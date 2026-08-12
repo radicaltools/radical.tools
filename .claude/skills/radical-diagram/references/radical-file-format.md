@@ -82,7 +82,7 @@ Snapshot shape (only when the user explicitly wants versioned milestones): `{ "i
 
 ## DDD / governance element types
 
-Available when using the extended built-in metamodels (the app resolves built-in metamodel ids: `c4-builtin`, `c4-ddd-builtin`, `c4-ddd-governance-builtin`). To use these types, set `"metamodel": { "id": "c4-ddd-governance-builtin" }`-style full metamodel copied from the app, or simply omit the metamodel and stick to core C4 types.
+Available when using an extended built-in metamodel. Set `"metamodel": { "id": "c4-ddd-builtin" }` for DDD or `"metamodel": { "id": "c4-ddd-governance-builtin" }` for DDD plus governance; the app expands these preset ids when it opens the file. Omit `metamodel` only for core C4 types.
 
 | type        | default w×h | allowed parents         | at root |
 |-------------|-------------|-------------------------|---------|
@@ -95,7 +95,7 @@ Available when using the extended built-in metamodels (the app resolves built-in
 
 ## Custom metamodel
 
-Only embed a `metamodel` object when the user needs non-C4 types. Shape per node type (`NodeTypeDef`): `id`, `label`, `color`, `fg`, `iconPath` (16×16 SVG path), `width`, `height`, `collapsedWidth`, `collapsedHeight`, `allowedParents?`, `allowedAtRoot?`, `properties[]`. Relation types (`RelationTypeDef`): `id`, `label`, `allowedPairs: [{from,to}]`, `properties[]`. Copy the structure from `tools/vscode-radical/example/demo.radical` or `src/renderer/src/types/metamodel.ts`.
+Embed a full custom `metamodel` only when built-in presets do not provide the needed types. It needs `id`, `name`, `nodeTypes`, and `relationTypes`. Each node type needs `id`, `label`, `color`, `fg`, `iconPath` (16×16 SVG path), `width`, and `height`; add optional `collapsedWidth`, `collapsedHeight`, `allowedParents`, `allowedAtRoot`, and `properties` as needed. Each relation type needs `id`, `label`, and `allowedPairs: [{from,to}]`. Use `src/renderer/src/types/metamodel.ts` as the authoritative shape.
 
 ## Collapsed sizes
 

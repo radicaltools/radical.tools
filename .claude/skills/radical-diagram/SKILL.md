@@ -67,7 +67,7 @@ A node with no `parentId` is at root — only `person`, `system`, and `group` ma
 
 ### Relation direction rules
 
-Relations follow "initiator → target". Databases never initiate (`database` must not be a `sourceId`). Persons call `system`/`container`/`webapp`. Everything else follows common sense; the validator checks the exact allowed pairs.
+Relations follow "initiator → target". Databases never initiate (`database` must not be a `sourceId`). Persons call `system`/`container`/`webapp`. The validator checks every pair against the active metamodel's allowed relation pairs.
 
 ## Positioning
 
@@ -80,4 +80,4 @@ Relations follow "initiator → target". Databases never initiate (`database` mu
 
 For views, sequences (dynamic views), presentations, milestones/snapshots, the DDD/governance types (`domain`, `adr`, `fitness-fn`, `requirement`, `blueprint`), and custom metamodels, read [references/radical-file-format.md](references/radical-file-format.md).
 
-A working full example: `tools/vscode-radical/example/demo.radical`.
+The minimal example above is a complete, valid core-C4 model.
