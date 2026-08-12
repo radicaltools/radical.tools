@@ -65,6 +65,8 @@ Optional: `description`, `technology`, `parentId`, `external` (external actor/sy
 
 A node with no `parentId` is at root — only `person`, `system`, and `group` may be at root. `container`/`database`/`webapp`/`queue` must have a `system` (or `group`) parent; `component` must sit inside a `container`/`webapp`/`group`.
 
+`webapp` is a built-in node type, and components may use it as a parent. Do not invent custom frontend node types. The current `WebAppNode` keeps its browser-card styling when it has children, unlike the expanded boundary styling used by `container`. When a clear component boundary is required in the current renderer, prefer the built-in `container` type with `technology: "Next.js / React"`; otherwise a `webapp` with component children is schema-valid.
+
 ### Relation direction rules
 
 Relations follow "initiator → target". Databases never initiate (`database` must not be a `sourceId`). Persons call `system`/`container`/`webapp`. The validator checks every pair against the active metamodel's allowed relation pairs.
