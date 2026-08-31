@@ -16,6 +16,14 @@ const api = {
     ipcRenderer.invoke('file:read', filePath),
   writeFile: (filePath: string, json: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('file:write', filePath, json),
+  openFolder: (): Promise<{ success: boolean; folderPath?: string; files?: Record<string, string>; error?: string }> =>
+    ipcRenderer.invoke('folder:open'),
+  pickFolder: (): Promise<{ success: boolean; folderPath?: string }> =>
+    ipcRenderer.invoke('folder:pick'),
+  readFolder: (folderPath: string): Promise<{ success: boolean; files?: Record<string, string>; error?: string }> =>
+    ipcRenderer.invoke('folder:read', folderPath),
+  writeFolder: (folderPath: string, files: Record<string, string>): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('folder:write', folderPath, files),
   devSaveSample: (json: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('dev:saveSample', json),
   devLoadSample: (): Promise<{ success: boolean; content?: string; error?: string }> =>
