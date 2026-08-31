@@ -1,8 +1,55 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join, resolve } from 'path'
-import { readFile, writeFile, watchFile, unwatchFile } from 'fs'
-import { readFile as readFileAsync, writeFile as writeFileAsync } from 'fs/promises'
+import { join, resolve, dirname as pathDirname, relative, sep } from 'path'
+import { watchFile, unwatchFile } from 'fs'
+import {
+  readFile as readFileAsync,
+  writeFile as writeFileAsync,
+  mkdir,
+  readdir,
+  rm,
+} from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+
+/** Recursively collect the `.md` / `.json` files under `root` as a map of
+ *  POSIX-relative path → UTF-8 content. Ignores hidden files/dirs. */
+async function readFolderFiles(root: string): Promise<Record<string, string>> {
+  const files: Record<string, string> = {}
+  async function walk(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+      const abs = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        await walk(abs)
+      } else if (entry.isFile() && /\.(md|json)$/i.test(entry.name)) {
+        const rel = relative(root, abs).split(sep).join('/')
+        files[rel] = await readFileAsync(abs, 'utf-8')
+      }
+    }
+  }
+  await walk(root)
+  return files
+}
+
+/** Write a file map into `root`, then prune our own stale files (`.md` under
+ *  `nodes/` and known sidecars) that are no longer present, so removals /
+ *  renames in the model are reflected on disk. Never touches unrelated files. */
+async function writeFolderFiles(root: string, files: Record<string, string>): Promise<void> {
+  await mkdir(root, { recursive: true })
+  for (const [rel, content] of Object.entries(files)) {
+    const abs = join(root, rel)
+    await mkdir(pathDirname(abs), { recursive: true })
+    await writeFileAsync(abs, content, 'utf-8')
+  }
+  // Prune stale managed files.
+  const existing = await readFolderFiles(root)
+  for (const rel of Object.keys(existing)) {
+    if (rel in files) continue
+    const managed = rel.startsWith('nodes/') || /^[^/]+\.json$/.test(rel) || rel === 'radical.md'
+    if (!managed) continue
+    await rm(join(root, rel), { force: true })
+  }
+}
 
 // ── CLI-specified model file (--file /path/to/model.c4.json or RADICAL_FILE env) ──
 function getWatchedFilePath(): string | null {
@@ -125,6 +172,55 @@ app.whenReady().then(() => {
   // ── IPC: CLI-specified watched file ────────────────────────────────────────
 
   ipcMain.handle('file:getWatchedPath', () => _watchedFilePath)
+
+  // ── IPC: markdown-folder persistence ─────────────────────────────────────
+
+  ipcMain.handle('folder:open', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showOpenDialog(win!, {
+      title: 'Open Model Folder',
+      properties: ['openDirectory'],
+    })
+    if (result.canceled || result.filePaths.length === 0) return { success: false }
+    const folderPath = result.filePaths[0]
+    try {
+      const files = await readFolderFiles(folderPath)
+      return { success: true, folderPath, files }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
+
+  ipcMain.handle('folder:pick', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showOpenDialog(win!, {
+      title: 'Choose Folder for Model',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (result.canceled || result.filePaths.length === 0) return { success: false }
+    return { success: true, folderPath: result.filePaths[0] }
+  })
+
+  ipcMain.handle('folder:read', async (_event, folderPath: string) => {
+    try {
+      const files = await readFolderFiles(folderPath)
+      return { success: true, files }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
+
+  ipcMain.handle(
+    'folder:write',
+    async (_event, folderPath: string, files: Record<string, string>) => {
+      try {
+        await writeFolderFiles(folderPath, files)
+        return { success: true }
+      } catch (e) {
+        return { success: false, error: (e as Error).message }
+      }
+    },
+  )
 
   // ── DEV: sample model source file helpers ─────────────────────────────────
   // Path is resolved once in the main process — no Vite define needed.

@@ -4473,7 +4473,7 @@ if (typeof window !== 'undefined') {
   const activeId = documents.getActiveId()
   if (activeId) {
     const meta = documents.listDocuments().find(d => d.id === activeId)
-    if (meta?.source === 'fs') {
+    if (meta?.source === 'fs' || meta?.source === 'md') {
       _suspended = true
       documents.loadDocument(activeId).then((data) => {
         if (data) {
@@ -4503,7 +4503,7 @@ if (typeof window !== 'undefined') {
     documents.loadDocument(s.activeId).then((data) => {
       if (data) {
         useDiagramStore.getState().loadDiagram(data)
-      } else if (switchMeta?.source === 'fs') {
+      } else if (switchMeta?.source === 'fs' || switchMeta?.source === 'md') {
         // New/empty file: initialize with the maximum built-in metamodel
         useDiagramStore.getState().loadDiagram({
           nodes: [],
