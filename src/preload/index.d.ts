@@ -11,6 +11,10 @@ declare global {
       openDiagram: () => Promise<{ success: boolean; filePath?: string; content?: string }>
       readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
       writeFile: (filePath: string, json: string) => Promise<{ success: boolean; error?: string }>
+      openFolder: () => Promise<{ success: boolean; folderPath?: string; files?: Record<string, string>; error?: string }>
+      pickFolder: () => Promise<{ success: boolean; folderPath?: string }>
+      readFolder: (folderPath: string) => Promise<{ success: boolean; files?: Record<string, string>; error?: string }>
+      writeFolder: (folderPath: string, files: Record<string, string>) => Promise<{ success: boolean; error?: string }>
       devSaveSample: (json: string) => Promise<{ success: boolean; error?: string }>
       devLoadSample: () => Promise<{ success: boolean; content?: string; error?: string }>
       getWatchedPath: () => Promise<string | null>

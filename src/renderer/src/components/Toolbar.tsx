@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { useDocumentsStore } from '../store/documentStore'
+import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
 import { HubImportModal } from './HubImportModal'
@@ -267,7 +267,7 @@ function AppMenu({
 }: {
   onManage: () => void
   activeDocLabel: string | null
-  activeDocSource: 'ls' | 'fs' | null
+  activeDocSource: DocumentSource | null
   connectionModifier: ConnectionMod
   setConnectionModifier: (m: ConnectionMod) => void
   theme: 'dark' | 'light'
@@ -333,7 +333,7 @@ function AppMenu({
                 {activeDocLabel && (
                   <span className="app-menu-current-doc-inline">
                     <span className={`toolbar-doc-badge ${activeDocSource}`}>
-                      {activeDocSource === 'fs' ? 'FILE' : 'LOCAL'}
+                      {activeDocSource === 'fs' ? 'FILE' : activeDocSource === 'md' ? 'FOLDER' : 'LOCAL'}
                     </span>
                     <span className="app-menu-current-doc-name">{activeDocLabel}</span>
                   </span>

@@ -4,6 +4,7 @@ import { documents, useDocumentsStore, type DocumentMeta, type DocumentSource } 
 import { useDiagramStore } from '../store/diagramStore'
 import { availableMetamodels } from '../types/metamodel'
 import { parseStructurizrDsl } from '../import/structurizrDsl'
+import { webFolderSupported } from '../persist/webFolder'
 
 interface Props {
   open: boolean
@@ -17,10 +18,17 @@ function fmtTime(ts: number): string {
   return d.toLocaleString()
 }
 
-const TABS: ReadonlyArray<{ key: TabKey; label: string; hint: string }> = [
+const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.openFolder
+/** Folder-of-Markdown mode works in Electron and in Chromium browsers (File
+ *  System Access API). */
+const folderSupported = isElectron || webFolderSupported()
+
+const ALL_TABS: ReadonlyArray<{ key: TabKey; label: string; hint: string; folderMode?: boolean }> = [
   { key: 'ls', label: 'Local storage', hint: 'Models saved inside the app (browser localStorage).' },
-  { key: 'fs', label: 'Files',         hint: 'Models backed by a JSON file on disk.' },
+  { key: 'fs', label: 'Files',         hint: 'Models backed by a single JSON file on disk.' },
+  { key: 'md', label: 'Folders',       hint: 'Models stored as a folder of Markdown files (one per element).', folderMode: true },
 ]
+const TABS = ALL_TABS.filter((t) => !t.folderMode || folderSupported)
 
 export function DocumentManagerModal({ open, onClose }: Props): React.ReactElement | null {
   const docs = useDocumentsStore((s) => s.docs)
@@ -36,6 +44,7 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   const presets = useMemo(() => availableMetamodels(), [])
   const [newPresetId, setNewPresetId] = useState<string>('c4-ddd-governance-builtin')
   const saveDiagram = useDiagramStore((s) => s.saveDiagram)
+  const loadDiagram = useDiagramStore((s) => s.loadDiagram)
 
   // Default the visible tab to the source of the active document so users
   // land on the section they're most likely editing.
@@ -57,7 +66,7 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   }, [open, onClose])
 
   const counts = useMemo(() => {
-    const c: Record<TabKey, number> = { ls: 0, fs: 0 }
+    const c: Record<TabKey, number> = { ls: 0, fs: 0, md: 0 }
     for (const d of docs) c[d.source]++
     return c
   }, [docs])
@@ -97,6 +106,31 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   const handleImportFile = async (): Promise<void> => {
     const meta = await documents.importFromFile()
     if (meta) setTab('fs')
+  }
+
+  const handleImportFolder = async (): Promise<void> => {
+    const meta = await documents.importFromFolder()
+    if (meta) setTab('md')
+  }
+
+  const handleSaveAsFolder = async (d: DocumentMeta): Promise<void> => {
+    const data = saveDiagram()
+    const meta = await documents.saveAsFolder(d.id, data)
+    if (meta) setTab('md')
+  }
+
+  // Web File System Access API handles lose permission across reloads; a user
+  // gesture re-grants it, after which we reload the folder's content.
+  const handleReconnect = async (d: DocumentMeta): Promise<void> => {
+    const ok = await documents.reconnectFolder(d.id)
+    if (!ok) {
+      window.alert('Could not get permission to access the folder.')
+      return
+    }
+    documents.setActiveId(d.id)
+    const data = await documents.loadDocument(d.id)
+    if (data) loadDiagram(data)
+    onClose()
   }
 
   const handleImportDsl = (): void => {
@@ -147,7 +181,9 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   const handleDelete = (d: DocumentMeta): void => {
     const which = d.source === 'fs'
       ? `Remove "${d.name}" from the library?\n\n(The file on disk will NOT be deleted.)`
-      : `Permanently delete "${d.name}" from local storage?`
+      : d.source === 'md'
+        ? `Remove "${d.name}" from the library?\n\n(The folder on disk will NOT be deleted.)`
+        : `Permanently delete "${d.name}" from local storage?`
     if (!window.confirm(which)) return
     documents.deleteDocument(d.id)
   }
@@ -222,6 +258,14 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
         </div>
       )
     }
+    if (tab === 'md') {
+      return (
+        <div className="docmgr-toolbar">
+          <button className="docmgr-btn primary" onClick={handleImportFolder}>Open folder…</button>
+          <span className="docmgr-toolbar-hint">Pick a folder of Markdown files (one <code>.md</code> per element) to add to the library.</span>
+        </div>
+      )
+    }
     return (
       <div className="docmgr-toolbar">
         <button className="docmgr-btn primary" onClick={handleImportFile}>Open file…</button>
@@ -236,6 +280,14 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
         <div className="docmgr-empty">
           <p style={{ margin: '0 0 12px' }}>No local models yet.</p>
           <button className="docmgr-btn primary" onClick={handleNewLSStart}>Create one</button>
+        </div>
+      )
+    }
+    if (tab === 'md') {
+      return (
+        <div className="docmgr-empty">
+          <p style={{ margin: '0 0 12px' }}>No folder-backed models yet.</p>
+          <button className="docmgr-btn primary" onClick={handleImportFolder}>Open a folder…</button>
         </div>
       )
     }
@@ -310,7 +362,7 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
                 <li key={d.id} className={`docmgr-item${isActive ? ' active' : ''}`}>
                   <div className="docmgr-item-main" onClick={() => handleSwitch(d.id)}>
                     <span className={`docmgr-badge ${d.source}`}>
-                      {d.source === 'fs' ? 'FILE' : 'LOCAL'}
+                      {d.source === 'fs' ? 'FILE' : d.source === 'md' ? 'FOLDER' : 'LOCAL'}
                     </span>
                     {isRenaming ? (
                       <input
@@ -330,6 +382,7 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
                         <div className="docmgr-name">{d.name}{isActive && <span className="docmgr-active-tag"> · active</span>}</div>
                         <div className="docmgr-sub">
                           {d.source === 'fs' && d.filePath && <span className="docmgr-path" title={d.filePath}>{d.filePath}</span>}
+                          {d.source === 'md' && d.folderPath && <span className="docmgr-path" title={d.folderPath}>{d.folderPath}</span>}
                           <span className="docmgr-time">modified {fmtTime(d.lastModified)}</span>
                         </div>
                       </div>
@@ -342,7 +395,13 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
                         {d.source === 'ls' && (
                           <button className="docmgr-btn small" onClick={() => handleSaveAs(d)} title="Save current model as a file (converts this entry to file-backed)">Save as file…</button>
                         )}
-                        <button className="docmgr-btn small danger" onClick={() => handleDelete(d)} title={d.source === 'fs' ? 'Remove from library (file kept)' : 'Delete from local storage'}>Delete</button>
+                        {folderSupported && d.source !== 'md' && (
+                          <button className="docmgr-btn small" onClick={() => handleSaveAsFolder(d)} title="Save current model as a folder of Markdown files (converts this entry to folder-backed)">Save as folder…</button>
+                        )}
+                        {!isElectron && d.source === 'md' && !documents.isFolderConnected(d.id) && (
+                          <button className="docmgr-btn small" onClick={() => handleReconnect(d)} title="Re-grant access to this folder and reload it">Reconnect…</button>
+                        )}
+                        <button className="docmgr-btn small danger" onClick={() => handleDelete(d)} title={d.source === 'ls' ? 'Delete from local storage' : 'Remove from library (files kept)'}>Delete</button>
                       </>
                     )}
                   </div>
