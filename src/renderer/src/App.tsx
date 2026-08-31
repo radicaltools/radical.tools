@@ -68,7 +68,7 @@ function AppInner(): React.ReactElement {
   // panel open so the freshly-selected node's properties slide into view
   // instead of being hidden behind a collapsed panel.
   useEffect(() => {
-    ;(window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel = () => {
+    ;window.__radicalExpandRightPanel = () => {
       setRightCollapsed((c) => {
         if (!c) return c
         localStorage.setItem(LS_RIGHT, '0')
@@ -76,7 +76,7 @@ function AppInner(): React.ReactElement {
       })
     }
     return () => {
-      delete (window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel
+      delete window.__radicalExpandRightPanel
     }
   }, [])
 

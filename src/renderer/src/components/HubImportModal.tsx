@@ -394,9 +394,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
           .every((n) => isParentAllowed(store.metamodel, (n.type as string) ?? 'component', dropParent.type))
 
       // Determine the viewport center in canvas coordinates.
-      const getViewport = (window as any).__rfGetViewport as
-        | (() => { x: number; y: number; zoom: number })
-        | undefined
+      const getViewport = window.__rfGetViewport
       const vp = getViewport?.() ?? { x: 0, y: 0, zoom: 1 }
       const centerX = (-vp.x + window.innerWidth / 2) / vp.zoom
       const centerY = (-vp.y + window.innerHeight / 2) / vp.zoom

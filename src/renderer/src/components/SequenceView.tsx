@@ -170,13 +170,13 @@ export function SequenceView(): React.ReactElement {
   // Register sequence-specific fit + zoom globals on mount.
   // The Toolbar "Fit All" and Zoom +/− buttons delegate to these.
   useEffect(() => {
-    ;(window as any).__radicalSeqFitFn  = () => fitFnRef.current()
-    ;(window as any).__radicalZoomIn    = () => setZoom((z) => clampZoom(z * 1.2))
-    ;(window as any).__radicalZoomOut   = () => setZoom((z) => clampZoom(z / 1.2))
+    ;window.__radicalSeqFitFn  = () => fitFnRef.current()
+    window.__radicalZoomIn    = () => setZoom((z) => clampZoom(z * 1.2))
+    window.__radicalZoomOut   = () => setZoom((z) => clampZoom(z / 1.2))
     return () => {
-      delete (window as any).__radicalSeqFitFn
-      delete (window as any).__radicalZoomIn
-      delete (window as any).__radicalZoomOut
+      delete window.__radicalSeqFitFn
+      delete window.__radicalZoomIn
+      delete window.__radicalZoomOut
     }
   }, [clampZoom])
 

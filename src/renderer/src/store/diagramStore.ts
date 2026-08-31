@@ -7,7 +7,6 @@ import {
   EdgeChange,
   applyNodeChanges,
   applyEdgeChanges,
-  MarkerType,
   Connection,
 } from 'reactflow'
 import {
@@ -24,8 +23,6 @@ import {
   SlideCanvasState,
   NodePosition,
   NODE_SIZES,
-  COLLAPSED_HEIGHT,
-  COLLAPSED_WIDTH,
   isContainerType,
 } from '../types/c4'
 import {
@@ -49,6 +46,17 @@ import { applyReferenceLayout } from '../layout/referenceLayout'
 import { minimizeCrossings } from '../layout/crossingOpt'
 import { LiveColaLayout } from '../layout/liveColaLayout'
 import { documents, useDocumentsStore } from './documentStore'
+import {
+  computeViewNodeSet,
+  computeViewCollapsedSet,
+  isEffectivelyCollapsed,
+  filterForView,
+  getDescendants,
+  effectiveNodeHeight,
+  effectiveNodeWidth,
+} from './viewModel'
+import { separateSiblings, deriveRFNodes, deriveRFEdges } from './rfDerivation'
+import { computeSnapDiff, computeSeqDiff, computeDiffGhosts } from './diff'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -121,690 +129,23 @@ function buildPresentationsFromData(
   return { presentations: list, activeId: list[0].id }
 }
 
-function computeSnapDiff(
-  prevNodes: Record<string, C4Node>,
-  currNodes: Record<string, C4Node>,
-  prevRels: Record<string, C4Relation>,
-  currRels: Record<string, C4Relation>,
-): Record<string, 'new' | 'changed' | 'removed'> {
-  const result: Record<string, 'new' | 'changed' | 'removed'> = {}
-  for (const id of Object.keys(currNodes)) {
-    if (!prevNodes[id]) {
-      result[id] = 'new'
-    } else {
-      const p = prevNodes[id], c = currNodes[id]
-      if (p.label !== c.label || p.description !== c.description || p.technology !== c.technology ||
-          p.type !== c.type || p.parentId !== c.parentId || p.external !== c.external) {
-        result[id] = 'changed'
-      }
-    }
-  }
-  // Removed nodes: in base but not in current.
-  for (const id of Object.keys(prevNodes)) {
-    if (!currNodes[id]) result[id] = 'removed'
-  }
-  for (const id of Object.keys(currRels)) {
-    if (!prevRels[id]) {
-      result[id] = 'new'
-    } else {
-      const p = prevRels[id], c = currRels[id]
-      if (p.sourceId !== c.sourceId || p.targetId !== c.targetId ||
-          p.label !== c.label || p.technology !== c.technology) {
-        result[id] = 'changed'
-      }
-    }
-  }
-  // Removed relations: in base but not in current.
-  for (const id of Object.keys(prevRels)) {
-    if (!currRels[id]) result[id] = 'removed'
-  }
-  return result
-}
+// Snapshot/milestone diff helpers moved to ./diff (imported above).
 
-/**
- * Compute sequence-level diff: which relation IDs were added to or removed
- * from sequences between two snapshots. Only covers membership changes —
- * structural node/relation changes are handled by computeSnapDiff.
- * Structural diff entries always win; this fills the gaps.
- */
-function computeSeqDiff(
-  prevSeqs: Record<string, DiagramSequence> | undefined,
-  currSeqs: Record<string, DiagramSequence> | undefined,
-): Record<string, 'new' | 'changed' | 'removed'> {
-  const result: Record<string, 'new' | 'changed' | 'removed'> = {}
-  const prev = prevSeqs ?? {}
-  const curr = currSeqs ?? {}
-  const allSeqIds = new Set([...Object.keys(prev), ...Object.keys(curr)])
-  for (const seqId of allSeqIds) {
-    const prevSeq = prev[seqId]
-    const currSeq = curr[seqId]
-    const prevIds = new Set(prevSeq?.relationIds ?? [])
-    const currIds = new Set(currSeq?.relationIds ?? [])
-    for (const rid of currIds) if (!prevIds.has(rid)) result[rid] = 'new'
-    for (const rid of prevIds) if (!currIds.has(rid) && !result[rid]) result[rid] = 'removed'
-    // Check step-description changes for relations present in both sequences at the same position.
-    if (prevSeq && currSeq) {
-      const len = Math.min(prevSeq.relationIds.length, currSeq.relationIds.length)
-      for (let i = 0; i < len; i++) {
-        const rid = currSeq.relationIds[i]
-        if (rid !== prevSeq.relationIds[i]) continue  // position shifted – skip
-        if (result[rid]) continue                     // already 'new' or 'removed'
-        const prevDesc = prevSeq.stepDescriptions?.[i] ?? ''
-        const currDesc = currSeq.stepDescriptions?.[i] ?? ''
-        if (prevDesc !== currDesc) result[rid] = 'changed'
-      }
-    }
-  }
-  return result
-}
+// View-model helpers (pure) now live in ./viewModel — imported above for
+// internal use and re-exported here so existing importers keep working.
+export {
+  computeViewCollapsedSet,
+  isEffectivelyCollapsed,
+  nodeEffectivelyCollapsedInView,
+  isNodeHidden,
+  getViewVisibleAncestor,
+} from './viewModel'
 
-/**
- * Build the ghost maps for a diff: nodes/relations that existed in the base
- * but are not present in the current state. Returned as plain dictionaries
- * so they can be merged into the canvas at render time without polluting
- * the actual model.
- */
-function computeDiffGhosts(
-  baseNodes: Record<string, C4Node>,
-  currNodes: Record<string, C4Node>,
-  baseRels: Record<string, C4Relation>,
-  currRels: Record<string, C4Relation>,
-): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } {
-  const nodes: Record<string, C4Node> = {}
-  const relations: Record<string, C4Relation> = {}
-  for (const id of Object.keys(baseNodes)) {
-    if (!currNodes[id]) nodes[id] = JSON.parse(JSON.stringify(baseNodes[id]))
-  }
-  for (const id of Object.keys(baseRels)) {
-    if (!currRels[id]) relations[id] = JSON.parse(JSON.stringify(baseRels[id]))
-  }
-  return { nodes, relations }
-}
-
-/** Compute the effective set of node IDs for a view: explicit nodeIds + all their ancestors */
-function computeViewNodeSet(view: DiagramView | undefined, nodes: Record<string, C4Node>): Set<string> | undefined {
-  if (!view) return undefined
-  if (view.nodeIds.length === 0) return undefined
-  const result = new Set<string>()
-  for (const id of view.nodeIds) {
-    let cur = id
-    while (cur && nodes[cur]) {
-      result.add(cur)
-      cur = nodes[cur].parentId ?? ''
-    }
-  }
-  return result
-}
-
-/**
- * Compute which nodes should be treated as collapsed in a view.
- * A parent (system/container) is view-collapsed if:
- * - it has children in the full model, AND
- * - none of those children are in the view filter, AND
- * - it is not already collapsed on the model.
- * Returns empty set when no view filter is active.
- */
-export function computeViewCollapsedSet(
-  viewFilter: Set<string> | undefined,
-  allNodes: Record<string, C4Node>
-): Set<string> {
-  const result = new Set<string>()
-  if (!viewFilter) return result
-
-  // Which parents have at least one child in the view?
-  const parentHasViewChild = new Set<string>()
-  for (const n of Object.values(allNodes)) {
-    if (n.parentId && viewFilter.has(n.id)) parentHasViewChild.add(n.parentId)
-  }
-
-  for (const [id, n] of Object.entries(allNodes)) {
-    if (!viewFilter.has(id)) continue
-    if (!isContainerType(n.type)) continue
-    if (n.collapsed) continue // already collapsed on the model
-    if (parentHasViewChild.has(id)) continue // has visible children
-
-    // Check it actually has children in the full model
-    const hasChildInModel = Object.values(allNodes).some(c => c.parentId === id)
-    if (hasChildInModel) result.add(id)
-  }
-  return result
-}
-
-/** Is the node effectively collapsed (model-collapsed OR view-collapsed)?
- *  Pass `expandedSet` (from `view.expandedNodeIds`) to allow a named view to
- *  override a model-level collapse. */
-export function isEffectivelyCollapsed(
-  node: C4Node,
-  viewCollapsedSet?: Set<string>,
-  expandedSet?: Set<string>
-): boolean {
-  if (expandedSet?.has(node.id)) return false  // view-level explicit expansion
-  return node.collapsed || (viewCollapsedSet?.has(node.id) ?? false)
-}
-
-/**
- * Compute whether a node is effectively collapsed in a given named view.
- * Used by tree-panel components (Sidebar, RightPanel) to show ▶/▼ correctly
- * without duplicating the logic in each component.
- *
- * @param node          The C4Node to check.
- * @param activeViewId  The currently active view ID (or null/undefined for the default view).
- * @param view          The DiagramView object (pass `undefined` when no view is active).
- */
-export function nodeEffectivelyCollapsedInView(
-  node: C4Node,
-  activeViewId: string | null | undefined,
-  view: DiagramView | undefined,
-): boolean {
-  if (!activeViewId) return node.collapsed
-  return (
-    (node.collapsed && !(view?.expandedNodeIds?.includes(node.id) ?? false)) ||
-    (view?.collapsedNodeIds?.includes(node.id) ?? false)
-  )
-}
-
-/** Return the subset of nodes/relations visible in the active view (or all if no view). */
-function filterForView(
-  allNodes: Record<string, C4Node>,
-  allRelations: Record<string, C4Relation>,
-  viewFilter: Set<string> | undefined,
-  viewCollapsedSet?: Set<string>
-): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } {
-  if (!viewFilter) return { nodes: allNodes, relations: allRelations }
-  const nodes: Record<string, C4Node> = {}
-  for (const [id, n] of Object.entries(allNodes)) {
-    if (viewFilter.has(id)) {
-      nodes[id] = viewCollapsedSet?.has(id) ? { ...n, collapsed: true } : n
-    }
-  }
-
-  const relations: Record<string, C4Relation> = {}
-  for (const [id, r] of Object.entries(allRelations)) {
-    if (viewFilter.has(r.sourceId) && viewFilter.has(r.targetId)) relations[id] = r
-  }
-  return { nodes, relations }
-}
-
-/**
- * Walk up the parent chain. Returns true if the node is hidden because
- * one of its ancestors is collapsed (model or view-collapsed).
- */
-export function isNodeHidden(
-  nodeId: string,
-  nodes: Record<string, C4Node>,
-  viewCollapsedSet?: Set<string>,
-  expandedSet?: Set<string>
-): boolean {
-  const node = nodes[nodeId]
-  if (!node || !node.parentId) return false
-  const parent = nodes[node.parentId]
-  if (!parent) return false
-  if (isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet)) return true
-  return isNodeHidden(node.parentId, nodes, viewCollapsedSet, expandedSet)
-}
-
-/**
- * Returns the id of the deepest visible ancestor for a given node.
- * If the node itself is visible, returns nodeId unchanged.
- */
-function getVisibleAncestor(
-  nodeId: string,
-  nodes: Record<string, C4Node>,
-  viewCollapsedSet?: Set<string>,
-  expandedSet?: Set<string>
-): string {
-  if (!isNodeHidden(nodeId, nodes, viewCollapsedSet, expandedSet)) return nodeId
-  const node = nodes[nodeId]
-  if (!node || !node.parentId) return nodeId
-  return getVisibleAncestor(node.parentId, nodes, viewCollapsedSet, expandedSet)
-}
-
-/**
- * View-aware version: walks up until the node is both visible (not collapsed)
- * AND present in the view filter. Used by deriveRFEdges to aggregate children
- * edges onto their view-visible parent.
- */
-export function getViewVisibleAncestor(
-  nodeId: string,
-  nodes: Record<string, C4Node>,
-  viewFilter: Set<string> | undefined,
-  viewCollapsedSet?: Set<string>,
-  expandedSet?: Set<string>
-): string {
-  // Without a view filter, fall back to normal collapse logic
-  if (!viewFilter) return getVisibleAncestor(nodeId, nodes, viewCollapsedSet, expandedSet)
-  // Walk up until we find a node in the view that isn't hidden
-  let cur = nodeId
-  while (cur) {
-    if (viewFilter.has(cur) && !isNodeHidden(cur, nodes, viewCollapsedSet, expandedSet)) return cur
-    const node = nodes[cur]
-    if (!node?.parentId) break
-    cur = node.parentId
-  }
-  // Fallback: return whatever getVisibleAncestor gives
-  return getVisibleAncestor(nodeId, nodes, viewCollapsedSet, expandedSet)
-}
-
-/** True if `ancestorId` is a (transitive) ancestor of `nodeId`. */
-function isAncestorOf(ancestorId: string, nodeId: string, nodes: Record<string, C4Node>): boolean {
-  let cur = nodes[nodeId]?.parentId
-  while (cur) {
-    if (cur === ancestorId) return true
-    cur = nodes[cur]?.parentId
-  }
-  return false
-}
-
-/** Return all descendant node ids (children, grandchildren, …) */
-function getDescendants(nodeId: string, nodes: Record<string, C4Node>): string[] {  const result: string[] = []
-  function walk(id: string) {
-    for (const n of Object.values(nodes)) {
-      if (n.parentId === id) {
-        result.push(n.id)
-        walk(n.id)
-      }
-    }
-  }
-  walk(nodeId)
-  return result
-}
-
-/** Effective rendered height of a node (respects collapse + view collapse). */
-function effectiveNodeHeight(n: C4Node, viewCollapsedSet?: Set<string>, expandedSet?: Set<string>): number {
-  if (isContainerType(n.type) && isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet)) {
-    return COLLAPSED_HEIGHT[n.type]
-  }
-  return n.height
-}
-
-/** Effective rendered width of a node (respects collapse + view collapse). */
-function effectiveNodeWidth(n: C4Node, viewCollapsedSet?: Set<string>, expandedSet?: Set<string>): number {
-  if (isContainerType(n.type) && isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet)) {
-    return COLLAPSED_WIDTH[n.type]
-  }
-  return n.width
-}
-
-/**
- * Multi-pass sibling overlap separation.
- * The dragged node stays fixed; siblings on the same parent level are pushed
- * apart until there are no more overlaps or max iterations are reached.
- * Returns a map of id → new {x, y} for nodes that actually moved.
- */
-const COLLISION_MARGIN = 10
-
-function separateSiblings(
-  draggedId: string,
-  nodes: Record<string, C4Node>
-): Record<string, { x: number; y: number }> {
-  const dragged = nodes[draggedId]
-  if (!dragged) return {}
-
-  // Visible siblings at the same parent level
-  const siblings = Object.values(nodes).filter(
-    (n) => n.parentId === dragged.parentId && !isNodeHidden(n.id, nodes)
-  )
-  if (siblings.length < 2) return {}
-
-  // Working copy of mutable positions
-  const pos: Record<string, { x: number; y: number; w: number; h: number }> = {}
-  for (const n of siblings) {
-    pos[n.id] = { x: n.x, y: n.y, w: effectiveNodeWidth(n), h: effectiveNodeHeight(n) }
-  }
-
-  const hasParent = !!dragged.parentId
-
-  for (let pass = 0; pass < 20; pass++) {
-    let anyOverlap = false
-
-    for (let i = 0; i < siblings.length; i++) {
-      for (let j = i + 1; j < siblings.length; j++) {
-        const a = siblings[i]
-        const b = siblings[j]
-        const pa = pos[a.id]
-        const pb = pos[b.id]
-
-        const ox = Math.min(pa.x + pa.w, pb.x + pb.w) - Math.max(pa.x, pb.x) + COLLISION_MARGIN
-        const oy = Math.min(pa.y + pa.h, pb.y + pb.h) - Math.max(pa.y, pb.y) + COLLISION_MARGIN
-
-        if (ox > 0 && oy > 0) {
-          anyOverlap = true
-          const fixA = a.id === draggedId
-          const fixB = b.id === draggedId
-
-          if (ox <= oy) {
-            const dir = pa.x < pb.x ? 1 : -1
-            if (fixA) {
-              pb.x += dir * ox
-              // If pushed past parent boundary, split: clamp sibling, push dragged
-              if (hasParent && pb.x < 0) {
-                pa.x += -pb.x  // push dragged by the overflow amount
-                pb.x = 0
-              }
-            } else if (fixB) {
-              pa.x -= dir * ox
-              if (hasParent && pa.x < 0) {
-                pb.x += -pa.x
-                pa.x = 0
-              }
-            } else {
-              pa.x -= dir * ox / 2
-              pb.x += dir * ox / 2
-              if (hasParent) {
-                if (pa.x < 0) { pb.x += -pa.x; pa.x = 0 }
-                if (pb.x < 0) { pa.x += -pb.x; pb.x = 0 }
-              }
-            }
-          } else {
-            const dir = pa.y < pb.y ? 1 : -1
-            if (fixA) {
-              pb.y += dir * oy
-              if (hasParent && pb.y < 0) {
-                pa.y += -pb.y
-                pb.y = 0
-              }
-            } else if (fixB) {
-              pa.y -= dir * oy
-              if (hasParent && pa.y < 0) {
-                pb.y += -pa.y
-                pa.y = 0
-              }
-            } else {
-              pa.y -= dir * oy / 2
-              pb.y += dir * oy / 2
-              if (hasParent) {
-                if (pa.y < 0) { pb.y += -pa.y; pa.y = 0 }
-                if (pb.y < 0) { pa.y += -pb.y; pb.y = 0 }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if (!anyOverlap) break
-  }
-
-  // ── Final sweep: resolve chain overlaps among non-dragged siblings ────────
-  // The pairwise solver can fail when 3+ elements form a chain (C pushes B
-  // into A). A linear sweep guarantees no overlaps between non-dragged nodes.
-  if (hasParent) {
-    const nonDragged = siblings.filter(s => s.id !== draggedId)
-
-    // Horizontal sweep (left → right): only for elements on the same row
-    nonDragged.sort((a, b) => pos[a.id].x - pos[b.id].x)
-    for (let k = 0; k < nonDragged.length; k++) {
-      const p = pos[nonDragged[k].id]
-      if (p.x < 0) p.x = 0
-      if (k > 0) {
-        const prev = pos[nonDragged[k - 1].id]
-        // Only adjust if they actually overlap vertically (same row)
-        const vyOverlap = Math.min(prev.y + prev.h, p.y + p.h) - Math.max(prev.y, p.y)
-        if (vyOverlap > 0) {
-          const minX = prev.x + prev.w + COLLISION_MARGIN
-          if (p.x < minX) p.x = minX
-        }
-      }
-    }
-
-    // Vertical sweep (top → bottom): only for elements in the same column
-    nonDragged.sort((a, b) => pos[a.id].y - pos[b.id].y)
-    for (let k = 0; k < nonDragged.length; k++) {
-      const p = pos[nonDragged[k].id]
-      if (p.y < 0) p.y = 0
-      if (k > 0) {
-        const prev = pos[nonDragged[k - 1].id]
-        // Only adjust if they actually overlap horizontally (same column)
-        const vxOverlap = Math.min(prev.x + prev.w, p.x + p.w) - Math.max(prev.x, p.x)
-        if (vxOverlap > 0) {
-          const minY = prev.y + prev.h + COLLISION_MARGIN
-          if (p.y < minY) p.y = minY
-        }
-      }
-    }
-  }
-
-  // Return only nodes that actually moved
-  const result: Record<string, { x: number; y: number }> = {}
-  for (const sib of siblings) {
-    if (pos[sib.id].x !== sib.x || pos[sib.id].y !== sib.y) {
-      result[sib.id] = { x: pos[sib.id].x, y: pos[sib.id].y }
-    }
-  }
-  return result
-}
+// Sibling-overlap separation moved to ./rfDerivation (imported above).
 
 // ─── RF state derivation ─────────────────────────────────────────────────────
 
-function deriveRFNodes(
-  nodes: Record<string, C4Node>,
-  viewFilter?: Set<string>,
-  viewCollapsedSet?: Set<string>,
-  ghostIds?: Set<string>,
-  locked?: boolean,
-  expandedSet?: Set<string>,
-): Node<C4NodeRFData>[] {
-  const rfNodes: Node<C4NodeRFData>[] = []
-
-  // React Flow requires parents to appear before their children. Sort by
-  // ancestor depth (roots first), then by type for stable ordering inside a
-  // depth band. Type-based ordering alone is wrong as soon as containers can
-  // nest (e.g. a sub-system inside a system) — comparing by type without
-  // depth would put the sub-system before its parent and React Flow would
-  // silently drop the parentNode link.
-  const depthCache = new Map<string, number>()
-  const depthOf = (id: string): number => {
-    const cached = depthCache.get(id)
-    if (cached !== undefined) return cached
-    const n = nodes[id]
-    const d = n?.parentId ? depthOf(n.parentId) + 1 : 0
-    depthCache.set(id, d)
-    return d
-  }
-  const typeRank = (t: string): number => {
-    if (t === 'domain') return 0
-    if (t === 'group') return 0
-    if (t === 'system') return 0
-    if (t === 'container' || t === 'database' || t === 'webapp' || t === 'queue') return 1
-    if (t === 'component') return 2
-    return 3
-  }
-  const sorted = Object.values(nodes)
-    .filter((n) => !viewFilter || viewFilter.has(n.id))
-    .sort((a, b) => {
-      const da = depthOf(a.id)
-      const db = depthOf(b.id)
-      if (da !== db) return da - db
-      return typeRank(a.type) - typeRank(b.type)
-    })
-
-  // Pre-compute which nodes have children among view-visible nodes.
-  // Using `sorted` (already filtered by viewFilter) ensures that a parent
-  // whose children are excluded from the current view renders at
-  // COLLAPSED_HEIGHT instead of its full model height.
-  const parentSet = new Set(sorted.map((n) => n.parentId).filter(Boolean))
-
-  // Minimum top offset for children inside an expanded parent — must clear
-  // the header (~30px) + 2-line label (~52px) + small gap. Mirrors the value
-  // used by ELK / smartLayout / fitParentToChildren.
-  const PARENT_LABEL_PAD = 110
-
-  for (const n of sorted) {
-    const hidden = isNodeHidden(n.id, nodes, viewCollapsedSet, expandedSet)
-    const hasChildren = parentSet.has(n.id)
-    const collapsed = isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet)
-    const isGhost = ghostIds?.has(n.id) ?? false
-
-    // Fixed-size node types always render at canonical NODE_SIZES regardless of
-    // what is stored in the document (handles legacy nodes created with old sizes).
-    const isFixedSize = n.type === 'adr' || n.type === 'fitness-fn' || n.type === 'requirement'
-
-    const effHeight = isFixedSize
-      ? NODE_SIZES[n.type].height
-      // Render at COLLAPSED_HEIGHT when:
-      //   a) node is effectively collapsed (model or view-collapse), OR
-      //   b) no children are visible in this view AND the node is not model-
-      //      collapsed-but-view-expanded (in that case n.height holds the last
-      //      expanded height which the user intentionally revealed).
-      : isContainerType(n.type) && (collapsed || (!hasChildren && !n.collapsed))
-        ? COLLAPSED_HEIGHT[n.type]
-        : n.height
-    const effWidth = isFixedSize
-      ? NODE_SIZES[n.type].width
-      : isContainerType(n.type) && (collapsed || (!hasChildren && !n.collapsed))
-        ? COLLAPSED_WIDTH[n.type]
-        : n.width
-
-    // Render-time safeguard: if a child sits too close to its parent's top
-    // (because the saved layout pre-dates the larger header padding), push
-    // the visible position down without mutating the model.
-    let renderY = n.y
-    if (n.parentId) {
-      const parent = nodes[n.parentId]
-      const parentExpanded =
-        parent &&
-        isContainerType(parent.type) &&
-        !isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet) &&
-        parentSet.has(parent.id)
-      if (parentExpanded && renderY < PARENT_LABEL_PAD) {
-        renderY = PARENT_LABEL_PAD
-      }
-    }
-
-
-    rfNodes.push({
-      id: n.id,
-      type: n.type,
-      position: { x: n.x, y: renderY },
-      parentNode: n.parentId,
-      extent: undefined,
-      expandParent: false,
-      hidden,
-      // Ghost nodes (removed-in-current-milestone overlay) are not selectable
-      // or draggable — they only exist as a visual diff hint.
-      // In viewer/presenter modes (`locked`), nothing is draggable so the
-      // saved layout cannot drift while someone browses the document.
-      selectable: !hidden && !isGhost && !locked,
-      draggable: !hidden && !isGhost && !locked,
-      className: isGhost ? 'rf-node-ghost' : undefined,
-      data: {
-        c4id: n.id,
-        type: n.type,
-        label: n.label,
-        description: n.description,
-        technology: n.technology,
-        parentId: n.parentId,
-        collapsed,
-        external: n.external,
-        width: effWidth,
-        height: effHeight,
-        hasChildren,
-      },
-      style: {
-        width: effWidth,
-        height: effHeight,
-      },
-      width: effWidth,
-      height: effHeight,
-      // Stack deeper nodes above their ancestors so a sub-system rendered
-      // inside another system doesn't get hidden behind it.
-      zIndex: depthOf(n.id) * 10
-        + (n.type === 'domain' || n.type === 'group' ? -1 : n.type === 'system' ? 0 : n.type === 'container' ? 1 : 2),
-    })
-  }
-  return rfNodes
-}
-
-function deriveRFEdges(
-  nodes: Record<string, C4Node>,
-  relations: Record<string, C4Relation>,
-  viewFilter?: Set<string>,
-  viewCollapsedSet?: Set<string>,
-  hiddenRelationIds?: Set<string>,
-  expandedSet?: Set<string>,
-): Edge<C4EdgeRFData>[] {
-  const rfEdges: Edge<C4EdgeRFData>[] = []
-  // Track virtual edges already emitted to avoid duplicates
-  const seen = new Set<string>()
-
-  // Depth-based zIndex — mirrors deriveRFNodes so edges always render above
-  // their parent group nodes and are reachable by pointer events.
-  const depthCache = new Map<string, number>()
-  const depthOf = (id: string): number => {
-    const cached = depthCache.get(id)
-    if (cached !== undefined) return cached
-    const n = nodes[id]
-    const d = n?.parentId ? depthOf(n.parentId) + 1 : 0
-    depthCache.set(id, d)
-    return d
-  }
-
-  for (const rel of Object.values(relations)) {
-    if (!nodes[rel.sourceId] || !nodes[rel.targetId]) continue
-    if (hiddenRelationIds && hiddenRelationIds.has(rel.id)) continue
-
-    const visSource = getViewVisibleAncestor(rel.sourceId, nodes, viewFilter, viewCollapsedSet, expandedSet)
-    const visTarget = getViewVisibleAncestor(rel.targetId, nodes, viewFilter, viewCollapsedSet, expandedSet)
-
-    if (visSource === visTarget) continue // collapsed to same ancestor → self-loop, skip
-
-    // If filtering by view, both endpoints must be in the view
-    if (viewFilter && (!viewFilter.has(visSource) || !viewFilter.has(visTarget))) continue
-
-    // Skip "parent ↔ own descendant" virtual edges. They appear when a child
-    // is in the view and its sibling (also a child of the same parent) is NOT
-    // in the view: that sibling resolves up to the parent, producing a
-    // misleading visual link from the child to its own parent. Hide them.
-    if (visSource !== rel.sourceId || visTarget !== rel.targetId) {
-      if (isAncestorOf(visSource, visTarget, nodes) || isAncestorOf(visTarget, visSource, nodes)) {
-        continue
-      }
-    }
-
-    const key = `${visSource}→${visTarget}`
-    const isVirtual = visSource !== rel.sourceId || visTarget !== rel.targetId
-
-    if (seen.has(key)) {
-      // Append label to existing edge instead of duplicating
-      const existing = rfEdges.find(
-        (e) => e.source === visSource && e.target === visTarget
-      )
-      if (existing && rel.label) {
-        existing.label = existing.label ? `${existing.label}\n${rel.label}` : rel.label
-      }
-      continue
-    }
-    seen.add(key)
-
-    // Edge must render above the parent containers of its endpoints so it's
-    // not hidden behind them. Use the same depth * 10 formula as deriveRFNodes
-    // so edges inside nested structures always exceed their parent's zIndex.
-    const srcDepth = depthOf(visSource)
-    const tgtDepth = depthOf(visTarget)
-    const edgeZIndex = Math.max(srcDepth, tgtDepth) * 10 + 5
-
-    rfEdges.push({
-      id: isVirtual ? `virtual-${key}` : rel.id,
-      source: visSource,
-      target: visTarget,
-      type: 'c4relation',
-      animated: false,
-      zIndex: edgeZIndex,
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
-      style: { stroke: '#94a3b8', strokeWidth: 1.5 },
-      label: rel.label,
-      data: {
-        originalSourceId: rel.sourceId,
-        originalTargetId: rel.targetId,
-        label: rel.label,
-        technology: rel.technology,
-        relationType: rel.relationType,
-        isVirtual,
-      },
-    })
-  }
-  return rfEdges
-}
+// React Flow node/edge derivation moved to ./rfDerivation (imported above).
 
 // ─── Sample diagram ──────────────────────────────────────────────────────────
 
@@ -1144,25 +485,25 @@ let _initLoadedFromDisk = false
 // module-local references become null and the auto-fit interval keeps ticking
 // against a dead closure.
 const _getFitViewFn = (): (() => void) | null =>
-  (typeof window !== 'undefined' ? (window as any).__radicalFitViewFn : null) ?? null
+  (typeof window !== 'undefined' ? window.__radicalFitViewFn : null) ?? null
 const _setFitViewFnRef = (fn: (() => void) | null) => {
-  if (typeof window !== 'undefined') (window as any).__radicalFitViewFn = fn
+  if (typeof window !== 'undefined') window.__radicalFitViewFn = fn
 }
 const _getFitViewInstantFn = (): (() => void) | null =>
-  (typeof window !== 'undefined' ? (window as any).__radicalFitViewInstantFn : null) ?? null
+  (typeof window !== 'undefined' ? window.__radicalFitViewInstantFn : null) ?? null
 const _setFitViewInstantFnRef = (fn: (() => void) | null) => {
-  if (typeof window !== 'undefined') (window as any).__radicalFitViewInstantFn = fn
+  if (typeof window !== 'undefined') window.__radicalFitViewInstantFn = fn
 }
 const _getAutoFitTimer = (): ReturnType<typeof setInterval> | null =>
-  (typeof window !== 'undefined' ? (window as any).__radicalAutoFitTimer : null) ?? null
+  (typeof window !== 'undefined' ? window.__radicalAutoFitTimer : null) ?? null
 const _setAutoFitTimer = (t: ReturnType<typeof setInterval> | null) => {
-  if (typeof window !== 'undefined') (window as any).__radicalAutoFitTimer = t
+  if (typeof window !== 'undefined') window.__radicalAutoFitTimer = t
 }
 // Viewport fns — stored on window so HMR module reloads don't lose them
 const _getViewportFn = (): (() => { x: number; y: number; zoom: number }) | null =>
-  (window as any).__rfGetViewport ?? null
+  window.__rfGetViewport ?? null
 const _setViewportFn = (): ((vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => void) | null =>
-  (window as any).__rfSetViewport ?? null
+  window.__rfSetViewport ?? null
 
 // ─── Store implementation ────────────────────────────────────────────────────
 
@@ -2188,7 +1529,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const currentPos = snapshotPositions(c4Nodes)
         // 1b. Snapshot current camera (pan + zoom). Canvas keeps this fresh
         //     in window.__rfCurrentViewport via React Flow's onMove handler.
-        const rawVP = (window as any).__rfCurrentViewport
+        const rawVP = window.__rfCurrentViewport
         const currentViewport: { x: number; y: number; zoom: number } | null = rawVP
           ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom }
           : null
@@ -2235,9 +1576,7 @@ export const useDiagramStore = create<DiagramStore>()(
           | null
         if (pending) {
           requestAnimationFrame(() => {
-            const setVP = (window as any).__rfSetViewport as
-              | ((vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => void)
-              | null
+            const setVP = window.__rfSetViewport
             setVP?.(pending, { duration: 250 })
           })
         }
@@ -2958,7 +2297,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // their pre-layout positions on the next rebuild.
           _liveLayout?.reset()
           if (typeof window !== 'undefined') {
-            const flush = (window as any).__radicalFlushPersist as (() => Promise<void>) | undefined
+            const flush = window.__radicalFlushPersist
             void flush?.()
           }
           if (typeof requestAnimationFrame !== 'undefined') {
@@ -3044,7 +2383,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // smart layout's exact result before cola has a chance to move
           // anything.
           if (typeof window !== 'undefined') {
-            const flush = (window as any).__radicalFlushPersist as (() => Promise<void>) | undefined
+            const flush = window.__radicalFlushPersist
             void flush?.()
           }
 
@@ -3686,7 +3025,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // user's curated view layout. Restoring the maps as a whole guards
         // against that and keeps named views as stable as the "All
         // elements" view (which writes to defaultPositions instead).
-        const W = window as any
+        const W = window
         if (prevMode === 'designer' && mode !== 'designer') {
           W.__preModeLayout = {
             c4Nodes: JSON.parse(JSON.stringify(get().c4Nodes)),
@@ -3821,7 +3160,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       addPresentationSlide(name) {
-        const raw = (window as any).__rfCurrentViewport
+        const raw = window.__rfCurrentViewport
         const viewport: { x: number; y: number; zoom: number } = raw
           ? { x: raw.x, y: raw.y, zoom: raw.zoom }
           : (_getViewportFn()?.() ?? { x: 0, y: 0, zoom: 1 })
@@ -3883,7 +3222,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Snapshot full model + active view so we can restore on exit.
         // (goToSlide replaces c4Nodes/c4Relations from a slide snapshot,
         // so restoring just positions wouldn't be enough.)
-        ;(window as any).__prePresState = {
+        ;window.__prePresState = {
           c4Nodes: JSON.parse(JSON.stringify(get().c4Nodes)),
           c4Relations: JSON.parse(JSON.stringify(get().c4Relations)),
           activeViewId: get().activeViewId,
@@ -3900,16 +3239,14 @@ export const useDiagramStore = create<DiagramStore>()(
       stopPresentation() {
         set((state) => { state.presentationActive = false })
         get().setDiffHighlight({})
-        const pre = (window as any).__prePresState as
-          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null }
-          | undefined
+        const pre = window.__prePresState
         if (pre) {
           set((state) => {
             state.c4Nodes = pre.c4Nodes as any
             state.c4Relations = pre.c4Relations as any
             state.activeViewId = pre.activeViewId
           })
-          ;(window as any).__prePresState = undefined
+          ;window.__prePresState = undefined
         }
         get()._sync()
         // Resume live layout when returning to any non-metamodel mode
@@ -4082,12 +3419,12 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       setViewportFns(getVP, setVP) {
-        ;(window as any).__rfGetViewport = getVP
-        ;(window as any).__rfSetViewport = setVP
+        window.__rfGetViewport = getVP
+        window.__rfSetViewport = setVP
       },
 
       captureSlideViewport(id: string) {
-        const raw = (window as any).__rfCurrentViewport
+        const raw = window.__rfCurrentViewport
         const vp: { x: number; y: number; zoom: number } | null = raw
           ? { x: raw.x, y: raw.y, zoom: raw.zoom }
           : (_getViewportFn()?.() ?? null)
@@ -4193,9 +3530,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Apply restored camera (loaded as activeViewId=null → default view).
         if (defaultVP) {
           requestAnimationFrame(() => {
-            const setVP = (window as any).__rfSetViewport as
-              | ((vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => void)
-              | null
+            const setVP = window.__rfSetViewport
             setVP?.(defaultVP, { duration: 0 })
           })
         }
@@ -4208,7 +3543,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const currentPos = snapshotPositions(c4Nodes)
         const savedDefaultPos = activeViewId === null ? currentPos : defaultPositions
         // Same for camera state so on reload each view restores its framing.
-        const rawVP = (window as any).__rfCurrentViewport
+        const rawVP = window.__rfCurrentViewport
         const currentVP: { x: number; y: number; zoom: number } | null = rawVP
           ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom }
           : null
@@ -4336,7 +3671,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Sequence view (dynamic) has its own fit registered via __radicalSeqFitFn.
         const activeView = get().activeViewId ? get().views[get().activeViewId!] : null
         if (activeView?.kind === 'dynamic') {
-          ;(window as any).__radicalSeqFitFn?.()
+          window.__radicalSeqFitFn?.()
           return
         }
         // Explicit one-shot fit-all: use the *animated* (force) fn so the
@@ -4345,10 +3680,10 @@ export const useDiagramStore = create<DiagramStore>()(
         _getFitViewFn()?.()
       },
       zoomIn() {
-        ;(window as any).__radicalZoomIn?.()
+        window.__radicalZoomIn?.()
       },
       zoomOut() {
-        ;(window as any).__radicalZoomOut?.()
+        window.__radicalZoomOut?.()
       },
       toggleAutoFit() {
         // Always cancel any existing timer first
@@ -4398,9 +3733,7 @@ if (typeof window !== 'undefined') {
     const data = useDiagramStore.getState().saveDiagram()
     // In explore mode, override the model slice with the layout snapshot taken
     // when we left designer, so ephemeral drags/collapses don't reach disk.
-    const pre = (window as any).__preModeLayout as
-      | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; views: Record<string, DiagramView>; defaultPositions: Record<string, NodePosition> }
-      | undefined
+    const pre = window.__preModeLayout
     if (_layoutSafePending && pre) {
       data.nodes = Object.values(pre.c4Nodes)
       data.relations = Object.values(pre.c4Relations)
@@ -4516,7 +3849,7 @@ if (typeof window !== 'undefined') {
   })
 
   // Expose hooks for other modules / future use.
-  ;(window as any).__radicalFlushPersist = flushPersist
+  window.__radicalFlushPersist = flushPersist
 
   // ── Synchronous flush on tab close / reload / hide ───────────────────────
   // LocalStorage writes are synchronous, so we can safely persist pending

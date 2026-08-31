@@ -192,7 +192,7 @@ function StructuralCanvas(): React.ReactElement {
   // Always keep window.__rfCurrentViewport up-to-date so slide capture is accurate
   const vp = useViewport()
   useEffect(() => {
-    ;(window as any).__rfCurrentViewport = { x: vp.x, y: vp.y, zoom: vp.zoom }
+    window.__rfCurrentViewport = { x: vp.x, y: vp.y, zoom: vp.zoom }
   }, [vp.x, vp.y, vp.zoom])
 
   // ── Auto-fit animation state ─────────────────────────────────────────
@@ -356,7 +356,7 @@ function StructuralCanvas(): React.ReactElement {
     // searched node is immediately overridden by fit-to-all on the next
     // 300ms tick. Manual / forced calls (Fit-All button) bypass this.
     if (!force) {
-      const until = (window as unknown as { __radicalAutoFitSuppressUntil?: number }).__radicalAutoFitSuppressUntil ?? 0
+      const until = window.__radicalAutoFitSuppressUntil ?? 0
       if (performance.now() < until) return
     }
     // Smart-fit: forced calls (Fit-All / initial toggle) → fit-all of all
@@ -436,7 +436,7 @@ function StructuralCanvas(): React.ReactElement {
     // Quick-search uses this to pan + zoom onto a specific node. Computed
     // here because only the RF instance knows the node's absolute layout
     // position (parent-relative coords would otherwise need translation).
-    ;(window as any).__rfFocusNode = (nodeId: string, opts?: { zoom?: number; duration?: number }) => {
+    ;window.__rfFocusNode = (nodeId: string, opts?: { zoom?: number; duration?: number }) => {
       const n = instance.getNode(nodeId) as (ReturnType<typeof instance.getNode> & { width?: number; height?: number }) | undefined
       if (!n) return
       const w = (n.width ?? 200)
@@ -447,7 +447,7 @@ function StructuralCanvas(): React.ReactElement {
       // Block the auto-fit interval tick from clobbering this zoom while
       // the pan animation is running and for a couple of seconds after,
       // so the user actually has time to look at the focused node.
-      ;(window as unknown as { __radicalAutoFitSuppressUntil?: number }).__radicalAutoFitSuppressUntil =
+      ;window.__radicalAutoFitSuppressUntil =
         performance.now() + dur + 2500
       // Also cancel any in-flight smooth-fit animation so it doesn't keep
       // pulling the viewport back during the focus pan.
@@ -472,11 +472,11 @@ function StructuralCanvas(): React.ReactElement {
     }, 100)
 
     // Register global zoom helpers used by the Toolbar zoom buttons.
-    ;(window as any).__radicalZoomIn  = () => instance.zoomIn({ duration: 300 })
-    ;(window as any).__radicalZoomOut = () => instance.zoomOut({ duration: 300 })
+    ;window.__radicalZoomIn  = () => instance.zoomIn({ duration: 300 })
+    window.__radicalZoomOut = () => instance.zoomOut({ duration: 300 })
     return () => {
-      delete (window as any).__radicalZoomIn
-      delete (window as any).__radicalZoomOut
+      delete window.__radicalZoomIn
+      delete window.__radicalZoomOut
     }
   }, [setFitViewFn, setViewportFns, smoothFitView])
 

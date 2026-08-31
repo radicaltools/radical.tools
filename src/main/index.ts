@@ -31,13 +31,25 @@ async function readFolderFiles(root: string): Promise<Record<string, string>> {
   return files
 }
 
+/** Resolve `rel` under `root`, guaranteeing the result stays inside `root`.
+ *  Defense-in-depth at the IPC boundary: callers slugify paths, but the map
+ *  keys are still untrusted renderer input, so reject absolute / `..` escapes. */
+function resolveWithin(root: string, rel: string): string {
+  const rootResolved = resolve(root)
+  const abs = resolve(rootResolved, rel)
+  if (abs !== rootResolved && !abs.startsWith(rootResolved + sep)) {
+    throw new Error(`Path escapes model folder: ${rel}`)
+  }
+  return abs
+}
+
 /** Write a file map into `root`, then prune our own stale files (`.md` under
  *  `nodes/` and known sidecars) that are no longer present, so removals /
  *  renames in the model are reflected on disk. Never touches unrelated files. */
 async function writeFolderFiles(root: string, files: Record<string, string>): Promise<void> {
   await mkdir(root, { recursive: true })
   for (const [rel, content] of Object.entries(files)) {
-    const abs = join(root, rel)
+    const abs = resolveWithin(root, rel)
     await mkdir(pathDirname(abs), { recursive: true })
     await writeFileAsync(abs, content, 'utf-8')
   }
@@ -47,7 +59,7 @@ async function writeFolderFiles(root: string, files: Record<string, string>): Pr
     if (rel in files) continue
     const managed = rel.startsWith('nodes/') || /^[^/]+\.json$/.test(rel) || rel === 'radical.md'
     if (!managed) continue
-    await rm(join(root, rel), { force: true })
+    await rm(resolveWithin(root, rel), { force: true })
   }
 }
 
@@ -100,7 +112,7 @@ function createWindow(): void {
       callback({
         responseHeaders: {
           'Content-Security-Policy': [
-            "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; font-src 'self' data:"
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; font-src 'self' data:"
           ]
         }
       })

@@ -148,7 +148,7 @@ export function QuickSearch(): React.ReactElement | null {
       if (focusId) {
         // Slight delay so the canvas has re-rendered after any view / node changes.
         setTimeout(() => {
-          const focus = (window as unknown as { __rfFocusNode?: (id: string, opts?: { zoom?: number; duration?: number }) => void }).__rfFocusNode
+          const focus = window.__rfFocusNode
           focus?.(focusId, { zoom: 1.2, duration: 600 })
         }, 120)
       }
@@ -190,13 +190,13 @@ export function QuickSearch(): React.ReactElement | null {
   // Expose a global hook so the toolbar (and other UI) can focus the search
   // input without reaching into this component's local state.
   useEffect(() => {
-    ;(window as unknown as { __radicalOpenQuickSearch?: () => void }).__radicalOpenQuickSearch = () => {
+    ;window.__radicalOpenQuickSearch = () => {
       if (presentationActive) return
       inputRef.current?.focus()
       inputRef.current?.select()
     }
     return () => {
-      delete (window as unknown as { __radicalOpenQuickSearch?: () => void }).__radicalOpenQuickSearch
+      delete window.__radicalOpenQuickSearch
     }
   }, [presentationActive])
 
@@ -393,7 +393,7 @@ export function QuickSearch(): React.ReactElement | null {
     inputRef.current?.blur()
     // Make sure the right-side properties panel is visible so the user can
     // see the freshly-selected object's details immediately after jumping.
-    const expandRight = (window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel
+    const expandRight = window.__radicalExpandRightPanel
     expandRight?.()
     if (r.kind === 'view') {
       // Just switch the view; no node selection.
@@ -418,7 +418,7 @@ export function QuickSearch(): React.ReactElement | null {
         setSelectedNodeIds([r.id])
         selectNode(r.id)
         requestAnimationFrame(() => {
-          const focus = (window as unknown as { __rfFocusNode?: (id: string, opts?: { zoom?: number; duration?: number }) => void }).__rfFocusNode
+          const focus = window.__rfFocusNode
           focus?.(r.id, { zoom: 1.2, duration: 500 })
         })
       }
@@ -440,7 +440,7 @@ export function QuickSearch(): React.ReactElement | null {
           expandAncestors(rel.targetId)
           selectEdge(r.id)
           requestAnimationFrame(() => {
-            const focus = (window as unknown as { __rfFocusNode?: (id: string, opts?: { zoom?: number; duration?: number }) => void }).__rfFocusNode
+            const focus = window.__rfFocusNode
             focus?.(rel.sourceId, { zoom: 1.0, duration: 500 })
           })
         }
