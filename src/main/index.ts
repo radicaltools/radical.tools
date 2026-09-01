@@ -57,7 +57,13 @@ async function writeFolderFiles(root: string, files: Record<string, string>): Pr
   const existing = await readFolderFiles(root)
   for (const rel of Object.keys(existing)) {
     if (rel in files) continue
-    const managed = rel.startsWith('nodes/') || /^[^/]+\.json$/.test(rel) || rel === 'radical.md'
+    const managed =
+      rel.startsWith('nodes/') ||
+      rel.startsWith('sequences/') ||
+      rel.startsWith('views/') ||
+      /^[^/]+\.json$/.test(rel) ||
+      rel === 'radical.md' ||
+      rel === 'relations.md'
     if (!managed) continue
     await rm(resolveWithin(root, rel), { force: true })
   }

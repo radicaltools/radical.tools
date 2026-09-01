@@ -78,6 +78,33 @@ tests/            Vitest unit/integration tests + layout benchmarks
 docs/             Architecture notes and improvement log
 ```
 
+## Persistence formats
+
+A model can be saved two ways:
+
+- **Single file** — `*.c4.json`: the whole model in one JSON document.
+- **Markdown folder** — the model exploded into human-readable, git-friendly files:
+
+```
+radical.md            manifest
+nodes/…               one .md per element (a C4 system/container becomes a directory
+                      with _index.md); geometry + custom fields live in the YAML
+                      frontmatter, the element's prose in the body
+relations.md          all relations as a single Markdown table
+sequences/<name>.md   interaction sequences as ordered lists
+views/<name>.md       views: identity (frontmatter) + node membership (list)
+_layout.json          machine state — per-view positions/camera, default-view camera
+snapshots.json        milestones (versioned model copies)
+presentations.json    presentation slides
+metamodel.json        element / relation type schema
+hubTemplates.json     Architecture Hub import records
+```
+
+Semantic content (elements, relations, sequences, views, descriptions) is authored as
+Markdown; only non-authored machine state stays in JSON sidecars. Older folders (positions
+in `_layout.json`, plus `relations.json` / `sequences.json` / `views.json`) still load and
+migrate to the newer layout on the next save.
+
 ## Running tests
 
 ```bash

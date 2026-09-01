@@ -35,6 +35,7 @@ export type FolderFiles = Record<string, string>
 export const MD_MANIFEST_FILE = 'radical.md'
 const LAYOUT_FILE = '_layout.json'
 const RELATIONS_FILE = 'relations.json'
+const RELATIONS_MD_FILE = 'relations.md'
 const VIEWS_FILE = 'views.json'
 const SEQUENCES_FILE = 'sequences.json'
 const SNAPSHOTS_FILE = 'snapshots.json'
@@ -42,13 +43,15 @@ const PRESENTATIONS_FILE = 'presentations.json'
 const METAMODEL_FILE = 'metamodel.json'
 const HUB_TEMPLATES_FILE = 'hubTemplates.json'
 const NODES_DIR = 'nodes'
+const SEQUENCES_DIR = 'sequences'
+const VIEWS_DIR = 'views'
 const INDEX_BASENAME = '_index.md'
 
 const FORMAT_VERSION = 1
 
-/** Node keys that are layout/state, not semantic — kept out of the `.md`. */
+/** Node geometry keys — now written into each node's frontmatter (positions-as-meta). */
 const NODE_LAYOUT_KEYS = new Set(['x', 'y', 'width', 'height', 'collapsed'])
-/** Node keys reconstructed from the folder structure / body, not frontmatter. */
+/** Node keys reconstructed from the folder structure / body, not the extra frontmatter loop. */
 const NODE_NONFRONT_KEYS = new Set([...NODE_LAYOUT_KEYS, 'parentId', 'description'])
 
 type Scalar = string | number | boolean
@@ -62,9 +65,12 @@ interface NodeLayout {
 }
 
 interface LayoutSidecar {
-  nodes: Record<string, NodeLayout>
+  nodes?: Record<string, NodeLayout>
   defaultPositions?: Record<string, NodePosition>
   defaultViewport?: { x: number; y: number; zoom: number } | null
+  /** Per-view transient UI state (positions, camera, collapse sets, treemap/wiki),
+   *  keyed by view id. The view's identity + membership live in views/<slug>.md. */
+  views?: Record<string, Record<string, unknown>>
 }
 
 // ─── YAML frontmatter (minimal, lossless for our scalar/multiline needs) ─────
@@ -186,18 +192,216 @@ function uniqueSlug(base: string, used: Set<string>): string {
   return slug
 }
 
+// ─── Relations table (single relations.md) ───────────────────────────────────
+
+const REL_COL_TO_KEY: Record<string, string> = {
+  id: 'id',
+  source: 'sourceId',
+  target: 'targetId',
+  label: 'label',
+  technology: 'technology',
+  type: 'relationType',
+}
+const REL_CORE_COLS = ['id', 'source', 'target', 'label', 'technology', 'type']
+const REL_KNOWN_KEYS = new Set(['id', 'sourceId', 'targetId', 'label', 'technology', 'relationType'])
+
+function escCell(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, '<br>')
+}
+function unescCell(value: string): string {
+  return value.replace(/<br>/g, '\n').replace(/\\\|/g, '|').replace(/\\\\/g, '\\')
+}
+function splitTableRow(line: string): string[] {
+  const inner = line.trim().replace(/^\|/, '').replace(/\|$/, '')
+  return inner.split(/(?<!\\)\|/).map((c) => c.trim())
+}
+
+/** Serialize relations as a single Markdown table. Lossless for the fixed C4
+ *  relation fields plus any extra scalar props (appended as sorted columns). */
+export function serializeRelationsTable(relations: C4Relation[]): string {
+  const extraKeys = new Set<string>()
+  for (const r of relations) {
+    for (const k of Object.keys(r)) if (!REL_KNOWN_KEYS.has(k)) extraKeys.add(k)
+  }
+  const cols = [...REL_CORE_COLS, ...[...extraKeys].sort()]
+  const cell = (r: C4Relation, col: string): string => {
+    const key = REL_COL_TO_KEY[col] ?? col
+    const v = (r as unknown as Record<string, unknown>)[key]
+    return v === undefined || v === null ? '' : escCell(String(v))
+  }
+  const rows = [
+    `| ${cols.join(' | ')} |`,
+    `| ${cols.map(() => '---').join(' | ')} |`,
+    ...relations.map((r) => `| ${cols.map((c) => cell(r, c)).join(' | ')} |`),
+  ]
+  return rows.join('\n') + '\n'
+}
+
+/** Parse a relations.md table back into C4Relation records. Header-driven so
+ *  extra columns round-trip; rows missing id/source/target are skipped. */
+export function parseRelationsTable(md: string): C4Relation[] {
+  const lines = md
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('|'))
+  if (lines.length < 2) return []
+  const header = splitTableRow(lines[0])
+  const out: C4Relation[] = []
+  for (const line of lines.slice(2)) {
+    const cells = splitTableRow(line)
+    const rel: Record<string, string> = {}
+    header.forEach((col, i) => {
+      const key = REL_COL_TO_KEY[col] ?? col
+      const val = unescCell(cells[i] ?? '')
+      if (val !== '') rel[key] = val
+    })
+    if (rel.id && rel.sourceId && rel.targetId) out.push(rel as unknown as C4Relation)
+  }
+  return out
+}
+
+// ─── Sequences (sequences/<slug>.md as ordered lists) ────────────────────
+
+function escStep(value: string): string {
+  return value.replace(/\r?\n/g, '<br>')
+}
+function unescStep(value: string): string {
+  return value.replace(/<br>/g, '\n')
+}
+
+const SEQ_STEP_RE = /^\s*\d+\.\s+`([^`]+)`(?:\s+—\s+(.*))?$/
+
+/** Serialize one sequence as frontmatter (id/name) + an ordered list where each
+ *  item is a backtick-wrapped relation id, optionally followed by ` — <desc>`. */
+export function serializeSequence(seq: DiagramSequence): string {
+  const front = serializeFrontmatter({ id: seq.id, name: seq.name })
+  const items = seq.relationIds.map((rid, i) => {
+    const desc = seq.stepDescriptions?.[i]
+    const base = `${i + 1}. \`${rid}\``
+    return desc ? `${base} — ${escStep(desc)}` : base
+  })
+  return front + '\n\n' + items.join('\n') + '\n'
+}
+
+/** Parse a sequence markdown file back into a DiagramSequence. `stepDescriptions`
+ *  is only set when at least one step carries one (matches the store's shape). */
+export function parseSequence(content: string): DiagramSequence {
+  const { front, body } = parseMarkdown(content)
+  const relationIds: string[] = []
+  const stepDescriptions: (string | undefined)[] = []
+  let anyDesc = false
+  for (const line of body.split('\n')) {
+    const m = SEQ_STEP_RE.exec(line)
+    if (!m) continue
+    relationIds.push(m[1])
+    if (m[2] !== undefined && m[2] !== '') {
+      stepDescriptions.push(unescStep(m[2]))
+      anyDesc = true
+    } else {
+      stepDescriptions.push(undefined)
+    }
+  }
+  const seq: DiagramSequence = {
+    id: String(front.id ?? ''),
+    name: typeof front.name === 'string' ? front.name : String(front.name ?? ''),
+    relationIds,
+  }
+  if (anyDesc) seq.stepDescriptions = stepDescriptions
+  return seq
+}
+
+function readSequences(files: FolderFiles): DiagramSequence[] | undefined {
+  const mdPaths = Object.keys(files).filter(
+    (p) => p.startsWith(SEQUENCES_DIR + '/') && p.endsWith('.md'),
+  )
+  if (mdPaths.length > 0) {
+    const seqs = mdPaths.map((p) => parseSequence(files[p])).filter((s) => s.id)
+    seqs.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    return seqs
+  }
+  return readJson<DiagramSequence[]>(files[SEQUENCES_FILE])
+}
+
+// ─── Views (views/<slug>.md — frontmatter + node list) ────────────────────
+
+/** View keys that describe the view's identity; everything else is transient UI
+ *  state stashed in the layout sidecar. `nodeIds` is emitted as the node list. */
+const VIEW_FRONT_KEYS = new Set(['id', 'name', 'kind', 'sequenceId', 'layoutMode'])
+
+function viewLayoutState(view: DiagramView): Record<string, unknown> {
+  const state: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(view)) {
+    if (VIEW_FRONT_KEYS.has(k) || k === 'nodeIds') continue
+    if (v === undefined) continue
+    state[k] = v
+  }
+  return state
+}
+
+/** Serialize a view as frontmatter (identity scalars) + a `## Nodes` list. */
+export function serializeView(view: DiagramView): string {
+  const front: Record<string, Scalar> = { id: view.id, name: view.name }
+  if (view.kind) front.kind = view.kind
+  if (view.sequenceId) front.sequenceId = view.sequenceId
+  if (view.layoutMode) front.layoutMode = view.layoutMode
+  const items = view.nodeIds.map((id) => `- \`${id}\``)
+  const body = items.length ? `## Nodes\n${items.join('\n')}` : '## Nodes'
+  return serializeFrontmatter(front) + '\n\n' + body + '\n'
+}
+
+/** Parse a view markdown file, merging in its transient state from the layout
+ *  sidecar (keyed by view id). */
+export function parseViewMd(
+  content: string,
+  viewsState: Record<string, Record<string, unknown>> | undefined,
+): DiagramView {
+  const { front, body } = parseMarkdown(content)
+  const id = String(front.id ?? '')
+  const nodeIds: string[] = []
+  for (const line of body.split('\n')) {
+    const m = /^-\s+`([^`]+)`\s*$/.exec(line.trim())
+    if (m) nodeIds.push(m[1])
+  }
+  const state = viewsState?.[id] ?? {}
+  const view: Record<string, unknown> = {
+    id,
+    name: typeof front.name === 'string' ? front.name : String(front.name ?? ''),
+    nodeIds,
+    positions: {},
+    ...state,
+  }
+  if (front.kind) view.kind = front.kind
+  if (front.sequenceId) view.sequenceId = front.sequenceId
+  if (front.layoutMode) view.layoutMode = front.layoutMode
+  if (!view.positions) view.positions = {}
+  return view as unknown as DiagramView
+}
+
+function readViews(
+  files: FolderFiles,
+  viewsState: Record<string, Record<string, unknown>> | undefined,
+): DiagramView[] | undefined {
+  const mdPaths = Object.keys(files).filter((p) => p.startsWith(VIEWS_DIR + '/') && p.endsWith('.md'))
+  if (mdPaths.length > 0) {
+    const views = mdPaths.map((p) => parseViewMd(files[p], viewsState)).filter((v) => v.id)
+    views.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    return views
+  }
+  return readJson<DiagramView[]>(files[VIEWS_FILE])
+}
+
 // ─── Serialize: DiagramData → folder files ───────────────────────────────────
 
 export function serializeToMdFolder(data: DiagramData, modelName?: string): FolderFiles {
   const files: FolderFiles = {}
-  const layout: LayoutSidecar = { nodes: {} }
+  const layout: LayoutSidecar = {}
 
   // Manifest.
   files[MD_MANIFEST_FILE] = serializeFrontmatter({
     radicalFormat: 'md-folder',
     version: FORMAT_VERSION,
     ...(modelName ? { name: modelName } : {}),
-  }) + `\n\n# ${modelName ?? 'Radical model'}\n\nThis folder is a Radical.Tools model persisted as Markdown files (one per element) plus JSON sidecar files. Edit the \`.md\` files freely; the app keeps them in sync.\n`
+  }) + `\n\n# ${modelName ?? 'Radical model'}\n\nThis folder is a Radical.Tools model persisted as Markdown files: one \`.md\` per element (geometry in its frontmatter), \`relations.md\` for relations, \`sequences/\` for interaction sequences, \`views/\` for views, plus a few JSON sidecars for machine state (snapshots, presentations, metamodel). Edit the \`.md\` files freely; the app keeps them in sync.\n`
 
   // Index nodes by parent for a hierarchical walk.
   const childrenOf = new Map<string | undefined, C4Node[]>()
@@ -211,19 +415,16 @@ export function serializeToMdFolder(data: DiagramData, modelName?: string): Fold
   }
 
   const emitNode = (node: C4Node, dir: string, slug: string): void => {
-    // Record layout / state in the sidecar, not the Markdown.
-    layout.nodes[node.id] = {
+    // Geometry lives in the node's own frontmatter (positions-as-meta).
+    const front: Record<string, Scalar> = {
+      id: node.id,
+      type: node.type,
+      label: node.label,
       x: node.x ?? 0,
       y: node.y ?? 0,
       width: node.width ?? 0,
       height: node.height ?? 0,
       collapsed: !!node.collapsed,
-    }
-
-    const front: Record<string, Scalar> = {
-      id: node.id,
-      type: node.type,
-      label: node.label,
     }
     // Sort remaining (custom metamodel) props for deterministic, git-stable output.
     const extraKeys = Object.keys(node)
@@ -262,19 +463,50 @@ export function serializeToMdFolder(data: DiagramData, modelName?: string): Fold
 
   writeChildren(childrenOf.get(undefined) ?? [], NODES_DIR)
 
-  // Layout sidecar.
-  if (data.defaultPositions) layout.defaultPositions = data.defaultPositions
-  if (data.defaultViewport !== undefined) layout.defaultViewport = data.defaultViewport
-  files[LAYOUT_FILE] = stableStringify(layout)
-
-  // Non-semantic / structurally-complex collections → JSON sidecars.
-  // Relation order is not semantic → sort by id for stable diffs.
+  // Relations → single Markdown table. Order is not semantic → sort by id.
   if (data.relations && data.relations.length > 0) {
     const relations = [...data.relations].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    files[RELATIONS_FILE] = stableStringify(relations)
+    files[RELATIONS_MD_FILE] = serializeRelationsTable(relations)
   }
-  writeJsonIfPresent(files, VIEWS_FILE, data.views, (v) => !!v && v.length > 0)
-  writeJsonIfPresent(files, SEQUENCES_FILE, data.sequences, (s) => !!s && s.length > 0)
+
+  // Sequences → one Markdown file each (ordered lists). Stable id order so
+  // slug de-dup suffixes are deterministic.
+  if (data.sequences && data.sequences.length > 0) {
+    const used = new Set<string>()
+    const ordered = [...data.sequences].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    for (const seq of ordered) {
+      const slug = uniqueSlug(slugify(seq.name || seq.id, seq.id), used)
+      files[`${SEQUENCES_DIR}/${slug}.md`] = serializeSequence(seq)
+    }
+  }
+
+  // Views → one Markdown file each (frontmatter + node list). Transient UI
+  // state (positions, camera, collapse/expand sets, treemap/wiki) goes into
+  // the layout sidecar keyed by view id, keeping the .md human-authorable.
+  if (data.views && data.views.length > 0) {
+    const used = new Set<string>()
+    const ordered = [...data.views].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    for (const view of ordered) {
+      const slug = uniqueSlug(slugify(view.name || view.id, view.id), used)
+      files[`${VIEWS_DIR}/${slug}.md`] = serializeView(view)
+      const state = viewLayoutState(view)
+      if (Object.keys(state).length > 0) (layout.views ??= {})[view.id] = state
+    }
+  }
+
+  // Layout sidecar — default-view camera/positions + per-view UI state.
+  // (Per-node geometry now lives in each node's frontmatter.)
+  if (data.defaultPositions) layout.defaultPositions = data.defaultPositions
+  if (data.defaultViewport !== undefined) layout.defaultViewport = data.defaultViewport
+  if (
+    layout.defaultPositions ||
+    layout.defaultViewport !== undefined ||
+    (layout.views && Object.keys(layout.views).length > 0)
+  ) {
+    files[LAYOUT_FILE] = stableStringify(layout)
+  }
+
+  // Non-semantic / structurally-complex collections → JSON sidecars.
   writeJsonIfPresent(files, SNAPSHOTS_FILE, data.snapshots, (s) => !!s && s.length > 0)
   writeJsonIfPresent(files, PRESENTATIONS_FILE, data.presentations, (p) => !!p && p.length > 0)
   if (data.metamodel) files[METAMODEL_FILE] = stableStringify(data.metamodel)
@@ -327,32 +559,39 @@ export function deserializeFromMdFolder(files: FolderFiles): DiagramData {
   const nodes: C4Node[] = parsed.map((p) => {
     const id = String(p.front.id)
     const parentId = p.parentDirKey === NODES_DIR ? undefined : parsedByDirKey.get(p.parentDirKey)
-    const lay = layout.nodes[id] ?? { x: 0, y: 0, width: 0, height: 0, collapsed: false }
+    // Geometry comes from frontmatter; fall back to the legacy _layout.json map.
+    const lay = layout.nodes?.[id]
+    const numOf = (v: Scalar | undefined, fallback: number): number =>
+      typeof v === 'number' ? v : fallback
     const node: Record<string, unknown> = {
       id,
       type: p.front.type,
       label: typeof p.front.label === 'string' ? p.front.label : String(p.front.label ?? ''),
-      x: lay.x,
-      y: lay.y,
-      width: lay.width,
-      height: lay.height,
-      collapsed: !!lay.collapsed,
+      x: numOf(p.front.x, lay?.x ?? 0),
+      y: numOf(p.front.y, lay?.y ?? 0),
+      width: numOf(p.front.width, lay?.width ?? 0),
+      height: numOf(p.front.height, lay?.height ?? 0),
+      collapsed:
+        typeof p.front.collapsed === 'boolean' ? p.front.collapsed : !!(lay?.collapsed ?? false),
     }
     if (parentId) node.parentId = parentId
     if (p.body) node.description = p.body
     for (const [key, value] of Object.entries(p.front)) {
       if (key === 'id' || key === 'type' || key === 'label') continue
+      if (NODE_LAYOUT_KEYS.has(key)) continue
       node[key] = value
     }
     return node as unknown as C4Node
   })
 
-  const relations = readJson<C4Relation[]>(files[RELATIONS_FILE]) ?? []
+  const relations = files[RELATIONS_MD_FILE]
+    ? parseRelationsTable(files[RELATIONS_MD_FILE])
+    : (readJson<C4Relation[]>(files[RELATIONS_FILE]) ?? [])
   const data: DiagramData = { nodes, relations }
 
-  const views = readJson<DiagramView[]>(files[VIEWS_FILE])
+  const views = readViews(files, layout.views)
   if (views) data.views = views
-  const sequences = readJson<DiagramSequence[]>(files[SEQUENCES_FILE])
+  const sequences = readSequences(files)
   if (sequences) data.sequences = sequences
   const snapshots = readJson<DiagramSnapshot[]>(files[SNAPSHOTS_FILE])
   if (snapshots) data.snapshots = snapshots
