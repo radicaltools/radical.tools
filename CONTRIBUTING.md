@@ -4,8 +4,8 @@ Thank you for your interest in contributing! This document explains how to get i
 
 ## Ways to contribute
 
-- **Report bugs** — open a [bug report](https://github.com/tomasz-zajac-opensource/radical.tools/issues/new?template=bug_report.md)
-- **Request features** — open a [feature request](https://github.com/tomasz-zajac-opensource/radical.tools/issues/new?template=feature_request.md)
+- **Report bugs** — open a [bug report](https://github.com/radicaltools/radical.tools/issues/new?template=bug_report.md)
+- **Request features** — open a [feature request](https://github.com/radicaltools/radical.tools/issues/new?template=feature_request.md)
 - **Submit code** — fork the repo and open a pull request
 - **Improve documentation** — fix typos, clarify explanations, add examples
 - **Share architecture patterns** — contribute to the [Architecture Hub](https://hub.radical.tools)
@@ -15,7 +15,7 @@ Thank you for your interest in contributing! This document explains how to get i
 **Prerequisites:** Node.js ≥ 20, npm ≥ 9
 
 ```bash
-git clone https://github.com/tomasz-zajac-opensource/radical.tools.git
+git clone https://github.com/radicaltools/radical.tools.git
 cd radical.tools
 npm install
 npm run dev        # Electron app with hot-reload

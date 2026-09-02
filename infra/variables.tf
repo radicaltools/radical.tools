@@ -24,7 +24,7 @@ variable "aws_region" {
 variable "github_repo" {
   description = "GitHub repository in 'owner/name' format. Used to scope the OIDC deploy role to pushes from the main branch only."
   type        = string
-  default     = "tomasz-zajac-opensource/radical.tools"
+  default     = "radicaltools/radical.tools"
 }
 
 variable "create_oidc_provider" {

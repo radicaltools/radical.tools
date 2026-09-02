@@ -21,4 +21,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PNG/SVG export, JSON save/load
 - Electron desktop app + browser mode
 
-[Unreleased]: https://github.com/tomasz-zajac-opensource/radical.tools/compare/HEAD
+[Unreleased]: https://github.com/radicaltools/radical.tools/compare/HEAD
