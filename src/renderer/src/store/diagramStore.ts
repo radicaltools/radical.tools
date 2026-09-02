@@ -618,8 +618,11 @@ function deriveRFNodes(
       return typeRank(a.type) - typeRank(b.type)
     })
 
-  // Pre-compute which nodes have children (in the full model)
-  const parentSet = new Set(Object.values(nodes).map((n) => n.parentId).filter(Boolean))
+  // Pre-compute which nodes have children among view-visible nodes.
+  // Using `sorted` (already filtered by viewFilter) ensures that a parent
+  // whose children are excluded from the current view renders at
+  // COLLAPSED_HEIGHT instead of its full model height.
+  const parentSet = new Set(sorted.map((n) => n.parentId).filter(Boolean))
 
   // Minimum top offset for children inside an expanded parent — must clear
   // the header (~30px) + 2-line label (~52px) + small gap. Mirrors the value
@@ -638,12 +641,17 @@ function deriveRFNodes(
 
     const effHeight = isFixedSize
       ? NODE_SIZES[n.type].height
-      : isContainerType(n.type) && (collapsed || !hasChildren)
+      // Render at COLLAPSED_HEIGHT when:
+      //   a) node is effectively collapsed (model or view-collapse), OR
+      //   b) no children are visible in this view AND the node is not model-
+      //      collapsed-but-view-expanded (in that case n.height holds the last
+      //      expanded height which the user intentionally revealed).
+      : isContainerType(n.type) && (collapsed || (!hasChildren && !n.collapsed))
         ? COLLAPSED_HEIGHT[n.type]
         : n.height
     const effWidth = isFixedSize
       ? NODE_SIZES[n.type].width
-      : isContainerType(n.type) && (collapsed || !hasChildren)
+      : isContainerType(n.type) && (collapsed || (!hasChildren && !n.collapsed))
         ? COLLAPSED_WIDTH[n.type]
         : n.width
 
@@ -4465,7 +4473,7 @@ if (typeof window !== 'undefined') {
   const activeId = documents.getActiveId()
   if (activeId) {
     const meta = documents.listDocuments().find(d => d.id === activeId)
-    if (meta?.source === 'fs') {
+    if (meta?.source === 'fs' || meta?.source === 'md') {
       _suspended = true
       documents.loadDocument(activeId).then((data) => {
         if (data) {
@@ -4495,7 +4503,7 @@ if (typeof window !== 'undefined') {
     documents.loadDocument(s.activeId).then((data) => {
       if (data) {
         useDiagramStore.getState().loadDiagram(data)
-      } else if (switchMeta?.source === 'fs') {
+      } else if (switchMeta?.source === 'fs' || switchMeta?.source === 'md') {
         // New/empty file: initialize with the maximum built-in metamodel
         useDiagramStore.getState().loadDiagram({
           nodes: [],

@@ -3649,6 +3649,10 @@ body {
   background: var(--accent-soft);
   color: var(--accent);
 }
+.docmgr-badge.md {
+  background: color-mix(in srgb, #16a34a 20%, transparent);
+  color: #16a34a;
+}
 .docmgr-item-info { min-width: 0; flex: 1; }
 .docmgr-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
 .docmgr-active-tag { font-weight: 400; color: var(--accent); font-size: 12px; }
