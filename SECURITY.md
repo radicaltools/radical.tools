@@ -12,7 +12,7 @@
 
 If you discover a security vulnerability, please report it via one of these channels:
 
-- **GitHub Private Vulnerability Reporting** — use the [Security tab](https://github.com/tomasz-zajac-opensource/radical.tools/security/advisories/new) on this repository
+- **GitHub Private Vulnerability Reporting** — use the [Security tab](https://github.com/radicaltools/radical.tools/security/advisories/new) on this repository
 - **Email** — contact the maintainer directly (see the GitHub profile)
 
 Please include the following in your report:

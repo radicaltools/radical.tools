@@ -10,13 +10,13 @@
     "color": "#0d1321",
     "theme": "dark"
   },
-  "homepage": "https://github.com/tomasz-zajac-opensource/radical.tools#readme",
+  "homepage": "https://github.com/radicaltools/radical.tools#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tomasz-zajac-opensource/radical.tools.git"
+    "url": "https://github.com/radicaltools/radical.tools.git"
   },
   "bugs": {
-    "url": "https://github.com/tomasz-zajac-opensource/radical.tools/issues"
+    "url": "https://github.com/radicaltools/radical.tools/issues"
   },
   "keywords": [
     "c4", "architecture", "diagram", "c4model", "ddd",

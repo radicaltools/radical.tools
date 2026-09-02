@@ -85,4 +85,4 @@ The metamodel can be customised per-document via the Radical menu → Schema →
 
 ## License
 
-[MIT](https://github.com/tomasz-zajac-opensource/radical.tools/blob/main/LICENSE)
+[MIT](https://github.com/radicaltools/radical.tools/blob/main/LICENSE)
