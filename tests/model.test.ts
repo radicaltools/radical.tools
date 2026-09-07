@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
+import { builtInGovernanceMetamodel } from '../src/renderer/src/types/metamodel'
 import type { C4Node, C4Relation, DiagramView } from '../src/renderer/src/types/c4'
 
 // Snapshot the pristine sample on import so each test starts from the same
@@ -21,6 +22,7 @@ const initial = (() => {
     c4Relations: JSON.parse(JSON.stringify(s.c4Relations)) as Record<string, C4Relation>,
     views: JSON.parse(JSON.stringify(s.views)) as Record<string, DiagramView>,
     activeViewId: s.activeViewId,
+    metamodel: s.metamodel ? JSON.parse(JSON.stringify(s.metamodel)) : undefined,
   }
 })()
 
@@ -30,6 +32,7 @@ beforeEach(() => {
     c4Relations: JSON.parse(JSON.stringify(initial.c4Relations)),
     views: JSON.parse(JSON.stringify(initial.views)),
     activeViewId: initial.activeViewId,
+    metamodel: initial.metamodel ? JSON.parse(JSON.stringify(initial.metamodel)) : undefined,
   } as any)
   useDiagramStore.getState()._sync()
 })
@@ -80,6 +83,34 @@ describe('addNode', () => {
     } as any)
     expect(id).toBe('')
     expect(Object.keys(useDiagramStore.getState().c4Nodes).length).toBe(before)
+  })
+
+  it('materializes metamodel property defaults on the new node', () => {
+    useDiagramStore.setState({ metamodel: builtInGovernanceMetamodel() } as any)
+    const id = useDiagramStore.getState().addNode({
+      type: 'requirement',
+      label: 'Req',
+      collapsed: false,
+      x: 0, y: 0, width: 200, height: 100,
+    } as any)
+    const n = useDiagramStore.getState().c4Nodes[id] as any
+    expect(n.ears_type).toBe('ubiquitous')
+    expect(n.status).toBe('draft')
+    expect(n.priority).toBe('must')
+  })
+
+  it('does not overwrite explicit values with defaults', () => {
+    useDiagramStore.setState({ metamodel: builtInGovernanceMetamodel() } as any)
+    const id = useDiagramStore.getState().addNode({
+      type: 'requirement',
+      label: 'Req',
+      ears_type: 'event-driven',
+      collapsed: false,
+      x: 0, y: 0, width: 200, height: 100,
+    } as any)
+    const n = useDiagramStore.getState().c4Nodes[id] as any
+    expect(n.ears_type).toBe('event-driven')
+    expect(n.status).toBe('draft')
   })
 })
 

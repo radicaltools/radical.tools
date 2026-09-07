@@ -1406,7 +1406,16 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._markMilestoneEdit()
         const id = uid()
         set((state) => {
-          state.c4Nodes[id] = { id, ...node }
+          // Materialize metamodel property defaults (e.g. requirement
+          // ears_type='ubiquitous') so they exist on the node — and thus
+          // reach persistence — instead of living only in UI fallbacks.
+          const newNode = { id, ...node } as C4Node & Record<string, unknown>
+          for (const p of def?.properties ?? []) {
+            if (p.default !== undefined && newNode[p.key] === undefined) {
+              newNode[p.key] = p.default
+            }
+          }
+          state.c4Nodes[id] = newNode
           // Auto-add to active view
           if (state.activeViewId && state.views[state.activeViewId]) {
             state.views[state.activeViewId].nodeIds.push(id)
@@ -1452,8 +1461,20 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._pushUndo()
         get()._markMilestoneEdit()
         set((state) => {
-          if (!state.c4Nodes[id]) return
-          Object.assign(state.c4Nodes[id], updates)
+          const node = state.c4Nodes[id] as (C4Node & Record<string, unknown>) | undefined
+          if (!node) return
+          Object.assign(node, updates)
+          // Retyping a node should materialize the new type's metamodel
+          // property defaults, same as addNode, so retyped and freshly
+          // created nodes of a type persist the same fields.
+          if ('type' in updates) {
+            const def = state.metamodel?.nodeTypes[node.type]
+            for (const p of def?.properties ?? []) {
+              if (p.default !== undefined && node[p.key] === undefined) {
+                node[p.key] = p.default
+              }
+            }
+          }
         })
         get()._sync()
         // Only wake the live layout if the change actually affects geometry

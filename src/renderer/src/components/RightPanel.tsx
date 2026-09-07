@@ -1595,7 +1595,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
     }
 
     // Renders a metamodel PropertyDef as a form control, including enum selects.
-    const metamodelField = (p: { key: string; label: string; type: string; options?: string[] }) => {
+    const metamodelField = (p: { key: string; label: string; type: string; options?: string[]; default?: string | number | boolean }) => {
       const value = (node as unknown as Record<string, unknown>)[p.key]
       const onChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         if (readOnly) return
@@ -1611,7 +1611,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
         return (
           <div className="props-field" key={p.key}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-              <input type="checkbox" checked={Boolean(value)} onChange={onChange as ChangeEvent<HTMLInputElement>['target']['onchange'] extends infer _ ? any : any}
+              <input type="checkbox" checked={Boolean(value ?? p.default)} onChange={onChange as ChangeEvent<HTMLInputElement>['target']['onchange'] extends infer _ ? any : any}
                 disabled={readOnly}
                 style={{ accentColor: 'var(--accent)' }} />
               {p.label}
@@ -1625,7 +1625,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
             <label className="props-label">{p.label}</label>
             <select
               className="props-input"
-              value={String(value ?? '')}
+              value={String(value ?? p.default ?? '')}
               disabled={readOnly}
               onChange={onChange as ChangeEvent<HTMLSelectElement>['target']['onchange'] extends infer _ ? any : any}
             >
@@ -1640,7 +1640,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
         return (
           <div className="props-field" key={p.key}>
             <label className="props-label">{p.label}</label>
-            <AutoResizeTextarea value={String(value ?? '')}
+            <AutoResizeTextarea value={String(value ?? p.default ?? '')}
               onChange={onChange} readOnly={readOnly} />
           </div>
         )
@@ -1648,7 +1648,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
       return (
         <div className="props-field" key={p.key}>
           <label className="props-label">{p.label}</label>
-          <input className="props-input" value={String(value ?? '')}
+          <input className="props-input" value={String(value ?? p.default ?? '')}
             onChange={onChange} readOnly={readOnly} />
         </div>
       )
