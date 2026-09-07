@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Manual — Radical.Tools</title>
-  <meta name="description" content="How to use Radical.Tools — step-by-step guide to modelling, views, milestones, layout and AI." />
+  <title>Docs — Radical.Tools</title>
+  <meta name="description" content="Radical.Tools documentation: modelling with C4, DDD and governance, six view kinds, milestones, presentations, Markdown-folder persistence, the metamodel editor, the Concept Hub and the AI assistant." />
   <!-- Before any stylesheet: sets data-theme for the first paint and is not blocked by a slow font CDN. -->
   <script src="theme.js?v=__BUILD__"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="landing.css?v=__BUILD__" />
   <link rel="stylesheet" href="style.css?v=__BUILD__" />
 </head>
@@ -30,599 +30,519 @@
     </nav>
   </header>
 
-  <!-- ── LAYOUT ── -->
   <div class="doc-layout">
 
-    <!-- Sidebar / TOC -->
+    <!-- ── Sidebar / TOC ── -->
     <aside class="doc-sidebar">
-      <nav class="doc-toc">
-        <div class="toc-label">Contents</div>
-        <ul>
-          <li><a href="#getting-started">Getting started</a></li>
-          <li><a href="#adding-elements">Adding elements</a></li>
-          <li><a href="#connecting">Connecting elements</a></li>
-          <li><a href="#editing">Editing &amp; properties</a></li>
-          <li><a href="#views">Views</a></li>
-          <li><a href="#milestones">Milestones</a></li>
-          <li><a href="#layout">Layout engines</a></li>
-          <li><a href="#presentation">Presentation mode</a></li>
-          <li><a href="#ai">AI integration</a></li>
-          <li><a href="#metamodel">Metamodel editor</a></li>
-          <li><a href="#files">Files &amp; documents</a></li>
-          <li><a href="#shortcuts">Keyboard shortcuts</a></li>
-        </ul>
+      <nav class="doc-toc" aria-label="Contents">
+        <div class="toc-group">
+          <div class="toc-label">Start</div>
+          <ul>
+            <li><a href="#getting-started">Getting started</a></li>
+            <li><a href="#workspace">The workspace</a></li>
+            <li><a href="#documents">Models &amp; files</a></li>
+          </ul>
+        </div>
+        <div class="toc-group">
+          <div class="toc-label">Modelling</div>
+          <ul>
+            <li><a href="#elements">Elements</a></li>
+            <li><a href="#relations">Relations</a></li>
+            <li><a href="#properties">Properties &amp; governance</a></li>
+            <li><a href="#selection">Working with selections</a></li>
+          </ul>
+        </div>
+        <div class="toc-group">
+          <div class="toc-label">Views</div>
+          <ul>
+            <li><a href="#views">Views</a></li>
+            <li><a href="#view-structure">Structure</a></li>
+            <li><a href="#view-flow">Flow &amp; sequences</a></li>
+            <li><a href="#view-hierarchy">Hierarchy</a></li>
+            <li><a href="#view-table">Table</a></li>
+            <li><a href="#view-matrix">Matrix</a></li>
+            <li><a href="#view-wiki">Wiki</a></li>
+          </ul>
+        </div>
+        <div class="toc-group">
+          <div class="toc-label">Work faster</div>
+          <ul>
+            <li><a href="#layout">Layout &amp; navigation</a></li>
+            <li><a href="#milestones">Milestones</a></li>
+            <li><a href="#presenting">Viewer &amp; Presenter</a></li>
+          </ul>
+        </div>
+        <div class="toc-group">
+          <div class="toc-label">Extend</div>
+          <ul>
+            <li><a href="#metamodel">Metamodel editor</a></li>
+            <li><a href="#hub">Concept Hub</a></li>
+            <li><a href="#ai">AI assistant</a></li>
+          </ul>
+        </div>
+        <div class="toc-group">
+          <div class="toc-label">Reference</div>
+          <ul>
+            <li><a href="#formats">File formats</a></li>
+            <li><a href="#links">Deep links</a></li>
+            <li><a href="#shortcuts">Keyboard shortcuts</a></li>
+            <li><a href="#vscode">VS Code &amp; local install</a></li>
+          </ul>
+        </div>
       </nav>
     </aside>
 
-    <!-- Main content -->
+    <!-- ── Main ── -->
     <main class="doc-main">
 
       <div class="doc-hero">
-        <span class="kicker">Manual</span>
-        <h1>How to use Radical.Tools</h1>
+        <span class="kicker">Docs</span>
+        <h1>Radical.Tools, explained</h1>
         <p class="doc-hero-sub">
-          A complete guide to building architecture models, creating views,
-          tracking history with milestones, and using the AI assistant.
+          One model of your architecture; every diagram, table and wiki page derived from it.
+          This guide walks through modelling, the six view kinds, milestones, presentations,
+          files, the metamodel editor, the Concept Hub and the AI assistant.
         </p>
+        <div class="doc-hero-actions">
+          <a class="cta" href="https://studio.radical.tools" target="_blank" rel="noopener">Open Studio</a>
+          <a class="cta ghost" href="#getting-started">Start with the basics ↓</a>
+        </div>
+        <p class="doc-hero-note">Screenshots follow the theme you pick in the top bar — toggle it to see the other look.</p>
       </div>
 
-      <!-- Getting started -->
+      <!-- ═══════════════ START ═══════════════ -->
+
       <section class="doc-section" id="getting-started">
         <h2>Getting started</h2>
         <p>
-          When you launch the app for the first time you'll see the <strong>Welcome screen</strong>.
-          Choose a metamodel — <em>C4</em>, <em>C4 + DDD Domains</em>, or <em>C4 + DDD + Governance</em> —
-          optionally load the sample <em>Fintech Banking Platform</em>
-          model, or import an existing <code>.json</code> file. The app opens into <strong>Designer mode</strong>
-          with an empty canvas.
-        </p>
-        <p>
-          The UI has three main zones:
+          Radical.Tools runs in the browser at <a href="https://studio.radical.tools" target="_blank" rel="noopener">studio.radical.tools</a>
+          — no account, nothing uploaded — or as a desktop app (see <a href="#vscode">local install</a>).
+          On first launch you land on the <strong>Welcome screen</strong>:
         </p>
         <ul>
-          <li><strong>Left panel</strong> — element palette (drag to add) and the full node tree.</li>
-          <li><strong>Canvas</strong> — the main editing area, powered by React Flow.</li>
-          <li><strong>Right panel</strong> — properties of the selected element, plus the view/milestone panel and the AI chat.</li>
+          <li><strong>New model</strong> — pick the metamodel first: <em>C4</em>, <em>C4 + DDD</em> (adds Domains) or <em>C4 + DDD + Governance</em> (adds ADRs, fitness functions, requirements and blueprints). You can change it later in the metamodel editor.</li>
+          <li><strong>Open file</strong> — a <code>.radical</code> / <code>.json</code> model from disk.</li>
+          <li><strong>Load the sample</strong> — the <em>Fintech Banking Platform</em> used throughout this guide: 29 elements, 8 views of every kind, a payment sequence, three milestones and a ready-made presentation.</li>
+          <li><strong>Recent</strong> — models you already have in this browser.</li>
         </ul>
-        <p>
-          The <strong>toolbar</strong> at the top controls layout, undo/redo, and the
-          Designer&nbsp;/&nbsp;Viewer&nbsp;/&nbsp;Presenter mode switch. <strong>Designer</strong> is the
-          full editing environment; <strong>Viewer</strong> is a read-only sandbox for navigating views;
-          <strong>Presenter</strong> drives the fullscreen slide deck.
-          The <strong>Radical menu</strong> (top-left logo button) gives access to model management, metamodel editor,
-          theme, Smart Fit, AI settings, and the connection-key preference.
-        </p>
         <figure class="doc-shot">
-          <img src="screenshots/welcome.png" alt="Welcome screen with 'Your recent models' dialog offering Open last, New model, and Open file buttons" />
-          <figcaption>The Welcome screen appears on first launch. Open your last model with one click, create a blank canvas, or load a <code>.json</code> file from disk.</figcaption>
+          <img class="shot-light" src="screenshots/welcome-light.png" alt="Welcome screen: New model with metamodel picker, Open file, Load sample, recent models" loading="lazy" />
+          <img class="shot-dark" src="screenshots/welcome-dark.png" alt="Welcome screen: New model with metamodel picker, Open file, Load sample, recent models" loading="lazy" />
+          <figcaption>The Welcome screen. Loading the sample is the fastest way to see every feature in this guide.</figcaption>
         </figure>
-        <figure class="doc-shot">
-          <img src="screenshots/canvas-overview.png" alt="Radical.Tools in Designer mode — full canvas showing the Fintech Banking Platform sample model with 27 nodes arranged hierarchically" />
-          <figcaption>Designer mode: element palette (left), canvas (centre), properties panel (right). The toolbar gives access to Fit All, Smart Layout, Undo/Redo and the mode switch.</figcaption>
-        </figure>
-      </section>
-
-      <!-- Adding elements -->
-      <section class="doc-section" id="adding-elements">
-        <h2>Adding elements</h2>
-        <p>There are two ways to add a new node:</p>
-        <ol>
-          <li>
-            <strong>Drag from the palette</strong> — grab any type from the left panel and drop it
-            anywhere on the canvas. The node is created at the drop position.
-          </li>
-          <li>
-            <strong>Double-click the canvas background</strong> — double-clicking an empty area
-            creates a new <em>System</em> node at that exact position. Rename it immediately in the
-            right panel.
-          </li>
-        </ol>
-        <h3>Nesting (parent–child)</h3>
-        <p>
-          Elements can be nested to represent containment (e.g. Containers inside a System).
-          Drop a child element <em>on top of</em> a parent node — the parent highlights to confirm
-          the drop target. You can also change the parent via the <em>Parent</em> field in the
-          properties panel. Nested children can be collapsed/expanded by clicking the triangle icon
-          on the parent node or the toggle in the tree view.
-        </p>
-      </section>
-
-      <!-- Connecting -->
-      <section class="doc-section" id="connecting">
-        <h2>Connecting elements</h2>
-        <p>
-          Relations are created by <strong>drag-to-connect</strong>:
-        </p>
-        <ol>
-          <li>Hold the <strong>connection modifier key</strong> (default: <kbd>Alt</kbd>).</li>
-          <li>Press and hold the mouse button on the <strong>source</strong> node.</li>
-          <li>Drag to the <strong>target</strong> node and release.</li>
-        </ol>
-        <p>
-          A preview line is drawn while you drag. The relation is validated against the
-          active metamodel — only allowed source→target type combinations produce a connection.
-        </p>
         <div class="doc-tip">
-          <strong>Tip:</strong> The connection modifier is configurable. Open
-          <em>Radical menu → Editing → Connect key</em> to switch between
-          <kbd>Alt</kbd>, <kbd>Shift</kbd>, <kbd>Ctrl</kbd>, and <kbd>⌘ Cmd</kbd>.
+          <strong>Tip:</strong> a deep link such as <code>studio.radical.tools/#/m/designer/v/canvas</code> skips the Welcome screen and opens the last active model directly. See <a href="#links">Deep links</a>.
         </div>
-        <p>
-          Click a relation to select it and edit its label, technology, and description in the right panel.
-          The edge label is rendered on the canvas and updates live.
-        </p>
       </section>
 
-      <!-- Editing -->
-      <section class="doc-section" id="editing">
-        <h2>Editing &amp; properties</h2>
+      <section class="doc-section" id="workspace">
+        <h2>The workspace</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/designer-light.png" alt="Designer perspective: element palette and views on the left, canvas in the centre, model tree on the right, toolbar on top" loading="lazy" />
+          <img class="shot-dark" src="screenshots/designer-dark.png" alt="Designer perspective: element palette and views on the left, canvas in the centre, model tree on the right, toolbar on top" loading="lazy" />
+          <figcaption>Designer perspective with the <em>System Context</em> view of the sample model active.</figcaption>
+        </figure>
+        <h3>Toolbar</h3>
+        <ul>
+          <li><strong>Radical menu</strong> (logo, top-left) — <em>Manage models…</em>, <em>Import from Hub…</em>, <em>Metamodel editor…</em>, light/dark theme, Smart Fit, the connect key, <em>AI providers…</em> and export (PNG, SVG, copy to clipboard).</li>
+          <li><strong>Fit All</strong>, zoom out / in, <strong>Smart Layout</strong> (or <em>Tree Layout</em> when the view asks for it), Undo / Redo.</li>
+          <li><strong>Quick Search</strong> (<kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>P</kbd>) — find any element, relation or view; doubles as the AI prompt.</li>
+          <li><strong>Perspective switch</strong> — <em>Designer</em> edits, <em>Viewer</em> explores read-only, <em>Presenter</em> builds and plays slide decks.</li>
+        </ul>
+        <h3>Left panel</h3>
+        <p>Three collapsible sections: <strong>Elements</strong> (the palette — drag onto the canvas), <strong>Views</strong> (one card per view, with node count and kind) and <strong>Milestones</strong>. In Viewer and Presenter the palette disappears and Views takes the top.</p>
+        <h3>Canvas</h3>
+        <p>The chip in the top-left corner names the active view (<em>Structure: System Context</em>) or, when time-travelling, the active milestone. Nodes can be dragged, nested, collapsed and connected here; the other view kinds replace the canvas with their own surface.</p>
+        <h3>Right panel</h3>
+        <p><strong>Nodes</strong> is the model tree — every element, whether or not the current view shows it; the eye icon toggles visibility in the active view and dimmed rows are outside it. <strong>Relations</strong> and <strong>Sequences</strong> follow. Selecting anything slides the panel to its <strong>properties</strong>.</p>
+      </section>
+
+      <section class="doc-section" id="documents">
+        <h2>Models &amp; files</h2>
         <p>
-          Click any node or edge to select it. Its properties appear in the <strong>right panel</strong>:
+          A model is a <em>document</em>. Open <em>Radical menu → Manage models…</em> to see them grouped by where they live:
         </p>
         <ul>
-          <li><strong>Label</strong> — the display name shown on the canvas.</li>
-          <li><strong>Technology / description</strong> — secondary text rendered inside the node.</li>
-          <li><strong>Type</strong> — change the element type (e.g. Container → Database). The node
-              re-renders with the new shape and colour.</li>
-          <li><strong>Parent</strong> — reparent the element by picking a different parent from the dropdown.</li>
+          <li><strong>Local storage</strong> — kept in this browser. Create with <em>+ New local model</em> (choose the metamodel), rename, delete, or convert with <em>Save as file…</em> / <em>Save as folder…</em>.</li>
+          <li><strong>Files</strong> — a single <code>.radical</code> JSON file on disk (desktop app).</li>
+          <li><strong>Folders</strong> — a <strong>Markdown folder</strong>: one <code>.md</code> per element with YAML front-matter, nested directories for containment, JSON sidecars for layout, views and relations. Diff-friendly and readable without the app. Works in the desktop app and, in Chromium browsers, via the File System Access API (you may be asked to <em>Reconnect</em> a folder after a reload).</li>
         </ul>
-        <p>
-          To <strong>delete</strong> a selected element press <kbd>Delete</kbd> or <kbd>⌫ Backspace</kbd>.
-          A confirmation dialog appears if the node has children or connected relations.
-        </p>
-        <p>
-          <strong>Undo / Redo</strong> — every action (add, edit, move, delete, layout) is tracked.
-          Use <kbd>⌘Z</kbd> / <kbd>Ctrl+Z</kbd> to undo and <kbd>⌘⇧Z</kbd> / <kbd>Ctrl+Y</kbd> to redo.
-        </p>
+        <p>Every change is <strong>autosaved</strong> (a few hundred milliseconds after you stop editing) to wherever the document lives. <em>Import Structurizr DSL…</em> converts a <code>.dsl</code> workspace into a new local model.</p>
         <figure class="doc-shot">
-          <img src="screenshots/properties.png" alt="Canvas with a node selected; right panel shows Label, Description, External checkbox, and Delete node button" />
-          <figcaption>Properties panel with a node selected. Edit the label, add a description, mark the element as external, or delete it. A selection action bar also appears at the bottom of the canvas.</figcaption>
+          <img class="shot-light" src="screenshots/documents-light.png" alt="Models dialog listing local, file and folder backed models with Rename, Save as file, Save as folder and Delete actions" loading="lazy" />
+          <img class="shot-dark" src="screenshots/documents-dark.png" alt="Models dialog listing local, file and folder backed models with Rename, Save as file, Save as folder and Delete actions" loading="lazy" />
+          <figcaption>The Models dialog. The badge on each row tells you where the model is stored.</figcaption>
         </figure>
+        <div class="doc-tip">
+          <strong>Desktop:</strong> launch with <code>radical --file path/to/model.radical</code> (or the <code>RADICAL_FILE</code> environment variable) and the app reloads whenever that file changes on disk — handy next to a text editor or a Git checkout.
+        </div>
       </section>
 
-      <!-- Views -->
+      <!-- ═══════════════ MODELLING ═══════════════ -->
+
+      <section class="doc-section" id="elements">
+        <h2>Elements</h2>
+        <ol>
+          <li><strong>Drag from the palette</strong> onto the canvas. Drop it <em>on top of</em> a container-type node (a system, domain, group…) to make it a child — the parent highlights while you hover.</li>
+          <li><strong>Double-click</strong> an empty spot on the canvas to create a <em>Software System</em> right there.</li>
+          <li><strong>Import from the Hub</strong> — see <a href="#hub">Concept Hub</a>.</li>
+        </ol>
+        <p>
+          The metamodel decides what is allowed. Dropping a Component directly on the canvas, a Person inside a System, or a fourth element of a type limited to three is <em>refused</em> with a message rather than silently drawn — so the model stays valid.
+        </p>
+        <h3>Containment</h3>
+        <p>Change a parent any time with the <em>Parent</em> field in properties, or by dragging the node into another container. Collapse a container with the toggle in its header or in the model tree; children fold away and relations re-attach to the parent. In a named view, collapsing is <em>per view</em> — the same system can be open in one view and folded in another.</p>
+        <h3>Visibility per view</h3>
+        <p>Elements exist once in the model and appear in as many views as you like. Use the eye icon in the model tree (or <em>Hide from view</em> in the selection bar) to add or remove an element from the active view. Ancestors of a visible element are included automatically.</p>
+      </section>
+
+      <section class="doc-section" id="relations">
+        <h2>Relations</h2>
+        <ol>
+          <li>Hold the <strong>connect key</strong> — <kbd>Alt</kbd> by default; change it under <em>Radical menu → Connect key</em>.</li>
+          <li>Press on the <strong>source</strong> node, drag to the <strong>target</strong>, release. A preview line follows the pointer; <kbd>Esc</kbd> cancels.</li>
+        </ol>
+        <p>
+          The relation type is inferred from the metamodel (e.g. <em>Interacts</em> between C4 elements, <em>Constrains</em> from an ADR). Pairs the metamodel does not allow are refused. Select an edge to edit its <strong>label</strong>, <strong>technology</strong> and <strong>relation type</strong> in the right panel; the <strong>edge action bar</strong> under it lets you re-route the source or the target, hide the relation from the active view, or delete it.
+        </p>
+      </section>
+
+      <section class="doc-section" id="properties">
+        <h2>Properties &amp; governance</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/properties-light.png" alt="A container selected on the canvas; the right panel shows its type badge, label, description, technology, external flag and parent" loading="lazy" />
+          <img class="shot-dark" src="screenshots/properties-dark.png" alt="A container selected on the canvas; the right panel shows its type badge, label, description, technology, external flag and parent" loading="lazy" />
+          <figcaption>Properties of a Container. Fields come from the metamodel, so custom types get their own forms.</figcaption>
+        </figure>
+        <p>
+          Every element has a label, description and parent; C4 runtime elements add <em>technology</em> and an <em>external</em> flag. Everything else is defined by the metamodel: text, long text, number, boolean and enum fields, optionally shown only when another field has a given value.
+        </p>
+        <h3>Requirements (EARS)</h3>
+        <p>
+          A Requirement is edited as a sentence. Pick the EARS pattern — <em>ubiquitous</em>, <em>event-driven</em> (<em>When …</em>), <em>state-driven</em> (<em>While …</em>), <em>unwanted behaviour</em> (<em>If …, then …</em>), <em>optional</em> (<em>Where …</em>) or <em>complex</em> — and click the highlighted slots to fill trigger, condition and action. Or just type the whole thing into the quick-entry box:
+        </p>
+        <p><code>When the user clicks save, the system shall persist the document</code></p>
+        <p>…and it is parsed into type, trigger and action. The subject (“the system”) is taken from the element the requirement <em>constrains</em>, when there is one. Status and priority (MoSCoW) are enums.</p>
+        <h3>ADRs and fitness functions</h3>
+        <p>
+          <strong>ADRs</strong> carry status (proposed → accepted → deprecated / superseded), date, context, decision, consequences and alternatives. <strong>Fitness functions</strong> carry category, trigger (on deploy / continuous / periodic), an <em>automated</em> flag, threshold and status. Both are ordinary elements: link them with <em>Constrains</em>, <em>Supersedes</em>, <em>Implements</em>, <em>Satisfies</em>, <em>Derives</em> and <em>Traces-to</em> relations to the parts of the architecture they govern, and they show up in the <a href="#view-table">Table</a>, <a href="#view-matrix">Matrix</a> and <a href="#view-wiki">Wiki</a> views like anything else.
+        </p>
+      </section>
+
+      <section class="doc-section" id="selection">
+        <h2>Working with selections</h2>
+        <p>
+          Click selects one element; <kbd>Shift</kbd>, <kbd>⌘</kbd>/<kbd>Ctrl</kbd> or <kbd>Alt</kbd>-click adds more. With several nodes selected the <strong>selection bar</strong> appears above the canvas:
+        </p>
+        <ul>
+          <li><strong>Wrap into…</strong> — create a new container of an allowed type around the selection.</li>
+          <li><strong>Move to…</strong> — re-parent the selection into another container.</li>
+          <li><strong>Unwrap</strong> — remove a container but keep its children and their relations.</li>
+          <li><strong>Hide from view</strong> — take the elements out of the active view without touching the model.</li>
+          <li><strong>Delete</strong> — remove from the model (with children); <kbd>Delete</kbd> does the same. Everything is undoable with <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd>.</li>
+        </ul>
+      </section>
+
+      <!-- ═══════════════ VIEWS ═══════════════ -->
+
       <section class="doc-section" id="views">
         <h2>Views</h2>
         <p>
-          A <strong>view</strong> is a filtered window onto the shared model. Every element lives in the
-          model once; views decide which subset is visible. This means you can create a high-level
-          System Context view and a detailed Container view without duplicating any data.
+          A view is a named, saved reading of the model: which elements it shows, how they are laid out, where the camera was, and <em>how</em> it renders them. Nothing in a view changes the model; deleting a view deletes no elements.
         </p>
-        <h3>Creating and managing views</h3>
-        <ol>
-          <li>Switch to <strong>Viewer mode</strong> (toolbar, top-right).</li>
-          <li>Click <em>+ New view</em> in the view list on the right panel, then pick a
-              type — Structure, Flow, Hierarchy, Table, Matrix, or Wiki.</li>
-          <li>Give the view a name (e.g. "System Context", "Payment flow").</li>
-          <li>Use the <strong>eye icons</strong> in the node tree to include or exclude elements for this view.</li>
-          <li>Each view stores its own layout — rearrange nodes here without affecting other views.</li>
-        </ol>
-        <p>
-          You can change a view's type at any time from the view's settings panel (or the
-          <em>Viz</em> dropdown in the view bar), so the same set of elements can be read as a diagram,
-          a table, or a matrix without rebuilding it.
-        </p>
-        <h3>View types</h3>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/views-light.png" alt="Views section open in the left panel listing Structure, Flow, Hierarchy, Matrix, Table and Wiki views of the sample model" loading="lazy" />
+          <img class="shot-dark" src="screenshots/views-dark.png" alt="Views section open in the left panel listing Structure, Flow, Hierarchy, Matrix, Table and Wiki views of the sample model" loading="lazy" />
+          <figcaption>Every view card shows its node count and kind. <em>Structure view</em> at the top is the unnamed default that always shows the whole model.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Create</strong> with <em>+ New view</em> in the left panel; it starts with the elements currently on screen.</li>
+          <li><strong>Open properties</strong> (the pencil on the active card) to rename it, change its <strong>kind</strong>, pick a <strong>layout mode</strong> (<em>Auto</em> or <em>Tree</em>), link a sequence for Flow views, or tune the treemap.</li>
+          <li><strong>Positions, camera and collapse state are per view.</strong> Arrange a container map one way and a context diagram another — switching back restores each exactly.</li>
+          <li><strong>Hidden relations</strong> — a relation can be hidden in one view (edge action bar) while staying in the model and in every other view.</li>
+        </ul>
         <div class="doc-table-wrap">
           <table class="doc-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>What it shows</th>
-                <th>Best for</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Kind</th><th>What it shows</th><th>Best for</th></tr></thead>
             <tbody>
-              <tr>
-                <td><strong>Structure</strong> <span class="badge-accent">default</span></td>
-                <td>Standard node-link architecture view with filtered elements and relations.</td>
-                <td>System Context, Container, Component, and custom static slices.</td>
-              </tr>
-              <tr>
-                <td><strong>Flow</strong></td>
-                <td>Sequence-aware view with numbered steps rendered on matching relations.</td>
-                <td>Request flows, use cases, incident walkthroughs, and presentations.</td>
-              </tr>
-              <tr>
-                <td><strong>Hierarchy</strong></td>
-                <td>Treemap view of the same model, organised by parent-child containment.</td>
-                <td>Domains, subdomains, bounded contexts, teams, and nested ownership structure.</td>
-              </tr>
-              <tr>
-                <td><strong>Table</strong></td>
-                <td>Editable spreadsheet of nodes and relations, with dedicated tabs for ADRs and Fitness Functions.</td>
-                <td>Bulk editing, governance, and reviewing the model as structured data.</td>
-              </tr>
-              <tr>
-                <td><strong>Matrix</strong></td>
-                <td>Dependency Structure Matrix (DSM) — elements on both axes, a marked cell for every relation.</td>
-                <td>Spotting coupling, auditing dependencies, and quickly wiring up relations.</td>
-              </tr>
-              <tr>
-                <td><strong>Wiki</strong></td>
-                <td>Document-style pages for each element with inline editing, children cards, relationships, and metamodel-driven properties.</td>
-                <td>Browsing and editing the model as readable documentation, onboarding, and governance review.</td>
-              </tr>
+              <tr><td><strong>Structure</strong></td><td>Node-and-link diagram with nesting</td><td>System context, container and component maps</td></tr>
+              <tr><td><strong>Flow</strong></td><td>Numbered steps of a sequence between participants</td><td>Runtime scenarios, “what happens when…”</td></tr>
+              <tr><td><strong>Hierarchy</strong></td><td>Drillable treemap of containment</td><td>Portfolio overviews, size and ownership</td></tr>
+              <tr><td><strong>Table</strong></td><td>Editable spreadsheet with governance tabs</td><td>Bulk editing, ADR and requirement registers</td></tr>
+              <tr><td><strong>Matrix</strong></td><td>Dependency structure matrix</td><td>Coupling, cycles, who-depends-on-whom</td></tr>
+              <tr><td><strong>Wiki</strong></td><td>One document page per element</td><td>Reading, reviewing, editing prose</td></tr>
             </tbody>
           </table>
         </div>
-        <h3>Structure views</h3>
-        <p>
-          <strong>Structure</strong> is the default view type. It renders nodes and relations on the
-          canvas and is the best choice for classic C4-style slices: System Context, Containers,
-          Components, or any custom architecture subset.
-        </p>
-        <p>
-          A structure view has its own filtering and layout, but it still points at the shared model.
-          Move elements or exclude them from one structure view and the underlying nodes remain available
-          to every other view.
-        </p>
-        <h3>Flow views</h3>
-        <p>
-          Set a view's type to <em>Flow</em> to add <strong>sequence numbers</strong> to relations.
-          Then choose the sequence to visualise in the view properties panel. Each matching edge gets
-          a step number (1, 2, 3…) on the canvas.
-        </p>
-        <p>
-          In presentation mode, flow views replay the sequence one step at a time — ideal for showing
-          user journeys, request lifecycles, integration hand-offs, or incident narratives.
-        </p>
-        <h3>Hierarchy views</h3>
-        <p>
-          Set a view's type to <em>Hierarchy</em> to render the same model as a <strong>treemap</strong>
-          instead of a node-link graph. Parent elements become nested tiles; child elements are packed
-          inside them.
-        </p>
-        <ul>
-          <li>Click a tile with children to drill into it.</li>
-          <li>Use breadcrumbs or the <em>Up</em> button to zoom back out.</li>
-          <li>Choose whether size is based on leaves, uniform sizing, or relation count.</li>
-          <li>Limit visible depth to keep dense trees readable, then expand specific branches inline.</li>
-        </ul>
-        <p>
-          Hierarchy views are useful when <strong>containment</strong> matters more than edge routing:
-          domains, subdomains, platform areas, team ownership maps, or any nested architecture where
-          you want to understand "what lives inside what" first.
-        </p>
-        <figure class="doc-shot">
-          <img src="screenshots/hierarchy.png" alt="Hierarchy view in light mode showing a treemap for the Platform system with nested Frontend, Backend, Database, Cache, Auth Service, and End User tiles" />
-          <figcaption>Hierarchy view in light mode. The breadcrumb bar lets you drill in and back out, while the size and levels controls tune how much of the containment tree is visible at once.</figcaption>
-        </figure>
-        <h3>Table views</h3>
-        <p>
-          Set a view's type to <em>Table</em> to work with the model as an <strong>editable
-          spreadsheet</strong> instead of a diagram. Each row is a node; click any cell to edit its
-          name, description, technology, or type inline. Drag an element type from the palette onto a
-          row to add a child, or drag an existing node to reparent it.
-        </p>
-        <p>
-          The table has four tabs:
-        </p>
-        <ul>
-          <li><strong>All Nodes</strong> — every element as an indented containment tree.</li>
-          <li><strong>ADRs</strong> — Architecture Decision Records with status, context, decision,
-              consequences, and alternatives columns.</li>
-          <li><strong>Fitness Functions</strong> — fitness functions with category, automation,
-              trigger, status, and threshold columns.</li>
-          <li><strong>Relations</strong> — every relation with its source, type, target, label, and
-              technology.</li>
-        </ul>
-        <p>
-          The ADR and Fitness Function tabs require the <em>C4 + DDD + Governance</em> metamodel
-          (see below). The bundled sample model uses it, so you can explore these tabs right away.
-        </p>
-        <figure class="doc-shot">
-          <img src="screenshots/table.png" alt="Table view showing an editable spreadsheet with All Nodes, ADRs, Fitness Functions and Relations tabs; rows show type badges, names and technology" />
-          <figcaption>The Table view as an editable spreadsheet. Switch tabs to manage ADRs and Fitness Functions, or edit any node or relation field inline. Drag a palette type onto a row to nest a new child element.</figcaption>
-        </figure>
-
-        <h3>Matrix views</h3>
-        <p>
-          Set a view's type to <em>Matrix</em> to render a <strong>Dependency Structure Matrix</strong>
-          (DSM): the elements appear on both the rows and the columns, and a coloured dot marks every
-          place where a <em>row → column</em> relation exists. The colour follows the relation type.
-        </p>
-        <ul>
-          <li>Hover a cell to highlight its row and column axes.</li>
-          <li>Click an <strong>empty</strong> cell to create a relation (subject to metamodel rules).</li>
-          <li>Click a <strong>marked</strong> cell to select the relation; click it again to remove it.</li>
-          <li>When a pair has several relations, a count badge appears — click to pick one from a popup.</li>
-        </ul>
-        <p>
-          Matrix views are collapse-aware: relations roll up to the nearest visible ancestor, so a
-          collapsed container shows the aggregated dependencies of everything inside it. In Viewer and
-          Presenter modes the matrix is read-only.
-        </p>
-        <figure class="doc-shot">
-          <img src="screenshots/matrix.png" alt="Matrix view showing a dependency structure matrix with elements on rows and columns and coloured dots where a relation exists" />
-          <figcaption>The Matrix (DSM) view. Every relation is a cell — read coupling at a glance, then click cells to add or remove dependencies without hunting for nodes on a canvas.</figcaption>
-        </figure>
-
-        <h3>Wiki views</h3>
-        <p>
-          Set a view's type to <em>Wiki</em> to browse and edit the model as <strong>readable, document-style
-          pages</strong>. Each element gets its own page with a large title, a lead paragraph, an infobox of
-          key facts, children cards, and a full relationship list — all editable inline with click-to-edit.
-        </p>
-        <ul>
-          <li>A <strong>navigation tree</strong> on the left lets you jump to any element; use the filter box to search by name.</li>
-          <li>Properties are rendered dynamically from the active <strong>metamodel</strong>, so ADRs show status, context, decision, consequences and alternatives, while fitness functions show category, automation level, trigger, and threshold.</li>
-          <li>Click any text, badge, or dropdown to <strong>edit in place</strong> — changes are written to the shared model immediately.</li>
-          <li>The wiki respects the view's <strong>node visibility</strong> filter: toggle elements on or off in the right panel's node tree to control what appears.</li>
-        </ul>
-        <p>
-          Wiki views are ideal for <strong>onboarding</strong> new team members, <strong>reviewing governance</strong>
-          artefacts (ADRs, fitness functions), or simply reading the architecture as structured documentation
-          rather than a diagram.
-        </p>
-        <figure class="doc-shot">
-          <img src="screenshots/wiki.png" alt="Wiki view showing a document-style page for Core Banking Platform with navigation tree, children cards, and an At a Glance infobox" />
-          <figcaption>The Wiki view renders each element as a readable page. Navigate with the tree on the left, edit any field inline, and browse children and relationships without switching views.</figcaption>
-        </figure>
-
-        <h3>View layout mode</h3>
-        <p>
-          Structure and flow views can independently use <em>Auto</em> (Smart Layout) or <em>Tree</em>
-          layout. Switch via the view's settings panel. In tree mode the Smart Layout button changes to
-          <em>Tree Layout</em>. Hierarchy, Table, Matrix and Wiki views don't use canvas layout — they expose
-          their own controls (depth and sizing, spreadsheet tabs, DSM cells, or document navigation respectively).
-        </p>
-        <figure class="doc-shot">
-          <img src="screenshots/views.png" alt="Views panel showing All elements, System Context, Core Banking Containers and Payments Domain views with a '+ New view' button" />
-          <figcaption>The views panel in Designer mode. Each named view can switch between Structure, Flow, Hierarchy, Table, Matrix and Wiki. Click <em>+ New view</em> to add another, then use the node tree's eye icons to control membership.</figcaption>
-        </figure>
       </section>
 
-      <!-- Milestones -->
+      <section class="doc-section" id="view-structure">
+        <h2>Structure views</h2>
+        <p>
+          The classic diagram. Relations between elements hidden inside a collapsed container are drawn to the container instead, so a system-level view stays readable while the detail is one click away. Set the view's <strong>layout mode</strong> to <em>Tree</em> for deep containment hierarchies; the Smart Layout button then runs a top-down tree layout instead of the graph ensemble.
+        </p>
+      </section>
+
+      <section class="doc-section" id="view-flow">
+        <h2>Flow views &amp; sequences</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/flow-light.png" alt="Flow view: participants across the top, numbered arrows for each step of the Payment Processing sequence" loading="lazy" />
+          <img class="shot-dark" src="screenshots/flow-dark.png" alt="Flow view: participants across the top, numbered arrows for each step of the Payment Processing sequence" loading="lazy" />
+          <figcaption>The <em>Payment Flow</em> view renders the <em>Payment Processing</em> sequence — seven relations from the model, in order, with per-step notes.</figcaption>
+        </figure>
+        <p>
+          A <strong>sequence</strong> is an ordered list of existing relations. Open <em>Sequences</em> in the right panel, click <em>+ New sequence</em>, then click relations on the canvas to append them as steps. Reorder with the arrows, add a note per step (shown on the arrow instead of the relation label), remove steps, or <em>Create a Flow view</em> for the sequence in one click. A Flow view is linked to exactly one sequence; participants are the elements involved, in order of first appearance. Zoom with <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>+</kbd>/<kbd>−</kbd>, <kbd>0</kbd> fits.
+        </p>
+        <p>Sequences are stored with milestones, so a Flow view can show how a scenario changed over time, and Presenter replays them step by step.</p>
+      </section>
+
+      <section class="doc-section" id="view-hierarchy">
+        <h2>Hierarchy views</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/hierarchy-light.png" alt="Hierarchy view: nested coloured rectangles for systems, domains and containers with a breadcrumb and size and levels controls" loading="lazy" />
+          <img class="shot-dark" src="screenshots/hierarchy-dark.png" alt="Hierarchy view: nested coloured rectangles for systems, domains and containers with a breadcrumb and size and levels controls" loading="lazy" />
+          <figcaption>Containment as a treemap. Click a rectangle to drill in; the breadcrumb takes you back.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Size</strong> — <em>Leaves</em> (area ∝ number of descendants), <em>Uniform</em> (siblings equal) or <em>Relations</em> (area ∝ connectivity).</li>
+          <li><strong>Levels</strong> — how many levels below the focus to render; expand a single branch inline without changing the limit.</li>
+          <li><strong>Drill</strong> — click to focus a subtree; <kbd>Esc</kbd> or <kbd>Backspace</kbd> goes up. Focus and depth are remembered per view.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="view-table">
+        <h2>Table views</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/table-light.png" alt="Table view with tabs All Nodes, ADRs, Fitness Functions, Requirements and Relations, showing type badges, names, descriptions, technology and parent" loading="lazy" />
+          <img class="shot-dark" src="screenshots/table-dark.png" alt="Table view with tabs All Nodes, ADRs, Fitness Functions, Requirements and Relations, showing type badges, names, descriptions, technology and parent" loading="lazy" />
+          <figcaption>The <em>Governance</em> table. Each tab has the columns that matter for that kind of element.</figcaption>
+        </figure>
+        <p>
+          <strong>All nodes</strong> shows the containment tree as indented rows; <strong>ADRs</strong>, <strong>Fitness Functions</strong> and <strong>Requirements</strong> expose their governance fields (status, priority, EARS pattern and slots…) as columns; <strong>Relations</strong> lists every edge with source, target, label, technology and type. Click a cell to edit it in place — enums become dropdowns, and columns that depend on another value (an EARS trigger only exists for event-driven requirements) grey out when they do not apply. Drop a palette item onto a row to add a child of that element.
+        </p>
+      </section>
+
+      <section class="doc-section" id="view-matrix">
+        <h2>Matrix views</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/matrix-light.png" alt="Dependency structure matrix with elements on rows and columns and coloured cells where relations exist" loading="lazy" />
+          <img class="shot-dark" src="screenshots/matrix-dark.png" alt="Dependency structure matrix with elements on rows and columns and coloured cells where relations exist" loading="lazy" />
+          <figcaption>The <em>Dependency Matrix</em>: rows depend on columns. Symmetric pairs reveal cycles at a glance.</figcaption>
+        </figure>
+        <p>
+          A design structure matrix of the view's elements. A filled cell means at least one relation from the row element to the column element; click it to see which. Because the matrix is just another view, it stays in sync with every diagram — add a relation on a Structure view and the cell lights up.
+        </p>
+      </section>
+
+      <section class="doc-section" id="view-wiki">
+        <h2>Wiki views</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/wiki-light.png" alt="Wiki view: a document page for Core Banking Platform with breadcrumb, description, facts box, children and relations" loading="lazy" />
+          <img class="shot-dark" src="screenshots/wiki-dark.png" alt="Wiki view: a document page for Core Banking Platform with breadcrumb, description, facts box, children and relations" loading="lazy" />
+          <figcaption>The <em>Architecture Wiki</em> view. Every element is a page; every field on it is editable inline.</figcaption>
+        </figure>
+        <p>
+          The overview page lists the view's elements as a table of contents; each element page shows its description as prose, short facts (status, technology, priority…) in an infobox, long fields as sections, children, and incoming and outgoing relations as links. Requirements show their EARS sentence with editable slots. You can add child elements and relations directly from a page. The page you are on is saved with the view, so a deep link lands on it.
+        </p>
+      </section>
+
+      <!-- ═══════════════ WORK FASTER ═══════════════ -->
+
+      <section class="doc-section" id="layout">
+        <h2>Layout &amp; navigation</h2>
+        <h3>Smart Layout</h3>
+        <p>
+          One button, several algorithms: a layered layout (ELK), a force-directed layout and a simulated-annealing pass are run as candidates, scored for edge crossings, overlaps and compactness, and the best one is applied — with edge routing cleaned up afterwards. It respects containment, so children are arranged inside their parents. A view with <em>Tree</em> layout mode gets a hierarchical tree layout instead.
+        </p>
+        <h3>Live physics</h3>
+        <p>While you drag, a light force simulation nudges neighbours out of the way and keeps containers hugging their children. It never fights you: the node you hold stays where you put it.</p>
+        <h3>Fit &amp; Smart Fit</h3>
+        <p><strong>Fit All</strong> frames the visible elements. <strong>Smart Fit</strong> (Radical menu) keeps the camera fitted as the diagram changes — useful while importing or laying out, less so while hand-arranging. Scroll to zoom, drag the background to pan.</p>
+        <h3>Quick Search</h3>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/search-light.png" alt="Quick Search open with the query Payment, listing matching views, nodes and relations with the views they appear in" loading="lazy" />
+          <img class="shot-dark" src="screenshots/search-dark.png" alt="Quick Search open with the query Payment, listing matching views, nodes and relations with the views they appear in" loading="lazy" />
+          <figcaption><kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>P</kbd> searches elements, relations and views. Each hit lists the views it appears in — pick one to jump straight there.</figcaption>
+        </figure>
+        <p>Results are ranked across labels, descriptions and technology. <kbd>↑</kbd>/<kbd>↓</kbd> to move, <kbd>Enter</kbd> to select and centre the camera on the element, <kbd>Esc</kbd> to close. With an AI provider configured the same box becomes the assistant (see <a href="#ai">AI assistant</a>).</p>
+      </section>
+
       <section class="doc-section" id="milestones">
         <h2>Milestones</h2>
-        <p>
-          A <strong>milestone</strong> is a named snapshot of the entire model state — nodes,
-          relations, views, and layout positions.
-        </p>
-        <h3>Creating a milestone</h3>
-        <ol>
-          <li>Click the camera icon in the toolbar (or open the milestones panel in the right panel).</li>
-          <li>Enter a name (e.g. "v1 — initial draft", "After sprint 3") and an optional date.</li>
-          <li>Click <em>Save milestone</em>.</li>
-        </ol>
-        <h3>Browsing and restoring</h3>
-        <p>
-          All milestones are listed in the right panel with their names, dates, and node/relation
-          counts. Click any milestone to <strong>preview</strong> it. Click <em>Restore</em> to
-          revert the live model to that snapshot (a new undo entry is created, so you can undo the restore).
-        </p>
-        <div class="doc-tip">
-          <strong>Tip:</strong> Milestones are stored inside the model JSON file —
-          they travel with the file when you export or share it.
-        </div>
         <figure class="doc-shot">
-          <img src="screenshots/milestones-panel.png" alt="Milestones panel expanded in Designer mode showing Current (live), v4 Full Platform, v3 Cards &amp; Fraud, v2 Payments &amp; Events, and v1 Core &amp; Accounts snapshots with dates and node counts" />
-          <figcaption>The milestones panel lists every named snapshot with its date and node count. Click any entry to preview that state; the currently active snapshot is highlighted.</figcaption>
+          <img class="shot-light" src="screenshots/milestones-light.png" alt="Milestone v2 active: the canvas shows the model as it was, the chip at the top names the milestone with a diff toggle, and the Milestones list shows Current (live), v3, v2, v1" loading="lazy" />
+          <img class="shot-dark" src="screenshots/milestones-dark.png" alt="Milestone v2 active: the canvas shows the model as it was, the chip at the top names the milestone with a diff toggle, and the Milestones list shows Current (live), v3, v2, v1" loading="lazy" />
+          <figcaption>Time travel: the <em>v2 – Payments &amp; Events</em> milestone of the sample. <em>Current (live)</em> brings you back.</figcaption>
         </figure>
-      </section>
-
-      <!-- Layout -->
-      <section class="doc-section" id="layout">
-        <h2>Layout engines</h2>
-        <p>Radical.Tools ships three layout engines, each with a different trade-off:</p>
-
-        <div class="doc-table-wrap">
-          <table class="doc-table">
-            <thead>
-              <tr>
-                <th>Engine</th>
-                <th>Style</th>
-                <th>Best for</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Smart Layout</strong> <span class="badge-accent">default</span></td>
-                <td>Simulated annealing + ELK ensemble</td>
-                <td>General diagrams — picks the cleanest result automatically with edge-crossing minimisation and aspect-ratio penalty.</td>
-              </tr>
-              <tr>
-                <td><strong>Tree Layout</strong></td>
-                <td>Hierarchical nested-tree (ELK)</td>
-                <td>Diagrams with a clear parent–child hierarchy. Enable per-view via the view settings panel.</td>
-              </tr>
-              <tr>
-                <td><strong>WebCola (live)</strong></td>
-                <td>Force-directed physics</td>
-                <td>Exploratory editing — nodes repel/attract in real time as you drag. Settles to a stable position. Toggled from the ELK/Cola button in the toolbar.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <h3>Smart Fit</h3>
         <p>
-          Enable <em>Smart Fit</em> (Radical menu → View → Smart Fit) to automatically zoom and
-          pan the viewport to fit all visible nodes after every layout run or model change.
-        </p>
-
-        <h3>Fit All</h3>
-        <p>
-          The <em>Fit All</em> button in the toolbar instantly fits all visible nodes into the
-          current viewport without triggering a re-layout.
-        </p>
-      </section>
-
-      <!-- Presentation -->
-      <section class="doc-section" id="presentation">
-        <h2>Presentation mode</h2>
-        <p>
-          Presentation mode turns your views into a fullscreen slide deck.
-        </p>
-        <ol>
-          <li>Switch to <strong>Viewer mode</strong>.</li>
-          <li>Drag views into the desired order in the slide deck at the bottom of the screen.</li>
-          <li>Click <strong>Present</strong> or press <kbd>F5</kbd> to go fullscreen.</li>
-          <li>Navigate between slides with the on-screen arrow buttons or keyboard.</li>
-            <li>Flow views replay their sequence steps one at a time — each press of the forward
-              arrow reveals the next numbered relation.</li>
-          <li>Press <kbd>Esc</kbd> or <kbd>F5</kbd> again to exit presentation mode.</li>
-        </ol>
-        <figure class="doc-shot">
-          <img src="screenshots/viewer-mode.png" alt="Viewer mode with views list on the left showing All elements, System Context, Core Banking Containers, Payments Domain; slide deck at the bottom with 4 slides; Present button bottom-left" />
-          <figcaption>Viewer mode: the views list (left) acts as your slide library. Drag views to reorder them in the deck at the bottom. Hit <em>Present</em> to go fullscreen.</figcaption>
-        </figure>
-      </section>
-
-      <!-- AI -->
-      <section class="doc-section" id="ai">
-        <h2>AI integration</h2>
-        <p>
-          The built-in AI assistant can answer questions about the model, detect gaps, and apply
-          natural-language changes as structured patches.
-        </p>
-        <h3>Opening the AI chat</h3>
-        <p>
-          Press <kbd>⌘P</kbd> / <kbd>Ctrl+P</kbd> to focus the quick-search bar.
-          Type <code>&gt;</code> (right angle bracket) to switch into <strong>AI mode</strong>.
-          The bar expands into a chat thread.
-        </p>
-        <h3>Example prompts</h3>
-        <ul>
-          <li><em>"Add a Redis cache container between the API Gateway and the User Service"</em></li>
-          <li><em>"What components talk directly to the database?"</em></li>
-          <li><em>"Rename Payment Service to Payment Processor and update all its relations"</em></li>
-          <li><em>"List all containers that have no outgoing relations"</em></li>
-        </ul>
-        <p>
-          Destructive changes are shown as a diff before being applied. Press <kbd>⌘↵</kbd> /
-          <kbd>Ctrl+Enter</kbd> to send a message to the AI without applying any pending patch.
-        </p>
-        <h3>Configuring providers</h3>
-        <p>
-          Go to <em>Radical menu → AI → AI providers…</em> to configure your preferred LLM.
-          Supported providers:
+          A milestone is a named, dated snapshot of the whole model — elements, relations and sequences. Click <em>+ New milestone</em> in the left panel to capture the current state. Click any milestone to <strong>step back in time</strong>: the canvas shows the model as it was, the chip at the top names it, and every view still works.
         </p>
         <ul>
-          <li><strong>Ollama</strong> — local models, no API key required.</li>
-          <li><strong>OpenAI</strong> — GPT-4o and other OpenAI models.</li>
-          <li><strong>Anthropic Claude</strong> — Claude 3 / Claude 4 family.</li>
-          <li><strong>Google Gemini</strong> — Gemini 1.5 / 2.0 models.</li>
+          <li><strong>Diff</strong> — the toggle on the chip colours what changed since the previous milestone: added, changed, and removed elements drawn as ghosts. Flow views show removed steps the same way.</li>
+          <li><strong>Editing in the past</strong> — if you change something while a milestone is active you are asked what you meant: <em>propagate</em> the change to that milestone and every later one, <em>save as a new milestone</em> right after it, or <em>discard</em>.</li>
+          <li><strong>Slides</strong> can be pinned to a milestone, so a presentation can tell the story in order.</li>
         </ul>
-        <div class="doc-tip">
-          Your API key is stored locally in the browser's <code>localStorage</code>.
-          Nothing is proxied — all requests go directly from the app to the provider.
-        </div>
-        <figure class="doc-shot">
-          <img src="screenshots/search.png" alt="Quick search bar open with 'Payment' query showing NODE and REL result badges with path context and view filter chips" />
-          <figcaption>The quick-search bar (<kbd>⌘P</kbd>) finds nodes and relations by name. Type <code>&gt;</code> first to switch into AI mode and send a natural-language prompt instead.</figcaption>
-        </figure>
       </section>
 
-      <!-- Metamodel -->
+      <section class="doc-section" id="presenting">
+        <h2>Viewer &amp; Presenter</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/viewer-light.png" alt="Viewer perspective: views list on the left, read-only canvas, model tree on the right" loading="lazy" />
+          <img class="shot-dark" src="screenshots/viewer-dark.png" alt="Viewer perspective: views list on the left, read-only canvas, model tree on the right" loading="lazy" />
+          <figcaption>Viewer: everything you can do in Designer to <em>look</em>, nothing that changes the saved model.</figcaption>
+        </figure>
+        <p>
+          <strong>Viewer</strong> is a sandbox. Drag, collapse, re-layout, switch views and milestones — all of it is thrown away when you return to Designer, so you can explore freely in front of others. It is also the perspective the <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a> uses to show concepts.
+        </p>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/presenter-light.png" alt="Presenter perspective: the slide dock along the bottom lists the Architecture Walkthrough slides with Present and Add slide buttons" loading="lazy" />
+          <img class="shot-dark" src="screenshots/presenter-dark.png" alt="Presenter perspective: the slide dock along the bottom lists the Architecture Walkthrough slides with Present and Add slide buttons" loading="lazy" />
+          <figcaption>Presenter: build a deck from views, then play it.</figcaption>
+        </figure>
+        <p>
+          <strong>Presenter</strong> adds the slide dock. Pick or create a presentation, then <em>Add slide</em> to capture what is on screen: the view, the camera, the layout and collapse state, and the model at that moment. Slides can be renamed, reordered, re-captured, and linked to a view or a milestone. <em>Present</em> (or <kbd>F5</kbd> from anywhere) goes full-screen: <kbd>→</kbd> <kbd>↓</kbd> <kbd>Space</kbd> advance, <kbd>←</kbd> <kbd>↑</kbd> go back, <kbd>Esc</kbd> exits. A Flow-view slide replays its sequence one step at a time. The URL updates as you present, so a listener can open the same slide.
+        </p>
+      </section>
+
+      <!-- ═══════════════ EXTEND ═══════════════ -->
+
       <section class="doc-section" id="metamodel">
         <h2>Metamodel editor</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/metamodel-light.png" alt="Metamodel editor listing node types with colour, icon, allowed parents and properties, and relation types with allowed pairs" loading="lazy" />
+          <img class="shot-dark" src="screenshots/metamodel-dark.png" alt="Metamodel editor listing node types with colour, icon, allowed parents and properties, and relation types with allowed pairs" loading="lazy" />
+          <figcaption>The metamodel travels with the model. Change it here and every form, palette entry and validation rule follows.</figcaption>
+        </figure>
         <p>
-          The <strong>metamodel</strong> defines which element types and relation types exist in
-          your diagram, along with their colours, icons, and allowed connections.
-        </p>
-        <p>
-          Open it via <em>Radical menu → Schema → Metamodel editor…</em> The canvas is replaced
-          by the metamodel editor. Changes take effect immediately — new types appear in the palette
-          and existing nodes re-render with any updated colours.
-        </p>
-        <h3>Built-in metamodels</h3>
-        <p>
-          Three presets ship built-in. Choose one on the Welcome screen (or via
-          <em>Radical menu → Models → New model</em>):
+          <em>Radical menu → Metamodel editor…</em>. Start from a preset — <strong>C4</strong>, <strong>C4 + DDD</strong> or <strong>C4 + DDD + Governance</strong> — then shape it:
         </p>
         <ul>
-          <li><strong>C4</strong> — Person, Software System, Container, Component, Database, Web App, Queue.</li>
-          <li><strong>C4 + DDD Domains</strong> — adds a strategic <em>Domain</em> container that nests
-              recursively (Core / Supporting / Generic) above the technical model, plus DDD relations
-              such as <em>Realises</em>, <em>Depends on</em>, and <em>Partnership</em>.</li>
-          <li><strong>C4 + DDD + Governance</strong> — adds two governance node types and links them to
-              architecture elements (see below).</li>
+          <li><strong>Node types</strong> — label, icon, colour, default and collapsed size, <em>allowed parents</em>, whether it may sit at the root, min/max <em>cardinality</em>, and <em>properties</em> (text, long text, number, boolean, enum with options and a default; a property can be <em>visible only when</em> another one has certain values).</li>
+          <li><strong>Relation types</strong> — label, colour, the <em>allowed pairs</em> of source and target types, and their own properties.</li>
+          <li>Built-in types can be extended but not deleted; add as many of your own as you need.</li>
         </ul>
-        <h3>Governance: ADRs &amp; Fitness Functions</h3>
+        <p>Validation is live: the palette, the parent drop-down, drag-and-drop and connection previews all consult the metamodel, and the AI assistant's patches are checked against it too.</p>
+      </section>
+
+      <section class="doc-section" id="hub">
+        <h2>Concept Hub</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/hub-catalogue-light.png" alt="hub.radical.tools: catalogue of concepts on the left and the Analytical Data Platform blueprint rendered on the canvas on the right" loading="lazy" />
+          <img class="shot-dark" src="screenshots/hub-catalogue-dark.png" alt="hub.radical.tools: catalogue of concepts on the left and the Analytical Data Platform blueprint rendered on the canvas on the right" loading="lazy" />
+          <figcaption><a href="https://hub.radical.tools" target="_blank" rel="noopener">hub.radical.tools</a> — the catalogue beside the real viewer.</figcaption>
+        </figure>
         <p>
-          The governance metamodel makes architectural intent part of the model itself:
-        </p>
-        <ul>
-          <li><strong>ADR</strong> — an Architecture Decision Record (Nygard / MADR style) with
-              <em>status</em>, <em>date</em>, <em>context</em>, <em>decision</em>,
-              <em>consequences</em>, and <em>alternatives considered</em>.</li>
-          <li><strong>Fitness Function</strong> — an objective, often automated check from
-              <em>Building Evolutionary Architectures</em>, with <em>category</em>,
-              <em>automated</em>, <em>trigger</em>, <em>threshold</em>, and <em>status</em>.</li>
-        </ul>
-        <p>
-          Three governance relations connect them to the architecture: <strong>Constrains</strong>
-          (an ADR or Fitness Function → any element), <strong>Supersedes</strong> (a newer ADR → an
-          older one), and <strong>Implements</strong> (a Fitness Function → the ADR it verifies). Manage
-          these records most comfortably in a <a href="#views">Table view</a>, on its ADRs and Fitness
-          Functions tabs. The bundled sample model uses this metamodel.
-        </p>
-        <p>
-          You can add custom node types (with a custom label, icon path, and colour) or remove types
-          that don't apply to your architecture. Relation types let you define which source and target
-          combinations are valid.
+          The Hub is a curated library of <strong>requirements</strong>, <strong>ADRs</strong>, <strong>fitness functions</strong>, <strong>patterns</strong> (C4 fragments) and <strong>blueprints</strong> (whole solution skeletons). It is rendered by the same engine as Studio, so you can open any concept as a diagram, wiki page or table before importing it. Select several and <em>Add to Studio</em>.
         </p>
         <figure class="doc-shot">
-          <img src="screenshots/metamodel.png" alt="Metamodel editor showing C4 built-in preset with 7 node types (Person, Software System, Container, Component, Database, Web App, Queue) and 2 relation types (Uses, Delivers to), with Add node type and Add relation type buttons" />
-          <figcaption>The metamodel editor. Expand any type to edit its label, icon, and colour. Click <em>+ Add node type</em> to define custom element types specific to your domain.</figcaption>
+          <img class="shot-light" src="screenshots/hub-import-light.png" alt="Import from Hub dialog in Studio listing three concepts with tags, template parameters and Add to Model buttons" loading="lazy" />
+          <img class="shot-dark" src="screenshots/hub-import-dark.png" alt="Import from Hub dialog in Studio listing three concepts with tags, template parameters and Add to Model buttons" loading="lazy" />
+          <figcaption>Inside Studio: <em>Radical menu → Import from Hub…</em>, or arrive from the Hub with your selection pre-loaded.</figcaption>
         </figure>
+        <ul>
+          <li><strong>Templates</strong> — concepts with parameters (a latency budget, an endpoint, a data class) ask for values on import; the <em>Hub template</em> section in the element's properties lets you change them later.</li>
+          <li><strong>Blueprints</strong> — pick which elements and which referenced concepts to bring in.</li>
+          <li><strong>Drop target</strong> — with a compatible container selected, imported elements become its children.</li>
+        </ul>
       </section>
 
-      <!-- Files -->
-      <section class="doc-section" id="files">
-        <h2>Files &amp; documents</h2>
+      <section class="doc-section" id="ai">
+        <h2>AI assistant</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/ai-settings-light.png" alt="AI providers dialog with a master switch and tabs for Ollama, OpenAI, Anthropic and Google Gemini, each with model, base URL and API key fields and a Test connection button" loading="lazy" />
+          <img class="shot-dark" src="screenshots/ai-settings-dark.png" alt="AI providers dialog with a master switch and tabs for Ollama, OpenAI, Anthropic and Google Gemini, each with model, base URL and API key fields and a Test connection button" loading="lazy" />
+          <figcaption><em>Radical menu → AI providers…</em>. Keys stay in this browser and calls go straight to the provider.</figcaption>
+        </figure>
         <p>
-          Radical.Tools stores models as plain <strong>JSON files</strong>. You can diff them in
-          git, edit them in a text editor, and automate transformations with any script.
+          Bring your own model: <strong>Ollama</strong> (local, no key), <strong>OpenAI</strong>, <strong>Anthropic Claude</strong> or <strong>Google Gemini</strong>. Enable AI, pick the active provider, paste a key, <em>Test connection</em>. Nothing is proxied through radical.tools.
         </p>
-        <h3>Document manager</h3>
         <p>
-          Open <em>Radical menu → Models → Manage models…</em> to create, rename, duplicate, or
-          delete models. Each model is either:
+          Then open Quick Search (<kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>P</kbd>) and switch to <strong>✨ AI mode</strong> — <kbd>Tab</kbd> on an empty box, the ✨ button, or <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Enter</kbd> to send the current text. The assistant sees the model and its metamodel and can:
         </p>
         <ul>
-          <li><strong>LOCAL</strong> — stored in browser <code>localStorage</code> (survives page
-              reloads, tied to the browser profile).</li>
-          <li><strong>FILE</strong> — an explicit <code>.json</code> file opened from the filesystem
-              via the Electron file dialog.</li>
+          <li><strong>Answer questions</strong> — “what depends on the Event Bus?”, “which containers have no owner?”. It queries the model with a small query language (<code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>STATS MODEL</code>) rather than guessing.</li>
+          <li><strong>Change the model</strong> — “add a Redis cache between the API gateway and the accounts service”. The answer is a <em>patch</em> (add / update / delete nodes and relations, add views) that is validated against the metamodel, applied atomically and undoable like any other edit.</li>
+          <li><strong>Draft governance</strong> — turn a paragraph into EARS requirements or an ADR with the right fields filled.</li>
         </ul>
-        <h3>Import / Export</h3>
+      </section>
+
+      <!-- ═══════════════ REFERENCE ═══════════════ -->
+
+      <section class="doc-section" id="formats">
+        <h2>File formats</h2>
+        <h3><code>.radical</code> (JSON)</h3>
+        <p>One file: <code>nodes</code>, <code>relations</code>, <code>sequences</code>, <code>views</code> (with per-view positions and camera), <code>snapshots</code> (milestones), <code>presentations</code>, the <code>metamodel</code> and Hub template records. Older <code>.c4.json</code> files open unchanged.</p>
+        <h3>Markdown folder</h3>
+<pre class="code"><code>my-model/
+├─ radical.md                 <span class="cm"># manifest</span>
+├─ nodes/
+│  ├─ retail-customer.md      <span class="cm"># one element = one file</span>
+│  └─ core-banking-platform/  <span class="cm"># containers become directories</span>
+│     ├─ _index.md            <span class="cm"># the container itself</span>
+│     └─ payments-service/
+│        ├─ _index.md
+│        └─ fx-engine.md
+├─ relations.json
+├─ views.json · sequences.json · snapshots.json · presentations.json
+├─ metamodel.json · hubTemplates.json
+└─ _layout.json               <span class="cm"># positions &amp; camera — the only noisy file</span></code></pre>
         <p>
-          In the document manager, use <em>Export</em> to save the active model as a
-          <code>.json</code> file, or <em>Import</em> to load one. In the desktop (Electron) app
-          this opens a native file dialog; in the browser it uses a file input / download.
+          Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the element's properties, sorted) and the description as body. Hierarchy is the directory tree. Output is deterministic — sorted keys, stable file names — so Git diffs show what changed and nothing else. Edit the files by hand; the app picks them up.
         </p>
       </section>
 
-      <!-- Shortcuts -->
+      <section class="doc-section" id="links">
+        <h2>Deep links</h2>
+        <p>Studio mirrors its state into the URL hash so any screen can be bookmarked or shared:</p>
+<pre class="code"><code>#/m/&lt;mode&gt;/v/&lt;viewId&gt;[/f/&lt;elementId&gt;][/s/&lt;milestoneId&gt;]
+#/d/&lt;docId&gt;/m/&lt;mode&gt;/v/&lt;viewId&gt;[/p/&lt;presentationId&gt;/play/1/sl/&lt;n&gt;]
+
+mode   designer | viewer | presenter | metamodel
+view   a view id, or <span class="cm">canvas</span> for the default Structure view
+f      element page (Wiki views)      s   active milestone
+p / sl presentation and 0-based slide while presenting
+d      <span class="cm">ls:&lt;uuid&gt;</span> or <span class="cm">fs:&lt;path&gt;</span> — which model (local to this machine)</code></pre>
+        <p>The Hub uses <code>#/c/&lt;conceptId&gt;/v/canvas|wiki|table</code> and <code>studio.radical.tools/?hub=id1,id2</code> opens Studio with those concepts queued for import.</p>
+      </section>
+
       <section class="doc-section" id="shortcuts">
         <h2>Keyboard shortcuts</h2>
         <div class="doc-table-wrap">
           <table class="doc-table">
-            <thead>
-              <tr>
-                <th>Action</th>
-                <th>Mac</th>
-                <th>Windows / Linux</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Keys</th><th>Action</th></tr></thead>
             <tbody>
-              <tr><td>Quick search / AI chat</td><td><kbd>⌘P</kbd></td><td><kbd>Ctrl+P</kbd></td></tr>
-              <tr><td>Undo</td><td><kbd>⌘Z</kbd></td><td><kbd>Ctrl+Z</kbd></td></tr>
-              <tr><td>Redo</td><td><kbd>⌘⇧Z</kbd></td><td><kbd>Ctrl+Y</kbd></td></tr>
-              <tr><td>Delete selected element</td><td><kbd>Delete</kbd> / <kbd>⌫</kbd></td><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td></tr>
-              <tr><td>Start / stop presentation</td><td><kbd>F5</kbd></td><td><kbd>F5</kbd></td></tr>
-              <tr><td>Send to AI (no patch)</td><td><kbd>⌘↵</kbd></td><td><kbd>Ctrl+Enter</kbd></td></tr>
-              <tr><td>Close / cancel / exit</td><td><kbd>Esc</kbd></td><td><kbd>Esc</kbd></td></tr>
-              <tr><td>Add System node at position</td><td colspan="2">double-click canvas background</td></tr>
-              <tr><td>Create relation</td><td colspan="2">hold <kbd>Alt</kbd> + drag (configurable)</td></tr>
-              <tr><td>Collapse/expand parent node</td><td colspan="2">click triangle icon on node</td></tr>
-              <tr><td>Fit all nodes in viewport</td><td colspan="2"><em>Fit All</em> button in toolbar</td></tr>
+              <tr><td><kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>P</kbd></td><td>Quick Search (and AI prompt)</td></tr>
+              <tr><td><kbd>Tab</kbd> / <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>In Quick Search: switch to AI mode / send to AI</td></tr>
+              <tr><td><kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>⇧</kbd>+<kbd>Z</kbd> or <kbd>Y</kbd></td><td>Undo · Redo</td></tr>
+              <tr><td><kbd>Alt</kbd> + drag (configurable)</td><td>Connect two elements</td></tr>
+              <tr><td><kbd>Shift</kbd> / <kbd>⌘</kbd>/<kbd>Ctrl</kbd> / <kbd>Alt</kbd> + click</td><td>Add to selection</td></tr>
+              <tr><td><kbd>Delete</kbd></td><td>Delete selected elements or relation</td></tr>
+              <tr><td>Double-click canvas</td><td>New Software System at the pointer</td></tr>
+              <tr><td><kbd>Esc</kbd></td><td>Cancel connection, close dialogs, leave edit mode; in Hierarchy views go up a level</td></tr>
+              <tr><td><kbd>F5</kbd></td><td>Start / stop the presentation</td></tr>
+              <tr><td><kbd>→</kbd> <kbd>↓</kbd> <kbd>Space</kbd> · <kbd>←</kbd> <kbd>↑</kbd></td><td>Next · previous slide while presenting</td></tr>
+              <tr><td><kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd></td><td>Zoom in / out / fit (Flow views)</td></tr>
+              <tr><td><kbd>Enter</kbd></td><td>Confirm inline edits (names, notes, table cells)</td></tr>
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section class="doc-section" id="vscode">
+        <h2>VS Code &amp; local install</h2>
+        <h3>VS Code extension</h3>
+        <p>
+          The <em>Radical</em> extension opens <code>.radical</code> files in a Radical.Tools editor inside VS Code, keeps the file and the editor in sync in both directions, follows the editor's light or dark theme, and offers <em>Radical: Open file</em> and <em>Radical: Open app</em> commands. It ships with the web build embedded.
+        </p>
+        <h3>Desktop app</h3>
+<pre class="code"><code><span class="cm"># Node.js ≥ 18</span>
+git clone https://github.com/radicaltools/radical.tools.git
+cd radical.tools
+npm install
+npm run dev              <span class="cm"># Electron, hot reload</span>
+npm run build &amp;&amp; npm start
+npm run dev:web          <span class="cm"># browser build: /  (Studio)  and  /hub.html  (Hub)</span></code></pre>
+        <p>The desktop app adds native file dialogs, Markdown folders without browser permissions and <code>--file</code> watching. Everything else is identical to the browser build.</p>
       </section>
 
     </main>
@@ -638,5 +558,26 @@
     </span>
   </footer>
 
+  <script>
+    // Highlight the TOC entry for the section in view.
+    (function () {
+      var links = Array.prototype.slice.call(document.querySelectorAll('.doc-toc a[href^="#"]'));
+      var byId = {};
+      links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+      var sections = Array.prototype.slice.call(document.querySelectorAll('.doc-section[id]'));
+      if (!('IntersectionObserver' in window) || !sections.length) return;
+      var current = null;
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            if (current) current.classList.remove('active');
+            current = byId[e.target.id];
+            if (current) current.classList.add('active');
+          }
+        });
+      }, { rootMargin: '-64px 0px -70% 0px', threshold: 0 });
+      sections.forEach(function (s) { io.observe(s); });
+    })();
+  </script>
 </body>
 </html>
