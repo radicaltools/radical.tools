@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from 're
 import { useDiagramStore } from '../store/diagramStore'
 import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, PropertyDef } from '../types/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
+import { EarsQuickEntry } from './EarsQuickEntry'
 import {
   C4Node,
   C4Relation,
@@ -763,6 +764,11 @@ function WikiElementPage({
               node={node as unknown as Record<string, unknown>}
               nodeId={node.id}
               subject={resolveEarsSubject(node.id, relations, nodes)}
+              readOnly={readOnly}
+              updateNode={(id, patch) => updateNode(id, patch as Parameters<UpdateNode>[1])}
+            />
+            <EarsQuickEntry
+              nodeId={node.id}
               readOnly={readOnly}
               updateNode={(id, patch) => updateNode(id, patch as Parameters<UpdateNode>[1])}
             />
