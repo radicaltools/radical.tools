@@ -109,7 +109,7 @@ describe('substituteTemplateDefaults', () => {
 
 describe('hub route', () => {
   it('round-trips concept + view + filters', () => {
-    const r = { concept: 'req-a b', view: 'wiki' as const, category: 'requirement', tag: 'perf/latency' }
+    const r = { browse: true, concept: 'req-a b', view: 'wiki' as const, category: 'requirement', tag: 'perf/latency' }
     const hash = formatHubHash(r)
     expect(hash).toBe('#/c/req-a%20b/v/wiki/cat/requirement/tag/perf%2Flatency')
     expect(parseHubHash(hash)).toEqual(r)
@@ -117,9 +117,15 @@ describe('hub route', () => {
 
   it('omits view without a concept and ignores unknown view kinds', () => {
     expect(formatHubHash({ view: 'table', category: 'adr' })).toBe('#/cat/adr')
-    expect(parseHubHash('#/c/x/v/bogus')).toEqual({ concept: 'x' })
+    expect(parseHubHash('#/c/x/v/bogus')).toEqual({ browse: true, concept: 'x' })
+  })
+
+  it('distinguishes landing (empty hash) from the bare catalogue (#/browse)', () => {
     expect(parseHubHash('')).toEqual({})
     expect(formatHubHash({})).toBe('')
+    expect(formatHubHash({ browse: true })).toBe('#/browse')
+    expect(parseHubHash('#/browse')).toEqual({ browse: true })
+    expect(parseHubHash('#/browse/cat/adr')).toEqual({ browse: true, category: 'adr' })
   })
 
   it('builds the studio import deep link', () => {

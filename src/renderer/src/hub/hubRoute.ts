@@ -3,15 +3,19 @@
 // Same key/value segment grammar as the studio router (route.ts), scoped to
 // the catalogue:
 //
+//   #/browse
 //   #/c/<conceptId>[/v/<canvas|wiki|table>][/cat/<category>][/tag/<tag>]
 //
 // `c` selects the concept shown in the viewer, `v` its presentation, `cat` /
-// `tag` the catalogue filters. Everything is optional; an empty hash is the
-// unfiltered catalogue with nothing selected.
+// `tag` the catalogue filters. An empty hash is the landing page; `browse` is
+// the unfiltered catalogue with nothing selected (any concept / filter implies
+// the catalogue too).
 
 import type { HubViewKind } from './conceptToDiagram'
 
 export interface HubRoute {
+  /** Catalogue is open (implied when concept / category / tag is set). */
+  browse?: boolean
   concept?: string
   view?: HubViewKind
   category?: string
@@ -24,6 +28,8 @@ export function parseHubHash(hash: string): HubRoute {
   const raw = hash.replace(/^#\/?/, '')
   if (!raw) return {}
   const parts = raw.split('/').filter(Boolean)
+  const browseFlag = parts[0] === 'browse'
+  if (browseFlag) parts.shift()
   const map: Record<string, string> = {}
   for (let i = 0; i + 1 < parts.length; i += 2) {
     try {
@@ -33,11 +39,16 @@ export function parseHubHash(hash: string): HubRoute {
     }
   }
   const view = (VIEW_KINDS as readonly string[]).includes(map.v) ? (map.v as HubViewKind) : undefined
+  const concept = map.c || undefined
+  const category = map.cat || undefined
+  const tag = map.tag || undefined
+  const browse = browseFlag || !!(concept || category || tag)
   return {
-    concept: map.c || undefined,
+    ...(browse ? { browse: true } : {}),
+    concept,
     view,
-    category: map.cat || undefined,
-    tag: map.tag || undefined,
+    category,
+    tag,
   }
 }
 
@@ -47,7 +58,8 @@ export function formatHubHash(route: HubRoute): string {
   if (route.concept && route.view) segs.push('v', route.view)
   if (route.category) segs.push('cat', encodeURIComponent(route.category))
   if (route.tag) segs.push('tag', encodeURIComponent(route.tag))
-  return segs.length ? '#/' + segs.join('/') : ''
+  if (segs.length === 0) return route.browse ? '#/browse' : ''
+  return '#/' + segs.join('/')
 }
 
 /** Deep link that opens the studio with the given concepts pre-selected in
