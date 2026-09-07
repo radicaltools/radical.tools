@@ -87,7 +87,7 @@ jobs:
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/index.html" "/manual.html" "/style.css"
+            --paths "/index.html" "/manual.html" "/style.css" "/landing.css"
 
       # ── Architecture Hub (hub.radical.tools) ─────────────────────────
       # The hub is the same renderer bundle booted from hub.html (embedded

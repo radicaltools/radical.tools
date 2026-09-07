@@ -3,273 +3,147 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Radical.Tools - Architecture Modelling Tool</title>
-  <meta name="description" content="Open-source architecture modelling tool. One model, many views, always in sync. Structure, flow, hierarchy, table, matrix and wiki views built on one shared source of truth. Ships with C4, DDD and governance (ADRs & Fitness Functions). MIT licensed. Desktop or browser." />
+  <title>Radical.Tools — Architecture modelling, not just drawing</title>
+  <meta name="description" content="Open-source architecture modelling. One model, many views — structure, flow, hierarchy, table, matrix and wiki — always in sync. C4, DDD and governance (ADRs, fitness functions, EARS requirements) built in. MIT licensed. Desktop or browser." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="landing.css" />
 </head>
 <body>
 
-  <!-- ── NAVBAR ── -->
-  <header class="navbar" id="home">
-    <div class="nav-inner">
-      <a href="#home" class="nav-logo">Radical<span class="dot">.</span>Tools</a>
-      <div class="nav-actions">
-        <a href="manual.html" class="btn btn-outline"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h8.75a.75.75 0 0 1 0 1.5H2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h8.75a.75.75 0 0 1 0 1.5H2.5A1.5 1.5 0 0 1 1 13.5Zm4.75.75a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 .53 1.28L12.56 5.5l1.47 1.72A.75.75 0 0 1 13.5 8.5h-7a.75.75 0 0 1 0-1.5h5.44l-.97-1.13a.75.75 0 0 1 0-.97l.97-1.13H6.5a.75.75 0 0 1-.75-.75Z"/></svg>Manual</a>
-        <a href="https://hub.radical.tools" target="_blank" rel="noopener" class="btn btn-outline"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="7" height="7" rx="1.5"/><rect x="9" y="0" width="7" height="7" rx="1.5"/><rect x="0" y="9" width="7" height="7" rx="1.5"/><rect x="9" y="9" width="7" height="7" rx="1.5"/></svg>Hub</a>
-        <a href="https://studio.radical.tools" target="_blank" rel="noopener" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61zm1.414 1.06a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354l-1.086-1.086zM11.189 6.25 9.75 4.81l-6.286 6.287a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.249.249 0 0 0 .108-.064l6.286-6.286z"/></svg>Studio</a>
-        <a href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener" class="btn-github" aria-label="GitHub">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22" aria-hidden="true"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.341-3.369-1.341-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.532 1.031 1.532 1.031.891 1.528 2.341 1.087 2.91.831.091-.645.349-1.087.635-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.03-2.682-.103-.253-.447-1.27.098-2.646 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.547 1.376.203 2.393.1 2.646.641.698 1.029 1.591 1.029 2.682 0 3.841-2.337 4.687-4.565 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
-        </a>
-      </div>
-    </div>
+  <header class="nav">
+    <a href="#top" class="logo"><span class="logo-mark">R</span><span>Radical<em>.Tools</em></span></a>
+    <nav class="nav-links">
+      <a class="nav-btn" href="manual.html">Manual</a>
+      <a class="nav-btn" href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a>
+      <a class="nav-btn primary" href="https://studio.radical.tools" target="_blank" rel="noopener">Open Studio</a>
+      <a class="nav-icon" href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener" aria-label="GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.341-3.369-1.341-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.532 1.031 1.532 1.031.891 1.528 2.341 1.087 2.91.831.091-.645.349-1.087.635-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.03-2.682-.103-.253-.447-1.27.098-2.646 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.547 1.376.203 2.393.1 2.646.641.698 1.029 1.591 1.029 2.682 0 3.841-2.337 4.687-4.565 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+      </a>
+    </nav>
   </header>
 
-  <div class="slides">
+  <main id="top">
 
-  <!-- ── HERO ── -->
-  <section class="hero">
-    <div class="hero-inner">
-      <div class="hero-text">
-        <div class="hero-eyebrow">
-          <span class="eyebrow-tag">MIT</span>
-          <span class="eyebrow-sep">/</span>
-          <span>open source</span>
-          <span class="eyebrow-sep">/</span>
-          <span>C4 &amp; beyond</span>
-        </div>
-        <h1 class="hero-title">
-          Architecture modelling,<br />
-          <span class="accent">not just drawing.</span>
-        </h1>
-        <p class="hero-sub">
-          Diagrams go stale because the drawing <em>is</em> the document.
-          Radical.Tools makes the <strong>model</strong> the document -
-          views are derived from it, always consistent.
-        </p>
-        <div class="hero-meta">
-          <a href="#concepts">How it works ↓</a>
-          <a href="#install">Run locally ↓</a>
-          <a href="https://hub.radical.tools" target="_blank" rel="noopener">Concept Hub →</a>
+    <!-- ── Hero ── -->
+    <section class="hero">
+      <div class="eyebrow">
+        <span class="eyebrow-tag">MIT</span>
+        <span class="sep">/</span><span>open source</span>
+        <span class="sep">/</span><span>C4 &amp; beyond</span>
+      </div>
+      <h1>Architecture modelling,<br /><span class="accent">not just drawing.</span></h1>
+      <p class="lead">
+        Diagrams go stale because the drawing <em>is</em> the document.
+        Radical.Tools makes the <em>model</em> the document — every view is derived from it, always consistent.
+      </p>
+      <div class="cta-row">
+        <a class="cta" href="https://studio.radical.tools" target="_blank" rel="noopener">Open Studio — free, in the browser</a>
+        <a class="cta ghost" href="https://hub.radical.tools" target="_blank" rel="noopener">Explore the Hub</a>
+      </div>
+      <p class="hero-note">No account. No cloud. Your models stay as files on your disk.</p>
+    </section>
+
+    <!-- ── Four layers ── -->
+    <section class="tiles" aria-label="How it works">
+      <a class="tile" href="manual.html#metamodel" style="--c:#4c1d95">
+        <span class="tile-icon"><svg viewBox="0 0 16 16"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9Zm1.5 1A.5.5 0 0 0 3 5v6a.5.5 0 0 0 .5.5h9A.5.5 0 0 0 13 11V5a.5.5 0 0 0-.5-.5h-9ZM5 7h2v2H5V7Zm4 0h2v2H9V7Z"/></svg></span>
+        <span class="tile-head"><span class="tile-name">Metamodel</span><span class="tile-n">01</span></span>
+        <span class="tile-text">The vocabulary: which element and relation types exist, and what may contain what. C4, C4 + DDD and C4 + Governance ship built in — extend or replace.</span>
+      </a>
+      <a class="tile" href="manual.html#adding-elements" style="--c:#1168bd">
+        <span class="tile-icon"><svg viewBox="0 0 16 16"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9ZM4 5h8v1H4V5Zm0 2.5h8v1H4v-1Zm0 2.5h5v1H4V10Z"/></svg></span>
+        <span class="tile-head"><span class="tile-name">Model</span><span class="tile-n">02</span></span>
+        <span class="tile-text">One graph of nodes and relations — the single source of truth. Add an element once and it exists in every view. No drift between levels.</span>
+      </a>
+      <a class="tile" href="manual.html#views" style="--c:#0e7490">
+        <span class="tile-icon"><svg viewBox="0 0 16 16"><path d="M2 2h5v5H2V2Zm7 0h5v5H9V2ZM2 9h5v5H2V9Zm7 0h5v5H9V9Z"/></svg></span>
+        <span class="tile-head"><span class="tile-name">Views</span><span class="tile-n">03</span></span>
+        <span class="tile-text">Six readings of the same model: Structure, Flow, Hierarchy, Table, Matrix and Wiki. Each keeps its own layout and filters; the model stays shared.</span>
+      </a>
+      <a class="tile" href="manual.html#milestones" style="--c:#92400e">
+        <span class="tile-icon"><svg viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2Zm0 1.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9ZM7.25 5h1.5v3.1l2.2 1.3-.75 1.3L7.25 9V5Z"/></svg></span>
+        <span class="tile-head"><span class="tile-name">Milestones</span><span class="tile-n">04</span></span>
+        <span class="tile-text">Name any state of the model, diff two milestones side by side, restore any of them. Architecture decisions get a timeline.</span>
+      </a>
+    </section>
+
+    <!-- ── Also in the box ── -->
+    <section class="features">
+      <h2>Also in the box</h2>
+      <ul class="feature-list">
+        <li>
+          <span class="f-icon" style="--c:#0e7490"><svg viewBox="0 0 16 16"><path d="M5 1a1 1 0 0 0-1 1H3a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-1a1 1 0 0 0-1-1H5Zm0 1h6v1H5V2ZM4 5.5h1.5v1.5H4V5.5Zm3 .25h5v1H7v-1ZM4 9h1.5v1.5H4V9Zm3 .25h5v1H7v-1Z"/></svg></span>
+          <span><strong>Governance as first-class elements.</strong> ADRs, fitness functions and EARS requirements live in the model and link to what they constrain, implement or supersede.</span>
+        </li>
+        <li>
+          <span class="f-icon" style="--c:#6ea8ff"><svg viewBox="0 0 16 16"><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="8" cy="8" r="2"/></svg></span>
+          <span><strong>AI that edits the model, not the picture.</strong> Ask questions, find gaps, or describe a change in plain language and apply it as a structured patch. Claude, OpenAI, Gemini or local Ollama — your key, nothing proxied.</span>
+        </li>
+        <li>
+          <span class="f-icon" style="--c:#1e3a5f"><svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><path d="M11.25 9.5h1.5v2.25H15v1.5h-2.25v2.25h-1.5v-2.25H9v-1.5h2.25V9.5Z"/></svg></span>
+          <span><strong>Concept Hub.</strong> A curated catalogue of patterns, blueprints, requirements, ADRs and fitness functions — explore them in the real viewer, then import with one click.</span>
+        </li>
+        <li>
+          <span class="f-icon" style="--c:#5b21b6"><svg viewBox="0 0 16 16"><path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3Zm1 .5V11h10V3.5H3ZM5 13h6v1H5v-1Z"/></svg></span>
+          <span><strong>Presentations from views.</strong> Sequence structure, flow and hierarchy views into a deck; flow views replay interactions step by step.</span>
+        </li>
+        <li>
+          <span class="f-icon" style="--c:#64748b"><svg viewBox="0 0 16 16"><path d="M4.5 1C3.67 1 3 1.67 3 2.5v11c0 .83.67 1.5 1.5 1.5h7c.83 0 1.5-.67 1.5-1.5V6L9 1H4.5ZM9 2l3 3.5H9V2ZM5 8h6v1H5V8Zm0 2.5h6v1H5v-1Zm0 2.5h3.5v1H5V13Z"/></svg></span>
+          <span><strong>Plain files, no lock-in.</strong> A single JSON file or a git-friendly folder of Markdown — one <code>.md</code> per element. Diff it, review it, script it.</span>
+        </li>
+        <li>
+          <span class="f-icon" style="--c:#438dd5"><svg viewBox="0 0 16 16"><path d="M1 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1H1V4Zm0 2.5h14V12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6.5ZM3 3a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm2 0a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Z"/></svg></span>
+          <span><strong>Desktop or browser, same code.</strong> Electron app for local folders and file watching; the web build for zero-install use. Also a VS Code extension.</span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ── Hub ── -->
+    <section class="hub">
+      <div class="hub-head">
+        <h2>Start from the Hub</h2>
+        <p>Don't model from a blank canvas. Pick a concept, see it rendered exactly as it will appear in your model, add it to Studio.</p>
+      </div>
+      <div class="chips">
+        <a class="chip" href="https://hub.radical.tools/#/cat/blueprint" target="_blank" rel="noopener" style="--c:#1e3a5f"><svg viewBox="0 0 16 16"><path d="M2 2h12v12H2V2Zm1 1v2h2V3H3Zm3 0v2h2V3H6Zm3 0v2h2V3H9Zm3 0v2h1V3h-1ZM3 6v2h2V6H3Zm3 0v2h2V6H6Zm3 0v2h2V6H9Zm3 0v2h1V6h-1ZM3 9v2h2V9H3Zm3 0v2h2V9H6Zm3 0v2h2V9H9Zm3 0v2h1V9h-1ZM3 12v1h2v-1H3Zm3 0v1h2v-1H6Zm3 0v1h2v-1H9Zm3 0v1h1v-1h-1Z"/></svg>Blueprints</a>
+        <a class="chip" href="https://hub.radical.tools/#/cat/pattern" target="_blank" rel="noopener" style="--c:#1168bd"><svg viewBox="0 0 16 16"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9ZM4 5h8v1H4V5Zm0 2.5h8v1H4v-1Zm0 2.5h5v1H4V10Z"/></svg>Patterns</a>
+        <a class="chip" href="https://hub.radical.tools/#/cat/requirement" target="_blank" rel="noopener" style="--c:#0e7490"><svg viewBox="0 0 16 16"><path d="M5 1a1 1 0 0 0-1 1H3a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-1a1 1 0 0 0-1-1H5Zm0 1h6v1H5V2ZM4 5.5h1.5v1.5H4V5.5Zm3 .25h5v1H7v-1ZM4 9h1.5v1.5H4V9Zm3 .25h5v1H7v-1Z"/></svg>Requirements</a>
+        <a class="chip" href="https://hub.radical.tools/#/cat/adr" target="_blank" rel="noopener" style="--c:#92400e"><svg viewBox="0 0 16 16"><path d="M4.5 1C3.67 1 3 1.67 3 2.5v11c0 .83.67 1.5 1.5 1.5h7c.83 0 1.5-.67 1.5-1.5V6L9 1H4.5ZM9 2l3 3.5H9V2ZM5 8h6v1H5V8Zm0 2.5h6v1H5v-1Zm0 2.5h3.5v1H5V13Z"/></svg>ADRs</a>
+        <a class="chip" href="https://hub.radical.tools/#/cat/fitness-function" target="_blank" rel="noopener" style="--c:#5b21b6"><svg viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2Zm0 1.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9ZM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Zm0 1a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/></svg>Fitness Functions</a>
+      </div>
+    </section>
+
+    <!-- ── Run locally ── -->
+    <section class="install" id="install">
+      <div class="install-text">
+        <h2>Run it locally</h2>
+        <p>Node.js ≥ 18. Desktop app with local folders and file watching — or just use <a href="https://studio.radical.tools" target="_blank" rel="noopener">studio.radical.tools</a>.</p>
+        <div class="install-links">
+          <a href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener">GitHub →</a>
+          <a href="https://github.com/radicaltools/radical.tools/releases" target="_blank" rel="noopener">Releases →</a>
+          <a href="manual.html">Manual →</a>
         </div>
       </div>
-    </div>
-    <div class="hero-gradient"></div>
-  </section>
-
-  <!-- ── CONCEPTS ── -->
-  <section class="concepts" id="concepts">
-    <div class="section-inner">
-      <div class="section-header">
-        <span class="kicker">How it works</span>
-        <h2>Four layers. One source of truth.</h2>
-        <p>Metamodel defines the rules. Model holds the truth. Views render slices. Milestones track history.</p>
-      </div>
-      <div class="concepts-grid">
-
-        <div class="concept-card">
-          <div class="concept-num">01</div>
-          <h3>Metamodel</h3>
-          <p class="concept-lead">The vocabulary of your architecture.</p>
-          <p>
-            Defines what kinds of things can exist: node types, relation types, allowed properties.
-            Three presets ship built-in: <strong>C4</strong> (Person, Software System, Container, Component),
-            <strong>C4 + DDD</strong> (recursive strategic Domains), and
-            <strong>C4 + DDD + Governance</strong> (Architecture Decision Records and Fitness Functions).
-            Extend any of them or replace the metamodel entirely.
-          </p>
-          <div class="concept-example">
-            <code>Person → uses → Software System</code>
-            <span class="ce-label">metamodel rule</span>
-          </div>
-        </div>
-
-        <div class="concept-card">
-          <div class="concept-num">02</div>
-          <h3>Model</h3>
-          <p class="concept-lead">The single source of truth.</p>
-          <p>
-            A graph of concrete nodes and relations that conforms to the metamodel.
-            Add an element once - it's available in every view.
-            No copy-pasting between diagrams. No drift between levels.
-          </p>
-          <div class="concept-example">
-            <code>PaymentService → calls → StripeAPI</code>
-            <span class="ce-label">model instance</span>
-          </div>
-        </div>
-
-        <div class="concept-card">
-          <div class="concept-num">03</div>
-          <h3>View</h3>
-          <p class="concept-lead">A named perspective on the same model.</p>
-          <p>
-            Different audiences need different levels of detail.
-            <strong>Structure</strong> views render scoped node-link diagrams such as System Context or Container maps.
-            <strong>Flow</strong> views bind a sequence to that same model and show numbered interaction steps.
-            <strong>Hierarchy</strong> views turn containment into a drillable treemap.
-            <strong>Table</strong> views give you an editable, governance-aware spreadsheet,
-            <strong>Matrix</strong> views expose dependencies as a DSM grid, and
-            <strong>Wiki</strong> views let you browse and edit elements as readable document pages.
-            Each view keeps its own layout, drill or filter state, while the underlying model stays shared.
-          </p>
-          <div class="concept-example">
-            <code>Structure / Flow / Hierarchy / Table / Matrix / Wiki → one model, six readings</code>
-            <span class="ce-label">view instance</span>
-          </div>
-        </div>
-
-        <div class="concept-card">
-          <div class="concept-num">04</div>
-          <h3>Milestone</h3>
-          <p class="concept-lead">A named snapshot of the model.</p>
-          <p>
-            Tag any state of the model with a name and date.
-            Browse history, diff two milestones side by side, and restore any previous state.
-            Architecture decisions get a timeline.
-          </p>
-          <div class="concept-example">
-            <code>v2 → v3 diff: +3 nodes, -1 relation</code>
-            <span class="ce-label">milestone diff</span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- ── FEATURES ── -->
-  <section class="features" id="features">
-    <div class="section-inner">
-      <div class="section-header">
-        <span class="kicker">Features</span>
-        <h2>Beyond the model itself.</h2>
-      </div>
-      <div class="features-grid">
-
-        <div class="feature-card">
-          <div class="fc-icon fc-teal">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v4l2.5 2.5"/><circle cx="12" cy="12" r="9"/><path d="M3.6 9h2M18.4 9h2M12 3.6v2"/></svg>
-          </div>
-          <h3>Milestones &amp; History</h3>
-          <p>Name a snapshot at any moment. Browse history, diff two versions side by side, and restore a previous state with one click.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon fc-blue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="12" cy="12" r="2"/><path d="M7 5h5M12 7v5M7 19h5M17 19h-5M5 7v5M19 7v5"/></svg>
-          </div>
-          <h3>Smart Layout</h3>
-          <p>Three layout engines: ELK (hierarchical), WebCola (live force-directed), and a simulated-annealing pipeline tuned for crossing minimisation.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon fc-green">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a9 9 0 1 0 9 9"/><path d="M16 2l3 3-3 3"/><path d="M19 5H13"/><path d="M9 9h6M9 13h4"/></svg>
-          </div>
-          <h3>AI Analysis</h3>
-          <p>Ask the model questions, detect gaps, or describe a change in plain language and let an LLM apply it as a structured patch. Works with Claude, OpenAI, Gemini, and local Ollama - your key, your API, nothing proxied.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon fc-orange">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18"/></svg>
-          </div>
-          <h3>Desktop &amp; Web</h3>
-          <p>Electron desktop app or browser - same codebase, same file format. No account, no cloud, no telemetry.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon fc-red">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h2M11 8h6M7 12h10"/></svg>
-          </div>
-          <h3>Presentation Mode</h3>
-          <p>Sequence any mix of structure, flow, and hierarchy views into a slide deck. Flow views replay interaction steps one by one; the others give you framing slides before and after the walkthrough.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon fc-blue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7M17.5 14v7"/></svg>
-          </div>
-          <h3>Six View Types</h3>
-          <p>Read the same model as a <strong>Structure</strong> diagram, a numbered <strong>Flow</strong>, a drillable <strong>Hierarchy</strong> treemap, an editable <strong>Table</strong>, a dependency <strong>Matrix</strong> (DSM), or an inline-editable <strong>Wiki</strong> document — all always in sync.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon fc-orange">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 4v5c0 4.5-3 7.5-8 9-5-1.5-8-4.5-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
-          </div>
-          <h3>Governance Built In</h3>
-          <p>Capture <strong>Architecture Decision Records</strong> and <strong>Fitness Functions</strong> as first-class nodes, then link them to the elements they constrain, supersede, or implement.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg>
-          </div>
-          <h3>Plain JSON, No Lock-in</h3>
-          <p>Models are JSON files on your disk. Diff in git, edit in any text editor, automate with any script.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="fc-icon fc-violet">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 15v6M14.5 18h6"/></svg>
-          </div>
-          <h3>Concept Hub</h3>
-          <p>Browse a curated library of <strong>architecture patterns</strong>, <strong>fitness functions</strong>, <strong>EARS requirements</strong> and <strong>ADR templates</strong>. Import any concept into your model with one click. <a href="https://hub.radical.tools" target="_blank" rel="noopener" style="color:var(--accent);border-bottom:1px dashed var(--accent)">Explore the Hub&nbsp;→</a></p>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- ── INSTALL ── -->
-  <section class="install" id="install">
-    <div class="section-inner install-inner">
-      <div class="section-header">
-        <span class="kicker">Install</span>
-        <h2>Run it locally.</h2>
-        <p>Node.js ≥ 18, npm ≥ 9.</p>
-      </div>
-      <div class="code-block">
-        <div class="code-title">Terminal</div>
-        <pre><code><span class="cm"># Clone the repository</span>
+      <pre class="code"><code><span class="cm"># clone, install, run</span>
 git clone https://github.com/radicaltools/radical.tools.git
 cd radical.tools
-
-<span class="cm"># Install dependencies</span>
 npm install
+npm run dev</code></pre>
+    </section>
 
-<span class="cm"># Start in development mode</span>
-npm run dev
+  </main>
 
-<span class="cm"># Build for production</span>
-npm run build &amp;&amp; npm start</code></pre>
-      </div>
-      <div class="install-cta">
-        <a href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener" class="btn btn-primary">
-          View on GitHub
-        </a>
-        <a href="https://github.com/radicaltools/radical.tools/releases" target="_blank" rel="noopener" class="btn btn-outline">
-          Releases
-        </a>
-      </div>
-    </div>
-    <footer class="footer">
-      <div class="footer-inner">
-        <span class="nav-logo">Radical<span class="dot">.</span>Tools</span>
-        <span class="footer-links">
-          <a href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener">GitHub</a>
-          <a href="https://c4model.com" target="_blank" rel="noopener">C4 Model</a>
-        </span>
-        <span class="footer-copy">© 2026 Radical.Tools</span>
-      </div>
-    </footer>
-  </section>
-
-  </div><!-- /.slides -->
+  <footer class="footer">
+    <span>Radical.Tools — MIT licensed. Built on the <a href="https://c4model.com" target="_blank" rel="noopener">C4 model</a>.</span>
+    <span class="footer-links">
+      <a href="https://studio.radical.tools" target="_blank" rel="noopener">Studio</a>
+      <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a>
+      <a href="manual.html">Manual</a>
+      <a href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener">GitHub</a>
+    </span>
+  </footer>
 
 </body>
 </html>
