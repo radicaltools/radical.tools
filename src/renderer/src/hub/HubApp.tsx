@@ -24,6 +24,7 @@ import {
   type HubViewKind,
 } from './conceptToDiagram'
 import { parseHubHash, formatHubHash, studioImportUrl } from './hubRoute'
+import { HubLanding } from './HubLanding'
 
 const STUDIO_URL = import.meta.env.DEV ? '/' : 'https://studio.radical.tools'
 const LS_THEME = 'radical-theme'
@@ -210,6 +211,8 @@ function HubAppInner(): React.ReactElement {
   const pushNotification = useDiagramStore((s) => s.pushNotification)
 
   const [conceptId, setConceptId] = useState<string | undefined>(() => parseHubHash(window.location.hash).concept)
+  // Landing page vs catalogue. Any concept / filter implies the catalogue.
+  const [browsing, setBrowsing] = useState<boolean>(() => !!parseHubHash(window.location.hash).browse)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [rightCollapsed, setRightCollapsed] = useState<boolean>(() => localStorage.getItem(LS_RIGHT) === '1')
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem(LS_THEME) as 'dark' | 'light') || 'dark')
@@ -250,28 +253,41 @@ function HubAppInner(): React.ReactElement {
     el?.scrollIntoView({ block: 'nearest' })
   }, [conceptId, concepts])
 
-  // Mirror state → URL.
+  // Mirror state → URL. Landing ↔ catalogue transitions push a history entry
+  // so the browser Back button returns to the landing page.
+  const prevBrowsing = useRef(browsing)
   useEffect(() => {
     const hash = formatHubHash({
+      browse: browsing,
       concept: concept?.id,
       view: concept ? viewKind : undefined,
       category: activeCategory ?? undefined,
       tag: activeTag ?? undefined,
     })
-    if (window.location.hash !== hash) history.replaceState(null, '', hash || window.location.pathname)
-  }, [concept, viewKind, activeCategory, activeTag])
+    const changed = prevBrowsing.current !== browsing
+    prevBrowsing.current = browsing
+    if (window.location.hash === hash) return
+    const url = hash || window.location.pathname
+    if (changed) history.pushState(null, '', url)
+    else history.replaceState(null, '', url)
+  }, [browsing, concept, viewKind, activeCategory, activeTag])
 
   // URL → state (back/forward, pasted links).
   useEffect(() => {
     const onHash = () => {
       const r = parseHubHash(window.location.hash)
+      setBrowsing(!!r.browse)
       if (r.concept !== conceptId) { pendingView.current = r.view; setConceptId(r.concept) }
       else if (r.view && r.view !== viewKind) setActiveView(viewIdForKind(r.view))
       setCategory(r.category ?? null)
       setTag(r.tag ?? null)
     }
     window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
+    window.addEventListener('popstate', onHash)
+    return () => {
+      window.removeEventListener('hashchange', onHash)
+      window.removeEventListener('popstate', onHash)
+    }
   }, [conceptId, viewKind, setActiveView, setCategory, setTag])
 
   const switchView = useCallback((kind: HubViewKind) => {
@@ -305,12 +321,48 @@ function HubAppInner(): React.ReactElement {
     setRightCollapsed((c) => { localStorage.setItem(LS_RIGHT, c ? '0' : '1'); return !c })
   }, [])
 
-  const list = filtered()
+  const openConcept = useCallback((id: string) => {
+    pendingView.current = undefined
+    setConceptId(id)
+    setBrowsing(true)
+  }, [])
+
+  const goHome = useCallback(() => {
+    setConceptId(undefined)
+    setCategory(null)
+    setTag(null)
+    setSearch('')
+    setBrowsing(false)
+  }, [setCategory, setTag, setSearch])
+
+  const toggleTheme = useCallback(() => setTheme((t) => (t === 'dark' ? 'light' : 'dark')), [])
+
   const counts = useMemo(() => {
     const m = new Map<string, number>()
     for (const c of concepts) m.set(c.category, (m.get(c.category) ?? 0) + 1)
     return m
   }, [concepts])
+
+  if (!browsing) {
+    return (
+      <>
+        <HubLanding
+          concepts={concepts}
+          loading={loading}
+          studioUrl={STUDIO_URL}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onBrowse={() => setBrowsing(true)}
+          onSearch={(q) => { setSearch(q); setBrowsing(true) }}
+          onCategory={(cat) => { setCategory(cat); setBrowsing(true) }}
+          onOpenConcept={openConcept}
+        />
+        <NotificationHost />
+      </>
+    )
+  }
+
+  const list = filtered()
   const conceptTheme = concept ? categoryTheme(concept.category) : null
 
   return (
@@ -318,9 +370,11 @@ function HubAppInner(): React.ReactElement {
       {/* ── Catalogue ─────────────────────────────────────────────────── */}
       <aside className="hub-catalog">
         <header className="hub-brand">
-          <span className="hub-brand-mark">R</span>
-          <span className="hub-brand-name">Radical Hub</span>
-          <span className="hub-brand-sub">Architecture concepts</span>
+          <button type="button" className="hub-brand-home" onClick={goHome} title="Back to the Hub home page">
+            <span className="hub-brand-mark">R</span>
+            <span className="hub-brand-name">Radical Hub</span>
+            <span className="hub-brand-sub">Architecture concepts</span>
+          </button>
         </header>
 
         <div className="hub-search">
@@ -375,7 +429,7 @@ function HubAppInner(): React.ReactElement {
               concept={c}
               active={c.id === conceptId}
               selected={selectedIds.has(c.id)}
-              onOpen={() => { pendingView.current = undefined; setConceptId(c.id) }}
+              onOpen={() => openConcept(c.id)}
               onToggleSelect={() => toggleSelect(c.id)}
               onTag={(t) => setTag(activeTag === t ? null : t)}
             />
@@ -442,7 +496,7 @@ function HubAppInner(): React.ReactElement {
           </>
         )}
         <div className="toolbar-sep" />
-        <button type="button" className="toolbar-btn" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} title="Toggle theme">
+        <button type="button" className="toolbar-btn" onClick={toggleTheme} title="Toggle theme">
           {theme === 'dark' ? <IconSun /> : <IconMoon />}
         </button>
       </div>
