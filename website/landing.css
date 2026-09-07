@@ -184,6 +184,7 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .tile-name { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
 .tile-n { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .tile-text { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.tile-text b { color: var(--text-2); font-weight: 600; }
 
 /* ── Feature list ────────────────────────────────────────────────── */
 .features { padding: 0 0 64px; }
@@ -201,6 +202,11 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
   font-size: 13px; line-height: 1.55; color: var(--muted);
 }
 .feature-list strong { color: var(--text); font-weight: 600; }
+/* A lone item in the last 3-column row stretches across instead of orphaning. */
+@media (min-width: 1000px) {
+  .feature-list li:nth-child(3n + 1):last-child { grid-column: 1 / -1; }
+}
+.feature-list em { color: var(--text-2); font-style: normal; font-weight: 500; }
 .feature-list code { color: var(--text-2); background: var(--hover-faint); padding: 0 5px; border-radius: 4px; }
 .f-icon {
   --c: var(--accent);
