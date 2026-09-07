@@ -6,14 +6,14 @@
 .site-nav {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;
-  width: min(1080px, 92vw); margin: 0 auto;
-  height: 56px; flex-shrink: 0;
-}
-.site-nav.wide {
-  width: 100%; margin: 0; padding: 0 14px;
-  background: var(--bg-panel);
+  width: 100%; height: 56px; flex-shrink: 0;
+  /* Same left edge as the centred sections, but the bar itself spans the page. */
+  padding: 0 calc((100% - min(1080px, 92vw)) / 2);
+  background: color-mix(in srgb, var(--bg-panel) 96%, transparent);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
 }
+.site-nav.wide { padding: 0 14px; background: var(--bg-panel); backdrop-filter: none; }
 .site-nav-logo {
   display: inline-flex; align-items: center; gap: 10px;
   font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
