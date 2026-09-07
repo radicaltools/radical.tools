@@ -25,6 +25,7 @@ import {
 } from './conceptToDiagram'
 import { parseHubHash, formatHubHash, studioImportUrl } from './hubRoute'
 import { HubLanding } from './HubLanding'
+import { SiteNav } from './SiteNav'
 
 const STUDIO_URL = import.meta.env.DEV ? '/' : 'https://studio.radical.tools'
 const LS_THEME = 'radical-theme'
@@ -49,19 +50,6 @@ const IconSmartLayout = () => (
   <svg className="toolbar-btn-accent-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
     <path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" />
     <circle cx="8" cy="8" r="2" />
-  </svg>
-)
-
-const IconSun = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
-    <circle cx="8" cy="8" r="3" />
-    <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" />
-  </svg>
-)
-
-const IconMoon = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round">
-    <path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z" />
   </svg>
 )
 
@@ -366,17 +354,11 @@ function HubAppInner(): React.ReactElement {
   const conceptTheme = concept ? categoryTheme(concept.category) : null
 
   return (
+    <div className="hub-shell">
+    <SiteNav wide studioUrl={STUDIO_URL} theme={theme} onToggleTheme={toggleTheme} onHub={goHome} />
     <div className={`hub-layout${rightCollapsed ? ' rp-collapsed' : ''}`}>
-      {/* ── Catalogue ─────────────────────────────────────────────────── */}
+      {/* ── Catalogue ────────────────────────────────────────────────────────────── */}
       <aside className="hub-catalog">
-        <header className="hub-brand">
-          <button type="button" className="hub-brand-home" onClick={goHome} title="Back to the Hub home page">
-            <span className="hub-brand-mark">R</span>
-            <span className="hub-brand-name">Radical Hub</span>
-            <span className="hub-brand-sub">Architecture concepts</span>
-          </button>
-        </header>
-
         <div className="hub-search">
           <input
             type="search"
@@ -495,10 +477,6 @@ function HubAppInner(): React.ReactElement {
             <div style={{ flex: 1 }} />
           </>
         )}
-        <div className="toolbar-sep" />
-        <button type="button" className="toolbar-btn" onClick={toggleTheme} title="Toggle theme">
-          {theme === 'dark' ? <IconSun /> : <IconMoon />}
-        </button>
       </div>
 
       {/* ── Viewer ────────────────────────────────────────────────────── */}
@@ -520,6 +498,7 @@ function HubAppInner(): React.ReactElement {
 
       <RightPanel readOnly collapsed={rightCollapsed} onToggleCollapsed={toggleRight} />
       <NotificationHost />
+    </div>
     </div>
   )
 }

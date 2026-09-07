@@ -2,6 +2,72 @@
 /* Catalogue on the left, the studio's own toolbar / view / right panel on the
    right. Relies on the design tokens and component styles from index.css. */
 
+/* ═══ Shared site navigation — keep in sync with website/landing.css ════ */
+.site-nav {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  width: min(1080px, 92vw); margin: 0 auto;
+  height: 56px; flex-shrink: 0;
+}
+.site-nav.wide {
+  width: 100%; margin: 0; padding: 0 14px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+}
+.site-nav-logo {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+  color: var(--text-primary); text-decoration: none;
+}
+.site-nav-logo em { font-style: normal; color: var(--accent); }
+.site-nav-mark {
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; color: #fff; font-weight: 800; font-size: 14px;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7c3aed));
+  box-shadow: var(--shadow-sm);
+}
+.site-nav-links { display: flex; align-items: center; gap: 6px; flex: 1; margin-left: 14px; }
+.site-nav-sep { width: 1px; height: 22px; background: var(--border-color); margin: 0 8px; opacity: 0.8; }
+/* First separator pushes Studio / GitHub / theme to the right edge. */
+.site-nav-links .site-nav-sep:first-of-type { margin-left: auto; }
+.site-nav-btn {
+  display: inline-flex; align-items: center;
+  height: 32px; padding: 0 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--hover-bg-faint);
+  color: var(--text-primary);
+  font: inherit; font-size: 12.5px; font-weight: 500;
+  text-decoration: none; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.site-nav-btn:hover { background: var(--hover-bg); border-color: var(--border-color-strong); }
+.site-nav-btn.active { border-color: rgba(var(--accent-rgb), 0.5); color: var(--accent); }
+.site-nav-btn.primary {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white), var(--accent));
+  color: #fff; border-color: transparent;
+}
+.site-nav-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent; color: var(--text-muted);
+  cursor: pointer; text-decoration: none; font: inherit; font-size: 14px;
+}
+.site-nav-icon:hover { color: var(--text-primary); background: var(--hover-bg); }
+@media (max-width: 640px) {
+  .site-nav-links .site-nav-btn:not(.primary):not(.active) { display: none; }
+  .site-nav-sep { display: none; }
+}
+
+/* ═══ Catalogue + viewer ════════════════════════════════════════════ */
+.hub-shell {
+  display: flex; flex-direction: column;
+  height: 100vh;
+  background: var(--bg-app);
+}
 .hub-layout {
   display: grid;
   grid-template-rows: 48px 1fr;
@@ -9,7 +75,7 @@
   grid-template-areas:
     "catalog toolbar toolbar"
     "catalog canvas  rightpanel";
-  height: 100vh;
+  flex: 1; min-height: 0;
   background: var(--bg-app);
   transition: grid-template-columns 0.22s var(--ease-out);
 }
@@ -24,40 +90,6 @@
   background: var(--bg-panel);
   border-right: 1px solid var(--border-color);
 }
-
-.hub-brand {
-  padding: 8px 8px 6px;
-  border-bottom: 1px solid var(--border-color);
-}
-.hub-brand-home {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 10px;
-  align-items: center;
-  text-align: left;
-  width: 100%;
-  padding: 4px 6px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.hub-brand-home:hover { background: var(--hover-bg-subtle); }
-.hub-brand-mark {
-  grid-row: 1 / span 2;
-  width: 30px; height: 30px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 8px;
-  font-weight: 800; font-size: 15px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7c3aed));
-  box-shadow: var(--shadow-sm);
-}
-.hub-brand-name { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
-.hub-brand-sub { font-size: 11px; color: var(--text-muted); }
 
 .hub-search { padding: 10px 12px 6px; }
 .hub-search input {
@@ -261,54 +293,22 @@
 .hub-empty-inner .muted { color: var(--text-muted); }
 
 /* ═══ Landing page ═════════════════════════════════════════════════ */
+/* index.css locks body to 100vh / overflow:hidden (it is an app shell), so the
+   landing must be its own fixed-height scroll container. */
 .hub-landing {
-  min-height: 100vh;
+  height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
+  user-select: text;
+  -webkit-overflow-scrolling: touch;
   background:
     radial-gradient(1100px 520px at 50% -120px, rgba(var(--accent-rgb), 0.18), transparent 70%),
     var(--bg-app);
   color: var(--text-primary);
 }
+/* Catalogue / wiki / table text should be selectable too. */
+.hub-catalog, .hub-toolbar-title { user-select: text; }
 .hub-landing section, .hub-landing-footer { width: min(1080px, 92vw); margin: 0 auto; }
-
-.hub-landing-nav {
-  position: sticky; top: 0; z-index: 5;
-  display: flex; align-items: center; justify-content: space-between;
-  width: min(1080px, 92vw); margin: 0 auto;
-  height: 60px;
-}
-.hub-landing-logo {
-  display: inline-flex; align-items: center; gap: 10px;
-  font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
-  color: var(--text-primary); text-decoration: none;
-}
-.hub-landing-logo em { font-style: normal; color: var(--accent); margin-left: 2px; }
-.hub-landing-links { display: flex; align-items: center; gap: 6px; }
-.hub-nav-btn {
-  display: inline-flex; align-items: center;
-  height: 32px; padding: 0 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  background: var(--hover-bg-faint);
-  color: var(--text-primary);
-  font-size: 12.5px; font-weight: 500;
-  text-decoration: none; cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-.hub-nav-btn:hover { background: var(--hover-bg); border-color: var(--border-color-strong); }
-.hub-nav-btn.primary {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white), var(--accent));
-  color: #fff; border-color: transparent;
-}
-.hub-nav-icon {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px;
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
-  background: transparent; color: var(--text-muted);
-  cursor: pointer; text-decoration: none; font-size: 14px;
-}
-.hub-nav-icon:hover { color: var(--text-primary); background: var(--hover-bg); }
 
 /* Hero */
 .hub-hero { padding: 72px 0 48px; text-align: center; }
@@ -467,5 +467,4 @@
 @media (max-width: 640px) {
   .hub-hero { padding: 40px 0 32px; }
   .hub-hero-search { flex-direction: column; }
-  .hub-landing-links .hub-nav-btn:not(.primary) { display: none; }
 }
