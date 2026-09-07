@@ -2274,6 +2274,32 @@ body {
   min-width: 60px;
 }
 
+/* EARS quick entry: type a plain sentence instead of picking ears_type first */
+.ears-quick-entry { margin: 6px 0 0; }
+.ears-quick-entry-input {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  font-style: italic;
+  background: var(--input-bg);
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: var(--text-primary);
+  outline: none;
+  box-sizing: border-box;
+}
+.ears-quick-entry-input:focus { border-color: #0e7490; border-style: solid; }
+.ears-quick-entry-input::placeholder { color: var(--text-muted); }
+.ears-quick-entry-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #0e7490;
+}
+.ears-quick-entry-sm .ears-quick-entry-input { font-size: 11px; padding: 4px 6px; }
+.ears-quick-entry-sm .ears-quick-entry-hint { font-size: 10px; }
+
 /* Body: main + infobox */
 .wiki-body {
   display: grid;

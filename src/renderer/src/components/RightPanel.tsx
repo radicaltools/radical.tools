@@ -2,6 +2,7 @@ import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback }
 import { useDiagramStore, nodeEffectivelyCollapsedInView } from '../store/diagramStore'
 import { C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '../types/c4'
 import { resolveEarsSubject } from '../types/metamodel'
+import { EarsQuickEntry } from './EarsQuickEntry'
 import type { HubImportRecord } from '../store/hubStore'
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
@@ -1723,6 +1724,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
         {node.type === 'requirement' && (
           <div className="props-ears-sentence">
             <EarsSentencePreview node={node as unknown as Record<string, unknown>} nodeId={node.id} subject={resolveEarsSubject(node.id, c4Relations, c4Nodes)} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} />
+            <EarsQuickEntry nodeId={node.id} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} compact />
           </div>
         )}
         <div>
