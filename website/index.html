@@ -34,18 +34,19 @@
       <div class="eyebrow">
         <span class="eyebrow-tag">MIT</span>
         <span class="sep">/</span><span>open source</span>
-        <span class="sep">/</span><span>C4 &amp; beyond</span>
+        <span class="sep">/</span><span>C4 · DDD · governance</span>
       </div>
       <h1>Architecture modelling,<br /><span class="accent">not just drawing.</span></h1>
       <p class="lead">
         Diagrams go stale because the drawing <em>is</em> the document.
-        Radical.Tools makes the <em>model</em> the document — every view is derived from it, always consistent.
+        Radical.Tools keeps <em>one model</em> — systems, containers, domains, decisions, requirements —
+        and renders every diagram, table and wiki page from it. Change it once, every view follows.
       </p>
       <div class="cta-row">
         <a class="cta" href="https://studio.radical.tools" target="_blank" rel="noopener">Open Studio — free, in the browser</a>
         <a class="cta ghost" href="https://hub.radical.tools" target="_blank" rel="noopener">Explore the Hub</a>
       </div>
-      <p class="hero-note">No account. No cloud. Your models stay as files on your disk.</p>
+      <p class="hero-note">No account, no cloud, no telemetry. Models are files on your disk — JSON or a folder of Markdown.</p>
     </section>
 
     <!-- ── Four layers ── -->
@@ -53,22 +54,22 @@
       <a class="tile" href="manual.html#metamodel" style="--c:#4c1d95">
         <span class="tile-icon"><svg viewBox="0 0 16 16"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9Zm1.5 1A.5.5 0 0 0 3 5v6a.5.5 0 0 0 .5.5h9A.5.5 0 0 0 13 11V5a.5.5 0 0 0-.5-.5h-9ZM5 7h2v2H5V7Zm4 0h2v2H9V7Z"/></svg></span>
         <span class="tile-head"><span class="tile-name">Metamodel</span><span class="tile-n">01</span></span>
-        <span class="tile-text">The vocabulary: which element and relation types exist, and what may contain what. C4, C4 + DDD and C4 + Governance ship built in — extend or replace.</span>
+        <span class="tile-text">The rules of your architecture: element and relation types, what may contain what, which properties each type carries. Three presets ship built in — C4, C4 + DDD, C4 + DDD + Governance — and a visual editor lets you extend or replace them.</span>
       </a>
       <a class="tile" href="manual.html#adding-elements" style="--c:#1168bd">
         <span class="tile-icon"><svg viewBox="0 0 16 16"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9ZM4 5h8v1H4V5Zm0 2.5h8v1H4v-1Zm0 2.5h5v1H4V10Z"/></svg></span>
         <span class="tile-head"><span class="tile-name">Model</span><span class="tile-n">02</span></span>
-        <span class="tile-text">One graph of nodes and relations — the single source of truth. Add an element once and it exists in every view. No drift between levels.</span>
+        <span class="tile-text">One graph of elements and relations, validated against the metamodel as you edit — wrong parent, wrong relation or too many of a kind are refused, not silently drawn. Add an element once and it exists in every view.</span>
       </a>
       <a class="tile" href="manual.html#views" style="--c:#0e7490">
         <span class="tile-icon"><svg viewBox="0 0 16 16"><path d="M2 2h5v5H2V2Zm7 0h5v5H9V2ZM2 9h5v5H2V9Zm7 0h5v5H9V9Z"/></svg></span>
         <span class="tile-head"><span class="tile-name">Views</span><span class="tile-n">03</span></span>
-        <span class="tile-text">Six readings of the same model: Structure, Flow, Hierarchy, Table, Matrix and Wiki. Each keeps its own layout and filters; the model stays shared.</span>
+        <span class="tile-text">Six readings of the same model: <b>Structure</b> diagrams, numbered <b>Flow</b> sequences, a drillable <b>Hierarchy</b> treemap, an editable <b>Table</b>, a dependency <b>Matrix</b> and a <b>Wiki</b> of element pages. Each view keeps its own scope, layout and camera.</span>
       </a>
       <a class="tile" href="manual.html#milestones" style="--c:#92400e">
         <span class="tile-icon"><svg viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2Zm0 1.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9ZM7.25 5h1.5v3.1l2.2 1.3-.75 1.3L7.25 9V5Z"/></svg></span>
         <span class="tile-head"><span class="tile-name">Milestones</span><span class="tile-n">04</span></span>
-        <span class="tile-text">Name any state of the model, diff two milestones side by side, restore any of them. Architecture decisions get a timeline.</span>
+        <span class="tile-text">Freeze the model under a name at any point. Compare two milestones and see what was added, removed or changed as ghosts on the canvas; restore any of them. Decisions get a timeline.</span>
       </a>
     </section>
 
@@ -78,27 +79,31 @@
       <ul class="feature-list">
         <li>
           <span class="f-icon" style="--c:#0e7490"><svg viewBox="0 0 16 16"><path d="M5 1a1 1 0 0 0-1 1H3a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-1a1 1 0 0 0-1-1H5Zm0 1h6v1H5V2ZM4 5.5h1.5v1.5H4V5.5Zm3 .25h5v1H7v-1ZM4 9h1.5v1.5H4V9Zm3 .25h5v1H7v-1Z"/></svg></span>
-          <span><strong>Governance as first-class elements.</strong> ADRs, fitness functions and EARS requirements live in the model and link to what they constrain, implement or supersede.</span>
+          <span><strong>Governance as first-class elements.</strong> ADRs, fitness functions and EARS requirements are model elements, linked to what they constrain, implement, satisfy or supersede. Type a requirement as a sentence — “When the user clicks save, the system shall persist the document” — and it is parsed into trigger, condition and action.</span>
         </li>
         <li>
           <span class="f-icon" style="--c:#6ea8ff"><svg viewBox="0 0 16 16"><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="8" cy="8" r="2"/></svg></span>
-          <span><strong>AI that edits the model, not the picture.</strong> Ask questions, find gaps, or describe a change in plain language and apply it as a structured patch. Claude, OpenAI, Gemini or local Ollama — your key, nothing proxied.</span>
+          <span><strong>AI that edits the model, not the picture.</strong> Ask what depends on what, find gaps, or describe a change in plain language. The answer comes back as a patch that is validated against the metamodel, applied to the model and undoable. Claude, OpenAI, Gemini or local Ollama — your key, called directly, nothing proxied.</span>
         </li>
         <li>
           <span class="f-icon" style="--c:#1e3a5f"><svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><path d="M11.25 9.5h1.5v2.25H15v1.5h-2.25v2.25h-1.5v-2.25H9v-1.5h2.25V9.5Z"/></svg></span>
-          <span><strong>Concept Hub.</strong> A curated catalogue of patterns, blueprints, requirements, ADRs and fitness functions — explore them in the real viewer, then import with one click.</span>
+          <span><strong>Concept Hub.</strong> 70+ curated requirements, ADRs, fitness functions, patterns and blueprints, rendered by the same engine as Studio. Fill in a template’s parameters, add it to your model, reconfigure later.</span>
+        </li>
+        <li>
+          <span class="f-icon" style="--c:#16a34a"><svg viewBox="0 0 16 16"><circle cx="3" cy="3" r="1.6"/><circle cx="13" cy="3" r="1.6"/><circle cx="3" cy="13" r="1.6"/><circle cx="13" cy="13" r="1.6"/><circle cx="8" cy="8" r="1.8"/><path d="M4.2 4.2 6.6 6.6M11.8 4.2 9.4 6.6M4.2 11.8 6.6 9.4M11.8 11.8 9.4 9.4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg></span>
+          <span><strong>Layout that earns its name.</strong> Smart Layout runs layered (ELK), force-directed and simulated-annealing candidates, scores them for crossings and overlap, and keeps the best. Live physics keeps things tidy while you drag; a tree mode handles deep containment.</span>
         </li>
         <li>
           <span class="f-icon" style="--c:#5b21b6"><svg viewBox="0 0 16 16"><path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3Zm1 .5V11h10V3.5H3ZM5 13h6v1H5v-1Z"/></svg></span>
-          <span><strong>Presentations from views.</strong> Sequence structure, flow and hierarchy views into a deck; flow views replay interactions step by step.</span>
+          <span><strong>Three perspectives, one model.</strong> <em>Designer</em> edits. <em>Viewer</em> explores read-only — drag, collapse, re-layout without touching the saved model. <em>Presenter</em> turns views into slides that capture scope, layout and camera; flow views replay step by step.</span>
         </li>
         <li>
           <span class="f-icon" style="--c:#64748b"><svg viewBox="0 0 16 16"><path d="M4.5 1C3.67 1 3 1.67 3 2.5v11c0 .83.67 1.5 1.5 1.5h7c.83 0 1.5-.67 1.5-1.5V6L9 1H4.5ZM9 2l3 3.5H9V2ZM5 8h6v1H5V8Zm0 2.5h6v1H5v-1Zm0 2.5h3.5v1H5V13Z"/></svg></span>
-          <span><strong>Plain files, no lock-in.</strong> A single JSON file or a git-friendly folder of Markdown — one <code>.md</code> per element. Diff it, review it, script it.</span>
+          <span><strong>Plain files, no lock-in.</strong> Save as a single <code>.radical</code> JSON file, or as a folder of Markdown — one <code>.md</code> per element with YAML front-matter, hierarchy as directories, layout in a sidecar. Diff it in git, edit it in any editor, script it. Autosaved either way.</span>
         </li>
         <li>
           <span class="f-icon" style="--c:#438dd5"><svg viewBox="0 0 16 16"><path d="M1 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1H1V4Zm0 2.5h14V12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6.5ZM3 3a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm2 0a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Z"/></svg></span>
-          <span><strong>Desktop or browser, same code.</strong> Electron app for local folders and file watching; the web build for zero-install use. Also a VS Code extension.</span>
+          <span><strong>Desktop, browser or VS Code — same code.</strong> The Electron app opens local files and folders and reloads a file you launched it with when it changes on disk. The web build needs no install and can still work on a local folder. The VS Code extension embeds the full editor for <code>.radical</code> files.</span>
         </li>
       </ul>
     </section>
@@ -107,7 +112,7 @@
     <section class="hub">
       <div class="hub-head">
         <h2>Start from the Hub</h2>
-        <p>Don't model from a blank canvas. Pick a concept, see it rendered exactly as it will appear in your model, add it to Studio.</p>
+        <p>Don’t model from a blank canvas. Open a concept as a diagram, wiki page or table — exactly as it will look in your model — collect the ones you want and add them to Studio in one click.</p>
       </div>
       <div class="chips">
         <a class="chip" href="https://hub.radical.tools/#/cat/blueprint" target="_blank" rel="noopener" style="--c:#1e3a5f"><svg viewBox="0 0 16 16"><path d="M2 2h12v12H2V2Zm1 1v2h2V3H3Zm3 0v2h2V3H6Zm3 0v2h2V3H9Zm3 0v2h1V3h-1ZM3 6v2h2V6H3Zm3 0v2h2V6H6Zm3 0v2h2V6H9Zm3 0v2h1V6h-1ZM3 9v2h2V9H3Zm3 0v2h2V9H6Zm3 0v2h2V9H9Zm3 0v2h1V9h-1ZM3 12v1h2v-1H3Zm3 0v1h2v-1H6Zm3 0v1h2v-1H9Zm3 0v1h1v-1h-1Z"/></svg>Blueprints</a>
@@ -122,7 +127,7 @@
     <section class="install" id="install">
       <div class="install-text">
         <h2>Run it locally</h2>
-        <p>Node.js ≥ 18. Desktop app with local folders and file watching — or just use <a href="https://studio.radical.tools" target="_blank" rel="noopener">studio.radical.tools</a>.</p>
+        <p>Node.js ≥ 18. The desktop app adds local folders, file watching and the Markdown-folder format with no browser permissions — or skip the install and use <a href="https://studio.radical.tools" target="_blank" rel="noopener">studio.radical.tools</a>.</p>
         <div class="install-links">
           <a href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener">GitHub →</a>
           <a href="https://github.com/radicaltools/radical.tools/releases" target="_blank" rel="noopener">Releases →</a>
