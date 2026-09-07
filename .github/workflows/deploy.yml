@@ -35,7 +35,8 @@ jobs:
 
       - name: Build web renderer
         run: npm run build:web
-        # Output: out/renderer/index.html + out/renderer/assets/**
+        # Output: out/renderer/{index.html,hub.html,hub-data.json} + out/renderer/assets/**
+        # index.html → studio.radical.tools, hub.html → hub.radical.tools (same bundle)
 
       - name: Configure AWS credentials (OIDC — no long-lived keys)
         uses: aws-actions/configure-aws-credentials@v4
@@ -89,28 +90,33 @@ jobs:
             --paths "/index.html" "/manual.html" "/style.css"
 
       # ── Architecture Hub (hub.radical.tools) ─────────────────────────
-      - name: Sync hub to S3
+      # The hub is the same renderer bundle booted from hub.html (embedded
+      # viewer profile). Assets are content-hashed and shared with the studio.
+      - name: Sync hub assets to S3
         run: |
-          aws s3 sync hub/ \
-            s3://${{ secrets.HUB_S3_BUCKET }}/ \
-            --delete \
-            --exclude "index.html" \
-            --exclude "hub-data.json" \
-            --cache-control "public, max-age=3600"
+          aws s3 sync out/renderer/assets/ \
+            s3://${{ secrets.HUB_S3_BUCKET }}/assets/ \
+            --cache-control "public, max-age=31536000, immutable" \
+            --delete
 
       - name: Upload hub index.html (no-cache)
         run: |
-          aws s3 cp hub/index.html \
+          aws s3 cp out/renderer/hub.html \
             s3://${{ secrets.HUB_S3_BUCKET }}/index.html \
             --cache-control "no-store" \
             --content-type "text/html; charset=utf-8"
 
       - name: Upload hub-data.json (no-cache)
         run: |
-          aws s3 cp hub/hub-data.json \
+          aws s3 cp out/renderer/hub-data.json \
             s3://${{ secrets.HUB_S3_BUCKET }}/hub-data.json \
             --cache-control "no-store" \
             --content-type "application/json; charset=utf-8"
+
+      - name: Remove legacy hub site files
+        run: |
+          aws s3 rm s3://${{ secrets.HUB_S3_BUCKET }}/hub.js || true
+          aws s3 rm s3://${{ secrets.HUB_S3_BUCKET }}/style.css || true
 
       - name: Invalidate CloudFront for hub
         run: |

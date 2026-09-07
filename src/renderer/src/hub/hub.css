@@ -1,0 +1,249 @@
+/* ─── Radical Hub — embedded viewer layout ─────────────────────────────── */
+/* Catalogue on the left, the studio's own toolbar / view / right panel on the
+   right. Relies on the design tokens and component styles from index.css. */
+
+.hub-layout {
+  display: grid;
+  grid-template-rows: 48px 1fr;
+  grid-template-columns: 340px 1fr 260px;
+  grid-template-areas:
+    "catalog toolbar toolbar"
+    "catalog canvas  rightpanel";
+  height: 100vh;
+  background: var(--bg-app);
+  transition: grid-template-columns 0.22s var(--ease-out);
+}
+.hub-layout.rp-collapsed { grid-template-columns: 340px 1fr 18px; }
+
+/* ── Catalogue column ─────────────────────────────────────────────── */
+.hub-catalog {
+  grid-area: catalog;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-color);
+}
+
+.hub-brand {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+.hub-brand-mark {
+  grid-row: 1 / span 2;
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  font-weight: 800; font-size: 15px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7c3aed));
+  box-shadow: var(--shadow-sm);
+}
+.hub-brand-name { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+.hub-brand-sub { font-size: 11px; color: var(--text-muted); }
+
+.hub-search { padding: 10px 12px 6px; }
+.hub-search input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+.hub-search input:focus { border-color: var(--accent); box-shadow: var(--shadow-glow); }
+
+.hub-filters {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 4px 12px 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+.hub-chip {
+  --chip-color: var(--text-muted);
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--hover-bg-faint);
+  color: var(--text-secondary);
+  font-size: 11px; font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.hub-chip svg { color: var(--chip-color); }
+.hub-chip:hover { border-color: var(--chip-color); color: var(--text-primary); }
+.hub-chip.active {
+  background: color-mix(in srgb, var(--chip-color) 22%, transparent);
+  border-color: var(--chip-color);
+  color: var(--text-primary);
+}
+.hub-chip-count {
+  font-size: 10px; font-weight: 600;
+  padding: 0 5px; border-radius: 999px;
+  background: rgba(0,0,0,0.25);
+  color: var(--text-muted);
+}
+[data-theme="light"] .hub-chip-count { background: rgba(0,0,0,0.08); }
+
+.hub-active-tag {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px 0;
+  font-size: 11px; color: var(--text-muted);
+}
+.hub-link {
+  border: none; background: none; padding: 0;
+  color: var(--accent); font-size: 11px; cursor: pointer;
+}
+.hub-link:hover { text-decoration: underline; }
+
+.hub-list {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.hub-list-msg { padding: 24px 8px; text-align: center; color: var(--text-muted); font-size: 12px; }
+.hub-list-err { color: var(--danger); }
+
+/* ── Concept card ─────────────────────────────────────────────────── */
+.hub-card {
+  --cat-color: var(--accent);
+  position: relative;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  background: var(--hover-bg-faint);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.hub-card::before {
+  content: '';
+  position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+  border-radius: 3px;
+  background: var(--cat-color);
+  opacity: 0.85;
+}
+.hub-card:hover { background: var(--hover-bg); border-color: var(--border-color-strong); }
+.hub-card.active {
+  border-color: var(--cat-color);
+  background: color-mix(in srgb, var(--cat-color) 12%, transparent);
+}
+.hub-card.selected { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+
+.hub-card-head { display: flex; align-items: center; gap: 8px; }
+.hub-card-icon {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  background: var(--cat-color);
+}
+.hub-card-name {
+  flex: 1; min-width: 0;
+  font-size: 12.5px; font-weight: 650; letter-spacing: -0.01em;
+  color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hub-card-select {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.hub-card-select svg { width: 12px; height: 12px; }
+.hub-card-select:hover { color: var(--text-primary); border-color: var(--border-color-strong); background: var(--hover-bg); }
+.hub-card-select.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.hub-card-desc {
+  margin: 6px 0 0;
+  font-size: 11.5px; line-height: 1.45;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hub-card.active .hub-card-desc { -webkit-line-clamp: unset; }
+
+.hub-card-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.hub-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 18px; padding: 0 6px;
+  border-radius: 5px;
+  font-size: 10px; font-weight: 500;
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.hub-badge-k { color: var(--text-muted); font-weight: 400; }
+.hub-badge-k::after { content: ':'; }
+.hub-badge-cat {
+  background: color-mix(in srgb, var(--cat-color) 22%, transparent);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; font-size: 9.5px;
+}
+
+.hub-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.hub-tag {
+  height: 18px; padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgba(var(--accent-rgb), 0.10);
+  color: var(--accent);
+  font-size: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+.hub-tag:hover, .hub-tag.on { background: rgba(var(--accent-rgb), 0.22); border-color: rgba(var(--accent-rgb), 0.5); }
+
+/* ── Basket ───────────────────────────────────────────────────────── */
+.hub-basket {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-toolbar);
+  font-size: 12px; color: var(--text-secondary);
+}
+.hub-basket .toolbar-btn { margin-left: auto; }
+
+/* ── Viewer toolbar ───────────────────────────────────────────────── */
+.hub-toolbar { -webkit-app-region: no-drag; }
+.hub-toolbar-cat {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 22px; padding: 0 8px;
+  border-radius: 6px;
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.hub-toolbar-title {
+  font-size: 13px; font-weight: 600;
+  max-width: 34vw;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hub-toolbar-title.muted { color: var(--text-muted); font-weight: 500; }
+
+/* ── Empty state ──────────────────────────────────────────────────── */
+.hub-empty {
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(var(--accent-rgb), 0.10), transparent 40%),
+    var(--bg-canvas);
+}
+.hub-empty-inner { max-width: 460px; padding: 32px; text-align: center; }
+.hub-empty-inner h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 10px; }
+.hub-empty-inner p { font-size: 13px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 8px; }
+.hub-empty-inner .muted { color: var(--text-muted); }
