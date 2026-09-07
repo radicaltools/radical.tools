@@ -106,6 +106,32 @@ describe('selectMilestone', () => {
   })
 })
 
+describe('saveDiagram while time-travelling', () => {
+  it('persists the live model (liveBackup), not the active milestone', () => {
+    const liveIds = Object.keys(useDiagramStore.getState().c4Nodes).sort()
+    useDiagramStore.getState().selectMilestone('snap-1')
+    const s = useDiagramStore.getState()
+    expect(s.activeSnapshotId).toBe('snap-1')
+    // The canvas now shows the milestone (fewer nodes than live)…
+    expect(Object.keys(s.c4Nodes).length).toBeLessThan(liveIds.length)
+    // …but what gets written to disk is still the live HEAD.
+    const saved = useDiagramStore.getState().saveDiagram()
+    expect(saved.nodes.map((n) => n.id).sort()).toEqual(liveIds)
+    expect(saved.relations.map((r) => r.id).sort()).toEqual(Object.keys(initial.c4Relations).sort())
+  })
+
+  it('does not write milestone positions into defaultPositions or view positions', () => {
+    const before = JSON.parse(JSON.stringify(useDiagramStore.getState().defaultPositions))
+    useDiagramStore.getState().selectMilestone('snap-1')
+    useDiagramStore.setState((st: any) => { for (const n of Object.values(st.c4Nodes) as any[]) { n.x = -9999 } return st })
+    const saved = useDiagramStore.getState().saveDiagram()
+    expect(saved.defaultPositions).toEqual(before)
+    for (const v of saved.views ?? []) {
+      for (const p of Object.values(v.positions)) expect(p.x).not.toBe(-9999)
+    }
+  })
+})
+
 describe('setDiffBase', () => {
   it('null on the oldest milestone clears the diff (no live HEAD fallback)', () => {
     useDiagramStore.getState().selectMilestone('snap-1')
