@@ -154,6 +154,7 @@ export function TableView(): React.ReactElement {
   const addNodeToView    = useDiagramStore((s) => s.addNodeToView)
   const addNode          = useDiagramStore((s) => s.addNode)
   const pushNotification = useDiagramStore((s) => s.pushNotification)
+  const readOnly         = useDiagramStore((s) => s.appMode !== 'designer')
 
   const [tab, setTab]             = useState<Tab>('all')
   const [editCell, setEditCell]   = useState<EditCell | null>(null)
@@ -341,8 +342,9 @@ export function TableView(): React.ReactElement {
   const cancelEdit = useCallback(() => setEditCell(null), [])
 
   const startEdit = useCallback((rowId: string, colKey: string, current: string) => {
+    if (readOnly) return
     setEditCell({ rowId, colKey, draft: current })
-  }, [])
+  }, [readOnly])
 
   const handleRowClick = useCallback((rowId: string) => {
     if (tab === 'relations') selectEdge(rowId)

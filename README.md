@@ -69,7 +69,9 @@ src/
     store/        Zustand stores (diagramStore, documentStore, hubStore)
     ai/           AI integration (providers: OpenAI, Anthropic, Gemini, Ollama)
     types/        C4 + metamodel TypeScript types
-hub/              Architecture Concept Hub static site (hub.radical.tools)
+    hub/          Radical Hub — embedded read-only viewer of the concept
+                  catalogue (hub.html entry → hub.radical.tools)
+    public/       hub-data.json — the concept catalogue (single source)
 website/          Marketing site (radical.tools)
 infra/            Terraform — AWS S3 + CloudFront + Route53 + IAM (OIDC)
 tools/

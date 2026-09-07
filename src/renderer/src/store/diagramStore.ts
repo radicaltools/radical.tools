@@ -49,6 +49,7 @@ import { applyReferenceLayout } from '../layout/referenceLayout'
 import { minimizeCrossings } from '../layout/crossingOpt'
 import { LiveColaLayout } from '../layout/liveColaLayout'
 import { documents, useDocumentsStore } from './documentStore'
+import { isViewerProfile } from '../runtime'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -1172,6 +1173,9 @@ export const useDiagramStore = create<DiagramStore>()(
     // We always have an "active" document. If the index is empty we seed one
     // with the built-in sample. For LS-backed docs we can hydrate
     // synchronously; FS-backed docs are loaded asynchronously below.
+    //
+    // The embedded viewer profile has no documents at all: it starts empty
+    // and the host page injects a model via loadDiagram().
     const buildSampleData = (): DiagramData => {
       const sample = buildSampleDiagram()
       return {
@@ -1181,7 +1185,8 @@ export const useDiagramStore = create<DiagramStore>()(
         snapshots: sample.snapshots,
       }
     }
-    const { meta: activeMeta } = documents.ensureActive(buildSampleData)
+    const viewerProfile = isViewerProfile()
+    const activeMeta = viewerProfile ? null : documents.ensureActive(buildSampleData).meta
 
     let initNodes: Record<string, C4Node>
     let initRelations: Record<string, C4Relation>
@@ -1192,7 +1197,7 @@ export const useDiagramStore = create<DiagramStore>()(
     let initMetamodel: Metamodel
 
     let persisted: DiagramData | null = null
-    if (activeMeta.source === 'ls') {
+    if (activeMeta?.source === 'ls') {
       // Synchronous LS read so the UI shows the right diagram on first paint.
       try {
         if (typeof localStorage !== 'undefined') {
@@ -1228,6 +1233,14 @@ export const useDiagramStore = create<DiagramStore>()(
       // Signal the boot startLiveLayout() call to skip cola's bulk phase
       // so the persisted positions aren't immediately overwritten.
       _initLoadedFromDisk = true
+    } else if (viewerProfile) {
+      initNodes = {}
+      initRelations = {}
+      initViews = {}
+      initDefaultPositions = {}
+      initSnapshots = []
+      initPres = buildPresentationsFromData(undefined, [])
+      initMetamodel = builtInGovernanceMetamodel()
     } else {
       const sample = buildSampleDiagram()
       initNodes = sample.nodes
@@ -1274,7 +1287,7 @@ export const useDiagramStore = create<DiagramStore>()(
       diffGhostNodes: {},
       diffGhostRelations: {},
       showDiff: false,
-      appMode: 'designer' as const,
+      appMode: (viewerProfile ? 'viewer' : 'designer') as 'viewer' | 'designer',
       metamodel: initMetamodel,
       hubTemplates: (persisted?.hubTemplates ?? {}) as Record<string, HubImportRecord>,
       notifications: [],
@@ -4406,7 +4419,9 @@ if (typeof requestAnimationFrame !== 'undefined') {
 // ─── Auto-persist to the active document ────────────────────────────────────
 // Subscribe to model slices and debounce-save into whatever the current
 // active document is (LS or FS, resolved fresh on every flush).
-if (typeof window !== 'undefined') {
+// The embedded viewer profile has no documents — skip the whole wiring so
+// nothing it shows can ever leak into (or be read from) storage.
+if (typeof window !== 'undefined' && !isViewerProfile()) {
   let _persistTimer: ReturnType<typeof setTimeout> | null = null
   let _suspended = false
   // When a structural presentation edit (add/remove/rename/reorder/link a
