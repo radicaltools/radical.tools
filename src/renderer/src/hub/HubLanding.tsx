@@ -6,6 +6,7 @@
 import React, { useMemo, useState } from 'react'
 import type { HubConcept } from '../store/hubStore'
 import { HUB_CATEGORIES, categoryTheme, type HubCategory } from '../types/hubTheme'
+import { SiteNav } from './SiteNav'
 
 const CATEGORY_BLURB: Record<HubCategory, string> = {
   pattern: 'Reference structures — microservices, CQRS, API gateway, strangler fig — as ready-made C4 fragments.',
@@ -19,10 +20,6 @@ const TypeIcon = ({ path, size = 16, color }: { path: string; size?: number; col
   <svg viewBox="0 0 16 16" width={size} height={size} fill={color ?? 'currentColor'} aria-hidden="true">
     <path d={path} />
   </svg>
-)
-
-const IconGitHub = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.341-3.369-1.341-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.532 1.031 1.532 1.031.891 1.528 2.341 1.087 2.91.831.091-.645.349-1.087.635-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.03-2.682-.103-.253-.447-1.27.098-2.646 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.547 1.376.203 2.393.1 2.646.641.698 1.029 1.591 1.029 2.682 0 3.841-2.337 4.687-4.565 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z" /></svg>
 )
 
 export interface HubLandingProps {
@@ -70,21 +67,12 @@ export function HubLanding({
 
   return (
     <div className="hub-landing">
-      <header className="hub-landing-nav">
-        <a className="hub-landing-logo" href="#/" onClick={(e) => e.preventDefault()}>
-          <span className="hub-brand-mark">R</span>
-          <span>Radical<em>Hub</em></span>
-        </a>
-        <nav className="hub-landing-links">
-          <button type="button" className="hub-nav-btn" onClick={onBrowse}>Catalogue</button>
-          <a className="hub-nav-btn" href="https://radical.tools" target="_blank" rel="noopener">radical.tools</a>
-          <a className="hub-nav-btn primary" href={studioUrl} target="_blank" rel="noopener">Open Studio</a>
-          <a className="hub-nav-icon" href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener" aria-label="GitHub"><IconGitHub /></a>
-          <button type="button" className="hub-nav-icon" onClick={onToggleTheme} title="Toggle theme" aria-label="Toggle theme">
-            {theme === 'dark' ? '☀' : '☾'}
-          </button>
-        </nav>
-      </header>
+      <SiteNav
+        studioUrl={studioUrl}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+        onHub={() => document.querySelector('.hub-landing')?.scrollTo({ top: 0, behavior: 'smooth' })}
+      />
 
       <section className="hub-hero">
         <div className="hub-hero-eyebrow">

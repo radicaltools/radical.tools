@@ -66,22 +66,30 @@ jobs:
             --paths "/index.html"
 
       # ── Marketing website (radical.tools + www) ─────────────────────────
+      - name: Stamp asset URLs with the build id
+        run: |
+          # HTML references landing.css / style.css / theme.js as `?v=__BUILD__`.
+          # Stamping the commit sha busts browser + CDN caches on every deploy.
+          sed -i "s/__BUILD__/${GITHUB_SHA::8}/g" website/*.html
+
       - name: Sync marketing website to S3
         run: |
           # Static site under website/ — HTML/CSS/screenshots.
-          # Exclude index.html so we can upload it with no-cache headers below.
+          # HTML is uploaded separately below with no-cache headers.
           aws s3 sync website/ \
             s3://${{ secrets.WEB_S3_BUCKET }}/ \
             --delete \
-            --exclude "index.html" \
+            --exclude "*.html" \
             --cache-control "public, max-age=3600"
 
-      - name: Upload website index.html (no-cache)
+      - name: Upload website HTML (no-cache)
         run: |
-          aws s3 cp website/index.html \
-            s3://${{ secrets.WEB_S3_BUCKET }}/index.html \
-            --cache-control "no-store" \
-            --content-type "text/html; charset=utf-8"
+          for f in website/*.html; do
+            aws s3 cp "$f" \
+              "s3://${{ secrets.WEB_S3_BUCKET }}/$(basename "$f")" \
+              --cache-control "no-store" \
+              --content-type "text/html; charset=utf-8"
+          done
 
       - name: Invalidate CloudFront for marketing site
         run: |
