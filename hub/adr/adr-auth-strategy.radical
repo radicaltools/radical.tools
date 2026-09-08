@@ -27,7 +27,8 @@
     "hubRefs": [
       "req-auth",
       "req-mfa",
-      "pattern-api-gateway"
+      "pattern-api-gateway",
+      "adr-zero-trust-network"
     ]
   },
   "nodes": [

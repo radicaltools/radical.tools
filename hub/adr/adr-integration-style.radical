@@ -24,7 +24,8 @@
       "pattern-circuit-breaker",
       "req-graceful-degradation",
       "adr-event-schema-evolution",
-      "pattern-bff"
+      "pattern-bff",
+      "pattern-anti-corruption-layer"
     ]
   },
   "nodes": [

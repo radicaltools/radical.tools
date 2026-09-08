@@ -1,0 +1,69 @@
+{
+  "hub": {
+    "id": "ff-startup-shutdown-check",
+    "category": "fitness-function",
+    "name": "Startup & Shutdown Verification",
+    "description": "Automatically verifies every service becomes ready within its startup budget and, on SIGTERM, drains in-flight requests within its shutdown budget instead of being killed mid-request — checked on every deploy, not assumed.",
+    "tags": [
+      "operational",
+      "disposability",
+      "kubernetes",
+      "deployment"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "STARTUP_SECONDS",
+        "label": "Max time to become ready (s)",
+        "hint": "10",
+        "type": "number",
+        "defaultValue": "10"
+      },
+      {
+        "key": "DRAIN_TIMEOUT_SECONDS",
+        "label": "Graceful shutdown drain timeout (s)",
+        "hint": "30",
+        "type": "number",
+        "defaultValue": "30"
+      }
+    ],
+    "hubRefs": [
+      "req-fast-startup-graceful-shutdown",
+      "req-zero-downtime-deploy"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-startup-shutdown-check-1",
+      "type": "fitness-fn",
+      "label": "Startup & Shutdown Verification",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "description": "Automatically verifies every service becomes ready within its startup budget and, on SIGTERM, drains in-flight requests within its shutdown budget instead of being killed mid-request — checked on every deploy, not assumed.",
+      "category": "operational",
+      "automated": true,
+      "trigger": "on-deploy",
+      "threshold": "100% of services report ready within {{STARTUP_SECONDS}}s and complete graceful shutdown (zero dropped in-flight requests) within {{DRAIN_TIMEOUT_SECONDS}}s of SIGTERM",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "STARTUP_SECONDS",
+          "label": "Max time to become ready (s)",
+          "hint": "10",
+          "type": "number",
+          "defaultValue": "10"
+        },
+        {
+          "key": "DRAIN_TIMEOUT_SECONDS",
+          "label": "Graceful shutdown drain timeout (s)",
+          "hint": "30",
+          "type": "number",
+          "defaultValue": "30"
+        }
+      ]
+    }
+  ]
+}

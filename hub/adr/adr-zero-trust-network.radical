@@ -1,0 +1,40 @@
+{
+  "hub": {
+    "id": "adr-zero-trust-network",
+    "category": "adr",
+    "name": "Network Trust Model",
+    "description": "Records whether the system trusts requests based on network location (perimeter/VPN model) or verifies every request's identity and context regardless of where it originates (zero trust).",
+    "tags": [
+      "security",
+      "zero-trust",
+      "network",
+      "nist",
+      "governance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-sidecar",
+      "req-least-privilege",
+      "adr-auth-strategy",
+      "req-mfa"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-zero-trust-network-1",
+      "type": "adr",
+      "label": "ADR: Zero trust — verify every request regardless of network location",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "The traditional model trusts anything inside the corporate network or VPN and puts the real defence at the perimeter. That assumption breaks down with cloud services, remote work, third-party integrations and lateral movement after a single compromised credential or device.",
+      "decision": "Every request is authenticated and authorized at the point of access based on identity and context (device posture, request risk), regardless of network location — internal service-to-service calls get the same scrutiny as calls from the public internet. Network segmentation is defence in depth, not the primary control.",
+      "consequences": "• No implicit trust for being ‘inside’ the VPC/VPN — internal services need their own authn/authz (mTLS or signed service identity), not just network reachability.\n• A stolen credential or compromised device doesn't automatically grant broad lateral access.\n• More moving parts: identity-aware proxies, service identity, continuous authorization checks add latency and operational surface compared to a flat trusted network.\n• Legacy systems that assume network-level trust need a gateway/proxy in front of them until they can be updated.",
+      "alternatives": "1. Perimeter/VPN model — simpler, lower latency, but a single breach inside the perimeter has broad blast radius.\n2. Zero trust (chosen) — smaller blast radius per compromise, at the cost of more infrastructure (identity-aware proxies, mTLS, policy engines) and some added latency per request."
+    }
+  ]
+}

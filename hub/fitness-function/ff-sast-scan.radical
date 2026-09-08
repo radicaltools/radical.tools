@@ -1,0 +1,38 @@
+{
+  "hub": {
+    "id": "ff-sast-scan",
+    "category": "fitness-function",
+    "name": "Static Application Security Testing (SAST)",
+    "description": "Scans source code on every change for injection flaws, XSS, hardcoded secrets and other code-level weaknesses by tracing data flow from untrusted input to dangerous sinks — the code-level counterpart to dependency vulnerability scanning.",
+    "tags": [
+      "structural",
+      "security",
+      "sast",
+      "owasp"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-input-validation",
+      "ff-security-scan",
+      "req-secrets-management"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-sast-scan-1",
+      "type": "fitness-fn",
+      "label": "Static Application Security Testing (SAST)",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "description": "Scans source code on every change for injection flaws, XSS, hardcoded secrets and other code-level weaknesses by tracing data flow from untrusted input to dangerous sinks — the code-level counterpart to dependency vulnerability scanning.",
+      "category": "structural",
+      "automated": true,
+      "trigger": "on-deploy",
+      "threshold": "Zero unresolved high/critical-severity findings; new findings block merge, existing findings tracked with an owner and a due date",
+      "status": "proposed"
+    }
+  ]
+}

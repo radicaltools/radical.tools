@@ -1,0 +1,71 @@
+{
+  "hub": {
+    "id": "req-fast-startup-graceful-shutdown",
+    "category": "requirement",
+    "name": "Fast Startup & Graceful Shutdown",
+    "description": "Processes start in a few seconds and, on SIGTERM, stop accepting new work, finish in-flight requests, then exit — instead of dying mid-request or blocking a rolling deploy.",
+    "tags": [
+      "disposability",
+      "kubernetes",
+      "deployment",
+      "resilience",
+      "twelve-factor"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "DRAIN_TIMEOUT_SECONDS",
+        "label": "Graceful shutdown drain timeout (s)",
+        "hint": "30",
+        "type": "number",
+        "defaultValue": "30"
+      },
+      {
+        "key": "STARTUP_SECONDS",
+        "label": "Max time to become ready (s)",
+        "hint": "10",
+        "type": "number",
+        "defaultValue": "10"
+      }
+    ],
+    "hubRefs": [
+      "ff-startup-shutdown-check",
+      "req-zero-downtime-deploy",
+      "req-autoscaling"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-fast-startup-graceful-shutdown-1",
+      "type": "requirement",
+      "label": "Fast Startup & Graceful Shutdown",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "the process receives SIGTERM (rolling deploy, scale-in, node drain)",
+      "action": "stop accepting new work immediately, allow in-flight requests up to {{DRAIN_TIMEOUT_SECONDS}} seconds to finish, then exit cleanly — and be ready to serve traffic within {{STARTUP_SECONDS}} seconds of being started",
+      "rationale": "Kubernetes and every autoscaler assume a process that handles SIGTERM and becomes ready quickly; get either wrong and rolling deploys drop requests, and scale-out can't add capacity fast enough to matter.",
+      "templateParams": [
+        {
+          "key": "DRAIN_TIMEOUT_SECONDS",
+          "label": "Graceful shutdown drain timeout (s)",
+          "hint": "30",
+          "type": "number",
+          "defaultValue": "30"
+        },
+        {
+          "key": "STARTUP_SECONDS",
+          "label": "Max time to become ready (s)",
+          "hint": "10",
+          "type": "number",
+          "defaultValue": "10"
+        }
+      ]
+    }
+  ]
+}

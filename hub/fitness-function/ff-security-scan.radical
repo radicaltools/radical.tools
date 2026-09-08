@@ -22,7 +22,8 @@
     ],
     "hubRefs": [
       "req-vulnerability-scanning",
-      "ff-license-compliance"
+      "ff-license-compliance",
+      "ff-sast-scan"
     ]
   },
   "nodes": [

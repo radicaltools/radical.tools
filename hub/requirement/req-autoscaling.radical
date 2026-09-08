@@ -37,7 +37,8 @@
       "req-resource-headroom",
       "req-throughput",
       "req-resource-isolation",
-      "ff-scale-out-verification"
+      "ff-scale-out-verification",
+      "req-fast-startup-graceful-shutdown"
     ]
   },
   "nodes": [
