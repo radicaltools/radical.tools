@@ -24,5 +24,5 @@ infra/tfplan
 infra/override.tf
 infra/override.tf.json
 # Note: infra/.terraform.lock.hcl IS committed (pins provider versions)
-# Note: src/renderer/public/hub/**/*.radical IS committed — it is the canonical
+# Note: hub/**/*.radical (repo root) IS committed — it is the canonical
 # concept catalogue served at hub.radical.tools/hub/ (index.json is generated)

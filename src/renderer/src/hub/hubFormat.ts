@@ -2,8 +2,9 @@
 //
 // Every hub concept is a regular Radical Studio document (`DiagramData`:
 // nodes + relations, openable in the studio as-is) with one extra top-level
-// `hub` block carrying the catalogue metadata. The catalogue lives in
-// src/renderer/public/hub/<category>/<id>.radical and is served verbatim;
+// `hub` block carrying the catalogue metadata. The catalogue lives in the
+// top-level hub/<category>/<id>.radical (repo root, alongside website/ and
+// docs/ — it's content, not app source) and is served verbatim;
 // `hub/index.json` (generated at build time, see tools/hubCatalogue.ts) lists
 // lightweight summaries so the UI can browse without downloading every file.
 //

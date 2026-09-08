@@ -1,15 +1,20 @@
 // ─── Hub catalogue build plugin ──────────────────────────────────────────────
 //
-// The catalogue is a folder of Radical Studio documents
-// (src/renderer/public/hub/<category>/<id>.radical, see hubFormat.ts).
-// Vite copies publicDir verbatim, so the concept files ship as-is; this plugin
-// adds the generated artefacts on top:
+// The catalogue is a folder of Radical Studio documents (top-level
+// hub/<category>/<id>.radical, see hubFormat.ts) — content curated by
+// contributors, kept at the repo root alongside website/ and docs/ rather
+// than inside src/renderer, since it isn't app source. This plugin serves
+// and bundles it under the same /hub/ URL prefix the app already expects:
 //
+//   hub/<category>/<id>.radical — the concept documents themselves
 //   hub/index.json  — summaries for browsing (built from the `hub` blocks)
 //   hub-data.json   — legacy single-file catalogue for older desktop builds
 //
-// In dev the same artefacts are served from memory, and `.radical` files get an
-// explicit JSON content type (the store rejects non-JSON responses).
+// In dev these are served from memory by a middleware; at build time this
+// plugin explicitly emits every file (the source directory sits outside
+// Vite's publicDir, so nothing copies it there implicitly). `.radical`
+// files get an explicit JSON content type (the store rejects non-JSON
+// responses).
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
@@ -78,8 +83,8 @@ export function buildIndex(entries: CatalogueEntry[]): HubConceptSummary[] {
   return entries.map(({ file, doc }) => summarize(doc, file))
 }
 
-export function hubCataloguePlugin(opts: { publicDir: string }): Plugin {
-  const dir = resolve(opts.publicDir, HUB_DIR)
+export function hubCataloguePlugin(opts: { hubDir: string }): Plugin {
+  const dir = resolve(opts.hubDir)
   const load = (): CatalogueEntry[] => {
     const entries = readCatalogue(dir)
     const errors = validateCatalogue(entries)
@@ -118,6 +123,12 @@ export function hubCataloguePlugin(opts: { publicDir: string }): Plugin {
       const entries = load()
       this.emitFile({ type: 'asset', fileName: `${HUB_DIR}/${HUB_INDEX_FILE}`, source: indexJson(entries) })
       this.emitFile({ type: 'asset', fileName: LEGACY_FILE, source: legacyJson(entries) })
+      // The concept documents themselves — Vite's publicDir copy doesn't
+      // reach them since hubDir now lives outside publicDir, so emit each
+      // one explicitly, verbatim (raw bytes, not the parsed-then-restringified doc).
+      for (const { file } of entries) {
+        this.emitFile({ type: 'asset', fileName: `${HUB_DIR}/${file}`, source: readFileSync(join(dir, file), 'utf8') })
+      }
     },
   }
 }
