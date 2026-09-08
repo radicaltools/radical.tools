@@ -35,8 +35,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "must",
       "trigger": "a verified data subject requests erasure of their personal data",
       "action": "delete or irreversibly anonymise the subject's personal data in all primary stores, replicas, search indexes and analytics datasets within {{ERASURE_DAYS}} days, and confirm completion to the requester",
       "rationale": "GDPR Article 17 sets a hard deadline and applies to every copy of the data; without a designed erasure path the request becomes a manual hunt across systems."

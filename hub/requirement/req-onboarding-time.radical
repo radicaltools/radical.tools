@@ -34,8 +34,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "should",
       "action": "allow a first-time user to complete the primary onboarding flow and reach the core value moment within {{ONBOARDING_MINUTES}} minutes without documentation or support",
       "rationale": "Time to value is the strongest predictor of activation and trial conversion; every extra step in onboarding is measurable drop-off."
     }

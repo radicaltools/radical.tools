@@ -29,10 +29,7 @@
       "collapsed": false,
       "description": "Scans source code on every change for injection flaws, XSS, hardcoded secrets and other code-level weaknesses by tracing data flow from untrusted input to dangerous sinks — the code-level counterpart to dependency vulnerability scanning.",
       "category": "structural",
-      "automated": true,
-      "trigger": "on-deploy",
-      "threshold": "Zero unresolved high/critical-severity findings; new findings block merge, existing findings tracked with an owner and a due date",
-      "status": "proposed"
+      "threshold": "Zero unresolved high/critical-severity findings; new findings block merge, existing findings tracked with an owner and a due date"
     }
   ]
 }

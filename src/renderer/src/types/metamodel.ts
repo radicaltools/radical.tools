@@ -381,22 +381,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
       options: ['structural', 'operational', 'process', 'holistic'],
       default: 'structural',
     },
-    { key: 'automated', label: 'Automated', type: 'boolean', default: false },
-    {
-      key: 'trigger',
-      label: 'Trigger',
-      type: 'enum',
-      options: ['on-deploy', 'continuous', 'periodic'],
-      default: 'on-deploy',
-    },
     { key: 'threshold', label: 'Threshold / Success criteria', type: 'text' },
-    {
-      key: 'status',
-      label: 'Status',
-      type: 'enum',
-      options: ['proposed', 'active', 'deprecated'],
-      default: 'proposed',
-    },
   ]
 
   const fitnessFn: NodeTypeDef = {
@@ -424,20 +409,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
       type: 'enum',
       options: ['ubiquitous', 'event-driven', 'state-driven', 'unwanted-behaviour', 'optional', 'complex'],
       default: 'ubiquitous',
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      type: 'enum',
-      options: ['draft', 'approved', 'implemented', 'verified', 'deprecated'],
-      default: 'draft',
-    },
-    {
-      key: 'priority',
-      label: 'Priority',
-      type: 'enum',
-      options: ['must', 'should', 'could', "won't"],
-      default: 'must',
     },
     { key: 'trigger',             label: 'When (trigger)',            type: 'text',     visibleWhen: { key: 'ears_type', values: ['event-driven', 'complex'] } },
     { key: 'precondition',        label: 'While (precondition)',      type: 'text',     visibleWhen: { key: 'ears_type', values: ['state-driven', 'complex'] } },

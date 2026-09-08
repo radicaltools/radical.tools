@@ -35,8 +35,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "must",
       "trigger": "a user requests a standard report",
       "action": "deliver the report within {{REPORT_MAX_SECONDS}} seconds, or immediately switch to asynchronous generation and notify the user when the report is ready",
       "rationale": "Users abandon blocking requests that appear to hang; a fixed cut-over to async keeps the UI responsive regardless of data volume."

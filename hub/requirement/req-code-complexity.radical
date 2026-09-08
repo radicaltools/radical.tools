@@ -35,8 +35,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "should",
       "action": "keep cyclomatic complexity below {{MAX_COMPLEXITY}} for every function, failing the build on new violations and tracking existing ones as technical debt",
       "rationale": "Highly branched functions need disproportionately many test cases and are where defects concentrate; a hard limit forces decomposition while the code is still fresh."
     }

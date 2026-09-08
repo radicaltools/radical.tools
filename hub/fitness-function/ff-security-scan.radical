@@ -38,10 +38,7 @@
       "height": 52,
       "collapsed": false,
       "category": "operational",
-      "automated": true,
-      "trigger": "on-deploy",
-      "threshold": "0 unresolved findings with CVSS ≥ {{BLOCK_CVSS}} without an approved, time-boxed exception",
-      "status": "proposed"
+      "threshold": "0 unresolved findings with CVSS ≥ {{BLOCK_CVSS}} without an approved, time-boxed exception"
     }
   ],
   "relations": []

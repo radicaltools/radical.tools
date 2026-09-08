@@ -35,8 +35,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "state-driven",
-      "status": "draft",
-      "priority": "must",
       "precondition": "the database holds a production-sized dataset and serves normal transactional load",
       "action": "execute transactional queries within {{DB_P95_MS}} ms at the 95th percentile, with slow-query logging enabled for anything above the threshold",
       "rationale": "A request typically issues several queries, so the database budget must be a small fraction of the API budget to leave room for serialisation, network and business logic."

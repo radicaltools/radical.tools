@@ -50,8 +50,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "state-driven",
-      "status": "draft",
-      "priority": "must",
       "precondition": "a user loads a page on a typical mid-range device and network connection",
       "action": "reach Largest Contentful Paint within {{LCP_SECONDS}} s and keep Interaction to Next Paint under {{INP_MS}} ms for at least {{USER_PCT}}% of real-user page views",
       "rationale": "Core Web Vitals are the industry-standard, field-measurable definition of perceived load speed and responsiveness, and they influence search ranking."

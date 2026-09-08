@@ -29,8 +29,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "must",
       "trigger": "a new version is deployed to production",
       "action": "roll the change out without failed or dropped user requests, keeping the previous version serving traffic until the new one passes its health checks, and support rollback within the same mechanism",
       "rationale": "Deployment windows and maintenance pages cap release frequency; only when a deploy is invisible to users can the team ship small changes often."

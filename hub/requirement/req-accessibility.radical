@@ -40,8 +40,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "conform to WCAG {{WCAG_VERSION}} Level {{WCAG_LEVEL}} on all user-facing pages and components, verified by automated checks in the pipeline and periodic manual testing with screen readers",
       "rationale": "Accessibility is a legal requirement in many jurisdictions (EU Accessibility Act, ADA, Section 508) and the same practices improve usability for everyone."
     }

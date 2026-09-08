@@ -695,18 +695,6 @@ AdrNode.displayName = 'AdrNode'
 const FF_COLOR = '#5b21b6'
 
 export const FitnessFnNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useDiagramStore(s => s.c4Nodes[data.c4id])
-  const extra = node as unknown as Record<string, string> | undefined
-  const automated = !!(node as unknown as Record<string, unknown> | undefined)?.automated
-  const status    = extra?.status ?? 'proposed'
-
-  const statusColor: Record<string, string> = {
-    proposed:   '#fbbf24',
-    active:     '#34d399',
-    deprecated: '#9ca3af',
-  }
-  const badge = statusColor[status] ?? '#9ca3af'
-
   return (
     <div
       className="c4-node"
@@ -725,13 +713,10 @@ export const FitnessFnNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
       <AllHandles />
       <DiffOverlay c4id={data.c4id} />
 
-      {/* Row 1: type + auto chip + status badge */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
+      {/* Row 1: type */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
         <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' }}>
-          FF{automated && <span style={{ marginLeft: 4, background: 'rgba(52,211,153,0.4)', color: '#d1fae5', padding: '0 3px', borderRadius: 2 }}>auto</span>}
-        </span>
-        <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', background: badge, color: '#000', padding: '1px 4px', borderRadius: 2 }}>
-          {status}
+          FF
         </span>
       </div>
 
@@ -749,32 +734,12 @@ FitnessFnNode.displayName = 'FitnessFnNode'
 
 // ─── Requirement Node (EARS) ──────────────────────────────────────────────────
 //
-// Compact pill: teal/cyan header strip with EARS type + priority + status badge.
+// Compact pill: teal/cyan header strip with the EARS sentence below.
 
 const REQ_COLOR = '#0e7490'
 
 export const RequirementNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
   const node = useDiagramStore(s => s.c4Nodes[data.c4id])
-  const extra = node as unknown as Record<string, string> | undefined
-  const status   = extra?.status ?? 'draft'
-  const priority = extra?.priority ?? 'must'
-
-  const statusColor: Record<string, string> = {
-    draft:        '#fbbf24',
-    approved:     '#60a5fa',
-    implemented:  '#34d399',
-    verified:     '#a78bfa',
-    deprecated:   '#9ca3af',
-  }
-  const badge = statusColor[status] ?? '#9ca3af'
-
-  const priorityLabel: Record<string, string> = {
-    must:   'M',
-    should: 'S',
-    could:  'C',
-    "won't": 'W',
-  }
-
   const c4Relations = useDiagramStore(s => s.c4Relations)
   const c4Nodes = useDiagramStore(s => s.c4Nodes)
   const subject = resolveEarsSubject(data.c4id, c4Relations, c4Nodes)
@@ -798,16 +763,10 @@ export const RequirementNode = memo(({ data, selected }: NodeProps<C4NodeRFData>
       <AllHandles />
       <DiffOverlay c4id={data.c4id} />
 
-      {/* Row 1: type + priority chip + status badge */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
+      {/* Row 1: type */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
         <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' }}>
           REQ
-          <span style={{ marginLeft: 4, background: 'rgba(6,182,212,0.4)', color: '#cffafe', padding: '0 3px', borderRadius: 2 }}>
-            {priorityLabel[priority] ?? 'M'}
-          </span>
-        </span>
-        <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', background: badge, color: '#000', padding: '1px 4px', borderRadius: 2 }}>
-          {status}
         </span>
       </div>
 

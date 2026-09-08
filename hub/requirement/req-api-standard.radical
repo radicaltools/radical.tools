@@ -36,8 +36,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "expose every user-facing and state-changing operation through an API described by a {{API_SPEC_FORMAT}} specification that is version-controlled with the service, covers all endpoints with schemas, error codes and examples, and is published with each release",
       "rationale": "A complete, machine-readable contract enables client generation, contract testing and automation, and prevents the UI from becoming the only way to use the system."
     }

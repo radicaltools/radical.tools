@@ -47,8 +47,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "sustain at least {{MIN_TPS}} transactions per second for {{PEAK_DURATION_MINUTES}} minutes while continuing to meet all response-time requirements",
       "rationale": "Latency targets are meaningless without a stated load; fixing the peak rate makes capacity planning and load testing concrete."
     }

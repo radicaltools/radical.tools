@@ -35,8 +35,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "should",
       "trigger": "a record passes {{RETENTION_DAYS}} days since its last business use",
       "action": "move the record to cold storage or delete it according to its data classification, and log the disposal in the audit trail",
       "rationale": "Storage minimisation is both a legal obligation under GDPR and a practical one: data you no longer hold cannot be breached, subpoenaed or slow your queries down."

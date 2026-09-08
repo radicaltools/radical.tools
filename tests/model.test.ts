@@ -95,8 +95,6 @@ describe('addNode', () => {
     } as any)
     const n = useDiagramStore.getState().c4Nodes[id] as any
     expect(n.ears_type).toBe('ubiquitous')
-    expect(n.status).toBe('draft')
-    expect(n.priority).toBe('must')
   })
 
   it('does not overwrite explicit values with defaults', () => {
@@ -110,7 +108,6 @@ describe('addNode', () => {
     } as any)
     const n = useDiagramStore.getState().c4Nodes[id] as any
     expect(n.ears_type).toBe('event-driven')
-    expect(n.status).toBe('draft')
   })
 })
 

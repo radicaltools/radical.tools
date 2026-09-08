@@ -38,10 +38,7 @@
       "height": 52,
       "collapsed": false,
       "category": "structural",
-      "automated": true,
-      "trigger": "on-deploy",
-      "threshold": "Efferent coupling ≤ {{MAX_FAN_OUT}} for every module and service",
-      "status": "proposed"
+      "threshold": "Efferent coupling ≤ {{MAX_FAN_OUT}} for every module and service"
     }
   ],
   "relations": []

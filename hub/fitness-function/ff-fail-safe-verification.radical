@@ -28,10 +28,7 @@
       "collapsed": false,
       "description": "Runs the system against a suite of deliberately low-confidence and ambiguous inputs and confirms it falls back to the safe default and hands off, rather than proceeding on a guess.",
       "category": "operational",
-      "automated": true,
-      "trigger": "on-deploy",
-      "threshold": "100% of the low-confidence/ambiguous test suite triggers the fail-safe fallback, not a guessed action",
-      "status": "proposed"
+      "threshold": "100% of the low-confidence/ambiguous test suite triggers the fail-safe fallback, not a guessed action"
     }
   ]
 }

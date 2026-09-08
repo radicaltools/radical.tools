@@ -52,10 +52,7 @@
       "height": 52,
       "collapsed": false,
       "category": "operational",
-      "automated": true,
-      "trigger": "continuous",
-      "threshold": "Burn rate < {{FAST_BURN_RATE}}× (1 h) and < {{SLOW_BURN_RATE}}× (6 h); releases blocked when remaining 30-day budget < {{FREEZE_REMAINING_PCT}}%",
-      "status": "proposed"
+      "threshold": "Burn rate < {{FAST_BURN_RATE}}× (1 h) and < {{SLOW_BURN_RATE}}× (6 h); releases blocked when remaining 30-day budget < {{FREEZE_REMAINING_PCT}}%"
     }
   ],
   "relations": []

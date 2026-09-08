@@ -28,8 +28,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "unwanted-behaviour",
-      "status": "draft",
-      "priority": "must",
       "unwanted_condition": "a single tenant or workload sustains resource consumption above its allotted share",
       "action": "throttle or shed that tenant's or workload's excess load before it measurably degrades latency or error rate for any other tenant",
       "rationale": "Shared infrastructure is only viable if no single occupant can starve the others; without an enforced ceiling, the noisiest tenant sets the experience for everyone."

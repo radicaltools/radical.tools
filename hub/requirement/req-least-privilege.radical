@@ -38,8 +38,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "grant every user account and workload identity the minimum permission set needed for its function, review all grants {{ACCESS_REVIEW_FREQUENCY}}, and revoke permissions unused since the previous review",
       "rationale": "Least privilege bounds the blast radius of a compromised account or a bug; regular review is what keeps it true after roles and systems change."
     }

@@ -50,10 +50,7 @@
       "height": 52,
       "collapsed": false,
       "category": "operational",
-      "automated": true,
-      "trigger": "on-deploy",
-      "threshold": "p75 LCP ≤ {{LCP_BUDGET_SECONDS}} s, p75 INP ≤ {{INP_BUDGET_MS}} ms, initial JS ≤ {{JS_BUDGET_KB}} kB",
-      "status": "proposed"
+      "threshold": "p75 LCP ≤ {{LCP_BUDGET_SECONDS}} s, p75 INP ≤ {{INP_BUDGET_MS}} ms, initial JS ≤ {{JS_BUDGET_KB}} kB"
     }
   ],
   "relations": []

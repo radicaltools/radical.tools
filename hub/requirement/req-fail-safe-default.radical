@@ -37,8 +37,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "unwanted-behaviour",
-      "status": "draft",
-      "priority": "must",
       "unwanted_condition": "an automated decision (an AI action, a payment, an irreversible write) cannot be made with confidence above {{MIN_CONFIDENCE_PCT}}%",
       "action": "take the least harmful, most reversible fallback action available and hand off to a human instead of proceeding on a low-confidence guess",
       "rationale": "An autonomous system that always acts on its best guess will eventually act confidently on a wrong guess; a system that recognises its own uncertainty and defaults to safety is what keeps a rare bad call from becoming an incident.",

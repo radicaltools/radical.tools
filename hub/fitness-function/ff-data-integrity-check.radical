@@ -36,10 +36,7 @@
       "collapsed": false,
       "description": "Periodically scans for referential-integrity violations, orphaned records and checksum mismatches that application-level constraints alone don't catch, especially across service or database boundaries.",
       "category": "structural",
-      "automated": true,
-      "trigger": "periodic",
       "threshold": "Zero unresolved referential-integrity violations older than {{MAX_AGE_HOURS}} hours",
-      "status": "proposed",
       "templateParams": [
         {
           "key": "MAX_AGE_HOURS",

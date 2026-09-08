@@ -43,8 +43,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "must",
       "trigger": "an SLO is consuming its error budget at more than {{BURN_RATE_ALERT}}× the sustainable rate",
       "action": "page the on-call engineer within {{ALERT_DELIVERY_SECONDS}} seconds with the affected SLO, current burn rate and links to the dashboard and runbook, and verify the paging path with a periodic end-to-end drill",
       "rationale": "Alerting on symptoms (budget burn) rather than causes keeps pages rare and meaningful, and a tested delivery path guards against the alert that never arrives."

@@ -34,8 +34,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "should",
       "action": "achieve at least {{MIN_TASK_SUCCESS_PCT}}% unassisted completion of the primary workflow in moderated usability tests with representative users, re-measured after significant UI changes",
       "rationale": "Task success is the most direct measure of whether the interface works; analytics show where users drop out but not why, and testing closes that gap."
     }

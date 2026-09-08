@@ -38,10 +38,7 @@
       "collapsed": false,
       "description": "Limits how much of the codebase is near-duplicate logic. High duplication is the earliest structural signal that a shared abstraction is missing, and it multiplies the cost of every future bug fix by however many copies exist.",
       "category": "structural",
-      "automated": true,
-      "trigger": "on-deploy",
       "threshold": "No more than {{MAX_DUPLICATION_PCT}}% of lines flagged as duplicated across the codebase",
-      "status": "proposed",
       "templateParams": [
         {
           "key": "MAX_DUPLICATION_PCT",

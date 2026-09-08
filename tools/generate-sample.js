@@ -321,12 +321,12 @@ function makeBaseData() {
     // ── Governance: Fitness Functions (Building Evolutionary Architectures) ───
     nd('ff-latency', 'fitness-fn', 'FF: Payment p99 < 250ms',
       'Continuously asserts that the end-to-end payment path stays within its latency budget.', '', 2900, 0, 180, 52, {
-      category: 'operational', automated: true, trigger: 'continuous', status: 'active',
+      category: 'operational',
       threshold: 'p99 latency < 250ms measured over any rolling 24h window',
     }),
     nd('ff-ledger', 'fitness-fn', 'FF: Zero ledger data loss',
       'Verifies the transaction ledger survives node failure with no committed-record loss.', '', 2900, 90, 180, 52, {
-      category: 'structural', automated: true, trigger: 'on-deploy', status: 'active',
+      category: 'structural',
       threshold: 'No committed transaction lost during automated chaos / failover tests',
     }),
   ]
@@ -542,6 +542,7 @@ async function main() {
       { id: 'view-treemap',  name: 'Platform Hierarchy', kind: 'treemap', nodeIds: TREEMAP_IDS, positions: treemapPositions, viewport: treemapVp },
       { id: 'view-matrix',   name: 'Dependency Matrix', kind: 'matrix', nodeIds: MATRIX_IDS, positions: defaultPositions, viewport: { x: 0, y: 0, zoom: 1 } },
       { id: 'view-governance', name: 'Governance', kind: 'table', nodeIds: GOVERNANCE_IDS, positions: defaultPositions, viewport: { x: 0, y: 0, zoom: 1 } },
+      { id: 'view-wiki', name: 'Architecture Wiki', kind: 'wiki', nodeIds: CORE_IDS, positions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
     ],
     snapshots: [
       { id: 'snap-v1', name: 'v1 – Core & Accounts',   timestamp: Date.now() - 90 * 86400000, nodes: v1NodeMap, relations: Object.fromEntries(v1RelList.map(r => [r.id, r])) },

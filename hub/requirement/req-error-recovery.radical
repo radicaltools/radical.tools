@@ -26,8 +26,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "show a human-readable message for every error state that names the problem, preserves the user's input and offers a specific next step, while logging the technical detail under a reference id shown to the user",
       "rationale": "Dead-end errors are where users give up and support tickets start; a reference id connects the two so the team can find the cause without asking the user to reproduce it."
     }

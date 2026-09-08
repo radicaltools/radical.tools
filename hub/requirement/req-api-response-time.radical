@@ -42,8 +42,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "state-driven",
-      "status": "draft",
-      "priority": "must",
       "precondition": "the system is serving normal production traffic",
       "action": "respond to API requests within {{P95_MS}} ms at the 95th percentile and never exceed {{P99_MS}} ms at the 99th percentile, measured at the service boundary",
       "rationale": "Downstream callers size their own timeouts and retry budgets around this figure; a percentile target with a tail ceiling prevents a small fraction of slow requests from cascading into upstream failures."

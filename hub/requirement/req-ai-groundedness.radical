@@ -37,8 +37,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "cite the retrieved document or governed data source for every factual claim, refuse to answer when no supporting source is retrieved, and maintain a groundedness score of at least {{GROUNDEDNESS_MIN_PCT}}% on the evaluation set",
       "rationale": "Language models produce fluent but unsupported statements; retrieval grounding and continuous evaluation reduce that risk to a measurable level and make the residual errors traceable."
     }

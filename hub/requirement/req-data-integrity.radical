@@ -26,8 +26,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "enforce referential integrity for every cross-entity relationship, rejecting operations that would leave dangling references and reconciling cross-service references with a scheduled consistency check",
       "rationale": "Orphaned records surface later as wrong totals, failed reports and compliance findings, and are far more expensive to repair than to prevent."
     }

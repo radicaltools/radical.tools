@@ -37,10 +37,7 @@
       "height": 52,
       "collapsed": false,
       "category": "process",
-      "automated": true,
-      "trigger": "periodic",
-      "threshold": "Median lead time ≤ {{MAX_LEAD_TIME_HOURS}} h (4-week rolling)",
-      "status": "proposed"
+      "threshold": "Median lead time ≤ {{MAX_LEAD_TIME_HOURS}} h (4-week rolling)"
     }
   ],
   "relations": []

@@ -38,10 +38,7 @@ const ADR_COLS: ColDef[] = [
 
 const FF_COLS: ColDef[] = [
   { key: 'label',     label: 'Name',      width: 220, type: 'text' },
-  { key: 'status',    label: 'Status',    width: 130, type: 'enum', options: ['proposed', 'active', 'deprecated'] },
   { key: 'category',  label: 'Category',  width: 150, type: 'enum', options: ['structural', 'operational', 'process', 'holistic'] },
-  { key: 'automated', label: 'Automated', width: 100, type: 'boolean' },
-  { key: 'trigger',   label: 'Trigger',   width: 130, type: 'enum', options: ['on-deploy', 'continuous', 'periodic'] },
   { key: 'threshold', label: 'Threshold / Success criteria', width: 240, type: 'textarea' },
 ]
 
@@ -57,8 +54,6 @@ const REQ_COLS: ColDef[] = [
   { key: 'label',              label: 'Name',           width: 220, type: 'text' },
   { key: '_ears_sentence',     label: 'EARS Sentence',  width: 380, type: 'readonly' },
   { key: 'ears_type',          label: 'EARS type',      width: 150, type: 'enum', options: ['ubiquitous', 'event-driven', 'state-driven', 'unwanted-behaviour', 'optional', 'complex'] },
-  { key: 'status',             label: 'Status',         width: 130, type: 'enum', options: ['draft', 'approved', 'implemented', 'verified', 'deprecated'] },
-  { key: 'priority',           label: 'Priority',       width: 100, type: 'enum', options: ['must', 'should', 'could', "won't"] },
   { key: 'trigger',            label: 'When (trigger)',  width: 180, type: 'text', visibleWhen: { key: 'ears_type', values: ['event-driven', 'complex'] } },
   { key: 'precondition',       label: 'While (precon.)', width: 180, type: 'text', visibleWhen: { key: 'ears_type', values: ['state-driven', 'complex'] } },
   { key: 'unwanted_condition', label: 'If (unwanted)',   width: 180, type: 'text', visibleWhen: { key: 'ears_type', values: ['unwanted-behaviour', 'complex'] } },
