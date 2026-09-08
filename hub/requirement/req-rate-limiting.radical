@@ -20,7 +20,8 @@
       }
     ],
     "hubRefs": [
-      "pattern-api-gateway"
+      "pattern-api-gateway",
+      "pattern-rate-limiter"
     ]
   },
   "nodes": [

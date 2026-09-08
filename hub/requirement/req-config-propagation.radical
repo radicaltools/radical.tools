@@ -18,6 +18,10 @@
         "type": "number",
         "defaultValue": "60"
       }
+    ],
+    "hubRefs": [
+      "req-zero-downtime-deploy",
+      "req-iac"
     ]
   },
   "nodes": [

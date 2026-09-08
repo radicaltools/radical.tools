@@ -20,7 +20,9 @@
     ],
     "hubRefs": [
       "req-mfa",
-      "req-secrets-management"
+      "req-secrets-management",
+      "pattern-sidecar",
+      "adr-multi-tenancy-strategy"
     ]
   },
   "nodes": [

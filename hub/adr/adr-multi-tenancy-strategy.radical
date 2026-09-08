@@ -1,0 +1,39 @@
+{
+  "hub": {
+    "id": "adr-multi-tenancy-strategy",
+    "category": "adr",
+    "name": "Multi-Tenancy Strategy",
+    "description": "Records how tenant data is isolated — shared schema with row-level security, or a dedicated database per tenant — and which tenants get which.",
+    "tags": [
+      "multi-tenancy",
+      "saas",
+      "data",
+      "isolation",
+      "governance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-least-privilege",
+      "req-data-integrity",
+      "adr-data-store"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-multi-tenancy-strategy-1",
+      "type": "adr",
+      "label": "ADR: Pooled tenancy by default, siloed for enterprise",
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "x": 0,
+      "y": 0,
+      "status": "proposed",
+      "date": "",
+      "context": "The product serves many customers (tenants) of very different sizes. Every tenant needs its data isolated from every other tenant; not every tenant needs — or can afford to pay for — the operational cost of a fully dedicated stack.",
+      "decision": "Small and mid-size tenants share infrastructure in a pooled model: one database, every table carrying a tenant_id, with row-level security enforcing isolation at the query layer. Enterprise tenants that require it (contractually or for compliance) are provisioned a siloed, dedicated database instead, behind the same application tier.",
+      "consequences": "• Pooled tenants get lower cost and simpler operations (one schema to migrate, one fleet to patch), at the cost of relying on row-level security being correct everywhere — a single missing tenant_id filter is a cross-tenant data leak.\n• Siloed tenants get the strongest isolation story and simplest compliance narrative, at the cost of per-tenant operational overhead (migrations, backups, capacity planning multiply by tenant count).\n• The application tier must support both storage topologies behind one code path, which the tenant-resolution layer needs to route transparently.\n• Moving a tenant from pooled to siloed later requires a live data migration, so the trigger for that move (contract tier, compliance requirement) should be decided up front.",
+      "alternatives": "1. Always siloed — safest isolation story, but operational cost scales linearly with tenant count and makes a low-cost self-serve tier uneconomical.\n2. Always pooled — cheapest to run, weakest isolation story; unattractive to enterprise buyers with compliance requirements.\n3. Schema-per-tenant — a middle ground, but migration tooling has to run per schema, and most databases don't scale well past a few thousand schemas.\n4. Pooled by default, siloed for enterprise (chosen) — matches cost to what each tier actually needs."
+    }
+  ]
+}

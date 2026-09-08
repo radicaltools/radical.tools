@@ -25,6 +25,10 @@
         "type": "number",
         "defaultValue": "3"
       }
+    ],
+    "hubRefs": [
+      "req-idempotency",
+      "req-error-rate"
     ]
   },
   "nodes": [

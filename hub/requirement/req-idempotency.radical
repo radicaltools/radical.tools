@@ -21,7 +21,10 @@
     ],
     "hubRefs": [
       "pattern-transactional-outbox",
-      "pattern-event-driven"
+      "pattern-event-driven",
+      "req-batch-job-completion",
+      "pattern-saga",
+      "adr-data-consistency-model"
     ]
   },
   "nodes": [

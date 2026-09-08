@@ -1,0 +1,39 @@
+{
+  "hub": {
+    "id": "adr-data-consistency-model",
+    "category": "adr",
+    "name": "Data Consistency Model",
+    "description": "Records whether cross-service state changes are strongly or eventually consistent, and where the line between the two sits.",
+    "tags": [
+      "consistency",
+      "distributed-systems",
+      "data",
+      "event-driven"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-saga",
+      "pattern-cqrs",
+      "pattern-event-driven",
+      "req-idempotency"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-data-consistency-model-1",
+      "type": "adr",
+      "label": "ADR: Eventual consistency across service boundaries",
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "x": 0,
+      "y": 0,
+      "status": "proposed",
+      "date": "",
+      "context": "Data now lives in more than one service's database. Some workflows want the same read-your-writes guarantee a single database gave us for free; others just need to converge eventually. Treating every boundary as strongly consistent means distributed transactions, which cost availability and throughput.",
+      "decision": "Each service is strongly consistent within its own transactional boundary. Across service boundaries, consistency is eventual: state changes propagate as domain events, and consumers are built to tolerate a short, bounded lag rather than assume the source has already applied the change.",
+      "consequences": "• UIs that read a just-written value across a service boundary need an explicit strategy (optimistic UI, polling, or a synchronous read-your-writes API for that one case) rather than assuming instant propagation.\n• Sagas and event choreography replace distributed transactions for multi-service workflows.\n• Reconciliation jobs are still needed as a backstop for the rare cases where propagation silently fails.\n• Debugging \"why doesn't this read reflect that write\" becomes a recurring class of support question that needs tooling (event lag dashboards).",
+      "alternatives": "1. Distributed transactions (2PC/XA) — true strong consistency everywhere, but couples service availability together and doesn't survive partitions well.\n2. Strong consistency via a shared database — simplest mentally, but re-couples the services the boundary was meant to decouple.\n3. Eventual consistency via events (chosen) — services stay independently deployable and available; consumers must be designed for lag."
+    }
+  ]
+}

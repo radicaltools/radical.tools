@@ -16,7 +16,8 @@
       "pattern-event-driven",
       "adr-integration-style",
       "req-health-checks",
-      "ff-coupling-guard"
+      "ff-coupling-guard",
+      "pattern-saga"
     ]
   },
   "nodes": [

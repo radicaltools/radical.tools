@@ -1,0 +1,566 @@
+{
+  "hub": {
+    "id": "bp-saas-b2b-platform",
+    "category": "blueprint",
+    "name": "SaaS B2B Multi-Tenant Platform",
+    "description": "A B2B SaaS reference architecture: one pooled, row-level-secured data tier serves self-serve and mid-market tenants, enterprise SSO federates through a dedicated identity service, and usage-based billing meters and enforces subscription state.",
+    "tags": [
+      "saas",
+      "multi-tenancy",
+      "b2b",
+      "sso",
+      "billing",
+      "governance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "PROVISION_MINUTES",
+        "label": "Max provisioning time (minutes)",
+        "hint": "2",
+        "type": "number",
+        "defaultValue": "2"
+      },
+      {
+        "key": "RECONCILIATION_PCT",
+        "label": "Max metering discrepancy at reconciliation (%)",
+        "hint": "0.5",
+        "type": "number",
+        "defaultValue": "0.5"
+      },
+      {
+        "key": "FUZZ_QUERY_COUNT",
+        "label": "Randomised queries per run",
+        "hint": "500",
+        "type": "number",
+        "defaultValue": "500"
+      },
+      {
+        "key": "MAX_TENANT_SHARE_PCT",
+        "label": "Max sustained CPU share per tenant (%)",
+        "hint": "20",
+        "type": "number",
+        "defaultValue": "20"
+      }
+    ],
+    "hubRefs": [
+      "adr-multi-tenancy-strategy",
+      "pattern-api-gateway",
+      "req-mfa",
+      "req-secrets-management",
+      "req-availability",
+      "pattern-event-driven",
+      "ff-error-budget",
+      "req-audit-logging"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "tenant-user",
+      "type": "person",
+      "label": "Tenant User",
+      "description": "An employee of a customer organisation using the product day to day.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "tenant-admin",
+      "type": "person",
+      "label": "Tenant Admin",
+      "description": "Manages their organisation's users, SSO configuration and subscription.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 210,
+      "y": 0
+    },
+    {
+      "id": "ops-staff",
+      "type": "person",
+      "label": "Platform Ops",
+      "description": "Provisions tenants, handles escalations, watches per-tenant health.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 420,
+      "y": 0
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "SaaS Platform",
+      "description": "One codebase and one pooled data tier serving every tenant, with a siloed escape hatch for the largest enterprise customers.",
+      "width": 1040,
+      "height": 990,
+      "collapsed": false,
+      "x": 0,
+      "y": 290
+    },
+    {
+      "id": "webapp",
+      "type": "webapp",
+      "label": "Web App",
+      "description": "The product's UI. Every request carries a resolved tenant context.",
+      "technology": "React",
+      "parentId": "platform",
+      "width": 210,
+      "height": 140,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "admin-console",
+      "type": "webapp",
+      "label": "Internal Admin Console",
+      "description": "Ops-facing: provisioning, impersonation (audited), tenant health.",
+      "technology": "React",
+      "parentId": "platform",
+      "width": 210,
+      "height": 140,
+      "collapsed": false,
+      "x": 280,
+      "y": 110
+    },
+    {
+      "id": "gateway",
+      "type": "container",
+      "label": "API Gateway",
+      "description": "Terminates auth, resolves the tenant from the token/subdomain, attaches tenant context to every downstream call.",
+      "technology": "Envoy",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 530,
+      "y": 110
+    },
+    {
+      "id": "identity-service",
+      "type": "container",
+      "label": "Identity & Tenant Service",
+      "description": "Provisions tenants, manages users and roles, federates with each enterprise tenant's own IdP.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 350
+    },
+    {
+      "id": "billing-service",
+      "type": "container",
+      "label": "Billing Service",
+      "description": "Owns subscriptions, usage metering and plan entitlements.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 350
+    },
+    {
+      "id": "core-service",
+      "type": "container",
+      "label": "Core Domain Service",
+      "description": "The product's actual domain logic. Every query is scoped by tenant_id.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 710,
+      "y": 350
+    },
+    {
+      "id": "notification-service",
+      "type": "container",
+      "label": "Notification Service",
+      "description": "Sends transactional email and in-app notifications, tenant-branded.",
+      "technology": "Node.js",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 590
+    },
+    {
+      "id": "event-bus",
+      "type": "queue",
+      "label": "Event Bus",
+      "description": "Tenant lifecycle and domain events: TenantProvisioned, SubscriptionChanged, UserInvited.",
+      "technology": "Kafka",
+      "parentId": "platform",
+      "width": 220,
+      "height": 95,
+      "collapsed": false,
+      "x": 370,
+      "y": 590
+    },
+    {
+      "id": "tenant-db",
+      "type": "database",
+      "label": "Tenant Data Store",
+      "description": "Pooled, multi-tenant: every table carries tenant_id, row-level security enforces isolation.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 30,
+      "y": 830
+    },
+    {
+      "id": "identity-db",
+      "type": "database",
+      "label": "Identity Store",
+      "description": "Tenants, users, roles, SSO configuration.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 260,
+      "y": 830
+    },
+    {
+      "id": "idp",
+      "type": "system",
+      "label": "Customer IdP",
+      "description": "An enterprise tenant's own SSO provider (Okta, Azure AD) — SAML/OIDC federation.",
+      "external": true,
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 0,
+      "y": 1400
+    },
+    {
+      "id": "payment-provider",
+      "type": "system",
+      "label": "Payment Provider",
+      "description": "Handles card capture and recurring billing.",
+      "external": true,
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 420,
+      "y": 1400
+    },
+    {
+      "id": "email-provider",
+      "type": "system",
+      "label": "Email Provider",
+      "description": "Transactional email delivery.",
+      "external": true,
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 840,
+      "y": 1400
+    },
+    {
+      "id": "req-tenant-isolation",
+      "type": "requirement",
+      "label": "Tenant Data Isolation",
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "x": 0,
+      "y": 1780,
+      "ears_type": "unwanted-behaviour",
+      "status": "draft",
+      "priority": "must",
+      "unwanted_condition": "a query executes without a validated tenant context",
+      "action": "reject the query, log a security event and alert the on-call rotation",
+      "rationale": "A missing tenant filter is a cross-tenant data leak — the single most damaging failure mode a pooled multi-tenant system has."
+    },
+    {
+      "id": "req-tenant-provisioning-time",
+      "type": "requirement",
+      "label": "Tenant Provisioning Time",
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "x": 320,
+      "y": 1780,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "a new tenant completes sign-up",
+      "action": "provision an isolated, ready-to-use workspace within {{PROVISION_MINUTES}} minutes",
+      "rationale": "Slow provisioning is the first thing a trial user experiences; it sets the tone for the whole evaluation.",
+      "templateParams": [
+        {
+          "key": "PROVISION_MINUTES",
+          "label": "Max provisioning time (minutes)",
+          "hint": "2",
+          "type": "number",
+          "defaultValue": "2"
+        }
+      ]
+    },
+    {
+      "id": "req-subscription-enforcement",
+      "type": "requirement",
+      "label": "Subscription Enforcement",
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "x": 640,
+      "y": 1780,
+      "ears_type": "state-driven",
+      "status": "draft",
+      "priority": "must",
+      "precondition": "a tenant's subscription is past due beyond the grace period",
+      "action": "restrict the tenant to read-only access until payment succeeds or the account is cancelled",
+      "rationale": "Non-payment must degrade access, not delete data — the tenant may still resolve billing and expects their data intact."
+    },
+    {
+      "id": "req-usage-metering-accuracy",
+      "type": "requirement",
+      "label": "Usage Metering Accuracy",
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "x": 960,
+      "y": 1780,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "record every billable usage event exactly once, reconciled against source-of-truth logs within {{RECONCILIATION_PCT}}% at month end",
+      "rationale": "Usage-based billing that overcounts erodes trust; undercounting is silent revenue loss. Both need to be caught before the invoice goes out.",
+      "templateParams": [
+        {
+          "key": "RECONCILIATION_PCT",
+          "label": "Max metering discrepancy at reconciliation (%)",
+          "hint": "0.5",
+          "type": "number",
+          "defaultValue": "0.5"
+        }
+      ]
+    },
+    {
+      "id": "ff-tenant-isolation-fuzz",
+      "type": "fitness-fn",
+      "label": "Tenant Isolation Fuzz Test",
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "x": 0,
+      "y": 1980,
+      "category": "structural",
+      "automated": true,
+      "trigger": "on-deploy",
+      "threshold": "Zero cross-tenant rows returned across {{FUZZ_QUERY_COUNT}} randomised queries run against two seeded tenants",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "FUZZ_QUERY_COUNT",
+          "label": "Randomised queries per run",
+          "hint": "500",
+          "type": "number",
+          "defaultValue": "500"
+        }
+      ]
+    },
+    {
+      "id": "ff-noisy-neighbor-guard",
+      "type": "fitness-fn",
+      "label": "Noisy Neighbour Guard",
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "x": 320,
+      "y": 1980,
+      "category": "operational",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "No single tenant sustains more than {{MAX_TENANT_SHARE_PCT}}% of pooled database CPU for over 5 minutes",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "MAX_TENANT_SHARE_PCT",
+          "label": "Max sustained CPU share per tenant (%)",
+          "hint": "20",
+          "type": "number",
+          "defaultValue": "20"
+        }
+      ]
+    },
+    {
+      "id": "ff-billing-reconciliation",
+      "type": "fitness-fn",
+      "label": "Billing Reconciliation",
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "x": 640,
+      "y": 1980,
+      "category": "process",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Metered usage matches the payment provider's invoiced usage within the tolerance defined by Usage Metering Accuracy",
+      "status": "proposed"
+    },
+    {
+      "id": "adr-tenancy-model",
+      "type": "adr",
+      "label": "ADR: Pooled tenancy, siloed for enterprise",
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "x": 0,
+      "y": 2152,
+      "status": "accepted",
+      "date": "",
+      "context": "Same trade-off as the standalone Multi-Tenancy Strategy ADR, applied concretely to this platform's tenant tiers.",
+      "decision": "Self-serve and mid-market tenants are pooled with row-level security; the top enterprise tier is siloed on request.",
+      "consequences": "Pooled tenants launch in minutes at low marginal cost; siloed tenants get a dedicated migration runbook and higher per-tenant ops cost.",
+      "alternatives": "Always-siloed was rejected as uneconomical for the self-serve tier; always-pooled was rejected as a blocker for enterprise compliance reviews."
+    },
+    {
+      "id": "adr-sso-federation",
+      "type": "adr",
+      "label": "ADR: Short-lived tenant-scoped tokens after IdP federation",
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "x": 320,
+      "y": 2152,
+      "status": "accepted",
+      "date": "",
+      "context": "Enterprise tenants federate via their own SAML/OIDC IdP; the platform must not become a long-lived credential store for those identities.",
+      "decision": "After a successful SSO handshake, the gateway issues its own short-lived, tenant-scoped JWT. The IdP is the source of truth for the identity; the platform never stores the tenant's SSO credentials.",
+      "consequences": "A tenant revoking a user at their IdP takes effect on the token's next short expiry, not instantly, which is an accepted trade-off; token issuance adds one extra hop to first login.",
+      "alternatives": "Storing IdP session cookies directly was rejected — it would tie the platform's session lifetime to each IdP's own cookie semantics and leak IdP-specific state into the app tier."
+    }
+  ],
+  "relations": [
+    {
+      "id": "tenant-user--webapp",
+      "sourceId": "tenant-user",
+      "targetId": "webapp",
+      "label": "Uses the product",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "tenant-admin--webapp",
+      "sourceId": "tenant-admin",
+      "targetId": "webapp",
+      "label": "Manages org, users, billing",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "ops-staff--admin-console",
+      "sourceId": "ops-staff",
+      "targetId": "admin-console",
+      "label": "Provisions and supports tenants",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "webapp--gateway",
+      "sourceId": "webapp",
+      "targetId": "gateway",
+      "label": "Calls API",
+      "technology": "HTTPS / JSON"
+    },
+    {
+      "id": "admin-console--gateway",
+      "sourceId": "admin-console",
+      "targetId": "gateway",
+      "label": "Calls internal API",
+      "technology": "HTTPS / JSON"
+    },
+    {
+      "id": "gateway--identity-service",
+      "sourceId": "gateway",
+      "targetId": "identity-service",
+      "label": "AuthN, tenant resolution",
+      "technology": "gRPC"
+    },
+    {
+      "id": "gateway--billing-service",
+      "sourceId": "gateway",
+      "targetId": "billing-service",
+      "label": "Routes /billing/**",
+      "technology": "gRPC"
+    },
+    {
+      "id": "gateway--core-service",
+      "sourceId": "gateway",
+      "targetId": "core-service",
+      "label": "Routes tenant-scoped requests",
+      "technology": "gRPC"
+    },
+    {
+      "id": "identity-service--idp",
+      "sourceId": "identity-service",
+      "targetId": "idp",
+      "label": "SAML/OIDC federation",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "identity-service--identity-db",
+      "sourceId": "identity-service",
+      "targetId": "identity-db",
+      "label": "Reads/writes",
+      "technology": "SQL"
+    },
+    {
+      "id": "billing-service--payment-provider",
+      "sourceId": "billing-service",
+      "targetId": "payment-provider",
+      "label": "Subscriptions, invoices",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "core-service--tenant-db",
+      "sourceId": "core-service",
+      "targetId": "tenant-db",
+      "label": "Reads/writes, always tenant-scoped",
+      "technology": "SQL"
+    },
+    {
+      "id": "core-service--event-bus",
+      "sourceId": "core-service",
+      "targetId": "event-bus",
+      "label": "Publishes domain events",
+      "technology": "Kafka protocol"
+    },
+    {
+      "id": "billing-service--event-bus",
+      "sourceId": "billing-service",
+      "targetId": "event-bus",
+      "label": "Publishes SubscriptionChanged",
+      "technology": "Kafka protocol"
+    },
+    {
+      "id": "identity-service--event-bus",
+      "sourceId": "identity-service",
+      "targetId": "event-bus",
+      "label": "Publishes TenantProvisioned, UserInvited",
+      "technology": "Kafka protocol"
+    },
+    {
+      "id": "notification-service--event-bus",
+      "sourceId": "notification-service",
+      "targetId": "event-bus",
+      "label": "Subscribes to lifecycle events",
+      "technology": "Kafka protocol"
+    },
+    {
+      "id": "notification-service--email-provider",
+      "sourceId": "notification-service",
+      "targetId": "email-provider",
+      "label": "Sends transactional email",
+      "technology": "HTTPS"
+    }
+  ]
+}

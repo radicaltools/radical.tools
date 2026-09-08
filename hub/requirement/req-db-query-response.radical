@@ -20,7 +20,8 @@
       }
     ],
     "hubRefs": [
-      "req-api-response-time"
+      "req-api-response-time",
+      "req-report-generation"
     ]
   },
   "nodes": [

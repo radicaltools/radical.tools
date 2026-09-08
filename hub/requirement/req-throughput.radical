@@ -28,7 +28,9 @@
     ],
     "hubRefs": [
       "req-api-response-time",
-      "req-autoscaling"
+      "req-autoscaling",
+      "req-report-generation",
+      "pattern-rate-limiter"
     ]
   },
   "nodes": [

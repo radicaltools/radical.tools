@@ -9,7 +9,11 @@
       "error-handling",
       "ux"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-graceful-degradation",
+      "req-error-rate"
+    ]
   },
   "nodes": [
     {
