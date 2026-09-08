@@ -335,13 +335,13 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
     error,
     activeCategory,
     searchQuery,
-    activeTag,
+    activeTags,
     fetchConcepts,
     loadConcept,
     loadConcepts,
     setCategory,
     setSearch,
-    setTag,
+    setTags,
     resetFilters,
     filteredConcepts,
   } = useHubStore()
@@ -372,7 +372,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
     if (!preselectedIds || preselectedIds.length === 0) return all
     const idSet = new Set(preselectedIds)
     return all.filter((c) => idSet.has(c.id))
-  }, [open, loading, filteredConcepts, activeCategory, searchQuery, activeTag, preselectedIds])
+  }, [open, loading, filteredConcepts, activeCategory, searchQuery, activeTags, preselectedIds])
 
   // Template parameter fill state: set when user clicks "Add to Model" on a
   // concept that has templateParams.
@@ -839,14 +839,16 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         </div>
 
         {/* ── Active tag filter indicator ─────────────────────────────── */}
-        {activeTag && (
-          <div style={{ padding: '6px 20px 0', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-            <span style={{ color: 'var(--text-muted)' }}>Tag:</span>
-            <span style={{ ...S.tag, background: 'var(--accent)', color: '#fff' }}>{activeTag}</span>
+        {activeTags.size > 0 && (
+          <div style={{ padding: '6px 20px 0', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 13 }}>
+            <span style={{ color: 'var(--text-muted)' }}>Tag{activeTags.size > 1 ? 's' : ''}:</span>
+            {[...activeTags].map((t) => (
+              <span key={t} style={{ ...S.tag, background: 'var(--accent)', color: '#fff' }}>{t}</span>
+            ))}
             <button
               type="button"
               style={{ ...S.closeBtn, fontSize: 14, padding: '0 4px' }}
-              onClick={() => setTag(null)}
+              onClick={() => setTags(new Set())}
               title="Clear tag filter"
             >
               ✕
@@ -933,9 +935,9 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
                         key={t}
                         style={{
                           ...S.tag,
-                          ...(activeTag === t ? { background: 'var(--accent)', color: '#fff' } : {}),
+                          ...(activeTags.has(t) ? { background: 'var(--accent)', color: '#fff' } : {}),
                         }}
-                        onClick={() => setTag(activeTag === t ? null : t)}
+                        onClick={() => setTags(activeTags.has(t) ? new Set() : new Set([t]))}
                         role="button"
                         tabIndex={0}
                         title={`Filter by tag "${t}"`}

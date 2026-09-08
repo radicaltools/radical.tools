@@ -151,4 +151,15 @@ describe('hub route', () => {
   it('builds the studio import deep link', () => {
     expect(studioImportUrl('https://studio.radical.tools', ['a', 'b'])).toBe('https://studio.radical.tools?hub=a%2Cb')
   })
+
+  it('round-trips multi-value tag/status facets and a sort key', () => {
+    const r = { browse: true, category: 'requirement', tag: 'security,performance', status: 'draft,proposed', sort: 'connections' as const }
+    const hash = formatHubHash(r)
+    expect(hash).toBe('#/cat/requirement/tag/security%2Cperformance/status/draft%2Cproposed/sort/connections')
+    expect(parseHubHash(hash)).toEqual(r)
+  })
+
+  it('ignores an unknown sort key', () => {
+    expect(parseHubHash('#/sort/bogus')).toEqual({})
+  })
 })

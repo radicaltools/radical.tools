@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlowProvider } from 'reactflow'
 import { useDiagramStore } from '../store/diagramStore'
-import { useHubStore, type HubConcept, type HubConceptSummary } from '../store/hubStore'
+import { useHubStore, buildConnectionCounts, toggleInSet, type HubConcept, type HubConceptSummary, type HubSortKey } from '../store/hubStore'
 import type { HubRadicalDoc } from './hubFormat'
 import { Canvas } from '../components/Canvas'
 import { WikiView } from '../components/WikiView'
@@ -32,6 +32,12 @@ import { SiteNav } from './SiteNav'
 const STUDIO_URL = import.meta.env.DEV ? '/' : 'https://studio.radical.tools'
 const LS_THEME = 'radical-theme'
 const LS_RIGHT = 'radical-hub-rp-collapsed'
+const LS_CATALOG_WIDTH = 'radical-hub-catalog-width'
+const CATALOG_WIDTH_DEFAULT = 480
+const CATALOG_WIDTH_MIN = 340
+const CATALOG_WIDTH_MAX = 860
+const TOP_TAGS_SHOWN = 16
+const SORT_LABELS: Record<HubSortKey, string> = { name: 'Name', category: 'Category', connections: 'Connections' }
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -80,6 +86,14 @@ const IconStudio = () => (
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** Comma-separated URL segment ↔ filter Set. */
+function csvToSet(csv: string | undefined): Set<string> {
+  return new Set(csv ? csv.split(',').map((s) => s.trim()).filter(Boolean) : [])
+}
+function setToCsv(set: Set<string>): string | undefined {
+  return set.size ? [...set].join(',') : undefined
+}
+
 /** The catalogue file as published — what "Download" / "Copy" hand out. */
 function conceptJson(doc: HubRadicalDoc): string {
   return JSON.stringify(doc, null, 2)
@@ -123,11 +137,12 @@ function metaBadges(concept: HubConceptSummary): Array<{ label: string; value: s
 // ─── Catalogue ───────────────────────────────────────────────────────────────
 
 function ConceptCard({
-  concept, active, selected, onOpen, onToggleSelect, onTag,
+  concept, active, selected, connections, onOpen, onToggleSelect, onTag,
 }: {
   concept: HubConceptSummary
   active: boolean
   selected: boolean
+  connections: number
   onOpen: () => void
   onToggleSelect: () => void
   onTag: (tag: string) => void
@@ -153,12 +168,17 @@ function ConceptCard({
         </button>
       </div>
       <p className="hub-card-desc">{concept.description}</p>
-      {(badges.length > 0 || concept.templateParams?.length) ? (
+      {(badges.length > 0 || concept.templateParams?.length || connections > 0) ? (
         <div className="hub-card-meta">
           <span className="hub-badge hub-badge-cat">{theme.label}</span>
           {badges.map((b) => (
             <span className="hub-badge" key={b.label}><span className="hub-badge-k">{b.label}</span>{b.value}</span>
           ))}
+          {connections > 0 && (
+            <span className="hub-badge" title={`${connections} related concept${connections === 1 ? '' : 's'}`}>
+              🔗 {connections}
+            </span>
+          )}
           {concept.templateParams?.length ? (
             <span className="hub-badge" title={concept.templateParams.map((p) => p.key).join(', ')}>
               <span className="hub-badge-k">params</span>{concept.templateParams.length}
@@ -177,6 +197,42 @@ function ConceptCard({
   )
 }
 
+/** One filter facet (Tags, Status, …): a "clear" toggle and a row of
+ *  toggleable value chips with counts. Shared so the facets can't drift
+ *  visually/behaviourally from each other as more of them are added. */
+function FacetGroup({ label, items, active, onToggle, onClear, extra }: {
+  label: string
+  items: Array<{ value: string; count: number }>
+  active: Set<string>
+  onToggle: (value: string) => void
+  onClear: () => void
+  extra?: React.ReactNode
+}) {
+  return (
+    <div className="hub-facet">
+      <div className="hub-facet-head">
+        <span>{label}</span>
+        {active.size > 0 && (
+          <button type="button" className="hub-link" onClick={onClear}>clear ({active.size})</button>
+        )}
+      </div>
+      <div className="hub-facet-chips">
+        {items.map(({ value, count }) => (
+          <button
+            type="button"
+            key={value}
+            className={`hub-tag${active.has(value) ? ' on' : ''}`}
+            onClick={() => onToggle(value)}
+          >
+            {value} <span className="hub-tag-count">{count}</span>
+          </button>
+        ))}
+        {extra}
+      </div>
+    </div>
+  )
+}
+
 // ─── App ─────────────────────────────────────────────────────────────────────
 
 function HubAppInner(): React.ReactElement {
@@ -188,12 +244,20 @@ function HubAppInner(): React.ReactElement {
   const fetchConcepts = useHubStore((s) => s.fetchConcepts)
   const loadConcept = useHubStore((s) => s.loadConcept)
   const activeCategory = useHubStore((s) => s.activeCategory)
-  const activeTag = useHubStore((s) => s.activeTag)
+  const activeTags = useHubStore((s) => s.activeTags)
+  const activeStatuses = useHubStore((s) => s.activeStatuses)
+  const sortBy = useHubStore((s) => s.sortBy)
   const searchQuery = useHubStore((s) => s.searchQuery)
   const setCategory = useHubStore((s) => s.setCategory)
-  const setTag = useHubStore((s) => s.setTag)
+  const toggleTag = useHubStore((s) => s.toggleTag)
+  const setTags = useHubStore((s) => s.setTags)
+  const toggleStatus = useHubStore((s) => s.toggleStatus)
+  const setStatuses = useHubStore((s) => s.setStatuses)
+  const setSortBy = useHubStore((s) => s.setSortBy)
   const setSearch = useHubStore((s) => s.setSearch)
   const filtered = useHubStore((s) => s.filteredConcepts)
+  const allTags = useHubStore((s) => s.allTags)
+  const allStatuses = useHubStore((s) => s.allStatuses)
 
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const isLayoutRunning = useDiagramStore((s) => s.isLayoutRunning)
@@ -209,6 +273,15 @@ function HubAppInner(): React.ReactElement {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [rightCollapsed, setRightCollapsed] = useState<boolean>(() => localStorage.getItem(LS_RIGHT) === '1')
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem(LS_THEME) as 'dark' | 'light') || 'dark')
+  const [catalogWidth, setCatalogWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem(LS_CATALOG_WIDTH))
+    return saved >= CATALOG_WIDTH_MIN && saved <= CATALOG_WIDTH_MAX ? saved : CATALOG_WIDTH_DEFAULT
+  })
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
+  const [isResizing, setIsResizing] = useState(false)
+  const [tagsExpanded, setTagsExpanded] = useState(false)
+  const catalogWidthRef = useRef(catalogWidth)
+  const activeDragCleanup = useRef<(() => void) | null>(null)
   // Pending view kind from a deep link, applied once the concept is loaded.
   const pendingView = useRef<HubViewKind | undefined>(parseHubHash(window.location.hash).view)
 
@@ -223,8 +296,10 @@ function HubAppInner(): React.ReactElement {
   useEffect(() => {
     const r = parseHubHash(window.location.hash)
     if (r.category) setCategory(r.category)
-    if (r.tag) setTag(r.tag)
-  }, [setCategory, setTag])
+    if (r.tag) setTags(csvToSet(r.tag))
+    if (r.status) setStatuses(csvToSet(r.status))
+    if (r.sort) setSortBy(r.sort)
+  }, [setCategory, setTags, setStatuses, setSortBy])
 
   const summary = useMemo(() => concepts.find((c) => c.id === conceptId), [concepts, conceptId])
   const concept = conceptId ? loaded[conceptId] : undefined
@@ -273,7 +348,9 @@ function HubAppInner(): React.ReactElement {
       concept: concept?.id,
       view: concept ? viewKind : undefined,
       category: activeCategory ?? undefined,
-      tag: activeTag ?? undefined,
+      tag: setToCsv(activeTags),
+      status: setToCsv(activeStatuses),
+      sort: sortBy !== 'name' ? sortBy : undefined,
     })
     const changed = prevBrowsing.current !== browsing
     prevBrowsing.current = browsing
@@ -281,7 +358,7 @@ function HubAppInner(): React.ReactElement {
     const url = hash || window.location.pathname
     if (changed) history.pushState(null, '', url)
     else history.replaceState(null, '', url)
-  }, [browsing, concept, viewKind, activeCategory, activeTag])
+  }, [browsing, concept, viewKind, activeCategory, activeTags, activeStatuses, sortBy])
 
   // URL → state (back/forward, pasted links).
   useEffect(() => {
@@ -291,7 +368,9 @@ function HubAppInner(): React.ReactElement {
       if (r.concept !== conceptId) { pendingView.current = r.view; setConceptId(r.concept) }
       else if (r.view && r.view !== viewKind) setActiveView(viewIdForKind(r.view))
       setCategory(r.category ?? null)
-      setTag(r.tag ?? null)
+      setTags(csvToSet(r.tag))
+      setStatuses(csvToSet(r.status))
+      setSortBy(r.sort ?? 'name')
     }
     window.addEventListener('hashchange', onHash)
     window.addEventListener('popstate', onHash)
@@ -299,7 +378,7 @@ function HubAppInner(): React.ReactElement {
       window.removeEventListener('hashchange', onHash)
       window.removeEventListener('popstate', onHash)
     }
-  }, [conceptId, viewKind, setActiveView, setCategory, setTag])
+  }, [conceptId, viewKind, setActiveView, setCategory, setTags, setStatuses, setSortBy])
 
   const switchView = useCallback((kind: HubViewKind) => {
     setActiveView(viewIdForKind(kind))
@@ -307,11 +386,7 @@ function HubAppInner(): React.ReactElement {
   }, [setActiveView, fitAll])
 
   const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
+    setSelectedIds((prev) => toggleInSet(prev, id))
   }, [])
 
   const openInStudio = useCallback((ids: string[]) => {
@@ -332,6 +407,39 @@ function HubAppInner(): React.ReactElement {
     setRightCollapsed((c) => { localStorage.setItem(LS_RIGHT, c ? '0' : '1'); return !c })
   }, [])
 
+  // Drag the divider between the catalogue and the viewer to resize the list.
+  const startResize = useCallback((e: React.PointerEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.min(CATALOG_WIDTH_MAX, Math.max(CATALOG_WIDTH_MIN, ev.clientX))
+      catalogWidthRef.current = next
+      setCatalogWidth(next)
+    }
+    const stop = () => {
+      setIsResizing(false)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+      activeDragCleanup.current = null
+      localStorage.setItem(LS_CATALOG_WIDTH, String(catalogWidthRef.current))
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', stop)
+    // A touch/pen drag interrupted by a system gesture ends in pointercancel,
+    // not pointerup — without this the listeners (and the resizing class)
+    // would be stuck forever.
+    window.addEventListener('pointercancel', stop)
+    activeDragCleanup.current = stop
+  }, [])
+
+  // Release the drag if the component unmounts mid-resize.
+  useEffect(() => () => activeDragCleanup.current?.(), [])
+
+  const toggleGroup = useCallback((cat: string) => {
+    setCollapsedGroups((prev) => toggleInSet(prev, cat))
+  }, [])
+
   const openConcept = useCallback((id: string) => {
     pendingView.current = undefined
     setConceptId(id)
@@ -341,10 +449,12 @@ function HubAppInner(): React.ReactElement {
   const goHome = useCallback(() => {
     setConceptId(undefined)
     setCategory(null)
-    setTag(null)
+    setTags(new Set())
+    setStatuses(new Set())
+    setSortBy('name')
     setSearch('')
     setBrowsing(false)
-  }, [setCategory, setTag, setSearch])
+  }, [setCategory, setTags, setStatuses, setSortBy, setSearch])
 
   const toggleTheme = useCallback(() => setTheme((t) => (t === 'dark' ? 'light' : 'dark')), [])
 
@@ -353,6 +463,38 @@ function HubAppInner(): React.ReactElement {
     for (const c of concepts) m.set(c.category, (m.get(c.category) ?? 0) + 1)
     return m
   }, [concepts])
+
+  // Everything below is derived from the filter/sort state, not from
+  // catalogWidth/isResizing/theme — memoized so dragging the resizer (which
+  // calls setCatalogWidth on every pointermove) doesn't re-filter, re-sort,
+  // re-tally tags/statuses and rebuild the connections map on every frame.
+  const list = useMemo(
+    () => filtered(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [concepts, activeCategory, searchQuery, activeTags, activeStatuses, sortBy],
+  )
+  const tagList = useMemo(() => allTags(), [concepts]) // eslint-disable-line react-hooks/exhaustive-deps
+  const statusList = useMemo(() => allStatuses(), [concepts]) // eslint-disable-line react-hooks/exhaustive-deps
+  const connectionCounts = useMemo(() => buildConnectionCounts(concepts), [concepts])
+  const groups = useMemo(() => {
+    // Grouping by category only makes sense alongside a category-agnostic
+    // sort — "Connections" sort promises a single top-to-bottom ranking, and
+    // regrouping by category would hide that behind category order instead.
+    if (activeCategory || sortBy === 'connections') {
+      return [{ category: activeCategory ?? 'all', items: list }]
+    }
+    const byCat = new Map<string, HubConceptSummary[]>()
+    for (const c of list) {
+      if (!byCat.has(c.category)) byCat.set(c.category, [])
+      byCat.get(c.category)!.push(c)
+    }
+    // Known categories first in their canonical order, then anything else
+    // the index happens to carry (so an unrecognised category still shows
+    // up instead of silently vanishing from the list).
+    const known = HUB_CATEGORIES.filter((cat) => byCat.has(cat))
+    const other = [...byCat.keys()].filter((cat) => !(HUB_CATEGORIES as readonly string[]).includes(cat))
+    return [...known, ...other].map((cat) => ({ category: cat, items: byCat.get(cat)! }))
+  }, [list, activeCategory, sortBy])
 
   if (!browsing) {
     return (
@@ -372,13 +514,17 @@ function HubAppInner(): React.ReactElement {
     )
   }
 
-  const list = filtered()
   const conceptTheme = concept ? categoryTheme(concept.category) : null
+  const visibleTags = tagsExpanded ? tagList : tagList.slice(0, TOP_TAGS_SHOWN)
+  const hasFacetFilters = activeTags.size > 0 || activeStatuses.size > 0
 
   return (
     <div className="hub-shell">
     <SiteNav wide studioUrl={STUDIO_URL} theme={theme} onToggleTheme={toggleTheme} onHub={goHome} />
-    <div className={`hub-layout${rightCollapsed ? ' rp-collapsed' : ''}`}>
+    <div
+      className={`hub-layout${rightCollapsed ? ' rp-collapsed' : ''}${isResizing ? ' resizing' : ''}`}
+      style={{ ['--hub-catalog-width' as string]: `${catalogWidth}px` }}
+    >
       {/* ── Catalogue ────────────────────────────────────────────────────────────── */}
       <aside className="hub-catalog">
         <div className="hub-search">
@@ -416,27 +562,81 @@ function HubAppInner(): React.ReactElement {
           })}
         </div>
 
-        {activeTag && (
-          <div className="hub-active-tag">
-            <span>Tag:</span> <span className="hub-tag on">{activeTag}</span>
-            <button type="button" className="hub-link" onClick={() => setTag(null)}>clear</button>
-          </div>
+        <FacetGroup
+          label="Tags"
+          items={visibleTags.map(({ tag, count }) => ({ value: tag, count }))}
+          active={activeTags}
+          onToggle={toggleTag}
+          onClear={() => setTags(new Set())}
+          extra={tagList.length > TOP_TAGS_SHOWN && (
+            <button type="button" className="hub-link hub-facet-more" onClick={() => setTagsExpanded((v) => !v)}>
+              {tagsExpanded ? 'show less' : `+${tagList.length - TOP_TAGS_SHOWN} more`}
+            </button>
+          )}
+        />
+
+        {statusList.length > 0 && (
+          <FacetGroup
+            label="Status"
+            items={statusList.map(({ status, count }) => ({ value: status, count }))}
+            active={activeStatuses}
+            onToggle={toggleStatus}
+            onClear={() => setStatuses(new Set())}
+          />
         )}
+
+        <div className="hub-list-toolbar">
+          <span className="hub-list-count">
+            {list.length === concepts.length ? `${list.length} concepts` : `${list.length} of ${concepts.length}`}
+            {hasFacetFilters && (
+              <button type="button" className="hub-link" onClick={() => { setTags(new Set()); setStatuses(new Set()) }}>reset</button>
+            )}
+          </span>
+          <label className="hub-sort">
+            Sort
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as HubSortKey)}>
+              <option value="name">{SORT_LABELS.name}</option>
+              <option value="category">{SORT_LABELS.category}</option>
+              <option value="connections">{SORT_LABELS.connections}</option>
+            </select>
+          </label>
+        </div>
 
         <div className="hub-list">
           {loading && <div className="hub-list-msg">Loading concepts…</div>}
           {error && <div className="hub-list-msg hub-list-err">⚠ {error}</div>}
           {!loading && !error && list.length === 0 && <div className="hub-list-msg">No concepts match your filters.</div>}
-          {list.map((c) => (
-            <ConceptCard
-              key={c.id}
-              concept={c}
-              active={c.id === conceptId}
-              selected={selectedIds.has(c.id)}
-              onOpen={() => openConcept(c.id)}
-              onToggleSelect={() => toggleSelect(c.id)}
-              onTag={(t) => setTag(activeTag === t ? null : t)}
-            />
+          {groups.map(({ category, items }) => (
+            <section className="hub-group" key={category}>
+              {groups.length > 1 && (
+                <button type="button" className="hub-group-head" onClick={() => toggleGroup(category)}>
+                  <TypeIcon path={categoryTheme(category).iconPath} size={12} />
+                  {categoryTheme(category).plural}
+                  <span className="hub-chip-count">{items.length}</span>
+                  <span className={`hub-group-chevron${collapsedGroups.has(category) ? '' : ' open'}`}>▾</span>
+                </button>
+              )}
+              {/* Collapse only applies when there's more than one section (the
+                  toggle above is what set it) — with a single group there's no
+                  header to re-expand it, so a stale collapsed id from a
+                  previous "All" view must never hide the only group shown. */}
+              {(groups.length === 1 || !collapsedGroups.has(category)) && (
+                <div className="hub-group-items">
+                  {items.map((c) => (
+                    <ConceptCard
+                      key={c.id}
+                      concept={c}
+                      active={c.id === conceptId}
+                      selected={selectedIds.has(c.id)}
+                      connections={connectionCounts.get(c.id) ?? 0}
+                      onOpen={() => openConcept(c.id)}
+                      onToggleSelect={() => toggleSelect(c.id)}
+                      onTag={(t) => toggleTag(t)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
           ))}
         </div>
 
@@ -450,6 +650,15 @@ function HubAppInner(): React.ReactElement {
           </div>
         )}
       </aside>
+
+      <div
+        className="hub-resizer"
+        onPointerDown={startResize}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize concept list"
+        title="Drag to resize"
+      />
 
       {/* ── Viewer toolbar ────────────────────────────────────────────── */}
       <div className="toolbar hub-toolbar">
