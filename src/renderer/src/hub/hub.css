@@ -69,47 +69,64 @@
   background: var(--bg-app);
 }
 .hub-layout {
-  display: grid;
-  grid-template-rows: 48px 1fr;
-  grid-template-columns: var(--hub-catalog-width, 480px) 6px 1fr 260px;
-  grid-template-areas:
-    "catalog resizer toolbar toolbar"
-    "catalog resizer canvas  rightpanel";
-  flex: 1; min-height: 0;
-  background: var(--bg-app);
-  transition: grid-template-columns 0.22s var(--ease-out);
-}
-.hub-layout.rp-collapsed { grid-template-columns: var(--hub-catalog-width, 480px) 6px 1fr 18px; }
-/* Dragging the resizer changes --hub-catalog-width every pointermove — the
-   transition above must not fight that or the panel visibly lags the cursor. */
-.hub-layout.resizing { transition: none; }
-
-/* ── Resizer ──────────────────────────────────────────────────────── */
-.hub-resizer {
-  grid-area: resizer;
-  cursor: col-resize;
   position: relative;
-  background: var(--border-color);
-}
-.hub-resizer::before {
-  content: '';
-  position: absolute; top: 0; bottom: 0; left: -4px; right: -4px;
-}
-.hub-resizer:hover, .hub-resizer:active { background: var(--accent); }
-
-/* ── Catalogue column ─────────────────────────────────────────────── */
-.hub-catalog {
-  grid-area: catalog;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  background: var(--bg-panel);
-  border-right: 1px solid var(--border-color);
+  flex: 1; min-height: 0;
+  background: var(--bg-app);
 }
 
-.hub-search { padding: 10px 12px 6px; }
+/* ── Catalogue (full width — the concept preview lives in a popup) ─── */
+.hub-catalog {
+  display: flex;
+  flex-direction: column;
+  flex: 1; min-height: 0;
+  background: var(--bg-panel);
+}
+
+/* ── Concept preview popup ────────────────────────────────────────── */
+.hub-concept-overlay {
+  position: absolute; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  padding: 4vh 3vw;
+  background: rgba(0, 0, 0, 0.55);
+}
+.hub-concept-panel {
+  display: grid;
+  grid-template-rows: 48px 1fr;
+  grid-template-columns: 1fr 260px;
+  grid-template-areas:
+    "toolbar toolbar"
+    "canvas  rightpanel";
+  position: relative;
+  width: 100%; height: 100%;
+  max-width: 1440px;
+  background: var(--bg-app);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  transition: grid-template-columns 0.22s var(--ease-out);
+}
+.hub-concept-panel.rp-collapsed { grid-template-columns: 1fr 18px; }
+
+.hub-concept-close {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--hover-bg-faint);
+  color: var(--text-secondary);
+  font-size: 12px; line-height: 1; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.hub-concept-close:hover { background: var(--hover-bg); color: var(--text-primary); }
+
+.hub-search { padding: 10px 16px 6px; }
 .hub-search input {
   width: 100%;
+  max-width: 520px;
   height: 30px;
   padding: 0 10px;
   border-radius: var(--radius-md);
@@ -209,13 +226,18 @@
 .hub-group-head:hover { color: var(--text-primary); }
 .hub-group-chevron { margin-left: auto; transition: transform 0.15s; color: var(--text-muted); }
 .hub-group-chevron.open { transform: rotate(180deg); }
-.hub-group-items { display: flex; flex-direction: column; gap: 8px; padding-top: 2px; }
+.hub-group-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+  padding-top: 2px;
+}
 
 .hub-list {
   flex: 1; min-height: 0;
   overflow-y: auto;
-  padding: 10px 12px 12px;
-  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 16px 16px;
+  display: flex; flex-direction: column; gap: 10px;
 }
 .hub-list-msg { padding: 24px 8px; text-align: center; color: var(--text-muted); font-size: 12px; }
 .hub-list-err { color: var(--danger); }
