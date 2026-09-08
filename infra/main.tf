@@ -63,15 +63,15 @@ resource "aws_route53_zone" "apex" {
 # ── ACM certificate (us-east-1, required by CloudFront) ─────────────────────
 
 resource "aws_acm_certificate" "www" {
-  count                     = local.use_www ? 1 : 0
-  provider                  = aws.us_east_1
-  domain_name               = var.apex_domain
+  count       = local.use_www ? 1 : 0
+  provider    = aws.us_east_1
+  domain_name = var.apex_domain
   subject_alternative_names = concat(
     [var.www_domain],
     local.use_app ? [var.app_domain] : [],
     local.use_hub ? [var.hub_domain] : [],
   )
-  validation_method         = "DNS"
+  validation_method = "DNS"
 
   lifecycle {
     create_before_destroy = true

@@ -40,11 +40,20 @@ data "aws_iam_policy_document" "github_actions_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # Scope by the immutable repository id (survives org transfers / renames);
+    # after a transfer GitHub suffixes the slug in `sub` with numeric ids, so a
+    # slug-based match silently stops working. The branch is checked via `sub`.
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:repository_id"
+      values   = [var.github_repository_id]
+    }
+
     # Restrict to pushes from the main branch only.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:ref:refs/heads/main"]
+      values   = ["repo:*:ref:refs/heads/main"]
     }
   }
 }
