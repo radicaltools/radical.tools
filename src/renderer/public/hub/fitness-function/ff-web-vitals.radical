@@ -1,0 +1,60 @@
+{
+  "hub": {
+    "id": "ff-web-vitals",
+    "category": "fitness-function",
+    "name": "Web Vitals Budget",
+    "description": "Performance budget for the web front end, checked in the pipeline with lab measurements and in production with real-user data.",
+    "tags": [
+      "operational",
+      "performance",
+      "web",
+      "core-web-vitals"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "LCP_BUDGET_SECONDS",
+        "label": "LCP budget (s)",
+        "hint": "2.5",
+        "type": "number",
+        "defaultValue": "2.5"
+      },
+      {
+        "key": "INP_BUDGET_MS",
+        "label": "INP budget (ms)",
+        "hint": "200",
+        "type": "number",
+        "defaultValue": "200"
+      },
+      {
+        "key": "JS_BUDGET_KB",
+        "label": "Initial JavaScript budget (kB, compressed)",
+        "hint": "300",
+        "type": "number",
+        "defaultValue": "300"
+      }
+    ],
+    "hubRefs": [
+      "req-page-load-time"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-web-vitals-1",
+      "type": "fitness-fn",
+      "label": "Web Vitals Budget",
+      "description": "Lab: Lighthouse CI on key pages with throttled network and CPU, asserting LCP, INP proxies and bundle size. Field: Core Web Vitals from the RUM library aggregated at the 75th percentile of page views over 28 days.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "on-deploy",
+      "threshold": "p75 LCP ≤ {{LCP_BUDGET_SECONDS}} s, p75 INP ≤ {{INP_BUDGET_MS}} ms, initial JS ≤ {{JS_BUDGET_KB}} kB",
+      "status": "proposed"
+    }
+  ],
+  "relations": []
+}

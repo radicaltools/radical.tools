@@ -1,0 +1,47 @@
+{
+  "hub": {
+    "id": "req-ai-human-handoff",
+    "category": "requirement",
+    "name": "AI Human Hand-off",
+    "description": "An AI agent escalates to a person when it is unsure, when the user asks, or when the action is irreversible.",
+    "tags": [
+      "ai",
+      "agentic-ai",
+      "safety",
+      "ux"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "CONFIDENCE_THRESHOLD_PCT",
+        "label": "Minimum confidence to act (%)",
+        "hint": "80",
+        "type": "number",
+        "defaultValue": "80"
+      }
+    ],
+    "hubRefs": [
+      "req-ai-groundedness",
+      "req-ai-autonomous-resolution"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-ai-human-handoff-1",
+      "type": "requirement",
+      "label": "AI Human Hand-off",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "the agent's confidence falls below {{CONFIDENCE_THRESHOLD_PCT}}%, the user asks for a human, or the next action is irreversible or above the agent's authorisation limit",
+      "action": "hand the conversation to a human operator with the full context and proposed action, and take no irreversible action until the operator confirms",
+      "rationale": "Autonomy without an escalation path fails loudly on exactly the cases that matter; a designed hand-off keeps the human in control of high-stakes decisions."
+    }
+  ],
+  "relations": []
+}

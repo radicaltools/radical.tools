@@ -3,21 +3,26 @@
     "id": "ff-api-contract",
     "category": "fitness-function",
     "name": "API Contract Compliance",
-    "description": "Validates that API implementations conform to their OpenAPI/AsyncAPI specifications. Catches breaking changes before they reach consumers. Critical for microservice architectures.",
+    "description": "Checks the running implementation and the published specification against each other and against the previous version, so breaking changes are caught before consumers see them.",
     "tags": [
-      "api",
-      "contract",
       "structural",
-      "compatibility"
+      "api",
+      "compatibility",
+      "openapi"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-api-standard",
+      "req-backward-compatibility",
+      "adr-api-versioning"
+    ]
   },
   "nodes": [
     {
       "id": "ff-api-contract-1",
       "type": "fitness-fn",
       "label": "API Contract Compliance",
-      "description": "Validates implementation against OpenAPI/AsyncAPI spec. Detects breaking changes (removed fields, changed types, dropped endpoints).",
+      "description": "Diffs the new OpenAPI document against the last released one (e.g. oasdiff, openapi-diff) and classifies changes as breaking or non-breaking; then runs contract tests generated from the spec against the built service. Consumer-driven contracts (Pact) can be added for internal APIs.",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -26,8 +31,9 @@
       "category": "structural",
       "automated": true,
       "trigger": "on-deploy",
-      "threshold": "0 breaking changes vs published spec",
-      "status": "active"
+      "threshold": "0 breaking changes within a major version; implementation passes 100% of spec-derived contract tests",
+      "status": "proposed"
     }
-  ]
+  ],
+  "relations": []
 }

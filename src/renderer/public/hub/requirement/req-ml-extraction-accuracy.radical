@@ -1,0 +1,44 @@
+{
+  "hub": {
+    "id": "req-ml-extraction-accuracy",
+    "category": "requirement",
+    "name": "Document Extraction Accuracy",
+    "description": "Accuracy threshold for ML-based extraction of structured fields from documents before results are trusted without review.",
+    "tags": [
+      "ai",
+      "machine-learning",
+      "document-processing"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MIN_F1_PCT",
+        "label": "Minimum F1 score (%)",
+        "hint": "95",
+        "type": "number",
+        "defaultValue": "95"
+      }
+    ],
+    "hubRefs": [
+      "ff-ai-eval-gate"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-ml-extraction-accuracy-1",
+      "type": "requirement",
+      "label": "Document Extraction Accuracy",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "achieve an F1 score of at least {{MIN_F1_PCT}}% per extracted field on a representative labelled test set, route documents below the per-field confidence threshold to human review, and re-evaluate on every model change",
+      "rationale": "F1 balances missed fields against wrong ones; below the threshold human correction costs more than the automation saves, so the metric decides where the review queue starts."
+    }
+  ],
+  "relations": []
+}

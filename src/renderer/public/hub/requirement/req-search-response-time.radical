@@ -2,42 +2,45 @@
   "hub": {
     "id": "req-search-response-time",
     "category": "requirement",
-    "name": "Search Functionality Response Time",
-    "description": "Performance: search queries must return results within 500ms to maintain a usable search experience.",
+    "name": "Search Response Time",
+    "description": "Latency target for user-initiated search queries.",
     "tags": [
       "performance",
       "search",
       "latency",
-      "nfr",
       "ux"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
-        "key": "SEARCH_P90_MS",
-        "label": "Search P90 response time (ms)",
+        "key": "SEARCH_P95_MS",
+        "label": "p95 search latency (ms)",
         "hint": "500",
         "type": "number",
         "defaultValue": "500"
       }
+    ],
+    "hubRefs": [
+      "req-api-response-time"
     ]
   },
   "nodes": [
     {
-      "id": "req-search-rt-1",
+      "id": "req-search-response-time-1",
       "type": "requirement",
-      "label": "Search Functionality Response Time",
+      "label": "Search Response Time",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
-      "ears_type": "state-driven",
-      "status": "approved",
-      "priority": "should",
-      "precondition": "a user submits a search query against a production-size dataset",
-      "action": "return search results within {{SEARCH_P90_MS}}ms for 90% of queries, using appropriate indexing strategies validated by performance testing with representative data",
-      "rationale": "Users expect near-instant search results. Results taking over 1 second cause a sharp drop in search engagement and perceived product quality."
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "a user submits a search query",
+      "action": "return the first page of results within {{SEARCH_P95_MS}} ms at the 95th percentile, using pre-built indexes rather than full scans",
+      "rationale": "Search is interactive and iterative; users refine queries several times, so each round trip must feel immediate or engagement drops sharply."
     }
-  ]
+  ],
+  "relations": []
 }

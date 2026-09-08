@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useHubStore, type HubConcept, type HubConceptSummary, type TemplateParam, type HubImportRecord } from '../store/hubStore'
 import { useDiagramStore } from '../store/diagramStore'
-import type { C4Node, C4Relation, C4ElementType } from '../types/c4'
+import type { C4Node, C4Relation, C4ElementType, DiagramSequence } from '../types/c4'
 import { NODE_SIZES } from '../types/c4'
 import { isParentAllowed } from '../types/metamodel'
 
@@ -479,12 +479,14 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
 
       // Build relation objects with remapped IDs.
       const newRelations: Record<string, C4Relation> = {}
+      const relIdMap = new Map<string, string>()
       if (concept.relations) {
         for (const raw of concept.relations) {
           const srcId = idMap.get(raw.sourceId as string)
           const dstId = idMap.get(raw.targetId as string)
           if (!srcId || !dstId) continue
           const relId = crypto.randomUUID()
+          if (typeof raw.id === 'string') relIdMap.set(raw.id, relId)
           newRelations[relId] = {
             id: relId,
             sourceId: srcId,
@@ -496,6 +498,21 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         }
       }
 
+      // Sequences (dynamic flows) survive only if every step's relation was imported.
+      const newSequences: Record<string, DiagramSequence> = {}
+      for (const raw of concept.sequences ?? []) {
+        const ids = (raw.relationIds as string[] | undefined) ?? []
+        const mapped = ids.map((id) => relIdMap.get(id))
+        if (ids.length === 0 || mapped.some((id) => !id)) continue
+        const seqId = crypto.randomUUID()
+        newSequences[seqId] = {
+          id: seqId,
+          name: (raw.name as string) || concept.name,
+          relationIds: mapped as string[],
+          stepDescriptions: raw.stepDescriptions as (string | undefined)[] | undefined,
+        }
+      }
+
       // Single undo + bulk insert — bypasses per-node metamodel validation
       // so curated hub concepts always import cleanly.
       store._pushUndo()
@@ -503,6 +520,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       useDiagramStore.setState((state) => {
         Object.assign(state.c4Nodes, newNodes)
         Object.assign(state.c4Relations, newRelations)
+        Object.assign(state.sequences, newSequences)
         if (state.activeViewId && state.views[state.activeViewId]) {
           state.views[state.activeViewId].nodeIds.push(...Object.keys(newNodes))
         }

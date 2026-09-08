@@ -1,0 +1,46 @@
+{
+  "hub": {
+    "id": "ff-license-compliance",
+    "category": "fitness-function",
+    "name": "License Compliance",
+    "description": "Ensures third-party dependencies carry licences compatible with the product's distribution model.",
+    "tags": [
+      "structural",
+      "compliance",
+      "supply-chain",
+      "legal"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "DENIED_LICENSES",
+        "label": "Denied licence identifiers",
+        "hint": "GPL-3.0, AGPL-3.0, SSPL-1.0",
+        "defaultValue": "GPL-3.0, AGPL-3.0, SSPL-1.0"
+      }
+    ],
+    "hubRefs": [
+      "req-vulnerability-scanning",
+      "ff-security-scan"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-license-compliance-1",
+      "type": "fitness-fn",
+      "label": "License Compliance",
+      "description": "Generates an SBOM (CycloneDX/SPDX) at build time and evaluates every component licence against an allow/deny list. Unknown licences are treated as denied until reviewed.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "structural",
+      "automated": true,
+      "trigger": "on-deploy",
+      "threshold": "0 dependencies licensed under {{DENIED_LICENSES}} or with an unidentified licence",
+      "status": "proposed"
+    }
+  ],
+  "relations": []
+}

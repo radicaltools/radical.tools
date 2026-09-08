@@ -1,0 +1,48 @@
+{
+  "hub": {
+    "id": "req-batch-job-completion",
+    "category": "requirement",
+    "name": "Batch Job Completion",
+    "description": "Reliability target for scheduled and batch workloads, with retries for transient errors and a dead-letter path for the rest.",
+    "tags": [
+      "reliability",
+      "batch",
+      "scheduling"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MIN_SUCCESS_PCT",
+        "label": "Successful runs per month (%)",
+        "hint": "99.5",
+        "type": "number",
+        "defaultValue": "99.5"
+      },
+      {
+        "key": "MAX_RETRIES",
+        "label": "Automatic retries per job",
+        "hint": "3",
+        "type": "number",
+        "defaultValue": "3"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-batch-job-completion-1",
+      "type": "requirement",
+      "label": "Batch Job Completion",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "complete at least {{MIN_SUCCESS_PCT}}% of scheduled job runs successfully each month, retrying transient failures up to {{MAX_RETRIES}} times with exponential back-off and routing persistent failures to a dead-letter queue with an alert",
+      "rationale": "Batch pipelines fail silently unless success is measured; bounded retries absorb infrastructure hiccups while the dead-letter path keeps genuine faults visible."
+    }
+  ],
+  "relations": []
+}

@@ -3,41 +3,45 @@
     "id": "req-backward-compatibility",
     "category": "requirement",
     "name": "API Backward Compatibility",
-    "description": "Interoperability: unwanted-behaviour requirement preventing breaking changes from being silently introduced into published APIs.",
+    "description": "Published APIs never break existing clients without a versioned transition period.",
     "tags": [
       "interoperability",
       "api",
-      "versioning",
-      "nfr",
-      "compatibility"
+      "versioning"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "DEPRECATION_MONTHS",
-        "label": "Deprecation period (months)",
+        "label": "Minimum deprecation period (months)",
         "hint": "6",
         "type": "number",
         "defaultValue": "6"
       }
+    ],
+    "hubRefs": [
+      "ff-api-contract",
+      "adr-api-versioning",
+      "req-api-standard"
     ]
   },
   "nodes": [
     {
-      "id": "req-compat-1",
+      "id": "req-backward-compatibility-1",
       "type": "requirement",
       "label": "API Backward Compatibility",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "unwanted-behaviour",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "unwanted_condition": "a breaking change is introduced to a published API (field removal, type change, or status code change)",
-      "action": "increment the major version and maintain the previous version for a minimum of {{DEPRECATION_MONTHS}} months with a deprecation notice",
-      "rationale": "Unannounced breaking changes break partner integrations. Stable contracts are a prerequisite for ecosystem adoption."
+      "unwanted_condition": "a change would remove a field, alter a type or change the semantics of a published endpoint",
+      "action": "publish the change under a new major version, keep the previous version fully operational for at least {{DEPRECATION_MONTHS}} months, and announce the deprecation via response headers and the changelog",
+      "rationale": "Partners upgrade on their own schedule; a breaking change without a transition period converts a release into an incident for every integrator."
     }
-  ]
+  ],
+  "relations": []
 }

@@ -1,0 +1,38 @@
+{
+  "hub": {
+    "id": "req-event-schema-compatibility",
+    "category": "requirement",
+    "name": "Event Schema Compatibility",
+    "description": "Published event schemas evolve without breaking existing consumers.",
+    "tags": [
+      "interoperability",
+      "messaging",
+      "schema",
+      "event-driven"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-event-driven",
+      "adr-event-schema-evolution"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-event-schema-compatibility-1",
+      "type": "requirement",
+      "label": "Event Schema Compatibility",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "unwanted-behaviour",
+      "status": "draft",
+      "priority": "must",
+      "unwanted_condition": "a producer attempts to publish an event whose schema is not backward compatible with the registered version",
+      "action": "reject the change in the build pipeline and at the schema registry, requiring a new event type or major version instead of an in-place breaking change",
+      "rationale": "Consumers of an event stream are often unknown to the producer; compatibility enforced by tooling is the only reliable protection against silently breaking them."
+    }
+  ],
+  "relations": []
+}

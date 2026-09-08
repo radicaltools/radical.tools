@@ -1,0 +1,45 @@
+{
+  "hub": {
+    "id": "req-error-rate",
+    "category": "requirement",
+    "name": "Request Error Rate",
+    "description": "Ceiling on server-side failures across all business transactions; the reliability counterpart to the availability target.",
+    "tags": [
+      "reliability",
+      "correctness",
+      "slo"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MAX_ERROR_RATE_PCT",
+        "label": "Max server-side error rate (%)",
+        "hint": "0.1",
+        "type": "number",
+        "defaultValue": "0.1"
+      }
+    ],
+    "hubRefs": [
+      "ff-error-budget",
+      "req-availability"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-error-rate-1",
+      "type": "requirement",
+      "label": "Request Error Rate",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "keep the share of requests failing with a server-side error (HTTP 5xx or equivalent) below {{MAX_ERROR_RATE_PCT}}% over any rolling 24-hour window",
+      "rationale": "Availability alone hides a service that is up but wrong; an explicit error-rate SLO catches partial failures and regressions that never take the service down."
+    }
+  ],
+  "relations": []
+}

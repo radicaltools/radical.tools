@@ -2,22 +2,35 @@
   "hub": {
     "id": "ff-security-scan",
     "category": "fitness-function",
-    "name": "Security Dependency Scan",
-    "description": "Scans all runtime and build dependencies for known CVEs before deployment. Blocks releases containing critical or high-severity vulnerabilities. Essential for supply-chain security.",
+    "name": "Dependency Vulnerability Scan",
+    "description": "Scans dependencies and container images for known vulnerabilities on every build and blocks the release on severe findings.",
     "tags": [
+      "operational",
       "security",
-      "dependencies",
-      "cve",
-      "operational"
+      "supply-chain",
+      "ci-cd"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "BLOCK_CVSS",
+        "label": "Block builds at CVSS ≥",
+        "hint": "7",
+        "type": "number",
+        "defaultValue": "7"
+      }
+    ],
+    "hubRefs": [
+      "req-vulnerability-scanning",
+      "ff-license-compliance"
+    ]
   },
   "nodes": [
     {
-      "id": "ff-sec-scan-1",
+      "id": "ff-security-scan-1",
       "type": "fitness-fn",
-      "label": "Security Dependency Scan",
-      "description": "Scans dependencies for CVEs. Fails pipeline on critical/high severity findings. Uses tools like Snyk, Trivy or npm audit.",
+      "label": "Dependency Vulnerability Scan",
+      "description": "Runs an SCA scanner (e.g. Trivy, Grype, Snyk) against the lockfile, the resolved dependency tree and the final container image, matched against the NVD and vendor advisory feeds. Findings are diffed against the previous release so only new or upgraded severities block.",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -26,8 +39,9 @@
       "category": "operational",
       "automated": true,
       "trigger": "on-deploy",
-      "threshold": "0 critical/high CVEs",
-      "status": "active"
+      "threshold": "0 unresolved findings with CVSS ≥ {{BLOCK_CVSS}} without an approved, time-boxed exception",
+      "status": "proposed"
     }
-  ]
+  ],
+  "relations": []
 }

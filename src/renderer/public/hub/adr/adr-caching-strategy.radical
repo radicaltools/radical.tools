@@ -1,0 +1,59 @@
+{
+  "hub": {
+    "id": "adr-caching-strategy",
+    "category": "adr",
+    "name": "Caching Strategy",
+    "description": "Records where and how data is cached, how cache entries are invalidated and what staleness is acceptable.",
+    "tags": [
+      "performance",
+      "caching",
+      "data",
+      "scalability"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "CACHE_PATTERN",
+        "label": "Cache pattern",
+        "hint": "Cache-aside",
+        "defaultValue": "Cache-aside"
+      },
+      {
+        "key": "CACHE_STORE",
+        "label": "Cache store",
+        "hint": "Redis",
+        "defaultValue": "Redis"
+      },
+      {
+        "key": "DEFAULT_TTL_SECONDS",
+        "label": "Default TTL (s)",
+        "hint": "300",
+        "defaultValue": "300"
+      }
+    ],
+    "hubRefs": [
+      "req-api-response-time",
+      "req-db-query-response",
+      "adr-data-store"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-caching-strategy-1",
+      "type": "adr",
+      "label": "ADR: {{CACHE_PATTERN}} caching with {{CACHE_STORE}}",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "Read-heavy endpoints exceed their latency budget when every request reaches the database, and the database is the hardest tier to scale. Forces: how stale a read may be for each data class, the write frequency of cached data, the cost of a cache miss storm after a deployment, multi-instance consistency and the operational overhead of another stateful component.",
+      "decision": "Use {{CACHE_PATTERN}} caching backed by {{CACHE_STORE}} for read-mostly reference and aggregate data, with a default TTL of {{DEFAULT_TTL_SECONDS}} seconds and explicit invalidation on write for data classes where staleness is not acceptable. Cache keys include the schema version so deployments do not serve incompatible payloads. Caching is opt-in per data class and documented in the service's data catalogue.",
+      "consequences": "• Database load and p95 latency drop for the covered endpoints; the cache becomes part of the capacity model.\n• Every cached data class has a declared staleness budget; UI and API contracts state it.\n• Cache unavailability must degrade to direct reads, not to failure; the client library implements this fallback.\n• Thundering-herd protection (request coalescing, jittered TTLs) is required for hot keys.\n• Personal data in the cache is subject to the same encryption, residency and erasure rules as the primary store.",
+      "alternatives": "1. No caching, scale the database — simplest consistency; expensive and eventually hits a ceiling.\n2. Read-through / write-through cache — transparent to callers; couples every write to cache availability.\n3. CDN / HTTP caching only — excellent for public, anonymous content; useless for personalised responses.\n4. In-process cache per instance — no extra infrastructure; inconsistent across instances and lost on every deploy."
+    }
+  ],
+  "relations": []
+}

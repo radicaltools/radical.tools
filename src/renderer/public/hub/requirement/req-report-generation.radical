@@ -3,19 +3,17 @@
     "id": "req-report-generation",
     "category": "requirement",
     "name": "Report Generation Time",
-    "description": "Performance: standard business reports must complete within 30 seconds to avoid user abandonment of reporting workflows.",
+    "description": "Time limit for synchronous report generation, with an explicit hand-off to asynchronous delivery for anything slower.",
     "tags": [
       "performance",
       "reporting",
-      "latency",
-      "nfr",
       "analytics"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "REPORT_MAX_SECONDS",
-        "label": "Max report generation time (seconds)",
+        "label": "Synchronous report limit (s)",
         "hint": "30",
         "type": "number",
         "defaultValue": "30"
@@ -24,20 +22,21 @@
   },
   "nodes": [
     {
-      "id": "req-report-1",
+      "id": "req-report-generation-1",
       "type": "requirement",
       "label": "Report Generation Time",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
-      "ears_type": "state-driven",
+      "ears_type": "event-driven",
       "status": "draft",
-      "priority": "should",
-      "precondition": "a user requests a standard report against a production-size dataset",
-      "action": "complete standard report generation and delivery within {{REPORT_MAX_SECONDS}} seconds, validated by volume testing with production-scale data",
-      "rationale": "Reports taking over 30 seconds are frequently abandoned. If generation is longer, an async model with notification should be used instead of a blocking request."
+      "priority": "must",
+      "trigger": "a user requests a standard report",
+      "action": "deliver the report within {{REPORT_MAX_SECONDS}} seconds, or immediately switch to asynchronous generation and notify the user when the report is ready",
+      "rationale": "Users abandon blocking requests that appear to hang; a fixed cut-over to async keeps the UI responsive regardless of data volume."
     }
-  ]
+  ],
+  "relations": []
 }

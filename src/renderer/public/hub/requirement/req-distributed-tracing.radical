@@ -1,0 +1,45 @@
+{
+  "hub": {
+    "id": "req-distributed-tracing",
+    "category": "requirement",
+    "name": "Distributed Tracing",
+    "description": "Trace context is propagated across every service, queue and job boundary so any request can be followed end to end.",
+    "tags": [
+      "observability",
+      "tracing",
+      "operations"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "TRACE_SAMPLING_PCT",
+        "label": "Baseline trace sampling (%)",
+        "hint": "10",
+        "type": "number",
+        "defaultValue": "10"
+      }
+    ],
+    "hubRefs": [
+      "adr-observability",
+      "req-centralised-logging"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-distributed-tracing-1",
+      "type": "requirement",
+      "label": "Distributed Tracing",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "propagate W3C Trace Context headers across all synchronous calls, message headers and scheduled jobs, sample at least {{TRACE_SAMPLING_PCT}}% of requests and always retain traces for errors and slow requests",
+      "rationale": "Latency and errors in a distributed system are emergent; without end-to-end traces the slowest hop and the failing dependency can only be guessed at."
+    }
+  ],
+  "relations": []
+}

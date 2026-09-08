@@ -3,30 +3,30 @@
     "id": "req-data-integrity",
     "category": "requirement",
     "name": "Referential Data Integrity",
-    "description": "Dependability: ubiquitous requirement preventing orphaned or inconsistent data across service boundaries.",
+    "description": "No orphaned or inconsistent records across entity relationships, whether enforced by the database or the application.",
     "tags": [
-      "dependability",
-      "data-integrity",
+      "reliability",
       "correctness",
-      "nfr"
+      "data-integrity"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin"
   },
   "nodes": [
     {
-      "id": "req-integrity-1",
+      "id": "req-data-integrity-1",
       "type": "requirement",
       "label": "Referential Data Integrity",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "action": "enforce referential integrity for all cross-entity relationships at the database or application layer, rejecting any operation that would leave orphaned records",
-      "rationale": "Orphaned records cause silent calculation errors, billing anomalies, and compliance violations that are expensive to detect and remediate."
+      "action": "enforce referential integrity for every cross-entity relationship, rejecting operations that would leave dangling references and reconciling cross-service references with a scheduled consistency check",
+      "rationale": "Orphaned records surface later as wrong totals, failed reports and compliance findings, and are far more expensive to repair than to prevent."
     }
-  ]
+  ],
+  "relations": []
 }

@@ -3,22 +3,26 @@
     "id": "ff-coupling-guard",
     "category": "fitness-function",
     "name": "Coupling Guard",
-    "description": "Measures component fan-out (number of outgoing dependencies) and flags modules that exceed the threshold. High fan-out indicates tight coupling and fragile change propagation.",
+    "description": "Limits how many other modules or services any single one depends on. High fan-out is the earliest structural signal of a change-amplifying design.",
     "tags": [
-      "architecture",
-      "coupling",
       "structural",
-      "modularity"
+      "coupling",
+      "modularity",
+      "architecture"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "MAX_FAN_OUT",
-        "label": "Max outgoing dependencies per component",
-        "hint": "5",
+        "label": "Max outgoing dependencies per module",
+        "hint": "6",
         "type": "number",
-        "defaultValue": "5"
+        "defaultValue": "6"
       }
+    ],
+    "hubRefs": [
+      "ff-dependency-rules",
+      "pattern-hexagonal"
     ]
   },
   "nodes": [
@@ -26,7 +30,7 @@
       "id": "ff-coupling-guard-1",
       "type": "fitness-fn",
       "label": "Coupling Guard",
-      "description": "Checks that no component has more than N outgoing dependencies. Prevents tightly-coupled designs that resist change.",
+      "description": "Builds the dependency graph from source (imports/packages) and from deployment manifests (service-to-service calls), then reports efferent coupling per module. New violations fail the build; existing ones are tracked as a debt trend.",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -35,8 +39,9 @@
       "category": "structural",
       "automated": true,
       "trigger": "on-deploy",
-      "threshold": "Component fan-out ≤ {{MAX_FAN_OUT}}",
-      "status": "active"
+      "threshold": "Efferent coupling ≤ {{MAX_FAN_OUT}} for every module and service",
+      "status": "proposed"
     }
-  ]
+  ],
+  "relations": []
 }

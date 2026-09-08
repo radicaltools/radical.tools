@@ -1,0 +1,48 @@
+{
+  "hub": {
+    "id": "ff-change-failure-rate",
+    "category": "fitness-function",
+    "name": "Change Failure Rate",
+    "description": "Share of production deployments that cause a degradation requiring a fix, rollback or hotfix. One of the four DORA metrics; the quality counterweight to speed.",
+    "tags": [
+      "process",
+      "dora",
+      "reliability",
+      "delivery"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MAX_CFR_PCT",
+        "label": "Max change failure rate (%)",
+        "hint": "15",
+        "type": "number",
+        "defaultValue": "15"
+      }
+    ],
+    "hubRefs": [
+      "ff-deploy-frequency",
+      "ff-mttr",
+      "adr-deployment-strategy"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-change-failure-rate-1",
+      "type": "fitness-fn",
+      "label": "Change Failure Rate",
+      "description": "Links incidents and rollbacks to the deployment that introduced them (deployment markers in the incident tool, or automatic rollback events in CD) and divides by total deployments. Reported monthly per service.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "process",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Change failure rate ≤ {{MAX_CFR_PCT}}% (rolling 30 days)",
+      "status": "proposed"
+    }
+  ],
+  "relations": []
+}

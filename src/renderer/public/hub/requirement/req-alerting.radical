@@ -1,0 +1,54 @@
+{
+  "hub": {
+    "id": "req-alerting",
+    "category": "requirement",
+    "name": "Actionable Alerting",
+    "description": "Threatened SLOs page the on-call engineer early, reliably and with the context needed to act.",
+    "tags": [
+      "observability",
+      "alerting",
+      "sre",
+      "operations"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "BURN_RATE_ALERT",
+        "label": "Error-budget burn rate that pages",
+        "hint": "2",
+        "type": "number",
+        "defaultValue": "2"
+      },
+      {
+        "key": "ALERT_DELIVERY_SECONDS",
+        "label": "Max detection-to-page delay (s)",
+        "hint": "60",
+        "type": "number",
+        "defaultValue": "60"
+      }
+    ],
+    "hubRefs": [
+      "ff-error-budget",
+      "req-availability"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-alerting-1",
+      "type": "requirement",
+      "label": "Actionable Alerting",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "an SLO is consuming its error budget at more than {{BURN_RATE_ALERT}}× the sustainable rate",
+      "action": "page the on-call engineer within {{ALERT_DELIVERY_SECONDS}} seconds with the affected SLO, current burn rate and links to the dashboard and runbook, and verify the paging path with a periodic end-to-end drill",
+      "rationale": "Alerting on symptoms (budget burn) rather than causes keeps pages rare and meaningful, and a tested delivery path guards against the alert that never arrives."
+    }
+  ],
+  "relations": []
+}

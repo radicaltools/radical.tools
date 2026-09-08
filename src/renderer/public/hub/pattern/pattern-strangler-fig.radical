@@ -3,81 +3,224 @@
     "id": "pattern-strangler-fig",
     "category": "pattern",
     "name": "Strangler Fig Migration",
-    "description": "Incrementally migrates a monolith to a new architecture by routing traffic through a facade. New features go to the new system; legacy features are migrated one by one until the monolith can be decommissioned.",
+    "description": "A routing facade sits in front of the legacy system; capabilities are rebuilt one at a time behind it and traffic is switched over per route, until the legacy system serves nothing and can be retired.",
     "tags": [
       "migration",
       "legacy",
-      "strangler",
-      "modernization"
+      "modernisation",
+      "incremental"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-api-gateway",
+      "req-backward-compatibility",
+      "adr-integration-style",
+      "ff-coupling-guard"
+    ]
   },
   "nodes": [
     {
-      "id": "pat-sf-facade",
-      "type": "container",
-      "label": "Strangler Facade",
-      "description": "Routes requests to either the legacy monolith or the new services based on feature flags / URL patterns. Transparent to consumers.",
-      "technology": "Reverse Proxy / API Gateway",
-      "x": 250,
+      "id": "user",
+      "type": "person",
+      "label": "User",
+      "description": "Notices no difference during the migration.",
+      "x": 0,
       "y": 0,
+      "width": 150,
+      "height": 170,
+      "collapsed": false
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Target Platform",
+      "description": "New services grow route by route behind the facade.",
+      "x": 0,
+      "y": 270,
+      "width": 1270,
+      "height": 340,
+      "collapsed": false
+    },
+    {
+      "id": "facade",
+      "type": "container",
+      "label": "Routing Facade",
+      "description": "Routes each path to legacy or new implementation by configuration; supports shadow traffic and percentage roll-out per route.",
+      "technology": "Envoy / NGINX",
+      "parentId": "platform",
+      "x": 30,
+      "y": 110,
       "width": 300,
       "height": 200,
       "collapsed": false
     },
     {
-      "id": "pat-sf-legacy",
-      "type": "system",
-      "label": "Legacy Monolith",
-      "description": "The existing system being migrated. Features are removed from here as they're rebuilt in the new services.",
-      "technology": "",
-      "x": 0,
-      "y": 350,
-      "width": 360,
-      "height": 260,
-      "collapsed": true,
-      "external": true
+      "id": "customers",
+      "type": "container",
+      "label": "Customer Service",
+      "description": "First capability migrated. Owns customer data going forward.",
+      "technology": "Go",
+      "parentId": "platform",
+      "x": 370,
+      "y": 110,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
     },
     {
-      "id": "pat-sf-new-svc",
-      "type": "system",
-      "label": "New Service",
-      "description": "Modern replacement for a subset of monolith functionality. Built with the target architecture.",
-      "technology": "",
-      "x": 500,
-      "y": 350,
-      "width": 360,
-      "height": 260,
-      "collapsed": true
-    },
-    {
-      "id": "pat-sf-new-db",
+      "id": "customers-db",
       "type": "database",
-      "label": "New Service Database",
-      "description": "Dedicated data store for the new service. Data migrated from the monolith's shared database.",
-      "technology": "",
-      "x": 550,
-      "y": 420,
+      "label": "Customer DB",
+      "description": "New store; seeded by a one-off migration, kept in sync until cut-over.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "x": 710,
+      "y": 110,
       "width": 190,
       "height": 130,
-      "collapsed": false,
-      "parentId": "pat-sf-new-svc"
+      "collapsed": false
+    },
+    {
+      "id": "sync",
+      "type": "container",
+      "label": "Legacy Sync",
+      "description": "Anti-corruption layer: translates legacy records and keeps both stores consistent during the transition.",
+      "technology": "Go worker",
+      "parentId": "platform",
+      "x": 940,
+      "y": 110,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "legacy",
+      "type": "system",
+      "label": "Legacy Monolith",
+      "description": "Still serves every capability not yet migrated.",
+      "external": true,
+      "x": 1350,
+      "y": 270,
+      "width": 590,
+      "height": 340,
+      "collapsed": false
+    },
+    {
+      "id": "monolith",
+      "type": "container",
+      "label": "Monolith Application",
+      "description": "Shrinks as routes move to the new platform.",
+      "technology": "Java EE",
+      "parentId": "legacy",
+      "x": 30,
+      "y": 110,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "legacy-db",
+      "type": "database",
+      "label": "Shared Legacy DB",
+      "description": "Single schema used by all legacy modules.",
+      "technology": "Oracle",
+      "parentId": "legacy",
+      "x": 370,
+      "y": 110,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
     }
   ],
   "relations": [
     {
-      "id": "pat-sf-r1",
-      "sourceId": "pat-sf-facade",
-      "targetId": "pat-sf-legacy",
-      "label": "Routes legacy features",
+      "id": "user--facade",
+      "sourceId": "user",
+      "targetId": "facade",
+      "label": "Uses the application",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "facade--monolith",
+      "sourceId": "facade",
+      "targetId": "monolith",
+      "label": "Routes not-yet-migrated paths",
       "technology": "HTTP"
     },
     {
-      "id": "pat-sf-r2",
-      "sourceId": "pat-sf-facade",
-      "targetId": "pat-sf-new-svc",
-      "label": "Routes migrated features",
+      "id": "facade--customers",
+      "sourceId": "facade",
+      "targetId": "customers",
+      "label": "Routes /customers/**",
       "technology": "HTTP"
+    },
+    {
+      "id": "customers--customers-db",
+      "sourceId": "customers",
+      "targetId": "customers-db",
+      "label": "Reads / writes",
+      "technology": "SQL"
+    },
+    {
+      "id": "monolith--legacy-db",
+      "sourceId": "monolith",
+      "targetId": "legacy-db",
+      "label": "Reads / writes",
+      "technology": "JDBC"
+    },
+    {
+      "id": "sync--legacy-db",
+      "sourceId": "sync",
+      "targetId": "legacy-db",
+      "label": "Reads legacy customer records",
+      "technology": "JDBC / CDC"
+    },
+    {
+      "id": "sync--customers-db",
+      "sourceId": "sync",
+      "targetId": "customers-db",
+      "label": "Writes translated records",
+      "technology": "SQL"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "pattern-strangler-fig-seq",
+      "name": "Migrate the customer capability",
+      "relationIds": [
+        "user--facade",
+        "sync--legacy-db",
+        "sync--customers-db",
+        "facade--customers",
+        "facade--monolith"
+      ],
+      "stepDescriptions": [
+        "All traffic already enters through the facade.",
+        "Customer data is extracted from the legacy schema.",
+        "Data is translated into the new model and kept in sync.",
+        "/customers/** is switched to the new service, gradually by percentage.",
+        "Everything else still goes to the monolith — until the next capability moves."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "pattern-strangler-fig-flow",
+      "name": "Migrate the customer capability",
+      "kind": "dynamic",
+      "sequenceId": "pattern-strangler-fig-seq",
+      "nodeIds": [
+        "user",
+        "platform",
+        "facade",
+        "customers",
+        "customers-db",
+        "sync",
+        "legacy",
+        "monolith",
+        "legacy-db"
+      ],
+      "positions": {}
     }
   ]
 }

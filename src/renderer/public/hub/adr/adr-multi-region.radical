@@ -1,0 +1,59 @@
+{
+  "hub": {
+    "id": "adr-multi-region",
+    "category": "adr",
+    "name": "Multi-Region Topology",
+    "description": "Records how the system is distributed across regions to meet availability and disaster-recovery objectives.",
+    "tags": [
+      "availability",
+      "disaster-recovery",
+      "cloud",
+      "resilience"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "TOPOLOGY",
+        "label": "Region topology",
+        "hint": "Active-passive with warm standby",
+        "defaultValue": "Active-passive with warm standby"
+      },
+      {
+        "key": "PRIMARY_REGION",
+        "label": "Primary region",
+        "hint": "eu-west-1",
+        "defaultValue": "eu-west-1"
+      },
+      {
+        "key": "SECONDARY_REGION",
+        "label": "Secondary region",
+        "hint": "eu-central-1",
+        "defaultValue": "eu-central-1"
+      }
+    ],
+    "hubRefs": [
+      "req-disaster-recovery",
+      "req-availability",
+      "ff-data-residency"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-multi-region-1",
+      "type": "adr",
+      "label": "ADR: {{TOPOLOGY}} multi-region topology",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "The availability target and the recovery objectives (RTO/RPO) cannot be met from a single region: a regional outage would exceed the allowed downtime. Forces: data residency constraints on where replicas may live, the consistency model the data store supports across regions, cost of duplicated capacity, and the operational complexity of failover and failback.",
+      "decision": "Run {{TOPOLOGY}}: {{PRIMARY_REGION}} serves all traffic; {{SECONDARY_REGION}} runs a scaled-down copy of the stateless tier and an asynchronously replicated database. Failover is triggered by health checks on the global load balancer and promotes the replica; failback is a planned operation. Failover is rehearsed on a fixed schedule.",
+      "consequences": "• RTO is bounded by replica promotion and DNS/traffic-manager propagation; RPO by replication lag, which is monitored and alerted.\n• Infrastructure cost rises by the standby footprint, well below the cost of full active-active.\n• All infrastructure must be defined as code and deployable to either region.\n• Application state outside the database (caches, queues, object storage) needs an explicit replication or rebuild plan.\n• Regular failover drills are non-negotiable; an untested failover is not a failover.",
+      "alternatives": "1. Single region, multiple availability zones — covers zone failures cheaply; does not survive a regional outage.\n2. Active-active across regions — near-zero RTO and better latency; requires conflict-free or globally consistent data and doubles cost.\n3. Backup-and-restore to a new region — lowest cost; RTO measured in hours and RPO in the backup interval.\n4. Pilot light (data replicated, compute provisioned on demand) — cheaper than warm standby; RTO depends on provisioning time."
+    }
+  ],
+  "relations": []
+}

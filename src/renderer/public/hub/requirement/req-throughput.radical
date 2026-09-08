@@ -2,40 +2,51 @@
   "hub": {
     "id": "req-throughput",
     "category": "requirement",
-    "name": "System Throughput",
-    "description": "Performance: ubiquitous requirement defining the minimum transaction processing rate the system must sustain.",
+    "name": "Peak Throughput",
+    "description": "Minimum sustained transaction rate the system must handle at peak without breaching its latency targets.",
     "tags": [
       "performance",
       "throughput",
-      "capacity",
-      "nfr"
+      "capacity"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "MIN_TPS",
-        "label": "Minimum throughput (TPS)",
+        "label": "Sustained transactions per second",
         "hint": "1000",
         "type": "number",
         "defaultValue": "1000"
+      },
+      {
+        "key": "PEAK_DURATION_MINUTES",
+        "label": "Peak duration to sustain (minutes)",
+        "hint": "30",
+        "type": "number",
+        "defaultValue": "30"
       }
+    ],
+    "hubRefs": [
+      "req-api-response-time",
+      "req-autoscaling"
     ]
   },
   "nodes": [
     {
       "id": "req-throughput-1",
       "type": "requirement",
-      "label": "System Throughput",
+      "label": "Peak Throughput",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "action": "sustain a minimum of {{MIN_TPS}} transactions per second under peak load without degrading response times beyond defined SLOs",
-      "rationale": "Peak traffic during promotional events requires sufficient throughput headroom to avoid revenue-impacting degradation."
+      "action": "sustain at least {{MIN_TPS}} transactions per second for {{PEAK_DURATION_MINUTES}} minutes while continuing to meet all response-time requirements",
+      "rationale": "Latency targets are meaningless without a stated load; fixing the peak rate makes capacity planning and load testing concrete."
     }
-  ]
+  ],
+  "relations": []
 }

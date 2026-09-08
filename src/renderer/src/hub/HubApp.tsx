@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlowProvider } from 'reactflow'
 import { useDiagramStore } from '../store/diagramStore'
 import { useHubStore, type HubConcept, type HubConceptSummary } from '../store/hubStore'
-import { conceptToDoc } from './hubFormat'
+import type { HubRadicalDoc } from './hubFormat'
 import { Canvas } from '../components/Canvas'
 import { WikiView } from '../components/WikiView'
 import { TableView } from '../components/TableView'
@@ -80,9 +80,9 @@ const IconStudio = () => (
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** The concept as a Radical Studio document — what "Download" / "Copy" hand out. */
-function conceptJson(concept: HubConcept): string {
-  return JSON.stringify(conceptToDoc(concept), null, 2)
+/** The catalogue file as published — what "Download" / "Copy" hand out. */
+function conceptJson(doc: HubRadicalDoc): string {
+  return JSON.stringify(doc, null, 2)
 }
 
 /** Fit once React Flow has measured the nodes, and again after the live
@@ -92,12 +92,12 @@ function scheduleFit(fit: () => void): () => void {
   return () => timers.forEach(clearTimeout)
 }
 
-function downloadConcept(concept: HubConcept): void {
-  const blob = new Blob([conceptJson(concept)], { type: 'application/json' })
+function downloadConcept(doc: HubRadicalDoc): void {
+  const blob = new Blob([conceptJson(doc)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${concept.id}.radical`
+  a.download = `${doc.hub.id}.radical`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -182,6 +182,7 @@ function ConceptCard({
 function HubAppInner(): React.ReactElement {
   const concepts = useHubStore((s) => s.concepts)
   const loaded = useHubStore((s) => s.loaded)
+  const docs = useHubStore((s) => s.docs)
   const loading = useHubStore((s) => s.loading)
   const error = useHubStore((s) => s.error)
   const fetchConcepts = useHubStore((s) => s.fetchConcepts)
@@ -227,6 +228,11 @@ function HubAppInner(): React.ReactElement {
 
   const summary = useMemo(() => concepts.find((c) => c.id === conceptId), [concepts, conceptId])
   const concept = conceptId ? loaded[conceptId] : undefined
+  const conceptDoc = conceptId ? docs[conceptId] : undefined
+  const related = useMemo(
+    () => (concept?.hubRefs ?? []).map((id) => concepts.find((c) => c.id === id)).filter((c): c is HubConceptSummary => !!c),
+    [concept, concepts],
+  )
   const [conceptError, setConceptError] = useState<string | null>(null)
   const viewKind = kindForViewId(activeViewId)
 
@@ -313,9 +319,9 @@ function HubAppInner(): React.ReactElement {
     window.open(studioImportUrl(STUDIO_URL, ids), '_blank', 'noopener')
   }, [])
 
-  const copyJson = useCallback(async (c: HubConcept) => {
+  const copyJson = useCallback(async (c: HubConcept, d: HubRadicalDoc) => {
     try {
-      await navigator.clipboard.writeText(conceptJson(c))
+      await navigator.clipboard.writeText(conceptJson(d))
       pushNotification(`Copied "${c.name}" as JSON`, 'info')
     } catch {
       pushNotification('Clipboard unavailable — use Download instead', 'error')
@@ -482,8 +488,8 @@ function HubAppInner(): React.ReactElement {
               </>
             )}
             <div style={{ flex: 1 }} />
-            <button type="button" className="toolbar-btn" onClick={() => void copyJson(concept)} title="Copy as .radical JSON"><IconCopy /> Copy JSON</button>
-            <button type="button" className="toolbar-btn" onClick={() => downloadConcept(concept)} title="Download as .radical file (opens in Radical Studio)"><IconDownload /> Download</button>
+            <button type="button" className="toolbar-btn" disabled={!conceptDoc} onClick={() => conceptDoc && void copyJson(concept, conceptDoc)} title="Copy as .radical JSON"><IconCopy /> Copy JSON</button>
+            <button type="button" className="toolbar-btn" disabled={!conceptDoc} onClick={() => conceptDoc && downloadConcept(conceptDoc)} title="Download as .radical file (opens in Radical Studio)"><IconDownload /> Download</button>
             <button type="button" className="toolbar-btn active" onClick={() => openInStudio([concept.id])} title="Open Radical Studio with this concept ready to import">
               <IconStudio /> Add to Studio
             </button>
@@ -519,6 +525,27 @@ function HubAppInner(): React.ReactElement {
         <TableView />
       ) : (
         <Canvas />
+      )}
+
+      {concept && related.length > 0 && (
+        <div className="hub-related" role="navigation" aria-label="Related concepts">
+          <span className="hub-related-label">Related</span>
+          {related.map((r) => {
+            const t = categoryTheme(r.category)
+            return (
+              <button
+                type="button"
+                key={r.id}
+                className="hub-related-chip"
+                style={{ ['--cat-color' as string]: t.color }}
+                title={`${t.label}: ${r.description}`}
+                onClick={() => openConcept(r.id)}
+              >
+                <TypeIcon path={t.iconPath} size={11} /> {r.name}
+              </button>
+            )
+          })}
+        </div>
       )}
 
       <RightPanel readOnly collapsed={rightCollapsed} onToggleCollapsed={toggleRight} />

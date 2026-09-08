@@ -56,6 +56,17 @@ export function validateCatalogue(entries: CatalogueEntry[]): string[] {
     if (file !== `${meta.category}/${meta.id}.radical`) errors.push(`${file}: expected path ${meta.category}/${meta.id}.radical`)
     if (ids.has(meta.id)) errors.push(`${file}: duplicate id "${meta.id}"`)
     ids.add(meta.id)
+    // Every {{KEY}} placeholder must be declared at concept or node level.
+    const declared = new Set((meta.templateParams ?? []).map((p) => p.key))
+    for (const n of doc.nodes ?? []) {
+      const nodeKeys = new Set([...declared, ...((n.templateParams as Array<{ key: string }> | undefined) ?? []).map((p) => p.key)])
+      for (const v of Object.values(n)) {
+        if (typeof v !== 'string') continue
+        for (const m of v.matchAll(/\{\{([A-Z0-9_]+)\}\}/g)) {
+          if (!nodeKeys.has(m[1])) errors.push(`${file}: node "${n.id}" uses undeclared template param {{${m[1]}}}`)
+        }
+      }
+    }
   }
   for (const { file, doc } of entries) {
     for (const ref of doc.hub?.hubRefs ?? []) if (!ids.has(ref)) errors.push(`${file}: hubRefs → unknown concept "${ref}"`)

@@ -2,42 +2,45 @@
   "hub": {
     "id": "req-data-retention",
     "category": "requirement",
-    "name": "Data Retention Policy",
-    "description": "Unwanted-behaviour requirement: prevents unbounded data growth by archiving old data.",
+    "name": "Data Retention Limit",
+    "description": "Personal and transactional data is kept only as long as needed and then archived or deleted.",
     "tags": [
-      "data",
-      "retention",
+      "privacy",
       "compliance",
-      "nfr",
-      "storage"
+      "data-lifecycle"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "RETENTION_DAYS",
         "label": "Retention period (days)",
-        "hint": "90",
+        "hint": "365",
         "type": "number",
-        "defaultValue": "90"
+        "defaultValue": "365"
       }
+    ],
+    "hubRefs": [
+      "req-gdpr-erasure",
+      "req-audit-logging"
     ]
   },
   "nodes": [
     {
       "id": "req-data-retention-1",
       "type": "requirement",
-      "label": "Data Retention Policy",
+      "label": "Data Retention Limit",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
-      "ears_type": "unwanted-behaviour",
-      "status": "approved",
+      "ears_type": "event-driven",
+      "status": "draft",
       "priority": "should",
-      "unwanted_condition": "transactional data is older than {{RETENTION_DAYS}} days",
-      "action": "archive the data to cold storage and remove it from the primary database",
-      "rationale": "Unbounded data growth degrades query performance and increases storage costs."
+      "trigger": "a record passes {{RETENTION_DAYS}} days since its last business use",
+      "action": "move the record to cold storage or delete it according to its data classification, and log the disposal in the audit trail",
+      "rationale": "Storage minimisation is both a legal obligation under GDPR and a practical one: data you no longer hold cannot be breached, subpoenaed or slow your queries down."
     }
-  ]
+  ],
+  "relations": []
 }

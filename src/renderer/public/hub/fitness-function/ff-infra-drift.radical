@@ -1,0 +1,37 @@
+{
+  "hub": {
+    "id": "ff-infra-drift",
+    "category": "fitness-function",
+    "name": "Infrastructure Drift Detection",
+    "description": "Detects live infrastructure that no longer matches the infrastructure-as-code definition, i.e. changes made outside the pipeline.",
+    "tags": [
+      "operational",
+      "infrastructure",
+      "iac",
+      "devops"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-iac"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-infra-drift-1",
+      "type": "fitness-fn",
+      "label": "Infrastructure Drift Detection",
+      "description": "Runs a read-only plan (e.g. terraform plan -detailed-exitcode) for every stack on a schedule and after each apply. Any planned change on an unchanged codebase is drift; the diff is attached to an alert and, for production, an incident ticket.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "0 resources drifted from the committed state in production stacks",
+      "status": "proposed"
+    }
+  ],
+  "relations": []
+}

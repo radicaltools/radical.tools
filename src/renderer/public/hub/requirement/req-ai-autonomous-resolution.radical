@@ -1,0 +1,52 @@
+{
+  "hub": {
+    "id": "req-ai-autonomous-resolution",
+    "category": "requirement",
+    "name": "AI Autonomous Resolution Rate",
+    "description": "Share of routine inquiries an AI agent resolves end to end without human escalation.",
+    "tags": [
+      "ai",
+      "agentic-ai",
+      "automation"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MIN_RESOLUTION_PCT",
+        "label": "Autonomous resolution rate (%)",
+        "hint": "70",
+        "type": "number",
+        "defaultValue": "70"
+      },
+      {
+        "key": "MEASUREMENT_WINDOW_DAYS",
+        "label": "Rolling measurement window (days)",
+        "hint": "30",
+        "type": "number",
+        "defaultValue": "30"
+      }
+    ],
+    "hubRefs": [
+      "req-ai-human-handoff",
+      "ff-ai-eval-gate"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-ai-autonomous-resolution-1",
+      "type": "requirement",
+      "label": "AI Autonomous Resolution Rate",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "resolve at least {{MIN_RESOLUTION_PCT}}% of routine inquiries without human escalation over a rolling {{MEASUREMENT_WINDOW_DAYS}}-day window, counting only cases the user confirmed as resolved",
+      "rationale": "Below a certain resolution rate the cost of reviewing and correcting escalations exceeds the savings; measuring it with user confirmation keeps the metric honest."
+    }
+  ],
+  "relations": []
+}

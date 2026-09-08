@@ -3,98 +3,193 @@
     "id": "pattern-hexagonal",
     "category": "pattern",
     "name": "Hexagonal Architecture (Ports & Adapters)",
-    "description": "Isolates business logic from infrastructure via ports (interfaces) and adapters (implementations). The domain core has no dependencies on frameworks, databases, or external services.",
+    "description": "The domain model and application services sit in the middle with no framework or infrastructure dependencies; everything external — HTTP, databases, third parties — talks to them only through adapters that implement explicitly defined ports.",
     "tags": [
       "hexagonal",
-      "ports-adapters",
+      "ports-and-adapters",
       "clean-architecture",
-      "ddd"
+      "ddd",
+      "components"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "ff-dependency-rules",
+      "ff-coupling-guard",
+      "req-code-complexity"
+    ]
   },
   "nodes": [
     {
-      "id": "pat-hex-domain",
-      "type": "domain",
-      "label": "Domain Core",
-      "description": "Pure business logic and domain rules. No infrastructure dependencies. Defines ports (interfaces) that adapters implement.",
-      "x": 250,
-      "y": 200,
-      "width": 520,
-      "height": 360,
-      "collapsed": false
-    },
-    {
-      "id": "pat-hex-app",
-      "type": "container",
-      "label": "Application Service",
-      "description": "Orchestrates use cases by calling domain objects and port interfaces. Thin layer — no business rules here.",
-      "technology": "",
-      "x": 300,
-      "y": 280,
-      "width": 300,
-      "height": 200,
-      "collapsed": false,
-      "parentId": "pat-hex-domain"
-    },
-    {
-      "id": "pat-hex-rest",
-      "type": "container",
-      "label": "REST Adapter (Driving)",
-      "description": "Inbound adapter: translates HTTP requests into application service calls. Implements the driving port.",
-      "technology": "Express / Spring MVC",
+      "id": "customer",
+      "type": "person",
+      "label": "Customer",
+      "description": "Places and tracks orders.",
       "x": 0,
       "y": 0,
-      "width": 300,
-      "height": 200,
+      "width": 150,
+      "height": 170,
       "collapsed": false
     },
     {
-      "id": "pat-hex-db",
-      "type": "container",
-      "label": "Database Adapter (Driven)",
-      "description": "Outbound adapter: implements the repository port to persist domain objects in a database.",
-      "technology": "Prisma / Hibernate",
+      "id": "platform",
+      "type": "system",
+      "label": "Ordering System",
+      "description": "One service shown at component level.",
       "x": 0,
-      "y": 650,
-      "width": 300,
-      "height": 200,
+      "y": 270,
+      "width": 1030,
+      "height": 560,
       "collapsed": false
     },
     {
-      "id": "pat-hex-ext",
+      "id": "service",
       "type": "container",
-      "label": "External API Adapter (Driven)",
-      "description": "Outbound adapter: implements a port to call external services (payment, email, etc.).",
-      "technology": "HTTP Client",
-      "x": 500,
-      "y": 650,
-      "width": 300,
-      "height": 200,
+      "label": "Order Service",
+      "description": "Dependencies point inwards only: adapters → application → domain.",
+      "technology": "Kotlin / Spring Boot",
+      "parentId": "platform",
+      "x": 30,
+      "y": 110,
+      "width": 740,
+      "height": 420,
+      "collapsed": false
+    },
+    {
+      "id": "rest",
+      "type": "component",
+      "label": "REST Adapter (driving)",
+      "description": "Maps HTTP requests and responses to use-case calls. Knows nothing about persistence.",
+      "technology": "Spring MVC",
+      "parentId": "service",
+      "x": 30,
+      "y": 110,
+      "width": 200,
+      "height": 120,
+      "collapsed": false
+    },
+    {
+      "id": "app",
+      "type": "component",
+      "label": "Application Services",
+      "description": "Use cases such as PlaceOrder. Orchestrate the domain and call outbound ports (OrderRepository, PaymentGateway).",
+      "technology": "Plain Kotlin",
+      "parentId": "service",
+      "x": 270,
+      "y": 110,
+      "width": 200,
+      "height": 120,
+      "collapsed": false
+    },
+    {
+      "id": "domain",
+      "type": "component",
+      "label": "Domain Model",
+      "description": "Entities, value objects and invariants. Zero framework imports.",
+      "technology": "Plain Kotlin",
+      "parentId": "service",
+      "x": 510,
+      "y": 110,
+      "width": 200,
+      "height": 120,
+      "collapsed": false
+    },
+    {
+      "id": "repo",
+      "type": "component",
+      "label": "Repository Adapter (driven)",
+      "description": "Implements OrderRepository on top of the database.",
+      "technology": "Spring Data / JDBC",
+      "parentId": "service",
+      "x": 30,
+      "y": 270,
+      "width": 200,
+      "height": 120,
+      "collapsed": false
+    },
+    {
+      "id": "payment",
+      "type": "component",
+      "label": "Payment Adapter (driven)",
+      "description": "Implements PaymentGateway against the provider's API, including retries and mapping of provider errors.",
+      "technology": "HTTP client",
+      "parentId": "service",
+      "x": 270,
+      "y": 270,
+      "width": 200,
+      "height": 120,
+      "collapsed": false
+    },
+    {
+      "id": "orders-db",
+      "type": "database",
+      "label": "Orders DB",
+      "description": "Relational storage; a detail hidden behind the repository port.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "x": 810,
+      "y": 110,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "psp",
+      "type": "system",
+      "label": "Payment Provider",
+      "description": "External payment API.",
+      "external": true,
+      "x": 0,
+      "y": 930,
+      "width": 360,
+      "height": 260,
       "collapsed": false
     }
   ],
   "relations": [
     {
-      "id": "pat-hex-r1",
-      "sourceId": "pat-hex-rest",
-      "targetId": "pat-hex-app",
-      "label": "Calls use cases",
-      "technology": ""
+      "id": "customer--service",
+      "sourceId": "customer",
+      "targetId": "service",
+      "label": "Uses REST API",
+      "technology": "HTTPS / JSON"
     },
     {
-      "id": "pat-hex-r2",
-      "sourceId": "pat-hex-app",
-      "targetId": "pat-hex-db",
-      "label": "Uses repository port",
-      "technology": ""
+      "id": "rest--app",
+      "sourceId": "rest",
+      "targetId": "app",
+      "label": "Invokes use case (driving port)"
     },
     {
-      "id": "pat-hex-r3",
-      "sourceId": "pat-hex-app",
-      "targetId": "pat-hex-ext",
-      "label": "Uses external port",
-      "technology": ""
+      "id": "app--domain",
+      "sourceId": "app",
+      "targetId": "domain",
+      "label": "Executes domain logic"
+    },
+    {
+      "id": "app--repo",
+      "sourceId": "app",
+      "targetId": "repo",
+      "label": "OrderRepository port"
+    },
+    {
+      "id": "app--payment",
+      "sourceId": "app",
+      "targetId": "payment",
+      "label": "PaymentGateway port"
+    },
+    {
+      "id": "repo--orders-db",
+      "sourceId": "repo",
+      "targetId": "orders-db",
+      "label": "Reads / writes",
+      "technology": "SQL"
+    },
+    {
+      "id": "service--psp",
+      "sourceId": "service",
+      "targetId": "psp",
+      "label": "Charges card (via Payment Adapter)",
+      "technology": "HTTPS"
     }
   ]
 }

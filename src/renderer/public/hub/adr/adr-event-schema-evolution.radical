@@ -1,0 +1,53 @@
+{
+  "hub": {
+    "id": "adr-event-schema-evolution",
+    "category": "adr",
+    "name": "Event Schema Evolution",
+    "description": "Records how event schemas are defined, registered and evolved so that producers and consumers can change independently.",
+    "tags": [
+      "messaging",
+      "event-driven",
+      "schema",
+      "governance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "SCHEMA_FORMAT",
+        "label": "Schema format",
+        "hint": "Avro",
+        "defaultValue": "Avro"
+      },
+      {
+        "key": "COMPATIBILITY_MODE",
+        "label": "Registry compatibility mode",
+        "hint": "BACKWARD",
+        "defaultValue": "BACKWARD"
+      }
+    ],
+    "hubRefs": [
+      "req-event-schema-compatibility",
+      "pattern-event-driven",
+      "adr-integration-style"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-event-schema-evolution-1",
+      "type": "adr",
+      "label": "ADR: {{SCHEMA_FORMAT}} with a schema registry",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "Events published to the broker are consumed by services owned by other teams, some unknown to the producer. Without a shared definition and compatibility rules, a field rename by a producer breaks consumers at runtime. Forces: payload size and serialisation speed, tooling for code generation, how strictly compatibility should be enforced and who owns each event.",
+      "decision": "Define every event with {{SCHEMA_FORMAT}} schemas registered in a schema registry under {{COMPATIBILITY_MODE}} compatibility. The registry rejects incompatible schema versions; the build pipeline runs the same check earlier. Each event type has an owning team, a documented purpose and a CloudEvents-style envelope (id, type, source, time, trace context).",
+      "consequences": "• Consumers can upgrade before or after producers within the compatibility rules; deploy ordering is no longer coupled.\n• Breaking changes require a new event type (or major version suffix) and a migration period, never an in-place change.\n• Code generation from schemas gives typed producers and consumers in every language in use.\n• The registry is a runtime dependency for serialisation and must be highly available and cached client-side.\n• Schema reviews become a lightweight governance step with a visible owner.",
+      "alternatives": "1. JSON without a registry — zero tooling; compatibility relies on convention and breaks silently.\n2. Protobuf with schemas in a shared repository — compact and typed; compatibility is enforced only by review unless a registry is added.\n3. JSON Schema with a registry — human-readable; weaker code generation and larger payloads.\n4. Versioned topics per schema change — explicit; topic sprawl and duplicated consumers."
+    }
+  ],
+  "relations": []
+}
