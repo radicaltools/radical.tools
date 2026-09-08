@@ -35,8 +35,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "must",
       "trigger": "a user submits a search query",
       "action": "return the first page of results within {{SEARCH_P95_MS}} ms at the 95th percentile, using pre-built indexes rather than full scans",
       "rationale": "Search is interactive and iterative; users refine queries several times, so each round trip must feel immediate or engagement drops sharply."

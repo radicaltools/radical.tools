@@ -45,10 +45,7 @@
       "collapsed": false,
       "description": "Periodically replays production-shaped traffic at the target peak load and confirms the system holds its latency and error-rate targets without operator intervention.",
       "category": "operational",
-      "automated": true,
-      "trigger": "periodic",
       "threshold": "Sustains {{MIN_TPS}} transactions/second for {{TEST_DURATION_MINUTES}} minutes with p95 latency and error rate within their SLOs",
-      "status": "proposed",
       "templateParams": [
         {
           "key": "MIN_TPS",

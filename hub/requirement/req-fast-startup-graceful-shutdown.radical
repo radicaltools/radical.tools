@@ -45,8 +45,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "must",
       "trigger": "the process receives SIGTERM (rolling deploy, scale-in, node drain)",
       "action": "stop accepting new work immediately, allow in-flight requests up to {{DRAIN_TIMEOUT_SECONDS}} seconds to finish, then exit cleanly — and be ready to serve traffic within {{STARTUP_SECONDS}} seconds of being started",
       "rationale": "Kubernetes and every autoscaler assume a process that handles SIGTERM and becomes ready quickly; get either wrong and rolling deploys drop requests, and scale-out can't add capacity fast enough to matter.",

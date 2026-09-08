@@ -45,10 +45,7 @@
       "height": 52,
       "collapsed": false,
       "category": "process",
-      "automated": true,
-      "trigger": "on-deploy",
-      "threshold": "Groundedness ≥ {{MIN_GROUNDEDNESS_PCT}}% and no metric more than {{MAX_REGRESSION_PCT}} pp below the current production baseline",
-      "status": "proposed"
+      "threshold": "Groundedness ≥ {{MIN_GROUNDEDNESS_PCT}}% and no metric more than {{MAX_REGRESSION_PCT}} pp below the current production baseline"
     }
   ],
   "relations": []

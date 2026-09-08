@@ -38,10 +38,7 @@
       "height": 52,
       "collapsed": false,
       "category": "process",
-      "automated": false,
-      "trigger": "periodic",
-      "threshold": "Median time to restore ≤ {{MAX_MTTR_HOURS}} h",
-      "status": "proposed"
+      "threshold": "Median time to restore ≤ {{MAX_MTTR_HOURS}} h"
     }
   ],
   "relations": []

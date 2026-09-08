@@ -36,10 +36,7 @@
       "height": 52,
       "collapsed": false,
       "category": "holistic",
-      "automated": true,
-      "trigger": "continuous",
-      "threshold": "All resources tagged data-class=personal located and replicated only in {{APPROVED_REGIONS}}",
-      "status": "proposed"
+      "threshold": "All resources tagged data-class=personal located and replicated only in {{APPROVED_REGIONS}}"
     }
   ],
   "relations": []

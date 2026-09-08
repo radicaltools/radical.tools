@@ -39,10 +39,7 @@
       "height": 52,
       "collapsed": false,
       "category": "process",
-      "automated": true,
-      "trigger": "periodic",
-      "threshold": "≥ {{MIN_DEPLOYS_PER_WEEK}} production deployments per service per week (4-week rolling median)",
-      "status": "proposed"
+      "threshold": "≥ {{MIN_DEPLOYS_PER_WEEK}} production deployments per service per week (4-week rolling median)"
     }
   ],
   "relations": []

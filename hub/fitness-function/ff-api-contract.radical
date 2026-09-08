@@ -29,10 +29,7 @@
       "height": 52,
       "collapsed": false,
       "category": "structural",
-      "automated": true,
-      "trigger": "on-deploy",
-      "threshold": "0 breaking changes within a major version; implementation passes 100% of spec-derived contract tests",
-      "status": "proposed"
+      "threshold": "0 breaking changes within a major version; implementation passes 100% of spec-derived contract tests"
     }
   ],
   "relations": []

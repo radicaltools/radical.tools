@@ -44,10 +44,7 @@
       "collapsed": false,
       "description": "Periodically drives synthetic load past the scale-out trigger and confirms autoscaling actually adds capacity and stabilises within the declared time, instead of assuming the policy still works.",
       "category": "operational",
-      "automated": true,
-      "trigger": "periodic",
       "threshold": "Additional capacity comes online within {{SCALE_OUT_SECONDS}}s of crossing the scale-out trigger, and latency returns within its SLO within {{STABILISE_SECONDS}}s after that",
-      "status": "proposed",
       "templateParams": [
         {
           "key": "SCALE_OUT_SECONDS",

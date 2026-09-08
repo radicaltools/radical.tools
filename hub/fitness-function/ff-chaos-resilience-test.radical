@@ -38,10 +38,7 @@
       "collapsed": false,
       "description": "Deliberately injects failures — killed instances, network latency, dependency outages — into a controlled environment and verifies the system degrades gracefully instead of cascading.",
       "category": "operational",
-      "automated": true,
-      "trigger": "periodic",
       "threshold": "{{MIN_SCENARIOS_PASSED_PCT}}% of the fault-injection suite completes with core functionality still available and no cascading failure beyond the targeted component",
-      "status": "proposed",
       "templateParams": [
         {
           "key": "MIN_SCENARIOS_PASSED_PCT",

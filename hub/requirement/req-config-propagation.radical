@@ -35,8 +35,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "must",
       "trigger": "an operator changes a runtime configuration value or feature flag",
       "action": "apply the change on every running instance within {{CONFIG_PROPAGATION_SECONDS}} seconds without a restart, and expose per-instance configuration version so lag can be monitored",
       "rationale": "Kill switches, rate limits and circuit-breaker thresholds are only useful during an incident if they take effect faster than the incident escalates."

@@ -44,10 +44,7 @@
       "collapsed": false,
       "description": "Tracks infrastructure spend per unit of useful work and fails the check when the trailing trend crosses the budget, catching cost creep before it reaches the monthly bill.",
       "category": "holistic",
-      "automated": true,
-      "trigger": "periodic",
       "threshold": "Cost per {{COST_UNIT}} stays at or below {{MAX_COST_PER_UNIT}} on a 7-day trailing average",
-      "status": "proposed",
       "templateParams": [
         {
           "key": "COST_UNIT",

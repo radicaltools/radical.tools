@@ -30,10 +30,7 @@
       "height": 52,
       "collapsed": false,
       "category": "structural",
-      "automated": true,
-      "trigger": "on-deploy",
-      "threshold": "0 dependency cycles and 0 violations of the declared layer and module rules",
-      "status": "proposed"
+      "threshold": "0 dependency cycles and 0 violations of the declared layer and module rules"
     }
   ],
   "relations": []

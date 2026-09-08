@@ -36,8 +36,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "must",
       "trigger": "a user submits credentials or a client presents a token for verification",
       "action": "complete credential validation and token issuance within {{AUTH_P95_MS}} ms at the 95th percentile, including any calls to external identity providers",
       "rationale": "Login is on the critical path of every session and is the first impression of system responsiveness; slow authentication inflates abandonment before the product is even seen."

@@ -34,8 +34,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "should",
       "trigger": "a developer pushes a commit to a branch",
       "action": "complete build, static analysis, unit and integration tests and security scanning within {{MAX_PIPELINE_MINUTES}} minutes, parallelising or tiering slower suites as needed",
       "rationale": "Slow pipelines push developers to batch commits and context-switch away, which delays feedback on regressions and inflates the size of every change."

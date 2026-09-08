@@ -43,8 +43,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "should",
       "action": "keep infrastructure cost per {{COST_UNIT}} at or below {{MAX_COST_PER_UNIT}}, reviewed monthly against the trailing 3-month trend",
       "rationale": "Without an explicit ceiling, cost creep is invisible until the monthly bill spikes; tying it to a unit of work (per request, per tenant, per transaction) keeps the number meaningful as the system grows.",
       "templateParams": [

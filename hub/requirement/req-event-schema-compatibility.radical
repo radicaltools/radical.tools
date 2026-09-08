@@ -27,8 +27,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "unwanted-behaviour",
-      "status": "draft",
-      "priority": "must",
       "unwanted_condition": "a producer attempts to publish an event whose schema is not backward compatible with the registered version",
       "action": "reject the change in the build pipeline and at the schema registry, requiring a new event type or major version instead of an in-place breaking change",
       "rationale": "Consumers of an event stream are often unknown to the producer; compatibility enforced by tooling is the only reliable protection against silently breaking them."

@@ -38,8 +38,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "accept an idempotency key on every state-changing operation and return the original result for any repeat of that key within {{IDEMPOTENCY_WINDOW_HOURS}} hours without re-executing the side effects",
       "rationale": "Network timeouts make it impossible for a client to know whether a request was applied; safe retries are only possible when repeating a request is harmless."
     }

@@ -43,8 +43,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "should",
       "action": "resolve at least {{MIN_RESOLUTION_PCT}}% of routine inquiries without human escalation over a rolling {{MEASUREMENT_WINDOW_DAYS}}-day window, counting only cases the user confirmed as resolved",
       "rationale": "Below a certain resolution rate the cost of reviewing and correcting escalations exceeds the savings; measuring it with user confirmation keeps the metric honest."
     }

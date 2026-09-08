@@ -118,9 +118,9 @@ function metaBadges(concept: HubConceptSummary): Array<{ label: string; value: s
   const push = (label: string, v: unknown) => { if (v !== undefined && v !== null && v !== '') out.push({ label, value: String(v) }) }
   switch (concept.category) {
     case 'requirement':
-      push('EARS', node.ears_type); push('Priority', node.priority); push('Status', node.status); break
+      push('EARS', node.ears_type); break
     case 'fitness-function':
-      push('Category', node.category); push('Trigger', node.trigger); push('Status', node.status); break
+      push('Category', node.category); break
     case 'adr':
       push('Status', node.status); break
     case 'pattern':

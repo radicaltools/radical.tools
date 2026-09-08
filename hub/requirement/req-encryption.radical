@@ -41,8 +41,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "encrypt personal and confidential data at rest with {{ENCRYPTION_ALGORITHM}} using managed keys, and encrypt all network traffic with {{MIN_TLS_VERSION}} or higher, refusing plaintext connections",
       "rationale": "Encryption is the baseline control expected by GDPR, PCI DSS and HIPAA alike, and it turns a lost disk, backup or network capture from a breach into a non-incident."
     }

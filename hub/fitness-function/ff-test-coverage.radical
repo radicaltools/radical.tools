@@ -36,10 +36,7 @@
       "height": 52,
       "collapsed": false,
       "category": "process",
-      "automated": true,
-      "trigger": "on-deploy",
-      "threshold": "Total line coverage ≥ {{MIN_COVERAGE_PCT}}% and no decrease on changed files",
-      "status": "proposed"
+      "threshold": "Total line coverage ≥ {{MIN_COVERAGE_PCT}}% and no decrease on changed files"
     }
   ],
   "relations": []

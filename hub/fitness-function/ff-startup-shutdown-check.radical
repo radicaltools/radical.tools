@@ -44,10 +44,7 @@
       "collapsed": false,
       "description": "Automatically verifies every service becomes ready within its startup budget and, on SIGTERM, drains in-flight requests within its shutdown budget instead of being killed mid-request — checked on every deploy, not assumed.",
       "category": "operational",
-      "automated": true,
-      "trigger": "on-deploy",
       "threshold": "100% of services report ready within {{STARTUP_SECONDS}}s and complete graceful shutdown (zero dropped in-flight requests) within {{DRAIN_TIMEOUT_SECONDS}}s of SIGTERM",
-      "status": "proposed",
       "templateParams": [
         {
           "key": "STARTUP_SECONDS",

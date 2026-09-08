@@ -34,8 +34,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "should",
       "action": "achieve an F1 score of at least {{MIN_F1_PCT}}% per extracted field on a representative labelled test set, route documents below the per-field confidence threshold to human review, and re-evaluate on every model change",
       "rationale": "F1 balances missed fields against wrong ones; below the threshold human correction costs more than the automation saves, so the metric decides where the review queue starts."
     }

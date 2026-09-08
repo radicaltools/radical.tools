@@ -52,10 +52,7 @@
       "height": 52,
       "collapsed": false,
       "category": "operational",
-      "automated": true,
-      "trigger": "continuous",
-      "threshold": "{{LATENCY_PERCENTILE}} latency ≤ {{LATENCY_THRESHOLD_MS}} ms over every {{EVAL_WINDOW_MINUTES}}-minute window",
-      "status": "proposed"
+      "threshold": "{{LATENCY_PERCENTILE}} latency ≤ {{LATENCY_THRESHOLD_MS}} ms over every {{EVAL_WINDOW_MINUTES}}-minute window"
     }
   ],
   "relations": []

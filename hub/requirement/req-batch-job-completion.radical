@@ -42,8 +42,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "should",
       "action": "complete at least {{MIN_SUCCESS_PCT}}% of scheduled job runs successfully each month, retrying transient failures up to {{MAX_RETRIES}} times with exponential back-off and routing persistent failures to a dead-letter queue with an alert",
       "rationale": "Batch pipelines fail silently unless success is measured; bounded retries absorb infrastructure hiccups while the dead-letter path keeps genuine faults visible."
     }

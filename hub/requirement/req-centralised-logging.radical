@@ -36,8 +36,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "emit logs as structured JSON with timestamp, severity, service, version and trace/correlation identifiers, shipped to a central store that is searchable for at least {{LOG_RETENTION_DAYS}} days",
       "rationale": "Diagnosing a cross-service incident requires joining logs by correlation id in one place; logs scattered across hosts in free text cannot be queried under time pressure."
     }

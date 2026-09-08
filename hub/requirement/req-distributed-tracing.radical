@@ -36,8 +36,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "propagate W3C Trace Context headers across all synchronous calls, message headers and scheduled jobs, sample at least {{TRACE_SAMPLING_PCT}}% of requests and always retain traces for errors and slow requests",
       "rationale": "Latency and errors in a distributed system are emergent; without end-to-end traces the slowest hop and the failing dependency can only be guessed at."
     }

@@ -34,8 +34,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "should",
       "action": "maintain at least {{MIN_COVERAGE_PCT}}% automated line coverage of business-logic modules and prevent any change from lowering coverage on the files it touches",
       "rationale": "Coverage is a coarse but enforceable proxy for a refactoring safety net; the ratchet on changed files stops the number from drifting down one commit at a time."
     }

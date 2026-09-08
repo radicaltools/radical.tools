@@ -36,8 +36,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "unwanted-behaviour",
-      "status": "draft",
-      "priority": "must",
       "unwanted_condition": "a change would remove a field, alter a type or change the semantics of a published endpoint",
       "action": "publish the change under a new major version, keep the previous version fully operational for at least {{DEPRECATION_MONTHS}} months, and announce the deprecation via response headers and the changelog",
       "rationale": "Partners upgrade on their own schedule; a breaking change without a transition period converts a release into an incident for every integrator."

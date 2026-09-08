@@ -34,8 +34,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "expose separate liveness and readiness endpoints that respond within {{HEALTH_RESPONSE_MS}} ms, where readiness reflects the availability of critical dependencies and liveness does not",
       "rationale": "Orchestrators route traffic and restart instances based on these endpoints; conflating liveness with readiness turns a dependency outage into a restart storm."
     }

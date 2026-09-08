@@ -43,8 +43,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "should",
       "action": "keep estimated carbon emissions per {{WORK_UNIT}} at or below {{MAX_CARBON_PER_UNIT}}, tracked via the cloud provider's carbon/energy reporting tools and reviewed quarterly",
       "rationale": "Carbon efficiency and cost efficiency are usually the same lever — right-sizing, higher utilisation, newer hardware, managed/serverless services — so tracking it is cheap once cost efficiency is already tracked, and it is increasingly a procurement requirement in enterprise and public-sector RFPs.",
       "templateParams": [

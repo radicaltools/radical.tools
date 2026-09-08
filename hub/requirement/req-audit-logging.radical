@@ -35,8 +35,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "record every state-changing operation with timestamp, actor identity, action, affected resource and before/after values in an append-only audit log retained for {{AUDIT_RETENTION_MONTHS}} months",
       "rationale": "Regulations such as SOX and PCI DSS require a reconstructable history of changes, and incident response depends on the same trail."
     }

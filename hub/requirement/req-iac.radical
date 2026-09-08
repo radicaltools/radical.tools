@@ -27,8 +27,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "define every cloud resource in declarative infrastructure code, apply changes exclusively through reviewed pipeline runs, and treat manual console changes as drift to be reverted",
       "rationale": "Hand-built environments cannot be reproduced, reviewed or recovered; code makes infrastructure auditable and turns disaster recovery into a re-run."
     }

@@ -35,8 +35,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "authenticate every API request using {{AUTH_PROTOCOL}} and reject unauthenticated or expired credentials with HTTP 401 before executing any business logic",
       "rationale": "Authentication at the boundary is the precondition for every other access-control decision; a single unauthenticated endpoint undermines the whole model."
     }

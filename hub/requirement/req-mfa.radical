@@ -27,8 +27,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "must",
       "trigger": "a user requests access to administrative functions or initiates a high-risk operation such as a payout, a permission change or a data export",
       "action": "require a second authentication factor (TOTP, push approval or a hardware key) before granting access, and re-prompt after the session's step-up validity expires",
       "rationale": "Credential theft is the most common intrusion path; a second factor turns a leaked password into a non-event for the operations that matter most."

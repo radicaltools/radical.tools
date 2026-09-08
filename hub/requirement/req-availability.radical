@@ -42,8 +42,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "draft",
-      "priority": "must",
       "action": "be available for at least {{AVAILABILITY_TARGET}}% of each {{MEASUREMENT_WINDOW}}, where \"available\" means successfully serving requests within the agreed response-time targets",
       "rationale": "An explicit target sizes the error budget, drives redundancy decisions and gives release policy an objective gate; each additional nine roughly multiplies infrastructure and process cost."
     }

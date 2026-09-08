@@ -52,8 +52,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "complex",
-      "status": "draft",
-      "priority": "must",
       "trigger": "average CPU utilisation exceeds {{SCALE_TRIGGER_CPU_PCT}}% for two consecutive minutes",
       "precondition": "fewer than {{MAX_INSTANCES}} instances are running",
       "action": "add compute instances so that new capacity is serving traffic within {{SCALE_OUT_SECONDS}} seconds, and scale back in when load subsides",

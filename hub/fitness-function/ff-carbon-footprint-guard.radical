@@ -42,10 +42,7 @@
       "collapsed": false,
       "description": "Tracks estimated carbon emissions per unit of useful work using the cloud provider's carbon reporting tools and flags the trend when it moves the wrong way, the same way a cost dashboard would.",
       "category": "holistic",
-      "automated": true,
-      "trigger": "periodic",
       "threshold": "Estimated carbon per {{WORK_UNIT}} stays at or below {{MAX_CARBON_PER_UNIT}} on a trailing quarterly average, or the trend is flat or declining",
-      "status": "proposed",
       "templateParams": [
         {
           "key": "WORK_UNIT",

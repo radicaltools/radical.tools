@@ -37,10 +37,7 @@
       "collapsed": false,
       "description": "Periodically executes a real failover to the secondary region and measures actual recovery time and data loss against the declared targets, instead of trusting the runbook was never tested.",
       "category": "process",
-      "automated": false,
-      "trigger": "periodic",
       "threshold": "Failover completes within the declared RTO and measured data loss stays within the declared RPO, verified at least {{DRILLS_PER_YEAR}} times a year",
-      "status": "proposed",
       "templateParams": [
         {
           "key": "DRILLS_PER_YEAR",

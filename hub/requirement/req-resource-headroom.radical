@@ -44,8 +44,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "state-driven",
-      "status": "draft",
-      "priority": "must",
       "precondition": "the system is serving normal production traffic",
       "action": "keep average CPU utilisation below {{CPU_CEILING_PCT}}% and memory utilisation below {{MEMORY_CEILING_PCT}}% per node, treating sustained breaches as a capacity incident",
       "rationale": "Saturated nodes degrade non-linearly: queueing delay explodes as utilisation approaches 100%, and scale-out takes time to become effective."

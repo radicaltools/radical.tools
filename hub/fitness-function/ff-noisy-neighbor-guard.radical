@@ -44,10 +44,7 @@
       "collapsed": false,
       "description": "Continuously measures each tenant's or workload's share of shared infrastructure resources and fails the check when one occupant sustains disproportionate consumption long enough to risk degrading its neighbours.",
       "category": "operational",
-      "automated": true,
-      "trigger": "continuous",
       "threshold": "No single tenant or workload sustains more than {{MAX_SHARE_PCT}}% of a shared resource pool for longer than {{SUSTAINED_MINUTES}} minutes",
-      "status": "proposed",
       "templateParams": [
         {
           "key": "MAX_SHARE_PCT",

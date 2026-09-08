@@ -50,8 +50,6 @@
       "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "draft",
-      "priority": "must",
       "trigger": "the primary region has been unreachable for more than {{OUTAGE_THRESHOLD_SECONDS}} seconds",
       "action": "fail over to the secondary region and resume service within {{RTO_MINUTES}} minutes, losing no more than {{RPO_MINUTES}} minutes of committed data",
       "rationale": "RTO and RPO are the two numbers that decide the replication topology and the price of the DR setup; stating them up front avoids discovering the gap during an outage."
