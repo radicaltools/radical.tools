@@ -1,7 +1,7 @@
 /**
  * Hub catalogue — one Radical Studio document per concept.
  *
- *   - every public/hub/<category>/<id>.radical is valid (hub block, ids, refs)
+ *   - every top-level hub/<category>/<id>.radical is valid (hub block, ids, refs)
  *   - index.json summaries carry what the cards / drop-target check need
  *   - doc ↔ concept mapping round-trips
  */
@@ -11,7 +11,7 @@ import { readCatalogue, validateCatalogue, buildIndex } from '../tools/hubCatalo
 import { conceptToDoc, docToConcept, summarize, type HubRadicalDoc } from '../src/renderer/src/hub/hubFormat'
 import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
 
-const HUB_DIR = resolve(__dirname, '../src/renderer/public/hub')
+const HUB_DIR = resolve(__dirname, '../hub')
 
 const doc: HubRadicalDoc = {
   hub: {
@@ -45,7 +45,7 @@ describe('hubFormat', () => {
   })
 })
 
-describe('public/hub catalogue', () => {
+describe('hub catalogue', () => {
   const entries = readCatalogue(HUB_DIR)
 
   it('contains concepts and passes validation', () => {

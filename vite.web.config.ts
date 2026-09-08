@@ -22,7 +22,7 @@ import { hubCataloguePlugin } from './tools/hubCatalogue'
 const root = resolve(__dirname, 'src/renderer')
 
 export default defineConfig({
-  plugins: [react(), hubCataloguePlugin({ publicDir: resolve(root, 'public') })],
+  plugins: [react(), hubCataloguePlugin({ hubDir: resolve(__dirname, 'hub') })],
   root,
   base: './',
   build: {
