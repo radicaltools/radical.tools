@@ -4,25 +4,33 @@
 // the catalogue:
 //
 //   #/browse
-//   #/c/<conceptId>[/v/<canvas|wiki|table>][/cat/<category>][/tag/<tag>]
+//   #/c/<conceptId>[/v/<canvas|wiki|table>][/cat/<category>][/tag/<tag,tag>][/status/<status,status>][/sort/<name|category|connections>]
 //
 // `c` selects the concept shown in the viewer, `v` its presentation, `cat` /
-// `tag` the catalogue filters. An empty hash is the landing page; `browse` is
-// the unfiltered catalogue with nothing selected (any concept / filter implies
-// the catalogue too).
+// `tag` / `status` / `sort` the catalogue filters. `tag` and `status` hold a
+// comma-separated list (multiple values in the same facet OR together — see
+// hubStore's filteredConcepts). An empty hash is the landing page; `browse`
+// is the unfiltered catalogue with nothing selected (any concept / filter
+// implies the catalogue too).
 
 import type { HubViewKind } from './conceptToDiagram'
+import type { HubSortKey } from '../store/hubStore'
 
 export interface HubRoute {
-  /** Catalogue is open (implied when concept / category / tag is set). */
+  /** Catalogue is open (implied when concept / category / tag / status is set). */
   browse?: boolean
   concept?: string
   view?: HubViewKind
   category?: string
+  /** Comma-separated tag list. */
   tag?: string
+  /** Comma-separated status list. */
+  status?: string
+  sort?: HubSortKey
 }
 
 const VIEW_KINDS: readonly HubViewKind[] = ['canvas', 'wiki', 'table']
+const SORT_KEYS: readonly HubSortKey[] = ['name', 'category', 'connections']
 
 export function parseHubHash(hash: string): HubRoute {
   const raw = hash.replace(/^#\/?/, '')
@@ -39,16 +47,20 @@ export function parseHubHash(hash: string): HubRoute {
     }
   }
   const view = (VIEW_KINDS as readonly string[]).includes(map.v) ? (map.v as HubViewKind) : undefined
+  const sort = (SORT_KEYS as readonly string[]).includes(map.sort) ? (map.sort as HubSortKey) : undefined
   const concept = map.c || undefined
   const category = map.cat || undefined
   const tag = map.tag || undefined
-  const browse = browseFlag || !!(concept || category || tag)
+  const status = map.status || undefined
+  const browse = browseFlag || !!(concept || category || tag || status || sort)
   return {
     ...(browse ? { browse: true } : {}),
     concept,
     view,
     category,
     tag,
+    status,
+    sort,
   }
 }
 
@@ -58,6 +70,8 @@ export function formatHubHash(route: HubRoute): string {
   if (route.concept && route.view) segs.push('v', route.view)
   if (route.category) segs.push('cat', encodeURIComponent(route.category))
   if (route.tag) segs.push('tag', encodeURIComponent(route.tag))
+  if (route.status) segs.push('status', encodeURIComponent(route.status))
+  if (route.sort) segs.push('sort', route.sort)
   if (segs.length === 0) return route.browse ? '#/browse' : ''
   return '#/' + segs.join('/')
 }

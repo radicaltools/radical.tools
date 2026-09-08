@@ -56,7 +56,14 @@ interface HubState {
   // Filters
   activeCategory: string | null
   searchQuery: string
-  activeTag: string | null
+  /** Multiple tags OR together (any match) — same facet, so union not intersection. */
+  activeTags: Set<string>
+  /** Same OR-within-facet semantics as tags. Values are the raw `preview.status`
+   *  strings, which aren't a single shared enum across categories (e.g. a
+   *  requirement's "draft" and an ADR's "proposed" are different fields), but
+   *  browsing by the literal word is still useful. */
+  activeStatuses: Set<string>
+  sortBy: HubSortKey
 
   // Actions
   fetchConcepts: () => Promise<void>
@@ -65,13 +72,22 @@ interface HubState {
   loadConcepts: (ids: string[]) => Promise<HubConcept[]>
   setCategory: (cat: string | null) => void
   setSearch: (q: string) => void
-  setTag: (tag: string | null) => void
+  toggleTag: (tag: string) => void
+  setTags: (tags: Set<string>) => void
+  toggleStatus: (status: string) => void
+  setStatuses: (statuses: Set<string>) => void
+  setSortBy: (sort: HubSortKey) => void
   resetFilters: () => void
 
   // Computed-like
   filteredConcepts: () => HubConceptSummary[]
   allTags: () => Array<{ tag: string; count: number }>
+  allStatuses: () => Array<{ status: string; count: number }>
+  /** Outgoing hubRefs + incoming references from other concepts. */
+  connectionCount: (id: string) => number
 }
+
+export type HubSortKey = 'name' | 'category' | 'connections'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -112,7 +128,9 @@ export const useHubStore = create<HubState>()((set, get) => ({
 
   activeCategory: null,
   searchQuery: '',
-  activeTag: null,
+  activeTags: new Set(),
+  activeStatuses: new Set(),
+  sortBy: 'name',
 
   async fetchConcepts() {
     const { lastFetched, loading } = get()
@@ -159,25 +177,50 @@ export const useHubStore = create<HubState>()((set, get) => ({
   setSearch(q) {
     set({ searchQuery: q })
   },
-  setTag(tag) {
-    set({ activeTag: tag })
+  toggleTag(tag) {
+    set((s) => ({ activeTags: toggleInSet(s.activeTags, tag) }))
+  },
+  setTags(tags) {
+    set({ activeTags: tags })
+  },
+  toggleStatus(status) {
+    set((s) => ({ activeStatuses: toggleInSet(s.activeStatuses, status) }))
+  },
+  setStatuses(statuses) {
+    set({ activeStatuses: statuses })
+  },
+  setSortBy(sort) {
+    set({ sortBy: sort })
   },
   resetFilters() {
-    set({ activeCategory: null, searchQuery: '', activeTag: null })
+    set({ activeCategory: null, searchQuery: '', activeTags: new Set(), activeStatuses: new Set() })
   },
 
   filteredConcepts() {
-    const { concepts, activeCategory, searchQuery, activeTag } = get()
+    const { concepts, activeCategory, searchQuery, activeTags, activeStatuses, sortBy } = get()
     const q = searchQuery.toLowerCase().trim()
-    return concepts.filter((c) => {
+    const filtered = concepts.filter((c) => {
       if (activeCategory && c.category !== activeCategory) return false
-      if (activeTag && !c.tags.includes(activeTag)) return false
+      // Multiple tags/statuses are the same facet — OR within it (broadens),
+      // combined with everything else via AND (narrows).
+      if (activeTags.size > 0 && !c.tags.some((t) => activeTags.has(t))) return false
+      if (activeStatuses.size > 0 && !activeStatuses.has(c.preview.status ?? '')) return false
       if (q) {
         const haystack = `${c.name} ${c.description} ${c.tags.join(' ')}`.toLowerCase()
         if (!haystack.includes(q)) return false
       }
       return true
     })
+    // One comparator per sort key (built once, not one `[...].sort()` branch
+    // per key) — and connections is looked up from a map built once, not
+    // recomputed per comparison (that was O(n² log n) for this sort alone).
+    const connectionCounts = sortBy === 'connections' ? buildConnectionCounts(concepts) : undefined
+    const byName = (a: HubConceptSummary, b: HubConceptSummary) => a.name.localeCompare(b.name)
+    const cmp: (a: HubConceptSummary, b: HubConceptSummary) => number =
+      sortBy === 'category' ? (a, b) => a.category.localeCompare(b.category) || byName(a, b)
+      : sortBy === 'connections' ? (a, b) => (connectionCounts!.get(b.id) ?? 0) - (connectionCounts!.get(a.id) ?? 0) || byName(a, b)
+      : byName
+    return [...filtered].sort(cmp)
   },
 
   allTags() {
@@ -189,4 +232,45 @@ export const useHubStore = create<HubState>()((set, get) => ({
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count)
   },
+
+  allStatuses() {
+    const counts = new Map<string, number>()
+    for (const c of get().concepts) {
+      const status = c.preview.status
+      if (status) counts.set(status, (counts.get(status) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .map(([status, count]) => ({ status, count }))
+      .sort((a, b) => b.count - a.count)
+  },
+
+  connectionCount(id) {
+    // One-off lookup — fine for a single id. Rendering many at once (a card
+    // list, a sort) should call buildConnectionCounts() once instead.
+    return buildConnectionCounts(get().concepts).get(id) ?? 0
+  },
 }))
+
+/** Toggle membership of `value` in `set`, returning a new Set (immutable). */
+export function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set)
+  if (next.has(value)) next.delete(value); else next.add(value)
+  return next
+}
+
+/**
+ * Outgoing hubRefs + incoming references, for every concept, in one O(n)
+ * pass — self-references and duplicate ids within one concept's own hubRefs
+ * are ignored so they can't inflate its count.
+ */
+export function buildConnectionCounts(concepts: HubConceptSummary[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  const bump = (id: string, by: number) => counts.set(id, (counts.get(id) ?? 0) + by)
+  for (const c of concepts) {
+    const refs = new Set(c.hubRefs ?? [])
+    refs.delete(c.id)
+    bump(c.id, refs.size)
+    for (const r of refs) bump(r, 1)
+  }
+  return counts
+}
