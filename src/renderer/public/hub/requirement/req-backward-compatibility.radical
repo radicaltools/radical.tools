@@ -1,0 +1,43 @@
+{
+  "hub": {
+    "id": "req-backward-compatibility",
+    "category": "requirement",
+    "name": "API Backward Compatibility",
+    "description": "Interoperability: unwanted-behaviour requirement preventing breaking changes from being silently introduced into published APIs.",
+    "tags": [
+      "interoperability",
+      "api",
+      "versioning",
+      "nfr",
+      "compatibility"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "DEPRECATION_MONTHS",
+        "label": "Deprecation period (months)",
+        "hint": "6",
+        "type": "number",
+        "defaultValue": "6"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-compat-1",
+      "type": "requirement",
+      "label": "API Backward Compatibility",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "unwanted-behaviour",
+      "status": "approved",
+      "priority": "must",
+      "unwanted_condition": "a breaking change is introduced to a published API (field removal, type change, or status code change)",
+      "action": "increment the major version and maintain the previous version for a minimum of {{DEPRECATION_MONTHS}} months with a deprecation notice",
+      "rationale": "Unannounced breaking changes break partner integrations. Stable contracts are a prerequisite for ecosystem adoption."
+    }
+  ]
+}

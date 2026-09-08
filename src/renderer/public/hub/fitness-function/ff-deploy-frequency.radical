@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "ff-deploy-frequency",
+    "category": "fitness-function",
+    "name": "Deployment Frequency",
+    "description": "Tracks how often the team deploys to production. One of the four DORA metrics. Low deployment frequency often correlates with large, risky batch releases.",
+    "tags": [
+      "dora",
+      "process",
+      "devops",
+      "deployment"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MIN_DEPLOYS_PER_WEEK",
+        "label": "Minimum deployments per week",
+        "hint": "1",
+        "type": "number",
+        "defaultValue": "1"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-deploy-freq-1",
+      "type": "fitness-fn",
+      "label": "Deployment Frequency",
+      "description": "Measures deployments per week/month. Target: on-demand or at least weekly for high-performing teams.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "process",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "≥ {{MIN_DEPLOYS_PER_WEEK}} deploy(s) per week",
+      "status": "active"
+    }
+  ]
+}

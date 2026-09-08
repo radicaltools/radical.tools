@@ -1,0 +1,33 @@
+{
+  "hub": {
+    "id": "req-iac",
+    "category": "requirement",
+    "name": "Infrastructure as Code",
+    "description": "Automatability: ubiquitous requirement mandating all infrastructure be defined and provisioned via code.",
+    "tags": [
+      "automatability",
+      "infrastructure",
+      "devops",
+      "nfr",
+      "iac"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "req-iac-1",
+      "type": "requirement",
+      "label": "Infrastructure as Code",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "define and provision all cloud infrastructure using IaC tooling (Terraform, Pulumi, or CloudFormation), with all changes applied exclusively via version-controlled pipelines",
+      "rationale": "Manual infrastructure changes are untracked, unrepeatable, and create snowflake environments. IaC enables reproducible environments and disaster recovery."
+    }
+  ]
+}

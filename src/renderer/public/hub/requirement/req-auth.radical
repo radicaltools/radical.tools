@@ -1,0 +1,40 @@
+{
+  "hub": {
+    "id": "req-auth",
+    "category": "requirement",
+    "name": "API Authentication",
+    "description": "All API requests must be authenticated. Ubiquitous security requirement with no preconditions.",
+    "tags": [
+      "security",
+      "authentication",
+      "api",
+      "nfr"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "AUTH_PROTOCOL",
+        "label": "Authentication protocol",
+        "hint": "OAuth 2.0",
+        "defaultValue": "OAuth 2.0"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-auth-1",
+      "type": "requirement",
+      "label": "API Authentication",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "authenticate all API requests using {{AUTH_PROTOCOL}} before processing",
+      "rationale": "Unauthenticated access exposes sensitive data and operations to unauthorized parties."
+    }
+  ]
+}

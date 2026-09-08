@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "ff-coupling-guard",
+    "category": "fitness-function",
+    "name": "Coupling Guard",
+    "description": "Measures component fan-out (number of outgoing dependencies) and flags modules that exceed the threshold. High fan-out indicates tight coupling and fragile change propagation.",
+    "tags": [
+      "architecture",
+      "coupling",
+      "structural",
+      "modularity"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MAX_FAN_OUT",
+        "label": "Max outgoing dependencies per component",
+        "hint": "5",
+        "type": "number",
+        "defaultValue": "5"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-coupling-guard-1",
+      "type": "fitness-fn",
+      "label": "Coupling Guard",
+      "description": "Checks that no component has more than N outgoing dependencies. Prevents tightly-coupled designs that resist change.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "structural",
+      "automated": true,
+      "trigger": "on-deploy",
+      "threshold": "Component fan-out ≤ {{MAX_FAN_OUT}}",
+      "status": "active"
+    }
+  ]
+}

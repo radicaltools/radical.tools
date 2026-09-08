@@ -1,0 +1,33 @@
+{
+  "hub": {
+    "id": "ff-api-contract",
+    "category": "fitness-function",
+    "name": "API Contract Compliance",
+    "description": "Validates that API implementations conform to their OpenAPI/AsyncAPI specifications. Catches breaking changes before they reach consumers. Critical for microservice architectures.",
+    "tags": [
+      "api",
+      "contract",
+      "structural",
+      "compatibility"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "ff-api-contract-1",
+      "type": "fitness-fn",
+      "label": "API Contract Compliance",
+      "description": "Validates implementation against OpenAPI/AsyncAPI spec. Detects breaking changes (removed fields, changed types, dropped endpoints).",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "structural",
+      "automated": true,
+      "trigger": "on-deploy",
+      "threshold": "0 breaking changes vs published spec",
+      "status": "active"
+    }
+  ]
+}

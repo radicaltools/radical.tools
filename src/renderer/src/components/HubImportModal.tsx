@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useHubStore, type HubConcept, type TemplateParam, type HubImportRecord } from '../store/hubStore'
+import { useHubStore, type HubConcept, type HubConceptSummary, type TemplateParam, type HubImportRecord } from '../store/hubStore'
 import { useDiagramStore } from '../store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType } from '../types/c4'
 import { NODE_SIZES } from '../types/c4'
@@ -293,6 +293,8 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
     searchQuery,
     activeTag,
     fetchConcepts,
+    loadConcept,
+    loadConcepts,
     setCategory,
     setSearch,
     setTag,
@@ -346,8 +348,11 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
   const [blueprintSelected, setBlueprintSelected] = useState<Set<string>>(new Set())
   const [blueprintSelectedRefs, setBlueprintSelectedRefs] = useState<Set<string>>(new Set())
 
-  // All concepts indexed by id — used to resolve hubRefs in the blueprint picker.
+  // All concept summaries indexed by id — used to list hubRefs in the blueprint picker.
   const allConcepts = useHubStore((s) => s.concepts)
+
+  // Concept ids whose .radical file is being fetched ("Add to Model" in flight).
+  const [fetchingIds, setFetchingIds] = useState<Set<string>>(new Set())
 
   // Initialise default values whenever a new concept is pending.
   useEffect(() => {
@@ -366,14 +371,11 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
 
   // If a node is selected, check whether a concept's root nodes can all be
   // placed inside it. Returns 'ok' | 'incompatible' | null (no selection).
-  const getDropTarget = useCallback((concept: HubConcept): 'ok' | 'incompatible' | null => {
+  const getDropTarget = useCallback((concept: HubConceptSummary): 'ok' | 'incompatible' | null => {
     if (!selectedNodeId) return null
     const parentNode = c4Nodes[selectedNodeId]
     if (!parentNode) return null
-    const rootTypes = concept.nodes
-      .filter((n) => !n.parentId)
-      .map((n) => (n.type as string) ?? 'component')
-    const allAllowed = rootTypes.every((t) => isParentAllowed(metamodel, t, parentNode.type))
+    const allAllowed = concept.rootTypes.every((t) => isParentAllowed(metamodel, t, parentNode.type))
     return allAllowed ? 'ok' : 'incompatible'
   }, [selectedNodeId, c4Nodes, metamodel])
 
@@ -563,10 +565,24 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
     [onClose, preselectedIds],
   )
 
-  // Clicking "Add to Model": show blueprint picker for blueprints, template
-  // fill form for parameterised concepts, otherwise import immediately.
+  // Clicking "Add to Model": fetch the concept file, then show the blueprint
+  // picker for blueprints, the template fill form for parameterised concepts,
+  // otherwise import immediately.
   const handleImportClick = useCallback(
-    (concept: HubConcept) => {
+    async (summary: HubConceptSummary) => {
+      setFetchingIds((prev) => new Set(prev).add(summary.id))
+      let concept: HubConcept
+      try {
+        concept = await loadConcept(summary.id)
+      } catch (err) {
+        useDiagramStore.getState().pushNotification(
+          `Failed to load "${summary.name}": ${err instanceof Error ? err.message : 'network error'}`,
+          'error',
+        )
+        return
+      } finally {
+        setFetchingIds((prev) => { const next = new Set(prev); next.delete(summary.id); return next })
+      }
       if (concept.category === 'blueprint') {
         // Pre-select all non-blueprint-type nodes (the blueprint root is not imported as a node).
         setBlueprintSelected(new Set(concept.nodes.filter((n) => n.type !== 'blueprint').map((n) => n.id as string)))
@@ -578,7 +594,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         handleImport(concept)
       }
     },
-    [handleImport],
+    [handleImport, loadConcept],
   )
 
   if (!open) return null
@@ -708,6 +724,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
             const dropTarget = getDropTarget(c)
             const selectedNodeLabel = selectedNodeId ? c4Nodes[selectedNodeId]?.label : null
             const alreadyImported = importedIds.has(c.id)
+            const fetching = fetchingIds.has(c.id)
             return (
               <div key={c.id} style={{ ...S.card, opacity: alreadyImported ? 0.55 : 1 }}>
                 <div style={S.cardHeader}>
@@ -734,10 +751,11 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
                     ? <span style={{ ...S.importBtn, background: '#059669', borderColor: '#059669', cursor: 'default', opacity: 0.85 }}>✓ Imported</span>
                     : <button
                         type="button"
-                        style={S.importBtn}
-                        onClick={() => handleImportClick(c)}
+                        style={{ ...S.importBtn, opacity: fetching ? 0.6 : 1 }}
+                        disabled={fetching}
+                        onClick={() => void handleImportClick(c)}
                       >
-                        Add to Model
+                        {fetching ? 'Loading…' : 'Add to Model'}
                       </button>
                   }
                 </div>
@@ -860,7 +878,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
               {blueprintConcept.hubRefs && blueprintConcept.hubRefs.length > 0 && (() => {
                 const refs = blueprintConcept.hubRefs
                   .map((id) => allConcepts.find((c) => c.id === id))
-                  .filter((c): c is HubConcept => !!c)
+                  .filter((c): c is HubConceptSummary => !!c)
                 if (refs.length === 0) return null
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 8, borderTop: '1px solid var(--border-color)', marginTop: 4 }}>
@@ -965,9 +983,14 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
                     }
                   }
                   // Import each selected referenced hub concept individually
-                  for (const refId of selectedRefs) {
-                    const refConcept = allConcepts.find((c) => c.id === refId)
-                    if (refConcept) handleImport(refConcept)
+                  if (selectedRefs.size > 0) {
+                    loadConcepts([...selectedRefs]).then(
+                      (refConcepts) => { for (const rc of refConcepts) handleImport(rc) },
+                      (err: unknown) => useDiagramStore.getState().pushNotification(
+                        `Failed to load referenced concepts: ${err instanceof Error ? err.message : 'network error'}`,
+                        'error',
+                      ),
+                    )
                   }
                 }}
               >

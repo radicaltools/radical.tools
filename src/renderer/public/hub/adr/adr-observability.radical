@@ -1,0 +1,50 @@
+{
+  "hub": {
+    "id": "adr-observability",
+    "category": "adr",
+    "name": "Observability Strategy",
+    "description": "Template ADR for choosing the observability stack and approach (logs, metrics, traces). Covers the three pillars of observability and their tooling.",
+    "tags": [
+      "observability",
+      "monitoring",
+      "logging",
+      "tracing"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "LOG_TOOL",
+        "label": "Log aggregation tool",
+        "hint": "Loki / Elasticsearch"
+      },
+      {
+        "key": "METRICS_TOOL",
+        "label": "Metrics tool",
+        "hint": "Prometheus"
+      },
+      {
+        "key": "TRACES_TOOL",
+        "label": "Distributed tracing tool",
+        "hint": "Jaeger / Tempo"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-observability-1",
+      "type": "adr",
+      "label": "ADR: Observability Strategy",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "We need a comprehensive observability strategy covering the three pillars: structured logging, metrics, and distributed tracing. The strategy must support debugging production issues, measuring SLOs, and understanding system behaviour across service boundaries.",
+      "decision": "We will implement OpenTelemetry for instrumentation. Logs: {{LOG_TOOL}}. Metrics: {{METRICS_TOOL}}. Traces: {{TRACES_TOOL}}. Dashboards: [TOOL].",
+      "consequences": "• All services must emit structured logs in JSON format\n• Correlation IDs propagated via [HEADER] across all service calls\n• SLO dashboards created for each critical user journey\n• Estimated additional infrastructure cost: [ESTIMATE]",
+      "alternatives": "1. [Alternative stack A] — rejected: [reason]\n2. Vendor-locked solution — rejected: portability concern\n3. Build custom — rejected: undifferentiated heavy lifting"
+    }
+  ]
+}

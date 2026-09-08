@@ -1,0 +1,33 @@
+{
+  "hub": {
+    "id": "req-api-standard",
+    "category": "requirement",
+    "name": "REST API Standard",
+    "description": "Interoperability: ubiquitous requirement mandating OpenAPI documentation for all public service endpoints.",
+    "tags": [
+      "interoperability",
+      "api",
+      "openapi",
+      "standards",
+      "nfr"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "req-api-std-1",
+      "type": "requirement",
+      "label": "REST API Standard",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "expose all public service interfaces as RESTful APIs documented with OpenAPI 3.0 specifications, version-controlled alongside the service code",
+      "rationale": "OpenAPI documentation enables automated client generation, contract testing, and accelerates third-party integrations."
+    }
+  ]
+}

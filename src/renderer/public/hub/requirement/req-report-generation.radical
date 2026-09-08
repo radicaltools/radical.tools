@@ -1,0 +1,43 @@
+{
+  "hub": {
+    "id": "req-report-generation",
+    "category": "requirement",
+    "name": "Report Generation Time",
+    "description": "Performance: standard business reports must complete within 30 seconds to avoid user abandonment of reporting workflows.",
+    "tags": [
+      "performance",
+      "reporting",
+      "latency",
+      "nfr",
+      "analytics"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "REPORT_MAX_SECONDS",
+        "label": "Max report generation time (seconds)",
+        "hint": "30",
+        "type": "number",
+        "defaultValue": "30"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-report-1",
+      "type": "requirement",
+      "label": "Report Generation Time",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "state-driven",
+      "status": "draft",
+      "priority": "should",
+      "precondition": "a user requests a standard report against a production-size dataset",
+      "action": "complete standard report generation and delivery within {{REPORT_MAX_SECONDS}} seconds, validated by volume testing with production-scale data",
+      "rationale": "Reports taking over 30 seconds are frequently abandoned. If generation is longer, an async model with notification should be used instead of a blocking request."
+    }
+  ]
+}

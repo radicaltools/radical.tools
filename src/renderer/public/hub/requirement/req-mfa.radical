@@ -1,0 +1,34 @@
+{
+  "hub": {
+    "id": "req-mfa",
+    "category": "requirement",
+    "name": "Multi-Factor Authentication",
+    "description": "Security: optional requirement mandating MFA for privileged access and sensitive operations.",
+    "tags": [
+      "security",
+      "authentication",
+      "mfa",
+      "nfr",
+      "access-control"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "req-mfa-1",
+      "type": "requirement",
+      "label": "Multi-Factor Authentication",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "optional",
+      "status": "approved",
+      "priority": "must",
+      "feature": "a user accesses administrative functions or performs a high-risk operation",
+      "action": "require multi-factor authentication using TOTP or a hardware key before granting access",
+      "rationale": "Stolen credentials alone are insufficient to compromise admin accounts. MFA prevents the majority of account-takeover attacks."
+    }
+  ]
+}

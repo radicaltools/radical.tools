@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "req-test-coverage",
+    "category": "requirement",
+    "name": "Automated Test Coverage",
+    "description": "Maintainability: ubiquitous requirement ensuring sufficient automated test coverage of business logic.",
+    "tags": [
+      "maintainability",
+      "testing",
+      "quality",
+      "nfr",
+      "ci-cd"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MIN_COVERAGE_PCT",
+        "label": "Minimum test coverage (%)",
+        "hint": "80",
+        "type": "number",
+        "defaultValue": "80"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-test-cov-1",
+      "type": "requirement",
+      "label": "Automated Test Coverage",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "maintain automated unit and integration test coverage of at least {{MIN_COVERAGE_PCT}}% for all business-logic modules, enforced via CI pipeline gates",
+      "rationale": "Test coverage acts as a safety net for refactoring. Below 80% coverage, defect escape rates increase significantly."
+    }
+  ]
+}

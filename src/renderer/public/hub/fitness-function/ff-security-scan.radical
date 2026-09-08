@@ -1,0 +1,33 @@
+{
+  "hub": {
+    "id": "ff-security-scan",
+    "category": "fitness-function",
+    "name": "Security Dependency Scan",
+    "description": "Scans all runtime and build dependencies for known CVEs before deployment. Blocks releases containing critical or high-severity vulnerabilities. Essential for supply-chain security.",
+    "tags": [
+      "security",
+      "dependencies",
+      "cve",
+      "operational"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "ff-sec-scan-1",
+      "type": "fitness-fn",
+      "label": "Security Dependency Scan",
+      "description": "Scans dependencies for CVEs. Fails pipeline on critical/high severity findings. Uses tools like Snyk, Trivy or npm audit.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "on-deploy",
+      "threshold": "0 critical/high CVEs",
+      "status": "active"
+    }
+  ]
+}

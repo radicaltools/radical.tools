@@ -1,0 +1,63 @@
+{
+  "hub": {
+    "id": "ff-error-budget",
+    "category": "fitness-function",
+    "name": "Error Budget Burn Rate",
+    "description": "Tracks the consumption rate of the error budget (derived from SLO). When the burn rate exceeds thresholds, it triggers alerts or freezes feature releases until reliability improves. Key SRE practice.",
+    "tags": [
+      "sre",
+      "reliability",
+      "slo",
+      "operational"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "BURN_RATE_MULTIPLIER",
+        "label": "Max burn rate multiplier (vs baseline)",
+        "hint": "2",
+        "type": "number",
+        "defaultValue": "2"
+      },
+      {
+        "key": "WINDOW_DAYS",
+        "label": "Measurement window (days)",
+        "hint": "14",
+        "type": "number",
+        "defaultValue": "14"
+      },
+      {
+        "key": "ALERT_THRESHOLD_PCT",
+        "label": "Alert at budget consumed (%)",
+        "hint": "50",
+        "type": "number",
+        "defaultValue": "50"
+      },
+      {
+        "key": "FREEZE_THRESHOLD_PCT",
+        "label": "Feature-freeze at budget consumed (%)",
+        "hint": "80",
+        "type": "number",
+        "defaultValue": "80"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-error-budget-1",
+      "type": "fitness-fn",
+      "label": "Error Budget Burn Rate",
+      "description": "Monitors error budget consumption. Alert at {{ALERT_THRESHOLD_PCT}}% consumed in first quarter of window. Feature freeze at {{FREEZE_THRESHOLD_PCT}}% consumed.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "Burn rate < {{BURN_RATE_MULTIPLIER}}x normal ({{WINDOW_DAYS}}-day window)",
+      "status": "active"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "req-ml-extraction",
+    "category": "requirement",
+    "name": "Intelligent Document Extraction Accuracy",
+    "description": "Automatability: ML-powered document processing must achieve sufficient accuracy to be trusted for automated data extraction workflows.",
+    "tags": [
+      "automatability",
+      "machine-learning",
+      "extraction",
+      "nfr",
+      "idp"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MIN_F1_PCT",
+        "label": "Minimum F1 score (%)",
+        "hint": "95",
+        "type": "number",
+        "defaultValue": "95"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-ml-ext-1",
+      "type": "requirement",
+      "label": "Intelligent Document Extraction Accuracy",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "achieve an F1 score of at least {{MIN_F1_PCT}}% for ML-based extraction of structured fields from unstructured documents (PDFs, forms), validated against a representative labelled test corpus",
+      "rationale": "Below 95% accuracy, the cost of human review corrections exceeds the automation savings. F1 score balances precision and recall to prevent both missed extractions and false positives."
+    }
+  ]
+}

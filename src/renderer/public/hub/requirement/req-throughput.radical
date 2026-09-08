@@ -1,0 +1,41 @@
+{
+  "hub": {
+    "id": "req-throughput",
+    "category": "requirement",
+    "name": "System Throughput",
+    "description": "Performance: ubiquitous requirement defining the minimum transaction processing rate the system must sustain.",
+    "tags": [
+      "performance",
+      "throughput",
+      "capacity",
+      "nfr"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MIN_TPS",
+        "label": "Minimum throughput (TPS)",
+        "hint": "1000",
+        "type": "number",
+        "defaultValue": "1000"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-throughput-1",
+      "type": "requirement",
+      "label": "System Throughput",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "sustain a minimum of {{MIN_TPS}} transactions per second under peak load without degrading response times beyond defined SLOs",
+      "rationale": "Peak traffic during promotional events requires sufficient throughput headroom to avoid revenue-impacting degradation."
+    }
+  ]
+}

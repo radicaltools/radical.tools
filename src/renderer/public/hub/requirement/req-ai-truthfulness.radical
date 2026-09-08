@@ -1,0 +1,33 @@
+{
+  "hub": {
+    "id": "req-ai-truthfulness",
+    "category": "requirement",
+    "name": "AI Agent Truthfulness",
+    "description": "Dependability: AI agents must cite verifiable sources for every factual claim, preventing hallucinations that could cause legal liability or user harm.",
+    "tags": [
+      "dependability",
+      "agentic-ai",
+      "truthfulness",
+      "nfr",
+      "rag"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "req-ai-truth-1",
+      "type": "requirement",
+      "label": "AI Agent Truthfulness",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "require AI agents to cite a specific retrieved document or governed data source for every factual claim, with groundedness score validated via LLM-as-a-Judge and audited monthly",
+      "rationale": "Air Canada was held legally liable when its chatbot hallucinated a policy. The NIST AI RMF requires explainability. RAG-grounded agents eliminate hallucinations by design."
+    }
+  ]
+}

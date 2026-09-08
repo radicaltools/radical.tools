@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "req-config-propagation",
+    "category": "requirement",
+    "name": "Configuration Propagation Speed",
+    "description": "Manageability: global configuration changes must propagate to all nodes within 5 minutes to enable timely operational control.",
+    "tags": [
+      "manageability",
+      "configuration",
+      "operations",
+      "nfr"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "CONFIG_PROPAGATION_SECONDS",
+        "label": "Max config propagation time (seconds)",
+        "hint": "300",
+        "type": "number",
+        "defaultValue": "300"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-config-prop-1",
+      "type": "requirement",
+      "label": "Configuration Propagation Speed",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "state-driven",
+      "status": "approved",
+      "priority": "must",
+      "precondition": "an operator applies a configuration change via the control plane",
+      "action": "propagate configuration changes to all running nodes within {{CONFIG_PROPAGATION_SECONDS}} seconds, with propagation lag monitored and alerted if the threshold is exceeded",
+      "rationale": "Slow config propagation delays operational responses to incidents. Feature flag changes, rate limit updates, and circuit breaker thresholds must take effect before an incident escalates."
+    }
+  ]
+}

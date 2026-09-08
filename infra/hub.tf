@@ -72,7 +72,7 @@ resource "aws_cloudfront_origin_access_control" "hub" {
 resource "aws_cloudfront_response_headers_policy" "hub_cors" {
   count   = local.use_hub ? 1 : 0
   name    = "${local.name_prefix}-hub-cors"
-  comment = "CORS headers for hub — allows studio.radical.tools to fetch hub-data.json"
+  comment = "CORS headers for hub — allows studio.radical.tools to fetch the concept catalogue"
 
   cors_config {
     access_control_allow_credentials = false
@@ -138,6 +138,20 @@ resource "aws_cloudfront_distribution" "hub" {
 
   # Concept data: always revalidate so concept updates are immediate.
   # CORS enabled so studio.radical.tools can fetch this cross-origin.
+  # /hub/* = index.json + <category>/<id>.radical; /hub-data.json = legacy bundle.
+  ordered_cache_behavior {
+    path_pattern           = "/hub/*"
+    target_origin_id       = "s3-${aws_s3_bucket.hub[0].id}"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    # AWS Managed-CachingDisabled
+    cache_policy_id            = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.hub_cors[0].id
+  }
+
   ordered_cache_behavior {
     path_pattern           = "/hub-data.json"
     target_origin_id       = "s3-${aws_s3_bucket.hub[0].id}"

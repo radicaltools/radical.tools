@@ -1,0 +1,49 @@
+{
+  "hub": {
+    "id": "req-autoscaling",
+    "category": "requirement",
+    "name": "Auto-Scaling Under Load",
+    "description": "Event-driven requirement that triggers horizontal scaling when load exceeds a threshold.",
+    "tags": [
+      "scalability",
+      "performance",
+      "cloud",
+      "nfr"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "SCALE_TRIGGER_RPS",
+        "label": "Scale-out trigger (requests/s)",
+        "hint": "1000",
+        "type": "number",
+        "defaultValue": "1000"
+      },
+      {
+        "key": "SCALE_OUT_SECONDS",
+        "label": "Scale-out time (seconds)",
+        "hint": "60",
+        "type": "number",
+        "defaultValue": "60"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-autoscaling-1",
+      "type": "requirement",
+      "label": "Auto-Scaling Under Load",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "approved",
+      "priority": "must",
+      "trigger": "incoming request rate exceeds {{SCALE_TRIGGER_RPS}} requests per second",
+      "action": "automatically scale out compute instances within {{SCALE_OUT_SECONDS}} seconds to maintain response time below 500ms",
+      "rationale": "Traffic spikes during promotions and seasonal events must be handled without manual intervention."
+    }
+  ]
+}

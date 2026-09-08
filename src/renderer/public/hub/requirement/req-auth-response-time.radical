@@ -1,0 +1,56 @@
+{
+  "hub": {
+    "id": "req-auth-response-time",
+    "category": "requirement",
+    "name": "Authentication Response Time",
+    "description": "Performance: user login and token verification must complete within 2 seconds to avoid abandonment.",
+    "tags": [
+      "performance",
+      "authentication",
+      "latency",
+      "nfr",
+      "ux"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MAX_CONCURRENT_LOGINS",
+        "label": "Max concurrent login attempts",
+        "hint": "1000",
+        "type": "number",
+        "defaultValue": "1000"
+      },
+      {
+        "key": "AUTH_RESPONSE_SECONDS",
+        "label": "Max auth response time (seconds)",
+        "hint": "2",
+        "type": "number",
+        "defaultValue": "2"
+      },
+      {
+        "key": "AUTH_PERCENTILE",
+        "label": "Percentile target",
+        "hint": "95th",
+        "defaultValue": "95th"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-auth-rt-1",
+      "type": "requirement",
+      "label": "Authentication Response Time",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "state-driven",
+      "status": "approved",
+      "priority": "must",
+      "precondition": "the system is under normal load with up to {{MAX_CONCURRENT_LOGINS}} concurrent login attempts",
+      "action": "complete user authentication (credential validation, token issuance) within {{AUTH_RESPONSE_SECONDS}} seconds for {{AUTH_PERCENTILE}} of requests",
+      "rationale": "Login delays over 2 seconds erode user trust and increase abandonment. The authentication step is the first impression of system reliability."
+    }
+  ]
+}

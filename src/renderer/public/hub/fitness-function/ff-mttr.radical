@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "ff-mttr",
+    "category": "fitness-function",
+    "name": "Mean Time to Recovery",
+    "description": "Measures how long it takes to restore service after a production incident. One of the four DORA metrics. Shorter MTTR indicates better incident response and system resilience.",
+    "tags": [
+      "dora",
+      "reliability",
+      "operational",
+      "incident"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MAX_MTTR_HOURS",
+        "label": "Max MTTR (hours)",
+        "hint": "1",
+        "type": "number",
+        "defaultValue": "1"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-mttr-1",
+      "type": "fitness-fn",
+      "label": "Mean Time to Recovery",
+      "description": "Tracks time from incident detection to service restoration. Target: less than one hour for elite performers (DORA).",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": false,
+      "trigger": "periodic",
+      "threshold": "MTTR < {{MAX_MTTR_HOURS}} hour(s)",
+      "status": "active"
+    }
+  ]
+}

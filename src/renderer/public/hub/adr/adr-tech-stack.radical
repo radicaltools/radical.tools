@@ -1,0 +1,40 @@
+{
+  "hub": {
+    "id": "adr-tech-stack",
+    "category": "adr",
+    "name": "Technology Stack Selection",
+    "description": "Template ADR for selecting the primary technology stack (language, framework, runtime). Captures the decision context, constraints, and trade-offs of choosing a tech stack.",
+    "tags": [
+      "technology",
+      "stack",
+      "framework",
+      "foundation"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "STACK",
+        "label": "Technology stack",
+        "hint": "TypeScript / Node.js"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-tech-stack-1",
+      "type": "adr",
+      "label": "ADR: {{STACK}}",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "We need to select a primary technology stack for the new service / module. Key factors: team expertise, ecosystem maturity, performance characteristics, hiring market, and long-term maintainability.",
+      "decision": "We will use {{STACK}} because [RATIONALE]. This choice balances team familiarity, ecosystem support, and performance requirements.",
+      "consequences": "• Team members unfamiliar with the stack will need onboarding (estimated 2-3 weeks)\n• We gain access to [ECOSYSTEM BENEFIT]\n• Lock-in: migrating away would require [EFFORT ESTIMATE]",
+      "alternatives": "1. [Alternative A] — rejected because [reason]\n2. [Alternative B] — rejected because [reason]\n3. [Alternative C] — viable but less preferred because [reason]"
+    }
+  ]
+}

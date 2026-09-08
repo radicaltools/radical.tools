@@ -1,0 +1,33 @@
+{
+  "hub": {
+    "id": "req-api-scriptability",
+    "category": "requirement",
+    "name": "API Scripting Coverage",
+    "description": "Automatability: all core system functions must be accessible via API to enable deterministic automation without UI interaction.",
+    "tags": [
+      "automatability",
+      "api",
+      "scripting",
+      "nfr",
+      "rpa"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "req-scripta-1",
+      "type": "requirement",
+      "label": "API Scripting Coverage",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "expose 100% of core data-entry and state-changing operations via headless REST API, enabling complete UI-less interaction for scripting, RPA, and programmatic integration",
+      "rationale": "Systems without complete API coverage force automation tools to use brittle UI scraping. API-first design is a prerequisite for both RPA and agentic AI workflows."
+    }
+  ]
+}

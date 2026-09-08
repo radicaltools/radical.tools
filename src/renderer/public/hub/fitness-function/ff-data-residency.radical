@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "ff-data-residency",
+    "category": "fitness-function",
+    "name": "Data Residency Check",
+    "description": "Continuously verifies that personal data is stored and processed only in approved geographic regions. Required for GDPR, data sovereignty laws, and contractual obligations.",
+    "tags": [
+      "compliance",
+      "gdpr",
+      "data",
+      "holistic",
+      "privacy"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "APPROVED_REGIONS",
+        "label": "Approved data residency regions",
+        "hint": "EU only / EU + US-East",
+        "defaultValue": "approved regions"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-data-res-1",
+      "type": "fitness-fn",
+      "label": "Data Residency Check",
+      "description": "Verifies that PII is stored only in approved regions (e.g. EU-only for GDPR). Checks cloud resource tags, database locations, and CDN configs.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "holistic",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "All PII stored in {{APPROVED_REGIONS}} only",
+      "status": "active"
+    }
+  ]
+}

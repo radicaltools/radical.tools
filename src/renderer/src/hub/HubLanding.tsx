@@ -4,7 +4,7 @@
 // search, pick a category, or open a featured concept straight in the viewer.
 
 import React, { useMemo, useState } from 'react'
-import type { HubConcept } from '../store/hubStore'
+import type { HubConceptSummary } from '../store/hubStore'
 import { HUB_CATEGORIES, categoryTheme, type HubCategory } from '../types/hubTheme'
 import { SiteNav } from './SiteNav'
 
@@ -23,7 +23,7 @@ const TypeIcon = ({ path, size = 16, color }: { path: string; size?: number; col
 )
 
 export interface HubLandingProps {
-  concepts: HubConcept[]
+  concepts: HubConceptSummary[]
   loading: boolean
   studioUrl: string
   theme: 'dark' | 'light'
@@ -36,10 +36,10 @@ export interface HubLandingProps {
 
 /** A representative sample across categories: bundles first (they demo the
  *  viewer best), then one of each governance type. */
-function pickFeatured(concepts: HubConcept[]): HubConcept[] {
+function pickFeatured(concepts: HubConceptSummary[]): HubConceptSummary[] {
   const byCat = (cat: HubCategory) => concepts.filter((c) => c.category === cat)
-  const out: HubConcept[] = []
-  const take = (list: HubConcept[], n: number) => { for (const c of list.slice(0, n)) if (!out.includes(c)) out.push(c) }
+  const out: HubConceptSummary[] = []
+  const take = (list: HubConceptSummary[], n: number) => { for (const c of list.slice(0, n)) if (!out.includes(c)) out.push(c) }
   take(byCat('blueprint'), 1)
   take(byCat('pattern'), 2)
   take(byCat('requirement'), 1)

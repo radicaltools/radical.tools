@@ -71,10 +71,14 @@ src/
     types/        C4 + metamodel TypeScript types
     hub/          Radical Hub — embedded read-only viewer of the concept
                   catalogue (hub.html entry → hub.radical.tools)
-    public/       hub-data.json — the concept catalogue (single source)
+    public/hub/   The concept catalogue — one Radical Studio document per
+                  concept (<category>/<id>.radical with a `hub` metadata
+                  block); hub/index.json is generated at build time
 website/          Marketing site (radical.tools)
 infra/            Terraform — AWS S3 + CloudFront + Route53 + IAM (OIDC)
 tools/
+  hubCatalogue.ts Vite plugin — validates public/hub/**.radical, emits
+                  hub/index.json (+ legacy hub-data.json)
   vscode-radical/ VS Code extension for .radical file syntax highlighting
 tests/            Vitest unit/integration tests + layout benchmarks
 docs/             Architecture notes and improvement log

@@ -1,0 +1,501 @@
+{
+  "nodes": [
+    {
+      "id": "pat-sf-facade",
+      "type": "container",
+      "label": "Strangler Facade",
+      "description": "Routes requests to either the legacy monolith or the new services based on feature flags / URL patterns. Transparent to consumers.",
+      "technology": "Reverse Proxy / API Gateway",
+      "x": 250,
+      "y": 0,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "pat-sf-legacy",
+      "type": "system",
+      "label": "Legacy Monolith",
+      "description": "The existing system being migrated. Features are removed from here as they're rebuilt in the new services.",
+      "technology": "",
+      "x": 0,
+      "y": 350,
+      "width": 360,
+      "height": 260,
+      "collapsed": true,
+      "external": true
+    },
+    {
+      "id": "pat-sf-new-svc",
+      "type": "system",
+      "label": "New Service",
+      "description": "Modern replacement for a subset of monolith functionality. Built with the target architecture.",
+      "technology": "",
+      "x": 500,
+      "y": 350,
+      "width": 360,
+      "height": 260,
+      "collapsed": true
+    },
+    {
+      "id": "pat-sf-new-db",
+      "type": "database",
+      "label": "New Service Database",
+      "description": "Dedicated data store for the new service. Data migrated from the monolith's shared database.",
+      "technology": "",
+      "x": 550,
+      "y": 420,
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "parentId": "pat-sf-new-svc"
+    }
+  ],
+  "relations": [
+    {
+      "id": "pat-sf-r1",
+      "sourceId": "pat-sf-facade",
+      "targetId": "pat-sf-legacy",
+      "label": "Routes legacy features",
+      "technology": "HTTP"
+    },
+    {
+      "id": "pat-sf-r2",
+      "sourceId": "pat-sf-facade",
+      "targetId": "pat-sf-new-svc",
+      "label": "Routes migrated features",
+      "technology": "HTTP"
+    }
+  ],
+  "sequences": [],
+  "views": [],
+  "defaultPositions": {
+    "pat-sf-facade": {
+      "x": 250,
+      "y": 0,
+      "width": 300,
+      "height": 200
+    },
+    "pat-sf-legacy": {
+      "x": 0,
+      "y": 350,
+      "width": 360,
+      "height": 260
+    },
+    "pat-sf-new-svc": {
+      "x": 500,
+      "y": 350,
+      "width": 360,
+      "height": 260
+    },
+    "pat-sf-new-db": {
+      "x": 550,
+      "y": 420,
+      "width": 190,
+      "height": 130
+    }
+  },
+  "defaultViewport": {
+    "x": 33.47129736693117,
+    "y": 517.4356251339404,
+    "zoom": 0.17571462213607397
+  },
+  "snapshots": [],
+  "presentations": [
+    {
+      "id": "51bcf401-1d02-4aeb-bedc-cfee9f88ad20",
+      "name": "Main",
+      "slides": []
+    }
+  ],
+  "metamodel": {
+    "id": "c4-builtin",
+    "name": "C4 (built-in)",
+    "nodeTypes": {
+      "person": {
+        "id": "person",
+        "label": "Person",
+        "color": "#08427b",
+        "fg": "#fff",
+        "iconPath": "M8 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM3 12.5C3 10.01 5.24 8 8 8s5 2.01 5 4.5V14H3v-1.5Z",
+        "width": 150,
+        "height": 170,
+        "collapsedWidth": 150,
+        "collapsedHeight": 170,
+        "allowedParents": [
+          "group"
+        ],
+        "allowedAtRoot": true,
+        "builtin": true,
+        "properties": [
+          {
+            "key": "description",
+            "label": "Description",
+            "type": "textarea"
+          },
+          {
+            "key": "external",
+            "label": "External",
+            "type": "boolean"
+          }
+        ]
+      },
+      "system": {
+        "id": "system",
+        "label": "Software System",
+        "color": "#1168bd",
+        "fg": "#fff",
+        "iconPath": "M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9ZM4 5h8v1H4V5Zm0 2.5h8v1H4v-1Zm0 2.5h5v1H4V10Z",
+        "width": 360,
+        "height": 260,
+        "collapsedWidth": 280,
+        "collapsedHeight": 180,
+        "allowedParents": [
+          "system",
+          "group"
+        ],
+        "allowedAtRoot": true,
+        "builtin": true,
+        "properties": [
+          {
+            "key": "description",
+            "label": "Description",
+            "type": "textarea"
+          },
+          {
+            "key": "external",
+            "label": "External",
+            "type": "boolean"
+          }
+        ]
+      },
+      "container": {
+        "id": "container",
+        "label": "Container",
+        "color": "#438dd5",
+        "fg": "#fff",
+        "iconPath": "M1 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1H1V4Zm0 2.5h14V12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6.5ZM3 3a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm2 0a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Z",
+        "width": 300,
+        "height": 200,
+        "collapsedWidth": 240,
+        "collapsedHeight": 160,
+        "allowedParents": [
+          "system",
+          "group"
+        ],
+        "allowedAtRoot": false,
+        "builtin": true,
+        "properties": [
+          {
+            "key": "description",
+            "label": "Description",
+            "type": "textarea"
+          },
+          {
+            "key": "technology",
+            "label": "Technology",
+            "type": "text"
+          },
+          {
+            "key": "external",
+            "label": "External",
+            "type": "boolean"
+          }
+        ]
+      },
+      "component": {
+        "id": "component",
+        "label": "Component",
+        "color": "#85bbf0",
+        "fg": "#000",
+        "iconPath": "M5 1v2H3a1 1 0 0 0-1 1v2h2v2H2v2h2v2H2v2a1 1 0 0 0 1 1h2v2h2v-2h2v2h2v-2h2a1 1 0 0 0 1-1v-2h-2v-2h2V8h-2V6h2V4a1 1 0 0 0-1-1h-2V1H9v2H7V1H5Z",
+        "width": 200,
+        "height": 120,
+        "collapsedWidth": 200,
+        "collapsedHeight": 120,
+        "allowedParents": [
+          "container",
+          "webapp",
+          "group"
+        ],
+        "allowedAtRoot": false,
+        "builtin": true,
+        "properties": [
+          {
+            "key": "description",
+            "label": "Description",
+            "type": "textarea"
+          },
+          {
+            "key": "technology",
+            "label": "Technology",
+            "type": "text"
+          },
+          {
+            "key": "external",
+            "label": "External",
+            "type": "boolean"
+          }
+        ]
+      },
+      "database": {
+        "id": "database",
+        "label": "Database",
+        "color": "#438dd5",
+        "fg": "#fff",
+        "iconPath": "M8 1C4.7 1 2 2.3 2 4v8c0 1.7 2.7 3 6 3s6-1.3 6-3V4c0-1.7-2.7-3-6-3ZM2 4c0 1.7 2.7 3 6 3s6-1.3 6-3",
+        "width": 190,
+        "height": 130,
+        "collapsedWidth": 190,
+        "collapsedHeight": 130,
+        "allowedParents": [
+          "system",
+          "group"
+        ],
+        "allowedAtRoot": false,
+        "builtin": true,
+        "properties": [
+          {
+            "key": "description",
+            "label": "Description",
+            "type": "textarea"
+          },
+          {
+            "key": "technology",
+            "label": "Technology",
+            "type": "text"
+          },
+          {
+            "key": "external",
+            "label": "External",
+            "type": "boolean"
+          }
+        ]
+      },
+      "webapp": {
+        "id": "webapp",
+        "label": "Web App",
+        "color": "#438dd5",
+        "fg": "#fff",
+        "iconPath": "M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3Zm1 2.5V13h10V5.5H3ZM4 3.5a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm1.5 0a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm1.5 0a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Z",
+        "width": 210,
+        "height": 140,
+        "collapsedWidth": 210,
+        "collapsedHeight": 140,
+        "allowedParents": [
+          "system",
+          "group"
+        ],
+        "allowedAtRoot": false,
+        "builtin": true,
+        "properties": [
+          {
+            "key": "description",
+            "label": "Description",
+            "type": "textarea"
+          },
+          {
+            "key": "technology",
+            "label": "Technology",
+            "type": "text"
+          },
+          {
+            "key": "external",
+            "label": "External",
+            "type": "boolean"
+          }
+        ]
+      },
+      "queue": {
+        "id": "queue",
+        "label": "Queue",
+        "color": "#438dd5",
+        "fg": "#fff",
+        "iconPath": "M4 3a3 2 0 1 0 0 4h8a3 2 0 1 0 0-4H4Zm-2 5.5a3 2 0 0 0 4 0v-1a3 2 0 0 1-4 0v1Zm10 0a3 2 0 0 0 4 0v-1a3 2 0 0 1-4 0v1Z",
+        "width": 220,
+        "height": 95,
+        "collapsedWidth": 220,
+        "collapsedHeight": 95,
+        "allowedParents": [
+          "system",
+          "group"
+        ],
+        "allowedAtRoot": false,
+        "builtin": true,
+        "properties": [
+          {
+            "key": "description",
+            "label": "Description",
+            "type": "textarea"
+          },
+          {
+            "key": "technology",
+            "label": "Technology",
+            "type": "text"
+          },
+          {
+            "key": "external",
+            "label": "External",
+            "type": "boolean"
+          }
+        ]
+      },
+      "group": {
+        "id": "group",
+        "label": "Group",
+        "color": "#64748b",
+        "fg": "#fff",
+        "iconPath": "M2 3.5C2 2.67 2.67 2 3.5 2H7l1.5 2h4c.83 0 1.5.67 1.5 1.5v7c0 .83-.67 1.5-1.5 1.5h-9C2.67 14 2 13.33 2 12.5v-9Z",
+        "width": 520,
+        "height": 360,
+        "collapsedWidth": 360,
+        "collapsedHeight": 220,
+        "allowedParents": [
+          "group"
+        ],
+        "allowedAtRoot": true,
+        "builtin": true,
+        "properties": [
+          {
+            "key": "description",
+            "label": "Description",
+            "type": "textarea"
+          }
+        ]
+      }
+    },
+    "relationTypes": {
+      "interacts": {
+        "id": "interacts",
+        "label": "Interacts",
+        "allowedPairs": [
+          {
+            "from": "person",
+            "to": "system"
+          },
+          {
+            "from": "person",
+            "to": "container"
+          },
+          {
+            "from": "person",
+            "to": "webapp"
+          },
+          {
+            "from": "system",
+            "to": "person"
+          },
+          {
+            "from": "system",
+            "to": "system"
+          },
+          {
+            "from": "system",
+            "to": "container"
+          },
+          {
+            "from": "system",
+            "to": "database"
+          },
+          {
+            "from": "system",
+            "to": "webapp"
+          },
+          {
+            "from": "system",
+            "to": "queue"
+          },
+          {
+            "from": "container",
+            "to": "person"
+          },
+          {
+            "from": "container",
+            "to": "system"
+          },
+          {
+            "from": "container",
+            "to": "container"
+          },
+          {
+            "from": "container",
+            "to": "database"
+          },
+          {
+            "from": "container",
+            "to": "webapp"
+          },
+          {
+            "from": "container",
+            "to": "queue"
+          },
+          {
+            "from": "webapp",
+            "to": "person"
+          },
+          {
+            "from": "webapp",
+            "to": "system"
+          },
+          {
+            "from": "webapp",
+            "to": "container"
+          },
+          {
+            "from": "webapp",
+            "to": "database"
+          },
+          {
+            "from": "webapp",
+            "to": "webapp"
+          },
+          {
+            "from": "webapp",
+            "to": "queue"
+          },
+          {
+            "from": "queue",
+            "to": "container"
+          },
+          {
+            "from": "queue",
+            "to": "webapp"
+          },
+          {
+            "from": "queue",
+            "to": "component"
+          },
+          {
+            "from": "component",
+            "to": "component"
+          },
+          {
+            "from": "component",
+            "to": "container"
+          },
+          {
+            "from": "component",
+            "to": "webapp"
+          },
+          {
+            "from": "component",
+            "to": "database"
+          },
+          {
+            "from": "component",
+            "to": "queue"
+          }
+        ],
+        "properties": [
+          {
+            "key": "technology",
+            "label": "Technology",
+            "type": "text"
+          }
+        ],
+        "builtin": true
+      }
+    }
+  },
+  "hubTemplates": {}
+}

@@ -1,0 +1,41 @@
+{
+  "hub": {
+    "id": "req-onboarding-time",
+    "category": "requirement",
+    "name": "User Onboarding Time",
+    "description": "Usability: ubiquitous requirement ensuring first-time users can reach core value quickly without external help.",
+    "tags": [
+      "usability",
+      "onboarding",
+      "ux",
+      "nfr"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "ONBOARDING_MINUTES",
+        "label": "Max onboarding time (minutes)",
+        "hint": "5",
+        "type": "number",
+        "defaultValue": "5"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-onboarding-1",
+      "type": "requirement",
+      "label": "User Onboarding Time",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "enable a first-time user to complete the primary onboarding flow and reach the core value moment within {{ONBOARDING_MINUTES}} minutes without external assistance",
+      "rationale": "Time-to-value is a key driver of trial-to-paid conversion. Friction in onboarding directly impacts revenue."
+    }
+  ]
+}

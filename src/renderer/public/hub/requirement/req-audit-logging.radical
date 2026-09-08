@@ -1,0 +1,33 @@
+{
+  "hub": {
+    "id": "req-audit-logging",
+    "category": "requirement",
+    "name": "Audit Logging",
+    "description": "Ubiquitous requirement: all state-changing operations must be logged for audit and compliance purposes.",
+    "tags": [
+      "audit",
+      "logging",
+      "compliance",
+      "security",
+      "nfr"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "req-audit-log-1",
+      "type": "requirement",
+      "label": "Audit Logging",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "log all state-changing operations with timestamp, actor identity, action type, affected resource, and before/after values",
+      "rationale": "Regulatory compliance (SOX, PCI-DSS) and security forensics require a complete, immutable audit trail."
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "hub": {
+    "id": "req-availability",
+    "category": "requirement",
+    "name": "System Availability",
+    "description": "Ensures the system meets its availability target. Ubiquitous requirement — applies at all times without preconditions.",
+    "tags": [
+      "availability",
+      "reliability",
+      "nfr",
+      "sla"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "AVAILABILITY_TARGET",
+        "label": "Availability target",
+        "hint": "99.9%",
+        "defaultValue": "99.9%"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-availability-1",
+      "type": "requirement",
+      "label": "System Availability",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "be available {{AVAILABILITY_TARGET}} of the time, measured monthly",
+      "rationale": "Business SLA requires three-nines availability to meet customer contracts and avoid penalty clauses."
+    }
+  ]
+}
