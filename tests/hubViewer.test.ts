@@ -68,12 +68,12 @@ describe('conceptToDiagramData', () => {
     expect(wiki.wikiFocusId).toBe('req-1')
   })
 
-  it('substitutes template defaults and leaves unresolved keys visible', () => {
+  it('substitutes template defaults but keeps them bracketed, and leaves unresolved keys visible', () => {
     const data = conceptToDiagramData(requirement)
     const n = data.nodes[0] as unknown as Record<string, unknown>
-    expect(n.label).toBe('Latency of /orders')
-    expect(n.trigger).toBe('a request hits /orders')
-    expect(n.action).toBe('respond within 250 ms (owner: {{OWNER}})')
+    expect(n.label).toBe('Latency of {{/orders}}')
+    expect(n.trigger).toBe('a request hits {{/orders}}')
+    expect(n.action).toBe('respond within {{250}} ms (owner: {{OWNER}})')
     expect(n.ears_type).toBe('event-driven')
     expect('templateParams' in n).toBe(false)
   })
@@ -104,6 +104,26 @@ describe('substituteTemplateDefaults', () => {
   it('is a no-op without params', () => {
     expect(substituteTemplateDefaults('{{A}}', undefined)).toBe('{{A}}')
     expect(substituteTemplateDefaults('{{A}}', [])).toBe('{{A}}')
+  })
+
+  it('keeps the {{…}} wrapper around a substituted default so it stays visually distinct from fixed prose', () => {
+    const params = [{ key: 'A', label: 'A', defaultValue: '42' }]
+    expect(substituteTemplateDefaults('cap at {{A}} items', params)).toBe('cap at {{42}} items')
+  })
+
+  it('falls back to the hint when there is no defaultValue, still bracketed', () => {
+    const params = [{ key: 'A', label: 'A', hint: 'e.g. 42' }]
+    expect(substituteTemplateDefaults('cap at {{A}} items', params)).toBe('cap at {{e.g. 42}} items')
+  })
+
+  it('leaves a key with neither default nor hint as the raw token', () => {
+    const params = [{ key: 'A', label: 'A' }]
+    expect(substituteTemplateDefaults('cap at {{A}} items', params)).toBe('cap at {{A}} items')
+  })
+
+  it('substitutes an explicit empty-string default instead of treating it as absent', () => {
+    const params = [{ key: 'A', label: 'A', defaultValue: '' }]
+    expect(substituteTemplateDefaults('suffix: {{A}}', params)).toBe('suffix: {{}}')
   })
 })
 

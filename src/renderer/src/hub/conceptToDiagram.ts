@@ -37,14 +37,18 @@ export function kindForViewId(viewId: string | null): HubViewKind {
   return 'canvas'
 }
 
-/** Fill `{{KEY}}` placeholders with each parameter's default so the preview
- *  reads as prose; keys without a default stay visible as placeholders. */
+/** Fill `{{KEY}}` placeholders with each parameter's default, but keep the
+ *  `{{…}}` wrapper around the substituted value (rather than dropping it) so
+ *  a reader browsing the hub can still tell which words in the prose are a
+ *  fill-in-the-blank parameter and which are fixed text — otherwise "at or
+ *  below $0.05" reads as an authored fact, not a customisable default. Keys
+ *  without any default/hint stay as the raw `{{KEY}}` token, already visible. */
 export function substituteTemplateDefaults(str: string, params: TemplateParam[] | undefined): string {
   if (!params?.length) return str
   const defaults = new Map(params.map((p) => [p.key, p.defaultValue ?? p.hint]))
   return str.replace(/\{\{([A-Z0-9_]+)\}\}/g, (m, key: string) => {
     const v = defaults.get(key)
-    return v ? v : m
+    return v !== undefined ? `{{${v}}}` : m
   })
 }
 
