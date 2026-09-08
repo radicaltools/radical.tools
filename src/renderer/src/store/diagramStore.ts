@@ -4240,27 +4240,38 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       saveDiagram() {
-        const { c4Nodes, c4Relations, sequences, views, activeViewId, defaultPositions, defaultViewport, snapshots, presentations, metamodel } = get()
+        const { c4Nodes, c4Relations, sequences, views, activeViewId, defaultPositions, defaultViewport, snapshots, presentations, metamodel, activeSnapshotId, liveBackup } = get()
 
-        // Snapshot current positions into the active context before saving
-        const currentPos = snapshotPositions(c4Nodes)
-        const savedDefaultPos = activeViewId === null ? currentPos : defaultPositions
+        // While a milestone is being viewed, c4Nodes / c4Relations hold the
+        // *snapshot*; the real model is parked in liveBackup. Persist that —
+        // otherwise a reload while time-travelling would overwrite the live
+        // model with the milestone. Committed milestone edits are applied to
+        // liveBackup too, so nothing is lost by reading from it.
+        const timeTravelling = !!activeSnapshotId && !!liveBackup
+        const liveNodes = timeTravelling ? liveBackup.nodes : c4Nodes
+        const liveRelations = timeTravelling ? liveBackup.relations : c4Relations
+        const liveSequences = timeTravelling ? (liveBackup.sequences ?? sequences) : sequences
+
+        // Snapshot current positions into the active context before saving —
+        // but not from the milestone's nodes, whose layout is not the live one.
+        const currentPos = timeTravelling ? null : snapshotPositions(c4Nodes)
+        const savedDefaultPos = activeViewId === null && currentPos ? currentPos : defaultPositions
         // Same for camera state so on reload each view restores its framing.
         const rawVP = (window as any).__rfCurrentViewport
-        const currentVP: { x: number; y: number; zoom: number } | null = rawVP
+        const currentVP: { x: number; y: number; zoom: number } | null = rawVP && !timeTravelling
           ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom }
           : null
         const savedDefaultVP = activeViewId === null ? (currentVP ?? defaultViewport) : defaultViewport
         const savedViews = Object.values(views).map(v => ({
           ...v,
-          positions: v.id === activeViewId ? currentPos : v.positions,
+          positions: v.id === activeViewId && currentPos ? currentPos : v.positions,
           viewport: v.id === activeViewId ? (currentVP ?? v.viewport) : v.viewport,
         }))
 
         return {
-          nodes: Object.values(c4Nodes),
-          relations: Object.values(c4Relations),
-          sequences: Object.values(sequences),
+          nodes: Object.values(liveNodes),
+          relations: Object.values(liveRelations),
+          sequences: Object.values(liveSequences),
           views: savedViews,
           defaultPositions: savedDefaultPos,
           defaultViewport: savedDefaultVP,
