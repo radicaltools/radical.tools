@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
 import { readCatalogue, validateCatalogue, buildIndex } from '../tools/hubCatalogue'
 import { conceptToDoc, docToConcept, summarize, type HubRadicalDoc } from '../src/renderer/src/hub/hubFormat'
+import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
 
 const HUB_DIR = resolve(__dirname, '../src/renderer/public/hub')
 
@@ -67,5 +68,15 @@ describe('public/hub catalogue', () => {
     const errors = validateCatalogue(bad)
     expect(errors.some((e) => e.includes('expected path requirement/req-x.radical'))).toBe(true)
     expect(errors.some((e) => e.includes('unknown concept "nope"'))).toBe(true)
+  })
+})
+
+describe('studio round-trip', () => {
+  it('loadDiagram → saveDiagram keeps the hub block (opening a concept in Studio must not strip it)', () => {
+    const store = useDiagramStore.getState()
+    store.loadDiagram({ nodes: [], relations: [], hub: doc.hub })
+    expect(useDiagramStore.getState().saveDiagram().hub).toEqual(doc.hub)
+    store.newDiagram()
+    expect(useDiagramStore.getState().saveDiagram().hub).toBeUndefined()
   })
 })

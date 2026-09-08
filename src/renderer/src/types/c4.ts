@@ -220,6 +220,8 @@ export interface DiagramData {
   metamodel?: Metamodel
   /** Hub import template records — allows reconfiguring template values after import. */
   hubTemplates?: Record<string, import('../store/hubStore').HubImportRecord>
+  /** Radical Hub catalogue metadata — present only in concept files published to the hub. */
+  hub?: import('../hub/hubFormat').HubConceptMeta
 }
 
 // ─── React Flow data shapes ──────────────────────────────────────────────────
