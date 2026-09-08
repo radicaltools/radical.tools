@@ -292,6 +292,39 @@
 .hub-empty-inner p { font-size: 13px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 8px; }
 .hub-empty-inner .muted { color: var(--text-muted); }
 
+/* ── Related concepts (floats over the viewer cell) ───────────────── */
+.hub-related {
+  grid-area: canvas;
+  align-self: end; justify-self: start;
+  z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  max-width: calc(100% - 24px);
+  margin: 0 0 12px 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+}
+.hub-related-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-muted); margin-right: 2px;
+}
+.hub-related-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 22px; padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--cat-color) 45%, transparent);
+  background: color-mix(in srgb, var(--cat-color) 12%, transparent);
+  color: var(--text-primary);
+  font-size: 11px; font-weight: 500; white-space: nowrap;
+  cursor: pointer;
+}
+.hub-related-chip svg { color: var(--cat-color); }
+.hub-related-chip:hover { background: color-mix(in srgb, var(--cat-color) 24%, transparent); }
+
 /* ═══ Landing page ═════════════════════════════════════════════════ */
 /* index.css locks body to 100vh / overflow:hidden (it is an app shell), so the
    landing must be its own fixed-height scroll container. */

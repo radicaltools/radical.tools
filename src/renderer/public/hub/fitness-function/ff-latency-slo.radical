@@ -3,28 +3,39 @@
     "id": "ff-latency-slo",
     "category": "fitness-function",
     "name": "Latency SLO Guard",
-    "description": "Monitors service response time against a defined SLO target. Triggers an alert or blocks deployment when the p99 latency exceeds the threshold. Ideal for user-facing APIs where response time directly impacts experience.",
+    "description": "Continuously compares tail latency against the SLO and fails the check when the budget is breached. The verification side of an API response-time requirement.",
     "tags": [
+      "operational",
       "performance",
       "slo",
-      "operational",
       "latency"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "LATENCY_PERCENTILE",
-        "label": "Measured percentile",
-        "hint": "p99",
-        "defaultValue": "p99"
+        "label": "Percentile",
+        "hint": "p95",
+        "defaultValue": "p95"
       },
       {
         "key": "LATENCY_THRESHOLD_MS",
-        "label": "Latency threshold (ms)",
-        "hint": "200",
+        "label": "Threshold (ms)",
+        "hint": "300",
         "type": "number",
-        "defaultValue": "200"
+        "defaultValue": "300"
+      },
+      {
+        "key": "EVAL_WINDOW_MINUTES",
+        "label": "Evaluation window (min)",
+        "hint": "5",
+        "type": "number",
+        "defaultValue": "5"
       }
+    ],
+    "hubRefs": [
+      "req-api-response-time",
+      "ff-error-budget"
     ]
   },
   "nodes": [
@@ -32,7 +43,7 @@
       "id": "ff-latency-slo-1",
       "type": "fitness-fn",
       "label": "Latency SLO Guard",
-      "description": "Ensures p99 response time stays within the defined SLO target. Measures end-to-end latency from client request to response.",
+      "description": "Queries the metrics backend for {{LATENCY_PERCENTILE}} request latency over a rolling {{EVAL_WINDOW_MINUTES}}-minute window, per endpoint group. Runs as a recording rule in production and as a synthetic load check in the pre-production gate.",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -41,8 +52,9 @@
       "category": "operational",
       "automated": true,
       "trigger": "continuous",
-      "threshold": "{{LATENCY_PERCENTILE}} latency < {{LATENCY_THRESHOLD_MS}}ms",
-      "status": "active"
+      "threshold": "{{LATENCY_PERCENTILE}} latency ≤ {{LATENCY_THRESHOLD_MS}} ms over every {{EVAL_WINDOW_MINUTES}}-minute window",
+      "status": "proposed"
     }
-  ]
+  ],
+  "relations": []
 }

@@ -1,0 +1,53 @@
+{
+  "hub": {
+    "id": "adr-api-versioning",
+    "category": "adr",
+    "name": "API Versioning Policy",
+    "description": "Records how public APIs are versioned, what counts as a breaking change and how deprecations are communicated.",
+    "tags": [
+      "api",
+      "versioning",
+      "compatibility",
+      "governance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "VERSIONING_SCHEME",
+        "label": "Versioning scheme",
+        "hint": "URL path major version (/v1, /v2)",
+        "defaultValue": "URL path major version (/v1, /v2)"
+      },
+      {
+        "key": "DEPRECATION_MONTHS",
+        "label": "Minimum deprecation period (months)",
+        "hint": "6",
+        "defaultValue": "6"
+      }
+    ],
+    "hubRefs": [
+      "req-backward-compatibility",
+      "req-api-standard",
+      "ff-api-contract"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-api-versioning-1",
+      "type": "adr",
+      "label": "ADR: {{VERSIONING_SCHEME}} API versioning",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "Public and partner APIs must evolve without breaking existing clients, which upgrade on their own schedule. The team needs one rule for what is a breaking change, how a new version is exposed and how long old versions are supported, so that every service does not invent its own policy.",
+      "decision": "Version public APIs with {{VERSIONING_SCHEME}}. Additive changes (new optional fields, new endpoints, new enum values where documented as open) are non-breaking and ship within the current version. Removing or renaming fields, changing types or semantics, or tightening validation is breaking and requires a new major version. Deprecated versions remain fully functional for at least {{DEPRECATION_MONTHS}} months, announced via a Deprecation header, the changelog and direct notice to registered consumers.",
+      "consequences": "• Clients can rely on a stable contract within a major version and plan migrations.\n• Running two major versions in parallel is normal; the implementation must support it (adapters or parallel routes).\n• The contract-diff check in CI is the enforcement point; a breaking diff fails the build unless the major version changes.\n• Clients must tolerate unknown fields, and this is stated in the API guidelines.\n• Internal service-to-service APIs may use a lighter policy when all consumers are known and deploy together.",
+      "alternatives": "1. Header or media-type versioning — cleaner URLs; harder to test in a browser and easy to omit by mistake.\n2. Date-based versioning per account (Stripe style) — fine-grained and gentle for clients; significant implementation complexity.\n3. No versioning, only additive changes forever — simple; accumulates dead fields and eventually forces a big-bang break.\n4. Version per endpoint — maximum flexibility; consumers must track many version numbers."
+    }
+  ],
+  "relations": []
+}

@@ -8,7 +8,7 @@
 // are provided so the viewer can switch presentation without any store
 // mutations beyond `setActiveView`.
 
-import type { C4Node, C4Relation, C4ElementType, DiagramData, DiagramView } from '../types/c4'
+import type { C4Node, C4Relation, C4ElementType, DiagramData, DiagramSequence, DiagramView } from '../types/c4'
 import { NODE_SIZES } from '../types/c4'
 import { builtInGovernanceMetamodel } from '../types/metamodel'
 import type { HubConcept, TemplateParam } from '../store/hubStore'
@@ -86,6 +86,16 @@ export function conceptToDiagramData(concept: HubConcept): DiagramData {
       relationType: typeof r.relationType === 'string' ? r.relationType : undefined,
     }))
 
+  const relIds = new Set(relations.map((r) => r.id))
+  const sequences: DiagramSequence[] = (concept.sequences ?? [])
+    .filter((s) => Array.isArray(s.relationIds) && (s.relationIds as string[]).length > 0 && (s.relationIds as string[]).every((id) => relIds.has(id)))
+    .map((s, i) => ({
+      id: typeof s.id === 'string' ? s.id : `${concept.id}-seq-${i}`,
+      name: typeof s.name === 'string' ? s.name : concept.name,
+      relationIds: s.relationIds as string[],
+      stepDescriptions: Array.isArray(s.stepDescriptions) ? (s.stepDescriptions as (string | undefined)[]) : undefined,
+    }))
+
   const allIds = nodes.map((n) => n.id)
   const firstRoot = nodes.find((n) => !n.parentId)?.id ?? allIds[0] ?? null
   const views: DiagramView[] = [
@@ -96,6 +106,7 @@ export function conceptToDiagramData(concept: HubConcept): DiagramData {
   return {
     nodes,
     relations,
+    sequences,
     views,
     metamodel: builtInGovernanceMetamodel(),
   }

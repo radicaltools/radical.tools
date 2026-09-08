@@ -3,43 +3,41 @@
     "id": "ff-error-budget",
     "category": "fitness-function",
     "name": "Error Budget Burn Rate",
-    "description": "Tracks the consumption rate of the error budget (derived from SLO). When the burn rate exceeds thresholds, it triggers alerts or freezes feature releases until reliability improves. Key SRE practice.",
+    "description": "Tracks how fast an SLO's error budget is being consumed and freezes risky releases when it burns too fast. The core SRE feedback loop between reliability and delivery speed.",
     "tags": [
+      "operational",
       "sre",
-      "reliability",
       "slo",
-      "operational"
+      "reliability"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
-        "key": "BURN_RATE_MULTIPLIER",
-        "label": "Max burn rate multiplier (vs baseline)",
-        "hint": "2",
+        "key": "FAST_BURN_RATE",
+        "label": "Fast-burn alert multiplier (1 h window)",
+        "hint": "14.4",
         "type": "number",
-        "defaultValue": "2"
+        "defaultValue": "14.4"
       },
       {
-        "key": "WINDOW_DAYS",
-        "label": "Measurement window (days)",
-        "hint": "14",
+        "key": "SLOW_BURN_RATE",
+        "label": "Slow-burn alert multiplier (6 h window)",
+        "hint": "6",
         "type": "number",
-        "defaultValue": "14"
+        "defaultValue": "6"
       },
       {
-        "key": "ALERT_THRESHOLD_PCT",
-        "label": "Alert at budget consumed (%)",
-        "hint": "50",
+        "key": "FREEZE_REMAINING_PCT",
+        "label": "Freeze releases below remaining budget (%)",
+        "hint": "20",
         "type": "number",
-        "defaultValue": "50"
-      },
-      {
-        "key": "FREEZE_THRESHOLD_PCT",
-        "label": "Feature-freeze at budget consumed (%)",
-        "hint": "80",
-        "type": "number",
-        "defaultValue": "80"
+        "defaultValue": "20"
       }
+    ],
+    "hubRefs": [
+      "req-availability",
+      "req-error-rate",
+      "req-alerting"
     ]
   },
   "nodes": [
@@ -47,7 +45,7 @@
       "id": "ff-error-budget-1",
       "type": "fitness-fn",
       "label": "Error Budget Burn Rate",
-      "description": "Monitors error budget consumption. Alert at {{ALERT_THRESHOLD_PCT}}% consumed in first quarter of window. Feature freeze at {{FREEZE_THRESHOLD_PCT}}% consumed.",
+      "description": "Computes burn rate = (observed error ratio) / (1 − SLO) over two windows. A fast burn of {{FAST_BURN_RATE}}× over 1 h pages immediately; a slow burn of {{SLOW_BURN_RATE}}× over 6 h opens a ticket. Remaining budget for the 30-day window gates the release pipeline.",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -56,8 +54,9 @@
       "category": "operational",
       "automated": true,
       "trigger": "continuous",
-      "threshold": "Burn rate < {{BURN_RATE_MULTIPLIER}}x normal ({{WINDOW_DAYS}}-day window)",
-      "status": "active"
+      "threshold": "Burn rate < {{FAST_BURN_RATE}}× (1 h) and < {{SLOW_BURN_RATE}}× (6 h); releases blocked when remaining 30-day budget < {{FREEZE_REMAINING_PCT}}%",
+      "status": "proposed"
     }
-  ]
+  ],
+  "relations": []
 }

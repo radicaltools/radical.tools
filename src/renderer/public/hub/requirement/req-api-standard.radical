@@ -2,32 +2,45 @@
   "hub": {
     "id": "req-api-standard",
     "category": "requirement",
-    "name": "REST API Standard",
-    "description": "Interoperability: ubiquitous requirement mandating OpenAPI documentation for all public service endpoints.",
+    "name": "API-First Contract",
+    "description": "Every capability is available through a documented, versioned API described by a machine-readable specification.",
     "tags": [
       "interoperability",
       "api",
       "openapi",
-      "standards",
-      "nfr"
+      "documentation"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "API_SPEC_FORMAT",
+        "label": "Specification format",
+        "hint": "OpenAPI 3.1",
+        "defaultValue": "OpenAPI 3.1"
+      }
+    ],
+    "hubRefs": [
+      "ff-api-contract",
+      "req-backward-compatibility",
+      "adr-api-versioning"
+    ]
   },
   "nodes": [
     {
-      "id": "req-api-std-1",
+      "id": "req-api-standard-1",
       "type": "requirement",
-      "label": "REST API Standard",
+      "label": "API-First Contract",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "action": "expose all public service interfaces as RESTful APIs documented with OpenAPI 3.0 specifications, version-controlled alongside the service code",
-      "rationale": "OpenAPI documentation enables automated client generation, contract testing, and accelerates third-party integrations."
+      "action": "expose every user-facing and state-changing operation through an API described by a {{API_SPEC_FORMAT}} specification that is version-controlled with the service, covers all endpoints with schemas, error codes and examples, and is published with each release",
+      "rationale": "A complete, machine-readable contract enables client generation, contract testing and automation, and prevents the UI from becoming the only way to use the system."
     }
-  ]
+  ],
+  "relations": []
 }

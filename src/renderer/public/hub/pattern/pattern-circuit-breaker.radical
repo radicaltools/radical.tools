@@ -1,0 +1,216 @@
+{
+  "hub": {
+    "id": "pattern-circuit-breaker",
+    "category": "pattern",
+    "name": "Circuit Breaker with Fallback",
+    "description": "Calls to an unreliable dependency go through a breaker that stops calling it after repeated failures and serves a fallback instead, so one slow dependency cannot exhaust threads or fail the whole request.",
+    "tags": [
+      "resilience",
+      "fault-tolerance",
+      "stability",
+      "graceful-degradation"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-graceful-degradation",
+      "adr-integration-style",
+      "req-api-response-time"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "customer",
+      "type": "person",
+      "label": "Customer",
+      "description": "Views product pages.",
+      "x": 0,
+      "y": 0,
+      "width": 150,
+      "height": 170,
+      "collapsed": false
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Storefront Platform",
+      "description": "Product page with recommendations from a third party.",
+      "x": 0,
+      "y": 270,
+      "width": 1050,
+      "height": 570,
+      "collapsed": false
+    },
+    {
+      "id": "storefront",
+      "type": "webapp",
+      "label": "Storefront",
+      "description": "Renders product pages.",
+      "technology": "Next.js",
+      "parentId": "platform",
+      "x": 30,
+      "y": 110,
+      "width": 210,
+      "height": 140,
+      "collapsed": false
+    },
+    {
+      "id": "product-api",
+      "type": "container",
+      "label": "Product API",
+      "description": "Assembles the product page. Recommendations are optional content.",
+      "technology": "Node.js",
+      "parentId": "platform",
+      "x": 280,
+      "y": 110,
+      "width": 740,
+      "height": 260,
+      "collapsed": false
+    },
+    {
+      "id": "handler",
+      "type": "component",
+      "label": "Product Handler",
+      "description": "Builds the response; treats recommendations as best-effort.",
+      "technology": "Express",
+      "parentId": "product-api",
+      "x": 30,
+      "y": 110,
+      "width": 200,
+      "height": 120,
+      "collapsed": false
+    },
+    {
+      "id": "breaker",
+      "type": "component",
+      "label": "Recommendations Client",
+      "description": "Timeout 300 ms; opens after 5 consecutive failures or 50% error rate in 10 s; half-open probe every 30 s.",
+      "technology": "opossum / resilience4j",
+      "parentId": "product-api",
+      "x": 270,
+      "y": 110,
+      "width": 200,
+      "height": 120,
+      "collapsed": false
+    },
+    {
+      "id": "fallback",
+      "type": "component",
+      "label": "Fallback",
+      "description": "Returns cached popular items when the circuit is open or the call fails.",
+      "technology": "In-process",
+      "parentId": "product-api",
+      "x": 510,
+      "y": 110,
+      "width": 200,
+      "height": 120,
+      "collapsed": false
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "Cache",
+      "description": "Popular items refreshed hourly; last known recommendations per category.",
+      "technology": "Redis",
+      "parentId": "platform",
+      "x": 30,
+      "y": 410,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "recs",
+      "type": "system",
+      "label": "Recommendation Provider",
+      "description": "Third-party recommendation engine with variable latency.",
+      "external": true,
+      "x": 0,
+      "y": 940,
+      "width": 360,
+      "height": 260,
+      "collapsed": false
+    }
+  ],
+  "relations": [
+    {
+      "id": "customer--storefront",
+      "sourceId": "customer",
+      "targetId": "storefront",
+      "label": "Opens product page",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "storefront--product-api",
+      "sourceId": "storefront",
+      "targetId": "product-api",
+      "label": "GET /products/{id}",
+      "technology": "HTTPS / JSON"
+    },
+    {
+      "id": "handler--breaker",
+      "sourceId": "handler",
+      "targetId": "breaker",
+      "label": "Requests recommendations"
+    },
+    {
+      "id": "product-api--recs",
+      "sourceId": "product-api",
+      "targetId": "recs",
+      "label": "Fetches recommendations (through the breaker)",
+      "technology": "HTTPS, 300 ms timeout"
+    },
+    {
+      "id": "breaker--fallback",
+      "sourceId": "breaker",
+      "targetId": "fallback",
+      "label": "On open circuit / failure"
+    },
+    {
+      "id": "fallback--cache",
+      "sourceId": "fallback",
+      "targetId": "cache",
+      "label": "Reads popular items",
+      "technology": "Redis protocol"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "pattern-circuit-breaker-seq",
+      "name": "Provider outage",
+      "relationIds": [
+        "customer--storefront",
+        "storefront--product-api",
+        "handler--breaker",
+        "breaker--fallback",
+        "fallback--cache"
+      ],
+      "stepDescriptions": [
+        "Customer opens a product page.",
+        "Page data is requested.",
+        "Handler asks for recommendations.",
+        "Circuit is open — the provider is not called at all.",
+        "Popular items are read from cache and returned; the page renders normally."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "pattern-circuit-breaker-flow",
+      "name": "Provider outage",
+      "kind": "dynamic",
+      "sequenceId": "pattern-circuit-breaker-seq",
+      "nodeIds": [
+        "customer",
+        "platform",
+        "storefront",
+        "product-api",
+        "handler",
+        "breaker",
+        "fallback",
+        "cache",
+        "recs"
+      ],
+      "positions": {}
+    }
+  ]
+}

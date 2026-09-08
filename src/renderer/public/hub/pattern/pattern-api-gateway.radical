@@ -2,85 +2,164 @@
   "hub": {
     "id": "pattern-api-gateway",
     "category": "pattern",
-    "name": "API Gateway Pattern",
-    "description": "Centralizes cross-cutting concerns (auth, rate limiting, routing, TLS termination) in a single entry point. Backend services focus on business logic without repeating infrastructure concerns.",
+    "name": "API Gateway",
+    "description": "A single entry point that terminates TLS, authenticates callers, enforces quotas and routes requests to backend services, so the services themselves stay free of edge concerns.",
     "tags": [
       "api-gateway",
-      "routing",
+      "edge",
       "security",
-      "edge"
+      "routing",
+      "microservices"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-auth",
+      "req-rate-limiting",
+      "adr-auth-strategy",
+      "pattern-microservices"
+    ]
   },
   "nodes": [
     {
-      "id": "pat-apigw-client",
+      "id": "customer",
       "type": "person",
-      "label": "API Consumer",
-      "description": "External client (web app, mobile app, third-party integration) that consumes the public API.",
-      "x": 300,
+      "label": "Customer",
+      "description": "Uses the web and mobile apps.",
+      "x": 0,
       "y": 0,
       "width": 150,
       "height": 170,
       "collapsed": false
     },
     {
-      "id": "pat-apigw-gw",
+      "id": "partner",
+      "type": "system",
+      "label": "Partner Application",
+      "description": "Third-party system integrating over the public API.",
+      "external": true,
+      "x": 230,
+      "y": 0,
+      "width": 360,
+      "height": 260,
+      "collapsed": false
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Commerce Platform",
+      "description": "Backend behind the public API.",
+      "x": 0,
+      "y": 360,
+      "width": 1380,
+      "height": 340,
+      "collapsed": false
+    },
+    {
+      "id": "gateway",
       "type": "container",
       "label": "API Gateway",
-      "description": "Edge proxy handling: TLS termination, authentication, rate limiting, request routing, response caching, and API versioning.",
-      "technology": "Kong / Envoy / AWS API GW",
-      "x": 250,
-      "y": 250,
+      "description": "Terminates TLS, validates access tokens, applies per-client rate limits, routes by path and version, and emits access logs and metrics.",
+      "technology": "Kong / Envoy / AWS API Gateway",
+      "parentId": "platform",
+      "x": 30,
+      "y": 110,
       "width": 300,
       "height": 200,
       "collapsed": false
     },
     {
-      "id": "pat-apigw-svc1",
+      "id": "users",
       "type": "container",
       "label": "User Service",
-      "description": "Manages user accounts, profiles, and preferences.",
-      "technology": "",
-      "x": 0,
-      "y": 550,
+      "description": "Accounts, profiles and preferences.",
+      "technology": "Node.js / NestJS",
+      "parentId": "platform",
+      "x": 370,
+      "y": 110,
       "width": 300,
       "height": 200,
       "collapsed": false
     },
     {
-      "id": "pat-apigw-svc2",
+      "id": "orders",
       "type": "container",
       "label": "Order Service",
-      "description": "Handles order creation, processing, and fulfilment.",
-      "technology": "",
-      "x": 400,
-      "y": 550,
+      "description": "Order capture, payment and fulfilment status.",
+      "technology": "Java / Spring Boot",
+      "parentId": "platform",
+      "x": 710,
+      "y": 110,
       "width": 300,
       "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "catalog",
+      "type": "container",
+      "label": "Catalog Service",
+      "description": "Products, prices and availability.",
+      "technology": "Go",
+      "parentId": "platform",
+      "x": 1050,
+      "y": 110,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "idp",
+      "type": "system",
+      "label": "Identity Provider",
+      "description": "Issues and signs OAuth 2.0 / OIDC tokens.",
+      "external": true,
+      "x": 0,
+      "y": 800,
+      "width": 360,
+      "height": 260,
       "collapsed": false
     }
   ],
   "relations": [
     {
-      "id": "pat-apigw-r1",
-      "sourceId": "pat-apigw-client",
-      "targetId": "pat-apigw-gw",
-      "label": "Sends API requests",
-      "technology": "HTTPS"
+      "id": "customer--gateway",
+      "sourceId": "customer",
+      "targetId": "gateway",
+      "label": "Calls public API",
+      "technology": "HTTPS / JSON"
     },
     {
-      "id": "pat-apigw-r2",
-      "sourceId": "pat-apigw-gw",
-      "targetId": "pat-apigw-svc1",
-      "label": "Proxies /users/**",
-      "technology": "gRPC"
+      "id": "partner--gateway",
+      "sourceId": "partner",
+      "targetId": "gateway",
+      "label": "Calls partner API",
+      "technology": "HTTPS / JSON, client credentials"
     },
     {
-      "id": "pat-apigw-r3",
-      "sourceId": "pat-apigw-gw",
-      "targetId": "pat-apigw-svc2",
-      "label": "Proxies /orders/**",
+      "id": "gateway--idp",
+      "sourceId": "gateway",
+      "targetId": "idp",
+      "label": "Fetches signing keys, introspects tokens",
+      "technology": "OIDC / JWKS"
+    },
+    {
+      "id": "gateway--users",
+      "sourceId": "gateway",
+      "targetId": "users",
+      "label": "Routes /v1/users/**",
+      "technology": "HTTP"
+    },
+    {
+      "id": "gateway--orders",
+      "sourceId": "gateway",
+      "targetId": "orders",
+      "label": "Routes /v1/orders/**",
+      "technology": "HTTP"
+    },
+    {
+      "id": "gateway--catalog",
+      "sourceId": "gateway",
+      "targetId": "catalog",
+      "label": "Routes /v1/catalog/**",
       "technology": "gRPC"
     }
   ]

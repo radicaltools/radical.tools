@@ -91,14 +91,14 @@
   "definitions": {
     "C4ElementType": {
       "type": "string",
-      "enum": ["person", "system", "container", "component", "database", "webapp", "queue", "domain"],
-      "description": "The C4 element type."
+      "enum": ["person", "system", "container", "component", "database", "webapp", "queue", "domain", "group", "adr", "fitness-fn", "requirement", "blueprint"],
+      "description": "The element type: C4 core types, DDD domain, organisational group, or governance types (ADR, fitness function, EARS requirement, blueprint)."
     },
     "C4Node": {
       "type": "object",
-      "description": "A C4 element (actor, system, container, component, etc.).",
+      "description": "A C4 element (actor, system, container, component, etc.). Additional properties are defined by the active metamodel (e.g. ears_type, threshold, decision).",
       "required": ["id", "type", "label", "collapsed", "x", "y", "width", "height"],
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "id": {
           "type": "string",

@@ -3,48 +3,51 @@
     "id": "req-api-response-time",
     "category": "requirement",
     "name": "API Response Time",
-    "description": "Performance: REST API endpoints must respond within 200ms for the majority of requests under normal load.",
+    "description": "Latency budget for synchronous API calls under normal load, expressed as a percentile target with a hard tail ceiling.",
     "tags": [
       "performance",
       "latency",
-      "api",
-      "nfr",
-      "response-time"
+      "api"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
-        "key": "P90_RESPONSE_MS",
-        "label": "P90 response time target (ms)",
-        "hint": "200",
+        "key": "P95_MS",
+        "label": "p95 response time (ms)",
+        "hint": "300",
         "type": "number",
-        "defaultValue": "200"
+        "defaultValue": "300"
       },
       {
-        "key": "P99_CEILING_MS",
-        "label": "P99 hard ceiling (ms)",
+        "key": "P99_MS",
+        "label": "p99 ceiling (ms)",
         "hint": "1000",
         "type": "number",
         "defaultValue": "1000"
       }
+    ],
+    "hubRefs": [
+      "ff-latency-slo",
+      "req-db-query-response"
     ]
   },
   "nodes": [
     {
-      "id": "req-api-rt-1",
+      "id": "req-api-response-time-1",
       "type": "requirement",
       "label": "API Response Time",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "state-driven",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "precondition": "the system is handling normal production traffic",
-      "action": "respond to REST API requests within {{P90_RESPONSE_MS}}ms at the 90th percentile, with a hard ceiling of {{P99_CEILING_MS}}ms at the 99th percentile",
-      "rationale": "API latency directly impacts downstream integration performance. Amazon found every 100ms of latency cost 1% in sales. Sub-200ms responses are required for a seamless UX."
+      "precondition": "the system is serving normal production traffic",
+      "action": "respond to API requests within {{P95_MS}} ms at the 95th percentile and never exceed {{P99_MS}} ms at the 99th percentile, measured at the service boundary",
+      "rationale": "Downstream callers size their own timeouts and retry budgets around this figure; a percentile target with a tail ceiling prevents a small fraction of slow requests from cascading into upstream failures."
     }
-  ]
+  ],
+  "relations": []
 }

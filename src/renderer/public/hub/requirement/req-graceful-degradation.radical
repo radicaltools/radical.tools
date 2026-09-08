@@ -3,31 +3,35 @@
     "id": "req-graceful-degradation",
     "category": "requirement",
     "name": "Graceful Degradation",
-    "description": "Availability: event-driven requirement ensuring the system remains partially functional when a non-critical dependency is unavailable.",
+    "description": "Core functionality keeps working when a non-critical dependency fails, instead of the whole page or request failing.",
     "tags": [
       "availability",
       "resilience",
-      "nfr",
-      "reliability"
+      "fault-tolerance"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-circuit-breaker",
+      "adr-integration-style"
+    ]
   },
   "nodes": [
     {
-      "id": "req-degrade-1",
+      "id": "req-graceful-degradation-1",
       "type": "requirement",
       "label": "Graceful Degradation",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
       "status": "draft",
       "priority": "should",
-      "trigger": "a non-critical downstream service or third-party dependency becomes unavailable",
-      "action": "continue serving core functionality using cached data or a reduced feature set, displaying a clear status notice to affected users rather than returning an error",
-      "rationale": "Total failures caused by partial outages erode user trust far more than reduced functionality. Circuit breakers and fallbacks are the standard mitigation."
+      "trigger": "a non-critical downstream service or third-party dependency becomes unavailable or exceeds its timeout",
+      "action": "continue serving the core workflow using cached data, defaults or a reduced feature set, and show a clear status notice instead of an error",
+      "rationale": "In a distributed system partial failure is the normal state; without explicit fallbacks every optional dependency becomes a single point of failure for the whole product."
     }
-  ]
+  ],
+  "relations": []
 }

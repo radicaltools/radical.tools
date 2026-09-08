@@ -3,40 +3,42 @@
     "id": "req-test-coverage",
     "category": "requirement",
     "name": "Automated Test Coverage",
-    "description": "Maintainability: ubiquitous requirement ensuring sufficient automated test coverage of business logic.",
+    "description": "Business logic is protected by automated tests, with coverage enforced in the pipeline.",
     "tags": [
       "maintainability",
       "testing",
-      "quality",
-      "nfr",
-      "ci-cd"
+      "quality"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "MIN_COVERAGE_PCT",
-        "label": "Minimum test coverage (%)",
+        "label": "Minimum line coverage (%)",
         "hint": "80",
         "type": "number",
         "defaultValue": "80"
       }
+    ],
+    "hubRefs": [
+      "ff-test-coverage"
     ]
   },
   "nodes": [
     {
-      "id": "req-test-cov-1",
+      "id": "req-test-coverage-1",
       "type": "requirement",
       "label": "Automated Test Coverage",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
-      "priority": "must",
-      "action": "maintain automated unit and integration test coverage of at least {{MIN_COVERAGE_PCT}}% for all business-logic modules, enforced via CI pipeline gates",
-      "rationale": "Test coverage acts as a safety net for refactoring. Below 80% coverage, defect escape rates increase significantly."
+      "status": "draft",
+      "priority": "should",
+      "action": "maintain at least {{MIN_COVERAGE_PCT}}% automated line coverage of business-logic modules and prevent any change from lowering coverage on the files it touches",
+      "rationale": "Coverage is a coarse but enforceable proxy for a refactoring safety net; the ratchet on changed files stops the number from drifting down one commit at a time."
     }
-  ]
+  ],
+  "relations": []
 }

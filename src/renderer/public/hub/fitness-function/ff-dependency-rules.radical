@@ -1,0 +1,39 @@
+{
+  "hub": {
+    "id": "ff-dependency-rules",
+    "category": "fitness-function",
+    "name": "Dependency Rules",
+    "description": "Enforces the intended layering and module boundaries: no cycles, no shortcuts from outer layers into the domain, no cross-context imports.",
+    "tags": [
+      "structural",
+      "architecture",
+      "layering",
+      "modularity"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-hexagonal",
+      "req-code-complexity",
+      "ff-coupling-guard"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-dependency-rules-1",
+      "type": "fitness-fn",
+      "label": "Dependency Rules",
+      "description": "Codifies the architecture as executable rules (ArchUnit, dependency-cruiser, NetArchTest, eslint-plugin-boundaries): allowed layer-to-layer dependencies, forbidden packages per layer and a zero-cycle constraint. Runs with the unit tests on every commit.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "structural",
+      "automated": true,
+      "trigger": "on-deploy",
+      "threshold": "0 dependency cycles and 0 violations of the declared layer and module rules",
+      "status": "proposed"
+    }
+  ],
+  "relations": []
+}

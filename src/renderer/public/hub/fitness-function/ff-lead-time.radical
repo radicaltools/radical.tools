@@ -3,22 +3,26 @@
     "id": "ff-lead-time",
     "category": "fitness-function",
     "name": "Lead Time for Changes",
-    "description": "Measures the time from code commit to running in production. One of the four DORA metrics. Shorter lead times indicate a healthier CI/CD pipeline and faster feedback loops.",
+    "description": "Time from commit to running in production. One of the four DORA metrics; the shorter it is, the faster the feedback loop.",
     "tags": [
-      "dora",
       "process",
-      "devops",
-      "lead-time"
+      "dora",
+      "delivery",
+      "devops"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
-        "key": "MAX_LEAD_TIME_DAYS",
-        "label": "Max median lead time (days)",
-        "hint": "1",
+        "key": "MAX_LEAD_TIME_HOURS",
+        "label": "Max median lead time (h)",
+        "hint": "24",
         "type": "number",
-        "defaultValue": "1"
+        "defaultValue": "24"
       }
+    ],
+    "hubRefs": [
+      "ff-deploy-frequency",
+      "req-ci-pipeline-time"
     ]
   },
   "nodes": [
@@ -26,7 +30,7 @@
       "id": "ff-lead-time-1",
       "type": "fitness-fn",
       "label": "Lead Time for Changes",
-      "description": "Tracks time from commit to production deploy. Target: less than one day for elite performers (DORA).",
+      "description": "For each production deployment, takes the commit timestamps of the included changes and computes the median commit-to-deploy interval. Sourced from the VCS and CD system; reported weekly.",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -35,8 +39,9 @@
       "category": "process",
       "automated": true,
       "trigger": "periodic",
-      "threshold": "Median lead time < {{MAX_LEAD_TIME_DAYS}} day(s)",
-      "status": "active"
+      "threshold": "Median lead time ≤ {{MAX_LEAD_TIME_HOURS}} h (4-week rolling)",
+      "status": "proposed"
     }
-  ]
+  ],
+  "relations": []
 }

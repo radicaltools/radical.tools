@@ -2,55 +2,46 @@
   "hub": {
     "id": "req-auth-response-time",
     "category": "requirement",
-    "name": "Authentication Response Time",
-    "description": "Performance: user login and token verification must complete within 2 seconds to avoid abandonment.",
+    "name": "Authentication Latency",
+    "description": "Latency budget for the login and token-issuance flow.",
     "tags": [
       "performance",
       "authentication",
       "latency",
-      "nfr",
       "ux"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
-        "key": "MAX_CONCURRENT_LOGINS",
-        "label": "Max concurrent login attempts",
-        "hint": "1000",
+        "key": "AUTH_P95_MS",
+        "label": "p95 authentication latency (ms)",
+        "hint": "1500",
         "type": "number",
-        "defaultValue": "1000"
-      },
-      {
-        "key": "AUTH_RESPONSE_SECONDS",
-        "label": "Max auth response time (seconds)",
-        "hint": "2",
-        "type": "number",
-        "defaultValue": "2"
-      },
-      {
-        "key": "AUTH_PERCENTILE",
-        "label": "Percentile target",
-        "hint": "95th",
-        "defaultValue": "95th"
+        "defaultValue": "1500"
       }
+    ],
+    "hubRefs": [
+      "req-auth",
+      "adr-auth-strategy"
     ]
   },
   "nodes": [
     {
-      "id": "req-auth-rt-1",
+      "id": "req-auth-response-time-1",
       "type": "requirement",
-      "label": "Authentication Response Time",
+      "label": "Authentication Latency",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
-      "ears_type": "state-driven",
-      "status": "approved",
+      "ears_type": "event-driven",
+      "status": "draft",
       "priority": "must",
-      "precondition": "the system is under normal load with up to {{MAX_CONCURRENT_LOGINS}} concurrent login attempts",
-      "action": "complete user authentication (credential validation, token issuance) within {{AUTH_RESPONSE_SECONDS}} seconds for {{AUTH_PERCENTILE}} of requests",
-      "rationale": "Login delays over 2 seconds erode user trust and increase abandonment. The authentication step is the first impression of system reliability."
+      "trigger": "a user submits credentials or a client presents a token for verification",
+      "action": "complete credential validation and token issuance within {{AUTH_P95_MS}} ms at the 95th percentile, including any calls to external identity providers",
+      "rationale": "Login is on the critical path of every session and is the first impression of system responsiveness; slow authentication inflates abandonment before the product is even seen."
     }
-  ]
+  ],
+  "relations": []
 }

@@ -2,42 +2,59 @@
   "hub": {
     "id": "req-page-load-time",
     "category": "requirement",
-    "name": "Page Load Time",
-    "description": "Performance: state-driven requirement ensuring web pages load within acceptable time under normal operating conditions.",
+    "name": "Page Load Performance",
+    "description": "Core Web Vitals targets for user-facing pages: how quickly the main content renders and how responsive the page is to input.",
     "tags": [
       "performance",
-      "latency",
       "web",
-      "nfr",
-      "core-web-vitals"
+      "core-web-vitals",
+      "ux"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
-        "key": "TTI_SECONDS",
-        "label": "Time-to-interactive (seconds)",
-        "hint": "3",
+        "key": "LCP_SECONDS",
+        "label": "Largest Contentful Paint (s)",
+        "hint": "2.5",
         "type": "number",
-        "defaultValue": "3"
+        "defaultValue": "2.5"
+      },
+      {
+        "key": "INP_MS",
+        "label": "Interaction to Next Paint (ms)",
+        "hint": "200",
+        "type": "number",
+        "defaultValue": "200"
+      },
+      {
+        "key": "USER_PCT",
+        "label": "Share of page views meeting the target (%)",
+        "hint": "75",
+        "type": "number",
+        "defaultValue": "75"
       }
+    ],
+    "hubRefs": [
+      "ff-web-vitals"
     ]
   },
   "nodes": [
     {
-      "id": "req-page-load-1",
+      "id": "req-page-load-time-1",
       "type": "requirement",
-      "label": "Page Load Time",
+      "label": "Page Load Performance",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "state-driven",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "precondition": "the user is on a standard broadband connection and the system is under normal load",
-      "action": "render the initial page and make it interactive (TTI) within {{TTI_SECONDS}} seconds for 95% of users",
-      "rationale": "Studies show that pages taking longer than 3 seconds lose ~53% of mobile visitors. Core Web Vitals impact SEO ranking."
+      "precondition": "a user loads a page on a typical mid-range device and network connection",
+      "action": "reach Largest Contentful Paint within {{LCP_SECONDS}} s and keep Interaction to Next Paint under {{INP_MS}} ms for at least {{USER_PCT}}% of real-user page views",
+      "rationale": "Core Web Vitals are the industry-standard, field-measurable definition of perceived load speed and responsiveness, and they influence search ranking."
     }
-  ]
+  ],
+  "relations": []
 }

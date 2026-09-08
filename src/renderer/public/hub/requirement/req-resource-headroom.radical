@@ -1,0 +1,52 @@
+{
+  "hub": {
+    "id": "req-resource-headroom",
+    "category": "requirement",
+    "name": "Compute Headroom",
+    "description": "Keeps steady-state resource utilisation below a ceiling so that traffic spikes can be absorbed while scaling kicks in.",
+    "tags": [
+      "performance",
+      "capacity",
+      "infrastructure"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "CPU_CEILING_PCT",
+        "label": "Average CPU utilisation ceiling (%)",
+        "hint": "70",
+        "type": "number",
+        "defaultValue": "70"
+      },
+      {
+        "key": "MEMORY_CEILING_PCT",
+        "label": "Average memory utilisation ceiling (%)",
+        "hint": "75",
+        "type": "number",
+        "defaultValue": "75"
+      }
+    ],
+    "hubRefs": [
+      "req-autoscaling"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-resource-headroom-1",
+      "type": "requirement",
+      "label": "Compute Headroom",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "state-driven",
+      "status": "draft",
+      "priority": "must",
+      "precondition": "the system is serving normal production traffic",
+      "action": "keep average CPU utilisation below {{CPU_CEILING_PCT}}% and memory utilisation below {{MEMORY_CEILING_PCT}}% per node, treating sustained breaches as a capacity incident",
+      "rationale": "Saturated nodes degrade non-linearly: queueing delay explodes as utilisation approaches 100%, and scale-out takes time to become effective."
+    }
+  ],
+  "relations": []
+}

@@ -2,41 +2,45 @@
   "hub": {
     "id": "req-centralised-logging",
     "category": "requirement",
-    "name": "Centralised Structured Logging",
-    "description": "Manageability: ubiquitous requirement mandating structured, centralised log collection across all services.",
+    "name": "Structured Centralised Logging",
+    "description": "All services emit structured logs with correlation identifiers into one queryable store.",
     "tags": [
-      "manageability",
-      "logging",
       "observability",
-      "nfr",
+      "logging",
       "operations"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "LOG_RETENTION_DAYS",
-        "label": "Log retention period (days)",
+        "label": "Log retention (days)",
         "hint": "30",
         "type": "number",
         "defaultValue": "30"
       }
+    ],
+    "hubRefs": [
+      "adr-observability",
+      "req-distributed-tracing",
+      "req-audit-logging"
     ]
   },
   "nodes": [
     {
-      "id": "req-logging-1",
+      "id": "req-centralised-logging-1",
       "type": "requirement",
-      "label": "Centralised Structured Logging",
+      "label": "Structured Centralised Logging",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "action": "emit all logs in structured JSON format with correlation IDs, severity, timestamp, and service name, aggregated into a centralised log store with a minimum {{LOG_RETENTION_DAYS}}-day retention",
-      "rationale": "Unstructured logs scattered across hosts are unqueryable in production incidents. Structured, centralised logs reduce mean time to diagnosis."
+      "action": "emit logs as structured JSON with timestamp, severity, service, version and trace/correlation identifiers, shipped to a central store that is searchable for at least {{LOG_RETENTION_DAYS}} days",
+      "rationale": "Diagnosing a cross-service incident requires joining logs by correlation id in one place; logs scattered across hosts in free text cannot be queried under time pressure."
     }
-  ]
+  ],
+  "relations": []
 }

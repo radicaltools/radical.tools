@@ -2,120 +2,260 @@
   "hub": {
     "id": "pattern-microservices",
     "category": "pattern",
-    "name": "Microservices Architecture",
-    "description": "A microservices decomposition with an API Gateway, two backend services, shared database per service, and message queue for async communication. Each service owns its data store.",
+    "name": "Microservices with Database per Service",
+    "description": "Independently deployable services, each owning its data store, fronted by a gateway and integrated through synchronous calls for queries and events for state changes.",
     "tags": [
       "microservices",
-      "distributed",
-      "api-gateway",
-      "architecture"
+      "distributed-systems",
+      "architecture",
+      "event-driven"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-api-gateway",
+      "pattern-event-driven",
+      "adr-integration-style",
+      "req-health-checks",
+      "ff-coupling-guard"
+    ]
   },
   "nodes": [
     {
-      "id": "pat-ms-gateway",
-      "type": "system",
-      "label": "API Gateway",
-      "description": "Entry point for all client requests. Routes, authenticates, and rate-limits incoming traffic.",
-      "technology": "Kong / AWS API Gateway",
-      "x": 300,
-      "y": 0,
-      "width": 360,
-      "height": 260,
-      "collapsed": true
-    },
-    {
-      "id": "pat-ms-service-a",
-      "type": "system",
-      "label": "Service A",
-      "description": "Handles domain capability A. Owns its data store and exposes APIs consumed by the gateway.",
-      "technology": "",
+      "id": "customer",
+      "type": "person",
+      "label": "Customer",
+      "description": "Browses the catalogue and places orders.",
       "x": 0,
-      "y": 350,
-      "width": 360,
-      "height": 260,
-      "collapsed": true
+      "y": 0,
+      "width": 150,
+      "height": 170,
+      "collapsed": false
     },
     {
-      "id": "pat-ms-db-a",
-      "type": "database",
-      "label": "Service A Database",
-      "description": "Private data store for Service A. Not shared with other services.",
-      "technology": "PostgreSQL",
-      "x": 50,
-      "y": 420,
-      "width": 190,
-      "height": 130,
-      "collapsed": false,
-      "parentId": "pat-ms-service-a"
-    },
-    {
-      "id": "pat-ms-service-b",
+      "id": "platform",
       "type": "system",
-      "label": "Service B",
-      "description": "Handles domain capability B. Communicates with Service A via events.",
-      "technology": "",
-      "x": 600,
-      "y": 350,
-      "width": 360,
-      "height": 260,
-      "collapsed": true
+      "label": "Retail Platform",
+      "description": "Set of independently deployable services.",
+      "x": 0,
+      "y": 270,
+      "width": 1040,
+      "height": 750,
+      "collapsed": false
     },
     {
-      "id": "pat-ms-db-b",
-      "type": "database",
-      "label": "Service B Database",
-      "description": "Private data store for Service B.",
-      "technology": "MongoDB",
-      "x": 650,
-      "y": 420,
-      "width": 190,
-      "height": 130,
-      "collapsed": false,
-      "parentId": "pat-ms-service-b"
+      "id": "storefront",
+      "type": "webapp",
+      "label": "Storefront",
+      "description": "Single-page application served from a CDN.",
+      "technology": "React",
+      "parentId": "platform",
+      "x": 30,
+      "y": 110,
+      "width": 210,
+      "height": 140,
+      "collapsed": false
     },
     {
-      "id": "pat-ms-queue",
+      "id": "gateway",
+      "type": "container",
+      "label": "API Gateway",
+      "description": "Edge routing, authentication and rate limiting.",
+      "technology": "Envoy",
+      "parentId": "platform",
+      "x": 370,
+      "y": 110,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "bus",
       "type": "queue",
-      "label": "Message Broker",
-      "description": "Async event bus for inter-service communication. Decouples services temporally.",
-      "technology": "RabbitMQ / Kafka",
-      "x": 300,
-      "y": 700,
+      "label": "Event Bus",
+      "description": "Durable, partitioned event log shared by all services.",
+      "technology": "Apache Kafka",
+      "parentId": "platform",
+      "x": 710,
+      "y": 110,
       "width": 220,
       "height": 95,
+      "collapsed": false
+    },
+    {
+      "id": "catalog",
+      "type": "container",
+      "label": "Catalog Service",
+      "description": "Products, prices, stock levels. Owns the catalogue data.",
+      "technology": "Go",
+      "parentId": "platform",
+      "x": 30,
+      "y": 350,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "orders",
+      "type": "container",
+      "label": "Order Service",
+      "description": "Order lifecycle. Publishes OrderPlaced, reacts to PaymentCaptured.",
+      "technology": "Java / Spring Boot",
+      "parentId": "platform",
+      "x": 370,
+      "y": 350,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "payments",
+      "type": "container",
+      "label": "Payment Service",
+      "description": "Charges cards via the provider and publishes payment outcomes.",
+      "technology": "Kotlin",
+      "parentId": "platform",
+      "x": 710,
+      "y": 350,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "catalog-db",
+      "type": "database",
+      "label": "Catalog DB",
+      "description": "Private to Catalog Service.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "x": 30,
+      "y": 590,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "orders-db",
+      "type": "database",
+      "label": "Orders DB",
+      "description": "Private to Order Service.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "x": 370,
+      "y": 590,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "payments-db",
+      "type": "database",
+      "label": "Payments DB",
+      "description": "Private to Payment Service; stores provider references, never card data.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "x": 710,
+      "y": 590,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "psp",
+      "type": "system",
+      "label": "Payment Provider",
+      "description": "External card-processing service.",
+      "external": true,
+      "x": 0,
+      "y": 1120,
+      "width": 360,
+      "height": 260,
       "collapsed": false
     }
   ],
   "relations": [
     {
-      "id": "pat-ms-r1",
-      "sourceId": "pat-ms-gateway",
-      "targetId": "pat-ms-service-a",
-      "label": "Routes requests",
-      "technology": "REST/gRPC"
+      "id": "customer--storefront",
+      "sourceId": "customer",
+      "targetId": "storefront",
+      "label": "Uses",
+      "technology": "HTTPS"
     },
     {
-      "id": "pat-ms-r2",
-      "sourceId": "pat-ms-gateway",
-      "targetId": "pat-ms-service-b",
-      "label": "Routes requests",
-      "technology": "REST/gRPC"
+      "id": "storefront--gateway",
+      "sourceId": "storefront",
+      "targetId": "gateway",
+      "label": "Calls API",
+      "technology": "HTTPS / JSON"
     },
     {
-      "id": "pat-ms-r3",
-      "sourceId": "pat-ms-service-a",
-      "targetId": "pat-ms-queue",
-      "label": "Publishes events",
-      "technology": "AMQP"
+      "id": "gateway--catalog",
+      "sourceId": "gateway",
+      "targetId": "catalog",
+      "label": "Routes catalogue requests",
+      "technology": "gRPC"
     },
     {
-      "id": "pat-ms-r4",
-      "sourceId": "pat-ms-queue",
-      "targetId": "pat-ms-service-b",
-      "label": "Delivers events",
-      "technology": "AMQP"
+      "id": "gateway--orders",
+      "sourceId": "gateway",
+      "targetId": "orders",
+      "label": "Routes order requests",
+      "technology": "HTTP"
+    },
+    {
+      "id": "catalog--catalog-db",
+      "sourceId": "catalog",
+      "targetId": "catalog-db",
+      "label": "Reads / writes",
+      "technology": "SQL"
+    },
+    {
+      "id": "orders--orders-db",
+      "sourceId": "orders",
+      "targetId": "orders-db",
+      "label": "Reads / writes",
+      "technology": "SQL"
+    },
+    {
+      "id": "payments--payments-db",
+      "sourceId": "payments",
+      "targetId": "payments-db",
+      "label": "Reads / writes",
+      "technology": "SQL"
+    },
+    {
+      "id": "orders--bus",
+      "sourceId": "orders",
+      "targetId": "bus",
+      "label": "Publishes OrderPlaced",
+      "technology": "Avro"
+    },
+    {
+      "id": "bus--payments",
+      "sourceId": "bus",
+      "targetId": "payments",
+      "label": "Delivers OrderPlaced",
+      "technology": "Consumer group"
+    },
+    {
+      "id": "payments--psp",
+      "sourceId": "payments",
+      "targetId": "psp",
+      "label": "Authorises and captures payment",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "payments--bus",
+      "sourceId": "payments",
+      "targetId": "bus",
+      "label": "Publishes PaymentCaptured / PaymentFailed",
+      "technology": "Avro"
+    },
+    {
+      "id": "bus--orders",
+      "sourceId": "bus",
+      "targetId": "orders",
+      "label": "Delivers payment events",
+      "technology": "Consumer group"
     }
   ]
 }

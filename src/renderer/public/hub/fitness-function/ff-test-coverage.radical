@@ -3,12 +3,12 @@
     "id": "ff-test-coverage",
     "category": "fitness-function",
     "name": "Test Coverage Gate",
-    "description": "Enforces a minimum code coverage percentage on every PR/deployment. Prevents untested code from reaching production. Best combined with mutation testing for quality, not just quantity.",
+    "description": "Enforces a minimum test coverage on every change and prevents coverage from eroding over time.",
     "tags": [
+      "process",
       "testing",
       "quality",
-      "process",
-      "coverage"
+      "ci-cd"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
@@ -19,14 +19,17 @@
         "type": "number",
         "defaultValue": "80"
       }
+    ],
+    "hubRefs": [
+      "req-test-coverage"
     ]
   },
   "nodes": [
     {
-      "id": "ff-test-cov-1",
+      "id": "ff-test-coverage-1",
       "type": "fitness-fn",
       "label": "Test Coverage Gate",
-      "description": "Blocks deployment when line/branch coverage falls below the threshold. Ratchets up: new code must meet or exceed current coverage.",
+      "description": "Collects line and branch coverage from the unit and integration test run, compares the project total with the threshold and the per-file coverage of changed files with the base branch. Pairs well with a mutation-testing sample to catch assertion-free tests.",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -35,8 +38,9 @@
       "category": "process",
       "automated": true,
       "trigger": "on-deploy",
-      "threshold": "≥ {{MIN_COVERAGE_PCT}}% line coverage, no decrease on diff",
-      "status": "active"
+      "threshold": "Total line coverage ≥ {{MIN_COVERAGE_PCT}}% and no decrease on changed files",
+      "status": "proposed"
     }
-  ]
+  ],
+  "relations": []
 }

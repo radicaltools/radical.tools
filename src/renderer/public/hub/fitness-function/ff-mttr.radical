@@ -2,41 +2,47 @@
   "hub": {
     "id": "ff-mttr",
     "category": "fitness-function",
-    "name": "Mean Time to Recovery",
-    "description": "Measures how long it takes to restore service after a production incident. One of the four DORA metrics. Shorter MTTR indicates better incident response and system resilience.",
+    "name": "Time to Restore Service",
+    "description": "How long it takes to recover from a production failure. One of the four DORA metrics; measures the effectiveness of observability, runbooks and rollback.",
     "tags": [
+      "process",
       "dora",
       "reliability",
-      "operational",
-      "incident"
+      "incident-management"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "MAX_MTTR_HOURS",
-        "label": "Max MTTR (hours)",
+        "label": "Max median time to restore (h)",
         "hint": "1",
         "type": "number",
         "defaultValue": "1"
       }
+    ],
+    "hubRefs": [
+      "ff-change-failure-rate",
+      "req-alerting",
+      "req-zero-downtime-deploy"
     ]
   },
   "nodes": [
     {
       "id": "ff-mttr-1",
       "type": "fitness-fn",
-      "label": "Mean Time to Recovery",
-      "description": "Tracks time from incident detection to service restoration. Target: less than one hour for elite performers (DORA).",
+      "label": "Time to Restore Service",
+      "description": "From the incident tool: time between incident detection (first alert or report) and service restoration for user-impacting incidents, median per month. Excludes post-incident review time.",
       "x": 0,
       "y": 0,
       "width": 180,
       "height": 52,
       "collapsed": false,
-      "category": "operational",
+      "category": "process",
       "automated": false,
       "trigger": "periodic",
-      "threshold": "MTTR < {{MAX_MTTR_HOURS}} hour(s)",
-      "status": "active"
+      "threshold": "Median time to restore ≤ {{MAX_MTTR_HOURS}} h",
+      "status": "proposed"
     }
-  ]
+  ],
+  "relations": []
 }

@@ -2,41 +2,44 @@
   "hub": {
     "id": "req-idempotency",
     "category": "requirement",
-    "name": "Idempotent Operations",
-    "description": "Dependability: ubiquitous requirement ensuring that retried or duplicated requests do not cause unintended side effects.",
+    "name": "Idempotent Write Operations",
+    "description": "Retried or duplicated requests must not create duplicate side effects such as double orders or double charges.",
     "tags": [
-      "dependability",
       "reliability",
-      "idempotency",
-      "nfr",
-      "data-integrity"
+      "correctness",
+      "api"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "IDEMPOTENCY_WINDOW_HOURS",
-        "label": "Idempotency key window (hours)",
+        "label": "Idempotency key retention (h)",
         "hint": "24",
         "type": "number",
         "defaultValue": "24"
       }
+    ],
+    "hubRefs": [
+      "pattern-transactional-outbox",
+      "pattern-event-driven"
     ]
   },
   "nodes": [
     {
       "id": "req-idempotency-1",
       "type": "requirement",
-      "label": "Idempotent Operations",
+      "label": "Idempotent Write Operations",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "action": "implement idempotency keys for all state-changing API operations, ensuring that duplicate requests within a {{IDEMPOTENCY_WINDOW_HOURS}}-hour window produce the same result without creating duplicate records",
-      "rationale": "Network retries are unavoidable. Without idempotency, transient failures cause double-charges, duplicate orders, or data corruption."
+      "action": "accept an idempotency key on every state-changing operation and return the original result for any repeat of that key within {{IDEMPOTENCY_WINDOW_HOURS}} hours without re-executing the side effects",
+      "rationale": "Network timeouts make it impossible for a client to know whether a request was applied; safe retries are only possible when repeating a request is harmless."
     }
-  ]
+  ],
+  "relations": []
 }

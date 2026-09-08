@@ -22,9 +22,15 @@ variable "aws_region" {
 }
 
 variable "github_repo" {
-  description = "GitHub repository in 'owner/name' format. Used to scope the OIDC deploy role to pushes from the main branch only."
+  description = "GitHub repository in 'owner/name' format (informational; the OIDC trust is scoped by github_repository_id)."
   type        = string
   default     = "radicaltools/radical.tools"
+}
+
+variable "github_repository_id" {
+  description = "Immutable numeric GitHub repository id (gh api /repos/OWNER/NAME --jq .id). Used to scope the OIDC deploy role."
+  type        = string
+  default     = "1224486829"
 }
 
 variable "create_oidc_provider" {

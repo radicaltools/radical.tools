@@ -2,41 +2,44 @@
   "hub": {
     "id": "req-ci-pipeline-time",
     "category": "requirement",
-    "name": "CI Pipeline Duration",
-    "description": "Maintainability: state-driven requirement keeping the CI/CD feedback loop short enough to maintain developer flow.",
+    "name": "CI Feedback Time",
+    "description": "The pipeline gives developers a verdict fast enough to keep them in flow.",
     "tags": [
       "maintainability",
       "ci-cd",
-      "developer-experience",
-      "nfr"
+      "developer-experience"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "MAX_PIPELINE_MINUTES",
-        "label": "Max pipeline duration (minutes)",
+        "label": "Max pipeline duration (min)",
         "hint": "10",
         "type": "number",
         "defaultValue": "10"
       }
+    ],
+    "hubRefs": [
+      "ff-lead-time"
     ]
   },
   "nodes": [
     {
-      "id": "req-ci-time-1",
+      "id": "req-ci-pipeline-time-1",
       "type": "requirement",
-      "label": "CI Pipeline Duration",
+      "label": "CI Feedback Time",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
-      "ears_type": "state-driven",
+      "ears_type": "event-driven",
       "status": "draft",
       "priority": "should",
-      "precondition": "a developer pushes a commit to a feature branch",
-      "action": "complete the full build, lint, test, and security scan pipeline within {{MAX_PIPELINE_MINUTES}} minutes",
-      "rationale": "Pipelines longer than 10 minutes break developer flow, discourage frequent commits, and slow down feedback on regressions."
+      "trigger": "a developer pushes a commit to a branch",
+      "action": "complete build, static analysis, unit and integration tests and security scanning within {{MAX_PIPELINE_MINUTES}} minutes, parallelising or tiering slower suites as needed",
+      "rationale": "Slow pipelines push developers to batch commits and context-switch away, which delays feedback on regressions and inflates the size of every change."
     }
-  ]
+  ],
+  "relations": []
 }

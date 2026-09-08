@@ -2,28 +2,33 @@
   "hub": {
     "id": "adr-data-store",
     "category": "adr",
-    "name": "Data Store Selection",
-    "description": "Template ADR for choosing the primary data store (relational, document, key-value, graph, etc.). Considers consistency, scalability, query patterns, and operational complexity.",
+    "name": "Primary Data Store",
+    "description": "Records the choice of the main persistence technology and the data-model, consistency and operational trade-offs behind it.",
     "tags": [
       "database",
-      "storage",
-      "data",
-      "persistence"
+      "persistence",
+      "data"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "DATABASE",
-        "label": "Data store",
-        "hint": "PostgreSQL"
+        "label": "Chosen data store",
+        "hint": "PostgreSQL",
+        "defaultValue": "PostgreSQL"
       }
+    ],
+    "hubRefs": [
+      "adr-caching-strategy",
+      "req-data-integrity",
+      "req-db-query-response"
     ]
   },
   "nodes": [
     {
       "id": "adr-data-store-1",
       "type": "adr",
-      "label": "ADR: {{DATABASE}}",
+      "label": "ADR: {{DATABASE}} as primary data store",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -31,10 +36,11 @@
       "collapsed": false,
       "status": "proposed",
       "date": "",
-      "context": "The service needs a persistent data store. Key considerations: data model complexity (relational vs document), consistency requirements (strong vs eventual), expected query patterns (OLTP vs OLAP), scalability needs, and operational team capabilities.",
-      "decision": "We will use {{DATABASE}} as the primary data store because [RATIONALE]. It provides the right balance of consistency, query flexibility, and operational simplicity for our use case.",
-      "consequences": "• Schema management via [TOOL/APPROACH]\n• Backup and DR strategy: [APPROACH]\n• Vendor lock-in risk: [LOW/MEDIUM/HIGH]\n• Estimated operational cost: [ESTIMATE]",
-      "alternatives": "1. [Alternative DB A] — rejected: [reason]\n2. [Alternative DB B] — rejected: [reason]\n3. Multi-model approach — rejected: operational complexity too high at current team size"
+      "context": "The service needs a primary store for its transactional data. Forces: shape of the data (relational vs document vs graph), consistency needs (strong vs eventual), dominant query patterns (point lookups, joins, aggregations, search), expected growth, managed-service availability in our cloud, backup/restore and point-in-time recovery, and the team's operational experience.",
+      "decision": "Use {{DATABASE}} as the primary transactional store. Specialised needs (full-text search, caching, analytics, time series) are served by purpose-built secondary stores fed from the primary, never the other way round.",
+      "consequences": "• Schema changes go through versioned, backward-compatible migrations run by the pipeline.\n• Backups, point-in-time recovery and restore drills are part of the operational baseline.\n• Secondary stores are derived data and may be rebuilt from the primary at any time.\n• Query patterns that fight the chosen model (e.g. deep graph traversal on a relational store) are a signal to introduce a dedicated store, not to bend the primary.\n• Vendor and managed-service lock-in is accepted in exchange for operational simplicity.",
+      "alternatives": "1. Document store (MongoDB, DynamoDB) — flexible schema and horizontal scale; weaker for ad-hoc joins and multi-document transactions.\n2. Distributed SQL (CockroachDB, Spanner, YugabyteDB) — relational model with geo-scale; higher cost and latency floor.\n3. Multi-model from day one — each store optimal for its use; operational and consistency complexity too high for the current team size.\n4. Event store as system of record — perfect audit trail; requires CQRS discipline across the whole service."
     }
-  ]
+  ],
+  "relations": []
 }
