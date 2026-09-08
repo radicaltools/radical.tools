@@ -31,25 +31,10 @@ export interface HubLandingProps {
   onBrowse: () => void
   onSearch: (query: string) => void
   onCategory: (category: HubCategory) => void
-  onOpenConcept: (id: string) => void
-}
-
-/** A representative sample across categories: bundles first (they demo the
- *  viewer best), then one of each governance type. */
-function pickFeatured(concepts: HubConceptSummary[]): HubConceptSummary[] {
-  const byCat = (cat: HubCategory) => concepts.filter((c) => c.category === cat)
-  const out: HubConceptSummary[] = []
-  const take = (list: HubConceptSummary[], n: number) => { for (const c of list.slice(0, n)) if (!out.includes(c)) out.push(c) }
-  take(byCat('blueprint'), 1)
-  take(byCat('pattern'), 2)
-  take(byCat('requirement'), 1)
-  take(byCat('fitness-function'), 1)
-  take(byCat('adr'), 1)
-  return out.slice(0, 6)
 }
 
 export function HubLanding({
-  concepts, loading, studioUrl, theme, onToggleTheme, onBrowse, onSearch, onCategory, onOpenConcept,
+  concepts, loading, studioUrl, theme, onToggleTheme, onBrowse, onSearch, onCategory,
 }: HubLandingProps): React.ReactElement {
   const [query, setQuery] = useState('')
   const counts = useMemo(() => {
@@ -57,7 +42,6 @@ export function HubLanding({
     for (const c of concepts) m.set(c.category, (m.get(c.category) ?? 0) + 1)
     return m
   }, [concepts])
-  const featured = useMemo(() => pickFeatured(concepts), [concepts])
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -122,54 +106,6 @@ export function HubLanding({
           )
         })}
       </section>
-
-      <section className="hub-how">
-        <h2>Three steps from idea to model</h2>
-        <div className="hub-how-steps">
-          <div className="hub-how-step">
-            <span className="hub-how-n">1</span>
-            <h3>Explore</h3>
-            <p>Open any concept as a diagram, a wiki page or a table. Drag, collapse, re-layout — it is the real viewer.</p>
-          </div>
-          <div className="hub-how-step">
-            <span className="hub-how-n">2</span>
-            <h3>Select</h3>
-            <p>Collect the concepts you want. Blueprints let you pick individual elements and referenced items.</p>
-          </div>
-          <div className="hub-how-step">
-            <span className="hub-how-n">3</span>
-            <h3>Add to Studio</h3>
-            <p>One click opens Radical Studio with your selection queued for import — template parameters and all.</p>
-          </div>
-        </div>
-      </section>
-
-      {featured.length > 0 && (
-        <section className="hub-featured">
-          <div className="hub-featured-head">
-            <h2>Start with these</h2>
-            <button type="button" className="hub-link" onClick={onBrowse}>See all {concepts.length} →</button>
-          </div>
-          <div className="hub-featured-grid">
-            {featured.map((c) => {
-              const t = categoryTheme(c.category)
-              return (
-                <button
-                  type="button"
-                  key={c.id}
-                  className="hub-feat-card"
-                  style={{ ['--cat-color' as string]: t.color }}
-                  onClick={() => onOpenConcept(c.id)}
-                >
-                  <span className="hub-feat-cat"><TypeIcon path={t.iconPath} size={11} /> {t.label}</span>
-                  <span className="hub-feat-name">{c.name}</span>
-                  <span className="hub-feat-desc">{c.description}</span>
-                </button>
-              )
-            })}
-          </div>
-        </section>
-      )}
 
       <footer className="hub-landing-footer">
         <span>Radical Hub — part of <a href="https://radical.tools" target="_blank" rel="noopener">Radical.Tools</a>. MIT licensed.</span>

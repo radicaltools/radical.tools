@@ -366,7 +366,6 @@ function HubAppInner(): React.ReactElement {
           onBrowse={() => setBrowsing(true)}
           onSearch={(q) => { setSearch(q); setBrowsing(true) }}
           onCategory={(cat) => { setCategory(cat); setBrowsing(true) }}
-          onOpenConcept={openConcept}
         />
         <NotificationHost />
       </>
