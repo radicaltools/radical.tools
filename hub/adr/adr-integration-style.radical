@@ -23,7 +23,8 @@
       "pattern-event-driven",
       "pattern-circuit-breaker",
       "req-graceful-degradation",
-      "adr-event-schema-evolution"
+      "adr-event-schema-evolution",
+      "pattern-bff"
     ]
   },
   "nodes": [

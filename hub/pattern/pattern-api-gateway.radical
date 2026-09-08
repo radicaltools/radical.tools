@@ -16,7 +16,9 @@
       "req-auth",
       "req-rate-limiting",
       "adr-auth-strategy",
-      "pattern-microservices"
+      "pattern-microservices",
+      "pattern-bff",
+      "pattern-rate-limiter"
     ]
   },
   "nodes": [

@@ -1,0 +1,113 @@
+{
+  "hub": {
+    "id": "pattern-bulkhead",
+    "category": "pattern",
+    "name": "Bulkhead Isolation",
+    "description": "Resources used to call each downstream dependency — connection pools, thread pools, queues — are partitioned per dependency instead of shared. A slow or failing dependency exhausts only its own bulkhead, leaving capacity for calls to every other dependency.",
+    "tags": [
+      "bulkhead",
+      "resilience",
+      "isolation",
+      "resource-pools",
+      "fault-tolerance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-circuit-breaker",
+      "req-graceful-degradation",
+      "ff-latency-slo"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Checkout Service",
+      "description": "One slow dependency must not exhaust the resources every other dependency also needs.",
+      "width": 560,
+      "height": 400,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "api-service",
+      "type": "container",
+      "label": "Checkout API",
+      "description": "Calls two external providers through separate resource pools instead of one shared pool.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 500,
+      "height": 260,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "payment-pool",
+      "type": "component",
+      "label": "Payment Client Pool",
+      "description": "Its own bounded connection/thread pool. Exhausting it cannot starve any other downstream call.",
+      "technology": "10 connections, 200ms timeout",
+      "parentId": "api-service",
+      "width": 200,
+      "height": 120,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "shipping-pool",
+      "type": "component",
+      "label": "Shipping Client Pool",
+      "description": "A separate bounded pool, sized independently of the payment pool.",
+      "technology": "10 connections, 500ms timeout",
+      "parentId": "api-service",
+      "width": 200,
+      "height": 120,
+      "collapsed": false,
+      "x": 270,
+      "y": 110
+    },
+    {
+      "id": "payment-provider",
+      "type": "system",
+      "label": "Payment Provider",
+      "description": "Third-party, occasionally slow under load.",
+      "external": true,
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 0,
+      "y": 520
+    },
+    {
+      "id": "shipping-provider",
+      "type": "system",
+      "label": "Shipping Provider",
+      "description": "A different third party with an independent uptime record.",
+      "external": true,
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 420,
+      "y": 520
+    }
+  ],
+  "relations": [
+    {
+      "id": "payment-pool--payment-provider",
+      "sourceId": "payment-pool",
+      "targetId": "payment-provider",
+      "label": "Authorises payment",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "shipping-pool--shipping-provider",
+      "sourceId": "shipping-pool",
+      "targetId": "shipping-provider",
+      "label": "Requests shipping quote",
+      "technology": "HTTPS"
+    }
+  ]
+}

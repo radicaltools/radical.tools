@@ -1,0 +1,208 @@
+{
+  "hub": {
+    "id": "pattern-saga",
+    "category": "pattern",
+    "name": "Saga (Orchestrated)",
+    "description": "A business transaction that spans multiple services runs as a sequence of local transactions coordinated by an orchestrator. If a step fails, the orchestrator runs compensating actions for every step that already succeeded, trading atomicity for service autonomy and availability.",
+    "tags": [
+      "saga",
+      "distributed-transactions",
+      "orchestration",
+      "compensation",
+      "microservices"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-microservices",
+      "pattern-transactional-outbox",
+      "pattern-cqrs",
+      "req-idempotency",
+      "adr-data-consistency-model"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "customer",
+      "type": "person",
+      "label": "Customer",
+      "description": "Places an order that must touch payment, inventory and shipping.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Order Fulfilment",
+      "description": "Coordinates a business transaction that spans four services without a distributed transaction.",
+      "width": 1040,
+      "height": 580,
+      "collapsed": false,
+      "x": 0,
+      "y": 290
+    },
+    {
+      "id": "order-service",
+      "type": "container",
+      "label": "Order Service",
+      "description": "Accepts the order and starts the saga.",
+      "technology": "Node.js",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "orchestrator",
+      "type": "container",
+      "label": "Saga Orchestrator",
+      "description": "Drives each step in order; on failure, runs compensating actions for every step that already succeeded.",
+      "technology": "Temporal",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 110
+    },
+    {
+      "id": "saga-store",
+      "type": "database",
+      "label": "Saga State Store",
+      "description": "Persists each saga instance's current step and history, so an orchestrator crash resumes instead of losing the transaction.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 710,
+      "y": 110
+    },
+    {
+      "id": "payment-service",
+      "type": "container",
+      "label": "Payment Service",
+      "description": "Reserves and later captures payment. Reservations expire and release automatically.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 350
+    },
+    {
+      "id": "inventory-service",
+      "type": "container",
+      "label": "Inventory Service",
+      "description": "Reserves stock for the order line items.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 350
+    },
+    {
+      "id": "shipping-service",
+      "type": "container",
+      "label": "Shipping Service",
+      "description": "Books a carrier once payment and stock are both confirmed.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 710,
+      "y": 350
+    }
+  ],
+  "relations": [
+    {
+      "id": "customer--order-service",
+      "sourceId": "customer",
+      "targetId": "order-service",
+      "label": "Places order",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "order-service--orchestrator",
+      "sourceId": "order-service",
+      "targetId": "orchestrator",
+      "label": "Starts saga: FulfilOrder",
+      "technology": "async command"
+    },
+    {
+      "id": "orchestrator--saga-store",
+      "sourceId": "orchestrator",
+      "targetId": "saga-store",
+      "label": "Persists step, resumes after crash",
+      "technology": "SQL"
+    },
+    {
+      "id": "orchestrator--payment-service",
+      "sourceId": "orchestrator",
+      "targetId": "payment-service",
+      "label": "Step 1: Reserve payment (compensate: Release payment)",
+      "technology": "gRPC"
+    },
+    {
+      "id": "orchestrator--inventory-service",
+      "sourceId": "orchestrator",
+      "targetId": "inventory-service",
+      "label": "Step 2: Reserve stock (compensate: Release stock)",
+      "technology": "gRPC"
+    },
+    {
+      "id": "orchestrator--shipping-service",
+      "sourceId": "orchestrator",
+      "targetId": "shipping-service",
+      "label": "Step 3: Book carrier (compensate: Cancel booking)",
+      "technology": "gRPC"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "pattern-saga-seq",
+      "name": "Happy path: payment, stock and shipping all succeed",
+      "relationIds": [
+        "customer--order-service",
+        "order-service--orchestrator",
+        "orchestrator--payment-service",
+        "orchestrator--inventory-service",
+        "orchestrator--shipping-service"
+      ],
+      "stepDescriptions": [
+        "Customer places an order.",
+        "Order service starts the saga.",
+        "Orchestrator reserves payment.",
+        "Orchestrator reserves stock.",
+        "Orchestrator books shipping; saga completes. If any step above had failed, the orchestrator would instead run that step's compensation and every prior step's compensation, in reverse order."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "pattern-saga-flow",
+      "name": "Happy path: payment, stock and shipping all succeed",
+      "kind": "dynamic",
+      "sequenceId": "pattern-saga-seq",
+      "nodeIds": [
+        "customer",
+        "platform",
+        "order-service",
+        "orchestrator",
+        "saga-store",
+        "payment-service",
+        "inventory-service",
+        "shipping-service"
+      ],
+      "positions": {}
+    }
+  ]
+}

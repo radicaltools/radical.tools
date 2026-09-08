@@ -14,7 +14,9 @@
     "hubRefs": [
       "pattern-event-driven",
       "req-idempotency",
-      "adr-data-store"
+      "adr-data-store",
+      "pattern-saga",
+      "adr-data-consistency-model"
     ]
   },
   "nodes": [

@@ -14,7 +14,9 @@
     "hubRefs": [
       "req-graceful-degradation",
       "adr-integration-style",
-      "req-api-response-time"
+      "req-api-response-time",
+      "pattern-sidecar",
+      "pattern-bulkhead"
     ]
   },
   "nodes": [

@@ -1,0 +1,179 @@
+{
+  "hub": {
+    "id": "pattern-bff",
+    "category": "pattern",
+    "name": "Backend for Frontend (BFF)",
+    "description": "Each client channel gets its own thin backend shaped around that channel's screens and interaction model, instead of every channel consuming one generic API. Aggregation, field-shaping and channel-specific session handling live in the BFF; domain logic stays in the services behind it.",
+    "tags": [
+      "bff",
+      "api-aggregation",
+      "mobile",
+      "frontend",
+      "api-gateway"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-api-gateway",
+      "req-page-load-time",
+      "adr-integration-style"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "web-user",
+      "type": "person",
+      "label": "Web User",
+      "description": "Browses and buys on the desktop web app.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "mobile-user",
+      "type": "person",
+      "label": "Mobile User",
+      "description": "Uses the native mobile app, often on a slower connection.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 210,
+      "y": 0
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Storefront Platform",
+      "description": "One set of domain services, fronted by a BFF per channel instead of one generic API.",
+      "width": 1040,
+      "height": 580,
+      "collapsed": false,
+      "x": 0,
+      "y": 290
+    },
+    {
+      "id": "web-bff",
+      "type": "container",
+      "label": "Web BFF",
+      "description": "Aggregates and shapes responses for the desktop web app; owns the web session.",
+      "technology": "Node.js / GraphQL",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "mobile-bff",
+      "type": "container",
+      "label": "Mobile BFF",
+      "description": "Smaller payloads and field-level trimming tuned for mobile bandwidth and screens.",
+      "technology": "Node.js / GraphQL",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 110
+    },
+    {
+      "id": "catalog-service",
+      "type": "container",
+      "label": "Catalog Service",
+      "description": "Owns product data. No channel-specific logic.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 350
+    },
+    {
+      "id": "pricing-service",
+      "type": "container",
+      "label": "Pricing Service",
+      "description": "Computes prices and active promotions.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 350
+    },
+    {
+      "id": "order-service",
+      "type": "container",
+      "label": "Order Service",
+      "description": "Owns order placement and status.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 710,
+      "y": 350
+    }
+  ],
+  "relations": [
+    {
+      "id": "web-user--web-bff",
+      "sourceId": "web-user",
+      "targetId": "web-bff",
+      "label": "Uses web app",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "mobile-user--mobile-bff",
+      "sourceId": "mobile-user",
+      "targetId": "mobile-bff",
+      "label": "Uses mobile app",
+      "technology": "HTTPS / JSON"
+    },
+    {
+      "id": "web-bff--catalog-service",
+      "sourceId": "web-bff",
+      "targetId": "catalog-service",
+      "label": "Product detail, full fields",
+      "technology": "gRPC"
+    },
+    {
+      "id": "web-bff--pricing-service",
+      "sourceId": "web-bff",
+      "targetId": "pricing-service",
+      "label": "Price + promotions",
+      "technology": "gRPC"
+    },
+    {
+      "id": "web-bff--order-service",
+      "sourceId": "web-bff",
+      "targetId": "order-service",
+      "label": "Order history, full detail",
+      "technology": "gRPC"
+    },
+    {
+      "id": "mobile-bff--catalog-service",
+      "sourceId": "mobile-bff",
+      "targetId": "catalog-service",
+      "label": "Product summary, trimmed fields",
+      "technology": "gRPC"
+    },
+    {
+      "id": "mobile-bff--pricing-service",
+      "sourceId": "mobile-bff",
+      "targetId": "pricing-service",
+      "label": "Price only",
+      "technology": "gRPC"
+    },
+    {
+      "id": "mobile-bff--order-service",
+      "sourceId": "mobile-bff",
+      "targetId": "order-service",
+      "label": "Order status, push-friendly shape",
+      "technology": "gRPC"
+    }
+  ]
+}

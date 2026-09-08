@@ -12,7 +12,9 @@
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "hubRefs": [
       "pattern-circuit-breaker",
-      "adr-integration-style"
+      "adr-integration-style",
+      "req-error-recovery",
+      "pattern-bulkhead"
     ]
   },
   "nodes": [

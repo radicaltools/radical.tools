@@ -21,7 +21,8 @@
     "hubRefs": [
       "adr-caching-strategy",
       "req-data-integrity",
-      "req-db-query-response"
+      "req-db-query-response",
+      "adr-multi-tenancy-strategy"
     ]
   },
   "nodes": [

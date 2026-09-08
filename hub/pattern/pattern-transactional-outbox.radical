@@ -15,7 +15,8 @@
     "hubRefs": [
       "req-idempotency",
       "pattern-event-driven",
-      "adr-integration-style"
+      "adr-integration-style",
+      "pattern-saga"
     ]
   },
   "nodes": [

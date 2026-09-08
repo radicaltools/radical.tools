@@ -21,7 +21,9 @@
     ],
     "hubRefs": [
       "ff-error-budget",
-      "req-availability"
+      "req-availability",
+      "req-error-recovery",
+      "req-batch-job-completion"
     ]
   },
   "nodes": [

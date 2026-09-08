@@ -17,7 +17,8 @@
       "adr-event-schema-evolution",
       "req-event-schema-compatibility",
       "req-idempotency",
-      "pattern-transactional-outbox"
+      "pattern-transactional-outbox",
+      "adr-data-consistency-model"
     ]
   },
   "nodes": [

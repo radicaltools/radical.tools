@@ -12,7 +12,8 @@
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "hubRefs": [
       "adr-deployment-strategy",
-      "ff-deploy-frequency"
+      "ff-deploy-frequency",
+      "req-config-propagation"
     ]
   },
   "nodes": [

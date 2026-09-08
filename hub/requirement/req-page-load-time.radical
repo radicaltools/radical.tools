@@ -35,7 +35,8 @@
       }
     ],
     "hubRefs": [
-      "ff-web-vitals"
+      "ff-web-vitals",
+      "pattern-bff"
     ]
   },
   "nodes": [

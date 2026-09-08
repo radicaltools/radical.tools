@@ -12,7 +12,8 @@
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "hubRefs": [
       "ff-infra-drift",
-      "req-secrets-management"
+      "req-secrets-management",
+      "req-config-propagation"
     ]
   },
   "nodes": [

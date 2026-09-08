@@ -18,6 +18,9 @@
         "type": "number",
         "defaultValue": "5"
       }
+    ],
+    "hubRefs": [
+      "req-task-success-rate"
     ]
   },
   "nodes": [

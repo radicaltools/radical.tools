@@ -1,0 +1,122 @@
+{
+  "hub": {
+    "id": "pattern-sidecar",
+    "category": "pattern",
+    "name": "Sidecar (Service Mesh)",
+    "description": "A proxy process runs alongside each service instance and intercepts all of its network traffic, handling mTLS, retries, timeouts and telemetry so the service's own code stays free of that logic. A control plane pushes routing and security policy to every sidecar.",
+    "tags": [
+      "sidecar",
+      "service-mesh",
+      "mtls",
+      "observability",
+      "infrastructure"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-circuit-breaker",
+      "req-distributed-tracing",
+      "req-least-privilege"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Service Mesh",
+      "description": "Cross-cutting network concerns move out of application code and into a uniform sidecar proxy per instance.",
+      "width": 620,
+      "height": 640,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "order-service",
+      "type": "container",
+      "label": "Order Service",
+      "description": "Business logic for orders. Unaware of mTLS, retries or tracing headers — the sidecar handles all of it.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 260,
+      "height": 260,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "order-sidecar",
+      "type": "component",
+      "label": "Sidecar",
+      "description": "Intercepts all inbound/outbound traffic for this instance: mTLS, retries, timeouts, load balancing and telemetry.",
+      "technology": "Envoy",
+      "parentId": "order-service",
+      "width": 200,
+      "height": 120,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "payment-service",
+      "type": "container",
+      "label": "Payment Service",
+      "description": "Business logic for payments. Same code whether it's called in dev or across regions in prod.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 260,
+      "height": 260,
+      "collapsed": false,
+      "x": 330,
+      "y": 110
+    },
+    {
+      "id": "payment-sidecar",
+      "type": "component",
+      "label": "Sidecar",
+      "description": "Intercepts all inbound/outbound traffic for this instance: mTLS, retries, timeouts, load balancing and telemetry.",
+      "technology": "Envoy",
+      "parentId": "payment-service",
+      "width": 200,
+      "height": 120,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "control-plane",
+      "type": "container",
+      "label": "Mesh Control Plane",
+      "description": "Pushes routing rules, mTLS certificates and traffic policy to every sidecar; aggregates the telemetry they emit.",
+      "technology": "Istio",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 410
+    }
+  ],
+  "relations": [
+    {
+      "id": "order-sidecar--payment-sidecar",
+      "sourceId": "order-sidecar",
+      "targetId": "payment-sidecar",
+      "label": "Order service's call to Payment is transparently intercepted, mTLS-wrapped and retried here",
+      "technology": "mTLS / HTTP2"
+    },
+    {
+      "id": "control-plane--order-sidecar",
+      "sourceId": "control-plane",
+      "targetId": "order-sidecar",
+      "label": "Pushes policy, certs; pulls telemetry",
+      "technology": "xDS"
+    },
+    {
+      "id": "control-plane--payment-sidecar",
+      "sourceId": "control-plane",
+      "targetId": "payment-sidecar",
+      "label": "Pushes policy, certs; pulls telemetry",
+      "technology": "xDS"
+    }
+  ]
+}

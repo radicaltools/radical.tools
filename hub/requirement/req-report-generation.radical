@@ -18,6 +18,10 @@
         "type": "number",
         "defaultValue": "30"
       }
+    ],
+    "hubRefs": [
+      "req-db-query-response",
+      "req-throughput"
     ]
   },
   "nodes": [

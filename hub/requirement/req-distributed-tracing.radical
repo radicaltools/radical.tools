@@ -21,7 +21,8 @@
     ],
     "hubRefs": [
       "adr-observability",
-      "req-centralised-logging"
+      "req-centralised-logging",
+      "pattern-sidecar"
     ]
   },
   "nodes": [
