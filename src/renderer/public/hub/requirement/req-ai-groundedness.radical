@@ -1,0 +1,46 @@
+{
+  "hub": {
+    "id": "req-ai-groundedness",
+    "category": "requirement",
+    "name": "Grounded AI Responses",
+    "description": "Factual claims made by an AI assistant are backed by retrieved sources and measured for groundedness.",
+    "tags": [
+      "ai",
+      "llm",
+      "rag",
+      "trustworthiness"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "GROUNDEDNESS_MIN_PCT",
+        "label": "Minimum groundedness score (%)",
+        "hint": "95",
+        "type": "number",
+        "defaultValue": "95"
+      }
+    ],
+    "hubRefs": [
+      "req-ai-human-handoff",
+      "ff-ai-eval-gate"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-ai-groundedness-1",
+      "type": "requirement",
+      "label": "Grounded AI Responses",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "cite the retrieved document or governed data source for every factual claim, refuse to answer when no supporting source is retrieved, and maintain a groundedness score of at least {{GROUNDEDNESS_MIN_PCT}}% on the evaluation set",
+      "rationale": "Language models produce fluent but unsupported statements; retrieval grounding and continuous evaluation reduce that risk to a measurable level and make the residual errors traceable."
+    }
+  ],
+  "relations": []
+}

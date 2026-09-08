@@ -2,55 +2,59 @@
   "hub": {
     "id": "req-disaster-recovery",
     "category": "requirement",
-    "name": "Disaster Recovery Failover",
-    "description": "Event-driven requirement: when the primary region fails, the system must failover to a secondary region within a defined time window.",
+    "name": "Regional Failover",
+    "description": "Recovery objectives when an entire region or availability zone becomes unavailable.",
     "tags": [
+      "availability",
       "disaster-recovery",
-      "failover",
-      "reliability",
-      "nfr"
+      "resilience"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "OUTAGE_THRESHOLD_SECONDS",
-        "label": "Primary outage threshold before failover (seconds)",
-        "hint": "30",
+        "label": "Outage detection threshold (s)",
+        "hint": "60",
         "type": "number",
-        "defaultValue": "30"
+        "defaultValue": "60"
       },
       {
         "key": "RTO_MINUTES",
-        "label": "Recovery Time Objective (minutes)",
-        "hint": "5",
+        "label": "Recovery Time Objective (min)",
+        "hint": "15",
         "type": "number",
-        "defaultValue": "5"
+        "defaultValue": "15"
       },
       {
         "key": "RPO_MINUTES",
-        "label": "Recovery Point Objective (minutes)",
-        "hint": "1",
+        "label": "Recovery Point Objective (min)",
+        "hint": "5",
         "type": "number",
-        "defaultValue": "1"
+        "defaultValue": "5"
       }
+    ],
+    "hubRefs": [
+      "adr-multi-region",
+      "req-availability"
     ]
   },
   "nodes": [
     {
-      "id": "req-dr-failover-1",
+      "id": "req-disaster-recovery-1",
       "type": "requirement",
-      "label": "Disaster Recovery Failover",
+      "label": "Regional Failover",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "event-driven",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "trigger": "the primary region becomes unavailable for more than {{OUTAGE_THRESHOLD_SECONDS}} seconds",
-      "action": "automatically failover to the secondary region with an RTO of {{RTO_MINUTES}} minutes and RPO of {{RPO_MINUTES}} minute",
-      "rationale": "Business continuity requires rapid recovery from regional outages to minimize revenue loss."
+      "trigger": "the primary region has been unreachable for more than {{OUTAGE_THRESHOLD_SECONDS}} seconds",
+      "action": "fail over to the secondary region and resume service within {{RTO_MINUTES}} minutes, losing no more than {{RPO_MINUTES}} minutes of committed data",
+      "rationale": "RTO and RPO are the two numbers that decide the replication topology and the price of the DR setup; stating them up front avoids discovering the gap during an outage."
     }
-  ]
+  ],
+  "relations": []
 }

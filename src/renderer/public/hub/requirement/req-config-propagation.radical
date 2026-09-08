@@ -2,41 +2,41 @@
   "hub": {
     "id": "req-config-propagation",
     "category": "requirement",
-    "name": "Configuration Propagation Speed",
-    "description": "Manageability: global configuration changes must propagate to all nodes within 5 minutes to enable timely operational control.",
+    "name": "Configuration Propagation",
+    "description": "Runtime configuration and feature-flag changes take effect across the fleet quickly and observably.",
     "tags": [
-      "manageability",
-      "configuration",
       "operations",
-      "nfr"
+      "configuration",
+      "feature-flags"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "CONFIG_PROPAGATION_SECONDS",
-        "label": "Max config propagation time (seconds)",
-        "hint": "300",
+        "label": "Max propagation time (s)",
+        "hint": "60",
         "type": "number",
-        "defaultValue": "300"
+        "defaultValue": "60"
       }
     ]
   },
   "nodes": [
     {
-      "id": "req-config-prop-1",
+      "id": "req-config-propagation-1",
       "type": "requirement",
-      "label": "Configuration Propagation Speed",
+      "label": "Configuration Propagation",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
-      "ears_type": "state-driven",
-      "status": "approved",
+      "ears_type": "event-driven",
+      "status": "draft",
       "priority": "must",
-      "precondition": "an operator applies a configuration change via the control plane",
-      "action": "propagate configuration changes to all running nodes within {{CONFIG_PROPAGATION_SECONDS}} seconds, with propagation lag monitored and alerted if the threshold is exceeded",
-      "rationale": "Slow config propagation delays operational responses to incidents. Feature flag changes, rate limit updates, and circuit breaker thresholds must take effect before an incident escalates."
+      "trigger": "an operator changes a runtime configuration value or feature flag",
+      "action": "apply the change on every running instance within {{CONFIG_PROPAGATION_SECONDS}} seconds without a restart, and expose per-instance configuration version so lag can be monitored",
+      "rationale": "Kill switches, rate limits and circuit-breaker thresholds are only useful during an incident if they take effect faster than the incident escalates."
     }
-  ]
+  ],
+  "relations": []
 }

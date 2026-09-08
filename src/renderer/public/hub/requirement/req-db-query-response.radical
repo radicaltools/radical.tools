@@ -2,42 +2,44 @@
   "hub": {
     "id": "req-db-query-response",
     "category": "requirement",
-    "name": "Database Query Response Time",
-    "description": "Performance: OLTP database queries must execute within 100ms to prevent query latency from dominating API response times.",
+    "name": "Database Query Latency",
+    "description": "Latency budget for transactional (OLTP) database queries, which usually dominate API response time.",
     "tags": [
       "performance",
       "database",
-      "latency",
-      "nfr",
-      "oltp"
+      "latency"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
-        "key": "DB_P90_MS",
-        "label": "DB query P90 target (ms)",
-        "hint": "100",
+        "key": "DB_P95_MS",
+        "label": "p95 query latency (ms)",
+        "hint": "50",
         "type": "number",
-        "defaultValue": "100"
+        "defaultValue": "50"
       }
+    ],
+    "hubRefs": [
+      "req-api-response-time"
     ]
   },
   "nodes": [
     {
-      "id": "req-db-rt-1",
+      "id": "req-db-query-response-1",
       "type": "requirement",
-      "label": "Database Query Response Time",
+      "label": "Database Query Latency",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "state-driven",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "precondition": "the system is running standard OLTP operations on a production-size dataset",
-      "action": "execute standard transactional queries within {{DB_P90_MS}}ms at the 90th percentile, monitored via continuous database performance telemetry",
-      "rationale": "Database query time is typically the largest single contributor to API latency. Queries exceeding 100ms expose APIs to SLO breaches under concurrent load."
+      "precondition": "the database holds a production-sized dataset and serves normal transactional load",
+      "action": "execute transactional queries within {{DB_P95_MS}} ms at the 95th percentile, with slow-query logging enabled for anything above the threshold",
+      "rationale": "A request typically issues several queries, so the database budget must be a small fraction of the API budget to leave room for serialisation, network and business logic."
     }
-  ]
+  ],
+  "relations": []
 }

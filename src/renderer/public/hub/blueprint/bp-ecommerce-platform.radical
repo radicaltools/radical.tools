@@ -1,0 +1,720 @@
+{
+  "hub": {
+    "id": "bp-ecommerce-platform",
+    "category": "blueprint",
+    "name": "E-commerce Platform",
+    "description": "Modular commerce backend — storefront, catalogue, cart and checkout, orders, payments and fulfilment — with the controls a payment-handling system needs. Generic requirements, fitness functions and decisions are linked as related concepts.",
+    "tags": [
+      "e-commerce",
+      "retail",
+      "payments",
+      "microservices",
+      "event-driven"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "CHECKOUT_P95_MS",
+        "label": "p95 checkout step latency (ms)",
+        "hint": "800",
+        "type": "number",
+        "defaultValue": "800"
+      },
+      {
+        "key": "RESERVATION_MINUTES",
+        "label": "Reservation hold (min)",
+        "hint": "15",
+        "type": "number",
+        "defaultValue": "15"
+      },
+      {
+        "key": "MAX_DROP_PP",
+        "label": "Max step-conversion drop vs 7-day baseline (pp)",
+        "hint": "3",
+        "type": "number",
+        "defaultValue": "3"
+      },
+      {
+        "key": "INDEX_LAG_SECONDS",
+        "label": "Max catalogue-to-index lag (s)",
+        "hint": "30",
+        "type": "number",
+        "defaultValue": "30"
+      }
+    ],
+    "hubRefs": [
+      "req-availability",
+      "req-api-response-time",
+      "req-page-load-time",
+      "req-idempotency",
+      "req-auth",
+      "req-encryption",
+      "req-rate-limiting",
+      "req-audit-logging",
+      "ff-latency-slo",
+      "ff-error-budget",
+      "ff-web-vitals",
+      "ff-security-scan",
+      "adr-integration-style",
+      "adr-deployment-strategy",
+      "adr-caching-strategy",
+      "pattern-api-gateway",
+      "pattern-transactional-outbox",
+      "pattern-circuit-breaker"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "shopper",
+      "type": "person",
+      "label": "Shopper",
+      "description": "Browses, adds to cart, pays.",
+      "x": 0,
+      "y": 0,
+      "width": 150,
+      "height": 170,
+      "collapsed": false
+    },
+    {
+      "id": "ops",
+      "type": "person",
+      "label": "Operations Staff",
+      "description": "Manages catalogue, prices and fulfilment exceptions.",
+      "x": 210,
+      "y": 0,
+      "width": 150,
+      "height": 170,
+      "collapsed": false
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Commerce Platform",
+      "description": "Independently deployable services behind a gateway; state changes flow as events.",
+      "x": 0,
+      "y": 290,
+      "width": 1720,
+      "height": 750,
+      "collapsed": false
+    },
+    {
+      "id": "storefront",
+      "type": "webapp",
+      "label": "Storefront",
+      "description": "Server-rendered storefront with client-side cart.",
+      "technology": "Next.js",
+      "parentId": "platform",
+      "x": 30,
+      "y": 110,
+      "width": 210,
+      "height": 140,
+      "collapsed": false
+    },
+    {
+      "id": "backoffice",
+      "type": "webapp",
+      "label": "Back Office",
+      "description": "Catalogue, pricing and order management UI.",
+      "technology": "React",
+      "parentId": "platform",
+      "x": 370,
+      "y": 110,
+      "width": 210,
+      "height": 140,
+      "collapsed": false
+    },
+    {
+      "id": "gateway",
+      "type": "container",
+      "label": "API Gateway",
+      "description": "TLS, authentication, rate limiting, routing.",
+      "technology": "Envoy",
+      "parentId": "platform",
+      "x": 710,
+      "y": 110,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "bus",
+      "type": "queue",
+      "label": "Event Bus",
+      "description": "OrderPlaced, PaymentCaptured, ShipmentDispatched, …",
+      "technology": "Apache Kafka",
+      "parentId": "platform",
+      "x": 1050,
+      "y": 110,
+      "width": 220,
+      "height": 95,
+      "collapsed": false
+    },
+    {
+      "id": "catalog",
+      "type": "container",
+      "label": "Catalog Service",
+      "description": "Products, variants, prices, stock; publishes a search projection.",
+      "technology": "Go",
+      "parentId": "platform",
+      "x": 1390,
+      "y": 110,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "cart",
+      "type": "container",
+      "label": "Cart & Checkout Service",
+      "description": "Cart state, promotions, tax and shipping quotes; creates the order.",
+      "technology": "Node.js",
+      "parentId": "platform",
+      "x": 30,
+      "y": 350,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "orders",
+      "type": "container",
+      "label": "Order Service",
+      "description": "Order lifecycle and status; source of truth for orders.",
+      "technology": "Java / Spring Boot",
+      "parentId": "platform",
+      "x": 370,
+      "y": 350,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "payments",
+      "type": "container",
+      "label": "Payment Service",
+      "description": "Tokenised payments via the provider; never stores card data (PCI DSS scope reduction).",
+      "technology": "Kotlin",
+      "parentId": "platform",
+      "x": 710,
+      "y": 350,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "fulfilment",
+      "type": "container",
+      "label": "Fulfilment Service",
+      "description": "Picks warehouse, books carrier, tracks shipment.",
+      "technology": "C# / .NET",
+      "parentId": "platform",
+      "x": 1050,
+      "y": 350,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "catalog-db",
+      "type": "database",
+      "label": "Catalog DB",
+      "description": "Owned by Catalog Service.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "x": 1390,
+      "y": 350,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "cart-db",
+      "type": "database",
+      "label": "Cart Store",
+      "description": "Short-lived carts with TTL.",
+      "technology": "Redis",
+      "parentId": "platform",
+      "x": 30,
+      "y": 590,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "orders-db",
+      "type": "database",
+      "label": "Orders DB",
+      "description": "Orders plus outbox table.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "x": 370,
+      "y": 590,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "payments-db",
+      "type": "database",
+      "label": "Payments DB",
+      "description": "Payment intents and provider references.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "x": 710,
+      "y": 590,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "search",
+      "type": "database",
+      "label": "Search Index",
+      "description": "Product search projection.",
+      "technology": "OpenSearch",
+      "parentId": "platform",
+      "x": 1050,
+      "y": 590,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "psp",
+      "type": "system",
+      "label": "Payment Provider",
+      "description": "Card authorisation and capture.",
+      "external": true,
+      "x": 0,
+      "y": 1160,
+      "width": 360,
+      "height": 260,
+      "collapsed": false
+    },
+    {
+      "id": "carrier",
+      "type": "system",
+      "label": "Carrier API",
+      "description": "Shipping labels and tracking.",
+      "external": true,
+      "x": 420,
+      "y": 1160,
+      "width": 360,
+      "height": 260,
+      "collapsed": false
+    },
+    {
+      "id": "email",
+      "type": "system",
+      "label": "E-mail Provider",
+      "description": "Transactional e-mail.",
+      "external": true,
+      "x": 840,
+      "y": 1160,
+      "width": 360,
+      "height": 260,
+      "collapsed": false
+    },
+    {
+      "id": "req-checkout-latency",
+      "type": "requirement",
+      "label": "Checkout Step Latency",
+      "x": 0,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "a shopper submits a checkout step (address, shipping, payment)",
+      "action": "respond within {{CHECKOUT_P95_MS}} ms at the 95th percentile including tax, shipping and payment-provider calls",
+      "rationale": "Checkout is where latency converts directly into abandoned carts; every step has a visible cost.",
+      "templateParams": [
+        {
+          "key": "CHECKOUT_P95_MS",
+          "label": "p95 checkout step latency (ms)",
+          "hint": "800",
+          "type": "number",
+          "defaultValue": "800"
+        }
+      ]
+    },
+    {
+      "id": "req-payment-once",
+      "type": "requirement",
+      "label": "Exactly-Once Payment Capture",
+      "x": 320,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "capture payment for an order at most once, using the provider's idempotency key derived from the order id, and reconcile captures against orders daily",
+      "rationale": "Double charges are the most damaging defect a shop can ship; idempotency at the provider boundary plus reconciliation makes them detectable and preventable."
+    },
+    {
+      "id": "req-stock-reservation",
+      "type": "requirement",
+      "label": "Stock Reservation",
+      "x": 640,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "an order is placed",
+      "action": "reserve stock for each line within the same transaction that records the order and release it automatically if payment is not captured within {{RESERVATION_MINUTES}} minutes",
+      "rationale": "Overselling creates cancellations and support load; unbounded reservations starve other shoppers.",
+      "templateParams": [
+        {
+          "key": "RESERVATION_MINUTES",
+          "label": "Reservation hold (min)",
+          "hint": "15",
+          "type": "number",
+          "defaultValue": "15"
+        }
+      ]
+    },
+    {
+      "id": "req-pci-scope",
+      "type": "requirement",
+      "label": "No Card Data at Rest",
+      "x": 960,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "never store, log or transmit primary account numbers through platform services; use provider tokenisation and hosted payment fields so card data reaches only the provider",
+      "rationale": "Keeping card data out of the platform reduces PCI DSS scope from the whole system to the integration boundary."
+    },
+    {
+      "id": "ff-checkout-conversion",
+      "type": "fitness-fn",
+      "label": "Checkout Funnel Guard",
+      "description": "Compares per-step checkout conversion from product analytics with the trailing 7-day baseline after each deployment; a significant drop triggers rollback review.",
+      "x": 0,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "holistic",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "No checkout step conversion more than {{MAX_DROP_PP}} pp below baseline in the hour after a release",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "MAX_DROP_PP",
+          "label": "Max step-conversion drop vs 7-day baseline (pp)",
+          "hint": "3",
+          "type": "number",
+          "defaultValue": "3"
+        }
+      ]
+    },
+    {
+      "id": "ff-payment-reconciliation",
+      "type": "fitness-fn",
+      "label": "Payment Reconciliation",
+      "description": "Nightly job matches provider settlement reports against captured payments and orders; unmatched records are reported to finance and on-call.",
+      "x": 320,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "0 unmatched captures or orders older than 24 h",
+      "status": "proposed"
+    },
+    {
+      "id": "ff-search-freshness",
+      "type": "fitness-fn",
+      "label": "Search Index Freshness",
+      "description": "Measures the lag between catalogue changes and their appearance in the search projection via a canary product updated every minute.",
+      "x": 640,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "Index lag ≤ {{INDEX_LAG_SECONDS}} s",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "INDEX_LAG_SECONDS",
+          "label": "Max catalogue-to-index lag (s)",
+          "hint": "30",
+          "type": "number",
+          "defaultValue": "30"
+        }
+      ]
+    },
+    {
+      "id": "adr-hosted-payments",
+      "type": "adr",
+      "label": "ADR: Hosted payment fields",
+      "x": 0,
+      "y": 1912,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "status": "accepted",
+      "date": "",
+      "context": "Handling card data directly puts the entire platform in PCI DSS scope with yearly audits and strict controls.",
+      "decision": "Use the provider's hosted fields and tokenisation; the platform stores only payment tokens and intent ids.",
+      "consequences": "PCI scope shrinks to SAQ A-EP level; checkout UI is partially controlled by the provider; switching providers requires re-tokenisation.",
+      "alternatives": "1. Own card form with server-side tokenisation — more control, full PCI scope. 2. Redirect to provider page — smallest scope, visibly worse UX."
+    },
+    {
+      "id": "adr-database-per-service",
+      "type": "adr",
+      "label": "ADR: Database per service",
+      "x": 320,
+      "y": 1912,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "status": "accepted",
+      "date": "",
+      "context": "A shared schema couples deployment of all services and makes ownership of data ambiguous.",
+      "decision": "Each service owns its store; other services get data through APIs or events, never through the database.",
+      "consequences": "Independent deployment and scaling; cross-service reports require projections or a data platform; joins across services are not possible in SQL.",
+      "alternatives": "1. Shared database — simple joins, tight coupling. 2. Shared schema with per-service tables — coupling through migrations remains."
+    }
+  ],
+  "relations": [
+    {
+      "id": "shopper--storefront",
+      "sourceId": "shopper",
+      "targetId": "storefront",
+      "label": "Shops",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "ops--backoffice",
+      "sourceId": "ops",
+      "targetId": "backoffice",
+      "label": "Manages catalogue and orders",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "storefront--gateway",
+      "sourceId": "storefront",
+      "targetId": "gateway",
+      "label": "Calls API",
+      "technology": "HTTPS / JSON"
+    },
+    {
+      "id": "backoffice--gateway",
+      "sourceId": "backoffice",
+      "targetId": "gateway",
+      "label": "Calls API",
+      "technology": "HTTPS / JSON"
+    },
+    {
+      "id": "gateway--catalog",
+      "sourceId": "gateway",
+      "targetId": "catalog",
+      "label": "Routes /catalog/**",
+      "technology": "gRPC"
+    },
+    {
+      "id": "gateway--cart",
+      "sourceId": "gateway",
+      "targetId": "cart",
+      "label": "Routes /cart/**, /checkout/**",
+      "technology": "HTTP"
+    },
+    {
+      "id": "gateway--orders",
+      "sourceId": "gateway",
+      "targetId": "orders",
+      "label": "Routes /orders/**",
+      "technology": "HTTP"
+    },
+    {
+      "id": "catalog--catalog-db",
+      "sourceId": "catalog",
+      "targetId": "catalog-db",
+      "label": "Reads / writes",
+      "technology": "SQL"
+    },
+    {
+      "id": "catalog--search",
+      "sourceId": "catalog",
+      "targetId": "search",
+      "label": "Updates search projection",
+      "technology": "HTTP bulk"
+    },
+    {
+      "id": "cart--cart-db",
+      "sourceId": "cart",
+      "targetId": "cart-db",
+      "label": "Reads / writes carts",
+      "technology": "Redis protocol"
+    },
+    {
+      "id": "cart--catalog",
+      "sourceId": "cart",
+      "targetId": "catalog",
+      "label": "Fetches prices and availability",
+      "technology": "gRPC"
+    },
+    {
+      "id": "cart--orders",
+      "sourceId": "cart",
+      "targetId": "orders",
+      "label": "Creates order",
+      "technology": "HTTP"
+    },
+    {
+      "id": "orders--orders-db",
+      "sourceId": "orders",
+      "targetId": "orders-db",
+      "label": "Writes order + outbox",
+      "technology": "SQL"
+    },
+    {
+      "id": "orders--bus",
+      "sourceId": "orders",
+      "targetId": "bus",
+      "label": "Publishes OrderPlaced (via outbox)",
+      "technology": "Avro"
+    },
+    {
+      "id": "bus--payments",
+      "sourceId": "bus",
+      "targetId": "payments",
+      "label": "Delivers OrderPlaced",
+      "technology": "Consumer group"
+    },
+    {
+      "id": "payments--payments-db",
+      "sourceId": "payments",
+      "targetId": "payments-db",
+      "label": "Reads / writes intents",
+      "technology": "SQL"
+    },
+    {
+      "id": "payments--psp",
+      "sourceId": "payments",
+      "targetId": "psp",
+      "label": "Authorises and captures",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "payments--bus",
+      "sourceId": "payments",
+      "targetId": "bus",
+      "label": "Publishes PaymentCaptured / PaymentFailed",
+      "technology": "Avro"
+    },
+    {
+      "id": "bus--orders",
+      "sourceId": "bus",
+      "targetId": "orders",
+      "label": "Delivers payment and shipment events",
+      "technology": "Consumer group"
+    },
+    {
+      "id": "bus--fulfilment",
+      "sourceId": "bus",
+      "targetId": "fulfilment",
+      "label": "Delivers PaymentCaptured",
+      "technology": "Consumer group"
+    },
+    {
+      "id": "fulfilment--carrier",
+      "sourceId": "fulfilment",
+      "targetId": "carrier",
+      "label": "Books shipment",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "fulfilment--bus",
+      "sourceId": "fulfilment",
+      "targetId": "bus",
+      "label": "Publishes ShipmentDispatched",
+      "technology": "Avro"
+    },
+    {
+      "id": "orders--email",
+      "sourceId": "orders",
+      "targetId": "email",
+      "label": "Sends order confirmation",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "req-checkout-latency--cart",
+      "sourceId": "req-checkout-latency",
+      "targetId": "cart",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-payment-once--payments",
+      "sourceId": "req-payment-once",
+      "targetId": "payments",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-stock-reservation--orders",
+      "sourceId": "req-stock-reservation",
+      "targetId": "orders",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-pci-scope--payments",
+      "sourceId": "req-pci-scope",
+      "targetId": "payments",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-checkout-latency--ff-checkout-conversion",
+      "sourceId": "req-checkout-latency",
+      "targetId": "ff-checkout-conversion",
+      "relationType": "traces-to"
+    },
+    {
+      "id": "req-payment-once--ff-payment-reconciliation",
+      "sourceId": "req-payment-once",
+      "targetId": "ff-payment-reconciliation",
+      "relationType": "traces-to"
+    },
+    {
+      "id": "ff-search-freshness--search",
+      "sourceId": "ff-search-freshness",
+      "targetId": "search",
+      "relationType": "constrains"
+    },
+    {
+      "id": "adr-hosted-payments--payments",
+      "sourceId": "adr-hosted-payments",
+      "targetId": "payments",
+      "relationType": "constrains"
+    },
+    {
+      "id": "adr-database-per-service--platform",
+      "sourceId": "adr-database-per-service",
+      "targetId": "platform",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-pci-scope--adr-hosted-payments",
+      "sourceId": "req-pci-scope",
+      "targetId": "adr-hosted-payments",
+      "relationType": "traces-to"
+    }
+  ]
+}

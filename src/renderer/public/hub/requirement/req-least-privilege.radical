@@ -2,40 +2,43 @@
   "hub": {
     "id": "req-least-privilege",
     "category": "requirement",
-    "name": "Principle of Least Privilege",
-    "description": "Security: users and services must be granted only the minimum permissions required for their role, reducing blast radius from compromised accounts.",
+    "name": "Least Privilege Access",
+    "description": "Users and service identities hold only the permissions their role requires, and those permissions are reviewed regularly.",
     "tags": [
       "security",
       "access-control",
-      "authorisation",
-      "nfr",
       "iam"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "ACCESS_REVIEW_FREQUENCY",
-        "label": "Access review frequency",
+        "label": "Access review cadence",
         "hint": "quarterly",
         "defaultValue": "quarterly"
       }
+    ],
+    "hubRefs": [
+      "req-mfa",
+      "req-secrets-management"
     ]
   },
   "nodes": [
     {
-      "id": "req-least-priv-1",
+      "id": "req-least-privilege-1",
       "type": "requirement",
-      "label": "Principle of Least Privilege",
+      "label": "Least Privilege Access",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "action": "grant every user account and service identity the minimum set of permissions necessary to perform its function, with access reviewed {{ACCESS_REVIEW_FREQUENCY}} and excess permissions revoked",
-      "rationale": "Least privilege limits blast radius when credentials are compromised. Google's BeyondCorp and Zero Trust models prove that eliminating implicit trust is the most effective defence against lateral movement."
+      "action": "grant every user account and workload identity the minimum permission set needed for its function, review all grants {{ACCESS_REVIEW_FREQUENCY}}, and revoke permissions unused since the previous review",
+      "rationale": "Least privilege bounds the blast radius of a compromised account or a bug; regular review is what keeps it true after roles and systems change."
     }
-  ]
+  ],
+  "relations": []
 }

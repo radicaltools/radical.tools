@@ -1,0 +1,55 @@
+{
+  "hub": {
+    "id": "ff-ai-eval-gate",
+    "category": "fitness-function",
+    "name": "AI Evaluation Gate",
+    "description": "Runs the model or prompt change against a curated evaluation set and blocks the release when quality metrics regress.",
+    "tags": [
+      "process",
+      "ai",
+      "llm",
+      "quality"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MIN_GROUNDEDNESS_PCT",
+        "label": "Minimum groundedness (%)",
+        "hint": "95",
+        "type": "number",
+        "defaultValue": "95"
+      },
+      {
+        "key": "MAX_REGRESSION_PCT",
+        "label": "Max allowed drop vs baseline (pp)",
+        "hint": "1",
+        "type": "number",
+        "defaultValue": "1"
+      }
+    ],
+    "hubRefs": [
+      "req-ai-groundedness",
+      "req-ai-autonomous-resolution",
+      "req-ml-extraction-accuracy"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-ai-eval-gate-1",
+      "type": "fitness-fn",
+      "label": "AI Evaluation Gate",
+      "description": "Executes the evaluation dataset (golden answers plus adversarial and out-of-scope prompts) against the candidate model, prompt and retrieval configuration; scores groundedness, task accuracy and refusal correctness with deterministic checks and an LLM judge calibrated against human labels.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "process",
+      "automated": true,
+      "trigger": "on-deploy",
+      "threshold": "Groundedness ≥ {{MIN_GROUNDEDNESS_PCT}}% and no metric more than {{MAX_REGRESSION_PCT}} pp below the current production baseline",
+      "status": "proposed"
+    }
+  ],
+  "relations": []
+}

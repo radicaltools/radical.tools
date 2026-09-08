@@ -2,13 +2,12 @@
   "hub": {
     "id": "req-error-recovery",
     "category": "requirement",
-    "name": "Error Recovery Guidance",
-    "description": "Usability: ubiquitous requirement ensuring every system error provides actionable recovery guidance.",
+    "name": "Recoverable Error Messages",
+    "description": "Every user-facing error explains what happened and offers a way forward.",
     "tags": [
       "usability",
       "error-handling",
-      "ux",
-      "nfr"
+      "ux"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin"
   },
@@ -16,17 +15,18 @@
     {
       "id": "req-error-recovery-1",
       "type": "requirement",
-      "label": "Error Recovery Guidance",
+      "label": "Recoverable Error Messages",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
       "status": "draft",
       "priority": "must",
-      "action": "display a human-readable error message with a specific corrective action or next step for every user-facing error state",
-      "rationale": "Dead-end error states cause abandonment. Users who understand what went wrong and how to fix it have significantly higher task completion rates."
+      "action": "show a human-readable message for every error state that names the problem, preserves the user's input and offers a specific next step, while logging the technical detail under a reference id shown to the user",
+      "rationale": "Dead-end errors are where users give up and support tickets start; a reference id connects the two so the team can find the cause without asking the user to reproduce it."
     }
-  ]
+  ],
+  "relations": []
 }

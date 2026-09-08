@@ -2,46 +2,49 @@
   "hub": {
     "id": "req-accessibility",
     "category": "requirement",
-    "name": "WCAG Accessibility",
-    "description": "Ubiquitous requirement ensuring the UI meets accessibility standards for all users.",
+    "name": "Accessibility Conformance",
+    "description": "User interfaces conform to WCAG so the product is usable with assistive technology.",
     "tags": [
+      "usability",
       "accessibility",
       "wcag",
-      "ui",
-      "nfr",
-      "inclusivity"
+      "compliance"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "WCAG_VERSION",
         "label": "WCAG version",
-        "hint": "2.1",
-        "defaultValue": "2.1"
+        "hint": "2.2",
+        "defaultValue": "2.2"
       },
       {
         "key": "WCAG_LEVEL",
-        "label": "Conformance level (A / AA / AAA)",
+        "label": "Conformance level",
         "hint": "AA",
         "defaultValue": "AA"
       }
+    ],
+    "hubRefs": [
+      "ff-accessibility-scan"
     ]
   },
   "nodes": [
     {
-      "id": "req-wcag-1",
+      "id": "req-accessibility-1",
       "type": "requirement",
-      "label": "WCAG Accessibility",
+      "label": "Accessibility Conformance",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
       "status": "draft",
-      "priority": "should",
-      "action": "conform to WCAG {{WCAG_VERSION}} Level {{WCAG_LEVEL}} for all user-facing pages and interactive components",
-      "rationale": "Inclusive design ensures the product is usable by people with disabilities and meets legal requirements in many jurisdictions."
+      "priority": "must",
+      "action": "conform to WCAG {{WCAG_VERSION}} Level {{WCAG_LEVEL}} on all user-facing pages and components, verified by automated checks in the pipeline and periodic manual testing with screen readers",
+      "rationale": "Accessibility is a legal requirement in many jurisdictions (EU Accessibility Act, ADA, Section 508) and the same practices improve usability for everyone."
     }
-  ]
+  ],
+  "relations": []
 }

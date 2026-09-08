@@ -2,39 +2,51 @@
   "hub": {
     "id": "req-availability",
     "category": "requirement",
-    "name": "System Availability",
-    "description": "Ensures the system meets its availability target. Ubiquitous requirement — applies at all times without preconditions.",
+    "name": "Service Availability",
+    "description": "Uptime target measured over a fixed window. Typical tiers: 99.0% for internal tools, 99.9% for customer-facing services, 99.99% for revenue- or safety-critical paths.",
     "tags": [
       "availability",
       "reliability",
-      "nfr",
-      "sla"
+      "sla",
+      "slo"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "AVAILABILITY_TARGET",
-        "label": "Availability target",
-        "hint": "99.9%",
-        "defaultValue": "99.9%"
+        "label": "Availability target (%)",
+        "hint": "99.9",
+        "defaultValue": "99.9"
+      },
+      {
+        "key": "MEASUREMENT_WINDOW",
+        "label": "Measurement window",
+        "hint": "calendar month",
+        "defaultValue": "calendar month"
       }
+    ],
+    "hubRefs": [
+      "ff-error-budget",
+      "req-disaster-recovery",
+      "req-zero-downtime-deploy"
     ]
   },
   "nodes": [
     {
       "id": "req-availability-1",
       "type": "requirement",
-      "label": "System Availability",
+      "label": "Service Availability",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "action": "be available {{AVAILABILITY_TARGET}} of the time, measured monthly",
-      "rationale": "Business SLA requires three-nines availability to meet customer contracts and avoid penalty clauses."
+      "action": "be available for at least {{AVAILABILITY_TARGET}}% of each {{MEASUREMENT_WINDOW}}, where \"available\" means successfully serving requests within the agreed response-time targets",
+      "rationale": "An explicit target sizes the error budget, drives redundancy decisions and gives release policy an objective gate; each additional nine roughly multiplies infrastructure and process cost."
     }
-  ]
+  ],
+  "relations": []
 }

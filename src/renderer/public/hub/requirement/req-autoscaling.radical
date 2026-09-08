@@ -2,48 +2,60 @@
   "hub": {
     "id": "req-autoscaling",
     "category": "requirement",
-    "name": "Auto-Scaling Under Load",
-    "description": "Event-driven requirement that triggers horizontal scaling when load exceeds a threshold.",
+    "name": "Automatic Scale-Out",
+    "description": "Horizontal scaling that reacts to load without operator intervention, bounded by a cost ceiling.",
     "tags": [
       "scalability",
-      "performance",
-      "cloud",
-      "nfr"
+      "elasticity",
+      "cloud"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
-        "key": "SCALE_TRIGGER_RPS",
-        "label": "Scale-out trigger (requests/s)",
-        "hint": "1000",
-        "type": "number",
-        "defaultValue": "1000"
-      },
-      {
-        "key": "SCALE_OUT_SECONDS",
-        "label": "Scale-out time (seconds)",
+        "key": "SCALE_TRIGGER_CPU_PCT",
+        "label": "Scale-out trigger (avg CPU %)",
         "hint": "60",
         "type": "number",
         "defaultValue": "60"
+      },
+      {
+        "key": "SCALE_OUT_SECONDS",
+        "label": "Time to add capacity (s)",
+        "hint": "120",
+        "type": "number",
+        "defaultValue": "120"
+      },
+      {
+        "key": "MAX_INSTANCES",
+        "label": "Maximum instance count",
+        "hint": "20",
+        "type": "number",
+        "defaultValue": "20"
       }
+    ],
+    "hubRefs": [
+      "req-resource-headroom",
+      "req-throughput"
     ]
   },
   "nodes": [
     {
       "id": "req-autoscaling-1",
       "type": "requirement",
-      "label": "Auto-Scaling Under Load",
+      "label": "Automatic Scale-Out",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
-      "ears_type": "event-driven",
-      "status": "approved",
+      "ears_type": "complex",
+      "status": "draft",
       "priority": "must",
-      "trigger": "incoming request rate exceeds {{SCALE_TRIGGER_RPS}} requests per second",
-      "action": "automatically scale out compute instances within {{SCALE_OUT_SECONDS}} seconds to maintain response time below 500ms",
-      "rationale": "Traffic spikes during promotions and seasonal events must be handled without manual intervention."
+      "trigger": "average CPU utilisation exceeds {{SCALE_TRIGGER_CPU_PCT}}% for two consecutive minutes",
+      "precondition": "fewer than {{MAX_INSTANCES}} instances are running",
+      "action": "add compute instances so that new capacity is serving traffic within {{SCALE_OUT_SECONDS}} seconds, and scale back in when load subsides",
+      "rationale": "Manual scaling is too slow for traffic spikes and too expensive to leave permanently provisioned; an upper bound keeps a misbehaving client from turning into an unbounded bill."
     }
-  ]
+  ],
+  "relations": []
 }

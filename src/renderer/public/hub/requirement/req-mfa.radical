@@ -3,15 +3,17 @@
     "id": "req-mfa",
     "category": "requirement",
     "name": "Multi-Factor Authentication",
-    "description": "Security: optional requirement mandating MFA for privileged access and sensitive operations.",
+    "description": "A second factor is required for privileged access and high-risk operations.",
     "tags": [
       "security",
       "authentication",
-      "mfa",
-      "nfr",
       "access-control"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-auth",
+      "req-least-privilege"
+    ]
   },
   "nodes": [
     {
@@ -21,14 +23,15 @@
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
-      "ears_type": "optional",
-      "status": "approved",
+      "ears_type": "event-driven",
+      "status": "draft",
       "priority": "must",
-      "feature": "a user accesses administrative functions or performs a high-risk operation",
-      "action": "require multi-factor authentication using TOTP or a hardware key before granting access",
-      "rationale": "Stolen credentials alone are insufficient to compromise admin accounts. MFA prevents the majority of account-takeover attacks."
+      "trigger": "a user requests access to administrative functions or initiates a high-risk operation such as a payout, a permission change or a data export",
+      "action": "require a second authentication factor (TOTP, push approval or a hardware key) before granting access, and re-prompt after the session's step-up validity expires",
+      "rationale": "Credential theft is the most common intrusion path; a second factor turns a leaked password into a non-event for the operations that matter most."
     }
-  ]
+  ],
+  "relations": []
 }

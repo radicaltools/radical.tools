@@ -3,30 +3,36 @@
     "id": "ff-deploy-frequency",
     "category": "fitness-function",
     "name": "Deployment Frequency",
-    "description": "Tracks how often the team deploys to production. One of the four DORA metrics. Low deployment frequency often correlates with large, risky batch releases.",
+    "description": "How often changes reach production. One of the four DORA delivery metrics; low frequency usually means large, risky batches.",
     "tags": [
-      "dora",
       "process",
-      "devops",
-      "deployment"
+      "dora",
+      "delivery",
+      "devops"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "MIN_DEPLOYS_PER_WEEK",
-        "label": "Minimum deployments per week",
-        "hint": "1",
+        "label": "Minimum production deployments per week",
+        "hint": "5",
         "type": "number",
-        "defaultValue": "1"
+        "defaultValue": "5"
       }
+    ],
+    "hubRefs": [
+      "ff-lead-time",
+      "ff-change-failure-rate",
+      "ff-mttr",
+      "req-zero-downtime-deploy"
     ]
   },
   "nodes": [
     {
-      "id": "ff-deploy-freq-1",
+      "id": "ff-deploy-frequency-1",
       "type": "fitness-fn",
       "label": "Deployment Frequency",
-      "description": "Measures deployments per week/month. Target: on-demand or at least weekly for high-performing teams.",
+      "description": "Counts successful production deployments per service from the CD system or deployment markers, reported weekly. Elite performers deploy on demand (multiple times per day); the threshold sets the floor for this team.",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -35,8 +41,9 @@
       "category": "process",
       "automated": true,
       "trigger": "periodic",
-      "threshold": "≥ {{MIN_DEPLOYS_PER_WEEK}} deploy(s) per week",
-      "status": "active"
+      "threshold": "≥ {{MIN_DEPLOYS_PER_WEEK}} production deployments per service per week (4-week rolling median)",
+      "status": "proposed"
     }
-  ]
+  ],
+  "relations": []
 }

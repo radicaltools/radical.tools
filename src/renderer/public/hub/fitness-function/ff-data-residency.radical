@@ -3,30 +3,33 @@
     "id": "ff-data-residency",
     "category": "fitness-function",
     "name": "Data Residency Check",
-    "description": "Continuously verifies that personal data is stored and processed only in approved geographic regions. Required for GDPR, data sovereignty laws, and contractual obligations.",
+    "description": "Verifies that personal data is stored and processed only in approved regions, catching drift in cloud configuration before an auditor does.",
     "tags": [
-      "compliance",
-      "gdpr",
-      "data",
       "holistic",
-      "privacy"
+      "compliance",
+      "privacy",
+      "gdpr"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "APPROVED_REGIONS",
-        "label": "Approved data residency regions",
-        "hint": "EU only / EU + US-East",
-        "defaultValue": "approved regions"
+        "label": "Approved regions",
+        "hint": "eu-west-1, eu-central-1",
+        "defaultValue": "eu-west-1, eu-central-1"
       }
+    ],
+    "hubRefs": [
+      "req-encryption",
+      "req-data-retention"
     ]
   },
   "nodes": [
     {
-      "id": "ff-data-res-1",
+      "id": "ff-data-residency-1",
       "type": "fitness-fn",
       "label": "Data Residency Check",
-      "description": "Verifies that PII is stored only in approved regions (e.g. EU-only for GDPR). Checks cloud resource tags, database locations, and CDN configs.",
+      "description": "Inventories storage resources tagged as holding personal data (databases, buckets, backups, search indexes, logging sinks) via the cloud API and compares their region and replication targets with the approved list. Runs against IaC plans before apply and against live accounts daily.",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -35,8 +38,9 @@
       "category": "holistic",
       "automated": true,
       "trigger": "continuous",
-      "threshold": "All PII stored in {{APPROVED_REGIONS}} only",
-      "status": "active"
+      "threshold": "All resources tagged data-class=personal located and replicated only in {{APPROVED_REGIONS}}",
+      "status": "proposed"
     }
-  ]
+  ],
+  "relations": []
 }

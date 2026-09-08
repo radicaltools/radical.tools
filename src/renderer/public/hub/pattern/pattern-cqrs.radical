@@ -2,106 +2,192 @@
   "hub": {
     "id": "pattern-cqrs",
     "category": "pattern",
-    "name": "CQRS + Event Sourcing",
-    "description": "Separates command (write) and query (read) models. Commands produce events stored in an event store; projections build read-optimized views from those events.",
+    "name": "CQRS with Event Sourcing",
+    "description": "Commands are validated by the write model and stored as an append-only stream of events; projections turn those events into read models shaped for each query. Writes and reads scale and evolve independently.",
     "tags": [
       "cqrs",
       "event-sourcing",
       "ddd",
-      "architecture"
+      "read-model"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-event-driven",
+      "req-idempotency",
+      "adr-data-store"
+    ]
   },
   "nodes": [
     {
-      "id": "pat-cqrs-cmd",
-      "type": "container",
-      "label": "Command Handler",
-      "description": "Validates and processes commands. Produces domain events. Enforces business invariants.",
-      "technology": "",
+      "id": "user",
+      "type": "person",
+      "label": "User",
+      "description": "Issues commands and views results.",
       "x": 0,
       "y": 0,
+      "width": 150,
+      "height": 170,
+      "collapsed": false
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Order Management",
+      "description": "Separate write and read paths.",
+      "x": 0,
+      "y": 270,
+      "width": 930,
+      "height": 580,
+      "collapsed": false
+    },
+    {
+      "id": "command-api",
+      "type": "container",
+      "label": "Command API",
+      "description": "Loads the aggregate from its event stream, validates the command against invariants, appends new events.",
+      "technology": "C# / .NET",
+      "parentId": "platform",
+      "x": 30,
+      "y": 110,
       "width": 300,
       "height": 200,
       "collapsed": false
     },
     {
-      "id": "pat-cqrs-es",
+      "id": "event-store",
       "type": "database",
       "label": "Event Store",
-      "description": "Append-only log of all domain events. The single source of truth. Supports event replay for rebuilding state.",
-      "technology": "EventStoreDB / Kafka",
-      "x": 0,
-      "y": 300,
+      "description": "Append-only streams per aggregate; the system of record. Supports catch-up subscriptions and replay.",
+      "technology": "EventStoreDB",
+      "parentId": "platform",
+      "x": 370,
+      "y": 110,
       "width": 190,
       "height": 130,
       "collapsed": false
     },
     {
-      "id": "pat-cqrs-proj",
+      "id": "projector",
       "type": "container",
-      "label": "Projection Engine",
-      "description": "Consumes events and builds read-optimized views. Runs asynchronously and can be rebuilt from scratch.",
-      "technology": "",
-      "x": 400,
-      "y": 300,
+      "label": "Projector",
+      "description": "Subscribes to the event streams and updates read models. Can be reset and replayed from the beginning.",
+      "technology": "C# / .NET worker",
+      "parentId": "platform",
+      "x": 600,
+      "y": 110,
       "width": 300,
       "height": 200,
       "collapsed": false
     },
     {
-      "id": "pat-cqrs-read",
+      "id": "query-api",
+      "type": "container",
+      "label": "Query API",
+      "description": "Serves reads straight from the read models. No business rules.",
+      "technology": "C# / .NET",
+      "parentId": "platform",
+      "x": 30,
+      "y": 350,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "read-store",
       "type": "database",
       "label": "Read Store",
-      "description": "Denormalized read model optimized for query patterns. Updated by projections.",
-      "technology": "Elasticsearch / Redis",
-      "x": 400,
-      "y": 600,
+      "description": "Denormalised views: order summaries, customer history, dashboards.",
+      "technology": "PostgreSQL / Elasticsearch",
+      "parentId": "platform",
+      "x": 370,
+      "y": 350,
       "width": 190,
       "height": 130,
-      "collapsed": false
-    },
-    {
-      "id": "pat-cqrs-query",
-      "type": "container",
-      "label": "Query Handler",
-      "description": "Serves read requests from the denormalized read store. No business logic, no writes.",
-      "technology": "",
-      "x": 700,
-      "y": 0,
-      "width": 300,
-      "height": 200,
       "collapsed": false
     }
   ],
   "relations": [
     {
-      "id": "pat-cqrs-r1",
-      "sourceId": "pat-cqrs-cmd",
-      "targetId": "pat-cqrs-es",
-      "label": "Persists events",
-      "technology": ""
+      "id": "user--command-api",
+      "sourceId": "user",
+      "targetId": "command-api",
+      "label": "Sends commands (PlaceOrder, CancelOrder)",
+      "technology": "HTTPS / JSON"
     },
     {
-      "id": "pat-cqrs-r2",
-      "sourceId": "pat-cqrs-proj",
-      "targetId": "pat-cqrs-es",
-      "label": "Reads events",
-      "technology": ""
+      "id": "command-api--event-store",
+      "sourceId": "command-api",
+      "targetId": "event-store",
+      "label": "Reads stream, appends events",
+      "technology": "gRPC"
     },
     {
-      "id": "pat-cqrs-r3",
-      "sourceId": "pat-cqrs-proj",
-      "targetId": "pat-cqrs-read",
-      "label": "Updates projections",
-      "technology": ""
+      "id": "projector--event-store",
+      "sourceId": "projector",
+      "targetId": "event-store",
+      "label": "Catch-up subscription",
+      "technology": "gRPC"
     },
     {
-      "id": "pat-cqrs-r4",
-      "sourceId": "pat-cqrs-query",
-      "targetId": "pat-cqrs-read",
-      "label": "Reads from",
-      "technology": ""
+      "id": "projector--read-store",
+      "sourceId": "projector",
+      "targetId": "read-store",
+      "label": "Upserts read models",
+      "technology": "SQL / HTTP"
+    },
+    {
+      "id": "user--query-api",
+      "sourceId": "user",
+      "targetId": "query-api",
+      "label": "Queries order views",
+      "technology": "HTTPS / JSON"
+    },
+    {
+      "id": "query-api--read-store",
+      "sourceId": "query-api",
+      "targetId": "read-store",
+      "label": "Reads",
+      "technology": "SQL / HTTP"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "pattern-cqrs-seq",
+      "name": "Place order and read it back",
+      "relationIds": [
+        "user--command-api",
+        "command-api--event-store",
+        "projector--event-store",
+        "projector--read-store",
+        "user--query-api",
+        "query-api--read-store"
+      ],
+      "stepDescriptions": [
+        "PlaceOrder command arrives.",
+        "Aggregate is rehydrated; OrderPlaced is appended.",
+        "Projector receives OrderPlaced from its subscription.",
+        "Order summary view is updated.",
+        "User requests the order summary.",
+        "View is returned; may lag the write by milliseconds."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "pattern-cqrs-flow",
+      "name": "Place order and read it back",
+      "kind": "dynamic",
+      "sequenceId": "pattern-cqrs-seq",
+      "nodeIds": [
+        "user",
+        "platform",
+        "command-api",
+        "event-store",
+        "projector",
+        "query-api",
+        "read-store"
+      ],
+      "positions": {}
     }
   ]
 }

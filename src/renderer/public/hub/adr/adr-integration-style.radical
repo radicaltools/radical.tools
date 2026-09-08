@@ -1,0 +1,48 @@
+{
+  "hub": {
+    "id": "adr-integration-style",
+    "category": "adr",
+    "name": "Service Integration Style",
+    "description": "Records the default way services communicate — synchronous calls, asynchronous events, or a defined mix — and when each is appropriate.",
+    "tags": [
+      "integration",
+      "messaging",
+      "api",
+      "distributed-systems"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "INTEGRATION_STYLE",
+        "label": "Default integration style",
+        "hint": "Sync REST for queries, async events for state changes",
+        "defaultValue": "Sync REST for queries, async events for state changes"
+      }
+    ],
+    "hubRefs": [
+      "pattern-event-driven",
+      "pattern-circuit-breaker",
+      "req-graceful-degradation",
+      "adr-event-schema-evolution"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-integration-style-1",
+      "type": "adr",
+      "label": "ADR: {{INTEGRATION_STYLE}} between services",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "Services need to exchange data and trigger work in each other. Synchronous request/response is simple to reason about but couples availability and latency along the call chain. Asynchronous messaging decouples producers from consumers and absorbs load, at the cost of eventual consistency and harder debugging. Forces: latency expectations, tolerance for stale data, failure isolation, ordering guarantees and the team's experience with brokers.",
+      "decision": "Adopt {{INTEGRATION_STYLE}}. Reads that a user is waiting on use synchronous calls with timeouts, retries with back-off and circuit breakers. State changes that other services need to know about are published as domain events through the message broker; consumers own their projections. Synchronous calls that fan out to more than two services are a design smell to be reviewed.",
+      "consequences": "• Services can be deployed and scaled independently; a slow consumer does not slow the producer.\n• Data is eventually consistent across services; UIs must be designed for it.\n• Every event needs a schema, an owner and a compatibility policy.\n• Distributed tracing and correlation ids across both calls and messages are mandatory for debuggability.\n• Idempotent consumers and the outbox pattern are required to avoid lost or duplicated events.",
+      "alternatives": "1. Synchronous only (REST/gRPC) — simplest mental model; availability of the whole chain is the product of its parts.\n2. Asynchronous only — maximal decoupling; awkward for request/response interactions and adds latency to every read.\n3. Shared database integration — no network hop; couples schemas across teams and defeats service autonomy.\n4. Orchestration via a workflow engine — explicit long-running processes; adds a central component and vendor coupling."
+    }
+  ],
+  "relations": []
+}

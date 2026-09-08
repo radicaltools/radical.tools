@@ -2,28 +2,32 @@
   "hub": {
     "id": "adr-tech-stack",
     "category": "adr",
-    "name": "Technology Stack Selection",
-    "description": "Template ADR for selecting the primary technology stack (language, framework, runtime). Captures the decision context, constraints, and trade-offs of choosing a tech stack.",
+    "name": "Primary Technology Stack",
+    "description": "Records the choice of language, runtime and framework for new services, and the forces that drove it.",
     "tags": [
       "technology",
-      "stack",
-      "framework",
+      "platform",
       "foundation"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "STACK",
-        "label": "Technology stack",
-        "hint": "TypeScript / Node.js"
+        "label": "Chosen stack",
+        "hint": "TypeScript / Node.js",
+        "defaultValue": "TypeScript / Node.js"
       }
+    ],
+    "hubRefs": [
+      "adr-data-store",
+      "ff-dependency-rules"
     ]
   },
   "nodes": [
     {
       "id": "adr-tech-stack-1",
       "type": "adr",
-      "label": "ADR: {{STACK}}",
+      "label": "ADR: {{STACK}} as primary stack",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -31,10 +35,11 @@
       "collapsed": false,
       "status": "proposed",
       "date": "",
-      "context": "We need to select a primary technology stack for the new service / module. Key factors: team expertise, ecosystem maturity, performance characteristics, hiring market, and long-term maintainability.",
-      "decision": "We will use {{STACK}} because [RATIONALE]. This choice balances team familiarity, ecosystem support, and performance requirements.",
-      "consequences": "• Team members unfamiliar with the stack will need onboarding (estimated 2-3 weeks)\n• We gain access to [ECOSYSTEM BENEFIT]\n• Lock-in: migrating away would require [EFFORT ESTIMATE]",
-      "alternatives": "1. [Alternative A] — rejected because [reason]\n2. [Alternative B] — rejected because [reason]\n3. [Alternative C] — viable but less preferred because [reason]"
+      "context": "New services need a default technology stack. The decision is driven by the team's existing expertise, hiring market, ecosystem maturity for our problem domain, runtime performance characteristics, operational tooling (observability, packaging, security scanning) and how easily the choice can be revisited later.",
+      "decision": "Use {{STACK}} as the default stack for new services. Deviations require an ADR of their own that names the concrete capability the default cannot provide.",
+      "consequences": "• One shared toolchain for linting, testing, packaging and dependency scanning across services.\n• Onboarding, code review and on-call rotate more easily between teams.\n• Libraries, internal SDKs and platform integrations are built once for this stack.\n• Problems the stack handles poorly (e.g. CPU-bound workloads, specialised ML tooling) need an explicit exception path.\n• The decision should be reviewed when the team or the problem space changes materially.",
+      "alternatives": "1. Polyglot by team choice — maximises local fit but fragments tooling, security patching and on-call coverage.\n2. A JVM-based stack (Kotlin / Java) — mature ecosystem and strong performance; heavier runtime and slower startup for serverless-style workloads.\n3. Go — excellent operational profile for infrastructure-style services; smaller ecosystem for rich web/back-office applications.\n4. Python — strongest for data and ML work; weaker typing story and concurrency model for high-throughput services."
     }
-  ]
+  ],
+  "relations": []
 }

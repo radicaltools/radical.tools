@@ -1,0 +1,208 @@
+{
+  "hub": {
+    "id": "pattern-transactional-outbox",
+    "category": "pattern",
+    "name": "Transactional Outbox",
+    "description": "Guarantees that a state change and the event announcing it are either both persisted or neither: the event is written to an outbox table in the same transaction and relayed to the bus afterwards.",
+    "tags": [
+      "event-driven",
+      "consistency",
+      "messaging",
+      "reliability",
+      "cdc"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-idempotency",
+      "pattern-event-driven",
+      "adr-integration-style"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "customer",
+      "type": "person",
+      "label": "Customer",
+      "description": "Places orders.",
+      "x": 0,
+      "y": 0,
+      "width": 150,
+      "height": 170,
+      "collapsed": false
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Order Platform",
+      "description": "Producer with outbox relay and an idempotent consumer.",
+      "x": 0,
+      "y": 270,
+      "width": 1040,
+      "height": 580,
+      "collapsed": false
+    },
+    {
+      "id": "orders",
+      "type": "container",
+      "label": "Order Service",
+      "description": "Writes the order and the OrderPlaced event row in one local transaction. Never talks to the broker directly.",
+      "technology": "Java / Spring Boot",
+      "parentId": "platform",
+      "x": 30,
+      "y": 110,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "orders-db",
+      "type": "database",
+      "label": "Orders DB",
+      "description": "Orders table plus outbox table (event id, type, payload, created_at, published_at).",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "x": 370,
+      "y": 110,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "relay",
+      "type": "container",
+      "label": "Outbox Relay",
+      "description": "Tails the outbox (CDC or polling), publishes each row exactly once in order, marks it published. Retries on broker failure.",
+      "technology": "Debezium / custom poller",
+      "parentId": "platform",
+      "x": 710,
+      "y": 110,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "bus",
+      "type": "queue",
+      "label": "Event Bus",
+      "description": "Durable event log.",
+      "technology": "Apache Kafka",
+      "parentId": "platform",
+      "x": 30,
+      "y": 350,
+      "width": 220,
+      "height": 95,
+      "collapsed": false
+    },
+    {
+      "id": "inventory",
+      "type": "container",
+      "label": "Inventory Service",
+      "description": "Consumes OrderPlaced. Deduplicates by event id before reserving stock.",
+      "technology": "Go",
+      "parentId": "platform",
+      "x": 370,
+      "y": 350,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "inventory-db",
+      "type": "database",
+      "label": "Inventory DB",
+      "description": "Stock levels plus processed-event ids.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "x": 710,
+      "y": 350,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    }
+  ],
+  "relations": [
+    {
+      "id": "customer--orders",
+      "sourceId": "customer",
+      "targetId": "orders",
+      "label": "Places order",
+      "technology": "HTTPS / JSON"
+    },
+    {
+      "id": "orders--orders-db",
+      "sourceId": "orders",
+      "targetId": "orders-db",
+      "label": "INSERT order + INSERT outbox row (one transaction)",
+      "technology": "SQL"
+    },
+    {
+      "id": "relay--orders-db",
+      "sourceId": "relay",
+      "targetId": "orders-db",
+      "label": "Reads unpublished outbox rows",
+      "technology": "Logical replication / SELECT … FOR UPDATE SKIP LOCKED"
+    },
+    {
+      "id": "relay--bus",
+      "sourceId": "relay",
+      "targetId": "bus",
+      "label": "Publishes OrderPlaced",
+      "technology": "Avro, key = orderId"
+    },
+    {
+      "id": "bus--inventory",
+      "sourceId": "bus",
+      "targetId": "inventory",
+      "label": "Delivers OrderPlaced (at-least-once)",
+      "technology": "Consumer group"
+    },
+    {
+      "id": "inventory--inventory-db",
+      "sourceId": "inventory",
+      "targetId": "inventory-db",
+      "label": "Reserves stock if event id not yet processed",
+      "technology": "SQL"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "pattern-transactional-outbox-seq",
+      "name": "Place order",
+      "relationIds": [
+        "customer--orders",
+        "orders--orders-db",
+        "relay--orders-db",
+        "relay--bus",
+        "bus--inventory",
+        "inventory--inventory-db"
+      ],
+      "stepDescriptions": [
+        "Customer submits the order.",
+        "Order row and OrderPlaced outbox row are committed atomically.",
+        "Relay picks up the new outbox row.",
+        "Event is published; the row is marked as published.",
+        "Consumer receives the event, possibly more than once.",
+        "Stock is reserved only if the event id is new."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "pattern-transactional-outbox-flow",
+      "name": "Place order",
+      "kind": "dynamic",
+      "sequenceId": "pattern-transactional-outbox-seq",
+      "nodeIds": [
+        "customer",
+        "platform",
+        "orders",
+        "orders-db",
+        "relay",
+        "bus",
+        "inventory",
+        "inventory-db"
+      ],
+      "positions": {}
+    }
+  ]
+}

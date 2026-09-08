@@ -1,0 +1,51 @@
+{
+  "hub": {
+    "id": "req-encryption",
+    "category": "requirement",
+    "name": "Encryption at Rest and in Transit",
+    "description": "Personal and confidential data is encrypted wherever it is stored and whenever it crosses a network.",
+    "tags": [
+      "security",
+      "encryption",
+      "privacy",
+      "compliance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "ENCRYPTION_ALGORITHM",
+        "label": "At-rest cipher",
+        "hint": "AES-256",
+        "defaultValue": "AES-256"
+      },
+      {
+        "key": "MIN_TLS_VERSION",
+        "label": "Minimum TLS version",
+        "hint": "TLS 1.2",
+        "defaultValue": "TLS 1.2"
+      }
+    ],
+    "hubRefs": [
+      "req-secrets-management",
+      "ff-data-residency"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-encryption-1",
+      "type": "requirement",
+      "label": "Encryption at Rest and in Transit",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "encrypt personal and confidential data at rest with {{ENCRYPTION_ALGORITHM}} using managed keys, and encrypt all network traffic with {{MIN_TLS_VERSION}} or higher, refusing plaintext connections",
+      "rationale": "Encryption is the baseline control expected by GDPR, PCI DSS and HIPAA alike, and it turns a lost disk, backup or network capture from a breach into a non-incident."
+    }
+  ],
+  "relations": []
+}

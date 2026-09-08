@@ -2,32 +2,44 @@
   "hub": {
     "id": "req-audit-logging",
     "category": "requirement",
-    "name": "Audit Logging",
-    "description": "Ubiquitous requirement: all state-changing operations must be logged for audit and compliance purposes.",
+    "name": "Audit Trail",
+    "description": "Every state-changing operation is recorded in a tamper-evident audit log with who, what and when.",
     "tags": [
-      "audit",
-      "logging",
-      "compliance",
       "security",
-      "nfr"
+      "compliance",
+      "audit",
+      "logging"
     ],
-    "requiredMetamodel": "c4-ddd-governance-builtin"
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "AUDIT_RETENTION_MONTHS",
+        "label": "Audit log retention (months)",
+        "hint": "24",
+        "type": "number",
+        "defaultValue": "24"
+      }
+    ],
+    "hubRefs": [
+      "req-centralised-logging"
+    ]
   },
   "nodes": [
     {
-      "id": "req-audit-log-1",
+      "id": "req-audit-logging-1",
       "type": "requirement",
-      "label": "Audit Logging",
+      "label": "Audit Trail",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "action": "log all state-changing operations with timestamp, actor identity, action type, affected resource, and before/after values",
-      "rationale": "Regulatory compliance (SOX, PCI-DSS) and security forensics require a complete, immutable audit trail."
+      "action": "record every state-changing operation with timestamp, actor identity, action, affected resource and before/after values in an append-only audit log retained for {{AUDIT_RETENTION_MONTHS}} months",
+      "rationale": "Regulations such as SOX and PCI DSS require a reconstructable history of changes, and incident response depends on the same trail."
     }
-  ]
+  ],
+  "relations": []
 }

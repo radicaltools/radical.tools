@@ -2,8 +2,8 @@
   "hub": {
     "id": "adr-observability",
     "category": "adr",
-    "name": "Observability Strategy",
-    "description": "Template ADR for choosing the observability stack and approach (logs, metrics, traces). Covers the three pillars of observability and their tooling.",
+    "name": "Observability Stack",
+    "description": "Records how logs, metrics and traces are produced, collected and stored, and which tools own each signal.",
     "tags": [
       "observability",
       "monitoring",
@@ -13,27 +13,35 @@
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
-        "key": "LOG_TOOL",
-        "label": "Log aggregation tool",
-        "hint": "Loki / Elasticsearch"
+        "key": "METRICS_BACKEND",
+        "label": "Metrics backend",
+        "hint": "Prometheus + Grafana",
+        "defaultValue": "Prometheus + Grafana"
       },
       {
-        "key": "METRICS_TOOL",
-        "label": "Metrics tool",
-        "hint": "Prometheus"
+        "key": "LOGS_BACKEND",
+        "label": "Logs backend",
+        "hint": "Loki",
+        "defaultValue": "Loki"
       },
       {
-        "key": "TRACES_TOOL",
-        "label": "Distributed tracing tool",
-        "hint": "Jaeger / Tempo"
+        "key": "TRACES_BACKEND",
+        "label": "Traces backend",
+        "hint": "Tempo",
+        "defaultValue": "Tempo"
       }
+    ],
+    "hubRefs": [
+      "req-centralised-logging",
+      "req-distributed-tracing",
+      "req-alerting"
     ]
   },
   "nodes": [
     {
       "id": "adr-observability-1",
       "type": "adr",
-      "label": "ADR: Observability Strategy",
+      "label": "ADR: OpenTelemetry-based observability",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -41,10 +49,11 @@
       "collapsed": false,
       "status": "proposed",
       "date": "",
-      "context": "We need a comprehensive observability strategy covering the three pillars: structured logging, metrics, and distributed tracing. The strategy must support debugging production issues, measuring SLOs, and understanding system behaviour across service boundaries.",
-      "decision": "We will implement OpenTelemetry for instrumentation. Logs: {{LOG_TOOL}}. Metrics: {{METRICS_TOOL}}. Traces: {{TRACES_TOOL}}. Dashboards: [TOOL].",
-      "consequences": "• All services must emit structured logs in JSON format\n• Correlation IDs propagated via [HEADER] across all service calls\n• SLO dashboards created for each critical user journey\n• Estimated additional infrastructure cost: [ESTIMATE]",
-      "alternatives": "1. [Alternative stack A] — rejected: [reason]\n2. Vendor-locked solution — rejected: portability concern\n3. Build custom — rejected: undifferentiated heavy lifting"
+      "context": "Operating a distributed system requires correlating logs, metrics and traces across services during incidents and measuring SLOs continuously. Forces: avoiding per-vendor instrumentation lock-in, cost of high-cardinality telemetry at scale, data residency of logs that may contain personal data, and the team's ability to run stateful backends.",
+      "decision": "Instrument all services with OpenTelemetry SDKs and export through an OpenTelemetry Collector. Metrics are stored in {{METRICS_BACKEND}}, logs in {{LOGS_BACKEND}}, traces in {{TRACES_BACKEND}}. Services never depend on a vendor SDK directly; the Collector is the only place where backends are configured.",
+      "consequences": "• Backends can be swapped or added by changing Collector configuration, not application code.\n• Every log line and span carries trace id, service name and version, enabling pivoting between signals.\n• Sampling, redaction of personal data and retention are enforced centrally in the Collector pipeline.\n• The Collector is a critical shared component and needs capacity planning and its own monitoring.\n• Teams must agree on naming conventions for metrics and attributes to keep dashboards reusable.",
+      "alternatives": "1. Single commercial APM suite — fastest time to value; per-host or per-GB pricing grows steeply and instrumentation is vendor-specific.\n2. Hyperscaler-native tooling (CloudWatch, Azure Monitor, Cloud Operations) — no extra infrastructure; weaker cross-cloud and local-development story.\n3. ELK for everything — mature logging; metrics and traces are second-class and storage cost is high.\n4. No tracing, logs and metrics only — lower cost; root-causing latency across services becomes guesswork."
     }
-  ]
+  ],
+  "relations": []
 }

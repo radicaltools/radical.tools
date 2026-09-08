@@ -47,6 +47,8 @@ interface HubState {
   concepts: HubConceptSummary[]
   /** Fully loaded concepts keyed by id. */
   loaded: Record<string, HubConcept>
+  /** Raw catalogue documents keyed by id (exact file contents, for download / copy). */
+  docs: Record<string, HubRadicalDoc>
   loading: boolean
   error: string | null
   lastFetched: number | null
@@ -103,6 +105,7 @@ const inflight = new Map<string, Promise<HubConcept>>()
 export const useHubStore = create<HubState>()((set, get) => ({
   concepts: [],
   loaded: {},
+  docs: {},
   loading: false,
   error: null,
   lastFetched: null,
@@ -138,7 +141,7 @@ export const useHubStore = create<HubState>()((set, get) => ({
     const p = fetchJson<HubRadicalDoc>(summary.file)
       .then((doc) => {
         const concept = docToConcept(doc)
-        set((s) => ({ loaded: { ...s.loaded, [id]: concept } }))
+        set((s) => ({ loaded: { ...s.loaded, [id]: concept }, docs: { ...s.docs, [id]: doc } }))
         return concept
       })
       .finally(() => inflight.delete(id))

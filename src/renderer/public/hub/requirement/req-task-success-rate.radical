@@ -2,41 +2,40 @@
   "hub": {
     "id": "req-task-success-rate",
     "category": "requirement",
-    "name": "Primary Workflow Task Success Rate",
-    "description": "Usability: users must be able to complete the primary workflow without external help, measured by task success rate in usability testing.",
+    "name": "Primary Task Success Rate",
+    "description": "Representative users can complete the primary workflow unaided, measured in usability testing.",
     "tags": [
       "usability",
       "ux",
-      "task-completion",
-      "nfr",
-      "quality"
+      "research"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "MIN_TASK_SUCCESS_PCT",
-        "label": "Minimum task success rate (%)",
-        "hint": "95",
+        "label": "Unassisted task success (%)",
+        "hint": "90",
         "type": "number",
-        "defaultValue": "95"
+        "defaultValue": "90"
       }
     ]
   },
   "nodes": [
     {
-      "id": "req-task-success-1",
+      "id": "req-task-success-rate-1",
       "type": "requirement",
-      "label": "Primary Workflow Task Success Rate",
+      "label": "Primary Task Success Rate",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
-      "priority": "must",
-      "action": "achieve a task success rate of at least {{MIN_TASK_SUCCESS_PCT}}% for the primary user workflow in moderated usability testing with representative users, without external assistance",
-      "rationale": "Task success rate is the most direct measure of usability. Airbnb doubled revenue by focusing on removing friction from primary workflows."
+      "status": "draft",
+      "priority": "should",
+      "action": "achieve at least {{MIN_TASK_SUCCESS_PCT}}% unassisted completion of the primary workflow in moderated usability tests with representative users, re-measured after significant UI changes",
+      "rationale": "Task success is the most direct measure of whether the interface works; analytics show where users drop out but not why, and testing closes that gap."
     }
-  ]
+  ],
+  "relations": []
 }

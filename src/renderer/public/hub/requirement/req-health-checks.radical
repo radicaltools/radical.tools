@@ -2,41 +2,43 @@
   "hub": {
     "id": "req-health-checks",
     "category": "requirement",
-    "name": "Service Health Checks",
-    "description": "Manageability: ubiquitous requirement ensuring every service exposes a standardised health endpoint for monitoring and orchestration.",
+    "name": "Health Endpoints",
+    "description": "Every service exposes liveness and readiness endpoints that orchestrators and load balancers can rely on.",
     "tags": [
-      "manageability",
-      "monitoring",
       "observability",
-      "nfr",
-      "operations"
+      "operations",
+      "kubernetes"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "HEALTH_RESPONSE_MS",
-        "label": "Max /health response time (ms)",
+        "label": "Health endpoint response limit (ms)",
         "hint": "200",
         "type": "number",
         "defaultValue": "200"
       }
+    ],
+    "hubRefs": [
+      "pattern-microservices"
     ]
   },
   "nodes": [
     {
-      "id": "req-health-1",
+      "id": "req-health-checks-1",
       "type": "requirement",
-      "label": "Service Health Checks",
+      "label": "Health Endpoints",
       "x": 0,
       "y": 0,
       "width": 200,
-      "height": 56,
+      "height": 80,
       "collapsed": false,
       "ears_type": "ubiquitous",
-      "status": "approved",
+      "status": "draft",
       "priority": "must",
-      "action": "expose a /health endpoint returning HTTP 200 with liveness and readiness status, including dependency health, within {{HEALTH_RESPONSE_MS}}ms",
-      "rationale": "Orchestrators and load balancers require health endpoints to route traffic away from unhealthy instances. Missing checks mean zombie processes receive live traffic."
+      "action": "expose separate liveness and readiness endpoints that respond within {{HEALTH_RESPONSE_MS}} ms, where readiness reflects the availability of critical dependencies and liveness does not",
+      "rationale": "Orchestrators route traffic and restart instances based on these endpoints; conflating liveness with readiness turns a dependency outage into a restart storm."
     }
-  ]
+  ],
+  "relations": []
 }

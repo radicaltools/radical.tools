@@ -3,27 +3,38 @@
     "id": "adr-auth-strategy",
     "category": "adr",
     "name": "Authentication Strategy",
-    "description": "Template ADR for choosing the authentication mechanism (JWT, session-based, OAuth 2.0, OIDC, mTLS). Covers security, scalability, and user experience trade-offs.",
+    "description": "Records how users and machine clients authenticate, and where token validation happens.",
     "tags": [
-      "authentication",
       "security",
-      "identity",
-      "oauth"
+      "authentication",
+      "identity"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "AUTH_MECHANISM",
         "label": "Authentication mechanism",
-        "hint": "JWT / OAuth 2.0"
+        "hint": "OAuth 2.0 / OIDC with an external IdP",
+        "defaultValue": "OAuth 2.0 / OIDC with an external IdP"
+      },
+      {
+        "key": "TOKEN_LIFETIME_MINUTES",
+        "label": "Access-token lifetime (min)",
+        "hint": "15",
+        "defaultValue": "15"
       }
+    ],
+    "hubRefs": [
+      "req-auth",
+      "req-mfa",
+      "pattern-api-gateway"
     ]
   },
   "nodes": [
     {
-      "id": "adr-auth-1",
+      "id": "adr-auth-strategy-1",
       "type": "adr",
-      "label": "ADR: {{AUTH_MECHANISM}}",
+      "label": "ADR: {{AUTH_MECHANISM}} for authentication",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -31,10 +42,11 @@
       "collapsed": false,
       "status": "proposed",
       "date": "",
-      "context": "We need to authenticate users and services. Requirements: support for SSO, token-based stateless auth for APIs, refresh token rotation, and compatibility with our frontend framework. Must support both human users and machine-to-machine (M2M) scenarios.",
-      "decision": "We will use {{AUTH_MECHANISM}} because [RATIONALE]. Human users authenticate via [FLOW], machine clients via [FLOW].",
-      "consequences": "• Token storage: [APPROACH]\n• Token lifetime and refresh strategy: [DETAILS]\n• Revocation mechanism: [APPROACH]\n• Impact on latency: [ESTIMATE]",
-      "alternatives": "1. [Alternative A] — rejected: [reason]\n2. [Alternative B] — rejected: [reason]"
+      "context": "Human users and machine clients must authenticate to the APIs. Requirements include single sign-on with the organisation's identity provider, stateless verification at the API layer, short-lived credentials with refresh, revocation on compromise, support for service-to-service calls, and MFA for privileged operations. Building and operating an in-house credential store is a liability the team wants to avoid.",
+      "decision": "Use {{AUTH_MECHANISM}}. Users authenticate with the Authorization Code flow with PKCE; services use the Client Credentials flow. Access tokens are JWTs with a lifetime of {{TOKEN_LIFETIME_MINUTES}} minutes, validated at the API gateway against the IdP's JWKS; refresh tokens are rotated on use and revoked server-side.",
+      "consequences": "• No passwords are stored or verified by our services.\n• Every service can validate tokens locally; the IdP is not on the request path.\n• Short token lifetimes bound the damage of a leaked token; revocation of long sessions is handled via refresh-token rotation.\n• The IdP becomes a critical dependency for login (not for already-issued tokens) and needs its own availability review.\n• Authorisation (roles, scopes, tenant claims) must be designed on top; authentication alone does not decide what a caller may do.",
+      "alternatives": "1. Server-side sessions with cookies — simple for a single web app; does not fit APIs consumed by multiple clients and services.\n2. Self-issued JWTs with our own user store — full control; we own credential storage, password policy, MFA and breach response.\n3. API keys per client — trivial to implement; no identity of the human behind the call, hard to rotate, no standard for scopes.\n4. Mutual TLS for all clients — strong service-to-service story; impractical for browsers and mobile apps."
     }
-  ]
+  ],
+  "relations": []
 }

@@ -3,27 +3,39 @@
     "id": "adr-deployment-strategy",
     "category": "adr",
     "name": "Deployment Strategy",
-    "description": "Template ADR for choosing the deployment strategy (blue-green, canary, rolling, recreate). Balances risk, rollback speed, and infrastructure cost.",
+    "description": "Records how new versions are rolled out to production and rolled back, balancing risk, speed and infrastructure cost.",
     "tags": [
       "deployment",
-      "devops",
+      "release",
       "ci-cd",
-      "release"
+      "devops"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "templateParams": [
       {
         "key": "DEPLOY_STRATEGY",
-        "label": "Deployment strategy",
-        "hint": "Blue-Green / Canary / Rolling"
+        "label": "Rollout strategy",
+        "hint": "Canary",
+        "defaultValue": "Canary"
+      },
+      {
+        "key": "CANARY_INITIAL_PCT",
+        "label": "Initial canary traffic (%)",
+        "hint": "5",
+        "defaultValue": "5"
       }
+    ],
+    "hubRefs": [
+      "req-zero-downtime-deploy",
+      "ff-change-failure-rate",
+      "ff-deploy-frequency"
     ]
   },
   "nodes": [
     {
-      "id": "adr-deploy-1",
+      "id": "adr-deployment-strategy-1",
       "type": "adr",
-      "label": "ADR: {{DEPLOY_STRATEGY}} Deployment",
+      "label": "ADR: {{DEPLOY_STRATEGY}} deployments",
       "x": 0,
       "y": 0,
       "width": 180,
@@ -31,10 +43,11 @@
       "collapsed": false,
       "status": "proposed",
       "date": "",
-      "context": "We need a reliable deployment strategy that minimizes downtime and risk. Considerations: zero-downtime requirement, rollback speed, infrastructure cost, database migration compatibility, and observability during rollout.",
-      "decision": "We will use {{DEPLOY_STRATEGY}} deployments because [RATIONALE]. Rollback is achieved by [MECHANISM].",
-      "consequences": "• Infrastructure cost: [ESTIMATE — e.g. 2x for blue-green]\n• Rollback time: [ESTIMATE]\n• Database migration approach: [APPROACH — backwards-compatible migrations]\n• Monitoring during rollout: [METRICS TO WATCH]",
-      "alternatives": "1. Blue-green — instant rollback but 2x infrastructure cost\n2. Canary — gradual rollout, requires good observability\n3. Rolling — least infrastructure overhead but slower rollback\n4. Recreate — simplest but causes downtime"
+      "context": "Releases must reach production without downtime, with a fast and reliable rollback and with early detection of regressions that tests did not catch. Forces: the availability target, whether the database schema can be evolved compatibly, the maturity of production metrics, infrastructure cost tolerance and the number of deployments per day the team aims for.",
+      "decision": "Use {{DEPLOY_STRATEGY}} deployments. New versions receive {{CANARY_INITIAL_PCT}}% of traffic first; promotion to 100% is automatic when error rate and latency SLIs stay within budget for the observation window, and rollback is automatic when they do not. All schema changes are expand/contract migrations so both versions can run side by side.",
+      "consequences": "• Regressions affect a small share of users and are rolled back automatically.\n• Requires reliable, low-latency SLIs — the deployment gate is only as good as the metrics.\n• Both versions run concurrently: database migrations, message schemas and caches must be compatible across N and N+1.\n• Feature flags decouple release from exposure and are used for changes that cannot be canaried by traffic share.\n• Slightly higher infrastructure cost during rollout; far lower than permanently duplicated environments.",
+      "alternatives": "1. Blue-green — instant switch and rollback; doubles the environment and still exposes 100% of users at once.\n2. Rolling update — lowest infrastructure overhead; slower rollback and no traffic-share control.\n3. Recreate (stop, then start) — simplest; incurs downtime and fails the zero-downtime requirement.\n4. Feature-flag-only releases — fine-grained exposure control; does not protect against faults in the new binary itself."
     }
-  ]
+  ],
+  "relations": []
 }

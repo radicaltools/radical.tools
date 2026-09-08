@@ -1,0 +1,44 @@
+{
+  "hub": {
+    "id": "req-code-complexity",
+    "category": "requirement",
+    "name": "Code Complexity Limit",
+    "description": "A ceiling on per-function cyclomatic complexity, enforced by static analysis.",
+    "tags": [
+      "maintainability",
+      "code-quality",
+      "static-analysis"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MAX_COMPLEXITY",
+        "label": "Max cyclomatic complexity per function",
+        "hint": "10",
+        "type": "number",
+        "defaultValue": "10"
+      }
+    ],
+    "hubRefs": [
+      "ff-dependency-rules"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-code-complexity-1",
+      "type": "requirement",
+      "label": "Code Complexity Limit",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "keep cyclomatic complexity below {{MAX_COMPLEXITY}} for every function, failing the build on new violations and tracking existing ones as technical debt",
+      "rationale": "Highly branched functions need disproportionately many test cases and are where defects concentrate; a hard limit forces decomposition while the code is still fresh."
+    }
+  ],
+  "relations": []
+}
