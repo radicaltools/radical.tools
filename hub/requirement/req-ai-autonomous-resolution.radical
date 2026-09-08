@@ -28,7 +28,8 @@
     ],
     "hubRefs": [
       "req-ai-human-handoff",
-      "ff-ai-eval-gate"
+      "ff-ai-eval-gate",
+      "req-fail-safe-default"
     ]
   },
   "nodes": [

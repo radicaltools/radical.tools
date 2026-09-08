@@ -15,7 +15,9 @@
     "hubRefs": [
       "req-least-privilege",
       "req-data-integrity",
-      "adr-data-store"
+      "adr-data-store",
+      "req-resource-isolation",
+      "ff-noisy-neighbor-guard"
     ]
   },
   "nodes": [

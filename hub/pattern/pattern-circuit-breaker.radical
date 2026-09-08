@@ -16,7 +16,8 @@
       "adr-integration-style",
       "req-api-response-time",
       "pattern-sidecar",
-      "pattern-bulkhead"
+      "pattern-bulkhead",
+      "ff-chaos-resilience-test"
     ]
   },
   "nodes": [

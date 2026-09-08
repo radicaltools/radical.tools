@@ -1,0 +1,65 @@
+{
+  "hub": {
+    "id": "ff-cost-efficiency-guard",
+    "category": "fitness-function",
+    "name": "Cost Efficiency Guard",
+    "description": "Tracks infrastructure spend per unit of useful work and fails the check when the trailing trend crosses the budget, catching cost creep before it reaches the monthly bill.",
+    "tags": [
+      "holistic",
+      "cost",
+      "cloud",
+      "finops"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "COST_UNIT",
+        "label": "Unit of work",
+        "hint": "1,000 requests",
+        "defaultValue": "1,000 requests"
+      },
+      {
+        "key": "MAX_COST_PER_UNIT",
+        "label": "Max cost per unit",
+        "hint": "$0.05",
+        "defaultValue": "$0.05"
+      }
+    ],
+    "hubRefs": [
+      "req-resource-efficiency",
+      "req-throughput"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-cost-efficiency-guard-1",
+      "type": "fitness-fn",
+      "label": "Cost Efficiency Guard",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "description": "Tracks infrastructure spend per unit of useful work and fails the check when the trailing trend crosses the budget, catching cost creep before it reaches the monthly bill.",
+      "category": "holistic",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Cost per {{COST_UNIT}} stays at or below {{MAX_COST_PER_UNIT}} on a 7-day trailing average",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "COST_UNIT",
+          "label": "Unit of work",
+          "hint": "1,000 requests",
+          "defaultValue": "1,000 requests"
+        },
+        {
+          "key": "MAX_COST_PER_UNIT",
+          "label": "Max cost per unit",
+          "hint": "$0.05",
+          "defaultValue": "$0.05"
+        }
+      ]
+    }
+  ]
+}

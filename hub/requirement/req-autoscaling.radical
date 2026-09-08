@@ -35,7 +35,9 @@
     ],
     "hubRefs": [
       "req-resource-headroom",
-      "req-throughput"
+      "req-throughput",
+      "req-resource-isolation",
+      "ff-scale-out-verification"
     ]
   },
   "nodes": [

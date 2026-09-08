@@ -22,7 +22,8 @@
     ],
     "hubRefs": [
       "req-ai-groundedness",
-      "req-ai-autonomous-resolution"
+      "req-ai-autonomous-resolution",
+      "req-fail-safe-default"
     ]
   },
   "nodes": [

@@ -34,7 +34,8 @@
     "hubRefs": [
       "req-disaster-recovery",
       "req-availability",
-      "ff-data-residency"
+      "ff-data-residency",
+      "ff-dr-drill-success"
     ]
   },
   "nodes": [

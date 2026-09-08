@@ -15,7 +15,8 @@
     "hubRefs": [
       "pattern-circuit-breaker",
       "req-graceful-degradation",
-      "ff-latency-slo"
+      "ff-latency-slo",
+      "ff-chaos-resilience-test"
     ]
   },
   "nodes": [

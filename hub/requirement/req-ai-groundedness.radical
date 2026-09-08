@@ -22,7 +22,8 @@
     ],
     "hubRefs": [
       "req-ai-human-handoff",
-      "ff-ai-eval-gate"
+      "ff-ai-eval-gate",
+      "ff-fail-safe-verification"
     ]
   },
   "nodes": [

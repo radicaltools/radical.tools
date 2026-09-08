@@ -20,7 +20,8 @@
       }
     ],
     "hubRefs": [
-      "ff-dependency-rules"
+      "ff-dependency-rules",
+      "ff-duplication-guard"
     ]
   },
   "nodes": [

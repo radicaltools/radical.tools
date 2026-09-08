@@ -27,7 +27,10 @@
       }
     ],
     "hubRefs": [
-      "req-autoscaling"
+      "req-autoscaling",
+      "ff-capacity-load-test",
+      "ff-scale-out-verification",
+      "req-resource-efficiency"
     ]
   },
   "nodes": [
