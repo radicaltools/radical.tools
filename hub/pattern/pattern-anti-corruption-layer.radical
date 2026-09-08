@@ -1,0 +1,88 @@
+{
+  "hub": {
+    "id": "pattern-anti-corruption-layer",
+    "category": "pattern",
+    "name": "Anti-Corruption Layer",
+    "description": "A translation layer sits between your clean domain model and a legacy or external system's model, so that system's concepts, quirks and technical debt never leak into your domain. The layer absorbs the cost of translation once, instead of every consumer redoing it.",
+    "tags": [
+      "ddd",
+      "anti-corruption-layer",
+      "integration",
+      "legacy",
+      "hexagonal"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-hexagonal",
+      "pattern-strangler-fig",
+      "adr-integration-style"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Modern Domain",
+      "description": "The current, clean domain model — protected from a legacy system's design decisions by a dedicated translation boundary.",
+      "x": 0,
+      "y": 0,
+      "width": 700,
+      "height": 340,
+      "collapsed": false
+    },
+    {
+      "id": "domain-service",
+      "type": "container",
+      "label": "Domain Service",
+      "description": "Owns the clean domain model. Knows nothing about the legacy system's schema, terminology or quirks.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "acl",
+      "type": "container",
+      "label": "Anti-Corruption Layer",
+      "description": "Translates between the legacy system's model/protocol and the clean domain model. Legacy quirks, deprecated fields and workarounds live here, not in the domain.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 110
+    },
+    {
+      "id": "legacy-system",
+      "type": "system",
+      "label": "Legacy System",
+      "description": "A pre-existing system with its own data model, terminology and technical constraints that don't map cleanly onto the current domain.",
+      "external": true,
+      "x": 0,
+      "y": 460,
+      "width": 360,
+      "height": 260,
+      "collapsed": false
+    }
+  ],
+  "relations": [
+    {
+      "id": "domain-service--acl",
+      "sourceId": "domain-service",
+      "targetId": "acl",
+      "label": "Uses the domain's own clean interface",
+      "technology": "in-process / gRPC"
+    },
+    {
+      "id": "acl--legacy-system",
+      "sourceId": "acl",
+      "targetId": "legacy-system",
+      "label": "Adapts to the legacy schema and protocol",
+      "technology": "SOAP / flat file"
+    }
+  ]
+}

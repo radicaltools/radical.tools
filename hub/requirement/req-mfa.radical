@@ -12,7 +12,8 @@
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "hubRefs": [
       "req-auth",
-      "req-least-privilege"
+      "req-least-privilege",
+      "adr-zero-trust-network"
     ]
   },
   "nodes": [

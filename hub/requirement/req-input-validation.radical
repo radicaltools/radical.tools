@@ -1,0 +1,38 @@
+{
+  "hub": {
+    "id": "req-input-validation",
+    "category": "requirement",
+    "name": "Input Validation & Injection Protection",
+    "description": "Every untrusted input is validated and, wherever it reaches an interpreter (SQL, shell, HTML, LDAP), passed through a parameterised or context-aware escaping API — never concatenated directly into a command or query.",
+    "tags": [
+      "security",
+      "owasp",
+      "injection",
+      "input-validation"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "ff-sast-scan",
+      "req-vulnerability-scanning",
+      "req-least-privilege"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-input-validation-1",
+      "type": "requirement",
+      "label": "Input Validation & Injection Protection",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "unwanted-behaviour",
+      "status": "draft",
+      "priority": "must",
+      "unwanted_condition": "untrusted input would reach a database query, shell command, or rendered HTML output without passing through a parameterised API, an allow-list validator, or a context-aware escaper",
+      "action": "reject the request or escape/parameterise the input before it reaches the interpreter — string concatenation into a query, command or template is never an accepted path",
+      "rationale": "Injection has topped or near-topped the OWASP Top 10 for over a decade because the fix is a coding discipline, not a product to buy; the requirement exists to make that discipline explicit and testable rather than assumed."
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "hub": {
+    "id": "req-carbon-efficiency",
+    "category": "requirement",
+    "name": "Compute Carbon Efficiency",
+    "description": "Ceiling on estimated carbon emissions per unit of useful work, tracked alongside cost so sustainability is a deliberate engineering trade-off, not an afterthought.",
+    "tags": [
+      "sustainability",
+      "carbon",
+      "cost",
+      "well-architected",
+      "cloud"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "WORK_UNIT",
+        "label": "Unit of work",
+        "hint": "1,000 requests",
+        "defaultValue": "1,000 requests"
+      },
+      {
+        "key": "MAX_CARBON_PER_UNIT",
+        "label": "Max carbon per unit",
+        "hint": "10 gCO2e",
+        "defaultValue": "10 gCO2e"
+      }
+    ],
+    "hubRefs": [
+      "ff-carbon-footprint-guard",
+      "req-resource-efficiency",
+      "ff-cost-efficiency-guard"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-carbon-efficiency-1",
+      "type": "requirement",
+      "label": "Compute Carbon Efficiency",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "keep estimated carbon emissions per {{WORK_UNIT}} at or below {{MAX_CARBON_PER_UNIT}}, tracked via the cloud provider's carbon/energy reporting tools and reviewed quarterly",
+      "rationale": "Carbon efficiency and cost efficiency are usually the same lever — right-sizing, higher utilisation, newer hardware, managed/serverless services — so tracking it is cheap once cost efficiency is already tracked, and it is increasingly a procurement requirement in enterprise and public-sector RFPs.",
+      "templateParams": [
+        {
+          "key": "WORK_UNIT",
+          "label": "Unit of work",
+          "hint": "1,000 requests",
+          "defaultValue": "1,000 requests"
+        },
+        {
+          "key": "MAX_CARBON_PER_UNIT",
+          "label": "Max carbon per unit",
+          "hint": "10 gCO2e",
+          "defaultValue": "10 gCO2e"
+        }
+      ]
+    }
+  ]
+}

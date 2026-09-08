@@ -22,7 +22,9 @@
       "req-mfa",
       "req-secrets-management",
       "pattern-sidecar",
-      "adr-multi-tenancy-strategy"
+      "adr-multi-tenancy-strategy",
+      "req-input-validation",
+      "adr-zero-trust-network"
     ]
   },
   "nodes": [

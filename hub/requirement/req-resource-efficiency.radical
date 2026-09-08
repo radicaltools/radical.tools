@@ -28,7 +28,8 @@
     "hubRefs": [
       "ff-cost-efficiency-guard",
       "req-throughput",
-      "req-resource-headroom"
+      "req-resource-headroom",
+      "req-carbon-efficiency"
     ]
   },
   "nodes": [

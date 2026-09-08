@@ -15,7 +15,8 @@
     "hubRefs": [
       "ff-dependency-rules",
       "ff-coupling-guard",
-      "req-code-complexity"
+      "req-code-complexity",
+      "pattern-anti-corruption-layer"
     ]
   },
   "nodes": [

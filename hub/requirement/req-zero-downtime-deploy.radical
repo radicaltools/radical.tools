@@ -13,7 +13,9 @@
     "hubRefs": [
       "adr-deployment-strategy",
       "ff-deploy-frequency",
-      "req-config-propagation"
+      "req-config-propagation",
+      "req-fast-startup-graceful-shutdown",
+      "ff-startup-shutdown-check"
     ]
   },
   "nodes": [

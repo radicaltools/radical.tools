@@ -1,0 +1,65 @@
+{
+  "hub": {
+    "id": "ff-carbon-footprint-guard",
+    "category": "fitness-function",
+    "name": "Carbon Footprint Guard",
+    "description": "Tracks estimated carbon emissions per unit of useful work using the cloud provider's carbon reporting tools and flags the trend when it moves the wrong way, the same way a cost dashboard would.",
+    "tags": [
+      "holistic",
+      "sustainability",
+      "carbon",
+      "cloud"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "WORK_UNIT",
+        "label": "Unit of work",
+        "hint": "1,000 requests",
+        "defaultValue": "1,000 requests"
+      },
+      {
+        "key": "MAX_CARBON_PER_UNIT",
+        "label": "Max carbon per unit",
+        "hint": "10 gCO2e",
+        "defaultValue": "10 gCO2e"
+      }
+    ],
+    "hubRefs": [
+      "req-carbon-efficiency",
+      "ff-cost-efficiency-guard"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-carbon-footprint-guard-1",
+      "type": "fitness-fn",
+      "label": "Carbon Footprint Guard",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "description": "Tracks estimated carbon emissions per unit of useful work using the cloud provider's carbon reporting tools and flags the trend when it moves the wrong way, the same way a cost dashboard would.",
+      "category": "holistic",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Estimated carbon per {{WORK_UNIT}} stays at or below {{MAX_CARBON_PER_UNIT}} on a trailing quarterly average, or the trend is flat or declining",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "WORK_UNIT",
+          "label": "Unit of work",
+          "hint": "1,000 requests",
+          "defaultValue": "1,000 requests"
+        },
+        {
+          "key": "MAX_CARBON_PER_UNIT",
+          "label": "Max carbon per unit",
+          "hint": "10 gCO2e",
+          "defaultValue": "10 gCO2e"
+        }
+      ]
+    }
+  ]
+}

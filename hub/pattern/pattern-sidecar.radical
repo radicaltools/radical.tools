@@ -15,7 +15,8 @@
     "hubRefs": [
       "pattern-circuit-breaker",
       "req-distributed-tracing",
-      "req-least-privilege"
+      "req-least-privilege",
+      "adr-zero-trust-network"
     ]
   },
   "nodes": [

@@ -15,7 +15,8 @@
       "pattern-api-gateway",
       "req-backward-compatibility",
       "adr-integration-style",
-      "ff-coupling-guard"
+      "ff-coupling-guard",
+      "pattern-anti-corruption-layer"
     ]
   },
   "nodes": [
