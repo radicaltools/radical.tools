@@ -1,0 +1,40 @@
+{
+  "hub": {
+    "id": "adr-auth-strategy",
+    "category": "adr",
+    "name": "Authentication Strategy",
+    "description": "Template ADR for choosing the authentication mechanism (JWT, session-based, OAuth 2.0, OIDC, mTLS). Covers security, scalability, and user experience trade-offs.",
+    "tags": [
+      "authentication",
+      "security",
+      "identity",
+      "oauth"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "AUTH_MECHANISM",
+        "label": "Authentication mechanism",
+        "hint": "JWT / OAuth 2.0"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-auth-1",
+      "type": "adr",
+      "label": "ADR: {{AUTH_MECHANISM}}",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "We need to authenticate users and services. Requirements: support for SSO, token-based stateless auth for APIs, refresh token rotation, and compatibility with our frontend framework. Must support both human users and machine-to-machine (M2M) scenarios.",
+      "decision": "We will use {{AUTH_MECHANISM}} because [RATIONALE]. Human users authenticate via [FLOW], machine clients via [FLOW].",
+      "consequences": "• Token storage: [APPROACH]\n• Token lifetime and refresh strategy: [DETAILS]\n• Revocation mechanism: [APPROACH]\n• Impact on latency: [ESTIMATE]",
+      "alternatives": "1. [Alternative A] — rejected: [reason]\n2. [Alternative B] — rejected: [reason]"
+    }
+  ]
+}

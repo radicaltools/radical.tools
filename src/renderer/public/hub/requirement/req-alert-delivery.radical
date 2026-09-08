@@ -1,0 +1,55 @@
+{
+  "hub": {
+    "id": "req-alert-delivery",
+    "category": "requirement",
+    "name": "Alert Delivery Reliability",
+    "description": "Manageability: critical operational alerts must be reliably delivered to the paging system to ensure on-call engineers are notified without delay.",
+    "tags": [
+      "manageability",
+      "alerting",
+      "reliability",
+      "nfr",
+      "operations"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "PAGING_SYSTEM",
+        "label": "Paging / on-call system",
+        "hint": "PagerDuty",
+        "defaultValue": "PagerDuty"
+      },
+      {
+        "key": "ALERT_DELIVERY_SECONDS",
+        "label": "Max alert delivery time (seconds)",
+        "hint": "60",
+        "type": "number",
+        "defaultValue": "60"
+      },
+      {
+        "key": "ALERT_RELIABILITY_PCT",
+        "label": "Alert delivery reliability (%)",
+        "hint": "99.9",
+        "defaultValue": "99.9"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-alert-del-1",
+      "type": "requirement",
+      "label": "Alert Delivery Reliability",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "approved",
+      "priority": "must",
+      "trigger": "a critical alert condition is detected by the monitoring system",
+      "action": "deliver critical alerts to {{PAGING_SYSTEM}} within {{ALERT_DELIVERY_SECONDS}} seconds of detection with {{ALERT_RELIABILITY_PCT}}% delivery reliability, verified by periodic end-to-end alert drills",
+      "rationale": "An alert that doesn't arrive is worse than no alert system at all. The Target breach worsened because alerts were ignored due to noise. High delivery reliability ensures the team actually gets notified."
+    }
+  ]
+}

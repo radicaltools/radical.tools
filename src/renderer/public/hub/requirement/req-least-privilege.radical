@@ -1,0 +1,41 @@
+{
+  "hub": {
+    "id": "req-least-privilege",
+    "category": "requirement",
+    "name": "Principle of Least Privilege",
+    "description": "Security: users and services must be granted only the minimum permissions required for their role, reducing blast radius from compromised accounts.",
+    "tags": [
+      "security",
+      "access-control",
+      "authorisation",
+      "nfr",
+      "iam"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "ACCESS_REVIEW_FREQUENCY",
+        "label": "Access review frequency",
+        "hint": "quarterly",
+        "defaultValue": "quarterly"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-least-priv-1",
+      "type": "requirement",
+      "label": "Principle of Least Privilege",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "grant every user account and service identity the minimum set of permissions necessary to perform its function, with access reviewed {{ACCESS_REVIEW_FREQUENCY}} and excess permissions revoked",
+      "rationale": "Least privilege limits blast radius when credentials are compromised. Google's BeyondCorp and Zero Trust models prove that eliminating implicit trust is the most effective defence against lateral movement."
+    }
+  ]
+}

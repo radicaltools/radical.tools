@@ -1,0 +1,40 @@
+{
+  "hub": {
+    "id": "adr-deployment-strategy",
+    "category": "adr",
+    "name": "Deployment Strategy",
+    "description": "Template ADR for choosing the deployment strategy (blue-green, canary, rolling, recreate). Balances risk, rollback speed, and infrastructure cost.",
+    "tags": [
+      "deployment",
+      "devops",
+      "ci-cd",
+      "release"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "DEPLOY_STRATEGY",
+        "label": "Deployment strategy",
+        "hint": "Blue-Green / Canary / Rolling"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-deploy-1",
+      "type": "adr",
+      "label": "ADR: {{DEPLOY_STRATEGY}} Deployment",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "We need a reliable deployment strategy that minimizes downtime and risk. Considerations: zero-downtime requirement, rollback speed, infrastructure cost, database migration compatibility, and observability during rollout.",
+      "decision": "We will use {{DEPLOY_STRATEGY}} deployments because [RATIONALE]. Rollback is achieved by [MECHANISM].",
+      "consequences": "• Infrastructure cost: [ESTIMATE — e.g. 2x for blue-green]\n• Rollback time: [ESTIMATE]\n• Database migration approach: [APPROACH — backwards-compatible migrations]\n• Monitoring during rollout: [METRICS TO WATCH]",
+      "alternatives": "1. Blue-green — instant rollback but 2x infrastructure cost\n2. Canary — gradual rollout, requires good observability\n3. Rolling — least infrastructure overhead but slower rollback\n4. Recreate — simplest but causes downtime"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "hub": {
+    "id": "req-graceful-degradation",
+    "category": "requirement",
+    "name": "Graceful Degradation",
+    "description": "Availability: event-driven requirement ensuring the system remains partially functional when a non-critical dependency is unavailable.",
+    "tags": [
+      "availability",
+      "resilience",
+      "nfr",
+      "reliability"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "req-degrade-1",
+      "type": "requirement",
+      "label": "Graceful Degradation",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "should",
+      "trigger": "a non-critical downstream service or third-party dependency becomes unavailable",
+      "action": "continue serving core functionality using cached data or a reduced feature set, displaying a clear status notice to affected users rather than returning an error",
+      "rationale": "Total failures caused by partial outages erode user trust far more than reduced functionality. Circuit breakers and fallbacks are the standard mitigation."
+    }
+  ]
+}

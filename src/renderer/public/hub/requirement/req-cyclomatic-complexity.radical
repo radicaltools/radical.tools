@@ -1,0 +1,41 @@
+{
+  "hub": {
+    "id": "req-cyclomatic-complexity",
+    "category": "requirement",
+    "name": "Code Complexity Limit",
+    "description": "Maintainability: ubiquitous requirement capping cyclomatic complexity per function to keep code understandable and testable.",
+    "tags": [
+      "maintainability",
+      "code-quality",
+      "complexity",
+      "nfr"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MAX_COMPLEXITY",
+        "label": "Max cyclomatic complexity per function",
+        "hint": "10",
+        "type": "number",
+        "defaultValue": "10"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-complexity-1",
+      "type": "requirement",
+      "label": "Code Complexity Limit",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "should",
+      "action": "keep cyclomatic complexity per function below {{MAX_COMPLEXITY}}, enforced by static analysis in the CI pipeline with build failure on violation",
+      "rationale": "Functions with complexity above 10 require exponentially more test cases and are significantly harder to debug and refactor."
+    }
+  ]
+}

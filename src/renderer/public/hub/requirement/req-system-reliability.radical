@@ -1,0 +1,41 @@
+{
+  "hub": {
+    "id": "req-system-reliability",
+    "category": "requirement",
+    "name": "Transaction Reliability",
+    "description": "Dependability: the system must complete the overwhelming majority of transactions without error to be justifiably trusted for business-critical operations.",
+    "tags": [
+      "dependability",
+      "reliability",
+      "mtbf",
+      "nfr",
+      "correctness"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "RELIABILITY_TARGET",
+        "label": "Transaction reliability target (%)",
+        "hint": "99.999",
+        "defaultValue": "99.999"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-reliability-1",
+      "type": "requirement",
+      "label": "Transaction Reliability",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "complete at least {{RELIABILITY_TARGET}}% of all business transactions without system-induced errors, tracked via Mean Time Between Failures (MTBF) and error rate dashboards",
+      "rationale": "Five-nines transaction reliability (1 failure per 100,000) is the threshold for systems trusted with financial, medical, or safety-critical operations. Below this, error rates cause measurable downstream harm."
+    }
+  ]
+}

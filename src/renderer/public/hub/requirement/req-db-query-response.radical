@@ -1,0 +1,43 @@
+{
+  "hub": {
+    "id": "req-db-query-response",
+    "category": "requirement",
+    "name": "Database Query Response Time",
+    "description": "Performance: OLTP database queries must execute within 100ms to prevent query latency from dominating API response times.",
+    "tags": [
+      "performance",
+      "database",
+      "latency",
+      "nfr",
+      "oltp"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "DB_P90_MS",
+        "label": "DB query P90 target (ms)",
+        "hint": "100",
+        "type": "number",
+        "defaultValue": "100"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-db-rt-1",
+      "type": "requirement",
+      "label": "Database Query Response Time",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "state-driven",
+      "status": "approved",
+      "priority": "must",
+      "precondition": "the system is running standard OLTP operations on a production-size dataset",
+      "action": "execute standard transactional queries within {{DB_P90_MS}}ms at the 90th percentile, monitored via continuous database performance telemetry",
+      "rationale": "Database query time is typically the largest single contributor to API latency. Queries exceeding 100ms expose APIs to SLO breaches under concurrent load."
+    }
+  ]
+}

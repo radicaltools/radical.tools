@@ -1,0 +1,32 @@
+{
+  "hub": {
+    "id": "req-error-recovery",
+    "category": "requirement",
+    "name": "Error Recovery Guidance",
+    "description": "Usability: ubiquitous requirement ensuring every system error provides actionable recovery guidance.",
+    "tags": [
+      "usability",
+      "error-handling",
+      "ux",
+      "nfr"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "req-error-recovery-1",
+      "type": "requirement",
+      "label": "Error Recovery Guidance",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "display a human-readable error message with a specific corrective action or next step for every user-facing error state",
+      "rationale": "Dead-end error states cause abandonment. Users who understand what went wrong and how to fix it have significantly higher task completion rates."
+    }
+  ]
+}

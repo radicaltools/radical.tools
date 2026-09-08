@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "req-health-checks",
+    "category": "requirement",
+    "name": "Service Health Checks",
+    "description": "Manageability: ubiquitous requirement ensuring every service exposes a standardised health endpoint for monitoring and orchestration.",
+    "tags": [
+      "manageability",
+      "monitoring",
+      "observability",
+      "nfr",
+      "operations"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "HEALTH_RESPONSE_MS",
+        "label": "Max /health response time (ms)",
+        "hint": "200",
+        "type": "number",
+        "defaultValue": "200"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-health-1",
+      "type": "requirement",
+      "label": "Service Health Checks",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "expose a /health endpoint returning HTTP 200 with liveness and readiness status, including dependency health, within {{HEALTH_RESPONSE_MS}}ms",
+      "rationale": "Orchestrators and load balancers require health endpoints to route traffic away from unhealthy instances. Missing checks mean zombie processes receive live traffic."
+    }
+  ]
+}

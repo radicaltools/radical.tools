@@ -1,0 +1,47 @@
+{
+  "hub": {
+    "id": "req-accessibility",
+    "category": "requirement",
+    "name": "WCAG Accessibility",
+    "description": "Ubiquitous requirement ensuring the UI meets accessibility standards for all users.",
+    "tags": [
+      "accessibility",
+      "wcag",
+      "ui",
+      "nfr",
+      "inclusivity"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "WCAG_VERSION",
+        "label": "WCAG version",
+        "hint": "2.1",
+        "defaultValue": "2.1"
+      },
+      {
+        "key": "WCAG_LEVEL",
+        "label": "Conformance level (A / AA / AAA)",
+        "hint": "AA",
+        "defaultValue": "AA"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-wcag-1",
+      "type": "requirement",
+      "label": "WCAG Accessibility",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "conform to WCAG {{WCAG_VERSION}} Level {{WCAG_LEVEL}} for all user-facing pages and interactive components",
+      "rationale": "Inclusive design ensures the product is usable by people with disabilities and meets legal requirements in many jurisdictions."
+    }
+  ]
+}

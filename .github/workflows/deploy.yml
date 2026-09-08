@@ -36,6 +36,7 @@ jobs:
       - name: Build web renderer
         run: npm run build:web
         # Output: out/renderer/{index.html,hub.html,hub-data.json} + out/renderer/assets/**
+        #         + out/renderer/hub/{index.json,<category>/<id>.radical}
         # index.html → studio.radical.tools, hub.html → hub.radical.tools (same bundle)
 
       - name: Configure AWS credentials (OIDC — no long-lived keys)
@@ -114,8 +115,19 @@ jobs:
             --cache-control "no-store" \
             --content-type "text/html; charset=utf-8"
 
-      - name: Upload hub-data.json (no-cache)
+      - name: Sync hub catalogue (no-cache)
         run: |
+          # hub/index.json + one .radical (JSON) document per concept.
+          # Served as JSON so fetch() content-type checks pass for .radical.
+          aws s3 sync out/renderer/hub/ \
+            s3://${{ secrets.HUB_S3_BUCKET }}/hub/ \
+            --delete \
+            --cache-control "no-store" \
+            --content-type "application/json; charset=utf-8"
+
+      - name: Upload legacy hub-data.json (no-cache)
+        run: |
+          # Single-file catalogue kept for older desktop builds.
           aws s3 cp out/renderer/hub-data.json \
             s3://${{ secrets.HUB_S3_BUCKET }}/hub-data.json \
             --cache-control "no-store" \
@@ -130,4 +142,4 @@ jobs:
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.HUB_CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/index.html" "/hub-data.json" "/style.css" "/hub.js"
+            --paths "/index.html" "/hub-data.json" "/hub/*" "/style.css" "/hub.js"

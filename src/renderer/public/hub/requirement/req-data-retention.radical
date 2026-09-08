@@ -1,0 +1,43 @@
+{
+  "hub": {
+    "id": "req-data-retention",
+    "category": "requirement",
+    "name": "Data Retention Policy",
+    "description": "Unwanted-behaviour requirement: prevents unbounded data growth by archiving old data.",
+    "tags": [
+      "data",
+      "retention",
+      "compliance",
+      "nfr",
+      "storage"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "RETENTION_DAYS",
+        "label": "Retention period (days)",
+        "hint": "90",
+        "type": "number",
+        "defaultValue": "90"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-data-retention-1",
+      "type": "requirement",
+      "label": "Data Retention Policy",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "unwanted-behaviour",
+      "status": "approved",
+      "priority": "should",
+      "unwanted_condition": "transactional data is older than {{RETENTION_DAYS}} days",
+      "action": "archive the data to cold storage and remove it from the primary database",
+      "rationale": "Unbounded data growth degrades query performance and increases storage costs."
+    }
+  ]
+}

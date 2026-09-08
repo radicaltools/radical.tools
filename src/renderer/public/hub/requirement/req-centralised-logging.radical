@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "req-centralised-logging",
+    "category": "requirement",
+    "name": "Centralised Structured Logging",
+    "description": "Manageability: ubiquitous requirement mandating structured, centralised log collection across all services.",
+    "tags": [
+      "manageability",
+      "logging",
+      "observability",
+      "nfr",
+      "operations"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "LOG_RETENTION_DAYS",
+        "label": "Log retention period (days)",
+        "hint": "30",
+        "type": "number",
+        "defaultValue": "30"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-logging-1",
+      "type": "requirement",
+      "label": "Centralised Structured Logging",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "emit all logs in structured JSON format with correlation IDs, severity, timestamp, and service name, aggregated into a centralised log store with a minimum {{LOG_RETENTION_DAYS}}-day retention",
+      "rationale": "Unstructured logs scattered across hosts are unqueryable in production incidents. Structured, centralised logs reduce mean time to diagnosis."
+    }
+  ]
+}

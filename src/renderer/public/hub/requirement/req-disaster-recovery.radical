@@ -1,0 +1,56 @@
+{
+  "hub": {
+    "id": "req-disaster-recovery",
+    "category": "requirement",
+    "name": "Disaster Recovery Failover",
+    "description": "Event-driven requirement: when the primary region fails, the system must failover to a secondary region within a defined time window.",
+    "tags": [
+      "disaster-recovery",
+      "failover",
+      "reliability",
+      "nfr"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "OUTAGE_THRESHOLD_SECONDS",
+        "label": "Primary outage threshold before failover (seconds)",
+        "hint": "30",
+        "type": "number",
+        "defaultValue": "30"
+      },
+      {
+        "key": "RTO_MINUTES",
+        "label": "Recovery Time Objective (minutes)",
+        "hint": "5",
+        "type": "number",
+        "defaultValue": "5"
+      },
+      {
+        "key": "RPO_MINUTES",
+        "label": "Recovery Point Objective (minutes)",
+        "hint": "1",
+        "type": "number",
+        "defaultValue": "1"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-dr-failover-1",
+      "type": "requirement",
+      "label": "Disaster Recovery Failover",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "approved",
+      "priority": "must",
+      "trigger": "the primary region becomes unavailable for more than {{OUTAGE_THRESHOLD_SECONDS}} seconds",
+      "action": "automatically failover to the secondary region with an RTO of {{RTO_MINUTES}} minutes and RPO of {{RPO_MINUTES}} minute",
+      "rationale": "Business continuity requires rapid recovery from regional outages to minimize revenue loss."
+    }
+  ]
+}

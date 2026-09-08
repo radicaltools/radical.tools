@@ -1,0 +1,44 @@
+{
+  "hub": {
+    "id": "req-rate-limiting",
+    "category": "requirement",
+    "name": "API Rate Limiting",
+    "description": "Complex requirement combining state and event conditions to protect the system from abuse.",
+    "tags": [
+      "security",
+      "api",
+      "rate-limiting",
+      "nfr",
+      "protection"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "RATE_LIMIT_RPM",
+        "label": "Rate limit (requests/minute per client)",
+        "hint": "100",
+        "type": "number",
+        "defaultValue": "100"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-rate-limit-1",
+      "type": "requirement",
+      "label": "API Rate Limiting",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "complex",
+      "status": "approved",
+      "priority": "must",
+      "precondition": "the API gateway is operating normally",
+      "trigger": "a single client exceeds {{RATE_LIMIT_RPM}} requests per minute",
+      "action": "reject excess requests with HTTP 429 and include a Retry-After header",
+      "rationale": "Prevents individual clients from monopolizing resources and degrading service for others."
+    }
+  ]
+}

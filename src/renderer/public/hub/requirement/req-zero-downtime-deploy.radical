@@ -1,0 +1,33 @@
+{
+  "hub": {
+    "id": "req-zero-downtime-deploy",
+    "category": "requirement",
+    "name": "Zero-Downtime Deployment",
+    "description": "Automatability: ubiquitous requirement ensuring deployments do not interrupt active users.",
+    "tags": [
+      "automatability",
+      "deployment",
+      "ci-cd",
+      "nfr",
+      "availability"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "req-zdd-1",
+      "type": "requirement",
+      "label": "Zero-Downtime Deployment",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "deploy all service updates using blue/green or rolling deployment strategies with automated smoke tests, completing without dropping any in-flight requests",
+      "rationale": "Maintenance windows are incompatible with global 24/7 services. Zero-downtime deploys allow continuous delivery without SLA violations."
+    }
+  ]
+}

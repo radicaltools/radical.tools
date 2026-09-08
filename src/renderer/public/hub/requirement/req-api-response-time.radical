@@ -1,0 +1,50 @@
+{
+  "hub": {
+    "id": "req-api-response-time",
+    "category": "requirement",
+    "name": "API Response Time",
+    "description": "Performance: REST API endpoints must respond within 200ms for the majority of requests under normal load.",
+    "tags": [
+      "performance",
+      "latency",
+      "api",
+      "nfr",
+      "response-time"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "P90_RESPONSE_MS",
+        "label": "P90 response time target (ms)",
+        "hint": "200",
+        "type": "number",
+        "defaultValue": "200"
+      },
+      {
+        "key": "P99_CEILING_MS",
+        "label": "P99 hard ceiling (ms)",
+        "hint": "1000",
+        "type": "number",
+        "defaultValue": "1000"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-api-rt-1",
+      "type": "requirement",
+      "label": "API Response Time",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "state-driven",
+      "status": "approved",
+      "priority": "must",
+      "precondition": "the system is handling normal production traffic",
+      "action": "respond to REST API requests within {{P90_RESPONSE_MS}}ms at the 90th percentile, with a hard ceiling of {{P99_CEILING_MS}}ms at the 99th percentile",
+      "rationale": "API latency directly impacts downstream integration performance. Amazon found every 100ms of latency cost 1% in sales. Sub-200ms responses are required for a seamless UX."
+    }
+  ]
+}

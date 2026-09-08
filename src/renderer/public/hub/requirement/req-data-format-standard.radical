@@ -1,0 +1,33 @@
+{
+  "hub": {
+    "id": "req-data-format-standard",
+    "category": "requirement",
+    "name": "Data Format Standard",
+    "description": "Interoperability: all service payloads must conform to a shared enterprise data schema to preserve semantic integrity across system boundaries.",
+    "tags": [
+      "interoperability",
+      "data-format",
+      "schema",
+      "nfr",
+      "standards"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "req-data-fmt-1",
+      "type": "requirement",
+      "label": "Data Format Standard",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "define a canonical enterprise data schema (JSON-LD for semantic web contexts, Protobuf for high-throughput services) and validate all service payloads against it via semantic unit tests",
+      "rationale": "Without a shared schema, a 'Customer ID' in one system has a different meaning in another. Semantic drift across services causes silent data corruption and expensive migration projects."
+    }
+  ]
+}

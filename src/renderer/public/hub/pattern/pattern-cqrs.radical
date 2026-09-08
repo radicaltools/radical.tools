@@ -1,0 +1,107 @@
+{
+  "hub": {
+    "id": "pattern-cqrs",
+    "category": "pattern",
+    "name": "CQRS + Event Sourcing",
+    "description": "Separates command (write) and query (read) models. Commands produce events stored in an event store; projections build read-optimized views from those events.",
+    "tags": [
+      "cqrs",
+      "event-sourcing",
+      "ddd",
+      "architecture"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "pat-cqrs-cmd",
+      "type": "container",
+      "label": "Command Handler",
+      "description": "Validates and processes commands. Produces domain events. Enforces business invariants.",
+      "technology": "",
+      "x": 0,
+      "y": 0,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "pat-cqrs-es",
+      "type": "database",
+      "label": "Event Store",
+      "description": "Append-only log of all domain events. The single source of truth. Supports event replay for rebuilding state.",
+      "technology": "EventStoreDB / Kafka",
+      "x": 0,
+      "y": 300,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "pat-cqrs-proj",
+      "type": "container",
+      "label": "Projection Engine",
+      "description": "Consumes events and builds read-optimized views. Runs asynchronously and can be rebuilt from scratch.",
+      "technology": "",
+      "x": 400,
+      "y": 300,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "pat-cqrs-read",
+      "type": "database",
+      "label": "Read Store",
+      "description": "Denormalized read model optimized for query patterns. Updated by projections.",
+      "technology": "Elasticsearch / Redis",
+      "x": 400,
+      "y": 600,
+      "width": 190,
+      "height": 130,
+      "collapsed": false
+    },
+    {
+      "id": "pat-cqrs-query",
+      "type": "container",
+      "label": "Query Handler",
+      "description": "Serves read requests from the denormalized read store. No business logic, no writes.",
+      "technology": "",
+      "x": 700,
+      "y": 0,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    }
+  ],
+  "relations": [
+    {
+      "id": "pat-cqrs-r1",
+      "sourceId": "pat-cqrs-cmd",
+      "targetId": "pat-cqrs-es",
+      "label": "Persists events",
+      "technology": ""
+    },
+    {
+      "id": "pat-cqrs-r2",
+      "sourceId": "pat-cqrs-proj",
+      "targetId": "pat-cqrs-es",
+      "label": "Reads events",
+      "technology": ""
+    },
+    {
+      "id": "pat-cqrs-r3",
+      "sourceId": "pat-cqrs-proj",
+      "targetId": "pat-cqrs-read",
+      "label": "Updates projections",
+      "technology": ""
+    },
+    {
+      "id": "pat-cqrs-r4",
+      "sourceId": "pat-cqrs-query",
+      "targetId": "pat-cqrs-read",
+      "label": "Reads from",
+      "technology": ""
+    }
+  ]
+}

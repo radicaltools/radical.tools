@@ -1,6 +1,7 @@
 // ─── Radical Hub — embedded viewer ───────────────────────────────────────────
 //
-// The catalogue of architecture concepts (hub-data.json) rendered by the real
+// The catalogue of architecture concepts (hub/index.json + one .radical file
+// per concept) rendered by the real
 // studio: pick a concept on the left, explore it on the right with the same
 // Canvas / Wiki / Table views and the same node components the editor uses.
 // The store runs under the 'viewer' runtime profile (see runtime.ts): nothing
@@ -9,7 +10,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlowProvider } from 'reactflow'
 import { useDiagramStore } from '../store/diagramStore'
-import { useHubStore, type HubConcept } from '../store/hubStore'
+import { useHubStore, type HubConcept, type HubConceptSummary } from '../store/hubStore'
+import { conceptToDoc } from './hubFormat'
 import { Canvas } from '../components/Canvas'
 import { WikiView } from '../components/WikiView'
 import { TableView } from '../components/TableView'
@@ -78,8 +80,9 @@ const IconStudio = () => (
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** The concept as a Radical Studio document — what "Download" / "Copy" hand out. */
 function conceptJson(concept: HubConcept): string {
-  return JSON.stringify(concept, null, 2)
+  return JSON.stringify(conceptToDoc(concept), null, 2)
 }
 
 /** Fit once React Flow has measured the nodes, and again after the live
@@ -94,14 +97,13 @@ function downloadConcept(concept: HubConcept): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${concept.id}.json`
+  a.download = `${concept.id}.radical`
   a.click()
   URL.revokeObjectURL(url)
 }
 
-function metaBadges(concept: HubConcept): Array<{ label: string; value: string }> {
-  const node = concept.nodes[0] as Record<string, unknown> | undefined
-  if (!node) return []
+function metaBadges(concept: HubConceptSummary): Array<{ label: string; value: string }> {
+  const node = concept.preview
   const out: Array<{ label: string; value: string }> = []
   const push = (label: string, v: unknown) => { if (v !== undefined && v !== null && v !== '') out.push({ label, value: String(v) }) }
   switch (concept.category) {
@@ -113,7 +115,7 @@ function metaBadges(concept: HubConcept): Array<{ label: string; value: string }
       push('Status', node.status); break
     case 'pattern':
     case 'blueprint':
-      push('Elements', concept.nodes.length); push('Relations', (concept.relations ?? []).length); break
+      push('Elements', concept.nodeCount); push('Relations', concept.relationCount); break
   }
   return out
 }
@@ -123,7 +125,7 @@ function metaBadges(concept: HubConcept): Array<{ label: string; value: string }
 function ConceptCard({
   concept, active, selected, onOpen, onToggleSelect, onTag,
 }: {
-  concept: HubConcept
+  concept: HubConceptSummary
   active: boolean
   selected: boolean
   onOpen: () => void
@@ -179,9 +181,11 @@ function ConceptCard({
 
 function HubAppInner(): React.ReactElement {
   const concepts = useHubStore((s) => s.concepts)
+  const loaded = useHubStore((s) => s.loaded)
   const loading = useHubStore((s) => s.loading)
   const error = useHubStore((s) => s.error)
   const fetchConcepts = useHubStore((s) => s.fetchConcepts)
+  const loadConcept = useHubStore((s) => s.loadConcept)
   const activeCategory = useHubStore((s) => s.activeCategory)
   const activeTag = useHubStore((s) => s.activeTag)
   const searchQuery = useHubStore((s) => s.searchQuery)
@@ -221,8 +225,21 @@ function HubAppInner(): React.ReactElement {
     if (r.tag) setTag(r.tag)
   }, [setCategory, setTag])
 
-  const concept = useMemo(() => concepts.find((c) => c.id === conceptId), [concepts, conceptId])
+  const summary = useMemo(() => concepts.find((c) => c.id === conceptId), [concepts, conceptId])
+  const concept = conceptId ? loaded[conceptId] : undefined
+  const [conceptError, setConceptError] = useState<string | null>(null)
   const viewKind = kindForViewId(activeViewId)
+
+  // Fetch the selected concept's .radical file once the index knows about it.
+  useEffect(() => {
+    setConceptError(null)
+    if (!summary || concept) return
+    let cancelled = false
+    loadConcept(summary.id).catch((err: unknown) => {
+      if (!cancelled) setConceptError(err instanceof Error ? err.message : 'Failed to load concept')
+    })
+    return () => { cancelled = true }
+  }, [summary, concept, loadConcept])
 
   // Load the selected concept into the (sandboxed) diagram store.
   useEffect(() => {
@@ -465,8 +482,8 @@ function HubAppInner(): React.ReactElement {
               </>
             )}
             <div style={{ flex: 1 }} />
-            <button type="button" className="toolbar-btn" onClick={() => void copyJson(concept)} title="Copy concept JSON"><IconCopy /> Copy JSON</button>
-            <button type="button" className="toolbar-btn" onClick={() => downloadConcept(concept)} title="Download concept JSON"><IconDownload /> Download</button>
+            <button type="button" className="toolbar-btn" onClick={() => void copyJson(concept)} title="Copy as .radical JSON"><IconCopy /> Copy JSON</button>
+            <button type="button" className="toolbar-btn" onClick={() => downloadConcept(concept)} title="Download as .radical file (opens in Radical Studio)"><IconDownload /> Download</button>
             <button type="button" className="toolbar-btn active" onClick={() => openInStudio([concept.id])} title="Open Radical Studio with this concept ready to import">
               <IconStudio /> Add to Studio
             </button>
@@ -483,9 +500,17 @@ function HubAppInner(): React.ReactElement {
       {!concept ? (
         <div className="canvas-area hub-empty">
           <div className="hub-empty-inner">
-            <h2>Radical Hub</h2>
-            <p>Curated requirements, ADRs, fitness functions, patterns and blueprints — rendered exactly as they will appear in your model.</p>
-            <p className="muted">Select a concept on the left to explore it as a diagram, a wiki page or a table. Use <em>Add to Studio</em> to import it into your own model.</p>
+            {conceptError ? (
+              <p className="hub-list-err">⚠ {conceptError}</p>
+            ) : summary ? (
+              <p className="muted">Loading “{summary.name}”…</p>
+            ) : (
+              <>
+                <h2>Radical Hub</h2>
+                <p>Curated requirements, ADRs, fitness functions, patterns and blueprints — rendered exactly as they will appear in your model.</p>
+                <p className="muted">Select a concept on the left to explore it as a diagram, a wiki page or a table. Use <em>Add to Studio</em> to import it into your own model.</p>
+              </>
+            )}
           </div>
         </div>
       ) : viewKind === 'wiki' ? (

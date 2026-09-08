@@ -1,0 +1,100 @@
+{
+  "hub": {
+    "id": "pattern-hexagonal",
+    "category": "pattern",
+    "name": "Hexagonal Architecture (Ports & Adapters)",
+    "description": "Isolates business logic from infrastructure via ports (interfaces) and adapters (implementations). The domain core has no dependencies on frameworks, databases, or external services.",
+    "tags": [
+      "hexagonal",
+      "ports-adapters",
+      "clean-architecture",
+      "ddd"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "pat-hex-domain",
+      "type": "domain",
+      "label": "Domain Core",
+      "description": "Pure business logic and domain rules. No infrastructure dependencies. Defines ports (interfaces) that adapters implement.",
+      "x": 250,
+      "y": 200,
+      "width": 520,
+      "height": 360,
+      "collapsed": false
+    },
+    {
+      "id": "pat-hex-app",
+      "type": "container",
+      "label": "Application Service",
+      "description": "Orchestrates use cases by calling domain objects and port interfaces. Thin layer — no business rules here.",
+      "technology": "",
+      "x": 300,
+      "y": 280,
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "parentId": "pat-hex-domain"
+    },
+    {
+      "id": "pat-hex-rest",
+      "type": "container",
+      "label": "REST Adapter (Driving)",
+      "description": "Inbound adapter: translates HTTP requests into application service calls. Implements the driving port.",
+      "technology": "Express / Spring MVC",
+      "x": 0,
+      "y": 0,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "pat-hex-db",
+      "type": "container",
+      "label": "Database Adapter (Driven)",
+      "description": "Outbound adapter: implements the repository port to persist domain objects in a database.",
+      "technology": "Prisma / Hibernate",
+      "x": 0,
+      "y": 650,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "pat-hex-ext",
+      "type": "container",
+      "label": "External API Adapter (Driven)",
+      "description": "Outbound adapter: implements a port to call external services (payment, email, etc.).",
+      "technology": "HTTP Client",
+      "x": 500,
+      "y": 650,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    }
+  ],
+  "relations": [
+    {
+      "id": "pat-hex-r1",
+      "sourceId": "pat-hex-rest",
+      "targetId": "pat-hex-app",
+      "label": "Calls use cases",
+      "technology": ""
+    },
+    {
+      "id": "pat-hex-r2",
+      "sourceId": "pat-hex-app",
+      "targetId": "pat-hex-db",
+      "label": "Uses repository port",
+      "technology": ""
+    },
+    {
+      "id": "pat-hex-r3",
+      "sourceId": "pat-hex-app",
+      "targetId": "pat-hex-ext",
+      "label": "Uses external port",
+      "technology": ""
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "hub": {
+    "id": "req-search-response-time",
+    "category": "requirement",
+    "name": "Search Functionality Response Time",
+    "description": "Performance: search queries must return results within 500ms to maintain a usable search experience.",
+    "tags": [
+      "performance",
+      "search",
+      "latency",
+      "nfr",
+      "ux"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "SEARCH_P90_MS",
+        "label": "Search P90 response time (ms)",
+        "hint": "500",
+        "type": "number",
+        "defaultValue": "500"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-search-rt-1",
+      "type": "requirement",
+      "label": "Search Functionality Response Time",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "state-driven",
+      "status": "approved",
+      "priority": "should",
+      "precondition": "a user submits a search query against a production-size dataset",
+      "action": "return search results within {{SEARCH_P90_MS}}ms for 90% of queries, using appropriate indexing strategies validated by performance testing with representative data",
+      "rationale": "Users expect near-instant search results. Results taking over 1 second cause a sharp drop in search engagement and perceived product quality."
+    }
+  ]
+}

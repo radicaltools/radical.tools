@@ -1,0 +1,121 @@
+{
+  "hub": {
+    "id": "pattern-microservices",
+    "category": "pattern",
+    "name": "Microservices Architecture",
+    "description": "A microservices decomposition with an API Gateway, two backend services, shared database per service, and message queue for async communication. Each service owns its data store.",
+    "tags": [
+      "microservices",
+      "distributed",
+      "api-gateway",
+      "architecture"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "pat-ms-gateway",
+      "type": "system",
+      "label": "API Gateway",
+      "description": "Entry point for all client requests. Routes, authenticates, and rate-limits incoming traffic.",
+      "technology": "Kong / AWS API Gateway",
+      "x": 300,
+      "y": 0,
+      "width": 360,
+      "height": 260,
+      "collapsed": true
+    },
+    {
+      "id": "pat-ms-service-a",
+      "type": "system",
+      "label": "Service A",
+      "description": "Handles domain capability A. Owns its data store and exposes APIs consumed by the gateway.",
+      "technology": "",
+      "x": 0,
+      "y": 350,
+      "width": 360,
+      "height": 260,
+      "collapsed": true
+    },
+    {
+      "id": "pat-ms-db-a",
+      "type": "database",
+      "label": "Service A Database",
+      "description": "Private data store for Service A. Not shared with other services.",
+      "technology": "PostgreSQL",
+      "x": 50,
+      "y": 420,
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "parentId": "pat-ms-service-a"
+    },
+    {
+      "id": "pat-ms-service-b",
+      "type": "system",
+      "label": "Service B",
+      "description": "Handles domain capability B. Communicates with Service A via events.",
+      "technology": "",
+      "x": 600,
+      "y": 350,
+      "width": 360,
+      "height": 260,
+      "collapsed": true
+    },
+    {
+      "id": "pat-ms-db-b",
+      "type": "database",
+      "label": "Service B Database",
+      "description": "Private data store for Service B.",
+      "technology": "MongoDB",
+      "x": 650,
+      "y": 420,
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "parentId": "pat-ms-service-b"
+    },
+    {
+      "id": "pat-ms-queue",
+      "type": "queue",
+      "label": "Message Broker",
+      "description": "Async event bus for inter-service communication. Decouples services temporally.",
+      "technology": "RabbitMQ / Kafka",
+      "x": 300,
+      "y": 700,
+      "width": 220,
+      "height": 95,
+      "collapsed": false
+    }
+  ],
+  "relations": [
+    {
+      "id": "pat-ms-r1",
+      "sourceId": "pat-ms-gateway",
+      "targetId": "pat-ms-service-a",
+      "label": "Routes requests",
+      "technology": "REST/gRPC"
+    },
+    {
+      "id": "pat-ms-r2",
+      "sourceId": "pat-ms-gateway",
+      "targetId": "pat-ms-service-b",
+      "label": "Routes requests",
+      "technology": "REST/gRPC"
+    },
+    {
+      "id": "pat-ms-r3",
+      "sourceId": "pat-ms-service-a",
+      "targetId": "pat-ms-queue",
+      "label": "Publishes events",
+      "technology": "AMQP"
+    },
+    {
+      "id": "pat-ms-r4",
+      "sourceId": "pat-ms-queue",
+      "targetId": "pat-ms-service-b",
+      "label": "Delivers events",
+      "technology": "AMQP"
+    }
+  ]
+}

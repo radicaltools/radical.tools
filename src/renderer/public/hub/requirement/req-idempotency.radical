@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "req-idempotency",
+    "category": "requirement",
+    "name": "Idempotent Operations",
+    "description": "Dependability: ubiquitous requirement ensuring that retried or duplicated requests do not cause unintended side effects.",
+    "tags": [
+      "dependability",
+      "reliability",
+      "idempotency",
+      "nfr",
+      "data-integrity"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "IDEMPOTENCY_WINDOW_HOURS",
+        "label": "Idempotency key window (hours)",
+        "hint": "24",
+        "type": "number",
+        "defaultValue": "24"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-idempotency-1",
+      "type": "requirement",
+      "label": "Idempotent Operations",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "implement idempotency keys for all state-changing API operations, ensuring that duplicate requests within a {{IDEMPOTENCY_WINDOW_HOURS}}-hour window produce the same result without creating duplicate records",
+      "rationale": "Network retries are unavoidable. Without idempotency, transient failures cause double-charges, duplicate orders, or data corruption."
+    }
+  ]
+}

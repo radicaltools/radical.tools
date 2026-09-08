@@ -1,0 +1,83 @@
+{
+  "hub": {
+    "id": "pattern-strangler-fig",
+    "category": "pattern",
+    "name": "Strangler Fig Migration",
+    "description": "Incrementally migrates a monolith to a new architecture by routing traffic through a facade. New features go to the new system; legacy features are migrated one by one until the monolith can be decommissioned.",
+    "tags": [
+      "migration",
+      "legacy",
+      "strangler",
+      "modernization"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "pat-sf-facade",
+      "type": "container",
+      "label": "Strangler Facade",
+      "description": "Routes requests to either the legacy monolith or the new services based on feature flags / URL patterns. Transparent to consumers.",
+      "technology": "Reverse Proxy / API Gateway",
+      "x": 250,
+      "y": 0,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "pat-sf-legacy",
+      "type": "system",
+      "label": "Legacy Monolith",
+      "description": "The existing system being migrated. Features are removed from here as they're rebuilt in the new services.",
+      "technology": "",
+      "x": 0,
+      "y": 350,
+      "width": 360,
+      "height": 260,
+      "collapsed": true,
+      "external": true
+    },
+    {
+      "id": "pat-sf-new-svc",
+      "type": "system",
+      "label": "New Service",
+      "description": "Modern replacement for a subset of monolith functionality. Built with the target architecture.",
+      "technology": "",
+      "x": 500,
+      "y": 350,
+      "width": 360,
+      "height": 260,
+      "collapsed": true
+    },
+    {
+      "id": "pat-sf-new-db",
+      "type": "database",
+      "label": "New Service Database",
+      "description": "Dedicated data store for the new service. Data migrated from the monolith's shared database.",
+      "technology": "",
+      "x": 550,
+      "y": 420,
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "parentId": "pat-sf-new-svc"
+    }
+  ],
+  "relations": [
+    {
+      "id": "pat-sf-r1",
+      "sourceId": "pat-sf-facade",
+      "targetId": "pat-sf-legacy",
+      "label": "Routes legacy features",
+      "technology": "HTTP"
+    },
+    {
+      "id": "pat-sf-r2",
+      "sourceId": "pat-sf-facade",
+      "targetId": "pat-sf-new-svc",
+      "label": "Routes migrated features",
+      "technology": "HTTP"
+    }
+  ]
+}

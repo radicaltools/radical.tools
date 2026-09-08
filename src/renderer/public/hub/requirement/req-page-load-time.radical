@@ -1,0 +1,43 @@
+{
+  "hub": {
+    "id": "req-page-load-time",
+    "category": "requirement",
+    "name": "Page Load Time",
+    "description": "Performance: state-driven requirement ensuring web pages load within acceptable time under normal operating conditions.",
+    "tags": [
+      "performance",
+      "latency",
+      "web",
+      "nfr",
+      "core-web-vitals"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "TTI_SECONDS",
+        "label": "Time-to-interactive (seconds)",
+        "hint": "3",
+        "type": "number",
+        "defaultValue": "3"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-page-load-1",
+      "type": "requirement",
+      "label": "Page Load Time",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "state-driven",
+      "status": "approved",
+      "priority": "must",
+      "precondition": "the user is on a standard broadband connection and the system is under normal load",
+      "action": "render the initial page and make it interactive (TTI) within {{TTI_SECONDS}} seconds for 95% of users",
+      "rationale": "Studies show that pages taking longer than 3 seconds lose ~53% of mobile visitors. Core Web Vitals impact SEO ranking."
+    }
+  ]
+}

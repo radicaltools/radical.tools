@@ -1,6 +1,7 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import { hubCataloguePlugin } from './tools/hubCatalogue'
 
 export default defineConfig({
   main: {
@@ -10,7 +11,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()]
   },
   renderer: {
-    plugins: [react()],
+    plugins: [react(), hubCataloguePlugin({ publicDir: resolve(__dirname, 'src/renderer/public') })],
     define: {
       __DEV_SAMPLE_DATA_PATH__: JSON.stringify(
         resolve(__dirname, 'src/renderer/src/store/fintechSampleData.json')

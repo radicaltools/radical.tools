@@ -1,0 +1,88 @@
+{
+  "hub": {
+    "id": "pattern-event-driven",
+    "category": "pattern",
+    "name": "Event-Driven Architecture",
+    "description": "An event-driven system where producers emit domain events to a central event bus, and multiple consumers react independently. Enables loose coupling and scalable processing.",
+    "tags": [
+      "event-driven",
+      "messaging",
+      "async",
+      "decoupling"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "pat-eda-producer",
+      "type": "system",
+      "label": "Event Producer",
+      "description": "Generates domain events when state changes occur. Events are immutable facts about what happened.",
+      "technology": "",
+      "x": 0,
+      "y": 0,
+      "width": 360,
+      "height": 260,
+      "collapsed": true
+    },
+    {
+      "id": "pat-eda-bus",
+      "type": "queue",
+      "label": "Event Bus",
+      "description": "Central event backbone. Persists events and delivers them to subscribed consumers. Supports replay and partitioning.",
+      "technology": "Apache Kafka / AWS EventBridge",
+      "x": 250,
+      "y": 350,
+      "width": 220,
+      "height": 95,
+      "collapsed": false
+    },
+    {
+      "id": "pat-eda-consumer-1",
+      "type": "system",
+      "label": "Consumer: Projections",
+      "description": "Builds read-optimized views (CQRS query side) by consuming domain events.",
+      "technology": "",
+      "x": 0,
+      "y": 550,
+      "width": 360,
+      "height": 260,
+      "collapsed": true
+    },
+    {
+      "id": "pat-eda-consumer-2",
+      "type": "system",
+      "label": "Consumer: Notifications",
+      "description": "Sends notifications (email, push, SMS) in response to domain events.",
+      "technology": "",
+      "x": 500,
+      "y": 550,
+      "width": 360,
+      "height": 260,
+      "collapsed": true
+    }
+  ],
+  "relations": [
+    {
+      "id": "pat-eda-r1",
+      "sourceId": "pat-eda-producer",
+      "targetId": "pat-eda-bus",
+      "label": "Emits domain events",
+      "technology": "Kafka Producer API"
+    },
+    {
+      "id": "pat-eda-r2",
+      "sourceId": "pat-eda-bus",
+      "targetId": "pat-eda-consumer-1",
+      "label": "Delivers events",
+      "technology": "Kafka Consumer API"
+    },
+    {
+      "id": "pat-eda-r3",
+      "sourceId": "pat-eda-bus",
+      "targetId": "pat-eda-consumer-2",
+      "label": "Delivers events",
+      "technology": "Kafka Consumer API"
+    }
+  ]
+}

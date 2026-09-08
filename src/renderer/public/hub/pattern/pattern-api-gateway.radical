@@ -1,0 +1,87 @@
+{
+  "hub": {
+    "id": "pattern-api-gateway",
+    "category": "pattern",
+    "name": "API Gateway Pattern",
+    "description": "Centralizes cross-cutting concerns (auth, rate limiting, routing, TLS termination) in a single entry point. Backend services focus on business logic without repeating infrastructure concerns.",
+    "tags": [
+      "api-gateway",
+      "routing",
+      "security",
+      "edge"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin"
+  },
+  "nodes": [
+    {
+      "id": "pat-apigw-client",
+      "type": "person",
+      "label": "API Consumer",
+      "description": "External client (web app, mobile app, third-party integration) that consumes the public API.",
+      "x": 300,
+      "y": 0,
+      "width": 150,
+      "height": 170,
+      "collapsed": false
+    },
+    {
+      "id": "pat-apigw-gw",
+      "type": "container",
+      "label": "API Gateway",
+      "description": "Edge proxy handling: TLS termination, authentication, rate limiting, request routing, response caching, and API versioning.",
+      "technology": "Kong / Envoy / AWS API GW",
+      "x": 250,
+      "y": 250,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "pat-apigw-svc1",
+      "type": "container",
+      "label": "User Service",
+      "description": "Manages user accounts, profiles, and preferences.",
+      "technology": "",
+      "x": 0,
+      "y": 550,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    },
+    {
+      "id": "pat-apigw-svc2",
+      "type": "container",
+      "label": "Order Service",
+      "description": "Handles order creation, processing, and fulfilment.",
+      "technology": "",
+      "x": 400,
+      "y": 550,
+      "width": 300,
+      "height": 200,
+      "collapsed": false
+    }
+  ],
+  "relations": [
+    {
+      "id": "pat-apigw-r1",
+      "sourceId": "pat-apigw-client",
+      "targetId": "pat-apigw-gw",
+      "label": "Sends API requests",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "pat-apigw-r2",
+      "sourceId": "pat-apigw-gw",
+      "targetId": "pat-apigw-svc1",
+      "label": "Proxies /users/**",
+      "technology": "gRPC"
+    },
+    {
+      "id": "pat-apigw-r3",
+      "sourceId": "pat-apigw-gw",
+      "targetId": "pat-apigw-svc2",
+      "label": "Proxies /orders/**",
+      "technology": "gRPC"
+    }
+  ]
+}

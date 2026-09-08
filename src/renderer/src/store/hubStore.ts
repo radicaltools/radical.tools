@@ -1,15 +1,19 @@
 import { create } from 'zustand'
+import {
+  HUB_INDEX_FILE,
+  docToConcept,
+  type HubConcept,
+  type HubConceptSummary,
+  type HubRadicalDoc,
+  type TemplateParam,
+} from '../hub/hubFormat'
 
-// ─── Hub concept shape (mirrors hub-data.json) ──────────────────────────────
+export type { HubConcept, HubConceptMeta, HubConceptSummary, HubCategory, TemplateParam } from '../hub/hubFormat'
 
-/** A single parameter that must be filled in before a hub concept is imported. */
-export interface TemplateParam {
-  key: string
-  label: string
-  hint?: string
-  type?: 'text' | 'number'
-  defaultValue?: string
-}
+// ─── Hub catalogue ───────────────────────────────────────────────────────────
+//
+// `hub/index.json` lists concept summaries; each concept is a Radical Studio
+// document at `hub/<category>/<id>.radical` fetched on demand (see hubFormat.ts).
 
 /**
  * Persisted record of a hub concept import that used template parameters.
@@ -31,36 +35,18 @@ export interface HubImportRecord {
   originalNodes: Record<string, Record<string, unknown>>
   /**
    * Per-node template params keyed by new node UUID.
-   * Derived from hub-data node-level templateParams at import time.
+   * Derived from node-level templateParams at import time.
    * Used by RightPanel to show only the params relevant to a given node.
    */
   nodeParams?: Record<string, TemplateParam[]>
 }
 
-export interface HubConcept {
-  id: string
-  category: 'pattern' | 'fitness-function' | 'requirement' | 'adr' | 'blueprint'
-  name: string
-  description: string
-  tags: string[]
-  requiredMetamodel?: string
-  /** Parameters the user must fill in before import; values are substituted
-   *  into node fields using {{KEY}} syntax. */
-  templateParams?: TemplateParam[]
-  nodes: Array<Record<string, unknown>>
-  relations?: Array<Record<string, unknown>>
-  /**
-   * IDs of other hub concepts that this blueprint recommends importing alongside
-   * its own inline elements. Used by blueprints to reference existing standalone
-   * requirements, fitness functions, ADRs, or patterns from the hub catalogue.
-   */
-  hubRefs?: string[]
-}
-
 // ─── Store types ────────────────────────────────────────────────────────────
 
 interface HubState {
-  concepts: HubConcept[]
+  concepts: HubConceptSummary[]
+  /** Fully loaded concepts keyed by id. */
+  loaded: Record<string, HubConcept>
   loading: boolean
   error: string | null
   lastFetched: number | null
@@ -72,26 +58,51 @@ interface HubState {
 
   // Actions
   fetchConcepts: () => Promise<void>
+  /** Fetch a concept file (cached). Throws on network / parse errors. */
+  loadConcept: (id: string) => Promise<HubConcept>
+  loadConcepts: (ids: string[]) => Promise<HubConcept[]>
   setCategory: (cat: string | null) => void
   setSearch: (q: string) => void
   setTag: (tag: string | null) => void
   resetFilters: () => void
 
   // Computed-like
-  filteredConcepts: () => HubConcept[]
+  filteredConcepts: () => HubConceptSummary[]
   allTags: () => Array<{ tag: string; count: number }>
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const HUB_URL = import.meta.env.DEV ? '/hub-data.json' : 'https://hub.radical.tools/hub-data.json'
-const FALLBACK_URL = import.meta.env.DEV ? 'https://hub.radical.tools/hub-data.json' : '/hub-data.json'
+const REMOTE_BASE = 'https://hub.radical.tools/hub/'
+const LOCAL_BASE = '/hub/'
+const HUB_BASE = import.meta.env.DEV ? LOCAL_BASE : REMOTE_BASE
+const FALLBACK_BASE = import.meta.env.DEV ? REMOTE_BASE : LOCAL_BASE
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+async function fetchJson<T>(path: string): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(HUB_BASE + path)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  } catch {
+    res = await fetch(FALLBACK_BASE + path)
+    if (!res.ok) throw new Error(`Fallback fetch failed: HTTP ${res.status}`)
+  }
+  // Guard against HTML error pages being returned instead of JSON
+  const ct = res.headers.get('content-type') ?? ''
+  if (!ct.includes('json')) {
+    throw new Error('Hub returned non-JSON response. CORS or network issue.')
+  }
+  return (await res.json()) as T
+}
+
+const inflight = new Map<string, Promise<HubConcept>>()
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
 export const useHubStore = create<HubState>()((set, get) => ({
   concepts: [],
+  loaded: {},
   loading: false,
   error: null,
   lastFetched: null,
@@ -107,20 +118,7 @@ export const useHubStore = create<HubState>()((set, get) => ({
 
     set({ loading: true, error: null })
     try {
-      let res: Response
-      try {
-        res = await fetch(HUB_URL)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      } catch {
-        res = await fetch(FALLBACK_URL)
-        if (!res.ok) throw new Error(`Fallback fetch failed: HTTP ${res.status}`)
-      }
-      // Guard against HTML error pages being returned instead of JSON
-      const ct = res.headers.get('content-type') ?? ''
-      if (!ct.includes('json')) {
-        throw new Error('Hub returned non-JSON response. CORS or network issue.')
-      }
-      const data: HubConcept[] = await res.json()
+      const data = await fetchJson<HubConceptSummary[]>(HUB_INDEX_FILE)
       set({ concepts: data, lastFetched: Date.now(), loading: false })
     } catch (err) {
       set({
@@ -128,6 +126,28 @@ export const useHubStore = create<HubState>()((set, get) => ({
         loading: false,
       })
     }
+  },
+
+  loadConcept(id) {
+    const cached = get().loaded[id]
+    if (cached) return Promise.resolve(cached)
+    const pending = inflight.get(id)
+    if (pending) return pending
+    const summary = get().concepts.find((c) => c.id === id)
+    if (!summary) return Promise.reject(new Error(`Unknown hub concept "${id}"`))
+    const p = fetchJson<HubRadicalDoc>(summary.file)
+      .then((doc) => {
+        const concept = docToConcept(doc)
+        set((s) => ({ loaded: { ...s.loaded, [id]: concept } }))
+        return concept
+      })
+      .finally(() => inflight.delete(id))
+    inflight.set(id, p)
+    return p
+  },
+
+  loadConcepts(ids) {
+    return Promise.all(ids.map((id) => get().loadConcept(id)))
   },
 
   setCategory(cat) {

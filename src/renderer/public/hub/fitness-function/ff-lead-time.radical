@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "ff-lead-time",
+    "category": "fitness-function",
+    "name": "Lead Time for Changes",
+    "description": "Measures the time from code commit to running in production. One of the four DORA metrics. Shorter lead times indicate a healthier CI/CD pipeline and faster feedback loops.",
+    "tags": [
+      "dora",
+      "process",
+      "devops",
+      "lead-time"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MAX_LEAD_TIME_DAYS",
+        "label": "Max median lead time (days)",
+        "hint": "1",
+        "type": "number",
+        "defaultValue": "1"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-lead-time-1",
+      "type": "fitness-fn",
+      "label": "Lead Time for Changes",
+      "description": "Tracks time from commit to production deploy. Target: less than one day for elite performers (DORA).",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "process",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Median lead time < {{MAX_LEAD_TIME_DAYS}} day(s)",
+      "status": "active"
+    }
+  ]
+}

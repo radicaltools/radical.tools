@@ -17,11 +17,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import { hubCataloguePlugin } from './tools/hubCatalogue'
 
 const root = resolve(__dirname, 'src/renderer')
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), hubCataloguePlugin({ publicDir: resolve(root, 'public') })],
   root,
   base: './',
   build: {

@@ -1,0 +1,41 @@
+{
+  "hub": {
+    "id": "req-mission-critical-sla",
+    "category": "requirement",
+    "name": "Mission-Critical Service SLA",
+    "description": "Availability: mission-critical services require four-nines uptime (99.99%), achieved through multi-region active-active architecture.",
+    "tags": [
+      "availability",
+      "sla",
+      "uptime",
+      "nfr",
+      "reliability"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "SLA_TARGET",
+        "label": "Availability target (%)",
+        "hint": "99.99",
+        "defaultValue": "99.99"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-mc-sla-1",
+      "type": "requirement",
+      "label": "Mission-Critical Service SLA",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "maintain {{SLA_TARGET}}% availability for mission-critical services, implemented via multi-region active-active architecture with automated failover",
+      "rationale": "Four-nines uptime is the industry standard for revenue-generating and safety-critical systems. Each additional nine costs exponentially more but protects against high-impact outages."
+    }
+  ]
+}

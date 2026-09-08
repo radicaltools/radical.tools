@@ -1,0 +1,42 @@
+{
+  "hub": {
+    "id": "req-task-success-rate",
+    "category": "requirement",
+    "name": "Primary Workflow Task Success Rate",
+    "description": "Usability: users must be able to complete the primary workflow without external help, measured by task success rate in usability testing.",
+    "tags": [
+      "usability",
+      "ux",
+      "task-completion",
+      "nfr",
+      "quality"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MIN_TASK_SUCCESS_PCT",
+        "label": "Minimum task success rate (%)",
+        "hint": "95",
+        "type": "number",
+        "defaultValue": "95"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-task-success-1",
+      "type": "requirement",
+      "label": "Primary Workflow Task Success Rate",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "approved",
+      "priority": "must",
+      "action": "achieve a task success rate of at least {{MIN_TASK_SUCCESS_PCT}}% for the primary user workflow in moderated usability testing with representative users, without external assistance",
+      "rationale": "Task success rate is the most direct measure of usability. Airbnb doubled revenue by focusing on removing friction from primary workflows."
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "hub": {
+    "id": "adr-data-store",
+    "category": "adr",
+    "name": "Data Store Selection",
+    "description": "Template ADR for choosing the primary data store (relational, document, key-value, graph, etc.). Considers consistency, scalability, query patterns, and operational complexity.",
+    "tags": [
+      "database",
+      "storage",
+      "data",
+      "persistence"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "DATABASE",
+        "label": "Data store",
+        "hint": "PostgreSQL"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-data-store-1",
+      "type": "adr",
+      "label": "ADR: {{DATABASE}}",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "status": "proposed",
+      "date": "",
+      "context": "The service needs a persistent data store. Key considerations: data model complexity (relational vs document), consistency requirements (strong vs eventual), expected query patterns (OLTP vs OLAP), scalability needs, and operational team capabilities.",
+      "decision": "We will use {{DATABASE}} as the primary data store because [RATIONALE]. It provides the right balance of consistency, query flexibility, and operational simplicity for our use case.",
+      "consequences": "• Schema management via [TOOL/APPROACH]\n• Backup and DR strategy: [APPROACH]\n• Vendor lock-in risk: [LOW/MEDIUM/HIGH]\n• Estimated operational cost: [ESTIMATE]",
+      "alternatives": "1. [Alternative DB A] — rejected: [reason]\n2. [Alternative DB B] — rejected: [reason]\n3. Multi-model approach — rejected: operational complexity too high at current team size"
+    }
+  ]
+}

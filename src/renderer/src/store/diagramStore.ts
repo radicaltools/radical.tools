@@ -40,7 +40,7 @@ import {
   canAddMoreOfType,
   inferRelationType,
 } from '../types/metamodel'
-import type { HubImportRecord } from './hubStore'
+import type { HubImportRecord, HubConceptMeta } from './hubStore'
 import { applyElkLayout, applyTreeLayout } from '../layout/elkLayout'
 import { applyColaLayout } from '../layout/colaLayout'
 import { applyRadicalLayout } from '../layout/radicalLayout'
@@ -1081,6 +1081,8 @@ interface DiagramStore {
   hubTemplates: Record<string, HubImportRecord>
   upsertHubTemplate: (id: string, record: HubImportRecord) => void
   deleteHubTemplate: (id: string) => void
+  /** Catalogue metadata of a hub concept file; carried through load/save untouched. */
+  hubMeta: HubConceptMeta | null
 
   // ── transient notifications (toasts) ──
   notifications: Array<{ id: string; severity: 'error' | 'warning' | 'info'; message: string; ts: number }>
@@ -1290,6 +1292,7 @@ export const useDiagramStore = create<DiagramStore>()(
       appMode: (viewerProfile ? 'viewer' : 'designer') as 'viewer' | 'designer',
       metamodel: initMetamodel,
       hubTemplates: (persisted?.hubTemplates ?? {}) as Record<string, HubImportRecord>,
+      hubMeta: persisted?.hub ?? null,
       notifications: [],
       presentations: initPres.presentations,
       activePresentationId: initPres.activeId,
@@ -4219,6 +4222,7 @@ export const useDiagramStore = create<DiagramStore>()(
             return dm
           })()
           state.hubTemplates = (data.hubTemplates ?? {}) as any
+          state.hubMeta = data.hub ?? null
         })
         get()._sync()
         // skipBulk=true: loaded positions are already correct; the 110-iteration
@@ -4275,6 +4279,7 @@ export const useDiagramStore = create<DiagramStore>()(
           presentations: presentations as Presentation[],
           metamodel: metamodel as Metamodel,
           hubTemplates: get().hubTemplates as Record<string, HubImportRecord>,
+          ...(get().hubMeta ? { hub: get().hubMeta as HubConceptMeta } : {}),
         }
       },
 
@@ -4309,6 +4314,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.presentationSlideIndex = 0
           state.metamodel = builtInC4Metamodel() as any
           state.hubTemplates = {} as any
+          state.hubMeta = null
         })
         get()._sync()
         get().startLiveLayout()
@@ -4340,6 +4346,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.presentationSlideIndex = 0
           state.metamodel = builtInC4Metamodel() as any
           state.hubTemplates = {} as any
+          state.hubMeta = null
         })
         get()._sync()
         get().startLiveLayout()

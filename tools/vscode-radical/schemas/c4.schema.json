@@ -57,6 +57,35 @@
     "metamodel": {
       "$ref": "#/definitions/Metamodel",
       "description": "Per-document metamodel overriding the built-in C4 preset."
+    },
+    "hub": {
+      "type": "object",
+      "description": "Radical Hub catalogue metadata — present only in documents published to hub.radical.tools.",
+      "required": ["id", "category", "name", "description", "tags"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string", "enum": ["pattern", "fitness-function", "requirement", "adr", "blueprint"] },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "requiredMetamodel": { "type": "string" },
+        "templateParams": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "label"],
+            "properties": {
+              "key": { "type": "string", "pattern": "^[A-Z0-9_]+$" },
+              "label": { "type": "string" },
+              "hint": { "type": "string" },
+              "type": { "type": "string", "enum": ["text", "number"] },
+              "defaultValue": { "type": "string" }
+            }
+          }
+        },
+        "hubRefs": { "type": "array", "items": { "type": "string" } }
+      }
     }
   },
   "definitions": {

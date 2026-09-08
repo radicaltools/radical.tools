@@ -1,0 +1,48 @@
+{
+  "hub": {
+    "id": "req-response-time",
+    "category": "requirement",
+    "name": "Response Time Under Load",
+    "description": "State-driven requirement: while the system is under normal operating conditions, API responses must complete within a target time.",
+    "tags": [
+      "performance",
+      "latency",
+      "nfr",
+      "response-time"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "RESPONSE_TIME_MS",
+        "label": "Maximum response time (ms)",
+        "hint": "500",
+        "type": "number",
+        "defaultValue": "500"
+      },
+      {
+        "key": "PERCENTILE",
+        "label": "Percentile",
+        "hint": "95th",
+        "defaultValue": "95th"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-response-time-1",
+      "type": "requirement",
+      "label": "Response Time Under Load",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 56,
+      "collapsed": false,
+      "ears_type": "state-driven",
+      "status": "approved",
+      "priority": "must",
+      "precondition": "the system is operating under normal load (< 80% CPU, < 70% memory)",
+      "action": "respond to any API request within {{RESPONSE_TIME_MS}}ms at the {{PERCENTILE}} percentile",
+      "rationale": "Perceived responsiveness directly impacts user satisfaction and conversion rates."
+    }
+  ]
+}
