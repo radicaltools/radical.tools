@@ -283,6 +283,50 @@ function applyTemplate(concept: HubConcept, values: Record<string, string>): Hub
   return { ...concept, nodes: concept.nodes.map(subst) }
 }
 
+/** Apply each templateParam's own default (or hint) — used for concepts
+ *  imported as a "related" tag-along rather than the primary import target,
+ *  so their {{KEY}} tokens don't land in the model unresolved. */
+function withDefaultParams(concept: HubConcept): HubConcept {
+  if (!concept.templateParams?.length) return concept
+  const values: Record<string, string> = {}
+  for (const p of concept.templateParams) values[p.key] = p.defaultValue ?? p.hint ?? ''
+  return applyTemplate(concept, values)
+}
+
+/** One checkbox row for a referenced hub concept — shared by the blueprint
+ *  picker's "Referenced Hub Concepts" section and the related-concepts
+ *  picker, so the two stay visually identical instead of drifting apart. */
+function RefCheckboxRow({ concept, checked, onToggle }: {
+  concept: HubConceptSummary
+  checked: boolean
+  onToggle: () => void
+}): React.ReactElement {
+  return (
+    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', padding: '4px 6px', borderRadius: 4, background: checked ? 'rgba(59,124,201,0.12)' : 'transparent' }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        style={{ marginTop: 2, accentColor: 'var(--accent)', flexShrink: 0 }}
+        onChange={onToggle}
+      />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12 }}>{CATEGORY_ICON[concept.category] ?? '📦'}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+            {concept.name}
+          </span>
+          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: CATEGORY_BADGE_COLORS[concept.category] ?? '#555', color: '#fff', flexShrink: 0 }}>
+            {CATEGORY_LABEL[concept.category] ?? concept.category}
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+          {concept.description}
+        </div>
+      </div>
+    </label>
+  )
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function HubImportModal({ open, onClose, preselectedIds }: Props): React.ReactElement | null {
@@ -348,6 +392,24 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
   const [blueprintSelected, setBlueprintSelected] = useState<Set<string>>(new Set())
   const [blueprintSelectedRefs, setBlueprintSelectedRefs] = useState<Set<string>>(new Set())
 
+  // Related-concepts picker state: set when user clicks "Add to Model" on any
+  // non-blueprint concept that has hubRefs — offers to import those alongside it.
+  const [relatedPickerConcept, setRelatedPickerConcept] = useState<HubConcept | null>(null)
+  const [relatedSelectedRefs, setRelatedSelectedRefs] = useState<Set<string>>(new Set())
+
+  // Reset any in-flight picker/dialog state when the modal is opened fresh —
+  // otherwise closing mid-flow (Esc, backdrop click) and reopening for an
+  // unrelated concept resurrects the stale overlay for whatever was pending.
+  useEffect(() => {
+    if (!open) return
+    setPendingConcept(null)
+    setBlueprintConcept(null)
+    setBlueprintSelected(new Set())
+    setBlueprintSelectedRefs(new Set())
+    setRelatedPickerConcept(null)
+    setRelatedSelectedRefs(new Set())
+  }, [open])
+
   // All concept summaries indexed by id — used to list hubRefs in the blueprint picker.
   const allConcepts = useHubStore((s) => s.concepts)
 
@@ -380,7 +442,11 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
   }, [selectedNodeId, c4Nodes, metamodel])
 
   const handleImport = useCallback(
-    (concept: HubConcept, templateData?: { originalConcept: HubConcept; paramValues: Record<string, string> }) => {
+    (
+      concept: HubConcept,
+      templateData?: { originalConcept: HubConcept; paramValues: Record<string, string> },
+      opts?: { suppressClose?: boolean; placementOffset?: { x: number; y: number } },
+    ) => {
       const store = useDiagramStore.getState()
 
       // Map old concept node IDs → new store IDs.
@@ -400,8 +466,11 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         | (() => { x: number; y: number; zoom: number })
         | undefined
       const vp = getViewport?.() ?? { x: 0, y: 0, zoom: 1 }
-      const centerX = (-vp.x + window.innerWidth / 2) / vp.zoom
-      const centerY = (-vp.y + window.innerHeight / 2) / vp.zoom
+      // A batch import (main concept + related concepts, all centered on the
+      // same viewport) staggers each subsequent one via placementOffset —
+      // otherwise every cluster lands exactly on top of the last.
+      const centerX = (-vp.x + window.innerWidth / 2) / vp.zoom + (opts?.placementOffset?.x ?? 0)
+      const centerY = (-vp.y + window.innerHeight / 2) / vp.zoom + (opts?.placementOffset?.y ?? 0)
 
       // Pre-generate IDs for all nodes so parent references resolve
       // regardless of ordering in hub-data.json.
@@ -576,16 +645,58 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
           next.add(concept.id)
           return next
         })
-      } else {
+      } else if (!opts?.suppressClose) {
         onClose()
       }
     },
     [onClose, preselectedIds],
   )
 
+  // Loads and imports a set of "related" hub concepts (each with its own
+  // template defaults applied, since there's no per-ref params dialog).
+  const importRelated = useCallback(
+    (ids: Set<string>) => {
+      if (ids.size === 0) return
+      loadConcepts([...ids]).then(
+        (refConcepts) => {
+          // Never let a related concept's import close the modal — it's a
+          // tag-along, not the user's primary action; the main concept
+          // (direct import, or the params dialog's own Import click) is
+          // what decides when the flow is actually done. Stagger each one
+          // sideways too, or every cluster lands on the same viewport
+          // center and they'd all stack exactly on top of each other.
+          // Spacing is sized per concept (a pattern's root cluster can be
+          // ~2000px wide, not just a single ~260px requirement card). Start
+          // with headroom for the main concept's own cluster, which could
+          // itself be a wide pattern.
+          const GAP = 200
+          let cursorX = 500
+          for (const rc of refConcepts) {
+            const rootNodes = rc.nodes.filter((n) => !n.parentId)
+            const xs = rootNodes.map((n) => (n.x as number) ?? 0)
+            const rights = rootNodes.map((n) => ((n.x as number) ?? 0) + ((n.width as number) ?? 200))
+            const width = rootNodes.length ? Math.max(...rights) - Math.min(...xs) : 260
+            cursorX += width / 2 + GAP
+            handleImport(withDefaultParams(rc), undefined, {
+              suppressClose: true,
+              placementOffset: { x: cursorX, y: 0 },
+            })
+            cursorX += width / 2
+          }
+        },
+        (err: unknown) => useDiagramStore.getState().pushNotification(
+          `Failed to load related concepts: ${err instanceof Error ? err.message : 'network error'}`,
+          'error',
+        ),
+      )
+    },
+    [handleImport, loadConcepts],
+  )
+
   // Clicking "Add to Model": fetch the concept file, then show the blueprint
-  // picker for blueprints, the template fill form for parameterised concepts,
-  // otherwise import immediately.
+  // picker for blueprints, the related-concepts picker for anything else with
+  // hubRefs, the template fill form for parameterised concepts, otherwise
+  // import immediately.
   const handleImportClick = useCallback(
     async (summary: HubConceptSummary) => {
       setFetchingIds((prev) => new Set(prev).add(summary.id))
@@ -601,18 +712,29 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       } finally {
         setFetchingIds((prev) => { const next = new Set(prev); next.delete(summary.id); return next })
       }
+      // Only offer refs that actually resolve to a concept the lightweight
+      // "related" flow can handle — a blueprint ref needs its own picker
+      // (inline elements + nested refs), not a flat one-node import.
+      const resolvableRefs = (concept.hubRefs ?? []).filter((id) => {
+        const ref = allConcepts.find((c) => c.id === id)
+        return ref && ref.category !== 'blueprint'
+      })
+
       if (concept.category === 'blueprint') {
         // Pre-select all non-blueprint-type nodes (the blueprint root is not imported as a node).
         setBlueprintSelected(new Set(concept.nodes.filter((n) => n.type !== 'blueprint').map((n) => n.id as string)))
         setBlueprintSelectedRefs(new Set(concept.hubRefs ?? []))
         setBlueprintConcept(concept)
+      } else if (resolvableRefs.length > 0) {
+        setRelatedSelectedRefs(new Set(resolvableRefs))
+        setRelatedPickerConcept(concept)
       } else if (concept.templateParams?.length) {
         setPendingConcept(concept)
       } else {
         handleImport(concept)
       }
     },
-    [handleImport, loadConcept],
+    [handleImport, loadConcept, allConcepts],
   )
 
   if (!open) return null
@@ -654,6 +776,10 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         {/* ── Pre-selection banner ───────────────────────────────────── */}
         {preselectedIds && preselectedIds.length > 0 && (() => {
           const allDone = concepts.length > 0 && concepts.every((c) => importedIds.has(c.id))
+          // Count only against the preselected set — importedIds can also
+          // contain related concepts tagged along via the related-concepts
+          // picker, which must not inflate this "X/Y" progress count.
+          const preselectedDoneCount = concepts.filter((c) => importedIds.has(c.id)).length
           return (
             <div style={{
               padding: '8px 20px',
@@ -669,7 +795,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
               <span style={{ flex: 1 }}>
                 {allDone
                   ? <><strong>All {concepts.length} concept{concepts.length !== 1 ? 's' : ''} imported!</strong></>
-                  : <>Showing <strong>{concepts.length}</strong> concept{concepts.length !== 1 ? 's' : ''} selected from Hub — <strong>{importedIds.size}/{concepts.length}</strong> imported.</>}
+                  : <>Showing <strong>{concepts.length}</strong> concept{concepts.length !== 1 ? 's' : ''} selected from Hub — <strong>{preselectedDoneCount}/{concepts.length}</strong> imported.</>}
               </span>
               {allDone && (
                 <button
@@ -906,40 +1032,21 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
                       Standalone hub items recommended by this blueprint. Each will be imported as a separate concept.
                     </div>
-                    {refs.map((ref) => {
-                      const checked = blueprintSelectedRefs.has(ref.id)
-                      return (
-                        <label key={ref.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', padding: '4px 6px', borderRadius: 4, background: checked ? 'rgba(59,124,201,0.12)' : 'transparent' }}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            style={{ marginTop: 2, accentColor: 'var(--accent)', flexShrink: 0 }}
-                            onChange={() => {
-                              setBlueprintSelectedRefs((prev) => {
-                                const next = new Set(prev)
-                                if (next.has(ref.id)) next.delete(ref.id)
-                                else next.add(ref.id)
-                                return next
-                              })
-                            }}
-                          />
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: 12 }}>{CATEGORY_ICON[ref.category] ?? '📦'}</span>
-                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                                {ref.name}
-                              </span>
-                              <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: CATEGORY_BADGE_COLORS[ref.category] ?? '#555', color: '#fff', flexShrink: 0 }}>
-                                {CATEGORY_LABEL[ref.category] ?? ref.category}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                              {ref.description}
-                            </div>
-                          </div>
-                        </label>
-                      )
-                    })}
+                    {refs.map((ref) => (
+                      <RefCheckboxRow
+                        key={ref.id}
+                        concept={ref}
+                        checked={blueprintSelectedRefs.has(ref.id)}
+                        onToggle={() => {
+                          setBlueprintSelectedRefs((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(ref.id)) next.delete(ref.id)
+                            else next.add(ref.id)
+                            return next
+                          })
+                        }}
+                      />
+                    ))}
                   </div>
                 )
               })()}
@@ -1001,15 +1108,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
                     }
                   }
                   // Import each selected referenced hub concept individually
-                  if (selectedRefs.size > 0) {
-                    loadConcepts([...selectedRefs]).then(
-                      (refConcepts) => { for (const rc of refConcepts) handleImport(rc) },
-                      (err: unknown) => useDiagramStore.getState().pushNotification(
-                        `Failed to load referenced concepts: ${err instanceof Error ? err.message : 'network error'}`,
-                        'error',
-                      ),
-                    )
-                  }
+                  importRelated(selectedRefs)
                 }}
               >
                 Import ({blueprintSelected.size} inline{blueprintSelectedRefs.size > 0 ? ` + ${blueprintSelectedRefs.size} refs` : ''})
@@ -1017,6 +1116,87 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
             </div>
           </div>
         )}
+
+        {/* ── Related-concepts picker overlay (non-blueprint concepts with hubRefs) ── */}
+        {relatedPickerConcept && (() => {
+          const refs = (relatedPickerConcept.hubRefs ?? [])
+            .map((id) => allConcepts.find((c) => c.id === id))
+            .filter((c): c is HubConceptSummary => !!c && c.category !== 'blueprint')
+          const allSelected = relatedSelectedRefs.size === refs.length
+          const proceedWithMain = (concept: HubConcept): void => {
+            if (concept.templateParams?.length) setPendingConcept(concept)
+            else handleImport(concept)
+          }
+          return (
+            <div style={S.templateOverlay}>
+              <div style={S.templateHeader}>
+                <div>
+                  <h3 style={S.title}>{CATEGORY_ICON[relatedPickerConcept.category] ?? '📦'} {relatedPickerConcept.name}</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+                    Also import related hub concepts?
+                  </p>
+                </div>
+                <button type="button" style={S.closeBtn} onClick={() => setRelatedPickerConcept(null)} aria-label="Cancel">✕</button>
+              </div>
+
+              <div style={S.templateBody}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {refs.map((ref) => (
+                    <RefCheckboxRow
+                      key={ref.id}
+                      concept={ref}
+                      checked={relatedSelectedRefs.has(ref.id)}
+                      onToggle={() => {
+                        setRelatedSelectedRefs((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(ref.id)) next.delete(ref.id)
+                          else next.add(ref.id)
+                          return next
+                        })
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div style={S.templateFooter}>
+                <button
+                  type="button"
+                  style={{ ...S.importBtn, background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
+                  onClick={() => setRelatedSelectedRefs(allSelected ? new Set() : new Set(refs.map((r) => r.id)))}
+                >
+                  {allSelected ? 'Deselect all' : 'Select all'}
+                </button>
+                <button
+                  type="button"
+                  style={{ ...S.importBtn, background: 'var(--input-bg)', color: 'var(--text-secondary)' }}
+                  onClick={() => {
+                    const concept = relatedPickerConcept
+                    setRelatedPickerConcept(null)
+                    setRelatedSelectedRefs(new Set())
+                    proceedWithMain(concept)
+                  }}
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  style={S.importBtn}
+                  onClick={() => {
+                    const concept = relatedPickerConcept
+                    const refsToImport = relatedSelectedRefs
+                    setRelatedPickerConcept(null)
+                    setRelatedSelectedRefs(new Set())
+                    importRelated(refsToImport)
+                    proceedWithMain(concept)
+                  }}
+                >
+                  Import ({1 + relatedSelectedRefs.size})
+                </button>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ── Template parameter fill overlay ─────────────────────────── */}
         {pendingConcept && (
