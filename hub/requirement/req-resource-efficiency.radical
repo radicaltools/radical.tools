@@ -1,0 +1,65 @@
+{
+  "hub": {
+    "id": "req-resource-efficiency",
+    "category": "requirement",
+    "name": "Resource Cost Efficiency",
+    "description": "Ceiling on infrastructure cost per unit of useful work, so the system doesn't quietly become more expensive to run as it scales.",
+    "tags": [
+      "performance",
+      "cost",
+      "efficiency",
+      "capacity"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "COST_UNIT",
+        "label": "Unit of work",
+        "hint": "1,000 requests",
+        "defaultValue": "1,000 requests"
+      },
+      {
+        "key": "MAX_COST_PER_UNIT",
+        "label": "Max cost per unit",
+        "hint": "$0.05",
+        "defaultValue": "$0.05"
+      }
+    ],
+    "hubRefs": [
+      "ff-cost-efficiency-guard",
+      "req-throughput",
+      "req-resource-headroom"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-resource-efficiency-1",
+      "type": "requirement",
+      "label": "Resource Cost Efficiency",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "keep infrastructure cost per {{COST_UNIT}} at or below {{MAX_COST_PER_UNIT}}, reviewed monthly against the trailing 3-month trend",
+      "rationale": "Without an explicit ceiling, cost creep is invisible until the monthly bill spikes; tying it to a unit of work (per request, per tenant, per transaction) keeps the number meaningful as the system grows.",
+      "templateParams": [
+        {
+          "key": "COST_UNIT",
+          "label": "Unit of work",
+          "hint": "1,000 requests",
+          "defaultValue": "1,000 requests"
+        },
+        {
+          "key": "MAX_COST_PER_UNIT",
+          "label": "Max cost per unit",
+          "hint": "$0.05",
+          "defaultValue": "$0.05"
+        }
+      ]
+    }
+  ]
+}

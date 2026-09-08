@@ -1,0 +1,69 @@
+{
+  "hub": {
+    "id": "ff-noisy-neighbor-guard",
+    "category": "fitness-function",
+    "name": "Noisy Neighbour Guard",
+    "description": "Continuously measures each tenant's or workload's share of shared infrastructure resources and fails the check when one occupant sustains disproportionate consumption long enough to risk degrading its neighbours.",
+    "tags": [
+      "operational",
+      "multi-tenancy",
+      "co-existence",
+      "capacity"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MAX_SHARE_PCT",
+        "label": "Max sustained share of a shared pool (%)",
+        "hint": "20",
+        "type": "number",
+        "defaultValue": "20"
+      },
+      {
+        "key": "SUSTAINED_MINUTES",
+        "label": "Sustained duration before it counts (minutes)",
+        "hint": "5",
+        "type": "number",
+        "defaultValue": "5"
+      }
+    ],
+    "hubRefs": [
+      "req-resource-isolation",
+      "adr-multi-tenancy-strategy"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-noisy-neighbor-guard-1",
+      "type": "fitness-fn",
+      "label": "Noisy Neighbour Guard",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "description": "Continuously measures each tenant's or workload's share of shared infrastructure resources and fails the check when one occupant sustains disproportionate consumption long enough to risk degrading its neighbours.",
+      "category": "operational",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "No single tenant or workload sustains more than {{MAX_SHARE_PCT}}% of a shared resource pool for longer than {{SUSTAINED_MINUTES}} minutes",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "MAX_SHARE_PCT",
+          "label": "Max sustained share of a shared pool (%)",
+          "hint": "20",
+          "type": "number",
+          "defaultValue": "20"
+        },
+        {
+          "key": "SUSTAINED_MINUTES",
+          "label": "Sustained duration before it counts (minutes)",
+          "hint": "5",
+          "type": "number",
+          "defaultValue": "5"
+        }
+      ]
+    }
+  ]
+}

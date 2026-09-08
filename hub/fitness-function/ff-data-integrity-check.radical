@@ -1,0 +1,54 @@
+{
+  "hub": {
+    "id": "ff-data-integrity-check",
+    "category": "fitness-function",
+    "name": "Data Integrity Audit",
+    "description": "Periodically scans for referential-integrity violations, orphaned records and checksum mismatches that application-level constraints alone don't catch, especially across service or database boundaries.",
+    "tags": [
+      "structural",
+      "data-integrity",
+      "correctness"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MAX_AGE_HOURS",
+        "label": "Max age before a violation must be resolved (h)",
+        "hint": "24",
+        "type": "number",
+        "defaultValue": "24"
+      }
+    ],
+    "hubRefs": [
+      "req-data-integrity",
+      "adr-data-consistency-model"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-data-integrity-check-1",
+      "type": "fitness-fn",
+      "label": "Data Integrity Audit",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "description": "Periodically scans for referential-integrity violations, orphaned records and checksum mismatches that application-level constraints alone don't catch, especially across service or database boundaries.",
+      "category": "structural",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Zero unresolved referential-integrity violations older than {{MAX_AGE_HOURS}} hours",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "MAX_AGE_HOURS",
+          "label": "Max age before a violation must be resolved (h)",
+          "hint": "24",
+          "type": "number",
+          "defaultValue": "24"
+        }
+      ]
+    }
+  ]
+}

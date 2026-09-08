@@ -35,7 +35,8 @@
     ],
     "hubRefs": [
       "adr-multi-region",
-      "req-availability"
+      "req-availability",
+      "ff-dr-drill-success"
     ]
   },
   "nodes": [

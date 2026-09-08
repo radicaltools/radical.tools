@@ -36,7 +36,8 @@
     "hubRefs": [
       "req-api-response-time",
       "ff-error-budget",
-      "pattern-bulkhead"
+      "pattern-bulkhead",
+      "ff-capacity-load-test"
     ]
   },
   "nodes": [

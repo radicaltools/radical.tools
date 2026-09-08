@@ -1,0 +1,70 @@
+{
+  "hub": {
+    "id": "ff-capacity-load-test",
+    "category": "fitness-function",
+    "name": "Capacity Load Test",
+    "description": "Periodically replays production-shaped traffic at the target peak load and confirms the system holds its latency and error-rate targets without operator intervention.",
+    "tags": [
+      "operational",
+      "performance",
+      "capacity",
+      "load-testing"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "MIN_TPS",
+        "label": "Sustained transactions per second",
+        "hint": "1000",
+        "type": "number",
+        "defaultValue": "1000"
+      },
+      {
+        "key": "TEST_DURATION_MINUTES",
+        "label": "Test duration (minutes)",
+        "hint": "30",
+        "type": "number",
+        "defaultValue": "30"
+      }
+    ],
+    "hubRefs": [
+      "req-throughput",
+      "req-resource-headroom",
+      "ff-latency-slo"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-capacity-load-test-1",
+      "type": "fitness-fn",
+      "label": "Capacity Load Test",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "description": "Periodically replays production-shaped traffic at the target peak load and confirms the system holds its latency and error-rate targets without operator intervention.",
+      "category": "operational",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Sustains {{MIN_TPS}} transactions/second for {{TEST_DURATION_MINUTES}} minutes with p95 latency and error rate within their SLOs",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "MIN_TPS",
+          "label": "Sustained transactions per second",
+          "hint": "1000",
+          "type": "number",
+          "defaultValue": "1000"
+        },
+        {
+          "key": "TEST_DURATION_MINUTES",
+          "label": "Test duration (minutes)",
+          "hint": "30",
+          "type": "number",
+          "defaultValue": "30"
+        }
+      ]
+    }
+  ]
+}

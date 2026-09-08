@@ -1,0 +1,69 @@
+{
+  "hub": {
+    "id": "ff-scale-out-verification",
+    "category": "fitness-function",
+    "name": "Scale-Out Verification",
+    "description": "Periodically drives synthetic load past the scale-out trigger and confirms autoscaling actually adds capacity and stabilises within the declared time, instead of assuming the policy still works.",
+    "tags": [
+      "operational",
+      "scalability",
+      "elasticity",
+      "load-testing"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "SCALE_OUT_SECONDS",
+        "label": "Max time to add capacity (s)",
+        "hint": "120",
+        "type": "number",
+        "defaultValue": "120"
+      },
+      {
+        "key": "STABILISE_SECONDS",
+        "label": "Max time for latency to recover (s)",
+        "hint": "60",
+        "type": "number",
+        "defaultValue": "60"
+      }
+    ],
+    "hubRefs": [
+      "req-autoscaling",
+      "req-resource-headroom"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-scale-out-verification-1",
+      "type": "fitness-fn",
+      "label": "Scale-Out Verification",
+      "x": 0,
+      "y": 0,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "description": "Periodically drives synthetic load past the scale-out trigger and confirms autoscaling actually adds capacity and stabilises within the declared time, instead of assuming the policy still works.",
+      "category": "operational",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Additional capacity comes online within {{SCALE_OUT_SECONDS}}s of crossing the scale-out trigger, and latency returns within its SLO within {{STABILISE_SECONDS}}s after that",
+      "status": "proposed",
+      "templateParams": [
+        {
+          "key": "SCALE_OUT_SECONDS",
+          "label": "Max time to add capacity (s)",
+          "hint": "120",
+          "type": "number",
+          "defaultValue": "120"
+        },
+        {
+          "key": "STABILISE_SECONDS",
+          "label": "Max time for latency to recover (s)",
+          "hint": "60",
+          "type": "number",
+          "defaultValue": "60"
+        }
+      ]
+    }
+  ]
+}

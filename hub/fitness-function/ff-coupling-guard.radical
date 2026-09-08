@@ -22,7 +22,8 @@
     ],
     "hubRefs": [
       "ff-dependency-rules",
-      "pattern-hexagonal"
+      "pattern-hexagonal",
+      "ff-duplication-guard"
     ]
   },
   "nodes": [

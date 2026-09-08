@@ -14,7 +14,8 @@
       "pattern-circuit-breaker",
       "adr-integration-style",
       "req-error-recovery",
-      "pattern-bulkhead"
+      "pattern-bulkhead",
+      "ff-chaos-resilience-test"
     ]
   },
   "nodes": [

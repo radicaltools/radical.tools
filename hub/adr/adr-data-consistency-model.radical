@@ -15,7 +15,8 @@
       "pattern-saga",
       "pattern-cqrs",
       "pattern-event-driven",
-      "req-idempotency"
+      "req-idempotency",
+      "ff-data-integrity-check"
     ]
   },
   "nodes": [

@@ -11,7 +11,8 @@
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "hubRefs": [
-      "adr-multi-tenancy-strategy"
+      "adr-multi-tenancy-strategy",
+      "ff-data-integrity-check"
     ]
   },
   "nodes": [

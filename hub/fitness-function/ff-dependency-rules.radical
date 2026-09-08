@@ -14,7 +14,8 @@
     "hubRefs": [
       "pattern-hexagonal",
       "req-code-complexity",
-      "ff-coupling-guard"
+      "ff-coupling-guard",
+      "ff-duplication-guard"
     ]
   },
   "nodes": [

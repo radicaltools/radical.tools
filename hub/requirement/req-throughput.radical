@@ -30,7 +30,10 @@
       "req-api-response-time",
       "req-autoscaling",
       "req-report-generation",
-      "pattern-rate-limiter"
+      "pattern-rate-limiter",
+      "req-resource-efficiency",
+      "ff-capacity-load-test",
+      "ff-cost-efficiency-guard"
     ]
   },
   "nodes": [
