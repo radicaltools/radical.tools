@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useHubStore, type HubConcept, type HubConceptSummary, type TemplateParam, type HubImportRecord } from '../store/hubStore'
+import { useHubStore, toggleInSet, type HubConcept, type HubConceptSummary, type TemplateParam, type HubImportRecord } from '../store/hubStore'
 import { useDiagramStore } from '../store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType, DiagramSequence } from '../types/c4'
 import { NODE_SIZES } from '../types/c4'
@@ -994,14 +994,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
                             type="checkbox"
                             checked={checked}
                             style={{ marginTop: 2, accentColor: 'var(--accent)', flexShrink: 0 }}
-                            onChange={() => {
-                              setBlueprintSelected((prev) => {
-                                const next = new Set(prev)
-                                if (next.has(nodeId)) next.delete(nodeId)
-                                else next.add(nodeId)
-                                return next
-                              })
-                            }}
+                            onChange={() => setBlueprintSelected((prev) => toggleInSet(prev, nodeId))}
                           />
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
@@ -1039,14 +1032,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
                         key={ref.id}
                         concept={ref}
                         checked={blueprintSelectedRefs.has(ref.id)}
-                        onToggle={() => {
-                          setBlueprintSelectedRefs((prev) => {
-                            const next = new Set(prev)
-                            if (next.has(ref.id)) next.delete(ref.id)
-                            else next.add(ref.id)
-                            return next
-                          })
-                        }}
+                        onToggle={() => setBlueprintSelectedRefs((prev) => toggleInSet(prev, ref.id))}
                       />
                     ))}
                   </div>

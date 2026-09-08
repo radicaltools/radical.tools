@@ -83,8 +83,6 @@ interface HubState {
   filteredConcepts: () => HubConceptSummary[]
   allTags: () => Array<{ tag: string; count: number }>
   allStatuses: () => Array<{ status: string; count: number }>
-  /** Outgoing hubRefs + incoming references from other concepts. */
-  connectionCount: (id: string) => number
 }
 
 export type HubSortKey = 'name' | 'category' | 'connections'
@@ -244,11 +242,6 @@ export const useHubStore = create<HubState>()((set, get) => ({
       .sort((a, b) => b.count - a.count)
   },
 
-  connectionCount(id) {
-    // One-off lookup — fine for a single id. Rendering many at once (a card
-    // list, a sort) should call buildConnectionCounts() once instead.
-    return buildConnectionCounts(get().concepts).get(id) ?? 0
-  },
 }))
 
 /** Toggle membership of `value` in `set`, returning a new Set (immutable). */

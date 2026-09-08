@@ -32,10 +32,6 @@ import { SiteNav } from './SiteNav'
 const STUDIO_URL = import.meta.env.DEV ? '/' : 'https://studio.radical.tools'
 const LS_THEME = 'radical-theme'
 const LS_RIGHT = 'radical-hub-rp-collapsed'
-const LS_CATALOG_WIDTH = 'radical-hub-catalog-width'
-const CATALOG_WIDTH_DEFAULT = 480
-const CATALOG_WIDTH_MIN = 340
-const CATALOG_WIDTH_MAX = 860
 const TOP_TAGS_SHOWN = 16
 const SORT_LABELS: Record<HubSortKey, string> = { name: 'Name', category: 'Category', connections: 'Connections' }
 
@@ -273,15 +269,8 @@ function HubAppInner(): React.ReactElement {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [rightCollapsed, setRightCollapsed] = useState<boolean>(() => localStorage.getItem(LS_RIGHT) === '1')
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem(LS_THEME) as 'dark' | 'light') || 'dark')
-  const [catalogWidth, setCatalogWidth] = useState<number>(() => {
-    const saved = Number(localStorage.getItem(LS_CATALOG_WIDTH))
-    return saved >= CATALOG_WIDTH_MIN && saved <= CATALOG_WIDTH_MAX ? saved : CATALOG_WIDTH_DEFAULT
-  })
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
-  const [isResizing, setIsResizing] = useState(false)
   const [tagsExpanded, setTagsExpanded] = useState(false)
-  const catalogWidthRef = useRef(catalogWidth)
-  const activeDragCleanup = useRef<(() => void) | null>(null)
   // Pending view kind from a deep link, applied once the concept is loaded.
   const pendingView = useRef<HubViewKind | undefined>(parseHubHash(window.location.hash).view)
 
@@ -407,35 +396,6 @@ function HubAppInner(): React.ReactElement {
     setRightCollapsed((c) => { localStorage.setItem(LS_RIGHT, c ? '0' : '1'); return !c })
   }, [])
 
-  // Drag the divider between the catalogue and the viewer to resize the list.
-  const startResize = useCallback((e: React.PointerEvent) => {
-    e.preventDefault()
-    setIsResizing(true)
-    const onMove = (ev: PointerEvent) => {
-      const next = Math.min(CATALOG_WIDTH_MAX, Math.max(CATALOG_WIDTH_MIN, ev.clientX))
-      catalogWidthRef.current = next
-      setCatalogWidth(next)
-    }
-    const stop = () => {
-      setIsResizing(false)
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', stop)
-      window.removeEventListener('pointercancel', stop)
-      activeDragCleanup.current = null
-      localStorage.setItem(LS_CATALOG_WIDTH, String(catalogWidthRef.current))
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', stop)
-    // A touch/pen drag interrupted by a system gesture ends in pointercancel,
-    // not pointerup — without this the listeners (and the resizing class)
-    // would be stuck forever.
-    window.addEventListener('pointercancel', stop)
-    activeDragCleanup.current = stop
-  }, [])
-
-  // Release the drag if the component unmounts mid-resize.
-  useEffect(() => () => activeDragCleanup.current?.(), [])
-
   const toggleGroup = useCallback((cat: string) => {
     setCollapsedGroups((prev) => toggleInSet(prev, cat))
   }, [])
@@ -445,6 +405,37 @@ function HubAppInner(): React.ReactElement {
     setConceptId(id)
     setBrowsing(true)
   }, [])
+
+  const closeConcept = useCallback(() => {
+    pendingView.current = undefined
+    setConceptId(undefined)
+  }, [])
+
+  // Esc closes the concept preview popup.
+  useEffect(() => {
+    if (!conceptId) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeConcept() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [conceptId, closeConcept])
+
+  // Backdrop click-to-close: a mousedown on the backdrop arms a one-shot
+  // mouseup listener (so a drag that ends outside the backdrop doesn't close
+  // it). If the popup unmounts first (e.g. Esc, while the button is still
+  // down), this tears the listener down instead of leaving it armed.
+  const backdropCleanup = useRef<(() => void) | null>(null)
+  useEffect(() => () => backdropCleanup.current?.(), [])
+  const onBackdropMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return
+    const start = e.currentTarget
+    const onUp = (ev: MouseEvent): void => {
+      window.removeEventListener('mouseup', onUp, true)
+      backdropCleanup.current = null
+      if (ev.target === start) closeConcept()
+    }
+    window.addEventListener('mouseup', onUp, true)
+    backdropCleanup.current = () => window.removeEventListener('mouseup', onUp, true)
+  }, [closeConcept])
 
   const goHome = useCallback(() => {
     setConceptId(undefined)
@@ -464,10 +455,10 @@ function HubAppInner(): React.ReactElement {
     return m
   }, [concepts])
 
-  // Everything below is derived from the filter/sort state, not from
-  // catalogWidth/isResizing/theme — memoized so dragging the resizer (which
-  // calls setCatalogWidth on every pointermove) doesn't re-filter, re-sort,
-  // re-tally tags/statuses and rebuild the connections map on every frame.
+  // Everything below is derived from the filter/sort state, not from e.g.
+  // theme or the concept popup being open/closed — memoized so those
+  // unrelated re-renders don't re-filter, re-sort, re-tally tags/statuses
+  // and rebuild the connections map for no reason.
   const list = useMemo(
     () => filtered(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -481,7 +472,7 @@ function HubAppInner(): React.ReactElement {
     // sort — "Connections" sort promises a single top-to-bottom ranking, and
     // regrouping by category would hide that behind category order instead.
     if (activeCategory || sortBy === 'connections') {
-      return [{ category: activeCategory ?? 'all', items: list }]
+      return list.length === 0 ? [] : [{ category: activeCategory ?? 'all', items: list }]
     }
     const byCat = new Map<string, HubConceptSummary[]>()
     for (const c of list) {
@@ -521,10 +512,7 @@ function HubAppInner(): React.ReactElement {
   return (
     <div className="hub-shell">
     <SiteNav wide studioUrl={STUDIO_URL} theme={theme} onToggleTheme={toggleTheme} onHub={goHome} />
-    <div
-      className={`hub-layout${rightCollapsed ? ' rp-collapsed' : ''}${isResizing ? ' resizing' : ''}`}
-      style={{ ['--hub-catalog-width' as string]: `${catalogWidth}px` }}
-    >
+    <div className="hub-layout">
       {/* ── Catalogue ────────────────────────────────────────────────────────────── */}
       <aside className="hub-catalog">
         <div className="hub-search">
@@ -651,114 +639,114 @@ function HubAppInner(): React.ReactElement {
         )}
       </aside>
 
-      <div
-        className="hub-resizer"
-        onPointerDown={startResize}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize concept list"
-        title="Drag to resize"
-      />
-
-      {/* ── Viewer toolbar ────────────────────────────────────────────── */}
-      <div className="toolbar hub-toolbar">
-        {concept && conceptTheme ? (
-          <>
-            <span className="hub-toolbar-cat" style={{ background: conceptTheme.color, color: conceptTheme.fg }}>
-              <TypeIcon path={conceptTheme.iconPath} size={12} color={conceptTheme.fg} /> {conceptTheme.label}
-            </span>
-            <span className="hub-toolbar-title" title={concept.name}>{concept.name}</span>
-            <div className="toolbar-sep" />
-            <div className="toolbar-mode-switch">
-              {(['canvas', 'wiki', 'table'] as HubViewKind[]).map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  className={`toolbar-mode-btn${viewKind === k ? ' active' : ''}`}
-                  onClick={() => switchView(k)}
-                >
-                  {k === 'canvas' ? 'Canvas' : k === 'wiki' ? 'Wiki' : 'Table'}
-                </button>
-              ))}
+      {conceptId && (
+        <div className="hub-concept-overlay" onMouseDown={onBackdropMouseDown}>
+          <div
+            className={`hub-concept-panel${rightCollapsed ? ' rp-collapsed' : ''}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label={concept?.name ?? summary?.name ?? 'Concept preview'}
+          >
+            {/* ── Viewer toolbar ────────────────────────────────────────────── */}
+            <div className="toolbar hub-toolbar">
+              {concept && conceptTheme ? (
+                <>
+                  <span className="hub-toolbar-cat" style={{ background: conceptTheme.color, color: conceptTheme.fg }}>
+                    <TypeIcon path={conceptTheme.iconPath} size={12} color={conceptTheme.fg} /> {conceptTheme.label}
+                  </span>
+                  <span className="hub-toolbar-title" title={concept.name}>{concept.name}</span>
+                  <div className="toolbar-sep" />
+                  <div className="toolbar-mode-switch">
+                    {(['canvas', 'wiki', 'table'] as HubViewKind[]).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        className={`toolbar-mode-btn${viewKind === k ? ' active' : ''}`}
+                        onClick={() => switchView(k)}
+                      >
+                        {k === 'canvas' ? 'Canvas' : k === 'wiki' ? 'Wiki' : 'Table'}
+                      </button>
+                    ))}
+                  </div>
+                  {viewKind === 'canvas' && (
+                    <>
+                      <button type="button" className="toolbar-btn" onClick={fitAll} title="Fit all nodes to viewport"><IconFitAll /> Fit</button>
+                      <button
+                        type="button"
+                        className="toolbar-btn toolbar-btn-accent"
+                        onClick={() => { void runSmartLayout() }}
+                        disabled={isLayoutRunning}
+                        title="Smart Layout (exploration only — nothing is saved)"
+                      >
+                        <IconSmartLayout /> Smart Layout
+                      </button>
+                    </>
+                  )}
+                  <div style={{ flex: 1 }} />
+                  <button type="button" className="toolbar-btn" disabled={!conceptDoc} onClick={() => conceptDoc && void copyJson(concept, conceptDoc)} title="Copy as .radical JSON"><IconCopy /> Copy JSON</button>
+                  <button type="button" className="toolbar-btn" disabled={!conceptDoc} onClick={() => conceptDoc && downloadConcept(conceptDoc)} title="Download as .radical file (opens in Radical Studio)"><IconDownload /> Download</button>
+                  <button type="button" className="toolbar-btn active" onClick={() => openInStudio([concept.id])} title="Open Radical Studio with this concept ready to import">
+                    <IconStudio /> Add to Studio
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="hub-toolbar-title muted">{summary ? summary.name : 'Loading…'}</span>
+                  <div style={{ flex: 1 }} />
+                </>
+              )}
+              <button type="button" className="hub-concept-close" onClick={closeConcept} title="Close (Esc)" aria-label="Close">
+                ✕
+              </button>
             </div>
-            {viewKind === 'canvas' && (
-              <>
-                <button type="button" className="toolbar-btn" onClick={fitAll} title="Fit all nodes to viewport"><IconFitAll /> Fit</button>
-                <button
-                  type="button"
-                  className="toolbar-btn toolbar-btn-accent"
-                  onClick={() => { void runSmartLayout() }}
-                  disabled={isLayoutRunning}
-                  title="Smart Layout (exploration only — nothing is saved)"
-                >
-                  <IconSmartLayout /> Smart Layout
-                </button>
-              </>
-            )}
-            <div style={{ flex: 1 }} />
-            <button type="button" className="toolbar-btn" disabled={!conceptDoc} onClick={() => conceptDoc && void copyJson(concept, conceptDoc)} title="Copy as .radical JSON"><IconCopy /> Copy JSON</button>
-            <button type="button" className="toolbar-btn" disabled={!conceptDoc} onClick={() => conceptDoc && downloadConcept(conceptDoc)} title="Download as .radical file (opens in Radical Studio)"><IconDownload /> Download</button>
-            <button type="button" className="toolbar-btn active" onClick={() => openInStudio([concept.id])} title="Open Radical Studio with this concept ready to import">
-              <IconStudio /> Add to Studio
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="hub-toolbar-title muted">Pick a concept to explore it</span>
-            <div style={{ flex: 1 }} />
-          </>
-        )}
-      </div>
 
-      {/* ── Viewer ────────────────────────────────────────────────────── */}
-      {!concept ? (
-        <div className="canvas-area hub-empty">
-          <div className="hub-empty-inner">
-            {conceptError ? (
-              <p className="hub-list-err">⚠ {conceptError}</p>
-            ) : summary ? (
-              <p className="muted">Loading “{summary.name}”…</p>
+            {/* ── Viewer ────────────────────────────────────────────────────── */}
+            {!concept ? (
+              <div className="canvas-area hub-empty">
+                <div className="hub-empty-inner">
+                  {conceptError ? (
+                    <p className="hub-list-err">⚠ {conceptError}</p>
+                  ) : summary ? (
+                    <p className="muted">Loading “{summary.name}”…</p>
+                  ) : null}
+                </div>
+              </div>
+            ) : viewKind === 'wiki' ? (
+              <WikiView />
+            ) : viewKind === 'table' ? (
+              <TableView />
             ) : (
-              <>
-                <h2>Radical Hub</h2>
-                <p>Curated requirements, ADRs, fitness functions, patterns and blueprints — rendered exactly as they will appear in your model.</p>
-                <p className="muted">Select a concept on the left to explore it as a diagram, a wiki page or a table. Use <em>Add to Studio</em> to import it into your own model.</p>
-              </>
+              <Canvas />
             )}
+
+            {concept && related.length > 0 && (
+              <div className="hub-related" role="navigation" aria-label="Related concepts">
+                <span className="hub-related-label">Related</span>
+                {related.map((r) => {
+                  const t = categoryTheme(r.category)
+                  return (
+                    <button
+                      type="button"
+                      key={r.id}
+                      className="hub-related-chip"
+                      style={{ ['--cat-color' as string]: t.color }}
+                      title={`${t.label}: ${r.description}`}
+                      onClick={() => openConcept(r.id)}
+                    >
+                      <TypeIcon path={t.iconPath} size={11} /> {r.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            <RightPanel readOnly collapsed={rightCollapsed} onToggleCollapsed={toggleRight} />
           </div>
         </div>
-      ) : viewKind === 'wiki' ? (
-        <WikiView />
-      ) : viewKind === 'table' ? (
-        <TableView />
-      ) : (
-        <Canvas />
       )}
-
-      {concept && related.length > 0 && (
-        <div className="hub-related" role="navigation" aria-label="Related concepts">
-          <span className="hub-related-label">Related</span>
-          {related.map((r) => {
-            const t = categoryTheme(r.category)
-            return (
-              <button
-                type="button"
-                key={r.id}
-                className="hub-related-chip"
-                style={{ ['--cat-color' as string]: t.color }}
-                title={`${t.label}: ${r.description}`}
-                onClick={() => openConcept(r.id)}
-              >
-                <TypeIcon path={t.iconPath} size={11} /> {r.name}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      <RightPanel readOnly collapsed={rightCollapsed} onToggleCollapsed={toggleRight} />
-      <NotificationHost />
     </div>
+    <NotificationHost />
     </div>
   )
 }
