@@ -2189,6 +2189,9 @@ body {
 @media (min-width: 1500px) {
   .wiki-doc { padding: 38px 72px 80px; }
 }
+@media (max-width: 860px) {
+  .wiki-doc { padding: 24px 22px 64px; }
+}
 .wiki-breadcrumb {
   display: flex;
   flex-wrap: wrap;
@@ -2357,17 +2360,6 @@ body {
 .ears-quick-entry-sm .ears-quick-entry-input { font-size: 11px; padding: 4px 6px; }
 .ears-quick-entry-sm .ears-quick-entry-hint { font-size: 10px; }
 
-/* Body: main + infobox */
-.wiki-body {
-  display: grid;
-  grid-template-columns: 1fr 270px;
-  gap: 36px;
-  align-items: start;
-}
-@media (max-width: 860px) {
-  .wiki-body { grid-template-columns: 1fr; }
-  .wiki-doc { padding: 24px 22px 64px; }
-}
 .wiki-main { min-width: 0; }
 
 .wiki-prose-section { margin-bottom: 28px; }
@@ -2630,40 +2622,30 @@ body {
 }
 .wiki-danger-btn:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
 
-/* Infobox */
-.wiki-infobox {
-  border: 1px solid var(--border-color);
-  border-radius: 11px;
-  background: var(--bg-app);
-  overflow: hidden;
-  position: sticky;
-  top: 12px;
+/* Meta row — short facts (Parent, Technology, External, …), part of the header */
+.wiki-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 22px;
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
 }
-.wiki-infobox-head {
-  padding: 10px 14px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border-color);
-  background: var(--hover-bg-faint);
+.wiki-meta-item {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 0;
 }
-.wiki-facts { margin: 0; padding: 6px 0; }
-.wiki-fact {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 10px;
-  padding: 7px 14px;
-  align-items: start;
-}
-.wiki-fact dt {
+.wiki-meta-item dt {
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--text-muted);
-  padding-top: 2px;
+  margin: 0;
 }
-.wiki-fact dd { margin: 0; font-size: 13px; color: var(--text-primary); min-width: 0; }
+.wiki-meta-item dd { margin: 0; font-size: 13px; color: var(--text-primary); min-width: 0; }
 .wiki-fact-text { display: inline-block; }
 
 /* Boolean pill */

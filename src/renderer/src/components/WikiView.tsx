@@ -848,6 +848,54 @@ function WikiElementPage({
             </button>
           )}
         </div>
+        <dl className="wiki-meta-row">
+          <div className="wiki-meta-item">
+            <dt>Parent</dt>
+            <dd>
+              <InlineSelect
+                value={node.parentId ?? ''}
+                readOnly={readOnly}
+                options={[
+                  { value: '', label: '— none —' },
+                  ...parentCandidates.map((n) => ({ value: n.id, label: n.label })),
+                ]}
+                display={
+                  parent ? (
+                    <button
+                      className="wiki-link"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onNavigate(parent.id)
+                      }}
+                    >
+                      {parent.label}
+                    </button>
+                  ) : (
+                    <span className="wiki-muted">none</span>
+                  )
+                }
+                onCommit={(v) => updateNode(node.id, { parentId: v || undefined })}
+              />
+            </dd>
+          </div>
+
+          {(hasMeta ? factProps : fallbackFacts).map((p) => (
+            <div className="wiki-meta-item" key={p.key}>
+              <dt>{p.label}</dt>
+              <dd>
+                <WikiFactValue
+                  def={p}
+                  value={getVal(p.key)}
+                  readOnly={readOnly}
+                  onCommit={(v) =>
+                    updateNode(node.id, { [p.key]: v } as Parameters<UpdateNode>[1])
+                  }
+                />
+              </dd>
+            </div>
+          ))}
+        </dl>
+
         {lead && (
           <InlineText
             multiline
@@ -878,169 +926,115 @@ function WikiElementPage({
         )}
       </header>
 
-      <div className="wiki-body">
-        <div className="wiki-main">
-          {/* Long-form sections */}
-          {(hasMeta ? sectionProps : []).map((p) => (
-            <section className="wiki-prose-section" key={p.key}>
-              <h2 className="wiki-h2">{p.label}</h2>
-              <InlineText
-                multiline={p.type === 'textarea'}
-                className="wiki-prose"
-                value={String(getVal(p.key) ?? '')}
-                placeholder={readOnly ? '—' : `Add ${p.label.toLowerCase()}…`}
-                readOnly={readOnly}
-                onCommit={(v) =>
-                  updateNode(node.id, { [p.key]: v } as Parameters<UpdateNode>[1])
-                }
+      <div className="wiki-main">
+        {/* Long-form sections */}
+        {(hasMeta ? sectionProps : []).map((p) => (
+          <section className="wiki-prose-section" key={p.key}>
+            <h2 className="wiki-h2">{p.label}</h2>
+            <InlineText
+              multiline={p.type === 'textarea'}
+              className="wiki-prose"
+              value={String(getVal(p.key) ?? '')}
+              placeholder={readOnly ? '—' : `Add ${p.label.toLowerCase()}…`}
+              readOnly={readOnly}
+              onCommit={(v) =>
+                updateNode(node.id, { [p.key]: v } as Parameters<UpdateNode>[1])
+              }
+            />
+          </section>
+        ))}
+
+        {/* Children */}
+        <section className="wiki-prose-section">
+          <div className="wiki-section-head">
+            <h2 className="wiki-h2">
+              Contains <span className="wiki-count">{children.length}</span>
+            </h2>
+            {!readOnly && (
+              <AddMenu
+                label="Add child"
+                variant="ghost"
+                options={childTypeChoices}
+                emptyHint="No child types allowed here"
+                onPick={onCreateChild}
               />
-            </section>
-          ))}
-
-          {/* Children */}
-          <section className="wiki-prose-section">
-            <div className="wiki-section-head">
-              <h2 className="wiki-h2">
-                Contains <span className="wiki-count">{children.length}</span>
-              </h2>
-              {!readOnly && (
-                <AddMenu
-                  label="Add child"
-                  variant="ghost"
-                  options={childTypeChoices}
-                  emptyHint="No child types allowed here"
-                  onPick={onCreateChild}
-                />
-              )}
-            </div>
-            {children.length === 0 ? (
-              <p className="wiki-muted">No child elements.</p>
-            ) : (
-              <div className="wiki-card-grid">
-                {children.map((c) => {
-                  const cm = typeMeta(c.type)
-                  return (
-                    <WikiNodeCard
-                      key={c.id}
-                      node={c}
-                      color={cm.color}
-                      metaLabel={cm.label}
-                      onOpen={() => onNavigate(c.id)}
-                      onDelete={readOnly ? undefined : () => onDeleteNode(c.id)}
-                    />
-                  )
-                })}
-              </div>
             )}
-          </section>
-
-          {/* Relations */}
-          <section className="wiki-prose-section">
-            <div className="wiki-section-head">
-              <h2 className="wiki-h2">
-                Relationships{' '}
-                <span className="wiki-count">{outgoing.length + incoming.length}</span>
-              </h2>
-              {!readOnly && (
-                <AddMenu
-                  label="Add relationship"
-                  variant="ghost"
-                  options={relationTargets}
-                  emptyHint="No valid targets"
-                  onPick={onCreateRelation}
-                />
-              )}
+          </div>
+          {children.length === 0 ? (
+            <p className="wiki-muted">No child elements.</p>
+          ) : (
+            <div className="wiki-card-grid">
+              {children.map((c) => {
+                const cm = typeMeta(c.type)
+                return (
+                  <WikiNodeCard
+                    key={c.id}
+                    node={c}
+                    color={cm.color}
+                    metaLabel={cm.label}
+                    onOpen={() => onNavigate(c.id)}
+                    onDelete={readOnly ? undefined : () => onDeleteNode(c.id)}
+                  />
+                )
+              })}
             </div>
-            {outgoing.length === 0 && incoming.length === 0 ? (
-              <p className="wiki-muted">No relationships.</p>
-            ) : (
-              <div className="wiki-rel-list">
-                {outgoing.map((r) => (
-                  <WikiRelationLine
-                    key={r.id}
-                    direction="out"
-                    otherNode={nodes[r.targetId]}
-                    relation={r}
-                    nodes={nodes}
-                    metamodel={metamodel}
-                    readOnly={readOnly}
-                    onNavigate={onNavigate}
-                    updateRelation={updateRelation}
-                    onDeleteRelation={onDeleteRelation}
-                    typeMeta={typeMeta}
-                  />
-                ))}
-                {incoming.map((r) => (
-                  <WikiRelationLine
-                    key={r.id}
-                    direction="in"
-                    otherNode={nodes[r.sourceId]}
-                    relation={r}
-                    nodes={nodes}
-                    metamodel={metamodel}
-                    readOnly={readOnly}
-                    onNavigate={onNavigate}
-                    updateRelation={updateRelation}
-                    onDeleteRelation={onDeleteRelation}
-                    typeMeta={typeMeta}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+          )}
+        </section>
 
-        {/* Infobox — short facts */}
-        <aside className="wiki-infobox">
-          <div className="wiki-infobox-head">At a glance</div>
-          <dl className="wiki-facts">
-            <div className="wiki-fact">
-              <dt>Parent</dt>
-              <dd>
-                <InlineSelect
-                  value={node.parentId ?? ''}
+        {/* Relations */}
+        <section className="wiki-prose-section">
+          <div className="wiki-section-head">
+            <h2 className="wiki-h2">
+              Relationships{' '}
+              <span className="wiki-count">{outgoing.length + incoming.length}</span>
+            </h2>
+            {!readOnly && (
+              <AddMenu
+                label="Add relationship"
+                variant="ghost"
+                options={relationTargets}
+                emptyHint="No valid targets"
+                onPick={onCreateRelation}
+              />
+            )}
+          </div>
+          {outgoing.length === 0 && incoming.length === 0 ? (
+            <p className="wiki-muted">No relationships.</p>
+          ) : (
+            <div className="wiki-rel-list">
+              {outgoing.map((r) => (
+                <WikiRelationLine
+                  key={r.id}
+                  direction="out"
+                  otherNode={nodes[r.targetId]}
+                  relation={r}
+                  nodes={nodes}
+                  metamodel={metamodel}
                   readOnly={readOnly}
-                  options={[
-                    { value: '', label: '— none —' },
-                    ...parentCandidates.map((n) => ({ value: n.id, label: n.label })),
-                  ]}
-                  display={
-                    parent ? (
-                      <button
-                        className="wiki-link"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onNavigate(parent.id)
-                        }}
-                      >
-                        {parent.label}
-                      </button>
-                    ) : (
-                      <span className="wiki-muted">none</span>
-                    )
-                  }
-                  onCommit={(v) => updateNode(node.id, { parentId: v || undefined })}
+                  onNavigate={onNavigate}
+                  updateRelation={updateRelation}
+                  onDeleteRelation={onDeleteRelation}
+                  typeMeta={typeMeta}
                 />
-              </dd>
+              ))}
+              {incoming.map((r) => (
+                <WikiRelationLine
+                  key={r.id}
+                  direction="in"
+                  otherNode={nodes[r.sourceId]}
+                  relation={r}
+                  nodes={nodes}
+                  metamodel={metamodel}
+                  readOnly={readOnly}
+                  onNavigate={onNavigate}
+                  updateRelation={updateRelation}
+                  onDeleteRelation={onDeleteRelation}
+                  typeMeta={typeMeta}
+                />
+              ))}
             </div>
-
-            {(hasMeta ? factProps : fallbackFacts).map((p) => (
-              <div className="wiki-fact" key={p.key}>
-                <dt>{p.label}</dt>
-                <dd>
-                  <WikiFactValue
-                    def={p}
-                    value={getVal(p.key)}
-                    readOnly={readOnly}
-                    onCommit={(v) =>
-                      updateNode(node.id, { [p.key]: v } as Parameters<UpdateNode>[1])
-                    }
-                  />
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </aside>
+          )}
+        </section>
       </div>
     </article>
   )
