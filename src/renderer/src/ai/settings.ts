@@ -9,25 +9,11 @@ export const AI_SETTINGS_KEY = 'radical-ai-settings'
 
 const PROVIDER_IDS: AIProviderId[] = ['ollama', 'openai', 'anthropic', 'gemini']
 
-const DEFAULT_MODELS: Record<AIProviderId, string> = {
-  ollama: 'llama3.1',
-  openai: 'gpt-4o-mini',
-  anthropic: 'claude-3-5-sonnet-20241022',
-  gemini: 'gemini-1.5-flash',
-}
-
-const DEFAULT_BASE_URLS: Record<AIProviderId, string> = {
-  ollama: 'http://localhost:11434',
-  openai: 'https://api.openai.com/v1',
-  anthropic: 'https://api.anthropic.com/v1',
-  gemini: 'https://generativelanguage.googleapis.com/v1beta',
-}
-
 export function defaultProviderConfig(_id: AIProviderId): ProviderConfig {
   // Leave fields empty so the modal shows only placeholders. The runtime
-  // (adapters) falls back to the per-provider defaults from AI_DEFAULTS
-  // when the user hasn't overridden them. This keeps the localStorage
-  // payload tiny and the UI honest about what is actually user-set.
+  // (adapters) falls back to each provider's own `defaultModel`/`defaultBaseUrl`
+  // (see registry.ts) when the user hasn't overridden them. This keeps the
+  // localStorage payload tiny and the UI honest about what is actually user-set.
   return {
     apiKey: '',
     baseUrl: '',
@@ -103,5 +89,3 @@ export function saveAISettings(settings: AISettings, storage?: MinimalStorage | 
     /* quota or similar — silently ignore */
   }
 }
-
-export const AI_DEFAULTS = { models: DEFAULT_MODELS, baseUrls: DEFAULT_BASE_URLS, providerIds: PROVIDER_IDS }

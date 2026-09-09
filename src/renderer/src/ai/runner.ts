@@ -123,7 +123,10 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
     )
 
     const res = await adapter.chat(
-      { model, messages, jsonMode: true, temperature: 0.2, signal },
+      // maxTokens above the 2048 provider default: a multi-op diagram patch
+      // (several add_node/add_relation ops) can run past that and get its
+      // JSON truncated mid-object, burning a retry round on a parse error.
+      { model, messages, jsonMode: true, temperature: 0.2, maxTokens: 8000, signal },
       cfg,
     )
     lastRaw = res.content

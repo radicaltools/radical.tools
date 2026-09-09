@@ -10,7 +10,7 @@ export interface ChatMessage {
 }
 
 export interface ChatRequest {
-  /** Provider-specific model name. e.g. "llama3.1", "gpt-4o-mini", "claude-3-5-sonnet-20241022", "gemini-1.5-flash" */
+  /** Provider-specific model name. e.g. "llama3.1", "gpt-4o-mini", "claude-haiku-4-5", "gemini-1.5-flash" */
   model: string
   messages: ChatMessage[]
   /** If true, ask the provider to return strict JSON. Best-effort per-provider. */
