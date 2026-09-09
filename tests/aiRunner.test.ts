@@ -42,6 +42,13 @@ function openaiSettings() {
   return s
 }
 
+function geminiSettings() {
+  const s = defaultAISettings()
+  s.active = 'gemini'
+  s.providers.gemini.apiKey = 'test-key'
+  return s
+}
+
 interface FakeRound { content: unknown[]; stop_reason: string }
 
 function fakeAnthropicFetch(rounds: FakeRound[]) {
@@ -230,6 +237,50 @@ describe('runAIPrompt — parity check with mocked OpenAI tool-calling', () => {
     const result = await runAIPrompt({
       prompt: 'Make a web app and a DB it reads from',
       settings: openaiSettings(),
+      diagram: facade,
+    })
+    expect(result.summary).toMatch(/Created/)
+    expect(result.report.added.nodes).toBe(2)
+    expect(result.report.added.relations).toBe(1)
+    expect(Object.keys(facade._nodes)).toHaveLength(2)
+  })
+})
+
+interface FakeGeminiRound { calls?: Array<{ name: string; args: unknown }>; text?: string }
+
+function fakeGeminiFetch(rounds: FakeGeminiRound[]) {
+  let call = 0
+  ;(globalThis as any).fetch = vi.fn(async () => {
+    const round = rounds[Math.min(call, rounds.length - 1)]
+    call++
+    const parts: unknown[] = []
+    if (round.text) parts.push({ text: round.text })
+    for (const c of round.calls ?? []) parts.push({ functionCall: { name: c.name, args: c.args } })
+    return new Response(
+      JSON.stringify({ modelVersion: 'gemini-1.5-flash', candidates: [{ content: { parts }, finishReason: 'STOP' }] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )
+  })
+}
+
+describe('runAIPrompt — parity check with mocked Gemini tool-calling (no call ids)', () => {
+  beforeEach(() => { delete (globalThis as any).fetch })
+
+  it('executes tool calls from one round, then returns the final text answer', async () => {
+    fakeGeminiFetch([
+      {
+        calls: [
+          { name: 'add_node', args: { tempId: 't1', type: 'system', label: 'Web App' } },
+          { name: 'add_node', args: { tempId: 't2', type: 'database', label: 'DB' } },
+          { name: 'add_relation', args: { sourceId: 't1', targetId: 't2', label: 'reads' } },
+        ],
+      },
+      { text: 'Created Web App and DB.' },
+    ])
+    const facade = makeFacade()
+    const result = await runAIPrompt({
+      prompt: 'Make a web app and a DB it reads from',
+      settings: geminiSettings(),
       diagram: facade,
     })
     expect(result.summary).toMatch(/Created/)
