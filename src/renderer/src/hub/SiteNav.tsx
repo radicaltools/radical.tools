@@ -16,14 +16,12 @@ export interface SiteNavProps {
   onToggleTheme: () => void
   /** Hub link handler (we are on the hub, so it navigates in-app). */
   onHub: () => void
-  /** Full-bleed variant for the catalogue layout (no centred column). */
-  wide?: boolean
 }
 
-export function SiteNav({ studioUrl, theme, onToggleTheme, onHub, wide }: SiteNavProps): React.ReactElement {
+export function SiteNav({ studioUrl, theme, onToggleTheme, onHub }: SiteNavProps): React.ReactElement {
   const themeLabel = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
   return (
-    <header className={`site-nav${wide ? ' wide' : ''}`}>
+    <header className="site-nav">
       <a className="site-nav-logo" href="https://radical.tools" aria-label="Radical.Tools"><span className="site-nav-mark">R</span></a>
       <nav className="site-nav-links">
         <a className="site-nav-btn" href="https://radical.tools">Home</a>

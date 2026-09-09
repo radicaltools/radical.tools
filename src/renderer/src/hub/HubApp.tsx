@@ -511,7 +511,7 @@ function HubAppInner(): React.ReactElement {
 
   return (
     <div className="hub-shell">
-    <SiteNav wide studioUrl={STUDIO_URL} theme={theme} onToggleTheme={toggleTheme} onHub={goHome} />
+    <SiteNav studioUrl={STUDIO_URL} theme={theme} onToggleTheme={toggleTheme} onHub={goHome} />
     <div className="hub-layout">
       {/* ── Catalogue ────────────────────────────────────────────────────────────── */}
       <aside className="hub-catalog">
