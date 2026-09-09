@@ -13,7 +13,6 @@
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
 }
-.site-nav.wide { padding: 0 14px; background: var(--bg-panel); backdrop-filter: none; }
 .site-nav-logo {
   display: inline-flex; align-items: center; gap: 10px;
   font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
@@ -76,11 +75,15 @@
   background: var(--bg-app);
 }
 
-/* ── Catalogue (full width — the concept preview lives in a popup) ─── */
+/* ── Catalogue (same column width as the rest of the site — the concept
+   preview still opens full-screen, in a popup on .hub-layout) ───────── */
 .hub-catalog {
   display: flex;
   flex-direction: column;
   flex: 1; min-height: 0;
+  width: 100%;
+  max-width: min(1080px, 92vw);
+  margin: 0 auto;
   background: var(--bg-panel);
 }
 
