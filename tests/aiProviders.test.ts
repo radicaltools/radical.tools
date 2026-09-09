@@ -229,7 +229,7 @@ describe('AI providers', () => {
     })
   })
 
-  it('Gemini: uses key in query string, separates system_instruction (tools not implemented yet)', async () => {
+  it('Gemini: uses key in query string, separates system_instruction', async () => {
     await expect(geminiAdapter.chat({ model: 'm', messages: SAMPLE }, {})).rejects.toThrow(/API key/)
     const { calls } = installFetch({
       modelVersion: 'gemini-1.5-flash',
@@ -262,5 +262,52 @@ describe('AI providers', () => {
       { apiKey: 'g' },
     )
     expect(calls[0].bodyParsed.contents.map((c: any) => c.role)).toEqual(['user', 'model', 'user'])
+  })
+
+  describe('Gemini — real tool-calling', () => {
+    it('sends tools wrapped in a Tool.functionDeclarations array', async () => {
+      const { calls } = installFetch({ candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }] })
+      await geminiAdapter.chat(
+        {
+          model: 'gemini-1.5-flash',
+          messages: SAMPLE,
+          tools: [{ name: 'add_node', description: 'Add a node', inputSchema: { type: 'object', properties: {} } }],
+        },
+        { apiKey: 'g' },
+      )
+      expect(calls[0].bodyParsed.tools).toEqual([
+        { functionDeclarations: [{ name: 'add_node', description: 'Add a node', parameters: { type: 'object', properties: {} } }] },
+      ])
+    })
+
+    it('maps a functionCall part to a generic tool_call block, synthesizing an id (Gemini has none)', async () => {
+      installFetch({
+        candidates: [{
+          content: { parts: [{ functionCall: { name: 'add_node', args: { tempId: 't1', type: 'system', label: 'X' } } }] },
+        }],
+      })
+      const out = await geminiAdapter.chat({ model: 'm', messages: SAMPLE }, { apiKey: 'g' })
+      expect(out.stopReason).toBe('tool_calls')
+      expect(out.content).toEqual([
+        { type: 'tool_call', id: 'add_node#0', name: 'add_node', input: { tempId: 't1', type: 'system', label: 'X' } },
+      ])
+    })
+
+    it('maps a tool_result-carrying turn back to a functionResponse part, recovering the name from the synthesized id', async () => {
+      const { calls } = installFetch({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] })
+      await geminiAdapter.chat({
+        model: 'm',
+        messages: [
+          { role: 'user', content: 'go' },
+          { role: 'assistant', content: [{ type: 'tool_call', id: 'add_node#0', name: 'add_node', input: { label: 'X' } }] },
+          { role: 'user', content: [{ type: 'tool_result', toolCallId: 'add_node#0', content: 'Created node n1.', isError: false }] },
+        ],
+      }, { apiKey: 'g' })
+      expect(calls[0].bodyParsed.contents).toEqual([
+        { role: 'user', parts: [{ text: 'go' }] },
+        { role: 'model', parts: [{ functionCall: { name: 'add_node', args: { label: 'X' } } }] },
+        { role: 'user', parts: [{ functionResponse: { name: 'add_node', response: { result: 'Created node n1.' } } }] },
+      ])
+    })
   })
 })
