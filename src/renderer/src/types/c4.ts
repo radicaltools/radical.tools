@@ -141,6 +141,12 @@ export interface DiagramView {
    */
   wikiFocusId?: string | null
   /**
+   * Table-only: id of the currently-selected tab ('all', 'relations', or a
+   * node-type id). `undefined` = "All Nodes". Persisted per view so
+   * switching away and back (or reopening the view) restores the tab.
+   */
+  tableActiveTab?: string
+  /**
    * Node IDs explicitly collapsed by the user in this named view.
    * Independent of the model-level `node.collapsed` flag — collapsing in one
    * view does not affect other views or the default "all nodes" view.
