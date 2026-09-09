@@ -1,33 +1,81 @@
 // ─── AI integration: shared types ───────────────────────────────────────────
 
-import type { C4ElementType } from '../types/c4'
-
 export type AIProviderId = 'ollama' | 'openai' | 'anthropic' | 'gemini'
+
+// ─── Chat wire format (provider-agnostic) ───────────────────────────────────
+//
+// Canonical shape follows Anthropic's: a tool result is a content block
+// inside a `user`-role message, with no separate 'tool' role. Every other
+// provider's adapter expands/repacks from this shape (not the other way
+// round) — see providers/*.ts.
+
+export type ChatContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_call'; id: string; name: string; input: unknown }
+  | { type: 'tool_result'; toolCallId: string; content: string; isError?: boolean }
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
-  content: string
+  /** A bare string is sugar for a single text block. Only an assistant turn
+   *  that made tool calls, and the turn reporting their results, use blocks. */
+  content: string | ChatContentBlock[]
+}
+
+export interface ToolDef {
+  name: string
+  description: string
+  /** Conservative common-subset JSON Schema (type/properties/required/enum/
+   *  items/description/additionalProperties) — kept identical across every
+   *  adapter so none has to translate a provider-specific schema dialect. */
+  inputSchema: Record<string, unknown>
 }
 
 export interface ChatRequest {
-  /** Provider-specific model name. e.g. "llama3.1", "gpt-4o-mini", "claude-haiku-4-5", "gemini-1.5-flash" */
   model: string
   messages: ChatMessage[]
-  /** If true, ask the provider to return strict JSON. Best-effort per-provider. */
-  jsonMode?: boolean
+  tools?: ToolDef[]
   /** Max tokens for the response. */
   maxTokens?: number
-  /** Sampling temperature, 0..1. */
+  /** Sampling temperature, 0..1. Provider adapters may drop this where it
+   *  conflicts with a model's default reasoning mode (see providers/claude.ts). */
   temperature?: number
   /** Abort signal for cancellation. */
   signal?: AbortSignal
 }
 
 export interface ChatResponse {
-  /** Raw assistant text content. */
-  content: string
+  /** Ordered blocks the assistant produced, in emission order. Push this
+   *  straight back as the next assistant ChatMessage.content — providers
+   *  that echo tool-call ids need to see their own prior ones on the next turn. */
+  content: ChatContentBlock[]
   /** Provider-reported model name (if available). */
   model?: string
+  stopReason: 'tool_calls' | 'end_turn' | 'max_tokens' | 'other'
+}
+
+export function textOf(content: ChatContentBlock[]): string {
+  return content
+    .filter((b): b is Extract<ChatContentBlock, { type: 'text' }> => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+}
+
+export function toolCallsOf(content: ChatContentBlock[]): Array<Extract<ChatContentBlock, { type: 'tool_call' }>> {
+  return content.filter((b): b is Extract<ChatContentBlock, { type: 'tool_call' }> => b.type === 'tool_call')
+}
+
+/** Flattens any message content — including tool_call/tool_result blocks —
+ *  to plain text. Used by providers that don't implement real tool-calling
+ *  yet, so a message inherited from a tool-calling-capable provider (e.g.
+ *  after a mid-session provider switch) degrades to readable text instead of
+ *  crashing the request. */
+export function contentToText(content: string | ChatContentBlock[]): string {
+  if (typeof content === 'string') return content
+  return content.map((b) => {
+    if (b.type === 'text') return b.text
+    if (b.type === 'tool_call') return `[called ${b.name}(${JSON.stringify(b.input)})]`
+    return `[tool result: ${b.content}]`
+  }).join('\n')
 }
 
 /** Provider configuration entry stored in settings. */
@@ -61,132 +109,4 @@ export interface ProviderAdapter {
   /** Default base URL — providers may ignore if hard-coded. */
   defaultBaseUrl?: string
   chat: ChatFn
-}
-
-// ─── Patch operations the model applies to the diagram ─────────────────────
-
-/**
- * AddNode — `tempId` is a model-provided identifier so subsequent operations
- * (relations, child nodes via parentId) can reference this newly created node
- * before a real id has been assigned by the store.
- */
-export interface AIAddNodeOp {
-  op: 'add_node'
-  tempId: string
-  type: C4ElementType | string
-  label: string
-  description?: string
-  technology?: string
-  /** Either an existing real node id or a tempId from a previous op in the same patch. */
-  parentId?: string | null
-  external?: boolean
-}
-
-export interface AIAddRelationOp {
-  op: 'add_relation'
-  /** sourceId / targetId may reference a real id or a tempId from the same patch. */
-  sourceId: string
-  targetId: string
-  label?: string
-  technology?: string
-}
-
-export interface AIUpdateNodeOp {
-  op: 'update_node'
-  id: string
-  label?: string
-  description?: string
-  technology?: string
-  external?: boolean
-  type?: C4ElementType | string
-}
-
-export interface AIDeleteNodeOp {
-  op: 'delete_node'
-  id: string
-}
-
-export interface AIDeleteRelationOp {
-  op: 'delete_relation'
-  id: string
-}
-
-// ─── Views ────────────────────────────────────────────────────────────────
-
-/** Create a new view. `tempId` lets later ops (set_active_view, set_view_nodes)
- *  reference it before a real id is assigned. nodeIds may include node tempIds
- *  produced by `add_node` ops earlier in the same patch. */
-export interface AIAddViewOp {
-  op: 'add_view'
-  tempId: string
-  name: string
-  nodeIds?: string[]
-  /** Switch to this view immediately after creation. */
-  active?: boolean
-}
-
-/** Replace the entire visible-node set of an existing view. */
-export interface AISetViewNodesOp {
-  op: 'set_view_nodes'
-  /** Real id or tempId from an `add_view` earlier in the same patch. */
-  id: string
-  nodeIds: string[]
-}
-
-export interface AIDeleteViewOp {
-  op: 'delete_view'
-  id: string
-}
-
-export interface AISetActiveViewOp {
-  op: 'set_active_view'
-  /** Real id, tempId from same patch, or null to clear the active view. */
-  id: string | null
-}
-
-/** Pan + zoom the canvas to a specific node after all other ops are applied. */
-export interface AIFocusNodeOp {
-  op: 'focus_node'
-  /** Real node id or tempId from an earlier add_node in the same patch. */
-  id: string
-}
-
-/**
- * Clear the entire diagram (all nodes, relations and views) before the
- * remaining ops in this patch run. Use when creating a model from scratch
- * so old content does not bleed into the new architecture.
- * This op MUST appear first in the operations array.
- */
-export interface AIResetDiagramOp {
-  op: 'reset_diagram'
-}
-
-/**
- * Ask the built-in local query engine to inspect the CURRENT model structure.
- * The runner executes these ops before any mutation ops and feeds the results
- * back to the model in a follow-up round.
- */
-export interface AIQueryModelOp {
-  op: 'query_model'
-  query: string
-}
-
-export type AIPatchOp =
-  | AIAddNodeOp
-  | AIAddRelationOp
-  | AIUpdateNodeOp
-  | AIDeleteNodeOp
-  | AIDeleteRelationOp
-  | AIAddViewOp
-  | AISetViewNodesOp
-  | AIDeleteViewOp
-  | AISetActiveViewOp
-  | AIFocusNodeOp
-  | AIResetDiagramOp
-  | AIQueryModelOp
-
-export interface AIPatch {
-  operations: AIPatchOp[]
-  /** Optional human-readable summary the assistant returns. */
-  summary?: string
 }

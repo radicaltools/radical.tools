@@ -147,4 +147,34 @@ describe('runModelQuery', () => {
   it('rejects unsupported queries', () => {
     expect(() => runModelQuery('DROP TABLE nodes', { nodes, relations, views })).toThrow(/Unsupported query/)
   })
+
+  it('filters nodes by a custom/governance property via the generic field fallback', () => {
+    const reqNodes: Record<string, C4Node> = {
+      ...nodes,
+      req1: {
+        id: 'req1', type: 'requirement', label: 'Req A', collapsed: false, x: 0, y: 0, width: 1, height: 1,
+        ears_type: 'event-driven',
+      } as unknown as C4Node,
+    }
+    const result = runModelQuery('LIST NODES WHERE ears_type = "event-driven"', { nodes: reqNodes, relations, views })
+    expect(result.result).toEqual({ total: 1, rows: [expect.objectContaining({ id: 'req1', ears_type: 'event-driven' })] })
+  })
+
+  it('filters relations by relationType', () => {
+    const relsWithDerives: Record<string, C4Relation> = {
+      ...relations,
+      r5: { id: 'r5', sourceId: 'req1', targetId: 'req2', relationType: 'derives' },
+    }
+    const result = runModelQuery('LIST RELATIONS WHERE relationType = "derives"', { nodes, relations: relsWithDerives, views })
+    expect(result.result).toEqual({ total: 1, rows: [expect.objectContaining({ id: 'r5', relationType: 'derives' })] })
+  })
+
+  it('filters views by kind', () => {
+    const viewsWithTable: Record<string, DiagramView> = {
+      ...views,
+      v2: { id: 'v2', name: 'Gov', kind: 'table', nodeIds: [], positions: {} },
+    }
+    const result = runModelQuery('LIST VIEWS WHERE kind = "table"', { nodes, relations, views: viewsWithTable })
+    expect(result.result).toEqual({ total: 1, rows: [expect.objectContaining({ id: 'v2', kind: 'table' })] })
+  })
 })

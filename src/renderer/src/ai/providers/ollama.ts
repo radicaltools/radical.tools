@@ -1,8 +1,13 @@
 // ─── Ollama provider (local, no key needed) ─────────────────────────────────
 // Uses /api/chat with stream:false. Ollama must be running with OLLAMA_ORIGINS
 // set so the browser can talk to it from radical.tools (or localhost during dev).
+//
+// Real tool-calling for this provider isn't implemented yet (Stage 0 ships
+// Anthropic only) — this adapter stays usable as plain chat: it ignores
+// `req.tools` and flattens any tool_call/tool_result blocks to plain text.
 
 import type { ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig } from '../types'
+import { contentToText } from '../types'
 
 const DEFAULT_BASE = 'http://localhost:11434'
 
@@ -11,9 +16,8 @@ async function ollamaChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
   const url = `${base}/api/chat`
   const body = {
     model: req.model,
-    messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+    messages: req.messages.map((m) => ({ role: m.role, content: contentToText(m.content) })),
     stream: false,
-    format: req.jsonMode ? 'json' : undefined,
     options: {
       temperature: req.temperature ?? 0.2,
       num_predict: req.maxTokens ?? 2048,
@@ -48,10 +52,12 @@ async function ollamaChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
     const text = await res.text().catch(() => '')
     throw new Error(`Ollama HTTP ${res.status}: ${text || res.statusText}`)
   }
-  const data = await res.json() as { message?: { content?: string }; model?: string }
+  const data = await res.json() as { message?: { content?: string }; model?: string; done_reason?: string }
+  const text = data?.message?.content ?? ''
   return {
-    content: data?.message?.content ?? '',
+    content: text ? [{ type: 'text', text }] : [],
     model: data?.model,
+    stopReason: data?.done_reason === 'length' ? 'max_tokens' : 'end_turn',
   }
 }
 
