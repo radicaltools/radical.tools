@@ -67,6 +67,15 @@ function deriveNodeCols(typeId: string, mm: Metamodel): ColDef[] {
   return [NODE_BASE_COL, ...(COMPUTED_NODE_COLS[typeId] ?? []), ...props.map(propToCol)]
 }
 
+/** Node types whose own tab renders as an indented tree instead of a flat
+ *  list, using the given relation type as the child→parent edge (e.g. a
+ *  Requirement "derives from" the requirement it decomposes). Unlike canvas
+ *  containment (`parentId`), this doesn't require the type to be a
+ *  container — it's purely a Table View reading of the relation graph. */
+const RELATION_TREE_BY_TYPE: Record<string, string> = {
+  requirement: 'derives',
+}
+
 // ─── Tab definitions ─────────────────────────────────────────────────────────
 //
 // 'all' and 'relations' are fixed; every other tab id is a node-type id from
@@ -109,26 +118,32 @@ interface TreeRow {
   depth: number
 }
 
-function buildTreeRows(nodeList: C4Node[]): TreeRow[] {
+/** Builds an indented row order from any parent-of function — canvas
+ *  containment (`parentId`) for "All Nodes", or a relation graph (e.g.
+ *  `derives`) for Requirement decomposition. Guards against cycles, which
+ *  can't happen for containment but can for a freely user-drawn relation. */
+function buildTreeRows(nodeList: C4Node[], getParentId: (n: C4Node) => string | null): TreeRow[] {
   const byParent = new Map<string | null, C4Node[]>()
   for (const n of nodeList) {
-    const key = n.parentId ?? null
+    const key = getParentId(n)
     if (!byParent.has(key)) byParent.set(key, [])
     byParent.get(key)!.push(n)
   }
   const result: TreeRow[] = []
+  const seen = new Set<string>()
   function walk(parentId: string | null, depth: number) {
     const children = byParent.get(parentId) ?? []
     for (const n of children) {
+      if (seen.has(n.id)) continue // cycle guard
+      seen.add(n.id)
       result.push({ node: n, depth })
       walk(n.id, depth + 1)
     }
   }
   walk(null, 0)
-  // append any orphans not visited (broken parentId refs)
-  const visited = new Set(result.map(r => r.node.id))
+  // append any orphans not visited (broken parent refs, or an unreachable cycle)
   for (const n of nodeList) {
-    if (!visited.has(n.id)) result.push({ node: n, depth: 0 })
+    if (!seen.has(n.id)) result.push({ node: n, depth: 0 })
   }
   return result
 }
@@ -225,11 +240,32 @@ export function TableView(): React.ReactElement {
   }, [relList, metamodel])
 
   const treeRows = useMemo<TreeRow[]>(() =>
-    tab === 'all' ? buildTreeRows(nodeList) : [],
+    tab === 'all' ? buildTreeRows(nodeList, n => n.parentId ?? null) : [],
     [tab, nodeList],
   )
 
+  // Relation-derived tree (e.g. Requirement via "derives"), for tabs
+  // configured in RELATION_TREE_BY_TYPE.
+  const treeRelationType = RELATION_TREE_BY_TYPE[tab]
+
+  const relationParentOf = useMemo(() => {
+    if (!treeRelationType) return null
+    const m = new Map<string, string>()
+    for (const r of relList) {
+      if (r.relationType !== treeRelationType) continue
+      if (!m.has(r.sourceId)) m.set(r.sourceId, r.targetId)
+    }
+    return m
+  }, [relList, treeRelationType])
+
+  const typeTreeRows = useMemo<TreeRow[]>(() => {
+    if (!relationParentOf) return []
+    const list = nodesByType.get(tab) ?? []
+    return buildTreeRows(list, n => relationParentOf.get(n.id) ?? null)
+  }, [relationParentOf, nodesByType, tab])
+
   const isNodeTypeTab = tab !== 'all' && tab !== 'relations'
+  const isTreeTab = tab === 'all' || !!treeRelationType
 
   const cols: ColDef[] =
     tab === 'relations' ? relCols
@@ -238,14 +274,16 @@ export function TableView(): React.ReactElement {
 
   const rows: (C4Node | C4Relation)[] =
     tab === 'relations' ? relList
-    : isNodeTypeTab      ? (nodesByType.get(tab) ?? [])
-    : treeRows.map(r => r.node)
+    : tab === 'all'       ? treeRows.map(r => r.node)
+    : treeRelationType    ? typeTreeRows.map(r => r.node)
+    : (nodesByType.get(tab) ?? [])
 
   const depthMap = useMemo<Map<string, number>>(() => {
+    const source = tab === 'all' ? treeRows : treeRelationType ? typeTreeRows : []
     const m = new Map<string, number>()
-    for (const r of treeRows) m.set(r.node.id, r.depth)
+    for (const r of source) m.set(r.node.id, r.depth)
     return m
-  }, [treeRows])
+  }, [tab, treeRelationType, treeRows, typeTreeRows])
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     const types = Array.from(e.dataTransfer.types)
@@ -507,7 +545,7 @@ export function TableView(): React.ReactElement {
     }
 
     // Display mode — click to start editing
-    const indent = tab === 'all' && col.key === 'label' && depth > 0
+    const indent = isTreeTab && col.key === 'label' && depth > 0
     return (
       <span
         className={`tv-cell-value ${col.type === 'textarea' ? 'tv-cell-multiline' : ''}`}
@@ -598,7 +636,7 @@ export function TableView(): React.ReactElement {
             {rows.map((row) => {
               const isNodeRow = tab !== 'relations'
               const isSelected = isNodeRow ? selectedNodeId === row.id : selectedEdgeId === row.id
-              const depth = tab === 'all' ? (depthMap.get(row.id) ?? 0) : 0
+              const depth = isTreeTab ? (depthMap.get(row.id) ?? 0) : 0
               return (
                 <tr
                   key={row.id}
