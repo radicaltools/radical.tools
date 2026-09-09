@@ -2192,6 +2192,65 @@ body {
 @media (max-width: 860px) {
   .wiki-doc { padding: 24px 22px 64px; }
 }
+
+/* ── Single page / Multi page toggle ────────────────────────────────────── */
+.wiki-page-mode-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin: 24px 48px 0;
+  border-radius: 8px;
+  background: var(--hover-bg, rgba(255,255,255,0.04));
+  border: 1px solid var(--border-color);
+  width: fit-content;
+}
+@media (min-width: 1500px) { .wiki-page-mode-toggle { margin: 28px 72px 0; } }
+@media (max-width: 860px) { .wiki-page-mode-toggle { margin: 16px 22px 0; } }
+.wiki-page-mode-toggle button {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.wiki-page-mode-toggle button:hover { color: var(--text-secondary); }
+.wiki-page-mode-toggle button.active {
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+/* ── Multi page mode: a child's full page embedded inline ───────────────── */
+.wiki-embedded-children {
+  display: flex;
+  flex-direction: column;
+}
+.wiki-embedded-child {
+  border-top: 1px dashed var(--border-color);
+  margin-top: 12px;
+}
+.wiki-doc-embedded {
+  padding: 24px 0 4px 28px;
+  border-left: 3px solid var(--type-color, var(--border-color));
+  margin-left: 4px;
+}
+.wiki-doc-embedded .wiki-doc-title,
+.wiki-doc-embedded .wiki-doc-title.wiki-inline-view,
+.wiki-doc-embedded .wiki-doc-title.wiki-inline-input {
+  font-size: 21px;
+}
+.wiki-embedded-open {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.wiki-embedded-open:hover { color: var(--text-secondary); }
+
 .wiki-breadcrumb {
   display: flex;
   flex-wrap: wrap;

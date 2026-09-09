@@ -945,6 +945,9 @@ interface DiagramStore {
   setTreemapFocus: (viewId: string, focusId: string | null) => void
   /** Persist wiki page focus (null = Overview / table of contents). */
   setWikiFocus: (viewId: string, focusId: string | null) => void
+  /** Switch how an element's page renders its children — short preview
+   *  cards ('single', default) or each child's full content inline ('multi'). */
+  setWikiPageMode: (viewId: string, mode: 'single' | 'multi') => void
   /** Persist the active Table View tab ('all', 'relations', or a node-type id). */
   setTableActiveTab: (viewId: string, tab: string) => void
   /** Choose how treemap rectangles are sized for a view. */
@@ -2378,6 +2381,15 @@ export const useDiagramStore = create<DiagramStore>()(
           const view = state.views[viewId]
           if (!view) return
           view.wikiFocusId = focusId
+        })
+        get()._sync()
+      },
+
+      setWikiPageMode(viewId, mode) {
+        set((state) => {
+          const view = state.views[viewId]
+          if (!view) return
+          view.wikiPageMode = mode
         })
         get()._sync()
       },

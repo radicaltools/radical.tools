@@ -141,6 +141,17 @@ export interface DiagramView {
    */
   wikiFocusId?: string | null
   /**
+   * Wiki-only: how an element's page renders its children.
+   * 'single' (default) — today's behaviour: children show as short preview
+   * cards you click through to, one element's page at a time.
+   * 'multi' — the focused element's own page is followed, inline on the
+   * same scrollable page, by each direct child's full page content
+   * (recursion stops there — a child's own children still show as preview
+   * cards, so the page stays bounded to one extra level).
+   * Persisted per view so reopening the view restores the chosen mode.
+   */
+  wikiPageMode?: 'single' | 'multi'
+  /**
    * Table-only: id of the currently-selected tab ('all', 'relations', or a
    * node-type id). `undefined` = "All Nodes". Persisted per view so
    * switching away and back (or reopening the view) restores the tab.

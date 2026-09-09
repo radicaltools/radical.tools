@@ -167,6 +167,7 @@ export function WikiView(): React.ReactElement {
   const removeRelation = useDiagramStore((s) => s.removeRelation)
   const pushNotification = useDiagramStore((s) => s.pushNotification)
   const setWikiFocus = useDiagramStore((s) => s.setWikiFocus)
+  const setWikiPageMode = useDiagramStore((s) => s.setWikiPageMode)
   const appMode = useDiagramStore((s) => s.appMode)
 
   const readOnly = appMode !== 'designer'
@@ -174,6 +175,7 @@ export function WikiView(): React.ReactElement {
 
   const view = activeViewId ? views[activeViewId] : null
   const focusId = view?.wikiFocusId ?? null
+  const pageMode = view?.wikiPageMode ?? 'single'
 
   const [filter, setFilter] = useState('')
 
@@ -282,6 +284,24 @@ export function WikiView(): React.ReactElement {
         typeMeta={typeMeta}
       />
       <div className="wiki-page">
+        {focus && (
+          <div className="wiki-page-mode-toggle">
+            <button
+              className={pageMode === 'single' ? 'active' : ''}
+              onClick={() => view && setWikiPageMode(view.id, 'single')}
+              title="Children show as short preview cards — click through one page at a time"
+            >
+              Single page
+            </button>
+            <button
+              className={pageMode === 'multi' ? 'active' : ''}
+              onClick={() => view && setWikiPageMode(view.id, 'multi')}
+              title="Each direct child's full content is shown inline, on this same page"
+            >
+              Multi page
+            </button>
+          </div>
+        )}
         {focus ? (
           <WikiElementPage
             key={focus.id}
@@ -293,12 +313,13 @@ export function WikiView(): React.ReactElement {
             updateNode={updateNode}
             updateRelation={updateRelation}
             onNavigate={goTo}
-            onCreateChild={(type) => createNode(type, focus.id)}
+            createNode={createNode}
             onDeleteNode={deleteNode}
-            onCreateRelation={(targetId) => createRelation(focus.id, targetId)}
+            createRelation={createRelation}
             onDeleteRelation={deleteRelation}
             readOnly={readOnly}
             typeMeta={typeMeta}
+            pageMode={pageMode}
           />
         ) : (
           <WikiOverview
@@ -656,12 +677,14 @@ function WikiElementPage({
   updateNode,
   updateRelation,
   onNavigate,
-  onCreateChild,
+  createNode,
   onDeleteNode,
-  onCreateRelation,
+  createRelation,
   onDeleteRelation,
   readOnly,
   typeMeta,
+  pageMode,
+  embedded = false,
 }: {
   node: C4Node
   nodes: Record<string, C4Node>
@@ -671,13 +694,23 @@ function WikiElementPage({
   updateNode: UpdateNode
   updateRelation: UpdateRelation
   onNavigate: (id: string) => void
-  onCreateChild: (type: string) => void
+  createNode: (type: string, parentId: string | undefined) => void
   onDeleteNode: (id: string) => void
-  onCreateRelation: (targetId: string) => void
+  createRelation: (sourceId: string, targetId: string) => void
   onDeleteRelation: (id: string) => void
   readOnly: boolean
   typeMeta: TypeMeta
+  /** 'single' (default) = children as short preview cards. 'multi' = each
+   *  direct child's full content shown inline below, on this same page. */
+  pageMode: 'single' | 'multi'
+  /** True for a child rendered inline by a 'multi' page mode parent — bounds
+   *  the inline expansion to one level (an embedded child's own children
+   *  still render as preview cards, never recurse further). */
+  embedded?: boolean
 }): React.ReactElement {
+  const onCreateChild = (type: string) => createNode(type, node.id)
+  const onCreateRelation = (targetId: string) => createRelation(node.id, targetId)
+
   const breadcrumb = useMemo(() => {
     const chain: C4Node[] = []
     let cur: C4Node | undefined = node
@@ -802,21 +835,26 @@ function WikiElementPage({
   const lead = fallbackLead
 
   return (
-    <article className="wiki-doc" style={{ ['--type-color' as string]: meta.color }}>
-      <nav className="wiki-breadcrumb">
-        {breadcrumb.map((b, i) => (
-          <React.Fragment key={b.id}>
-            {i > 0 && <span className="wiki-breadcrumb-sep">›</span>}
-            {b.id === node.id ? (
-              <span className="wiki-breadcrumb-current">{b.label}</span>
-            ) : (
-              <button className="wiki-link" onClick={() => onNavigate(b.id)}>
-                {b.label}
-              </button>
-            )}
-          </React.Fragment>
-        ))}
-      </nav>
+    <article
+      className={`wiki-doc ${embedded ? 'wiki-doc-embedded' : ''}`}
+      style={{ ['--type-color' as string]: meta.color }}
+    >
+      {!embedded && (
+        <nav className="wiki-breadcrumb">
+          {breadcrumb.map((b, i) => (
+            <React.Fragment key={b.id}>
+              {i > 0 && <span className="wiki-breadcrumb-sep">›</span>}
+              {b.id === node.id ? (
+                <span className="wiki-breadcrumb-current">{b.label}</span>
+              ) : (
+                <button className="wiki-link" onClick={() => onNavigate(b.id)}>
+                  {b.label}
+                </button>
+              )}
+            </React.Fragment>
+          ))}
+        </nav>
+      )}
 
       <header className="wiki-doc-header">
         <div className="wiki-kicker">
@@ -838,6 +876,15 @@ function WikiElementPage({
             readOnly={readOnly}
             onCommit={(v) => updateNode(node.id, { label: v })}
           />
+          {embedded && (
+            <button
+              className="wiki-link wiki-embedded-open"
+              title="Focus this element on its own page"
+              onClick={() => onNavigate(node.id)}
+            >
+              Open as its own page ↗
+            </button>
+          )}
           {!readOnly && (
             <button
               className="wiki-danger-btn"
@@ -962,6 +1009,31 @@ function WikiElementPage({
           </div>
           {children.length === 0 ? (
             <p className="wiki-muted">No child elements.</p>
+          ) : pageMode === 'multi' && !embedded ? (
+            <div className="wiki-embedded-children">
+              {children.map((c) => (
+                <div className="wiki-embedded-child" key={c.id}>
+                  <WikiElementPage
+                    node={c}
+                    nodes={nodes}
+                    relations={relations}
+                    visibleSet={visibleSet}
+                    metamodel={metamodel}
+                    updateNode={updateNode}
+                    updateRelation={updateRelation}
+                    onNavigate={onNavigate}
+                    createNode={createNode}
+                    onDeleteNode={onDeleteNode}
+                    createRelation={createRelation}
+                    onDeleteRelation={onDeleteRelation}
+                    readOnly={readOnly}
+                    typeMeta={typeMeta}
+                    pageMode={pageMode}
+                    embedded
+                  />
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="wiki-card-grid">
               {children.map((c) => {
