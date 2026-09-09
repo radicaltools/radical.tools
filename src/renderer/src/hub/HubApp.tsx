@@ -721,7 +721,11 @@ function HubAppInner(): React.ReactElement {
             )}
 
             {concept && related.length > 0 && (
-              <div className="hub-related" role="navigation" aria-label="Related concepts">
+              <div
+                className={`hub-related${viewKind === 'wiki' ? ' hub-related-inset' : ''}`}
+                role="navigation"
+                aria-label="Related concepts"
+              >
                 <span className="hub-related-label">Related</span>
                 {related.map((r) => {
                   const t = categoryTheme(r.category)
