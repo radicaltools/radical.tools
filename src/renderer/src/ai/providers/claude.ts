@@ -26,10 +26,13 @@ async function claudeChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
   const body: Record<string, unknown> = {
     model: req.model,
     max_tokens: req.maxTokens ?? 2048,
-    temperature: req.temperature ?? 0.2,
     messages: rest.map((m) => ({ role: m.role, content: m.content })),
   }
   if (system) body.system = system
+  // No `temperature`: current-generation models (Opus 5, Sonnet 5, ...) run
+  // adaptive extended thinking by default, and thinking rejects sampling
+  // params (temperature/top_p/top_k) with a 400. Omitting it works across
+  // every model version instead of hardcoding which ones allow it.
 
   const res = await fetch(url, {
     method: 'POST',
@@ -60,7 +63,7 @@ async function claudeChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
 export const claudeAdapter: ProviderAdapter = {
   id: 'anthropic',
   label: 'Anthropic (Claude)',
-  defaultModel: 'claude-3-5-sonnet-20241022',
+  defaultModel: 'claude-haiku-4-5',
   defaultBaseUrl: DEFAULT_BASE,
   chat: claudeChat,
 }
