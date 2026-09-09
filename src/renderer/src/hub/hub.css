@@ -399,6 +399,10 @@
   box-shadow: var(--shadow-md);
   pointer-events: auto;
 }
+/* The Wiki view has its own left contents rail inside the same "canvas"
+   grid area — without this offset the panel lands on top of it instead of
+   over the (nonexistent, in that view) diagram. */
+.hub-related-inset { margin-left: 260px; max-width: calc(100% - 272px); }
 .hub-related-label {
   font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--text-muted); margin-right: 2px;
