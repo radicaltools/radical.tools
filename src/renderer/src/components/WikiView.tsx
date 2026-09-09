@@ -3,6 +3,7 @@ import { useDiagramStore } from '../store/diagramStore'
 import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, PropertyDef } from '../types/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { EarsQuickEntry } from './EarsQuickEntry'
+import { loadStudioSettings, STUDIO_SETTINGS_CHANGED_EVENT } from '../studioSettings'
 import {
   C4Node,
   C4Relation,
@@ -179,6 +180,15 @@ export function WikiView(): React.ReactElement {
 
   const [filter, setFilter] = useState('')
 
+  // Studio-wide preference (see components/Toolbar.tsx's "Wiki multi-page
+  // depth" control) — how many levels 'multi' page mode embeds inline.
+  const [multiPageDepth, setMultiPageDepth] = useState(() => loadStudioSettings().wikiMultiPageDepth)
+  useEffect(() => {
+    const onChange = (): void => setMultiPageDepth(loadStudioSettings().wikiMultiPageDepth)
+    window.addEventListener(STUDIO_SETTINGS_CHANGED_EVENT, onChange)
+    return () => window.removeEventListener(STUDIO_SETTINGS_CHANGED_EVENT, onChange)
+  }, [])
+
   // Respect the right-panel visibility filter: a view's nodeIds defines the
   // visible set (empty = show all). Ancestors are included so the hierarchy
   // stays navigable, mirroring the canvas/treemap behaviour.
@@ -324,6 +334,7 @@ export function WikiView(): React.ReactElement {
             readOnly={readOnly}
             typeMeta={typeMeta}
             pageMode={pageMode}
+            remainingDepth={multiPageDepth}
           />
         ) : (
           <WikiOverview
@@ -689,6 +700,7 @@ function WikiElementPage({
   typeMeta,
   pageMode,
   embedded = false,
+  remainingDepth = 1,
 }: {
   node: C4Node
   nodes: Record<string, C4Node>
@@ -707,10 +719,15 @@ function WikiElementPage({
   /** 'single' (default) = children as short preview cards. 'multi' = each
    *  direct child's full content shown inline below, on this same page. */
   pageMode: 'single' | 'multi'
-  /** True for a child rendered inline by a 'multi' page mode parent — bounds
-   *  the inline expansion to one level (an embedded child's own children
-   *  still render as preview cards, never recurse further). */
+  /** True for a child rendered inline by a 'multi' page mode parent —
+   *  suppresses the breadcrumb and shows "Open as its own page" instead. */
   embedded?: boolean
+  /** How many more levels 'multi' page mode may still embed inline, from
+   *  here down — the Studio-wide "Wiki multi-page depth" setting at the top
+   *  level, decremented by one on each embedded recursion. 0 = show this
+   *  node's own children as preview cards even in 'multi' mode (the depth
+   *  budget is spent). Defaults to 1 for any caller that doesn't pass it. */
+  remainingDepth?: number
 }): React.ReactElement {
   // Types that nest via a relation instead of canvas containment (e.g. a
   // Requirement "derives" from the one it decomposes — allowedParents can't
@@ -1043,7 +1060,7 @@ function WikiElementPage({
           </div>
           {children.length === 0 ? (
             <p className="wiki-muted">No child elements.</p>
-          ) : pageMode === 'multi' && !embedded ? (
+          ) : pageMode === 'multi' && remainingDepth > 0 ? (
             <div className="wiki-embedded-children">
               {children.map((c) => (
                 <div className="wiki-embedded-child" key={c.id}>
@@ -1064,6 +1081,7 @@ function WikiElementPage({
                     typeMeta={typeMeta}
                     pageMode={pageMode}
                     embedded
+                    remainingDepth={remainingDepth - 1}
                   />
                 </div>
               ))}
