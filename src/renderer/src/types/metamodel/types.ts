@@ -54,6 +54,15 @@ export interface NodeTypeDef {
    *  with columns derived from `properties`, instead of only showing up in
    *  the generic "All Nodes" tree. */
   tableTab?: boolean
+  /** For types that nest via a relation instead of canvas containment (e.g.
+   *  a Requirement "derives" from the one it decomposes) — the id of the
+   *  RelationTypeDef whose `allowedPairs` has `{from: thisType, to: thisType}`.
+   *  A child is any node with an outgoing relation of this type pointing at
+   *  the parent. Drives both Table View's per-type tree (instead of a flat
+   *  list) and Wiki View's "Contains" section + "Add child" (instead of
+   *  requiring `allowedParents` to include this type, which it usually
+   *  can't — containment and this kind of relation are different things). */
+  hierarchyRelation?: string
 }
 
 export interface RelationPair {
