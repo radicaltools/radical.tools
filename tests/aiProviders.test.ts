@@ -63,18 +63,50 @@ describe('AI providers', () => {
     await expect(ollamaAdapter.chat({ model: 'm', messages: SAMPLE }, {})).rejects.toThrow(/Ollama HTTP 500/)
   })
 
-  it('Ollama: flattens tool_call/tool_result blocks to plain text (real tool-calling not implemented yet)', async () => {
-    const { calls } = installFetch({ message: { content: 'ok' }, model: 'llama3.1' })
-    await ollamaAdapter.chat({
-      model: 'llama3.1',
-      messages: [
-        { role: 'user', content: 'do it' },
-        { role: 'assistant', content: [{ type: 'tool_call', id: 'c1', name: 'add_node', input: { label: 'X' } }] },
-        { role: 'user', content: [{ type: 'tool_result', toolCallId: 'c1', content: 'Created node n1.' }] },
-      ],
-    }, {})
-    expect(calls[0].bodyParsed.messages[1].content).toMatch(/called add_node/)
-    expect(calls[0].bodyParsed.messages[2].content).toMatch(/tool result: Created node n1/)
+  describe('Ollama — real tool-calling (best-effort — not every local model honors `tools`)', () => {
+    it('forwards tools as OpenAI-compatible {type:function,function:{...}}', async () => {
+      const { calls } = installFetch({ message: { content: 'ok' }, model: 'llama3.1' })
+      await ollamaAdapter.chat(
+        {
+          model: 'llama3.1',
+          messages: SAMPLE,
+          tools: [{ name: 'add_node', description: 'Add a node', inputSchema: { type: 'object', properties: {} } }],
+        },
+        {},
+      )
+      expect(calls[0].bodyParsed.tools).toEqual([
+        { type: 'function', function: { name: 'add_node', description: 'Add a node', parameters: { type: 'object', properties: {} } } },
+      ])
+    })
+
+    it('maps tool_calls response entries to generic tool_call blocks, synthesizing an id (Ollama has none)', async () => {
+      installFetch({
+        model: 'llama3.1',
+        message: { content: '', tool_calls: [{ function: { name: 'add_node', arguments: { tempId: 't1', type: 'system', label: 'X' } } }] },
+      })
+      const out = await ollamaAdapter.chat({ model: 'llama3.1', messages: SAMPLE }, {})
+      expect(out.stopReason).toBe('tool_calls')
+      expect(out.content).toEqual([
+        { type: 'tool_call', id: 'add_node#0', name: 'add_node', input: { tempId: 't1', type: 'system', label: 'X' } },
+      ])
+    })
+
+    it('maps a tool_result-carrying turn back to a {role:tool, tool_name} message, recovering the name from the synthesized id', async () => {
+      const { calls } = installFetch({ model: 'llama3.1', message: { content: 'ok' } })
+      await ollamaAdapter.chat({
+        model: 'llama3.1',
+        messages: [
+          { role: 'user', content: 'go' },
+          { role: 'assistant', content: [{ type: 'tool_call', id: 'add_node#0', name: 'add_node', input: { label: 'X' } }] },
+          { role: 'user', content: [{ type: 'tool_result', toolCallId: 'add_node#0', content: 'Created node n1.', isError: false }] },
+        ],
+      }, {})
+      expect(calls[0].bodyParsed.messages).toEqual([
+        { role: 'user', content: 'go' },
+        { role: 'assistant', content: '', tool_calls: [{ function: { name: 'add_node', arguments: { label: 'X' } } }] },
+        { role: 'tool', content: 'Created node n1.', tool_name: 'add_node' },
+      ])
+    })
   })
 
   describe('OpenAI — real tool-calling', () => {

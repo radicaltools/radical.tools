@@ -49,6 +49,12 @@ function geminiSettings() {
   return s
 }
 
+function ollamaSettings() {
+  const s = defaultAISettings()
+  s.active = 'ollama'
+  return s
+}
+
 interface FakeRound { content: unknown[]; stop_reason: string }
 
 function fakeAnthropicFetch(rounds: FakeRound[]) {
@@ -287,5 +293,61 @@ describe('runAIPrompt — parity check with mocked Gemini tool-calling (no call 
     expect(result.report.added.nodes).toBe(2)
     expect(result.report.added.relations).toBe(1)
     expect(Object.keys(facade._nodes)).toHaveLength(2)
+  })
+})
+
+interface FakeOllamaRound { tool_calls?: Array<{ name: string; args: unknown }>; text?: string }
+
+function fakeOllamaFetch(rounds: FakeOllamaRound[]) {
+  let call = 0
+  ;(globalThis as any).fetch = vi.fn(async () => {
+    const round = rounds[Math.min(call, rounds.length - 1)]
+    call++
+    const message: Record<string, unknown> = { content: round.text ?? '' }
+    if (round.tool_calls) {
+      message.tool_calls = round.tool_calls.map((c) => ({ function: { name: c.name, arguments: c.args } }))
+    }
+    return new Response(
+      JSON.stringify({ model: 'llama3.1', message }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )
+  })
+}
+
+describe('runAIPrompt — parity check with mocked Ollama tool-calling (no call ids, best-effort)', () => {
+  beforeEach(() => { delete (globalThis as any).fetch })
+
+  it('executes tool calls from one round, then returns the final text answer', async () => {
+    fakeOllamaFetch([
+      {
+        tool_calls: [
+          { name: 'add_node', args: { tempId: 't1', type: 'system', label: 'Web App' } },
+          { name: 'add_node', args: { tempId: 't2', type: 'database', label: 'DB' } },
+          { name: 'add_relation', args: { sourceId: 't1', targetId: 't2', label: 'reads' } },
+        ],
+      },
+      { text: 'Created Web App and DB.' },
+    ])
+    const facade = makeFacade()
+    const result = await runAIPrompt({
+      prompt: 'Make a web app and a DB it reads from',
+      settings: ollamaSettings(),
+      diagram: facade,
+    })
+    expect(result.summary).toMatch(/Created/)
+    expect(result.report.added.nodes).toBe(2)
+    expect(result.report.added.relations).toBe(1)
+    expect(Object.keys(facade._nodes)).toHaveLength(2)
+  })
+
+  it('treats a model that ignores tools and just answers as a normal, immediate finish', async () => {
+    fakeOllamaFetch([{ text: 'I cannot use tools, but the answer is 42.' }])
+    const result = await runAIPrompt({
+      prompt: 'what is the answer',
+      settings: ollamaSettings(),
+      diagram: makeFacade(),
+    })
+    expect(result.iterations).toBe(0)
+    expect(result.summary).toMatch(/42/)
   })
 })
