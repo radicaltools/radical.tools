@@ -945,6 +945,8 @@ interface DiagramStore {
   setTreemapFocus: (viewId: string, focusId: string | null) => void
   /** Persist wiki page focus (null = Overview / table of contents). */
   setWikiFocus: (viewId: string, focusId: string | null) => void
+  /** Persist the active Table View tab ('all', 'relations', or a node-type id). */
+  setTableActiveTab: (viewId: string, tab: string) => void
   /** Choose how treemap rectangles are sized for a view. */
   setTreemapSizeBy: (viewId: string, mode: 'leaves' | 'uniform' | 'relations') => void
   setTreemapMaxDepth: (viewId: string, depth: number | null) => void
@@ -2376,6 +2378,15 @@ export const useDiagramStore = create<DiagramStore>()(
           const view = state.views[viewId]
           if (!view) return
           view.wikiFocusId = focusId
+        })
+        get()._sync()
+      },
+
+      setTableActiveTab(viewId, tab) {
+        set((state) => {
+          const view = state.views[viewId]
+          if (!view) return
+          view.tableActiveTab = tab
         })
         get()._sync()
       },

@@ -151,8 +151,15 @@ export function TableView(): React.ReactElement {
   const pushNotification = useDiagramStore((s) => s.pushNotification)
   const readOnly         = useDiagramStore((s) => s.appMode !== 'designer')
   const metamodel        = useDiagramStore((s) => s.metamodel)
+  const setTableActiveTab = useDiagramStore((s) => s.setTableActiveTab)
 
-  const [tab, setTab]             = useState<Tab>('all')
+  // Persisted on the view (like wikiFocusId/treemapFocusId) so switching
+  // away and back — or reopening the view — restores the selected tab.
+  const tab: Tab = activeView?.tableActiveTab ?? 'all'
+  const setTab = useCallback((next: Tab) => {
+    if (activeViewId) setTableActiveTab(activeViewId, next)
+  }, [activeViewId, setTableActiveTab])
+
   const [editCell, setEditCell]   = useState<EditCell | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [dropParentId, setDropParentId] = useState<string | null>(null)
