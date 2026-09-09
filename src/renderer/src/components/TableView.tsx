@@ -30,8 +30,6 @@ const ALL_NODES_COLS: ColDef[] = [
   { key: '_type',       label: 'Type',        width: 130, type: 'readonly' },
   { key: 'label',       label: 'Name',        width: 220, type: 'text' },
   { key: 'description', label: 'Description', width: 280, type: 'textarea' },
-  { key: 'technology',  label: 'Technology',  width: 160, type: 'text' },
-  { key: '_parent',     label: 'Parent',      width: 180, type: 'readonly' },
 ]
 
 const REL_BASE_COLS: ColDef[] = [
@@ -81,7 +79,6 @@ type Tab = string
 
 function getNodeProp(node: C4Node, key: string, nodes: Record<string, C4Node>, relations?: Record<string, C4Relation>): string {
   if (key === '_type')   return TYPE_LABELS[node.type] ?? node.type
-  if (key === '_parent') return node.parentId ? (nodes[node.parentId]?.label ?? node.parentId) : ''
   if (key === '_ears_sentence') return composeEarsSentence(node as unknown as Record<string, unknown>, relations ? resolveEarsSubject(node.id, relations, nodes) : undefined).sentence
   const raw = (node as unknown as Record<string, unknown>)[key]
   if (raw === undefined || raw === null) return ''
