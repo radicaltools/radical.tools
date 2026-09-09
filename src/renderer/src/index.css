@@ -2038,6 +2038,7 @@ body {
 /* ─── Wiki view ───────────────────────────────────────────────────── */
 .wiki-view {
   grid-area: canvas;
+  height: 100%;
   display: flex;
   min-height: 0;
   overflow: hidden;
@@ -2049,10 +2050,16 @@ body {
   font-size: 13px;
 }
 
-/* Left contents rail */
+/* Left contents rail — height is explicit (not just align-items: stretch)
+ * because .wiki-nav is itself a column flex container: when its own cross
+ * size is left implicit, browsers can size it to its content instead of
+ * stretching it to match .wiki-view, which silently breaks the inner
+ * .wiki-nav-tree's overflow scroll (it never gets a bounded height to
+ * scroll within, so long lists overflow the popup instead of scrolling). */
 .wiki-nav {
   width: 248px;
   flex: 0 0 248px;
+  height: 100%;
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -2168,6 +2175,7 @@ body {
 /* Document column — fills the full canvas between the side panels */
 .wiki-page {
   flex: 1;
+  height: 100%;
   min-width: 0;
   overflow-y: auto;
   background: var(--bg-panel);
