@@ -77,20 +77,89 @@ describe('AI providers', () => {
     expect(calls[0].bodyParsed.messages[2].content).toMatch(/tool result: Created node n1/)
   })
 
-  it('OpenAI: requires key, sends Bearer auth (tools not implemented yet — ignored)', async () => {
-    await expect(openaiAdapter.chat({ model: 'm', messages: SAMPLE }, {})).rejects.toThrow(/API key/)
-    const { calls } = installFetch({
-      model: 'gpt-4o-mini',
-      choices: [{ message: { content: 'reply' } }],
+  describe('OpenAI — real tool-calling', () => {
+    it('requires key, sends Bearer auth, forwards tools as {type:function,function:{...}}', async () => {
+      await expect(openaiAdapter.chat({ model: 'm', messages: SAMPLE }, {})).rejects.toThrow(/API key/)
+      const { calls } = installFetch({
+        model: 'gpt-4o-mini',
+        choices: [{ message: { content: 'reply' }, finish_reason: 'stop' }],
+      })
+      const out = await openaiAdapter.chat(
+        {
+          model: 'gpt-4o-mini',
+          messages: SAMPLE,
+          tools: [{ name: 'add_node', description: 'Add a node', inputSchema: { type: 'object', properties: {} } }],
+        },
+        { apiKey: 'sk-x' },
+      )
+      expect(out.content).toEqual([{ type: 'text', text: 'reply' }])
+      expect(out.stopReason).toBe('end_turn')
+      expect(calls[0].url).toBe('https://api.openai.com/v1/chat/completions')
+      expect((calls[0].init.headers as Record<string, string>).Authorization).toBe('Bearer sk-x')
+      expect(calls[0].bodyParsed.tools).toEqual([
+        { type: 'function', function: { name: 'add_node', description: 'Add a node', parameters: { type: 'object', properties: {} } } },
+      ])
     })
-    const out = await openaiAdapter.chat(
-      { model: 'gpt-4o-mini', messages: SAMPLE, tools: [{ name: 'add_node', description: 'x', inputSchema: {} }] },
-      { apiKey: 'sk-x' },
-    )
-    expect(out.content).toEqual([{ type: 'text', text: 'reply' }])
-    expect(calls[0].url).toBe('https://api.openai.com/v1/chat/completions')
-    expect((calls[0].init.headers as Record<string, string>).Authorization).toBe('Bearer sk-x')
-    expect(calls[0].bodyParsed.tools).toBeUndefined()
+
+    it('maps tool_calls response entries to generic tool_call blocks, parsing JSON arguments', async () => {
+      installFetch({
+        model: 'gpt-4o-mini',
+        choices: [{
+          message: {
+            content: null,
+            tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'add_node', arguments: '{"tempId":"t1","type":"system","label":"X"}' } }],
+          },
+          finish_reason: 'tool_calls',
+        }],
+      })
+      const out = await openaiAdapter.chat({ model: 'm', messages: SAMPLE }, { apiKey: 'k' })
+      expect(out.stopReason).toBe('tool_calls')
+      expect(out.content).toEqual([
+        { type: 'tool_call', id: 'call_1', name: 'add_node', input: { tempId: 't1', type: 'system', label: 'X' } },
+      ])
+    })
+
+    it('falls back to an empty input object when arguments is malformed JSON', async () => {
+      installFetch({
+        model: 'gpt-4o-mini',
+        choices: [{
+          message: { content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'add_node', arguments: '{not json' } }] },
+          finish_reason: 'tool_calls',
+        }],
+      })
+      const out = await openaiAdapter.chat({ model: 'm', messages: SAMPLE }, { apiKey: 'k' })
+      expect(out.content).toEqual([{ type: 'tool_call', id: 'call_1', name: 'add_node', input: {} }])
+    })
+
+    it('expands an assistant tool_call turn into tool_calls, and a tool_result turn into N role:tool messages', async () => {
+      const { calls } = installFetch({ model: 'm', choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] })
+      await openaiAdapter.chat({
+        model: 'm',
+        messages: [
+          { role: 'user', content: 'go' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'text', text: 'Working on it.' },
+              { type: 'tool_call', id: 'call_1', name: 'add_node', input: { label: 'X' } },
+            ],
+          },
+          {
+            role: 'user',
+            content: [{ type: 'tool_result', toolCallId: 'call_1', content: 'Created node n1.', isError: false }],
+          },
+        ],
+      }, { apiKey: 'k' })
+      expect(calls[0].bodyParsed.messages).toEqual([
+        { role: 'user', content: 'go' },
+        {
+          role: 'assistant',
+          content: 'Working on it.',
+          tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'add_node', arguments: '{"label":"X"}' } }],
+        },
+        { role: 'tool', tool_call_id: 'call_1', content: 'Created node n1.' },
+      ])
+    })
   })
 
   describe('Claude — real tool-calling', () => {

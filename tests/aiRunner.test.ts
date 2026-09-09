@@ -22,14 +22,23 @@ function makeFacade(): DiagramFacade & { _nodes: Record<string, C4Node>; _rels: 
   }
 }
 
-// All runner tests target the Anthropic adapter (the only one with real
-// tool-calling wired up so far — see providers/claude.ts), so we override
-// the default-active provider (which is intentionally OpenAI in production
-// so the AI agent stays hidden until the user sets a key).
+// Most runner tests target the Anthropic adapter (see providers/claude.ts);
+// a smaller parity block at the end targets OpenAI (providers/openai.ts) to
+// prove the loop itself — dispatch, batching, self-correction — behaves the
+// same regardless of which real-tool-calling adapter is under it. Both
+// override the default-active provider (intentionally OpenAI-with-no-key in
+// production, so the AI agent stays hidden until the user sets a key).
 function anthropicSettings() {
   const s = defaultAISettings()
   s.active = 'anthropic'
   s.providers.anthropic.apiKey = 'test-key'
+  return s
+}
+
+function openaiSettings() {
+  const s = defaultAISettings()
+  s.active = 'openai'
+  s.providers.openai.apiKey = 'test-key'
   return s
 }
 
@@ -177,5 +186,55 @@ describe('runAIPrompt — end-to-end with mocked Anthropic tool-calling', () => 
     expect(result.history[0]).toEqual({ role: 'user', content: 'add an API system' })
     expect(result.history.some((m) => m.role === 'assistant' && Array.isArray(m.content))).toBe(true)
     expect(result.history.at(-1)).toEqual({ role: 'assistant', content: [{ type: 'text', text: 'Done.' }] })
+  })
+})
+
+interface FakeOpenAIRound { tool_calls?: Array<{ id: string; name: string; args: unknown }>; text?: string }
+
+function fakeOpenAIFetch(rounds: FakeOpenAIRound[]) {
+  let call = 0
+  ;(globalThis as any).fetch = vi.fn(async () => {
+    const round = rounds[Math.min(call, rounds.length - 1)]
+    call++
+    const message: Record<string, unknown> = { content: round.text ?? null }
+    if (round.tool_calls) {
+      message.tool_calls = round.tool_calls.map((c) => ({
+        id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) },
+      }))
+    }
+    return new Response(
+      JSON.stringify({
+        model: 'gpt-4o-mini',
+        choices: [{ message, finish_reason: round.tool_calls ? 'tool_calls' : 'stop' }],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )
+  })
+}
+
+describe('runAIPrompt — parity check with mocked OpenAI tool-calling', () => {
+  beforeEach(() => { delete (globalThis as any).fetch })
+
+  it('executes tool calls from one round, then returns the final text answer', async () => {
+    fakeOpenAIFetch([
+      {
+        tool_calls: [
+          { id: 'c1', name: 'add_node', args: { tempId: 't1', type: 'system', label: 'Web App' } },
+          { id: 'c2', name: 'add_node', args: { tempId: 't2', type: 'database', label: 'DB' } },
+          { id: 'c3', name: 'add_relation', args: { sourceId: 't1', targetId: 't2', label: 'reads' } },
+        ],
+      },
+      { text: 'Created Web App and DB.' },
+    ])
+    const facade = makeFacade()
+    const result = await runAIPrompt({
+      prompt: 'Make a web app and a DB it reads from',
+      settings: openaiSettings(),
+      diagram: facade,
+    })
+    expect(result.summary).toMatch(/Created/)
+    expect(result.report.added.nodes).toBe(2)
+    expect(result.report.added.relations).toBe(1)
+    expect(Object.keys(facade._nodes)).toHaveLength(2)
   })
 })

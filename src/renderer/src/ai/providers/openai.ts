@@ -1,14 +1,81 @@
 // ─── OpenAI / ChatGPT provider ──────────────────────────────────────────────
-// Real tool-calling for this provider isn't implemented yet (Stage 0 ships
-// Anthropic only) — this adapter stays usable as plain chat: it ignores
-// `req.tools` and flattens any tool_call/tool_result blocks (e.g. inherited
-// from a prior run on a tool-calling-capable provider) to plain text rather
-// than erroring.
+// Chat Completions API (POST /v1/chat/completions) — confirmed current and
+// still documenting `tools`/`tool_calls` (OpenAI's newer Responses API
+// exists too, but Chat Completions remains supported and is what this app
+// already targets).
 
-import type { ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig } from '../types'
-import { contentToText } from '../types'
+import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig } from '../types'
 
 const DEFAULT_BASE = 'https://api.openai.com/v1'
+
+interface OAToolCall {
+  id: string
+  type: 'function'
+  function: { name: string; arguments: string }
+}
+
+/** Generic canonical content -> OpenAI's message shapes. Assistant turns may
+ *  mix text + tool_call blocks in one message; a tool-result-carrying user
+ *  turn (always a pure batch per this app's runner) has no OpenAI bundle —
+ *  it expands into one `role: 'tool'` message per result. */
+function toOpenAIMessages(messages: ChatMessage[]): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = []
+  for (const m of messages) {
+    if (typeof m.content === 'string') {
+      out.push({ role: m.role, content: m.content })
+      continue
+    }
+    const textParts = m.content.filter((b): b is Extract<ChatContentBlock, { type: 'text' }> => b.type === 'text')
+    const toolCalls = m.content.filter((b): b is Extract<ChatContentBlock, { type: 'tool_call' }> => b.type === 'tool_call')
+    const toolResults = m.content.filter((b): b is Extract<ChatContentBlock, { type: 'tool_result' }> => b.type === 'tool_result')
+
+    if (toolCalls.length > 0) {
+      out.push({
+        role: 'assistant',
+        content: textParts.length ? textParts.map((b) => b.text).join('') : null,
+        tool_calls: toolCalls.map((c): OAToolCall => ({
+          id: c.id,
+          type: 'function',
+          function: { name: c.name, arguments: JSON.stringify(c.input ?? {}) },
+        })),
+      })
+    } else if (textParts.length > 0) {
+      out.push({ role: m.role, content: textParts.map((b) => b.text).join('') })
+    }
+    for (const r of toolResults) {
+      out.push({
+        role: 'tool',
+        tool_call_id: r.toolCallId,
+        content: r.isError ? `Error: ${r.content}` : r.content,
+      })
+    }
+  }
+  return out
+}
+
+function fromOpenAIMessage(message: { content?: string | null; tool_calls?: OAToolCall[] }): ChatContentBlock[] {
+  const out: ChatContentBlock[] = []
+  if (message.content) out.push({ type: 'text', text: message.content })
+  for (const c of message.tool_calls ?? []) {
+    let input: unknown = {}
+    try {
+      input = JSON.parse(c.function.arguments)
+    } catch {
+      // Malformed JSON from the model — leave input empty so the handler's
+      // own required-field checks produce a self-correcting tool_result
+      // instead of crashing the run.
+    }
+    out.push({ type: 'tool_call', id: c.id, name: c.function.name, input })
+  }
+  return out
+}
+
+function toStopReason(finishReason: unknown): ChatResponse['stopReason'] {
+  if (finishReason === 'tool_calls') return 'tool_calls'
+  if (finishReason === 'stop') return 'end_turn'
+  if (finishReason === 'length') return 'max_tokens'
+  return 'other'
+}
 
 async function openaiChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatResponse> {
   if (!cfg.apiKey) throw new Error('OpenAI: API key is required')
@@ -16,9 +83,15 @@ async function openaiChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
   const url = `${base}/chat/completions`
   const body: Record<string, unknown> = {
     model: req.model,
-    messages: req.messages.map((m) => ({ role: m.role, content: contentToText(m.content) })),
+    messages: toOpenAIMessages(req.messages),
     temperature: req.temperature ?? 0.2,
     max_tokens: req.maxTokens ?? 2048,
+  }
+  if (req.tools?.length) {
+    body.tools = req.tools.map((t) => ({
+      type: 'function',
+      function: { name: t.name, description: t.description, parameters: t.inputSchema },
+    }))
   }
 
   const res = await fetch(url, {
@@ -36,13 +109,13 @@ async function openaiChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
   }
   const data = await res.json() as {
     model?: string
-    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>
+    choices?: Array<{ message?: { content?: string | null; tool_calls?: OAToolCall[] }; finish_reason?: string }>
   }
-  const text = data?.choices?.[0]?.message?.content ?? ''
+  const choice = data?.choices?.[0]
   return {
-    content: text ? [{ type: 'text', text }] : [],
+    content: choice?.message ? fromOpenAIMessage(choice.message) : [],
     model: data?.model,
-    stopReason: data?.choices?.[0]?.finish_reason === 'length' ? 'max_tokens' : 'end_turn',
+    stopReason: toStopReason(choice?.finish_reason),
   }
 }
 
