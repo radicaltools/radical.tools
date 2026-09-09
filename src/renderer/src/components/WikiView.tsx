@@ -328,7 +328,11 @@ export function WikiView(): React.ReactElement {
 const ARCHITECTURE_ROOT_TYPES: ReadonlySet<string> = new Set([
   'person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group',
 ])
-const GOVERNANCE_ROOT_TYPES: ReadonlySet<string> = new Set(['adr', 'fitness-fn', 'requirement', 'blueprint'])
+// Governance items are further split by type — a flat "Governance" bucket
+// mixing ADRs, fitness functions and requirements is just a smaller version
+// of the same illegible wall, so each type gets its own labelled subgroup.
+const GOVERNANCE_TYPE_ORDER: readonly string[] = ['requirement', 'adr', 'fitness-fn', 'blueprint']
+const GOVERNANCE_ROOT_TYPES: ReadonlySet<string> = new Set(GOVERNANCE_TYPE_ORDER)
 
 type RootSectionId = 'architecture' | 'governance' | 'other'
 
@@ -343,6 +347,9 @@ function rootSectionOf(type: string): RootSectionId {
   if (GOVERNANCE_ROOT_TYPES.has(type)) return 'governance'
   return 'other'
 }
+
+interface NavSubgroup { key: string; label: string; count: number; rendered: React.ReactNode[] }
+interface NavSection { id: RootSectionId; label: string; count: number; rendered?: React.ReactNode[]; subgroups?: NavSubgroup[] }
 
 function WikiNav({
   filter,
@@ -359,7 +366,7 @@ function WikiNav({
   onSelect: (id: string | null) => void
   typeMeta: TypeMeta
 }): React.ReactElement {
-  const [collapsed, setCollapsed] = useState<Set<RootSectionId>>(() => new Set())
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
   const lower = filter.trim().toLowerCase()
 
   const renderNode = (n: C4Node, depth: number): React.ReactNode => {
@@ -386,13 +393,34 @@ function WikiNav({
   }
 
   const roots = childrenOf['__root__'] ?? []
-  const sections = ROOT_SECTIONS.map(({ id, label }) => {
+  const sections: NavSection[] = ROOT_SECTIONS.map(({ id, label }) => {
     const items = roots.filter((n) => rootSectionOf(n.type) === id)
-    const rendered = items.map((n) => renderNode(n, 1)).filter(Boolean)
-    return { id, label, count: items.length, rendered }
+    if (id === 'governance') {
+      const byType = new Map<string, C4Node[]>()
+      for (const n of items) {
+        const list = byType.get(n.type) ?? []
+        list.push(n)
+        byType.set(n.type, list)
+      }
+      const typeOrder = [
+        ...GOVERNANCE_TYPE_ORDER.filter((t) => byType.has(t)),
+        ...[...byType.keys()].filter((t) => !GOVERNANCE_TYPE_ORDER.includes(t)),
+      ]
+      const subgroups = typeOrder.map((type) => {
+        const typeItems = byType.get(type)!
+        return {
+          key: type,
+          label: typeMeta(type).label,
+          count: typeItems.length,
+          rendered: typeItems.map((n) => renderNode(n, 2)).filter(Boolean),
+        }
+      })
+      return { id, label, count: items.length, subgroups }
+    }
+    return { id, label, count: items.length, rendered: items.map((n) => renderNode(n, 1)).filter(Boolean) }
   }).filter((s) => s.count > 0)
 
-  const toggleSection = (id: RootSectionId) => {
+  const toggleSection = (id: string) => {
     setCollapsed((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
@@ -416,11 +444,14 @@ function WikiNav({
         <span className="wiki-nav-text">Overview</span>
       </button>
       <div className="wiki-nav-tree">
-        {sections.map(({ id, label, count, rendered }) => {
+        {sections.map(({ id, label, count, rendered, subgroups }) => {
           // Hide a section entirely once filtering leaves nothing in it, but
           // only when the user is actually filtering — an empty count is
           // never possible unfiltered since the section wouldn't exist.
-          if (lower && rendered.every((r) => !r)) return null
+          const empty = subgroups
+            ? subgroups.every((g) => g.rendered.every((r) => !r))
+            : rendered!.every((r) => !r)
+          if (lower && empty) return null
           const isCollapsed = collapsed.has(id)
           return (
             <div className="wiki-nav-section" key={id}>
@@ -429,7 +460,23 @@ function WikiNav({
                 {label}
                 <span className="wiki-nav-section-count">{count}</span>
               </button>
-              {!isCollapsed && rendered}
+              {!isCollapsed && (subgroups ? (
+                subgroups.map(({ key, label: subLabel, count: subCount, rendered: subRendered }) => {
+                  if (lower && subRendered.every((r) => !r)) return null
+                  const subId = `${id}:${key}`
+                  const subCollapsed = collapsed.has(subId)
+                  return (
+                    <div className="wiki-nav-subsection" key={subId}>
+                      <button className="wiki-nav-subsection-head" onClick={() => toggleSection(subId)}>
+                        <span className={`wiki-nav-section-chevron ${subCollapsed ? 'collapsed' : ''}`}>▾</span>
+                        {subLabel}
+                        <span className="wiki-nav-section-count">{subCount}</span>
+                      </button>
+                      {!subCollapsed && subRendered}
+                    </div>
+                  )
+                })
+              ) : rendered)}
             </div>
           )
         })}

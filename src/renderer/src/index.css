@@ -2113,6 +2113,24 @@ body {
   letter-spacing: 0;
   text-transform: none;
 }
+.wiki-nav-subsection-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 5px 10px 3px 23px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+.wiki-nav-subsection-head:hover { color: var(--text-secondary); opacity: 1; }
+.wiki-nav-subsection + .wiki-nav-subsection { margin-top: 2px; }
 .wiki-nav-item {
   display: flex;
   align-items: center;
