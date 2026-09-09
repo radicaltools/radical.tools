@@ -265,6 +265,17 @@ function NodeTypeCard({
               })}
           </div>
 
+          <div className="mm-row">
+            <label className="mm-checkbox" title="Show this type as its own tab in Table View, with a column per property. Otherwise it only appears in the generic All Nodes tab.">
+              <input
+                type="checkbox"
+                checked={def.tableTab ?? false}
+                onChange={(e) => onChange({ tableTab: e.target.checked || undefined })}
+              />
+              Own tab in Table View
+            </label>
+          </div>
+
           <div className="mm-section-label">Custom properties</div>
           <PropertyEditor
             properties={def.properties ?? []}

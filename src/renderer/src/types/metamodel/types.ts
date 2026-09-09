@@ -50,6 +50,10 @@ export interface NodeTypeDef {
   /** Hub-only types are imported from the Hub and should not appear in the
    *  canvas element palette (users cannot create them manually). */
   hubOnly?: boolean
+  /** Record-like types (ADRs, requirements, …) get their own Table View tab
+   *  with columns derived from `properties`, instead of only showing up in
+   *  the generic "All Nodes" tree. */
+  tableTab?: boolean
 }
 
 export interface RelationPair {

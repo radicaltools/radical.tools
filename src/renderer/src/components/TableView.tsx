@@ -2,11 +2,19 @@ import React, { useState, useCallback, useMemo } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType } from '../types/c4'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, NODE_SIZES } from '../types/c4'
+import type { Metamodel, PropertyDef } from '../types/metamodel'
 import { isParentAllowed, composeEarsSentence, resolveEarsSubject } from '../types/metamodel'
 
 // ─── Column definitions ──────────────────────────────────────────────────────
+//
+// Node-type tabs are NOT hardcoded per entity — every node type's columns are
+// derived from its metamodel `properties` (see `deriveNodeCols`). A type only
+// gets its own tab when `NodeTypeDef.tableTab` is set (ADR, Fitness Function,
+// Requirement, Blueprint by default); plain C4 elements stay in "All Nodes".
+// This is what lets a custom type added via the Metamodel Editor show up
+// here automatically, with no code changes.
 
-type CellType = 'text' | 'textarea' | 'enum' | 'boolean' | 'readonly'
+type CellType = 'text' | 'textarea' | 'enum' | 'boolean' | 'number' | 'readonly'
 
 interface ColDef {
   key: string
@@ -26,23 +34,7 @@ const ALL_NODES_COLS: ColDef[] = [
   { key: '_parent',     label: 'Parent',      width: 180, type: 'readonly' },
 ]
 
-const ADR_COLS: ColDef[] = [
-  { key: 'label',        label: 'Name',                    width: 220, type: 'text' },
-  { key: 'status',       label: 'Status',                  width: 130, type: 'enum', options: ['proposed', 'accepted', 'deprecated', 'superseded'] },
-  { key: 'date',         label: 'Date',                    width: 110, type: 'text' },
-  { key: 'context',      label: 'Context',                 width: 260, type: 'textarea' },
-  { key: 'decision',     label: 'Decision',                width: 280, type: 'textarea' },
-  { key: 'consequences', label: 'Consequences',            width: 240, type: 'textarea' },
-  { key: 'alternatives', label: 'Alternatives considered', width: 240, type: 'textarea' },
-]
-
-const FF_COLS: ColDef[] = [
-  { key: 'label',     label: 'Name',      width: 220, type: 'text' },
-  { key: 'category',  label: 'Category',  width: 150, type: 'enum', options: ['structural', 'operational', 'process', 'holistic'] },
-  { key: 'threshold', label: 'Threshold / Success criteria', width: 240, type: 'textarea' },
-]
-
-const REL_COLS: ColDef[] = [
+const REL_BASE_COLS: ColDef[] = [
   { key: '_source',    label: 'From',       width: 200, type: 'readonly' },
   { key: '_relType',   label: 'Type',       width: 130, type: 'readonly' },
   { key: '_target',    label: 'To',         width: 200, type: 'readonly' },
@@ -50,29 +42,40 @@ const REL_COLS: ColDef[] = [
   { key: 'technology', label: 'Technology', width: 160, type: 'text' },
 ]
 
-const REQ_COLS: ColDef[] = [
-  { key: 'label',              label: 'Name',           width: 220, type: 'text' },
-  { key: '_ears_sentence',     label: 'EARS Sentence',  width: 380, type: 'readonly' },
-  { key: 'ears_type',          label: 'EARS type',      width: 150, type: 'enum', options: ['ubiquitous', 'event-driven', 'state-driven', 'unwanted-behaviour', 'optional', 'complex'] },
-  { key: 'trigger',            label: 'When (trigger)',  width: 180, type: 'text', visibleWhen: { key: 'ears_type', values: ['event-driven', 'complex'] } },
-  { key: 'precondition',       label: 'While (precon.)', width: 180, type: 'text', visibleWhen: { key: 'ears_type', values: ['state-driven', 'complex'] } },
-  { key: 'unwanted_condition', label: 'If (unwanted)',   width: 180, type: 'text', visibleWhen: { key: 'ears_type', values: ['unwanted-behaviour', 'complex'] } },
-  { key: 'feature',            label: 'Where (feature)', width: 160, type: 'text', visibleWhen: { key: 'ears_type', values: ['optional', 'complex'] } },
-  { key: 'action',             label: 'System shall…',  width: 280, type: 'textarea' },
-  { key: 'rationale',          label: 'Rationale',      width: 240, type: 'textarea' },
-]
+const NODE_BASE_COL: ColDef = { key: 'label', label: 'Name', width: 220, type: 'text' }
+
+const DEFAULT_COL_WIDTH: Record<CellType, number> = {
+  text: 160,
+  textarea: 260,
+  enum: 140,
+  boolean: 90,
+  number: 110,
+  readonly: 160,
+}
+
+function propToCol(p: PropertyDef): ColDef {
+  return { key: p.key, label: p.label, width: DEFAULT_COL_WIDTH[p.type], type: p.type, options: p.options, visibleWhen: p.visibleWhen }
+}
+
+/** Computed (non-property) columns for specific node types, e.g. the EARS
+ *  sentence preview — these can't be expressed as a plain metamodel property
+ *  since they're derived from several fields plus the relation graph. */
+const COMPUTED_NODE_COLS: Record<string, ColDef[]> = {
+  requirement: [{ key: '_ears_sentence', label: 'EARS Sentence', width: 380, type: 'readonly' }],
+}
+
+function deriveNodeCols(typeId: string, mm: Metamodel): ColDef[] {
+  const props = mm.nodeTypes[typeId]?.properties ?? []
+  return [NODE_BASE_COL, ...(COMPUTED_NODE_COLS[typeId] ?? []), ...props.map(propToCol)]
+}
 
 // ─── Tab definitions ─────────────────────────────────────────────────────────
+//
+// 'all' and 'relations' are fixed; every other tab id is a node-type id from
+// the current metamodel (`NodeTypeDef.tableTab === true`) — see `useMemo`
+// below in the component.
 
-type Tab = 'all' | 'adr' | 'fitness-fn' | 'requirement' | 'relations'
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'all',         label: 'All Nodes' },
-  { id: 'adr',         label: 'ADRs' },
-  { id: 'fitness-fn',  label: 'Fitness Functions' },
-  { id: 'requirement', label: 'Requirements' },
-  { id: 'relations',   label: 'Relations' },
-]
+type Tab = string
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -150,6 +153,7 @@ export function TableView(): React.ReactElement {
   const addNode          = useDiagramStore((s) => s.addNode)
   const pushNotification = useDiagramStore((s) => s.pushNotification)
   const readOnly         = useDiagramStore((s) => s.appMode !== 'designer')
+  const metamodel        = useDiagramStore((s) => s.metamodel)
 
   const [tab, setTab]             = useState<Tab>('all')
   const [editCell, setEditCell]   = useState<EditCell | null>(null)
@@ -169,9 +173,28 @@ export function TableView(): React.ReactElement {
     [nodes, visibleNodeIds],
   )
 
-  const adrList = useMemo(() => nodeList.filter(n => n.type === 'adr'), [nodeList])
-  const ffList  = useMemo(() => nodeList.filter(n => n.type === 'fitness-fn'), [nodeList])
-  const reqList = useMemo(() => nodeList.filter(n => n.type === 'requirement'), [nodeList])
+  const nodeTabs = useMemo(() =>
+    Object.values(metamodel.nodeTypes)
+      .filter(t => t.tableTab)
+      .map(t => ({ id: t.id, label: t.label })),
+    [metamodel],
+  )
+
+  const TABS = useMemo(() => [
+    { id: 'all', label: 'All Nodes' },
+    ...nodeTabs,
+    { id: 'relations', label: 'Relations' },
+  ], [nodeTabs])
+
+  const nodesByType = useMemo(() => {
+    const m = new Map<string, C4Node[]>()
+    for (const n of nodeList) {
+      const arr = m.get(n.type)
+      if (arr) arr.push(n)
+      else m.set(n.type, [n])
+    }
+    return m
+  }, [nodeList])
 
   const relList = useMemo(() =>
     visibleNodeIds
@@ -180,23 +203,38 @@ export function TableView(): React.ReactElement {
     [relations, visibleNodeIds],
   )
 
+  // Sparse union: base relation columns + every extra property declared by a
+  // relation type that actually appears in `relList`, deduped by key (two
+  // relation types sharing a property key share the same underlying field).
+  const relCols = useMemo<ColDef[]>(() => {
+    const seen = new Set(REL_BASE_COLS.map(c => c.key))
+    const extra: ColDef[] = []
+    for (const r of relList) {
+      const def = metamodel.relationTypes[r.relationType ?? 'interacts']
+      for (const p of def?.properties ?? []) {
+        if (seen.has(p.key)) continue
+        seen.add(p.key)
+        extra.push(propToCol(p))
+      }
+    }
+    return [...REL_BASE_COLS, ...extra]
+  }, [relList, metamodel])
+
   const treeRows = useMemo<TreeRow[]>(() =>
     tab === 'all' ? buildTreeRows(nodeList) : [],
     [tab, nodeList],
   )
 
+  const isNodeTypeTab = tab !== 'all' && tab !== 'relations'
+
   const cols: ColDef[] =
-    tab === 'adr'         ? ADR_COLS
-    : tab === 'fitness-fn'  ? FF_COLS
-    : tab === 'requirement' ? REQ_COLS
-    : tab === 'relations'   ? REL_COLS
+    tab === 'relations' ? relCols
+    : isNodeTypeTab      ? deriveNodeCols(tab, metamodel)
     : ALL_NODES_COLS
 
   const rows: (C4Node | C4Relation)[] =
-    tab === 'adr'         ? adrList
-    : tab === 'fitness-fn'  ? ffList
-    : tab === 'requirement' ? reqList
-    : tab === 'relations'  ? relList
+    tab === 'relations' ? relList
+    : isNodeTypeTab      ? (nodesByType.get(tab) ?? [])
     : treeRows.map(r => r.node)
 
   const depthMap = useMemo<Map<string, number>>(() => {
@@ -321,18 +359,20 @@ export function TableView(): React.ReactElement {
   const commitEdit = useCallback(() => {
     if (!editCell) return
     const { rowId, colKey, draft } = editCell
+    const isNumber = cols.find(c => c.key === colKey)?.type === 'number'
+    const numVal = draft === '' ? undefined : Number(draft)
     if (tab === 'relations') {
-      updateRelation(rowId, { [colKey]: draft || undefined } as Partial<C4Relation>)
+      updateRelation(rowId, { [colKey]: isNumber ? numVal : (draft || undefined) } as Partial<C4Relation>)
     } else {
       if (colKey === 'label' || colKey === 'description' || colKey === 'technology') {
         updateNode(rowId, { [colKey]: draft || undefined } as Partial<C4Node>)
       } else {
         // governance property stored directly on node via Object.assign
-        updateNode(rowId, { [colKey]: draft } as Parameters<typeof updateNode>[1])
+        updateNode(rowId, { [colKey]: isNumber ? numVal : draft } as Parameters<typeof updateNode>[1])
       }
     }
     setEditCell(null)
-  }, [editCell, tab, updateNode, updateRelation])
+  }, [editCell, tab, cols, updateNode, updateRelation])
 
   const cancelEdit = useCallback(() => setEditCell(null), [])
 
@@ -447,6 +487,7 @@ export function TableView(): React.ReactElement {
       return (
         <input
           autoFocus
+          type={col.type === 'number' ? 'number' : 'text'}
           className="tv-cell-input"
           value={editCell!.draft}
           onChange={(e) => setEditCell({ ...editCell!, draft: e.target.value })}
@@ -477,11 +518,9 @@ export function TableView(): React.ReactElement {
   }
 
   const emptyMsg =
-    tab === 'adr'         ? 'No ADRs in this model.' :
-    tab === 'fitness-fn'  ? 'No Fitness Functions in this model.' :
-    tab === 'requirement' ? 'No Requirements in this model.' :
-    tab === 'relations'   ? 'No relations.' :
-                            'No nodes.'
+    tab === 'relations' ? 'No relations.' :
+    isNodeTypeTab        ? `No ${TABS.find(t => t.id === tab)?.label ?? tab} in this model.` :
+                           'No nodes.'
 
   return (
     <div
@@ -517,11 +556,9 @@ export function TableView(): React.ReactElement {
       <div className="tv-tabs">
         {TABS.map(t => {
           const count =
-            t.id === 'all'          ? nodeList.length
-            : t.id === 'adr'        ? adrList.length
-            : t.id === 'fitness-fn' ? ffList.length
-            : t.id === 'requirement' ? reqList.length
-            : relList.length
+            t.id === 'all'       ? nodeList.length
+            : t.id === 'relations' ? relList.length
+            : nodesByType.get(t.id)?.length ?? 0
           return (
             <button
               key={t.id}

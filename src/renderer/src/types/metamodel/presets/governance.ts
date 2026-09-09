@@ -42,6 +42,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
+    tableTab: true,
     properties: adrProps,
   }
 
@@ -71,6 +72,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
+    tableTab: true,
     properties: fitnessFnProps,
   }
 
@@ -106,6 +108,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
+    tableTab: true,
     properties: requirementProps,
   }
 
@@ -210,6 +213,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedAtRoot: true,
     builtin: true,
     hubOnly: true,
+    tableTab: true,
     properties: blueprintProps,
   }
 
