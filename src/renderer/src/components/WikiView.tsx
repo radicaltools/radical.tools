@@ -321,6 +321,29 @@ export function WikiView(): React.ReactElement {
 
 // ─── Navigation (left column) ────────────────────────────────────────────────
 
+// Root-level elements are split into named sections so the rail reads as an
+// organised document outline instead of one flat, type-agnostic list —
+// the C4/DDD structural model, then the governance layer (ADRs, fitness
+// functions, requirements, blueprints) that references it.
+const ARCHITECTURE_ROOT_TYPES: ReadonlySet<string> = new Set([
+  'person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group',
+])
+const GOVERNANCE_ROOT_TYPES: ReadonlySet<string> = new Set(['adr', 'fitness-fn', 'requirement', 'blueprint'])
+
+type RootSectionId = 'architecture' | 'governance' | 'other'
+
+const ROOT_SECTIONS: Array<{ id: RootSectionId; label: string }> = [
+  { id: 'architecture', label: 'C4' },
+  { id: 'governance', label: 'Governance' },
+  { id: 'other', label: 'Other' },
+]
+
+function rootSectionOf(type: string): RootSectionId {
+  if (ARCHITECTURE_ROOT_TYPES.has(type)) return 'architecture'
+  if (GOVERNANCE_ROOT_TYPES.has(type)) return 'governance'
+  return 'other'
+}
+
 function WikiNav({
   filter,
   setFilter,
@@ -336,30 +359,44 @@ function WikiNav({
   onSelect: (id: string | null) => void
   typeMeta: TypeMeta
 }): React.ReactElement {
+  const [collapsed, setCollapsed] = useState<Set<RootSectionId>>(() => new Set())
   const lower = filter.trim().toLowerCase()
 
-  const renderBranch = (parentKey: string, depth: number): React.ReactNode => {
-    const items = childrenOf[parentKey] ?? []
-    return items.map((n) => {
-      const matches = !lower || n.label.toLowerCase().includes(lower)
-      const childNodes = renderBranch(n.id, depth + 1)
-      const hasMatchingChild = Array.isArray(childNodes) && childNodes.some(Boolean)
-      if (lower && !matches && !hasMatchingChild) return null
-      const meta = typeMeta(n.type)
-      return (
-        <div key={n.id}>
-          <button
-            className={`wiki-nav-item ${focusId === n.id ? 'active' : ''}`}
-            style={{ paddingLeft: 10 + depth * 13 }}
-            onClick={() => onSelect(n.id)}
-            title={n.label}
-          >
-            <span className="wiki-nav-dot" style={{ background: meta.color }} />
-            <span className="wiki-nav-text">{n.label}</span>
-          </button>
-          {childNodes}
-        </div>
-      )
+  const renderNode = (n: C4Node, depth: number): React.ReactNode => {
+    const matches = !lower || n.label.toLowerCase().includes(lower)
+    const childItems = childrenOf[n.id] ?? []
+    const childNodes = childItems.map((c) => renderNode(c, depth + 1))
+    const hasMatchingChild = childNodes.some(Boolean)
+    if (lower && !matches && !hasMatchingChild) return null
+    const meta = typeMeta(n.type)
+    return (
+      <div key={n.id}>
+        <button
+          className={`wiki-nav-item ${focusId === n.id ? 'active' : ''}`}
+          style={{ paddingLeft: 10 + depth * 13 }}
+          onClick={() => onSelect(n.id)}
+          title={n.label}
+        >
+          <span className="wiki-nav-dot" style={{ background: meta.color }} />
+          <span className="wiki-nav-text">{n.label}</span>
+        </button>
+        {childNodes}
+      </div>
+    )
+  }
+
+  const roots = childrenOf['__root__'] ?? []
+  const sections = ROOT_SECTIONS.map(({ id, label }) => {
+    const items = roots.filter((n) => rootSectionOf(n.type) === id)
+    const rendered = items.map((n) => renderNode(n, 1)).filter(Boolean)
+    return { id, label, count: items.length, rendered }
+  }).filter((s) => s.count > 0)
+
+  const toggleSection = (id: RootSectionId) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
     })
   }
 
@@ -378,7 +415,25 @@ function WikiNav({
       >
         <span className="wiki-nav-text">Overview</span>
       </button>
-      <div className="wiki-nav-tree">{renderBranch('__root__', 0)}</div>
+      <div className="wiki-nav-tree">
+        {sections.map(({ id, label, count, rendered }) => {
+          // Hide a section entirely once filtering leaves nothing in it, but
+          // only when the user is actually filtering — an empty count is
+          // never possible unfiltered since the section wouldn't exist.
+          if (lower && rendered.every((r) => !r)) return null
+          const isCollapsed = collapsed.has(id)
+          return (
+            <div className="wiki-nav-section" key={id}>
+              <button className="wiki-nav-section-head" onClick={() => toggleSection(id)}>
+                <span className={`wiki-nav-section-chevron ${isCollapsed ? 'collapsed' : ''}`}>▾</span>
+                {label}
+                <span className="wiki-nav-section-count">{count}</span>
+              </button>
+              {!isCollapsed && rendered}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
