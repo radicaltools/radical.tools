@@ -109,6 +109,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedAtRoot: true,
     builtin: true,
     tableTab: true,
+    hierarchyRelation: 'derives',
     properties: requirementProps,
   }
 

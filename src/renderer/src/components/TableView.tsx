@@ -67,14 +67,6 @@ function deriveNodeCols(typeId: string, mm: Metamodel): ColDef[] {
   return [NODE_BASE_COL, ...(COMPUTED_NODE_COLS[typeId] ?? []), ...props.map(propToCol)]
 }
 
-/** Node types whose own tab renders as an indented tree instead of a flat
- *  list, using the given relation type as the child→parent edge (e.g. a
- *  Requirement "derives from" the requirement it decomposes). Unlike canvas
- *  containment (`parentId`), this doesn't require the type to be a
- *  container — it's purely a Table View reading of the relation graph. */
-const RELATION_TREE_BY_TYPE: Record<string, string> = {
-  requirement: 'derives',
-}
 
 // ─── Tab definitions ─────────────────────────────────────────────────────────
 //
@@ -244,9 +236,11 @@ export function TableView(): React.ReactElement {
     [tab, nodeList],
   )
 
-  // Relation-derived tree (e.g. Requirement via "derives"), for tabs
-  // configured in RELATION_TREE_BY_TYPE.
-  const treeRelationType = RELATION_TREE_BY_TYPE[tab]
+  const isNodeTypeTab = tab !== 'all' && tab !== 'relations'
+
+  // Relation-derived tree (e.g. Requirement via "derives"), for node types
+  // that declare NodeTypeDef.hierarchyRelation in the metamodel.
+  const treeRelationType = isNodeTypeTab ? metamodel.nodeTypes[tab]?.hierarchyRelation : undefined
 
   const relationParentOf = useMemo(() => {
     if (!treeRelationType) return null
@@ -264,7 +258,6 @@ export function TableView(): React.ReactElement {
     return buildTreeRows(list, n => relationParentOf.get(n.id) ?? null)
   }, [relationParentOf, nodesByType, tab])
 
-  const isNodeTypeTab = tab !== 'all' && tab !== 'relations'
   const isTreeTab = tab === 'all' || !!treeRelationType
 
   const cols: ColDef[] =

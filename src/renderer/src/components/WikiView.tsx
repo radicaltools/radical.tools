@@ -221,8 +221,11 @@ export function WikiView(): React.ReactElement {
 
   // Create a node of `type` (optionally inside `parentId`), then navigate to
   // it. addNode validates metamodel rules and emits its own error toast on
-  // failure (returning '').
-  const createNode = (type: string, parentId: string | undefined) => {
+  // failure (returning ''). `onCreated` runs before navigating — e.g. to
+  // wire up a hierarchyRelation edge (see WikiElementPage's onCreateChild
+  // for a hierarchyRelation-typed node, such as a Requirement "deriving
+  // from" the one it's a child of).
+  const createNode = (type: string, parentId: string | undefined, onCreated?: (id: string) => void) => {
     const def = metamodel?.nodeTypes[type]
     const label = `New ${def?.label ?? TYPE_LABELS[type as C4ElementType] ?? type}`
     const size = NODE_SIZES[type as C4ElementType]
@@ -240,6 +243,7 @@ export function WikiView(): React.ReactElement {
       height: def?.height ?? size?.height ?? 90,
     })
     if (id) {
+      onCreated?.(id)
       pushNotification(`${label} added.`, 'info')
       goTo(id)
     }
@@ -257,8 +261,8 @@ export function WikiView(): React.ReactElement {
     if (focusId === id || (focusId && !c4Nodes[focusId])) goTo(parentId)
   }
 
-  const createRelation = (sourceId: string, targetId: string) => {
-    addRelation({ sourceId, targetId })
+  const createRelation = (sourceId: string, targetId: string, relationType?: string) => {
+    addRelation({ sourceId, targetId, ...(relationType ? { relationType } : {}) })
   }
 
   const deleteRelation = (id: string) => {
@@ -694,9 +698,9 @@ function WikiElementPage({
   updateNode: UpdateNode
   updateRelation: UpdateRelation
   onNavigate: (id: string) => void
-  createNode: (type: string, parentId: string | undefined) => void
+  createNode: (type: string, parentId: string | undefined, onCreated?: (id: string) => void) => void
   onDeleteNode: (id: string) => void
-  createRelation: (sourceId: string, targetId: string) => void
+  createRelation: (sourceId: string, targetId: string, relationType?: string) => void
   onDeleteRelation: (id: string) => void
   readOnly: boolean
   typeMeta: TypeMeta
@@ -708,7 +712,21 @@ function WikiElementPage({
    *  still render as preview cards, never recurse further). */
   embedded?: boolean
 }): React.ReactElement {
-  const onCreateChild = (type: string) => createNode(type, node.id)
+  // Types that nest via a relation instead of canvas containment (e.g. a
+  // Requirement "derives" from the one it decomposes — allowedParents can't
+  // express that, since containment and this relation are different things).
+  const hierarchyRelationType = metamodel?.nodeTypes[node.type]?.hierarchyRelation
+
+  const onCreateChild = (type: string) => {
+    if (hierarchyRelationType) {
+      // New child inherits the same structural container (system/domain/
+      // group) as `node`, if any, then gets a hierarchyRelation edge back
+      // to `node` — e.g. child --derives--> node.
+      createNode(type, node.parentId, (newId) => createRelation(newId, node.id, hierarchyRelationType))
+    } else {
+      createNode(type, node.id)
+    }
+  }
   const onCreateRelation = (targetId: string) => createRelation(node.id, targetId)
 
   const breadcrumb = useMemo(() => {
@@ -725,10 +743,16 @@ function WikiElementPage({
 
   const children = useMemo(
     () =>
-      Object.values(nodes)
-        .filter((n) => n.parentId === node.id && (!visibleSet || visibleSet.has(n.id)))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [nodes, node.id, visibleSet],
+      hierarchyRelationType
+        ? Object.values(relations)
+            .filter((r) => r.relationType === hierarchyRelationType && r.targetId === node.id)
+            .map((r) => nodes[r.sourceId])
+            .filter((n): n is C4Node => !!n && (!visibleSet || visibleSet.has(n.id)))
+            .sort((a, b) => a.label.localeCompare(b.label))
+        : Object.values(nodes)
+            .filter((n) => n.parentId === node.id && (!visibleSet || visibleSet.has(n.id)))
+            .sort((a, b) => a.label.localeCompare(b.label)),
+    [nodes, relations, node.id, visibleSet, hierarchyRelationType],
   )
 
   const outgoing = useMemo(
@@ -802,11 +826,21 @@ function WikiElementPage({
     [nodes, node, metamodel],
   )
 
-  // Node types that may be created as a child of this element.
-  const childTypeChoices = useMemo(
-    () => childTypeOptions(metamodel, node.type, typeMeta),
-    [metamodel, node.type, typeMeta],
-  )
+  // Node types that may be created as a child of this element — via
+  // allowedParents normally, or via the hierarchyRelation's allowedPairs
+  // (whichever type(s) may derive-from/etc. this node's type) when set.
+  const childTypeChoices = useMemo(() => {
+    if (hierarchyRelationType) {
+      const relDef = metamodel?.relationTypes[hierarchyRelationType]
+      const fromTypes = new Set(
+        (relDef?.allowedPairs ?? []).filter((p) => p.to === node.type).map((p) => p.from),
+      )
+      return [...fromTypes]
+        .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+    }
+    return childTypeOptions(metamodel, node.type, typeMeta)
+  }, [metamodel, node.type, typeMeta, hierarchyRelationType])
 
   // Existing nodes that may become the target of a new outgoing relation,
   // restricted to those the metamodel permits and that are visible.
