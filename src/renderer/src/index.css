@@ -5904,7 +5904,10 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
   line-height: 1.4;
-  max-height: 2.8em;
+  /* No explicit max-height here: it fights with -webkit-line-clamp's own
+     height calculation and can clip the second line mid-glyph instead of
+     showing the "…" the clamp would otherwise render — the clamp already
+     confines the box to 2 lines on its own. */
 }
 
 .tv-cell-placeholder {
