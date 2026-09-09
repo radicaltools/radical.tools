@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   AI_SYSTEM_PROMPT,
   buildContextMessage,
-  buildMessages,
-  extractJsonObject,
+  buildMetamodelMessage,
+  buildSystemMessages,
 } from '../src/renderer/src/ai/systemPrompt'
 import type { C4Node, C4Relation } from '../src/renderer/src/types/c4'
+import type { Metamodel } from '../src/renderer/src/types/metamodel'
 
 const node = (over: Partial<C4Node>): C4Node => ({
   id: 'n', type: 'system', label: 'L', collapsed: false,
@@ -13,91 +14,79 @@ const node = (over: Partial<C4Node>): C4Node => ({
 })
 
 describe('AI_SYSTEM_PROMPT contract', () => {
-  it('mentions the JSON-only output requirement', () => {
-    expect(AI_SYSTEM_PROMPT).toMatch(/ONLY a single JSON object/i)
-  })
-
-  it('mentions every supported op kind', () => {
-    for (const k of ['add_node', 'add_relation', 'update_node', 'delete_node', 'delete_relation', 'query_model']) {
-      expect(AI_SYSTEM_PROMPT).toContain(k)
-    }
-  })
-
-  it('documents the built-in query language', () => {
-    expect(AI_SYSTEM_PROMPT).toMatch(/BUILT-IN MODEL QUERY LANGUAGE/)
-    expect(AI_SYSTEM_PROMPT).toMatch(/LIST NODES/)
-    expect(AI_SYSTEM_PROMPT).toMatch(/LIST TECHNOLOGIES/)
-    expect(AI_SYSTEM_PROMPT).toMatch(/AND, OR, NOT/)
-    expect(AI_SYSTEM_PROMPT).toMatch(/GET DEPENDENTS OF/)
-  })
-
   it('instructs the model to follow metamodel rules', () => {
     expect(AI_SYSTEM_PROMPT).toMatch(/metamodel/i)
     expect(AI_SYSTEM_PROMPT).toMatch(/allowedParents/)
   })
-})
 
-describe('buildContextMessage', () => {
-  it('serialises only the relevant fields', () => {
-    const msg = buildContextMessage(
-      { n1: node({ id: 'n1', label: 'A', type: 'system' }) },
-      { r1: { id: 'r1', sourceId: 'n1', targetId: 'n1', label: 'self' } as C4Relation },
-    )
-    expect(msg).toContain('"id": "n1"')
-    expect(msg).toContain('"label": "A"')
-    expect(msg).toContain('"sourceId": "n1"')
-    // x/y/width/height are NOT included (layout is the tool's job)
-    expect(msg).not.toMatch(/"width"/)
+  it('documents the requirement decomposition (derives) workflow', () => {
+    expect(AI_SYSTEM_PROMPT).toMatch(/derives/)
+    expect(AI_SYSTEM_PROMPT).toMatch(/ears_type/)
+  })
+
+  it('tells the model to stop making tool calls once it has a final answer', () => {
+    expect(AI_SYSTEM_PROMPT).toMatch(/no further tool calls|no tool calls/i)
   })
 })
 
-describe('buildMessages', () => {
-  it('puts system prompt first, metamodel + context next, history then user prompt', () => {
-    const msgs = buildMessages(
-      'Add a system called Foo',
-      {},
-      {},
-      [{ role: 'assistant', content: 'previous' }],
+describe('buildMetamodelMessage', () => {
+  it("includes each type's properties, so the model knows valid property-bag keys", () => {
+    const mm: Metamodel = {
+      id: 'm',
+      name: 'M',
+      nodeTypes: {
+        requirement: {
+          id: 'requirement', label: 'Requirement', color: '', fg: '', iconPath: '', width: 0, height: 0,
+          properties: [{ key: 'ears_type', label: 'EARS type', type: 'enum', options: ['ubiquitous'] }],
+        },
+      },
+      relationTypes: {
+        derives: {
+          id: 'derives', label: 'Derives from',
+          allowedPairs: [{ from: 'requirement', to: 'requirement' }],
+          properties: [],
+        },
+      },
+    }
+    const msg = buildMetamodelMessage(mm)
+    expect(msg).toContain('ears_type')
+    expect(msg).toContain('ubiquitous')
+    expect(msg).toContain('derives')
+  })
+})
+
+describe('buildContextMessage', () => {
+  it('serialises base fields and spreads governance properties, but not layout', () => {
+    const n = node({ id: 'n1', label: 'A', type: 'requirement' }) as unknown as Record<string, unknown>
+    n.ears_type = 'event-driven'
+    const msg = buildContextMessage(
+      { n1: n as unknown as C4Node },
+      { r1: { id: 'r1', sourceId: 'n1', targetId: 'n1', label: 'self', relationType: 'derives' } as C4Relation },
     )
-    expect(msgs[0].role).toBe('system')
-    expect(msgs[0].content).toBe(AI_SYSTEM_PROMPT)
+    expect(msg).toContain('"id": "n1"')
+    expect(msg).toContain('"label": "A"')
+    expect(msg).toContain('"ears_type": "event-driven"')
+    expect(msg).toContain('"relationType": "derives"')
+    // x/y/width/height/collapsed are NOT included (layout is the tool's job)
+    expect(msg).not.toMatch(/"width"/)
+  })
+
+  it('serialises view kind', () => {
+    const msg = buildContextMessage({}, {}, null, {
+      v1: { id: 'v1', name: 'Governance', kind: 'table', nodeIds: [], positions: {} },
+    })
+    expect(msg).toContain('"kind": "table"')
+  })
+})
+
+describe('buildSystemMessages', () => {
+  it('returns exactly the prompt, metamodel, and context messages, in order', () => {
+    const msgs = buildSystemMessages({}, {}, undefined, null, undefined)
+    expect(msgs).toHaveLength(3)
+    expect(msgs[0]).toEqual({ role: 'system', content: AI_SYSTEM_PROMPT })
     expect(msgs[1].role).toBe('system')
     expect(msgs[1].content).toMatch(/Metamodel/i)
     expect(msgs[2].role).toBe('system')
     expect(msgs[2].content).toMatch(/Current diagram state/)
-    expect(msgs[3]).toEqual({ role: 'assistant', content: 'previous' })
-    expect(msgs[4]).toEqual({ role: 'user', content: 'Add a system called Foo' })
-  })
-})
-
-describe('extractJsonObject', () => {
-  it('parses a bare object', () => {
-    expect(extractJsonObject('{"a":1}')).toEqual({ a: 1 })
-  })
-
-  it('strips ```json fences', () => {
-    expect(extractJsonObject('```json\n{"a":2}\n```')).toEqual({ a: 2 })
-  })
-
-  it('strips bare ``` fences', () => {
-    expect(extractJsonObject('```\n{"a":3}\n```')).toEqual({ a: 3 })
-  })
-
-  it('extracts the first balanced object out of surrounding prose', () => {
-    const r = extractJsonObject('Sure! Here you go:\n{"operations":[{"op":"delete_node","id":"x"}]}\nThanks.')
-    expect(r).toEqual({ operations: [{ op: 'delete_node', id: 'x' }] })
-  })
-
-  it('handles braces inside string values', () => {
-    const r = extractJsonObject('{"a":"has } brace","b":2}')
-    expect(r).toEqual({ a: 'has } brace', b: 2 })
-  })
-
-  it('throws on missing object', () => {
-    expect(() => extractJsonObject('no braces here')).toThrow(/No JSON object/)
-  })
-
-  it('throws on unbalanced object', () => {
-    expect(() => extractJsonObject('{"a":1')).toThrow(/Unbalanced/)
   })
 })

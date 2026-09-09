@@ -44,14 +44,14 @@ describe('AI providers', () => {
 
   it('Ollama: posts to /api/chat with stream:false and parses message.content', async () => {
     const { calls } = installFetch({ message: { content: 'hi from llama' }, model: 'llama3.1' })
-    const req: ChatRequest = { model: 'llama3.1', messages: SAMPLE, jsonMode: true }
+    const req: ChatRequest = { model: 'llama3.1', messages: SAMPLE }
     const out = await ollamaAdapter.chat(req, { baseUrl: 'http://h:1234' })
-    expect(out.content).toBe('hi from llama')
+    expect(out.content).toEqual([{ type: 'text', text: 'hi from llama' }])
     expect(out.model).toBe('llama3.1')
+    expect(out.stopReason).toBe('end_turn')
     expect(calls).toHaveLength(1)
     expect(calls[0].url).toBe('http://h:1234/api/chat')
     expect(calls[0].bodyParsed.stream).toBe(false)
-    expect(calls[0].bodyParsed.format).toBe('json')
     expect(calls[0].bodyParsed.messages).toEqual([
       { role: 'system', content: 'sys-1' },
       { role: 'user', content: 'hello' },
@@ -63,60 +63,120 @@ describe('AI providers', () => {
     await expect(ollamaAdapter.chat({ model: 'm', messages: SAMPLE }, {})).rejects.toThrow(/Ollama HTTP 500/)
   })
 
-  it('OpenAI: requires key, sends Bearer + json_object response_format', async () => {
+  it('Ollama: flattens tool_call/tool_result blocks to plain text (real tool-calling not implemented yet)', async () => {
+    const { calls } = installFetch({ message: { content: 'ok' }, model: 'llama3.1' })
+    await ollamaAdapter.chat({
+      model: 'llama3.1',
+      messages: [
+        { role: 'user', content: 'do it' },
+        { role: 'assistant', content: [{ type: 'tool_call', id: 'c1', name: 'add_node', input: { label: 'X' } }] },
+        { role: 'user', content: [{ type: 'tool_result', toolCallId: 'c1', content: 'Created node n1.' }] },
+      ],
+    }, {})
+    expect(calls[0].bodyParsed.messages[1].content).toMatch(/called add_node/)
+    expect(calls[0].bodyParsed.messages[2].content).toMatch(/tool result: Created node n1/)
+  })
+
+  it('OpenAI: requires key, sends Bearer auth (tools not implemented yet — ignored)', async () => {
     await expect(openaiAdapter.chat({ model: 'm', messages: SAMPLE }, {})).rejects.toThrow(/API key/)
     const { calls } = installFetch({
       model: 'gpt-4o-mini',
       choices: [{ message: { content: 'reply' } }],
     })
     const out = await openaiAdapter.chat(
-      { model: 'gpt-4o-mini', messages: SAMPLE, jsonMode: true },
+      { model: 'gpt-4o-mini', messages: SAMPLE, tools: [{ name: 'add_node', description: 'x', inputSchema: {} }] },
       { apiKey: 'sk-x' },
     )
-    expect(out.content).toBe('reply')
+    expect(out.content).toEqual([{ type: 'text', text: 'reply' }])
     expect(calls[0].url).toBe('https://api.openai.com/v1/chat/completions')
     expect((calls[0].init.headers as Record<string, string>).Authorization).toBe('Bearer sk-x')
-    expect(calls[0].bodyParsed.response_format).toEqual({ type: 'json_object' })
+    expect(calls[0].bodyParsed.tools).toBeUndefined()
   })
 
-  it('Claude: splits system, sets x-api-key + version + browser-access headers', async () => {
-    await expect(claudeAdapter.chat({ model: 'm', messages: SAMPLE }, {})).rejects.toThrow(/API key/)
-    const { calls } = installFetch({
-      model: 'claude-3-5-sonnet-20241022',
-      content: [{ type: 'text', text: 'hello' }, { type: 'text', text: ' world' }],
+  describe('Claude — real tool-calling', () => {
+    it('splits system, sets x-api-key + version + browser-access headers, forwards tools, omits temperature', async () => {
+      await expect(claudeAdapter.chat({ model: 'm', messages: SAMPLE }, {})).rejects.toThrow(/API key/)
+      const { calls } = installFetch({
+        model: 'claude-haiku-4-5',
+        content: [{ type: 'text', text: 'hello' }],
+        stop_reason: 'end_turn',
+      })
+      const out = await claudeAdapter.chat(
+        {
+          model: 'claude-haiku-4-5',
+          messages: SAMPLE,
+          temperature: 0.2,
+          tools: [{ name: 'add_node', description: 'Add a node', inputSchema: { type: 'object', properties: {} } }],
+        },
+        { apiKey: 'k-claude' },
+      )
+      expect(out.content).toEqual([{ type: 'text', text: 'hello' }])
+      expect(out.stopReason).toBe('end_turn')
+      expect(calls[0].url).toBe('https://api.anthropic.com/v1/messages')
+      const headers = calls[0].init.headers as Record<string, string>
+      expect(headers['x-api-key']).toBe('k-claude')
+      expect(headers['anthropic-version']).toBe('2023-06-01')
+      expect(headers['anthropic-dangerous-direct-browser-access']).toBe('true')
+      expect(calls[0].bodyParsed.system).toBe('sys-1')
+      expect(calls[0].bodyParsed.messages).toEqual([{ role: 'user', content: 'hello' }])
+      expect(calls[0].bodyParsed.tools).toEqual([
+        { name: 'add_node', description: 'Add a node', input_schema: { type: 'object', properties: {} } },
+      ])
+      expect(calls[0].bodyParsed.temperature).toBeUndefined()
     })
-    const out = await claudeAdapter.chat(
-      { model: 'claude-3-5-sonnet-20241022', messages: SAMPLE },
-      { apiKey: 'k-claude' },
-    )
-    expect(out.content).toBe('hello world')
-    expect(calls[0].url).toBe('https://api.anthropic.com/v1/messages')
-    const headers = calls[0].init.headers as Record<string, string>
-    expect(headers['x-api-key']).toBe('k-claude')
-    expect(headers['anthropic-version']).toBe('2023-06-01')
-    expect(headers['anthropic-dangerous-direct-browser-access']).toBe('true')
-    expect(calls[0].bodyParsed.system).toBe('sys-1')
-    expect(calls[0].bodyParsed.messages).toEqual([{ role: 'user', content: 'hello' }])
+
+    it('maps tool_use response blocks to generic tool_call blocks with stopReason "tool_calls"', async () => {
+      installFetch({
+        model: 'claude-haiku-4-5',
+        content: [
+          { type: 'text', text: 'Adding a node.' },
+          { type: 'tool_use', id: 'call_1', name: 'add_node', input: { tempId: 't1', type: 'system', label: 'X' } },
+        ],
+        stop_reason: 'tool_use',
+      })
+      const out = await claudeAdapter.chat({ model: 'm', messages: SAMPLE }, { apiKey: 'k' })
+      expect(out.stopReason).toBe('tool_calls')
+      expect(out.content).toEqual([
+        { type: 'text', text: 'Adding a node.' },
+        { type: 'tool_call', id: 'call_1', name: 'add_node', input: { tempId: 't1', type: 'system', label: 'X' } },
+      ])
+    })
+
+    it('maps a tool_result-carrying user turn to Anthropic tool_result content blocks', async () => {
+      const { calls } = installFetch({ model: 'm', content: [], stop_reason: 'end_turn' })
+      await claudeAdapter.chat({
+        model: 'm',
+        messages: [
+          { role: 'user', content: 'go' },
+          { role: 'assistant', content: [{ type: 'tool_call', id: 'call_1', name: 'add_node', input: { label: 'X' } }] },
+          { role: 'user', content: [{ type: 'tool_result', toolCallId: 'call_1', content: 'Created node n1.', isError: false }] },
+        ],
+      }, { apiKey: 'k' })
+      expect(calls[0].bodyParsed.messages).toEqual([
+        { role: 'user', content: 'go' },
+        { role: 'assistant', content: [{ type: 'tool_use', id: 'call_1', name: 'add_node', input: { label: 'X' } }] },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call_1', content: 'Created node n1.', is_error: false }] },
+      ])
+    })
   })
 
-  it('Gemini: uses key in query string, separates system_instruction', async () => {
+  it('Gemini: uses key in query string, separates system_instruction (tools not implemented yet)', async () => {
     await expect(geminiAdapter.chat({ model: 'm', messages: SAMPLE }, {})).rejects.toThrow(/API key/)
     const { calls } = installFetch({
       modelVersion: 'gemini-1.5-flash',
       candidates: [{ content: { parts: [{ text: 'gem' }, { text: 'ini' }] } }],
     })
     const out = await geminiAdapter.chat(
-      { model: 'gemini-1.5-flash', messages: SAMPLE, jsonMode: true },
+      { model: 'gemini-1.5-flash', messages: SAMPLE },
       { apiKey: 'g-key' },
     )
-    expect(out.content).toBe('gemini')
+    expect(out.content).toEqual([{ type: 'text', text: 'gemini' }])
     expect(calls[0].url).toContain('/models/gemini-1.5-flash:generateContent')
     expect(calls[0].url).toContain('key=g-key')
     expect(calls[0].bodyParsed.system_instruction.parts[0].text).toBe('sys-1')
     expect(calls[0].bodyParsed.contents).toEqual([
       { role: 'user', parts: [{ text: 'hello' }] },
     ])
-    expect(calls[0].bodyParsed.generationConfig.responseMimeType).toBe('application/json')
   })
 
   it('Gemini: maps assistant role to "model"', async () => {

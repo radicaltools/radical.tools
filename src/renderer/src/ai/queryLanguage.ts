@@ -1,10 +1,9 @@
 import type { C4Node, C4Relation, DiagramView } from '../types/c4'
 
-export const MODEL_QUERY_LANGUAGE_HELP = `BUILT-IN MODEL QUERY LANGUAGE:
-When you need exact information from the CURRENT diagram structure, return one
-or more query_model ops and nothing else. The runner will execute them locally
-and send the results back to you in the next round. Do NOT mix query_model ops
-with mutation ops in the same response.
+export const MODEL_QUERY_LANGUAGE_HELP = `Query the CURRENT diagram structure with a small built-in query language —
+use this whenever you need exact data before answering or acting, instead of
+guessing from the context block. Free to call alongside other tools in the
+same turn.
 
 Syntax:
 - LIST NODES
@@ -32,21 +31,26 @@ Boolean logic in WHERE:
 - Parentheses are supported: ( ... )
 
 Supported node fields:
-- id, type, label, description, technology, parentId, external
+- id, type, label, description, technology, parentId, external,
+  plus any custom/governance property key for that node's type
+  (e.g. status, ears_type, category — see the metamodel context message)
 
 Supported relation fields:
-- id, sourceId, targetId, label, technology,
-  source.label, source.type, target.label, target.type
+- id, sourceId, targetId, label, technology, relationType,
+  source.label, source.type, target.label, target.type,
+  plus any custom property key for that relation's type
 
 Supported view fields:
-- id, name
+- id, name, kind
 
 Examples:
-- { "op": "query_model", "query": "LIST TECHNOLOGIES" }
-- { "op": "query_model", "query": "LIST NODES WHERE label ~ \"auth\" OR technology ~ \"oauth\" LIMIT 5" }
-- { "op": "query_model", "query": "LIST RELATIONS WHERE NOT technology = \"SQL\"" }
-- { "op": "query_model", "query": "GET NEIGHBORS OF node-123 DEPTH 2" }
-- { "op": "query_model", "query": "GET DEPENDENTS OF database-1 DEPTH 4" }`.trim()
+- "LIST TECHNOLOGIES"
+- "LIST NODES WHERE label ~ \"auth\" OR technology ~ \"oauth\" LIMIT 5"
+- "LIST NODES WHERE type = \"requirement\" AND ears_type = \"unwanted-behaviour\""
+- "LIST RELATIONS WHERE relationType = \"derives\""
+- "LIST VIEWS WHERE kind = \"table\""
+- "GET NEIGHBORS OF node-123 DEPTH 2"
+- "GET DEPENDENTS OF database-1 DEPTH 4"`.trim()
 
 export interface ModelQueryContext {
   nodes: Record<string, C4Node>
@@ -297,8 +301,14 @@ function viewNodeSet(view: DiagramView, nodes: Record<string, C4Node>): Set<stri
   return set
 }
 
+const LAYOUT_ONLY_NODE_KEYS = new Set(['collapsed', 'x', 'y', 'width', 'height'])
+
+/** Custom/governance properties ride as extra own-keys on the node/relation
+ *  (see diagramStore's addNode/updateNode/addRelation) — spread them in so
+ *  search results actually surface e.g. a Requirement's ears_type, not just
+ *  let WHERE filter on it. */
 function summarizeNode(node: C4Node) {
-  return {
+  const out: Record<string, unknown> = {
     id: node.id,
     type: node.type,
     label: node.label,
@@ -307,12 +317,18 @@ function summarizeNode(node: C4Node) {
     parentId: node.parentId ?? null,
     external: node.external ?? false,
   }
+  for (const [key, val] of Object.entries(node as unknown as Record<string, unknown>)) {
+    if (key in out || LAYOUT_ONLY_NODE_KEYS.has(key)) continue
+    if (val === undefined || val === '') continue
+    out[key] = val
+  }
+  return out
 }
 
 function summarizeRelation(rel: C4Relation, nodes: Record<string, C4Node>) {
   const source = nodes[rel.sourceId]
   const target = nodes[rel.targetId]
-  return {
+  const out: Record<string, unknown> = {
     id: rel.id,
     sourceId: rel.sourceId,
     sourceLabel: source?.label ?? null,
@@ -322,7 +338,14 @@ function summarizeRelation(rel: C4Relation, nodes: Record<string, C4Node>) {
     targetType: target?.type ?? null,
     label: rel.label ?? null,
     technology: rel.technology ?? null,
+    relationType: rel.relationType ?? null,
   }
+  for (const [key, val] of Object.entries(rel as unknown as Record<string, unknown>)) {
+    if (key in out) continue
+    if (val === undefined || val === '') continue
+    out[key] = val
+  }
+  return out
 }
 
 function summarizeView(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>) {
@@ -334,6 +357,7 @@ function summarizeView(view: DiagramView, nodes: Record<string, C4Node>, relatio
   return {
     id: view.id,
     name: view.name,
+    kind: view.kind ?? 'static',
     nodeCount: set.size,
     relationCount,
     hiddenRelationCount: hidden.size,
@@ -349,7 +373,10 @@ function getNodeField(node: C4Node, field: string): unknown {
     case 'technology': return node.technology ?? null
     case 'parentId': return node.parentId ?? null
     case 'external': return node.external ?? false
-    default: throw new Error(`Unsupported node field: ${field}`)
+    // Custom/governance properties (ears_type, status, category, ...) ride as
+    // extra own-keys on the node — fall through to a generic read instead of
+    // rejecting any field not in the fixed list above.
+    default: return (node as unknown as Record<string, unknown>)[field] ?? null
   }
 }
 
@@ -362,11 +389,12 @@ function getRelationField(rel: C4Relation, field: string, nodes: Record<string, 
     case 'targetId': return rel.targetId
     case 'label': return rel.label ?? null
     case 'technology': return rel.technology ?? null
+    case 'relationType': return rel.relationType ?? null
     case 'source.label': return source?.label ?? null
     case 'source.type': return source?.type ?? null
     case 'target.label': return target?.label ?? null
     case 'target.type': return target?.type ?? null
-    default: throw new Error(`Unsupported relation field: ${field}`)
+    default: return (rel as unknown as Record<string, unknown>)[field] ?? null
   }
 }
 
@@ -374,7 +402,8 @@ function getViewField(view: DiagramView, field: string): unknown {
   switch (field) {
     case 'id': return view.id
     case 'name': return view.name
-    default: throw new Error(`Unsupported view field: ${field}`)
+    case 'kind': return view.kind ?? 'static'
+    default: return (view as unknown as Record<string, unknown>)[field] ?? null
   }
 }
 

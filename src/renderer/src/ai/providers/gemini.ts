@@ -1,8 +1,13 @@
 // ─── Google Gemini provider ─────────────────────────────────────────────────
 // Uses the v1beta generateContent endpoint with API key in the query string.
 // System prompts go into `system_instruction`, the rest into `contents`.
+//
+// Real tool-calling for this provider isn't implemented yet (Stage 0 ships
+// Anthropic only) — this adapter stays usable as plain chat: it ignores
+// `req.tools` and flattens any tool_call/tool_result blocks to plain text.
 
 import type { ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig } from '../types'
+import { contentToText } from '../types'
 
 const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
@@ -14,11 +19,11 @@ function toGeminiContents(messages: ChatMessage[]): {
   const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = []
   for (const m of messages) {
     if (m.role === 'system') {
-      systems.push(m.content)
+      systems.push(contentToText(m.content))
     } else {
       contents.push({
         role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }],
+        parts: [{ text: contentToText(m.content) }],
       })
     }
   }
@@ -38,7 +43,6 @@ async function geminiChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
     generationConfig: {
       temperature: req.temperature ?? 0.2,
       maxOutputTokens: req.maxTokens ?? 2048,
-      responseMimeType: req.jsonMode ? 'application/json' : undefined,
     },
   }
   if (system) body.system_instruction = system
@@ -54,12 +58,16 @@ async function geminiChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
     throw new Error(`Gemini HTTP ${res.status}: ${text || res.statusText}`)
   }
   const data = await res.json() as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>
     modelVersion?: string
   }
   const parts = data?.candidates?.[0]?.content?.parts ?? []
-  const content = parts.map((p) => p?.text ?? '').join('')
-  return { content, model: data?.modelVersion }
+  const text = parts.map((p) => p?.text ?? '').join('')
+  return {
+    content: text ? [{ type: 'text', text }] : [],
+    model: data?.modelVersion,
+    stopReason: data?.candidates?.[0]?.finishReason === 'MAX_TOKENS' ? 'max_tokens' : 'end_turn',
+  }
 }
 
 export const geminiAdapter: ProviderAdapter = {

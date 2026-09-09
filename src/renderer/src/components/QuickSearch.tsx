@@ -6,7 +6,7 @@ import { loadAISettings } from '../ai/settings'
 import { getAdapter, listAdapters } from '../ai/registry'
 import { openAISettings } from './AISettingsModal'
 import type { AISettings, ChatMessage } from '../ai/types'
-import type { ApplyReport } from '../ai/applyPatch'
+import type { ApplyReport } from '../ai/diagramFacade'
 
 /**
  * Cmd/Ctrl+P quick-search palette.
@@ -42,7 +42,7 @@ export function QuickSearch(): React.ReactElement | null {
   const [aiSettings, setAiSettings] = useState<AISettings>(() => loadAISettings())
   const [aiBusy, setAiBusy] = useState(false)
   const [aiHistory, setAiHistory] = useState<ChatMessage[]>([])
-  const [aiLast, setAiLast] = useState<{ text: string; report?: ApplyReport; error?: string; retries?: number } | null>(null)
+  const [aiLast, setAiLast] = useState<{ text: string; report?: ApplyReport; error?: string; iterations?: number } | null>(null)
   const aiAbortRef = useRef<AbortController | null>(null)
 
   // Keep AI settings fresh when the user updates them in the modal.
@@ -86,6 +86,8 @@ export function QuickSearch(): React.ReactElement | null {
       useDiagramStore.getState().setViewNodes(viewId, nodeIds),
     removeView: (id: string) => useDiagramStore.getState().removeView(id),
     setActiveView: (id: string | null) => useDiagramStore.getState().setActiveView(id),
+    setViewKind: (id: string, kind: Parameters<ReturnType<typeof useDiagramStore.getState>['setViewKind']>[1]) =>
+      useDiagramStore.getState().setViewKind(id, kind),
     // ── diagram-level ──
     clearDiagram: () => {
       const s = useDiagramStore.getState()
@@ -119,6 +121,19 @@ export function QuickSearch(): React.ReactElement | null {
     if (!aiConfigured && aiMode) setAiMode(false)
   }, [aiConfigured, aiMode])
 
+  // Conversation history can carry provider-specific tool_call/tool_result
+  // blocks (only Anthropic implements real tool-calling so far — see
+  // providers/*.ts). Switching providers mid-session would otherwise replay
+  // that shape into an adapter that doesn't understand it, so start fresh.
+  const prevActiveProviderRef = useRef(aiSettings.active)
+  useEffect(() => {
+    if (prevActiveProviderRef.current !== aiSettings.active) {
+      prevActiveProviderRef.current = aiSettings.active
+      setAiHistory([])
+      setAiLast(null)
+    }
+  }, [aiSettings.active])
+
   const runAI = useCallback(async (text: string): Promise<void> => {
     const prompt = text.trim()
     if (!prompt || aiBusy) return
@@ -130,7 +145,6 @@ export function QuickSearch(): React.ReactElement | null {
     setAiLast(null)
     const ctl = new AbortController()
     aiAbortRef.current = ctl
-    const userTurn: ChatMessage = { role: 'user', content: prompt }
     try {
       const result = await runAIPrompt({
         prompt,
@@ -139,8 +153,8 @@ export function QuickSearch(): React.ReactElement | null {
         history: aiHistory,
         signal: ctl.signal,
       })
-      setAiHistory((h) => [...h, userTurn, { role: 'assistant', content: result.summary || 'Done.' }])
-      setAiLast({ text: result.summary || 'Done.', report: result.report, retries: result.retries })
+      setAiHistory((h) => [...h, ...result.history])
+      setAiLast({ text: result.summary || 'Done.', report: result.report, iterations: result.iterations })
       // Clear the input after a successful run so the next prompt starts fresh.
       setQ('')
       // If the AI issued a focus_node op, animate the camera to that node.
@@ -601,16 +615,16 @@ export function QuickSearch(): React.ReactElement | null {
                 <div className="qs-ai-text">
                   <span style={{ whiteSpace: 'pre-line' }}>{aiLast.text}</span>
                   {aiLast.report && <AIReportLine report={aiLast.report} />}
-                  {(aiLast.retries || aiHistory.length > 0) && (
+                  {(aiLast.iterations || aiHistory.length > 0) && (
                     <div className="qs-ai-meta">
-                      {aiLast.retries ? (
+                      {aiLast.iterations ? (
                         <span className="qs-ai-meta-pill">
-                          ↻ {aiLast.retries} corrective round{aiLast.retries === 1 ? '' : 's'}
+                          ↻ {aiLast.iterations} tool round{aiLast.iterations === 1 ? '' : 's'}
                         </span>
                       ) : null}
                       {aiHistory.length > 0 && (
                         <span className="qs-ai-meta-pill">
-                          {aiHistory.length / 2} turn{aiHistory.length / 2 === 1 ? '' : 's'} in context
+                          {aiHistory.length} message{aiHistory.length === 1 ? '' : 's'} in context
                         </span>
                       )}
                     </div>
@@ -739,6 +753,7 @@ function AIReportLine({ report }: { report: ApplyReport }): React.ReactElement {
   if (report.added.relations) parts.push(`+${report.added.relations} relation${report.added.relations === 1 ? '' : 's'}`)
   if (report.added.views) parts.push(`+${report.added.views} view${report.added.views === 1 ? '' : 's'}`)
   if (report.updated.nodes) parts.push(`~${report.updated.nodes} updated`)
+  if (report.updated.relations) parts.push(`~${report.updated.relations} relation${report.updated.relations === 1 ? '' : 's'} updated`)
   if (report.updated.views) parts.push(`~${report.updated.views} view${report.updated.views === 1 ? '' : 's'}`)
   if (report.deleted.nodes) parts.push(`−${report.deleted.nodes} node${report.deleted.nodes === 1 ? '' : 's'}`)
   if (report.deleted.relations) parts.push(`−${report.deleted.relations} relation${report.deleted.relations === 1 ? '' : 's'}`)

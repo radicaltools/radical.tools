@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { loadAISettings, saveAISettings } from '../ai/settings'
 import { listAdapters, getAdapter } from '../ai/registry'
 import type { AIProviderId, AISettings } from '../ai/types'
+import { textOf } from '../ai/types'
 
 interface Props {
   open: boolean
@@ -90,7 +91,7 @@ export function AISettingsModal({ open, onClose }: Props): React.ReactElement | 
         maxTokens: 8,
         temperature: 0,
       }, cfg)
-      const text = (res.content || '').trim().slice(0, 60)
+      const text = textOf(res.content).trim().slice(0, 60)
       setTest({ status: 'ok', message: text ? `OK · ${text}` : 'OK' })
     } catch (err) {
       setTest({ status: 'err', message: (err as Error).message?.slice(0, 140) || 'Request failed' })
