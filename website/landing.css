@@ -192,6 +192,10 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .cta.ghost:hover { border-color: var(--border-strong); background: var(--hover); }
 .hero-note { margin-top: 16px; font-size: 12.5px; color: var(--muted); }
 
+/* ── Harness ─────────────────────────────────────────────────────── */
+.harness { padding: 0 0 8px; }
+.harness .tiles { grid-template-columns: repeat(3, 1fr); padding: 0; }
+
 /* ── Tiles (four layers) ─────────────────────────────────────────── */
 .tiles {
   display: grid;
@@ -316,5 +320,6 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 @media (max-width: 760px) {
   .hero { padding: 44px 0 36px; }
   .hub, .install { grid-template-columns: 1fr; }
+  .harness .tiles { grid-template-columns: 1fr; }
   .chips { justify-content: flex-start; }
 }
