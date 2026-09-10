@@ -12,10 +12,18 @@
 
 import type { C4Node, C4Relation } from '../types/c4'
 import type { Metamodel } from '../types/metamodel'
-import { runSmartLayoutCore, runSmartLayoutELKPhase, type SmartLayoutResult } from './smartLayout'
+import {
+  runSmartLayoutCore,
+  runSmartLayoutELKPhase,
+  type SmartLayoutResult,
+  type SmartLayoutProgress,
+  type SmartLayoutOnProgress,
+} from './smartLayout'
 // Vite ?worker import — processed at build time into a separate worker chunk.
 // Static top-level import is required for Vite's worker plugin to detect it.
 import SmartLayoutWorkerClass from './smartLayout.worker?worker'
+
+export type { SmartLayoutProgress, SmartLayoutOnProgress }
 
 /**
  * Runs the layout in a dedicated Web Worker so the renderer thread stays
@@ -34,14 +42,15 @@ export async function runSmartLayout(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
   metamodel?: Metamodel,
+  onProgress?: SmartLayoutOnProgress,
 ): Promise<SmartLayoutResult> {
   // Node / Vitest — no Worker API, fall back to direct in-thread call.
   if (typeof Worker === 'undefined') {
-    return runSmartLayoutCore(nodes, relations, metamodel)
+    return runSmartLayoutCore(nodes, relations, metamodel, onProgress)
   }
 
   // Phase 1: ELK candidate generation on the main thread.
-  const elkResult = await runSmartLayoutELKPhase(nodes, relations, metamodel)
+  const elkResult = await runSmartLayoutELKPhase(nodes, relations, metamodel, onProgress)
   if (elkResult.done) {
     // All candidates failed — return the baseline result immediately.
     return elkResult.result
@@ -53,7 +62,15 @@ export async function runSmartLayout(
   return new Promise<SmartLayoutResult>((resolve, reject) => {
     const worker = new SmartLayoutWorkerClass()
 
-    worker.onmessage = (e: MessageEvent<{ type: 'result'; result: SmartLayoutResult } | { type: 'error'; message: string }>) => {
+    worker.onmessage = (e: MessageEvent<
+      | { type: 'result'; result: SmartLayoutResult }
+      | { type: 'error'; message: string }
+      | { type: 'progress'; progress: SmartLayoutProgress }
+    >) => {
+      if (e.data.type === 'progress') {
+        onProgress?.(e.data.progress)
+        return
+      }
       worker.terminate()
       if (e.data.type === 'result') {
         resolve(e.data.result)

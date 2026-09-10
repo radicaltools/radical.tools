@@ -11,9 +11,10 @@
  * Main → Worker  { nodes, relations, valid, rootIds, baseline }
  * Worker → Main  { type: 'result', result: SmartLayoutResult }
  *              | { type: 'error',  message: string }
+ *              | { type: 'progress', progress: SmartLayoutProgress }
  */
 
-import { runSmartLayoutSAPhase, type SmartLayoutResult, type SmartLayoutCandidate } from './smartLayout'
+import { runSmartLayoutSAPhase, type SmartLayoutResult, type SmartLayoutCandidate, type SmartLayoutProgress } from './smartLayout'
 import type { C4Node, C4Relation } from '../types/c4'
 import type { LayoutMetrics } from './crossingOpt'
 
@@ -26,7 +27,10 @@ self.onmessage = async (e: MessageEvent) => {
     baseline: LayoutMetrics
   }
   try {
-    const result: SmartLayoutResult = await runSmartLayoutSAPhase(nodes, relations, valid, rootIds, baseline)
+    const result: SmartLayoutResult = await runSmartLayoutSAPhase(
+      nodes, relations, valid, rootIds, baseline,
+      (progress: SmartLayoutProgress) => self.postMessage({ type: 'progress', progress }),
+    )
     self.postMessage({ type: 'result', result })
   } catch (err) {
     self.postMessage({ type: 'error', message: String(err) })

@@ -12,14 +12,8 @@ import { d3adaptor, Layout, InputNode, Group, Link } from 'webcola'
 import { dispatch } from 'd3-dispatch'
 import { timer } from 'd3-timer'
 import { drag as d3drag } from 'd3-drag'
-import {
-  C4Node,
-  C4Relation,
-  COLLAPSED_HEIGHT,
-  COLLAPSED_WIDTH,
-  NODE_SIZES,
-  isContainerType,
-} from '../types/c4'
+import { C4Node, C4Relation } from '../types/c4'
+import { effectiveWidth, effectiveHeight, isVisible } from './geometry'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,26 +39,6 @@ interface C4Group extends Group {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function effectiveWidth(n: C4Node): number {
-  if (isContainerType(n.type) && n.collapsed)
-    return COLLAPSED_WIDTH[n.type]
-  return n.width ?? NODE_SIZES[n.type].width
-}
-
-function effectiveHeight(n: C4Node): number {
-  if (isContainerType(n.type) && n.collapsed)
-    return COLLAPSED_HEIGHT[n.type]
-  return n.height ?? NODE_SIZES[n.type].height
-}
-
-function isVisible(node: C4Node, all: Record<string, C4Node>): boolean {
-  if (!node.parentId) return true
-  const parent = all[node.parentId]
-  if (!parent) return true
-  if (parent.collapsed) return false
-  return isVisible(parent, all)
-}
 
 /** Walk parent chain to compute absolute top-left from relative positions. */
 function toAbsoluteTopLeft(n: C4Node, all: Record<string, C4Node>): { x: number; y: number } {

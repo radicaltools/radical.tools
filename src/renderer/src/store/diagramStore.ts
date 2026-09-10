@@ -41,15 +41,43 @@ import {
   inferRelationType,
 } from '../types/metamodel'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
-import { applyElkLayout, applyTreeLayout } from '../layout/elkLayout'
-import { applyColaLayout } from '../layout/colaLayout'
+import { applyTreeLayout } from '../layout/elkLayout'
 import { applyRadicalLayout } from '../layout/radicalLayout'
-import { runSmartLayout } from '../layout/smartLayoutRunner'
-import { applyReferenceLayout } from '../layout/referenceLayout'
+import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '../layout/crossingOpt'
 import { LiveColaLayout } from '../layout/liveColaLayout'
 import { documents, useDocumentsStore } from './documentStore'
 import { isViewerProfile } from '../runtime'
+
+// ─── Smart Layout "why this layout" report ───────────────────────────────────
+//
+// Distilled from SmartLayoutResult after every run and kept in the store so
+// the UI can show the full candidate ranking (previously a console.info-only
+// breadcrumb) instead of it being invisible to anyone not watching DevTools.
+
+export interface SmartLayoutReportCandidate {
+  name: string
+  composite: number
+  crossings: number
+  renderedCrossings: number
+  overdraws: number
+  renderedOverdraws: number
+  nodeOverlap: number
+  edgeLengthMean: number
+  aspectPenalty: number
+  symmetryDeficit: number
+}
+
+export interface SmartLayoutReport {
+  timestamp: number
+  winnerName: string
+  /** Ranked ascending by composite score (index 0 = best pre-refinement candidate). */
+  candidates: SmartLayoutReportCandidate[]
+  before: { crossings: number; overdraws: number }
+  after: { crossings: number; overdraws: number }
+  refinement: { before: number; after: number; iterations: number }
+  planarity: { verdict: 'planar' | 'near-planar' | 'tangled'; crossingEdges: number; totalEdges: number }
+}
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -888,6 +916,10 @@ interface DiagramStore {
   selectedNodeIds: string[]
   layoutMode: 'elk' | 'cola' | 'radical'
   isLayoutRunning: boolean
+  /** Live in-run status for the Smart Layout button (which candidate is being tried / which SA phase is refining). */
+  smartLayoutProgress: SmartLayoutProgress | null
+  /** Full candidate ranking + SA stats from the last Smart Layout run — powers the "why this layout" panel. */
+  lastSmartLayoutReport: SmartLayoutReport | null
   liveLayoutActive: boolean
 
   // ── connect mode ──
@@ -990,10 +1022,7 @@ interface DiagramStore {
   resolveOverlaps: (draggedId: string) => void
 
   // ── actions: layout ──
-  runElkLayout: () => Promise<void>
-  runColaLayout: () => void
   runRadicalLayout: () => void
-  runReferenceLayout: () => void
   runTreeLayout: () => Promise<void>
   runSmartLayout: () => Promise<void>
   setLayoutMode: (mode: 'elk' | 'cola' | 'radical') => void
@@ -1277,6 +1306,8 @@ export const useDiagramStore = create<DiagramStore>()(
       selectedNodeIds: [],
       layoutMode: 'radical',
       isLayoutRunning: false,
+      smartLayoutProgress: null,
+      lastSmartLayoutReport: null,
       liveLayoutActive: true,
       connectSource: null,
       connectionModifier: 'alt' as const,
@@ -2783,108 +2814,6 @@ export const useDiagramStore = create<DiagramStore>()(
         }
       },
 
-      async runElkLayout() {
-        if (get().appMode !== 'designer') return
-        set((state) => { state.isLayoutRunning = true })
-        try {
-          const state = get()
-          const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-          const vf = computeViewNodeSet(view, state.c4Nodes)
-          const vcs = computeViewCollapsedSet(vf, state.c4Nodes)
-          const { nodes: c4Nodes, relations: c4Relations } = filterForView(state.c4Nodes, state.c4Relations, vf, vcs)
-          const positions = await applyElkLayout(c4Nodes, c4Relations)
-          set((state) => {
-            for (const [id, pos] of Object.entries(positions)) {
-              const node = state.c4Nodes[id]
-              if (!node) continue
-              node.x = pos.x
-              node.y = pos.y
-              if (pos.width)  node.width  = pos.width
-              if (pos.height) node.height = pos.height
-            }
-          })
-
-          // ── Crossing minimisation post-process ──────────────────────────
-          const { nodes: viewNodes, relations: viewRels } = filterForView(get().c4Nodes, get().c4Relations, vf, vcs)
-          const crossOpt = minimizeCrossings(viewNodes, viewRels)
-          if (Object.keys(crossOpt).length > 0) {
-            set((state) => {
-              for (const [id, pos] of Object.entries(crossOpt)) {
-                const n = state.c4Nodes[id]
-                if (n) { n.x = pos.x; n.y = pos.y }
-              }
-            })
-            // Swapping children positions can move large nodes past their
-            // parent boundary — resize every parent to fit after the swap.
-            get()._resizeParentsBottomUp(vf, vcs)
-          }
-
-          get()._sync()
-
-          // ── Post-layout collision safety pass ───────────────────────────
-          const { nodes: safetyNodes } = filterForView(get().c4Nodes, get().c4Relations, vf, vcs)
-          const rootIds = Object.values(safetyNodes)
-            .filter((n) => !n.parentId)
-            .map((n) => n.id)
-          for (const id of rootIds) {
-            const updates = separateSiblings(id, safetyNodes)
-            if (Object.keys(updates).length > 0) {
-              set((state) => {
-                for (const [sid, pos] of Object.entries(updates)) {
-                  const n = state.c4Nodes[sid]
-                  if (n) { n.x = pos.x; n.y = pos.y }
-                }
-              })
-            }
-          }
-          if (rootIds.length > 0) get()._sync()
-        } finally {
-          set((state) => { state.isLayoutRunning = false })
-        }
-      },
-
-      runColaLayout() {
-        if (get().appMode !== 'designer') return
-        set((state) => { state.isLayoutRunning = true })
-        try {
-          const state = get()
-          const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-          const vf = computeViewNodeSet(view, state.c4Nodes)
-          const vcs = computeViewCollapsedSet(vf, state.c4Nodes)
-          const { nodes: c4Nodes, relations: c4Relations } = filterForView(state.c4Nodes, state.c4Relations, vf, vcs)
-          const positions = applyColaLayout(c4Nodes, c4Relations)
-          set((state) => {
-            for (const [id, pos] of Object.entries(positions)) {
-              const node = state.c4Nodes[id]
-              if (!node) continue
-              node.x = pos.x
-              node.y = pos.y
-            }
-          })
-
-          // Cola only positions nodes — resize parent containers bottom-up
-          get()._resizeParentsBottomUp(vf, vcs)
-
-          // ── Crossing minimisation post-process ──────────────────────────
-          const { nodes: viewNodes, relations: viewRels } = filterForView(get().c4Nodes, get().c4Relations, vf, vcs)
-          const crossOpt = minimizeCrossings(viewNodes, viewRels)
-          if (Object.keys(crossOpt).length > 0) {
-            set((state) => {
-              for (const [id, pos] of Object.entries(crossOpt)) {
-                const n = state.c4Nodes[id]
-                if (n) { n.x = pos.x; n.y = pos.y }
-              }
-            })
-            // Swapping children can overflow parents — resize again.
-            get()._resizeParentsBottomUp(vf, vcs)
-          }
-
-          get()._sync()
-        } finally {
-          set((state) => { state.isLayoutRunning = false })
-        }
-      },
-
       runRadicalLayout() {
         if (get().appMode !== 'designer') return
         set((state) => { state.isLayoutRunning = true })
@@ -2941,33 +2870,6 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           }
           if (rootIds.length > 0) get()._sync()
-        } finally {
-          set((state) => { state.isLayoutRunning = false })
-        }
-      },
-
-      runReferenceLayout() {
-        if (get().appMode !== 'designer') return
-        set((state) => { state.isLayoutRunning = true })
-        try {
-          const state = get()
-          const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-          const vf = computeViewNodeSet(view, state.c4Nodes)
-          const vcs = computeViewCollapsedSet(vf, state.c4Nodes)
-          const { nodes: c4Nodes } = filterForView(state.c4Nodes, state.c4Relations, vf, vcs)
-          const positions = applyReferenceLayout(c4Nodes)
-          set((state) => {
-            for (const [id, pos] of Object.entries(positions)) {
-              const node = state.c4Nodes[id]
-              if (!node) continue
-              node.x = pos.x
-              node.y = pos.y
-              if (pos.width)  node.width  = pos.width
-              if (pos.height) node.height = pos.height
-            }
-          })
-          get()._resizeParentsBottomUp(vf, vcs)
-          get()._sync()
         } finally {
           set((state) => { state.isLayoutRunning = false })
         }
@@ -3048,14 +2950,16 @@ export const useDiagramStore = create<DiagramStore>()(
             return
           }
         }
-        set((state) => { state.isLayoutRunning = true })
+        set((state) => { state.isLayoutRunning = true; state.smartLayoutProgress = { phase: 'candidates', done: 0, total: 10 } })
         try {
           const state = get()
           const view = state.activeViewId ? state.views[state.activeViewId] : undefined
           const vf = computeViewNodeSet(view, state.c4Nodes)
           const vcs = computeViewCollapsedSet(vf, state.c4Nodes)
           const { nodes: c4Nodes, relations: c4Relations } = filterForView(state.c4Nodes, state.c4Relations, vf, vcs)
-          const result = await runSmartLayout(c4Nodes, c4Relations, state.metamodel as Metamodel | undefined)
+          const result = await runSmartLayout(c4Nodes, c4Relations, state.metamodel as Metamodel | undefined, (progress) => {
+            set((s) => { s.smartLayoutProgress = progress })
+          })
           if (result.candidates.length === 0) {
             get().pushNotification('Smart layout: no candidate produced a result.', 'warning')
             return
@@ -3142,11 +3046,38 @@ export const useDiagramStore = create<DiagramStore>()(
               `${c.name} [composite=${c.score.composite.toFixed(0)} cross=${c.metrics.crossings}(rend${c.score.renderedCrossings}) over=${c.metrics.overdraws}(rend${c.score.renderedOverdraws}) loop=${c.score.stubLoopPenalty.toFixed(2)} olap=${c.score.nodeOverlap.toFixed(1)} long=${c.score.edgeLengthExcess.toFixed(1)} lmean=${c.score.edgeLengthMean.toFixed(2)} leaf=${c.score.leafCentrality.toFixed(2)} ar=${c.score.aspectPenalty.toFixed(2)} sym=${c.score.symmetryDeficit.toFixed(2)}]`,
             ).join(' | '),
           )
+          // Same ranking, surfaced to the UI (previously console-only) so a
+          // "why this layout?" panel can show it without opening DevTools.
+          const report: SmartLayoutReport = {
+            timestamp: Date.now(),
+            winnerName: result.winner.name,
+            candidates: result.candidates.map((c) => ({
+              name: c.name,
+              composite: c.score.composite,
+              crossings: c.metrics.crossings,
+              renderedCrossings: c.score.renderedCrossings,
+              overdraws: c.metrics.overdraws,
+              renderedOverdraws: c.score.renderedOverdraws,
+              nodeOverlap: c.score.nodeOverlap,
+              edgeLengthMean: c.score.edgeLengthMean,
+              aspectPenalty: c.score.aspectPenalty,
+              symmetryDeficit: c.score.symmetryDeficit,
+            })),
+            before: { crossings: before.crossings, overdraws: before.overdraws },
+            after: { crossings: after.crossings, overdraws: after.overdraws },
+            refinement: result.refinement,
+            planarity: {
+              verdict: result.planarity.verdict,
+              crossingEdges: result.planarity.crossingEdges,
+              totalEdges: result.planarity.totalEdges,
+            },
+          }
+          set((state) => { state.lastSmartLayoutReport = report })
         } catch (err) {
           console.error('[smartLayout] failed:', err)
           get().pushNotification('Smart layout failed — see console.', 'error')
         } finally {
-          set((state) => { state.isLayoutRunning = false })
+          set((state) => { state.isLayoutRunning = false; state.smartLayoutProgress = null })
         }
       },
 

@@ -15,10 +15,15 @@
 import ELK from 'elkjs/lib/elk.bundled.js'
 import type { ElkNode, ElkExtendedEdge, LayoutOptions } from 'elkjs'
 import { C4Node, C4Relation, PositionMap, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType } from '../types/c4'
+import { ELK_ROOT_SPACING, ELK_CHILD_SPACING } from './elkSpacingBase'
 
 const elk = new ELK()
 
 // ─── ELK layout options ──────────────────────────────────────────────────────
+//
+// Spacing numbers live in elkSpacingBase.ts, shared with smartLayout.ts's
+// ensemble candidates so tuning one propagates to the other instead of
+// silently drifting apart.
 
 const LAYERED_OPTIONS: LayoutOptions = {
   'elk.algorithm': 'layered',
@@ -31,7 +36,6 @@ const LAYERED_OPTIONS: LayoutOptions = {
 
   // ── Connected-component placement ────────────────────────────────────────
   'elk.separateConnectedComponents': 'true',
-  'elk.spacing.componentComponent': '80',
 
   // ── Crossing minimisation ─────────────────────────────────────────────────
   'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
@@ -43,10 +47,7 @@ const LAYERED_OPTIONS: LayoutOptions = {
   'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
 
   // ── Spacing ───────────────────────────────────────────────────────────────
-  'elk.spacing.nodeNode': '60',
-  'elk.layered.spacing.nodeNodeBetweenLayers': '80',
-  'elk.spacing.edgeNode': '20',
-  'elk.spacing.edgeEdge': '10',
+  ...ELK_ROOT_SPACING,
 
   // ── Post-layout ──────────────────────────────────────────────────────────
   'elk.layered.unnecessaryBendpoints': 'true',
@@ -61,16 +62,12 @@ const CHILD_OPTIONS: LayoutOptions = {
   'elk.algorithm': 'layered',
   'elk.direction': 'RIGHT',
   'elk.separateConnectedComponents': 'true',
-  'elk.spacing.componentComponent': '40',
   'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
   'elk.layered.crossingMinimization.greedySwitch.type': 'TWO_SIDED',
   'elk.layered.thoroughness': '50',
   'elk.layered.considerModelOrder.strategy': 'NONE',
   'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
-  'elk.spacing.nodeNode': '30',
-  'elk.layered.spacing.nodeNodeBetweenLayers': '50',
-  'elk.spacing.edgeNode': '12',
-  'elk.spacing.edgeEdge': '8',
+  ...ELK_CHILD_SPACING,
   'elk.layered.unnecessaryBendpoints': 'true',
   'elk.layered.compaction.postCompaction.strategy': 'EDGE_LENGTH',
   'elk.padding': '[top=110, right=20, bottom=20, left=20]',
