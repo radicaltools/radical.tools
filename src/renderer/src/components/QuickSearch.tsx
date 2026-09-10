@@ -4,6 +4,8 @@ import { useOutsideClick } from '../hooks/useOutsideClick'
 import { runAIPrompt } from '../ai/runner'
 import { loadAISettings } from '../ai/settings'
 import { getAdapter, listAdapters } from '../ai/registry'
+import { useDiagramFacade } from '../ai/useDiagramFacade'
+import { AIReportLine } from './AIReportLine'
 import { openAISettings } from './AISettingsModal'
 import type { AISettings, ChatMessage } from '../ai/types'
 import type { ApplyReport } from '../ai/diagramFacade'
@@ -58,51 +60,7 @@ export function QuickSearch(): React.ReactElement | null {
 
   // Diagram facade — read fresh from the store on every call so the AI sees
   // the latest state even mid-session.
-  const aiDiagram = useMemo(() => ({
-    getNodes: () => useDiagramStore.getState().c4Nodes,
-    getRelations: () => useDiagramStore.getState().c4Relations,
-    getMetamodel: () => useDiagramStore.getState().metamodel,
-    getActiveView: () => {
-      const s = useDiagramStore.getState()
-      if (!s.activeViewId) return null
-      const v = s.views[s.activeViewId]
-      if (!v) return null
-      return { id: v.id, name: v.name, nodeIds: v.nodeIds }
-    },
-    addNode: (n: Parameters<ReturnType<typeof useDiagramStore.getState>['addNode']>[0]) =>
-      useDiagramStore.getState().addNode(n),
-    updateNode: (id: string, u: Parameters<ReturnType<typeof useDiagramStore.getState>['updateNode']>[1]) =>
-      useDiagramStore.getState().updateNode(id, u),
-    removeNode: (id: string) => useDiagramStore.getState().removeNode(id),
-    addRelation: (r: Parameters<ReturnType<typeof useDiagramStore.getState>['addRelation']>[0]) =>
-      useDiagramStore.getState().addRelation(r),
-    updateRelation: (id: string, u: Parameters<ReturnType<typeof useDiagramStore.getState>['updateRelation']>[1]) =>
-      useDiagramStore.getState().updateRelation(id, u),
-    removeRelation: (id: string) => useDiagramStore.getState().removeRelation(id),
-    // ── views ──
-    getViews: () => useDiagramStore.getState().views,
-    addView: (name: string) => useDiagramStore.getState().addView(name),
-    setViewNodes: (viewId: string, nodeIds: string[]) =>
-      useDiagramStore.getState().setViewNodes(viewId, nodeIds),
-    removeView: (id: string) => useDiagramStore.getState().removeView(id),
-    setActiveView: (id: string | null) => useDiagramStore.getState().setActiveView(id),
-    setViewKind: (id: string, kind: Parameters<ReturnType<typeof useDiagramStore.getState>['setViewKind']>[1]) =>
-      useDiagramStore.getState().setViewKind(id, kind),
-    // ── diagram-level ──
-    clearDiagram: () => {
-      const s = useDiagramStore.getState()
-      s.loadDiagram({
-        nodes: [],
-        relations: [],
-        views: [],
-        defaultPositions: {},
-        defaultViewport: null,
-        snapshots: [],
-        presentations: [],
-        metamodel: s.metamodel,
-      })
-    },
-  }), [])
+  const aiDiagram = useDiagramFacade()
 
   const aiAdapterCfg = aiSettings.providers[aiSettings.active]
   const aiAdapter = getAdapter(aiSettings.active)
@@ -747,25 +705,3 @@ export function QuickSearch(): React.ReactElement | null {
   )
 }
 
-function AIReportLine({ report }: { report: ApplyReport }): React.ReactElement {
-  const parts: string[] = []
-  if (report.added.nodes) parts.push(`+${report.added.nodes} node${report.added.nodes === 1 ? '' : 's'}`)
-  if (report.added.relations) parts.push(`+${report.added.relations} relation${report.added.relations === 1 ? '' : 's'}`)
-  if (report.added.views) parts.push(`+${report.added.views} view${report.added.views === 1 ? '' : 's'}`)
-  if (report.updated.nodes) parts.push(`~${report.updated.nodes} updated`)
-  if (report.updated.relations) parts.push(`~${report.updated.relations} relation${report.updated.relations === 1 ? '' : 's'} updated`)
-  if (report.updated.views) parts.push(`~${report.updated.views} view${report.updated.views === 1 ? '' : 's'}`)
-  if (report.deleted.nodes) parts.push(`−${report.deleted.nodes} node${report.deleted.nodes === 1 ? '' : 's'}`)
-  if (report.deleted.relations) parts.push(`−${report.deleted.relations} relation${report.deleted.relations === 1 ? '' : 's'}`)
-  if (report.deleted.views) parts.push(`−${report.deleted.views} view${report.deleted.views === 1 ? '' : 's'}`)
-  return (
-    <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-muted)' }}>
-      {parts.length ? parts.join(' · ') : 'No changes'}
-      {report.errors.length > 0 && (
-        <div style={{ color: '#ff8888', marginTop: 2 }}>
-          {report.errors.map((e, i) => <div key={i}>⚠ {e}</div>)}
-        </div>
-      )}
-    </div>
-  )
-}

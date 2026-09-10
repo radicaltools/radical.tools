@@ -184,6 +184,44 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
+  // ── Gherkin Scenario ─────────────────────────────────────────────────────
+
+  const scenarioProps: PropertyDef[] = [
+    { key: 'given',   label: 'Given', type: 'textarea' },
+    { key: 'when',    label: 'When',  type: 'textarea' },
+    { key: 'then',    label: 'Then',  type: 'textarea' },
+    { key: 'gherkin', label: 'Extra steps (And/But, raw Gherkin)', type: 'textarea' },
+  ]
+
+  const scenario: NodeTypeDef = {
+    id: 'scenario',
+    label: 'Scenario',
+    color: '#166534',
+    fg: '#fff',
+    // Play/run triangle in a rounded frame
+    iconPath: 'M3 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H3Zm3.5 2.5 5 3.5-5 3.5v-7Z',
+    width: 200,
+    height: 80,
+    collapsedWidth: 180,
+    collapsedHeight: 80,
+    allowedParents: ['system', 'domain', 'group'],
+    allowedAtRoot: true,
+    builtin: true,
+    tableTab: true,
+    properties: scenarioProps,
+  }
+
+  // scenario → requirement: this scenario verifies that requirement
+  const verifiesTargets = ['requirement'] as const
+  const verifies: RelationTypeDef = {
+    id: 'verifies',
+    label: 'Verifies',
+    allowedPairs: verifiesTargets.map(to => ({ from: 'scenario', to })),
+    properties: [],
+    color: '#16a34a',
+    builtin: true,
+  }
+
   // ── Blueprint ─────────────────────────────────────────────────────────────
 
   const blueprintProps: PropertyDef[] = [
@@ -226,6 +264,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
       adr,
       'fitness-fn': fitnessFn,
       requirement,
+      scenario,
       blueprint,
     },
     relationTypes: {
@@ -236,6 +275,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
       satisfies,
       derives,
       'traces-to': tracesTo,
+      verifies,
     },
   }
 }

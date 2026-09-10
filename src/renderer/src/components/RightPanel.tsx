@@ -62,7 +62,7 @@ const PALETTE_GROUPS: { label: string; types: string[] }[] = [
   { label: 'C4',          types: ['person', 'system', 'container', 'component', 'database', 'webapp', 'queue'] },
   { label: 'Domain',      types: ['domain'] },
   { label: 'Governance',  types: ['adr', 'fitness-fn', 'blueprint'] },
-  { label: 'Requirements',types: ['requirement'] },
+  { label: 'Requirements',types: ['requirement', 'scenario'] },
   { label: 'Other',       types: ['group'] },
 ]
 

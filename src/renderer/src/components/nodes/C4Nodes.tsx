@@ -732,6 +732,63 @@ export const FitnessFnNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
 
 FitnessFnNode.displayName = 'FitnessFnNode'
 
+// ─── Scenario Node (Gherkin) ────────────────────────────────────────────────
+//
+// Compact pill: green header strip + label on one line.
+
+const SCENARIO_COLOR = '#166534'
+
+export const ScenarioNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useDiagramStore(s => s.c4Nodes[data.c4id]) as unknown as Record<string, unknown> | undefined
+  const given = String(node?.given ?? '').trim()
+  const when = String(node?.when ?? '').trim()
+  const then = String(node?.then ?? '').trim()
+  const preview = [given && `Given ${given}`, when && `When ${when}`, then && `Then ${then}`].filter(Boolean).join(' · ')
+
+  return (
+    <div
+      className="c4-node"
+      style={{
+        position: 'relative',
+        width: data.width,
+        height: data.height,
+        background: SCENARIO_COLOR,
+        border: `2px solid ${selected ? 'var(--accent)' : 'rgba(0,0,0,0.25)'}`,
+        borderRadius: 6,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+
+      {/* Row 1: type */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
+        <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' }}>
+          SCENARIO
+        </span>
+      </div>
+
+      {/* Row 2: label */}
+      <div style={{ padding: '2px 7px 0', overflow: 'hidden' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+          {data.label}
+        </span>
+      </div>
+
+      {/* Row 3: given/when/then preview */}
+      <div style={{ flex: 1, padding: '2px 7px 4px', overflow: 'hidden' }}>
+        <span style={{ fontSize: 9, color: preview ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', fontStyle: 'italic', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {preview || 'Given / When / Then…'}
+        </span>
+      </div>
+    </div>
+  )
+})
+
+ScenarioNode.displayName = 'ScenarioNode'
+
 // ─── Requirement Node (EARS) ──────────────────────────────────────────────────
 //
 // Compact pill: teal/cyan header strip with the EARS sentence below.
