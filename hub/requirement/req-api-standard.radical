@@ -5,6 +5,7 @@
     "name": "API-First Contract",
     "description": "Every capability is available through a documented, versioned API described by a machine-readable specification.",
     "tags": [
+      "principle",
       "interoperability",
       "api",
       "openapi",

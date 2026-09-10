@@ -5,6 +5,7 @@
     "name": "Event Schema Compatibility",
     "description": "Published event schemas evolve without breaking existing consumers.",
     "tags": [
+      "principle",
       "interoperability",
       "messaging",
       "schema",

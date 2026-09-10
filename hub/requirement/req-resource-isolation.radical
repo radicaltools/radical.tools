@@ -5,6 +5,7 @@
     "name": "Tenant / Workload Resource Isolation",
     "description": "One tenant's or workload's resource consumption must not degrade service for any other tenant or workload sharing the same infrastructure.",
     "tags": [
+      "principle",
       "multi-tenancy",
       "isolation",
       "co-existence",

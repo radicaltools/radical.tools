@@ -5,6 +5,7 @@
     "name": "Idempotent Write Operations",
     "description": "Retried or duplicated requests must not create duplicate side effects such as double orders or double charges.",
     "tags": [
+      "principle",
       "reliability",
       "correctness",
       "api"

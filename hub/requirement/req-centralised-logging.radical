@@ -5,6 +5,7 @@
     "name": "Structured Centralised Logging",
     "description": "All services emit structured logs with correlation identifiers into one queryable store.",
     "tags": [
+      "principle",
       "observability",
       "logging",
       "operations"

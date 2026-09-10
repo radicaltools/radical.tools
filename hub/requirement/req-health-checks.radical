@@ -5,6 +5,7 @@
     "name": "Health Endpoints",
     "description": "Every service exposes liveness and readiness endpoints that orchestrators and load balancers can rely on.",
     "tags": [
+      "principle",
       "observability",
       "operations",
       "kubernetes"

@@ -5,6 +5,7 @@
     "name": "API Rate Limiting",
     "description": "Per-client request quotas that protect shared capacity from abusive or runaway clients.",
     "tags": [
+      "principle",
       "security",
       "api",
       "resilience"

@@ -5,6 +5,7 @@
     "name": "Referential Data Integrity",
     "description": "No orphaned or inconsistent records across entity relationships, whether enforced by the database or the application.",
     "tags": [
+      "principle",
       "reliability",
       "correctness",
       "data-integrity"

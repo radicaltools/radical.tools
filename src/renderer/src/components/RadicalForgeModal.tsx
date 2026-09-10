@@ -23,6 +23,14 @@ const HUB_CATEGORIES_FOR_STAGE: Partial<Record<ForgeStageId, HubCategory[]>> = {
   fitness: ['fitness-function'],
 }
 
+/** Requirements tagged this way are generic, domain-agnostic engineering
+ *  tenets (idempotency, least privilege, resource isolation, ...) rather
+ *  than product-specific behaviour — a "principle" is modeled as a kind of
+ *  requirement (a tag), not a new concept type. The C4 stage treats them as
+ *  decomposition guidance alongside patterns/ADRs. */
+const PRINCIPLE_TAG = 'principle'
+const PRINCIPLE_MATCH_LIMIT = 2
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -155,6 +163,12 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       const categories = HUB_CATEGORIES_FOR_STAGE[stage.id]
       if (categories) out[stage.id] = findRelevantConcepts(hubConcepts, categories, description, activeMetamodelId)
     }
+    // Decomposition guidance for the C4 stage also draws on "principle"-tagged
+    // requirements (see PRINCIPLE_TAG above) — searched separately so they
+    // don't get crowded out by the (much larger) pattern/adr pool.
+    const principleReqs = hubConcepts.filter((c) => c.category === 'requirement' && c.tags.includes(PRINCIPLE_TAG))
+    const principleMatches = findRelevantConcepts(principleReqs, 'requirement', description, activeMetamodelId, PRINCIPLE_MATCH_LIMIT)
+    if (principleMatches.length) out.c4 = [...(out.c4 ?? []), ...principleMatches]
     return out
   }, [hubConcepts, description, activeMetamodelId])
 

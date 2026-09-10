@@ -5,6 +5,7 @@
     "name": "Input Validation & Injection Protection",
     "description": "Every untrusted input is validated and, wherever it reaches an interpreter (SQL, shell, HTML, LDAP), passed through a parameterised or context-aware escaping API — never concatenated directly into a command or query.",
     "tags": [
+      "principle",
       "security",
       "owasp",
       "injection",
