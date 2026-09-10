@@ -611,6 +611,15 @@ export function Toolbar(): React.ReactElement {
     return () => window.removeEventListener('radical:open-ai-settings', onOpen as EventListener)
   }, [])
 
+  // Lets WelcomeScreen (rendered as a sibling overlay, before any document is
+  // open) launch Radical Forge right after creating the blank model it opens
+  // into — same window-event pattern as the AI settings modal above.
+  useEffect(() => {
+    const onOpen = () => setForgeOpen(true)
+    window.addEventListener('radical:open-forge', onOpen as EventListener)
+    return () => window.removeEventListener('radical:open-forge', onOpen as EventListener)
+  }, [])
+
   return (
     <div className="toolbar">
       <AISettingsModal open={aiSettingsOpen} onClose={handleCloseAISettings} />

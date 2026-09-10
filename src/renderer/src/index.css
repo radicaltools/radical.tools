@@ -5802,6 +5802,16 @@ body {
   background: #e4eaff;
 }
 
+.welcome-btn-forge {
+  background: linear-gradient(135deg, #f0f4ff, #faf0ff);
+  color: #5b3fb0;
+  border-color: #dcc9f7;
+}
+
+.welcome-btn-forge:hover {
+  background: linear-gradient(135deg, #e4eaff, #f3e4ff);
+}
+
 .welcome-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
