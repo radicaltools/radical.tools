@@ -63,20 +63,41 @@ function buildHubGuidanceBlock(hubMatches: HubConceptSummary[] | undefined): str
   ].join('\n')
 }
 
+/** Formats the user's answers to the pre-stage clarifying questions (see
+ *  ai/forgeClarify.ts) as a block the model should treat as authoritative —
+ *  it asked, the user answered, so these override any conflicting guess it
+ *  would otherwise make from the free-text description alone. */
+function buildClarificationsBlock(clarifications: string | undefined): string {
+  if (!clarifications?.trim()) return ''
+  return [
+    '',
+    "User's answers to your clarifying questions — treat these as authoritative:",
+    clarifications.trim(),
+  ].join('\n')
+}
+
 /** Builds the task instruction for one stage. `description` is the original
  *  free-text system description the user provided in the Input step — later
  *  stages still get it for grounding, even though the requirements/model it
  *  implies are by then already in the live diagram (and thus in `history`).
  *  `hubMatches` are the same Hub suggestions shown in the wizard UI for this
  *  stage (see RadicalForgeModal.tsx) — generation and what the user sees
- *  stay the same set, no separate "what did the AI see" mystery. */
-export function buildForgeStagePrompt(stageId: ForgeStageId, description: string, hubMatches?: HubConceptSummary[]): string {
+ *  stay the same set, no separate "what did the AI see" mystery.
+ *  `clarifications` is the formatted Q&A from the pre-stage clarify step
+ *  (ai/forgeClarify.ts), when the user answered any. */
+export function buildForgeStagePrompt(
+  stageId: ForgeStageId,
+  description: string,
+  hubMatches?: HubConceptSummary[],
+  clarifications?: string,
+): string {
   const descBlock = [
     'Original system description (provided by the user in the Radical Forge wizard):',
     '"""',
     description.trim(),
     '"""',
     buildHubGuidanceBlock(hubMatches),
+    buildClarificationsBlock(clarifications),
   ].filter(Boolean).join('\n')
 
   switch (stageId) {
