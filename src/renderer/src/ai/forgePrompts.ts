@@ -1,14 +1,24 @@
 // ─── Radical Forge stage prompts ────────────────────────────────────────────
 // Radical Forge walks a free-text system description through four sequential
-// AI generation stages (requirements → C4 model → fitness functions →
-// Gherkin scenarios), each a normal `runAIPrompt` call sharing one running
-// `history` array — so a later stage sees everything an earlier stage
-// created (via buildContextMessage in systemPrompt.ts), same as any multi-turn
-// chat. No new AI infrastructure: these are just task-scoped prompt strings.
+// AI generation stages — requirements → fitness functions → Gherkin
+// scenarios → C4 model — each a normal `runAIPrompt` call sharing one
+// running `history` array — so a later stage sees everything an earlier
+// stage created (via buildContextMessage in systemPrompt.ts), same as any
+// multi-turn chat. No new AI infrastructure: these are just task-scoped
+// prompt strings.
+//
+// C4 deliberately runs LAST: the behavior/quality spec (requirements,
+// fitness functions, scenarios) is nailed down first, and the architecture
+// follows from it rather than the other way around. This changes how
+// fitness functions link back — with no C4 elements to `constrains` yet,
+// they're linked from the requirement side via `traces-to` instead; once C4
+// runs last, it links the elements it creates to matching fitness-fns via
+// `constrains` (see the governance metamodel preset for why the relation
+// only goes fitness-fn/adr/requirement → C4-element, never the reverse).
 
 import type { HubConceptSummary } from '../store/hubStore'
 
-export type ForgeStageId = 'requirements' | 'c4' | 'fitness' | 'scenarios'
+export type ForgeStageId = 'requirements' | 'fitness' | 'scenarios' | 'c4'
 
 export interface ForgeStage {
   id: ForgeStageId
@@ -24,19 +34,19 @@ export const FORGE_STAGES: ForgeStage[] = [
     blurb: 'Extract functional requirements from the description, written as EARS statements.',
   },
   {
-    id: 'c4',
-    title: 'C4 model',
-    blurb: 'Derive the system/container/component structure and relations that satisfy those requirements.',
-  },
-  {
     id: 'fitness',
     title: 'Fitness functions',
-    blurb: 'Propose measurable guardrails (fitness functions) constraining the model above.',
+    blurb: 'Propose measurable guardrails (fitness functions) constraining those requirements.',
   },
   {
     id: 'scenarios',
     title: 'Gherkin scenarios',
     blurb: 'Write Given/When/Then scenarios that verify each requirement.',
+  },
+  {
+    id: 'c4',
+    title: 'C4 model',
+    blurb: 'Derive the system/container/component structure that satisfies the spec above.',
   },
 ]
 
@@ -118,24 +128,34 @@ export function buildForgeStagePrompt(
       return [
         descBlock,
         '',
-        'Task: using the requirements already in the model plus the description above,',
-        'derive the C4 structure — the people/systems/containers/components involved —',
-        'and the relations between them. Link each element to the requirement(s) it',
-        'satisfies with a `satisfies` relation. Do not invent requirements at this',
-        'stage; if the description implies something not yet covered by a requirement,',
-        'model the C4 element anyway but leave it unlinked rather than fabricating a',
-        'requirement here.',
+        'Task: using the requirements, fitness functions and Gherkin scenarios already',
+        'in the model, plus the description above, derive the C4 structure — the',
+        'people/systems/containers/components involved — and the relations between',
+        'them. This is the last stage: the behavior and quality spec is already fully',
+        'formed, so let the architecture follow from it rather than guessing ahead of',
+        'it — e.g. a fitness function with a tight latency threshold or a scenario',
+        'implying an async flow should visibly shape how you decompose the system.',
+        'Link each element to the requirement(s) it satisfies with a `satisfies`',
+        'relation, AND link each existing `fitness-fn` node to whichever new element(s)',
+        'it actually constrains with a `constrains` relation (this only becomes',
+        'possible now that real elements exist for it to point at). Do not invent',
+        'requirements at this stage; if the description implies something not yet',
+        'covered by a requirement, model the C4 element anyway but leave it unlinked',
+        'rather than fabricating a requirement here.',
       ].join('\n')
 
     case 'fitness':
       return [
         descBlock,
         '',
-        'Task: propose fitness functions (`fitness-fn` nodes) that constrain the systems',
-        '/ containers / requirements already in the model — measurable guardrails for',
-        'things like latency, availability, coupling, security posture, or delivery',
-        'flow implied by the description. Set `category` and a concrete `threshold`',
-        'for each. Link each to what it constrains with a `constrains` relation.',
+        'Task: propose fitness functions (`fitness-fn` nodes) that constrain the',
+        'requirements already in the model — measurable guardrails for things like',
+        'latency, availability, coupling, security posture, or delivery flow implied',
+        'by the description. Set `category` and a concrete `threshold` for each. No',
+        'systems/containers exist yet (C4 runs later, once this spec is settled), so',
+        'link each fitness function to the requirement(s) it constrains with a',
+        '`traces-to` relation FROM the requirement TO the fitness function (the',
+        'reverse direction isn\'t valid in the metamodel) rather than `constrains`.',
       ].join('\n')
 
     case 'scenarios':

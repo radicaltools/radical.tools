@@ -53,6 +53,15 @@ describe('buildClarifyPrompt', () => {
     expect(withMatches).toContain(HUB_MATCHES_QUESTION_ID)
     expect(withoutMatches).not.toContain(HUB_MATCHES_QUESTION_ID)
   })
+
+  it('includes prior-stage Q&A (and the do-not-repeat instruction) only when passed', () => {
+    const priorQA = 'Q: Which auth mechanism?\nA: OAuth2'
+    const withPrior = buildClarifyPrompt('C4 model', 'desc', undefined, priorQA)
+    const withoutPrior = buildClarifyPrompt('C4 model', 'desc', undefined)
+    expect(withPrior).toContain(priorQA)
+    expect(withPrior).toContain('do NOT ask about these')
+    expect(withoutPrior).not.toContain('do NOT ask about these')
+  })
 })
 
 describe('formatClarificationAnswers', () => {
