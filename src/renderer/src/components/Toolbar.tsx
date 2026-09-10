@@ -5,6 +5,7 @@ import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
 import { HubImportModal } from './HubImportModal'
+import { RadicalForgeModal } from './RadicalForgeModal'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { useExport } from '../hooks/useExport'
 import {
@@ -247,6 +248,7 @@ function AppMenu({
   metamodelActive, onToggleMetamodel,
   onOpenAISettings,
   onOpenHub,
+  onOpenForge,
   onExportPNG,
   onExportSVG,
   onCopyToClipboard,
@@ -265,6 +267,7 @@ function AppMenu({
   onToggleMetamodel: () => void
   onOpenAISettings: () => void
   onOpenHub: () => void
+  onOpenForge: () => void
   onExportPNG: () => void
   onExportSVG: () => void
   onCopyToClipboard: () => void
@@ -432,6 +435,15 @@ function AppMenu({
               <span className="app-menu-icon"><IconAI /></span>
               <span className="app-menu-text">AI providers…</span>
             </button>
+            <button
+              className="app-menu-item"
+              role="menuitem"
+              onClick={run(onOpenForge)}
+              title="Generate requirements, a C4 model, fitness functions and Gherkin scenarios from a description"
+            >
+              <span className="app-menu-icon"><IconAI /></span>
+              <span className="app-menu-text">Radical Forge…</span>
+            </button>
           </div>
 
           <div className="app-menu-divider" />
@@ -557,6 +569,10 @@ export function Toolbar(): React.ReactElement {
   const handleOpenAISettings = useCallback(() => { setAISettingsOpen(true) }, [])
   const handleCloseAISettings = useCallback(() => { setAISettingsOpen(false) }, [])
 
+  const [forgeOpen, setForgeOpen] = useState(false)
+  const handleOpenForge = useCallback(() => { setForgeOpen(true) }, [])
+  const handleCloseForge = useCallback(() => { setForgeOpen(false) }, [])
+
   const [hubOpen, setHubOpen] = useState(false)
   const [hubPreselectedIds, setHubPreselectedIds] = useState<string[] | undefined>(undefined)
   const handleOpenHub = useCallback(() => {
@@ -599,6 +615,7 @@ export function Toolbar(): React.ReactElement {
     <div className="toolbar">
       <AISettingsModal open={aiSettingsOpen} onClose={handleCloseAISettings} />
       <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} />
+      <RadicalForgeModal open={forgeOpen} onClose={handleCloseForge} />
       <AppMenu
         onManage={handleManage}
         activeDocLabel={activeDoc?.name ?? null}
@@ -613,6 +630,7 @@ export function Toolbar(): React.ReactElement {
         onToggleMetamodel={() => setAppMode(appMode === 'metamodel' ? 'designer' : 'metamodel')}
         onOpenAISettings={handleOpenAISettings}
         onOpenHub={handleOpenHub}
+        onOpenForge={handleOpenForge}
         onExportPNG={handleExportPNG}
         onExportSVG={handleExportSVG}
         onCopyToClipboard={copyToClipboard}

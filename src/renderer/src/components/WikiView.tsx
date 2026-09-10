@@ -375,7 +375,7 @@ const ARCHITECTURE_ROOT_TYPES: ReadonlySet<string> = new Set([
 // Governance items are further split by type — a flat "Governance" bucket
 // mixing ADRs, fitness functions and requirements is just a smaller version
 // of the same illegible wall, so each type gets its own labelled subgroup.
-const GOVERNANCE_TYPE_ORDER: readonly string[] = ['requirement', 'adr', 'fitness-fn', 'blueprint']
+const GOVERNANCE_TYPE_ORDER: readonly string[] = ['requirement', 'scenario', 'adr', 'fitness-fn', 'blueprint']
 const GOVERNANCE_ROOT_TYPES: ReadonlySet<string> = new Set(GOVERNANCE_TYPE_ORDER)
 
 type RootSectionId = 'architecture' | 'governance' | 'other'
