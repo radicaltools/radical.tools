@@ -1,0 +1,200 @@
+{
+  "hub": {
+    "id": "pattern-crdt-sync",
+    "category": "pattern",
+    "name": "CRDT Local-First Sync",
+    "description": "Each client keeps a CRDT replica of the document and applies its own edits instantly, online or offline; a sync server relays operations between replicas and persists snapshots, so any number of concurrent editors converge on the same state without locking or a central conflict resolver.",
+    "tags": [
+      "real-time",
+      "crdt",
+      "local-first",
+      "offline",
+      "collaboration"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "adr-realtime-transport",
+      "req-presence-latency",
+      "ff-sync-convergence-test",
+      "pattern-event-driven"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "collaborator",
+      "type": "person",
+      "label": "Collaborator",
+      "description": "Any of the users concurrently editing the same document; edits apply to their local replica instantly, online or offline.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Collaboration Service",
+      "description": "Relays and durably stores operations so every replica of a document converges.",
+      "width": 700,
+      "height": 750,
+      "collapsed": false,
+      "x": 0,
+      "y": 290
+    },
+    {
+      "id": "sync-gateway",
+      "type": "container",
+      "label": "Sync Gateway",
+      "description": "Authenticates the client, admits it to the document's room, and relays its operations to every other connected replica.",
+      "technology": "Node.js / WebSocket",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "op-broadcast-bus",
+      "type": "queue",
+      "label": "Op Broadcast Bus",
+      "description": "Fans accepted operations out to every gateway instance, so a client converges regardless of which instance the other editors are connected to.",
+      "technology": "Redis Pub/Sub",
+      "parentId": "platform",
+      "width": 220,
+      "height": 95,
+      "collapsed": false,
+      "x": 370,
+      "y": 110
+    },
+    {
+      "id": "snapshot-worker",
+      "type": "container",
+      "label": "Snapshot Worker",
+      "description": "Periodically compacts each document's operation log into a snapshot, so a reconnecting client doesn't have to replay its full history.",
+      "technology": "Node.js",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 350
+    },
+    {
+      "id": "op-log-store",
+      "type": "database",
+      "label": "Op Log Store",
+      "description": "Durable, append-only log of every accepted operation per document — the system of record a snapshot can always be rebuilt from.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 370,
+      "y": 350
+    },
+    {
+      "id": "snapshot-store",
+      "type": "database",
+      "label": "Snapshot Store",
+      "description": "Latest compacted state per document, loaded on client join so it doesn't need the full op log.",
+      "technology": "S3",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 30,
+      "y": 590
+    }
+  ],
+  "relations": [
+    {
+      "id": "collaborator--sync-gateway",
+      "sourceId": "collaborator",
+      "targetId": "sync-gateway",
+      "label": "Sends & receives operations",
+      "technology": "WebSocket"
+    },
+    {
+      "id": "sync-gateway--op-broadcast-bus",
+      "sourceId": "sync-gateway",
+      "targetId": "op-broadcast-bus",
+      "label": "Publishes accepted operation",
+      "technology": "pub/sub"
+    },
+    {
+      "id": "op-broadcast-bus--sync-gateway",
+      "sourceId": "op-broadcast-bus",
+      "targetId": "sync-gateway",
+      "label": "Delivers operations accepted by other instances",
+      "technology": "pub/sub"
+    },
+    {
+      "id": "sync-gateway--op-log-store",
+      "sourceId": "sync-gateway",
+      "targetId": "op-log-store",
+      "label": "Appends accepted operation",
+      "technology": "SQL"
+    },
+    {
+      "id": "snapshot-worker--op-log-store",
+      "sourceId": "snapshot-worker",
+      "targetId": "op-log-store",
+      "label": "Reads operations since the last snapshot",
+      "technology": "SQL"
+    },
+    {
+      "id": "snapshot-worker--snapshot-store",
+      "sourceId": "snapshot-worker",
+      "targetId": "snapshot-store",
+      "label": "Writes compacted snapshot",
+      "technology": "S3 API"
+    },
+    {
+      "id": "sync-gateway--snapshot-store",
+      "sourceId": "sync-gateway",
+      "targetId": "snapshot-store",
+      "label": "Loads snapshot when a client (re)joins",
+      "technology": "S3 API"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "pattern-crdt-sync-seq",
+      "name": "Two replicas edit and converge",
+      "relationIds": [
+        "collaborator--sync-gateway",
+        "sync-gateway--op-broadcast-bus",
+        "op-broadcast-bus--sync-gateway",
+        "sync-gateway--op-log-store",
+        "sync-gateway--snapshot-store"
+      ],
+      "stepDescriptions": [
+        "Collaborator's local CRDT applies the edit instantly and sends the resulting operation to the gateway it's connected to.",
+        "That gateway publishes the accepted operation onto the broadcast bus.",
+        "Every other gateway instance receives it and relays it to its own connected replicas, which merge it into their local CRDT — merge order doesn't matter, so this can happen in any order relative to other concurrent edits.",
+        "The originating gateway durably appends the operation to the op log.",
+        "A newly joining or reconnecting replica loads the latest snapshot instead of the full history, then catches up on whatever operations landed after it."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "pattern-crdt-sync-flow",
+      "name": "Two replicas edit and converge",
+      "kind": "dynamic",
+      "sequenceId": "pattern-crdt-sync-seq",
+      "nodeIds": [
+        "collaborator",
+        "platform",
+        "sync-gateway",
+        "op-broadcast-bus",
+        "snapshot-worker",
+        "op-log-store",
+        "snapshot-store"
+      ],
+      "positions": {}
+    }
+  ]
+}

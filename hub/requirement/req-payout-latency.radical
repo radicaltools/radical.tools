@@ -1,0 +1,46 @@
+{
+  "hub": {
+    "id": "req-payout-latency",
+    "category": "requirement",
+    "name": "Seller Payout Latency",
+    "description": "Time from an order becoming payout-eligible to the seller actually receiving funds.",
+    "tags": [
+      "marketplace",
+      "payments",
+      "trust",
+      "sla"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "PAYOUT_HOURS",
+        "label": "Payout SLA after eligibility (hours)",
+        "hint": "48",
+        "type": "number",
+        "defaultValue": "48"
+      }
+    ],
+    "hubRefs": [
+      "adr-marketplace-payments-model",
+      "req-availability",
+      "req-audit-logging"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-payout-latency-1",
+      "type": "requirement",
+      "label": "Seller Payout Latency",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "trigger": "an order becomes payout-eligible — delivered, past the buyer's dispute window, with no open hold",
+      "action": "release the seller's payout, net of commission, within {{PAYOUT_HOURS}} hours",
+      "rationale": "Payout speed is one of the few things a marketplace can promise sellers directly; it can only start the clock once the dispute window has passed, since a chargeback after payout has to be clawed back rather than simply withheld."
+    }
+  ],
+  "relations": []
+}

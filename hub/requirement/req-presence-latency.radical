@@ -1,0 +1,46 @@
+{
+  "hub": {
+    "id": "req-presence-latency",
+    "category": "requirement",
+    "name": "Presence & Edit Propagation Latency",
+    "description": "Time from one collaborator's cursor move or edit to it becoming visible to every other collaborator currently viewing the same document.",
+    "tags": [
+      "real-time",
+      "latency",
+      "collaboration",
+      "ux"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "PROPAGATION_MS",
+        "label": "Edit / presence propagation (ms, p95)",
+        "hint": "150",
+        "type": "number",
+        "defaultValue": "150"
+      }
+    ],
+    "hubRefs": [
+      "pattern-crdt-sync",
+      "ff-sync-convergence-test",
+      "req-availability"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-presence-latency-1",
+      "type": "requirement",
+      "label": "Presence & Edit Propagation Latency",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "trigger": "a connected collaborator moves their cursor, changes their selection, or edits the document",
+      "action": "propagate that change to every other collaborator currently viewing the same document within {{PROPAGATION_MS}} ms at the 95th percentile",
+      "rationale": "Below roughly this threshold collaboration feels 'live'; above it, users start to see stale cursors and edits that collide before they notice someone else is already there — the perceptual line between real-time and merely synced."
+    }
+  ],
+  "relations": []
+}

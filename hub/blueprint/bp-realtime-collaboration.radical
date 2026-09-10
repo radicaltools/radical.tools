@@ -1,0 +1,543 @@
+{
+  "hub": {
+    "id": "bp-realtime-collaboration",
+    "category": "blueprint",
+    "name": "Real-Time Collaboration Platform",
+    "description": "A multiplayer document or whiteboard editor: each client holds a local CRDT replica for instant, offline-capable edits, a stateless gateway fleet relays operations and presence between clients over a shared broadcast bus, and periodic snapshots keep reconnects fast — so any number of concurrent collaborators converge without locking or conflicts.",
+    "tags": [
+      "real-time",
+      "collaboration",
+      "crdt",
+      "offline-first",
+      "websocket"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "OFFLINE_GRACE_HOURS",
+        "label": "Offline edit merge window (hours)",
+        "hint": "72",
+        "type": "number",
+        "defaultValue": "72"
+      },
+      {
+        "key": "MAX_DOC_COLLABORATORS",
+        "label": "Concurrent collaborators per document",
+        "hint": "50",
+        "type": "number",
+        "defaultValue": "50"
+      },
+      {
+        "key": "SNAPSHOT_INTERVAL_OPS",
+        "label": "Operations between snapshots",
+        "hint": "500",
+        "type": "number",
+        "defaultValue": "500"
+      },
+      {
+        "key": "PROPAGATION_MS",
+        "label": "Presence / op fan-out (ms, p95)",
+        "hint": "150",
+        "type": "number",
+        "defaultValue": "150"
+      }
+    ],
+    "hubRefs": [
+      "pattern-crdt-sync",
+      "adr-realtime-transport",
+      "req-presence-latency",
+      "ff-sync-convergence-test",
+      "pattern-event-driven",
+      "req-availability",
+      "req-mfa",
+      "adr-tech-stack"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "collaborator",
+      "type": "person",
+      "label": "Collaborator",
+      "description": "Any of the users concurrently editing the same document, online or offline.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "workspace-admin",
+      "type": "person",
+      "label": "Workspace Admin",
+      "description": "Manages who can access which documents and revokes access when someone leaves.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 210,
+      "y": 0
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Collaboration Service",
+      "description": "Everything behind the editor client — sync, storage, access control and presence — that a workspace's collaborators share.",
+      "width": 960,
+      "height": 750,
+      "collapsed": false,
+      "x": 0,
+      "y": 290
+    },
+    {
+      "id": "editor-client",
+      "type": "webapp",
+      "label": "Editor Client",
+      "description": "Holds the local CRDT replica; edits apply instantly and work offline until reconnect.",
+      "technology": "TypeScript",
+      "parentId": "platform",
+      "width": 210,
+      "height": 140,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "sync-gateway",
+      "type": "container",
+      "label": "Sync Gateway",
+      "description": "Authenticates the client, admits it to the document's room, and relays its operations. Holds no document state itself.",
+      "technology": "Node.js / WebSocket",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 110
+    },
+    {
+      "id": "op-broadcast-bus",
+      "type": "queue",
+      "label": "Op Broadcast Bus",
+      "description": "The reason which gateway instance a collaborator happens to be connected to doesn't matter.",
+      "technology": "Redis Pub/Sub",
+      "parentId": "platform",
+      "width": 220,
+      "height": 95,
+      "collapsed": false,
+      "x": 710,
+      "y": 110
+    },
+    {
+      "id": "snapshot-worker",
+      "type": "container",
+      "label": "Snapshot Worker",
+      "description": "Periodically compacts each document's operation log into a snapshot.",
+      "technology": "Node.js",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 350
+    },
+    {
+      "id": "permission-service",
+      "type": "container",
+      "label": "Permission Service",
+      "description": "Checks document share and access rules before admitting a client to a room, and revokes active sessions when access changes.",
+      "technology": "Node.js",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 350
+    },
+    {
+      "id": "op-log-store",
+      "type": "database",
+      "label": "Op Log Store",
+      "description": "Holds the actual edit history per document; the offline-merge and recovery-point requirements below are both really requirements on this store.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 30,
+      "y": 590
+    },
+    {
+      "id": "snapshot-store",
+      "type": "database",
+      "label": "Snapshot Store",
+      "description": "A performance shortcut for joining a busy document quickly — never what recovery correctness actually relies on.",
+      "technology": "S3",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 370,
+      "y": 590
+    },
+    {
+      "id": "identity-provider",
+      "type": "system",
+      "label": "Identity Provider",
+      "description": "Authenticates the collaborator and issues the session the gateway verifies.",
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 0,
+      "y": 1160
+    },
+    {
+      "id": "req-offline-merge",
+      "type": "requirement",
+      "label": "Offline Edit Merge Window",
+      "x": 0,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "a client reconnects after being offline",
+      "action": "replay its local operation log against the server and merge without data loss or manual conflict resolution, even after up to {{OFFLINE_GRACE_HOURS}} hours offline",
+      "rationale": "Local-first only pays off if reconnecting after a real gap — a flight, a dead laptop battery — is as unremarkable as reconnecting after a second's blip.",
+      "templateParams": [
+        {
+          "key": "OFFLINE_GRACE_HOURS",
+          "label": "Offline edit merge window (hours)",
+          "hint": "72",
+          "type": "number",
+          "defaultValue": "72"
+        }
+      ]
+    },
+    {
+      "id": "req-room-capacity",
+      "type": "requirement",
+      "label": "Concurrent Collaborator Capacity",
+      "x": 320,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "support at least {{MAX_DOC_COLLABORATORS}} concurrent collaborators per document without a perceptible increase in edit propagation latency",
+      "rationale": "A collaboration feature that visibly slows down exactly when a lot of people show up fails at the moment it matters most.",
+      "templateParams": [
+        {
+          "key": "MAX_DOC_COLLABORATORS",
+          "label": "Concurrent collaborators per document",
+          "hint": "50",
+          "type": "number",
+          "defaultValue": "50"
+        }
+      ]
+    },
+    {
+      "id": "req-access-revocation",
+      "type": "requirement",
+      "label": "Access Revocation Propagation",
+      "x": 640,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "a workspace admin revokes a collaborator's access to a document",
+      "action": "disconnect that collaborator's active session and reject any further operations from them within seconds, not only on their next reconnect",
+      "rationale": "A local-first replica keeps a full copy of the document; revocation has to end the live session immediately, or removing access is theatre."
+    },
+    {
+      "id": "req-snapshot-recovery",
+      "type": "requirement",
+      "label": "Snapshot-Free Recovery Point",
+      "x": 960,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "be able to reconstruct any document's state as of any point in the last {{SNAPSHOT_INTERVAL_OPS}}-operation window from the op log alone, without the snapshot store",
+      "rationale": "The op log, not the snapshot, is the actual system of record; the snapshot store is only ever a performance optimisation and must stay one, not a hidden second source of truth.",
+      "templateParams": [
+        {
+          "key": "SNAPSHOT_INTERVAL_OPS",
+          "label": "Operations between snapshots",
+          "hint": "500",
+          "type": "number",
+          "defaultValue": "500"
+        }
+      ]
+    },
+    {
+      "id": "ff-presence-fanout-guard",
+      "type": "fitness-fn",
+      "label": "Presence Fan-out Latency Guard",
+      "description": "Measures the time from an accepted operation to it being delivered to every other connected replica of the same document.",
+      "x": 0,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "p95 presence / operation fan-out to all connected replicas stays under {{PROPAGATION_MS}} ms",
+      "status": "proposed"
+    },
+    {
+      "id": "ff-snapshot-compaction-lag",
+      "type": "fitness-fn",
+      "label": "Snapshot Compaction Lag",
+      "description": "Checks how far behind the snapshot worker is on any actively-edited document.",
+      "x": 320,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Op log for any active document never exceeds {{SNAPSHOT_INTERVAL_OPS}} unsnapshotted operations",
+      "status": "proposed"
+    },
+    {
+      "id": "ff-reconnect-success-rate",
+      "type": "fitness-fn",
+      "label": "Reconnect Success Rate",
+      "description": "Tracks whether a client reconnecting after a network blip resumes syncing or falls back to a full document re-download.",
+      "x": 640,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "At least 99.9% of reconnect attempts resume syncing without a full document re-download",
+      "status": "proposed"
+    },
+    {
+      "id": "adr-crdt-over-ot",
+      "type": "adr",
+      "label": "ADR: CRDT over Operational Transformation",
+      "x": 0,
+      "y": 1912,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "status": "accepted",
+      "date": "",
+      "context": "Concurrent edits from many clients need to merge without a central lock and, ideally, without a live connection to a sequencing server.",
+      "decision": "Use CRDTs for the document's data structure rather than Operational Transformation.",
+      "consequences": "No central transform server is required and offline editing works without special-casing; CRDT metadata overhead grows with edit history and needs periodic compaction and tombstone pruning.",
+      "alternatives": "1. Operational Transformation — proven at large scale, but requires a central sequencing server and is notoriously hard to implement correctly for rich documents. 2. Lock-based pessimistic editing — simplest to reason about, but kills the \"everyone edits at once\" experience. 3. Last-write-wins on the whole document — trivial, but silently discards concurrent edits. 4. CRDT (chosen)."
+    },
+    {
+      "id": "adr-stateless-gateway-fleet",
+      "type": "adr",
+      "label": "ADR: Stateless gateway fleet with a shared broadcast bus",
+      "x": 320,
+      "y": 1912,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "status": "accepted",
+      "date": "",
+      "context": "WebSocket connections need to scale horizontally while every replica of a document stays in sync regardless of which gateway instance a client lands on.",
+      "decision": "Gateways hold no document state themselves; they publish and subscribe to operations through a shared broadcast bus, so any instance can serve any client.",
+      "consequences": "Gateway instances scale and restart freely with no handoff logic, but every operation takes an extra hop through the bus, adding a small amount of latency to the common case.",
+      "alternatives": "1. Sticky sessions routing all of a document's clients to one gateway instance — lower latency per operation, but that instance becomes a single point of failure and a hot-spot for popular documents. 2. Shared broadcast bus (chosen). 3. Peer-to-peer mesh between clients — no server bottleneck, but NAT traversal and offline persistence become much harder to get right."
+    }
+  ],
+  "relations": [
+    {
+      "id": "collaborator--editor-client",
+      "sourceId": "collaborator",
+      "targetId": "editor-client",
+      "label": "Edits the document",
+      "technology": "local-first UI"
+    },
+    {
+      "id": "editor-client--sync-gateway",
+      "sourceId": "editor-client",
+      "targetId": "sync-gateway",
+      "label": "Sends & receives operations",
+      "technology": "WebSocket"
+    },
+    {
+      "id": "sync-gateway--identity-provider",
+      "sourceId": "sync-gateway",
+      "targetId": "identity-provider",
+      "label": "Verifies session",
+      "technology": "OIDC"
+    },
+    {
+      "id": "sync-gateway--permission-service",
+      "sourceId": "sync-gateway",
+      "targetId": "permission-service",
+      "label": "Checks document access before admitting the client",
+      "technology": "gRPC"
+    },
+    {
+      "id": "sync-gateway--op-broadcast-bus",
+      "sourceId": "sync-gateway",
+      "targetId": "op-broadcast-bus",
+      "label": "Publishes accepted operation",
+      "technology": "pub/sub"
+    },
+    {
+      "id": "op-broadcast-bus--sync-gateway",
+      "sourceId": "op-broadcast-bus",
+      "targetId": "sync-gateway",
+      "label": "Delivers operations accepted by other instances",
+      "technology": "pub/sub"
+    },
+    {
+      "id": "sync-gateway--op-log-store",
+      "sourceId": "sync-gateway",
+      "targetId": "op-log-store",
+      "label": "Appends accepted operation",
+      "technology": "SQL"
+    },
+    {
+      "id": "snapshot-worker--op-log-store",
+      "sourceId": "snapshot-worker",
+      "targetId": "op-log-store",
+      "label": "Reads operations since the last snapshot",
+      "technology": "SQL"
+    },
+    {
+      "id": "snapshot-worker--snapshot-store",
+      "sourceId": "snapshot-worker",
+      "targetId": "snapshot-store",
+      "label": "Writes compacted snapshot",
+      "technology": "S3 API"
+    },
+    {
+      "id": "sync-gateway--snapshot-store",
+      "sourceId": "sync-gateway",
+      "targetId": "snapshot-store",
+      "label": "Loads snapshot when a client (re)joins",
+      "technology": "S3 API"
+    },
+    {
+      "id": "workspace-admin--permission-service",
+      "sourceId": "workspace-admin",
+      "targetId": "permission-service",
+      "label": "Manages sharing & access, revokes collaborators",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "req-offline-merge--sync-gateway",
+      "sourceId": "req-offline-merge",
+      "targetId": "sync-gateway",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-room-capacity--sync-gateway",
+      "sourceId": "req-room-capacity",
+      "targetId": "sync-gateway",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-access-revocation--permission-service",
+      "sourceId": "req-access-revocation",
+      "targetId": "permission-service",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-snapshot-recovery--op-log-store",
+      "sourceId": "req-snapshot-recovery",
+      "targetId": "op-log-store",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-offline-merge--ff-reconnect-success-rate",
+      "sourceId": "req-offline-merge",
+      "targetId": "ff-reconnect-success-rate",
+      "relationType": "traces-to"
+    },
+    {
+      "id": "req-room-capacity--ff-presence-fanout-guard",
+      "sourceId": "req-room-capacity",
+      "targetId": "ff-presence-fanout-guard",
+      "relationType": "traces-to"
+    },
+    {
+      "id": "ff-snapshot-compaction-lag--snapshot-worker",
+      "sourceId": "ff-snapshot-compaction-lag",
+      "targetId": "snapshot-worker",
+      "relationType": "constrains"
+    },
+    {
+      "id": "adr-crdt-over-ot--editor-client",
+      "sourceId": "adr-crdt-over-ot",
+      "targetId": "editor-client",
+      "relationType": "constrains"
+    },
+    {
+      "id": "adr-stateless-gateway-fleet--sync-gateway",
+      "sourceId": "adr-stateless-gateway-fleet",
+      "targetId": "sync-gateway",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-room-capacity--adr-stateless-gateway-fleet",
+      "sourceId": "req-room-capacity",
+      "targetId": "adr-stateless-gateway-fleet",
+      "relationType": "traces-to"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "bp-realtime-collaboration-seq",
+      "name": "An edit is accepted, broadcast, and persisted",
+      "relationIds": [
+        "editor-client--sync-gateway",
+        "sync-gateway--permission-service",
+        "sync-gateway--op-broadcast-bus",
+        "op-broadcast-bus--sync-gateway",
+        "sync-gateway--op-log-store"
+      ],
+      "stepDescriptions": [
+        "Collaborator edits; the local CRDT applies the change instantly and sends the resulting operation to the gateway.",
+        "Gateway checks the operation is still within the collaborator's current access before accepting it.",
+        "Gateway publishes the accepted operation onto the broadcast bus.",
+        "Every other gateway instance receives it and relays it to its own connected replicas — merge order doesn't matter, so this can happen in any order relative to other concurrent edits.",
+        "The originating gateway durably appends the operation to the op log."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "bp-realtime-collaboration-flow",
+      "name": "An edit is accepted, broadcast, and persisted",
+      "kind": "dynamic",
+      "sequenceId": "bp-realtime-collaboration-seq",
+      "nodeIds": [
+        "collaborator",
+        "workspace-admin",
+        "platform",
+        "editor-client",
+        "sync-gateway",
+        "op-broadcast-bus",
+        "snapshot-worker",
+        "permission-service",
+        "op-log-store",
+        "snapshot-store",
+        "identity-provider"
+      ],
+      "positions": {}
+    }
+  ]
+}

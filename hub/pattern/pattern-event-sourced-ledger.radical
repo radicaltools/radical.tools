@@ -1,0 +1,211 @@
+{
+  "hub": {
+    "id": "pattern-event-sourced-ledger",
+    "category": "pattern",
+    "name": "Event-Sourced Double-Entry Ledger",
+    "description": "Every financial fact is appended as an immutable journal entry whose debits and credits net to zero; account balances are a projection rebuilt by replaying the journal, never mutated directly, so the books can always be reconstructed and reconciled from the append-only source of truth.",
+    "tags": [
+      "fintech",
+      "ledger",
+      "event-sourcing",
+      "double-entry",
+      "compliance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-ledger-immutability",
+      "ff-ledger-balance-integrity",
+      "adr-ledger-reconciliation-strategy",
+      "pattern-cqrs",
+      "req-audit-logging"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "finance-ops",
+      "type": "person",
+      "label": "Finance Ops",
+      "description": "Reviews reconciliation exceptions and authorises compensating entries; never edits a posted entry directly.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Ledger Service",
+      "description": "Records every financial fact as a balanced, immutable journal entry and projects it into account balances.",
+      "width": 1040,
+      "height": 510,
+      "collapsed": false,
+      "x": 0,
+      "y": 290
+    },
+    {
+      "id": "posting-api",
+      "type": "container",
+      "label": "Posting API",
+      "description": "Validates that a transaction's debits and credits are balanced before appending it; rejects anything that isn't.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "balance-projector",
+      "type": "container",
+      "label": "Balance Projector",
+      "description": "Replays the journal into current-balance read models; can be reset and rebuilt from genesis at any time.",
+      "technology": "Java worker",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 110
+    },
+    {
+      "id": "reconciliation-worker",
+      "type": "container",
+      "label": "Reconciliation Worker",
+      "description": "Matches posted entries against the external settlement feed, continuously and in a nightly batch sweep.",
+      "technology": "Java worker",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 710,
+      "y": 110
+    },
+    {
+      "id": "journal-store",
+      "type": "database",
+      "label": "Journal Store",
+      "description": "The system of record: every posted entry, ever, in the order it was accepted. Never updated, never deleted.",
+      "technology": "PostgreSQL (append-only)",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 30,
+      "y": 350
+    },
+    {
+      "id": "balance-store",
+      "type": "database",
+      "label": "Balance Store",
+      "description": "Denormalised current balance per account — a projection, safely rebuildable from the journal.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 370,
+      "y": 350
+    },
+    {
+      "id": "bank-rail",
+      "type": "system",
+      "label": "Bank / Payment Rail",
+      "description": "Settles the underlying money movement and reports what actually cleared.",
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 0,
+      "y": 920
+    }
+  ],
+  "relations": [
+    {
+      "id": "bank-rail--posting-api",
+      "sourceId": "bank-rail",
+      "targetId": "posting-api",
+      "label": "Reports a settled transaction",
+      "technology": "webhook"
+    },
+    {
+      "id": "posting-api--journal-store",
+      "sourceId": "posting-api",
+      "targetId": "journal-store",
+      "label": "Appends a balanced double-entry",
+      "technology": "SQL insert-only"
+    },
+    {
+      "id": "balance-projector--journal-store",
+      "sourceId": "balance-projector",
+      "targetId": "journal-store",
+      "label": "Replays / subscribes to new entries",
+      "technology": "SQL"
+    },
+    {
+      "id": "balance-projector--balance-store",
+      "sourceId": "balance-projector",
+      "targetId": "balance-store",
+      "label": "Updates account balance projection",
+      "technology": "SQL"
+    },
+    {
+      "id": "reconciliation-worker--journal-store",
+      "sourceId": "reconciliation-worker",
+      "targetId": "journal-store",
+      "label": "Reads posted entries",
+      "technology": "SQL"
+    },
+    {
+      "id": "reconciliation-worker--bank-rail",
+      "sourceId": "reconciliation-worker",
+      "targetId": "bank-rail",
+      "label": "Fetches settlement statement (nightly batch)",
+      "technology": "SFTP / API"
+    },
+    {
+      "id": "finance-ops--posting-api",
+      "sourceId": "finance-ops",
+      "targetId": "posting-api",
+      "label": "Submits a compensating entry to correct a prior mistake — never edits the original",
+      "technology": "HTTPS"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "pattern-event-sourced-ledger-seq",
+      "name": "Settle a transaction and update balances",
+      "relationIds": [
+        "bank-rail--posting-api",
+        "posting-api--journal-store",
+        "balance-projector--journal-store",
+        "balance-projector--balance-store"
+      ],
+      "stepDescriptions": [
+        "Bank / payment rail reports a settled transaction.",
+        "Posting API checks the transaction's debits and credits sum to zero and appends it to the journal.",
+        "Balance projector picks up the new entry from its subscription to the journal.",
+        "Balance projector updates the affected accounts' balance projection — never the journal itself."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "pattern-event-sourced-ledger-flow",
+      "name": "Settle a transaction and update balances",
+      "kind": "dynamic",
+      "sequenceId": "pattern-event-sourced-ledger-seq",
+      "nodeIds": [
+        "finance-ops",
+        "platform",
+        "posting-api",
+        "balance-projector",
+        "reconciliation-worker",
+        "journal-store",
+        "balance-store",
+        "bank-rail"
+      ],
+      "positions": {}
+    }
+  ]
+}

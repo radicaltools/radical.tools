@@ -1,0 +1,38 @@
+{
+  "hub": {
+    "id": "adr-realtime-transport",
+    "category": "adr",
+    "name": "Real-Time Transport Choice",
+    "description": "Records how live edits and presence reach other connected clients — WebSocket, Server-Sent Events, or WebRTC — and the fallback when the primary transport is blocked.",
+    "tags": [
+      "real-time",
+      "networking",
+      "websocket",
+      "governance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-crdt-sync",
+      "req-presence-latency",
+      "req-availability"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-realtime-transport-1",
+      "type": "adr",
+      "label": "ADR: WebSocket with long-polling fallback",
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "x": 0,
+      "y": 0,
+      "status": "proposed",
+      "date": "",
+      "context": "Collaborators need low-latency, bidirectional delivery of operations and presence — cursors, selections — to every other client viewing the same document, over networks that don't all allow the same protocols; some corporate proxies block WebSocket upgrades entirely.",
+      "decision": "Use WebSocket as the primary transport for both directions — client operations up, relayed operations and presence down — with an HTTP long-polling fallback that the client switches to automatically when the WebSocket upgrade fails or drops repeatedly.",
+      "consequences": "• A single persistent connection carries both operations and presence, keeping latency low and avoiding the overhead of a second channel.\n• The fallback path adds a second code path on both client and server that has to be kept behaviour-identical to the WebSocket path, and tested as its own thing, not assumed to \"just work\" the same way.\n• Presence data shares the same connection as document operations, so a presence flood from a very large room can't be independently throttled without also touching the operation path.\n• Any load balancer or proxy in front of the gateway fleet must support long-lived connections and sticky enough routing for a session's fallback requests to reach the same instance.",
+      "alternatives": "1. WebRTC data channels — lowest possible latency directly between peers, but the server never sees the operations in transit to persist or authorise them, and NAT traversal needs its own signalling and TURN relay infrastructure.\n2. Server-Sent Events for the down channel plus HTTP POST for writes — works through anything that allows plain HTTP, but two separate connections cost more round trips and the write path never gets push-level latency.\n3. Plain HTTP polling only — simplest possible infrastructure, but the polling interval directly trades off against both latency and server load.\n4. WebSocket with a long-polling fallback (chosen) — best latency for the common case, at the cost of maintaining a second path for the uncommon one."
+    }
+  ]
+}
