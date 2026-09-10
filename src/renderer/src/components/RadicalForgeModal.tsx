@@ -8,8 +8,20 @@ import { useDiagramFacade } from '../ai/useDiagramFacade'
 import { FORGE_STAGES, buildForgeStagePrompt, type ForgeStageId } from '../ai/forgePrompts'
 import { buildGherkinFiles, downloadGherkinFiles } from '../export/exportGherkin'
 import { AIReportLine } from './AIReportLine'
+import { useHubStore, type HubCategory, type HubConceptSummary } from '../store/hubStore'
+import { findRelevantConcepts } from '../hub/matchConcepts'
+import { importHubConceptIntoDiagram } from '../hub/importConcept'
 import type { AISettings, ChatMessage } from '../ai/types'
 import type { ApplyReport } from '../ai/diagramFacade'
+
+/** Hub categories worth surfacing as prior art for each stage — the C4 stage
+ *  is where decomposition/coupling guidance (patterns, ADRs) matters most.
+ *  `scenarios` has no matching Hub category (no Gherkin content there). */
+const HUB_CATEGORIES_FOR_STAGE: Partial<Record<ForgeStageId, HubCategory[]>> = {
+  requirements: ['requirement'],
+  c4: ['pattern', 'adr'],
+  fitness: ['fitness-function'],
+}
 
 interface Props {
   open: boolean
@@ -71,8 +83,15 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const [stageReports, setStageReports] = useState<Partial<Record<ForgeStageId, ApplyReport>>>({})
   const [stageSummaries, setStageSummaries] = useState<Partial<Record<ForgeStageId, string>>>({})
   const [aiSettings, setAiSettings] = useState<AISettings>(() => loadAISettings())
+  const [importedHubIds, setImportedHubIds] = useState<Set<string>>(new Set())
+  const [importingHubId, setImportingHubId] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const diagram = useDiagramFacade()
+
+  const hubConcepts = useHubStore((s) => s.concepts)
+  const fetchHubConcepts = useHubStore((s) => s.fetchConcepts)
+  const loadHubConcept = useHubStore((s) => s.loadConcept)
+  const activeMetamodelId = useDiagramStore((s) => s.metamodel?.id)
 
   // Reset to a clean run every time the wizard is (re)opened.
   useEffect(() => {
@@ -85,7 +104,12 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setStageReports({})
     setStageSummaries({})
     setAiSettings(loadAISettings())
+    setImportedHubIds(new Set())
   }, [open])
+
+  useEffect(() => {
+    if (open) fetchHubConcepts()
+  }, [open, fetchHubConcepts])
 
   // Keep settings fresh if the user opens "AI providers…" mid-wizard.
   useEffect(() => {
@@ -124,6 +148,16 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (text) setDescription(text)
   }, [])
 
+  const hubMatchesByStage = useMemo(() => {
+    const out: Partial<Record<ForgeStageId, HubConceptSummary[]>> = {}
+    if (!description.trim()) return out
+    for (const stage of FORGE_STAGES) {
+      const categories = HUB_CATEGORIES_FOR_STAGE[stage.id]
+      if (categories) out[stage.id] = findRelevantConcepts(hubConcepts, categories, description, activeMetamodelId)
+    }
+    return out
+  }, [hubConcepts, description, activeMetamodelId])
+
   const runStage = useCallback(async (stageId: ForgeStageId) => {
     if (busy || unavailableReason) return
     setBusy(true)
@@ -131,7 +165,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     const ctl = new AbortController()
     abortRef.current = ctl
     try {
-      const prompt = buildForgeStagePrompt(stageId, description)
+      const prompt = buildForgeStagePrompt(stageId, description, hubMatchesByStage[stageId])
       const result = await runAIPrompt({ prompt, settings: aiSettings, diagram, history, signal: ctl.signal })
       setHistory((h) => [...h, ...result.history])
       setStageReports((r) => ({ ...r, [stageId]: result.report }))
@@ -142,9 +176,23 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       abortRef.current = null
       setBusy(false)
     }
-  }, [busy, unavailableReason, description, aiSettings, diagram, history])
+  }, [busy, unavailableReason, description, hubMatchesByStage, aiSettings, diagram, history])
 
   const cancelStage = useCallback(() => { abortRef.current?.abort() }, [])
+
+  const handleImportHubConcept = useCallback(async (summary: HubConceptSummary) => {
+    setImportingHubId(summary.id)
+    setError(null)
+    try {
+      const concept = await loadHubConcept(summary.id)
+      importHubConceptIntoDiagram(concept)
+      setImportedHubIds((s) => new Set(s).add(summary.id))
+    } catch (err) {
+      setError((err as Error).message || String(err))
+    } finally {
+      setImportingHubId(null)
+    }
+  }, [loadHubConcept])
 
   const stepIndex = STEP_ORDER.indexOf(step)
   const goTo = useCallback((s: WizardStep) => { if (!busy) setStep(s) }, [busy])
@@ -245,6 +293,34 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
           {currentStage && (
             <div className="forge-stage-card">
               <p className="milestone-modal-text" style={{ margin: '0 0 10px' }}>{currentStage.blurb}</p>
+
+              {!!hubMatchesByStage[currentStage.id]?.length && (
+                <div className="forge-hub-suggestions">
+                  <div className="forge-hub-suggestions-label">Suggested from the Hub</div>
+                  {hubMatchesByStage[currentStage.id]!.map((c) => {
+                    const imported = importedHubIds.has(c.id)
+                    const importing = importingHubId === c.id
+                    return (
+                      <div key={c.id} className="forge-hub-card">
+                        <div className="forge-hub-card-main">
+                          <span className="forge-hub-card-name">{c.name}</span>
+                          <span className="forge-hub-card-category">{c.category}</span>
+                          <div className="forge-hub-card-desc">{c.description}</div>
+                        </div>
+                        <button
+                          type="button"
+                          className="qs-ai-mini-btn"
+                          disabled={imported || importing}
+                          onClick={() => handleImportHubConcept(c)}
+                        >
+                          {imported ? '✓ Imported' : importing ? 'Importing…' : 'Import'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               {!stageReports[currentStage.id] && !busy && (
                 <button
                   type="button"

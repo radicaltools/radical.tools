@@ -3814,6 +3814,50 @@ body {
 .forge-primary-btn:hover { filter: brightness(1.08); }
 .forge-primary-btn:disabled { opacity: 0.5; cursor: default; filter: none; }
 
+.forge-hub-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: var(--bg-toolbar, rgba(255,255,255,0.03));
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.forge-hub-suggestions-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.forge-hub-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-top: 1px solid var(--border-color);
+}
+.forge-hub-card:first-of-type { border-top: none; }
+.forge-hub-card-main { flex: 1; min-width: 0; }
+.forge-hub-card-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.forge-hub-card-category {
+  margin-left: 6px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.forge-hub-card-desc {
+  font-size: 11px;
+  color: var(--text-secondary, var(--text-muted));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
 /* ─── Document manager modal ─────────────────────────────────────────────── */
 .docmgr-backdrop {
   position: fixed; inset: 0; z-index: 2000;
