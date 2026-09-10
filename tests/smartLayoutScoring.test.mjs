@@ -1,17 +1,15 @@
 /**
- * Headless validation of the new render-aware composite cost function.
+ * Headless regression test for the render-aware composite cost function.
  *
- * Builds two snapshots of the SAME C4 scene (mirroring the two screenshots
- * the user sent: algorithm output vs. their manual fix) and verifies that
+ * Builds two snapshots of the SAME C4 scene (mirroring two screenshots a
+ * user sent: algorithm output vs. their manual fix) and verifies that
  * `computeCompositeScore` ranks the manual fix BETTER (lower composite).
- *
- * Run: `node --import tsx tests/smartLayoutScoring.test.mjs`
- *
- * Note: requires the `tsx` dev dependency for on-the-fly .ts imports.
+ * This is the empirical check that caught the original bug — the cost
+ * function preferring a visibly worse layout — so it's wired into `npm test`
+ * instead of being a standalone script nobody runs.
  */
-const { computeCompositeScore } = await import(
-  '../src/renderer/src/layout/smartLayout.ts'
-)
+import { describe, it, expect } from 'vitest'
+import { computeCompositeScore } from '../src/renderer/src/layout/smartLayout'
 
 // ─── Scene ──────────────────────────────────────────────────────────────────
 //
@@ -22,22 +20,6 @@ const { computeCompositeScore } = await import(
 //   - external Person, second Person, and a grey ExternalSystem
 //
 // Sizes from typical C4 nodes (system 280×140, container 200×100, etc.).
-
-function relativeChildren(parent, siblings, gapX = 30, gapY = 30, padX = 14, padY = 40) {
-  // Lay out siblings in a row inside `parent`. Returns { children, parentSize }.
-  const totalW = siblings.reduce((s, c) => s + c.width, 0) + (siblings.length - 1) * gapX
-  const maxH = siblings.reduce((m, c) => Math.max(m, c.height), 0)
-  const parentW = totalW + 2 * padX
-  const parentH = maxH + padY + padY * 0.6
-  let cx = padX
-  for (const c of siblings) {
-    c.x = cx
-    c.y = padY
-    c.parentId = parent
-    cx += c.width + gapX
-  }
-  return { siblings, parentW, parentH }
-}
 
 /** Build the common node SET (without positions) — only sizes and parents. */
 function buildNodes() {
@@ -92,15 +74,13 @@ function buildRelations() {
     R('r8', 'extSys',         'sysA.container'),
     R('r9', 'compA',          'compB'),
     R('r10', 'compB',         'compC'),
-    R('r11', 'compC',         'sysBDb'.replace('sysBDb','sysB.db')),
+    R('r11', 'compC',         'sysB.db'),
     R('r12', 'compA',         'sysB.queue'),
   ]
 }
 
 /** Algorithm-style layout (tall column, External System pushed centrally). */
 function layoutAlgorithm(N) {
-  // sysA.containerB inner layout
-  const cChildren = [N.compA, N.compB, N.compC]
   // 3 components stacked roughly vertically: compA top, compB right, compC bottom-mid
   N.compA.parentId = 'sysB.containerB'; N.compA.x = 30;  N.compA.y = 40
   N.compB.parentId = 'sysB.containerB'; N.compB.x = 230; N.compB.y = 40
@@ -126,7 +106,6 @@ function layoutAlgorithm(N) {
 
 /** User-fixed layout (horizontal spread, External pushed to corner). */
 function layoutManual(N) {
-  // sysB.containerB inner layout (similar but tighter)
   N.compA.parentId = 'sysB.containerB'; N.compA.x = 130; N.compA.y = 40
   N.compB.parentId = 'sysB.containerB'; N.compB.x = 30;  N.compB.y = 200
   N.compC.parentId = 'sysB.containerB'; N.compC.x = 230; N.compC.y = 200
@@ -149,37 +128,19 @@ function layoutManual(N) {
   N.extSys.x     = 950; N.extSys.y     = 700   // BOTTOM-RIGHT CORNER — peripheral
 }
 
-function runScenario(name, layoutFn) {
+function scoreScenario(layoutFn) {
   const Nobj = buildNodes()
   layoutFn(Nobj)
   const nodes = Object.fromEntries(Object.values(Nobj).map((n) => [n.id, n]))
   const relations = Object.fromEntries(buildRelations().map((r) => [r.id, r]))
-  const score = computeCompositeScore(nodes, relations)
-  console.log(`\n── ${name} ─────────────────────────────────────`)
-  console.log(`  composite       = ${score.composite.toFixed(1)}`)
-  console.log(`  rendCrossings   = ${score.renderedCrossings}`)
-  console.log(`  rendOverdraws   = ${score.renderedOverdraws}`)
-  console.log(`  stubLoop        = ${score.stubLoopPenalty.toFixed(2)}`)
-  console.log(`  nodeOverlap     = ${score.nodeOverlap.toFixed(2)}`)
-  console.log(`  edgeLengthMean  = ${score.edgeLengthMean.toFixed(2)}`)
-  console.log(`  leafCentrality  = ${score.leafCentrality.toFixed(2)}`)
-  console.log(`  aspect          = ${score.aspectPenalty.toFixed(2)}`)
-  console.log(`  compactness     = ${score.compactness.toFixed(2)}`)
-  console.log(`  symmetry        = ${score.symmetryDeficit.toFixed(2)}`)
-  return score
+  return computeCompositeScore(nodes, relations)
 }
 
-const algo   = runScenario('ALGORITHM (tall, central External)', layoutAlgorithm)
-const manual = runScenario('MANUAL FIX  (wide, peripheral External)', layoutManual)
+describe('smartLayout composite score — real user regression scenario', () => {
+  it('ranks the peripheral-External manual fix below the central-External algorithm output', () => {
+    const algo = scoreScenario(layoutAlgorithm)
+    const manual = scoreScenario(layoutManual)
 
-console.log('\n────────────────────────────────────────────────')
-const winner = manual.composite < algo.composite ? 'MANUAL ✓' : 'ALGORITHM ✗'
-console.log(`Verdict: ${winner} wins (manual=${manual.composite.toFixed(1)}, algo=${algo.composite.toFixed(1)})`)
-const delta = ((algo.composite - manual.composite) / algo.composite * 100).toFixed(1)
-console.log(`Improvement: manual is ${delta}% lower than algorithm.`)
-
-if (manual.composite >= algo.composite) {
-  console.error('\n❌ FAIL: cost function still prefers the algorithm output over the user fix.')
-  process.exit(1)
-}
-console.log('\n✅ PASS: cost function correctly prefers the manual fix.')
+    expect(manual.composite).toBeLessThan(algo.composite)
+  })
+})

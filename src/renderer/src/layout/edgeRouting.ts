@@ -210,16 +210,25 @@ function buildSvgPath(pts: Pt[]): string {
   return d
 }
 
+/**
+ * Control-point pull distance: half the endpoint distance, capped so very
+ * long edges don't loop wildly and very short ones still get a visible bend.
+ */
+function controlPointPull(dist: number): number {
+  return Math.min(180, Math.max(40, dist * 0.5))
+}
+
+/** Cubic-bezier control points pulled along each endpoint's exit normal. */
+function bezierControlPoints(s: Pt, sSide: Position, t: Pt, tSide: Position): { c1: Pt; c2: Pt } {
+  const pull = controlPointPull(Math.hypot(t.x - s.x, t.y - s.y))
+  return { c1: extendPt(s.x, s.y, sSide, pull), c2: extendPt(t.x, t.y, tSide, pull) }
+}
+
 /** Build a cubic bezier with control points pulled along the exit sides. */
 function buildBezierPath(
   s: Pt, sSide: Position, t: Pt, tSide: Position
 ): string {
-  const dist = Math.hypot(t.x - s.x, t.y - s.y)
-  // Control-point pull: half the endpoint distance, capped so very long
-  // edges don't loop wildly and very short ones still get a visible bend.
-  const pull = Math.min(180, Math.max(40, dist * 0.5))
-  const c1 = extendPt(s.x, s.y, sSide, pull)
-  const c2 = extendPt(t.x, t.y, tSide, pull)
+  const { c1, c2 } = bezierControlPoints(s, sSide, t, tSide)
   return `M${s.x},${s.y}C${c1.x},${c1.y} ${c2.x},${c2.y} ${t.x},${t.y}`
 }
 
@@ -358,10 +367,7 @@ export function computeRoutedEdge(
   // direct curve would actually cross a node, since A* paths look stiffer.
   const s = { x: sx, y: sy }
   const t = { x: tx, y: ty }
-  const dist = Math.hypot(tx - sx, ty - sy)
-  const pull = Math.min(180, Math.max(40, dist * 0.5))
-  const c1 = extendPt(sx, sy, srcSide, pull)
-  const c2 = extendPt(tx, ty, tgtSide, pull)
+  const { c1, c2 } = bezierControlPoints(s, srcSide, t, tgtSide)
 
   // Padding for the hit test is smaller than the routing OBS_PAD: we only
   // re-route when the curve clearly goes *through* a node, not when it just

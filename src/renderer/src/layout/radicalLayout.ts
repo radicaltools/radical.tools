@@ -12,15 +12,8 @@
  * This is NOT a generic graph layout — it understands C4 hierarchy.
  */
 
-import {
-  C4Node,
-  C4Relation,
-  PositionMap,
-  NODE_SIZES,
-  COLLAPSED_HEIGHT,
-  COLLAPSED_WIDTH,
-  isContainerType,
-} from '../types/c4'
+import { C4Node, C4Relation, PositionMap, NODE_SIZES, COLLAPSED_HEIGHT, COLLAPSED_WIDTH } from '../types/c4'
+import { effectiveWidth, effectiveHeight, isVisible } from './geometry'
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -41,28 +34,6 @@ const GRID_SIZE           = 20   // snap unit
 
 function snap(v: number): number {
   return Math.round(v / GRID_SIZE) * GRID_SIZE
-}
-
-function effectiveWidth(n: C4Node): number {
-  if (isContainerType(n.type) && n.collapsed) {
-    return COLLAPSED_WIDTH[n.type]
-  }
-  return n.width
-}
-
-function effectiveHeight(n: C4Node): number {
-  if (isContainerType(n.type) && n.collapsed) {
-    return COLLAPSED_HEIGHT[n.type]
-  }
-  return n.height
-}
-
-function isVisible(node: C4Node, allNodes: Record<string, C4Node>): boolean {
-  if (!node.parentId) return true
-  const parent = allNodes[node.parentId]
-  if (!parent) return true
-  if (parent.collapsed) return false
-  return isVisible(parent, allNodes)
 }
 
 function getVisibleChildren(

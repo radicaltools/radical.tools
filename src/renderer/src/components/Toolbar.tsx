@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore, type SmartLayoutReport } from '../store/diagramStore'
+import type { SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
@@ -256,6 +257,94 @@ const IconClipboard = () => (
   </svg>
 )
 
+const IconInfo = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="8" cy="8" r="6.2" />
+    <path d="M8 7.2v4M8 5.1v.05" />
+  </svg>
+)
+
+// ── Smart Layout progress + "why this layout" report ─────────────────────────
+
+function smartLayoutProgressLabel(p: SmartLayoutProgress | null): string | null {
+  if (!p) return null
+  if (p.phase === 'candidates') return `Trying ${p.total} algorithms… ${p.done}/${p.total}`
+  if (p.phase === 'refining-a') return 'Refining with simulated annealing…'
+  if (p.phase === 'refining-b') return 'Refining containers…'
+  return 'Polishing…'
+}
+
+/**
+ * Surfaces the full candidate ranking that Smart Layout already computes
+ * (previously a console.info-only breadcrumb) so the ensemble's reasoning
+ * is legible without opening DevTools.
+ */
+function SmartLayoutReportButton({ report }: { report: SmartLayoutReport }): React.ReactElement {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  useOutsideClick([wrapRef], open, useCallback(() => setOpen(false), []))
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('keydown', onKey) }
+  }, [open])
+
+  const arrow = ' → '
+
+  return (
+    <div className="smart-layout-report-wrap" ref={wrapRef}>
+      <button
+        className="toolbar-btn toolbar-btn-icon-only"
+        onClick={() => setOpen((o) => !o)}
+        title="Why this layout? — full ranking of every algorithm Smart Layout tried"
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        <IconInfo />
+      </button>
+      {open && (
+        <div className="smart-layout-report-popover" role="dialog" aria-label="Smart Layout report">
+          <div className="smart-layout-report-header">
+            <div className="smart-layout-report-title">Why this layout?</div>
+            <div className="smart-layout-report-sub">
+              Winner: <strong>{report.winnerName}</strong> · crossings {report.before.crossings}{arrow}{report.after.crossings},
+              {' '}overdraws {report.before.overdraws}{arrow}{report.after.overdraws} · {report.planarity.verdict}
+              {report.planarity.verdict !== 'planar' && ` (${report.planarity.crossingEdges}/${report.planarity.totalEdges} edges cross)`}
+            </div>
+            <div className="smart-layout-report-sub">
+              Simulated annealing: {report.refinement.before.toFixed(0)}{arrow}{report.refinement.after.toFixed(0)} cost
+              {' '}over {report.refinement.iterations} iterations
+            </div>
+          </div>
+          <div className="smart-layout-report-table-wrap">
+            <table className="smart-layout-report-table">
+              <thead>
+                <tr>
+                  <th>Algorithm</th>
+                  <th title="Composite aesthetic cost — lower is better">Score</th>
+                  <th title="Edge crossings (rendered)">Cross</th>
+                  <th title="Edge/node overdraws (rendered)">Draw</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.candidates.map((c) => (
+                  <tr key={c.name} className={c.name === report.winnerName ? 'winner' : undefined}>
+                    <td>{c.name === report.winnerName ? '★ ' : ''}{c.name}</td>
+                    <td>{c.composite.toFixed(0)}</td>
+                    <td>{c.renderedCrossings}</td>
+                    <td>{c.renderedOverdraws}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── App menu (hamburger popover) ─────────────────────────────────────────────
 
 type ConnectionMod = 'alt' | 'shift' | 'ctrl' | 'meta'
@@ -505,6 +594,8 @@ export function Toolbar(): React.ReactElement {
   const zoomOut = useDiagramStore((s) => s.zoomOut)
   const runSmartLayout = useDiagramStore((s) => s.runSmartLayout)
   const isLayoutRunning = useDiagramStore((s) => s.isLayoutRunning)
+  const smartLayoutProgress = useDiagramStore((s) => s.smartLayoutProgress)
+  const lastSmartLayoutReport = useDiagramStore((s) => s.lastSmartLayoutReport)
   const activeViewLayoutMode = useDiagramStore((s) =>
     s.activeViewId ? s.views[s.activeViewId]?.layoutMode ?? 'auto' : 'auto'
   )
@@ -668,22 +759,29 @@ export function Toolbar(): React.ReactElement {
         <IconZoomIn />
       </button>
 
-      {activeViewKind !== 'treemap' && activeViewKind !== 'dynamic' && activeViewKind !== 'table' && activeViewKind !== 'matrix' && <button
-        className="toolbar-btn toolbar-btn-accent"
-        onClick={() => { void runSmartLayout() }}
-        disabled={isLayoutRunning || appMode === 'metamodel'}
-        title={
-          activeViewLayoutMode === 'tree'
-            ? 'Tree Layout — hierarchical nested-tree arrangement (configured for the active view).'
-            : 'Smart Layout — ensemble of layered + semantic algorithms with edge-crossing minimisation, picks the cleanest result.'
-        }
-      >
-        {activeViewLayoutMode === 'tree' ? (
-          <><IconTreeLayout /> Tree Layout</>
-        ) : (
-          <><IconSmartLayout /> Smart Layout</>
+      {activeViewKind !== 'treemap' && activeViewKind !== 'dynamic' && activeViewKind !== 'table' && activeViewKind !== 'matrix' && <>
+        <button
+          className={`toolbar-btn toolbar-btn-accent${isLayoutRunning ? ' toolbar-btn-busy' : ''}`}
+          onClick={() => { void runSmartLayout() }}
+          disabled={isLayoutRunning || appMode === 'metamodel'}
+          title={
+            activeViewLayoutMode === 'tree'
+              ? 'Tree Layout — hierarchical nested-tree arrangement (configured for the active view).'
+              : 'Smart Layout — ensemble of layered + semantic algorithms with edge-crossing minimisation, picks the cleanest result.'
+          }
+        >
+          {isLayoutRunning && activeViewLayoutMode !== 'tree' ? (
+            <><span className="toolbar-btn-spin"><IconSmartLayout /></span> {smartLayoutProgressLabel(smartLayoutProgress) ?? 'Working…'}</>
+          ) : activeViewLayoutMode === 'tree' ? (
+            <><IconTreeLayout /> Tree Layout</>
+          ) : (
+            <><IconSmartLayout /> Smart Layout</>
+          )}
+        </button>
+        {!isLayoutRunning && activeViewLayoutMode !== 'tree' && lastSmartLayoutReport && (
+          <SmartLayoutReportButton report={lastSmartLayoutReport} />
         )}
-      </button>}
+      </>}
 
       <div className="toolbar-sep" />
 

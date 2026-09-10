@@ -421,6 +421,61 @@ body {
 
 .toolbar-btn svg { width: 14px; height: 14px; }
 
+/* Smart Layout — in-run progress state. Overrides the generic :disabled dim
+   so the live "trying N algorithms…" label stays legible while it runs. */
+.toolbar-btn-busy:disabled {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text-primary);
+}
+.toolbar-btn-spin {
+  display: inline-flex;
+  animation: toolbar-btn-spin 1.1s linear infinite;
+}
+@keyframes toolbar-btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+.toolbar-btn-icon-only { padding: 0 7px; }
+
+/* "Why this layout?" report popover */
+.smart-layout-report-wrap { position: relative; display: inline-flex; }
+.smart-layout-report-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 1000;
+  width: 420px;
+  max-width: min(420px, calc(100vw - 32px));
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15), 0 8px 24px rgba(0, 0, 0, 0.28);
+  padding: 10px;
+  animation: app-menu-in 120ms ease-out;
+  transform-origin: top left;
+}
+.smart-layout-report-header { padding: 2px 4px 8px; }
+.smart-layout-report-title { font-size: 12.5px; font-weight: 700; margin-bottom: 4px; }
+.smart-layout-report-sub { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+.smart-layout-report-table-wrap { max-height: 260px; overflow-y: auto; overflow-x: auto; }
+.smart-layout-report-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.smart-layout-report-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+.smart-layout-report-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  white-space: nowrap;
+}
+.smart-layout-report-table tr.winner { color: var(--accent); font-weight: 600; }
+
 /* ── Mode switcher ────────────────────────────────────────────────── */
 .toolbar-mode-switch {
   display: flex;

@@ -46,6 +46,7 @@ import type { Metamodel } from '../types/metamodel'
 import { applyRadicalLayout } from './radicalLayout'
 import { minimizeCrossings, computeLayoutMetrics, type LayoutMetrics } from './crossingOpt'
 import { pickSides } from './portAllocator'
+import { ELK_ROOT_SPACING, ELK_CHILD_SPACING } from './elkSpacingBase'
 
 // ─── Composite aesthetic score ────────────────────────────────────────────
 //
@@ -268,6 +269,10 @@ function computeRenderAwareEdgeMetrics(
     const sb = borderPoint(sn.x, sn.y, sn.w, sn.h, sSide)
     const tb = borderPoint(tn.x, tn.y, tn.w, tn.h, tSide)
     const dist = Math.hypot(tb.x - sb.x, tb.y - sb.y)
+    // Mirrors edgeRouting.ts's controlPointPull() — kept as an inlined
+    // literal (not imported) so this file stays free of any non-elkSpacing
+    // dependency the SA Web Worker chunk would otherwise pick up. If that
+    // formula changes, update this one too.
     const pull = Math.min(180, Math.max(40, dist * 0.5))
     const c1x = sb.x + sb.nx * pull, c1y = sb.y + sb.ny * pull
     const c2x = tb.x + tb.nx * pull, c2y = tb.y + tb.ny * pull
@@ -559,17 +564,17 @@ function symmetryDeficitFn(
 
 
 // ─── Shared spacing baseline ──────────────────────────────────────────────
+//
+// Numeric spacing comes from elkSpacingBase.ts (shared with elkLayout.ts) —
+// only the fields specific to the ensemble's own padding/thoroughness/
+// crossing-minimisation profile are kept here.
 
 const COMMON_SPACING: LayoutOptions = {
-  'elk.spacing.nodeNode': '60',
-  'elk.layered.spacing.nodeNodeBetweenLayers': '80',
-  'elk.spacing.edgeNode': '20',
-  'elk.spacing.edgeEdge': '10',
+  ...ELK_ROOT_SPACING,
   'elk.layered.unnecessaryBendpoints': 'true',
   'elk.layered.compaction.postCompaction.strategy': 'EDGE_LENGTH',
   'elk.padding': '[top=40, right=30, bottom=30, left=30]',
   'elk.separateConnectedComponents': 'true',
-  'elk.spacing.componentComponent': '80',
   'elk.layered.thoroughness': '50',
   'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
   'elk.layered.crossingMinimization.greedySwitch.type': 'TWO_SIDED',
@@ -577,12 +582,8 @@ const COMMON_SPACING: LayoutOptions = {
 
 const CHILD_SPACING: LayoutOptions = {
   ...COMMON_SPACING,
-  'elk.spacing.nodeNode': '30',
-  'elk.layered.spacing.nodeNodeBetweenLayers': '50',
-  'elk.spacing.edgeNode': '12',
-  'elk.spacing.edgeEdge': '8',
+  ...ELK_CHILD_SPACING,
   'elk.padding': '[top=40, right=20, bottom=20, left=20]',
-  'elk.spacing.componentComponent': '40',
 }
 
 function elkLayered(
@@ -1167,6 +1168,8 @@ async function refineWithSimulatedAnnealing(
   const RESTARTS = 4
   const perRun = budgetMs / RESTARTS
   let totalIter = 0
+  // Reheat after this many consecutive sweeps with no new global-best cost.
+  const STAGNATION_LIMIT = 12
 
   for (let restart = 0; restart < RESTARTS; restart++) {
     // Seed positions: restart 0 = input, restart k>0 = best so far.
@@ -1188,8 +1191,10 @@ async function refineWithSimulatedAnnealing(
     const T_END = 3
     const cooling = 0.95
     const t0 = now()
+    let sweepsSinceImprovement = 0
 
     while (now() - t0 < perRun && T > T_END) {
+      const bestBeforeSweep = bestCost
       // One sweep = one perturbation per root node, plus one swap.
       // Mixing translation + swap follows Davidson-Harel (1996) — pure
       // translation SA gets stuck because swapping two roots is many
@@ -1268,7 +1273,23 @@ async function refineWithSimulatedAnnealing(
         }
         totalIter++
       }
-      T *= cooling
+
+      if (bestCost < bestBeforeSweep) {
+        sweepsSinceImprovement = 0
+        T *= cooling
+      } else {
+        sweepsSinceImprovement++
+        if (sweepsSinceImprovement >= STAGNATION_LIMIT) {
+          // Davidson-Harel "kick": no new global best for a while means the
+          // chain is trapped in a basin greedy descent can't climb out of.
+          // Reheat instead of cooling further so the next sweeps can jump
+          // to a neighbouring basin.
+          T = T0 * 0.6
+          sweepsSinceImprovement = 0
+        } else {
+          T *= cooling
+        }
+      }
     }
     // Yield between SA restarts so the event loop can paint the spinner
     // and handle input. Each restart is ~perRun ms of sync CPU work.
@@ -1511,6 +1532,16 @@ export type ELKPhaseResult =
   | { done: false; valid: SmartLayoutCandidate[]; rootIds: string[]; baseline: LayoutMetrics }
 
 /**
+ * In-run progress, reported so the UI can show that Smart Layout is actually
+ * trying multiple algorithms rather than just spinning opaquely.
+ */
+export type SmartLayoutProgress =
+  | { phase: 'candidates'; done: number; total: number }
+  | { phase: 'refining-a' | 'refining-b' | 'refining-c' }
+
+export type SmartLayoutOnProgress = (progress: SmartLayoutProgress) => void
+
+/**
  * ELK candidate-generation phase — always runs on the main thread.
  *
  * elk-worker.min.js is a standalone Web Worker script and cannot be imported
@@ -1522,6 +1553,7 @@ export async function runSmartLayoutELKPhase(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
   metamodel?: Metamodel,
+  onProgress?: SmartLayoutOnProgress,
 ): Promise<ELKPhaseResult> {
   // Dynamic import so ELK (with its elk-worker.min.js CJS dependency) is NOT
   // bundled into the Web Worker chunk — it's code-split and fetched only when
@@ -1534,7 +1566,7 @@ export async function runSmartLayoutELKPhase(
   // Ten structurally different candidates run in parallel.
   // stress / force / mrtree may degrade on compound graphs — runCandidate
   // swallows failures so the remaining set still wins.
-  const candidates = await Promise.all([
+  const candidatePromises: Promise<SmartLayoutCandidate | null>[] = [
     runCandidate(
       'Layered TB · Brandes-Köpf · model-order',
       nodes, relations,
@@ -1612,7 +1644,19 @@ export async function runSmartLayoutELKPhase(
       nodes, relations,
       applyRadicalLayout(nodes, relations),
     ),
-  ])
+  ]
+
+  // Report progress as each candidate settles (order of completion, not of
+  // the array above) so the UI can show "N/10 algorithms tried" live instead
+  // of a single opaque spinner for the whole ~1s ensemble run.
+  const total = candidatePromises.length
+  let doneCount = 0
+  onProgress?.({ phase: 'candidates', done: 0, total })
+  const tracked = candidatePromises.map((p) => p.finally(() => {
+    doneCount++
+    onProgress?.({ phase: 'candidates', done: doneCount, total })
+  }))
+  const candidates = await Promise.all(tracked)
 
   const valid = candidates.filter((c): c is SmartLayoutCandidate => c !== null)
   if (valid.length === 0) {
@@ -1643,10 +1687,11 @@ export async function runSmartLayoutCore(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
   metamodel?: Metamodel,
+  onProgress?: SmartLayoutOnProgress,
 ): Promise<SmartLayoutResult> {
-  const elkResult = await runSmartLayoutELKPhase(nodes, relations, metamodel)
+  const elkResult = await runSmartLayoutELKPhase(nodes, relations, metamodel, onProgress)
   if (elkResult.done) return elkResult.result
-  return runSmartLayoutSAPhase(nodes, relations, elkResult.valid, elkResult.rootIds, elkResult.baseline)
+  return runSmartLayoutSAPhase(nodes, relations, elkResult.valid, elkResult.rootIds, elkResult.baseline, onProgress)
 }
 
 /**
@@ -1665,9 +1710,11 @@ export async function runSmartLayoutSAPhase(
   valid: SmartLayoutCandidate[],  // sorted ascending by composite score
   rootIds: string[],
   baseline: LayoutMetrics,
+  onProgress?: SmartLayoutOnProgress,
 ): Promise<SmartLayoutResult> {
   // Phase A multi-start: refine the top-K ELK candidates independently and
   // pick whichever Phase A leaves in the best basin.
+  onProgress?.({ phase: 'refining-a' })
   const PHASEA_K = Math.min(2, valid.length)
   const phaseABudget = 400
   let phaseA = await refineWithSimulatedAnnealing(nodes, relations, valid[0].positions, rootIds, phaseABudget)
@@ -1681,11 +1728,13 @@ export async function runSmartLayoutSAPhase(
   }
   // Refit parents in case root SA loosened sibling spacing.
   const fittedA = fitParentsToChildren(nodes, phaseA.positions)
+  onProgress?.({ phase: 'refining-b' })
   const phaseB = await refinePerCompound(nodes, relations, fittedA, 200)
   // Critical: per-compound SA mutates child positions in parent-relative
   // space WITHOUT enforcing they stay inside the parent. Refit so containers
   // hug their (possibly drifted) children before the final polish.
   const fittedB = fitParentsToChildren(nodes, phaseB.positions)
+  onProgress?.({ phase: 'refining-c' })
   const phaseC = await refineWithSimulatedAnnealing(
     nodes, relations, fittedB, rootIds, 200,
     {

@@ -42,6 +42,10 @@ export interface PortAllocation {
 // ─── Side picking (same logic that lived inside RelationEdge) ───────────────
 
 function bestSide(dx: number, dy: number, isTarget: boolean): Position {
+  // C4 diagrams are usually taller than wide (person → system → container
+  // stacks read top-to-bottom), so a small bias toward Top/Bottom sides
+  // keeps edges from defaulting to Left/Right on near-diagonal offsets,
+  // which read as more "sideways spaghetti" than a vertical connection.
   const VERTICAL_BIAS = 1.15
   if (Math.abs(dx) >= Math.abs(dy) * VERTICAL_BIAS) {
     const goingRight = dx > 0
@@ -107,6 +111,9 @@ function distributePorts(
   )
 
   const total = isVertical ? w : h
+  // Keep ports off the corners (20px, or 20% of a very small side) so a
+  // port never lands exactly where two sides meet — that reads as the edge
+  // touching a corner rather than a face.
   const MARGIN = Math.min(20, total * 0.2)
   const usable = Math.max(0, total - 2 * MARGIN)
 
