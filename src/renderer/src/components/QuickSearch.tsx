@@ -515,6 +515,24 @@ export function QuickSearch(): React.ReactElement | null {
         >
           ✨
         </button>
+        <button
+          type="button"
+          className="qs-forge-toggle"
+          title="Open Radical Forge — generate a model from a description"
+          aria-label="Open Radical Forge"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            closeDropdown()
+            window.dispatchEvent(new CustomEvent('radical:open-forge'))
+          }}
+        >
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M9.5 1.5 3 8l1.5 1.5L11 3z" />
+            <path d="M9 3l4 4" />
+            <path d="M2 14l2.5-2.5" />
+            <circle cx="12.5" cy="3.5" r="1.5" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
         {aiBusy && (
           <button
             type="button"
