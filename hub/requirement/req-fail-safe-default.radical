@@ -5,6 +5,7 @@
     "name": "Fail-Safe Default Behaviour",
     "description": "When the system cannot determine a safe or correct outcome with sufficient confidence, it defaults to the least harmful, most reversible action and escalates to a human — instead of guessing or proceeding blindly.",
     "tags": [
+      "principle",
       "safety",
       "ai",
       "fail-safe",

@@ -5,6 +5,7 @@
     "name": "Configuration Propagation",
     "description": "Runtime configuration and feature-flag changes take effect across the fleet quickly and observably.",
     "tags": [
+      "principle",
       "operations",
       "configuration",
       "feature-flags"

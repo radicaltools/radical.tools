@@ -5,6 +5,7 @@
     "name": "Distributed Tracing",
     "description": "Trace context is propagated across every service, queue and job boundary so any request can be followed end to end.",
     "tags": [
+      "principle",
       "observability",
       "tracing",
       "operations"

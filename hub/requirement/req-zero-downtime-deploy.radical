@@ -5,6 +5,7 @@
     "name": "Zero-Downtime Deployment",
     "description": "Releases must not interrupt in-flight requests or make the service unavailable to users.",
     "tags": [
+      "principle",
       "availability",
       "deployment",
       "ci-cd"

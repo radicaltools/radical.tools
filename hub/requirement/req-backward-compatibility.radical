@@ -5,6 +5,7 @@
     "name": "API Backward Compatibility",
     "description": "Published APIs never break existing clients without a versioned transition period.",
     "tags": [
+      "principle",
       "interoperability",
       "api",
       "versioning"

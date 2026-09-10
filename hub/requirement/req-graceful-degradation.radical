@@ -5,6 +5,7 @@
     "name": "Graceful Degradation",
     "description": "Core functionality keeps working when a non-critical dependency fails, instead of the whole page or request failing.",
     "tags": [
+      "principle",
       "availability",
       "resilience",
       "fault-tolerance"

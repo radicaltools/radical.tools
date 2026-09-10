@@ -5,6 +5,7 @@
     "name": "Infrastructure as Code",
     "description": "All infrastructure is declared in version-controlled code and changed only through the pipeline.",
     "tags": [
+      "principle",
       "automation",
       "infrastructure",
       "devops"

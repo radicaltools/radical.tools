@@ -5,6 +5,7 @@
     "name": "Least Privilege Access",
     "description": "Users and service identities hold only the permissions their role requires, and those permissions are reviewed regularly.",
     "tags": [
+      "principle",
       "security",
       "access-control",
       "iam"
