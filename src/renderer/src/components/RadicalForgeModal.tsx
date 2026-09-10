@@ -11,8 +11,17 @@ import { AIReportLine } from './AIReportLine'
 import { useHubStore, type HubCategory, type HubConceptSummary } from '../store/hubStore'
 import { findRelevantConcepts } from '../hub/matchConcepts'
 import { importHubConceptIntoDiagram } from '../hub/importConcept'
+import {
+  askClarifyingQuestions,
+  formatClarificationAnswers,
+  HUB_MATCHES_QUESTION_ID,
+  type ClarifyStageQuestion,
+} from '../ai/forgeClarify'
 import type { AISettings, ChatMessage } from '../ai/types'
 import type { ApplyReport } from '../ai/diagramFacade'
+
+type ClarifyStatus = 'asking' | 'form' | 'done'
+type ClarifyAnswers = Record<string, string | string[]>
 
 /** Hub categories worth surfacing as prior art for each stage — the C4 stage
  *  is where decomposition/coupling guidance (patterns, ADRs) matters most.
@@ -93,8 +102,13 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const [aiSettings, setAiSettings] = useState<AISettings>(() => loadAISettings())
   const [importedHubIds, setImportedHubIds] = useState<Set<string>>(new Set())
   const [importingHubId, setImportingHubId] = useState<string | null>(null)
+  const [clarifyStatusByStage, setClarifyStatusByStage] = useState<Partial<Record<ForgeStageId, ClarifyStatus>>>({})
+  const [clarifyQuestionsByStage, setClarifyQuestionsByStage] = useState<Partial<Record<ForgeStageId, ClarifyStageQuestion[]>>>({})
+  const [clarifyAnswersByStage, setClarifyAnswersByStage] = useState<Partial<Record<ForgeStageId, ClarifyAnswers>>>({})
   const abortRef = useRef<AbortController | null>(null)
   const diagram = useDiagramFacade()
+
+  const currentStageId: ForgeStageId | null = FORGE_STAGES.some((s) => s.id === step) ? (step as ForgeStageId) : null
 
   const hubConcepts = useHubStore((s) => s.concepts)
   const fetchHubConcepts = useHubStore((s) => s.fetchConcepts)
@@ -113,6 +127,9 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setStageSummaries({})
     setAiSettings(loadAISettings())
     setImportedHubIds(new Set())
+    setClarifyStatusByStage({})
+    setClarifyQuestionsByStage({})
+    setClarifyAnswersByStage({})
   }, [open])
 
   useEffect(() => {
@@ -172,6 +189,71 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     return out
   }, [hubConcepts, description, activeMetamodelId])
 
+  // Fires once per stage, the moment it becomes current: asks the model
+  // whether it needs clarifying questions before generating. Skips the call
+  // entirely when AI isn't configured (Generate is disabled anyway) or the
+  // stage was already generated (revisiting a done stage shouldn't re-ask).
+  useEffect(() => {
+    if (!open || !currentStageId) return
+    if (clarifyStatusByStage[currentStageId]) return
+    if (stageReports[currentStageId] || unavailableReason) {
+      setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: 'done' }))
+      return
+    }
+    const stage = FORGE_STAGES.find((s) => s.id === currentStageId)!
+    setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: 'asking' }))
+    let cancelled = false
+    askClarifyingQuestions(stage.title, description, hubMatchesByStage[currentStageId], aiSettings)
+      .then((questions) => {
+        if (cancelled) return
+        setClarifyQuestionsByStage((q) => ({ ...q, [currentStageId]: questions }))
+        // multiSelect questions (in practice, just hub_matches) default to
+        // "everything selected" — unless the user deselects something,
+        // generation behaves exactly like it did before this feature.
+        const defaults: ClarifyAnswers = {}
+        for (const q of questions) {
+          if (q.kind === 'select' && q.multiSelect) defaults[q.id] = q.options ?? []
+        }
+        setClarifyAnswersByStage((a) => ({ ...a, [currentStageId]: defaults }))
+        setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: questions.length ? 'form' : 'done' }))
+      })
+      .catch(() => {
+        // A failed clarify call shouldn't block generation — just skip
+        // straight to "done" (no questions); the real error (if any) will
+        // resurface when Generate itself is clicked.
+        if (!cancelled) setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: 'done' }))
+      })
+    return () => { cancelled = true }
+  }, [open, currentStageId, clarifyStatusByStage, stageReports, unavailableReason, description, hubMatchesByStage, aiSettings])
+
+  const setClarifyAnswer = useCallback((stageId: ForgeStageId, questionId: string, value: string | string[]) => {
+    setClarifyAnswersByStage((prev) => ({
+      ...prev,
+      [stageId]: { ...(prev[stageId] ?? {}), [questionId]: value },
+    }))
+  }, [])
+
+  const toggleClarifyOption = useCallback((stageId: ForgeStageId, questionId: string, option: string) => {
+    setClarifyAnswersByStage((prev) => {
+      const current = (prev[stageId]?.[questionId] as string[] | undefined) ?? []
+      const next = current.includes(option) ? current.filter((o) => o !== option) : [...current, option]
+      return { ...prev, [stageId]: { ...(prev[stageId] ?? {}), [questionId]: next } }
+    })
+  }, [])
+
+  const submitClarify = useCallback((stageId: ForgeStageId) => {
+    setClarifyStatusByStage((s) => ({ ...s, [stageId]: 'done' }))
+  }, [])
+
+  const skipClarify = useCallback((stageId: ForgeStageId) => {
+    setClarifyAnswersByStage((a) => ({ ...a, [stageId]: {} }))
+    setClarifyStatusByStage((s) => ({ ...s, [stageId]: 'done' }))
+  }, [])
+
+  const editClarify = useCallback((stageId: ForgeStageId) => {
+    setClarifyStatusByStage((s) => ({ ...s, [stageId]: 'form' }))
+  }, [])
+
   const runStage = useCallback(async (stageId: ForgeStageId) => {
     if (busy || unavailableReason) return
     setBusy(true)
@@ -179,7 +261,18 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     const ctl = new AbortController()
     abortRef.current = ctl
     try {
-      const prompt = buildForgeStagePrompt(stageId, description, hubMatchesByStage[stageId])
+      const allMatches = hubMatchesByStage[stageId] ?? []
+      const answers = clarifyAnswersByStage[stageId]
+      const hubAnswer = answers?.[HUB_MATCHES_QUESTION_ID]
+      // A hub_matches answer restricts guidance to what the user kept
+      // checked; no such question this run (e.g. no Hub matches existed, or
+      // the model didn't ask) means "use everything found", same as before
+      // this feature.
+      const effectiveMatches = Array.isArray(hubAnswer)
+        ? allMatches.filter((m) => hubAnswer.includes(m.name))
+        : allMatches
+      const clarifications = formatClarificationAnswers(clarifyQuestionsByStage[stageId], answers)
+      const prompt = buildForgeStagePrompt(stageId, description, effectiveMatches, clarifications)
       const result = await runAIPrompt({ prompt, settings: aiSettings, diagram, history, signal: ctl.signal })
       setHistory((h) => [...h, ...result.history])
       setStageReports((r) => ({ ...r, [stageId]: result.report }))
@@ -190,7 +283,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       abortRef.current = null
       setBusy(false)
     }
-  }, [busy, unavailableReason, description, hubMatchesByStage, aiSettings, diagram, history])
+  }, [busy, unavailableReason, description, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, history])
 
   const cancelStage = useCallback(() => { abortRef.current?.abort() }, [])
 
@@ -335,7 +428,70 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                 </div>
               )}
 
-              {!stageReports[currentStage.id] && !busy && (
+              {(clarifyStatusByStage[currentStage.id] === 'asking' || !clarifyStatusByStage[currentStage.id]) && (
+                <div className="qs-ai-status">
+                  <span className="qs-ai-dot" /> Checking for clarifying questions…
+                </div>
+              )}
+
+              {clarifyStatusByStage[currentStage.id] === 'form' && (
+                <div className="forge-clarify">
+                  <div className="forge-clarify-label">A few quick questions before generating</div>
+                  {clarifyQuestionsByStage[currentStage.id]!.map((q) => (
+                    <div key={q.id} className="forge-clarify-q">
+                      <label className="forge-clarify-question">{q.question}</label>
+                      {q.kind === 'text' ? (
+                        <input
+                          type="text"
+                          className="forge-clarify-input"
+                          value={(clarifyAnswersByStage[currentStage.id]?.[q.id] as string) ?? ''}
+                          onChange={(e) => setClarifyAnswer(currentStage.id, q.id, e.target.value)}
+                        />
+                      ) : (
+                        <div className="forge-clarify-options">
+                          {(q.options ?? []).map((opt) => {
+                            const answer = clarifyAnswersByStage[currentStage.id]?.[q.id]
+                            const checked = q.multiSelect
+                              ? ((answer as string[] | undefined) ?? []).includes(opt)
+                              : answer === opt
+                            return (
+                              <label key={opt} className="forge-clarify-option">
+                                <input
+                                  type={q.multiSelect ? 'checkbox' : 'radio'}
+                                  checked={checked}
+                                  onChange={() => q.multiSelect
+                                    ? toggleClarifyOption(currentStage.id, q.id, opt)
+                                    : setClarifyAnswer(currentStage.id, q.id, opt)}
+                                />
+                                {opt}
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <button type="button" className="forge-primary-btn" onClick={() => submitClarify(currentStage.id)}>
+                      Continue
+                    </button>
+                    <button type="button" className="qs-ai-mini-btn" onClick={() => skipClarify(currentStage.id)}>
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {clarifyStatusByStage[currentStage.id] === 'done' && !!clarifyQuestionsByStage[currentStage.id]?.length && !stageReports[currentStage.id] && (
+                <div className="forge-clarify-summary">
+                  Clarified ✓
+                  <button type="button" className="qs-ai-mini-btn" onClick={() => editClarify(currentStage.id)}>
+                    Edit answers
+                  </button>
+                </div>
+              )}
+
+              {clarifyStatusByStage[currentStage.id] === 'done' && !stageReports[currentStage.id] && !busy && (
                 <button
                   type="button"
                   className="forge-primary-btn"
@@ -352,7 +508,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                 </div>
               )}
               {error && <div className="qs-ai-error">Error: {error}</div>}
-              {stageReports[currentStage.id] && !busy && (
+              {clarifyStatusByStage[currentStage.id] !== 'form' && stageReports[currentStage.id] && !busy && (
                 <div className="forge-stage-result">
                   <div className="qs-ai-text">{stageSummaries[currentStage.id]}</div>
                   <AIReportLine report={stageReports[currentStage.id]!} />

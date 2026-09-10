@@ -3858,6 +3858,53 @@ body {
   margin-top: 1px;
 }
 
+.forge-clarify {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.forge-clarify-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.forge-clarify-q { display: flex; flex-direction: column; gap: 4px; }
+.forge-clarify-question { font-size: 12px; color: var(--text-primary); font-weight: 500; }
+.forge-clarify-input {
+  padding: 5px 8px;
+  font-size: 12px;
+  background: var(--bg-input, var(--bg-toolbar));
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  outline: none;
+}
+.forge-clarify-input:focus { border-color: var(--accent, #3b82f6); }
+.forge-clarify-options { display: flex; flex-direction: column; gap: 3px; }
+.forge-clarify-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.forge-clarify-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
 /* ─── Document manager modal ─────────────────────────────────────────────── */
 .docmgr-backdrop {
   position: fixed; inset: 0; z-index: 2000;
