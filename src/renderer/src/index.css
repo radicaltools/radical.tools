@@ -3758,6 +3758,24 @@ body {
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   animation: forge-panel-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+.forge-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), #9b5de5);
+}
+.forge-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+.forge-title-icon {
+  display: inline-flex;
+  color: #9b5de5;
+  flex-shrink: 0;
+}
 @keyframes forge-panel-in {
   from { transform: translate(-50%, -10px) scale(0.98); opacity: 0; }
   to   { transform: translate(-50%, 0) scale(1); opacity: 1; }
@@ -3768,24 +3786,39 @@ body {
 .forge-steps {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   margin: 4px 0 10px;
 }
 .forge-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 10.5px;
-  padding: 4px 8px;
+  font-weight: 600;
+  padding: 5px 10px;
   border-radius: 999px;
   border: 1px solid var(--border-color);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
+  transition: background-color .14s, border-color .14s, color .14s, box-shadow .14s;
 }
-.forge-step:disabled { cursor: default; opacity: 0.5; }
-.forge-step.done { color: var(--text-primary); border-color: var(--text-muted); }
+.forge-step:hover:not(:disabled):not(.active) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+.forge-step:disabled { cursor: default; opacity: 0.4; }
+.forge-step-check { font-size: 9px; line-height: 1; }
+.forge-step.done {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
 .forge-step.active {
   color: #fff;
   background: var(--accent);
   border-color: var(--accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .forge-warning {
   font-size: 11.5px;
@@ -3823,18 +3856,65 @@ body {
   padding: 2px 0;
 }
 .forge-stage-result { margin-top: 4px; }
-.forge-primary-btn {
+/* ─── Radical Forge — button system ──────────────────────────────────────── */
+.forge-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
   font-size: 12px;
   font-weight: 600;
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--accent);
+  padding: 7px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: background-color .14s, border-color .14s, color .14s, box-shadow .14s, filter .14s, transform .06s;
+}
+.forge-btn:active:not(:disabled) { transform: translateY(1px); }
+.forge-btn:disabled { cursor: default; opacity: 0.45; }
+.forge-btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
+
+.forge-btn-primary {
   background: var(--accent);
   color: #fff;
-  cursor: pointer;
+  border-color: var(--accent);
+  box-shadow: 0 1px 2px rgba(0,0,0,.18);
 }
-.forge-primary-btn:hover { filter: brightness(1.08); }
-.forge-primary-btn:disabled { opacity: 0.5; cursor: default; filter: none; }
+.forge-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.forge-btn-primary:disabled { filter: none; box-shadow: none; }
+
+.forge-btn-secondary {
+  background: transparent;
+  color: var(--text-secondary, var(--text-primary));
+  border-color: var(--border-color);
+}
+.forge-btn-secondary:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+  background: var(--bg-hover, rgba(255,255,255,0.05));
+}
+
+.forge-btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: transparent;
+}
+.forge-btn-ghost:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-hover, rgba(255,255,255,0.06));
+}
+
+.forge-btn-success {
+  background: color-mix(in srgb, #16a34a 16%, transparent);
+  color: #16a34a;
+  border-color: color-mix(in srgb, #16a34a 40%, transparent);
+  cursor: default;
+}
 
 .forge-hub-suggestions {
   display: flex;
@@ -3857,8 +3937,8 @@ body {
 .forge-hub-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 4px;
+  gap: 10px;
+  padding: 7px 4px;
   border-top: 1px solid var(--border-color);
 }
 .forge-hub-card:first-of-type { border-top: none; }
@@ -3900,23 +3980,37 @@ body {
 .forge-clarify-q { display: flex; flex-direction: column; gap: 4px; }
 .forge-clarify-question { font-size: 12px; color: var(--text-primary); font-weight: 500; }
 .forge-clarify-input {
-  padding: 5px 8px;
+  padding: 6px 9px;
   font-size: 12px;
   background: var(--bg-input, var(--bg-toolbar));
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text-primary);
   outline: none;
+  transition: border-color .13s;
 }
 .forge-clarify-input:focus { border-color: var(--accent, #3b82f6); }
-.forge-clarify-options { display: flex; flex-direction: column; gap: 3px; }
+.forge-clarify-options { display: flex; flex-direction: column; gap: 5px; }
 .forge-clarify-option {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
-  color: var(--text-primary);
+  color: var(--text-secondary, var(--text-primary));
   cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input, transparent);
+  transition: border-color .13s, background-color .13s, color .13s;
+}
+.forge-clarify-option:hover { border-color: var(--text-muted); }
+.forge-clarify-option input { accent-color: var(--accent); margin: 0; flex-shrink: 0; cursor: pointer; }
+.forge-clarify-option:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-primary);
+  font-weight: 500;
 }
 .forge-clarify-summary {
   display: flex;
