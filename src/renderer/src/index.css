@@ -3734,28 +3734,36 @@ body {
   line-height: 1;
 }
 
-/* ─── Radical Forge — full-height docked panel (not a centered popup: the
-   canvas stays visible and interactive beside it, so the user watches the
-   model build live) ──────────────────────────────────────────────────── */
+/* ─── Radical Forge — drops down from the top-center search bar, same
+   family as .quick-search-dropdown's own pop-open treatment. No backdrop:
+   canvas stays visible and interactive around it, closing is via ✕/Escape. */
 .forge-panel {
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(46vw, 640px);
-  min-width: 420px;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(640px, 90vw);
+  max-height: min(78vh, 720px);
   z-index: 4000;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   padding: 20px 22px;
-  background: var(--bg-panel, #1f2330);
+  background: color-mix(in srgb, var(--bg-panel) 97%, transparent);
   color: var(--text-primary);
-  border-left: 1px solid var(--border-color);
-  box-shadow: -8px 0 24px rgba(0,0,0,0.25);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0,0,0,0.45), 0 4px 10px rgba(0,0,0,0.22);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  animation: forge-panel-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-@media (max-width: 860px) {
-  .forge-panel { width: 100vw; min-width: 0; }
+@keyframes forge-panel-in {
+  from { transform: translate(-50%, -10px) scale(0.98); opacity: 0; }
+  to   { transform: translate(-50%, 0) scale(1); opacity: 1; }
+}
+@media (max-width: 720px) {
+  .forge-panel { width: 94vw; top: 46px; }
 }
 .forge-steps {
   display: flex;
@@ -5172,6 +5180,25 @@ body {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.qs-forge-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+.qs-forge-toggle:hover {
+  color: #9b5de5;
+  border-color: color-mix(in srgb, #9b5de5 50%, transparent);
+  background: color-mix(in srgb, #9b5de5 14%, transparent);
 }
 .qs-ai-banner {
   display: flex;
