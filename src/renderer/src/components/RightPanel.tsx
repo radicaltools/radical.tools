@@ -94,7 +94,14 @@ function PaletteItem({ typeId, label, sublabel, color, iconPath }: {
 
 // ── Tree node ─────────────────────────────────────────────────────────────────
 
-function TreeNodeItem({ nodeId, depth }: { nodeId: string; depth: number }) {
+function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
+  nodeId: string
+  depth: number
+  /** When set, only render children present in this set (a search/type filter is active). Ancestors of matches are included so the tree path stays visible. */
+  filterSet?: Set<string> | null
+  /** Nodes that directly match the active filter (vs. shown only as an ancestor path) — used to highlight them. */
+  matchedSet?: Set<string> | null
+}) {
   const node = useDiagramStore((s) => s.c4Nodes[nodeId])
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
   const selectNode = useDiagramStore((s) => s.selectNode)
@@ -107,7 +114,7 @@ function TreeNodeItem({ nodeId, depth }: { nodeId: string; depth: number }) {
 
   if (!node) return null
 
-  const children = Object.values(allNodes).filter((n) => n.parentId === nodeId)
+  const children = Object.values(allNodes).filter((n) => n.parentId === nodeId && (!filterSet || filterSet.has(n.id)))
   const hasChildren = children.length > 0
   const isSelected = selectedNodeId === nodeId
   const canCollapse = isContainerType(node.type) && hasChildren
@@ -115,9 +122,11 @@ function TreeNodeItem({ nodeId, depth }: { nodeId: string; depth: number }) {
   const inView = !activeView
     || activeView.nodeIds.length === 0
     || activeView.nodeIds.includes(nodeId)
+  const isFilterMatch = !!matchedSet?.has(nodeId)
   // Effective collapsed: per-view if a named view is active, else model-level.
   // A model-collapsed node can be overridden in this view via expandedNodeIds.
-  const isEffectivelyCollapsed = nodeEffectivelyCollapsedInView(node, activeViewId, activeView)
+  // While a search/type filter is active, force-expand so matches stay reachable.
+  const isEffectivelyCollapsed = filterSet ? false : nodeEffectivelyCollapsedInView(node, activeViewId, activeView)
 
   const onDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData('application/c4-node-id', nodeId)
@@ -128,7 +137,7 @@ function TreeNodeItem({ nodeId, depth }: { nodeId: string; depth: number }) {
   return (
     <>
       <div
-        className={`tree-node ${isSelected ? 'selected' : ''}`}
+        className={`tree-node ${isSelected ? 'selected' : ''}${isFilterMatch ? ' filter-match' : ''}`}
         style={{ paddingLeft: 12 + depth * 14, opacity: inView ? 1 : 0.35 }}
         draggable
         onDragStart={onDragStart}
@@ -142,7 +151,7 @@ function TreeNodeItem({ nodeId, depth }: { nodeId: string; depth: number }) {
           {canCollapse ? (isEffectivelyCollapsed ? '▶' : '▼') : '·'}
         </span>
         <span className="tree-badge"><C4Icon type={node.type} size={10} /></span>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+        <span className="tree-node-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
           {node.label}
         </span>
         {activeViewId && (
@@ -160,7 +169,7 @@ function TreeNodeItem({ nodeId, depth }: { nodeId: string; depth: number }) {
         )}
       </div>
       {!isEffectivelyCollapsed && children.map((c) => (
-        <TreeNodeItem key={c.id} nodeId={c.id} depth={depth + 1} />
+        <TreeNodeItem key={c.id} nodeId={c.id} depth={depth + 1} filterSet={filterSet} matchedSet={matchedSet} />
       ))}
     </>
   )
@@ -404,6 +413,91 @@ const Icon = {
       <circle cx="9.5" cy="11.5" r="1.5"/>
     </svg>
   ),
+  Search: () => (
+    <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+      <circle cx="7" cy="7" r="4.5"/>
+      <path d="M13 13 L10.2 10.2"/>
+    </svg>
+  ),
+}
+
+// ── Nodes filter bar (search + type chips + bulk show/hide) ─────────────────
+// Filters what the Nodes tree *displays* (client-side, by label/description/
+// technology/type). "Show matches" / "Hide matches" additionally write the
+// matched set into the active view's nodeIds via the same store actions the
+// per-node eye toggle already uses.
+
+function NodesFilterBar({
+  search, onSearchChange, typeCounts, typeFilter, onToggleType,
+  matchedCount, totalCount, filterActive, hasActiveView, onShowAll, onShowMatches, onHideMatches, onClearFilter,
+}: {
+  search: string
+  onSearchChange: (v: string) => void
+  typeCounts: { type: C4ElementType; count: number }[]
+  typeFilter: Set<C4ElementType>
+  onToggleType: (t: C4ElementType) => void
+  matchedCount: number
+  totalCount: number
+  filterActive: boolean
+  hasActiveView: boolean
+  onShowAll: () => void
+  onShowMatches: () => void
+  onHideMatches: () => void
+  onClearFilter: () => void
+}) {
+  return (
+    <div className="rp-filter-bar">
+      <div className="rp-filter-search">
+        <span className="rp-filter-search-icon" aria-hidden><Icon.Search /></span>
+        <input
+          className="props-input"
+          placeholder="Filter nodes…"
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') onClearFilter() }}
+        />
+        {search && (
+          <button className="rp-filter-search-clear" onClick={() => onSearchChange('')} title="Clear search">
+            <Icon.Close />
+          </button>
+        )}
+      </div>
+
+      {typeCounts.length > 1 && (
+        <div className="rp-filter-chips">
+          {typeCounts.map(({ type, count }) => (
+            <button
+              key={type}
+              className={`rp-filter-chip${typeFilter.has(type) ? ' active' : ''}`}
+              onClick={() => onToggleType(type)}
+              title={`${TYPE_LABELS[type] || type} (${count})`}
+            >
+              <C4Icon type={type} size={9} />
+              <span>{TYPE_LABELS[type] || type}</span>
+              <span className="rp-filter-chip-count">{count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filterActive ? (
+        <div className="rp-filter-actions">
+          <span className="rp-filter-summary">{matchedCount} of {totalCount}</span>
+          {hasActiveView && (
+            <>
+              <button className="rp-filter-action-btn" onClick={onShowMatches} disabled={matchedCount === 0}>Show matches</button>
+              <button className="rp-filter-action-btn" onClick={onHideMatches} disabled={matchedCount === 0}>Hide matches</button>
+            </>
+          )}
+          <button className="rp-filter-action-btn subtle" onClick={onClearFilter}>Clear</button>
+        </div>
+      ) : hasActiveView ? (
+        <div className="rp-filter-actions">
+          <button className="rp-filter-action-btn subtle" onClick={onShowAll}>Show all</button>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 /** Format a timestamp as "just now", "5m ago", "3h ago", "2d ago", "MMM d" */
@@ -1894,11 +1988,59 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
   const selectEdge = useDiagramStore((s) => s.selectEdge)
   const activeSequenceId = useDiagramStore((s) => s.activeSequenceId)
   const setActiveSequence = useDiagramStore((s) => s.setActiveSequence)
+  const activeViewId = useDiagramStore((s) => s.activeViewId)
+  const setViewNodes = useDiagramStore((s) => s.setViewNodes)
+  const removeNodeFromView = useDiagramStore((s) => s.removeNodeFromView)
   const nodesCount = useDiagramStore((s) => Object.keys(s.c4Nodes).length)
   const relationsCount = useDiagramStore((s) => Object.keys(s.c4Relations).length)
   const sequencesCount = useDiagramStore((s) => Object.keys(s.sequences).length)
-  const rootNodes = Object.values(allNodes).filter((n) => !n.parentId)
   const [openSection, setOpenSection] = useState<'nodes' | 'relations' | 'sequences'>('nodes')
+
+  // ── Nodes tree filter: free-text search + type chips ──────────────────────
+  const [nodeSearch, setNodeSearch] = useState('')
+  const [nodeTypeFilter, setNodeTypeFilter] = useState<Set<C4ElementType>>(new Set())
+  const nodeFilterActive = nodeSearch.trim() !== '' || nodeTypeFilter.size > 0
+
+  const { nodesMatchedSet, nodesVisibleSet, nodeTypeCounts } = useMemo(() => {
+    const counts = new Map<C4ElementType, number>()
+    for (const n of Object.values(allNodes)) counts.set(n.type, (counts.get(n.type) ?? 0) + 1)
+    const known = PALETTE_ORDER.filter((t) => counts.has(t as C4ElementType)) as C4ElementType[]
+    const custom = Array.from(counts.keys()).filter((t) => !PALETTE_ORDER.includes(t)).sort()
+    const typeCounts = [...known, ...custom].map((type) => ({ type, count: counts.get(type)! }))
+
+    if (!nodeFilterActive) return { nodesMatchedSet: null, nodesVisibleSet: null, nodeTypeCounts: typeCounts }
+
+    const q = nodeSearch.trim().toLowerCase()
+    const matched = new Set<string>()
+    for (const n of Object.values(allNodes)) {
+      if (nodeTypeFilter.size > 0 && !nodeTypeFilter.has(n.type)) continue
+      const haystack = `${n.label} ${n.description ?? ''} ${n.technology ?? ''} ${TYPE_LABELS[n.type] ?? n.type}`.toLowerCase()
+      if (!q || haystack.includes(q)) matched.add(n.id)
+    }
+    const visible = new Set(matched)
+    for (const id of matched) {
+      let cur = allNodes[id]?.parentId
+      while (cur && allNodes[cur] && !visible.has(cur)) { visible.add(cur); cur = allNodes[cur].parentId }
+    }
+    return { nodesMatchedSet: matched, nodesVisibleSet: visible, nodeTypeCounts: typeCounts }
+  }, [allNodes, nodeSearch, nodeTypeFilter, nodeFilterActive])
+
+  const rootNodes = Object.values(allNodes).filter((n) => !n.parentId && (!nodesVisibleSet || nodesVisibleSet.has(n.id)))
+
+  const handleToggleNodeType = (t: C4ElementType) => {
+    setNodeTypeFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(t)) next.delete(t); else next.add(t)
+      return next
+    })
+  }
+  const handleClearNodeFilter = () => { setNodeSearch(''); setNodeTypeFilter(new Set()) }
+  const handleShowAllNodes = () => { if (activeViewId) setViewNodes(activeViewId, []) }
+  const handleShowMatches = () => { if (activeViewId && nodesMatchedSet) setViewNodes(activeViewId, Array.from(nodesMatchedSet)) }
+  const handleHideMatches = () => {
+    if (!activeViewId || !nodesMatchedSet) return
+    for (const id of nodesMatchedSet) removeNodeFromView(activeViewId, id)
+  }
 
   // Pane 2 is shown when any item is selected
   const hasSelection = !!(selectedNodeId || selectedEdgeId || activeSequenceId)
@@ -1929,9 +2071,30 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
           <div className="rp-pane">
             <AccordionSection title="Nodes" count={nodesCount}
               open={openSection === 'nodes'} onToggle={() => setOpenSection('nodes')}>
+              {nodesCount > 0 && (
+                <NodesFilterBar
+                  search={nodeSearch}
+                  onSearchChange={setNodeSearch}
+                  typeCounts={nodeTypeCounts}
+                  typeFilter={nodeTypeFilter}
+                  onToggleType={handleToggleNodeType}
+                  matchedCount={nodesMatchedSet?.size ?? 0}
+                  totalCount={nodesCount}
+                  filterActive={nodeFilterActive}
+                  hasActiveView={!!activeViewId}
+                  onShowAll={handleShowAllNodes}
+                  onShowMatches={handleShowMatches}
+                  onHideMatches={handleHideMatches}
+                  onClearFilter={handleClearNodeFilter}
+                />
+              )}
               {rootNodes.length === 0
-                ? <div className="lp-empty-state" style={{ padding: '4px 12px 8px' }}>No nodes.</div>
-                : rootNodes.map((n) => <TreeNodeItem key={n.id} nodeId={n.id} depth={0} />)
+                ? <div className="lp-empty-state" style={{ padding: '4px 12px 8px' }}>
+                    {nodeFilterActive ? 'No matches.' : 'No nodes.'}
+                  </div>
+                : rootNodes.map((n) => (
+                    <TreeNodeItem key={n.id} nodeId={n.id} depth={0} filterSet={nodesVisibleSet} matchedSet={nodesMatchedSet} />
+                  ))
               }
             </AccordionSection>
             <AccordionSection title="Relations" count={relationsCount}
