@@ -376,24 +376,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
 
   return createPortal(
     <div
-      className="milestone-modal-backdrop"
-      onMouseDown={(e) => {
-        if (e.target !== e.currentTarget) return
-        const start = e.currentTarget
-        const onUp = (ev: MouseEvent): void => {
-          window.removeEventListener('mouseup', onUp, true)
-          if (ev.target === start && !busy) onClose()
-        }
-        window.addEventListener('mouseup', onUp, true)
-      }}
+      className="forge-panel"
+      role="dialog"
+      aria-label="Radical Forge"
     >
-      <div
-        className="milestone-modal forge-modal"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="Radical Forge"
-      >
         <button
           type="button"
           className="ai-settings-close"
@@ -645,7 +631,6 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
             </button>
           )}
         </div>
-      </div>
     </div>,
     document.body,
   )
