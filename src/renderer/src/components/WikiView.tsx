@@ -298,24 +298,22 @@ export function WikiView(): React.ReactElement {
         typeMeta={typeMeta}
       />
       <div className="wiki-page">
-        {focus && (
-          <div className="wiki-page-mode-toggle">
-            <button
-              className={pageMode === 'single' ? 'active' : ''}
-              onClick={() => view && setWikiPageMode(view.id, 'single')}
-              title="Children show as short preview cards — click through one page at a time"
-            >
-              Single page
-            </button>
-            <button
-              className={pageMode === 'multi' ? 'active' : ''}
-              onClick={() => view && setWikiPageMode(view.id, 'multi')}
-              title="Each direct child's full content is shown inline, on this same page"
-            >
-              Multi page
-            </button>
-          </div>
-        )}
+        <div className="wiki-page-mode-toggle">
+          <button
+            className={pageMode === 'single' ? 'active' : ''}
+            onClick={() => view && setWikiPageMode(view.id, 'single')}
+            title="Children show as short preview cards — click through one page at a time"
+          >
+            Single page
+          </button>
+          <button
+            className={pageMode === 'multi' ? 'active' : ''}
+            onClick={() => view && setWikiPageMode(view.id, 'multi')}
+            title="Each direct child's full content is shown inline, on this same page"
+          >
+            Multi page
+          </button>
+        </div>
         {focus ? (
           <WikiElementPage
             key={focus.id}
@@ -340,14 +338,24 @@ export function WikiView(): React.ReactElement {
           <WikiOverview
             roots={childrenOf['__root__'] ?? []}
             childrenOf={childrenOf}
+            nodes={c4Nodes}
+            relations={c4Relations}
+            visibleSet={visibleSet}
             metamodel={metamodel}
+            updateNode={updateNode}
+            updateRelation={updateRelation}
             onNavigate={goTo}
+            createNode={createNode}
             onCreateRoot={(type) => createNode(type, undefined)}
             onDeleteNode={deleteNode}
+            createRelation={createRelation}
+            onDeleteRelation={deleteRelation}
             readOnly={readOnly}
             totalNodes={nodeList.length}
             totalRelations={Object.keys(c4Relations).length}
             typeMeta={typeMeta}
+            pageMode={pageMode}
+            remainingDepth={multiPageDepth}
           />
         )}
       </div>
@@ -574,25 +582,47 @@ function WikiNodeCard({
 function WikiOverview({
   roots,
   childrenOf,
+  nodes,
+  relations,
+  visibleSet,
   metamodel,
+  updateNode,
+  updateRelation,
   onNavigate,
+  createNode,
   onCreateRoot,
   onDeleteNode,
+  createRelation,
+  onDeleteRelation,
   readOnly,
   totalNodes,
   totalRelations,
   typeMeta,
+  pageMode,
+  remainingDepth = 1,
 }: {
   roots: C4Node[]
   childrenOf: Record<string, C4Node[]>
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  visibleSet: Set<string> | null
   metamodel: Metamodel
+  updateNode: UpdateNode
+  updateRelation: UpdateRelation
   onNavigate: (id: string) => void
+  createNode: (type: string, parentId: string | undefined, onCreated?: (id: string) => void) => void
   onCreateRoot: (type: string) => void
   onDeleteNode: (id: string) => void
+  createRelation: (sourceId: string, targetId: string, relationType?: string) => void
+  onDeleteRelation: (id: string) => void
   readOnly: boolean
   totalNodes: number
   totalRelations: number
   typeMeta: TypeMeta
+  /** Mirrors WikiElementPage's pageMode — 'multi' embeds each root element's
+   *  full content inline on the Overview page instead of a preview-card grid. */
+  pageMode: 'single' | 'multi'
+  remainingDepth?: number
 }): React.ReactElement {
   const rootTypes = useMemo(
     () => childTypeOptions(metamodel, undefined, typeMeta),
@@ -619,6 +649,32 @@ function WikiOverview({
       </header>
       {roots.length === 0 ? (
         <p className="wiki-muted">No elements yet.</p>
+      ) : pageMode === 'multi' && remainingDepth > 0 ? (
+        <div className="wiki-embedded-children">
+          {roots.map((n) => (
+            <div className="wiki-embedded-child" key={n.id}>
+              <WikiElementPage
+                node={n}
+                nodes={nodes}
+                relations={relations}
+                visibleSet={visibleSet}
+                metamodel={metamodel}
+                updateNode={updateNode}
+                updateRelation={updateRelation}
+                onNavigate={onNavigate}
+                createNode={createNode}
+                onDeleteNode={onDeleteNode}
+                createRelation={createRelation}
+                onDeleteRelation={onDeleteRelation}
+                readOnly={readOnly}
+                typeMeta={typeMeta}
+                pageMode={pageMode}
+                embedded
+                remainingDepth={remainingDepth - 1}
+              />
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="wiki-card-grid">
           {roots.map((n) => {
