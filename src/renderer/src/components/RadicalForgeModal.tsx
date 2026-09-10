@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '../store/diagramStore'
-import { runAIPrompt } from '../ai/runner'
+import { runAIPrompt, type ForgeProgressEvent } from '../ai/runner'
 import { loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
@@ -22,6 +22,21 @@ import type { ApplyReport } from '../ai/diagramFacade'
 
 type ClarifyStatus = 'asking' | 'form' | 'done'
 type ClarifyAnswers = Record<string, string | string[]>
+
+interface ProgressEntry {
+  id: number
+  kind: 'text' | 'action'
+  text: string
+  ok?: boolean
+}
+interface StageProgress {
+  round: number
+  entries: ProgressEntry[]
+}
+/** Caps the live feed so a long run doesn't grow the DOM unbounded — only
+ *  the tail is ever shown anyway. */
+const PROGRESS_ENTRY_LIMIT = 40
+const PROGRESS_VISIBLE_COUNT = 7
 
 /** Hub categories worth surfacing as prior art for each stage — the C4 stage
  *  is where decomposition/coupling guidance (patterns, ADRs) matters most.
@@ -105,6 +120,9 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const [clarifyStatusByStage, setClarifyStatusByStage] = useState<Partial<Record<ForgeStageId, ClarifyStatus>>>({})
   const [clarifyQuestionsByStage, setClarifyQuestionsByStage] = useState<Partial<Record<ForgeStageId, ClarifyStageQuestion[]>>>({})
   const [clarifyAnswersByStage, setClarifyAnswersByStage] = useState<Partial<Record<ForgeStageId, ClarifyAnswers>>>({})
+  const [progressByStage, setProgressByStage] = useState<Partial<Record<ForgeStageId, StageProgress>>>({})
+  const progressIdRef = useRef(0)
+  const progressListRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   // Stages the clarify effect below has already started for this wizard run
   // — a ref, not state, so starting a fetch doesn't itself change an effect
@@ -134,6 +152,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setClarifyStatusByStage({})
     setClarifyQuestionsByStage({})
     setClarifyAnswersByStage({})
+    setProgressByStage({})
     clarifyStartedRef.current = new Set()
   }, [open])
 
@@ -274,8 +293,21 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (busy || unavailableReason) return
     setBusy(true)
     setError(null)
+    setProgressByStage((p) => ({ ...p, [stageId]: { round: 0, entries: [] } }))
     const ctl = new AbortController()
     abortRef.current = ctl
+    const onProgress = (event: ForgeProgressEvent): void => {
+      setProgressByStage((p) => {
+        const cur = p[stageId] ?? { round: 0, entries: [] }
+        if (event.type === 'round') return { ...p, [stageId]: { ...cur, round: event.round } }
+        const id = progressIdRef.current++
+        const entry: ProgressEntry = event.type === 'text'
+          ? { id, kind: 'text', text: event.text }
+          : { id, kind: 'action', text: event.label, ok: event.ok }
+        const entries = [...cur.entries, entry].slice(-PROGRESS_ENTRY_LIMIT)
+        return { ...p, [stageId]: { ...cur, entries } }
+      })
+    }
     try {
       const allMatches = hubMatchesByStage[stageId] ?? []
       const answers = clarifyAnswersByStage[stageId]
@@ -289,7 +321,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         : allMatches
       const clarifications = formatClarificationAnswers(clarifyQuestionsByStage[stageId], answers)
       const prompt = buildForgeStagePrompt(stageId, description, effectiveMatches, clarifications)
-      const result = await runAIPrompt({ prompt, settings: aiSettings, diagram, history, signal: ctl.signal })
+      const result = await runAIPrompt({ prompt, settings: aiSettings, diagram, history, signal: ctl.signal, onProgress })
       setHistory((h) => [...h, ...result.history])
       setStageReports((r) => ({ ...r, [stageId]: result.report }))
       setStageSummaries((s) => ({ ...s, [stageId]: result.summary || 'Done.' }))
@@ -302,6 +334,12 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   }, [busy, unavailableReason, description, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, history])
 
   const cancelStage = useCallback(() => { abortRef.current?.abort() }, [])
+
+  // Keep the live progress feed scrolled to its newest entry.
+  useEffect(() => {
+    const el = progressListRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [progressByStage, currentStageId])
 
   const handleImportHubConcept = useCallback(async (summary: HubConceptSummary) => {
     setImportingHubId(summary.id)
@@ -517,12 +555,41 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                   Generate {currentStage.title.toLowerCase()}
                 </button>
               )}
-              {busy && (
-                <div className="qs-ai-status">
-                  <span className="qs-ai-dot" /> Generating…
-                  <button type="button" className="qs-ai-mini-btn" onClick={cancelStage}>Cancel</button>
-                </div>
-              )}
+              {busy && (() => {
+                const prog = progressByStage[currentStage.id] ?? { round: 0, entries: [] }
+                const createdCount = prog.entries.filter((e) => e.kind === 'action' && e.ok && e.text.startsWith('+')).length
+                const failedCount = prog.entries.filter((e) => e.kind === 'action' && e.ok === false).length
+                const visible = prog.entries.slice(-PROGRESS_VISIBLE_COUNT)
+                return (
+                  <div className="forge-progress">
+                    <div className="forge-progress-header">
+                      <span className="forge-progress-pulse" aria-hidden />
+                      <span className="forge-progress-round">Round {prog.round || 1}</span>
+                      {createdCount > 0 && <span className="forge-progress-stat">+{createdCount}</span>}
+                      {failedCount > 0 && <span className="forge-progress-stat forge-progress-stat-error">{failedCount} failed</span>}
+                      <span className="forge-progress-spacer" />
+                      <button type="button" className="qs-ai-mini-btn" onClick={cancelStage}>Cancel</button>
+                    </div>
+                    <div className="forge-progress-list" ref={progressListRef}>
+                      {visible.length === 0 && (
+                        <div className="forge-progress-entry forge-progress-entry-text">
+                          <span className="forge-progress-dot" />
+                          <span className="forge-progress-entry-text-inner">Thinking…</span>
+                        </div>
+                      )}
+                      {visible.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className={`forge-progress-entry forge-progress-entry-${entry.kind === 'text' ? 'text' : entry.ok === false ? 'error' : 'action'}`}
+                        >
+                          <span className="forge-progress-dot" />
+                          <span className="forge-progress-entry-text-inner">{entry.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
               {error && <div className="qs-ai-error">Error: {error}</div>}
               {clarifyStatusByStage[currentStage.id] !== 'form' && stageReports[currentStage.id] && !busy && (
                 <div className="forge-stage-result">

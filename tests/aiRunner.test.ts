@@ -351,3 +351,72 @@ describe('runAIPrompt — parity check with mocked Ollama tool-calling (no call 
     expect(result.summary).toMatch(/42/)
   })
 })
+
+describe('runAIPrompt — onProgress (live feed for Radical Forge)', () => {
+  beforeEach(() => { delete (globalThis as any).fetch })
+
+  it('emits a round event per round and an action event per tool call, with resolved node labels', async () => {
+    fakeAnthropicFetch([
+      {
+        content: [
+          toolUse('c1', 'add_node', { tempId: 't1', type: 'system', label: 'Web App' }),
+          toolUse('c2', 'add_node', { tempId: 't2', type: 'database', label: 'DB' }),
+          toolUse('c3', 'add_relation', { sourceId: 't1', targetId: 't2', label: 'reads' }),
+        ],
+        stop_reason: 'tool_use',
+      },
+      { content: [text('Created Web App and DB.')], stop_reason: 'end_turn' },
+    ])
+    const events: unknown[] = []
+    await runAIPrompt({
+      prompt: 'Make a web app and a DB it reads from',
+      settings: anthropicSettings(),
+      diagram: makeFacade(),
+      onProgress: (e) => events.push(e),
+    })
+
+    expect(events).toEqual([
+      { type: 'round', round: 1 },
+      { type: 'action', ok: true, label: '+ system: Web App' },
+      { type: 'action', ok: true, label: '+ database: DB' },
+      // sourceId/targetId are tempIds ("t1"/"t2") — describeToolCall resolves
+      // them through ctx to the real node labels, not the raw tempId strings.
+      { type: 'action', ok: true, label: '+ relation: Web App → DB' },
+      { type: 'round', round: 2 },
+      { type: 'text', text: 'Created Web App and DB.' },
+    ])
+  })
+
+  it('emits a failed action with ok:false when a tool call errors', async () => {
+    fakeAnthropicFetch([
+      { content: [toolUse('c1', 'add_node', { tempId: 't1', type: 'database', label: 'DB' })], stop_reason: 'tool_use' },
+      { content: [text('Done.')], stop_reason: 'end_turn' },
+    ])
+    const base = makeFacade()
+    // Same rejection trick as the "self-correct" test above: a parent-less
+    // database is refused, forcing result.ok === false for this call.
+    const facade: DiagramFacade = { ...base, addNode: (n) => (n.type === 'database' && !n.parentId ? '' : base.addNode(n)) }
+    const events: unknown[] = []
+    await runAIPrompt({
+      prompt: 'Add a database',
+      settings: anthropicSettings(),
+      diagram: facade,
+      onProgress: (e) => events.push(e),
+    })
+    const actions = events.filter((e): e is { type: 'action'; ok: boolean; label: string } => (e as any).type === 'action')
+    expect(actions).toHaveLength(1)
+    expect(actions[0].ok).toBe(false)
+    expect(actions[0].label).toBe('add_node failed')
+  })
+
+  it('never calls onProgress when the caller does not pass it (no behavior change for existing callers)', async () => {
+    fakeAnthropicFetch([{ content: [text('Just an answer, no tools.')], stop_reason: 'end_turn' }])
+    // No onProgress in opts — should not throw, same as before this feature existed.
+    const result = await runAIPrompt({
+      prompt: 'hello',
+      settings: anthropicSettings(),
+      diagram: makeFacade(),
+    })
+    expect(result.summary).toMatch(/Just an answer/)
+  })
+})

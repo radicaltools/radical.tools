@@ -3905,6 +3905,97 @@ body {
   margin-bottom: 10px;
 }
 
+/* ─── Radical Forge — live progress feed ─────────────────────────────────── */
+.forge-progress {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-toolbar, rgba(255,255,255,0.03));
+}
+.forge-progress-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.forge-progress-pulse {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: forge-progress-pulse 1.1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes forge-progress-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+.forge-progress-round {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.forge-progress-stat {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #16a34a 18%, transparent);
+  color: #16a34a;
+}
+.forge-progress-stat-error {
+  background: color-mix(in srgb, #ff6b6b 18%, transparent);
+  color: #ff6b6b;
+}
+.forge-progress-spacer { flex: 1; }
+.forge-progress-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 168px;
+  overflow-y: auto;
+  padding: 6px 4px;
+}
+.forge-progress-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-secondary, var(--text-primary));
+  animation: forge-progress-in 0.22s ease-out;
+}
+@keyframes forge-progress-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.forge-progress-entry-text-inner {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.forge-progress-dot {
+  flex-shrink: 0;
+  margin-top: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.forge-progress-entry-action .forge-progress-dot { background: #16a34a; }
+.forge-progress-entry-error .forge-progress-dot { background: #ff6b6b; }
+.forge-progress-entry-error { color: #ff8888; }
+.forge-progress-entry-text .forge-progress-dot { background: var(--accent); }
+.forge-progress-entry-text .forge-progress-entry-text-inner {
+  white-space: normal;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
 /* ─── Document manager modal ─────────────────────────────────────────────── */
 .docmgr-backdrop {
   position: fixed; inset: 0; z-index: 2000;
