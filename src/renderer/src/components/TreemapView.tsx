@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { TYPE_ICON_PATHS } from '../types/c4'
-import type { C4ElementType, C4Node, C4Relation } from '../types/c4'
+import type { C4Node, C4Relation } from '../types/c4'
 
 // ─── Color palette per C4 type ──────────────────────────────────────────────
 const TYPE_COLORS_LIGHT: Record<string, readonly [string, string, string]> = {
@@ -57,53 +56,32 @@ interface TNode {
   descendants:  number  // total leaves under this node (1 if leaf)
   children:     TNode[]
   hasKids:      boolean
-  /** true iff this node has real children that were hidden by the depth
-   *  cutoff (i.e. user could click to reveal them inline) */
-  cutAtDepth:   boolean
-  /** true iff this node id is in the view's `treemapExpandedIds` set */
-  isExpanded:   boolean
   rect?:        Rect
 }
 
 interface Rect { x: number; y: number; w: number; h: number }
 
 // ─── Build tree ──────────────────────────────────────────────────────────────
+// Always builds the WHOLE tree, unconditionally — there is no depth cutoff at
+// build time any more. `treemapMaxDepth` is a *render-time* visibility window
+// relative to whatever node is currently focused (see `applyViewNow` below),
+// so the camera can zoom continuously across a single static layout instead
+// of rebuilding a new one every time the focus changes.
 
 function buildTree(
-  nodes:        Record<string, C4Node>,
-  relCount:     Record<string, number>,
-  viewFilter:   Set<string> | undefined,
-  parentId:     string | undefined,
-  depth:        number,
-  sizeBy:       SizeBy,
-  maxDepth:     number,
-  expandedSet:  Set<string>,
-  parentForced: boolean,
+  nodes:      Record<string, C4Node>,
+  relCount:   Record<string, number>,
+  viewFilter: Set<string> | undefined,
+  parentId:   string | undefined,
+  depth:      number,
+  sizeBy:     SizeBy,
 ): TNode[] {
   const result: TNode[] = []
   for (const n of Object.values(nodes)) {
     if (n.parentId !== parentId) continue
     if (viewFilter && !viewFilter.has(n.id)) continue
-    // A node forces unlimited expansion of its subtree when the user has
-    // explicitly expanded it (or any ancestor of it within this build).
-    const nodeForced = parentForced || expandedSet.has(n.id)
-    const cutChildren = !nodeForced && depth + 1 >= maxDepth
-    const children = cutChildren
-      ? []
-      : buildTree(nodes, relCount, viewFilter, n.id, depth + 1, sizeBy, maxDepth, expandedSet, nodeForced)
-    // When children were cut by the depth limit, still mark hasKids so the
-    // node renders as drillable/expandable.
-    let hasKids = children.length > 0
-    let cutAtDepth = false
-    if (!hasKids && cutChildren) {
-      for (const m of Object.values(nodes)) {
-        if (m.parentId !== n.id) continue
-        if (viewFilter && !viewFilter.has(m.id)) continue
-        hasKids = true
-        cutAtDepth = true
-        break
-      }
-    }
+    const children = buildTree(nodes, relCount, viewFilter, n.id, depth + 1, sizeBy)
+    const hasKids = children.length > 0
     const rc = relCount[n.id] ?? 0
     const descendants = children.length === 0
       ? 1
@@ -112,7 +90,6 @@ function buildTree(
     if (sizeBy === 'uniform') {
       // every sibling weighs the same; parent = number of own children (>=1)
       value = children.length === 0 ? 1 : children.reduce((s, c) => s + c.value, 0)
-      if (children.length === 0) value = 1
     } else if (sizeBy === 'relations') {
       // legacy: leaves sized by relation count
       value = children.length === 0
@@ -122,11 +99,7 @@ function buildTree(
       // 'leaves' (default) — area ∝ number of descendant leaves
       value = descendants
     }
-    result.push({
-      id: n.id, label: n.label, type: n.type, depth, relCount: rc,
-      descendants, children, hasKids, cutAtDepth,
-      isExpanded: expandedSet.has(n.id), value,
-    })
+    result.push({ id: n.id, label: n.label, type: n.type, depth, relCount: rc, descendants, children, hasKids, value })
   }
   return result
 }
@@ -172,9 +145,13 @@ function squarifySlice(nodes: TNode[], vals: number[], rect: Rect): void {
   }
 }
 
-const HDR = [32, 26, 20, 16]
-const PAD = [10,  7,  5,  3]
-const GAP = [ 3,  2,  1,  1]  // inter-sibling gap per depth level
+const GAP        = [3, 2, 1, 1]    // inter-sibling gap per depth level
+const OUTER_PAD  = [4, 3, 2, 2]    // gap between a parent's own edge and its children
+// Every visible tile can be labeled (see applyViewNow), so a node with
+// children reserves extra room at its own top edge — its children are inset
+// below this band, never under where its own label sits. Without it, a
+// parent's label and its top-left child's tile would land on the same spot.
+const LABEL_PAD_TOP = [20, 18, 16, 15]
 
 function applyLayout(nodes: TNode[], rect: Rect, depth: number): void {
   if (!nodes.length || rect.w < 2 || rect.h < 2) return
@@ -193,14 +170,14 @@ function applyLayout(nodes: TNode[], rect: Rect, depth: number): void {
       h: Math.max(0, n.rect.h - gap * 2),
     }
   }
-  const hh = HDR[Math.min(depth, 3)]
-  const pd = PAD[Math.min(depth, 3)]
+  const pad = OUTER_PAD[Math.min(depth, 3)]
+  const padTop = LABEL_PAD_TOP[Math.min(depth, 3)]
   for (const n of nodes) {
     if (!n.rect || !n.children.length) continue
     const inner = {
-      x: n.rect.x + pd, y: n.rect.y + hh + pd,
-      w: Math.max(0, n.rect.w - pd * 2),
-      h: Math.max(0, n.rect.h - hh - pd * 2),
+      x: n.rect.x + pad, y: n.rect.y + padTop,
+      w: Math.max(0, n.rect.w - pad * 2),
+      h: Math.max(0, n.rect.h - padTop - pad),
     }
     if (inner.w > 4 && inner.h > 4) applyLayout(n.children, inner, depth + 1)
   }
@@ -211,7 +188,15 @@ function flatten(nodes: TNode[], out: TNode[] = []): TNode[] {
   return out
 }
 
+type View = [x0: number, y0: number, x1: number, y1: number]
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
+
+const MARGIN = 16
 
 export function TreemapView(): React.ReactElement {
   const isDark          = useIsDarkTheme()
@@ -219,7 +204,6 @@ export function TreemapView(): React.ReactElement {
   const FALLBACK_COLORS = isDark ? FALLBACK_COLORS_DARK : FALLBACK_COLORS_LIGHT
   const c4Nodes         = useDiagramStore(s => s.c4Nodes)
   const c4Relations     = useDiagramStore(s => s.c4Relations)
-  const metamodel       = useDiagramStore(s => s.metamodel)
   const activeViewId    = useDiagramStore(s => s.activeViewId)
   const views           = useDiagramStore(s => s.views)
   const selectNode      = useDiagramStore(s => s.selectNode)
@@ -227,53 +211,23 @@ export function TreemapView(): React.ReactElement {
   const setTreemapFocus = useDiagramStore(s => s.setTreemapFocus)
   const setTreemapSizeBy = useDiagramStore(s => s.setTreemapSizeBy)
   const setTreemapMaxDepth = useDiagramStore(s => s.setTreemapMaxDepth)
-  const toggleTreemapExpand = useDiagramStore(s => s.toggleTreemapExpand)
 
   const activeView = activeViewId ? views[activeViewId] : null
   const focusId    = activeView?.treemapFocusId ?? null
   const sizeBy: SizeBy = activeView?.treemapSizeBy ?? 'leaves'
   // null/undefined = unlimited. Default = 2 levels below focus (children +
   // grandchildren) — keeps the view legible; user can change via dropdown.
+  // This is now a *render-time* window (see applyViewNow), not a build cutoff.
   const maxDepthRaw = activeView?.treemapMaxDepth
   const maxDepth: number =
     maxDepthRaw === null ? Infinity
     : (typeof maxDepthRaw === 'number' && maxDepthRaw > 0) ? maxDepthRaw
     : 2
-  // Per-view set of node ids the user expanded inline beyond `maxDepth`.
-  const expandedSet = useMemo(
-    () => new Set(activeView?.treemapExpandedIds ?? []),
-    [activeView],
-  )
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize]       = useState({ w: 800, h: 600 })
   const [hovered, setHovered] = useState<TNode | null>(null)
   const [mouse, setMouse]     = useState({ x: 0, y: 0 })
-
-  // Canvas-zoom drill animation, overlay strategy.
-  // Main <g> always renders the CURRENT (renderFocusId) tree at identity.
-  // During drill, an overlay <g> on top holds a frozen snapshot of the OLD
-  // tree:
-  //   drill-in:  overlay starts at identity, zooms so clicked rect fills the
-  //              viewport, fades out at the end — revealing NEW underneath.
-  //   drill-out: overlay starts at identity, shrinks into the position the
-  //              previously focused node occupies in the NEW layout, fades
-  //              out at the end.
-  const [renderFocusId, setRenderFocusId] = useState<string | null>(focusId)
-  const [overlay, setOverlay] = useState<
-    { flat: TNode[]; transform: string; opacity: number; transition: string } | null
-  >(null)
-  const prevFocusRef    = useRef<string | null>(focusId)
-  const clickedRectRef  = useRef<Rect | null>(null)
-  const raf1Ref         = useRef<number | null>(null)
-  const raf2Ref         = useRef<number | null>(null)
-  const animTimerRef    = useRef<number | null>(null)
-
-  useEffect(() => () => {
-    if (raf1Ref.current   !== null) cancelAnimationFrame(raf1Ref.current)
-    if (raf2Ref.current   !== null) cancelAnimationFrame(raf2Ref.current)
-    if (animTimerRef.current !== null) window.clearTimeout(animTimerRef.current)
-  }, [])
 
   // Track container size
   useEffect(() => {
@@ -332,98 +286,151 @@ export function TreemapView(): React.ReactElement {
     if (focusId && !c4Nodes[focusId]) setFocus(null)
   }, [focusId, c4Nodes, setFocus])
 
-  // Build tree (rooted at the RENDERED focus, which may lag the store focus
-  // during drill-in so the OLD tree stays visible while it zooms in).
+  // Single static layout for the WHOLE tree, rooted at the true top level.
+  // Recomputed only when the data, filter, container size or sizing mode
+  // change — never when the focus changes. Zooming in/out is purely a camera
+  // move over this one layout (see applyViewNow), which is what makes the
+  // drill continuous instead of a rebuild-and-crossfade.
   const flatNodes = useMemo(() => {
-    const MARGIN = 16
-    const roots = buildTree(c4Nodes, relCount, viewFilter, renderFocusId ?? undefined, 0, sizeBy, maxDepth, expandedSet, false)
-    applyLayout(roots, { x: MARGIN, y: MARGIN, w: size.w - MARGIN * 2, h: size.h - MARGIN * 2 }, 0)
+    const roots = buildTree(c4Nodes, relCount, viewFilter, undefined, 0, sizeBy)
+    applyLayout(roots, {
+      x: MARGIN, y: MARGIN,
+      w: Math.max(1, size.w - MARGIN * 2),
+      h: Math.max(1, size.h - MARGIN * 2),
+    }, 0)
     return flatten(roots)
-  }, [c4Nodes, relCount, viewFilter, renderFocusId, size, sizeBy, maxDepth, expandedSet])
+  }, [c4Nodes, relCount, viewFilter, size, sizeBy])
 
-  // Drive canvas-zoom drill animation on store focus change.
-  useLayoutEffect(() => {
-    const prev = prevFocusRef.current
-    if (prev === focusId) return
-    prevFocusRef.current = focusId
+  const nodeById = useMemo(() => {
+    const m = new Map<string, TNode>()
+    for (const n of flatNodes) m.set(n.id, n)
+    return m
+  }, [flatNodes])
 
-    const W = size.w, H = size.h
-    const MARGIN = 16
-
-    // Cancel any in-flight animation
-    if (raf1Ref.current    !== null) cancelAnimationFrame(raf1Ref.current)
-    if (raf2Ref.current    !== null) cancelAnimationFrame(raf2Ref.current)
-    if (animTimerRef.current !== null) window.clearTimeout(animTimerRef.current)
-
-    // Snapshot the currently-rendered (OLD) tree before swapping renderFocus.
-    const frozenOld = flatNodes
-    const clicked   = clickedRectRef.current
-    clickedRectRef.current = null
-
-    // Swap main layer to NEW immediately. It will render underneath the overlay.
-    setRenderFocusId(focusId)
-
-    if (W < 1 || H < 1) {
-      setOverlay(null)
-      return
-    }
-
-    // Compute overlay target transform.
-    //   drill-in: zoom into clicked rect (rect fills viewport at end)
-    //   drill-out: shrink into prev-focus rect within NEW layout
-    let targetTransform: string | null = null
-
-    if (clicked && focusId !== null) {
-      const sx = W / Math.max(1, clicked.w)
-      const sy = H / Math.max(1, clicked.h)
-      targetTransform =
-        `translate(${-clicked.x * sx}px, ${-clicked.y * sy}px) scale(${sx}, ${sy})`
-    } else if (prev !== null) {
-      const newRoots = buildTree(c4Nodes, relCount, viewFilter, focusId ?? undefined, 0, sizeBy, maxDepth, expandedSet, false)
-      applyLayout(newRoots, { x: MARGIN, y: MARGIN, w: W - MARGIN * 2, h: H - MARGIN * 2 }, 0)
-      const refRect = flatten(newRoots).find((n) => n.id === prev)?.rect
-      if (refRect) {
-        const sx = refRect.w / W
-        const sy = refRect.h / H
-        targetTransform =
-          `translate(${refRect.x}px, ${refRect.y}px) scale(${sx}, ${sy})`
-      }
-    }
-
-    if (!targetTransform || frozenOld.length === 0) {
-      setOverlay(null)
-      return
-    }
-
-    // Phase 1: pin overlay at identity (covering canvas with OLD), no transition.
-    setOverlay({
-      flat: frozenOld,
-      transform: 'translate(0px, 0px) scale(1, 1)',
-      opacity: 1,
-      transition: 'none',
-    })
-
-    // Phase 2: next frame, animate to target transform + fade out at the end.
-    raf1Ref.current = requestAnimationFrame(() => {
-      raf2Ref.current = requestAnimationFrame(() => {
-        setOverlay({
-          flat: frozenOld,
-          transform: targetTransform!,
-          opacity: 0,
-          transition:
-            'transform 360ms cubic-bezier(0.4, 0, 0.2, 1), ' +
-            'opacity 140ms ease-in 240ms',
-        })
-      })
-    })
-
-    // Phase 3: clear overlay after the animation completes.
-    animTimerRef.current = window.setTimeout(() => {
-      setOverlay(null)
-    }, 420)
-  }, [focusId, size.w, size.h, c4Nodes, relCount, viewFilter, sizeBy, maxDepth, expandedSet])
+  const outerView = useMemo<View>(() => [
+    MARGIN, MARGIN,
+    Math.max(MARGIN + 1, size.w - MARGIN),
+    Math.max(MARGIN + 1, size.h - MARGIN),
+  ], [size])
 
   const isEmpty = flatNodes.length === 0
+
+  // ── camera-zoom engine ──────────────────────────────────────────────────
+  // React creates the <rect>/<text> elements once per flatNodes change (data
+  // / size / sizeBy); everything about WHERE they sit on screen and whether
+  // they're visible is then owned imperatively by this effect, keyed off
+  // `focusId`. Because x/y/width/height are never re-derived from state in
+  // JSX (they're set once from the static base layout and never change
+  // value), React's reconciliation never touches them again, so mutating
+  // them directly here doesn't fight re-renders triggered by anything else
+  // (hover, selection, unrelated store updates).
+  const rectRefs   = useRef<Map<string, SVGRectElement>>(new Map())
+  const textRefs   = useRef<Map<string, SVGTextElement>>(new Map())
+  const viewRef     = useRef<View>(outerView)
+  const zoomRafRef  = useRef<number | null>(null)
+  const prevFocusIdRef = useRef<string | null>(focusId)
+
+  const truncateLabel = useCallback((label: string, widthPx: number): string => {
+    const avail = widthPx - 14
+    const maxChars = Math.floor(avail / 6.2)
+    if (maxChars <= 0) return ''
+    if (label.length <= maxChars) return label
+    if (maxChars <= 1) return '…'
+    return label.slice(0, maxChars - 1) + '…'
+  }, [])
+
+  const applyViewNow = useCallback((view: View, focusDepth: number) => {
+    const kx = size.w / Math.max(1e-6, view[2] - view[0])
+    const ky = size.h / Math.max(1e-6, view[3] - view[1])
+    const depthCeiling = maxDepth === Infinity ? Infinity : focusDepth + maxDepth
+    for (const n of flatNodes) {
+      const r = n.rect
+      if (!r) continue
+      const rd = n.depth - focusDepth
+      const visible = rd >= 0 && n.depth <= depthCeiling
+      const x = (r.x - view[0]) * kx
+      const y = (r.y - view[1]) * ky
+      const w = Math.max(0, r.w * kx)
+      const h = Math.max(0, r.h * ky)
+      const rectEl = rectRefs.current.get(n.id)
+      if (rectEl) {
+        rectEl.setAttribute('x', String(x))
+        rectEl.setAttribute('y', String(y))
+        rectEl.setAttribute('width', String(w))
+        rectEl.setAttribute('height', String(h))
+        rectEl.style.opacity = visible ? '1' : '0'
+        rectEl.style.pointerEvents = visible ? 'auto' : 'none'
+      }
+      const textEl = textRefs.current.get(n.id)
+      if (textEl) {
+        // Label every visible tile except the focus's own (rd 0) — that one
+        // is covered by its children anyway (its label would sit right where
+        // the first child's tile paints) and its name is already in the
+        // breadcrumb. Unlike the bubble/square mockup — which only had a
+        // single real root — this app can have several independent
+        // top-level nodes, so *every* visible level below focus needs its
+        // own label, not just the immediate children.
+        const showLabel = visible && rd >= 1 && w > 34 && h > 16
+        textEl.style.display = showLabel ? 'inline' : 'none'
+        if (showLabel) {
+          // Nodes with children reserve a top band sized by LABEL_PAD_TOP
+          // (see applyLayout) — sit the label inside that band. Leaves have
+          // no reserved band, so a smaller fixed inset is enough.
+          const labelY = n.hasKids ? LABEL_PAD_TOP[Math.min(n.depth, 3)] - 6 : 15
+          textEl.setAttribute('x', String(x + 7))
+          textEl.setAttribute('y', String(y + labelY))
+          textEl.textContent = truncateLabel(n.label, w)
+        }
+      }
+    }
+  }, [flatNodes, size, maxDepth, truncateLabel])
+
+  // Drive the camera to whatever node is focused. Animates on a real focus
+  // change; snaps instantly when only the underlying layout changed (resize,
+  // data edit, sizeBy) so those never produce a spurious "zoom".
+  useLayoutEffect(() => {
+    const focusNode  = focusId ? nodeById.get(focusId) : undefined
+    const targetView: View = focusNode?.rect
+      ? [focusNode.rect.x, focusNode.rect.y, focusNode.rect.x + focusNode.rect.w, focusNode.rect.y + focusNode.rect.h]
+      : outerView
+    const targetDepth = focusNode ? focusNode.depth : -1
+
+    const changed = prevFocusIdRef.current !== focusId
+    prevFocusIdRef.current = focusId
+
+    if (zoomRafRef.current !== null) { cancelAnimationFrame(zoomRafRef.current); zoomRafRef.current = null }
+
+    const reduced = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    if (!changed || reduced) {
+      viewRef.current = targetView
+      applyViewNow(targetView, targetDepth)
+      return
+    }
+
+    const start = viewRef.current
+    const duration = 550
+    const t0 = performance.now()
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - t0) / duration)
+      const e = easeInOutCubic(t)
+      const v: View = [
+        start[0] + (targetView[0] - start[0]) * e,
+        start[1] + (targetView[1] - start[1]) * e,
+        start[2] + (targetView[2] - start[2]) * e,
+        start[3] + (targetView[3] - start[3]) * e,
+      ]
+      viewRef.current = v
+      applyViewNow(v, targetDepth)
+      zoomRafRef.current = t < 1 ? requestAnimationFrame(tick) : null
+    }
+    zoomRafRef.current = requestAnimationFrame(tick)
+  }, [focusId, flatNodes, outerView, nodeById, applyViewNow])
+
+  useEffect(() => () => {
+    if (zoomRafRef.current !== null) cancelAnimationFrame(zoomRafRef.current)
+  }, [])
 
   const handleBack = useCallback(() => {
     if (!focusId) return
@@ -449,188 +456,19 @@ export function TreemapView(): React.ReactElement {
     setMouse({ x: e.clientX, y: e.clientY })
   }, [])
 
-  // Render helper — emits clipPaths + node visuals for a given flat-node list.
-  // `interactive=false` is used for the overlay (frozen snapshot) so it does
-  // not capture hover/selection or react to clicks.
-  const renderNodes = (flat: TNode[], interactive: boolean, idPrefix: string) => (
-    <>
-      <defs>
-        {flat.map((n) => n.rect && (
-          <clipPath key={`${idPrefix}cp-${n.id}`} id={`${idPrefix}cp-${n.id}`}>
-            <rect
-              x={n.rect.x + 1} y={n.rect.y + 1}
-              width={Math.max(0, n.rect.w - 2)}
-              height={Math.max(0, n.rect.h - 2)}
-            />
-          </clipPath>
-        ))}
-      </defs>
+  // Single click always selects (leaf or container) — a container's own
+  // properties should be reachable without having to drill into it.
+  // Double-click is the drilling gesture: on a node with children it zooms
+  // in; on the currently-focused node's own tile (the sliver still visible
+  // behind its children) it zooms out one level, mirroring the breadcrumb.
+  const handleClick = useCallback((n: TNode) => {
+    selectNode(n.id)
+  }, [selectNode])
 
-      {flat.map((n) => {
-        if (!n.rect) return null
-        const { x, y, w, h } = n.rect
-        if (w < 2 || h < 2) return null
-
-        const [fill, border, fg] = (TYPE_COLORS[n.type] ?? FALLBACK_COLORS) as [string, string, string]
-        const typeDef = metamodel?.nodeTypes[n.type]
-        const iconPath = typeDef?.iconPath ?? TYPE_ICON_PATHS[n.type as C4ElementType] ?? ''
-        const isHov = interactive && hovered?.id === n.id
-        const isSel = interactive && selectedNodeId === n.id
-        const hh    = HDR[Math.min(n.depth, 3)]
-        const rx    = Math.max(0, 6 - n.depth * 2)
-        const fontSize = Math.min(12, Math.max(9, Math.min(w / 9, hh - 7)))
-        // Show header strip whenever the node *could* have children — even if
-        // they're currently cut by `maxDepth`, so the expand/collapse badge
-        // remains reachable.
-        const showHeader = n.hasKids && h > hh + 4
-        // Badge appears when children exist but are hidden by the depth
-        // limit (`+`), or when the user has explicitly expanded a node that
-        // would otherwise be cut at this depth (`−`).
-        const showExpandBadge =
-          n.cutAtDepth || (n.isExpanded && n.depth + 1 >= maxDepth)
-        const badgeIcon = n.isExpanded ? '−' : '+'
-
-        const handleBodyClick = interactive
-          ? (e: React.MouseEvent) => {
-              e.stopPropagation()
-              if (n.hasKids) {
-                clickedRectRef.current = { x, y, w, h }
-                setFocus(n.id)
-              } else {
-                selectNode(n.id)
-              }
-            }
-          : undefined
-        const handleHeaderClick = interactive
-          ? (e: React.MouseEvent) => {
-              e.stopPropagation()
-              if (n.hasKids) {
-                clickedRectRef.current = { x, y, w, h }
-                setFocus(n.id)
-              } else {
-                selectNode(n.id)
-              }
-            }
-          : undefined
-        const handleBadgeClick = interactive
-          ? (e: React.MouseEvent) => {
-              e.stopPropagation()
-              if (activeViewId) toggleTreemapExpand(activeViewId, n.id)
-            }
-          : undefined
-
-        const strokeCol =
-          isSel ? '#ffd84d' :
-          isHov ? 'rgba(255,255,255,0.9)' : border
-        const strokeW = isSel ? 2 : isHov ? 1.5 : 0.6
-        const iconInset = showHeader && showExpandBadge && w > 40 ? 22 : 6
-        const iconSize = showHeader
-          ? Math.max(12, Math.min(15, hh - 8))
-          : Math.max(11, Math.min(14, h - 8))
-        const iconBoxPad = showHeader ? 3 : 2
-        const iconBoxSize = iconSize + iconBoxPad * 2
-        const showIcon = !!iconPath && w > (showHeader ? 66 : 44) && h > (showHeader ? hh - 2 : 16)
-        const iconX = x + iconInset
-        const iconY = showHeader ? y + (hh - iconBoxSize) / 2 : y + (h - iconBoxSize) / 2
-        const labelX  = iconX + (showIcon ? iconBoxSize + 5 : 0)
-        const iconFill = fg
-        const iconScale = iconSize / 16
-
-        return (
-          <g
-            key={`${idPrefix}${n.id}`}
-            onMouseEnter={interactive ? () => setHovered(n) : undefined}
-          >
-            <rect
-              x={x} y={y} width={w} height={h}
-              fill={fill} stroke={strokeCol} strokeWidth={strokeW} rx={rx}
-              style={interactive ? { cursor: 'pointer' } : undefined}
-              onClick={handleBodyClick}
-              pointerEvents={interactive ? undefined : 'none'}
-            />
-            {showHeader && (
-              <>
-                <rect
-                  x={x} y={y} width={w} height={hh}
-                  fill={border} fillOpacity={isHov ? 0.75 : 0.55} rx={rx}
-                  style={interactive ? { cursor: 'pointer' } : undefined}
-                  onClick={handleHeaderClick}
-                  pointerEvents={interactive ? undefined : 'none'}
-                />
-                {showExpandBadge && w > 40 && (
-                  <g
-                    style={interactive ? { cursor: 'pointer' } : undefined}
-                    onClick={handleBadgeClick}
-                    pointerEvents={interactive ? undefined : 'none'}
-                  >
-                    <rect
-                      x={x + 3} y={y + (hh - 16) / 2}
-                      width={16} height={16} rx={3}
-                      fill="rgba(0,0,0,0.25)"
-                    />
-                    <text
-                      x={x + 11} y={y + hh / 2 + 1}
-                      dominantBaseline="middle" textAnchor="middle"
-                      fill={fg} fontSize={13} fontWeight={700}
-                      fontFamily="system-ui, sans-serif"
-                      pointerEvents="none"
-                    >
-                      {badgeIcon}
-                    </text>
-                  </g>
-                )}
-                {n.hasKids && w > 24 && (
-                  <text
-                    x={x + w - 6} y={y + hh / 2 + 1}
-                    dominantBaseline="middle" textAnchor="end"
-                    fill={fg} fontSize={10} opacity={0.85}
-                    fontFamily="system-ui, sans-serif"
-                    pointerEvents="none"
-                  >
-                    ⤢
-                  </text>
-                )}
-              </>
-            )}
-            {showIcon && (
-              <g
-                clipPath={`url(#${idPrefix}cp-${n.id})`}
-                pointerEvents="none"
-              >
-                <rect
-                  x={iconX}
-                  y={iconY}
-                  width={iconBoxSize}
-                  height={iconBoxSize}
-                  rx={3}
-                  fill={showHeader ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.12)'}
-                />
-                <path
-                  d={iconPath}
-                  fill={iconFill}
-                  transform={`translate(${iconX + iconBoxPad}, ${iconY + iconBoxPad}) scale(${iconScale})`}
-                />
-              </g>
-            )}
-            {w > 28 && (showHeader ? true : h > 12) && (
-              <text
-                x={labelX}
-                y={showHeader ? y + hh - 8 : y + h / 2}
-                dominantBaseline={showHeader ? 'auto' : 'middle'}
-                fill={fg} fontSize={fontSize}
-                fontWeight={n.depth <= 1 ? 600 : 400}
-                fontFamily="system-ui, -apple-system, sans-serif"
-                clipPath={`url(#${idPrefix}cp-${n.id})`}
-                pointerEvents="none"
-              >
-                {n.label}
-              </text>
-            )}
-          </g>
-        )
-      })}
-    </>
-  )
+  const handleDoubleClick = useCallback((n: TNode) => {
+    if (n.id === focusId) setFocus(c4Nodes[n.id]?.parentId ?? null)
+    else if (n.hasKids) setFocus(n.id)
+  }, [focusId, c4Nodes, setFocus])
 
   return (
     <div className="treemap-wrap-outer">
@@ -707,31 +545,62 @@ export function TreemapView(): React.ReactElement {
             {focusId ? 'No child elements. Zoom out to navigate.' : 'No elements to display.'}
           </div>
         ) : (
-          <svg width={size.w} height={size.h} style={{ display: 'block', userSelect: 'none' }}>
-            {/* Main layer — current (NEW after a drill) tree at identity. */}
+          <svg
+            width={size.w} height={size.h}
+            style={{ display: 'block', userSelect: 'none' }}
+            onClick={() => selectNode(null)}
+            onDoubleClick={() => setFocus(null)}
+          >
+            {/* Pass 1: every rect, painted back-to-front by tree order so a
+                parent always sits behind its own children. */}
             <g>
-              {renderNodes(flatNodes, true, '')}
+              {flatNodes.map((n) => {
+                if (!n.rect) return null
+                const [fill, border, fg] = (TYPE_COLORS[n.type] ?? FALLBACK_COLORS) as [string, string, string]
+                const isHov = hovered?.id === n.id
+                const isSel = selectedNodeId === n.id
+                const strokeCol = isSel ? '#ffd84d' : isHov ? fg : border
+                const strokeW = isSel ? 2 : isHov ? 1.5 : 0.8
+                return (
+                  <rect
+                    key={n.id}
+                    ref={(el) => {
+                      if (el) rectRefs.current.set(n.id, el)
+                      else rectRefs.current.delete(n.id)
+                    }}
+                    x={n.rect.x} y={n.rect.y} width={n.rect.w} height={n.rect.h}
+                    rx={Math.max(0, 6 - n.depth * 2)}
+                    fill={fill} stroke={strokeCol} strokeWidth={strokeW}
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={() => setHovered(n)}
+                    onClick={(e) => { e.stopPropagation(); handleClick(n) }}
+                    onDoubleClick={(e) => { e.stopPropagation(); handleDoubleClick(n) }}
+                  />
+                )
+              })}
             </g>
-
-            {/* Overlay layer — frozen OLD tree during a drill animation.
-                Zooms toward the clicked rect (drill-in) or shrinks into the
-                prev-focus rect (drill-out), then fades out, revealing the
-                main layer underneath. */}
-            {overlay && (
-              <g
-                style={{
-                  transform: overlay.transform,
-                  transformBox: 'fill-box',
-                  transformOrigin: '0 0',
-                  transition: overlay.transition,
-                  opacity: overlay.opacity,
-                  pointerEvents: 'none',
-                  willChange: 'transform, opacity',
-                }}
-              >
-                {renderNodes(overlay.flat, false, 'ov-')}
-              </g>
-            )}
+            {/* Pass 2: labels, painted after every rect so a parent's own
+                label is never hidden behind its first child's tile. */}
+            <g pointerEvents="none" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+              {flatNodes.map((n) => {
+                if (!n.rect) return null
+                const [, , fg] = (TYPE_COLORS[n.type] ?? FALLBACK_COLORS) as [string, string, string]
+                return (
+                  <text
+                    key={`t-${n.id}`}
+                    ref={(el) => {
+                      if (el) textRefs.current.set(n.id, el)
+                      else textRefs.current.delete(n.id)
+                    }}
+                    x={n.rect.x + 7} y={n.rect.y + 15}
+                    fill={fg}
+                    fontSize={11}
+                    fontWeight={600}
+                    style={{ display: 'none' }}
+                  />
+                )
+              })}
+            </g>
           </svg>
         )}
 
@@ -755,7 +624,7 @@ export function TreemapView(): React.ReactElement {
             )}
             <span className="tm-tt-hint">
               {hovered.hasKids
-                ? 'click tile → zoom in'
+                ? 'click → select · double-click → zoom in'
                 : 'click → select'}
             </span>
           </div>
