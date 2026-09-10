@@ -106,6 +106,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const [clarifyQuestionsByStage, setClarifyQuestionsByStage] = useState<Partial<Record<ForgeStageId, ClarifyStageQuestion[]>>>({})
   const [clarifyAnswersByStage, setClarifyAnswersByStage] = useState<Partial<Record<ForgeStageId, ClarifyAnswers>>>({})
   const abortRef = useRef<AbortController | null>(null)
+  // Stages the clarify effect below has already started for this wizard run
+  // — a ref, not state, so starting a fetch doesn't itself change an effect
+  // dependency (see the effect for why that would matter).
+  const clarifyStartedRef = useRef<Set<ForgeStageId>>(new Set())
   const diagram = useDiagramFacade()
 
   const currentStageId: ForgeStageId | null = FORGE_STAGES.some((s) => s.id === step) ? (step as ForgeStageId) : null
@@ -130,6 +134,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setClarifyStatusByStage({})
     setClarifyQuestionsByStage({})
     setClarifyAnswersByStage({})
+    clarifyStartedRef.current = new Set()
   }, [open])
 
   useEffect(() => {
@@ -193,19 +198,31 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   // whether it needs clarifying questions before generating. Skips the call
   // entirely when AI isn't configured (Generate is disabled anyway) or the
   // stage was already generated (revisiting a done stage shouldn't re-ask).
+  //
+  // Guards re-entry with a ref (clarifyStartedRef), not the clarifyStatusByStage
+  // state this effect itself sets: putting that state in the dependency array
+  // made every setClarifyStatusByStage call re-trigger the effect, whose
+  // cleanup then set `cancelled = true` on the in-flight request before the
+  // re-run's own guard bailed out (status was already non-empty) — the
+  // response would arrive, see `cancelled`, and silently no-op, leaving the
+  // stage stuck on "Checking for clarifying questions…" forever. Reading
+  // stageReports/unavailableReason/description/hubMatchesByStage/aiSettings
+  // without listing them is deliberate for the same reason — this is a
+  // fire-once-per-stage-entry effect, not a sync-on-every-change one.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!open || !currentStageId) return
-    if (clarifyStatusByStage[currentStageId]) return
+    if (clarifyStartedRef.current.has(currentStageId)) return
     if (stageReports[currentStageId] || unavailableReason) {
+      clarifyStartedRef.current.add(currentStageId)
       setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: 'done' }))
       return
     }
+    clarifyStartedRef.current.add(currentStageId)
     const stage = FORGE_STAGES.find((s) => s.id === currentStageId)!
     setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: 'asking' }))
-    let cancelled = false
     askClarifyingQuestions(stage.title, description, hubMatchesByStage[currentStageId], aiSettings)
       .then((questions) => {
-        if (cancelled) return
         setClarifyQuestionsByStage((q) => ({ ...q, [currentStageId]: questions }))
         // multiSelect questions (in practice, just hub_matches) default to
         // "everything selected" — unless the user deselects something,
@@ -221,10 +238,9 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         // A failed clarify call shouldn't block generation — just skip
         // straight to "done" (no questions); the real error (if any) will
         // resurface when Generate itself is clicked.
-        if (!cancelled) setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: 'done' }))
+        setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: 'done' }))
       })
-    return () => { cancelled = true }
-  }, [open, currentStageId, clarifyStatusByStage, stageReports, unavailableReason, description, hubMatchesByStage, aiSettings])
+  }, [open, currentStageId])
 
   const setClarifyAnswer = useCallback((stageId: ForgeStageId, questionId: string, value: string | string[]) => {
     setClarifyAnswersByStage((prev) => ({
