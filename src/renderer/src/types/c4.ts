@@ -129,12 +129,6 @@ export interface DiagramView {
    */
   treemapMaxDepth?: number | null
   /**
-   * Treemap-only: node ids the user explicitly expanded inline (overriding
-   * `treemapMaxDepth`). Each id forces its entire subtree to render in full,
-   * without changing the focus root. Persisted per view.
-   */
-  treemapExpandedIds?: string[]
-  /**
    * Wiki-only: id of the element whose page is currently shown.
    * `null`/`undefined` = Overview (table of contents). Persisted per view so
    * reopening the view restores the user's location.
