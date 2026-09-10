@@ -17,6 +17,7 @@ import { WikiView } from '../components/WikiView'
 import { TableView } from '../components/TableView'
 import { RightPanel } from '../components/RightPanel'
 import { NotificationHost } from '../components/NotificationHost'
+import { SmartLayoutButton } from '../components/SmartLayoutButton'
 import { HUB_CATEGORIES, categoryTheme, type HubCategory } from '../types/hubTheme'
 import {
   conceptToDiagramData,
@@ -47,13 +48,6 @@ const IconFitAll = () => (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
     <path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3" />
     <rect x="5" y="5" width="6" height="6" rx="1" />
-  </svg>
-)
-
-const IconSmartLayout = () => (
-  <svg className="toolbar-btn-accent-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" />
-    <circle cx="8" cy="8" r="2" />
   </svg>
 )
 
@@ -256,11 +250,9 @@ function HubAppInner(): React.ReactElement {
   const allStatuses = useHubStore((s) => s.allStatuses)
 
   const activeViewId = useDiagramStore((s) => s.activeViewId)
-  const isLayoutRunning = useDiagramStore((s) => s.isLayoutRunning)
   const loadDiagram = useDiagramStore((s) => s.loadDiagram)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
   const fitAll = useDiagramStore((s) => s.fitAll)
-  const runSmartLayout = useDiagramStore((s) => s.runSmartLayout)
   const pushNotification = useDiagramStore((s) => s.pushNotification)
 
   const [conceptId, setConceptId] = useState<string | undefined>(() => parseHubHash(window.location.hash).concept)
@@ -672,15 +664,7 @@ function HubAppInner(): React.ReactElement {
                   {viewKind === 'canvas' && (
                     <>
                       <button type="button" className="toolbar-btn" onClick={fitAll} title="Fit all nodes to viewport"><IconFitAll /> Fit</button>
-                      <button
-                        type="button"
-                        className="toolbar-btn toolbar-btn-accent"
-                        onClick={() => { void runSmartLayout() }}
-                        disabled={isLayoutRunning}
-                        title="Smart Layout (exploration only — nothing is saved)"
-                      >
-                        <IconSmartLayout /> Smart Layout
-                      </button>
+                      <SmartLayoutButton readOnlyNote="Exploration only — nothing is saved." />
                     </>
                   )}
                   <div style={{ flex: 1 }} />
