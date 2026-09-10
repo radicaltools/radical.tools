@@ -1,0 +1,213 @@
+{
+  "hub": {
+    "id": "pattern-rag-pipeline",
+    "category": "pattern",
+    "name": "Retrieval-Augmented Generation Pipeline",
+    "description": "New content is chunked and embedded into a vector store; at query time a retriever finds the most relevant passages and an orchestrator grounds the LLM's answer in them, citing sources and refusing to answer when nothing relevant is retrieved.",
+    "tags": [
+      "ai",
+      "llm",
+      "rag",
+      "retrieval",
+      "vector-search"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "req-ai-groundedness",
+      "ff-ai-eval-gate",
+      "adr-llm-provider-strategy",
+      "req-encryption",
+      "pattern-event-driven"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "user",
+      "type": "person",
+      "label": "User",
+      "description": "Asks a question in natural language and expects a grounded, cited answer — or an honest refusal.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "RAG Assistant",
+      "description": "Answers questions using only what it can retrieve from indexed source documents.",
+      "width": 1040,
+      "height": 510,
+      "collapsed": false,
+      "x": 0,
+      "y": 290
+    },
+    {
+      "id": "ingestion-worker",
+      "type": "container",
+      "label": "Ingestion Worker",
+      "description": "Chunks new or changed source documents and requests embeddings before writing them to the vector store.",
+      "technology": "Python",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "retriever",
+      "type": "container",
+      "label": "Retriever",
+      "description": "Embeds the incoming question, runs top-k similarity search with reranking, and returns passages plus their source citations.",
+      "technology": "Python",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 110
+    },
+    {
+      "id": "orchestrator",
+      "type": "container",
+      "label": "Orchestrator",
+      "description": "Builds the grounded prompt from retrieved passages, calls the LLM, and refuses to answer when no passage supports the question.",
+      "technology": "Python",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 710,
+      "y": 110
+    },
+    {
+      "id": "vector-store",
+      "type": "database",
+      "label": "Vector Store",
+      "description": "Embeddings for every indexed chunk, searchable by similarity.",
+      "technology": "pgvector",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 30,
+      "y": 350
+    },
+    {
+      "id": "document-store",
+      "type": "database",
+      "label": "Document Store",
+      "description": "Source documents and their versions — the system of record the vector store is built from.",
+      "technology": "S3",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 370,
+      "y": 350
+    },
+    {
+      "id": "llm-provider",
+      "type": "system",
+      "label": "LLM Provider",
+      "description": "Hosted completion API called with the retrieved context; swappable per the LLM provider strategy decision.",
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 0,
+      "y": 920
+    }
+  ],
+  "relations": [
+    {
+      "id": "user--orchestrator",
+      "sourceId": "user",
+      "targetId": "orchestrator",
+      "label": "Asks a question",
+      "technology": "HTTPS / JSON"
+    },
+    {
+      "id": "orchestrator--retriever",
+      "sourceId": "orchestrator",
+      "targetId": "retriever",
+      "label": "Requests grounding context for the question",
+      "technology": "gRPC"
+    },
+    {
+      "id": "retriever--vector-store",
+      "sourceId": "retriever",
+      "targetId": "vector-store",
+      "label": "k-NN similarity search",
+      "technology": "SQL"
+    },
+    {
+      "id": "ingestion-worker--document-store",
+      "sourceId": "ingestion-worker",
+      "targetId": "document-store",
+      "label": "Reads new or changed source documents",
+      "technology": "S3 API"
+    },
+    {
+      "id": "ingestion-worker--vector-store",
+      "sourceId": "ingestion-worker",
+      "targetId": "vector-store",
+      "label": "Writes chunk embeddings",
+      "technology": "SQL"
+    },
+    {
+      "id": "orchestrator--llm-provider",
+      "sourceId": "orchestrator",
+      "targetId": "llm-provider",
+      "label": "Completion request with retrieved passages",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "orchestrator--user",
+      "sourceId": "orchestrator",
+      "targetId": "user",
+      "label": "Returns an answer with citations, or a refusal",
+      "technology": "HTTPS / JSON"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "pattern-rag-pipeline-seq",
+      "name": "Ask a grounded question",
+      "relationIds": [
+        "user--orchestrator",
+        "orchestrator--retriever",
+        "retriever--vector-store",
+        "orchestrator--llm-provider",
+        "orchestrator--user"
+      ],
+      "stepDescriptions": [
+        "User asks a question.",
+        "Orchestrator asks the retriever for supporting context.",
+        "Retriever embeds the question and finds the closest passages in the vector store.",
+        "Orchestrator sends the question plus retrieved passages to the LLM.",
+        "Orchestrator returns the answer with citations to the retrieved passages — or a refusal if nothing relevant was retrieved."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "pattern-rag-pipeline-flow",
+      "name": "Ask a grounded question",
+      "kind": "dynamic",
+      "sequenceId": "pattern-rag-pipeline-seq",
+      "nodeIds": [
+        "user",
+        "platform",
+        "ingestion-worker",
+        "retriever",
+        "orchestrator",
+        "vector-store",
+        "document-store",
+        "llm-provider"
+      ],
+      "positions": {}
+    }
+  ]
+}

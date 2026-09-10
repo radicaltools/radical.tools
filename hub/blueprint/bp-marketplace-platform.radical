@@ -1,0 +1,629 @@
+{
+  "hub": {
+    "id": "bp-marketplace-platform",
+    "category": "blueprint",
+    "name": "Marketplace / Two-Sided Platform",
+    "description": "A managed marketplace matching buyers and sellers: listings and search on one side, browsing and checkout on the other, funds held and split by a payments facilitator so the platform never custodies money directly, and seller payouts release once the buyer's dispute window closes.",
+    "tags": [
+      "marketplace",
+      "two-sided",
+      "payments",
+      "trust-and-safety",
+      "search"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "LISTING_REVIEW_SLA_HOURS",
+        "label": "Listing moderation SLA (hours)",
+        "hint": "24",
+        "type": "number",
+        "defaultValue": "24"
+      },
+      {
+        "key": "COMMISSION_PCT",
+        "label": "Platform commission (%)",
+        "hint": "15",
+        "type": "number",
+        "defaultValue": "15"
+      },
+      {
+        "key": "DISPUTE_WINDOW_DAYS",
+        "label": "Buyer dispute window (days)",
+        "hint": "7",
+        "type": "number",
+        "defaultValue": "7"
+      },
+      {
+        "key": "SUPPRESSION_MINUTES",
+        "label": "Delisting suppression time (min)",
+        "hint": "5",
+        "type": "number",
+        "defaultValue": "5"
+      }
+    ],
+    "hubRefs": [
+      "adr-marketplace-payments-model",
+      "req-payout-latency",
+      "req-search-response-time",
+      "req-idempotency",
+      "req-audit-logging",
+      "pattern-event-driven",
+      "pattern-saga",
+      "req-availability"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "buyer",
+      "type": "person",
+      "label": "Buyer",
+      "description": "Searches listings, checks out, and can open a dispute within the dispute window.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "seller",
+      "type": "person",
+      "label": "Seller",
+      "description": "Publishes listings and receives payouts, net of commission, once orders clear the dispute window.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 210,
+      "y": 0
+    },
+    {
+      "id": "trust-safety-agent",
+      "type": "person",
+      "label": "Trust & Safety Agent",
+      "description": "Reviews new listings and flagged sellers, and investigates disputes.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 420,
+      "y": 0
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Marketplace Platform",
+      "description": "Matches buyers and sellers and moves money between them without custodying it directly.",
+      "width": 1040,
+      "height": 750,
+      "collapsed": false,
+      "x": 0,
+      "y": 290
+    },
+    {
+      "id": "listings-service",
+      "type": "container",
+      "label": "Listings Service",
+      "description": "Owns listing lifecycle and moderation state — draft, in review, live, suspended.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "order-checkout-service",
+      "type": "container",
+      "label": "Order & Checkout Service",
+      "description": "Buyer-side search entry point, cart and checkout.",
+      "technology": "Node.js",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 110
+    },
+    {
+      "id": "payments-facilitator-adapter",
+      "type": "container",
+      "label": "Payments Facilitator Adapter",
+      "description": "Talks to the split-payments provider: creates holds at checkout, releases payouts, applies the commission split.",
+      "technology": "Node.js",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 710,
+      "y": 110
+    },
+    {
+      "id": "payout-worker",
+      "type": "container",
+      "label": "Payout Worker",
+      "description": "Watches for orders that become payout-eligible and triggers the release once the dispute window has closed.",
+      "technology": "Java worker",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 350
+    },
+    {
+      "id": "trust-safety-console",
+      "type": "webapp",
+      "label": "Trust & Safety Console",
+      "description": "Queue of new listings awaiting review and flagged sellers awaiting investigation.",
+      "technology": "React",
+      "parentId": "platform",
+      "width": 210,
+      "height": 140,
+      "collapsed": false,
+      "x": 370,
+      "y": 350
+    },
+    {
+      "id": "order-events",
+      "type": "queue",
+      "label": "Order Events",
+      "description": "OrderPlaced, OrderDelivered and related lifecycle events driving payouts and notifications.",
+      "technology": "Kafka",
+      "parentId": "platform",
+      "width": 220,
+      "height": 95,
+      "collapsed": false,
+      "x": 710,
+      "y": 350
+    },
+    {
+      "id": "listings-db",
+      "type": "database",
+      "label": "Listings DB",
+      "description": "Listing content, pricing and moderation status.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 30,
+      "y": 590
+    },
+    {
+      "id": "orders-db",
+      "type": "database",
+      "label": "Orders DB",
+      "description": "Orders, their state, and links to holds and payouts.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 370,
+      "y": 590
+    },
+    {
+      "id": "search-index",
+      "type": "database",
+      "label": "Search Index",
+      "description": "Searchable, ranked view of every approved, non-suspended listing.",
+      "technology": "OpenSearch",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 710,
+      "y": 590
+    },
+    {
+      "id": "payments-provider",
+      "type": "system",
+      "label": "Payments Facilitator (Provider)",
+      "description": "Holds funds in transit and executes the buyer/seller/platform split at payout time, per the marketplace payments model.",
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 0,
+      "y": 1160
+    },
+    {
+      "id": "notification-provider",
+      "type": "system",
+      "label": "Notification Provider",
+      "description": "Sends order, dispute and payout emails/SMS to buyers and sellers.",
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 420,
+      "y": 1160
+    },
+    {
+      "id": "req-listing-moderation",
+      "type": "requirement",
+      "label": "Listing Moderation SLA",
+      "x": 0,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "a seller publishes a new listing",
+      "action": "review it against marketplace policy and either approve it for search or reject it with a reason within {{LISTING_REVIEW_SLA_HOURS}} hours",
+      "rationale": "Every hour a policy-violating listing is live is an hour a buyer can be harmed by it; every hour a compliant listing waits in review is lost seller revenue — the SLA is the deliberate trade-off between the two.",
+      "templateParams": [
+        {
+          "key": "LISTING_REVIEW_SLA_HOURS",
+          "label": "Listing moderation SLA (hours)",
+          "hint": "24",
+          "type": "number",
+          "defaultValue": "24"
+        }
+      ]
+    },
+    {
+      "id": "req-commission-accuracy",
+      "type": "requirement",
+      "label": "Commission Deduction Accuracy",
+      "x": 320,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "deduct exactly {{COMMISSION_PCT}}% commission from each payout and record the split so buyer, seller and platform amounts always sum to the original order total",
+      "rationale": "A marketplace's entire revenue model is this deduction; a rounding or double-deduction bug here is a direct, compounding revenue or trust defect, not a cosmetic one.",
+      "templateParams": [
+        {
+          "key": "COMMISSION_PCT",
+          "label": "Platform commission (%)",
+          "hint": "15",
+          "type": "number",
+          "defaultValue": "15"
+        }
+      ]
+    },
+    {
+      "id": "req-dispute-window-hold",
+      "type": "requirement",
+      "label": "Dispute Window Hold",
+      "x": 640,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "hold seller funds for {{DISPUTE_WINDOW_DAYS}} days after delivery before releasing payout, and freeze the hold if a buyer opens a dispute inside that window",
+      "rationale": "Paying a seller out before the window closes means a valid chargeback has to be clawed back after the fact instead of simply withheld — clawbacks fail far more often than holds.",
+      "templateParams": [
+        {
+          "key": "DISPUTE_WINDOW_DAYS",
+          "label": "Buyer dispute window (days)",
+          "hint": "7",
+          "type": "number",
+          "defaultValue": "7"
+        }
+      ]
+    },
+    {
+      "id": "req-delisting-suppression",
+      "type": "requirement",
+      "label": "Delisted Item Suppression",
+      "x": 960,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "a listing is removed or a seller is suspended",
+      "action": "remove it from search results within {{SUPPRESSION_MINUTES}} minutes, before any further orders can be placed against it",
+      "rationale": "A moderation decision that still lets buyers find and order the suspended listing for the next hour didn't actually happen from the buyer's point of view.",
+      "templateParams": [
+        {
+          "key": "SUPPRESSION_MINUTES",
+          "label": "Delisting suppression time (min)",
+          "hint": "5",
+          "type": "number",
+          "defaultValue": "5"
+        }
+      ]
+    },
+    {
+      "id": "ff-payout-reconciliation-guard",
+      "type": "fitness-fn",
+      "label": "Payout Reconciliation Guard",
+      "description": "Checks every released payout against its order's total, commission and any open holds.",
+      "x": 0,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "0 payouts released that don't net to (order total minus commission minus open holds), checked every settlement cycle",
+      "status": "proposed"
+    },
+    {
+      "id": "ff-chargeback-rate-guard",
+      "type": "fitness-fn",
+      "label": "Chargeback Rate Guard",
+      "description": "Tracks chargebacks as a share of settled orders — a rising rate signals a fraud or listing-quality problem before the payment network penalises the platform for it.",
+      "x": 320,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "Chargeback rate stays below 1% of settled orders, trailing 30 days",
+      "status": "proposed"
+    },
+    {
+      "id": "ff-search-relevance-guard",
+      "type": "fitness-fn",
+      "label": "Search Relevance Guard",
+      "description": "Compares click-through on top search results before and after a ranking change.",
+      "x": 640,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "holistic",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Click-through rate on top-3 search results does not regress more than 5 pp versus the trailing 30-day baseline after a ranking change",
+      "status": "proposed"
+    },
+    {
+      "id": "adr-centralised-search-index",
+      "type": "adr",
+      "label": "ADR: Centralised search index over per-category services",
+      "x": 0,
+      "y": 1912,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "status": "accepted",
+      "date": "",
+      "context": "Buyers need to search and filter listings across every seller category in one query, and ranking quality needs to be tuned consistently.",
+      "decision": "Feed a single shared search index from listing-change events rather than letting each category team own its own search stack.",
+      "consequences": "Ranking and relevance tuning happen in one place and buyers can search across categories in a single call, at the cost of coupling every listing-producing service to one shared event schema.",
+      "alternatives": "1. Per-category search services — team autonomy, but inconsistent ranking logic and no single cross-category search call. 2. Database-native full-text search — simplest to add, but ranking quality and scale are limited. 3. Centralised search index (chosen). 4. Third-party search-as-a-service — fast to start, but less control over ranking and cost at high listing volume."
+    },
+    {
+      "id": "adr-suspend-first-moderation",
+      "type": "adr",
+      "label": "ADR: Suspend-first moderation for policy violations",
+      "x": 320,
+      "y": 1912,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "status": "accepted",
+      "date": "",
+      "context": "A high-confidence fraud or policy-violation signal has to be weighed against a seller's due process — acting immediately protects buyers fastest, but a false positive costs a legitimate seller sales and payout access during the investigation.",
+      "decision": "Suspend first on a high-confidence signal — hide from search, freeze payouts — then investigate and either reinstate or ban, rather than investigating first and acting after.",
+      "consequences": "Buyers are protected as fast as the platform can detect a problem; the investigation SLA becomes a trust-critical metric in its own right, since it's now the only thing standing between a wrongly-flagged seller and lost income.",
+      "alternatives": "1. Investigate first, act after — protects sellers from false positives, but a genuine bad actor keeps selling and collecting funds during the investigation window. 2. Suspend first, investigate after (chosen). 3. Community reporting only, no proactive detection — cheapest, but slowest and worst for buyer trust. 4. Permanent ban on first signal, no reinstatement path — fastest, but the harshest possible cost of a false positive."
+    }
+  ],
+  "relations": [
+    {
+      "id": "buyer--order-checkout-service",
+      "sourceId": "buyer",
+      "targetId": "order-checkout-service",
+      "label": "Browses & checks out",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "seller--listings-service",
+      "sourceId": "seller",
+      "targetId": "listings-service",
+      "label": "Creates / updates listing",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "order-checkout-service--search-index",
+      "sourceId": "order-checkout-service",
+      "targetId": "search-index",
+      "label": "Queries listings",
+      "technology": "REST"
+    },
+    {
+      "id": "listings-service--search-index",
+      "sourceId": "listings-service",
+      "targetId": "search-index",
+      "label": "Publishes listing change on approval",
+      "technology": "async event"
+    },
+    {
+      "id": "listings-service--listings-db",
+      "sourceId": "listings-service",
+      "targetId": "listings-db",
+      "label": "Persists listing",
+      "technology": "SQL"
+    },
+    {
+      "id": "order-checkout-service--orders-db",
+      "sourceId": "order-checkout-service",
+      "targetId": "orders-db",
+      "label": "Persists order",
+      "technology": "SQL"
+    },
+    {
+      "id": "order-checkout-service--payments-facilitator-adapter",
+      "sourceId": "order-checkout-service",
+      "targetId": "payments-facilitator-adapter",
+      "label": "Authorises & holds payment",
+      "technology": "gRPC"
+    },
+    {
+      "id": "payments-facilitator-adapter--payments-provider",
+      "sourceId": "payments-facilitator-adapter",
+      "targetId": "payments-provider",
+      "label": "Creates hold / split payment",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "order-checkout-service--order-events",
+      "sourceId": "order-checkout-service",
+      "targetId": "order-events",
+      "label": "Emits OrderPlaced / OrderDelivered",
+      "technology": "async event"
+    },
+    {
+      "id": "order-events--payout-worker",
+      "sourceId": "order-events",
+      "targetId": "payout-worker",
+      "label": "Triggers payout eligibility check",
+      "technology": "async event"
+    },
+    {
+      "id": "payout-worker--payments-facilitator-adapter",
+      "sourceId": "payout-worker",
+      "targetId": "payments-facilitator-adapter",
+      "label": "Releases seller payout",
+      "technology": "gRPC"
+    },
+    {
+      "id": "payout-worker--notification-provider",
+      "sourceId": "payout-worker",
+      "targetId": "notification-provider",
+      "label": "Sends payout confirmation",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "trust-safety-agent--trust-safety-console",
+      "sourceId": "trust-safety-agent",
+      "targetId": "trust-safety-console",
+      "label": "Reviews flagged listings & disputes",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "trust-safety-console--listings-service",
+      "sourceId": "trust-safety-console",
+      "targetId": "listings-service",
+      "label": "Approves or suspends listing",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "req-listing-moderation--listings-service",
+      "sourceId": "req-listing-moderation",
+      "targetId": "listings-service",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-commission-accuracy--payments-facilitator-adapter",
+      "sourceId": "req-commission-accuracy",
+      "targetId": "payments-facilitator-adapter",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-dispute-window-hold--payout-worker",
+      "sourceId": "req-dispute-window-hold",
+      "targetId": "payout-worker",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-delisting-suppression--search-index",
+      "sourceId": "req-delisting-suppression",
+      "targetId": "search-index",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-commission-accuracy--ff-payout-reconciliation-guard",
+      "sourceId": "req-commission-accuracy",
+      "targetId": "ff-payout-reconciliation-guard",
+      "relationType": "traces-to"
+    },
+    {
+      "id": "req-listing-moderation--adr-suspend-first-moderation",
+      "sourceId": "req-listing-moderation",
+      "targetId": "adr-suspend-first-moderation",
+      "relationType": "traces-to"
+    },
+    {
+      "id": "ff-chargeback-rate-guard--payments-facilitator-adapter",
+      "sourceId": "ff-chargeback-rate-guard",
+      "targetId": "payments-facilitator-adapter",
+      "relationType": "constrains"
+    },
+    {
+      "id": "ff-search-relevance-guard--search-index",
+      "sourceId": "ff-search-relevance-guard",
+      "targetId": "search-index",
+      "relationType": "constrains"
+    },
+    {
+      "id": "adr-centralised-search-index--search-index",
+      "sourceId": "adr-centralised-search-index",
+      "targetId": "search-index",
+      "relationType": "constrains"
+    },
+    {
+      "id": "adr-suspend-first-moderation--trust-safety-console",
+      "sourceId": "adr-suspend-first-moderation",
+      "targetId": "trust-safety-console",
+      "relationType": "constrains"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "bp-marketplace-platform-seq",
+      "name": "Seller lists, buyer orders, payout releases after the dispute window",
+      "relationIds": [
+        "seller--listings-service",
+        "listings-service--search-index",
+        "buyer--order-checkout-service",
+        "order-checkout-service--payments-facilitator-adapter",
+        "order-checkout-service--order-events",
+        "order-events--payout-worker",
+        "payout-worker--payments-facilitator-adapter"
+      ],
+      "stepDescriptions": [
+        "Seller publishes a listing; it enters review before it can appear in search.",
+        "Once approved, the listing is published to the search index.",
+        "Buyer finds it and checks out.",
+        "Order & Checkout Service authorises and holds payment through the facilitator — funds move, but nothing is released to the seller yet.",
+        "Order lifecycle events (placed, delivered) are emitted.",
+        "Once the order is delivered and the dispute window has passed with no dispute open, the payout worker marks it payout-eligible.",
+        "Payout worker instructs the facilitator to release the seller's share, net of commission."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "bp-marketplace-platform-flow",
+      "name": "Seller lists, buyer orders, payout releases after the dispute window",
+      "kind": "dynamic",
+      "sequenceId": "bp-marketplace-platform-seq",
+      "nodeIds": [
+        "buyer",
+        "seller",
+        "trust-safety-agent",
+        "platform",
+        "listings-service",
+        "order-checkout-service",
+        "payments-facilitator-adapter",
+        "payout-worker",
+        "trust-safety-console",
+        "order-events",
+        "listings-db",
+        "orders-db",
+        "search-index",
+        "payments-provider",
+        "notification-provider"
+      ],
+      "positions": {}
+    }
+  ]
+}

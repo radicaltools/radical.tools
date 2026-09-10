@@ -1,0 +1,45 @@
+{
+  "hub": {
+    "id": "ff-ledger-balance-integrity",
+    "category": "fitness-function",
+    "name": "Ledger Balance Integrity Check",
+    "description": "Continuously verifies that every journal entry's debits equal its credits, and that projected account balances match a full replay of the journal from genesis — flagging any drift immediately rather than at the next audit.",
+    "tags": [
+      "fintech",
+      "ledger",
+      "structural",
+      "correctness"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "CHECK_INTERVAL_MIN",
+        "label": "Integrity check interval (minutes)",
+        "hint": "5",
+        "type": "number",
+        "defaultValue": "5"
+      }
+    ],
+    "hubRefs": [
+      "pattern-event-sourced-ledger",
+      "req-ledger-immutability",
+      "req-data-integrity"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-ledger-balance-integrity-1",
+      "type": "fitness-fn",
+      "label": "Ledger Balance Integrity Check",
+      "description": "Sums debits and credits on every posted entry — must net to zero — and periodically replays the entire journal from genesis into a shadow balance set, diffing it against the live projection.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "structural",
+      "threshold": "0 unbalanced entries at post time; 0 drift between live and replayed balances, checked every {{CHECK_INTERVAL_MIN}} minutes"
+    }
+  ],
+  "relations": []
+}

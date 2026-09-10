@@ -1,0 +1,39 @@
+{
+  "hub": {
+    "id": "adr-marketplace-payments-model",
+    "category": "adr",
+    "name": "Marketplace Payments Model",
+    "description": "Records how money moves between buyer and seller — who legally holds funds in transit, when the platform's commission is taken, and what licensing obligations that creates.",
+    "tags": [
+      "marketplace",
+      "payments",
+      "governance",
+      "compliance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-event-sourced-ledger",
+      "req-payout-latency",
+      "req-idempotency",
+      "adr-data-consistency-model"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-marketplace-payments-model-1",
+      "type": "adr",
+      "label": "ADR: Facilitated split payments, platform never holds funds",
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "x": 0,
+      "y": 0,
+      "status": "proposed",
+      "date": "",
+      "context": "A two-sided marketplace moves money it doesn't ultimately own, from buyers to sellers, minus commission. How that money is held in transit determines whether the platform takes on money-transmitter obligations, who bears chargeback risk, and how hard it is to guarantee sellers actually get paid.",
+      "decision": "Use a managed payments-facilitator provider's split-payment product: the provider holds funds in transit and executes the split — seller share, platform commission — at payout time. The platform never custodies buyer funds directly; it only instructs the provider what split to apply and when to release it.",
+      "consequences": "• The platform operates as a facilitator under the provider's money-transmitter licence rather than needing its own, removing years of regulatory work from the critical path to launch.\n• Commission collection is guaranteed by construction — deducted before the seller is paid, not invoiced separately and hoped for.\n• The platform's control over payout timing is limited to what the provider's API exposes; a provider incident or policy change becomes a dependency the marketplace can't fully route around.\n• Refunds and chargebacks flow through the provider's split-payment reversal logic, which the order and dispute workflow must model explicitly rather than treating payment as one atomic step.",
+      "alternatives": "1. Platform as merchant of record, invoicing sellers for commission separately — the platform bears full chargeback and fraud liability on every transaction and likely crosses into money-transmitter territory on its own.\n2. Buyer pays seller directly, platform only invoices commission after the fact — simplest to build and clearly outside payments regulation, but the platform has no mechanism to guarantee it collects its commission or to protect buyers with a dispute process.\n3. Build a full in-house ledger and banking-rail integration — maximum control and no per-transaction provider fee, but a multi-year regulatory and engineering undertaking before the first transaction can move.\n4. Managed split-payment facilitator (chosen) — fastest path to a compliant, chargeback-protected marketplace, at the cost of depending on the provider's product and pricing."
+    }
+  ]
+}

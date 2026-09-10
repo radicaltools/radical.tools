@@ -11,7 +11,7 @@ An open-source software architecture design studio — diagram, document, and ev
 - **Smart Layout** — SA-based auto-layout with crossing minimisation, edge-length optimisation, aspect-ratio penalty, and compound parent fitting
 - **Multiple layout engines** — ELK (hierarchical/layered/force), webcola (live physics), custom Smart Layout pipeline
 - **AI assistant** — chat with OpenAI / Anthropic / Gemini / Ollama to generate and modify diagrams
-- **Architecture Hub** — browse and import 70+ curated architecture concepts (patterns, fitness functions, ADRs, requirements) from [hub.radical.tools](https://hub.radical.tools)
+- **Architecture Hub** — browse and import 120+ curated architecture concepts (patterns, fitness functions, ADRs, requirements, blueprints) from [hub.radical.tools](https://hub.radical.tools)
 - **Multiple views** — Canvas, Matrix, Sequence, Treemap, Table, Wiki per diagram
 - **Presentation mode** — fullscreen slides with navigation bar
 - **Metamodel editor** — customise node types, relation types, and constraints

@@ -1,0 +1,38 @@
+{
+  "hub": {
+    "id": "adr-ledger-reconciliation-strategy",
+    "category": "adr",
+    "name": "Ledger Reconciliation Strategy",
+    "description": "Records how the internal journal is kept in agreement with the external bank or processor record — continuously, in a nightly batch, or both.",
+    "tags": [
+      "fintech",
+      "ledger",
+      "reconciliation",
+      "governance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-event-sourced-ledger",
+      "ff-ledger-balance-integrity",
+      "req-disaster-recovery"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-ledger-reconciliation-strategy-1",
+      "type": "adr",
+      "label": "ADR: Continuous reconciliation with a nightly batch safety net",
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "x": 0,
+      "y": 0,
+      "status": "proposed",
+      "date": "",
+      "context": "The internal journal and the bank or processor's own records can disagree — a webhook is dropped, an event arrives out of order, a correction happens on the processor's side days later. Left undetected, that drift eventually surfaces as a customer-visible balance error.",
+      "decision": "Reconcile continuously: match each inbound settlement event against the journal within minutes of receipt. Back that with a nightly full batch reconciliation against the processor's end-of-day statement, which catches anything the event stream missed — a webhook that never arrived, a late correction, a duplicate.",
+      "consequences": "• Most discrepancies surface and are actionable within minutes, while the business context is still fresh.\n• The nightly batch is what actually guarantees completeness — it doesn't depend on every event having arrived, only on the processor's statement being authoritative — so it can't be skipped as \"redundant\" once continuous reconciliation is working.\n• Two reconciliation code paths, streaming and batch, need to agree on what \"matched\" means, or they produce contradictory exception reports.\n• Every discrepancy needs a place to land — a suspense account, not a dropped log line — or reconciliation becomes something that alerts but doesn't actually fix anything.",
+      "alternatives": "1. Nightly batch only — simplest to build, but a discrepancy from this morning sits undetected and possibly compounding until the batch runs.\n2. Continuous event-driven only — fast, but blind to anything the event stream itself missed, such as a webhook that was never delivered.\n3. Manual, periodic spreadsheet reconciliation — doesn't scale past a handful of transactions a day and depends entirely on someone remembering to run it.\n4. Continuous plus nightly batch safety net (chosen) — fast detection for the common case, with a completeness guarantee that doesn't depend on the event stream being perfect."
+    }
+  ]
+}

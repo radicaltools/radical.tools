@@ -1,0 +1,625 @@
+{
+  "hub": {
+    "id": "bp-ai-assistant-platform",
+    "category": "blueprint",
+    "name": "AI Support Assistant Platform",
+    "description": "A retrieval-grounded AI agent that resolves customer or ops requests end to end where it safely can, extracts structured data from inbound tickets and documents, and hands off to a human when confidence is low or the action is irreversible — with a continuous evaluation gate blocking any model or prompt change that regresses quality.",
+    "tags": [
+      "ai",
+      "llm",
+      "rag",
+      "agentic-ai",
+      "customer-support",
+      "governance"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "ESCALATION_SLA_MIN",
+        "label": "Escalation pickup SLA (min)",
+        "hint": "15",
+        "type": "number",
+        "defaultValue": "15"
+      },
+      {
+        "key": "EXTRACTION_REVIEW_THRESHOLD_PCT",
+        "label": "Extraction review threshold (%)",
+        "hint": "90",
+        "type": "number",
+        "defaultValue": "90"
+      },
+      {
+        "key": "KB_STALENESS_HOURS",
+        "label": "Max knowledge base staleness (hours)",
+        "hint": "4",
+        "type": "number",
+        "defaultValue": "4"
+      },
+      {
+        "key": "AUDIT_RETENTION_DAYS",
+        "label": "Case audit trail retention (days)",
+        "hint": "365",
+        "type": "number",
+        "defaultValue": "365"
+      }
+    ],
+    "hubRefs": [
+      "req-ai-groundedness",
+      "req-ai-human-handoff",
+      "req-ai-autonomous-resolution",
+      "req-ml-extraction-accuracy",
+      "ff-ai-eval-gate",
+      "pattern-rag-pipeline",
+      "adr-llm-provider-strategy",
+      "req-audit-logging",
+      "req-encryption",
+      "adr-tech-stack"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "customer",
+      "type": "person",
+      "label": "Customer",
+      "description": "Submits a request by chat, email or ticket and either gets an immediate resolution or is told a human is looking into it.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "human-agent",
+      "type": "person",
+      "label": "Human Agent",
+      "description": "Picks up escalated cases with the assistant's full reasoning and proposed action already attached.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 210,
+      "y": 0
+    },
+    {
+      "id": "ops",
+      "type": "person",
+      "label": "Ops",
+      "description": "Curates the knowledge base, tunes the evaluation set, and watches drift and cost dashboards.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 420,
+      "y": 0
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "AI Assistant Platform",
+      "description": "Resolves what it can ground and is authorised to act on; escalates the rest.",
+      "width": 1040,
+      "height": 750,
+      "collapsed": false,
+      "x": 0,
+      "y": 290
+    },
+    {
+      "id": "ingestion-api",
+      "type": "container",
+      "label": "Ingestion API",
+      "description": "Receives inbound tickets, chat messages and emails and opens a case.",
+      "technology": "Node.js",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "extraction-worker",
+      "type": "container",
+      "label": "Extraction Worker",
+      "description": "Pulls structured fields — order id, account, dates, amounts — out of attachments and message bodies.",
+      "technology": "Python",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 110
+    },
+    {
+      "id": "retriever",
+      "type": "container",
+      "label": "Retriever",
+      "description": "Semantic search over the knowledge base for passages that support answering the case.",
+      "technology": "Python",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 710,
+      "y": 110
+    },
+    {
+      "id": "orchestrator",
+      "type": "container",
+      "label": "Orchestrator",
+      "description": "Plans the response, decides whether to act autonomously or escalate, and calls the LLM provider.",
+      "technology": "Python",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 350
+    },
+    {
+      "id": "handoff-queue",
+      "type": "queue",
+      "label": "Handoff Queue",
+      "description": "Holds escalated cases, each with the assistant's reasoning and proposed action, until an agent picks it up.",
+      "technology": "SQS",
+      "parentId": "platform",
+      "width": 220,
+      "height": 95,
+      "collapsed": false,
+      "x": 370,
+      "y": 350
+    },
+    {
+      "id": "agent-console",
+      "type": "webapp",
+      "label": "Agent Console",
+      "description": "Where a human agent reviews the case, the assistant's proposed action and its reasoning, and resolves it.",
+      "technology": "React",
+      "parentId": "platform",
+      "width": 210,
+      "height": 140,
+      "collapsed": false,
+      "x": 710,
+      "y": 350
+    },
+    {
+      "id": "knowledge-base",
+      "type": "database",
+      "label": "Knowledge Base",
+      "description": "Indexed source-of-truth content — policies, docs, prior resolved cases — used for grounding.",
+      "technology": "Vector DB",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 30,
+      "y": 590
+    },
+    {
+      "id": "case-store",
+      "type": "database",
+      "label": "Case Store",
+      "description": "Case state, extracted fields, and the full resolution history for every request.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 370,
+      "y": 590
+    },
+    {
+      "id": "llm-provider",
+      "type": "system",
+      "label": "LLM Provider",
+      "description": "Whichever model actually answers a given case — routed by task per the platform's provider strategy, invisibly to everything upstream of the orchestrator.",
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 0,
+      "y": 1160
+    },
+    {
+      "id": "source-channel",
+      "type": "system",
+      "label": "Helpdesk / Email Source",
+      "description": "Where customer requests originate — shared inbox, chat widget, or ticketing system.",
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 420,
+      "y": 1160
+    },
+    {
+      "id": "req-escalation-pickup",
+      "type": "requirement",
+      "label": "Escalation Pickup Time",
+      "x": 0,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "a case is escalated to the human queue",
+      "action": "be picked up by an available human agent within {{ESCALATION_SLA_MIN}} minutes",
+      "rationale": "An escalation nobody picks up is worse than not escalating at all — the customer is left waiting on a channel no one is actively watching.",
+      "templateParams": [
+        {
+          "key": "ESCALATION_SLA_MIN",
+          "label": "Escalation pickup SLA (min)",
+          "hint": "15",
+          "type": "number",
+          "defaultValue": "15"
+        }
+      ]
+    },
+    {
+      "id": "req-extraction-review",
+      "type": "requirement",
+      "label": "Low-Confidence Extraction Review",
+      "x": 320,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "extracted-field confidence for a case falls below {{EXTRACTION_REVIEW_THRESHOLD_PCT}}%",
+      "action": "route the case to a human review queue instead of auto-filing the extracted values",
+      "rationale": "Auto-filing a low-confidence extraction — wrong order id, wrong amount — fails silently and is expensive to trace back; a review queue makes the uncertainty visible instead.",
+      "templateParams": [
+        {
+          "key": "EXTRACTION_REVIEW_THRESHOLD_PCT",
+          "label": "Extraction review threshold (%)",
+          "hint": "90",
+          "type": "number",
+          "defaultValue": "90"
+        }
+      ]
+    },
+    {
+      "id": "req-kb-freshness",
+      "type": "requirement",
+      "label": "Knowledge Base Freshness",
+      "x": 640,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "should",
+      "action": "keep the retrieval knowledge base no more than {{KB_STALENESS_HOURS}} hours behind the source-of-truth content systems it's built from",
+      "rationale": "A grounded answer is only as good as what's indexed; stale policy content produces confidently wrong, fully-cited answers.",
+      "templateParams": [
+        {
+          "key": "KB_STALENESS_HOURS",
+          "label": "Max knowledge base staleness (hours)",
+          "hint": "4",
+          "type": "number",
+          "defaultValue": "4"
+        }
+      ]
+    },
+    {
+      "id": "req-case-audit-trail",
+      "type": "requirement",
+      "label": "Case Decision Audit Trail",
+      "x": 960,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "log every autonomous decision, the sources retrieved, and the confidence score for each case, retained for {{AUDIT_RETENTION_DAYS}} days",
+      "rationale": "When an autonomous decision is questioned later, the trail has to already exist — it can't be reconstructed from a model that doesn't remember why it answered the way it did.",
+      "templateParams": [
+        {
+          "key": "AUDIT_RETENTION_DAYS",
+          "label": "Case audit trail retention (days)",
+          "hint": "365",
+          "type": "number",
+          "defaultValue": "365"
+        }
+      ]
+    },
+    {
+      "id": "ff-escalation-backlog-guard",
+      "type": "fitness-fn",
+      "label": "Escalation Backlog Guard",
+      "description": "Watches the handoff queue depth against on-duty agent headcount.",
+      "x": 0,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "Handoff queue depth never exceeds 5 open cases per on-duty agent",
+      "status": "proposed"
+    },
+    {
+      "id": "ff-extraction-drift-monitor",
+      "type": "fitness-fn",
+      "label": "Extraction Accuracy Drift Monitor",
+      "description": "Compares live, human-reviewed extraction accuracy against the offline evaluation-set baseline.",
+      "x": 320,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Live sampled extraction accuracy stays within 3 pp of the offline evaluation-set baseline, checked weekly",
+      "status": "proposed"
+    },
+    {
+      "id": "ff-cost-per-case-guard",
+      "type": "fitness-fn",
+      "label": "Cost per Resolved Case Guard",
+      "description": "Tracks fully-loaded cost (LLM calls, compute, human time) per case actually resolved.",
+      "x": 640,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Fully-loaded cost per autonomously resolved case stays under $2.50, checked daily",
+      "status": "proposed"
+    },
+    {
+      "id": "adr-confidence-gated-autonomy",
+      "type": "adr",
+      "label": "ADR: Confidence-gated autonomy, not full automation",
+      "x": 0,
+      "y": 1912,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "status": "accepted",
+      "date": "",
+      "context": "Full automation maximises savings but makes every wrong autonomous action a direct customer-facing incident; full human review eliminates the savings automation exists to capture.",
+      "decision": "The orchestrator acts autonomously only above the confidence threshold and only for a pre-approved list of reversible action types; everything else queues for a human.",
+      "consequences": "Wrong autonomous actions are bounded to low-stakes, reversible ones; the pre-approved action list becomes a piece of configuration that has to be reviewed as deliberately as code.",
+      "alternatives": "1. Fully autonomous with post-hoc audit — highest savings, but irreversible mistakes reach the customer before anyone reviews them. 2. Human-in-the-loop for every action — safest, but removes the automation benefit entirely. 3. Confidence-gated autonomy on reversible actions only (chosen). 4. Rule-based automation without model judgement calls — safe and predictable, but handles far fewer cases."
+    },
+    {
+      "id": "adr-retrieval-over-finetuning",
+      "type": "adr",
+      "label": "ADR: Retrieval over fine-tuning for knowledge updates",
+      "x": 320,
+      "y": 1912,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "status": "accepted",
+      "date": "",
+      "context": "The knowledge the assistant needs — policies, prices, procedures — changes far more often than a model retraining cycle can track.",
+      "decision": "Keep the base model frozen and push knowledge updates through the retrieval index rather than fine-tuning on new content.",
+      "consequences": "Knowledge freshness becomes index-refresh latency instead of training-cycle latency, but overall answer quality is now capped by retrieval quality, not just model quality.",
+      "alternatives": "1. Periodic fine-tuning on new knowledge — keeps knowledge \"in\" the model, but the feedback loop is slow and risks catastrophic forgetting of earlier knowledge. 2. Retrieval only (chosen). 3. Retrieval plus light fine-tuning for tone and format only — a reasonable hybrid, at the cost of a second training pipeline. 4. Stuffing all knowledge into the prompt without retrieval — doesn't scale past a small, static document set."
+    }
+  ],
+  "relations": [
+    {
+      "id": "customer--ingestion-api",
+      "sourceId": "customer",
+      "targetId": "ingestion-api",
+      "label": "Submits request / ticket",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "source-channel--ingestion-api",
+      "sourceId": "source-channel",
+      "targetId": "ingestion-api",
+      "label": "Delivers inbound ticket / email",
+      "technology": "webhook"
+    },
+    {
+      "id": "ingestion-api--extraction-worker",
+      "sourceId": "ingestion-api",
+      "targetId": "extraction-worker",
+      "label": "Sends attachments for field extraction",
+      "technology": "async job"
+    },
+    {
+      "id": "extraction-worker--case-store",
+      "sourceId": "extraction-worker",
+      "targetId": "case-store",
+      "label": "Writes extracted fields",
+      "technology": "SQL"
+    },
+    {
+      "id": "ingestion-api--orchestrator",
+      "sourceId": "ingestion-api",
+      "targetId": "orchestrator",
+      "label": "New case ready",
+      "technology": "async event"
+    },
+    {
+      "id": "orchestrator--retriever",
+      "sourceId": "orchestrator",
+      "targetId": "retriever",
+      "label": "Requests grounding context",
+      "technology": "gRPC"
+    },
+    {
+      "id": "retriever--knowledge-base",
+      "sourceId": "retriever",
+      "targetId": "knowledge-base",
+      "label": "k-NN search",
+      "technology": "vector query"
+    },
+    {
+      "id": "orchestrator--llm-provider",
+      "sourceId": "orchestrator",
+      "targetId": "llm-provider",
+      "label": "Completion request with retrieved context",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "orchestrator--case-store",
+      "sourceId": "orchestrator",
+      "targetId": "case-store",
+      "label": "Reads / updates case state",
+      "technology": "SQL"
+    },
+    {
+      "id": "orchestrator--handoff-queue",
+      "sourceId": "orchestrator",
+      "targetId": "handoff-queue",
+      "label": "Escalates low-confidence or irreversible case",
+      "technology": "async message"
+    },
+    {
+      "id": "handoff-queue--agent-console",
+      "sourceId": "handoff-queue",
+      "targetId": "agent-console",
+      "label": "Surfaces case to on-duty agent",
+      "technology": "WebSocket"
+    },
+    {
+      "id": "human-agent--agent-console",
+      "sourceId": "human-agent",
+      "targetId": "agent-console",
+      "label": "Picks up and resolves escalated cases",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "agent-console--case-store",
+      "sourceId": "agent-console",
+      "targetId": "case-store",
+      "label": "Records human resolution",
+      "technology": "SQL"
+    },
+    {
+      "id": "orchestrator--customer",
+      "sourceId": "orchestrator",
+      "targetId": "customer",
+      "label": "Sends grounded, cited answer",
+      "technology": "HTTPS / JSON"
+    },
+    {
+      "id": "ops--knowledge-base",
+      "sourceId": "ops",
+      "targetId": "knowledge-base",
+      "label": "Curates and publishes source knowledge",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "req-escalation-pickup--handoff-queue",
+      "sourceId": "req-escalation-pickup",
+      "targetId": "handoff-queue",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-extraction-review--extraction-worker",
+      "sourceId": "req-extraction-review",
+      "targetId": "extraction-worker",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-kb-freshness--knowledge-base",
+      "sourceId": "req-kb-freshness",
+      "targetId": "knowledge-base",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-case-audit-trail--case-store",
+      "sourceId": "req-case-audit-trail",
+      "targetId": "case-store",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-escalation-pickup--ff-escalation-backlog-guard",
+      "sourceId": "req-escalation-pickup",
+      "targetId": "ff-escalation-backlog-guard",
+      "relationType": "traces-to"
+    },
+    {
+      "id": "req-extraction-review--ff-extraction-drift-monitor",
+      "sourceId": "req-extraction-review",
+      "targetId": "ff-extraction-drift-monitor",
+      "relationType": "traces-to"
+    },
+    {
+      "id": "ff-cost-per-case-guard--orchestrator",
+      "sourceId": "ff-cost-per-case-guard",
+      "targetId": "orchestrator",
+      "relationType": "constrains"
+    },
+    {
+      "id": "adr-confidence-gated-autonomy--orchestrator",
+      "sourceId": "adr-confidence-gated-autonomy",
+      "targetId": "orchestrator",
+      "relationType": "constrains"
+    },
+    {
+      "id": "adr-retrieval-over-finetuning--retriever",
+      "sourceId": "adr-retrieval-over-finetuning",
+      "targetId": "retriever",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-case-audit-trail--adr-confidence-gated-autonomy",
+      "sourceId": "req-case-audit-trail",
+      "targetId": "adr-confidence-gated-autonomy",
+      "relationType": "traces-to"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "bp-ai-assistant-platform-seq",
+      "name": "Autonomous resolution with escalation fallback",
+      "relationIds": [
+        "customer--ingestion-api",
+        "ingestion-api--orchestrator",
+        "orchestrator--retriever",
+        "retriever--knowledge-base",
+        "orchestrator--handoff-queue",
+        "handoff-queue--agent-console",
+        "agent-console--case-store"
+      ],
+      "stepDescriptions": [
+        "Customer submits a request.",
+        "Ingestion API opens a case and hands it to the orchestrator.",
+        "Orchestrator requests grounding context from the retriever.",
+        "Retriever finds the supporting passages in the knowledge base.",
+        "Confidence is below threshold, or the proposed action is irreversible, so the orchestrator escalates instead of acting.",
+        "The case surfaces in the handoff queue for the next available agent.",
+        "The agent resolves it from the console; had confidence been high enough, the orchestrator would instead have answered the customer directly."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "bp-ai-assistant-platform-flow",
+      "name": "Autonomous resolution with escalation fallback",
+      "kind": "dynamic",
+      "sequenceId": "bp-ai-assistant-platform-seq",
+      "nodeIds": [
+        "customer",
+        "human-agent",
+        "ops",
+        "platform",
+        "ingestion-api",
+        "extraction-worker",
+        "retriever",
+        "orchestrator",
+        "handoff-queue",
+        "agent-console",
+        "knowledge-base",
+        "case-store",
+        "llm-provider",
+        "source-channel"
+      ],
+      "positions": {}
+    }
+  ]
+}

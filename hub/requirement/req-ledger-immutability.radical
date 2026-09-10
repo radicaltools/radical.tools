@@ -1,0 +1,38 @@
+{
+  "hub": {
+    "id": "req-ledger-immutability",
+    "category": "requirement",
+    "name": "Immutable Ledger Entries",
+    "description": "Once posted, a journal entry is never updated or deleted — corrections happen only through a new, linked compensating entry.",
+    "tags": [
+      "fintech",
+      "ledger",
+      "compliance",
+      "audit",
+      "correctness"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-event-sourced-ledger",
+      "req-audit-logging",
+      "ff-ledger-balance-integrity"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "req-ledger-immutability-1",
+      "type": "requirement",
+      "label": "Immutable Ledger Entries",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a posted journal entry needs to be corrected, reversed, or removed for any reason",
+      "action": "never update or delete the original entry; post a new, separately timestamped compensating entry whose debits and credits reverse it, and link the two so either can be found from the other",
+      "rationale": "Reconciliation, audits and point-in-time balance reconstruction all depend on the journal meaning exactly what it said at the time; an entry that can be quietly rewritten stops being evidence of anything."
+    }
+  ],
+  "relations": []
+}

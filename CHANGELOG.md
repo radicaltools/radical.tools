@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Architecture Hub — browse and import 70+ curated architecture concepts
+- Architecture Hub — browse and import 120+ curated architecture concepts
 - AI assistant integration (OpenAI, Anthropic, Gemini, Ollama)
 - Smart Layout pipeline with SA-based auto-layout
 - Metamodel editor — customise node types, relation types, and constraints

@@ -1,0 +1,45 @@
+{
+  "hub": {
+    "id": "ff-sync-convergence-test",
+    "category": "fitness-function",
+    "name": "CRDT Convergence Test",
+    "description": "Property-based test that replays the same set of concurrent operations across multiple replicas in randomised order, with simulated disconnects and reconnects, and asserts every replica ends up in byte-identical state.",
+    "tags": [
+      "structural",
+      "crdt",
+      "correctness",
+      "testing"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "CONVERGENCE_RUNS",
+        "label": "Randomised property-test iterations per release",
+        "hint": "1000",
+        "type": "number",
+        "defaultValue": "1000"
+      }
+    ],
+    "hubRefs": [
+      "pattern-crdt-sync",
+      "req-presence-latency",
+      "ff-chaos-resilience-test"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "ff-sync-convergence-test-1",
+      "type": "fitness-fn",
+      "label": "CRDT Convergence Test",
+      "description": "Generates a random batch of concurrent operations from simulated replicas and applies them to each replica in a different random order, including simulated network partitions and out-of-order delivery, then diffs the resulting document states.",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "category": "structural",
+      "threshold": "100% of {{CONVERGENCE_RUNS}} randomised replay runs per release converge to identical state — any divergence fails the build"
+    }
+  ],
+  "relations": []
+}

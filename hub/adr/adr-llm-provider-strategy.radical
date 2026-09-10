@@ -1,0 +1,40 @@
+{
+  "hub": {
+    "id": "adr-llm-provider-strategy",
+    "category": "adr",
+    "name": "LLM Provider Strategy",
+    "description": "Records whether model calls go to a hosted frontier API, a self-hosted open-weight model, or both routed by task.",
+    "tags": [
+      "ai",
+      "llm",
+      "governance",
+      "cost",
+      "data-residency"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "hubRefs": [
+      "pattern-rag-pipeline",
+      "req-ai-groundedness",
+      "req-encryption",
+      "ff-cost-efficiency-guard"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "adr-llm-provider-strategy-1",
+      "type": "adr",
+      "label": "ADR: Hybrid LLM routing by task",
+      "width": 180,
+      "height": 52,
+      "collapsed": false,
+      "x": 0,
+      "y": 0,
+      "status": "proposed",
+      "date": "",
+      "context": "Every model call has to go somewhere: a hosted frontier API, a self-hosted open-weight model, or a mix. The right choice depends on task quality requirements, per-token cost at expected volume, latency, and whether the input data is allowed to leave the perimeter at all.",
+      "decision": "Default to a hosted frontier API for quality-critical, low-volume tasks (drafting, complex reasoning). Route high-volume, latency-sensitive or data-sensitive tasks (classification, extraction, redaction) to a self-hosted open-weight model behind the same internal completion interface, so callers don't know or care which one answered.",
+      "consequences": "• Quality-critical tasks keep pace with frontier model improvements without any migration; only the routing table changes as models are added.\n• High-volume tasks avoid per-token cost that would otherwise dominate the bill, at the cost of running and updating GPU infrastructure for the self-hosted model.\n• Data that cannot leave the perimeter has a compliant path (self-hosted) without blocking the product entirely on it.\n• The routing layer and its fallback behaviour — what happens when the preferred provider is down or rate-limited — becomes critical infrastructure in its own right, not an afterthought.",
+      "alternatives": "1. Always hosted API — simplest to build and keeps pace with frontier quality, but every request leaves the perimeter and cost scales linearly with volume regardless of task complexity.\n2. Always self-hosted — full control over data residency and cost at scale, but requires GPU operations expertise and typically lags frontier quality on complex reasoning tasks.\n3. Single hosted provider, no fallback — simplest integration, but a provider outage or pricing change has no mitigation.\n4. Hybrid routing by task (chosen) — matches each task to the provider it actually needs, at the cost of maintaining two integration paths and a routing policy."
+    }
+  ]
+}
