@@ -240,7 +240,15 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     clarifyStartedRef.current.add(currentStageId)
     const stage = FORGE_STAGES.find((s) => s.id === currentStageId)!
     setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: 'asking' }))
-    askClarifyingQuestions(stage.title, description, hubMatchesByStage[currentStageId], aiSettings)
+    // So the model doesn't re-ask something the user already answered in an
+    // earlier stage's clarify round (e.g. auth mechanism asked again at the
+    // C4 stage after already being answered at Requirements).
+    const priorQA = FORGE_STAGES
+      .slice(0, FORGE_STAGES.findIndex((s) => s.id === currentStageId))
+      .map((s) => formatClarificationAnswers(clarifyQuestionsByStage[s.id], clarifyAnswersByStage[s.id]))
+      .filter(Boolean)
+      .join('\n\n')
+    askClarifyingQuestions(stage.title, description, hubMatchesByStage[currentStageId], aiSettings, undefined, priorQA)
       .then((questions) => {
         setClarifyQuestionsByStage((q) => ({ ...q, [currentStageId]: questions }))
         // multiSelect questions (in practice, just hub_matches) default to

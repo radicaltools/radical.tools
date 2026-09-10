@@ -58,7 +58,12 @@ export function parseClarifyResponse(text: string): ClarifyStageQuestion[] {
   }
 }
 
-export function buildClarifyPrompt(stageTitle: string, description: string, hubMatches: HubConceptSummary[] | undefined): string {
+export function buildClarifyPrompt(
+  stageTitle: string,
+  description: string,
+  hubMatches: HubConceptSummary[] | undefined,
+  priorQA?: string,
+): string {
   const lines = [
     `You are about to generate the "${stageTitle}" stage of a Radical Forge run for the system described below.`,
     '',
@@ -67,6 +72,15 @@ export function buildClarifyPrompt(stageTitle: string, description: string, hubM
     description.trim(),
     '"""',
   ]
+
+  if (priorQA?.trim()) {
+    lines.push(
+      '',
+      'Already answered in earlier stages of this run — do NOT ask about these',
+      'again unless something is still genuinely unclear:',
+      priorQA.trim(),
+    )
+  }
 
   if (hubMatches?.length) {
     lines.push(
@@ -130,13 +144,14 @@ export async function askClarifyingQuestions(
   hubMatches: HubConceptSummary[] | undefined,
   settings: AISettings,
   signal?: AbortSignal,
+  priorQA?: string,
 ): Promise<ClarifyStageQuestion[]> {
   const adapter = getAdapter(settings.active)
   const cfg = settings.providers[settings.active]
   const model = cfg.model || adapter.defaultModel
   const res = await adapter.chat({
     model,
-    messages: [{ role: 'user', content: buildClarifyPrompt(stageTitle, description, hubMatches) }],
+    messages: [{ role: 'user', content: buildClarifyPrompt(stageTitle, description, hubMatches, priorQA) }],
     maxTokens: 700,
     temperature: 0.3,
     signal,
