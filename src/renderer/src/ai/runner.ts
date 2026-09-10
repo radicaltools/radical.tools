@@ -22,6 +22,16 @@ export interface RunAIResult {
   history: ChatMessage[]
 }
 
+/** Live progress, emitted as the loop below works — lets a caller (Radical
+ *  Forge) show what's actually happening instead of one static "Generating…"
+ *  for the whole run. Purely observational: nothing here changes control
+ *  flow or RunAIResult, so callers that don't pass `onProgress` (QuickSearch)
+ *  are completely unaffected. */
+export type ForgeProgressEvent =
+  | { type: 'round'; round: number }
+  | { type: 'text'; text: string }
+  | { type: 'action'; ok: boolean; label: string }
+
 export interface RunAIOptions {
   prompt: string
   settings: AISettings
@@ -30,10 +40,39 @@ export interface RunAIOptions {
   signal?: AbortSignal
   /** Maximum tool-execution rounds before giving up. Default: 12. */
   maxIterations?: number
+  onProgress?: (event: ForgeProgressEvent) => void
+}
+
+/** One human-readable line for a tool call — resolves tempIds/labels through
+ *  `ctx` so e.g. an add_relation shows real node labels ("Web App → DB"),
+ *  not raw ids. Best-effort: an id that isn't resolvable (yet, or ever)
+ *  falls back to the raw id rather than failing. */
+function describeToolCall(name: string, input: unknown, ctx: ToolRunContext): string {
+  const i = (input ?? {}) as Record<string, unknown>
+  const nodeLabel = (id: unknown): string => {
+    const resolved = ctx.resolveId(String(id ?? ''))
+    return ctx.diagram.getNodes()[resolved]?.label ?? String(id ?? '?')
+  }
+  switch (name) {
+    case 'add_node': return `+ ${String(i.type ?? 'node')}: ${String(i.label ?? '')}`
+    case 'update_node': return `~ updated ${String(i.label ?? i.id ?? 'node')}`
+    case 'delete_node': return '− removed node'
+    case 'add_relation': return `+ ${String(i.relationType ?? 'relation')}: ${nodeLabel(i.sourceId)} → ${nodeLabel(i.targetId)}`
+    case 'update_relation': return '~ updated relation'
+    case 'delete_relation': return '− removed relation'
+    case 'create_view': return `+ view: ${String(i.name ?? '')}`
+    case 'set_view_nodes': return '~ updated view'
+    case 'set_active_view': return 'switched view'
+    case 'delete_view': return '− removed view'
+    case 'search_model': return 'searched the model'
+    case 'focus_node': return 'focused a node'
+    case 'reset_diagram': return 'reset the diagram'
+    default: return name
+  }
 }
 
 export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
-  const { settings, prompt, diagram, history = [], signal } = opts
+  const { settings, prompt, diagram, history = [], signal, onProgress } = opts
   const maxIterations = opts.maxIterations ?? 12
   const cfg = settings.providers[settings.active]
   const adapter = getAdapter(settings.active)
@@ -71,6 +110,7 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
   const report = emptyReport()
   let lastRaw = ''
   let iterations = 0
+  let round = 0
 
   while (true) {
     if (signal?.aborted) throw new Error('Aborted')
@@ -78,6 +118,9 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
       report.errors = [`Stopped after ${maxIterations} tool-calling rounds without a final answer.`]
       break
     }
+
+    round++
+    onProgress?.({ type: 'round', round })
 
     // Re-read live state every round so the model sees whatever the previous
     // round's tool calls just changed.
@@ -98,6 +141,7 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
     // next turn — push the assistant content verbatim, not just its text.
     turns.push({ role: 'assistant', content: res.content })
     lastRaw = textOf(res.content)
+    if (lastRaw) onProgress?.({ type: 'text', text: lastRaw })
 
     const calls = toolCallsOf(res.content)
     if (calls.length === 0) {
@@ -115,6 +159,7 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
         const msg = `Unknown tool "${call.name}"`
         resultBlocks.push({ type: 'tool_result', toolCallId: call.id, content: msg, isError: true })
         roundErrors.push(msg)
+        onProgress?.({ type: 'action', ok: false, label: msg })
         continue
       }
       let result
@@ -126,6 +171,7 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
       resultBlocks.push({ type: 'tool_result', toolCallId: call.id, content: result.resultText, isError: !result.ok })
       if (result.ok) mergeReport(report, result)
       else roundErrors.push(`${call.name}: ${result.resultText}`)
+      onProgress?.({ type: 'action', ok: result.ok, label: result.ok ? describeToolCall(call.name, call.input, ctx) : `${call.name} failed` })
     }
     // Errors are scoped to "still failing this round" — a round with no
     // errors clears whatever the previous round reported, since the model
