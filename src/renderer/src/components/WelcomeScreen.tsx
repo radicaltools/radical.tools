@@ -26,6 +26,23 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
     onDismiss()
   }
 
+  // "Start with Radical Forge" — opens straight into a blank model with the
+  // wizard already up, so a user can go from nothing to a described system
+  // without first clicking "New model" then hunting for Forge in the app
+  // menu. Toolbar.tsx (already mounted underneath this overlay) listens for
+  // the event — same pattern as radical:open-ai-settings.
+  function handleForge(): void {
+    const preset = presets.find(p => p.id === selectedPresetId) ?? presets[0]
+    documents.createLSDocument('Untitled model', {
+      nodes: [],
+      relations: [],
+      metamodel: preset.build(),
+    })
+    setPickerOpen(false)
+    onDismiss()
+    window.dispatchEvent(new CustomEvent('radical:open-forge'))
+  }
+
   function handleOpen(id: string): void {
     documents.setActiveId(id)
     onDismiss()
@@ -87,6 +104,17 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
                 Open last — {lastDoc.name}
               </button>
             )}
+            <button
+              className="welcome-btn welcome-btn-forge"
+              onClick={handleForge}
+              title="Describe a system in plain language and let AI generate requirements, a C4 model, fitness functions and Gherkin scenarios for it"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                <path d="M4.5 1.5l.9 2.1L7.5 4.5l-2.1.9-.9 2.1-.9-2.1L1.5 4.5l2.1-.9z"/>
+                <path d="M10.5 6.5l.65 1.35L12.5 8.5l-1.35.65-.65 1.35-.65-1.35L8.5 8.5l1.35-.65z"/>
+              </svg>
+              Start with Radical Forge
+            </button>
             <div className="welcome-btn-group">
             <button
               className={lastDoc ? 'welcome-btn welcome-btn-ghost' : 'welcome-btn welcome-btn-primary'}
