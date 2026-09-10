@@ -3983,6 +3983,11 @@ export const useDiagramStore = create<DiagramStore>()(
         // captured viewport at all (legacy data), fall back to fitView.
         const vp = slide.viewport
         if (vp && (vp.zoom || vp.x || vp.y)) {
+          // Slide switch just changed the visible node/view set — block the
+          // 300ms auto-fit interval from reacting to that as "new content"
+          // and dragging the camera to a fit-all framing right after we set
+          // the slide's own captured viewport below.
+          ;(window as any).__rfSuppressAutoFit?.(600 + 1200)
           requestAnimationFrame(() => _setViewportFn()?.(
             { x: vp.x, y: vp.y, zoom: vp.zoom },
             { duration: 600 },
@@ -4045,6 +4050,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // Restore saved viewport, or fit view if none captured.
         const vp = slide.viewport
         if (vp && (vp.zoom || vp.x || vp.y)) {
+          // See goToSlide — same auto-fit race, same fix.
+          ;(window as any).__rfSuppressAutoFit?.(400 + 1200)
           requestAnimationFrame(() => _setViewportFn()?.(
             { x: vp.x, y: vp.y, zoom: vp.zoom },
             { duration: 400 },
