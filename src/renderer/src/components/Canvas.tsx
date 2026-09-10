@@ -357,7 +357,21 @@ function StructuralCanvas(): React.ReactElement {
     // 300ms tick. Manual / forced calls (Fit-All button) bypass this.
     if (!force) {
       const until = (window as unknown as { __radicalAutoFitSuppressUntil?: number }).__radicalAutoFitSuppressUntil ?? 0
-      if (performance.now() < until) return
+      if (performance.now() < until) {
+        // Keep the smart-fit "previously visible" memory in sync with
+        // reality while suppressed (e.g. during a presentation slide
+        // transition, which swaps the whole node/view set). Otherwise the
+        // first tick after suppression ends sees a stale diff against the
+        // pre-transition node set, reads it as "newly revealed content",
+        // and yanks the camera back to a fit-all framing right after the
+        // caller's own viewport was correctly applied.
+        const inst = rfInstanceRef.current
+        if (inst) {
+          const visible = inst.getNodes().filter((n) => !n.hidden)
+          prevVisibleIdsRef.current = new Set(visible.map((n) => n.id))
+        }
+        return
+      }
     }
     // Smart-fit: forced calls (Fit-All / initial toggle) → fit-all of all
     // visible nodes. Auto ticks → only react when something *new* appeared
@@ -407,6 +421,22 @@ function StructuralCanvas(): React.ReactElement {
     void duration // duration kept in API for callers; loop is time-constant based
   }, [computeFitTarget, computeSmartFitTarget])
 
+  /**
+   * Suppress the auto-fit interval for `durationMs` and cancel any in-flight
+   * fit animation immediately. Used by callers that just set an explicit
+   * camera position of their own (quick-search focus, presentation slide
+   * navigation) so the next 300ms auto-fit tick doesn't immediately
+   * fight/override it.
+   */
+  const suppressAutoFit = useCallback((durationMs: number) => {
+    ;(window as unknown as { __radicalAutoFitSuppressUntil?: number }).__radicalAutoFitSuppressUntil =
+      performance.now() + durationMs
+    if (fitAnimRef.current != null) {
+      cancelAnimationFrame(fitAnimRef.current)
+      fitAnimRef.current = null
+    }
+  }, [])
+
   // Cancel the in-flight fit animation on unmount (HMR / route change).
   useEffect(() => {
     return () => {
@@ -447,16 +477,13 @@ function StructuralCanvas(): React.ReactElement {
       // Block the auto-fit interval tick from clobbering this zoom while
       // the pan animation is running and for a couple of seconds after,
       // so the user actually has time to look at the focused node.
-      ;(window as unknown as { __radicalAutoFitSuppressUntil?: number }).__radicalAutoFitSuppressUntil =
-        performance.now() + dur + 2500
-      // Also cancel any in-flight smooth-fit animation so it doesn't keep
-      // pulling the viewport back during the focus pan.
-      if (fitAnimRef.current != null) {
-        cancelAnimationFrame(fitAnimRef.current)
-        fitAnimRef.current = null
-      }
+      suppressAutoFit(dur + 2500)
       instance.setCenter(px, py, { zoom: opts?.zoom ?? 1.1, duration: dur })
     }
+    // Presentation slide navigation (diagramStore's goToSlide/previewSlide)
+    // uses this to stop the auto-fit interval from fighting the slide's own
+    // captured camera right after a slide switch swaps the visible node set.
+    ;(window as any).__rfSuppressAutoFit = suppressAutoFit
     // Restore the camera saved with the active view (or default context).
     // Falls back to fit-all if no viewport was persisted yet.
     setTimeout(() => {
@@ -478,7 +505,7 @@ function StructuralCanvas(): React.ReactElement {
       delete (window as any).__radicalZoomIn
       delete (window as any).__radicalZoomOut
     }
-  }, [setFitViewFn, setViewportFns, smoothFitView])
+  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit])
 
   // Double-click on the canvas background → add a new System at that position
   const onCanvasDoubleClick = useCallback(
