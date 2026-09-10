@@ -3734,14 +3734,28 @@ body {
   line-height: 1;
 }
 
-/* ─── Radical Forge modal ─────────────────────────────────────────────────── */
-.forge-modal {
-  position: relative;
-  width: min(560px, 92vw);
-  max-height: 88vh;
+/* ─── Radical Forge — full-height docked panel (not a centered popup: the
+   canvas stays visible and interactive beside it, so the user watches the
+   model build live) ──────────────────────────────────────────────────── */
+.forge-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(46vw, 640px);
+  min-width: 420px;
+  z-index: 4000;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 20px 22px;
+  background: var(--bg-panel, #1f2330);
+  color: var(--text-primary);
+  border-left: 1px solid var(--border-color);
+  box-shadow: -8px 0 24px rgba(0,0,0,0.25);
+}
+@media (max-width: 860px) {
+  .forge-panel { width: 100vw; min-width: 0; }
 }
 .forge-steps {
   display: flex;
