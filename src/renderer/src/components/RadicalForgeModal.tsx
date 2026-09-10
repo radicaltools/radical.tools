@@ -398,7 +398,17 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         >
           ✕
         </button>
-        <h3 className="milestone-modal-title">Radical Forge</h3>
+        <div className="forge-title-row">
+          <span className="forge-title-icon" aria-hidden>
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9.5 1.5 3 8l1.5 1.5L11 3z" />
+              <path d="M9 3l4 4" />
+              <path d="M2 14l2.5-2.5" />
+              <circle cx="12.5" cy="3.5" r="1.5" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <h3 className="milestone-modal-title" style={{ margin: 0 }}>Radical Forge</h3>
+        </div>
         <p className="milestone-modal-text" style={{ marginBottom: 10 }}>
           Turn a free-text system description into requirements, a C4 model, fitness
           functions and Gherkin scenarios — one reviewable stage at a time.
@@ -416,6 +426,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
               onClick={() => goTo(s)}
               title={STEP_LABELS[s]}
             >
+              {i < stepIndex && <span className="forge-step-check" aria-hidden>✓</span>}
               {STEP_LABELS[s]}
             </button>
           ))}
@@ -424,7 +435,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         {unavailableReason && (
           <div className="forge-warning">
             {unavailableReason}{' '}
-            <button type="button" className="qs-ai-mini-btn" onClick={openAISettings}>Configure…</button>
+            <button type="button" className="forge-btn forge-btn-secondary forge-btn-sm" onClick={openAISettings}>Configure…</button>
           </div>
         )}
 
@@ -439,7 +450,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                 rows={10}
                 autoFocus
               />
-              <button type="button" className="qs-ai-mini-btn" onClick={handleUpload} style={{ marginTop: 8 }}>
+              <button type="button" className="forge-btn forge-btn-secondary forge-btn-sm" onClick={handleUpload} style={{ marginTop: 8 }}>
                 Upload .txt / .md file…
               </button>
             </>
@@ -464,7 +475,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                         </div>
                         <button
                           type="button"
-                          className="qs-ai-mini-btn"
+                          className={`forge-btn forge-btn-sm ${imported ? 'forge-btn-success' : 'forge-btn-secondary'}`}
                           disabled={imported || importing}
                           onClick={() => handleImportHubConcept(c)}
                         >
@@ -520,10 +531,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                     </div>
                   ))}
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                    <button type="button" className="forge-primary-btn" onClick={() => submitClarify(currentStage.id)}>
+                    <button type="button" className="forge-btn forge-btn-primary" onClick={() => submitClarify(currentStage.id)}>
                       Continue
                     </button>
-                    <button type="button" className="qs-ai-mini-btn" onClick={() => skipClarify(currentStage.id)}>
+                    <button type="button" className="forge-btn forge-btn-ghost" onClick={() => skipClarify(currentStage.id)}>
                       Skip
                     </button>
                   </div>
@@ -533,7 +544,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
               {clarifyStatusByStage[currentStage.id] === 'done' && !!clarifyQuestionsByStage[currentStage.id]?.length && !stageReports[currentStage.id] && (
                 <div className="forge-clarify-summary">
                   Clarified ✓
-                  <button type="button" className="qs-ai-mini-btn" onClick={() => editClarify(currentStage.id)}>
+                  <button type="button" className="forge-btn forge-btn-secondary forge-btn-sm" onClick={() => editClarify(currentStage.id)}>
                     Edit answers
                   </button>
                 </div>
@@ -542,7 +553,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
               {clarifyStatusByStage[currentStage.id] === 'done' && !stageReports[currentStage.id] && !busy && (
                 <button
                   type="button"
-                  className="forge-primary-btn"
+                  className="forge-btn forge-btn-primary"
                   onClick={() => runStage(currentStage.id)}
                   disabled={!!unavailableReason}
                 >
@@ -562,7 +573,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                       {createdCount > 0 && <span className="forge-progress-stat">+{createdCount}</span>}
                       {failedCount > 0 && <span className="forge-progress-stat forge-progress-stat-error">{failedCount} failed</span>}
                       <span className="forge-progress-spacer" />
-                      <button type="button" className="qs-ai-mini-btn" onClick={cancelStage}>Cancel</button>
+                      <button type="button" className="forge-btn forge-btn-ghost forge-btn-sm" onClick={cancelStage}>Cancel</button>
                     </div>
                     <div className="forge-progress-list" ref={progressListRef}>
                       {visible.length === 0 && (
@@ -591,7 +602,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                   <AIReportLine report={stageReports[currentStage.id]!} />
                   <button
                     type="button"
-                    className="qs-ai-mini-btn"
+                    className="forge-btn forge-btn-secondary forge-btn-sm"
                     style={{ marginTop: 8 }}
                     onClick={() => runStage(currentStage.id)}
                   >
@@ -610,7 +621,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                   : 'No Gherkin scenarios in the model yet — go back to the Scenarios step to generate some, or add them manually on the canvas.'}
               </p>
               {gherkinFiles.length > 0 && (
-                <button type="button" className="forge-primary-btn" onClick={() => downloadGherkinFiles(gherkinFiles)}>
+                <button type="button" className="forge-btn forge-btn-primary" onClick={() => downloadGherkinFiles(gherkinFiles)}>
                   Export .feature files
                 </button>
               )}
@@ -619,15 +630,15 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         </div>
 
         <div className="milestone-modal-footer" style={{ justifyContent: 'space-between' }}>
-          <button type="button" className="qs-ai-mini-btn" onClick={goBack} disabled={busy || stepIndex === 0}>
+          <button type="button" className="forge-btn forge-btn-secondary" onClick={goBack} disabled={busy || stepIndex === 0}>
             ← Back
           </button>
           {step === 'export' ? (
-            <button type="button" className="forge-primary-btn" onClick={onClose}>Done</button>
+            <button type="button" className="forge-btn forge-btn-primary" onClick={onClose}>Done</button>
           ) : (
             <button
               type="button"
-              className="qs-ai-mini-btn"
+              className={`forge-btn ${step === 'input' ? 'forge-btn-primary' : 'forge-btn-secondary'}`}
               onClick={goNext}
               disabled={
                 busy
