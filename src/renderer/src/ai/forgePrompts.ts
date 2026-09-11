@@ -27,6 +27,17 @@ export interface ForgeStage {
   blurb: string
 }
 
+/** The node type(s) each stage is actually meant to create — used to scope
+ *  the metamodel context message down to full detail for these (plus
+ *  whatever's already in the diagram) and abbreviated for the rest (see
+ *  ai/systemPrompt.ts's `buildMetamodelMessage`). */
+export const PRIMARY_TYPE_IDS_FOR_STAGE: Record<ForgeStageId, string[]> = {
+  requirements: ['requirement'],
+  fitness: ['fitness-fn'],
+  scenarios: ['scenario'],
+  c4: ['person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group'],
+}
+
 export const FORGE_STAGES: ForgeStage[] = [
   {
     id: 'requirements',
@@ -73,6 +84,25 @@ function buildHubGuidanceBlock(hubMatches: HubConceptSummary[] | undefined): str
   ].join('\n')
 }
 
+/** Formats a compact synopsis of earlier stages in this run — replaces
+ *  carrying their full verbatim tool-call transcripts forward (which
+ *  `RadicalForgeModal.tsx` used to do via a growing `history` array). The
+ *  live diagram-context message (systemPrompt.ts's `buildContextMessage`)
+ *  already re-sends the complete, authoritative current model state fresh
+ *  every round, so replaying raw tool calls on top of that was mostly
+ *  redundant — this keeps just the "what was decided and why" that a fresh
+ *  state dump can't carry on its own. */
+export function buildPriorStagesBlock(summaries: { title: string; summary: string }[]): string {
+  const withText = summaries.filter((s) => s.summary.trim())
+  if (!withText.length) return ''
+  return [
+    '',
+    'Summary of earlier stages in this run (the full current model state is',
+    'given separately above — this is just what each stage decided and why):',
+    ...withText.map((s) => `- ${s.title}: ${s.summary.trim()}`),
+  ].join('\n')
+}
+
 /** Formats the user's answers to the pre-stage clarifying questions (see
  *  ai/forgeClarify.ts) as a block the model should treat as authoritative —
  *  it asked, the user answered, so these override any conflicting guess it
@@ -94,18 +124,21 @@ function buildClarificationsBlock(clarifications: string | undefined): string {
  *  stage (see RadicalForgeModal.tsx) — generation and what the user sees
  *  stay the same set, no separate "what did the AI see" mystery.
  *  `clarifications` is the formatted Q&A from the pre-stage clarify step
- *  (ai/forgeClarify.ts), when the user answered any. */
+ *  (ai/forgeClarify.ts), when the user answered any. `priorStageSummaries`
+ *  is the pre-formatted output of `buildPriorStagesBlock` above. */
 export function buildForgeStagePrompt(
   stageId: ForgeStageId,
   description: string,
   hubMatches?: HubConceptSummary[],
   clarifications?: string,
+  priorStageSummaries?: string,
 ): string {
   const descBlock = [
     'Original system description (provided by the user in the Radical Forge wizard):',
     '"""',
     description.trim(),
     '"""',
+    priorStageSummaries,
     buildHubGuidanceBlock(hubMatches),
     buildClarificationsBlock(clarifications),
   ].filter(Boolean).join('\n')

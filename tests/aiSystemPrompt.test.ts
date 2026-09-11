@@ -53,6 +53,35 @@ describe('buildMetamodelMessage', () => {
     expect(msg).toContain('ubiquitous')
     expect(msg).toContain('derives')
   })
+
+  it('abbreviates properties for types outside relevantTypeIds and not yet in use, but keeps full detail for relevant or in-use types', () => {
+    const mm: Metamodel = {
+      id: 'm',
+      name: 'M',
+      nodeTypes: {
+        requirement: {
+          id: 'requirement', label: 'Requirement', color: '', fg: '', iconPath: '', width: 0, height: 0,
+          properties: [{ key: 'ears_type', label: 'EARS type', type: 'enum', options: ['ubiquitous'] }],
+        },
+        system: {
+          id: 'system', label: 'System', color: '', fg: '', iconPath: '', width: 0, height: 0,
+          properties: [{ key: 'tech', label: 'Tech', type: 'text' }],
+        },
+        container: {
+          id: 'container', label: 'Container', color: '', fg: '', iconPath: '', width: 0, height: 0,
+          properties: [{ key: 'stack', label: 'Stack', type: 'text' }],
+        },
+      },
+      relationTypes: {},
+    }
+    const nodes: Record<string, C4Node> = { s1: node({ id: 's1', type: 'system' }) }
+    const msg = buildMetamodelMessage(mm, new Set(['requirement']), nodes)
+    // relevant (requirement) and in-use (system) keep full property detail
+    expect(msg).toContain('ears_type')
+    expect(msg).toContain('"tech"')
+    // irrelevant and unused (container) loses its properties array
+    expect(msg).not.toContain('"stack"')
+  })
 })
 
 describe('buildContextMessage', () => {
@@ -63,30 +92,31 @@ describe('buildContextMessage', () => {
       { n1: n as unknown as C4Node },
       { r1: { id: 'r1', sourceId: 'n1', targetId: 'n1', label: 'self', relationType: 'derives' } as C4Relation },
     )
-    expect(msg).toContain('"id": "n1"')
-    expect(msg).toContain('"label": "A"')
-    expect(msg).toContain('"ears_type": "event-driven"')
-    expect(msg).toContain('"relationType": "derives"')
+    expect(msg).toContain('"id":"n1"')
+    expect(msg).toContain('"label":"A"')
+    expect(msg).toContain('"ears_type":"event-driven"')
+    expect(msg).toContain('"relationType":"derives"')
     // x/y/width/height/collapsed are NOT included (layout is the tool's job)
     expect(msg).not.toMatch(/"width"/)
+    // JSON is compact (no pretty-print indentation) to save tokens
+    expect(msg).not.toMatch(/\n {2}"/)
   })
 
   it('serialises view kind', () => {
     const msg = buildContextMessage({}, {}, null, {
       v1: { id: 'v1', name: 'Governance', kind: 'table', nodeIds: [], positions: {} },
     })
-    expect(msg).toContain('"kind": "table"')
+    expect(msg).toContain('"kind":"table"')
   })
 })
 
 describe('buildSystemMessages', () => {
-  it('returns exactly the prompt, metamodel, and context messages, in order', () => {
-    const msgs = buildSystemMessages({}, {}, undefined, null, undefined)
-    expect(msgs).toHaveLength(3)
+  it('returns exactly the prompt and (cacheable) metamodel messages, in order — the diagram-state message now lives in the conversation turns instead (see ai/runner.ts)', () => {
+    const msgs = buildSystemMessages(undefined, {})
+    expect(msgs).toHaveLength(2)
     expect(msgs[0]).toEqual({ role: 'system', content: AI_SYSTEM_PROMPT })
     expect(msgs[1].role).toBe('system')
     expect(msgs[1].content).toMatch(/Metamodel/i)
-    expect(msgs[2].role).toBe('system')
-    expect(msgs[2].content).toMatch(/Current diagram state/)
+    expect(msgs[1].cacheBreakpoint).toBe(true)
   })
 })

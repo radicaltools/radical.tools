@@ -26,27 +26,45 @@ Rules:
 
 /** Build a compact, machine-readable summary of the metamodel rules —
  *  including each type's custom `properties`, which is how the model learns
- *  what keys are valid in add_node/add_relation's `properties` bag. */
-export function buildMetamodelMessage(mm: Metamodel | undefined): string {
+ *  what keys are valid in add_node/add_relation's `properties` bag.
+ *
+ *  `relevantTypeIds` (when given — Radical Forge passes its current stage's
+ *  primary type(s); QuickSearch's freeform chat has no "stage" and omits it,
+ *  keeping today's always-full-detail behavior) trims the verbose
+ *  `properties` array for node types that are both irrelevant to the active
+ *  stage AND not yet used anywhere in `nodes` — a type already present in the
+ *  diagram keeps full detail regardless, since the model may still need to
+ *  reference/link to it correctly. This never removes a type from the tool
+ *  schema's own `type` enum (ai/tools/nodeTools.ts) — the model can still
+ *  create any type, just with less up-front documentation for the unlikely
+ *  ones. Abbreviated entries keep id/label/allowedParents/allowedAtRoot/
+ *  cardinality — enough to know the type exists and roughly where it fits. */
+export function buildMetamodelMessage(
+  mm: Metamodel | undefined,
+  relevantTypeIds?: Set<string>,
+  nodes?: Record<string, C4Node>,
+): string {
   if (!mm) {
     return [
       'Metamodel: (none loaded — falling back to default C4 types)',
       'Allowed node types: ' + FALLBACK_TYPES.map(t => `"${t}"`).join(', '),
     ].join('\n')
   }
+  const typesInUse = new Set<string>(Object.values(nodes ?? {}).map((n) => n.type))
   const types = Object.values(mm.nodeTypes).map((t) => {
     // Mirror the same defaulting that diagramStore uses: when allowedParents is
     // empty/undefined the type is allowed at the root unless explicitly false.
     const allowedParents = t.allowedParents && t.allowedParents.length > 0 ? t.allowedParents : []
     const rootDefault = allowedParents.length === 0
     const atRoot = t.allowedAtRoot ?? rootDefault
+    const fullDetail = !relevantTypeIds || relevantTypeIds.has(t.id) || typesInUse.has(t.id)
     return {
       id: t.id,
       label: t.label,
       allowedParents,
       allowedAtRoot: atRoot,
       cardinality: t.cardinality,
-      properties: t.properties,
+      ...(fullDetail ? { properties: t.properties } : {}),
     }
   })
   const relations = Object.values(mm.relationTypes).map((r) => ({
@@ -58,11 +76,15 @@ export function buildMetamodelMessage(mm: Metamodel | undefined): string {
   return [
     `Metamodel "${mm.name}". Use ONLY the node/relation types listed below; respect`,
     '`allowedParents` (empty ⇒ requires `allowedAtRoot: true` to be a root node),',
-    '`cardinality.max`, and `allowedPairs`. Each type\'s `properties` array is the',
-    'exact set of keys valid in that type\'s `properties` tool-call bag — key,',
-    'label, type, and (for enums) the allowed `options`.',
+    '`cardinality.max`, and `allowedPairs`. Each type\'s `properties` array (where',
+    'present) is the exact set of keys valid in that type\'s `properties` tool-call',
+    'bag — key, label, type, and (for enums) the allowed `options`. A type with no',
+    '`properties` array here still exists and can be created — its property schema',
+    'was just omitted here as unlikely to be needed; call search_model or add_node',
+    'without a `properties` bag if unsure (unknown keys are dropped with a note,',
+    'not a hard failure).',
     '```json',
-    JSON.stringify({ nodeTypes: types, relationTypes: relations }, null, 2),
+    JSON.stringify({ nodeTypes: types, relationTypes: relations }),
     '```',
   ].join('\n')
 }
@@ -109,7 +131,7 @@ export function buildContextMessage(
     'Current diagram state (use these ids when referring to existing elements;',
     'any field beyond id/type/label/parentId is a custom or governance property):',
     '```json',
-    JSON.stringify({ nodes: ns, relations: rs, views: vs }, null, 2),
+    JSON.stringify({ nodes: ns, relations: rs, views: vs }),
     '```',
   ]
   if (activeView) {
@@ -123,24 +145,27 @@ export function buildContextMessage(
   return lines.join('\n')
 }
 
-/** The system-role messages for one round — rebuilt fresh every round so the
- *  model always sees the latest state (including whatever its own previous
- *  tool calls this run just changed). The first two blocks (prompt +
- *  metamodel) are byte-identical for the whole life of an open document —
- *  the metamodel message carries `cacheBreakpoint: true` so a
- *  caching-capable provider (see providers/claude.ts) can reuse that prefix
- *  across every round instead of reprocessing it from scratch. The diagram
- *  state message is deliberately left unmarked — it changes every round. */
+/** The system-role messages for one round — rebuilt fresh every round, but
+ *  byte-identical for the whole life of an open document (the diagram-state
+ *  message that used to live here as a third, ever-changing block has moved
+ *  into the conversation turns themselves — see ai/runner.ts — so this
+ *  prefix can stay stable and fully cacheable instead of being invalidated
+ *  every round). The metamodel message carries `cacheBreakpoint: true` so a
+ *  caching-capable provider (see providers/claude.ts) can reuse this prefix
+ *  across every round AND every stage of a run instead of reprocessing it
+ *  from scratch. `relevantTypeIds` is passed straight through to
+ *  `buildMetamodelMessage` (see there) — Radical Forge scopes it to the
+ *  active stage's primary type(s); QuickSearch's freeform chat omits it for
+ *  full detail always. `nodes` is needed even though this no longer builds
+ *  the diagram-state message — `buildMetamodelMessage` uses it to keep
+ *  full property detail for any type already in use. */
 export function buildSystemMessages(
-  nodes: Record<string, C4Node>,
-  relations: Record<string, C4Relation>,
   metamodel: Metamodel | undefined,
-  activeView?: { id: string; name: string; nodeIds: string[] } | null,
-  views?: Record<string, DiagramView>,
+  nodes: Record<string, C4Node>,
+  relevantTypeIds?: Set<string>,
 ): ChatMessage[] {
   return [
     { role: 'system', content: AI_SYSTEM_PROMPT },
-    { role: 'system', content: buildMetamodelMessage(metamodel), cacheBreakpoint: true },
-    { role: 'system', content: buildContextMessage(nodes, relations, activeView, views) },
+    { role: 'system', content: buildMetamodelMessage(metamodel, relevantTypeIds, nodes), cacheBreakpoint: true },
   ]
 }

@@ -63,7 +63,9 @@ interface FakeRound {
 
 function fakeAnthropicFetch(rounds: FakeRound[]) {
   let call = 0
-  ;(globalThis as any).fetch = vi.fn(async () => {
+  const bodies: any[] = []
+  ;(globalThis as any).fetch = vi.fn(async (_url: string, init?: RequestInit) => {
+    if (init?.body) bodies.push(JSON.parse(init.body as string))
     const round = rounds[Math.min(call, rounds.length - 1)]
     call++
     return new Response(
@@ -71,7 +73,7 @@ function fakeAnthropicFetch(rounds: FakeRound[]) {
       { status: 200, headers: { 'content-type': 'application/json' } },
     )
   })
-  return { calls: () => call }
+  return { calls: () => call, bodies: () => bodies }
 }
 
 const toolUse = (id: string, name: string, input: unknown) => ({ type: 'tool_use', id, name, input })
@@ -200,9 +202,48 @@ describe('runAIPrompt — end-to-end with mocked Anthropic tool-calling', () => 
       settings: anthropicSettings(),
       diagram: makeFacade(),
     })
-    expect(result.history[0]).toEqual({ role: 'user', content: 'add an API system' })
+    // The initial user turn now carries a leading diagram-state snapshot
+    // block ahead of the original prompt text (see ai/runner.ts's
+    // `withLeadingText`) instead of the live state going out as a separate,
+    // ever-changing system message — that's what makes the system prefix in
+    // front of it byte-stable and cacheable across rounds/stages.
+    expect(result.history[0].role).toBe('user')
+    const firstContent = result.history[0].content
+    expect(Array.isArray(firstContent)).toBe(true)
+    expect(firstContent).toEqual([
+      { type: 'text', text: expect.stringMatching(/Current diagram state/) },
+      { type: 'text', text: 'add an API system' },
+    ])
     expect(result.history.some((m) => m.role === 'assistant' && Array.isArray(m.content))).toBe(true)
     expect(result.history.at(-1)).toEqual({ role: 'assistant', content: [{ type: 'text', text: 'Done.' }] })
+  })
+
+  it('caches the growing within-stage prefix: a rolling second cache_control breakpoint moves forward each round instead of accumulating', async () => {
+    const { bodies } = fakeAnthropicFetch([
+      { content: [toolUse('c1', 'add_node', { tempId: 't1', type: 'system', label: 'API' })], stop_reason: 'tool_use' },
+      { content: [toolUse('c2', 'add_node', { tempId: 't2', type: 'system', label: 'DB' })], stop_reason: 'tool_use' },
+      { content: [text('Done.')], stop_reason: 'end_turn' },
+    ])
+    await runAIPrompt({ prompt: 'add two systems', settings: anthropicSettings(), diagram: makeFacade() })
+    const reqs = bodies()
+    expect(reqs).toHaveLength(3)
+
+    const cacheControlBlocks = (body: any): number =>
+      body.messages.flatMap((m: any) => (Array.isArray(m.content) ? m.content : [])).filter((b: any) => b.cache_control).length
+      + body.system.filter((b: any) => b.cache_control).length
+
+    // Round 1: only the system-prefix breakpoint (metamodel message) exists yet.
+    expect(cacheControlBlocks(reqs[0])).toBe(1)
+    // Round 2+: the system breakpoint plus exactly one rolling breakpoint in
+    // `messages` marking the end of the previously-sent, now-stable turns —
+    // never more than one there, however many rounds accumulate.
+    expect(cacheControlBlocks(reqs[1])).toBe(2)
+    expect(cacheControlBlocks(reqs[2])).toBe(2)
+
+    // Every round's outgoing final message carries a fresh leading
+    // diagram-state snapshot ahead of the tool_result blocks.
+    const lastMsg2 = reqs[1].messages.at(-1)
+    expect(lastMsg2.content[0].text).toMatch(/Current diagram state/)
   })
 })
 

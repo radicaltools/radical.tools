@@ -5,7 +5,7 @@ import { runAIPrompt, type ForgeProgressEvent } from '../ai/runner'
 import { loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
-import { FORGE_STAGES, buildForgeStagePrompt, type ForgeStageId } from '../ai/forgePrompts'
+import { FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, buildForgeStagePrompt, buildPriorStagesBlock, type ForgeStageId } from '../ai/forgePrompts'
 import { buildGherkinFiles, downloadGherkinFiles } from '../export/exportGherkin'
 import { AIReportLine } from './AIReportLine'
 import { useHubStore, type HubCategory, type HubConceptSummary } from '../store/hubStore'
@@ -17,7 +17,7 @@ import {
   HUB_MATCHES_QUESTION_ID,
   type ClarifyStageQuestion,
 } from '../ai/forgeClarify'
-import { addTokenUsage, type AISettings, type ChatMessage, type TokenUsage } from '../ai/types'
+import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
 import type { ApplyReport } from '../ai/diagramFacade'
 
 type ClarifyStatus = 'asking' | 'form' | 'done'
@@ -117,7 +117,6 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [history, setHistory] = useState<ChatMessage[]>([])
   const [stageReports, setStageReports] = useState<Partial<Record<ForgeStageId, ApplyReport>>>({})
   const [stageSummaries, setStageSummaries] = useState<Partial<Record<ForgeStageId, string>>>({})
   const [aiSettings, setAiSettings] = useState<AISettings>(() => loadAISettings())
@@ -153,7 +152,6 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setDescription('')
     setBusy(false)
     setError(null)
-    setHistory([])
     setStageReports({})
     setStageSummaries({})
     setAiSettings(loadAISettings())
@@ -346,9 +344,13 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         ? allMatches.filter((m) => hubAnswer.includes(m.name))
         : allMatches
       const clarifications = formatClarificationAnswers(clarifyQuestionsByStage[stageId], answers)
-      const prompt = buildForgeStagePrompt(stageId, description, effectiveMatches, clarifications)
-      const result = await runAIPrompt({ prompt, settings: aiSettings, diagram, history, signal: ctl.signal, onProgress })
-      setHistory((h) => [...h, ...result.history])
+      const stageIdx = FORGE_STAGES.findIndex((s) => s.id === stageId)
+      const priorStageSummaries = buildPriorStagesBlock(
+        FORGE_STAGES.slice(0, stageIdx).map((s) => ({ title: s.title, summary: stageSummaries[s.id] ?? '' })),
+      )
+      const prompt = buildForgeStagePrompt(stageId, description, effectiveMatches, clarifications, priorStageSummaries)
+      const relevantTypeIds = new Set(PRIMARY_TYPE_IDS_FOR_STAGE[stageId])
+      const result = await runAIPrompt({ prompt, settings: aiSettings, diagram, signal: ctl.signal, onProgress, relevantTypeIds })
       setStageReports((r) => ({ ...r, [stageId]: result.report }))
       setStageSummaries((s) => ({ ...s, [stageId]: result.summary || 'Done.' }))
       if (result.usage) {
@@ -361,7 +363,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       abortRef.current = null
       setBusy(false)
     }
-  }, [busy, unavailableReason, description, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, history])
+  }, [busy, unavailableReason, description, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries])
 
   const cancelStage = useCallback(() => { abortRef.current?.abort() }, [])
 

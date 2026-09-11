@@ -22,15 +22,25 @@ interface AnthropicBlock {
   tool_use_id?: string
   content?: string
   is_error?: boolean
+  cache_control?: { type: 'ephemeral' }
 }
 
-function toAnthropicContent(content: string | ChatContentBlock[]): string | AnthropicBlock[] {
-  if (typeof content === 'string') return content
-  return content.map((b): AnthropicBlock => {
+/** `cacheBreakpoint` on a message (see ai/runner.ts's rolling within-stage
+ *  breakpoint) needs to land on that message's LAST content block — a plain
+ *  string message is lifted into single-block array form so it has
+ *  somewhere to carry it; a message with no flag is untouched either way. */
+function toAnthropicContent(content: string | ChatContentBlock[], cacheBreakpoint?: boolean): string | AnthropicBlock[] {
+  if (typeof content === 'string') {
+    if (!cacheBreakpoint) return content
+    return [{ type: 'text', text: content, cache_control: { type: 'ephemeral' } }]
+  }
+  const blocks = content.map((b): AnthropicBlock => {
     if (b.type === 'text') return { type: 'text', text: b.text }
     if (b.type === 'tool_call') return { type: 'tool_use', id: b.id, name: b.name, input: b.input }
     return { type: 'tool_result', tool_use_id: b.toolCallId, content: b.content, is_error: b.isError }
   })
+  if (cacheBreakpoint && blocks.length) blocks[blocks.length - 1].cache_control = { type: 'ephemeral' }
+  return blocks
 }
 
 function fromAnthropicContent(blocks: AnthropicBlock[]): ChatContentBlock[] {
@@ -101,7 +111,7 @@ async function claudeChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
   const body: Record<string, unknown> = {
     model: req.model,
     max_tokens: req.maxTokens ?? 2048,
-    messages: rest.map((m) => ({ role: m.role, content: toAnthropicContent(m.content) })),
+    messages: rest.map((m) => ({ role: m.role, content: toAnthropicContent(m.content, m.cacheBreakpoint) })),
   }
   if (system.length) body.system = system
   if (req.tools?.length) {
