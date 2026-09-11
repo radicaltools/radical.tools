@@ -202,17 +202,20 @@ describe('runAIPrompt — end-to-end with mocked Anthropic tool-calling', () => 
       settings: anthropicSettings(),
       diagram: makeFacade(),
     })
-    // The initial user turn now carries a leading diagram-state snapshot
-    // block ahead of the original prompt text (see ai/runner.ts's
-    // `withLeadingText`) instead of the live state going out as a separate,
-    // ever-changing system message — that's what makes the system prefix in
-    // front of it byte-stable and cacheable across rounds/stages.
+    // The initial user turn now carries a trailing diagram-state snapshot
+    // block after the original prompt text (see ai/runner.ts's
+    // `withTrailingText`) instead of the live state going out as a
+    // separate, ever-changing system message — that's what makes the
+    // system prefix in front of it byte-stable and cacheable across
+    // rounds/stages. It must be TRAILING, not leading: Anthropic requires
+    // `tool_result` blocks to be the first content in a user turn that
+    // follows a `tool_use` — a block ahead of them is rejected.
     expect(result.history[0].role).toBe('user')
     const firstContent = result.history[0].content
     expect(Array.isArray(firstContent)).toBe(true)
     expect(firstContent).toEqual([
-      { type: 'text', text: expect.stringMatching(/Current diagram state/) },
       { type: 'text', text: 'add an API system' },
+      { type: 'text', text: expect.stringMatching(/Current diagram state/) },
     ])
     expect(result.history.some((m) => m.role === 'assistant' && Array.isArray(m.content))).toBe(true)
     expect(result.history.at(-1)).toEqual({ role: 'assistant', content: [{ type: 'text', text: 'Done.' }] })
@@ -240,10 +243,13 @@ describe('runAIPrompt — end-to-end with mocked Anthropic tool-calling', () => 
     expect(cacheControlBlocks(reqs[1])).toBe(2)
     expect(cacheControlBlocks(reqs[2])).toBe(2)
 
-    // Every round's outgoing final message carries a fresh leading
-    // diagram-state snapshot ahead of the tool_result blocks.
+    // Every round's outgoing final message carries a fresh diagram-state
+    // snapshot APPENDED after its tool_result blocks — never before them,
+    // since Anthropic requires tool_result to be the first content
+    // immediately following the tool_use it answers.
     const lastMsg2 = reqs[1].messages.at(-1)
-    expect(lastMsg2.content[0].text).toMatch(/Current diagram state/)
+    expect(lastMsg2.content[0].type).toBe('tool_result')
+    expect(lastMsg2.content.at(-1).text).toMatch(/Current diagram state/)
   })
 })
 
