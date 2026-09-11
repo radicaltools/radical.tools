@@ -55,7 +55,11 @@ function ollamaSettings() {
   return s
 }
 
-interface FakeRound { content: unknown[]; stop_reason: string }
+interface FakeRound {
+  content: unknown[]
+  stop_reason: string
+  usage?: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number }
+}
 
 function fakeAnthropicFetch(rounds: FakeRound[]) {
   let call = 0
@@ -63,7 +67,7 @@ function fakeAnthropicFetch(rounds: FakeRound[]) {
     const round = rounds[Math.min(call, rounds.length - 1)]
     call++
     return new Response(
-      JSON.stringify({ model: 'claude-haiku-4-5', content: round.content, stop_reason: round.stop_reason }),
+      JSON.stringify({ model: 'claude-haiku-4-5', content: round.content, stop_reason: round.stop_reason, usage: round.usage }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     )
   })
@@ -418,5 +422,39 @@ describe('runAIPrompt — onProgress (live feed for Radical Forge)', () => {
       diagram: makeFacade(),
     })
     expect(result.summary).toMatch(/Just an answer/)
+  })
+
+  it('sums usage across every round and emits a running total via onProgress', async () => {
+    fakeAnthropicFetch([
+      {
+        content: [toolUse('c1', 'add_node', { tempId: 't1', type: 'system', label: 'Web App' })],
+        stop_reason: 'tool_use',
+        usage: { input_tokens: 1000, output_tokens: 50, cache_read_input_tokens: 700 },
+      },
+      {
+        content: [text('Done.')],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 1200, output_tokens: 20, cache_read_input_tokens: 900 },
+      },
+    ])
+    const usageEvents: unknown[] = []
+    const result = await runAIPrompt({
+      prompt: 'Make a web app',
+      settings: anthropicSettings(),
+      diagram: makeFacade(),
+      onProgress: (e) => { if (e.type === 'usage') usageEvents.push(e) },
+    })
+    // Running total after each round, not per-round deltas.
+    expect(usageEvents).toEqual([
+      { type: 'usage', usage: { inputTokens: 1000, outputTokens: 50, cachedInputTokens: 700 } },
+      { type: 'usage', usage: { inputTokens: 2200, outputTokens: 70, cachedInputTokens: 1600 } },
+    ])
+    expect(result.usage).toEqual({ inputTokens: 2200, outputTokens: 70, cachedInputTokens: 1600 })
+  })
+
+  it('leaves result.usage undefined when the provider never reports usage', async () => {
+    fakeAnthropicFetch([{ content: [text('ok')], stop_reason: 'end_turn' }])
+    const result = await runAIPrompt({ prompt: 'hello', settings: anthropicSettings(), diagram: makeFacade() })
+    expect(result.usage).toBeUndefined()
   })
 })

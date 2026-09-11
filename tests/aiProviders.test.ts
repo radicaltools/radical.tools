@@ -107,6 +107,18 @@ describe('AI providers', () => {
         { role: 'tool', content: 'Created node n1.', tool_name: 'add_node' },
       ])
     })
+
+    it('parses usage from the top-level prompt_eval_count/eval_count fields (no "usage" object, no cache concept)', async () => {
+      installFetch({ model: 'llama3.1', message: { content: 'ok' }, prompt_eval_count: 120, eval_count: 15 })
+      const out = await ollamaAdapter.chat({ model: 'llama3.1', messages: SAMPLE }, {})
+      expect(out.usage).toEqual({ inputTokens: 120, outputTokens: 15 })
+    })
+
+    it('omits usage when eval counts are absent', async () => {
+      installFetch({ model: 'llama3.1', message: { content: 'ok' } })
+      const out = await ollamaAdapter.chat({ model: 'llama3.1', messages: SAMPLE }, {})
+      expect(out.usage).toBeUndefined()
+    })
   })
 
   describe('OpenAI — real tool-calling', () => {
@@ -192,6 +204,16 @@ describe('AI providers', () => {
         { role: 'tool', tool_call_id: 'call_1', content: 'Created node n1.' },
       ])
     })
+
+    it('parses usage, including prompt_tokens_details.cached_tokens (OpenAI\'s automatic caching)', async () => {
+      installFetch({
+        model: 'gpt-4o-mini',
+        choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 800, completion_tokens: 25, prompt_tokens_details: { cached_tokens: 512 } },
+      })
+      const out = await openaiAdapter.chat({ model: 'm', messages: SAMPLE }, { apiKey: 'k' })
+      expect(out.usage).toEqual({ inputTokens: 800, outputTokens: 25, cachedInputTokens: 512 })
+    })
   })
 
   describe('Claude — real tool-calling', () => {
@@ -218,12 +240,50 @@ describe('AI providers', () => {
       expect(headers['x-api-key']).toBe('k-claude')
       expect(headers['anthropic-version']).toBe('2023-06-01')
       expect(headers['anthropic-dangerous-direct-browser-access']).toBe('true')
-      expect(calls[0].bodyParsed.system).toBe('sys-1')
+      expect(calls[0].bodyParsed.system).toEqual([{ type: 'text', text: 'sys-1' }])
       expect(calls[0].bodyParsed.messages).toEqual([{ role: 'user', content: 'hello' }])
       expect(calls[0].bodyParsed.tools).toEqual([
         { name: 'add_node', description: 'Add a node', input_schema: { type: 'object', properties: {} } },
       ])
       expect(calls[0].bodyParsed.temperature).toBeUndefined()
+    })
+
+    it('attaches cache_control only to a message flagged cacheBreakpoint, as one block among plain ones', async () => {
+      const { calls } = installFetch({ model: 'claude-haiku-4-5', content: [{ type: 'text', text: 'hi' }], stop_reason: 'end_turn' })
+      await claudeAdapter.chat(
+        {
+          model: 'claude-haiku-4-5',
+          messages: [
+            { role: 'system', content: 'prompt' },
+            { role: 'system', content: 'metamodel', cacheBreakpoint: true },
+            { role: 'system', content: 'live diagram state' },
+            { role: 'user', content: 'hello' },
+          ],
+        },
+        { apiKey: 'k-claude' },
+      )
+      expect(calls[0].bodyParsed.system).toEqual([
+        { type: 'text', text: 'prompt' },
+        { type: 'text', text: 'metamodel', cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: 'live diagram state' },
+      ])
+    })
+
+    it('parses usage, including cache_read_input_tokens when present', async () => {
+      installFetch({
+        model: 'claude-haiku-4-5',
+        content: [{ type: 'text', text: 'hi' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 500, output_tokens: 40, cache_read_input_tokens: 300 },
+      })
+      const out = await claudeAdapter.chat({ model: 'm', messages: SAMPLE }, { apiKey: 'k' })
+      expect(out.usage).toEqual({ inputTokens: 500, outputTokens: 40, cachedInputTokens: 300 })
+    })
+
+    it('omits usage entirely when the response has none', async () => {
+      installFetch({ model: 'claude-haiku-4-5', content: [{ type: 'text', text: 'hi' }], stop_reason: 'end_turn' })
+      const out = await claudeAdapter.chat({ model: 'm', messages: SAMPLE }, { apiKey: 'k' })
+      expect(out.usage).toBeUndefined()
     })
 
     it('maps tool_use response blocks to generic tool_call blocks with stopReason "tool_calls"', async () => {
@@ -340,6 +400,15 @@ describe('AI providers', () => {
         { role: 'model', parts: [{ functionCall: { name: 'add_node', args: { label: 'X' } } }] },
         { role: 'user', parts: [{ functionResponse: { name: 'add_node', response: { result: 'Created node n1.' } } }] },
       ])
+    })
+
+    it('parses usage from usageMetadata, including cachedContentTokenCount', async () => {
+      installFetch({
+        candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }],
+        usageMetadata: { promptTokenCount: 640, candidatesTokenCount: 30, cachedContentTokenCount: 200 },
+      })
+      const out = await geminiAdapter.chat({ model: 'm', messages: SAMPLE }, { apiKey: 'g' })
+      expect(out.usage).toEqual({ inputTokens: 640, outputTokens: 30, cachedInputTokens: 200 })
     })
   })
 })

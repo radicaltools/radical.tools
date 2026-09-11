@@ -17,7 +17,7 @@ import {
   HUB_MATCHES_QUESTION_ID,
   type ClarifyStageQuestion,
 } from '../ai/forgeClarify'
-import type { AISettings, ChatMessage } from '../ai/types'
+import { addTokenUsage, type AISettings, type ChatMessage, type TokenUsage } from '../ai/types'
 import type { ApplyReport } from '../ai/diagramFacade'
 
 type ClarifyStatus = 'asking' | 'form' | 'done'
@@ -32,6 +32,12 @@ interface ProgressEntry {
 interface StageProgress {
   round: number
   entries: ProgressEntry[]
+  usage?: TokenUsage
+}
+/** Compact "3.2K" style formatting — token counts get large fast across a
+ *  multi-stage Forge run, and nobody needs the exact digit. */
+function formatTokenCount(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n)
 }
 /** Caps the live feed so a long run doesn't grow the DOM unbounded — only
  *  the tail is ever shown anyway. */
@@ -121,6 +127,9 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const [clarifyQuestionsByStage, setClarifyQuestionsByStage] = useState<Partial<Record<ForgeStageId, ClarifyStageQuestion[]>>>({})
   const [clarifyAnswersByStage, setClarifyAnswersByStage] = useState<Partial<Record<ForgeStageId, ClarifyAnswers>>>({})
   const [progressByStage, setProgressByStage] = useState<Partial<Record<ForgeStageId, StageProgress>>>({})
+  /** Running total across every stage generated so far this wizard session —
+   *  undefined until the first stage with usage data completes. */
+  const [sessionUsage, setSessionUsage] = useState<TokenUsage | undefined>(undefined)
   const progressIdRef = useRef(0)
   const progressListRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -153,6 +162,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setClarifyQuestionsByStage({})
     setClarifyAnswersByStage({})
     setProgressByStage({})
+    setSessionUsage(undefined)
     clarifyStartedRef.current = new Set()
   }, [open])
 
@@ -249,7 +259,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       .filter(Boolean)
       .join('\n\n')
     askClarifyingQuestions(stage.title, description, hubMatchesByStage[currentStageId], aiSettings, undefined, priorQA)
-      .then((questions) => {
+      .then(({ questions, usage }) => {
         setClarifyQuestionsByStage((q) => ({ ...q, [currentStageId]: questions }))
         // multiSelect questions (in practice, just hub_matches) default to
         // "everything selected" — unless the user deselects something,
@@ -260,6 +270,13 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         }
         setClarifyAnswersByStage((a) => ({ ...a, [currentStageId]: defaults }))
         setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: questions.length ? 'form' : 'done' }))
+        // The clarify call is real spend too, even though it never touches
+        // the diagram — count it in both the per-stage and session totals
+        // just like a generation round.
+        if (usage) {
+          setProgressByStage((p) => ({ ...p, [currentStageId]: { ...(p[currentStageId] ?? { round: 0, entries: [] }), usage: addTokenUsage(p[currentStageId]?.usage, usage) } }))
+          setSessionUsage((u) => addTokenUsage(u, usage))
+        }
       })
       .catch(() => {
         // A failed clarify call shouldn't block generation — just skip
@@ -308,6 +325,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       setProgressByStage((p) => {
         const cur = p[stageId] ?? { round: 0, entries: [] }
         if (event.type === 'round') return { ...p, [stageId]: { ...cur, round: event.round } }
+        if (event.type === 'usage') return { ...p, [stageId]: { ...cur, usage: event.usage } }
         const id = progressIdRef.current++
         const entry: ProgressEntry = event.type === 'text'
           ? { id, kind: 'text', text: event.text }
@@ -333,6 +351,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       setHistory((h) => [...h, ...result.history])
       setStageReports((r) => ({ ...r, [stageId]: result.report }))
       setStageSummaries((s) => ({ ...s, [stageId]: result.summary || 'Done.' }))
+      if (result.usage) {
+        setProgressByStage((p) => ({ ...p, [stageId]: { ...(p[stageId] ?? { round: 0, entries: [] }), usage: result.usage } }))
+        setSessionUsage((u) => addTokenUsage(u, result.usage))
+      }
     } catch (err) {
       setError((err as Error).message || String(err))
     } finally {
@@ -408,6 +430,14 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
             </svg>
           </span>
           <h3 className="milestone-modal-title" style={{ margin: 0 }}>Radical Forge</h3>
+          {sessionUsage && (
+            <span
+              className="forge-session-usage"
+              title={`${sessionUsage.inputTokens.toLocaleString()} input + ${sessionUsage.outputTokens.toLocaleString()} output tokens this session${sessionUsage.cachedInputTokens ? ` (${sessionUsage.cachedInputTokens.toLocaleString()} served from cache)` : ''}`}
+            >
+              {formatTokenCount(sessionUsage.inputTokens + sessionUsage.outputTokens)} tokens
+            </span>
+          )}
         </div>
         <p className="milestone-modal-text" style={{ marginBottom: 10 }}>
           Turn a free-text system description into requirements, a C4 model, fitness
@@ -572,6 +602,11 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                       <span className="forge-progress-round">Round {prog.round || 1}</span>
                       {createdCount > 0 && <span className="forge-progress-stat">+{createdCount}</span>}
                       {failedCount > 0 && <span className="forge-progress-stat forge-progress-stat-error">{failedCount} failed</span>}
+                      {prog.usage && (
+                        <span className="forge-progress-stat forge-progress-stat-usage">
+                          {formatTokenCount(prog.usage.inputTokens + prog.usage.outputTokens)} tok
+                        </span>
+                      )}
                       <span className="forge-progress-spacer" />
                       <button type="button" className="forge-btn forge-btn-ghost forge-btn-sm" onClick={cancelStage}>Cancel</button>
                     </div>
@@ -600,6 +635,18 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                 <div className="forge-stage-result">
                   <div className="qs-ai-text">{stageSummaries[currentStage.id]}</div>
                   <AIReportLine report={stageReports[currentStage.id]!} />
+                  {progressByStage[currentStage.id]?.usage && (() => {
+                    const u = progressByStage[currentStage.id]!.usage!
+                    const cachedPct = u.cachedInputTokens && u.inputTokens
+                      ? Math.round((u.cachedInputTokens / u.inputTokens) * 100)
+                      : null
+                    return (
+                      <div className="forge-usage-line">
+                        {formatTokenCount(u.inputTokens)} in · {formatTokenCount(u.outputTokens)} out
+                        {cachedPct !== null && cachedPct > 0 && ` · ${cachedPct}% cached`}
+                      </div>
+                    )
+                  })()}
                   <button
                     type="button"
                     className="forge-btn forge-btn-secondary forge-btn-sm"

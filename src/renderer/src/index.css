@@ -3776,6 +3776,17 @@ body {
   color: #9b5de5;
   flex-shrink: 0;
 }
+.forge-session-usage {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-toolbar, rgba(255,255,255,0.05));
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: default;
+}
 @keyframes forge-panel-in {
   from { transform: translate(-50%, -10px) scale(0.98); opacity: 0; }
   to   { transform: translate(-50%, 0) scale(1); opacity: 1; }
@@ -4065,6 +4076,15 @@ body {
 .forge-progress-stat-error {
   background: color-mix(in srgb, #ff6b6b 18%, transparent);
   color: #ff6b6b;
+}
+.forge-progress-stat-usage {
+  background: color-mix(in srgb, #9b5de5 16%, transparent);
+  color: #9b5de5;
+}
+.forge-usage-line {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 .forge-progress-spacer { flex: 1; }
 .forge-progress-list {

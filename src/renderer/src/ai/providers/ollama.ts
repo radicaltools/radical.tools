@@ -13,7 +13,7 @@
 // pseudo-tool-call text in `content` instead of populating `tool_calls` —
 // documented limitation, not a bug to chase here.
 
-import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig } from '../types'
+import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '../types'
 
 const DEFAULT_BASE = 'http://localhost:11434'
 
@@ -73,6 +73,13 @@ function fromOllamaMessage(message: { content?: string; tool_calls?: OllamaToolC
   return out
 }
 
+// No "usage" object like the cloud providers — counts are two top-level
+// fields, and there's no cache concept for a locally-run model.
+function parseUsage(promptEvalCount: number | undefined, evalCount: number | undefined): TokenUsage | undefined {
+  if (promptEvalCount === undefined && evalCount === undefined) return undefined
+  return { inputTokens: promptEvalCount ?? 0, outputTokens: evalCount ?? 0 }
+}
+
 async function ollamaChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatResponse> {
   const base = (cfg.baseUrl || DEFAULT_BASE).replace(/\/+$/, '')
   const url = `${base}/api/chat`
@@ -124,6 +131,8 @@ async function ollamaChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
     message?: { content?: string; tool_calls?: OllamaToolCall[] }
     model?: string
     done_reason?: string
+    prompt_eval_count?: number
+    eval_count?: number
   }
   const content = data?.message ? fromOllamaMessage(data.message) : []
   const hasToolCalls = content.some((b) => b.type === 'tool_call')
@@ -131,6 +140,7 @@ async function ollamaChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
     content,
     model: data?.model,
     stopReason: hasToolCalls ? 'tool_calls' : (data?.done_reason === 'length' ? 'max_tokens' : 'end_turn'),
+    usage: parseUsage(data?.prompt_eval_count, data?.eval_count),
   }
 }
 

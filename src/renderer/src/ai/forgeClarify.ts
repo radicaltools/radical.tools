@@ -11,7 +11,7 @@
 // button: getAdapter(id).chat({...}, cfg) then textOf(res.content).
 
 import { getAdapter } from './registry'
-import { textOf, type AISettings } from './types'
+import { textOf, type AISettings, type TokenUsage } from './types'
 import type { HubConceptSummary } from '../store/hubStore'
 
 export interface ClarifyStageQuestion {
@@ -135,6 +135,14 @@ export function formatClarificationAnswers(
   return lines.join('\n\n')
 }
 
+export interface ClarifyResult {
+  questions: ClarifyStageQuestion[]
+  /** From this call alone — the caller sums it into whatever running total
+   *  it's tracking (the clarify call is real token spend too, same as any
+   *  generation round; it just doesn't touch the diagram). */
+  usage?: TokenUsage
+}
+
 /** Fires the clarify call and returns parsed questions (never throws for a
  *  malformed model response — only for a genuine network/auth failure,
  *  which the caller surfaces the same way a generation failure would). */
@@ -145,7 +153,7 @@ export async function askClarifyingQuestions(
   settings: AISettings,
   signal?: AbortSignal,
   priorQA?: string,
-): Promise<ClarifyStageQuestion[]> {
+): Promise<ClarifyResult> {
   const adapter = getAdapter(settings.active)
   const cfg = settings.providers[settings.active]
   const model = cfg.model || adapter.defaultModel
@@ -156,5 +164,5 @@ export async function askClarifyingQuestions(
     temperature: 0.3,
     signal,
   }, cfg)
-  return parseClarifyResponse(textOf(res.content))
+  return { questions: parseClarifyResponse(textOf(res.content)), usage: res.usage }
 }

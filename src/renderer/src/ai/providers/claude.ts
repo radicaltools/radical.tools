@@ -8,7 +8,7 @@
 // inside a `user`-role message, no separate 'tool' role. Every other
 // provider's adapter expands/repacks from this shape.
 
-import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig } from '../types'
+import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '../types'
 
 const DEFAULT_BASE = 'https://api.anthropic.com/v1'
 const ANTHROPIC_VERSION = '2023-06-01'
@@ -44,14 +44,46 @@ function fromAnthropicContent(blocks: AnthropicBlock[]): ChatContentBlock[] {
   return out
 }
 
-function splitSystem(messages: ChatMessage[]): { system: string; rest: ChatMessage[] } {
-  const systems: string[] = []
+interface AnthropicSystemBlock {
+  type: 'text'
+  text: string
+  cache_control?: { type: 'ephemeral' }
+}
+
+/** Pulls every `system`-role message out into Anthropic's separate `system`
+ *  field, as an array of blocks (not one joined string) so a message flagged
+ *  `cacheBreakpoint` can carry its own `cache_control` — everything up to and
+ *  including that block is then reusable cache across rounds/stages that
+ *  share the identical prefix (see ai/systemPrompt.ts for which block that
+ *  is and why). A `system` array with no cache_control block behaves exactly
+ *  like the plain string this replaced — this is a superset, not a behavior
+ *  change for callers that don't set the flag. */
+function splitSystem(messages: ChatMessage[]): { system: AnthropicSystemBlock[]; rest: ChatMessage[] } {
+  const system: AnthropicSystemBlock[] = []
   const rest: ChatMessage[] = []
   for (const m of messages) {
-    if (m.role === 'system') systems.push(typeof m.content === 'string' ? m.content : '')
-    else rest.push(m)
+    if (m.role === 'system') {
+      const text = typeof m.content === 'string' ? m.content : ''
+      if (!text) continue
+      system.push({
+        type: 'text',
+        text,
+        ...(m.cacheBreakpoint ? { cache_control: { type: 'ephemeral' } } : {}),
+      })
+    } else {
+      rest.push(m)
+    }
   }
-  return { system: systems.join('\n\n'), rest }
+  return { system, rest }
+}
+
+function parseUsage(usage: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } | undefined): TokenUsage | undefined {
+  if (!usage) return undefined
+  return {
+    inputTokens: usage.input_tokens ?? 0,
+    outputTokens: usage.output_tokens ?? 0,
+    ...(usage.cache_read_input_tokens !== undefined ? { cachedInputTokens: usage.cache_read_input_tokens } : {}),
+  }
 }
 
 function toStopReason(stopReason: unknown): ChatResponse['stopReason'] {
@@ -71,7 +103,7 @@ async function claudeChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
     max_tokens: req.maxTokens ?? 2048,
     messages: rest.map((m) => ({ role: m.role, content: toAnthropicContent(m.content) })),
   }
-  if (system) body.system = system
+  if (system.length) body.system = system
   if (req.tools?.length) {
     body.tools = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }))
   }
@@ -99,11 +131,13 @@ async function claudeChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
     model?: string
     content?: AnthropicBlock[]
     stop_reason?: string
+    usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number }
   }
   return {
     content: fromAnthropicContent(data?.content ?? []),
     model: data?.model,
     stopReason: toStopReason(data?.stop_reason),
+    usage: parseUsage(data?.usage),
   }
 }
 
