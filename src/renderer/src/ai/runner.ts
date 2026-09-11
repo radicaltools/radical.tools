@@ -52,14 +52,18 @@ export interface RunAIOptions {
   relevantTypeIds?: Set<string>
 }
 
-/** Prepends a fresh text block to a turn's content ahead of sending it —
- *  used to carry the live diagram-state snapshot on the current round's new
+/** Appends a fresh text block to a turn's content ahead of sending it — used
+ *  to carry the live diagram-state snapshot on the current round's new
  *  content (the initial prompt on round 1, the tool-results message on
  *  round 2+) instead of a separate system message that would change every
- *  round and break the cacheable prefix in front of it (see below). */
-function withLeadingText(content: string | ChatContentBlock[], text: string): ChatContentBlock[] {
+ *  round and break the cacheable prefix in front of it (see below). Must be
+ *  APPENDED, not prepended: Anthropic requires `tool_result` blocks to be
+ *  the first content in the user turn immediately following the `tool_use`
+ *  they answer — a leading block ahead of them gets rejected with "tool_use
+ *  ids were found without tool_result blocks immediately after". */
+function withTrailingText(content: string | ChatContentBlock[], text: string): ChatContentBlock[] {
   const blocks: ChatContentBlock[] = typeof content === 'string' ? [{ type: 'text', text: content }] : content
-  return [{ type: 'text', text }, ...blocks]
+  return [...blocks, { type: 'text', text }]
 }
 
 /** One human-readable line for a tool call — resolves tempIds/labels through
@@ -153,7 +157,7 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
     const systemMessages = buildSystemMessages(metamodel, diagram.getNodes(), relevantTypeIds)
 
     // Re-read live state every round so the model sees whatever the previous
-    // round's tool calls just changed — attached as a leading text block on
+    // round's tool calls just changed — attached as a trailing text block on
     // THIS round's new turn (rather than a separate, ever-changing system
     // message) so everything before it stays a stable, appendable prefix.
     // This bakes a (soon stale) snapshot permanently into `turns[last]`,
@@ -167,7 +171,7 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
       diagram.getViews?.(),
     )
     const current = turns[turns.length - 1]
-    current.content = withLeadingText(current.content, contextText)
+    current.content = withTrailingText(current.content, contextText)
 
     if (round > 1) {
       // Clear the previous marker (else it'd accumulate past the 4-block
