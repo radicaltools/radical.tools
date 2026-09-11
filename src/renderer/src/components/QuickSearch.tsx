@@ -7,7 +7,7 @@ import { getAdapter, listAdapters } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
 import { AIReportLine } from './AIReportLine'
 import { openAISettings } from './AISettingsModal'
-import type { AISettings, ChatMessage } from '../ai/types'
+import type { AISettings, ChatMessage, TokenUsage } from '../ai/types'
 import type { ApplyReport } from '../ai/diagramFacade'
 
 /**
@@ -44,7 +44,7 @@ export function QuickSearch(): React.ReactElement | null {
   const [aiSettings, setAiSettings] = useState<AISettings>(() => loadAISettings())
   const [aiBusy, setAiBusy] = useState(false)
   const [aiHistory, setAiHistory] = useState<ChatMessage[]>([])
-  const [aiLast, setAiLast] = useState<{ text: string; report?: ApplyReport; error?: string; iterations?: number } | null>(null)
+  const [aiLast, setAiLast] = useState<{ text: string; report?: ApplyReport; error?: string; iterations?: number; usage?: TokenUsage } | null>(null)
   const aiAbortRef = useRef<AbortController | null>(null)
 
   // Keep AI settings fresh when the user updates them in the modal.
@@ -112,7 +112,7 @@ export function QuickSearch(): React.ReactElement | null {
         signal: ctl.signal,
       })
       setAiHistory((h) => [...h, ...result.history])
-      setAiLast({ text: result.summary || 'Done.', report: result.report, iterations: result.iterations })
+      setAiLast({ text: result.summary || 'Done.', report: result.report, iterations: result.iterations, usage: result.usage })
       // Clear the input after a successful run so the next prompt starts fresh.
       setQ('')
       // If the AI issued a focus_node op, animate the camera to that node.
@@ -591,7 +591,7 @@ export function QuickSearch(): React.ReactElement | null {
                 <div className="qs-ai-text">
                   <span style={{ whiteSpace: 'pre-line' }}>{aiLast.text}</span>
                   {aiLast.report && <AIReportLine report={aiLast.report} />}
-                  {(aiLast.iterations || aiHistory.length > 0) && (
+                  {(aiLast.iterations || aiHistory.length > 0 || aiLast.usage) && (
                     <div className="qs-ai-meta">
                       {aiLast.iterations ? (
                         <span className="qs-ai-meta-pill">
@@ -601,6 +601,14 @@ export function QuickSearch(): React.ReactElement | null {
                       {aiHistory.length > 0 && (
                         <span className="qs-ai-meta-pill">
                           {aiHistory.length} message{aiHistory.length === 1 ? '' : 's'} in context
+                        </span>
+                      )}
+                      {aiLast.usage && (
+                        <span
+                          className="qs-ai-meta-pill"
+                          title={`${aiLast.usage.inputTokens.toLocaleString()} input + ${aiLast.usage.outputTokens.toLocaleString()} output tokens${aiLast.usage.cachedInputTokens ? ` (${aiLast.usage.cachedInputTokens.toLocaleString()} served from cache)` : ''}`}
+                        >
+                          {aiLast.usage.inputTokens + aiLast.usage.outputTokens} tokens
                         </span>
                       )}
                     </div>

@@ -125,7 +125,12 @@ export function buildContextMessage(
 
 /** The system-role messages for one round — rebuilt fresh every round so the
  *  model always sees the latest state (including whatever its own previous
- *  tool calls this run just changed). */
+ *  tool calls this run just changed). The first two blocks (prompt +
+ *  metamodel) are byte-identical for the whole life of an open document —
+ *  the metamodel message carries `cacheBreakpoint: true` so a
+ *  caching-capable provider (see providers/claude.ts) can reuse that prefix
+ *  across every round instead of reprocessing it from scratch. The diagram
+ *  state message is deliberately left unmarked — it changes every round. */
 export function buildSystemMessages(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
@@ -135,7 +140,7 @@ export function buildSystemMessages(
 ): ChatMessage[] {
   return [
     { role: 'system', content: AI_SYSTEM_PROMPT },
-    { role: 'system', content: buildMetamodelMessage(metamodel) },
+    { role: 'system', content: buildMetamodelMessage(metamodel), cacheBreakpoint: true },
     { role: 'system', content: buildContextMessage(nodes, relations, activeView, views) },
   ]
 }

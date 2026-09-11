@@ -4,7 +4,7 @@
 // exists too, but Chat Completions remains supported and is what this app
 // already targets).
 
-import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig } from '../types'
+import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '../types'
 
 const DEFAULT_BASE = 'https://api.openai.com/v1'
 
@@ -70,6 +70,17 @@ function fromOpenAIMessage(message: { content?: string | null; tool_calls?: OATo
   return out
 }
 
+function parseUsage(usage: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } | undefined): TokenUsage | undefined {
+  if (!usage) return undefined
+  return {
+    inputTokens: usage.prompt_tokens ?? 0,
+    outputTokens: usage.completion_tokens ?? 0,
+    // OpenAI caches automatically (no code needed to enable it) for prompts
+    // sharing an identical >=1024-token prefix with a recent request.
+    ...(usage.prompt_tokens_details?.cached_tokens !== undefined ? { cachedInputTokens: usage.prompt_tokens_details.cached_tokens } : {}),
+  }
+}
+
 function toStopReason(finishReason: unknown): ChatResponse['stopReason'] {
   if (finishReason === 'tool_calls') return 'tool_calls'
   if (finishReason === 'stop') return 'end_turn'
@@ -110,12 +121,14 @@ async function openaiChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
   const data = await res.json() as {
     model?: string
     choices?: Array<{ message?: { content?: string | null; tool_calls?: OAToolCall[] }; finish_reason?: string }>
+    usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } }
   }
   const choice = data?.choices?.[0]
   return {
     content: choice?.message ? fromOpenAIMessage(choice.message) : [],
     model: data?.model,
     stopReason: toStopReason(choice?.finish_reason),
+    usage: parseUsage(data?.usage),
   }
 }
 

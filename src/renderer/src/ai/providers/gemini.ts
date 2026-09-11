@@ -14,7 +14,7 @@
 // calls route by name only, so if Gemini itself doesn't guarantee ordering
 // there's no way to tell two such results apart on this end either.
 
-import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig } from '../types'
+import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '../types'
 
 const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
@@ -76,6 +76,15 @@ function fromGeminiParts(parts: GeminiPart[]): ChatContentBlock[] {
   return out
 }
 
+function parseUsage(usage: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number } | undefined): TokenUsage | undefined {
+  if (!usage) return undefined
+  return {
+    inputTokens: usage.promptTokenCount ?? 0,
+    outputTokens: usage.candidatesTokenCount ?? 0,
+    ...(usage.cachedContentTokenCount !== undefined ? { cachedInputTokens: usage.cachedContentTokenCount } : {}),
+  }
+}
+
 // The presence of functionCall parts is a more reliable "the model wants to
 // call a tool" signal than Gemini's finishReason (whose exact tool-calling
 // value isn't consistently documented) — this app's runner only branches on
@@ -119,6 +128,7 @@ async function geminiChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
   const data = await res.json() as {
     candidates?: Array<{ content?: { parts?: GeminiPart[] }; finishReason?: string }>
     modelVersion?: string
+    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number }
   }
   const parts = data?.candidates?.[0]?.content?.parts ?? []
   const content = fromGeminiParts(parts)
@@ -127,6 +137,7 @@ async function geminiChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
     content,
     model: data?.modelVersion,
     stopReason: toStopReason(data?.candidates?.[0]?.finishReason, hasToolCalls),
+    usage: parseUsage(data?.usageMetadata),
   }
 }
 

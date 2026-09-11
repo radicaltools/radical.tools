@@ -19,6 +19,13 @@ export interface ChatMessage {
   /** A bare string is sugar for a single text block. Only an assistant turn
    *  that made tool calls, and the turn reporting their results, use blocks. */
   content: string | ChatContentBlock[]
+  /** Hint, not a requirement: "cache everything up to and including this
+   *  message" — only providers that support prompt caching (currently just
+   *  Anthropic, see providers/claude.ts) read this; everyone else ignores it.
+   *  Set on messages that are byte-identical across every round/stage of a
+   *  run (e.g. the metamodel message in systemPrompt.ts), never on ones that
+   *  change every round (e.g. the live diagram-state message). */
+  cacheBreakpoint?: boolean
 }
 
 export interface ToolDef {
@@ -43,6 +50,16 @@ export interface ChatRequest {
   signal?: AbortSignal
 }
 
+/** Token usage for one chat call. `cachedInputTokens` is present only when
+ *  the provider reports a cache hit on part of the input (currently just
+ *  Anthropic's `cache_read_input_tokens` / OpenAI's automatic
+ *  `prompt_tokens_details.cached_tokens` — Gemini and Ollama never set it). */
+export interface TokenUsage {
+  inputTokens: number
+  outputTokens: number
+  cachedInputTokens?: number
+}
+
 export interface ChatResponse {
   /** Ordered blocks the assistant produced, in emission order. Push this
    *  straight back as the next assistant ChatMessage.content — providers
@@ -51,6 +68,24 @@ export interface ChatResponse {
   /** Provider-reported model name (if available). */
   model?: string
   stopReason: 'tool_calls' | 'end_turn' | 'max_tokens' | 'other'
+  /** Absent only if the provider's response genuinely omitted usage data. */
+  usage?: TokenUsage
+}
+
+/** Adds two usages together (missing `cachedInputTokens` treated as 0, but
+ *  the result only carries the field if at least one side had it — keeps
+ *  "never reported by this provider" distinguishable from "reported as 0"). */
+export function addTokenUsage(a: TokenUsage | undefined, b: TokenUsage | undefined): TokenUsage | undefined {
+  if (!a) return b
+  if (!b) return a
+  const cached = (a.cachedInputTokens ?? undefined) !== undefined || (b.cachedInputTokens ?? undefined) !== undefined
+    ? (a.cachedInputTokens ?? 0) + (b.cachedInputTokens ?? 0)
+    : undefined
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    ...(cached !== undefined ? { cachedInputTokens: cached } : {}),
+  }
 }
 
 export function textOf(content: ChatContentBlock[]): string {

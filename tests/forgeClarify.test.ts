@@ -3,7 +3,7 @@
  * tolerate real model output (markdown fences, stray prose, a model that
  * ignores the format) without ever throwing or blocking the wizard.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { parseClarifyResponse, formatClarificationAnswers, HUB_MATCHES_QUESTION_ID, buildClarifyPrompt } from '../src/renderer/src/ai/forgeClarify'
 
 describe('parseClarifyResponse', () => {
@@ -89,5 +89,31 @@ describe('formatClarificationAnswers', () => {
     expect(formatClarificationAnswers(undefined, {})).toBe('')
     expect(formatClarificationAnswers([], {})).toBe('')
     expect(formatClarificationAnswers([{ id: 'a', question: 'Q?', kind: 'text' }], undefined)).toBe('')
+  })
+})
+
+describe('askClarifyingQuestions', () => {
+  it('returns both the parsed questions and the usage from the underlying chat call — this is real spend even though it never touches the diagram', async () => {
+    vi.resetModules()
+    vi.doMock('../src/renderer/src/ai/registry', () => ({
+      getAdapter: () => ({
+        id: 'anthropic',
+        label: 'Claude',
+        defaultModel: 'claude-x',
+        chat: vi.fn(async () => ({
+          content: [{ type: 'text', text: '[{"id":"auth","question":"Which auth?","kind":"text"}]' }],
+          stopReason: 'end_turn',
+          usage: { inputTokens: 300, outputTokens: 20 },
+        })),
+      }),
+    }))
+    const { askClarifyingQuestions } = await import('../src/renderer/src/ai/forgeClarify')
+    const settings = { enabled: true, active: 'anthropic', providers: { anthropic: { apiKey: 'x' }, ollama: {}, openai: {}, gemini: {} } } as any
+
+    const result = await askClarifyingQuestions('Requirements', 'desc', undefined, settings)
+
+    expect(result.questions).toEqual([{ id: 'auth', question: 'Which auth?', kind: 'text' }])
+    expect(result.usage).toEqual({ inputTokens: 300, outputTokens: 20 })
+    vi.doUnmock('../src/renderer/src/ai/registry')
   })
 })
