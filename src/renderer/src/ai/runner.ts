@@ -7,7 +7,7 @@
 
 import { emptyReport, mergeReport, type ApplyReport, type DiagramFacade } from './diagramFacade'
 import { getAdapter } from './registry'
-import { buildSystemMessages } from './systemPrompt'
+import { buildContextMessage, buildSystemMessages } from './systemPrompt'
 import { buildToolDefs, buildToolHandlers, type ToolRunContext } from './tools'
 import { addTokenUsage, textOf, toolCallsOf, type AISettings, type ChatContentBlock, type ChatMessage, type TokenUsage } from './types'
 
@@ -45,6 +45,21 @@ export interface RunAIOptions {
   /** Maximum tool-execution rounds before giving up. Default: 12. */
   maxIterations?: number
   onProgress?: (event: ForgeProgressEvent) => void
+  /** Scopes the metamodel context message to full detail for these type(s)
+   *  (plus whatever's already in the diagram) — see systemPrompt.ts's
+   *  `buildMetamodelMessage`. Radical Forge passes its active stage's
+   *  primary type(s); QuickSearch omits it for full detail always. */
+  relevantTypeIds?: Set<string>
+}
+
+/** Prepends a fresh text block to a turn's content ahead of sending it —
+ *  used to carry the live diagram-state snapshot on the current round's new
+ *  content (the initial prompt on round 1, the tool-results message on
+ *  round 2+) instead of a separate system message that would change every
+ *  round and break the cacheable prefix in front of it (see below). */
+function withLeadingText(content: string | ChatContentBlock[], text: string): ChatContentBlock[] {
+  const blocks: ChatContentBlock[] = typeof content === 'string' ? [{ type: 'text', text: content }] : content
+  return [{ type: 'text', text }, ...blocks]
 }
 
 /** One human-readable line for a tool call — resolves tempIds/labels through
@@ -76,7 +91,7 @@ function describeToolCall(name: string, input: unknown, ctx: ToolRunContext): st
 }
 
 export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
-  const { settings, prompt, diagram, history = [], signal, onProgress } = opts
+  const { settings, prompt, diagram, history = [], signal, onProgress, relevantTypeIds } = opts
   const maxIterations = opts.maxIterations ?? 12
   const cfg = settings.providers[settings.active]
   const adapter = getAdapter(settings.active)
@@ -116,6 +131,12 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
   let iterations = 0
   let round = 0
   let usage: TokenUsage | undefined
+  // Tracks which `turns` entry currently carries the rolling second cache
+  // breakpoint (the end of the previously-sent, now-stable prefix), so it
+  // can be moved forward each round instead of accumulating one breakpoint
+  // per round — Anthropic allows at most 4 cache_control blocks per
+  // request, and this run's system prefix already uses one.
+  let cacheMarkIdx = -1
 
   while (true) {
     if (signal?.aborted) throw new Error('Aborted')
@@ -127,15 +148,35 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
     round++
     onProgress?.({ type: 'round', round })
 
+    // The prompt + metamodel prefix is byte-identical every round (see
+    // systemPrompt.ts) so it stays cacheable across rounds AND stages.
+    const systemMessages = buildSystemMessages(metamodel, diagram.getNodes(), relevantTypeIds)
+
     // Re-read live state every round so the model sees whatever the previous
-    // round's tool calls just changed.
-    const systemMessages = buildSystemMessages(
+    // round's tool calls just changed — attached as a leading text block on
+    // THIS round's new turn (rather than a separate, ever-changing system
+    // message) so everything before it stays a stable, appendable prefix.
+    // This bakes a (soon stale) snapshot permanently into `turns[last]`,
+    // which is fine: it's just there to keep prefix bytes stable for
+    // caching, and every round appends its own fresh snapshot on its own
+    // new turn, so the model always has an up-to-date one at the tail.
+    const contextText = buildContextMessage(
       diagram.getNodes(),
       diagram.getRelations(),
-      metamodel,
       diagram.getActiveView?.() ?? null,
       diagram.getViews?.(),
     )
+    const current = turns[turns.length - 1]
+    current.content = withLeadingText(current.content, contextText)
+
+    if (round > 1) {
+      // Clear the previous marker (else it'd accumulate past the 4-block
+      // limit over a long run) and mark the newly-stable boundary — the
+      // entry right before this round's fresh content.
+      if (cacheMarkIdx >= 0) delete turns[cacheMarkIdx].cacheBreakpoint
+      cacheMarkIdx = turns.length - 2
+      turns[cacheMarkIdx].cacheBreakpoint = true
+    }
 
     const res = await adapter.chat(
       { model, messages: [...systemMessages, ...history, ...turns], tools, maxTokens: 8000, temperature: 0.2, signal },

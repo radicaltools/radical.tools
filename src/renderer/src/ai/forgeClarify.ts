@@ -156,9 +156,13 @@ export async function askClarifyingQuestions(
 ): Promise<ClarifyResult> {
   const adapter = getAdapter(settings.active)
   const cfg = settings.providers[settings.active]
-  const model = cfg.model || adapter.defaultModel
+  // Deliberately ignores cfg.model (the user's chosen *generation* model,
+  // which may be a pricier tier for quality) — clarify is a small, cheap,
+  // structured-output task, and every adapter's defaultModel is already
+  // that provider's fast/cheap tier (see providers/*.ts), so this always
+  // routes clarify there regardless of what generation is configured to use.
   const res = await adapter.chat({
-    model,
+    model: adapter.defaultModel,
     messages: [{ role: 'user', content: buildClarifyPrompt(stageTitle, description, hubMatches, priorQA) }],
     maxTokens: 700,
     temperature: 0.3,
