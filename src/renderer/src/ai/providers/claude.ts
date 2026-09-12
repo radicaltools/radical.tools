@@ -87,10 +87,26 @@ function splitSystem(messages: ChatMessage[]): { system: AnthropicSystemBlock[];
   return { system, rest }
 }
 
-function parseUsage(usage: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } | undefined): TokenUsage | undefined {
+/** Anthropic's `input_tokens` is deliberately ONLY the fresh, non-cached
+ *  portion of the prompt — a cache hit/write moves those tokens into
+ *  `cache_read_input_tokens`/`cache_creation_input_tokens` instead, so a
+ *  well-cached request can report `input_tokens: 21` even for a 10K-token
+ *  prompt. `TokenUsage.inputTokens` is meant to be the TOTAL (matching
+ *  OpenAI's `prompt_tokens`, which already includes its cached portion —
+ *  see providers/openai.ts) — folding all three in here is what makes the
+ *  displayed counter track real spend instead of silently undercounting
+ *  every cached request (i.e. nearly every request, once caching is on). */
+function parseUsage(usage: {
+  input_tokens?: number
+  output_tokens?: number
+  cache_read_input_tokens?: number
+  cache_creation_input_tokens?: number
+} | undefined): TokenUsage | undefined {
   if (!usage) return undefined
+  const cacheRead = usage.cache_read_input_tokens ?? 0
+  const cacheCreation = usage.cache_creation_input_tokens ?? 0
   return {
-    inputTokens: usage.input_tokens ?? 0,
+    inputTokens: (usage.input_tokens ?? 0) + cacheRead + cacheCreation,
     outputTokens: usage.output_tokens ?? 0,
     ...(usage.cache_read_input_tokens !== undefined ? { cachedInputTokens: usage.cache_read_input_tokens } : {}),
   }
@@ -141,7 +157,7 @@ async function claudeChat(req: ChatRequest, cfg: ProviderConfig): Promise<ChatRe
     model?: string
     content?: AnthropicBlock[]
     stop_reason?: string
-    usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number }
+    usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }
   }
   return {
     content: fromAnthropicContent(data?.content ?? []),

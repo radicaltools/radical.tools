@@ -491,12 +491,16 @@ describe('runAIPrompt — onProgress (live feed for Radical Forge)', () => {
       diagram: makeFacade(),
       onProgress: (e) => { if (e.type === 'usage') usageEvents.push(e) },
     })
-    // Running total after each round, not per-round deltas.
+    // Running total after each round, not per-round deltas. Anthropic's
+    // `input_tokens` is only the fresh, non-cached portion — the adapter
+    // folds `cache_read_input_tokens` into `inputTokens` too (see
+    // providers/claude.ts's `parseUsage`) so the total tracks real spend:
+    // round 1 is 1000 + 700 = 1700, round 2 is 1200 + 900 = 2100.
     expect(usageEvents).toEqual([
-      { type: 'usage', usage: { inputTokens: 1000, outputTokens: 50, cachedInputTokens: 700 } },
-      { type: 'usage', usage: { inputTokens: 2200, outputTokens: 70, cachedInputTokens: 1600 } },
+      { type: 'usage', usage: { inputTokens: 1700, outputTokens: 50, cachedInputTokens: 700 } },
+      { type: 'usage', usage: { inputTokens: 3800, outputTokens: 70, cachedInputTokens: 1600 } },
     ])
-    expect(result.usage).toEqual({ inputTokens: 2200, outputTokens: 70, cachedInputTokens: 1600 })
+    expect(result.usage).toEqual({ inputTokens: 3800, outputTokens: 70, cachedInputTokens: 1600 })
   })
 
   it('leaves result.usage undefined when the provider never reports usage', async () => {
