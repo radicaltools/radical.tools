@@ -563,8 +563,13 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                     </div>
                   ))}
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    {/* Deliberately NOT labeled "Continue" — that's the
+                        footer button's job (advancing to the next wizard
+                        step once this stage has generated). This one only
+                        confirms the answers above and reveals the Generate
+                        button for the current stage. */}
                     <button type="button" className="forge-btn forge-btn-primary" onClick={() => submitClarify(currentStage.id)}>
-                      Continue
+                      Confirm answers
                     </button>
                     <button type="button" className="forge-btn forge-btn-ghost" onClick={() => skipClarify(currentStage.id)}>
                       Skip

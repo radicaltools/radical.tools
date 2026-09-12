@@ -269,7 +269,7 @@ describe('AI providers', () => {
       ])
     })
 
-    it('parses usage, including cache_read_input_tokens when present', async () => {
+    it('folds cache_read_input_tokens into the total inputTokens (Anthropic reports it separately from input_tokens, unlike OpenAI\'s prompt_tokens which already includes its cached portion) while still surfacing it separately as cachedInputTokens for display', async () => {
       installFetch({
         model: 'claude-haiku-4-5',
         content: [{ type: 'text', text: 'hi' }],
@@ -277,7 +277,18 @@ describe('AI providers', () => {
         usage: { input_tokens: 500, output_tokens: 40, cache_read_input_tokens: 300 },
       })
       const out = await claudeAdapter.chat({ model: 'm', messages: SAMPLE }, { apiKey: 'k' })
-      expect(out.usage).toEqual({ inputTokens: 500, outputTokens: 40, cachedInputTokens: 300 })
+      expect(out.usage).toEqual({ inputTokens: 800, outputTokens: 40, cachedInputTokens: 300 })
+    })
+
+    it('also folds cache_creation_input_tokens (a cache WRITE, billed at a premium, happens on essentially every first request in a session) into inputTokens', async () => {
+      installFetch({
+        model: 'claude-haiku-4-5',
+        content: [{ type: 'text', text: 'hi' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 21, output_tokens: 40, cache_creation_input_tokens: 1500, cache_read_input_tokens: 0 },
+      })
+      const out = await claudeAdapter.chat({ model: 'm', messages: SAMPLE }, { apiKey: 'k' })
+      expect(out.usage).toEqual({ inputTokens: 1521, outputTokens: 40, cachedInputTokens: 0 })
     })
 
     it('omits usage entirely when the response has none', async () => {

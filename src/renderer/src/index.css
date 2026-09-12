@@ -3770,6 +3770,10 @@ body {
   align-items: center;
   gap: 8px;
   margin: 0 0 6px;
+  /* Reserves room for the absolutely-positioned .ai-settings-close button
+     (right: 10px, width: 28px) so a wide token count (e.g. "25.9K tokens")
+     doesn't run underneath it. */
+  padding-right: 32px;
 }
 .forge-title-icon {
   display: inline-flex;
