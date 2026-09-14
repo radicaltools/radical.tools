@@ -98,10 +98,14 @@ const _undoStack: HistoryEntry[] = []
 const _redoStack: HistoryEntry[] = []
 
 function _captureState(state: DiagramStore): HistoryEntry {
+  // No clone needed: the store is immer-managed, so `state.c4Nodes` etc. are
+  // never mutated in place — future edits produce new objects for the
+  // changed paths only, leaving this reference (and everything reachable
+  // from it) untouched. Retaining it is Immer's own documented undo pattern.
   return {
-    c4Nodes: JSON.parse(JSON.stringify(state.c4Nodes)),
-    c4Relations: JSON.parse(JSON.stringify(state.c4Relations)),
-    views: JSON.parse(JSON.stringify(state.views)),
+    c4Nodes: state.c4Nodes,
+    c4Relations: state.c4Relations,
+    views: state.views,
   }
 }
 
@@ -3209,13 +3213,15 @@ export const useDiagramStore = create<DiagramStore>()(
       // ── snapshots (versions) ────────────────────────────────────────────
       createSnapshot(name) {
         const id = uid()
+        // Reference the live model directly — safe under immer's copy-on-write
+        // (see _captureState). Avoids cloning the whole model per snapshot.
         const snap: DiagramSnapshot = {
           id,
           name,
           timestamp: Date.now(),
-          nodes: JSON.parse(JSON.stringify(get().c4Nodes)),
-          relations: JSON.parse(JSON.stringify(get().c4Relations)),
-          sequences: JSON.parse(JSON.stringify(get().sequences)),
+          nodes: get().c4Nodes,
+          relations: get().c4Relations,
+          sequences: get().sequences,
         }
         set((state) => { state.snapshots.push(snap as any) })
         return id
@@ -3226,10 +3232,10 @@ export const useDiagramStore = create<DiagramStore>()(
         if (!snap) return
         _pushUndo(get())
         set((state) => {
-          state.c4Nodes = JSON.parse(JSON.stringify(snap.nodes)) as any
-          state.c4Relations = JSON.parse(JSON.stringify(snap.relations)) as any
+          state.c4Nodes = snap.nodes as any
+          state.c4Relations = snap.relations as any
           if (snap.sequences) {
-            state.sequences = JSON.parse(JSON.stringify(snap.sequences)) as any
+            state.sequences = snap.sequences as any
           }
           state.canUndo = _undoStack.length > 0
           state.canRedo = _redoStack.length > 0
@@ -3240,15 +3246,16 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       removeSnapshot(id) {
+        const backup = get().liveBackup
         set((state) => {
           state.snapshots = state.snapshots.filter(s => s.id !== id) as any
           if (state.activeSnapshotId === id) {
             // If the active milestone is being deleted, restore live and clear flags.
-            if (state.liveBackup) {
-              state.c4Nodes = JSON.parse(JSON.stringify(state.liveBackup.nodes)) as any
-              state.c4Relations = JSON.parse(JSON.stringify(state.liveBackup.relations)) as any
-              if ((state.liveBackup as any).sequences) {
-                state.sequences = JSON.parse(JSON.stringify((state.liveBackup as any).sequences)) as any
+            if (backup) {
+              state.c4Nodes = backup.nodes as any
+              state.c4Relations = backup.relations as any
+              if ((backup as any).sequences) {
+                state.sequences = (backup as any).sequences as any
               }
             }
             state.activeSnapshotId = null
@@ -3290,7 +3297,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Backup live HEAD if we don't already have one.
         const backup = activeSnapshotId
           ? get().liveBackup
-          : { nodes: JSON.parse(JSON.stringify(c4Nodes)), relations: JSON.parse(JSON.stringify(c4Relations)), sequences: JSON.parse(JSON.stringify(sequences)) }
+          : { nodes: c4Nodes, relations: c4Relations, sequences }
 
         // In viewer (explore mode) keep the user's currently-arranged
         // positions for any node that still exists in the new milestone
@@ -3340,21 +3347,30 @@ export const useDiagramStore = create<DiagramStore>()(
           : { nodes: {}, relations: {} }
         _pushUndo(get())
         set((state) => {
-          const nextNodes = JSON.parse(JSON.stringify(snap.nodes)) as Record<string, C4Node>
+          // `snap.nodes` is shared (never mutated in place, see _captureState).
+          // When preserving layout, shallow-copy the map and only build a
+          // fresh object for the specific nodes getting a position override —
+          // everything else stays a shared reference with the snapshot.
+          let nextNodes: Record<string, C4Node>
           if (preserveLayout) {
-            for (const [nid, n] of Object.entries(nextNodes)) {
-              const live = livePosByLabel.get(nid)
-              if (live) {
-                n.x = live.x; n.y = live.y
-                n.width = live.width; n.height = live.height
-                if (live.collapsed !== undefined) n.collapsed = live.collapsed
+            nextNodes = { ...(snap.nodes as Record<string, C4Node>) }
+            for (const [nid, live] of livePosByLabel) {
+              const n = nextNodes[nid]
+              if (!n) continue
+              nextNodes[nid] = {
+                ...n,
+                x: live.x, y: live.y,
+                width: live.width, height: live.height,
+                ...(live.collapsed !== undefined ? { collapsed: live.collapsed } : {}),
               }
             }
+          } else {
+            nextNodes = snap.nodes as Record<string, C4Node>
           }
           state.c4Nodes = nextNodes as any
-          state.c4Relations = JSON.parse(JSON.stringify(snap.relations)) as any
+          state.c4Relations = snap.relations as any
           if (snap.sequences) {
-            state.sequences = JSON.parse(JSON.stringify(snap.sequences)) as any
+            state.sequences = snap.sequences as any
           }
           state.activeSnapshotId = id
           state.liveBackup = backup as any
@@ -3382,11 +3398,11 @@ export const useDiagramStore = create<DiagramStore>()(
       discardMilestoneChanges() {
         const { liveBackup } = get()
         set((state) => {
-          if (state.liveBackup) {
-            state.c4Nodes = JSON.parse(JSON.stringify(state.liveBackup.nodes)) as any
-            state.c4Relations = JSON.parse(JSON.stringify(state.liveBackup.relations)) as any
-            if ((state.liveBackup as any).sequences) {
-              state.sequences = JSON.parse(JSON.stringify((state.liveBackup as any).sequences)) as any
+          if (liveBackup) {
+            state.c4Nodes = liveBackup.nodes as any
+            state.c4Relations = liveBackup.relations as any
+            if ((liveBackup as any).sequences) {
+              state.sequences = (liveBackup as any).sequences as any
             }
           }
           state.activeSnapshotId = null
@@ -3400,7 +3416,6 @@ export const useDiagramStore = create<DiagramStore>()(
         })
         get()._sync()
         _liveLayout?.reset()
-        void liveBackup
       },
 
       commitMilestoneChanges(mode, newName) {
@@ -3409,10 +3424,12 @@ export const useDiagramStore = create<DiagramStore>()(
         const idx = snapshots.findIndex(s => s.id === activeSnapshotId)
         if (idx < 0) return
 
-        // Deep clones of the current (edited) canvas state.
-        const editedNodes: Record<string, C4Node> = JSON.parse(JSON.stringify(c4Nodes))
-        const editedRels: Record<string, C4Relation> = JSON.parse(JSON.stringify(c4Relations))
-        const editedSeqs: Record<string, DiagramSequence> = JSON.parse(JSON.stringify(sequences))
+        // Reference the current (edited) canvas state directly — read-only use
+        // below (diffing, or embedding whole into a snapshot); safe under
+        // immer's copy-on-write (see _captureState).
+        const editedNodes = c4Nodes as Record<string, C4Node>
+        const editedRels = c4Relations as Record<string, C4Relation>
+        const editedSeqs = sequences as Record<string, DiagramSequence>
         // Snapshot of the milestone BEFORE edits — used to compute the diff.
         const baseSnap = snapshots[idx]
         const baseNodes = baseSnap.nodes as Record<string, C4Node>
@@ -3528,9 +3545,9 @@ export const useDiagramStore = create<DiagramStore>()(
           for (let i = idx; i < state.snapshots.length; i++) {
             const snap = state.snapshots[i] as any
             if (i === idx) {
-              snap.nodes = JSON.parse(JSON.stringify(editedNodes))
-              snap.relations = JSON.parse(JSON.stringify(editedRels))
-              snap.sequences = JSON.parse(JSON.stringify(editedSeqs))
+              snap.nodes = editedNodes
+              snap.relations = editedRels
+              snap.sequences = editedSeqs
             } else {
               if (!snap.sequences) snap.sequences = {}
               applyDiff(snap.nodes, snap.relations, snap.sequences)
@@ -3664,10 +3681,10 @@ export const useDiagramStore = create<DiagramStore>()(
         const W = window as any
         if (prevMode === 'designer' && mode !== 'designer') {
           W.__preModeLayout = {
-            c4Nodes: JSON.parse(JSON.stringify(get().c4Nodes)),
-            c4Relations: JSON.parse(JSON.stringify(get().c4Relations)),
-            views: JSON.parse(JSON.stringify(get().views)),
-            defaultPositions: JSON.parse(JSON.stringify(get().defaultPositions)),
+            c4Nodes: get().c4Nodes,
+            c4Relations: get().c4Relations,
+            views: get().views,
+            defaultPositions: get().defaultPositions,
             activeViewId: get().activeViewId,
           }
         } else if (prevMode !== 'designer' && mode === 'designer' && W.__preModeLayout) {
@@ -3806,8 +3823,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // what was on screen at creation time, even if the user later edits
         // nodes/relations or switches the active milestone.
         const modelSnapshot = {
-          nodes: JSON.parse(JSON.stringify(get().c4Nodes)) as Record<string, C4Node>,
-          relations: JSON.parse(JSON.stringify(get().c4Relations)) as Record<string, C4Relation>,
+          nodes: get().c4Nodes as Record<string, C4Node>,
+          relations: get().c4Relations as Record<string, C4Relation>,
         }
         const id = uid()
         const slideName = name ?? `Slide ${presentationSlides.length + 1}`
@@ -3859,8 +3876,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // (goToSlide replaces c4Nodes/c4Relations from a slide snapshot,
         // so restoring just positions wouldn't be enough.)
         ;(window as any).__prePresState = {
-          c4Nodes: JSON.parse(JSON.stringify(get().c4Nodes)),
-          c4Relations: JSON.parse(JSON.stringify(get().c4Relations)),
+          c4Nodes: get().c4Nodes,
+          c4Relations: get().c4Relations,
           activeViewId: get().activeViewId,
         }
         set((state) => { state.presentationActive = true })
@@ -3915,20 +3932,22 @@ export const useDiagramStore = create<DiagramStore>()(
           | undefined
         if (inline) {
           set((state) => {
-            state.c4Nodes = JSON.parse(JSON.stringify(inline.nodes)) as any
-            state.c4Relations = JSON.parse(JSON.stringify(inline.relations)) as any
+            state.c4Nodes = inline.nodes as any
+            state.c4Relations = inline.relations as any
           })
         } else if (slide.snapshotId) {
           const snap = get().snapshots.find(s => s.id === slide.snapshotId)
           if (snap) {
             set((state) => {
-              state.c4Nodes = JSON.parse(JSON.stringify(snap.nodes)) as any
-              state.c4Relations = JSON.parse(JSON.stringify(snap.relations)) as any
+              state.c4Nodes = snap.nodes as any
+              state.c4Relations = snap.relations as any
             })
           }
         }
 
-        // Apply saved canvas state (positions + collapsed) — overrides snapshot positions
+        // Apply saved canvas state (positions + collapsed) — overrides snapshot positions.
+        // Mutates via the `state.c4Nodes[id]` draft, so it copy-on-writes only
+        // the touched nodes and leaves the shared snapshot/slide data intact.
         if (slide.canvasState) {
           set((state) => {
             for (const [id, ns] of Object.entries(slide.canvasState!.nodes)) {
@@ -4012,15 +4031,15 @@ export const useDiagramStore = create<DiagramStore>()(
           | undefined
         if (inline) {
           set((state) => {
-            state.c4Nodes = JSON.parse(JSON.stringify(inline.nodes)) as any
-            state.c4Relations = JSON.parse(JSON.stringify(inline.relations)) as any
+            state.c4Nodes = inline.nodes as any
+            state.c4Relations = inline.relations as any
           })
         } else if (slide.snapshotId) {
           const snap = get().snapshots.find(s => s.id === slide.snapshotId)
           if (snap) {
             set((state) => {
-              state.c4Nodes = JSON.parse(JSON.stringify(snap.nodes)) as any
-              state.c4Relations = JSON.parse(JSON.stringify(snap.relations)) as any
+              state.c4Nodes = snap.nodes as any
+              state.c4Relations = snap.relations as any
             })
           }
         }
@@ -4079,8 +4098,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // Re-capture the full inline model snapshot too — "Capture viewport"
         // semantically means "this slide should look like the screen does now".
         const modelSnapshot = {
-          nodes: JSON.parse(JSON.stringify(get().c4Nodes)) as Record<string, C4Node>,
-          relations: JSON.parse(JSON.stringify(get().c4Relations)) as Record<string, C4Relation>,
+          nodes: get().c4Nodes as Record<string, C4Node>,
+          relations: get().c4Relations as Record<string, C4Relation>,
         }
         set((state) => {
           const pres = state.presentations.find(p => p.id === state.activePresentationId)
