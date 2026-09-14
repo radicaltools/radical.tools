@@ -9,15 +9,17 @@
 // (plain functions + zustand store) so the diagram store can wire into it.
 
 import { create } from 'zustand'
-import type { DiagramData } from '../types/c4'
+import type { DiagramData, C4Node } from '../types/c4'
 import {
   serializeToMdFolder,
   deserializeFromMdFolder,
+  extractNodeBody,
 } from '../persist/mdFolder'
 import {
   webFolderSupported,
   pickWebDirectory,
   readFolderFromHandle,
+  readOneFileFromHandle,
   writeFolderToHandle,
   verifyPermission,
   saveHandle,
@@ -35,6 +37,12 @@ const LS_LEGACY_KEY = 'radical-diagram-v1'
  *  folder is "connected" so a permission-pending handle can never clobber the
  *  user's files with an empty/stale model after a reload. */
 const connectedWebFolders = new Set<string>()
+
+/** Md-folder docs (source==='md') loaded lazily: docId → nodeId → relative
+ *  .md file path, for node bodies not read into memory at load time. Static
+ *  once populated — "already hydrated" is tracked by the caller (diagramStore),
+ *  not here; re-fetching a path here is idempotent, just redundant I/O. */
+const mdBodyPaths = new Map<string, Record<string, string>>()
 
 export type DocumentSource = 'ls' | 'fs' | 'md'
 
@@ -119,6 +127,49 @@ function defaultNameFromPath(filePath: string): string {
 function defaultNameFromFolder(folderPath: string): string {
   const base = folderPath.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? folderPath
   return base || folderPath
+}
+
+/** Fetch one md-folder node's body from disk (Electron file or web handle),
+ *  without caching it anywhere — the caller decides what to do with it. */
+async function fetchNodeBody(id: string, nodeId: string): Promise<string | undefined> {
+  const meta = readIndex().docs.find(d => d.id === id)
+  if (!meta) return undefined
+  const relPath = mdBodyPaths.get(id)?.[nodeId]
+  if (!relPath) return undefined
+  try {
+    if (meta.folderPath && window.electronAPI?.readFile) {
+      const res = await window.electronAPI.readFile(`${meta.folderPath}/${relPath}`)
+      if (!res.success || res.content === undefined) return undefined
+      return extractNodeBody(res.content)
+    }
+    if (!window.electronAPI?.readFile && webFolderSupported()) {
+      const handle = await loadHandle(id)
+      if (!handle) return undefined
+      const content = await readOneFileFromHandle(handle, relPath)
+      return extractNodeBody(content)
+    }
+  } catch { return undefined }
+  return undefined
+}
+
+/** For an md-folder save: return `data.nodes`, with any not-yet-hydrated
+ *  node's `description` filled in by a transient re-read of its file. Never
+ *  mutates `data` or caches into the live store — purely for serialization,
+ *  so a node the user never opened can't have its saved content clobbered
+ *  with an empty description. */
+async function nodesForMdSave(id: string, data: DiagramData): Promise<C4Node[]> {
+  const pending = mdBodyPaths.get(id)
+  if (!pending || Object.keys(pending).length === 0) return data.nodes
+  let patched: C4Node[] | null = null
+  for (let i = 0; i < data.nodes.length; i++) {
+    const node = data.nodes[i]
+    if (node.description !== undefined || !(node.id in pending)) continue
+    const body = await fetchNodeBody(id, node.id)
+    if (body === undefined) continue
+    if (!patched) patched = data.nodes.slice()
+    patched[i] = { ...node, description: body }
+  }
+  return patched ?? data.nodes
 }
 
 /** Browser-only file picker used when running outside Electron. Resolves with
@@ -238,10 +289,23 @@ export interface DocumentsAPI {
    *  De-dupes by path. Content is NOT loaded here. */
   createMdDocument(folderPath: string): DocumentMeta
 
-  /** Read the payload for a document. Async because FS reads cross IPC. */
+  /** Read the payload for a document. Async because FS reads cross IPC.
+   *  For md-folder docs, node bodies (descriptions) are loaded lazily — see
+   *  `getPendingBodyNodeIds` / `hydrateNodeBody`. */
   loadDocument(id: string): Promise<DiagramData | null>
 
-  /** Persist new payload under an existing document. */
+  /** Node ids whose body (.md file) was not read into `loadDocument`'s
+   *  result — empty for non-md docs or once nothing is pending. */
+  getPendingBodyNodeIds(id: string): string[]
+
+  /** Fetch one node's body on demand (md-folder docs only). Pure fetch —
+   *  does not cache or mutate any store; the caller merges the result. */
+  hydrateNodeBody(id: string, nodeId: string): Promise<string | undefined>
+
+  /** Persist new payload under an existing document. For md-folder docs,
+   *  any node whose body was never hydrated is re-read from disk just for
+   *  serialization (never cached into the live model) so an unopened
+   *  node's saved content is never clobbered with an empty description. */
   saveDocument(id: string, data: DiagramData): Promise<void>
 
   /** Update the display name. (Does NOT rename files on disk.) */
@@ -378,7 +442,11 @@ export const documents: DocumentsAPI = {
       const res = await window.electronAPI.readFolder(meta.folderPath)
       if (!res.success || !res.files) return null
       if (Object.keys(res.files).length === 0) return null // empty/new folder
-      try { return deserializeFromMdFolder(res.files) } catch { return null }
+      try {
+        const { data, bodyPaths } = deserializeFromMdFolder(res.files, { lazy: true })
+        mdBodyPaths.set(id, bodyPaths ?? {})
+        return data
+      } catch { return null }
     }
     if (meta.source === 'md' && !window.electronAPI?.readFolder && webFolderSupported()) {
       const handle = await loadHandle(id)
@@ -388,10 +456,20 @@ export const documents: DocumentsAPI = {
       try {
         const files = await readFolderFromHandle(handle)
         if (Object.keys(files).length === 0) return null // empty/new folder
-        return deserializeFromMdFolder(files)
+        const { data, bodyPaths } = deserializeFromMdFolder(files, { lazy: true })
+        mdBodyPaths.set(id, bodyPaths ?? {})
+        return data
       } catch { return null }
     }
     return null
+  },
+
+  getPendingBodyNodeIds(id) {
+    return Object.keys(mdBodyPaths.get(id) ?? {})
+  },
+
+  async hydrateNodeBody(id, nodeId) {
+    return fetchNodeBody(id, nodeId)
   },
 
   async saveDocument(id, data) {
@@ -408,7 +486,8 @@ export const documents: DocumentsAPI = {
         return
       }
     } else if (meta.source === 'md' && meta.folderPath && window.electronAPI?.writeFolder) {
-      const files = serializeToMdFolder(data, meta.name)
+      const nodes = await nodesForMdSave(id, data)
+      const files = serializeToMdFolder({ ...data, nodes }, meta.name)
       const res = await window.electronAPI.writeFolder(meta.folderPath, files)
       if (!res.success) {
         console.warn('[documentStore] folder write failed for', meta.folderPath, res.error)
@@ -425,7 +504,8 @@ export const documents: DocumentsAPI = {
       const handle = await loadHandle(id)
       if (!handle) return
       try {
-        await writeFolderToHandle(handle, serializeToMdFolder(data, meta.name))
+        const nodes = await nodesForMdSave(id, data)
+        await writeFolderToHandle(handle, serializeToMdFolder({ ...data, nodes }, meta.name))
       } catch (e) {
         console.warn('[documentStore] web folder write failed:', e)
         return
