@@ -107,7 +107,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
             <button
               className="welcome-btn welcome-btn-forge"
               onClick={handleForge}
-              title="Describe a system in plain language and let AI generate requirements, a C4 model, fitness functions and Gherkin scenarios for it"
+              title="Describe a system in plain language and let AI generate requirements, fitness functions, Gherkin scenarios, UI mockups and a C4 model for it"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                 <path d="M4.5 1.5l.9 2.1L7.5 4.5l-2.1.9-.9 2.1-.9-2.1L1.5 4.5l2.1-.9z"/>

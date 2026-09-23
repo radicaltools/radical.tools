@@ -1,24 +1,32 @@
 // ─── Radical Forge stage prompts ────────────────────────────────────────────
-// Radical Forge walks a free-text system description through four sequential
+// Radical Forge walks a free-text system description through five sequential
 // AI generation stages — requirements → fitness functions → Gherkin
-// scenarios → C4 model — each a normal `runAIPrompt` call sharing one
+// scenarios → UI mockups → C4 model — each a normal `runAIPrompt` call sharing one
 // running `history` array — so a later stage sees everything an earlier
 // stage created (via buildContextMessage in systemPrompt.ts), same as any
 // multi-turn chat. No new AI infrastructure: these are just task-scoped
 // prompt strings.
 //
 // C4 deliberately runs LAST: the behavior/quality spec (requirements,
-// fitness functions, scenarios) is nailed down first, and the architecture
+// fitness functions, scenarios, screens) is nailed down first, and the architecture
 // follows from it rather than the other way around. This changes how
 // fitness functions link back — with no C4 elements to `constrains` yet,
 // they're linked from the requirement side via `traces-to` instead; once C4
 // runs last, it links the elements it creates to matching fitness-fns via
 // `constrains` (see the governance metamodel preset for why the relation
 // only goes fitness-fn/adr/requirement → C4-element, never the reverse).
+//
+// Mockups are part of that spec, so they come before C4: the screens a user
+// needs shape the front-end decomposition, not the other way around. Same
+// trick as fitness functions — with no webapp to point at yet, `presented-by`
+// (mockup → webapp/container) is added by the C4 stage once the elements
+// exist. The mockups stage only creates the mockup nodes and their links;
+// wireframes are drawn by a separate per-mockup call (ai/mockupWireframe.ts),
+// triggered from the wizard.
 
 import type { HubConceptSummary } from '../store/hubStore'
 
-export type ForgeStageId = 'requirements' | 'fitness' | 'scenarios' | 'c4'
+export type ForgeStageId = 'requirements' | 'fitness' | 'scenarios' | 'c4' | 'mockups'
 
 export interface ForgeStage {
   id: ForgeStageId
@@ -35,6 +43,7 @@ export const PRIMARY_TYPE_IDS_FOR_STAGE: Record<ForgeStageId, string[]> = {
   requirements: ['requirement'],
   fitness: ['fitness-fn'],
   scenarios: ['scenario'],
+  mockups: ['mockup'],
   c4: ['person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group'],
 }
 
@@ -53,6 +62,11 @@ export const FORGE_STAGES: ForgeStage[] = [
     id: 'scenarios',
     title: 'Gherkin scenarios',
     blurb: 'Write Given/When/Then scenarios that verify each requirement.',
+  },
+  {
+    id: 'mockups',
+    title: 'Mockups',
+    blurb: 'Sketch the user-facing screens that illustrate the requirements and scenarios, then draw low-fi wireframes for them.',
   },
   {
     id: 'c4',
@@ -161,17 +175,20 @@ export function buildForgeStagePrompt(
       return [
         descBlock,
         '',
-        'Task: using the requirements, fitness functions and Gherkin scenarios already',
-        'in the model, plus the description above, derive the C4 structure — the',
-        'people/systems/containers/components involved — and the relations between',
-        'them. This is the last stage: the behavior and quality spec is already fully',
-        'formed, so let the architecture follow from it rather than guessing ahead of',
-        'it — e.g. a fitness function with a tight latency threshold or a scenario',
-        'implying an async flow should visibly shape how you decompose the system.',
+        'Task: using the requirements, fitness functions, Gherkin scenarios and UI',
+        'mockups already in the model, plus the description above, derive the C4',
+        'structure — the people/systems/containers/components involved — and the',
+        'relations between them. This is the last stage: the behavior and quality',
+        'spec is already fully formed, so let the architecture follow from it rather',
+        'than guessing ahead of it — e.g. a fitness function with a tight latency',
+        'threshold, a scenario implying an async flow, or a set of screens implying a',
+        'separate admin front-end should visibly shape how you decompose the system.',
         'Link each element to the requirement(s) it satisfies with a `satisfies`',
         'relation, AND link each existing `fitness-fn` node to whichever new element(s)',
-        'it actually constrains with a `constrains` relation (this only becomes',
-        'possible now that real elements exist for it to point at). Do not invent',
+        'it actually constrains with a `constrains` relation, AND link each existing',
+        '`mockup` node to the webapp or container that renders it with a',
+        '`presented-by` relation FROM the mockup TO that element (both only become',
+        'possible now that real elements exist to point at). Do not invent',
         'requirements at this stage; if the description implies something not yet',
         'covered by a requirement, model the C4 element anyway but leave it unlinked',
         'rather than fabricating a requirement here.',
@@ -200,6 +217,26 @@ export function buildForgeStagePrompt(
         'or unwanted-behaviour case. Fill `given`/`when`/`then` with concrete steps (not',
         'placeholders) and use the `gherkin` field only for extra `And`/`But` steps.',
         'Link each scenario to the requirement it exercises with a `verifies` relation.',
+      ].join('\n')
+
+    case 'mockups':
+      return [
+        descBlock,
+        '',
+        'Task: identify the key user-facing screens implied by the requirements and',
+        'scenarios already in the model — only where a person interacts through a UI;',
+        'skip machine-to-machine / API-only behaviour. Create one `mockup` node per',
+        'screen (typically 3-8; fold small variations such as an error state into the',
+        'screen they belong to). Set `screen` to its route or screen name and',
+        '`description` to what the user sees and does there. Leave `link` empty.',
+        'Link each mockup to the requirement(s) and scenario(s) it covers with',
+        '`illustrates` (mockup → requirement / scenario), and model the main navigation',
+        'between screens with `navigates-to` (mockup → mockup), using the relation',
+        'label for the user action that triggers it (e.g. "Pay"). No systems or',
+        'containers exist yet (C4 runs next and will link each screen to the front-end',
+        'that renders it), so do not create any here. Do not draw wireframes here —',
+        'they are generated separately from these nodes. If the system has no user',
+        'interface at all, create no mockups and say so in your summary.',
       ].join('\n')
   }
 }
