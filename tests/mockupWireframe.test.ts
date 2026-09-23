@@ -98,7 +98,7 @@ describe('mockup md-folder round-trip', () => {
   it('keeps a multi-line wireframe and link lossless', () => {
     const wireframe = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">\n  <rect x="0" y="0" width="400" height="40"/>\n\n  <text x="10" y="25">Checkout</text>\n</svg>'
     const m = node({ id: 'm1', type: 'mockup', label: 'Checkout', link: 'https://figma.com/file/abc', wireframe })
-    const data = deserializeFromMdFolder(serializeToMdFolder({ nodes: [m], relations: [] }))
+    const { data } = deserializeFromMdFolder(serializeToMdFolder({ nodes: [m], relations: [] }))
     const back = data.nodes[0] as unknown as Record<string, unknown>
     expect(back.wireframe).toBe(wireframe)
     expect(back.link).toBe('https://figma.com/file/abc')
