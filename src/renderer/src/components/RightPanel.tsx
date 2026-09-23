@@ -4,8 +4,7 @@ import { C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isCo
 import { resolveEarsSubject } from '../types/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import type { HubImportRecord } from '../store/hubStore'
-import { loadAISettings } from '../ai/settings'
-import { generateWireframe, wireframeDataUri } from '../ai/mockupWireframe'
+import { MockupWireframe } from './MockupWireframe'
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 
@@ -1628,99 +1627,6 @@ function HubTemplateSection({
   )
 }
 
-// ── Mockup: design link + AI-generated low-fi wireframe ─────────────────────
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const u = new URL(value)
-    return u.protocol === 'http:' || u.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
-
-function MockupSection({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }) {
-  const node = useDiagramStore((s) => s.c4Nodes[nodeId]) as unknown as Record<string, unknown> | undefined
-  const updateNode = useDiagramStore((s) => s.updateNode)
-  const [busy, setBusy] = useState(false)
-  const [status, setStatus] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
-
-  // Cancel an in-flight generation when the user selects another node.
-  useEffect(() => {
-    setStatus(null)
-    return () => abortRef.current?.abort()
-  }, [nodeId])
-
-  if (!node) return null
-  const wireframe = typeof node.wireframe === 'string' ? node.wireframe : ''
-  const link = typeof node.link === 'string' ? node.link.trim() : ''
-  const aiEnabled = loadAISettings().enabled
-
-  const generate = async (): Promise<void> => {
-    const settings = loadAISettings()
-    abortRef.current?.abort()
-    const ac = new AbortController()
-    abortRef.current = ac
-    setBusy(true)
-    setStatus(null)
-    try {
-      const { c4Nodes, c4Relations } = useDiagramStore.getState()
-      const { svg, usage } = await generateWireframe(nodeId, c4Nodes, c4Relations, settings, ac.signal)
-      updateNode(nodeId, { wireframe: svg } as Parameters<typeof updateNode>[1])
-      setStatus(usage ? { kind: 'info', text: `${usage.inputTokens + usage.outputTokens} tokens` } : null)
-    } catch (err) {
-      if (!ac.signal.aborted) setStatus({ kind: 'error', text: err instanceof Error ? err.message : String(err) })
-    } finally {
-      if (abortRef.current === ac) {
-        abortRef.current = null
-        setBusy(false)
-      }
-    }
-  }
-
-  return (
-    <div className="props-mockup">
-      <div className="props-section-title">Wireframe</div>
-      {wireframe ? (
-        <img className="props-mockup-preview" src={wireframeDataUri(wireframe)} alt="Wireframe" />
-      ) : (
-        <div className="props-mockup-empty">
-          {aiEnabled
-            ? 'Link requirements / scenarios with “Illustrates”, then generate a low-fi wireframe.'
-            : 'Enable AI in settings to generate a wireframe, or add a design link.'}
-        </div>
-      )}
-      <div className="props-mockup-actions">
-        {link && isHttpUrl(link) && (
-          <button className="props-mockup-btn" onClick={() => window.open(link, '_blank', 'noopener')}>
-            🔗 Open design
-          </button>
-        )}
-        {!readOnly && aiEnabled && (
-          busy ? (
-            <button className="props-mockup-btn" onClick={() => abortRef.current?.abort()}>
-              Cancel…
-            </button>
-          ) : (
-            <button className="props-mockup-btn" onClick={() => void generate()}>
-              ✨ {wireframe ? 'Regenerate' : 'Generate'} wireframe
-            </button>
-          )
-        )}
-        {!readOnly && wireframe && !busy && (
-          <button className="props-mockup-btn" onClick={() => updateNode(nodeId, { wireframe: undefined } as Parameters<typeof updateNode>[1])}>
-            Remove
-          </button>
-        )}
-      </div>
-      {status && (
-        <div className={`props-mockup-status props-mockup-status--${status.kind}`}>{status.text}</div>
-      )}
-    </div>
-  )
-}
-
 function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
@@ -1951,7 +1857,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
           }
           {parentSelector}
         </div>
-        {node.type === 'mockup' && <MockupSection nodeId={node.id} readOnly={readOnly} />}
+        {node.type === 'mockup' && <MockupWireframe nodeId={node.id} readOnly={readOnly} />}
         {(() => {
           const entry = Object.entries(hubTemplates as Record<string, HubImportRecord>)
             .find(([, rec]) => rec.nodeIds.includes(node.id))
