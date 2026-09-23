@@ -72,7 +72,7 @@ describe('md-folder persistence', () => {
 
   it('round-trips losslessly', () => {
     const files = serializeToMdFolder(sample, 'Demo')
-    const back = deserializeFromMdFolder(files)
+    const { data: back } = deserializeFromMdFolder(files)
 
     const byId = (d: DiagramData): Record<string, C4Node> =>
       Object.fromEntries(d.nodes.map((n) => [n.id, n]))
@@ -92,7 +92,7 @@ describe('md-folder persistence', () => {
 
   it('preserves custom metamodel property types and multiline prose', () => {
     const files = serializeToMdFolder(sample)
-    const back = deserializeFromMdFolder(files)
+    const { data: back } = deserializeFromMdFolder(files)
     const adr = back.nodes.find((n) => n.id === 'adr1') as unknown as Record<string, unknown>
     expect(adr.status).toBe('accepted')
     expect(adr.context).toBe('We need an audit trail.\nMultiple regulators require it.')
@@ -107,7 +107,7 @@ describe('md-folder persistence', () => {
       nodes: [node({ id: 'n1', type: 'adr', label: '123', ...({ date: '2026-01-01', ref: '007' } as Record<string, unknown>) })],
       relations: [],
     }
-    const back = deserializeFromMdFolder(serializeToMdFolder(data))
+    const { data: back } = deserializeFromMdFolder(serializeToMdFolder(data))
     const n = back.nodes[0] as unknown as Record<string, unknown>
     expect(n.label).toBe('123')
     expect(n.ref).toBe('007')

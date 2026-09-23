@@ -1638,10 +1638,19 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
   const selectNode = useDiagramStore((s) => s.selectNode)
   const selectEdge = useDiagramStore((s) => s.selectEdge)
   const hubTemplates = useDiagramStore((s) => s.hubTemplates)
+  const pendingBodyNodeIds = useDiagramStore((s) => s.pendingBodyNodeIds)
+  const hydrateNode = useDiagramStore((s) => s.hydrateNode)
+
+  // Lazily-loaded md-folder docs don't have the description in memory until
+  // the node is opened — fetch it now.
+  useEffect(() => {
+    if (selectedNodeId) hydrateNode(selectedNodeId)
+  }, [selectedNodeId, hydrateNode])
 
   // ── Node ──────────────────────────────────────────────────────────────────
   if (selectedNodeId && c4Nodes[selectedNodeId]) {
     const node = c4Nodes[selectedNodeId]
+    const descriptionPending = !!pendingBodyNodeIds[node.id]
 
     // Generic field renderer — handles built-in typed fields and arbitrary
     // extra properties stored on the node by the metamodel property definitions.
@@ -1672,6 +1681,14 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
         )
       }
       if (type === 'textarea') {
+        if (key === 'description' && descriptionPending) {
+          return (
+            <div className="props-field" key={key}>
+              <label className="props-label">{label}</label>
+              <AutoResizeTextarea value="Loading…" onChange={() => {}} readOnly />
+            </div>
+          )
+        }
         return (
           <div className="props-field" key={key}>
             <label className="props-label">{label}</label>
@@ -1732,6 +1749,14 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
         )
       }
       if (p.type === 'textarea') {
+        if (p.key === 'description' && descriptionPending) {
+          return (
+            <div className="props-field" key={p.key}>
+              <label className="props-label">{p.label}</label>
+              <AutoResizeTextarea value="Loading…" onChange={() => {}} readOnly />
+            </div>
+          )
+        }
         return (
           <div className="props-field" key={p.key}>
             <label className="props-label">{p.label}</label>
@@ -1994,12 +2019,29 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
   const nodesCount = useDiagramStore((s) => Object.keys(s.c4Nodes).length)
   const relationsCount = useDiagramStore((s) => Object.keys(s.c4Relations).length)
   const sequencesCount = useDiagramStore((s) => Object.keys(s.sequences).length)
+  const pendingBodyNodeIds = useDiagramStore((s) => s.pendingBodyNodeIds)
+  const scanDescriptions = useDiagramStore((s) => s.scanDescriptions)
   const [openSection, setOpenSection] = useState<'nodes' | 'relations' | 'sequences'>('nodes')
 
   // ── Nodes tree filter: free-text search + type chips ──────────────────────
   const [nodeSearch, setNodeSearch] = useState('')
   const [nodeTypeFilter, setNodeTypeFilter] = useState<Set<C4ElementType>>(new Set())
   const nodeFilterActive = nodeSearch.trim() !== '' || nodeTypeFilter.size > 0
+
+  // Descriptions on unopened nodes of a lazily-loaded doc aren't in memory
+  // yet, so the instant search below can't see them. "Search descriptions"
+  // is an explicit opt-in scan over just those nodes (see scanDescriptions).
+  // Matches get merged into c4Nodes by that action, so they flow back into
+  // the synchronous search below automatically once it resolves — no local
+  // result-merging needed here.
+  const pendingCount = Object.keys(pendingBodyNodeIds).length
+  const [descScanning, setDescScanning] = useState(false)
+  const handleScanDescriptions = () => {
+    const q = nodeSearch.trim()
+    if (!q) return
+    setDescScanning(true)
+    scanDescriptions(q).finally(() => setDescScanning(false))
+  }
 
   const { nodesMatchedSet, nodesVisibleSet, nodeTypeCounts } = useMemo(() => {
     const counts = new Map<C4ElementType, number>()
@@ -2087,6 +2129,17 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
                   onHideMatches={handleHideMatches}
                   onClearFilter={handleClearNodeFilter}
                 />
+              )}
+              {nodeFilterActive && pendingCount > 0 && (
+                <button
+                  className="lp-icon-btn"
+                  style={{ margin: '0 12px 8px', fontSize: 12, width: 'auto', padding: '4px 8px' }}
+                  disabled={descScanning}
+                  onClick={handleScanDescriptions}
+                  title={`Also search the ${pendingCount} node description(s) not yet opened`}
+                >
+                  {descScanning ? 'Searching descriptions…' : `Search descriptions (${pendingCount} unopened)`}
+                </button>
               )}
               {rootNodes.length === 0
                 ? <div className="lp-empty-state" style={{ padding: '4px 12px 8px' }}>

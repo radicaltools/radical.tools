@@ -296,10 +296,43 @@ function writeJsonIfPresent<T>(
 
 // ─── Deserialize: folder files → DiagramData ─────────────────────────────────
 
-export function deserializeFromMdFolder(files: FolderFiles): DiagramData {
+export interface DeserializeMdFolderOptions {
+  /**
+   * When true, node bodies (descriptions) are NOT loaded into memory —
+   * instead their relative file paths are returned via `bodyPaths` so a
+   * caller can fetch a single node's body on demand later. Everything else
+   * (frontmatter-derived fields, layout, sidecars) loads exactly as today.
+   *
+   * Note: `description` is only ever set on a node when its body is
+   * non-empty (see below) — so `description === undefined` already
+   * legitimately means "no description" on a normal (non-lazy) load.
+   * Callers must track "not yet hydrated" separately (via `bodyPaths`),
+   * never by checking whether `description` is falsy.
+   */
+  lazy?: boolean
+}
+
+export interface DeserializeMdFolderResult {
+  data: DiagramData
+  /** Present only when `lazy: true` — nodeId → relative .md file path, for
+   *  nodes whose body was not loaded. */
+  bodyPaths?: Record<string, string>
+}
+
+/** Extract just the body (description) text from one node's raw .md content. */
+export function extractNodeBody(content: string): string {
+  return parseMarkdown(content).body
+}
+
+export function deserializeFromMdFolder(
+  files: FolderFiles,
+  opts?: DeserializeMdFolderOptions,
+): DeserializeMdFolderResult {
+  const lazy = opts?.lazy ?? false
   const layout = readJson<LayoutSidecar>(files[LAYOUT_FILE]) ?? { nodes: {} }
 
   interface ParsedNode {
+    path: string
     front: Record<string, Scalar>
     body: string
     /** Directory key that identifies this node as a container (or null). */
@@ -317,12 +350,14 @@ export function deserializeFromMdFolder(files: FolderFiles): DiagramData {
     const isIndex = path.endsWith('/' + INDEX_BASENAME)
     if (isIndex) {
       const ownDirKey = dirname(path) // e.g. nodes/system-a
-      parsed.push({ front, body, ownDirKey, parentDirKey: dirname(ownDirKey) })
+      parsed.push({ path, front, body, ownDirKey, parentDirKey: dirname(ownDirKey) })
       parsedByDirKey.set(ownDirKey, String(front.id))
     } else {
-      parsed.push({ front, body, ownDirKey: null, parentDirKey: dirname(path) })
+      parsed.push({ path, front, body, ownDirKey: null, parentDirKey: dirname(path) })
     }
   }
+
+  const bodyPaths: Record<string, string> = {}
 
   const nodes: C4Node[] = parsed.map((p) => {
     const id = String(p.front.id)
@@ -339,7 +374,10 @@ export function deserializeFromMdFolder(files: FolderFiles): DiagramData {
       collapsed: !!lay.collapsed,
     }
     if (parentId) node.parentId = parentId
-    if (p.body) node.description = p.body
+    if (p.body) {
+      if (lazy) bodyPaths[id] = p.path
+      else node.description = p.body
+    }
     for (const [key, value] of Object.entries(p.front)) {
       if (key === 'id' || key === 'type' || key === 'label') continue
       node[key] = value
@@ -366,7 +404,7 @@ export function deserializeFromMdFolder(files: FolderFiles): DiagramData {
   if (layout.defaultPositions) data.defaultPositions = layout.defaultPositions
   if (layout.defaultViewport !== undefined) data.defaultViewport = layout.defaultViewport
 
-  return data
+  return lazy ? { data, bodyPaths } : { data }
 }
 
 /** True when the file map looks like a Radical md-folder (has the manifest). */
