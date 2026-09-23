@@ -3,6 +3,7 @@ import { NodeProps, Handle, Position } from 'reactflow'
 import { C4NodeRFData, NODE_COLORS, TYPE_ICON_PATHS } from '../../types/c4'
 import { useDiagramStore } from '../../store/diagramStore'
 import { composeEarsSentence, resolveEarsSubject } from '../../types/metamodel'
+import { wireframeDataUri } from '../../ai/mockupWireframe'
 
 // ─── Diff highlight overlay ────────────────────────────────────────────────
 function DiffOverlay({ c4id }: { c4id: string }) {
@@ -788,6 +789,73 @@ export const ScenarioNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) =
 })
 
 ScenarioNode.displayName = 'ScenarioNode'
+
+// ─── Mockup Node ──────────────────────────────────────────────────────────────
+//
+// A UI screen: header strip + label, then the AI-generated wireframe as a
+// thumbnail (rendered via <img> so the SVG can never run scripts), or a
+// placeholder pointing at the external design link when there is none.
+
+const MOCKUP_COLOR = '#be185d'
+
+export const MockupNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useDiagramStore(s => s.c4Nodes[data.c4id]) as unknown as Record<string, unknown> | undefined
+  const wireframe = typeof node?.wireframe === 'string' ? node.wireframe : ''
+  const link = typeof node?.link === 'string' ? node.link.trim() : ''
+  const screen = typeof node?.screen === 'string' ? node.screen.trim() : ''
+
+  return (
+    <div
+      className="c4-node"
+      style={{
+        position: 'relative',
+        width: data.width,
+        height: data.height,
+        background: MOCKUP_COLOR,
+        border: `2px solid ${selected ? 'var(--accent)' : 'rgba(0,0,0,0.25)'}`,
+        borderRadius: 6,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+
+      {/* Row 1: type + screen */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
+        <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' }}>
+          MOCKUP
+        </span>
+        {screen && (
+          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {screen}
+          </span>
+        )}
+      </div>
+
+      {/* Row 2: label */}
+      <div style={{ padding: '2px 7px 3px', overflow: 'hidden' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+          {data.label}
+        </span>
+      </div>
+
+      {/* Row 3: wireframe thumbnail / placeholder */}
+      <div style={{ flex: 1, margin: '0 5px 5px', background: '#fff', borderRadius: 3, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {wireframe ? (
+          <img src={wireframeDataUri(wireframe)} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
+        ) : (
+          <span style={{ fontSize: 9, color: '#9ca3af', fontStyle: 'italic', padding: 6, textAlign: 'center', wordBreak: 'break-all' }}>
+            {link ? `🔗 ${link.replace(/^https?:\/\//, '')}` : 'No wireframe yet'}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+})
+
+MockupNode.displayName = 'MockupNode'
 
 // ─── Requirement Node (EARS) ──────────────────────────────────────────────────
 //

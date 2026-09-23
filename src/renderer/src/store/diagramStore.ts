@@ -670,7 +670,7 @@ function deriveRFNodes(
 
     // Fixed-size node types always render at canonical NODE_SIZES regardless of
     // what is stored in the document (handles legacy nodes created with old sizes).
-    const isFixedSize = n.type === 'adr' || n.type === 'fitness-fn' || n.type === 'requirement' || n.type === 'scenario'
+    const isFixedSize = n.type === 'adr' || n.type === 'fitness-fn' || n.type === 'requirement' || n.type === 'scenario' || n.type === 'mockup'
 
     const effHeight = isFixedSize
       ? NODE_SIZES[n.type].height
