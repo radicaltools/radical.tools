@@ -439,7 +439,7 @@ function AppMenu({
               className="app-menu-item"
               role="menuitem"
               onClick={run(onOpenForge)}
-              title="Generate requirements, a C4 model, fitness functions and Gherkin scenarios from a description"
+              title="Generate requirements, fitness functions, Gherkin scenarios, UI mockups and a C4 model from a description"
             >
               <span className="app-menu-icon"><IconAI /></span>
               <span className="app-menu-text">Radical Forge…</span>

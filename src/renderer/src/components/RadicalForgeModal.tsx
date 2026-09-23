@@ -19,8 +19,21 @@ import {
 } from '../ai/forgeClarify'
 import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
 import type { ApplyReport } from '../ai/diagramFacade'
+import { generateWireframe } from '../ai/mockupWireframe'
 
 type ClarifyStatus = 'asking' | 'form' | 'done'
+
+/** Batch wireframe generation after the Mockups stage — one tool-less call
+ *  per mockup (ai/mockupWireframe.ts), run sequentially so a large batch
+ *  doesn't trip provider rate limits. */
+interface WireframeRun {
+  total: number
+  done: number
+  failed: number
+  /** Label of the mockup currently being drawn (while running). */
+  current?: string
+  running: boolean
+}
 type ClarifyAnswers = Record<string, string | string[]>
 
 interface ProgressEntry {
@@ -75,7 +88,8 @@ const STEP_LABELS: Record<WizardStep, string> = {
   c4: 'C4 model',
   fitness: 'Fitness fns',
   scenarios: 'Scenarios',
-  export: 'Export',
+  mockups: 'Mockups',
+  export: 'Finish',
 }
 
 /** Browser-only text-file picker (mirrors documentStore.ts's defaultWebFilePicker,
@@ -129,6 +143,15 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   /** Running total across every stage generated so far this wizard session —
    *  undefined until the first stage with usage data completes. */
   const [sessionUsage, setSessionUsage] = useState<TokenUsage | undefined>(undefined)
+  const [wireframeRun, setWireframeRun] = useState<WireframeRun | null>(null)
+  /** Furthest step reached by normal forward navigation — stepper tabs past
+   *  it stay disabled. An early finish jumps to the last step without
+   *  raising this, so stages the user never reached can't be opened from
+   *  the stepper (they resume via ← Back instead). */
+  const [reachedIndex, setReachedIndex] = useState(0)
+  /** Stage the user explicitly finished the run at ("Finish here"), or null
+   *  when the run went through every stage / hasn't finished. */
+  const [finishedAt, setFinishedAt] = useState<ForgeStageId | null>(null)
   const progressIdRef = useRef(0)
   const progressListRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -161,6 +184,9 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setClarifyAnswersByStage({})
     setProgressByStage({})
     setSessionUsage(undefined)
+    setWireframeRun(null)
+    setReachedIndex(0)
+    setFinishedAt(null)
     clarifyStartedRef.current = new Set()
   }, [open])
 
@@ -367,6 +393,46 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
 
   const cancelStage = useCallback(() => { abortRef.current?.abort() }, [])
 
+  const generateMissingWireframes = useCallback(async () => {
+    if (busy || unavailableReason) return
+    const { c4Nodes } = useDiagramStore.getState()
+    const targets = Object.values(c4Nodes).filter(
+      (n) => n.type === 'mockup' && !(n as unknown as Record<string, unknown>).wireframe,
+    )
+    if (!targets.length) return
+    setBusy(true)
+    setError(null)
+    const ctl = new AbortController()
+    abortRef.current = ctl
+    let done = 0
+    let failed = 0
+    setWireframeRun({ total: targets.length, done, failed, running: true })
+    try {
+      for (const target of targets) {
+        if (ctl.signal.aborted) break
+        setWireframeRun({ total: targets.length, done, failed, current: target.label, running: true })
+        try {
+          // Re-read the model each time: earlier wireframes / user edits
+          // made while the batch runs are then part of the next prompt.
+          const { c4Nodes: nodes, c4Relations, updateNode } = useDiagramStore.getState()
+          if (!nodes[target.id]) continue
+          const { svg, usage } = await generateWireframe(target.id, nodes, c4Relations, aiSettings, ctl.signal)
+          updateNode(target.id, { wireframe: svg } as Parameters<typeof updateNode>[1])
+          if (usage) setSessionUsage((u) => addTokenUsage(u, usage))
+        } catch (err) {
+          if (ctl.signal.aborted) break
+          failed++
+          setError(`${target.label}: ${(err as Error).message || String(err)}`)
+        }
+        done++
+      }
+    } finally {
+      setWireframeRun({ total: targets.length, done, failed, running: false })
+      abortRef.current = null
+      setBusy(false)
+    }
+  }, [busy, unavailableReason, aiSettings])
+
   // Keep the live progress feed scrolled to its newest entry.
   useEffect(() => {
     const el = progressListRef.current
@@ -391,16 +457,79 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const goTo = useCallback((s: WizardStep) => { if (!busy) setStep(s) }, [busy])
   const goNext = useCallback(() => {
     const next = STEP_ORDER[stepIndex + 1]
-    if (next) setStep(next)
+    if (!next) return
+    setStep(next)
+    setReachedIndex((r) => Math.max(r, stepIndex + 1))
+    setFinishedAt(null)
   }, [stepIndex])
   const goBack = useCallback(() => {
+    // Back from an early finish resumes the run where it was stopped.
+    if (step === 'export' && finishedAt) {
+      setStep(finishedAt)
+      setFinishedAt(null)
+      return
+    }
     const prev = STEP_ORDER[stepIndex - 1]
     if (prev) setStep(prev)
-  }, [stepIndex])
+  }, [step, stepIndex, finishedAt])
+  /** Explicitly end the run at the current stage — everything generated so
+   *  far stays in the model; later stages (and this one, if it was never
+   *  generated) are reported as skipped on the finish step. */
+  const finishHere = useCallback(() => {
+    if (busy || !currentStageId) return
+    setFinishedAt(currentStageId)
+    setStep('export')
+  }, [busy, currentStageId])
 
   const nodes = useDiagramStore((s) => s.c4Nodes)
   const relations = useDiagramStore((s) => s.c4Relations)
   const gherkinFiles = useMemo(() => buildGherkinFiles(nodes, relations), [nodes, relations])
+  const mockupStats = useMemo(() => {
+    const mockups = Object.values(nodes).filter((n) => n.type === 'mockup')
+    const missing = mockups.filter((n) => !(n as unknown as Record<string, unknown>).wireframe).length
+    return { total: mockups.length, missing }
+  }, [nodes])
+
+  const isLastStage = currentStageId === FORGE_STAGES[FORGE_STAGES.length - 1].id
+  // The footer is the wizard's single action bar: its right-hand side shows
+  // whatever moves the current stage forward right now (answer the clarifying
+  // questions → generate → continue), so the stage body only ever holds
+  // per-item actions (Hub import, editing answers, wireframes, export).
+  const stageAction: React.ReactNode = (() => {
+    if (!currentStageId) return null
+    const stageTitle = FORGE_STAGES.find((st) => st.id === currentStageId)!.title.toLowerCase()
+    const clarifyStatus = clarifyStatusByStage[currentStageId]
+    if (busy) {
+      return <button type="button" className="forge-btn forge-btn-secondary" onClick={cancelStage}>Cancel</button>
+    }
+    if (clarifyStatus === 'form') {
+      return (
+        <>
+          <button type="button" className="forge-btn forge-btn-ghost" onClick={() => skipClarify(currentStageId)}>Skip questions</button>
+          <button type="button" className="forge-btn forge-btn-primary" onClick={() => submitClarify(currentStageId)}>Confirm answers</button>
+        </>
+      )
+    }
+    if (stageReports[currentStageId]) {
+      return (
+        <>
+          <button type="button" className="forge-btn forge-btn-secondary" onClick={() => runStage(currentStageId)} disabled={!!unavailableReason}>Regenerate</button>
+          <button type="button" className="forge-btn forge-btn-primary" onClick={goNext}>{isLastStage ? 'Finish →' : 'Continue →'}</button>
+        </>
+      )
+    }
+    return (
+      <button
+        type="button"
+        className="forge-btn forge-btn-primary"
+        onClick={() => runStage(currentStageId)}
+        disabled={clarifyStatus !== 'done' || !!unavailableReason}
+        title={clarifyStatus !== 'done' ? 'Checking for clarifying questions…' : undefined}
+      >
+        Generate {stageTitle}
+      </button>
+    )
+  })()
 
   if (!open) return null
 
@@ -442,26 +571,33 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
           )}
         </div>
         <p className="milestone-modal-text" style={{ marginBottom: 10 }}>
-          Turn a free-text system description into requirements, a C4 model, fitness
-          functions and Gherkin scenarios — one reviewable stage at a time.
+          Turn a free-text system description into requirements, fitness functions,
+          Gherkin scenarios, UI mockups and a C4 model — one reviewable stage at a time.
         </p>
 
         <div className="forge-steps" role="tablist">
-          {STEP_ORDER.map((s, i) => (
-            <button
-              key={s}
-              type="button"
-              role="tab"
-              aria-selected={step === s}
-              className={`forge-step${step === s ? ' active' : ''}${i < stepIndex ? ' done' : ''}`}
-              disabled={i > stepIndex || busy}
-              onClick={() => goTo(s)}
-              title={STEP_LABELS[s]}
-            >
-              {i < stepIndex && <span className="forge-step-check" aria-hidden>✓</span>}
-              {STEP_LABELS[s]}
-            </button>
-          ))}
+          {STEP_ORDER.map((s, i) => {
+            const isStage = s !== 'input' && s !== 'export'
+            const done = s === 'input' ? stepIndex > 0 : isStage && !!stageReports[s as ForgeStageId]
+            // Only meaningful once the run has ended: a stage that never
+            // produced anything was skipped by finishing early.
+            const skipped = step === 'export' && isStage && !done
+            return (
+              <button
+                key={s}
+                type="button"
+                role="tab"
+                aria-selected={step === s}
+                className={`forge-step${step === s ? ' active' : ''}${done && step !== s ? ' done' : ''}${skipped ? ' skipped' : ''}`}
+                disabled={busy || (i > reachedIndex && step !== s)}
+                onClick={() => goTo(s)}
+                title={skipped ? `${STEP_LABELS[s]} — skipped` : STEP_LABELS[s]}
+              >
+                {done && step !== s && <span className="forge-step-check" aria-hidden>✓</span>}
+                {STEP_LABELS[s]}
+              </button>
+            )
+          })}
         </div>
 
         {unavailableReason && (
@@ -562,23 +698,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                       )}
                     </div>
                   ))}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                    {/* Deliberately NOT labeled "Continue" — that's the
-                        footer button's job (advancing to the next wizard
-                        step once this stage has generated). This one only
-                        confirms the answers above and reveals the Generate
-                        button for the current stage. */}
-                    <button type="button" className="forge-btn forge-btn-primary" onClick={() => submitClarify(currentStage.id)}>
-                      Confirm answers
-                    </button>
-                    <button type="button" className="forge-btn forge-btn-ghost" onClick={() => skipClarify(currentStage.id)}>
-                      Skip
-                    </button>
-                  </div>
                 </div>
               )}
 
-              {clarifyStatusByStage[currentStage.id] === 'done' && !!clarifyQuestionsByStage[currentStage.id]?.length && !stageReports[currentStage.id] && (
+              {clarifyStatusByStage[currentStage.id] === 'done' && !!clarifyQuestionsByStage[currentStage.id]?.length && !stageReports[currentStage.id] && !busy && (
                 <div className="forge-clarify-summary">
                   Clarified ✓
                   <button type="button" className="forge-btn forge-btn-secondary forge-btn-sm" onClick={() => editClarify(currentStage.id)}>
@@ -587,17 +710,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                 </div>
               )}
 
-              {clarifyStatusByStage[currentStage.id] === 'done' && !stageReports[currentStage.id] && !busy && (
-                <button
-                  type="button"
-                  className="forge-btn forge-btn-primary"
-                  onClick={() => runStage(currentStage.id)}
-                  disabled={!!unavailableReason}
-                >
-                  Generate {currentStage.title.toLowerCase()}
-                </button>
-              )}
-              {busy && (() => {
+              {busy && !wireframeRun?.running && (() => {
                 const prog = progressByStage[currentStage.id] ?? { round: 0, entries: [] }
                 const createdCount = prog.entries.filter((e) => e.kind === 'action' && e.ok && e.text.startsWith('+')).length
                 const failedCount = prog.entries.filter((e) => e.kind === 'action' && e.ok === false).length
@@ -614,8 +727,6 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                           {formatTokenCount(prog.usage.inputTokens + prog.usage.outputTokens)} tok
                         </span>
                       )}
-                      <span className="forge-progress-spacer" />
-                      <button type="button" className="forge-btn forge-btn-ghost forge-btn-sm" onClick={cancelStage}>Cancel</button>
                     </div>
                     <div className="forge-progress-list" ref={progressListRef}>
                       {visible.length === 0 && (
@@ -654,14 +765,39 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                       </div>
                     )
                   })()}
-                  <button
-                    type="button"
-                    className="forge-btn forge-btn-secondary forge-btn-sm"
-                    style={{ marginTop: 8 }}
-                    onClick={() => runStage(currentStage.id)}
-                  >
-                    Regenerate
-                  </button>
+                </div>
+              )}
+              {currentStage.id === 'mockups' && stageReports.mockups && mockupStats.total > 0 && (
+                <div className="forge-wireframes">
+                  <div className="forge-wireframes-title">Wireframes</div>
+                  {wireframeRun?.running ? (
+                    <div className="forge-wireframes-row">
+                      <span className="forge-progress-pulse" aria-hidden />
+                      <span>
+                        Drawing {Math.min(wireframeRun.done + 1, wireframeRun.total)}/{wireframeRun.total}
+                        {wireframeRun.current ? ` — ${wireframeRun.current}` : ''}
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="forge-wireframes-row">
+                        {mockupStats.missing === 0
+                          ? `All ${mockupStats.total} mockup${mockupStats.total === 1 ? ' has' : 's have'} a wireframe.`
+                          : `${mockupStats.missing} of ${mockupStats.total} mockup${mockupStats.total === 1 ? '' : 's'} without a wireframe.`}
+                        {wireframeRun && wireframeRun.failed > 0 && ` ${wireframeRun.failed} failed.`}
+                      </div>
+                      {mockupStats.missing > 0 && !busy && (
+                        <button
+                          type="button"
+                          className="forge-btn forge-btn-primary forge-btn-sm"
+                          onClick={() => void generateMissingWireframes()}
+                          disabled={!!unavailableReason}
+                        >
+                          ✨ Generate {mockupStats.missing} wireframe{mockupStats.missing === 1 ? '' : 's'}
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -669,6 +805,26 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
 
           {step === 'export' && (
             <div className="forge-stage-card">
+              <p className="milestone-modal-text" style={{ margin: '0 0 8px' }}>
+                {finishedAt
+                  ? `Run finished early at ${FORGE_STAGES.find((st) => st.id === finishedAt)!.title.toLowerCase()}. Everything generated so far stays in the model — use ← Back to resume.`
+                  : 'All stages done.'}
+              </p>
+              <ul className="forge-finish-summary">
+                {FORGE_STAGES.map((st) => {
+                  const report = stageReports[st.id]
+                  return (
+                    <li key={st.id} className={report ? '' : 'forge-finish-skipped'}>
+                      <span className="forge-finish-stage">{st.title}</span>
+                      <span className="forge-finish-result">
+                        {report
+                          ? `+${report.added.nodes} node${report.added.nodes === 1 ? '' : 's'} · +${report.added.relations} relation${report.added.relations === 1 ? '' : 's'}`
+                          : 'skipped'}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
               <p className="milestone-modal-text" style={{ margin: '0 0 10px' }}>
                 {gherkinFiles.length > 0
                   ? `Ready to export ${gherkinFiles.length} .feature file${gherkinFiles.length === 1 ? '' : 's'} from the scenarios in this model.`
@@ -689,19 +845,30 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
           </button>
           {step === 'export' ? (
             <button type="button" className="forge-btn forge-btn-primary" onClick={onClose}>Done</button>
-          ) : (
+          ) : !currentStage ? (
             <button
               type="button"
-              className={`forge-btn ${step === 'input' ? 'forge-btn-primary' : 'forge-btn-secondary'}`}
+              className="forge-btn forge-btn-primary"
               onClick={goNext}
-              disabled={
-                busy
-                || (step === 'input' && !description.trim())
-                || (!!currentStage && !stageReports[currentStage.id])
-              }
+              disabled={!description.trim()}
             >
-              {step === 'input' ? 'Start →' : 'Continue →'}
+              Start →
             </button>
+          ) : (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {!(isLastStage && stageReports[currentStage.id]) && (
+                <button
+                  type="button"
+                  className="forge-btn forge-btn-ghost"
+                  onClick={finishHere}
+                  disabled={busy}
+                  title={busy ? 'Cancel the running step first' : 'End the run here — keep what has been generated and skip the remaining stages'}
+                >
+                  Finish here
+                </button>
+              )}
+              {stageAction}
+            </div>
           )}
         </div>
     </div>,

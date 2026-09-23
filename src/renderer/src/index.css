@@ -3872,6 +3872,7 @@ body {
   border-color: var(--text-muted);
 }
 .forge-step:disabled { cursor: default; opacity: 0.4; }
+.forge-step.skipped:not(.active) { text-decoration: line-through; border-style: dashed; }
 .forge-step-check { font-size: 9px; line-height: 1; }
 .forge-step.done {
   color: var(--accent);
@@ -3919,7 +3920,52 @@ body {
 .forge-stage-card {
   padding: 2px 0;
 }
+.forge-wireframes {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.forge-wireframes-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.forge-wireframes-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 12px;
+  color: var(--text-secondary, var(--text-muted));
+}
+
 .forge-stage-result { margin-top: 4px; }
+.forge-finish-summary {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+.forge-finish-summary li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.forge-finish-summary li + li { border-top: 1px solid var(--border-color); }
+.forge-finish-stage { color: var(--text-primary); font-weight: 600; }
+.forge-finish-result { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.forge-finish-skipped .forge-finish-stage { color: var(--text-muted); font-weight: 400; }
+.forge-finish-skipped .forge-finish-result { font-style: italic; }
 /* ─── Radical Forge — button system ──────────────────────────────────────── */
 .forge-btn {
   display: inline-flex;
@@ -4139,7 +4185,6 @@ body {
   color: var(--text-muted);
   margin-top: 2px;
 }
-.forge-progress-spacer { flex: 1; }
 .forge-progress-list {
   display: flex;
   flex-direction: column;
