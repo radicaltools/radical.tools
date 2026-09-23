@@ -19,6 +19,10 @@ function installFolderApi(): { disk: Record<string, string> } {
     openFolder: vi.fn(async () => ({ success: true, folderPath: '/tmp/model', files: { ...disk } })),
     pickFolder: vi.fn(async () => ({ success: true, folderPath: '/tmp/model' })),
     readFolder: vi.fn(async () => ({ success: true, files: { ...disk } })),
+    readFile: vi.fn(async (filePath: string) => {
+      const rel = filePath.replace(/^\/tmp\/model\//, '')
+      return rel in disk ? { success: true, content: disk[rel] } : { success: false }
+    }),
     writeFolder: vi.fn(async (_path: string, files: Record<string, string>) => {
       // Emulate the main-process prune-and-write: replace managed files.
       for (const k of Object.keys(disk)) delete disk[k]
@@ -67,7 +71,7 @@ describe('documents — md-folder backend', () => {
     expect(Object.keys(disk).some((p) => p.startsWith('nodes/event-sourcing'))).toBe(true)
   })
 
-  it('round-trips through save + load on the md backend', async () => {
+  it('round-trips through save + load on the md backend, loading node bodies lazily', async () => {
     installFolderApi()
     const ls = documents.createLSDocument('Draft', SAMPLE)
     const meta = await documents.saveAsFolder(ls.id, SAMPLE)
@@ -76,7 +80,33 @@ describe('documents — md-folder backend', () => {
     expect(loaded).not.toBeNull()
     const byId = Object.fromEntries(loaded!.nodes.map((n) => [n.id, n]))
     expect(byId.sys1.label).toBe('Payments')
-    expect(byId.sys1.description).toBe('Money mover')
     expect((byId.adr1 as unknown as Record<string, unknown>).status).toBe('accepted')
+
+    // The body isn't read into memory at load time...
+    expect(byId.sys1.description).toBeUndefined()
+    expect(documents.getPendingBodyNodeIds(meta!.id)).toContain('sys1')
+
+    // ...but can be fetched on demand.
+    const body = await documents.hydrateNodeBody(meta!.id, 'sys1')
+    expect(body).toBe('Money mover')
+  })
+
+  it('does not lose an unopened node\'s description on save (lazy round-trip safety)', async () => {
+    installFolderApi()
+    const ls = documents.createLSDocument('Draft', SAMPLE)
+    const meta = await documents.saveAsFolder(ls.id, SAMPLE)
+    await documents.saveDocument(meta!.id, SAMPLE)
+
+    // Load lazily and save straight back WITHOUT ever hydrating sys1's body —
+    // this is the scenario that would silently wipe unopened content if
+    // saveDocument didn't transiently re-read it first.
+    const loaded = await documents.loadDocument(meta!.id)
+    expect(loaded!.nodes.find((n) => n.id === 'sys1')!.description).toBeUndefined()
+    await documents.saveDocument(meta!.id, loaded!)
+
+    const reloaded = await documents.loadDocument(meta!.id)
+    const body = await documents.hydrateNodeBody(meta!.id, 'sys1')
+    expect(body).toBe('Money mover')
+    expect(reloaded!.nodes.find((n) => n.id === 'adr1')).toBeDefined()
   })
 })

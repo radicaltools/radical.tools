@@ -904,6 +904,10 @@ interface DiagramStore {
   defaultPositions: Record<string, NodePosition>
   /** Camera state (pan + zoom) for the "All" (default) view */
   defaultViewport: { x: number; y: number; zoom: number } | null
+  /** Node ids on a lazily-loaded md-folder doc whose `description` hasn't
+   *  been fetched from disk yet — see `hydrateNode`. Empty for other
+   *  document sources. */
+  pendingBodyNodeIds: Record<string, true>
 
   // ── derived React Flow state ──
   rfNodes: Node<C4NodeRFData>[]
@@ -933,6 +937,17 @@ interface DiagramStore {
   // ── actions: nodes ──
   addNode: (node: Omit<C4Node, 'id'>) => string
   updateNode: (id: string, updates: Partial<Omit<C4Node, 'id'>>) => void
+  /** Fetch a lazily-loaded node's description from disk and merge it in.
+   *  No-op if the node isn't pending. Not a user edit: doesn't push undo or
+   *  mark a milestone dirty. */
+  hydrateNode: (id: string) => void
+  /** Explicit "search descriptions" action: scans every not-yet-hydrated
+   *  node's body for `query` (case-insensitive substring). Matches are
+   *  merged into the live model (so opening them next is instant);
+   *  non-matches are read but discarded, not cached. Returns matching ids
+   *  (only newly-discovered ones — already-hydrated matches are found by
+   *  the normal synchronous search). */
+  scanDescriptions: (query: string) => Promise<Set<string>>
   removeNode: (id: string) => void
   toggleCollapse: (id: string) => void
 
@@ -1302,6 +1317,7 @@ export const useDiagramStore = create<DiagramStore>()(
       activeViewId: null,
       defaultPositions: initDefaultPositions,
       defaultViewport: persisted?.defaultViewport ?? null,
+      pendingBodyNodeIds: {},
       rfNodes: deriveRFNodes(initNodes),
       rfEdges: deriveRFEdges(initNodes, initRelations),
       selectedNodeId: null,
@@ -1541,6 +1557,48 @@ export const useDiagramStore = create<DiagramStore>()(
         if (LAYOUT_KEYS.some((k) => k in updates)) {
           _liveLayout?.invalidate()
         }
+      },
+
+      hydrateNode(id) {
+        if (!get().pendingBodyNodeIds[id]) return
+        const activeId = documents.getActiveId()
+        if (!activeId) return
+        documents.hydrateNodeBody(activeId, id).then((body) => {
+          // The node (or the whole doc) may have changed/closed while the
+          // read was in flight — re-check before merging.
+          if (!get().pendingBodyNodeIds[id]) return
+          set((state) => {
+            delete state.pendingBodyNodeIds[id]
+            const node = state.c4Nodes[id] as (C4Node & Record<string, unknown>) | undefined
+            if (node && body !== undefined) node.description = body
+          })
+        })
+      },
+
+      async scanDescriptions(query) {
+        const q = query.trim().toLowerCase()
+        const matches = new Set<string>()
+        if (!q) return matches
+        const activeId = documents.getActiveId()
+        const pendingIds = Object.keys(get().pendingBodyNodeIds)
+        if (!activeId || pendingIds.length === 0) return matches
+        const results = await Promise.all(pendingIds.map(async (id) => ({
+          id,
+          body: await documents.hydrateNodeBody(activeId, id),
+        })))
+        set((state) => {
+          for (const { id, body } of results) {
+            if (body === undefined) continue
+            if (!state.pendingBodyNodeIds[id]) continue // resolved another way meanwhile
+            if (body.toLowerCase().includes(q)) {
+              matches.add(id)
+              const node = state.c4Nodes[id] as (C4Node & Record<string, unknown>) | undefined
+              if (node) node.description = body
+              delete state.pendingBodyNodeIds[id]
+            }
+          }
+        })
+        return matches
       },
 
       removeNode(id) {
@@ -4157,7 +4215,16 @@ export const useDiagramStore = create<DiagramStore>()(
         const defaultPos = data.defaultPositions ?? snapshotPositions(nodes)
         const defaultVP: { x: number; y: number; zoom: number } | null = data.defaultViewport ?? null
 
+        // Lazily-loaded md-folder docs report which node bodies weren't read
+        // into `data` — track them so `hydrateNode` knows what to fetch.
+        const activeDocId = documents.getActiveId()
+        const pendingBody: Record<string, true> = {}
+        if (activeDocId) {
+          for (const id of documents.getPendingBodyNodeIds(activeDocId)) pendingBody[id] = true
+        }
+
         set((state) => {
+          state.pendingBodyNodeIds = pendingBody as any
           state.c4Nodes = nodes as any
           state.c4Relations = relations as any
           state.sequences = sequences as any

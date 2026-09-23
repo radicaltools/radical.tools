@@ -91,6 +91,19 @@ export async function readFolderFromHandle(handle: FsDirHandle): Promise<FolderF
   return out
 }
 
+/** Read a single file by its relative POSIX path (e.g. a lazily-loaded node
+ *  body), without walking the rest of the tree. */
+export async function readOneFileFromHandle(handle: FsDirHandle, relPath: string): Promise<string> {
+  const parts = relPath.split('/')
+  let dir = handle
+  for (let i = 0; i < parts.length - 1; i++) {
+    dir = await dir.getDirectoryHandle(parts[i])
+  }
+  const fileHandle = await dir.getFileHandle(parts[parts.length - 1])
+  const file = await fileHandle.getFile()
+  return file.text()
+}
+
 /** Write a file map into a directory handle, then prune our own stale managed
  *  files (`.md` under `nodes/` and known sidecars) that are no longer present. */
 export async function writeFolderToHandle(handle: FsDirHandle, files: FolderFiles): Promise<void> {
