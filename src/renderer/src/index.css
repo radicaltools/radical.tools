@@ -2167,6 +2167,38 @@ body {
 }
 .props-delete:hover { background: rgba(255,107,107,0.12); }
 
+.props-mockup { margin-bottom: 12px; }
+.props-mockup-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+.props-mockup-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 10px;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+}
+.props-mockup-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.props-mockup-btn {
+  padding: 5px 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+.props-mockup-btn:hover { border-color: var(--accent); }
+.props-mockup-status { font-size: 11px; margin-top: 6px; color: var(--text-muted); }
+.props-mockup-status--error { color: var(--danger); }
+
 /* ─── Wiki view ───────────────────────────────────────────────────── */
 .wiki-view {
   grid-area: canvas;

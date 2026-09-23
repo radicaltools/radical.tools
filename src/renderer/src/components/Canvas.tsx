@@ -12,7 +12,7 @@ import ReactFlow, {
   getViewportForBounds,
 } from 'reactflow'
 import { useDiagramStore } from '../store/diagramStore'
-import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, RequirementNode, ScenarioNode, BlueprintNode } from './nodes/C4Nodes'
+import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT } from '../types/c4'
@@ -34,6 +34,7 @@ const nodeTypes: NodeTypes = {
   requirement: RequirementNode as any,
   scenario: ScenarioNode as any,
   blueprint: BlueprintNode as any,
+  mockup: MockupNode as any,
 }
 
 const edgeTypes: EdgeTypes = {
