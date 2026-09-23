@@ -3,6 +3,8 @@ import { useDiagramStore } from '../store/diagramStore'
 import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, PropertyDef } from '../types/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { EarsQuickEntry } from './EarsQuickEntry'
+import { MockupWireframe } from './MockupWireframe'
+import { wireframeDataUri } from '../ai/mockupWireframe'
 import { loadStudioSettings, STUDIO_SETTINGS_CHANGED_EVENT } from '../studioSettings'
 import {
   C4Node,
@@ -560,6 +562,13 @@ function WikiNodeCard({
             {sub}
           </span>
           {node.description && <span className="wiki-card-desc">{node.description}</span>}
+          {node.type === 'mockup' && typeof (node as unknown as Record<string, unknown>).wireframe === 'string' && (
+            <img
+              className="wiki-card-thumb"
+              src={wireframeDataUri((node as unknown as Record<string, string>).wireframe)}
+              alt=""
+            />
+          )}
         </span>
       </button>
       {onDelete && (
@@ -1081,6 +1090,15 @@ function WikiElementPage({
       </header>
 
       <div className="wiki-main">
+        {node.type === 'mockup' && (
+          <MockupWireframe
+            nodeId={node.id}
+            readOnly={readOnly}
+            className="wiki-prose-section mockup-wf"
+            heading={<h2 className="wiki-h2">Wireframe</h2>}
+          />
+        )}
+
         {/* Long-form sections */}
         {(hasMeta ? sectionProps : []).map((p) => (
           <section className="wiki-prose-section" key={p.key}>

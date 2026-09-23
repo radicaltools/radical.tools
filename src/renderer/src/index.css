@@ -2167,8 +2167,8 @@ body {
 }
 .props-delete:hover { background: rgba(255,107,107,0.12); }
 
-.props-mockup { margin-bottom: 12px; }
-.props-mockup-preview {
+.mockup-wf { margin-bottom: 12px; }
+.mockup-wf-preview {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -2177,7 +2177,7 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 4px;
 }
-.props-mockup-empty {
+.mockup-wf-empty {
   font-size: 11px;
   color: var(--text-muted);
   font-style: italic;
@@ -2185,8 +2185,8 @@ body {
   border: 1px dashed var(--border-color);
   border-radius: 4px;
 }
-.props-mockup-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.props-mockup-btn {
+.mockup-wf-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mockup-wf-btn {
   padding: 5px 9px;
   border: 1px solid var(--border-color);
   border-radius: 4px;
@@ -2195,9 +2195,26 @@ body {
   font-size: 11px;
   cursor: pointer;
 }
-.props-mockup-btn:hover { border-color: var(--accent); }
-.props-mockup-status { font-size: 11px; margin-top: 6px; color: var(--text-muted); }
-.props-mockup-status--error { color: var(--danger); }
+.mockup-wf-btn:hover { border-color: var(--accent); }
+.mockup-wf-status { font-size: 11px; margin-top: 6px; color: var(--text-muted); }
+.mockup-wf-status--error { color: var(--danger); }
+
+/* Wiki page: wider preview, capped so a 4:3 frame doesn't dominate the page */
+.wiki-prose-section.mockup-wf .mockup-wf-preview { max-width: 640px; }
+.wiki-prose-section.mockup-wf .mockup-wf-empty { font-size: 13px; max-width: 640px; }
+
+/* Wiki overview card thumbnail */
+.wiki-card-thumb {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  margin-top: 6px;
+}
 
 /* ─── Wiki view ───────────────────────────────────────────────────── */
 .wiki-view {
