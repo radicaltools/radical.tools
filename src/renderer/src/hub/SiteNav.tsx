@@ -1,7 +1,7 @@
 // ─── Shared site navigation ──────────────────────────────────────────────────
 //
 // The same bar as radical.tools / docs (website/landing.css `.site-nav`):
-// Home · Hub · Docs | Open Studio | GitHub · theme. Keep markup and class
+// Home · Docs | Hub · Studio | GitHub · theme. Keep markup and class
 // names in sync with website/index.html and website/manual.html.
 
 import React from 'react'
@@ -25,10 +25,10 @@ export function SiteNav({ studioUrl, theme, onToggleTheme, onHub }: SiteNavProps
       <a className="site-nav-logo" href="https://radical.tools" aria-label="Radical.Tools"><span className="site-nav-mark">R</span></a>
       <nav className="site-nav-links">
         <a className="site-nav-btn" href="https://radical.tools">Home</a>
-        <button type="button" className="site-nav-btn active" onClick={onHub}>Hub</button>
         <a className="site-nav-btn" href="https://radical.tools/manual.html">Docs</a>
         <span className="site-nav-sep" aria-hidden="true" />
-        <a className="site-nav-btn primary" href={studioUrl} target="_blank" rel="noopener">Open Studio</a>
+        <button type="button" className="site-nav-btn active" onClick={onHub}>Hub</button>
+        <a className="site-nav-btn primary" href={studioUrl} target="_blank" rel="noopener">Studio</a>
         <span className="site-nav-sep" aria-hidden="true" />
         <a className="site-nav-icon" href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener" aria-label="GitHub"><IconGitHub /></a>
         <button type="button" className="site-nav-icon" onClick={onToggleTheme} title={themeLabel} aria-label={themeLabel}>

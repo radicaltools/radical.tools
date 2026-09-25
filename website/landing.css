@@ -121,7 +121,7 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 }
 .site-nav-links { display: flex; align-items: center; gap: 6px; flex: 1; margin-left: 14px; }
 .site-nav-sep { width: 1px; height: 22px; background: var(--border); margin: 0 8px; opacity: 0.8; }
-/* First separator pushes Studio / GitHub / theme to the right edge. */
+/* First separator pushes Hub / Studio / GitHub / theme to the right edge. */
 .site-nav-links .site-nav-sep:first-of-type { margin-left: auto; }
 .site-nav-btn {
   display: inline-flex; align-items: center;
