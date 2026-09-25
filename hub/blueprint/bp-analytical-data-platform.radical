@@ -371,12 +371,38 @@
       "alternatives": "1. Spark jobs only — flexible, no conventions for tests or lineage. 2. Stored procedures — vendor-coupled and hard to review."
     },
     {
+      "id": "flow-analyst",
+      "type": "group",
+      "label": "Analyst journey",
+      "description": "Finding a dashboard, exploring the data behind it and asking for access.",
+      "x": 0,
+      "y": 1534,
+      "width": 1560,
+      "height": 330,
+      "collapsed": false
+    },
+    {
+      "id": "mockup-bi-home",
+      "type": "mockup",
+      "label": "Dashboards",
+      "description": "Governed dashboards by owning team.",
+      "parentId": "flow-analyst",
+      "x": 30,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/dashboards",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">BI</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Datasets</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Explore</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Dashboards</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Dashboards</text>\n  <rect x=\"214\" y=\"40\" width=\"170\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"220\" y=\"52.0\" font-size=\"8\" fill=\"#999\">Search dashboards</text>\n  <rect x=\"16\" y=\"66\" width=\"116\" height=\"100\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <line x1=\"24\" y1=\"116\" x2=\"124\" y2=\"116\" stroke=\"#ccc\"/>\n  <polyline points=\"24.0,104.0 44.0,96.0 64.0,100.0 84.0,88.0 104.0,92.0 124.0,84.0\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"24\" y=\"136\" font-size=\"8.5\" fill=\"#333\" font-weight=\"bold\">Sales overview</text>\n  <text x=\"24\" y=\"152\" font-size=\"7.5\" fill=\"#666\">Sales Data</text>\n  <rect x=\"140\" y=\"66\" width=\"116\" height=\"100\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <line x1=\"148\" y1=\"116\" x2=\"248\" y2=\"116\" stroke=\"#ccc\"/>\n  <polyline points=\"148.0,96.0 168.0,100.0 188.0,88.0 208.0,92.0 228.0,84.0 248.0,96.0\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"148\" y=\"136\" font-size=\"8.5\" fill=\"#333\" font-weight=\"bold\">Marketing funnel</text>\n  <text x=\"148\" y=\"152\" font-size=\"7.5\" fill=\"#666\">Growth</text>\n  <rect x=\"264\" y=\"66\" width=\"116\" height=\"100\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <line x1=\"272\" y1=\"116\" x2=\"372\" y2=\"116\" stroke=\"#ccc\"/>\n  <polyline points=\"272.0,100.0 292.0,88.0 312.0,92.0 332.0,84.0 352.0,96.0 372.0,96.0\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"272\" y=\"136\" font-size=\"8.5\" fill=\"#333\" font-weight=\"bold\">Inventory health</text>\n  <text x=\"272\" y=\"152\" font-size=\"7.5\" fill=\"#666\">Ops</text>\n  <rect x=\"16\" y=\"176\" width=\"116\" height=\"100\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <line x1=\"24\" y1=\"226\" x2=\"124\" y2=\"226\" stroke=\"#ccc\"/>\n  <polyline points=\"24.0,198.0 44.0,202.0 64.0,194.0 84.0,206.0 104.0,206.0 124.0,206.0\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"24\" y=\"246\" font-size=\"8.5\" fill=\"#333\" font-weight=\"bold\">Finance close</text>\n  <text x=\"24\" y=\"262\" font-size=\"7.5\" fill=\"#666\">Finance</text>\n  <rect x=\"140\" y=\"176\" width=\"116\" height=\"100\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <line x1=\"148\" y1=\"226\" x2=\"248\" y2=\"226\" stroke=\"#ccc\"/>\n  <polyline points=\"148.0,202.0 168.0,194.0 188.0,206.0 208.0,206.0 228.0,206.0 248.0,206.0\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"148\" y=\"246\" font-size=\"8.5\" fill=\"#333\" font-weight=\"bold\">Support SLAs</text>\n  <text x=\"148\" y=\"262\" font-size=\"7.5\" fill=\"#666\">CX</text>\n  <rect x=\"264\" y=\"176\" width=\"116\" height=\"100\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <line x1=\"272\" y1=\"226\" x2=\"372\" y2=\"226\" stroke=\"#ccc\"/>\n  <polyline points=\"272.0,194.0 292.0,206.0 312.0,206.0 332.0,206.0 352.0,206.0 372.0,206.0\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"272\" y=\"246\" font-size=\"8.5\" fill=\"#333\" font-weight=\"bold\">Product usage</text>\n  <text x=\"272\" y=\"262\" font-size=\"7.5\" fill=\"#666\">Product</text>\n  <text x=\"16\" y=\"290\" font-size=\"8\" fill=\"#666\">Starred and recently viewed first.</text>\n</svg>"
+    },
+    {
       "id": "mockup-sales-dashboard",
       "type": "mockup",
       "label": "Sales Dashboard",
       "description": "Self-service dashboard showing how fresh the data is; restricted columns are masked for users whose role does not allow them.",
-      "x": 0,
-      "y": 1534,
+      "parentId": "flow-analyst",
+      "x": 350,
+      "y": 110,
       "width": 220,
       "height": 190,
       "collapsed": false,
@@ -384,12 +410,27 @@
       "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">BI</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Datasets</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Explore</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Dashboards</text>\n  <text x=\"16\" y=\"52\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Sales overview</text>\n  <rect x=\"16\" y=\"60\" width=\"76\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"54.0\" y=\"70\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Region: EMEA ▾</text>\n  <rect x=\"98\" y=\"60\" width=\"76\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"136.0\" y=\"70\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Last 30 days ▾</text>\n  <rect x=\"284\" y=\"40\" width=\"104\" height=\"14\" rx=\"7\" fill=\"#dbeafe\"/>\n  <text x=\"336.0\" y=\"50\" font-size=\"8\" fill=\"#2563eb\" text-anchor=\"middle\">Data as of 2 min ago</text>\n  <rect x=\"16\" y=\"84\" width=\"116\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"99\" font-size=\"8\" fill=\"#666\">Revenue</text>\n  <text x=\"26\" y=\"118\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">€4.2M</text>\n  <rect x=\"140\" y=\"84\" width=\"116\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"150\" y=\"99\" font-size=\"8\" fill=\"#666\">Orders</text>\n  <text x=\"150\" y=\"118\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">38,120</text>\n  <rect x=\"264\" y=\"84\" width=\"116\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"274\" y=\"99\" font-size=\"8\" fill=\"#666\">Avg basket</text>\n  <text x=\"274\" y=\"118\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">€110</text>\n  <rect x=\"16\" y=\"136\" width=\"240\" height=\"86\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"24\" y=\"150\" font-size=\"8\" fill=\"#333\">Revenue by day</text>\n  <line x1=\"24\" y1=\"214\" x2=\"248\" y2=\"214\" stroke=\"#ccc\"/>\n  <polyline points=\"24.0,197.2 48.9,188.8 73.8,191.6 98.7,180.4 123.6,183.2 148.4,174.8 173.3,177.6 198.2,169.2 223.1,172.0 248.0,163.6\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <rect x=\"264\" y=\"136\" width=\"120\" height=\"86\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"272\" y=\"150\" font-size=\"8\" fill=\"#333\">By channel</text>\n  <line x1=\"272\" y1=\"214\" x2=\"376\" y2=\"214\" stroke=\"#ccc\"/>\n  <rect x=\"277.2\" y=\"163.6\" width=\"15.6\" height=\"50.4\" fill=\"#ccc\"/>\n  <rect x=\"303.2\" y=\"180.4\" width=\"15.6\" height=\"33.6\" fill=\"#ccc\"/>\n  <rect x=\"329.2\" y=\"191.6\" width=\"15.6\" height=\"22.4\" fill=\"#ccc\"/>\n  <rect x=\"355.2\" y=\"200.0\" width=\"15.6\" height=\"14.0\" fill=\"#ccc\"/>\n  <rect x=\"16\" y=\"232\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"244.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Customer</text>\n  <text x=\"112\" y=\"244.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">E-mail</text>\n  <text x=\"262\" y=\"244.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Lifetime value</text>\n  <line x1=\"16\" y1=\"268\" x2=\"384\" y2=\"268\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"262.0\" font-size=\"8\" fill=\"#333\">C-10293</text>\n  <text x=\"112\" y=\"262.0\" font-size=\"8\" fill=\"#333\">•••••• (restricted)</text>\n  <text x=\"262\" y=\"262.0\" font-size=\"8\" fill=\"#333\">€2,410</text>\n  <line x1=\"16\" y1=\"286\" x2=\"384\" y2=\"286\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"280.0\" font-size=\"8\" fill=\"#333\">C-10877</text>\n  <text x=\"112\" y=\"280.0\" font-size=\"8\" fill=\"#333\">•••••• (restricted)</text>\n  <text x=\"262\" y=\"280.0\" font-size=\"8\" fill=\"#333\">€1,980</text>\n</svg>"
     },
     {
+      "id": "mockup-explore",
+      "type": "mockup",
+      "label": "Explore",
+      "description": "Self-service exploration; row and column policies from the catalogue still apply.",
+      "parentId": "flow-analyst",
+      "x": 670,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/explore",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">BI</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Datasets</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Explore</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Dashboards</text>\n  <rect x=\"0\" y=\"30\" width=\"120\" height=\"270\" rx=\"0\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"14\" y=\"55\" font-size=\"9\" fill=\"#666\">curated.orders</text>\n  <text x=\"14\" y=\"79\" font-size=\"9\" fill=\"#666\">order_id</text>\n  <text x=\"14\" y=\"103\" font-size=\"9\" fill=\"#666\">amount</text>\n  <text x=\"14\" y=\"127\" font-size=\"9\" fill=\"#666\">customer_id</text>\n  <rect x=\"6\" y=\"138\" width=\"108\" height=\"20\" rx=\"3\" fill=\"#eef2ff\" stroke=\"#eef2ff\"/>\n  <text x=\"14\" y=\"151\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">customer_email</text>\n  <text x=\"14\" y=\"175\" font-size=\"9\" fill=\"#666\">region</text>\n  <text x=\"136\" y=\"54\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Explore curated.orders</text>\n  <rect x=\"136\" y=\"62\" width=\"85\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"178.5\" y=\"72\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Group by: region</text>\n  <rect x=\"227\" y=\"62\" width=\"62\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"258.0\" y=\"72\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Sum: amount</text>\n  <rect x=\"295\" y=\"62\" width=\"67\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"328.5\" y=\"72\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Last 30 days</text>\n  <line x1=\"136\" y1=\"180\" x2=\"384\" y2=\"180\" stroke=\"#ccc\"/>\n  <rect x=\"148.4\" y=\"99.0\" width=\"37.2\" height=\"81.0\" fill=\"#ccc\"/>\n  <rect x=\"210.4\" y=\"126.0\" width=\"37.2\" height=\"54.0\" fill=\"#ccc\"/>\n  <rect x=\"272.4\" y=\"112.5\" width=\"37.2\" height=\"67.5\" fill=\"#ccc\"/>\n  <rect x=\"334.4\" y=\"144.0\" width=\"37.2\" height=\"36.0\" fill=\"#ccc\"/>\n  <rect x=\"136\" y=\"196\" width=\"248\" height=\"24\" rx=\"3\" fill=\"#333\" stroke=\"#333\"/>\n  <text x=\"146\" y=\"211.0\" font-size=\"8\" fill=\"#fff\">customer_email is restricted for your role.</text>\n  <text x=\"136\" y=\"236\" font-size=\"8\" fill=\"#666\">Rows you can see are filtered to EMEA by policy.</text>\n  <rect x=\"136\" y=\"256\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"191.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Request access</text>\n  <rect x=\"274\" y=\"256\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"329.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Save chart</text>\n</svg>"
+    },
+    {
       "id": "mockup-dataset-lineage",
       "type": "mockup",
       "label": "Dataset & Lineage",
       "description": "Catalogue page for a curated dataset with owner, classification and column-level lineage from source to dashboard.",
-      "x": 320,
-      "y": 1534,
+      "parentId": "flow-analyst",
+      "x": 990,
+      "y": 110,
       "width": 220,
       "height": 190,
       "collapsed": false,
@@ -397,17 +438,85 @@
       "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Data Catalog</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Glossary</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Domains</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Search</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">curated.orders</text>\n  <rect x=\"16\" y=\"62\" width=\"90\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"61.0\" y=\"72\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Owner: Sales Data</text>\n  <rect x=\"112\" y=\"62\" width=\"67\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"145.5\" y=\"72\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Confidential</text>\n  <rect x=\"185\" y=\"62\" width=\"67\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"218.5\" y=\"72\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Contains PII</text>\n  <text x=\"16\" y=\"96\" font-size=\"9\" fill=\"#666\">Schema</text>\n  <text x=\"66\" y=\"96\" font-size=\"9\" fill=\"#2563eb\" font-weight=\"bold\">Lineage</text>\n  <text x=\"120\" y=\"96\" font-size=\"9\" fill=\"#666\">Quality</text>\n  <line x1=\"66\" y1=\"100\" x2=\"104\" y2=\"100\" stroke=\"#2563eb\" stroke-width=\"2\"/>\n  <line x1=\"16\" y1=\"101\" x2=\"384\" y2=\"101\" stroke=\"#ccc\"/>\n  <rect x=\"16\" y=\"116\" width=\"80\" height=\"96\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"130\" font-size=\"7.5\" fill=\"#333\" font-weight=\"bold\">raw.shop_orders</text>\n  <text x=\"24\" y=\"143\" font-size=\"7.5\" fill=\"#666\">order_id</text>\n  <rect x=\"20\" y=\"151\" width=\"72\" height=\"14\" rx=\"2\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <text x=\"24\" y=\"161\" font-size=\"7.5\" fill=\"#333\">amount</text>\n  <text x=\"24\" y=\"179\" font-size=\"7.5\" fill=\"#666\">customer_id</text>\n  <rect x=\"112\" y=\"116\" width=\"80\" height=\"96\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"118\" y=\"130\" font-size=\"7.5\" fill=\"#333\" font-weight=\"bold\">stg_orders</text>\n  <text x=\"120\" y=\"143\" font-size=\"7.5\" fill=\"#666\">order_id</text>\n  <rect x=\"116\" y=\"151\" width=\"72\" height=\"14\" rx=\"2\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <text x=\"120\" y=\"161\" font-size=\"7.5\" fill=\"#333\">amount</text>\n  <text x=\"120\" y=\"179\" font-size=\"7.5\" fill=\"#666\">customer_id</text>\n  <rect x=\"208\" y=\"116\" width=\"80\" height=\"96\" rx=\"3\" fill=\"#fff\" stroke=\"#2563eb\"/>\n  <text x=\"214\" y=\"130\" font-size=\"7.5\" fill=\"#333\" font-weight=\"bold\">curated.orders</text>\n  <text x=\"216\" y=\"143\" font-size=\"7.5\" fill=\"#666\">order_id</text>\n  <rect x=\"212\" y=\"151\" width=\"72\" height=\"14\" rx=\"2\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <text x=\"216\" y=\"161\" font-size=\"7.5\" fill=\"#333\">amount</text>\n  <text x=\"216\" y=\"179\" font-size=\"7.5\" fill=\"#666\">customer_id</text>\n  <rect x=\"304\" y=\"116\" width=\"80\" height=\"96\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"310\" y=\"130\" font-size=\"7.5\" fill=\"#333\" font-weight=\"bold\">Sales overview</text>\n  <text x=\"312\" y=\"143\" font-size=\"7.5\" fill=\"#666\">order_id</text>\n  <rect x=\"308\" y=\"151\" width=\"72\" height=\"14\" rx=\"2\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <text x=\"312\" y=\"161\" font-size=\"7.5\" fill=\"#333\">amount</text>\n  <text x=\"312\" y=\"179\" font-size=\"7.5\" fill=\"#666\">customer_id</text>\n  <line x1=\"96\" y1=\"156\" x2=\"108\" y2=\"156\" stroke=\"#2563eb\"/>\n  <path d=\"M107 153 L112 156 L107 159 Z\" fill=\"#2563eb\"/>\n  <line x1=\"192\" y1=\"156\" x2=\"204\" y2=\"156\" stroke=\"#2563eb\"/>\n  <path d=\"M203 153 L208 156 L203 159 Z\" fill=\"#2563eb\"/>\n  <line x1=\"288\" y1=\"156\" x2=\"300\" y2=\"156\" stroke=\"#2563eb\"/>\n  <path d=\"M299 153 L304 156 L299 159 Z\" fill=\"#2563eb\"/>\n  <text x=\"16\" y=\"234\" font-size=\"7.5\" fill=\"#666\">Column lineage for amount: raw.shop_orders.total → stg_orders.amount → curated.orders.amount</text>\n  <rect x=\"16\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"81.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Open in lineage API</text>\n</svg>"
     },
     {
+      "id": "mockup-access-request",
+      "type": "mockup",
+      "label": "Request Access",
+      "description": "Access to restricted columns is requested from the dataset owner, time-boxed and audited.",
+      "parentId": "flow-analyst",
+      "x": 1310,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/datasets/:name/access",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"300\" rx=\"0\" fill=\"#e5e7eb\" stroke=\"#e5e7eb\"/>\n  <rect x=\"55.0\" y=\"40.0\" width=\"290\" height=\"220\" rx=\"6\" fill=\"#fff\" stroke=\"#333\"/>\n  <text x=\"71.0\" y=\"66.0\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Request access</text>\n  <text x=\"71.0\" y=\"86.0\" font-size=\"9\" fill=\"#333\">curated.orders · column customer_email</text>\n  <text x=\"71.0\" y=\"100.0\" font-size=\"8\" fill=\"#666\">Classification: PII · Owner: Sales Data</text>\n  <text x=\"71.0\" y=\"114.0\" font-size=\"8\" fill=\"#666\">Why do you need it?</text>\n  <rect x=\"71.0\" y=\"118.0\" width=\"258\" height=\"44\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"77.0\" y=\"143.0\" font-size=\"8\" fill=\"#999\">Churn analysis for EMEA key accounts…</text>\n  <text x=\"71.0\" y=\"172.0\" font-size=\"8\" fill=\"#666\">For how long</text>\n  <rect x=\"71.0\" y=\"176.0\" width=\"258\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"77.0\" y=\"188.0\" font-size=\"8\" fill=\"#999\">30 days</text>\n  <path d=\"M317.0 183.0 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <rect x=\"71.0\" y=\"216.0\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"126.0\" y=\"229.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Cancel</text>\n  <rect x=\"219.0\" y=\"216.0\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"274.0\" y=\"229.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Send request</text>\n</svg>"
+    },
+    {
+      "id": "flow-data-engineer",
+      "type": "group",
+      "label": "Data engineer journey",
+      "description": "Keeping pipelines fresh and bad data out of curated tables.",
+      "x": 0,
+      "y": 1944,
+      "width": 1240,
+      "height": 330,
+      "collapsed": false
+    },
+    {
+      "id": "mockup-pipelines",
+      "type": "mockup",
+      "label": "Pipelines",
+      "description": "All pipelines with schedule and freshness.",
+      "parentId": "flow-data-engineer",
+      "x": 30,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/pipelines",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Orchestrator</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Quarantine</text>\n  <text x=\"322\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Runs</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Pipelines</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Pipelines</text>\n  <rect x=\"16\" y=\"66\" width=\"368\" height=\"26\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"82.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Pipeline</text>\n  <text x=\"142\" y=\"82.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Schedule</text>\n  <text x=\"212\" y=\"82.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Last run</text>\n  <text x=\"282\" y=\"82.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Freshness</text>\n  <line x1=\"16\" y1=\"118\" x2=\"384\" y2=\"118\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"108.0\" font-size=\"8\" fill=\"#333\">orders_stream</text>\n  <text x=\"142\" y=\"108.0\" font-size=\"8\" fill=\"#333\">streaming</text>\n  <text x=\"212\" y=\"108.0\" font-size=\"8\" fill=\"#333\">live</text>\n  <rect x=\"280\" y=\"98.0\" width=\"62\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"311.0\" y=\"108.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">38 s behind</text>\n  <rect x=\"16\" y=\"118\" width=\"368\" height=\"26\" fill=\"#eef2ff\"/>\n  <line x1=\"16\" y1=\"144\" x2=\"384\" y2=\"144\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"134.0\" font-size=\"8\" fill=\"#333\">orders_daily</text>\n  <text x=\"142\" y=\"134.0\" font-size=\"8\" fill=\"#333\">02:00</text>\n  <text x=\"212\" y=\"134.0\" font-size=\"8\" fill=\"#333\">failed</text>\n  <rect x=\"280\" y=\"124.0\" width=\"67\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"313.5\" y=\"134.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">stale · 26 h</text>\n  <line x1=\"16\" y1=\"170\" x2=\"384\" y2=\"170\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"160.0\" font-size=\"8\" fill=\"#333\">customers</text>\n  <text x=\"142\" y=\"160.0\" font-size=\"8\" fill=\"#333\">hourly</text>\n  <text x=\"212\" y=\"160.0\" font-size=\"8\" fill=\"#333\">12 min ago</text>\n  <rect x=\"280\" y=\"150.0\" width=\"35\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"297.5\" y=\"160.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">fresh</text>\n  <line x1=\"16\" y1=\"196\" x2=\"384\" y2=\"196\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"186.0\" font-size=\"8\" fill=\"#333\">products</text>\n  <text x=\"142\" y=\"186.0\" font-size=\"8\" fill=\"#333\">hourly</text>\n  <text x=\"212\" y=\"186.0\" font-size=\"8\" fill=\"#333\">40 min ago</text>\n  <rect x=\"280\" y=\"176.0\" width=\"35\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"297.5\" y=\"186.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">fresh</text>\n  <line x1=\"16\" y1=\"222\" x2=\"384\" y2=\"222\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"206.5\" width=\"80\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"142\" y=\"212.0\" font-size=\"8\" fill=\"#333\">daily</text>\n  <rect x=\"212\" y=\"206.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"280\" y=\"202.0\" width=\"35\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"297.5\" y=\"212.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">fresh</text>\n</svg>"
+    },
+    {
       "id": "mockup-quality-runs",
       "type": "mockup",
       "label": "Data Quality Runs",
       "description": "Run results with the quality gate applied: failing records are quarantined, the affected models fail and the dataset owner is notified before anything reaches consumers.",
-      "x": 640,
-      "y": 1534,
+      "parentId": "flow-data-engineer",
+      "x": 350,
+      "y": 110,
       "width": 220,
       "height": 190,
       "collapsed": false,
       "screen": "/runs",
       "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Orchestrator</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Quarantine</text>\n  <text x=\"322\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Runs</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Pipelines</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Transformation runs — today</text>\n  <rect x=\"16\" y=\"64\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Model</text>\n  <text x=\"142\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Checks</text>\n  <text x=\"202\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Result</text>\n  <text x=\"332\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Owner</text>\n  <rect x=\"16\" y=\"82\" width=\"368\" height=\"18\" fill=\"#eef2ff\"/>\n  <line x1=\"16\" y1=\"100\" x2=\"384\" y2=\"100\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"94.0\" font-size=\"8\" fill=\"#333\">curated.orders</text>\n  <text x=\"142\" y=\"94.0\" font-size=\"8\" fill=\"#333\">14 / 16</text>\n  <rect x=\"200\" y=\"84.0\" width=\"122\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"261.0\" y=\"94.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">failed — 132 quarantined</text>\n  <text x=\"332\" y=\"94.0\" font-size=\"8\" fill=\"#333\">notified ✓</text>\n  <line x1=\"16\" y1=\"118\" x2=\"384\" y2=\"118\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"112.0\" font-size=\"8\" fill=\"#333\">curated.customers</text>\n  <text x=\"142\" y=\"112.0\" font-size=\"8\" fill=\"#333\">9 / 9</text>\n  <rect x=\"200\" y=\"102.0\" width=\"39\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"219.5\" y=\"112.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">passed</text>\n  <text x=\"332\" y=\"112.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <line x1=\"16\" y1=\"136\" x2=\"384\" y2=\"136\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"130.0\" font-size=\"8\" fill=\"#333\">agg.daily_sales</text>\n  <text x=\"142\" y=\"130.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <rect x=\"200\" y=\"120.0\" width=\"126\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"263.0\" y=\"130.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">skipped (upstream failed)</text>\n  <text x=\"332\" y=\"130.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <line x1=\"16\" y1=\"154\" x2=\"384\" y2=\"154\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"148.0\" font-size=\"8\" fill=\"#333\">curated.products</text>\n  <text x=\"142\" y=\"148.0\" font-size=\"8\" fill=\"#333\">11 / 11</text>\n  <rect x=\"200\" y=\"138.0\" width=\"39\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"219.5\" y=\"148.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">passed</text>\n  <text x=\"332\" y=\"148.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <rect x=\"16\" y=\"166\" width=\"368\" height=\"84\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"184\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Failed checks — curated.orders</text>\n  <text x=\"26\" y=\"202\" font-size=\"8\" fill=\"#333\">✕ unique(order_id) — 132 duplicate rows</text>\n  <text x=\"26\" y=\"218\" font-size=\"8\" fill=\"#333\">✕ relationships(customer_id → curated.customers) — 4 orphans</text>\n  <text x=\"26\" y=\"238\" font-size=\"8\" fill=\"#666\">Failing rows were quarantined; downstream models were not updated.</text>\n  <rect x=\"16\" y=\"262\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"81.0\" y=\"275.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Open quarantine</text>\n  <rect x=\"296\" y=\"262\" width=\"88\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"340.0\" y=\"275.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Re-run</text>\n</svg>"
+    },
+    {
+      "id": "mockup-quarantine",
+      "type": "mockup",
+      "label": "Quarantine",
+      "description": "Rows that failed the quality gate, held back until fixed, discarded or released.",
+      "parentId": "flow-data-engineer",
+      "x": 670,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/quarantine/:run",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Orchestrator</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Quarantine</text>\n  <text x=\"322\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Runs</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Pipelines</text>\n  <text x=\"16\" y=\"46\" font-size=\"8\" fill=\"#2563eb\">← Runs</text>\n  <text x=\"16\" y=\"66\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Quarantine · curated.orders</text>\n  <text x=\"16\" y=\"82\" font-size=\"8\" fill=\"#666\">132 rows held back from run 2026-03-24 02:00 · owner notified</text>\n  <rect x=\"16\" y=\"92\" width=\"368\" height=\"22\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"106.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">order_id</text>\n  <text x=\"102\" y=\"106.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">amount</text>\n  <text x=\"172\" y=\"106.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">customer_id</text>\n  <text x=\"262\" y=\"106.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Failed check</text>\n  <line x1=\"16\" y1=\"136\" x2=\"384\" y2=\"136\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"128.0\" font-size=\"8\" fill=\"#333\">98213</text>\n  <text x=\"102\" y=\"128.0\" font-size=\"8\" fill=\"#333\">42.10</text>\n  <text x=\"172\" y=\"128.0\" font-size=\"8\" fill=\"#333\">C-10293</text>\n  <text x=\"262\" y=\"128.0\" font-size=\"8\" fill=\"#333\">unique(order_id)</text>\n  <line x1=\"16\" y1=\"158\" x2=\"384\" y2=\"158\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"150.0\" font-size=\"8\" fill=\"#333\">98213</text>\n  <text x=\"102\" y=\"150.0\" font-size=\"8\" fill=\"#333\">42.10</text>\n  <text x=\"172\" y=\"150.0\" font-size=\"8\" fill=\"#333\">C-10293</text>\n  <text x=\"262\" y=\"150.0\" font-size=\"8\" fill=\"#333\">unique(order_id)</text>\n  <line x1=\"16\" y1=\"180\" x2=\"384\" y2=\"180\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"172.0\" font-size=\"8\" fill=\"#333\">98277</text>\n  <text x=\"102\" y=\"172.0\" font-size=\"8\" fill=\"#333\">15.00</text>\n  <text x=\"172\" y=\"172.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <text x=\"262\" y=\"172.0\" font-size=\"8\" fill=\"#333\">not_null(customer_id)</text>\n  <line x1=\"16\" y1=\"202\" x2=\"384\" y2=\"202\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"188.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"102\" y=\"188.5\" width=\"30\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"172\" y=\"188.5\" width=\"50\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"262\" y=\"188.5\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <line x1=\"16\" y1=\"224\" x2=\"384\" y2=\"224\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"210.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"102\" y=\"210.5\" width=\"30\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"172\" y=\"210.5\" width=\"50\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"262\" y=\"210.5\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"256\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"76.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Download sample</text>\n  <rect x=\"144\" y=\"256\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"199.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Discard rows</text>\n  <rect x=\"262\" y=\"256\" width=\"122\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"323.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Release after fix</text>\n</svg>"
+    },
+    {
+      "id": "mockup-freshness",
+      "type": "mockup",
+      "label": "Freshness Monitor",
+      "description": "Streaming latency against the {{INGESTION_LATENCY_SECONDS}} s target from event to raw zone.",
+      "parentId": "flow-data-engineer",
+      "x": 990,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/freshness",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Orchestrator</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Freshness</text>\n  <text x=\"327\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Runs</text>\n  <text x=\"291\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Pipelines</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Streaming freshness</text>\n  <rect x=\"250\" y=\"44\" width=\"122\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"311.0\" y=\"54\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Target: queryable ≤ 60 s</text>\n  <rect x=\"16\" y=\"66\" width=\"368\" height=\"120\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <text x=\"24\" y=\"80\" font-size=\"8\" fill=\"#333\">Event → raw zone latency (p95, last 24 h)</text>\n  <line x1=\"24\" y1=\"176\" x2=\"376\" y2=\"176\" stroke=\"#ccc\"/>\n  <polyline points=\"24.0,150.2 56.0,148.5 88.0,151.9 120.0,145.9 152.0,150.2 184.0,124.4 216.0,98.6 248.0,137.3 280.0,147.6 312.0,150.2 344.0,149.3 376.0,151.1\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <line x1=\"24\" y1=\"111.5\" x2=\"376\" y2=\"111.5\" stroke=\"#333\" stroke-dasharray=\"3 3\"/>\n  <text x=\"376\" y=\"107.5\" font-size=\"7.5\" fill=\"#333\" text-anchor=\"end\">60 s</text>\n  <rect x=\"16\" y=\"200\" width=\"368\" height=\"22\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"214.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Topic</text>\n  <text x=\"172\" y=\"214.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">p95 now</text>\n  <text x=\"262\" y=\"214.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Breaches 24 h</text>\n  <line x1=\"16\" y1=\"244\" x2=\"384\" y2=\"244\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"236.0\" font-size=\"8\" fill=\"#333\">orders</text>\n  <text x=\"172\" y=\"236.0\" font-size=\"8\" fill=\"#333\">38 s</text>\n  <text x=\"262\" y=\"236.0\" font-size=\"8\" fill=\"#333\">1</text>\n  <line x1=\"16\" y1=\"266\" x2=\"384\" y2=\"266\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"258.0\" font-size=\"8\" fill=\"#333\">clickstream</text>\n  <text x=\"172\" y=\"258.0\" font-size=\"8\" fill=\"#333\">22 s</text>\n  <text x=\"262\" y=\"258.0\" font-size=\"8\" fill=\"#333\">0</text>\n</svg>"
     }
   ],
   "relations": [
@@ -547,6 +656,19 @@
       "relationType": "implements"
     },
     {
+      "id": "mockup-bi-home--bi",
+      "sourceId": "mockup-bi-home",
+      "targetId": "bi",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-bi-home--mockup-sales-dashboard",
+      "sourceId": "mockup-bi-home",
+      "targetId": "mockup-sales-dashboard",
+      "relationType": "navigates-to",
+      "label": "Open"
+    },
+    {
       "id": "mockup-sales-dashboard--req-rls",
       "sourceId": "mockup-sales-dashboard",
       "targetId": "req-rls",
@@ -565,11 +687,37 @@
       "relationType": "presented-by"
     },
     {
+      "id": "mockup-sales-dashboard--mockup-explore",
+      "sourceId": "mockup-sales-dashboard",
+      "targetId": "mockup-explore",
+      "relationType": "navigates-to",
+      "label": "Explore"
+    },
+    {
       "id": "mockup-sales-dashboard--mockup-dataset-lineage",
       "sourceId": "mockup-sales-dashboard",
       "targetId": "mockup-dataset-lineage",
       "relationType": "navigates-to",
       "label": "View dataset"
+    },
+    {
+      "id": "mockup-explore--req-rls",
+      "sourceId": "mockup-explore",
+      "targetId": "req-rls",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-explore--bi",
+      "sourceId": "mockup-explore",
+      "targetId": "bi",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-explore--mockup-access-request",
+      "sourceId": "mockup-explore",
+      "targetId": "mockup-access-request",
+      "relationType": "navigates-to",
+      "label": "Request access"
     },
     {
       "id": "mockup-dataset-lineage--req-lineage",
@@ -584,11 +732,56 @@
       "relationType": "presented-by"
     },
     {
-      "id": "mockup-dataset-lineage--mockup-quality-runs",
+      "id": "mockup-dataset-lineage--mockup-access-request",
       "sourceId": "mockup-dataset-lineage",
+      "targetId": "mockup-access-request",
+      "relationType": "navigates-to",
+      "label": "Request access"
+    },
+    {
+      "id": "mockup-access-request--req-rls",
+      "sourceId": "mockup-access-request",
+      "targetId": "req-rls",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-access-request--catalog",
+      "sourceId": "mockup-access-request",
+      "targetId": "catalog",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-access-request--mockup-dataset-lineage",
+      "sourceId": "mockup-access-request",
+      "targetId": "mockup-dataset-lineage",
+      "relationType": "navigates-to",
+      "label": "Send request"
+    },
+    {
+      "id": "mockup-pipelines--req-freshness",
+      "sourceId": "mockup-pipelines",
+      "targetId": "req-freshness",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-pipelines--orchestrator",
+      "sourceId": "mockup-pipelines",
+      "targetId": "orchestrator",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-pipelines--mockup-quality-runs",
+      "sourceId": "mockup-pipelines",
       "targetId": "mockup-quality-runs",
       "relationType": "navigates-to",
-      "label": "Quality"
+      "label": "Open runs"
+    },
+    {
+      "id": "mockup-pipelines--mockup-freshness",
+      "sourceId": "mockup-pipelines",
+      "targetId": "mockup-freshness",
+      "relationType": "navigates-to",
+      "label": "Freshness"
     },
     {
       "id": "mockup-quality-runs--req-quality-gate",
@@ -599,6 +792,44 @@
     {
       "id": "mockup-quality-runs--orchestrator",
       "sourceId": "mockup-quality-runs",
+      "targetId": "orchestrator",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-quality-runs--mockup-quarantine",
+      "sourceId": "mockup-quality-runs",
+      "targetId": "mockup-quarantine",
+      "relationType": "navigates-to",
+      "label": "Open quarantine"
+    },
+    {
+      "id": "mockup-quarantine--req-quality-gate",
+      "sourceId": "mockup-quarantine",
+      "targetId": "req-quality-gate",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-quarantine--orchestrator",
+      "sourceId": "mockup-quarantine",
+      "targetId": "orchestrator",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-quarantine--mockup-quality-runs",
+      "sourceId": "mockup-quarantine",
+      "targetId": "mockup-quality-runs",
+      "relationType": "navigates-to",
+      "label": "Release after fix"
+    },
+    {
+      "id": "mockup-freshness--req-freshness",
+      "sourceId": "mockup-freshness",
+      "targetId": "req-freshness",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-freshness--orchestrator",
+      "sourceId": "mockup-freshness",
       "targetId": "orchestrator",
       "relationType": "presented-by"
     }

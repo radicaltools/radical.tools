@@ -4,15 +4,16 @@
  *   - every top-level hub/<category>/<id>.radical is valid (hub block, ids, refs)
  *   - index.json summaries carry what the cards / drop-target check need
  *   - doc ↔ concept mapping round-trips
- *   - blueprint mockups are wired up with metamodel-valid relations and
- *     carry wireframes that are already sanitised
+ *   - blueprint mockups form per-actor screen flows (flow groups linked by
+ *     navigates-to), use metamodel-valid relations and carry wireframes that
+ *     are already sanitised
  */
 import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
 import { readCatalogue, validateCatalogue, buildIndex } from '../tools/hubCatalogue'
 import { conceptToDoc, docToConcept, summarize, type HubRadicalDoc } from '../src/renderer/src/hub/hubFormat'
 import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
-import { builtInGovernanceMetamodel } from '../src/renderer/src/types/metamodel'
+import { builtInGovernanceMetamodel, isParentAllowed } from '../src/renderer/src/types/metamodel'
 import { sanitizeWireframeSvg } from '../src/renderer/src/ai/mockupWireframe'
 
 const HUB_DIR = resolve(__dirname, '../hub')
@@ -89,12 +90,17 @@ describe('blueprint mockups', () => {
   const blueprints = readCatalogue(HUB_DIR).filter((e) => e.doc.hub.category === 'blueprint')
   const mm = builtInGovernanceMetamodel()
 
-  it.each(blueprints.map((e) => [e.file, e.doc] as const))('%s has wired-up mockups with sanitised wireframes', (_file, doc) => {
+  it.each(blueprints.map((e) => [e.file, e.doc] as const))('%s has screen flows with sanitised wireframes', (_file, doc) => {
     const byId = new Map(doc.nodes.map((n) => [String(n.id), n]))
     const mockups = doc.nodes.filter((n) => n.type === 'mockup')
-    expect(mockups.length).toBeGreaterThan(0)
+    expect(mockups.length).toBeGreaterThanOrEqual(8)
+    const inFlow = new Set((doc.relations ?? []).filter((r) => r.relationType === 'navigates-to').flatMap((r) => [r.sourceId, r.targetId]))
 
     for (const m of mockups) {
+      const flow = byId.get(String(m.parentId))
+      expect(flow?.type, `${m.id}: not inside a flow group`).toBe('group')
+      expect(isParentAllowed(mm, 'mockup', 'group')).toBe(true)
+      expect(inFlow.has(String(m.id)), `${m.id}: not linked into its flow`).toBe(true)
       const wireframe = m.wireframe as string
       expect(typeof m.screen).toBe('string')
       expect(sanitizeWireframeSvg(wireframe)).toBe(wireframe)
