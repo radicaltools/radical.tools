@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Radical Forge: Mockups stage before C4 with batch wireframe generation, "Finish here" at every stage with a summary step, and a single footer action bar
 - Hub blueprints: per-actor screen flows (79 mockups in 19 flows) and named views — canvas: System context, Containers, Governance map, Mockups, technical flow, one per screen flow; wiki: Governance, Requirements; a per-mode view selector and `/cv/<viewId>` deep links in the Hub; views are imported with the concept
 
+### Changed
+- Radical Hub uses its own emerald palette (accent, background, borders) in both themes so it reads apart from radical.tools; Studio keeps its blue
+
 ### Fixed
 - Hub concept files' `views` were ignored by the viewer and on import
 - Importing from the Hub no longer stacks one "Imported …" notification per concept over the template-parameter form

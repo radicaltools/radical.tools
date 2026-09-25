@@ -2,6 +2,45 @@
 /* Catalogue on the left, the studio's own toolbar / view / right panel on the
    right. Relies on the design tokens and component styles from index.css. */
 
+/* ═══ Hub palette — emerald, so the Hub reads apart from radical.tools ═══ */
+/* Overrides index.css tokens; this file is loaded only by hub.html, so Studio
+   keeps its blue. Both blocks repeat every token because :root here comes after
+   index.css's [data-theme="light"] and would otherwise win in light mode. */
+:root {
+  --bg-app:       #101c1b;
+  --bg-panel:     #172624;
+  --bg-toolbar:   rgba(16, 28, 27, 0.78);
+  --bg-canvas:    #0c1716;
+  --border-color: #243a37;
+  --border-color-strong: #33504c;
+  --text-secondary: #c6dcd7;
+  --text-muted:   #93b0a9;
+  --accent:       #10b981;
+  --accent-rgb:   16,185,129;
+  --accent-soft:  rgba(16,185,129,0.12);
+  --accent-mix:   #0891b2;
+  --minimap-mask: rgba(12,23,22,0.7);
+  --hint-bg:      rgba(12,23,22,0.85);
+  --edge-label-bg:rgba(12,23,22,0.85);
+}
+[data-theme="light"] {
+  --bg-app:       #f1f6f4;
+  --bg-panel:     #ffffff;
+  --bg-toolbar:   rgba(246, 250, 248, 0.78);
+  --bg-canvas:    #eef4f1;
+  --border-color: #dbe6e1;
+  --border-color-strong: #bfd0c9;
+  --text-secondary: #41524d;
+  --text-muted:   #64786f;
+  --accent:       #059669;
+  --accent-rgb:   5,150,105;
+  --accent-soft:  rgba(5,150,105,0.10);
+  --accent-mix:   #0e7490;
+  --minimap-mask: rgba(241,246,244,0.7);
+  --hint-bg:      rgba(241,246,244,0.92);
+  --edge-label-bg:rgba(255,255,255,0.92);
+}
+
 /* ═══ Shared site navigation — keep in sync with website/landing.css ════ */
 .site-nav {
   position: sticky; top: 0; z-index: 20;
@@ -23,7 +62,7 @@
   width: 28px; height: 28px;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 8px; color: #fff; font-weight: 800; font-size: 14px;
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7c3aed));
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--accent-mix)));
   box-shadow: var(--shadow-sm);
 }
 .site-nav-links { display: flex; align-items: center; gap: 6px; flex: 1; margin-left: 14px; }
@@ -469,7 +508,7 @@
   margin-bottom: 20px;
 }
 .hub-hero-title .accent {
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7c3aed));
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--accent-mix)));
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
 .hub-hero-sub {
