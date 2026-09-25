@@ -7,8 +7,9 @@
  *   - blueprint mockups form per-actor screen flows (flow groups linked by
  *     navigates-to), use metamodel-valid relations and carry wireframes that
  *     are already sanitised
- *   - blueprints ship named views (context, containers, governance, one per
- *     screen flow) over sequences whose steps all exist
+ *   - blueprints ship named views (context, containers, governance map,
+ *     mockups, one per screen flow, governance / requirements wikis) over
+ *     sequences whose steps all exist
  */
 import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
@@ -138,7 +139,7 @@ describe('blueprint views and sequences', () => {
       expect(s.stepDescriptions ?? []).toHaveLength(s.relationIds.length)
     }
     for (const v of views) {
-      expect(['static', 'dynamic']).toContain(v.kind)
+      expect(['static', 'dynamic', 'wiki']).toContain(v.kind)
       for (const id of v.nodeIds) expect(nodeIds.has(id), `${v.id}: unknown node ${id}`).toBe(true)
       if (v.kind === 'dynamic') expect(seqIds.has(v.sequenceId!), `${v.id}: unknown sequence`).toBe(true)
       for (const [id, p] of Object.entries(v.positions)) {
@@ -148,7 +149,14 @@ describe('blueprint views and sequences', () => {
     }
 
     const ids = views.map((v) => v.id)
-    expect(ids).toEqual(expect.arrayContaining(['view-context', 'view-containers', 'view-governance']))
+    expect(ids).toEqual(expect.arrayContaining([
+      'view-context', 'view-containers', 'view-governance', 'view-mockups', 'view-wiki-governance', 'view-wiki-requirements',
+    ]))
+    const byId = Object.fromEntries(views.map((v) => [v.id, v]))
+    expect(byId['view-mockups'].kind).toBe('static')
+    expect(byId['view-wiki-governance'].kind).toBe('wiki')
+    const reqs = doc.nodes.filter((n) => n.type === 'requirement').map((n) => String(n.id))
+    expect([...byId['view-wiki-requirements'].nodeIds].sort()).toEqual([...reqs].sort())
     expect(views.some((v) => v.kind === 'dynamic' && !v.id.startsWith('view-flow-')), 'technical flow').toBe(true)
     for (const g of doc.nodes.filter((n) => n.type === 'group' && String(n.id).startsWith('flow-'))) {
       expect(ids, `view for ${g.id}`).toContain(`view-${g.id}`)

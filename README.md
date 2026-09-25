@@ -8,10 +8,12 @@ An open-source software architecture design studio — diagram, document, and ev
 
 - **C4 model** — Person, Software System, Container, Component, Database, Web App, Queue, Relation
 - **Domain & Governance elements** — Domain, ADR, Fitness Function, Requirement, Blueprint
+- **UI mockups** — Mockup element with a design link or an AI-generated low-fi wireframe, linked to requirements and scenarios (*illustrates*), to the container that renders it (*presented by*) and to other screens (*navigates to*) to model screen flows
 - **Smart Layout** — SA-based auto-layout with crossing minimisation, edge-length optimisation, aspect-ratio penalty, and compound parent fitting
 - **Multiple layout engines** — ELK (hierarchical/layered/force), webcola (live physics), custom Smart Layout pipeline
 - **AI assistant** — chat with OpenAI / Anthropic / Gemini / Ollama to generate and modify diagrams
-- **Architecture Hub** — browse and import 120+ curated architecture concepts (patterns, fitness functions, ADRs, requirements, blueprints) from [hub.radical.tools](https://hub.radical.tools)
+- **Radical Forge** — turn a system description into requirements, fitness functions, Gherkin scenarios, UI mockups and a C4 model, one reviewable stage at a time
+- **Architecture Hub** — browse and import 120+ curated architecture concepts (patterns, fitness functions, ADRs, requirements, blueprints) from [hub.radical.tools](https://hub.radical.tools); blueprints include per-actor screen flows and named views
 - **Multiple views** — Canvas, Matrix, Sequence, Treemap, Table, Wiki per diagram
 - **Presentation mode** — fullscreen slides with navigation bar
 - **Metamodel editor** — customise node types, relation types, and constraints

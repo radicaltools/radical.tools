@@ -5,8 +5,8 @@
 // as-is) and both studio import paths (ids remapped to the freshly created
 // nodes / relations / sequences) — so it lives here once.
 //
-// Only canvas kinds are taken over: the Hub builds its own wiki / table views
-// and the studio has its defaults. A view keeps only the elements that exist
+// Canvas (static / dynamic), wiki and table views are taken over; the Hub
+// adds its own all-elements wiki / table views on top. A view keeps only the elements that exist
 // on the receiving side, so a partial blueprint import still gets sensible
 // views, and a view left with no nodes is dropped. A dynamic view whose
 // sequence did not survive falls back to a static view of the same nodes.
@@ -71,7 +71,9 @@ export function conceptViewsToDiagram(
 ): DiagramView[] {
   const out: DiagramView[] = []
   for (const [i, raw] of (rawViews ?? []).entries()) {
-    const kind = raw.kind === 'dynamic' ? 'dynamic' : raw.kind === undefined || raw.kind === 'static' ? 'static' : null
+    const kind = raw.kind === undefined ? 'static'
+      : raw.kind === 'static' || raw.kind === 'dynamic' || raw.kind === 'wiki' || raw.kind === 'table' ? raw.kind
+      : null
     if (!kind) continue
     const nodeIds = mapIds(raw.nodeIds, maps.node)
     if (nodeIds.length === 0) continue
@@ -80,11 +82,17 @@ export function conceptViewsToDiagram(
     const view: DiagramView = {
       id: opts.newId ? opts.newId() : typeof raw.id === 'string' ? raw.id : `view-${i}`,
       name: opts.namePrefix ? `${opts.namePrefix} — ${name}` : name,
-      kind: sequenceId ? 'dynamic' : 'static',
+      kind: kind === 'dynamic' ? (sequenceId ? 'dynamic' : 'static') : kind,
       nodeIds,
       positions: opts.keepPositions ? mapPositions(raw.positions, maps.node) : {},
     }
     if (sequenceId) view.sequenceId = sequenceId
+    if (kind === 'wiki') {
+      const focus = typeof raw.wikiFocusId === 'string' ? maps.node(raw.wikiFocusId) : undefined
+      view.wikiFocusId = focus ?? null
+      if (raw.wikiPageMode === 'single' || raw.wikiPageMode === 'multi') view.wikiPageMode = raw.wikiPageMode
+    }
+    if (kind === 'table' && typeof raw.tableActiveTab === 'string') view.tableActiveTab = raw.tableActiveTab
     const collapsed = mapIds(raw.collapsedNodeIds, maps.node)
     if (collapsed.length) view.collapsedNodeIds = collapsed
     const expanded = mapIds(raw.expandedNodeIds, maps.node)

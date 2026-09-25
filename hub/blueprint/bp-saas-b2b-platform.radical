@@ -1335,7 +1335,7 @@
     },
     {
       "id": "view-governance",
-      "name": "Governance",
+      "name": "Governance map",
       "kind": "static",
       "nodeIds": [
         "req-tenant-isolation",
@@ -1402,6 +1402,127 @@
           "y": 1780,
           "width": 260,
           "height": 80
+        }
+      }
+    },
+    {
+      "id": "view-mockups",
+      "name": "Mockups",
+      "kind": "static",
+      "nodeIds": [
+        "flow-onboarding",
+        "flow-tenant-user",
+        "flow-tenant-admin",
+        "flow-platform-ops",
+        "mockup-signup",
+        "mockup-provisioning",
+        "mockup-invite-team",
+        "mockup-workspace-dashboard",
+        "mockup-project",
+        "mockup-read-only",
+        "mockup-billing-usage",
+        "mockup-update-payment",
+        "mockup-sso-settings",
+        "mockup-users-roles",
+        "mockup-tenant-list",
+        "mockup-tenant-detail"
+      ],
+      "positions": {
+        "flow-onboarding": {
+          "x": 0,
+          "y": 2324,
+          "width": 920,
+          "height": 330
+        },
+        "flow-platform-ops": {
+          "x": 0,
+          "y": 3554,
+          "width": 600,
+          "height": 330
+        },
+        "flow-tenant-admin": {
+          "x": 0,
+          "y": 3144,
+          "width": 1240,
+          "height": 330
+        },
+        "flow-tenant-user": {
+          "x": 0,
+          "y": 2734,
+          "width": 920,
+          "height": 330
+        },
+        "mockup-billing-usage": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-invite-team": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-project": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-provisioning": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-read-only": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-signup": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-sso-settings": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-tenant-detail": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-tenant-list": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-update-payment": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-users-roles": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-workspace-dashboard": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
         }
       }
     },
@@ -1556,6 +1677,37 @@
           "height": 190
         }
       }
+    },
+    {
+      "id": "view-wiki-governance",
+      "name": "Governance",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-tenant-isolation",
+        "req-tenant-provisioning-time",
+        "req-subscription-enforcement",
+        "req-usage-metering-accuracy",
+        "ff-tenant-isolation-fuzz",
+        "ff-noisy-neighbor-guard",
+        "ff-billing-reconciliation",
+        "adr-tenancy-model",
+        "adr-sso-federation"
+      ],
+      "positions": {},
+      "wikiFocusId": null
+    },
+    {
+      "id": "view-wiki-requirements",
+      "name": "Requirements",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-tenant-isolation",
+        "req-tenant-provisioning-time",
+        "req-subscription-enforcement",
+        "req-usage-metering-accuracy"
+      ],
+      "positions": {},
+      "wikiFocusId": null
     }
   ]
 }

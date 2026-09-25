@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest'
 import {
   conceptToDiagramData,
   defaultViewKind,
+  kindForViewId,
   substituteTemplateDefaults,
   HUB_WIKI_VIEW_ID,
   HUB_TABLE_VIEW_ID,
@@ -137,13 +138,14 @@ describe('hub route', () => {
     expect(parseHubHash(hash)).toEqual(r)
   })
 
-  it('round-trips a named canvas view, and only on the canvas', () => {
-    const r = { browse: true, concept: 'bp-x', view: 'canvas' as const, canvasView: 'view-flow-shopper' }
+  it('round-trips a named view in any mode', () => {
+    const r = { browse: true, concept: 'bp-x', view: 'canvas' as const, namedView: 'view-flow-shopper' }
     const hash = formatHubHash(r)
     expect(hash).toBe('#/c/bp-x/v/canvas/cv/view-flow-shopper')
     expect(parseHubHash(hash)).toEqual(r)
-    expect(formatHubHash({ ...r, view: 'wiki' })).toBe('#/c/bp-x/v/wiki')
-    expect(parseHubHash('#/c/bp-x/v/wiki/cv/view-flow-shopper').canvasView).toBeUndefined()
+    const wiki = { ...r, view: 'wiki' as const, namedView: 'view-wiki-governance' }
+    expect(parseHubHash(formatHubHash(wiki))).toEqual(wiki)
+    expect(formatHubHash({ concept: 'bp-x', namedView: 'v' })).toBe('#/c/bp-x')
   })
 
   it('omits view without a concept and ignores unknown view kinds', () => {
@@ -182,14 +184,19 @@ describe('concept views', () => {
     views: [
       { id: 'v-flow', name: 'Write flow', kind: 'dynamic', sequenceId: 's1', nodeIds: ['sys', 'cmd'],
         positions: { sys: { x: 5, y: 6, width: 360, height: 260 }, cmd: { x: 1, y: 2 } } },
-      { id: 'v-wiki', name: 'Not a canvas view', kind: 'wiki', nodeIds: ['sys'] },
+      { id: 'v-wiki', name: 'Docs', kind: 'wiki', nodeIds: ['sys'], wikiFocusId: 'sys' },
+      { id: 'v-matrix', name: 'Unsupported kind', kind: 'matrix', nodeIds: ['sys'] },
       { id: 'v-empty', name: 'Only ghosts', kind: 'static', nodeIds: ['ghost'] },
     ],
   }
 
-  it('shows the concept\'s canvas views in the viewer, before wiki / table, with complete positions only', () => {
+  it('shows the concept\'s canvas and wiki views in the viewer, before the synthetic wiki / table, with complete positions only', () => {
     const views = conceptToDiagramData(withViews).views!
-    expect(views.map((v) => v.id)).toEqual(['v-flow', HUB_WIKI_VIEW_ID, HUB_TABLE_VIEW_ID])
+    expect(views.map((v) => v.id)).toEqual(['v-flow', 'v-wiki', HUB_WIKI_VIEW_ID, HUB_TABLE_VIEW_ID])
+    expect(views[1]).toMatchObject({ kind: 'wiki', wikiFocusId: 'sys', nodeIds: ['sys'] })
+    const byId = Object.fromEntries(views.map((v) => [v.id, v]))
+    expect(kindForViewId('v-wiki', byId)).toBe('wiki')
+    expect(kindForViewId('v-flow', byId)).toBe('canvas')
     expect(views[0]).toMatchObject({ kind: 'dynamic', sequenceId: 's1', nodeIds: ['sys', 'cmd'] })
     expect(views[0].positions).toEqual({ sys: { x: 5, y: 6, width: 360, height: 260 } })
   })
@@ -203,6 +210,7 @@ describe('concept views', () => {
     )
     expect(views).toEqual([
       { id: 'id-1', name: 'CQRS — Write flow', kind: 'static', nodeIds: ['new-sys'], positions: {} },
+      { id: 'id-2', name: 'CQRS — Docs', kind: 'wiki', nodeIds: ['new-sys'], positions: {}, wikiFocusId: 'new-sys' },
     ])
   })
 })

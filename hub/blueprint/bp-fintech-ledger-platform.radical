@@ -1306,7 +1306,7 @@
     },
     {
       "id": "view-governance",
-      "name": "Governance",
+      "name": "Governance map",
       "kind": "static",
       "nodeIds": [
         "req-balanced-entry-enforcement",
@@ -1414,6 +1414,120 @@
           "y": 350,
           "width": 300,
           "height": 200
+        }
+      }
+    },
+    {
+      "id": "view-mockups",
+      "name": "Mockups",
+      "kind": "static",
+      "nodeIds": [
+        "flow-customer",
+        "flow-finance-ops",
+        "flow-compliance",
+        "mockup-accounts-overview",
+        "mockup-statement",
+        "mockup-transaction-detail",
+        "mockup-dispute",
+        "mockup-dispute-status",
+        "mockup-reconciliation-exceptions",
+        "mockup-exception-detail",
+        "mockup-compensating-entry",
+        "mockup-entry-approval",
+        "mockup-journal-entry",
+        "mockup-audit-trail",
+        "mockup-regulatory-reports"
+      ],
+      "positions": {
+        "flow-compliance": {
+          "x": 0,
+          "y": 2904,
+          "width": 600,
+          "height": 330
+        },
+        "flow-customer": {
+          "x": 0,
+          "y": 2084,
+          "width": 1560,
+          "height": 330
+        },
+        "flow-finance-ops": {
+          "x": 0,
+          "y": 2494,
+          "width": 1560,
+          "height": 330
+        },
+        "mockup-accounts-overview": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-audit-trail": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-compensating-entry": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-dispute": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-dispute-status": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-entry-approval": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-exception-detail": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-journal-entry": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-reconciliation-exceptions": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-regulatory-reports": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-statement": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-transaction-detail": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
         }
       }
     },
@@ -1551,6 +1665,37 @@
           "height": 190
         }
       }
+    },
+    {
+      "id": "view-wiki-governance",
+      "name": "Governance",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-balanced-entry-enforcement",
+        "req-reconciliation-freshness",
+        "req-statement-accuracy-cutoff",
+        "req-dispute-investigation-sla",
+        "ff-settlement-backlog-guard",
+        "ff-manual-adjustment-rate-guard",
+        "ff-regulatory-report-timeliness",
+        "adr-suspense-account-for-unmatched",
+        "adr-ledger-as-system-of-record"
+      ],
+      "positions": {},
+      "wikiFocusId": null
+    },
+    {
+      "id": "view-wiki-requirements",
+      "name": "Requirements",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-balanced-entry-enforcement",
+        "req-reconciliation-freshness",
+        "req-statement-accuracy-cutoff",
+        "req-dispute-investigation-sla"
+      ],
+      "positions": {},
+      "wikiFocusId": null
     }
   ]
 }

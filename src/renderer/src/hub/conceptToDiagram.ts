@@ -32,10 +32,20 @@ export function viewIdForKind(kind: HubViewKind): string | null {
   return null
 }
 
-export function kindForViewId(viewId: string | null): HubViewKind {
+/** Mode a view belongs to. Pass the loaded views so the concept's own named
+ *  wiki / table views are recognised (everything else is a canvas view). */
+export function kindForViewId(viewId: string | null, views?: Record<string, DiagramView>): HubViewKind {
   if (viewId === HUB_WIKI_VIEW_ID) return 'wiki'
   if (viewId === HUB_TABLE_VIEW_ID) return 'table'
+  const kind = viewId ? views?.[viewId]?.kind : undefined
+  if (kind === 'wiki') return 'wiki'
+  if (kind === 'table') return 'table'
   return 'canvas'
+}
+
+/** True for the viewer's synthetic all-elements wiki / table views. */
+export function isSyntheticViewId(viewId: string | null): boolean {
+  return viewId === HUB_WIKI_VIEW_ID || viewId === HUB_TABLE_VIEW_ID
 }
 
 /** Fill `{{KEY}}` placeholders with each parameter's default, but keep the
