@@ -644,12 +644,9 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         store.upsertHubTemplate(importId, record)
       }
 
-      store.pushNotification(
-        useDropParent
-          ? `Imported "${concept.name}" into "${dropParent!.label}"`
-          : `Imported "${concept.name}"`,
-        'info',
-      )
+      // No success toast: the modal itself marks each concept as imported,
+      // and a blueprint with its related concepts would otherwise stack a
+      // dozen toasts over the template-parameter form that follows.
       // In preselected (hub import) mode: mark as done and close only when all imported.
       if (preselectedIds && preselectedIds.length > 0) {
         setImportedIds((prev) => {

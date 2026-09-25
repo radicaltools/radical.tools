@@ -186,7 +186,7 @@ export function importHubConceptIntoDiagram(
     store.upsertHubTemplate(importId, record)
   }
 
-  store.pushNotification(`Imported "${concept.name}"`, 'info')
+  // No success toast — callers show the imported state on the card itself.
 
   return { nodeIds: Object.keys(newNodes) }
 }
