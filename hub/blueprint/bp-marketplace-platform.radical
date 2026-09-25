@@ -1047,9 +1047,225 @@
         "Once the order is delivered and the dispute window has passed with no dispute open, the payout worker marks it payout-eligible.",
         "Payout worker instructs the facilitator to release the seller's share, net of commission."
       ]
+    },
+    {
+      "id": "seq-flow-buyer",
+      "name": "Buyer journey",
+      "relationIds": [
+        "mockup-mp-search--mockup-mp-listing",
+        "mockup-mp-listing--mockup-mp-checkout",
+        "mockup-mp-checkout--mockup-order-dispute",
+        "mockup-order-dispute--mockup-mp-open-dispute",
+        "mockup-mp-open-dispute--mockup-mp-dispute-status"
+      ],
+      "stepDescriptions": [
+        "Open listing → Listing. Listing page with seller reputation and buyer protection terms.",
+        "Buy now → Checkout. Payment goes to the payments facilitator, which holds the funds; the platform never custodies them.",
+        "Pay → Order & Buyer Protection. Buyer view of an order: funds stay held for {{DISPUTE_WINDOW_DAYS}} days after delivery, and opening a dispute freezes the payout.",
+        "Open a dispute → Open a Dispute. Opening a dispute inside the {{DISPUTE_WINDOW_DAYS}}-day window freezes the seller payout.",
+        "Open dispute → Dispute Status. Conversation and status while Trust & Safety reviews."
+      ]
+    },
+    {
+      "id": "seq-flow-seller",
+      "name": "Seller journey",
+      "relationIds": [
+        "mockup-seller-dashboard--mockup-new-listing",
+        "mockup-new-listing--mockup-my-listings",
+        "mockup-my-listings--mockup-new-listing",
+        "mockup-seller-dashboard--mockup-seller-payouts"
+      ],
+      "stepDescriptions": [
+        "New listing → New Listing. Seller creates a listing; it goes into review and only appears in search once approved (within {{LISTING_REVIEW_SLA_HOURS}} h).",
+        "Submit for review → My Listings. Listing states from the moderation workflow — in review, live, rejected with a reason.",
+        "Edit & resubmit → New Listing. Seller creates a listing; it goes into review and only appears in search once approved (within {{LISTING_REVIEW_SLA_HOURS}} h).",
+        "Payouts → Payouts. Per-order split: {{COMMISSION_PCT}}% commission deducted, payouts held for the protection window and frozen while a dispute is open."
+      ]
+    },
+    {
+      "id": "seq-flow-trust-safety",
+      "name": "Trust & Safety journey",
+      "relationIds": [
+        "mockup-listing-review-queue--mockup-seller-investigation",
+        "mockup-seller-investigation--mockup-ts-dispute-case",
+        "mockup-seller-investigation--mockup-listing-review-queue"
+      ],
+      "stepDescriptions": [
+        "Suspend → Seller Investigation. Suspending a seller removes every listing from search within {{SUPPRESSION_MINUTES}} minutes.",
+        "Disputes → Dispute Case. Evidence from both sides; the payout stays frozen until a resolution is chosen.",
+        "Suspend seller → Listing Review Queue. Trust & Safety queue sorted by time left on the review SLA."
+      ]
     }
   ],
   "views": [
+    {
+      "id": "view-context",
+      "name": "System context",
+      "kind": "static",
+      "nodeIds": [
+        "buyer",
+        "seller",
+        "trust-safety-agent",
+        "platform",
+        "payments-provider",
+        "notification-provider"
+      ],
+      "collapsedNodeIds": [
+        "platform"
+      ],
+      "positions": {
+        "buyer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 280,
+          "height": 180
+        },
+        "seller": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "trust-safety-agent": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "payments-provider": {
+          "x": 400,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        },
+        "notification-provider": {
+          "x": 820,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        }
+      }
+    },
+    {
+      "id": "view-containers",
+      "name": "Containers",
+      "kind": "static",
+      "nodeIds": [
+        "buyer",
+        "seller",
+        "trust-safety-agent",
+        "platform",
+        "listings-service",
+        "order-checkout-service",
+        "payments-facilitator-adapter",
+        "payout-worker",
+        "trust-safety-console",
+        "order-events",
+        "listings-db",
+        "orders-db",
+        "search-index",
+        "payments-provider",
+        "notification-provider"
+      ],
+      "positions": {
+        "buyer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "listings-db": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "listings-service": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "notification-provider": {
+          "x": 420,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "order-checkout-service": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "order-events": {
+          "x": 710,
+          "y": 350,
+          "width": 220,
+          "height": 95
+        },
+        "orders-db": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "payments-facilitator-adapter": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "payments-provider": {
+          "x": 0,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "payout-worker": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "search-index": {
+          "x": 710,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "seller": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "trust-safety-agent": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "trust-safety-console": {
+          "x": 370,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        }
+      }
+    },
     {
       "id": "bp-marketplace-platform-flow",
       "name": "Seller lists, buyer orders, payout releases after the dispute window",
@@ -1072,7 +1288,353 @@
         "payments-provider",
         "notification-provider"
       ],
-      "positions": {}
+      "positions": {
+        "buyer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "listings-db": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "listings-service": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "notification-provider": {
+          "x": 420,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "order-checkout-service": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "order-events": {
+          "x": 710,
+          "y": 350,
+          "width": 220,
+          "height": 95
+        },
+        "orders-db": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "payments-facilitator-adapter": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "payments-provider": {
+          "x": 0,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "payout-worker": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "search-index": {
+          "x": 710,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "seller": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "trust-safety-agent": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "trust-safety-console": {
+          "x": 370,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        }
+      }
+    },
+    {
+      "id": "view-governance",
+      "name": "Governance",
+      "kind": "static",
+      "nodeIds": [
+        "req-listing-moderation",
+        "req-commission-accuracy",
+        "req-dispute-window-hold",
+        "req-delisting-suppression",
+        "ff-payout-reconciliation-guard",
+        "ff-chargeback-rate-guard",
+        "ff-search-relevance-guard",
+        "adr-centralised-search-index",
+        "adr-suspend-first-moderation",
+        "listings-service",
+        "payments-facilitator-adapter",
+        "payout-worker",
+        "search-index",
+        "trust-safety-console"
+      ],
+      "positions": {
+        "adr-centralised-search-index": {
+          "x": 0,
+          "y": 1912,
+          "width": 260,
+          "height": 52
+        },
+        "adr-suspend-first-moderation": {
+          "x": 320,
+          "y": 1912,
+          "width": 260,
+          "height": 52
+        },
+        "ff-chargeback-rate-guard": {
+          "x": 320,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "ff-payout-reconciliation-guard": {
+          "x": 0,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "ff-search-relevance-guard": {
+          "x": 640,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "listings-service": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "payments-facilitator-adapter": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "payout-worker": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "req-commission-accuracy": {
+          "x": 320,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-delisting-suppression": {
+          "x": 960,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-dispute-window-hold": {
+          "x": 640,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-listing-moderation": {
+          "x": 0,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "search-index": {
+          "x": 710,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "trust-safety-console": {
+          "x": 370,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        }
+      }
+    },
+    {
+      "id": "view-flow-buyer",
+      "name": "Buyer journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-buyer",
+      "nodeIds": [
+        "flow-buyer",
+        "mockup-mp-search",
+        "mockup-mp-listing",
+        "mockup-mp-checkout",
+        "mockup-order-dispute",
+        "mockup-mp-open-dispute",
+        "mockup-mp-dispute-status"
+      ],
+      "positions": {
+        "flow-buyer": {
+          "x": 0,
+          "y": 2084,
+          "width": 1560,
+          "height": 630
+        },
+        "mockup-mp-checkout": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-mp-dispute-status": {
+          "x": 30,
+          "y": 410,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-mp-listing": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-mp-open-dispute": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-mp-search": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-order-dispute": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-seller",
+      "name": "Seller journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-seller",
+      "nodeIds": [
+        "flow-seller",
+        "mockup-seller-dashboard",
+        "mockup-new-listing",
+        "mockup-my-listings",
+        "mockup-seller-payouts"
+      ],
+      "positions": {
+        "flow-seller": {
+          "x": 0,
+          "y": 2794,
+          "width": 1240,
+          "height": 330
+        },
+        "mockup-my-listings": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-new-listing": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-seller-dashboard": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-seller-payouts": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-trust-safety",
+      "name": "Trust & Safety journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-trust-safety",
+      "nodeIds": [
+        "flow-trust-safety",
+        "mockup-listing-review-queue",
+        "mockup-seller-investigation",
+        "mockup-ts-dispute-case"
+      ],
+      "positions": {
+        "flow-trust-safety": {
+          "x": 0,
+          "y": 3204,
+          "width": 920,
+          "height": 330
+        },
+        "mockup-listing-review-queue": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-seller-investigation": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-ts-dispute-case": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
     }
   ]
 }

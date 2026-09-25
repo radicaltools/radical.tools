@@ -12,6 +12,7 @@ import type { C4Node, C4Relation, C4ElementType, DiagramData, DiagramSequence, D
 import { NODE_SIZES } from '../types/c4'
 import { builtInGovernanceMetamodel } from '../types/metamodel'
 import type { HubConcept, TemplateParam } from '../store/hubStore'
+import { conceptViewsToDiagram } from './conceptViews'
 
 export const HUB_WIKI_VIEW_ID = 'hub-wiki'
 export const HUB_TABLE_VIEW_ID = 'hub-table'
@@ -52,7 +53,11 @@ export function substituteTemplateDefaults(str: string, params: TemplateParam[] 
   })
 }
 
-export function conceptToDiagramData(concept: HubConcept): DiagramData {
+/** `layoutFrom`: id of one of the concept's views whose stored positions
+ *  replace the node coordinates — the Hub viewer runs in explore mode, where
+ *  switching the active view deliberately keeps the current layout, so it
+ *  reloads the concept laid out for the chosen view instead. */
+export function conceptToDiagramData(concept: HubConcept, opts: { layoutFrom?: string | null } = {}): DiagramData {
   const ids = new Set(concept.nodes.map((n) => String(n.id)))
   const params = concept.templateParams
 
@@ -102,10 +107,25 @@ export function conceptToDiagramData(concept: HubConcept): DiagramData {
 
   const allIds = nodes.map((n) => n.id)
   const firstRoot = nodes.find((n) => !n.parentId)?.id ?? allIds[0] ?? null
+  const seqIds = new Set(sequences.map((s) => s.id))
+  const keep = (set: Set<string>) => (id: string) => (set.has(id) ? id : undefined)
   const views: DiagramView[] = [
+    ...conceptViewsToDiagram(
+      concept.views,
+      { node: keep(ids), relation: keep(relIds), sequence: keep(seqIds) },
+      { keepPositions: true },
+    ),
     { id: HUB_WIKI_VIEW_ID, name: 'Wiki', kind: 'wiki', nodeIds: allIds, positions: {}, wikiFocusId: firstRoot },
     { id: HUB_TABLE_VIEW_ID, name: 'Table', kind: 'table', nodeIds: allIds, positions: {} },
   ]
+
+  const layout = opts.layoutFrom ? views.find((v) => v.id === opts.layoutFrom)?.positions : undefined
+  if (layout) {
+    for (const n of nodes) {
+      const p = layout[n.id]
+      if (p) Object.assign(n, { x: p.x, y: p.y, width: p.width, height: p.height })
+    }
+  }
 
   return {
     nodes,

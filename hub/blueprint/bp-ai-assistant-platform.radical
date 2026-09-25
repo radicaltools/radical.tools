@@ -951,9 +951,212 @@
         "The case surfaces in the handoff queue for the next available agent.",
         "The agent resolves it from the console; had confidence been high enough, the orchestrator would instead have answered the customer directly."
       ]
+    },
+    {
+      "id": "seq-flow-customer",
+      "name": "Customer journey",
+      "relationIds": [
+        "mockup-chat-start--mockup-chat-answer",
+        "mockup-chat-answer--mockup-support-chat",
+        "mockup-support-chat--mockup-chat-human"
+      ],
+      "stepDescriptions": [
+        "Ask → Chat — Grounded Answer. Answer grounded in retrieved sources; actions need the customer's confirmation.",
+        "Not resolved → Chat — Handoff. Customer-facing chat: the assistant answers with cited sources when it can ground the answer and hands off to a person when it cannot.",
+        "Agent joins → Chat — Agent Joined. A person joins with the full case history, within {{ESCALATION_SLA_MIN}} minutes of the handoff."
+      ]
+    },
+    {
+      "id": "seq-flow-human-agent",
+      "name": "Human agent journey",
+      "relationIds": [
+        "mockup-escalation-queue--mockup-case-review",
+        "mockup-case-review--mockup-case-resolved",
+        "mockup-case-resolved--mockup-case-audit",
+        "mockup-case-resolved--mockup-escalation-queue"
+      ],
+      "stepDescriptions": [
+        "Pick up → Case Review. The assistant's proposed action with its confidence, per-field extraction confidence (below {{EXTRACTION_REVIEW_THRESHOLD_PCT}}% needs review) and the sources it used.",
+        "Approve & send → Case Resolved. Resolution with every autonomous and human decision recorded for {{AUDIT_RETENTION_DAYS}} days.",
+        "Audit trail → Case Audit Trail. Search decisions, sources and confidence across cases for audits.",
+        "Next case → Escalation Queue. Human agents pick up escalated cases oldest-first; each case must be picked up within {{ESCALATION_SLA_MIN}} minutes."
+      ]
+    },
+    {
+      "id": "seq-flow-assistant-ops",
+      "name": "Assistant ops journey",
+      "relationIds": [
+        "mockup-kb-sources--mockup-quality-drift",
+        "mockup-quality-drift--mockup-kb-sources"
+      ],
+      "stepDescriptions": [
+        "Quality → Quality & Drift. Autonomous resolution rate, eval results and cost per case.",
+        "Fix stale source → Knowledge Sources. Source sync status against the {{KB_STALENESS_HOURS}}-hour freshness limit."
+      ]
     }
   ],
   "views": [
+    {
+      "id": "view-context",
+      "name": "System context",
+      "kind": "static",
+      "nodeIds": [
+        "customer",
+        "human-agent",
+        "ops",
+        "platform",
+        "llm-provider",
+        "source-channel"
+      ],
+      "collapsedNodeIds": [
+        "platform"
+      ],
+      "positions": {
+        "customer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "human-agent": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "ops": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 280,
+          "height": 180
+        },
+        "llm-provider": {
+          "x": 400,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        },
+        "source-channel": {
+          "x": 820,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        }
+      }
+    },
+    {
+      "id": "view-containers",
+      "name": "Containers",
+      "kind": "static",
+      "nodeIds": [
+        "customer",
+        "human-agent",
+        "ops",
+        "platform",
+        "ingestion-api",
+        "extraction-worker",
+        "retriever",
+        "orchestrator",
+        "handoff-queue",
+        "agent-console",
+        "knowledge-base",
+        "case-store",
+        "llm-provider",
+        "source-channel"
+      ],
+      "positions": {
+        "agent-console": {
+          "x": 710,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        },
+        "case-store": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "customer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "extraction-worker": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "handoff-queue": {
+          "x": 370,
+          "y": 350,
+          "width": 220,
+          "height": 95
+        },
+        "human-agent": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "ingestion-api": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "knowledge-base": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "llm-provider": {
+          "x": 0,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "ops": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "orchestrator": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "retriever": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "source-channel": {
+          "x": 420,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        }
+      }
+    },
     {
       "id": "bp-ai-assistant-platform-flow",
       "name": "Autonomous resolution with escalation fallback",
@@ -975,7 +1178,333 @@
         "llm-provider",
         "source-channel"
       ],
-      "positions": {}
+      "positions": {
+        "agent-console": {
+          "x": 710,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        },
+        "case-store": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "customer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "extraction-worker": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "handoff-queue": {
+          "x": 370,
+          "y": 350,
+          "width": 220,
+          "height": 95
+        },
+        "human-agent": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "ingestion-api": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "knowledge-base": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "llm-provider": {
+          "x": 0,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "ops": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "orchestrator": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "retriever": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "source-channel": {
+          "x": 420,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        }
+      }
+    },
+    {
+      "id": "view-governance",
+      "name": "Governance",
+      "kind": "static",
+      "nodeIds": [
+        "req-escalation-pickup",
+        "req-extraction-review",
+        "req-kb-freshness",
+        "req-case-audit-trail",
+        "ff-escalation-backlog-guard",
+        "ff-extraction-drift-monitor",
+        "ff-cost-per-case-guard",
+        "adr-confidence-gated-autonomy",
+        "adr-retrieval-over-finetuning",
+        "handoff-queue",
+        "extraction-worker",
+        "knowledge-base",
+        "case-store",
+        "orchestrator",
+        "retriever"
+      ],
+      "positions": {
+        "adr-confidence-gated-autonomy": {
+          "x": 0,
+          "y": 1912,
+          "width": 260,
+          "height": 52
+        },
+        "adr-retrieval-over-finetuning": {
+          "x": 320,
+          "y": 1912,
+          "width": 260,
+          "height": 52
+        },
+        "case-store": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "extraction-worker": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "ff-cost-per-case-guard": {
+          "x": 640,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "ff-escalation-backlog-guard": {
+          "x": 0,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "ff-extraction-drift-monitor": {
+          "x": 320,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "handoff-queue": {
+          "x": 370,
+          "y": 350,
+          "width": 220,
+          "height": 95
+        },
+        "knowledge-base": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "orchestrator": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "req-case-audit-trail": {
+          "x": 960,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-escalation-pickup": {
+          "x": 0,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-extraction-review": {
+          "x": 320,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-kb-freshness": {
+          "x": 640,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "retriever": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        }
+      }
+    },
+    {
+      "id": "view-flow-customer",
+      "name": "Customer journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-customer",
+      "nodeIds": [
+        "flow-customer",
+        "mockup-chat-start",
+        "mockup-chat-answer",
+        "mockup-support-chat",
+        "mockup-chat-human"
+      ],
+      "positions": {
+        "flow-customer": {
+          "x": 0,
+          "y": 2084,
+          "width": 1240,
+          "height": 330
+        },
+        "mockup-chat-answer": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-chat-human": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-chat-start": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-support-chat": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-human-agent",
+      "name": "Human agent journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-human-agent",
+      "nodeIds": [
+        "flow-human-agent",
+        "mockup-escalation-queue",
+        "mockup-case-review",
+        "mockup-case-resolved",
+        "mockup-case-audit"
+      ],
+      "positions": {
+        "flow-human-agent": {
+          "x": 0,
+          "y": 2494,
+          "width": 1240,
+          "height": 330
+        },
+        "mockup-case-audit": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-case-resolved": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-case-review": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-escalation-queue": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-assistant-ops",
+      "name": "Assistant ops journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-assistant-ops",
+      "nodeIds": [
+        "flow-assistant-ops",
+        "mockup-kb-sources",
+        "mockup-quality-drift"
+      ],
+      "positions": {
+        "flow-assistant-ops": {
+          "x": 0,
+          "y": 2904,
+          "width": 600,
+          "height": 330
+        },
+        "mockup-kb-sources": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-quality-drift": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
     }
   ]
 }

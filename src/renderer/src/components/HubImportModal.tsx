@@ -6,6 +6,7 @@ import type { C4Node, C4Relation, C4ElementType, DiagramSequence } from '../type
 import { NODE_SIZES } from '../types/c4'
 import { isParentAllowed } from '../types/metamodel'
 import { nodeTypeTheme } from '../types/hubTheme'
+import { conceptViewsToDiagram } from '../hub/conceptViews'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -570,11 +571,13 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
 
       // Sequences (dynamic flows) survive only if every step's relation was imported.
       const newSequences: Record<string, DiagramSequence> = {}
+      const seqIdMap = new Map<string, string>()
       for (const raw of concept.sequences ?? []) {
         const ids = (raw.relationIds as string[] | undefined) ?? []
         const mapped = ids.map((id) => relIdMap.get(id))
         if (ids.length === 0 || mapped.some((id) => !id)) continue
         const seqId = crypto.randomUUID()
+        if (typeof raw.id === 'string') seqIdMap.set(raw.id, seqId)
         newSequences[seqId] = {
           id: seqId,
           name: (raw.name as string) || concept.name,
@@ -585,12 +588,20 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
 
       // Single undo + bulk insert — bypasses per-node metamodel validation
       // so curated hub concepts always import cleanly.
+      // Named views travel with the concept, restricted to what was imported.
+      const newViews = conceptViewsToDiagram(
+        concept.views,
+        { node: (id) => idMap.get(id), relation: (id) => relIdMap.get(id), sequence: (id) => seqIdMap.get(id) },
+        { newId: () => crypto.randomUUID(), namePrefix: concept.name },
+      )
+
       store._pushUndo()
       store._markMilestoneEdit()
       useDiagramStore.setState((state) => {
         Object.assign(state.c4Nodes, newNodes)
         Object.assign(state.c4Relations, newRelations)
         Object.assign(state.sequences, newSequences)
+        for (const v of newViews) state.views[v.id] = v
         if (state.activeViewId && state.views[state.activeViewId]) {
           state.views[state.activeViewId].nodeIds.push(...Object.keys(newNodes))
         }

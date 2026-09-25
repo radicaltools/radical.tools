@@ -4,7 +4,7 @@
 // the catalogue:
 //
 //   #/browse
-//   #/c/<conceptId>[/v/<canvas|wiki|table>][/cat/<category>][/tag/<tag,tag>][/status/<status,status>][/sort/<name|category|connections>]
+//   #/c/<conceptId>[/v/<canvas|wiki|table>][/cv/<canvasViewId>][/cat/<category>][/tag/<tag,tag>][/status/<status,status>][/sort/<name|category|connections>]
 //
 // `c` selects the concept shown in the viewer, `v` its presentation, `cat` /
 // `tag` / `status` / `sort` the catalogue filters. `tag` and `status` hold a
@@ -21,6 +21,8 @@ export interface HubRoute {
   browse?: boolean
   concept?: string
   view?: HubViewKind
+  /** Named canvas view of the concept (only with view = canvas). */
+  canvasView?: string
   category?: string
   /** Comma-separated tag list. */
   tag?: string
@@ -49,6 +51,7 @@ export function parseHubHash(hash: string): HubRoute {
   const view = (VIEW_KINDS as readonly string[]).includes(map.v) ? (map.v as HubViewKind) : undefined
   const sort = (SORT_KEYS as readonly string[]).includes(map.sort) ? (map.sort as HubSortKey) : undefined
   const concept = map.c || undefined
+  const canvasView = view === 'canvas' || !view ? map.cv || undefined : undefined
   const category = map.cat || undefined
   const tag = map.tag || undefined
   const status = map.status || undefined
@@ -57,6 +60,7 @@ export function parseHubHash(hash: string): HubRoute {
     ...(browse ? { browse: true } : {}),
     concept,
     view,
+    ...(canvasView ? { canvasView } : {}),
     category,
     tag,
     status,
@@ -68,6 +72,7 @@ export function formatHubHash(route: HubRoute): string {
   const segs: string[] = []
   if (route.concept) segs.push('c', encodeURIComponent(route.concept))
   if (route.concept && route.view) segs.push('v', route.view)
+  if (route.concept && route.view === 'canvas' && route.canvasView) segs.push('cv', encodeURIComponent(route.canvasView))
   if (route.category) segs.push('cat', encodeURIComponent(route.category))
   if (route.tag) segs.push('tag', encodeURIComponent(route.tag))
   if (route.status) segs.push('status', encodeURIComponent(route.status))

@@ -986,9 +986,216 @@
         "Reconciliation worker independently reads posted entries from the journal.",
         "Reconciliation worker also fetches the bank's own end-of-day statement in a nightly batch and matches it against what was posted, catching anything the event stream alone would have missed."
       ]
+    },
+    {
+      "id": "seq-flow-customer",
+      "name": "Customer journey",
+      "relationIds": [
+        "mockup-accounts-overview--mockup-statement",
+        "mockup-statement--mockup-transaction-detail",
+        "mockup-transaction-detail--mockup-dispute",
+        "mockup-dispute--mockup-dispute-status"
+      ],
+      "stepDescriptions": [
+        "View statements → Account Statement. Customer statement generated strictly from balances replayed through a fixed cut-off; each line links to a dispute.",
+        "Open transaction → Transaction Detail. One statement line with its settlement status and the journal entry behind it.",
+        "Dispute → Dispute a Transaction. Opens an investigation the moment it is submitted; the customer gets a resolution or explanation within {{DISPUTE_INVESTIGATION_DAYS}} days.",
+        "Submit dispute → Dispute Status. Open dispute with the time left until the {{DISPUTE_INVESTIGATION_DAYS}}-day resolution deadline."
+      ]
+    },
+    {
+      "id": "seq-flow-finance-ops",
+      "name": "Finance Ops journey",
+      "relationIds": [
+        "mockup-reconciliation-exceptions--mockup-exception-detail",
+        "mockup-exception-detail--mockup-compensating-entry",
+        "mockup-compensating-entry--mockup-entry-approval",
+        "mockup-entry-approval--mockup-journal-entry",
+        "mockup-journal-entry--mockup-reconciliation-exceptions",
+        "mockup-exception-detail--mockup-reconciliation-exceptions"
+      ],
+      "stepDescriptions": [
+        "Open exception → Exception Detail. Settlement event next to candidate journal entries; a manual match or a compensating entry clears it.",
+        "Compensating entry → Compensating Entry. Double-entry form that cannot be submitted unless debits equal credits.",
+        "Submit for approval → Four-Eyes Approval. A second person approves before the entry is posted; nobody approves their own entries.",
+        "Approve & post → Journal Entry. Posted entries are immutable; the only correction is another entry.",
+        "Exception cleared → Reconciliation Exceptions. Finance Ops queue of settlement events not matched within {{RECONCILIATION_LAG_MIN}} minutes.",
+        "Confirm match → Reconciliation Exceptions. Finance Ops queue of settlement events not matched within {{RECONCILIATION_LAG_MIN}} minutes."
+      ]
+    },
+    {
+      "id": "seq-flow-compliance",
+      "name": "Compliance journey",
+      "relationIds": [
+        "mockup-audit-trail--mockup-regulatory-reports"
+      ],
+      "stepDescriptions": [
+        "Reports → Regulatory Reports. Scheduled regulatory extracts built from the journal at a fixed cut-off, signed off by Compliance."
+      ]
     }
   ],
   "views": [
+    {
+      "id": "view-context",
+      "name": "System context",
+      "kind": "static",
+      "nodeIds": [
+        "customer",
+        "finance-ops",
+        "compliance-officer",
+        "platform",
+        "bank-rail",
+        "regulator"
+      ],
+      "collapsedNodeIds": [
+        "platform"
+      ],
+      "positions": {
+        "compliance-officer": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "customer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "finance-ops": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 280,
+          "height": 180
+        },
+        "bank-rail": {
+          "x": 400,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        },
+        "regulator": {
+          "x": 820,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        }
+      }
+    },
+    {
+      "id": "view-containers",
+      "name": "Containers",
+      "kind": "static",
+      "nodeIds": [
+        "customer",
+        "finance-ops",
+        "compliance-officer",
+        "platform",
+        "posting-api",
+        "balance-projector",
+        "reconciliation-worker",
+        "statement-service",
+        "finance-ops-console",
+        "settlement-events",
+        "journal-store",
+        "balance-store",
+        "bank-rail",
+        "regulator"
+      ],
+      "positions": {
+        "balance-projector": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "balance-store": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "bank-rail": {
+          "x": 0,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "compliance-officer": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "customer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "finance-ops": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "finance-ops-console": {
+          "x": 370,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        },
+        "journal-store": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "posting-api": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "reconciliation-worker": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "regulator": {
+          "x": 420,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "settlement-events": {
+          "x": 710,
+          "y": 350,
+          "width": 220,
+          "height": 95
+        },
+        "statement-service": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        }
+      }
+    },
     {
       "id": "bp-fintech-ledger-platform-flow",
       "name": "Settlement arrives, posts, and reconciles",
@@ -1010,7 +1217,340 @@
         "bank-rail",
         "regulator"
       ],
-      "positions": {}
+      "positions": {
+        "balance-projector": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "balance-store": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "bank-rail": {
+          "x": 0,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "compliance-officer": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "customer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "finance-ops": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "finance-ops-console": {
+          "x": 370,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        },
+        "journal-store": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "posting-api": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "reconciliation-worker": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "regulator": {
+          "x": 420,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "settlement-events": {
+          "x": 710,
+          "y": 350,
+          "width": 220,
+          "height": 95
+        },
+        "statement-service": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        }
+      }
+    },
+    {
+      "id": "view-governance",
+      "name": "Governance",
+      "kind": "static",
+      "nodeIds": [
+        "req-balanced-entry-enforcement",
+        "req-reconciliation-freshness",
+        "req-statement-accuracy-cutoff",
+        "req-dispute-investigation-sla",
+        "ff-settlement-backlog-guard",
+        "ff-manual-adjustment-rate-guard",
+        "ff-regulatory-report-timeliness",
+        "adr-suspense-account-for-unmatched",
+        "adr-ledger-as-system-of-record",
+        "posting-api",
+        "reconciliation-worker",
+        "statement-service",
+        "finance-ops-console",
+        "balance-projector"
+      ],
+      "positions": {
+        "adr-ledger-as-system-of-record": {
+          "x": 320,
+          "y": 1912,
+          "width": 260,
+          "height": 52
+        },
+        "adr-suspense-account-for-unmatched": {
+          "x": 0,
+          "y": 1912,
+          "width": 260,
+          "height": 52
+        },
+        "balance-projector": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "ff-manual-adjustment-rate-guard": {
+          "x": 320,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "ff-regulatory-report-timeliness": {
+          "x": 640,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "ff-settlement-backlog-guard": {
+          "x": 0,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "finance-ops-console": {
+          "x": 370,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "posting-api": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "reconciliation-worker": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "req-balanced-entry-enforcement": {
+          "x": 0,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-dispute-investigation-sla": {
+          "x": 960,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-reconciliation-freshness": {
+          "x": 320,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-statement-accuracy-cutoff": {
+          "x": 640,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "statement-service": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        }
+      }
+    },
+    {
+      "id": "view-flow-customer",
+      "name": "Customer journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-customer",
+      "nodeIds": [
+        "flow-customer",
+        "mockup-accounts-overview",
+        "mockup-statement",
+        "mockup-transaction-detail",
+        "mockup-dispute",
+        "mockup-dispute-status"
+      ],
+      "positions": {
+        "flow-customer": {
+          "x": 0,
+          "y": 2084,
+          "width": 1560,
+          "height": 330
+        },
+        "mockup-accounts-overview": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-dispute": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-dispute-status": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-statement": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-transaction-detail": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-finance-ops",
+      "name": "Finance Ops journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-finance-ops",
+      "nodeIds": [
+        "flow-finance-ops",
+        "mockup-reconciliation-exceptions",
+        "mockup-exception-detail",
+        "mockup-compensating-entry",
+        "mockup-entry-approval",
+        "mockup-journal-entry"
+      ],
+      "positions": {
+        "flow-finance-ops": {
+          "x": 0,
+          "y": 2494,
+          "width": 1560,
+          "height": 330
+        },
+        "mockup-compensating-entry": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-entry-approval": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-exception-detail": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-journal-entry": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-reconciliation-exceptions": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-compliance",
+      "name": "Compliance journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-compliance",
+      "nodeIds": [
+        "flow-compliance",
+        "mockup-audit-trail",
+        "mockup-regulatory-reports"
+      ],
+      "positions": {
+        "flow-compliance": {
+          "x": 0,
+          "y": 2904,
+          "width": 600,
+          "height": 330
+        },
+        "mockup-audit-trail": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-regulatory-reports": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
     }
   ]
 }
