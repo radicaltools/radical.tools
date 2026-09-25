@@ -1383,7 +1383,7 @@
     },
     {
       "id": "view-governance",
-      "name": "Governance",
+      "name": "Governance map",
       "kind": "static",
       "nodeIds": [
         "req-listing-moderation",
@@ -1491,6 +1491,127 @@
           "y": 350,
           "width": 210,
           "height": 140
+        }
+      }
+    },
+    {
+      "id": "view-mockups",
+      "name": "Mockups",
+      "kind": "static",
+      "nodeIds": [
+        "flow-buyer",
+        "flow-seller",
+        "flow-trust-safety",
+        "mockup-mp-search",
+        "mockup-mp-listing",
+        "mockup-mp-checkout",
+        "mockup-order-dispute",
+        "mockup-mp-open-dispute",
+        "mockup-mp-dispute-status",
+        "mockup-seller-dashboard",
+        "mockup-new-listing",
+        "mockup-my-listings",
+        "mockup-seller-payouts",
+        "mockup-listing-review-queue",
+        "mockup-seller-investigation",
+        "mockup-ts-dispute-case"
+      ],
+      "positions": {
+        "flow-buyer": {
+          "x": 0,
+          "y": 2084,
+          "width": 1560,
+          "height": 630
+        },
+        "flow-seller": {
+          "x": 0,
+          "y": 2794,
+          "width": 1240,
+          "height": 330
+        },
+        "flow-trust-safety": {
+          "x": 0,
+          "y": 3204,
+          "width": 920,
+          "height": 330
+        },
+        "mockup-listing-review-queue": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-mp-checkout": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-mp-dispute-status": {
+          "x": 30,
+          "y": 410,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-mp-listing": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-mp-open-dispute": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-mp-search": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-my-listings": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-new-listing": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-order-dispute": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-seller-dashboard": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-seller-investigation": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-seller-payouts": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-ts-dispute-case": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
         }
       }
     },
@@ -1635,6 +1756,37 @@
           "height": 190
         }
       }
+    },
+    {
+      "id": "view-wiki-governance",
+      "name": "Governance",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-listing-moderation",
+        "req-commission-accuracy",
+        "req-dispute-window-hold",
+        "req-delisting-suppression",
+        "ff-payout-reconciliation-guard",
+        "ff-chargeback-rate-guard",
+        "ff-search-relevance-guard",
+        "adr-centralised-search-index",
+        "adr-suspend-first-moderation"
+      ],
+      "positions": {},
+      "wikiFocusId": null
+    },
+    {
+      "id": "view-wiki-requirements",
+      "name": "Requirements",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-listing-moderation",
+        "req-commission-accuracy",
+        "req-dispute-window-hold",
+        "req-delisting-suppression"
+      ],
+      "positions": {},
+      "wikiFocusId": null
     }
   ]
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Docs — Radical.Tools</title>
-  <meta name="description" content="Radical.Tools documentation: modelling with C4, DDD and governance, six view kinds, milestones, presentations, Markdown-folder persistence, the metamodel editor, the Concept Hub and the AI assistant." />
+  <meta name="description" content="Radical.Tools documentation: modelling with C4, DDD and governance, UI mockups and screen flows, six view kinds, milestones, presentations, Markdown-folder persistence, the metamodel editor, the Concept Hub and the AI assistant." />
   <!-- Before any stylesheet: sets data-theme for the first paint and is not blocked by a slow font CDN. -->
   <script src="theme.js?v=__BUILD__"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -49,6 +49,7 @@
             <li><a href="#elements">Elements</a></li>
             <li><a href="#relations">Relations</a></li>
             <li><a href="#properties">Properties &amp; governance</a></li>
+            <li><a href="#mockups">Mockups &amp; screen flows</a></li>
             <li><a href="#selection">Working with selections</a></li>
           </ul>
         </div>
@@ -78,6 +79,7 @@
             <li><a href="#metamodel">Metamodel editor</a></li>
             <li><a href="#hub">Concept Hub</a></li>
             <li><a href="#ai">AI assistant</a></li>
+            <li><a href="#forge">Radical Forge</a></li>
           </ul>
         </div>
         <div class="toc-group">
@@ -226,6 +228,32 @@
         <h3>ADRs and fitness functions</h3>
         <p>
           <strong>ADRs</strong> carry status (proposed → accepted → deprecated / superseded), date, context, decision, consequences and alternatives. <strong>Fitness functions</strong> carry category, trigger (on deploy / continuous / periodic), an <em>automated</em> flag, threshold and status. Both are ordinary elements: link them with <em>Constrains</em>, <em>Supersedes</em>, <em>Implements</em>, <em>Satisfies</em>, <em>Derives</em> and <em>Traces-to</em> relations to the parts of the architecture they govern, and they show up in the <a href="#view-table">Table</a>, <a href="#view-matrix">Matrix</a> and <a href="#view-wiki">Wiki</a> views like anything else.
+        </p>
+      </section>
+
+      <section class="doc-section" id="mockups">
+        <h2>Mockups &amp; screen flows</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/mockups-light.png" alt="The Shopper journey screen flow from the E-commerce blueprint: mockups with low-fi wireframes linked by labelled navigates-to relations; the right panel shows the selected Checkout mockup with its wireframe" loading="lazy" />
+          <img class="shot-dark" src="screenshots/mockups-dark.png" alt="The Shopper journey screen flow from the E-commerce blueprint: mockups with low-fi wireframes linked by labelled navigates-to relations; the right panel shows the selected Checkout mockup with its wireframe" loading="lazy" />
+          <figcaption>A screen flow: each mockup carries a low-fi wireframe, and <em>Navigates to</em> relations are labelled with the action that moves the user on.</figcaption>
+        </figure>
+        <p>
+          A <strong>Mockup</strong> (palette group <em>UX</em>) is one screen of the product. Beside label and description it has a <em>Screen / route</em> and an optional <em>Design link</em> to an external design (Figma, Penpot, …). Link it to the rest of the model with three relations:
+        </p>
+        <ul>
+          <li><strong>Illustrates</strong> — mockup → the requirements and scenarios the screen shows.</li>
+          <li><strong>Presented by</strong> — mockup → the web app or container that renders it.</li>
+          <li><strong>Navigates to</strong> — mockup → mockup, labelled with the triggering action (<em>Pay</em>, <em>Add to cart</em>). Chains of these are screen flows.</li>
+        </ul>
+        <h3>Wireframes</h3>
+        <p>
+          The <em>Wireframe</em> section of a mockup's properties (and of its <a href="#view-wiki">Wiki</a> page) shows a low-fi wireframe. With <a href="#ai">AI</a> enabled, <strong>Generate wireframe</strong> drafts one from the model around the screen: its description and route, the EARS requirements and Gherkin scenarios it illustrates, the container that presents it and the screens it navigates to. <em>Regenerate</em> and <em>Remove</em> do what they say; <em>Open design</em> follows the design link. Wireframes appear as thumbnails on the canvas and on Wiki overview cards.
+        </p>
+        <p>A wireframe is plain SVG stored on the element. Scripts, event handlers and external references are stripped, and it is only ever displayed as an image, so it can never run code or load anything.</p>
+        <h3>Screen flows</h3>
+        <p>
+          Group the mockups of one actor's journey in a <em>Group</em> (“Shopper journey”) and link the steps with <em>Navigates to</em>, including branches and returns (<em>Payment → Payment declined → try again</em>). Record the steps as a <a href="#view-flow">sequence</a> to replay the flow screen by screen in a Flow view or in Presenter.
         </p>
       </section>
 
@@ -441,7 +469,7 @@
         </figure>
         <ul>
           <li><strong>Templates</strong> — concepts with parameters (a latency budget, an endpoint, a data class) ask for values on import; the <em>Hub template</em> section in the element's properties lets you change them later.</li>
-          <li><strong>Blueprints</strong> — pick which elements and which referenced concepts to bring in.</li>
+          <li><strong>Blueprints</strong> — pick which elements and which referenced concepts to bring in. Every blueprint ships one <a href="#mockups">screen flow</a> per actor (mockups with wireframes) and named views: on the canvas <em>System context</em>, <em>Containers</em>, <em>Governance map</em>, <em>Mockups</em> (every screen flow with its wireframes), its technical flow and one Flow view per screen flow; in the wiki <em>Governance</em> and <em>Requirements</em>. In the Hub, the view selector next to <em>Canvas / Wiki / Table</em> lists the views of the current mode; on import they arrive as views of your model, limited to the elements you picked.</li>
           <li><strong>Drop target</strong> — with a compatible container selected, imported elements become its children.</li>
         </ul>
       </section>
@@ -463,6 +491,17 @@
           <li><strong>Answer questions</strong> — “what depends on the Event Bus?”, “which containers have no owner?”. It queries the model with a small query language (<code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>STATS MODEL</code>) rather than guessing.</li>
           <li><strong>Change the model</strong> — “add a Redis cache between the API gateway and the accounts service”. The answer is a <em>patch</em> (add / update / delete nodes and relations, add views) that is validated against the metamodel, applied atomically and undoable like any other edit.</li>
           <li><strong>Draft governance</strong> — turn a paragraph into EARS requirements or an ADR with the right fields filled.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="forge">
+        <h2>Radical Forge</h2>
+        <p>
+          <strong>Radical Forge</strong> (<em>Start with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
+        </p>
+        <ul>
+          <li><strong>Mockups</strong> come before C4: the stage creates the user-facing screens with <em>Illustrates</em> and <em>Navigates to</em> links, then <em>Generate wireframes</em> draws a wireframe for every mockup that has none. The C4 stage then designs the front-ends the screens need and links each mockup to its container with <em>Presented by</em>.</li>
+          <li><strong>Finish here</strong> ends the run at any stage and keeps what has been generated. The final step summarises every stage (what was added, what was skipped) and exports the scenarios as <code>.feature</code> files; <em>← Back</em> resumes where you stopped.</li>
         </ul>
       </section>
 
@@ -502,7 +541,7 @@ view   a view id, or <span class="cm">canvas</span> for the default Structure vi
 f      element page (Wiki views)      s   active milestone
 p / sl presentation and 0-based slide while presenting
 d      <span class="cm">ls:&lt;uuid&gt;</span> or <span class="cm">fs:&lt;path&gt;</span> — which model (local to this machine)</code></pre>
-        <p>The Hub uses <code>#/c/&lt;conceptId&gt;/v/canvas|wiki|table</code> and <code>studio.radical.tools/?hub=id1,id2</code> opens Studio with those concepts queued for import.</p>
+        <p>The Hub uses <code>#/c/&lt;conceptId&gt;/v/canvas|wiki|table</code> (plus <code>/cv/&lt;viewId&gt;</code> for one of a concept's named views) and <code>studio.radical.tools/?hub=id1,id2</code> opens Studio with those concepts queued for import.</p>
       </section>
 
       <section class="doc-section" id="shortcuts">

@@ -1267,7 +1267,7 @@
     },
     {
       "id": "view-governance",
-      "name": "Governance",
+      "name": "Governance map",
       "kind": "static",
       "nodeIds": [
         "req-escalation-pickup",
@@ -1382,6 +1382,106 @@
           "y": 110,
           "width": 300,
           "height": 200
+        }
+      }
+    },
+    {
+      "id": "view-mockups",
+      "name": "Mockups",
+      "kind": "static",
+      "nodeIds": [
+        "flow-customer",
+        "flow-human-agent",
+        "flow-assistant-ops",
+        "mockup-chat-start",
+        "mockup-chat-answer",
+        "mockup-support-chat",
+        "mockup-chat-human",
+        "mockup-escalation-queue",
+        "mockup-case-review",
+        "mockup-case-resolved",
+        "mockup-case-audit",
+        "mockup-kb-sources",
+        "mockup-quality-drift"
+      ],
+      "positions": {
+        "flow-assistant-ops": {
+          "x": 0,
+          "y": 2904,
+          "width": 600,
+          "height": 330
+        },
+        "flow-customer": {
+          "x": 0,
+          "y": 2084,
+          "width": 1240,
+          "height": 330
+        },
+        "flow-human-agent": {
+          "x": 0,
+          "y": 2494,
+          "width": 1240,
+          "height": 330
+        },
+        "mockup-case-audit": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-case-resolved": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-case-review": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-chat-answer": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-chat-human": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-chat-start": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-escalation-queue": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-kb-sources": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-quality-drift": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-support-chat": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
         }
       }
     },
@@ -1505,6 +1605,37 @@
           "height": 190
         }
       }
+    },
+    {
+      "id": "view-wiki-governance",
+      "name": "Governance",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-escalation-pickup",
+        "req-extraction-review",
+        "req-kb-freshness",
+        "req-case-audit-trail",
+        "ff-escalation-backlog-guard",
+        "ff-extraction-drift-monitor",
+        "ff-cost-per-case-guard",
+        "adr-confidence-gated-autonomy",
+        "adr-retrieval-over-finetuning"
+      ],
+      "positions": {},
+      "wikiFocusId": null
+    },
+    {
+      "id": "view-wiki-requirements",
+      "name": "Requirements",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-escalation-pickup",
+        "req-extraction-review",
+        "req-kb-freshness",
+        "req-case-audit-trail"
+      ],
+      "positions": {},
+      "wikiFocusId": null
     }
   ]
 }

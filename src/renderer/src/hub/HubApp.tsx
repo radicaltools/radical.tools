@@ -23,6 +23,7 @@ import {
   conceptToDiagramData,
   defaultViewKind,
   kindForViewId,
+  isSyntheticViewId,
   viewIdForKind,
   type HubViewKind,
 } from './conceptToDiagram'
@@ -263,9 +264,9 @@ function HubAppInner(): React.ReactElement {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem(LS_THEME) as 'dark' | 'light') || 'dark')
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
   const [tagsExpanded, setTagsExpanded] = useState(false)
-  // Pending view kind (and named canvas view) from a deep link, applied once the concept is loaded.
+  // Pending view kind (and named view) from a deep link, applied once the concept is loaded.
   const pendingView = useRef<HubViewKind | undefined>(parseHubHash(window.location.hash).view)
-  const pendingCanvasView = useRef<string | undefined>(parseHubHash(window.location.hash).canvasView)
+  const pendingNamedView = useRef<string | undefined>(parseHubHash(window.location.hash).namedView)
   const views = useDiagramStore((s) => s.views)
 
   useEffect(() => {
@@ -292,14 +293,15 @@ function HubAppInner(): React.ReactElement {
     [concept, concepts],
   )
   const [conceptError, setConceptError] = useState<string | null>(null)
-  const viewKind = kindForViewId(activeViewId)
-  // The concept's own named canvas views ("Containers", a screen flow, …);
-  // `null` = the full model ("All elements").
-  const canvasViews = useMemo(
-    () => Object.values(views).filter((v) => kindForViewId(v.id) === 'canvas'),
-    [views],
+  const viewKind = kindForViewId(activeViewId, views)
+  // The concept's own named views for the current mode ("Containers" or a
+  // screen flow on the canvas, "Governance" in the wiki, …); `null` = all
+  // elements (the default canvas / the synthetic wiki and table views).
+  const namedViews = useMemo(
+    () => Object.values(views).filter((v) => !isSyntheticViewId(v.id) && kindForViewId(v.id, views) === viewKind),
+    [views, viewKind],
   )
-  const canvasViewId = viewKind === 'canvas' ? activeViewId : null
+  const namedViewId = activeViewId && !isSyntheticViewId(activeViewId) ? activeViewId : null
 
   // Fetch the selected concept's .radical file once the index knows about it.
   useEffect(() => {
@@ -316,13 +318,16 @@ function HubAppInner(): React.ReactElement {
   useEffect(() => {
     if (!concept) return
     loadDiagram(conceptToDiagramData(concept))
-    const kind = pendingView.current ?? defaultViewKind(concept)
-    const named = pendingCanvasView.current
+    const named = pendingNamedView.current
+    const namedDef = named ? (concept.views ?? []).find((v) => v.id === named) : undefined
+    const namedKind: HubViewKind | undefined = namedDef
+      ? namedDef.kind === 'wiki' ? 'wiki' : namedDef.kind === 'table' ? 'table' : 'canvas'
+      : undefined
+    const kind = namedKind ?? pendingView.current ?? defaultViewKind(concept)
     pendingView.current = undefined
-    pendingCanvasView.current = undefined
-    const hasNamed = kind === 'canvas' && !!named && (concept.views ?? []).some((v) => v.id === named)
-    if (hasNamed) loadDiagram(conceptToDiagramData(concept, { layoutFrom: named }))
-    setActiveView(hasNamed ? named! : viewIdForKind(kind))
+    pendingNamedView.current = undefined
+    if (namedKind === 'canvas') loadDiagram(conceptToDiagramData(concept, { layoutFrom: named }))
+    setActiveView(namedKind ? named! : viewIdForKind(kind))
     if (kind === 'canvas') return scheduleFit(fitAll)
   }, [concept, loadDiagram, setActiveView, fitAll])
 
@@ -341,7 +346,7 @@ function HubAppInner(): React.ReactElement {
       browse: browsing,
       concept: concept?.id,
       view: concept ? viewKind : undefined,
-      canvasView: concept && canvasViewId ? canvasViewId : undefined,
+      namedView: concept && namedViewId ? namedViewId : undefined,
       category: activeCategory ?? undefined,
       tag: setToCsv(activeTags),
       status: setToCsv(activeStatuses),
@@ -353,16 +358,15 @@ function HubAppInner(): React.ReactElement {
     const url = hash || window.location.pathname
     if (changed) history.pushState(null, '', url)
     else history.replaceState(null, '', url)
-  }, [browsing, concept, viewKind, canvasViewId, activeCategory, activeTags, activeStatuses, sortBy])
+  }, [browsing, concept, viewKind, namedViewId, activeCategory, activeTags, activeStatuses, sortBy])
 
   // URL → state (back/forward, pasted links).
   useEffect(() => {
     const onHash = () => {
       const r = parseHubHash(window.location.hash)
       setBrowsing(!!r.browse)
-      if (r.concept !== conceptId) { pendingView.current = r.view; pendingCanvasView.current = r.canvasView; setConceptId(r.concept) }
-      else if (r.view === 'canvas' && (r.canvasView ?? null) !== canvasViewId) switchCanvasViewRef.current(r.canvasView ?? null)
-      else if (r.view && r.view !== viewKind) setActiveView(viewIdForKind(r.view))
+      if (r.concept !== conceptId) { pendingView.current = r.view; pendingNamedView.current = r.namedView; setConceptId(r.concept) }
+      else if (r.view && (r.view !== viewKind || (r.namedView ?? null) !== namedViewId)) switchNamedViewRef.current(r.view, r.namedView ?? null)
       setCategory(r.category ?? null)
       setTags(csvToSet(r.tag))
       setStatuses(csvToSet(r.status))
@@ -374,7 +378,7 @@ function HubAppInner(): React.ReactElement {
       window.removeEventListener('hashchange', onHash)
       window.removeEventListener('popstate', onHash)
     }
-  }, [conceptId, viewKind, canvasViewId, setActiveView, setCategory, setTags, setStatuses, setSortBy])
+  }, [conceptId, viewKind, namedViewId, setActiveView, setCategory, setTags, setStatuses, setSortBy])
 
   // Reload the concept laid out for the chosen view (null = the full model
   // in its default layout) — see conceptToDiagramData's `layoutFrom`.
@@ -384,13 +388,15 @@ function HubAppInner(): React.ReactElement {
     setActiveView(viewId)
     scheduleFit(fitAll)
   }, [concept, loadDiagram, setActiveView, fitAll])
-  const switchCanvasViewRef = useRef(switchCanvasView)
-  switchCanvasViewRef.current = switchCanvasView
-
-  const switchView = useCallback((kind: HubViewKind) => {
-    if (kind === 'canvas') return switchCanvasView(null)
-    setActiveView(viewIdForKind(kind))
+  // Any mode + optional named view; canvas goes through the reload above.
+  const switchNamedView = useCallback((kind: HubViewKind, viewId: string | null) => {
+    if (kind === 'canvas') return switchCanvasView(viewId)
+    setActiveView(viewId ?? viewIdForKind(kind))
   }, [setActiveView, switchCanvasView])
+  const switchNamedViewRef = useRef(switchNamedView)
+  switchNamedViewRef.current = switchNamedView
+
+  const switchView = useCallback((kind: HubViewKind) => switchNamedView(kind, null), [switchNamedView])
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => toggleInSet(prev, id))
@@ -687,21 +693,21 @@ function HubAppInner(): React.ReactElement {
                       </button>
                     ))}
                   </div>
+                  {namedViews.length > 0 && (
+                    <select
+                      className="hub-view-select"
+                      value={namedViewId ?? ''}
+                      onChange={(e) => switchNamedView(viewKind, e.target.value || null)}
+                      title="Named views of this concept"
+                    >
+                      <option value="">All elements</option>
+                      {namedViews.map((v) => (
+                        <option key={v.id} value={v.id}>{v.name}</option>
+                      ))}
+                    </select>
+                  )}
                   {viewKind === 'canvas' && (
                     <>
-                      {canvasViews.length > 0 && (
-                        <select
-                          className="hub-view-select"
-                          value={canvasViewId ?? ''}
-                          onChange={(e) => switchCanvasView(e.target.value || null)}
-                          title="Named views of this concept"
-                        >
-                          <option value="">All elements</option>
-                          {canvasViews.map((v) => (
-                            <option key={v.id} value={v.id}>{v.name}</option>
-                          ))}
-                        </select>
-                      )}
                       <button type="button" className="toolbar-btn" onClick={fitAll} title="Fit all nodes to viewport"><IconFitAll /> Fit</button>
                       <SmartLayoutButton readOnlyNote="Exploration only — nothing is saved." />
                     </>

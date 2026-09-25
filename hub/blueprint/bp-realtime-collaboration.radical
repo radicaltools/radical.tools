@@ -1092,7 +1092,7 @@
     },
     {
       "id": "view-governance",
-      "name": "Governance",
+      "name": "Governance map",
       "kind": "static",
       "nodeIds": [
         "req-offline-merge",
@@ -1204,6 +1204,92 @@
       }
     },
     {
+      "id": "view-mockups",
+      "name": "Mockups",
+      "kind": "static",
+      "nodeIds": [
+        "flow-collaborator",
+        "flow-workspace-admin",
+        "mockup-doc-list",
+        "mockup-document-editor",
+        "mockup-reconnect-merge",
+        "mockup-version-history",
+        "mockup-restore-version",
+        "mockup-share-dialog",
+        "mockup-workspace-members",
+        "mockup-remove-member",
+        "mockup-access-revoked"
+      ],
+      "positions": {
+        "flow-collaborator": {
+          "x": 0,
+          "y": 2084,
+          "width": 1560,
+          "height": 330
+        },
+        "flow-workspace-admin": {
+          "x": 0,
+          "y": 2494,
+          "width": 1240,
+          "height": 330
+        },
+        "mockup-access-revoked": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-doc-list": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-document-editor": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-reconnect-merge": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-remove-member": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-restore-version": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-share-dialog": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-version-history": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-workspace-members": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
       "id": "view-flow-collaborator",
       "name": "Collaborator journey",
       "kind": "dynamic",
@@ -1299,6 +1385,37 @@
           "height": 190
         }
       }
+    },
+    {
+      "id": "view-wiki-governance",
+      "name": "Governance",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-offline-merge",
+        "req-room-capacity",
+        "req-access-revocation",
+        "req-snapshot-recovery",
+        "ff-presence-fanout-guard",
+        "ff-snapshot-compaction-lag",
+        "ff-reconnect-success-rate",
+        "adr-crdt-over-ot",
+        "adr-stateless-gateway-fleet"
+      ],
+      "positions": {},
+      "wikiFocusId": null
+    },
+    {
+      "id": "view-wiki-requirements",
+      "name": "Requirements",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-offline-merge",
+        "req-room-capacity",
+        "req-access-revocation",
+        "req-snapshot-recovery"
+      ],
+      "positions": {},
+      "wikiFocusId": null
     }
   ]
 }
