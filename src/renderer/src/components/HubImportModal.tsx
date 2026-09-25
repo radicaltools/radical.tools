@@ -5,6 +5,7 @@ import { useDiagramStore } from '../store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType, DiagramSequence } from '../types/c4'
 import { NODE_SIZES } from '../types/c4'
 import { isParentAllowed } from '../types/metamodel'
+import { nodeTypeTheme } from '../types/hubTheme'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -979,11 +980,12 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
                   component: 'Components', database: 'Databases', webapp: 'Web Apps',
                   queue: 'Queues', domain: 'Domains', group: 'Groups',
                   adr: 'ADRs', 'fitness-fn': 'Fitness Functions', requirement: 'Requirements',
+                  person: 'People',
                 }
                 return Object.entries(grouped).filter(([type]) => type !== 'blueprint').map(([type, nodes]) => (
                   <div key={type} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 2 }}>
-                      {TYPE_LABELS_LOCAL[type] ?? type} ({nodes.length})
+                      {TYPE_LABELS_LOCAL[type] ?? nodeTypeTheme(type).plural} ({nodes.length})
                     </div>
                     {nodes.map((n) => {
                       const nodeId = n.id as string

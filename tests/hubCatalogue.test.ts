@@ -4,12 +4,16 @@
  *   - every top-level hub/<category>/<id>.radical is valid (hub block, ids, refs)
  *   - index.json summaries carry what the cards / drop-target check need
  *   - doc ↔ concept mapping round-trips
+ *   - blueprint mockups are wired up with metamodel-valid relations and
+ *     carry wireframes that are already sanitised
  */
 import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
 import { readCatalogue, validateCatalogue, buildIndex } from '../tools/hubCatalogue'
 import { conceptToDoc, docToConcept, summarize, type HubRadicalDoc } from '../src/renderer/src/hub/hubFormat'
 import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
+import { builtInGovernanceMetamodel } from '../src/renderer/src/types/metamodel'
+import { sanitizeWireframeSvg } from '../src/renderer/src/ai/mockupWireframe'
 
 const HUB_DIR = resolve(__dirname, '../hub')
 
@@ -78,5 +82,34 @@ describe('studio round-trip', () => {
     expect(useDiagramStore.getState().saveDiagram().hub).toEqual(doc.hub)
     store.newDiagram()
     expect(useDiagramStore.getState().saveDiagram().hub).toBeUndefined()
+  })
+})
+
+describe('blueprint mockups', () => {
+  const blueprints = readCatalogue(HUB_DIR).filter((e) => e.doc.hub.category === 'blueprint')
+  const mm = builtInGovernanceMetamodel()
+
+  it.each(blueprints.map((e) => [e.file, e.doc] as const))('%s has wired-up mockups with sanitised wireframes', (_file, doc) => {
+    const byId = new Map(doc.nodes.map((n) => [String(n.id), n]))
+    const mockups = doc.nodes.filter((n) => n.type === 'mockup')
+    expect(mockups.length).toBeGreaterThan(0)
+
+    for (const m of mockups) {
+      const wireframe = m.wireframe as string
+      expect(typeof m.screen).toBe('string')
+      expect(sanitizeWireframeSvg(wireframe)).toBe(wireframe)
+      const out = (doc.relations ?? []).filter((r) => r.sourceId === m.id)
+      expect(out.filter((r) => r.relationType === 'presented-by')).toHaveLength(1)
+    }
+
+    for (const r of doc.relations ?? []) {
+      const src = byId.get(r.sourceId)
+      const tgt = byId.get(r.targetId)
+      expect(src, `${r.id}: missing source`).toBeDefined()
+      expect(tgt, `${r.id}: missing target`).toBeDefined()
+      if (src!.type !== 'mockup') continue
+      const pairs = mm.relationTypes[r.relationType ?? '']?.allowedPairs ?? []
+      expect(pairs.some((p) => p.from === src!.type && p.to === tgt!.type), `${r.id}: ${r.relationType} ${src!.type} → ${tgt!.type}`).toBe(true)
+    }
   })
 })

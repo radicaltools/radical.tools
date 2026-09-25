@@ -357,6 +357,45 @@
       "decision": "Gateways hold no document state themselves; they publish and subscribe to operations through a shared broadcast bus, so any instance can serve any client.",
       "consequences": "Gateway instances scale and restart freely with no handoff logic, but every operation takes an extra hop through the bus, adding a small amount of latency to the common case.",
       "alternatives": "1. Sticky sessions routing all of a document's clients to one gateway instance — lower latency per operation, but that instance becomes a single point of failure and a hot-spot for popular documents. 2. Shared broadcast bus (chosen). 3. Peer-to-peer mesh between clients — no server bottleneck, but NAT traversal and offline persistence become much harder to get right."
+    },
+    {
+      "id": "mockup-document-editor",
+      "type": "mockup",
+      "label": "Document Editor",
+      "description": "Everyone edits a local replica: changes apply instantly, keep working offline (up to {{OFFLINE_GRACE_HOURS}} h) and merge on reconnect; presence shows up to {{MAX_DOC_COLLABORATORS}} collaborators.",
+      "x": 0,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/d/:docId",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Q3 Planning</text>\n  <circle cx=\"272\" cy=\"15\" r=\"8\" fill=\"#bbb\" stroke=\"#fff\"/>\n  <circle cx=\"284\" cy=\"15\" r=\"8\" fill=\"#999\" stroke=\"#fff\"/>\n  <circle cx=\"296\" cy=\"15\" r=\"8\" fill=\"#ccc\" stroke=\"#fff\"/>\n  <circle cx=\"308\" cy=\"15\" r=\"8\" fill=\"#aaa\" stroke=\"#fff\"/>\n  <text x=\"324\" y=\"19\" font-size=\"8\" fill=\"#666\">+3</text>\n  <rect x=\"342\" y=\"6\" width=\"50\" height=\"18\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"367.0\" y=\"18.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Share</text>\n  <rect x=\"0\" y=\"30\" width=\"400\" height=\"22\" rx=\"0\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <rect x=\"10\" y=\"35\" width=\"16\" height=\"12\" rx=\"2\" fill=\"#eee\" stroke=\"#eee\"/>\n  <rect x=\"32\" y=\"35\" width=\"16\" height=\"12\" rx=\"2\" fill=\"#eee\" stroke=\"#eee\"/>\n  <rect x=\"54\" y=\"35\" width=\"16\" height=\"12\" rx=\"2\" fill=\"#eee\" stroke=\"#eee\"/>\n  <rect x=\"76\" y=\"35\" width=\"16\" height=\"12\" rx=\"2\" fill=\"#eee\" stroke=\"#eee\"/>\n  <rect x=\"98\" y=\"35\" width=\"16\" height=\"12\" rx=\"2\" fill=\"#eee\" stroke=\"#eee\"/>\n  <rect x=\"120\" y=\"35\" width=\"16\" height=\"12\" rx=\"2\" fill=\"#eee\" stroke=\"#eee\"/>\n  <rect x=\"142\" y=\"35\" width=\"16\" height=\"12\" rx=\"2\" fill=\"#eee\" stroke=\"#eee\"/>\n  <rect x=\"254\" y=\"34\" width=\"145\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"326.5\" y=\"44\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">Offline — edits saved locally</text>\n  <text x=\"40\" y=\"84\" font-size=\"16\" fill=\"#333\" font-weight=\"bold\">Q3 Planning</text>\n  <rect x=\"40\" y=\"100\" width=\"320\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"40\" y=\"111\" width=\"320\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"40\" y=\"122\" width=\"192\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"40\" y=\"150\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Goals</text>\n  <rect x=\"40\" y=\"160\" width=\"300\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"40\" y=\"171\" width=\"180\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <line x1=\"206\" y1=\"158\" x2=\"206\" y2=\"172\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <rect x=\"206\" y=\"148\" width=\"22\" height=\"10\" fill=\"#2563eb\"/>\n  <text x=\"217\" y=\"156\" font-size=\"7\" fill=\"#fff\" text-anchor=\"middle\">Ana</text>\n  <text x=\"40\" y=\"206\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Risks</text>\n  <rect x=\"40\" y=\"216\" width=\"290\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"40\" y=\"227\" width=\"290\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"40\" y=\"238\" width=\"174\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"40\" y=\"280\" font-size=\"8\" fill=\"#2563eb\">History</text>\n</svg>"
+    },
+    {
+      "id": "mockup-share-dialog",
+      "type": "mockup",
+      "label": "Share & Access",
+      "description": "Workspace admins manage who can open the document; removing someone disconnects their live session instead of waiting for it to expire.",
+      "x": 320,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/d/:docId/share",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"300\" rx=\"0\" fill=\"#e5e7eb\" stroke=\"#e5e7eb\"/>\n  <rect x=\"60\" y=\"30\" width=\"280\" height=\"244\" rx=\"6\" fill=\"#fff\" stroke=\"#333\"/>\n  <text x=\"76\" y=\"56\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Share “Q3 Planning”</text>\n  <rect x=\"76\" y=\"68\" width=\"184\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"82\" y=\"80.0\" font-size=\"8\" fill=\"#999\">Add people or groups</text>\n  <rect x=\"268\" y=\"68\" width=\"56\" height=\"18\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"296.0\" y=\"80.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Invite</text>\n  <circle cx=\"88\" cy=\"110\" r=\"9\" fill=\"#bbb\" stroke=\"#fff\"/>\n  <rect x=\"104\" y=\"104\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"104\" y=\"113\" width=\"54\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"324\" y=\"114\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">Owner</text>\n  <circle cx=\"88\" cy=\"140\" r=\"9\" fill=\"#999\" stroke=\"#fff\"/>\n  <rect x=\"104\" y=\"134\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"104\" y=\"143\" width=\"54\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"214\" y=\"132\" width=\"70\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"220\" y=\"144.0\" font-size=\"8\" fill=\"#999\">Can edit</text>\n  <path d=\"M272 139 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <text x=\"324\" y=\"144\" font-size=\"8\" fill=\"#2563eb\" text-anchor=\"end\">Remove</text>\n  <circle cx=\"88\" cy=\"170\" r=\"9\" fill=\"#ccc\" stroke=\"#fff\"/>\n  <rect x=\"104\" y=\"164\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"104\" y=\"173\" width=\"54\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"214\" y=\"162\" width=\"70\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"220\" y=\"174.0\" font-size=\"8\" fill=\"#999\">Can edit</text>\n  <path d=\"M272 169 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <text x=\"324\" y=\"174\" font-size=\"8\" fill=\"#2563eb\" text-anchor=\"end\">Remove</text>\n  <circle cx=\"88\" cy=\"200\" r=\"9\" fill=\"#aaa\" stroke=\"#fff\"/>\n  <rect x=\"104\" y=\"194\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"104\" y=\"203\" width=\"54\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"214\" y=\"192\" width=\"70\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"220\" y=\"204.0\" font-size=\"8\" fill=\"#999\">Can view</text>\n  <path d=\"M272 199 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <text x=\"324\" y=\"204\" font-size=\"8\" fill=\"#2563eb\" text-anchor=\"end\">Remove</text>\n  <text x=\"76\" y=\"228\" font-size=\"8\" fill=\"#666\">Link access</text>\n  <rect x=\"76\" y=\"232\" width=\"248\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"82\" y=\"244.0\" font-size=\"8\" fill=\"#999\">Only people in the workspace</text>\n  <path d=\"M312 239 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <text x=\"76\" y=\"264\" font-size=\"7.5\" fill=\"#666\">Removing someone disconnects their open session immediately.</text>\n</svg>"
+    },
+    {
+      "id": "mockup-version-history",
+      "type": "mockup",
+      "label": "Version History",
+      "description": "Browse and restore any earlier state of the document, reconstructed from snapshots plus the operation log.",
+      "x": 640,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/d/:docId/history",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Q3 Planning — Version history</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Close</text>\n  <text x=\"24\" y=\"60\" font-size=\"14\" fill=\"#333\" font-weight=\"bold\">Q3 Planning</text>\n  <rect x=\"24\" y=\"74\" width=\"230\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"24\" y=\"85\" width=\"230\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"24\" y=\"96\" width=\"138\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"20\" y=\"108\" width=\"238\" height=\"40\" rx=\"3\" fill=\"#dbeafe\" stroke=\"#2563eb\"/>\n  <rect x=\"28\" y=\"116\" width=\"210\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"28\" y=\"126\" width=\"210\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"28\" y=\"136\" width=\"126\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"24\" y=\"164\" width=\"220\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"24\" y=\"175\" width=\"220\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"24\" y=\"186\" width=\"220\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"24\" y=\"197\" width=\"132\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"270\" y=\"30\" width=\"130\" height=\"270\" rx=\"0\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"282\" y=\"50\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Today 14:02</text>\n  <text x=\"282\" y=\"62\" font-size=\"8\" fill=\"#666\">Ana, Ben</text>\n  <rect x=\"274\" y=\"74\" width=\"122\" height=\"34\" rx=\"3\" fill=\"#eef2ff\" stroke=\"#eef2ff\"/>\n  <text x=\"282\" y=\"88\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Today 11:40</text>\n  <text x=\"282\" y=\"100\" font-size=\"8\" fill=\"#666\">Ben</text>\n  <text x=\"282\" y=\"126\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Yesterday 17:15</text>\n  <text x=\"282\" y=\"138\" font-size=\"8\" fill=\"#666\">Ana, Chris, +2</text>\n  <text x=\"282\" y=\"164\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Yesterday 09:03</text>\n  <text x=\"282\" y=\"176\" font-size=\"8\" fill=\"#666\">Chris</text>\n  <text x=\"282\" y=\"202\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">2 Apr 16:48</text>\n  <text x=\"282\" y=\"214\" font-size=\"8\" fill=\"#666\">Ana</text>\n  <rect x=\"280\" y=\"262\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"335.0\" y=\"275.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Restore this version</text>\n</svg>"
     }
   ],
   "relations": [
@@ -496,6 +535,62 @@
       "sourceId": "req-room-capacity",
       "targetId": "adr-stateless-gateway-fleet",
       "relationType": "traces-to"
+    },
+    {
+      "id": "mockup-document-editor--req-offline-merge",
+      "sourceId": "mockup-document-editor",
+      "targetId": "req-offline-merge",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-document-editor--req-room-capacity",
+      "sourceId": "mockup-document-editor",
+      "targetId": "req-room-capacity",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-document-editor--editor-client",
+      "sourceId": "mockup-document-editor",
+      "targetId": "editor-client",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-document-editor--mockup-share-dialog",
+      "sourceId": "mockup-document-editor",
+      "targetId": "mockup-share-dialog",
+      "relationType": "navigates-to",
+      "label": "Share"
+    },
+    {
+      "id": "mockup-document-editor--mockup-version-history",
+      "sourceId": "mockup-document-editor",
+      "targetId": "mockup-version-history",
+      "relationType": "navigates-to",
+      "label": "History"
+    },
+    {
+      "id": "mockup-share-dialog--req-access-revocation",
+      "sourceId": "mockup-share-dialog",
+      "targetId": "req-access-revocation",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-share-dialog--editor-client",
+      "sourceId": "mockup-share-dialog",
+      "targetId": "editor-client",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-version-history--req-snapshot-recovery",
+      "sourceId": "mockup-version-history",
+      "targetId": "req-snapshot-recovery",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-version-history--editor-client",
+      "sourceId": "mockup-version-history",
+      "targetId": "editor-client",
+      "relationType": "presented-by"
     }
   ],
   "sequences": [

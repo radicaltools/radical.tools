@@ -392,6 +392,45 @@
       "decision": "The internal journal is the source of truth for what the product shows the customer; the bank feed is an input reconciled against it, not the other way round.",
       "consequences": "A balance can update the instant a posting is accepted, before the bank settles — which means \"posted\" and \"reconciled\" must be visibly different states, or a customer or support agent will confuse a provisional balance with a settled one.",
       "alternatives": "1. Bank/processor as source of truth, product waits for their confirmation — correct by construction, but the customer's balance now lags the actual action by the settlement delay. 2. Internal ledger as source of truth (chosen). 3. Dual-write both, resolve conflicts on read — no clear authority, hardest of the three to reason about when they disagree."
+    },
+    {
+      "id": "mockup-statement",
+      "type": "mockup",
+      "label": "Account Statement",
+      "description": "Customer statement generated strictly from balances replayed through a fixed cut-off; each line links to a dispute.",
+      "x": 0,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/accounts/:id/statement",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Bank</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Help</text>\n  <text x=\"352\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Statements</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Accounts</text>\n  <text x=\"16\" y=\"54\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Statement — March 2026</text>\n  <text x=\"16\" y=\"70\" font-size=\"8\" fill=\"#666\">Balances as of the cut-off: 31 Mar 2026, 23:59:59 UTC</text>\n  <rect x=\"16\" y=\"80\" width=\"176\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"96\" font-size=\"8\" fill=\"#666\">Opening balance</text>\n  <text x=\"26\" y=\"114\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">€2,410.55</text>\n  <rect x=\"208\" y=\"80\" width=\"176\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"218\" y=\"96\" font-size=\"8\" fill=\"#666\">Closing balance</text>\n  <text x=\"218\" y=\"114\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">€1,982.13</text>\n  <rect x=\"16\" y=\"134\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"146.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Date</text>\n  <text x=\"82\" y=\"146.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Description</text>\n  <text x=\"252\" y=\"146.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Amount</text>\n  <text x=\"322\" y=\"146.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\"></text>\n  <line x1=\"16\" y1=\"170\" x2=\"384\" y2=\"170\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"164.0\" font-size=\"8\" fill=\"#333\">03 Mar</text>\n  <text x=\"82\" y=\"164.0\" font-size=\"8\" fill=\"#333\">Card — Green Grocer</text>\n  <text x=\"252\" y=\"164.0\" font-size=\"8\" fill=\"#333\">−42.10</text>\n  <text x=\"322\" y=\"164.0\" font-size=\"8\" fill=\"#2563eb\">Dispute</text>\n  <line x1=\"16\" y1=\"188\" x2=\"384\" y2=\"188\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"182.0\" font-size=\"8\" fill=\"#333\">07 Mar</text>\n  <text x=\"82\" y=\"182.0\" font-size=\"8\" fill=\"#333\">Salary — Acme Ltd</text>\n  <text x=\"252\" y=\"182.0\" font-size=\"8\" fill=\"#333\">+3,200.00</text>\n  <text x=\"322\" y=\"182.0\" font-size=\"8\" fill=\"#2563eb\">Dispute</text>\n  <line x1=\"16\" y1=\"206\" x2=\"384\" y2=\"206\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"200.0\" font-size=\"8\" fill=\"#333\">12 Mar</text>\n  <text x=\"82\" y=\"200.0\" font-size=\"8\" fill=\"#333\">Transfer to savings</text>\n  <text x=\"252\" y=\"200.0\" font-size=\"8\" fill=\"#333\">−500.00</text>\n  <text x=\"322\" y=\"200.0\" font-size=\"8\" fill=\"#2563eb\">Dispute</text>\n  <line x1=\"16\" y1=\"224\" x2=\"384\" y2=\"224\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"218.0\" font-size=\"8\" fill=\"#333\">18 Mar</text>\n  <rect x=\"82\" y=\"212.5\" width=\"120\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"252\" y=\"212.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"322\" y=\"218.0\" font-size=\"8\" fill=\"#2563eb\">Dispute</text>\n  <line x1=\"16\" y1=\"242\" x2=\"384\" y2=\"242\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"236.0\" font-size=\"8\" fill=\"#333\">24 Mar</text>\n  <rect x=\"82\" y=\"230.5\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"252\" y=\"230.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"322\" y=\"236.0\" font-size=\"8\" fill=\"#2563eb\">Dispute</text>\n  <rect x=\"16\" y=\"262\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"76.0\" y=\"275.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Download PDF</text>\n</svg>"
+    },
+    {
+      "id": "mockup-dispute",
+      "type": "mockup",
+      "label": "Dispute a Transaction",
+      "description": "Opens an investigation the moment it is submitted; the customer gets a resolution or explanation within {{DISPUTE_INVESTIGATION_DAYS}} days.",
+      "x": 320,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/disputes/new",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Bank</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Help</text>\n  <text x=\"352\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Statements</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Accounts</text>\n  <text x=\"16\" y=\"54\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Dispute a transaction</text>\n  <rect x=\"16\" y=\"64\" width=\"368\" height=\"30\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"83\" font-size=\"9\" fill=\"#333\">03 Mar 2026 · Card — Green Grocer · −€42.10</text>\n  <text x=\"16\" y=\"112\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">What went wrong?</text>\n  <circle cx=\"20.5\" cy=\"124.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"31\" y=\"128\" font-size=\"8\" fill=\"#333\">I didn't make this payment</text>\n  <circle cx=\"20.5\" cy=\"140.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <circle cx=\"20.5\" cy=\"140.5\" r=\"2.2\" fill=\"#2563eb\"/>\n  <text x=\"31\" y=\"144\" font-size=\"8\" fill=\"#333\">I was charged the wrong amount</text>\n  <circle cx=\"20.5\" cy=\"156.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"31\" y=\"160\" font-size=\"8\" fill=\"#333\">I didn't receive the goods or service</text>\n  <text x=\"16\" y=\"176\" font-size=\"8\" fill=\"#666\">Tell us what happened</text>\n  <rect x=\"16\" y=\"180\" width=\"368\" height=\"46\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"206.0\" font-size=\"8\" fill=\"#999\">Charged €42.10, receipt says €24.10…</text>\n  <text x=\"16\" y=\"244\" font-size=\"8\" fill=\"#666\">We'll open an investigation right away and reply within the investigation window.</text>\n  <rect x=\"16\" y=\"258\" width=\"90\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"61.0\" y=\"271.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Cancel</text>\n  <rect x=\"264\" y=\"258\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"324.0\" y=\"271.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Submit dispute</text>\n</svg>"
+    },
+    {
+      "id": "mockup-reconciliation-exceptions",
+      "type": "mockup",
+      "label": "Reconciliation Exceptions",
+      "description": "Finance Ops queue of settlement events not matched within {{RECONCILIATION_LAG_MIN}} minutes. Corrections are compensating entries that must balance before they can be submitted — the journal itself is never edited.",
+      "x": 640,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/ops/exceptions",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Finance Ops</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Journal</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Exceptions (7)</text>\n  <rect x=\"16\" y=\"40\" width=\"62\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"47.0\" y=\"50\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Unmatched 5</text>\n  <rect x=\"84\" y=\"40\" width=\"90\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"129.0\" y=\"50\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Amount mismatch 2</text>\n  <rect x=\"180\" y=\"40\" width=\"90\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"225.0\" y=\"50\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Older than 24 h 1</text>\n  <rect x=\"16\" y=\"62\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"74.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Settlement ref</text>\n  <text x=\"132\" y=\"74.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Amount</text>\n  <text x=\"202\" y=\"74.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Age</text>\n  <text x=\"252\" y=\"74.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Status</text>\n  <rect x=\"16\" y=\"80\" width=\"368\" height=\"18\" fill=\"#eef2ff\"/>\n  <line x1=\"16\" y1=\"98\" x2=\"384\" y2=\"98\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"92.0\" font-size=\"8\" fill=\"#333\">STL-88213</text>\n  <text x=\"132\" y=\"92.0\" font-size=\"8\" fill=\"#333\">1,250.00</text>\n  <text x=\"202\" y=\"92.0\" font-size=\"8\" fill=\"#333\">42 min</text>\n  <rect x=\"250\" y=\"82.0\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"276.5\" y=\"92.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">unmatched</text>\n  <line x1=\"16\" y1=\"116\" x2=\"384\" y2=\"116\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"110.0\" font-size=\"8\" fill=\"#333\">STL-88207</text>\n  <text x=\"132\" y=\"110.0\" font-size=\"8\" fill=\"#333\">980.40</text>\n  <text x=\"202\" y=\"110.0\" font-size=\"8\" fill=\"#333\">1 h 10</text>\n  <rect x=\"250\" y=\"100.0\" width=\"81\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"290.5\" y=\"110.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">amount mismatch</text>\n  <line x1=\"16\" y1=\"134\" x2=\"384\" y2=\"134\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"128.0\" font-size=\"8\" fill=\"#333\">STL-88190</text>\n  <text x=\"132\" y=\"128.0\" font-size=\"8\" fill=\"#333\">75.00</text>\n  <text x=\"202\" y=\"128.0\" font-size=\"8\" fill=\"#333\">26 h</text>\n  <rect x=\"250\" y=\"118.0\" width=\"81\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"290.5\" y=\"128.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">older than 24 h</text>\n  <line x1=\"16\" y1=\"152\" x2=\"384\" y2=\"152\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"146.0\" font-size=\"8\" fill=\"#333\">STL-88188</text>\n  <rect x=\"132\" y=\"140.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"202\" y=\"140.5\" width=\"30\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"250\" y=\"136.0\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"276.5\" y=\"146.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">unmatched</text>\n  <rect x=\"16\" y=\"164\" width=\"368\" height=\"120\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"182\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Compensating entry for STL-88213</text>\n  <text x=\"26\" y=\"192\" font-size=\"8\" fill=\"#666\">Debit account</text>\n  <rect x=\"26\" y=\"196\" width=\"150\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"32\" y=\"208.0\" font-size=\"8\" fill=\"#999\">Suspense 1990</text>\n  <path d=\"M164 203 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <rect x=\"186\" y=\"196\" width=\"70\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"192\" y=\"208.0\" font-size=\"8\" fill=\"#999\">1,250.00</text>\n  <text x=\"26\" y=\"226\" font-size=\"8\" fill=\"#666\">Credit account</text>\n  <rect x=\"26\" y=\"230\" width=\"150\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"32\" y=\"242.0\" font-size=\"8\" fill=\"#999\">Customer 4410-22</text>\n  <path d=\"M164 237 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <rect x=\"186\" y=\"230\" width=\"70\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"192\" y=\"242.0\" font-size=\"8\" fill=\"#999\">1,250.00</text>\n  <rect x=\"270\" y=\"206\" width=\"58\" height=\"14\" rx=\"7\" fill=\"#dbeafe\"/>\n  <text x=\"299.0\" y=\"216\" font-size=\"8\" fill=\"#2563eb\" text-anchor=\"middle\">Balanced ✓</text>\n  <rect x=\"266\" y=\"256\" width=\"108\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"320.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Submit for approval</text>\n</svg>"
     }
   ],
   "relations": [
@@ -552,6 +591,55 @@
       "sourceId": "adr-ledger-as-system-of-record",
       "targetId": "balance-projector",
       "relationType": "constrains"
+    },
+    {
+      "id": "mockup-statement--req-statement-accuracy-cutoff",
+      "sourceId": "mockup-statement",
+      "targetId": "req-statement-accuracy-cutoff",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-statement--statement-service",
+      "sourceId": "mockup-statement",
+      "targetId": "statement-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-statement--mockup-dispute",
+      "sourceId": "mockup-statement",
+      "targetId": "mockup-dispute",
+      "relationType": "navigates-to",
+      "label": "Dispute"
+    },
+    {
+      "id": "mockup-dispute--req-dispute-investigation-sla",
+      "sourceId": "mockup-dispute",
+      "targetId": "req-dispute-investigation-sla",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-dispute--statement-service",
+      "sourceId": "mockup-dispute",
+      "targetId": "statement-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-reconciliation-exceptions--req-reconciliation-freshness",
+      "sourceId": "mockup-reconciliation-exceptions",
+      "targetId": "req-reconciliation-freshness",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-reconciliation-exceptions--req-balanced-entry-enforcement",
+      "sourceId": "mockup-reconciliation-exceptions",
+      "targetId": "req-balanced-entry-enforcement",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-reconciliation-exceptions--finance-ops-console",
+      "sourceId": "mockup-reconciliation-exceptions",
+      "targetId": "finance-ops-console",
+      "relationType": "presented-by"
     }
   ],
   "sequences": [
