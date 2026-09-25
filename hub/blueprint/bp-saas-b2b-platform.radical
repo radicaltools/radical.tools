@@ -442,12 +442,24 @@
       "alternatives": "Storing IdP session cookies directly was rejected — it would tie the platform's session lifetime to each IdP's own cookie semantics and leak IdP-specific state into the app tier."
     },
     {
+      "id": "flow-onboarding",
+      "type": "group",
+      "label": "Onboarding journey",
+      "description": "From sign-up to a working, provisioned workspace.",
+      "x": 0,
+      "y": 2324,
+      "width": 920,
+      "height": 330,
+      "collapsed": false
+    },
+    {
       "id": "mockup-signup",
       "type": "mockup",
       "label": "Sign Up",
       "description": "Self-serve sign-up; the new tenant gets an isolated, ready-to-use workspace within {{PROVISION_MINUTES}} minutes.",
-      "x": 0,
-      "y": 2324,
+      "parentId": "flow-onboarding",
+      "x": 30,
+      "y": 110,
       "width": 220,
       "height": 190,
       "collapsed": false,
@@ -455,12 +467,80 @@
       "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"300\" rx=\"0\" fill=\"#f3f4f6\" stroke=\"#f3f4f6\"/>\n  <rect x=\"100\" y=\"20\" width=\"200\" height=\"262\" rx=\"6\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <rect x=\"188\" y=\"34\" width=\"24\" height=\"24\" rx=\"5\" fill=\"#ccc\"/>\n  <text x=\"200\" y=\"78\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Start your free trial</text>\n  <text x=\"116\" y=\"92\" font-size=\"8\" fill=\"#666\">Work e-mail</text>\n  <rect x=\"116\" y=\"96\" width=\"168\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"122\" y=\"108.0\" font-size=\"8\" fill=\"#999\">jane@acme.com</text>\n  <text x=\"116\" y=\"126\" font-size=\"8\" fill=\"#666\">Company</text>\n  <rect x=\"116\" y=\"130\" width=\"168\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"122\" y=\"142.0\" font-size=\"8\" fill=\"#999\">Acme Inc.</text>\n  <text x=\"116\" y=\"160\" font-size=\"8\" fill=\"#666\">Workspace URL</text>\n  <rect x=\"116\" y=\"164\" width=\"168\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"122\" y=\"176.0\" font-size=\"8\" fill=\"#999\">acme.app.example</text>\n  <rect x=\"116\" y=\"194\" width=\"168\" height=\"22\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"200.0\" y=\"208.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Create workspace</text>\n  <text x=\"200\" y=\"232\" font-size=\"8\" fill=\"#666\" text-anchor=\"middle\">or</text>\n  <rect x=\"116\" y=\"240\" width=\"168\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"200.0\" y=\"253.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Sign up with SSO</text>\n  <text x=\"200\" y=\"276\" font-size=\"7.5\" fill=\"#666\" text-anchor=\"middle\">Your workspace is ready in a couple of minutes.</text>\n</svg>"
     },
     {
+      "id": "mockup-provisioning",
+      "type": "mockup",
+      "label": "Provisioning",
+      "description": "Provisioning progress; an isolated workspace is ready within {{PROVISION_MINUTES}} minutes.",
+      "parentId": "flow-onboarding",
+      "x": 350,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/setup",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"300\" rx=\"0\" fill=\"#f3f4f6\" stroke=\"#f3f4f6\"/>\n  <rect x=\"90\" y=\"50\" width=\"220\" height=\"200\" rx=\"6\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <text x=\"200\" y=\"84\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Setting up acme.app.example</text>\n  <rect x=\"110\" y=\"108\" width=\"180\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"110\" y=\"108\" width=\"118\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <rect x=\"110\" y=\"130\" width=\"9\" height=\"9\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <path d=\"M112 134.5 l2 2 l3.5 -4\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"125\" y=\"138\" font-size=\"8\" fill=\"#333\">Workspace and database schema</text>\n  <rect x=\"110\" y=\"148\" width=\"9\" height=\"9\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <path d=\"M112 152.5 l2 2 l3.5 -4\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"125\" y=\"156\" font-size=\"8\" fill=\"#333\">Default roles and your admin account</text>\n  <rect x=\"110\" y=\"166\" width=\"9\" height=\"9\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"125\" y=\"174\" font-size=\"8\" fill=\"#333\">Sample project</text>\n  <text x=\"200\" y=\"204\" font-size=\"8\" fill=\"#666\" text-anchor=\"middle\">Usually ready in under 2 minutes.</text>\n  <text x=\"200\" y=\"220\" font-size=\"8\" fill=\"#666\" text-anchor=\"middle\">We'll e-mail you when it's done.</text>\n</svg>"
+    },
+    {
+      "id": "mockup-invite-team",
+      "type": "mockup",
+      "label": "Invite Your Team",
+      "description": "Last onboarding step; invites land in the new tenant only.",
+      "parentId": "flow-onboarding",
+      "x": 670,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/setup/invite",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"300\" rx=\"0\" fill=\"#f3f4f6\" stroke=\"#f3f4f6\"/>\n  <rect x=\"70\" y=\"30\" width=\"260\" height=\"240\" rx=\"6\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <text x=\"200\" y=\"60\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Invite your team</text>\n  <text x=\"200\" y=\"76\" font-size=\"8\" fill=\"#666\" text-anchor=\"middle\">Step 2 of 2</text>\n  <rect x=\"90\" y=\"90\" width=\"220\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"96\" y=\"102.0\" font-size=\"8\" fill=\"#999\">ben@acme.com</text>\n  <rect x=\"90\" y=\"114\" width=\"220\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"96\" y=\"126.0\" font-size=\"8\" fill=\"#999\">chris@acme.com</text>\n  <rect x=\"90\" y=\"138\" width=\"220\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"96\" y=\"150.0\" font-size=\"8\" fill=\"#999\">Add another e-mail…</text>\n  <text x=\"90\" y=\"170\" font-size=\"8\" fill=\"#666\">Default role</text>\n  <rect x=\"90\" y=\"174\" width=\"220\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"96\" y=\"186.0\" font-size=\"8\" fill=\"#999\">Member</text>\n  <path d=\"M298 181 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <rect x=\"90\" y=\"214\" width=\"220\" height=\"22\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"200.0\" y=\"228.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Send invites</text>\n  <text x=\"200\" y=\"256\" font-size=\"8\" fill=\"#2563eb\" text-anchor=\"middle\">Skip for now</text>\n</svg>"
+    },
+    {
+      "id": "flow-tenant-user",
+      "type": "group",
+      "label": "Tenant user journey",
+      "description": "Daily work inside the tenant, and what happens when billing lapses.",
+      "x": 0,
+      "y": 2734,
+      "width": 920,
+      "height": 330,
+      "collapsed": false
+    },
+    {
       "id": "mockup-workspace-dashboard",
       "type": "mockup",
       "label": "Workspace Dashboard",
-      "description": "Tenant home. When a payment fails the workspace turns read-only — data stays visible, writes are blocked — until billing is fixed.",
-      "x": 320,
-      "y": 2324,
+      "description": "Tenant home; every request carries the resolved tenant context.",
+      "parentId": "flow-tenant-user",
+      "x": 30,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Acme ▾</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Settings</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Projects</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Welcome back, Jane</text>\n  <rect x=\"16.0\" y=\"64\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26.0\" y=\"79\" font-size=\"8\" fill=\"#666\">Active projects</text>\n  <text x=\"26.0\" y=\"96\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">12</text>\n  <rect x=\"141.33333333333331\" y=\"64\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"151.33333333333331\" y=\"79\" font-size=\"8\" fill=\"#666\">Members</text>\n  <text x=\"151.33333333333331\" y=\"96\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">48</text>\n  <rect x=\"266.66666666666663\" y=\"64\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"276.66666666666663\" y=\"79\" font-size=\"8\" fill=\"#666\">API calls this month</text>\n  <text x=\"276.66666666666663\" y=\"96\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">812k</text>\n  <text x=\"16\" y=\"132\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Projects</text>\n  <rect x=\"300\" y=\"120\" width=\"84\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"342.0\" y=\"133.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">+ New project</text>\n  <rect x=\"16\" y=\"146\" width=\"368\" height=\"24\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"161.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Name</text>\n  <text x=\"192\" y=\"161.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Owner</text>\n  <text x=\"292\" y=\"161.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Updated</text>\n  <rect x=\"16\" y=\"170\" width=\"368\" height=\"24\" fill=\"#eef2ff\"/>\n  <line x1=\"16\" y1=\"194\" x2=\"384\" y2=\"194\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"185.0\" font-size=\"8\" fill=\"#333\">Website relaunch</text>\n  <rect x=\"192\" y=\"179.5\" width=\"60\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"185.0\" font-size=\"8\" fill=\"#333\">2 h ago</text>\n  <line x1=\"16\" y1=\"218\" x2=\"384\" y2=\"218\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"203.5\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"203.5\" width=\"70\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"209.0\" font-size=\"8\" fill=\"#333\">yesterday</text>\n  <line x1=\"16\" y1=\"242\" x2=\"384\" y2=\"242\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"227.5\" width=\"130\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"227.5\" width=\"50\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"233.0\" font-size=\"8\" fill=\"#333\">3 days ago</text>\n  <line x1=\"16\" y1=\"266\" x2=\"384\" y2=\"266\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"251.5\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"251.5\" width=\"60\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"257.0\" font-size=\"8\" fill=\"#333\">last week</text>\n  <line x1=\"16\" y1=\"290\" x2=\"384\" y2=\"290\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"275.5\" width=\"110\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"275.5\" width=\"60\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"281.0\" font-size=\"8\" fill=\"#333\">last week</text>\n</svg>"
+    },
+    {
+      "id": "mockup-project",
+      "type": "mockup",
+      "label": "Project",
+      "description": "Project board; all data is scoped by tenant id — nothing from other tenants is reachable.",
+      "parentId": "flow-tenant-user",
+      "x": 350,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/projects/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Acme ▾</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Settings</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Projects</text>\n  <text x=\"16\" y=\"46\" font-size=\"8\" fill=\"#2563eb\">← Projects</text>\n  <text x=\"16\" y=\"66\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Website relaunch</text>\n  <text x=\"16\" y=\"82\" font-size=\"8\" fill=\"#666\">acme.app.example/projects/website-relaunch</text>\n  <text x=\"16\" y=\"104\" font-size=\"9\" fill=\"#2563eb\" font-weight=\"bold\">Tasks</text>\n  <line x1=\"16\" y1=\"108\" x2=\"41\" y2=\"108\" stroke=\"#2563eb\" stroke-width=\"2\"/>\n  <text x=\"57\" y=\"104\" font-size=\"9\" fill=\"#666\">Files</text>\n  <text x=\"98\" y=\"104\" font-size=\"9\" fill=\"#666\">Activity</text>\n  <line x1=\"16\" y1=\"109\" x2=\"384\" y2=\"109\" stroke=\"#ccc\"/>\n  <rect x=\"16\" y=\"118\" width=\"116\" height=\"170\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"24\" y=\"134\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">To do</text>\n  <rect x=\"22\" y=\"142\" width=\"104\" height=\"38\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <rect x=\"28\" y=\"150\" width=\"88\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"28\" y=\"160\" width=\"52\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"186\" width=\"104\" height=\"38\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <rect x=\"28\" y=\"194\" width=\"88\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"28\" y=\"204\" width=\"52\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"230\" width=\"104\" height=\"38\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <rect x=\"28\" y=\"238\" width=\"88\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"28\" y=\"248\" width=\"52\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"142\" y=\"118\" width=\"116\" height=\"170\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"150\" y=\"134\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">In progress</text>\n  <rect x=\"148\" y=\"142\" width=\"104\" height=\"38\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <rect x=\"154\" y=\"150\" width=\"88\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"154\" y=\"160\" width=\"52\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"148\" y=\"186\" width=\"104\" height=\"38\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <rect x=\"154\" y=\"194\" width=\"88\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"154\" y=\"204\" width=\"52\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"268\" y=\"118\" width=\"116\" height=\"170\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"276\" y=\"134\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Done</text>\n  <rect x=\"274\" y=\"142\" width=\"104\" height=\"38\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <rect x=\"280\" y=\"150\" width=\"88\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"280\" y=\"160\" width=\"52\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"274\" y=\"186\" width=\"104\" height=\"38\" rx=\"3\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <rect x=\"280\" y=\"194\" width=\"88\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"280\" y=\"204\" width=\"52\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n</svg>"
+    },
+    {
+      "id": "mockup-read-only",
+      "type": "mockup",
+      "label": "Read-Only Workspace",
+      "description": "After a failed payment the workspace stays readable but writes are blocked until billing is fixed.",
+      "parentId": "flow-tenant-user",
+      "x": 670,
+      "y": 110,
       "width": 220,
       "height": 190,
       "collapsed": false,
@@ -468,17 +548,110 @@
       "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Acme ▾</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Settings</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Projects</text>\n  <rect x=\"16\" y=\"38\" width=\"368\" height=\"26\" rx=\"3\" fill=\"#fef3c7\" stroke=\"#d97706\"/>\n  <text x=\"26\" y=\"55\" font-size=\"8\" fill=\"#333\">Payment failed — the workspace is read-only until billing is updated.</text>\n  <text x=\"374\" y=\"55\" font-size=\"8\" fill=\"#2563eb\" font-weight=\"bold\" text-anchor=\"end\">Update billing</text>\n  <rect x=\"16\" y=\"76\" width=\"116\" height=\"48\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"92\" font-size=\"8\" fill=\"#666\">Active projects</text>\n  <text x=\"26\" y=\"114\" font-size=\"14\" fill=\"#333\" font-weight=\"bold\">12</text>\n  <rect x=\"140\" y=\"76\" width=\"116\" height=\"48\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"150\" y=\"92\" font-size=\"8\" fill=\"#666\">Members</text>\n  <text x=\"150\" y=\"114\" font-size=\"14\" fill=\"#333\" font-weight=\"bold\">48</text>\n  <rect x=\"264\" y=\"76\" width=\"116\" height=\"48\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"274\" y=\"92\" font-size=\"8\" fill=\"#666\">API calls this month</text>\n  <text x=\"274\" y=\"114\" font-size=\"14\" fill=\"#333\" font-weight=\"bold\">812k</text>\n  <text x=\"16\" y=\"146\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Projects</text>\n  <rect x=\"300\" y=\"134\" width=\"84\" height=\"20\" rx=\"3\" fill=\"#e5e7eb\" stroke=\"#e5e7eb\"/>\n  <text x=\"342.0\" y=\"147.0\" font-size=\"9\" fill=\"#999\" font-weight=\"bold\" text-anchor=\"middle\">+ New project</text>\n  <rect x=\"16\" y=\"160\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"172.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Name</text>\n  <text x=\"192\" y=\"172.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Owner</text>\n  <text x=\"292\" y=\"172.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Updated</text>\n  <line x1=\"16\" y1=\"196\" x2=\"384\" y2=\"196\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"184.5\" width=\"120\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"184.5\" width=\"60\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"190.0\" font-size=\"8\" fill=\"#333\">2 h ago</text>\n  <line x1=\"16\" y1=\"214\" x2=\"384\" y2=\"214\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"202.5\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"202.5\" width=\"70\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"208.0\" font-size=\"8\" fill=\"#333\">yesterday</text>\n  <line x1=\"16\" y1=\"232\" x2=\"384\" y2=\"232\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"220.5\" width=\"130\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"220.5\" width=\"50\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"226.0\" font-size=\"8\" fill=\"#333\">3 days ago</text>\n  <line x1=\"16\" y1=\"250\" x2=\"384\" y2=\"250\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"238.5\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"238.5\" width=\"60\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"244.0\" font-size=\"8\" fill=\"#333\">last week</text>\n  <line x1=\"16\" y1=\"268\" x2=\"384\" y2=\"268\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"256.5\" width=\"110\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"256.5\" width=\"60\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"262.0\" font-size=\"8\" fill=\"#333\">last week</text>\n</svg>"
     },
     {
+      "id": "flow-tenant-admin",
+      "type": "group",
+      "label": "Tenant admin journey",
+      "description": "Billing, SSO and user management for one organisation.",
+      "x": 0,
+      "y": 3144,
+      "width": 1240,
+      "height": 330,
+      "collapsed": false
+    },
+    {
       "id": "mockup-billing-usage",
       "type": "mockup",
       "label": "Billing & Usage",
       "description": "Tenant admin view of plan, metered usage and invoices; usage figures are recorded exactly once and reconciled against source logs.",
-      "x": 640,
-      "y": 2324,
+      "parentId": "flow-tenant-admin",
+      "x": 30,
+      "y": 110,
       "width": 220,
       "height": 190,
       "collapsed": false,
       "screen": "/settings/billing",
-      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Acme ▾</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Settings</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Projects</text>\n  <rect x=\"0\" y=\"30\" width=\"110\" height=\"270\" rx=\"0\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"14\" y=\"55\" font-size=\"9\" fill=\"#666\">Profile</text>\n  <text x=\"14\" y=\"79\" font-size=\"9\" fill=\"#666\">Users</text>\n  <text x=\"14\" y=\"103\" font-size=\"9\" fill=\"#666\">Single sign-on</text>\n  <rect x=\"6\" y=\"114\" width=\"98\" height=\"20\" rx=\"3\" fill=\"#eef2ff\" stroke=\"#eef2ff\"/>\n  <text x=\"14\" y=\"127\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Billing &amp; usage</text>\n  <text x=\"14\" y=\"151\" font-size=\"9\" fill=\"#666\">Audit log</text>\n  <text x=\"126\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Billing &amp; usage</text>\n  <rect x=\"126\" y=\"64\" width=\"258\" height=\"44\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"136\" y=\"80\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Business plan</text>\n  <text x=\"136\" y=\"98\" font-size=\"8\" fill=\"#666\">€49 per seat / month · 48 seats</text>\n  <rect x=\"290\" y=\"76\" width=\"86\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"333.0\" y=\"89.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Change plan</text>\n  <text x=\"126\" y=\"126\" font-size=\"8\" fill=\"#333\">API calls</text>\n  <text x=\"384\" y=\"126\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">812k / 1M</text>\n  <rect x=\"126\" y=\"130\" width=\"258\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"126\" y=\"130\" width=\"208\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <text x=\"126\" y=\"152\" font-size=\"8\" fill=\"#333\">Storage</text>\n  <text x=\"384\" y=\"152\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">38 / 100 GB</text>\n  <rect x=\"126\" y=\"156\" width=\"258\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"126\" y=\"156\" width=\"98\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <text x=\"126\" y=\"186\" font-size=\"7.5\" fill=\"#666\">Usage is metered per event and reconciled daily against source logs.</text>\n  <rect x=\"126\" y=\"196\" width=\"258\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"132\" y=\"208.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Invoice</text>\n  <text x=\"222\" y=\"208.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Amount</text>\n  <text x=\"302\" y=\"208.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Status</text>\n  <line x1=\"126\" y1=\"232\" x2=\"384\" y2=\"232\" stroke=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"226.0\" font-size=\"8\" fill=\"#333\">Mar 2026</text>\n  <text x=\"222\" y=\"226.0\" font-size=\"8\" fill=\"#333\">€2,352.00</text>\n  <rect x=\"300\" y=\"216.0\" width=\"76\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"338.0\" y=\"226.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">payment failed</text>\n  <line x1=\"126\" y1=\"250\" x2=\"384\" y2=\"250\" stroke=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"244.0\" font-size=\"8\" fill=\"#333\">Feb 2026</text>\n  <text x=\"222\" y=\"244.0\" font-size=\"8\" fill=\"#333\">€2,254.00</text>\n  <rect x=\"300\" y=\"234.0\" width=\"30\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"315.0\" y=\"244.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">paid</text>\n  <rect x=\"126\" y=\"262\" width=\"150\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"201.0\" y=\"275.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Update payment method</text>\n</svg>"
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Acme ▾</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Settings</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Projects</text>\n  <rect x=\"0\" y=\"30\" width=\"110\" height=\"270\" rx=\"0\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"14\" y=\"55\" font-size=\"9\" fill=\"#666\">Profile</text>\n  <text x=\"14\" y=\"79\" font-size=\"9\" fill=\"#666\">Users &amp; roles</text>\n  <text x=\"14\" y=\"103\" font-size=\"9\" fill=\"#666\">Single sign-on</text>\n  <rect x=\"6\" y=\"114\" width=\"98\" height=\"20\" rx=\"3\" fill=\"#eef2ff\" stroke=\"#eef2ff\"/>\n  <text x=\"14\" y=\"127\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Billing &amp; usage</text>\n  <text x=\"14\" y=\"151\" font-size=\"9\" fill=\"#666\">Audit log</text>\n  <text x=\"126\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Billing &amp; usage</text>\n  <rect x=\"126\" y=\"64\" width=\"258\" height=\"44\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"136\" y=\"80\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Business plan</text>\n  <text x=\"136\" y=\"98\" font-size=\"8\" fill=\"#666\">€49 per seat / month · 48 seats</text>\n  <rect x=\"290\" y=\"76\" width=\"86\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"333.0\" y=\"89.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Change plan</text>\n  <text x=\"126\" y=\"126\" font-size=\"8\" fill=\"#333\">API calls</text>\n  <text x=\"384\" y=\"126\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">812k / 1M</text>\n  <rect x=\"126\" y=\"130\" width=\"258\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"126\" y=\"130\" width=\"208\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <text x=\"126\" y=\"152\" font-size=\"8\" fill=\"#333\">Storage</text>\n  <text x=\"384\" y=\"152\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">38 / 100 GB</text>\n  <rect x=\"126\" y=\"156\" width=\"258\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"126\" y=\"156\" width=\"98\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <text x=\"126\" y=\"186\" font-size=\"7.5\" fill=\"#666\">Usage is metered per event and reconciled daily against source logs.</text>\n  <rect x=\"126\" y=\"196\" width=\"258\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"132\" y=\"208.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Invoice</text>\n  <text x=\"222\" y=\"208.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Amount</text>\n  <text x=\"302\" y=\"208.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Status</text>\n  <line x1=\"126\" y1=\"232\" x2=\"384\" y2=\"232\" stroke=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"226.0\" font-size=\"8\" fill=\"#333\">Mar 2026</text>\n  <text x=\"222\" y=\"226.0\" font-size=\"8\" fill=\"#333\">€2,352.00</text>\n  <rect x=\"300\" y=\"216.0\" width=\"76\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"338.0\" y=\"226.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">payment failed</text>\n  <line x1=\"126\" y1=\"250\" x2=\"384\" y2=\"250\" stroke=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"244.0\" font-size=\"8\" fill=\"#333\">Feb 2026</text>\n  <text x=\"222\" y=\"244.0\" font-size=\"8\" fill=\"#333\">€2,254.00</text>\n  <rect x=\"300\" y=\"234.0\" width=\"30\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"315.0\" y=\"244.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">paid</text>\n  <rect x=\"126\" y=\"262\" width=\"150\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"201.0\" y=\"275.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Update payment method</text>\n</svg>"
+    },
+    {
+      "id": "mockup-update-payment",
+      "type": "mockup",
+      "label": "Update Payment Method",
+      "description": "New card; the failed invoice is retried immediately and write access comes back on success.",
+      "parentId": "flow-tenant-admin",
+      "x": 350,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/settings/billing/payment",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"300\" rx=\"0\" fill=\"#e5e7eb\" stroke=\"#e5e7eb\"/>\n  <rect x=\"60.0\" y=\"40.0\" width=\"280\" height=\"220\" rx=\"6\" fill=\"#fff\" stroke=\"#333\"/>\n  <text x=\"76.0\" y=\"66.0\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Update payment method</text>\n  <text x=\"76.0\" y=\"86.0\" font-size=\"8\" fill=\"#666\">Card number</text>\n  <rect x=\"76.0\" y=\"90.0\" width=\"248\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"82.0\" y=\"102.0\" font-size=\"8\" fill=\"#999\">•••• •••• •••• ••••</text>\n  <text x=\"76.0\" y=\"120.0\" font-size=\"8\" fill=\"#666\">Expiry</text>\n  <rect x=\"76.0\" y=\"124.0\" width=\"120\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"82.0\" y=\"136.0\" font-size=\"8\" fill=\"#999\">MM / YY</text>\n  <text x=\"204.0\" y=\"120.0\" font-size=\"8\" fill=\"#666\">CVC</text>\n  <rect x=\"204.0\" y=\"124.0\" width=\"120\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"210.0\" y=\"136.0\" font-size=\"8\" fill=\"#999\">•••</text>\n  <text x=\"76.0\" y=\"168.0\" font-size=\"8\" fill=\"#666\">We retry the failed invoice right away; write access</text>\n  <text x=\"76.0\" y=\"180.0\" font-size=\"8\" fill=\"#666\">returns as soon as the payment succeeds.</text>\n  <rect x=\"76.0\" y=\"212.0\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"131.0\" y=\"225.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Cancel</text>\n  <rect x=\"214.0\" y=\"212.0\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"269.0\" y=\"225.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Save &amp; pay €2,352</text>\n</svg>"
+    },
+    {
+      "id": "mockup-sso-settings",
+      "type": "mockup",
+      "label": "Single Sign-On",
+      "description": "SAML/OIDC federation with the tenant's own identity provider.",
+      "parentId": "flow-tenant-admin",
+      "x": 670,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/settings/sso",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Acme ▾</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Settings</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Projects</text>\n  <rect x=\"0\" y=\"30\" width=\"110\" height=\"270\" rx=\"0\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"14\" y=\"55\" font-size=\"9\" fill=\"#666\">Profile</text>\n  <text x=\"14\" y=\"79\" font-size=\"9\" fill=\"#666\">Users &amp; roles</text>\n  <rect x=\"6\" y=\"90\" width=\"98\" height=\"20\" rx=\"3\" fill=\"#eef2ff\" stroke=\"#eef2ff\"/>\n  <text x=\"14\" y=\"103\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Single sign-on</text>\n  <text x=\"14\" y=\"127\" font-size=\"9\" fill=\"#666\">Billing &amp; usage</text>\n  <text x=\"14\" y=\"151\" font-size=\"9\" fill=\"#666\">Audit log</text>\n  <text x=\"126\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Single sign-on</text>\n  <text x=\"126\" y=\"66\" font-size=\"8\" fill=\"#666\">Identity provider</text>\n  <rect x=\"126\" y=\"70\" width=\"258\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"132\" y=\"82.0\" font-size=\"8\" fill=\"#999\">Okta (SAML 2.0)</text>\n  <path d=\"M372 77 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <text x=\"126\" y=\"100\" font-size=\"8\" fill=\"#666\">SSO URL</text>\n  <rect x=\"126\" y=\"104\" width=\"258\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"132\" y=\"116.0\" font-size=\"8\" fill=\"#999\">https://acme.okta.com/app/…/sso/saml</text>\n  <text x=\"126\" y=\"134\" font-size=\"8\" fill=\"#666\">Entity ID</text>\n  <rect x=\"126\" y=\"138\" width=\"258\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"132\" y=\"150.0\" font-size=\"8\" fill=\"#999\">http://www.okta.com/exk…</text>\n  <text x=\"126\" y=\"168\" font-size=\"8\" fill=\"#666\">X.509 certificate</text>\n  <rect x=\"126\" y=\"172\" width=\"258\" height=\"34\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"132\" y=\"192.0\" font-size=\"8\" fill=\"#999\">-----BEGIN CERTIFICATE-----…</text>\n  <rect x=\"126\" y=\"216\" width=\"9\" height=\"9\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <path d=\"M128 220.5 l2 2 l3.5 -4\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"141\" y=\"224\" font-size=\"8\" fill=\"#333\">Require SSO for all members</text>\n  <rect x=\"126\" y=\"256\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"181.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Test connection</text>\n  <rect x=\"284\" y=\"256\" width=\"100\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"334.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Save</text>\n</svg>"
+    },
+    {
+      "id": "mockup-users-roles",
+      "type": "mockup",
+      "label": "Users & Roles",
+      "description": "Seats, roles and how each user signs in.",
+      "parentId": "flow-tenant-admin",
+      "x": 990,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/settings/users",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Acme ▾</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Settings</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Projects</text>\n  <rect x=\"0\" y=\"30\" width=\"110\" height=\"270\" rx=\"0\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"14\" y=\"55\" font-size=\"9\" fill=\"#666\">Profile</text>\n  <rect x=\"6\" y=\"66\" width=\"98\" height=\"20\" rx=\"3\" fill=\"#eef2ff\" stroke=\"#eef2ff\"/>\n  <text x=\"14\" y=\"79\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Users &amp; roles</text>\n  <text x=\"14\" y=\"103\" font-size=\"9\" fill=\"#666\">Single sign-on</text>\n  <text x=\"14\" y=\"127\" font-size=\"9\" fill=\"#666\">Billing &amp; usage</text>\n  <text x=\"14\" y=\"151\" font-size=\"9\" fill=\"#666\">Audit log</text>\n  <text x=\"126\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Users &amp; roles</text>\n  <rect x=\"300\" y=\"40\" width=\"84\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"342.0\" y=\"53.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Invite</text>\n  <rect x=\"126\" y=\"66\" width=\"258\" height=\"24\" fill=\"#f3f4f6\"/>\n  <text x=\"132\" y=\"81.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">User</text>\n  <text x=\"242\" y=\"81.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Role</text>\n  <text x=\"312\" y=\"81.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Via</text>\n  <line x1=\"126\" y1=\"114\" x2=\"384\" y2=\"114\" stroke=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"105.0\" font-size=\"8\" fill=\"#333\">Jane Doe</text>\n  <text x=\"242\" y=\"105.0\" font-size=\"8\" fill=\"#333\">Admin</text>\n  <text x=\"312\" y=\"105.0\" font-size=\"8\" fill=\"#333\">SSO</text>\n  <line x1=\"126\" y1=\"138\" x2=\"384\" y2=\"138\" stroke=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"129.0\" font-size=\"8\" fill=\"#333\">Ben Okafor</text>\n  <text x=\"242\" y=\"129.0\" font-size=\"8\" fill=\"#333\">Member</text>\n  <text x=\"312\" y=\"129.0\" font-size=\"8\" fill=\"#333\">SSO</text>\n  <line x1=\"126\" y1=\"162\" x2=\"384\" y2=\"162\" stroke=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"153.0\" font-size=\"8\" fill=\"#333\">Chris Lee</text>\n  <text x=\"242\" y=\"153.0\" font-size=\"8\" fill=\"#333\">Member</text>\n  <text x=\"312\" y=\"153.0\" font-size=\"8\" fill=\"#333\">invite</text>\n  <line x1=\"126\" y1=\"186\" x2=\"384\" y2=\"186\" stroke=\"#e5e7eb\"/>\n  <rect x=\"132\" y=\"171.5\" width=\"70\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"242\" y=\"177.0\" font-size=\"8\" fill=\"#333\">Viewer</text>\n  <text x=\"312\" y=\"177.0\" font-size=\"8\" fill=\"#333\">SSO</text>\n  <line x1=\"126\" y1=\"210\" x2=\"384\" y2=\"210\" stroke=\"#e5e7eb\"/>\n  <rect x=\"132\" y=\"195.5\" width=\"80\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"242\" y=\"201.0\" font-size=\"8\" fill=\"#333\">Member</text>\n  <text x=\"312\" y=\"201.0\" font-size=\"8\" fill=\"#333\">SSO</text>\n  <line x1=\"126\" y1=\"234\" x2=\"384\" y2=\"234\" stroke=\"#e5e7eb\"/>\n  <rect x=\"132\" y=\"219.5\" width=\"60\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"242\" y=\"225.0\" font-size=\"8\" fill=\"#333\">Member</text>\n  <text x=\"312\" y=\"225.0\" font-size=\"8\" fill=\"#333\">SSO</text>\n  <text x=\"126\" y=\"248\" font-size=\"8\" fill=\"#666\">48 seats in use of 50</text>\n</svg>"
+    },
+    {
+      "id": "flow-platform-ops",
+      "type": "group",
+      "label": "Platform ops journey",
+      "description": "Watching tenant health across the pooled tier.",
+      "x": 0,
+      "y": 3554,
+      "width": 600,
+      "height": 330,
+      "collapsed": false
+    },
+    {
+      "id": "mockup-tenant-list",
+      "type": "mockup",
+      "label": "Tenants",
+      "description": "All tenants with plan, tier and share of pooled load.",
+      "parentId": "flow-platform-ops",
+      "x": 30,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/admin/tenants",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Admin Console</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Audit</text>\n  <text x=\"347\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Incidents</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Tenants</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Tenants</text>\n  <rect x=\"16\" y=\"64\" width=\"220\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"76.0\" font-size=\"8\" fill=\"#999\">Search tenants</text>\n  <rect x=\"16\" y=\"92\" width=\"368\" height=\"26\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"108.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Tenant</text>\n  <text x=\"132\" y=\"108.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Plan</text>\n  <text x=\"202\" y=\"108.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Tier</text>\n  <text x=\"272\" y=\"108.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Load share</text>\n  <text x=\"342\" y=\"108.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Status</text>\n  <line x1=\"16\" y1=\"144\" x2=\"384\" y2=\"144\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"134.0\" font-size=\"8\" fill=\"#333\">Acme Inc.</text>\n  <text x=\"132\" y=\"134.0\" font-size=\"8\" fill=\"#333\">Business</text>\n  <text x=\"202\" y=\"134.0\" font-size=\"8\" fill=\"#333\">pooled</text>\n  <text x=\"272\" y=\"134.0\" font-size=\"8\" fill=\"#333\">3.1%</text>\n  <rect x=\"340\" y=\"124.0\" width=\"21\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"350.5\" y=\"134.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">ok</text>\n  <line x1=\"16\" y1=\"170\" x2=\"384\" y2=\"170\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"160.0\" font-size=\"8\" fill=\"#333\">Globex</text>\n  <text x=\"132\" y=\"160.0\" font-size=\"8\" fill=\"#333\">Enterprise</text>\n  <text x=\"202\" y=\"160.0\" font-size=\"8\" fill=\"#333\">silo</text>\n  <text x=\"272\" y=\"160.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <rect x=\"340\" y=\"150.0\" width=\"21\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"350.5\" y=\"160.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">ok</text>\n  <rect x=\"16\" y=\"170\" width=\"368\" height=\"26\" fill=\"#eef2ff\"/>\n  <line x1=\"16\" y1=\"196\" x2=\"384\" y2=\"196\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"186.0\" font-size=\"8\" fill=\"#333\">Initech</text>\n  <text x=\"132\" y=\"186.0\" font-size=\"8\" fill=\"#333\">Business</text>\n  <text x=\"202\" y=\"186.0\" font-size=\"8\" fill=\"#333\">pooled</text>\n  <text x=\"272\" y=\"186.0\" font-size=\"8\" fill=\"#333\">21.4%</text>\n  <rect x=\"340\" y=\"176.0\" width=\"25\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"352.5\" y=\"186.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">hot</text>\n  <line x1=\"16\" y1=\"222\" x2=\"384\" y2=\"222\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"206.5\" width=\"70\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"212.0\" font-size=\"8\" fill=\"#333\">Starter</text>\n  <text x=\"202\" y=\"212.0\" font-size=\"8\" fill=\"#333\">pooled</text>\n  <text x=\"272\" y=\"212.0\" font-size=\"8\" fill=\"#333\">0.4%</text>\n  <rect x=\"340\" y=\"202.0\" width=\"21\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"350.5\" y=\"212.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">ok</text>\n  <line x1=\"16\" y1=\"248\" x2=\"384\" y2=\"248\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"232.5\" width=\"80\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"238.0\" font-size=\"8\" fill=\"#333\">Business</text>\n  <text x=\"202\" y=\"238.0\" font-size=\"8\" fill=\"#333\">pooled</text>\n  <text x=\"272\" y=\"238.0\" font-size=\"8\" fill=\"#333\">1.2%</text>\n  <rect x=\"340\" y=\"228.0\" width=\"21\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"350.5\" y=\"238.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">ok</text>\n</svg>"
+    },
+    {
+      "id": "mockup-tenant-detail",
+      "type": "mockup",
+      "label": "Tenant Detail",
+      "description": "Per-tenant health against the {{MAX_TENANT_SHARE_PCT}}% noisy-neighbour limit; impersonation is audited.",
+      "parentId": "flow-platform-ops",
+      "x": 350,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/admin/tenants/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Admin Console</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Audit</text>\n  <text x=\"347\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Incidents</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Tenants</text>\n  <text x=\"16\" y=\"46\" font-size=\"8\" fill=\"#2563eb\">← Tenants</text>\n  <text x=\"16\" y=\"66\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Initech</text>\n  <rect x=\"80\" y=\"56\" width=\"62\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"111.0\" y=\"66\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">pooled tier</text>\n  <rect x=\"16.0\" y=\"76\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26.0\" y=\"91\" font-size=\"8\" fill=\"#666\">Share of pooled load</text>\n  <text x=\"26.0\" y=\"108\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">21.4%</text>\n  <rect x=\"141.33333333333331\" y=\"76\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"151.33333333333331\" y=\"91\" font-size=\"8\" fill=\"#666\">p95 latency</text>\n  <text x=\"151.33333333333331\" y=\"108\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">310 ms</text>\n  <rect x=\"266.66666666666663\" y=\"76\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"276.66666666666663\" y=\"91\" font-size=\"8\" fill=\"#666\">Seats</text>\n  <text x=\"276.66666666666663\" y=\"108\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">420</text>\n  <text x=\"16\" y=\"140\" font-size=\"8\" fill=\"#333\">Load share vs 20% limit</text>\n  <text x=\"384\" y=\"140\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">21.4% / 20%</text>\n  <rect x=\"16\" y=\"144\" width=\"368\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"144\" width=\"262\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <text x=\"16\" y=\"176\" font-size=\"8\" fill=\"#333\">Over the noisy-neighbour limit — consider moving to a silo.</text>\n  <rect x=\"16\" y=\"190\" width=\"368\" height=\"40\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"206\" font-size=\"8\" fill=\"#333\">Impersonation is logged to the tenant's audit log</text>\n  <text x=\"26\" y=\"220\" font-size=\"8\" fill=\"#666\">and requires a support ticket id.</text>\n  <rect x=\"16\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"81.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Impersonate…</text>\n  <rect x=\"254\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"319.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Migrate to silo</text>\n</svg>"
     }
   ],
   "relations": [
@@ -614,17 +787,43 @@
       "relationType": "presented-by"
     },
     {
-      "id": "mockup-signup--mockup-workspace-dashboard",
+      "id": "mockup-signup--mockup-provisioning",
       "sourceId": "mockup-signup",
-      "targetId": "mockup-workspace-dashboard",
+      "targetId": "mockup-provisioning",
       "relationType": "navigates-to",
       "label": "Create workspace"
     },
     {
-      "id": "mockup-workspace-dashboard--req-subscription-enforcement",
-      "sourceId": "mockup-workspace-dashboard",
-      "targetId": "req-subscription-enforcement",
+      "id": "mockup-provisioning--req-tenant-provisioning-time",
+      "sourceId": "mockup-provisioning",
+      "targetId": "req-tenant-provisioning-time",
       "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-provisioning--webapp",
+      "sourceId": "mockup-provisioning",
+      "targetId": "webapp",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-provisioning--mockup-invite-team",
+      "sourceId": "mockup-provisioning",
+      "targetId": "mockup-invite-team",
+      "relationType": "navigates-to",
+      "label": "Ready"
+    },
+    {
+      "id": "mockup-invite-team--webapp",
+      "sourceId": "mockup-invite-team",
+      "targetId": "webapp",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-invite-team--mockup-workspace-dashboard",
+      "sourceId": "mockup-invite-team",
+      "targetId": "mockup-workspace-dashboard",
+      "relationType": "navigates-to",
+      "label": "Send invites"
     },
     {
       "id": "mockup-workspace-dashboard--webapp",
@@ -633,8 +832,46 @@
       "relationType": "presented-by"
     },
     {
-      "id": "mockup-workspace-dashboard--mockup-billing-usage",
+      "id": "mockup-workspace-dashboard--mockup-project",
       "sourceId": "mockup-workspace-dashboard",
+      "targetId": "mockup-project",
+      "relationType": "navigates-to",
+      "label": "Open project"
+    },
+    {
+      "id": "mockup-workspace-dashboard--mockup-read-only",
+      "sourceId": "mockup-workspace-dashboard",
+      "targetId": "mockup-read-only",
+      "relationType": "navigates-to",
+      "label": "Payment fails"
+    },
+    {
+      "id": "mockup-project--req-tenant-isolation",
+      "sourceId": "mockup-project",
+      "targetId": "req-tenant-isolation",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-project--webapp",
+      "sourceId": "mockup-project",
+      "targetId": "webapp",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-read-only--req-subscription-enforcement",
+      "sourceId": "mockup-read-only",
+      "targetId": "req-subscription-enforcement",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-read-only--webapp",
+      "sourceId": "mockup-read-only",
+      "targetId": "webapp",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-read-only--mockup-billing-usage",
+      "sourceId": "mockup-read-only",
       "targetId": "mockup-billing-usage",
       "relationType": "navigates-to",
       "label": "Update billing"
@@ -655,6 +892,83 @@
       "id": "mockup-billing-usage--webapp",
       "sourceId": "mockup-billing-usage",
       "targetId": "webapp",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-billing-usage--mockup-update-payment",
+      "sourceId": "mockup-billing-usage",
+      "targetId": "mockup-update-payment",
+      "relationType": "navigates-to",
+      "label": "Update payment method"
+    },
+    {
+      "id": "mockup-billing-usage--mockup-sso-settings",
+      "sourceId": "mockup-billing-usage",
+      "targetId": "mockup-sso-settings",
+      "relationType": "navigates-to",
+      "label": "Single sign-on"
+    },
+    {
+      "id": "mockup-update-payment--req-subscription-enforcement",
+      "sourceId": "mockup-update-payment",
+      "targetId": "req-subscription-enforcement",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-update-payment--webapp",
+      "sourceId": "mockup-update-payment",
+      "targetId": "webapp",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-update-payment--mockup-workspace-dashboard",
+      "sourceId": "mockup-update-payment",
+      "targetId": "mockup-workspace-dashboard",
+      "relationType": "navigates-to",
+      "label": "Save & pay"
+    },
+    {
+      "id": "mockup-sso-settings--webapp",
+      "sourceId": "mockup-sso-settings",
+      "targetId": "webapp",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-sso-settings--mockup-users-roles",
+      "sourceId": "mockup-sso-settings",
+      "targetId": "mockup-users-roles",
+      "relationType": "navigates-to",
+      "label": "Users & roles"
+    },
+    {
+      "id": "mockup-users-roles--webapp",
+      "sourceId": "mockup-users-roles",
+      "targetId": "webapp",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-tenant-list--admin-console",
+      "sourceId": "mockup-tenant-list",
+      "targetId": "admin-console",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-tenant-list--mockup-tenant-detail",
+      "sourceId": "mockup-tenant-list",
+      "targetId": "mockup-tenant-detail",
+      "relationType": "navigates-to",
+      "label": "Open tenant"
+    },
+    {
+      "id": "mockup-tenant-detail--req-tenant-isolation",
+      "sourceId": "mockup-tenant-detail",
+      "targetId": "req-tenant-isolation",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-tenant-detail--admin-console",
+      "sourceId": "mockup-tenant-detail",
+      "targetId": "admin-console",
       "relationType": "presented-by"
     }
   ]

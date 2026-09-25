@@ -416,12 +416,133 @@
       "alternatives": "1. Investigate first, act after — protects sellers from false positives, but a genuine bad actor keeps selling and collecting funds during the investigation window. 2. Suspend first, investigate after (chosen). 3. Community reporting only, no proactive detection — cheapest, but slowest and worst for buyer trust. 4. Permanent ban on first signal, no reinstatement path — fastest, but the harshest possible cost of a false positive."
     },
     {
+      "id": "flow-buyer",
+      "type": "group",
+      "label": "Buyer journey",
+      "description": "Finding an item, paying with buyer protection and disputing it.",
+      "x": 0,
+      "y": 2084,
+      "width": 1560,
+      "height": 630,
+      "collapsed": false
+    },
+    {
+      "id": "mockup-mp-search",
+      "type": "mockup",
+      "label": "Search",
+      "description": "Only approved, live listings appear in search.",
+      "parentId": "flow-buyer",
+      "x": 30,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/search",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Account</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Orders</text>\n  <text x=\"291\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Sell</text>\n  <rect x=\"16\" y=\"40\" width=\"368\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"52.0\" font-size=\"8\" fill=\"#999\">armchair</text>\n  <text x=\"16\" y=\"76\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">64 listings</text>\n  <rect x=\"84\" y=\"66\" width=\"62\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"115.0\" y=\"76\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Furniture ✕</text>\n  <rect x=\"152\" y=\"66\" width=\"67\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"185.5\" y=\"76\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Within 50 km</text>\n  <rect x=\"225\" y=\"66\" width=\"44\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"247.0\" y=\"76\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Price ▾</text>\n  <rect x=\"16\" y=\"88\" width=\"116\" height=\"66\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"88\" x2=\"132\" y2=\"154\" stroke=\"#ccc\"/>\n  <line x1=\"132\" y1=\"88\" x2=\"16\" y2=\"154\" stroke=\"#ccc\"/>\n  <rect x=\"16\" y=\"160\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"16\" y=\"178\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">€180</text>\n  <text x=\"132\" y=\"178\" font-size=\"7.5\" fill=\"#666\" text-anchor=\"end\">VintageCo</text>\n  <rect x=\"140\" y=\"88\" width=\"116\" height=\"66\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"140\" y1=\"88\" x2=\"256\" y2=\"154\" stroke=\"#ccc\"/>\n  <line x1=\"256\" y1=\"88\" x2=\"140\" y2=\"154\" stroke=\"#ccc\"/>\n  <rect x=\"140\" y=\"160\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"140\" y=\"178\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">€95</text>\n  <text x=\"256\" y=\"178\" font-size=\"7.5\" fill=\"#666\" text-anchor=\"end\">jan_k</text>\n  <rect x=\"264\" y=\"88\" width=\"116\" height=\"66\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"264\" y1=\"88\" x2=\"380\" y2=\"154\" stroke=\"#ccc\"/>\n  <line x1=\"380\" y1=\"88\" x2=\"264\" y2=\"154\" stroke=\"#ccc\"/>\n  <rect x=\"264\" y=\"160\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"264\" y=\"178\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">€240</text>\n  <text x=\"380\" y=\"178\" font-size=\"7.5\" fill=\"#666\" text-anchor=\"end\">Loft&amp;Co</text>\n  <rect x=\"16\" y=\"192\" width=\"116\" height=\"66\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"192\" x2=\"132\" y2=\"258\" stroke=\"#ccc\"/>\n  <line x1=\"132\" y1=\"192\" x2=\"16\" y2=\"258\" stroke=\"#ccc\"/>\n  <rect x=\"16\" y=\"264\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"16\" y=\"282\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">€60</text>\n  <text x=\"132\" y=\"282\" font-size=\"7.5\" fill=\"#666\" text-anchor=\"end\">mira</text>\n  <rect x=\"140\" y=\"192\" width=\"116\" height=\"66\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"140\" y1=\"192\" x2=\"256\" y2=\"258\" stroke=\"#ccc\"/>\n  <line x1=\"256\" y1=\"192\" x2=\"140\" y2=\"258\" stroke=\"#ccc\"/>\n  <rect x=\"140\" y=\"264\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"140\" y=\"282\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">€130</text>\n  <text x=\"256\" y=\"282\" font-size=\"7.5\" fill=\"#666\" text-anchor=\"end\">OakHaus</text>\n  <rect x=\"264\" y=\"192\" width=\"116\" height=\"66\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"264\" y1=\"192\" x2=\"380\" y2=\"258\" stroke=\"#ccc\"/>\n  <line x1=\"380\" y1=\"192\" x2=\"264\" y2=\"258\" stroke=\"#ccc\"/>\n  <rect x=\"264\" y=\"264\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"264\" y=\"282\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">€310</text>\n  <text x=\"380\" y=\"282\" font-size=\"7.5\" fill=\"#666\" text-anchor=\"end\">retro.de</text>\n</svg>"
+    },
+    {
+      "id": "mockup-mp-listing",
+      "type": "mockup",
+      "label": "Listing",
+      "description": "Listing page with seller reputation and buyer protection terms.",
+      "parentId": "flow-buyer",
+      "x": 350,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/listings/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Account</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Orders</text>\n  <text x=\"291\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Sell</text>\n  <rect x=\"16\" y=\"40\" width=\"190\" height=\"150\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"40\" x2=\"206\" y2=\"190\" stroke=\"#ccc\"/>\n  <line x1=\"206\" y1=\"40\" x2=\"16\" y2=\"190\" stroke=\"#ccc\"/>\n  <rect x=\"16\" y=\"196\" width=\"43\" height=\"32\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"196\" x2=\"59\" y2=\"228\" stroke=\"#ccc\"/>\n  <line x1=\"59\" y1=\"196\" x2=\"16\" y2=\"228\" stroke=\"#ccc\"/>\n  <rect x=\"65\" y=\"196\" width=\"43\" height=\"32\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"65\" y1=\"196\" x2=\"108\" y2=\"228\" stroke=\"#ccc\"/>\n  <line x1=\"108\" y1=\"196\" x2=\"65\" y2=\"228\" stroke=\"#ccc\"/>\n  <rect x=\"114\" y=\"196\" width=\"43\" height=\"32\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"114\" y1=\"196\" x2=\"157\" y2=\"228\" stroke=\"#ccc\"/>\n  <line x1=\"157\" y1=\"196\" x2=\"114\" y2=\"228\" stroke=\"#ccc\"/>\n  <rect x=\"163\" y=\"196\" width=\"43\" height=\"32\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"163\" y1=\"196\" x2=\"206\" y2=\"228\" stroke=\"#ccc\"/>\n  <line x1=\"206\" y1=\"196\" x2=\"163\" y2=\"228\" stroke=\"#ccc\"/>\n  <text x=\"220\" y=\"56\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Mid-century armchair</text>\n  <text x=\"220\" y=\"76\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">€180.00</text>\n  <text x=\"220\" y=\"94\" font-size=\"8\" fill=\"#666\">Used — good condition · Berlin</text>\n  <rect x=\"220\" y=\"106\" width=\"164\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"220\" y=\"115\" width=\"164\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"220\" y=\"124\" width=\"98\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <circle cx=\"230\" cy=\"150\" r=\"9\" fill=\"#ccc\" stroke=\"#fff\"/>\n  <text x=\"246\" y=\"148\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">VintageCo</text>\n  <text x=\"246\" y=\"160\" font-size=\"8\" fill=\"#666\">★ 4.8 · 212 sales</text>\n  <rect x=\"220\" y=\"180\" width=\"164\" height=\"22\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"302.0\" y=\"194.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Buy now</text>\n  <rect x=\"220\" y=\"208\" width=\"164\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"302.0\" y=\"221.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Message seller</text>\n  <text x=\"16\" y=\"256\" font-size=\"7.5\" fill=\"#666\">Buyer protection: your payment is held until you confirm the item arrived as described.</text>\n</svg>"
+    },
+    {
+      "id": "mockup-mp-checkout",
+      "type": "mockup",
+      "label": "Checkout",
+      "description": "Payment goes to the payments facilitator, which holds the funds; the platform never custodies them.",
+      "parentId": "flow-buyer",
+      "x": 670,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/checkout",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace — Checkout</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Help</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Checkout</text>\n  <rect x=\"16\" y=\"64\" width=\"48\" height=\"48\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"64\" x2=\"64\" y2=\"112\" stroke=\"#ccc\"/>\n  <line x1=\"64\" y1=\"64\" x2=\"16\" y2=\"112\" stroke=\"#ccc\"/>\n  <rect x=\"74\" y=\"70\" width=\"140\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"74\" y=\"80\" width=\"84\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"252\" y=\"84\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"end\">€180.00</text>\n  <text x=\"16\" y=\"124\" font-size=\"8\" fill=\"#666\">Delivery</text>\n  <rect x=\"16\" y=\"128\" width=\"236\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"140.0\" font-size=\"8\" fill=\"#999\">Courier · 2–3 days · €19.00</text>\n  <path d=\"M240 135 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <text x=\"16\" y=\"158\" font-size=\"8\" fill=\"#666\">Card</text>\n  <rect x=\"16\" y=\"162\" width=\"236\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"174.0\" font-size=\"8\" fill=\"#999\">•••• •••• •••• 4421</text>\n  <rect x=\"266\" y=\"64\" width=\"118\" height=\"130\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"276\" y=\"82\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">You pay</text>\n  <text x=\"276\" y=\"100\" font-size=\"8\" fill=\"#666\">Item</text>\n  <text x=\"374\" y=\"100\" font-size=\"8\" fill=\"#333\" text-anchor=\"end\">€180.00</text>\n  <text x=\"276\" y=\"116\" font-size=\"8\" fill=\"#666\">Delivery</text>\n  <text x=\"374\" y=\"116\" font-size=\"8\" fill=\"#333\" text-anchor=\"end\">€19.00</text>\n  <text x=\"276\" y=\"132\" font-size=\"8\" fill=\"#666\">Protection</text>\n  <text x=\"374\" y=\"132\" font-size=\"8\" fill=\"#333\" text-anchor=\"end\">€2.40</text>\n  <text x=\"276\" y=\"156\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Total</text>\n  <text x=\"374\" y=\"156\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"end\">€201.40</text>\n  <text x=\"16\" y=\"212\" font-size=\"7.5\" fill=\"#666\">Funds are held by our payment partner — the seller is paid only after the</text>\n  <text x=\"16\" y=\"224\" font-size=\"7.5\" fill=\"#666\">protection window ends. We never hold your money ourselves.</text>\n  <rect x=\"16\" y=\"246\" width=\"236\" height=\"24\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"134.0\" y=\"261.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Pay €201.40</text>\n</svg>"
+    },
+    {
+      "id": "mockup-order-dispute",
+      "type": "mockup",
+      "label": "Order & Buyer Protection",
+      "description": "Buyer view of an order: funds stay held for {{DISPUTE_WINDOW_DAYS}} days after delivery, and opening a dispute freezes the payout.",
+      "parentId": "flow-buyer",
+      "x": 990,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/orders/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Account</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Orders</text>\n  <text x=\"291\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Search</text>\n  <text x=\"16\" y=\"54\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Order #58213</text>\n  <text x=\"16\" y=\"70\" font-size=\"8\" fill=\"#666\">Sold by VintageCo · delivered 2 Apr</text>\n  <rect x=\"16\" y=\"80\" width=\"60\" height=\"60\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"80\" x2=\"76\" y2=\"140\" stroke=\"#ccc\"/>\n  <line x1=\"76\" y1=\"80\" x2=\"16\" y2=\"140\" stroke=\"#ccc\"/>\n  <rect x=\"88\" y=\"88\" width=\"180\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"88\" y=\"98\" width=\"108\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"384\" y=\"96\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"end\">€180.00</text>\n  <text x=\"16\" y=\"162\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Where your money is</text>\n  <rect x=\"16\" y=\"170\" width=\"39\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"35.5\" y=\"180\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Paid ✓</text>\n  <rect x=\"61\" y=\"170\" width=\"62\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"92.0\" y=\"180\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Delivered ✓</text>\n  <rect x=\"129\" y=\"170\" width=\"126\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"192.0\" y=\"180\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Held for buyer protection</text>\n  <rect x=\"261\" y=\"170\" width=\"94\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"308.0\" y=\"180\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Released to seller</text>\n  <text x=\"16\" y=\"204\" font-size=\"8\" fill=\"#333\">Buyer protection window</text>\n  <text x=\"384\" y=\"204\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">3 of 7 days</text>\n  <rect x=\"16\" y=\"208\" width=\"368\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"208\" width=\"128\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <text x=\"16\" y=\"236\" font-size=\"8\" fill=\"#666\">Something wrong? Opening a dispute freezes the payout until it is resolved.</text>\n  <rect x=\"16\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"81.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Open a dispute</text>\n  <rect x=\"254\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"319.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Confirm all good</text>\n</svg>"
+    },
+    {
+      "id": "mockup-mp-open-dispute",
+      "type": "mockup",
+      "label": "Open a Dispute",
+      "description": "Opening a dispute inside the {{DISPUTE_WINDOW_DAYS}}-day window freezes the seller payout.",
+      "parentId": "flow-buyer",
+      "x": 1310,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/orders/:id/dispute",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Account</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Orders</text>\n  <text x=\"291\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Search</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Open a dispute — order #58213</text>\n  <circle cx=\"20.5\" cy=\"74.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"31\" y=\"78\" font-size=\"8\" fill=\"#333\">Item didn't arrive</text>\n  <circle cx=\"20.5\" cy=\"90.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <circle cx=\"20.5\" cy=\"90.5\" r=\"2.2\" fill=\"#2563eb\"/>\n  <text x=\"31\" y=\"94\" font-size=\"8\" fill=\"#333\">Item not as described</text>\n  <circle cx=\"20.5\" cy=\"106.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"31\" y=\"110\" font-size=\"8\" fill=\"#333\">Item arrived damaged</text>\n  <text x=\"16\" y=\"122\" font-size=\"8\" fill=\"#666\">What happened?</text>\n  <rect x=\"16\" y=\"126\" width=\"368\" height=\"50\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"154.0\" font-size=\"8\" fill=\"#999\">The left armrest is cracked…</text>\n  <rect x=\"16\" y=\"184\" width=\"368\" height=\"40\" rx=\"3\" fill=\"#fff\" stroke=\"#999\" stroke-dasharray=\"4 3\"/>\n  <text x=\"200\" y=\"208\" font-size=\"9\" fill=\"#2563eb\" font-weight=\"bold\" text-anchor=\"middle\">+ Add photos of the item</text>\n  <rect x=\"16\" y=\"232\" width=\"368\" height=\"24\" rx=\"3\" fill=\"#eef2ff\" stroke=\"#c7d2fe\"/>\n  <text x=\"26\" y=\"247.0\" font-size=\"8\" fill=\"#333\">The seller's payout is frozen while the dispute is open.</text>\n  <rect x=\"16\" y=\"266\" width=\"90\" height=\"22\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"61.0\" y=\"280.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Cancel</text>\n  <rect x=\"254\" y=\"266\" width=\"130\" height=\"22\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"319.0\" y=\"280.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Open dispute</text>\n</svg>"
+    },
+    {
+      "id": "mockup-mp-dispute-status",
+      "type": "mockup",
+      "label": "Dispute Status",
+      "description": "Conversation and status while Trust & Safety reviews.",
+      "parentId": "flow-buyer",
+      "x": 30,
+      "y": 410,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/disputes/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Account</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Orders</text>\n  <text x=\"291\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Search</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Dispute on order #58213</text>\n  <rect x=\"16\" y=\"64\" width=\"48\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"40.0\" y=\"74\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Opened ✓</text>\n  <rect x=\"70\" y=\"64\" width=\"94\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"117.0\" y=\"74\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Seller responded ✓</text>\n  <rect x=\"170\" y=\"64\" width=\"67\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"203.5\" y=\"74\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Under review</text>\n  <rect x=\"243\" y=\"64\" width=\"48\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"267.0\" y=\"74\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Resolved</text>\n  <rect x=\"16\" y=\"88\" width=\"368\" height=\"24\" rx=\"3\" fill=\"#333\" stroke=\"#333\"/>\n  <text x=\"26\" y=\"103.0\" font-size=\"8\" fill=\"#fff\">Payout to the seller is on hold until this is resolved.</text>\n  <rect x=\"200\" y=\"124\" width=\"184\" height=\"28\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <rect x=\"208\" y=\"132\" width=\"168\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"208\" y=\"141\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"160\" width=\"184\" height=\"28\" rx=\"8\" fill=\"#f3f4f6\" stroke=\"#f3f4f6\"/>\n  <rect x=\"24\" y=\"168\" width=\"168\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"24\" y=\"177\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"200\" y=\"196\" width=\"184\" height=\"19\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <rect x=\"208\" y=\"204\" width=\"168\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"262\" width=\"300\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"274.0\" font-size=\"8\" fill=\"#999\">Write a message…</text>\n  <rect x=\"324\" y=\"262\" width=\"60\" height=\"18\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"354.0\" y=\"274.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Send</text>\n</svg>"
+    },
+    {
+      "id": "flow-seller",
+      "type": "group",
+      "label": "Seller journey",
+      "description": "Listing items, getting them approved and getting paid.",
+      "x": 0,
+      "y": 2794,
+      "width": 1240,
+      "height": 330,
+      "collapsed": false
+    },
+    {
+      "id": "mockup-seller-dashboard",
+      "type": "mockup",
+      "label": "Seller Dashboard",
+      "description": "What needs the seller's attention today.",
+      "parentId": "flow-seller",
+      "x": 30,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/sell",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace — Sell</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Payouts</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Orders</text>\n  <text x=\"291\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Listings</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Seller dashboard</text>\n  <rect x=\"284\" y=\"40\" width=\"100\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"334.0\" y=\"53.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">+ New listing</text>\n  <rect x=\"16.0\" y=\"64\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26.0\" y=\"79\" font-size=\"8\" fill=\"#666\">Live listings</text>\n  <text x=\"26.0\" y=\"96\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">23</text>\n  <rect x=\"141.33333333333331\" y=\"64\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"151.33333333333331\" y=\"79\" font-size=\"8\" fill=\"#666\">In review</text>\n  <text x=\"151.33333333333331\" y=\"96\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">2</text>\n  <rect x=\"266.66666666666663\" y=\"64\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"276.66666666666663\" y=\"79\" font-size=\"8\" fill=\"#666\">Next payout</text>\n  <text x=\"276.66666666666663\" y=\"96\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">€412.50</text>\n  <text x=\"16\" y=\"130\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">To do</text>\n  <rect x=\"16\" y=\"140\" width=\"26\" height=\"26\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"140\" x2=\"42\" y2=\"166\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"140\" x2=\"16\" y2=\"166\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"144\" width=\"202.4\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"153\" width=\"121\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"298.4\" y=\"144\" width=\"85\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"340.9\" y=\"154\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">ship by tomorrow</text>\n  <line x1=\"16\" y1=\"170\" x2=\"384\" y2=\"170\" stroke=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"174\" width=\"26\" height=\"26\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"174\" x2=\"42\" y2=\"200\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"174\" x2=\"16\" y2=\"200\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"178\" width=\"202.4\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"187\" width=\"121\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"275.4\" y=\"178\" width=\"108\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"329.4\" y=\"188\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">rejected — see reason</text>\n  <line x1=\"16\" y1=\"204\" x2=\"384\" y2=\"204\" stroke=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"208\" width=\"26\" height=\"26\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"208\" x2=\"42\" y2=\"234\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"208\" x2=\"16\" y2=\"234\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"212\" width=\"202.4\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"221\" width=\"121\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"312.2\" y=\"212\" width=\"71\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"347.7\" y=\"222\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">buyer message</text>\n  <line x1=\"16\" y1=\"238\" x2=\"384\" y2=\"238\" stroke=\"#e5e7eb\"/>\n</svg>"
+    },
+    {
       "id": "mockup-new-listing",
       "type": "mockup",
       "label": "New Listing",
       "description": "Seller creates a listing; it goes into review and only appears in search once approved (within {{LISTING_REVIEW_SLA_HOURS}} h).",
-      "x": 0,
-      "y": 2084,
+      "parentId": "flow-seller",
+      "x": 350,
+      "y": 110,
       "width": 220,
       "height": 190,
       "collapsed": false,
@@ -429,12 +550,52 @@
       "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace — Sell</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Payouts</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">My listings</text>\n  <text x=\"16\" y=\"54\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Create a listing</text>\n  <rect x=\"16\" y=\"64\" width=\"150\" height=\"118\" rx=\"3\" fill=\"#fff\" stroke=\"#999\" stroke-dasharray=\"4 3\"/>\n  <text x=\"91\" y=\"120\" font-size=\"9\" fill=\"#2563eb\" font-weight=\"bold\" text-anchor=\"middle\">+ Add photos</text>\n  <text x=\"91\" y=\"134\" font-size=\"8\" fill=\"#666\" text-anchor=\"middle\">up to 10</text>\n  <text x=\"180\" y=\"60\" font-size=\"8\" fill=\"#666\">Title</text>\n  <rect x=\"180\" y=\"64\" width=\"204\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"186\" y=\"76.0\" font-size=\"8\" fill=\"#999\">Mid-century armchair</text>\n  <text x=\"180\" y=\"94\" font-size=\"8\" fill=\"#666\">Price</text>\n  <rect x=\"180\" y=\"98\" width=\"96\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"186\" y=\"110.0\" font-size=\"8\" fill=\"#999\">€ 180.00</text>\n  <text x=\"288\" y=\"94\" font-size=\"8\" fill=\"#666\">Category</text>\n  <rect x=\"288\" y=\"98\" width=\"96\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"294\" y=\"110.0\" font-size=\"8\" fill=\"#999\">Furniture</text>\n  <path d=\"M372 105 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <text x=\"180\" y=\"128\" font-size=\"8\" fill=\"#666\">Description</text>\n  <rect x=\"180\" y=\"132\" width=\"204\" height=\"54\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"186\" y=\"162.0\" font-size=\"8\" fill=\"#999\">Condition, dimensions, pickup…</text>\n  <rect x=\"16\" y=\"196\" width=\"368\" height=\"36\" rx=\"3\" fill=\"#f3f4f6\" stroke=\"#f3f4f6\"/>\n  <text x=\"26\" y=\"211\" font-size=\"8\" fill=\"#333\">Listings are reviewed against marketplace policy before they appear in search.</text>\n  <text x=\"26\" y=\"224\" font-size=\"8\" fill=\"#666\">You keep the price minus the platform commission.</text>\n  <rect x=\"16\" y=\"256\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"71.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Save draft</text>\n  <rect x=\"254\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"319.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Submit for review</text>\n</svg>"
     },
     {
+      "id": "mockup-my-listings",
+      "type": "mockup",
+      "label": "My Listings",
+      "description": "Listing states from the moderation workflow — in review, live, rejected with a reason.",
+      "parentId": "flow-seller",
+      "x": 670,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/sell/listings",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace — Sell</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Payouts</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Orders</text>\n  <text x=\"291\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Listings</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">My listings</text>\n  <text x=\"16\" y=\"76\" font-size=\"9\" fill=\"#666\">All 25</text>\n  <text x=\"62\" y=\"76\" font-size=\"9\" fill=\"#666\">Live 23</text>\n  <text x=\"113\" y=\"76\" font-size=\"9\" fill=\"#2563eb\" font-weight=\"bold\">In review 1</text>\n  <line x1=\"113\" y1=\"80\" x2=\"168\" y2=\"80\" stroke=\"#2563eb\" stroke-width=\"2\"/>\n  <text x=\"184\" y=\"76\" font-size=\"9\" fill=\"#666\">Rejected 1</text>\n  <line x1=\"16\" y1=\"81\" x2=\"384\" y2=\"81\" stroke=\"#ccc\"/>\n  <rect x=\"12\" y=\"91\" width=\"376\" height=\"32\" rx=\"3\" fill=\"#eef2ff\" stroke=\"#eef2ff\"/>\n  <rect x=\"16\" y=\"94\" width=\"26\" height=\"26\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"94\" x2=\"42\" y2=\"120\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"94\" x2=\"16\" y2=\"120\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"98\" width=\"202.4\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"107\" width=\"121\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"303.0\" y=\"98\" width=\"81\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"343.5\" y=\"108\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">in review · 3 h</text>\n  <line x1=\"16\" y1=\"124\" x2=\"384\" y2=\"124\" stroke=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"128\" width=\"26\" height=\"26\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"128\" x2=\"42\" y2=\"154\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"128\" x2=\"16\" y2=\"154\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"132\" width=\"202.4\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"141\" width=\"121\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"353.6\" y=\"132\" width=\"30\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"368.6\" y=\"142\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">live</text>\n  <line x1=\"16\" y1=\"158\" x2=\"384\" y2=\"158\" stroke=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"162\" width=\"26\" height=\"26\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"162\" x2=\"42\" y2=\"188\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"162\" x2=\"16\" y2=\"188\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"166\" width=\"202.4\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"175\" width=\"121\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"353.6\" y=\"166\" width=\"30\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"368.6\" y=\"176\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">live</text>\n  <line x1=\"16\" y1=\"192\" x2=\"384\" y2=\"192\" stroke=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"202\" width=\"368\" height=\"46\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"218\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Rejected: “Designer lamp”</text>\n  <text x=\"26\" y=\"234\" font-size=\"8\" fill=\"#666\">Reason: brand name in title without proof of authenticity.</text>\n  <rect x=\"284\" y=\"256\" width=\"100\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"334.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Edit &amp; resubmit</text>\n</svg>"
+    },
+    {
+      "id": "mockup-seller-payouts",
+      "type": "mockup",
+      "label": "Payouts",
+      "description": "Per-order split: {{COMMISSION_PCT}}% commission deducted, payouts held for the protection window and frozen while a dispute is open.",
+      "parentId": "flow-seller",
+      "x": 990,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/sell/payouts",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace — Sell</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Payouts</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Orders</text>\n  <text x=\"291\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Listings</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Payouts</text>\n  <rect x=\"16.0\" y=\"64\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26.0\" y=\"79\" font-size=\"8\" fill=\"#666\">Available</text>\n  <text x=\"26.0\" y=\"96\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">€412.50</text>\n  <rect x=\"141.33333333333331\" y=\"64\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"151.33333333333331\" y=\"79\" font-size=\"8\" fill=\"#666\">Held (protection)</text>\n  <text x=\"151.33333333333331\" y=\"96\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">€880.00</text>\n  <rect x=\"266.66666666666663\" y=\"64\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"276.66666666666663\" y=\"79\" font-size=\"8\" fill=\"#666\">Frozen (dispute)</text>\n  <text x=\"276.66666666666663\" y=\"96\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">€180.00</text>\n  <rect x=\"16\" y=\"118\" width=\"368\" height=\"22\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"132.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Order</text>\n  <text x=\"82\" y=\"132.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Sale</text>\n  <text x=\"152\" y=\"132.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Commission</text>\n  <text x=\"232\" y=\"132.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Payout</text>\n  <text x=\"302\" y=\"132.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Status</text>\n  <line x1=\"16\" y1=\"162\" x2=\"384\" y2=\"162\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"154.0\" font-size=\"8\" fill=\"#333\">#58240</text>\n  <text x=\"82\" y=\"154.0\" font-size=\"8\" fill=\"#333\">€250.00</text>\n  <text x=\"152\" y=\"154.0\" font-size=\"8\" fill=\"#333\">−€37.50</text>\n  <text x=\"232\" y=\"154.0\" font-size=\"8\" fill=\"#333\">€212.50</text>\n  <rect x=\"300\" y=\"144.0\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"326.5\" y=\"154.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">available</text>\n  <line x1=\"16\" y1=\"184\" x2=\"384\" y2=\"184\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"176.0\" font-size=\"8\" fill=\"#333\">#58231</text>\n  <text x=\"82\" y=\"176.0\" font-size=\"8\" fill=\"#333\">€235.29</text>\n  <text x=\"152\" y=\"176.0\" font-size=\"8\" fill=\"#333\">−€35.29</text>\n  <text x=\"232\" y=\"176.0\" font-size=\"8\" fill=\"#333\">€200.00</text>\n  <rect x=\"300\" y=\"166.0\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"326.5\" y=\"176.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">available</text>\n  <line x1=\"16\" y1=\"206\" x2=\"384\" y2=\"206\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"198.0\" font-size=\"8\" fill=\"#333\">#58227</text>\n  <text x=\"82\" y=\"198.0\" font-size=\"8\" fill=\"#333\">€880.00</text>\n  <text x=\"152\" y=\"198.0\" font-size=\"8\" fill=\"#333\">−€132.00</text>\n  <text x=\"232\" y=\"198.0\" font-size=\"8\" fill=\"#333\">€748.00</text>\n  <rect x=\"300\" y=\"188.0\" width=\"71\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"335.5\" y=\"198.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">held · 4 days</text>\n  <line x1=\"16\" y1=\"228\" x2=\"384\" y2=\"228\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"220.0\" font-size=\"8\" fill=\"#333\">#58213</text>\n  <text x=\"82\" y=\"220.0\" font-size=\"8\" fill=\"#333\">€180.00</text>\n  <text x=\"152\" y=\"220.0\" font-size=\"8\" fill=\"#333\">−€27.00</text>\n  <text x=\"232\" y=\"220.0\" font-size=\"8\" fill=\"#333\">€153.00</text>\n  <rect x=\"300\" y=\"210.0\" width=\"39\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"319.5\" y=\"220.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">frozen</text>\n  <text x=\"16\" y=\"242\" font-size=\"8\" fill=\"#666\">Commission is 15% of the item price; every split is recorded per order.</text>\n  <rect x=\"264\" y=\"256\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"324.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Withdraw €412.50</text>\n</svg>"
+    },
+    {
+      "id": "flow-trust-safety",
+      "type": "group",
+      "label": "Trust & Safety journey",
+      "description": "Moderating listings, investigating sellers and resolving disputes.",
+      "x": 0,
+      "y": 3204,
+      "width": 920,
+      "height": 330,
+      "collapsed": false
+    },
+    {
       "id": "mockup-listing-review-queue",
       "type": "mockup",
       "label": "Listing Review Queue",
       "description": "Trust & Safety queue sorted by time left on the review SLA. Rejecting a listing or suspending a seller removes it from search within {{SUPPRESSION_MINUTES}} minutes.",
-      "x": 320,
-      "y": 2084,
+      "parentId": "flow-trust-safety",
+      "x": 30,
+      "y": 110,
       "width": 220,
       "height": 190,
       "collapsed": false,
@@ -442,17 +603,32 @@
       "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Trust &amp; Safety</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Disputes</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Sellers</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Listings (14)</text>\n  <rect x=\"0\" y=\"30\" width=\"150\" height=\"270\" rx=\"0\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <rect x=\"4\" y=\"34\" width=\"142\" height=\"46\" rx=\"3\" fill=\"#eef2ff\" stroke=\"#eef2ff\"/>\n  <rect x=\"10\" y=\"38\" width=\"32\" height=\"32\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"10\" y1=\"38\" x2=\"42\" y2=\"70\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"38\" x2=\"10\" y2=\"70\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"42\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"51\" width=\"54\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"60\" width=\"48\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"74.0\" y=\"70\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">3 h left</text>\n  <rect x=\"10\" y=\"88\" width=\"32\" height=\"32\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"10\" y1=\"88\" x2=\"42\" y2=\"120\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"88\" x2=\"10\" y2=\"120\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"92\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"101\" width=\"54\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"110\" width=\"48\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"74.0\" y=\"120\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">7 h left</text>\n  <rect x=\"10\" y=\"138\" width=\"32\" height=\"32\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"10\" y1=\"138\" x2=\"42\" y2=\"170\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"138\" x2=\"10\" y2=\"170\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"142\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"151\" width=\"54\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"160\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"76.5\" y=\"170\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">11 h left</text>\n  <rect x=\"10\" y=\"188\" width=\"32\" height=\"32\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"10\" y1=\"188\" x2=\"42\" y2=\"220\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"188\" x2=\"10\" y2=\"220\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"192\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"201\" width=\"54\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"210\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"76.5\" y=\"220\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">19 h left</text>\n  <rect x=\"10\" y=\"238\" width=\"32\" height=\"32\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"10\" y1=\"238\" x2=\"42\" y2=\"270\" stroke=\"#ccc\"/>\n  <line x1=\"42\" y1=\"238\" x2=\"10\" y2=\"270\" stroke=\"#ccc\"/>\n  <rect x=\"50\" y=\"242\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"251\" width=\"54\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"50\" y=\"260\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"76.5\" y=\"270\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">22 h left</text>\n  <rect x=\"166\" y=\"42\" width=\"100\" height=\"80\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"166\" y1=\"42\" x2=\"266\" y2=\"122\" stroke=\"#ccc\"/>\n  <line x1=\"266\" y1=\"42\" x2=\"166\" y2=\"122\" stroke=\"#ccc\"/>\n  <text x=\"276\" y=\"56\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Mid-century armchair</text>\n  <text x=\"276\" y=\"72\" font-size=\"8\" fill=\"#666\">€180 · seller VintageCo</text>\n  <rect x=\"276\" y=\"80\" width=\"58\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"305.0\" y=\"90\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">New seller</text>\n  <text x=\"166\" y=\"142\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Policy checks</text>\n  <rect x=\"166\" y=\"150\" width=\"9\" height=\"9\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <path d=\"M168 154.5 l2 2 l3.5 -4\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"181\" y=\"158\" font-size=\"8\" fill=\"#333\">Photos show the actual item</text>\n  <rect x=\"166\" y=\"166\" width=\"9\" height=\"9\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <path d=\"M168 170.5 l2 2 l3.5 -4\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <text x=\"181\" y=\"174\" font-size=\"8\" fill=\"#333\">Price and description are consistent</text>\n  <rect x=\"166\" y=\"182\" width=\"9\" height=\"9\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"181\" y=\"190\" font-size=\"8\" fill=\"#333\">No prohibited category or keywords</text>\n  <text x=\"166\" y=\"214\" font-size=\"8\" fill=\"#666\">Suspending a seller removes all their listings from search.</text>\n  <rect x=\"166\" y=\"256\" width=\"70\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"201.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Reject…</text>\n  <rect x=\"244\" y=\"256\" width=\"60\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"274.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Suspend</text>\n  <rect x=\"312\" y=\"256\" width=\"72\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"348.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Approve</text>\n</svg>"
     },
     {
-      "id": "mockup-order-dispute",
+      "id": "mockup-seller-investigation",
       "type": "mockup",
-      "label": "Order & Buyer Protection",
-      "description": "Buyer view of an order: funds stay held for {{DISPUTE_WINDOW_DAYS}} days after delivery, and opening a dispute freezes the payout.",
-      "x": 640,
-      "y": 2084,
+      "label": "Seller Investigation",
+      "description": "Suspending a seller removes every listing from search within {{SUPPRESSION_MINUTES}} minutes.",
+      "parentId": "flow-trust-safety",
+      "x": 350,
+      "y": 110,
       "width": 220,
       "height": 190,
       "collapsed": false,
-      "screen": "/orders/:id",
-      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Marketplace</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Account</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Orders</text>\n  <text x=\"291\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Search</text>\n  <text x=\"16\" y=\"54\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Order #58213</text>\n  <text x=\"16\" y=\"70\" font-size=\"8\" fill=\"#666\">Sold by VintageCo · delivered 2 Apr</text>\n  <rect x=\"16\" y=\"80\" width=\"60\" height=\"60\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"80\" x2=\"76\" y2=\"140\" stroke=\"#ccc\"/>\n  <line x1=\"76\" y1=\"80\" x2=\"16\" y2=\"140\" stroke=\"#ccc\"/>\n  <rect x=\"88\" y=\"88\" width=\"180\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"88\" y=\"98\" width=\"108\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"384\" y=\"96\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"end\">€180.00</text>\n  <text x=\"16\" y=\"162\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Where your money is</text>\n  <rect x=\"16\" y=\"170\" width=\"39\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"35.5\" y=\"180\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Paid ✓</text>\n  <rect x=\"61\" y=\"170\" width=\"62\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"92.0\" y=\"180\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Delivered ✓</text>\n  <rect x=\"129\" y=\"170\" width=\"126\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"192.0\" y=\"180\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Held for buyer protection</text>\n  <rect x=\"261\" y=\"170\" width=\"94\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"308.0\" y=\"180\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Released to seller</text>\n  <text x=\"16\" y=\"204\" font-size=\"8\" fill=\"#333\">Buyer protection window</text>\n  <text x=\"384\" y=\"204\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">3 of 7 days</text>\n  <rect x=\"16\" y=\"208\" width=\"368\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"208\" width=\"128\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <text x=\"16\" y=\"236\" font-size=\"8\" fill=\"#666\">Something wrong? Opening a dispute freezes the payout until it is resolved.</text>\n  <rect x=\"16\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"81.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Open a dispute</text>\n  <rect x=\"254\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"319.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Confirm all good</text>\n</svg>"
+      "screen": "/trust/sellers/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Trust &amp; Safety</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Disputes</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Sellers</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Listings (14)</text>\n  <text x=\"16\" y=\"46\" font-size=\"8\" fill=\"#2563eb\">← Listing review</text>\n  <circle cx=\"30\" cy=\"70\" r=\"13\" fill=\"#ccc\" stroke=\"#fff\"/>\n  <text x=\"52\" y=\"68\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">VintageCo</text>\n  <text x=\"52\" y=\"82\" font-size=\"8\" fill=\"#666\">Seller since 2023 · 212 sales · 3 reports this week</text>\n  <rect x=\"16.0\" y=\"96\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26.0\" y=\"111\" font-size=\"8\" fill=\"#666\">Open reports</text>\n  <text x=\"26.0\" y=\"128\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">3</text>\n  <rect x=\"141.33333333333331\" y=\"96\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"151.33333333333331\" y=\"111\" font-size=\"8\" fill=\"#666\">Live listings</text>\n  <text x=\"151.33333333333331\" y=\"128\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">23</text>\n  <rect x=\"266.66666666666663\" y=\"96\" width=\"117.33333333333333\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"276.66666666666663\" y=\"111\" font-size=\"8\" fill=\"#666\">Dispute rate</text>\n  <text x=\"276.66666666666663\" y=\"128\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">4.1%</text>\n  <text x=\"16\" y=\"158\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Reports</text>\n  <rect x=\"16\" y=\"172\" width=\"202.4\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"181\" width=\"121\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"384\" y=\"180\" font-size=\"8\" fill=\"#333\" text-anchor=\"end\">counterfeit</text>\n  <line x1=\"16\" y1=\"198\" x2=\"384\" y2=\"198\" stroke=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"206\" width=\"202.4\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"215\" width=\"121\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"384\" y=\"214\" font-size=\"8\" fill=\"#333\" text-anchor=\"end\">misdescribed</text>\n  <line x1=\"16\" y1=\"232\" x2=\"384\" y2=\"232\" stroke=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"234\" width=\"368\" height=\"24\" rx=\"3\" fill=\"#333\" stroke=\"#333\"/>\n  <text x=\"26\" y=\"249.0\" font-size=\"8\" fill=\"#fff\">Suspending hides all 23 listings from search within 5 minutes.</text>\n  <rect x=\"16\" y=\"266\" width=\"90\" height=\"22\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"61.0\" y=\"280.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Warn</text>\n  <rect x=\"264\" y=\"266\" width=\"120\" height=\"22\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"324.0\" y=\"280.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Suspend seller</text>\n</svg>"
+    },
+    {
+      "id": "mockup-ts-dispute-case",
+      "type": "mockup",
+      "label": "Dispute Case",
+      "description": "Evidence from both sides; the payout stays frozen until a resolution is chosen.",
+      "parentId": "flow-trust-safety",
+      "x": 670,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/trust/disputes/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Trust &amp; Safety</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Disputes (4)</text>\n  <text x=\"312\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Sellers</text>\n  <text x=\"261\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Listings</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Dispute DSP-58213</text>\n  <rect x=\"140\" y=\"44\" width=\"71\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"175.5\" y=\"54\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">payout frozen</text>\n  <text x=\"16\" y=\"70\" font-size=\"8\" fill=\"#666\">Buyer: item not as described · €180.00 · opened day 3 of 7</text>\n  <rect x=\"16\" y=\"80\" width=\"180\" height=\"130\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"96\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Buyer</text>\n  <rect x=\"26\" y=\"106\" width=\"150\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"26\" y=\"116\" width=\"150\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"26\" y=\"126\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"26\" y=\"146\" width=\"60\" height=\"50\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"26\" y1=\"146\" x2=\"86\" y2=\"196\" stroke=\"#ccc\"/>\n  <line x1=\"86\" y1=\"146\" x2=\"26\" y2=\"196\" stroke=\"#ccc\"/>\n  <rect x=\"94\" y=\"146\" width=\"60\" height=\"50\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"94\" y1=\"146\" x2=\"154\" y2=\"196\" stroke=\"#ccc\"/>\n  <line x1=\"154\" y1=\"146\" x2=\"94\" y2=\"196\" stroke=\"#ccc\"/>\n  <rect x=\"204\" y=\"80\" width=\"180\" height=\"130\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"214\" y=\"96\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Seller</text>\n  <rect x=\"214\" y=\"106\" width=\"150\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"214\" y=\"116\" width=\"150\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"214\" y=\"126\" width=\"150\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"214\" y=\"136\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"16\" y=\"230\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Resolution</text>\n  <rect x=\"16\" y=\"256\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"71.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Refund buyer</text>\n  <rect x=\"134\" y=\"256\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"189.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Partial refund</text>\n  <rect x=\"252\" y=\"256\" width=\"132\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"318.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Release to seller</text>\n</svg>"
     }
   ],
   "relations": [
@@ -615,6 +791,121 @@
       "relationType": "constrains"
     },
     {
+      "id": "mockup-mp-search--order-checkout-service",
+      "sourceId": "mockup-mp-search",
+      "targetId": "order-checkout-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-mp-search--mockup-mp-listing",
+      "sourceId": "mockup-mp-search",
+      "targetId": "mockup-mp-listing",
+      "relationType": "navigates-to",
+      "label": "Open listing"
+    },
+    {
+      "id": "mockup-mp-listing--order-checkout-service",
+      "sourceId": "mockup-mp-listing",
+      "targetId": "order-checkout-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-mp-listing--mockup-mp-checkout",
+      "sourceId": "mockup-mp-listing",
+      "targetId": "mockup-mp-checkout",
+      "relationType": "navigates-to",
+      "label": "Buy now"
+    },
+    {
+      "id": "mockup-mp-checkout--req-dispute-window-hold",
+      "sourceId": "mockup-mp-checkout",
+      "targetId": "req-dispute-window-hold",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-mp-checkout--order-checkout-service",
+      "sourceId": "mockup-mp-checkout",
+      "targetId": "order-checkout-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-mp-checkout--mockup-order-dispute",
+      "sourceId": "mockup-mp-checkout",
+      "targetId": "mockup-order-dispute",
+      "relationType": "navigates-to",
+      "label": "Pay"
+    },
+    {
+      "id": "mockup-order-dispute--req-dispute-window-hold",
+      "sourceId": "mockup-order-dispute",
+      "targetId": "req-dispute-window-hold",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-order-dispute--order-checkout-service",
+      "sourceId": "mockup-order-dispute",
+      "targetId": "order-checkout-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-order-dispute--mockup-mp-open-dispute",
+      "sourceId": "mockup-order-dispute",
+      "targetId": "mockup-mp-open-dispute",
+      "relationType": "navigates-to",
+      "label": "Open a dispute"
+    },
+    {
+      "id": "mockup-mp-open-dispute--req-dispute-window-hold",
+      "sourceId": "mockup-mp-open-dispute",
+      "targetId": "req-dispute-window-hold",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-mp-open-dispute--order-checkout-service",
+      "sourceId": "mockup-mp-open-dispute",
+      "targetId": "order-checkout-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-mp-open-dispute--mockup-mp-dispute-status",
+      "sourceId": "mockup-mp-open-dispute",
+      "targetId": "mockup-mp-dispute-status",
+      "relationType": "navigates-to",
+      "label": "Open dispute"
+    },
+    {
+      "id": "mockup-mp-dispute-status--req-dispute-window-hold",
+      "sourceId": "mockup-mp-dispute-status",
+      "targetId": "req-dispute-window-hold",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-mp-dispute-status--order-checkout-service",
+      "sourceId": "mockup-mp-dispute-status",
+      "targetId": "order-checkout-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-seller-dashboard--listings-service",
+      "sourceId": "mockup-seller-dashboard",
+      "targetId": "listings-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-seller-dashboard--mockup-new-listing",
+      "sourceId": "mockup-seller-dashboard",
+      "targetId": "mockup-new-listing",
+      "relationType": "navigates-to",
+      "label": "New listing"
+    },
+    {
+      "id": "mockup-seller-dashboard--mockup-seller-payouts",
+      "sourceId": "mockup-seller-dashboard",
+      "targetId": "mockup-seller-payouts",
+      "relationType": "navigates-to",
+      "label": "Payouts"
+    },
+    {
       "id": "mockup-new-listing--req-listing-moderation",
       "sourceId": "mockup-new-listing",
       "targetId": "req-listing-moderation",
@@ -624,6 +915,50 @@
       "id": "mockup-new-listing--listings-service",
       "sourceId": "mockup-new-listing",
       "targetId": "listings-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-new-listing--mockup-my-listings",
+      "sourceId": "mockup-new-listing",
+      "targetId": "mockup-my-listings",
+      "relationType": "navigates-to",
+      "label": "Submit for review"
+    },
+    {
+      "id": "mockup-my-listings--req-listing-moderation",
+      "sourceId": "mockup-my-listings",
+      "targetId": "req-listing-moderation",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-my-listings--listings-service",
+      "sourceId": "mockup-my-listings",
+      "targetId": "listings-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-my-listings--mockup-new-listing",
+      "sourceId": "mockup-my-listings",
+      "targetId": "mockup-new-listing",
+      "relationType": "navigates-to",
+      "label": "Edit & resubmit"
+    },
+    {
+      "id": "mockup-seller-payouts--req-commission-accuracy",
+      "sourceId": "mockup-seller-payouts",
+      "targetId": "req-commission-accuracy",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-seller-payouts--req-dispute-window-hold",
+      "sourceId": "mockup-seller-payouts",
+      "targetId": "req-dispute-window-hold",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-seller-payouts--payout-worker",
+      "sourceId": "mockup-seller-payouts",
+      "targetId": "payout-worker",
       "relationType": "presented-by"
     },
     {
@@ -645,15 +980,48 @@
       "relationType": "presented-by"
     },
     {
-      "id": "mockup-order-dispute--req-dispute-window-hold",
-      "sourceId": "mockup-order-dispute",
+      "id": "mockup-listing-review-queue--mockup-seller-investigation",
+      "sourceId": "mockup-listing-review-queue",
+      "targetId": "mockup-seller-investigation",
+      "relationType": "navigates-to",
+      "label": "Suspend"
+    },
+    {
+      "id": "mockup-seller-investigation--req-delisting-suppression",
+      "sourceId": "mockup-seller-investigation",
+      "targetId": "req-delisting-suppression",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-seller-investigation--trust-safety-console",
+      "sourceId": "mockup-seller-investigation",
+      "targetId": "trust-safety-console",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-seller-investigation--mockup-ts-dispute-case",
+      "sourceId": "mockup-seller-investigation",
+      "targetId": "mockup-ts-dispute-case",
+      "relationType": "navigates-to",
+      "label": "Disputes"
+    },
+    {
+      "id": "mockup-seller-investigation--mockup-listing-review-queue",
+      "sourceId": "mockup-seller-investigation",
+      "targetId": "mockup-listing-review-queue",
+      "relationType": "navigates-to",
+      "label": "Suspend seller"
+    },
+    {
+      "id": "mockup-ts-dispute-case--req-dispute-window-hold",
+      "sourceId": "mockup-ts-dispute-case",
       "targetId": "req-dispute-window-hold",
       "relationType": "illustrates"
     },
     {
-      "id": "mockup-order-dispute--order-checkout-service",
-      "sourceId": "mockup-order-dispute",
-      "targetId": "order-checkout-service",
+      "id": "mockup-ts-dispute-case--trust-safety-console",
+      "sourceId": "mockup-ts-dispute-case",
+      "targetId": "trust-safety-console",
       "relationType": "presented-by"
     }
   ],
