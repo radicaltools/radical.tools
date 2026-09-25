@@ -440,6 +440,45 @@
       "decision": "After a successful SSO handshake, the gateway issues its own short-lived, tenant-scoped JWT. The IdP is the source of truth for the identity; the platform never stores the tenant's SSO credentials.",
       "consequences": "A tenant revoking a user at their IdP takes effect on the token's next short expiry, not instantly, which is an accepted trade-off; token issuance adds one extra hop to first login.",
       "alternatives": "Storing IdP session cookies directly was rejected — it would tie the platform's session lifetime to each IdP's own cookie semantics and leak IdP-specific state into the app tier."
+    },
+    {
+      "id": "mockup-signup",
+      "type": "mockup",
+      "label": "Sign Up",
+      "description": "Self-serve sign-up; the new tenant gets an isolated, ready-to-use workspace within {{PROVISION_MINUTES}} minutes.",
+      "x": 0,
+      "y": 2324,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/signup",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"300\" rx=\"0\" fill=\"#f3f4f6\" stroke=\"#f3f4f6\"/>\n  <rect x=\"100\" y=\"20\" width=\"200\" height=\"262\" rx=\"6\" fill=\"#fff\" stroke=\"#ccc\"/>\n  <rect x=\"188\" y=\"34\" width=\"24\" height=\"24\" rx=\"5\" fill=\"#ccc\"/>\n  <text x=\"200\" y=\"78\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Start your free trial</text>\n  <text x=\"116\" y=\"92\" font-size=\"8\" fill=\"#666\">Work e-mail</text>\n  <rect x=\"116\" y=\"96\" width=\"168\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"122\" y=\"108.0\" font-size=\"8\" fill=\"#999\">jane@acme.com</text>\n  <text x=\"116\" y=\"126\" font-size=\"8\" fill=\"#666\">Company</text>\n  <rect x=\"116\" y=\"130\" width=\"168\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"122\" y=\"142.0\" font-size=\"8\" fill=\"#999\">Acme Inc.</text>\n  <text x=\"116\" y=\"160\" font-size=\"8\" fill=\"#666\">Workspace URL</text>\n  <rect x=\"116\" y=\"164\" width=\"168\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"122\" y=\"176.0\" font-size=\"8\" fill=\"#999\">acme.app.example</text>\n  <rect x=\"116\" y=\"194\" width=\"168\" height=\"22\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"200.0\" y=\"208.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Create workspace</text>\n  <text x=\"200\" y=\"232\" font-size=\"8\" fill=\"#666\" text-anchor=\"middle\">or</text>\n  <rect x=\"116\" y=\"240\" width=\"168\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"200.0\" y=\"253.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Sign up with SSO</text>\n  <text x=\"200\" y=\"276\" font-size=\"7.5\" fill=\"#666\" text-anchor=\"middle\">Your workspace is ready in a couple of minutes.</text>\n</svg>"
+    },
+    {
+      "id": "mockup-workspace-dashboard",
+      "type": "mockup",
+      "label": "Workspace Dashboard",
+      "description": "Tenant home. When a payment fails the workspace turns read-only — data stays visible, writes are blocked — until billing is fixed.",
+      "x": 320,
+      "y": 2324,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Acme ▾</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Settings</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Projects</text>\n  <rect x=\"16\" y=\"38\" width=\"368\" height=\"26\" rx=\"3\" fill=\"#fef3c7\" stroke=\"#d97706\"/>\n  <text x=\"26\" y=\"55\" font-size=\"8\" fill=\"#333\">Payment failed — the workspace is read-only until billing is updated.</text>\n  <text x=\"374\" y=\"55\" font-size=\"8\" fill=\"#2563eb\" font-weight=\"bold\" text-anchor=\"end\">Update billing</text>\n  <rect x=\"16\" y=\"76\" width=\"116\" height=\"48\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"92\" font-size=\"8\" fill=\"#666\">Active projects</text>\n  <text x=\"26\" y=\"114\" font-size=\"14\" fill=\"#333\" font-weight=\"bold\">12</text>\n  <rect x=\"140\" y=\"76\" width=\"116\" height=\"48\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"150\" y=\"92\" font-size=\"8\" fill=\"#666\">Members</text>\n  <text x=\"150\" y=\"114\" font-size=\"14\" fill=\"#333\" font-weight=\"bold\">48</text>\n  <rect x=\"264\" y=\"76\" width=\"116\" height=\"48\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"274\" y=\"92\" font-size=\"8\" fill=\"#666\">API calls this month</text>\n  <text x=\"274\" y=\"114\" font-size=\"14\" fill=\"#333\" font-weight=\"bold\">812k</text>\n  <text x=\"16\" y=\"146\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Projects</text>\n  <rect x=\"300\" y=\"134\" width=\"84\" height=\"20\" rx=\"3\" fill=\"#e5e7eb\" stroke=\"#e5e7eb\"/>\n  <text x=\"342.0\" y=\"147.0\" font-size=\"9\" fill=\"#999\" font-weight=\"bold\" text-anchor=\"middle\">+ New project</text>\n  <rect x=\"16\" y=\"160\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"172.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Name</text>\n  <text x=\"192\" y=\"172.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Owner</text>\n  <text x=\"292\" y=\"172.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Updated</text>\n  <line x1=\"16\" y1=\"196\" x2=\"384\" y2=\"196\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"184.5\" width=\"120\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"184.5\" width=\"60\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"190.0\" font-size=\"8\" fill=\"#333\">2 h ago</text>\n  <line x1=\"16\" y1=\"214\" x2=\"384\" y2=\"214\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"202.5\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"202.5\" width=\"70\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"208.0\" font-size=\"8\" fill=\"#333\">yesterday</text>\n  <line x1=\"16\" y1=\"232\" x2=\"384\" y2=\"232\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"220.5\" width=\"130\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"220.5\" width=\"50\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"226.0\" font-size=\"8\" fill=\"#333\">3 days ago</text>\n  <line x1=\"16\" y1=\"250\" x2=\"384\" y2=\"250\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"238.5\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"238.5\" width=\"60\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"244.0\" font-size=\"8\" fill=\"#333\">last week</text>\n  <line x1=\"16\" y1=\"268\" x2=\"384\" y2=\"268\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"256.5\" width=\"110\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"192\" y=\"256.5\" width=\"60\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"292\" y=\"262.0\" font-size=\"8\" fill=\"#333\">last week</text>\n</svg>"
+    },
+    {
+      "id": "mockup-billing-usage",
+      "type": "mockup",
+      "label": "Billing & Usage",
+      "description": "Tenant admin view of plan, metered usage and invoices; usage figures are recorded exactly once and reconciled against source logs.",
+      "x": 640,
+      "y": 2324,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/settings/billing",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Acme ▾</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Settings</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Projects</text>\n  <rect x=\"0\" y=\"30\" width=\"110\" height=\"270\" rx=\"0\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"14\" y=\"55\" font-size=\"9\" fill=\"#666\">Profile</text>\n  <text x=\"14\" y=\"79\" font-size=\"9\" fill=\"#666\">Users</text>\n  <text x=\"14\" y=\"103\" font-size=\"9\" fill=\"#666\">Single sign-on</text>\n  <rect x=\"6\" y=\"114\" width=\"98\" height=\"20\" rx=\"3\" fill=\"#eef2ff\" stroke=\"#eef2ff\"/>\n  <text x=\"14\" y=\"127\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Billing &amp; usage</text>\n  <text x=\"14\" y=\"151\" font-size=\"9\" fill=\"#666\">Audit log</text>\n  <text x=\"126\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Billing &amp; usage</text>\n  <rect x=\"126\" y=\"64\" width=\"258\" height=\"44\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"136\" y=\"80\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Business plan</text>\n  <text x=\"136\" y=\"98\" font-size=\"8\" fill=\"#666\">€49 per seat / month · 48 seats</text>\n  <rect x=\"290\" y=\"76\" width=\"86\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"333.0\" y=\"89.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Change plan</text>\n  <text x=\"126\" y=\"126\" font-size=\"8\" fill=\"#333\">API calls</text>\n  <text x=\"384\" y=\"126\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">812k / 1M</text>\n  <rect x=\"126\" y=\"130\" width=\"258\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"126\" y=\"130\" width=\"208\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <text x=\"126\" y=\"152\" font-size=\"8\" fill=\"#333\">Storage</text>\n  <text x=\"384\" y=\"152\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">38 / 100 GB</text>\n  <rect x=\"126\" y=\"156\" width=\"258\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"126\" y=\"156\" width=\"98\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <text x=\"126\" y=\"186\" font-size=\"7.5\" fill=\"#666\">Usage is metered per event and reconciled daily against source logs.</text>\n  <rect x=\"126\" y=\"196\" width=\"258\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"132\" y=\"208.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Invoice</text>\n  <text x=\"222\" y=\"208.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Amount</text>\n  <text x=\"302\" y=\"208.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Status</text>\n  <line x1=\"126\" y1=\"232\" x2=\"384\" y2=\"232\" stroke=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"226.0\" font-size=\"8\" fill=\"#333\">Mar 2026</text>\n  <text x=\"222\" y=\"226.0\" font-size=\"8\" fill=\"#333\">€2,352.00</text>\n  <rect x=\"300\" y=\"216.0\" width=\"76\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"338.0\" y=\"226.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">payment failed</text>\n  <line x1=\"126\" y1=\"250\" x2=\"384\" y2=\"250\" stroke=\"#e5e7eb\"/>\n  <text x=\"132\" y=\"244.0\" font-size=\"8\" fill=\"#333\">Feb 2026</text>\n  <text x=\"222\" y=\"244.0\" font-size=\"8\" fill=\"#333\">€2,254.00</text>\n  <rect x=\"300\" y=\"234.0\" width=\"30\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"315.0\" y=\"244.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">paid</text>\n  <rect x=\"126\" y=\"262\" width=\"150\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"201.0\" y=\"275.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Update payment method</text>\n</svg>"
     }
   ],
   "relations": [
@@ -561,6 +600,62 @@
       "targetId": "email-provider",
       "label": "Sends transactional email",
       "technology": "HTTPS"
+    },
+    {
+      "id": "mockup-signup--req-tenant-provisioning-time",
+      "sourceId": "mockup-signup",
+      "targetId": "req-tenant-provisioning-time",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-signup--webapp",
+      "sourceId": "mockup-signup",
+      "targetId": "webapp",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-signup--mockup-workspace-dashboard",
+      "sourceId": "mockup-signup",
+      "targetId": "mockup-workspace-dashboard",
+      "relationType": "navigates-to",
+      "label": "Create workspace"
+    },
+    {
+      "id": "mockup-workspace-dashboard--req-subscription-enforcement",
+      "sourceId": "mockup-workspace-dashboard",
+      "targetId": "req-subscription-enforcement",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-workspace-dashboard--webapp",
+      "sourceId": "mockup-workspace-dashboard",
+      "targetId": "webapp",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-workspace-dashboard--mockup-billing-usage",
+      "sourceId": "mockup-workspace-dashboard",
+      "targetId": "mockup-billing-usage",
+      "relationType": "navigates-to",
+      "label": "Update billing"
+    },
+    {
+      "id": "mockup-billing-usage--req-usage-metering-accuracy",
+      "sourceId": "mockup-billing-usage",
+      "targetId": "req-usage-metering-accuracy",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-billing-usage--req-subscription-enforcement",
+      "sourceId": "mockup-billing-usage",
+      "targetId": "req-subscription-enforcement",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-billing-usage--webapp",
+      "sourceId": "mockup-billing-usage",
+      "targetId": "webapp",
+      "relationType": "presented-by"
     }
   ]
 }

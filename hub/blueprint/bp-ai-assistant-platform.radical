@@ -404,6 +404,45 @@
       "decision": "Keep the base model frozen and push knowledge updates through the retrieval index rather than fine-tuning on new content.",
       "consequences": "Knowledge freshness becomes index-refresh latency instead of training-cycle latency, but overall answer quality is now capped by retrieval quality, not just model quality.",
       "alternatives": "1. Periodic fine-tuning on new knowledge — keeps knowledge \"in\" the model, but the feedback loop is slow and risks catastrophic forgetting of earlier knowledge. 2. Retrieval only (chosen). 3. Retrieval plus light fine-tuning for tone and format only — a reasonable hybrid, at the cost of a second training pipeline. 4. Stuffing all knowledge into the prompt without retrieval — doesn't scale past a small, static document set."
+    },
+    {
+      "id": "mockup-support-chat",
+      "type": "mockup",
+      "label": "Support Chat",
+      "description": "Customer-facing chat: the assistant answers with cited sources when it can ground the answer and hands off to a person when it cannot.",
+      "x": 0,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "chat widget",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"300\" rx=\"0\" fill=\"#f3f4f6\" stroke=\"#f3f4f6\"/>\n  <rect x=\"20\" y=\"30\" width=\"150\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"20\" y=\"42\" width=\"150\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"20\" y=\"54\" width=\"150\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"20\" y=\"66\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"20\" y=\"100\" width=\"130\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"20\" y=\"112\" width=\"130\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"20\" y=\"124\" width=\"78\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"196\" y=\"14\" width=\"188\" height=\"276\" rx=\"8\" fill=\"#fff\" stroke=\"#333\"/>\n  <rect x=\"196\" y=\"14\" width=\"188\" height=\"30\" rx=\"8\" fill=\"#f3f4f6\"/>\n  <text x=\"208\" y=\"33\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Support</text>\n  <rect x=\"300\" y=\"22\" width=\"67\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"333.5\" y=\"32\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">AI assistant</text>\n  <rect x=\"262\" y=\"54\" width=\"112\" height=\"28\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <rect x=\"270\" y=\"62\" width=\"96\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"270\" y=\"71\" width=\"57\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"206\" y=\"90\" width=\"140\" height=\"37\" rx=\"8\" fill=\"#f3f4f6\" stroke=\"#f3f4f6\"/>\n  <rect x=\"214\" y=\"98\" width=\"124\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"214\" y=\"107\" width=\"124\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"214\" y=\"116\" width=\"74\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"206\" y=\"131\" width=\"126\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"269.0\" y=\"141\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Source: Returns policy §2</text>\n  <rect x=\"262\" y=\"153\" width=\"112\" height=\"19\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <rect x=\"270\" y=\"161\" width=\"96\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"206\" y=\"182\" width=\"168\" height=\"34\" rx=\"6\" fill=\"#fff\" stroke=\"#999\" stroke-dasharray=\"4 3\"/>\n  <text x=\"214\" y=\"196\" font-size=\"8\" fill=\"#333\">Connecting you to a person —</text>\n  <text x=\"214\" y=\"208\" font-size=\"8\" fill=\"#666\">usually within a few minutes.</text>\n  <rect x=\"206\" y=\"258\" width=\"132\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"212\" y=\"270.0\" font-size=\"8\" fill=\"#999\">Type a message…</text>\n  <rect x=\"344\" y=\"258\" width=\"30\" height=\"18\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"359.0\" y=\"270.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">➤</text>\n</svg>"
+    },
+    {
+      "id": "mockup-escalation-queue",
+      "type": "mockup",
+      "label": "Escalation Queue",
+      "description": "Human agents pick up escalated cases oldest-first; each case must be picked up within {{ESCALATION_SLA_MIN}} minutes.",
+      "x": 320,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/console/queue",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Agent Console</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Knowledge</text>\n  <text x=\"327\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">My cases</text>\n  <text x=\"271\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Queue (6)</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Escalated cases</text>\n  <rect x=\"284\" y=\"40\" width=\"100\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"334.0\" y=\"53.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Pick up next</text>\n  <rect x=\"16\" y=\"68\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"80.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Case</text>\n  <text x=\"86\" y=\"80.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Reason</text>\n  <text x=\"236\" y=\"80.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Waiting</text>\n  <text x=\"296\" y=\"80.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Confidence</text>\n  <rect x=\"16\" y=\"86\" width=\"368\" height=\"18\" fill=\"#eef2ff\"/>\n  <line x1=\"16\" y1=\"104\" x2=\"384\" y2=\"104\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"98.0\" font-size=\"8\" fill=\"#333\">#4821</text>\n  <text x=\"86\" y=\"98.0\" font-size=\"8\" fill=\"#333\">Refund above auto-approve limit</text>\n  <rect x=\"234\" y=\"88.0\" width=\"35\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"251.5\" y=\"98.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">12:40</text>\n  <text x=\"296\" y=\"98.0\" font-size=\"8\" fill=\"#333\">62%</text>\n  <line x1=\"16\" y1=\"122\" x2=\"384\" y2=\"122\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"116.0\" font-size=\"8\" fill=\"#333\">#4826</text>\n  <text x=\"86\" y=\"116.0\" font-size=\"8\" fill=\"#333\">Low-confidence extraction</text>\n  <rect x=\"234\" y=\"106.0\" width=\"35\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"251.5\" y=\"116.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">08:15</text>\n  <text x=\"296\" y=\"116.0\" font-size=\"8\" fill=\"#333\">71%</text>\n  <line x1=\"16\" y1=\"140\" x2=\"384\" y2=\"140\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"134.0\" font-size=\"8\" fill=\"#333\">#4830</text>\n  <text x=\"86\" y=\"134.0\" font-size=\"8\" fill=\"#333\">Customer asked for a person</text>\n  <rect x=\"234\" y=\"124.0\" width=\"35\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"251.5\" y=\"134.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">04:02</text>\n  <text x=\"296\" y=\"134.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <line x1=\"16\" y1=\"158\" x2=\"384\" y2=\"158\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"152.0\" font-size=\"8\" fill=\"#333\">#4831</text>\n  <rect x=\"86\" y=\"146.5\" width=\"110\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"234\" y=\"142.0\" width=\"35\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"251.5\" y=\"152.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">02:30</text>\n  <rect x=\"296\" y=\"146.5\" width=\"30\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <line x1=\"16\" y1=\"176\" x2=\"384\" y2=\"176\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"170.0\" font-size=\"8\" fill=\"#333\">#4833</text>\n  <rect x=\"86\" y=\"164.5\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"234\" y=\"160.0\" width=\"35\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"251.5\" y=\"170.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">00:48</text>\n  <rect x=\"296\" y=\"164.5\" width=\"30\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"16\" y=\"196\" font-size=\"8\" fill=\"#666\">Oldest waiting first. Target pick-up time is shown on each case.</text>\n  <rect x=\"16\" y=\"210\" width=\"368\" height=\"70\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"228\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Queue health</text>\n  <text x=\"26\" y=\"240\" font-size=\"8\" fill=\"#333\">Cases picked up within target today</text>\n  <text x=\"374\" y=\"240\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">70%</text>\n  <rect x=\"26\" y=\"244\" width=\"348\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"26\" y=\"244\" width=\"243\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n</svg>"
+    },
+    {
+      "id": "mockup-case-review",
+      "type": "mockup",
+      "label": "Case Review",
+      "description": "The assistant's proposed action with its confidence, per-field extraction confidence (below {{EXTRACTION_REVIEW_THRESHOLD_PCT}}% needs review) and the sources it used.",
+      "x": 640,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/console/cases/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Agent Console — Case #4821</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Back to queue</text>\n  <rect x=\"0\" y=\"30\" width=\"180\" height=\"270\" rx=\"0\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <rect x=\"52\" y=\"42\" width=\"118\" height=\"28\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <rect x=\"60\" y=\"50\" width=\"102\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"60\" y=\"59\" width=\"61\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"10\" y=\"78\" width=\"118\" height=\"37\" rx=\"8\" fill=\"#f3f4f6\" stroke=\"#f3f4f6\"/>\n  <rect x=\"18\" y=\"86\" width=\"102\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"18\" y=\"95\" width=\"102\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"18\" y=\"104\" width=\"61\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"52\" y=\"123\" width=\"118\" height=\"19\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <rect x=\"60\" y=\"131\" width=\"102\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"10\" y=\"150\" width=\"118\" height=\"28\" rx=\"8\" fill=\"#f3f4f6\" stroke=\"#f3f4f6\"/>\n  <rect x=\"18\" y=\"158\" width=\"102\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"18\" y=\"167\" width=\"61\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"196\" y=\"50\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Assistant proposal</text>\n  <rect x=\"196\" y=\"58\" width=\"188\" height=\"32\" rx=\"3\" fill=\"#fff\" stroke=\"#2563eb\"/>\n  <text x=\"206\" y=\"78\" font-size=\"9\" fill=\"#333\">Refund €42.10 to the original card</text>\n  <text x=\"196\" y=\"106\" font-size=\"8\" fill=\"#333\">Confidence</text>\n  <text x=\"384\" y=\"106\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">62% — below threshold</text>\n  <rect x=\"196\" y=\"110\" width=\"188\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"196\" y=\"110\" width=\"116\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <line x1=\"365\" y1=\"108\" x2=\"365\" y2=\"120\" stroke=\"#333\" stroke-dasharray=\"2 2\"/>\n  <rect x=\"196\" y=\"132\" width=\"188\" height=\"16\" fill=\"#f3f4f6\"/>\n  <text x=\"202\" y=\"143.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Extracted field</text>\n  <text x=\"292\" y=\"143.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Value</text>\n  <text x=\"352\" y=\"143.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Conf.</text>\n  <line x1=\"196\" y1=\"164\" x2=\"384\" y2=\"164\" stroke=\"#e5e7eb\"/>\n  <text x=\"202\" y=\"159.0\" font-size=\"8\" fill=\"#333\">Order id</text>\n  <text x=\"292\" y=\"159.0\" font-size=\"8\" fill=\"#333\">98213</text>\n  <text x=\"352\" y=\"159.0\" font-size=\"8\" fill=\"#333\">98%</text>\n  <line x1=\"196\" y1=\"180\" x2=\"384\" y2=\"180\" stroke=\"#e5e7eb\"/>\n  <text x=\"202\" y=\"175.0\" font-size=\"8\" fill=\"#333\">Amount</text>\n  <text x=\"292\" y=\"175.0\" font-size=\"8\" fill=\"#333\">€42.10</text>\n  <rect x=\"350\" y=\"165.0\" width=\"25\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"362.5\" y=\"175.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">61%</text>\n  <line x1=\"196\" y1=\"196\" x2=\"384\" y2=\"196\" stroke=\"#e5e7eb\"/>\n  <text x=\"202\" y=\"191.0\" font-size=\"8\" fill=\"#333\">Order date</text>\n  <text x=\"292\" y=\"191.0\" font-size=\"8\" fill=\"#333\">3 Mar</text>\n  <text x=\"352\" y=\"191.0\" font-size=\"8\" fill=\"#333\">93%</text>\n  <text x=\"196\" y=\"210\" font-size=\"7.5\" fill=\"#666\">Sources: Returns policy §2 · Order 98213 · Payment log</text>\n  <text x=\"196\" y=\"224\" font-size=\"7.5\" fill=\"#666\">Decision, sources and scores go to the audit trail.</text>\n  <rect x=\"196\" y=\"262\" width=\"80\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"236.0\" y=\"275.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Edit</text>\n  <rect x=\"284\" y=\"262\" width=\"100\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"334.0\" y=\"275.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Approve &amp; send</text>\n</svg>"
     }
   ],
   "relations": [
@@ -571,6 +610,61 @@
       "sourceId": "req-case-audit-trail",
       "targetId": "adr-confidence-gated-autonomy",
       "relationType": "traces-to"
+    },
+    {
+      "id": "mockup-support-chat--req-escalation-pickup",
+      "sourceId": "mockup-support-chat",
+      "targetId": "req-escalation-pickup",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-support-chat--source-channel",
+      "sourceId": "mockup-support-chat",
+      "targetId": "source-channel",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-escalation-queue--req-escalation-pickup",
+      "sourceId": "mockup-escalation-queue",
+      "targetId": "req-escalation-pickup",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-escalation-queue--req-extraction-review",
+      "sourceId": "mockup-escalation-queue",
+      "targetId": "req-extraction-review",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-escalation-queue--agent-console",
+      "sourceId": "mockup-escalation-queue",
+      "targetId": "agent-console",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-escalation-queue--mockup-case-review",
+      "sourceId": "mockup-escalation-queue",
+      "targetId": "mockup-case-review",
+      "relationType": "navigates-to",
+      "label": "Pick up"
+    },
+    {
+      "id": "mockup-case-review--req-extraction-review",
+      "sourceId": "mockup-case-review",
+      "targetId": "req-extraction-review",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-case-review--req-case-audit-trail",
+      "sourceId": "mockup-case-review",
+      "targetId": "req-case-audit-trail",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-case-review--agent-console",
+      "sourceId": "mockup-case-review",
+      "targetId": "agent-console",
+      "relationType": "presented-by"
     }
   ],
   "sequences": [

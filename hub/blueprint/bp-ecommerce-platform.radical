@@ -492,6 +492,45 @@
       "decision": "Each service owns its store; other services get data through APIs or events, never through the database.",
       "consequences": "Independent deployment and scaling; cross-service reports require projections or a data platform; joins across services are not possible in SQL.",
       "alternatives": "1. Shared database — simple joins, tight coupling. 2. Shared schema with per-service tables — coupling through migrations remains."
+    },
+    {
+      "id": "mockup-product-page",
+      "type": "mockup",
+      "label": "Product Page",
+      "description": "Product detail with live availability from the catalogue; \"Add to cart\" leads into checkout.",
+      "x": 0,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/products/:slug",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Shop</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Cart (2)</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Account</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Search</text>\n  <rect x=\"16\" y=\"44\" width=\"168\" height=\"140\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"44\" x2=\"184\" y2=\"184\" stroke=\"#ccc\"/>\n  <line x1=\"184\" y1=\"44\" x2=\"16\" y2=\"184\" stroke=\"#ccc\"/>\n  <rect x=\"16\" y=\"190\" width=\"39\" height=\"30\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"190\" x2=\"55\" y2=\"220\" stroke=\"#ccc\"/>\n  <line x1=\"55\" y1=\"190\" x2=\"16\" y2=\"220\" stroke=\"#ccc\"/>\n  <rect x=\"59\" y=\"190\" width=\"39\" height=\"30\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"59\" y1=\"190\" x2=\"98\" y2=\"220\" stroke=\"#ccc\"/>\n  <line x1=\"98\" y1=\"190\" x2=\"59\" y2=\"220\" stroke=\"#ccc\"/>\n  <rect x=\"102\" y=\"190\" width=\"39\" height=\"30\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"102\" y1=\"190\" x2=\"141\" y2=\"220\" stroke=\"#ccc\"/>\n  <line x1=\"141\" y1=\"190\" x2=\"102\" y2=\"220\" stroke=\"#ccc\"/>\n  <rect x=\"145\" y=\"190\" width=\"39\" height=\"30\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"145\" y1=\"190\" x2=\"184\" y2=\"220\" stroke=\"#ccc\"/>\n  <line x1=\"184\" y1=\"190\" x2=\"145\" y2=\"220\" stroke=\"#ccc\"/>\n  <text x=\"200\" y=\"58\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Trail Running Shoe</text>\n  <text x=\"200\" y=\"76\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">€129.00</text>\n  <rect x=\"200\" y=\"84\" width=\"94\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"247.0\" y=\"94\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">In stock — 12 left</text>\n  <text x=\"200\" y=\"116\" font-size=\"8\" fill=\"#666\">Size</text>\n  <rect x=\"200\" y=\"121\" width=\"24\" height=\"18\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"212\" y=\"133\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">38</text>\n  <rect x=\"228\" y=\"121\" width=\"24\" height=\"18\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"240\" y=\"133\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">39</text>\n  <rect x=\"256\" y=\"121\" width=\"24\" height=\"18\" rx=\"3\" fill=\"#dbeafe\" stroke=\"#2563eb\"/>\n  <text x=\"268\" y=\"133\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">40</text>\n  <rect x=\"284\" y=\"121\" width=\"24\" height=\"18\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"296\" y=\"133\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">41</text>\n  <rect x=\"312\" y=\"121\" width=\"24\" height=\"18\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"324\" y=\"133\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">42</text>\n  <rect x=\"200\" y=\"150\" width=\"184\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"200\" y=\"159\" width=\"184\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"200\" y=\"168\" width=\"110\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"200\" y=\"184\" width=\"184\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"292.0\" y=\"197.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Add to cart</text>\n  <text x=\"16\" y=\"244\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">You may also like</text>\n  <rect x=\"16\" y=\"252\" width=\"86\" height=\"40\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"16\" y1=\"252\" x2=\"102\" y2=\"292\" stroke=\"#ccc\"/>\n  <line x1=\"102\" y1=\"252\" x2=\"16\" y2=\"292\" stroke=\"#ccc\"/>\n  <rect x=\"110\" y=\"252\" width=\"86\" height=\"40\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"110\" y1=\"252\" x2=\"196\" y2=\"292\" stroke=\"#ccc\"/>\n  <line x1=\"196\" y1=\"252\" x2=\"110\" y2=\"292\" stroke=\"#ccc\"/>\n  <rect x=\"204\" y=\"252\" width=\"86\" height=\"40\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"204\" y1=\"252\" x2=\"290\" y2=\"292\" stroke=\"#ccc\"/>\n  <line x1=\"290\" y1=\"252\" x2=\"204\" y2=\"292\" stroke=\"#ccc\"/>\n  <rect x=\"298\" y=\"252\" width=\"86\" height=\"40\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"298\" y1=\"252\" x2=\"384\" y2=\"292\" stroke=\"#ccc\"/>\n  <line x1=\"384\" y1=\"252\" x2=\"298\" y2=\"292\" stroke=\"#ccc\"/>\n</svg>"
+    },
+    {
+      "id": "mockup-checkout",
+      "type": "mockup",
+      "label": "Checkout",
+      "description": "Final checkout step. Card fields are the provider's hosted fields, so card data never touches platform services; every step must answer within {{CHECKOUT_P95_MS}} ms at p95.",
+      "x": 320,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/checkout",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Shop — Checkout</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Help</text>\n  <rect x=\"16\" y=\"40\" width=\"62\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"47.0\" y=\"50\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">1 Address ✓</text>\n  <rect x=\"84\" y=\"40\" width=\"67\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"117.5\" y=\"50\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">2 Shipping ✓</text>\n  <rect x=\"157\" y=\"40\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"183.5\" y=\"50\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">3 Payment</text>\n  <text x=\"16\" y=\"76\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Payment</text>\n  <rect x=\"16\" y=\"84\" width=\"236\" height=\"110\" rx=\"3\" fill=\"#fff\" stroke=\"#999\" stroke-dasharray=\"4 3\"/>\n  <text x=\"24\" y=\"98\" font-size=\"8\" fill=\"#666\">Card details — hosted by the payment provider</text>\n  <text x=\"24\" y=\"108\" font-size=\"8\" fill=\"#666\">Card number</text>\n  <rect x=\"24\" y=\"112\" width=\"220\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"30\" y=\"124.0\" font-size=\"8\" fill=\"#999\">•••• •••• •••• ••••</text>\n  <text x=\"24\" y=\"142\" font-size=\"8\" fill=\"#666\">Expiry</text>\n  <rect x=\"24\" y=\"146\" width=\"104\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"30\" y=\"158.0\" font-size=\"8\" fill=\"#999\">MM / YY</text>\n  <text x=\"140\" y=\"142\" font-size=\"8\" fill=\"#666\">CVC</text>\n  <rect x=\"140\" y=\"146\" width=\"104\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"146\" y=\"158.0\" font-size=\"8\" fill=\"#999\">•••</text>\n  <text x=\"16\" y=\"210\" font-size=\"7.5\" fill=\"#666\">Card data goes straight to the provider — never through our servers.</text>\n  <rect x=\"16\" y=\"222\" width=\"236\" height=\"24\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"134.0\" y=\"237.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Pay €141.90</text>\n  <text x=\"16\" y=\"262\" font-size=\"8\" fill=\"#2563eb\">← Back to shipping</text>\n  <rect x=\"266\" y=\"40\" width=\"118\" height=\"206\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"276\" y=\"58\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Order summary</text>\n  <rect x=\"276\" y=\"68\" width=\"30\" height=\"30\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"276\" y1=\"68\" x2=\"306\" y2=\"98\" stroke=\"#ccc\"/>\n  <line x1=\"306\" y1=\"68\" x2=\"276\" y2=\"98\" stroke=\"#ccc\"/>\n  <rect x=\"312\" y=\"74\" width=\"62\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"312\" y=\"83\" width=\"37\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"276\" y=\"108\" width=\"30\" height=\"30\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"276\" y1=\"108\" x2=\"306\" y2=\"138\" stroke=\"#ccc\"/>\n  <line x1=\"306\" y1=\"108\" x2=\"276\" y2=\"138\" stroke=\"#ccc\"/>\n  <rect x=\"312\" y=\"114\" width=\"62\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"312\" y=\"123\" width=\"37\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <line x1=\"276\" y1=\"156\" x2=\"374\" y2=\"156\" stroke=\"#ccc\"/>\n  <text x=\"276\" y=\"172\" font-size=\"8\" fill=\"#666\">Subtotal</text>\n  <text x=\"374\" y=\"172\" font-size=\"8\" fill=\"#333\" text-anchor=\"end\">€129.00</text>\n  <text x=\"276\" y=\"188\" font-size=\"8\" fill=\"#666\">Shipping</text>\n  <text x=\"374\" y=\"188\" font-size=\"8\" fill=\"#333\" text-anchor=\"end\">€4.90</text>\n  <text x=\"276\" y=\"204\" font-size=\"8\" fill=\"#666\">Tax</text>\n  <text x=\"374\" y=\"204\" font-size=\"8\" fill=\"#333\" text-anchor=\"end\">€8.00</text>\n  <text x=\"276\" y=\"228\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Total</text>\n  <text x=\"374\" y=\"228\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"end\">€141.90</text>\n</svg>"
+    },
+    {
+      "id": "mockup-order-confirmation",
+      "type": "mockup",
+      "label": "Order Confirmation",
+      "description": "Shown once payment is captured. Refreshing or retrying never charges again — capture is keyed by the order id — and stock stays reserved for the order.",
+      "x": 640,
+      "y": 2084,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/orders/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Shop</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Cart (0)</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Account</text>\n  <circle cx=\"40\" cy=\"62\" r=\"12\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"2\"/>\n  <path d=\"M35 62 l3.5 3.5 l6.5 -7\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"2\"/>\n  <text x=\"64\" y=\"60\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Thank you — order #10482 is placed</text>\n  <text x=\"64\" y=\"76\" font-size=\"9\" fill=\"#666\">Payment captured once · confirmation e-mail on its way</text>\n  <rect x=\"16\" y=\"96\" width=\"48\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"40.0\" y=\"106\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Placed ✓</text>\n  <rect x=\"70\" y=\"96\" width=\"39\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"89.5\" y=\"106\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Paid ✓</text>\n  <rect x=\"115\" y=\"96\" width=\"39\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"134.5\" y=\"106\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Packed</text>\n  <rect x=\"160\" y=\"96\" width=\"44\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"182.0\" y=\"106\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Shipped</text>\n  <rect x=\"210\" y=\"96\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"236.5\" y=\"106\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Delivered</text>\n  <rect x=\"16\" y=\"122\" width=\"368\" height=\"104\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <rect x=\"26\" y=\"132\" width=\"36\" height=\"36\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"26\" y1=\"132\" x2=\"62\" y2=\"168\" stroke=\"#ccc\"/>\n  <line x1=\"62\" y1=\"132\" x2=\"26\" y2=\"168\" stroke=\"#ccc\"/>\n  <rect x=\"72\" y=\"140\" width=\"180\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"72\" y=\"150\" width=\"108\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"300\" y=\"152\" font-size=\"8\" fill=\"#666\">1 ×</text>\n  <text x=\"374\" y=\"152\" font-size=\"8\" fill=\"#333\" text-anchor=\"end\">€129.00</text>\n  <rect x=\"26\" y=\"176\" width=\"36\" height=\"36\" rx=\"3\" fill=\"#eee\" stroke=\"#ccc\"/>\n  <line x1=\"26\" y1=\"176\" x2=\"62\" y2=\"212\" stroke=\"#ccc\"/>\n  <line x1=\"62\" y1=\"176\" x2=\"26\" y2=\"212\" stroke=\"#ccc\"/>\n  <rect x=\"72\" y=\"184\" width=\"180\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"72\" y=\"194\" width=\"108\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"300\" y=\"196\" font-size=\"8\" fill=\"#666\">1 ×</text>\n  <text x=\"374\" y=\"196\" font-size=\"8\" fill=\"#333\" text-anchor=\"end\">€4.90</text>\n  <text x=\"16\" y=\"246\" font-size=\"8\" fill=\"#666\">Items are reserved for you — nothing else can be sold against them.</text>\n  <rect x=\"16\" y=\"262\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"76.0\" y=\"275.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Track order</text>\n  <rect x=\"264\" y=\"262\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"324.0\" y=\"275.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Continue shopping</text>\n</svg>"
     }
   ],
   "relations": [
@@ -715,6 +754,62 @@
       "sourceId": "req-pci-scope",
       "targetId": "adr-hosted-payments",
       "relationType": "traces-to"
+    },
+    {
+      "id": "mockup-product-page--storefront",
+      "sourceId": "mockup-product-page",
+      "targetId": "storefront",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-product-page--mockup-checkout",
+      "sourceId": "mockup-product-page",
+      "targetId": "mockup-checkout",
+      "relationType": "navigates-to",
+      "label": "Checkout"
+    },
+    {
+      "id": "mockup-checkout--req-checkout-latency",
+      "sourceId": "mockup-checkout",
+      "targetId": "req-checkout-latency",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-checkout--req-pci-scope",
+      "sourceId": "mockup-checkout",
+      "targetId": "req-pci-scope",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-checkout--storefront",
+      "sourceId": "mockup-checkout",
+      "targetId": "storefront",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-checkout--mockup-order-confirmation",
+      "sourceId": "mockup-checkout",
+      "targetId": "mockup-order-confirmation",
+      "relationType": "navigates-to",
+      "label": "Pay"
+    },
+    {
+      "id": "mockup-order-confirmation--req-payment-once",
+      "sourceId": "mockup-order-confirmation",
+      "targetId": "req-payment-once",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-order-confirmation--req-stock-reservation",
+      "sourceId": "mockup-order-confirmation",
+      "targetId": "req-stock-reservation",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-order-confirmation--storefront",
+      "sourceId": "mockup-order-confirmation",
+      "targetId": "storefront",
+      "relationType": "presented-by"
     }
   ]
 }

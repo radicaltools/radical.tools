@@ -369,6 +369,45 @@
       "decision": "All curated-zone transformations are dbt models with at least one test and a description; Spark is reserved for raw ingestion and feature engineering.",
       "consequences": "Version control, testing and documentation by default; CI/CD required for model deployment; learning curve for SQL-only teams.",
       "alternatives": "1. Spark jobs only — flexible, no conventions for tests or lineage. 2. Stored procedures — vendor-coupled and hard to review."
+    },
+    {
+      "id": "mockup-sales-dashboard",
+      "type": "mockup",
+      "label": "Sales Dashboard",
+      "description": "Self-service dashboard showing how fresh the data is; restricted columns are masked for users whose role does not allow them.",
+      "x": 0,
+      "y": 1534,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/dashboards/sales",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">BI</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Datasets</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Explore</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Dashboards</text>\n  <text x=\"16\" y=\"52\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Sales overview</text>\n  <rect x=\"16\" y=\"60\" width=\"76\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"54.0\" y=\"70\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Region: EMEA ▾</text>\n  <rect x=\"98\" y=\"60\" width=\"76\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"136.0\" y=\"70\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Last 30 days ▾</text>\n  <rect x=\"284\" y=\"40\" width=\"104\" height=\"14\" rx=\"7\" fill=\"#dbeafe\"/>\n  <text x=\"336.0\" y=\"50\" font-size=\"8\" fill=\"#2563eb\" text-anchor=\"middle\">Data as of 2 min ago</text>\n  <rect x=\"16\" y=\"84\" width=\"116\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"99\" font-size=\"8\" fill=\"#666\">Revenue</text>\n  <text x=\"26\" y=\"118\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">€4.2M</text>\n  <rect x=\"140\" y=\"84\" width=\"116\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"150\" y=\"99\" font-size=\"8\" fill=\"#666\">Orders</text>\n  <text x=\"150\" y=\"118\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">38,120</text>\n  <rect x=\"264\" y=\"84\" width=\"116\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"274\" y=\"99\" font-size=\"8\" fill=\"#666\">Avg basket</text>\n  <text x=\"274\" y=\"118\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">€110</text>\n  <rect x=\"16\" y=\"136\" width=\"240\" height=\"86\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"24\" y=\"150\" font-size=\"8\" fill=\"#333\">Revenue by day</text>\n  <line x1=\"24\" y1=\"214\" x2=\"248\" y2=\"214\" stroke=\"#ccc\"/>\n  <polyline points=\"24.0,197.2 48.9,188.8 73.8,191.6 98.7,180.4 123.6,183.2 148.4,174.8 173.3,177.6 198.2,169.2 223.1,172.0 248.0,163.6\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"1.5\"/>\n  <rect x=\"264\" y=\"136\" width=\"120\" height=\"86\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"272\" y=\"150\" font-size=\"8\" fill=\"#333\">By channel</text>\n  <line x1=\"272\" y1=\"214\" x2=\"376\" y2=\"214\" stroke=\"#ccc\"/>\n  <rect x=\"277.2\" y=\"163.6\" width=\"15.6\" height=\"50.4\" fill=\"#ccc\"/>\n  <rect x=\"303.2\" y=\"180.4\" width=\"15.6\" height=\"33.6\" fill=\"#ccc\"/>\n  <rect x=\"329.2\" y=\"191.6\" width=\"15.6\" height=\"22.4\" fill=\"#ccc\"/>\n  <rect x=\"355.2\" y=\"200.0\" width=\"15.6\" height=\"14.0\" fill=\"#ccc\"/>\n  <rect x=\"16\" y=\"232\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"244.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Customer</text>\n  <text x=\"112\" y=\"244.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">E-mail</text>\n  <text x=\"262\" y=\"244.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Lifetime value</text>\n  <line x1=\"16\" y1=\"268\" x2=\"384\" y2=\"268\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"262.0\" font-size=\"8\" fill=\"#333\">C-10293</text>\n  <text x=\"112\" y=\"262.0\" font-size=\"8\" fill=\"#333\">•••••• (restricted)</text>\n  <text x=\"262\" y=\"262.0\" font-size=\"8\" fill=\"#333\">€2,410</text>\n  <line x1=\"16\" y1=\"286\" x2=\"384\" y2=\"286\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"280.0\" font-size=\"8\" fill=\"#333\">C-10877</text>\n  <text x=\"112\" y=\"280.0\" font-size=\"8\" fill=\"#333\">•••••• (restricted)</text>\n  <text x=\"262\" y=\"280.0\" font-size=\"8\" fill=\"#333\">€1,980</text>\n</svg>"
+    },
+    {
+      "id": "mockup-dataset-lineage",
+      "type": "mockup",
+      "label": "Dataset & Lineage",
+      "description": "Catalogue page for a curated dataset with owner, classification and column-level lineage from source to dashboard.",
+      "x": 320,
+      "y": 1534,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/datasets/:name/lineage",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Data Catalog</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Glossary</text>\n  <text x=\"332\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Domains</text>\n  <text x=\"281\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Search</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">curated.orders</text>\n  <rect x=\"16\" y=\"62\" width=\"90\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"61.0\" y=\"72\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Owner: Sales Data</text>\n  <rect x=\"112\" y=\"62\" width=\"67\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"145.5\" y=\"72\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Confidential</text>\n  <rect x=\"185\" y=\"62\" width=\"67\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"218.5\" y=\"72\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Contains PII</text>\n  <text x=\"16\" y=\"96\" font-size=\"9\" fill=\"#666\">Schema</text>\n  <text x=\"66\" y=\"96\" font-size=\"9\" fill=\"#2563eb\" font-weight=\"bold\">Lineage</text>\n  <text x=\"120\" y=\"96\" font-size=\"9\" fill=\"#666\">Quality</text>\n  <line x1=\"66\" y1=\"100\" x2=\"104\" y2=\"100\" stroke=\"#2563eb\" stroke-width=\"2\"/>\n  <line x1=\"16\" y1=\"101\" x2=\"384\" y2=\"101\" stroke=\"#ccc\"/>\n  <rect x=\"16\" y=\"116\" width=\"80\" height=\"96\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"130\" font-size=\"7.5\" fill=\"#333\" font-weight=\"bold\">raw.shop_orders</text>\n  <text x=\"24\" y=\"143\" font-size=\"7.5\" fill=\"#666\">order_id</text>\n  <rect x=\"20\" y=\"151\" width=\"72\" height=\"14\" rx=\"2\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <text x=\"24\" y=\"161\" font-size=\"7.5\" fill=\"#333\">amount</text>\n  <text x=\"24\" y=\"179\" font-size=\"7.5\" fill=\"#666\">customer_id</text>\n  <rect x=\"112\" y=\"116\" width=\"80\" height=\"96\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"118\" y=\"130\" font-size=\"7.5\" fill=\"#333\" font-weight=\"bold\">stg_orders</text>\n  <text x=\"120\" y=\"143\" font-size=\"7.5\" fill=\"#666\">order_id</text>\n  <rect x=\"116\" y=\"151\" width=\"72\" height=\"14\" rx=\"2\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <text x=\"120\" y=\"161\" font-size=\"7.5\" fill=\"#333\">amount</text>\n  <text x=\"120\" y=\"179\" font-size=\"7.5\" fill=\"#666\">customer_id</text>\n  <rect x=\"208\" y=\"116\" width=\"80\" height=\"96\" rx=\"3\" fill=\"#fff\" stroke=\"#2563eb\"/>\n  <text x=\"214\" y=\"130\" font-size=\"7.5\" fill=\"#333\" font-weight=\"bold\">curated.orders</text>\n  <text x=\"216\" y=\"143\" font-size=\"7.5\" fill=\"#666\">order_id</text>\n  <rect x=\"212\" y=\"151\" width=\"72\" height=\"14\" rx=\"2\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <text x=\"216\" y=\"161\" font-size=\"7.5\" fill=\"#333\">amount</text>\n  <text x=\"216\" y=\"179\" font-size=\"7.5\" fill=\"#666\">customer_id</text>\n  <rect x=\"304\" y=\"116\" width=\"80\" height=\"96\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"310\" y=\"130\" font-size=\"7.5\" fill=\"#333\" font-weight=\"bold\">Sales overview</text>\n  <text x=\"312\" y=\"143\" font-size=\"7.5\" fill=\"#666\">order_id</text>\n  <rect x=\"308\" y=\"151\" width=\"72\" height=\"14\" rx=\"2\" fill=\"#dbeafe\" stroke=\"#dbeafe\"/>\n  <text x=\"312\" y=\"161\" font-size=\"7.5\" fill=\"#333\">amount</text>\n  <text x=\"312\" y=\"179\" font-size=\"7.5\" fill=\"#666\">customer_id</text>\n  <line x1=\"96\" y1=\"156\" x2=\"108\" y2=\"156\" stroke=\"#2563eb\"/>\n  <path d=\"M107 153 L112 156 L107 159 Z\" fill=\"#2563eb\"/>\n  <line x1=\"192\" y1=\"156\" x2=\"204\" y2=\"156\" stroke=\"#2563eb\"/>\n  <path d=\"M203 153 L208 156 L203 159 Z\" fill=\"#2563eb\"/>\n  <line x1=\"288\" y1=\"156\" x2=\"300\" y2=\"156\" stroke=\"#2563eb\"/>\n  <path d=\"M299 153 L304 156 L299 159 Z\" fill=\"#2563eb\"/>\n  <text x=\"16\" y=\"234\" font-size=\"7.5\" fill=\"#666\">Column lineage for amount: raw.shop_orders.total → stg_orders.amount → curated.orders.amount</text>\n  <rect x=\"16\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"81.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Open in lineage API</text>\n</svg>"
+    },
+    {
+      "id": "mockup-quality-runs",
+      "type": "mockup",
+      "label": "Data Quality Runs",
+      "description": "Run results with the quality gate applied: failing records are quarantined, the affected models fail and the dataset owner is notified before anything reaches consumers.",
+      "x": 640,
+      "y": 1534,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/runs",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Orchestrator</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Quarantine</text>\n  <text x=\"322\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Runs</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Pipelines</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Transformation runs — today</text>\n  <rect x=\"16\" y=\"64\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Model</text>\n  <text x=\"142\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Checks</text>\n  <text x=\"202\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Result</text>\n  <text x=\"332\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Owner</text>\n  <rect x=\"16\" y=\"82\" width=\"368\" height=\"18\" fill=\"#eef2ff\"/>\n  <line x1=\"16\" y1=\"100\" x2=\"384\" y2=\"100\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"94.0\" font-size=\"8\" fill=\"#333\">curated.orders</text>\n  <text x=\"142\" y=\"94.0\" font-size=\"8\" fill=\"#333\">14 / 16</text>\n  <rect x=\"200\" y=\"84.0\" width=\"122\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"261.0\" y=\"94.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">failed — 132 quarantined</text>\n  <text x=\"332\" y=\"94.0\" font-size=\"8\" fill=\"#333\">notified ✓</text>\n  <line x1=\"16\" y1=\"118\" x2=\"384\" y2=\"118\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"112.0\" font-size=\"8\" fill=\"#333\">curated.customers</text>\n  <text x=\"142\" y=\"112.0\" font-size=\"8\" fill=\"#333\">9 / 9</text>\n  <rect x=\"200\" y=\"102.0\" width=\"39\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"219.5\" y=\"112.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">passed</text>\n  <text x=\"332\" y=\"112.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <line x1=\"16\" y1=\"136\" x2=\"384\" y2=\"136\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"130.0\" font-size=\"8\" fill=\"#333\">agg.daily_sales</text>\n  <text x=\"142\" y=\"130.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <rect x=\"200\" y=\"120.0\" width=\"126\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"263.0\" y=\"130.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">skipped (upstream failed)</text>\n  <text x=\"332\" y=\"130.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <line x1=\"16\" y1=\"154\" x2=\"384\" y2=\"154\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"148.0\" font-size=\"8\" fill=\"#333\">curated.products</text>\n  <text x=\"142\" y=\"148.0\" font-size=\"8\" fill=\"#333\">11 / 11</text>\n  <rect x=\"200\" y=\"138.0\" width=\"39\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"219.5\" y=\"148.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">passed</text>\n  <text x=\"332\" y=\"148.0\" font-size=\"8\" fill=\"#333\">—</text>\n  <rect x=\"16\" y=\"166\" width=\"368\" height=\"84\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"184\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Failed checks — curated.orders</text>\n  <text x=\"26\" y=\"202\" font-size=\"8\" fill=\"#333\">✕ unique(order_id) — 132 duplicate rows</text>\n  <text x=\"26\" y=\"218\" font-size=\"8\" fill=\"#333\">✕ relationships(customer_id → curated.customers) — 4 orphans</text>\n  <text x=\"26\" y=\"238\" font-size=\"8\" fill=\"#666\">Failing rows were quarantined; downstream models were not updated.</text>\n  <rect x=\"16\" y=\"262\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"81.0\" y=\"275.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Open quarantine</text>\n  <rect x=\"296\" y=\"262\" width=\"88\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"340.0\" y=\"275.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Re-run</text>\n</svg>"
     }
   ],
   "relations": [
@@ -506,6 +545,62 @@
       "sourceId": "ff-quality",
       "targetId": "adr-dbt",
       "relationType": "implements"
+    },
+    {
+      "id": "mockup-sales-dashboard--req-rls",
+      "sourceId": "mockup-sales-dashboard",
+      "targetId": "req-rls",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-sales-dashboard--req-freshness",
+      "sourceId": "mockup-sales-dashboard",
+      "targetId": "req-freshness",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-sales-dashboard--bi",
+      "sourceId": "mockup-sales-dashboard",
+      "targetId": "bi",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-sales-dashboard--mockup-dataset-lineage",
+      "sourceId": "mockup-sales-dashboard",
+      "targetId": "mockup-dataset-lineage",
+      "relationType": "navigates-to",
+      "label": "View dataset"
+    },
+    {
+      "id": "mockup-dataset-lineage--req-lineage",
+      "sourceId": "mockup-dataset-lineage",
+      "targetId": "req-lineage",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-dataset-lineage--catalog",
+      "sourceId": "mockup-dataset-lineage",
+      "targetId": "catalog",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-dataset-lineage--mockup-quality-runs",
+      "sourceId": "mockup-dataset-lineage",
+      "targetId": "mockup-quality-runs",
+      "relationType": "navigates-to",
+      "label": "Quality"
+    },
+    {
+      "id": "mockup-quality-runs--req-quality-gate",
+      "sourceId": "mockup-quality-runs",
+      "targetId": "req-quality-gate",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-quality-runs--orchestrator",
+      "sourceId": "mockup-quality-runs",
+      "targetId": "orchestrator",
+      "relationType": "presented-by"
     }
   ]
 }
