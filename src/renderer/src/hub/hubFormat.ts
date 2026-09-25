@@ -47,6 +47,8 @@ export interface HubRadicalDoc {
   nodes: Array<Record<string, unknown>>
   relations?: Array<Record<string, unknown>>
   sequences?: Array<Record<string, unknown>>
+  /** Named canvas views (static, or dynamic over a sequence). */
+  views?: Array<Record<string, unknown>>
   [extra: string]: unknown
 }
 
@@ -56,6 +58,8 @@ export interface HubConcept extends HubConceptMeta {
   relations?: Array<Record<string, unknown>>
   /** Named flows over `relations` (Studio dynamic views). */
   sequences?: Array<Record<string, unknown>>
+  /** Named canvas views — see hub/conceptViews.ts. */
+  views?: Array<Record<string, unknown>>
 }
 
 /** One entry of `hub/index.json`. Enough to render cards and decide drop
@@ -82,14 +86,16 @@ export function conceptFile(meta: Pick<HubConceptMeta, 'id' | 'category'>): stri
 export function docToConcept(doc: HubRadicalDoc): HubConcept {
   const c: HubConcept = { ...doc.hub, nodes: doc.nodes, relations: doc.relations }
   if (doc.sequences?.length) c.sequences = doc.sequences
+  if (doc.views?.length) c.views = doc.views
   return c
 }
 
 export function conceptToDoc(concept: HubConcept): HubRadicalDoc {
-  const { nodes, relations, sequences, ...hub } = concept
+  const { nodes, relations, sequences, views, ...hub } = concept
   const d: HubRadicalDoc = { hub, nodes }
   if (relations) d.relations = relations
   if (sequences?.length) d.sequences = sequences
+  if (views?.length) d.views = views
   return d
 }
 

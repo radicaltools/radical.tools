@@ -971,5 +971,591 @@
       "targetId": "admin-console",
       "relationType": "presented-by"
     }
+  ],
+  "sequences": [
+    {
+      "id": "seq-technical",
+      "name": "Sign-up to a provisioned workspace",
+      "relationIds": [
+        "tenant-admin--webapp",
+        "webapp--gateway",
+        "gateway--identity-service",
+        "identity-service--identity-db",
+        "identity-service--event-bus",
+        "notification-service--event-bus",
+        "notification-service--email-provider",
+        "tenant-user--webapp",
+        "gateway--core-service",
+        "core-service--tenant-db"
+      ],
+      "stepDescriptions": [
+        "The new customer's admin signs up in the web app.",
+        "Web app calls the sign-up API.",
+        "Gateway routes to the Identity & Tenant Service.",
+        "Tenant, admin user and default roles are created.",
+        "TenantProvisioned is published.",
+        "Notification Service picks up the lifecycle event.",
+        "Welcome e-mail with the workspace link is sent.",
+        "Invited users sign in to the new workspace.",
+        "Requests reach the core service with the resolved tenant context.",
+        "Every query is scoped by tenant_id."
+      ]
+    },
+    {
+      "id": "seq-flow-onboarding",
+      "name": "Onboarding journey",
+      "relationIds": [
+        "mockup-signup--mockup-provisioning",
+        "mockup-provisioning--mockup-invite-team"
+      ],
+      "stepDescriptions": [
+        "Create workspace → Provisioning. Provisioning progress; an isolated workspace is ready within {{PROVISION_MINUTES}} minutes.",
+        "Ready → Invite Your Team. Last onboarding step; invites land in the new tenant only."
+      ]
+    },
+    {
+      "id": "seq-flow-tenant-user",
+      "name": "Tenant user journey",
+      "relationIds": [
+        "mockup-workspace-dashboard--mockup-project",
+        "mockup-workspace-dashboard--mockup-read-only"
+      ],
+      "stepDescriptions": [
+        "Open project → Project. Project board; all data is scoped by tenant id — nothing from other tenants is reachable.",
+        "Payment fails → Read-Only Workspace. After a failed payment the workspace stays readable but writes are blocked until billing is fixed."
+      ]
+    },
+    {
+      "id": "seq-flow-tenant-admin",
+      "name": "Tenant admin journey",
+      "relationIds": [
+        "mockup-billing-usage--mockup-update-payment",
+        "mockup-billing-usage--mockup-sso-settings",
+        "mockup-sso-settings--mockup-users-roles"
+      ],
+      "stepDescriptions": [
+        "Update payment method → Update Payment Method. New card; the failed invoice is retried immediately and write access comes back on success.",
+        "Single sign-on → Single Sign-On. SAML/OIDC federation with the tenant's own identity provider.",
+        "Users & roles → Users & Roles. Seats, roles and how each user signs in."
+      ]
+    },
+    {
+      "id": "seq-flow-platform-ops",
+      "name": "Platform ops journey",
+      "relationIds": [
+        "mockup-tenant-list--mockup-tenant-detail"
+      ],
+      "stepDescriptions": [
+        "Open tenant → Tenant Detail. Per-tenant health against the {{MAX_TENANT_SHARE_PCT}}% noisy-neighbour limit; impersonation is audited."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "view-context",
+      "name": "System context",
+      "kind": "static",
+      "nodeIds": [
+        "tenant-user",
+        "tenant-admin",
+        "ops-staff",
+        "platform",
+        "idp",
+        "payment-provider",
+        "email-provider"
+      ],
+      "collapsedNodeIds": [
+        "platform"
+      ],
+      "positions": {
+        "ops-staff": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 280,
+          "height": 180
+        },
+        "tenant-admin": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "tenant-user": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "idp": {
+          "x": 400,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        },
+        "payment-provider": {
+          "x": 820,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        },
+        "email-provider": {
+          "x": 1240,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        }
+      }
+    },
+    {
+      "id": "view-containers",
+      "name": "Containers",
+      "kind": "static",
+      "nodeIds": [
+        "tenant-user",
+        "tenant-admin",
+        "ops-staff",
+        "platform",
+        "webapp",
+        "admin-console",
+        "gateway",
+        "identity-service",
+        "billing-service",
+        "core-service",
+        "notification-service",
+        "event-bus",
+        "tenant-db",
+        "identity-db",
+        "idp",
+        "payment-provider",
+        "email-provider"
+      ],
+      "positions": {
+        "admin-console": {
+          "x": 280,
+          "y": 110,
+          "width": 210,
+          "height": 140
+        },
+        "billing-service": {
+          "x": 370,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "core-service": {
+          "x": 710,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "email-provider": {
+          "x": 840,
+          "y": 1400,
+          "width": 360,
+          "height": 260
+        },
+        "event-bus": {
+          "x": 370,
+          "y": 590,
+          "width": 220,
+          "height": 95
+        },
+        "gateway": {
+          "x": 530,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "identity-db": {
+          "x": 260,
+          "y": 830,
+          "width": 190,
+          "height": 130
+        },
+        "identity-service": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "idp": {
+          "x": 0,
+          "y": 1400,
+          "width": 360,
+          "height": 260
+        },
+        "notification-service": {
+          "x": 30,
+          "y": 590,
+          "width": 300,
+          "height": 200
+        },
+        "ops-staff": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "payment-provider": {
+          "x": 420,
+          "y": 1400,
+          "width": 360,
+          "height": 260
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 990
+        },
+        "tenant-admin": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "tenant-db": {
+          "x": 30,
+          "y": 830,
+          "width": 190,
+          "height": 130
+        },
+        "tenant-user": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "webapp": {
+          "x": 30,
+          "y": 110,
+          "width": 210,
+          "height": 140
+        }
+      }
+    },
+    {
+      "id": "view-technical-flow",
+      "name": "Sign-up to a provisioned workspace",
+      "kind": "dynamic",
+      "sequenceId": "seq-technical",
+      "nodeIds": [
+        "tenant-admin",
+        "webapp",
+        "gateway",
+        "identity-service",
+        "identity-db",
+        "event-bus",
+        "notification-service",
+        "email-provider",
+        "tenant-user",
+        "core-service",
+        "tenant-db"
+      ],
+      "positions": {
+        "core-service": {
+          "x": 710,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "email-provider": {
+          "x": 840,
+          "y": 1400,
+          "width": 360,
+          "height": 260
+        },
+        "event-bus": {
+          "x": 370,
+          "y": 590,
+          "width": 220,
+          "height": 95
+        },
+        "gateway": {
+          "x": 530,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "identity-db": {
+          "x": 260,
+          "y": 830,
+          "width": 190,
+          "height": 130
+        },
+        "identity-service": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "notification-service": {
+          "x": 30,
+          "y": 590,
+          "width": 300,
+          "height": 200
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 990
+        },
+        "tenant-admin": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "tenant-db": {
+          "x": 30,
+          "y": 830,
+          "width": 190,
+          "height": 130
+        },
+        "tenant-user": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "webapp": {
+          "x": 30,
+          "y": 110,
+          "width": 210,
+          "height": 140
+        }
+      }
+    },
+    {
+      "id": "view-governance",
+      "name": "Governance",
+      "kind": "static",
+      "nodeIds": [
+        "req-tenant-isolation",
+        "req-tenant-provisioning-time",
+        "req-subscription-enforcement",
+        "req-usage-metering-accuracy",
+        "ff-tenant-isolation-fuzz",
+        "ff-noisy-neighbor-guard",
+        "ff-billing-reconciliation",
+        "adr-tenancy-model",
+        "adr-sso-federation"
+      ],
+      "positions": {
+        "adr-sso-federation": {
+          "x": 320,
+          "y": 2152,
+          "width": 260,
+          "height": 52
+        },
+        "adr-tenancy-model": {
+          "x": 0,
+          "y": 2152,
+          "width": 260,
+          "height": 52
+        },
+        "ff-billing-reconciliation": {
+          "x": 640,
+          "y": 1980,
+          "width": 260,
+          "height": 52
+        },
+        "ff-noisy-neighbor-guard": {
+          "x": 320,
+          "y": 1980,
+          "width": 260,
+          "height": 52
+        },
+        "ff-tenant-isolation-fuzz": {
+          "x": 0,
+          "y": 1980,
+          "width": 260,
+          "height": 52
+        },
+        "req-subscription-enforcement": {
+          "x": 640,
+          "y": 1780,
+          "width": 260,
+          "height": 80
+        },
+        "req-tenant-isolation": {
+          "x": 0,
+          "y": 1780,
+          "width": 260,
+          "height": 80
+        },
+        "req-tenant-provisioning-time": {
+          "x": 320,
+          "y": 1780,
+          "width": 260,
+          "height": 80
+        },
+        "req-usage-metering-accuracy": {
+          "x": 960,
+          "y": 1780,
+          "width": 260,
+          "height": 80
+        }
+      }
+    },
+    {
+      "id": "view-flow-onboarding",
+      "name": "Onboarding journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-onboarding",
+      "nodeIds": [
+        "flow-onboarding",
+        "mockup-signup",
+        "mockup-provisioning",
+        "mockup-invite-team"
+      ],
+      "positions": {
+        "flow-onboarding": {
+          "x": 0,
+          "y": 2324,
+          "width": 920,
+          "height": 330
+        },
+        "mockup-invite-team": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-provisioning": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-signup": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-tenant-user",
+      "name": "Tenant user journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-tenant-user",
+      "nodeIds": [
+        "flow-tenant-user",
+        "mockup-workspace-dashboard",
+        "mockup-project",
+        "mockup-read-only"
+      ],
+      "positions": {
+        "flow-tenant-user": {
+          "x": 0,
+          "y": 2734,
+          "width": 920,
+          "height": 330
+        },
+        "mockup-project": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-read-only": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-workspace-dashboard": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-tenant-admin",
+      "name": "Tenant admin journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-tenant-admin",
+      "nodeIds": [
+        "flow-tenant-admin",
+        "mockup-billing-usage",
+        "mockup-update-payment",
+        "mockup-sso-settings",
+        "mockup-users-roles"
+      ],
+      "positions": {
+        "flow-tenant-admin": {
+          "x": 0,
+          "y": 3144,
+          "width": 1240,
+          "height": 330
+        },
+        "mockup-billing-usage": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-sso-settings": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-update-payment": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-users-roles": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-platform-ops",
+      "name": "Platform ops journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-platform-ops",
+      "nodeIds": [
+        "flow-platform-ops",
+        "mockup-tenant-list",
+        "mockup-tenant-detail"
+      ],
+      "positions": {
+        "flow-platform-ops": {
+          "x": 0,
+          "y": 3554,
+          "width": 600,
+          "height": 330
+        },
+        "mockup-tenant-detail": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-tenant-list": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    }
   ]
 }

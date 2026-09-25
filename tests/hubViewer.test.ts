@@ -5,6 +5,7 @@
  *     (ids preserved, governance metamodel, synthetic wiki/table views,
  *     template defaults substituted, dangling parents/relations dropped)
  *   - defaultViewKind: single governance element → wiki, bundles → canvas
+ *   - conceptViewsToDiagram: concept views kept in the viewer / remapped on import
  *   - parseHubHash / formatHubHash round-trip
  */
 import { describe, it, expect } from 'vitest'
@@ -16,6 +17,7 @@ import {
   HUB_TABLE_VIEW_ID,
 } from '../src/renderer/src/hub/conceptToDiagram'
 import { parseHubHash, formatHubHash, studioImportUrl } from '../src/renderer/src/hub/hubRoute'
+import { conceptViewsToDiagram } from '../src/renderer/src/hub/conceptViews'
 import type { HubConcept } from '../src/renderer/src/store/hubStore'
 
 const requirement: HubConcept = {
@@ -135,6 +137,15 @@ describe('hub route', () => {
     expect(parseHubHash(hash)).toEqual(r)
   })
 
+  it('round-trips a named canvas view, and only on the canvas', () => {
+    const r = { browse: true, concept: 'bp-x', view: 'canvas' as const, canvasView: 'view-flow-shopper' }
+    const hash = formatHubHash(r)
+    expect(hash).toBe('#/c/bp-x/v/canvas/cv/view-flow-shopper')
+    expect(parseHubHash(hash)).toEqual(r)
+    expect(formatHubHash({ ...r, view: 'wiki' })).toBe('#/c/bp-x/v/wiki')
+    expect(parseHubHash('#/c/bp-x/v/wiki/cv/view-flow-shopper').canvasView).toBeUndefined()
+  })
+
   it('omits view without a concept and ignores unknown view kinds', () => {
     expect(formatHubHash({ view: 'table', category: 'adr' })).toBe('#/cat/adr')
     expect(parseHubHash('#/c/x/v/bogus')).toEqual({ browse: true, concept: 'x' })
@@ -161,5 +172,37 @@ describe('hub route', () => {
 
   it('ignores an unknown sort key', () => {
     expect(parseHubHash('#/sort/bogus')).toEqual({})
+  })
+})
+
+describe('concept views', () => {
+  const withViews: HubConcept = {
+    ...pattern,
+    sequences: [{ id: 's1', name: 'Write', relationIds: ['r1'] }],
+    views: [
+      { id: 'v-flow', name: 'Write flow', kind: 'dynamic', sequenceId: 's1', nodeIds: ['sys', 'cmd'],
+        positions: { sys: { x: 5, y: 6, width: 360, height: 260 }, cmd: { x: 1, y: 2 } } },
+      { id: 'v-wiki', name: 'Not a canvas view', kind: 'wiki', nodeIds: ['sys'] },
+      { id: 'v-empty', name: 'Only ghosts', kind: 'static', nodeIds: ['ghost'] },
+    ],
+  }
+
+  it('shows the concept\'s canvas views in the viewer, before wiki / table, with complete positions only', () => {
+    const views = conceptToDiagramData(withViews).views!
+    expect(views.map((v) => v.id)).toEqual(['v-flow', HUB_WIKI_VIEW_ID, HUB_TABLE_VIEW_ID])
+    expect(views[0]).toMatchObject({ kind: 'dynamic', sequenceId: 's1', nodeIds: ['sys', 'cmd'] })
+    expect(views[0].positions).toEqual({ sys: { x: 5, y: 6, width: 360, height: 260 } })
+  })
+
+  it('remaps ids on import, drops unmapped elements and positions, and falls back to static without the sequence', () => {
+    let n = 0
+    const views = conceptViewsToDiagram(
+      withViews.views,
+      { node: (id) => (id === 'sys' ? 'new-sys' : undefined), relation: () => undefined, sequence: () => undefined },
+      { newId: () => `id-${++n}`, namePrefix: 'CQRS' },
+    )
+    expect(views).toEqual([
+      { id: 'id-1', name: 'CQRS — Write flow', kind: 'static', nodeIds: ['new-sys'], positions: {} },
+    ])
   })
 })

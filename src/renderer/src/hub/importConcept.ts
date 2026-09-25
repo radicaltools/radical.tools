@@ -10,6 +10,7 @@ import type { C4ElementType, C4Node, C4Relation, DiagramSequence } from '../type
 import { NODE_SIZES } from '../types/c4'
 import { useDiagramStore } from '../store/diagramStore'
 import type { HubConcept, HubImportRecord, TemplateParam } from '../store/hubStore'
+import { conceptViewsToDiagram } from './conceptViews'
 
 export interface ImportHubConceptResult {
   nodeIds: string[]
@@ -125,11 +126,13 @@ export function importHubConceptIntoDiagram(
   }
 
   const newSequences: Record<string, DiagramSequence> = {}
+  const seqIdMap = new Map<string, string>()
   for (const raw of templated.sequences ?? []) {
     const ids = (raw.relationIds as string[] | undefined) ?? []
     const mapped = ids.map((id) => relIdMap.get(id))
     if (ids.length === 0 || mapped.some((id) => !id)) continue
     const seqId = crypto.randomUUID()
+    if (typeof raw.id === 'string') seqIdMap.set(raw.id, seqId)
     newSequences[seqId] = {
       id: seqId,
       name: (raw.name as string) || concept.name,
@@ -138,12 +141,19 @@ export function importHubConceptIntoDiagram(
     }
   }
 
+  const newViews = conceptViewsToDiagram(
+    templated.views,
+    { node: (id) => idMap.get(id), relation: (id) => relIdMap.get(id), sequence: (id) => seqIdMap.get(id) },
+    { newId: () => crypto.randomUUID(), namePrefix: concept.name },
+  )
+
   store._pushUndo()
   store._markMilestoneEdit()
   useDiagramStore.setState((state) => {
     Object.assign(state.c4Nodes, newNodes)
     Object.assign(state.c4Relations, newRelations)
     Object.assign(state.sequences, newSequences)
+    for (const v of newViews) state.views[v.id] = v
     if (state.activeViewId && state.views[state.activeViewId]) {
       state.views[state.activeViewId].nodeIds.push(...Object.keys(newNodes))
     }

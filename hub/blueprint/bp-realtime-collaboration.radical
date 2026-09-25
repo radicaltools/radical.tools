@@ -842,9 +842,167 @@
         "Every other gateway instance receives it and relays it to its own connected replicas — merge order doesn't matter, so this can happen in any order relative to other concurrent edits.",
         "The originating gateway durably appends the operation to the op log."
       ]
+    },
+    {
+      "id": "seq-flow-collaborator",
+      "name": "Collaborator journey",
+      "relationIds": [
+        "mockup-doc-list--mockup-document-editor",
+        "mockup-document-editor--mockup-reconnect-merge",
+        "mockup-document-editor--mockup-version-history",
+        "mockup-version-history--mockup-restore-version",
+        "mockup-restore-version--mockup-document-editor"
+      ],
+      "stepDescriptions": [
+        "Open → Document Editor. Everyone edits a local replica: changes apply instantly, keep working offline (up to {{OFFLINE_GRACE_HOURS}} h) and merge on reconnect; presence shows up to {{MAX_DOC_COLLABORATORS}} collaborators.",
+        "Reconnect → Back Online — Merged. On reconnect the offline operation log is replayed and merged automatically — no conflict dialogs, no lost edits.",
+        "History → Version History. Browse and restore any earlier state of the document, reconstructed from snapshots plus the operation log.",
+        "Restore this version → Restore Version. Restoring an older state is itself a new version, reconstructed from snapshot plus operation log.",
+        "Restore → Document Editor. Everyone edits a local replica: changes apply instantly, keep working offline (up to {{OFFLINE_GRACE_HOURS}} h) and merge on reconnect; presence shows up to {{MAX_DOC_COLLABORATORS}} collaborators."
+      ]
+    },
+    {
+      "id": "seq-flow-workspace-admin",
+      "name": "Workspace admin journey",
+      "relationIds": [
+        "mockup-share-dialog--mockup-workspace-members",
+        "mockup-workspace-members--mockup-remove-member",
+        "mockup-remove-member--mockup-access-revoked"
+      ],
+      "stepDescriptions": [
+        "Manage members → Workspace Members. Everyone with access to the workspace and their role.",
+        "Remove → Remove Member. Removal disconnects live sessions immediately instead of waiting for tokens to expire.",
+        "Remove → Access Removed. What the removed collaborator sees: the session is closed and further operations are rejected."
+      ]
     }
   ],
   "views": [
+    {
+      "id": "view-context",
+      "name": "System context",
+      "kind": "static",
+      "nodeIds": [
+        "collaborator",
+        "workspace-admin",
+        "platform",
+        "identity-provider"
+      ],
+      "collapsedNodeIds": [
+        "platform"
+      ],
+      "positions": {
+        "collaborator": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 280,
+          "height": 180
+        },
+        "workspace-admin": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "identity-provider": {
+          "x": 400,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        }
+      }
+    },
+    {
+      "id": "view-containers",
+      "name": "Containers",
+      "kind": "static",
+      "nodeIds": [
+        "collaborator",
+        "workspace-admin",
+        "platform",
+        "editor-client",
+        "sync-gateway",
+        "op-broadcast-bus",
+        "snapshot-worker",
+        "permission-service",
+        "op-log-store",
+        "snapshot-store",
+        "identity-provider"
+      ],
+      "positions": {
+        "collaborator": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "editor-client": {
+          "x": 30,
+          "y": 110,
+          "width": 210,
+          "height": 140
+        },
+        "identity-provider": {
+          "x": 0,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "op-broadcast-bus": {
+          "x": 710,
+          "y": 110,
+          "width": 220,
+          "height": 95
+        },
+        "op-log-store": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "permission-service": {
+          "x": 370,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 960,
+          "height": 750
+        },
+        "snapshot-store": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "snapshot-worker": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "sync-gateway": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "workspace-admin": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        }
+      }
+    },
     {
       "id": "bp-realtime-collaboration-flow",
       "name": "An edit is accepted, broadcast, and persisted",
@@ -863,7 +1021,284 @@
         "snapshot-store",
         "identity-provider"
       ],
-      "positions": {}
+      "positions": {
+        "collaborator": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "editor-client": {
+          "x": 30,
+          "y": 110,
+          "width": 210,
+          "height": 140
+        },
+        "identity-provider": {
+          "x": 0,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "op-broadcast-bus": {
+          "x": 710,
+          "y": 110,
+          "width": 220,
+          "height": 95
+        },
+        "op-log-store": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "permission-service": {
+          "x": 370,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 960,
+          "height": 750
+        },
+        "snapshot-store": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "snapshot-worker": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "sync-gateway": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "workspace-admin": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        }
+      }
+    },
+    {
+      "id": "view-governance",
+      "name": "Governance",
+      "kind": "static",
+      "nodeIds": [
+        "req-offline-merge",
+        "req-room-capacity",
+        "req-access-revocation",
+        "req-snapshot-recovery",
+        "ff-presence-fanout-guard",
+        "ff-snapshot-compaction-lag",
+        "ff-reconnect-success-rate",
+        "adr-crdt-over-ot",
+        "adr-stateless-gateway-fleet",
+        "sync-gateway",
+        "permission-service",
+        "op-log-store",
+        "snapshot-worker",
+        "editor-client"
+      ],
+      "positions": {
+        "adr-crdt-over-ot": {
+          "x": 0,
+          "y": 1912,
+          "width": 260,
+          "height": 52
+        },
+        "adr-stateless-gateway-fleet": {
+          "x": 320,
+          "y": 1912,
+          "width": 260,
+          "height": 52
+        },
+        "editor-client": {
+          "x": 30,
+          "y": 110,
+          "width": 210,
+          "height": 140
+        },
+        "ff-presence-fanout-guard": {
+          "x": 0,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "ff-reconnect-success-rate": {
+          "x": 640,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "ff-snapshot-compaction-lag": {
+          "x": 320,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "op-log-store": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "permission-service": {
+          "x": 370,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 960,
+          "height": 750
+        },
+        "req-access-revocation": {
+          "x": 640,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-offline-merge": {
+          "x": 0,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-room-capacity": {
+          "x": 320,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-snapshot-recovery": {
+          "x": 960,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "snapshot-worker": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        },
+        "sync-gateway": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        }
+      }
+    },
+    {
+      "id": "view-flow-collaborator",
+      "name": "Collaborator journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-collaborator",
+      "nodeIds": [
+        "flow-collaborator",
+        "mockup-doc-list",
+        "mockup-document-editor",
+        "mockup-reconnect-merge",
+        "mockup-version-history",
+        "mockup-restore-version"
+      ],
+      "positions": {
+        "flow-collaborator": {
+          "x": 0,
+          "y": 2084,
+          "width": 1560,
+          "height": 330
+        },
+        "mockup-doc-list": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-document-editor": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-reconnect-merge": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-restore-version": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-version-history": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-workspace-admin",
+      "name": "Workspace admin journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-workspace-admin",
+      "nodeIds": [
+        "flow-workspace-admin",
+        "mockup-share-dialog",
+        "mockup-workspace-members",
+        "mockup-remove-member",
+        "mockup-access-revoked"
+      ],
+      "positions": {
+        "flow-workspace-admin": {
+          "x": 0,
+          "y": 2494,
+          "width": 1240,
+          "height": 330
+        },
+        "mockup-access-revoked": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-remove-member": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-share-dialog": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-workspace-members": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
     }
   ]
 }

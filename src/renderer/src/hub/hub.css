@@ -207,6 +207,17 @@
 }
 .hub-list-count { display: flex; align-items: center; gap: 8px; }
 .hub-sort { display: flex; align-items: center; gap: 6px; }
+.hub-view-select {
+  max-width: 260px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
 .hub-sort select {
   height: 24px; padding: 0 5px;
   border-radius: 6px;

@@ -7,6 +7,8 @@
  *   - blueprint mockups form per-actor screen flows (flow groups linked by
  *     navigates-to), use metamodel-valid relations and carry wireframes that
  *     are already sanitised
+ *   - blueprints ship named views (context, containers, governance, one per
+ *     screen flow) over sequences whose steps all exist
  */
 import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
@@ -116,6 +118,40 @@ describe('blueprint mockups', () => {
       if (src!.type !== 'mockup') continue
       const pairs = mm.relationTypes[r.relationType ?? '']?.allowedPairs ?? []
       expect(pairs.some((p) => p.from === src!.type && p.to === tgt!.type), `${r.id}: ${r.relationType} ${src!.type} → ${tgt!.type}`).toBe(true)
+    }
+  })
+})
+
+describe('blueprint views and sequences', () => {
+  const blueprints = readCatalogue(HUB_DIR).filter((e) => e.doc.hub.category === 'blueprint')
+
+  it.each(blueprints.map((e) => [e.file, e.doc] as const))('%s has consistent views and sequences', (_file, doc) => {
+    const nodeIds = new Set(doc.nodes.map((n) => String(n.id)))
+    const relIds = new Set((doc.relations ?? []).map((r) => String(r.id)))
+    const sequences = (doc.sequences ?? []) as Array<{ id: string; relationIds: string[]; stepDescriptions?: string[] }>
+    const seqIds = new Set(sequences.map((s) => s.id))
+    const views = (doc.views ?? []) as Array<{ id: string; kind: string; sequenceId?: string; nodeIds: string[]; positions: Record<string, Record<string, unknown>> }>
+
+    for (const s of sequences) {
+      expect(s.relationIds.length).toBeGreaterThan(0)
+      for (const id of s.relationIds) expect(relIds.has(id), `${s.id}: unknown relation ${id}`).toBe(true)
+      expect(s.stepDescriptions ?? []).toHaveLength(s.relationIds.length)
+    }
+    for (const v of views) {
+      expect(['static', 'dynamic']).toContain(v.kind)
+      for (const id of v.nodeIds) expect(nodeIds.has(id), `${v.id}: unknown node ${id}`).toBe(true)
+      if (v.kind === 'dynamic') expect(seqIds.has(v.sequenceId!), `${v.id}: unknown sequence`).toBe(true)
+      for (const [id, p] of Object.entries(v.positions)) {
+        expect(nodeIds.has(id)).toBe(true)
+        for (const k of ['x', 'y', 'width', 'height']) expect(typeof p[k], `${v.id}.${id}.${k}`).toBe('number')
+      }
+    }
+
+    const ids = views.map((v) => v.id)
+    expect(ids).toEqual(expect.arrayContaining(['view-context', 'view-containers', 'view-governance']))
+    expect(views.some((v) => v.kind === 'dynamic' && !v.id.startsWith('view-flow-')), 'technical flow').toBe(true)
+    for (const g of doc.nodes.filter((n) => n.type === 'group' && String(n.id).startsWith('flow-'))) {
+      expect(ids, `view for ${g.id}`).toContain(`view-${g.id}`)
     }
   })
 })
