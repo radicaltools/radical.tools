@@ -23,6 +23,7 @@ import {
   Presentation,
   SlideCanvasState,
   NodePosition,
+  PositionMap,
   NODE_SIZES,
   COLLAPSED_HEIGHT,
   COLLAPSED_WIDTH,
@@ -45,6 +46,7 @@ import { applyTreeLayout } from '../layout/elkLayout'
 import { applyRadicalLayout } from '../layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '../layout/crossingOpt'
+import { compoundPadding } from '../layout/geometry'
 import { LiveColaLayout } from '../layout/liveColaLayout'
 import { documents, useDocumentsStore } from './documentStore'
 import { isViewerProfile } from '../runtime'
@@ -356,6 +358,62 @@ function filterForView(
     if (viewFilter.has(r.sourceId) && viewFilter.has(r.targetId)) relations[id] = r
   }
   return { nodes, relations }
+}
+
+interface LayoutInput {
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  viewFilter: Set<string> | undefined
+  viewCollapsedSet: Set<string>
+  expandedSet: Set<string> | undefined
+}
+
+/**
+ * The graph a layout algorithm should see for the active view: the same
+ * node filter, collapse rules (view-collapsed, per-view collapsed and
+ * expanded overrides) and hidden relations the canvas applies when it
+ * renders. `collapsed` on the returned nodes is the effective state.
+ */
+function layoutInputForView(state: DiagramStore): LayoutInput {
+  const view = state.activeViewId ? state.views[state.activeViewId] : undefined
+  const viewFilter = computeViewNodeSet(view, state.c4Nodes)
+  const viewCollapsedSet = computeViewCollapsedSet(viewFilter, state.c4Nodes)
+  for (const id of view?.collapsedNodeIds ?? []) viewCollapsedSet.add(id)
+  const expandedSet = view?.expandedNodeIds?.length ? new Set(view.expandedNodeIds) : undefined
+
+  const filtered = filterForView(state.c4Nodes, state.c4Relations, viewFilter)
+  const nodes: Record<string, C4Node> = {}
+  for (const [id, n] of Object.entries(filtered.nodes)) {
+    const collapsed = isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet)
+    nodes[id] = collapsed === n.collapsed ? n : { ...n, collapsed }
+  }
+  const hidden = new Set(view?.hiddenRelationIds ?? [])
+  const relations: Record<string, C4Relation> = {}
+  for (const [id, r] of Object.entries(filtered.relations)) {
+    if (!hidden.has(id)) relations[id] = r
+  }
+  return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet }
+}
+
+/**
+ * Write a layout result into the model. Collapsed nodes keep their stored
+ * size: the canvas draws them at the collapsed size anyway, and the stored
+ * one is what they expand back to.
+ */
+function applyLayoutPositions(
+  c4Nodes: Record<string, C4Node>,
+  positions: PositionMap,
+  input: LayoutInput,
+): void {
+  for (const [id, pos] of Object.entries(positions)) {
+    const node = c4Nodes[id]
+    if (!node) continue
+    node.x = pos.x
+    node.y = pos.y
+    if (input.nodes[id]?.collapsed) continue
+    if (pos.width)  node.width  = pos.width
+    if (pos.height) node.height = pos.height
+  }
 }
 
 /**
@@ -1182,7 +1240,7 @@ interface DiagramStore {
   _sync: () => void
   _pushUndo: () => void
   _markMilestoneEdit: () => void
-  _resizeParentsBottomUp: (viewFilter?: Set<string>, viewCollapsedSet?: Set<string>) => void
+  _resizeParentsBottomUp: (viewFilter?: Set<string>, viewCollapsedSet?: Set<string>, expandedSet?: Set<string>) => void
 }
 
 // ─── Live layout singleton (not serialisable → kept outside store) ───────────
@@ -2804,9 +2862,9 @@ export const useDiagramStore = create<DiagramStore>()(
         if (viewFilter) children = children.filter((c) => viewFilter.has(c.id))
         if (children.length === 0) return
 
-        // Padding matching ELK CHILD_OPTIONS (direction RIGHT, same for both levels)
-        const padRight  = (parent.type === 'container') ? 20 : 30
-        const padBottom = (parent.type === 'container') ? 20 : 30
+        const pad = compoundPadding(parent.type)
+        const padRight  = pad.side
+        const padBottom = pad.bottom
 
         let maxRight = 0
         let maxBottom = 0
@@ -2841,7 +2899,7 @@ export const useDiagramStore = create<DiagramStore>()(
       // ── layout ───────────────────────────────────────────────────────────
 
       /** Resize every parent container bottom-up after children have moved. */
-      _resizeParentsBottomUp(viewFilter, viewCollapsedSet) {
+      _resizeParentsBottomUp(viewFilter, viewCollapsedSet, expandedSet) {
         const allNodes = Object.values(get().c4Nodes)
         // Only process parents that are in the view (or all if no filter)
         const relevantNodes = viewFilter
@@ -2856,7 +2914,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         parentIds.sort((a, b) => nodeDepth(b) - nodeDepth(a)) // deepest first
         for (const pid of parentIds) {
-          get().fitParentToChildren(pid, viewFilter, viewCollapsedSet)
+          get().fitParentToChildren(pid, viewFilter, viewCollapsedSet, expandedSet)
         }
       },
 
@@ -2864,29 +2922,17 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().appMode !== 'designer') return
         set((state) => { state.isLayoutRunning = true })
         try {
-          const state = get()
-          const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-          const vf = computeViewNodeSet(view, state.c4Nodes)
-          const vcs = computeViewCollapsedSet(vf, state.c4Nodes)
-          const { nodes: c4Nodes, relations: c4Relations } = filterForView(state.c4Nodes, state.c4Relations, vf, vcs)
-          const positions = applyRadicalLayout(c4Nodes, c4Relations)
-          set((state) => {
-            for (const [id, pos] of Object.entries(positions)) {
-              const node = state.c4Nodes[id]
-              if (!node) continue
-              node.x = pos.x
-              node.y = pos.y
-              if (pos.width)  node.width  = pos.width
-              if (pos.height) node.height = pos.height
-            }
-          })
+          const input = layoutInputForView(get())
+          const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
+          const positions = applyRadicalLayout(input.nodes, input.relations)
+          set((state) => { applyLayoutPositions(state.c4Nodes, positions, input) })
 
           // Resize parents bottom-up for any compound nodes not sized by radical
-          get()._resizeParentsBottomUp(vf, vcs)
+          get()._resizeParentsBottomUp(vf, vcs, expandedSet)
           get()._sync()
 
           // Crossing minimisation: swap siblings to reduce edge crossings/overlaps
-          const { nodes: viewNodes, relations: viewRels } = filterForView(get().c4Nodes, get().c4Relations, vf, vcs)
+          const { nodes: viewNodes, relations: viewRels } = layoutInputForView(get())
           const crossOpt = minimizeCrossings(viewNodes, viewRels)
           if (Object.keys(crossOpt).length > 0) {
             set((state) => {
@@ -2895,12 +2941,12 @@ export const useDiagramStore = create<DiagramStore>()(
                 if (n) { n.x = pos.x; n.y = pos.y }
               }
             })
-            get()._resizeParentsBottomUp(vf, vcs)
+            get()._resizeParentsBottomUp(vf, vcs, expandedSet)
             get()._sync()
           }
 
           // Post-layout collision safety
-          const { nodes: safetyNodes } = filterForView(get().c4Nodes, get().c4Relations, vf, vcs)
+          const { nodes: safetyNodes } = layoutInputForView(get())
           const rootIds = Object.values(safetyNodes)
             .filter((n) => !n.parentId)
             .map((n) => n.id)
@@ -2925,27 +2971,15 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().appMode === 'metamodel') return
         set((state) => { state.isLayoutRunning = true })
         try {
-          const state = get()
-          const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-          const vf = computeViewNodeSet(view, state.c4Nodes)
-          const vcs = computeViewCollapsedSet(vf, state.c4Nodes)
-          const { nodes: c4Nodes, relations: c4Relations } = filterForView(state.c4Nodes, state.c4Relations, vf, vcs)
-          const positions = await applyTreeLayout(c4Nodes, c4Relations)
+          const input = layoutInputForView(get())
+          const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
+          const positions = await applyTreeLayout(input.nodes, input.relations)
           get()._markMilestoneEdit()
-          set((state) => {
-            for (const [id, pos] of Object.entries(positions)) {
-              const node = state.c4Nodes[id]
-              if (!node) continue
-              node.x = pos.x
-              node.y = pos.y
-              if (pos.width)  node.width  = pos.width
-              if (pos.height) node.height = pos.height
-            }
-          })
-          get()._resizeParentsBottomUp(vf, vcs)
+          set((state) => { applyLayoutPositions(state.c4Nodes, positions, input) })
+          get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level.
-          const { nodes: safetyNodes } = filterForView(get().c4Nodes, get().c4Relations, vf, vcs)
+          const { nodes: safetyNodes } = layoutInputForView(get())
           const rootIds = Object.values(safetyNodes)
             .filter((n) => !n.parentId)
             .map((n) => n.id)
@@ -2998,33 +3032,25 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         set((state) => { state.isLayoutRunning = true; state.smartLayoutProgress = { phase: 'candidates', done: 0, total: 10 } })
         try {
-          const state = get()
-          const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-          const vf = computeViewNodeSet(view, state.c4Nodes)
-          const vcs = computeViewCollapsedSet(vf, state.c4Nodes)
-          const { nodes: c4Nodes, relations: c4Relations } = filterForView(state.c4Nodes, state.c4Relations, vf, vcs)
-          const result = await runSmartLayout(c4Nodes, c4Relations, state.metamodel as Metamodel | undefined, (progress) => {
+          const input = layoutInputForView(get())
+          const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
+          const result = await runSmartLayout(input.nodes, input.relations, get().metamodel as Metamodel | undefined, (progress) => {
             set((s) => { s.smartLayoutProgress = progress })
           })
           if (result.candidates.length === 0) {
             get().pushNotification('Smart layout: no candidate produced a result.', 'warning')
             return
           }
+          if (result.keptCurrent) {
+            get().pushNotification('Smart layout: the current layout already scores best — nothing changed.', 'info')
+            return
+          }
           get()._markMilestoneEdit()
-          set((state) => {
-            for (const [id, pos] of Object.entries(result.winner.positions)) {
-              const node = state.c4Nodes[id]
-              if (!node) continue
-              node.x = pos.x
-              node.y = pos.y
-              if (pos.width)  node.width  = pos.width
-              if (pos.height) node.height = pos.height
-            }
-          })
-          get()._resizeParentsBottomUp(vf, vcs)
+          set((state) => { applyLayoutPositions(state.c4Nodes, result.winner.positions, input) })
+          get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level (same as ELK/Radical paths).
-          const { nodes: safetyNodes } = filterForView(get().c4Nodes, get().c4Relations, vf, vcs)
+          const { nodes: safetyNodes } = layoutInputForView(get())
           const rootIds = Object.values(safetyNodes)
             .filter((n) => !n.parentId)
             .map((n) => n.id)

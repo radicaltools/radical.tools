@@ -8,7 +8,7 @@
  *
  * Protocol
  * ─────────
- * Main → Worker  { nodes, relations, valid, rootIds, baseline }
+ * Main → Worker  { nodes, relations, valid, baseline }   (nodes/relations = visible projection from the ELK phase)
  * Worker → Main  { type: 'result', result: SmartLayoutResult }
  *              | { type: 'error',  message: string }
  *              | { type: 'progress', progress: SmartLayoutProgress }
@@ -19,16 +19,15 @@ import type { C4Node, C4Relation } from '../types/c4'
 import type { LayoutMetrics } from './crossingOpt'
 
 self.onmessage = async (e: MessageEvent) => {
-  const { nodes, relations, valid, rootIds, baseline } = e.data as {
+  const { nodes, relations, valid, baseline } = e.data as {
     nodes: Record<string, C4Node>
     relations: Record<string, C4Relation>
     valid: SmartLayoutCandidate[]
-    rootIds: string[]
     baseline: LayoutMetrics
   }
   try {
     const result: SmartLayoutResult = await runSmartLayoutSAPhase(
-      nodes, relations, valid, rootIds, baseline,
+      nodes, relations, valid, baseline,
       (progress: SmartLayoutProgress) => self.postMessage({ type: 'progress', progress }),
     )
     self.postMessage({ type: 'result', result })

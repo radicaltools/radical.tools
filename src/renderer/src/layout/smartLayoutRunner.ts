@@ -56,7 +56,7 @@ export async function runSmartLayout(
     return elkResult.result
   }
 
-  const { valid, rootIds, baseline } = elkResult
+  const { nodes: visibleNodes, relations: visibleRelations, valid, baseline } = elkResult
 
   // Phase 2: SA refinement in the worker.
   return new Promise<SmartLayoutResult>((resolve, reject) => {
@@ -84,6 +84,6 @@ export async function runSmartLayout(
       reject(new Error(e.message ?? 'smartLayout worker error'))
     }
 
-    worker.postMessage({ nodes, relations, valid, rootIds, baseline })
+    worker.postMessage({ nodes: visibleNodes, relations: visibleRelations, valid, baseline })
   })
 }

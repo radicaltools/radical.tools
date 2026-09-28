@@ -16,6 +16,7 @@ import ELK from 'elkjs/lib/elk.bundled.js'
 import type { ElkNode, ElkExtendedEdge, LayoutOptions } from 'elkjs'
 import { C4Node, C4Relation, PositionMap, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType } from '../types/c4'
 import { ELK_ROOT_SPACING, ELK_CHILD_SPACING } from './elkSpacingBase'
+import { projectToVisibleGraph } from './geometry'
 
 const elk = new ELK()
 
@@ -139,10 +140,13 @@ function parseElkResult(node: ElkNode, result: PositionMap): void {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export async function applyElkLayout(
-  c4Nodes: Record<string, C4Node>,
-  c4Relations: Record<string, C4Relation>,
+  inputNodes: Record<string, C4Node>,
+  inputRelations: Record<string, C4Relation>,
   opts?: { rootOptions?: LayoutOptions; childOptions?: LayoutOptions },
 ): Promise<PositionMap> {
+  // ELK throws on edges whose endpoints aren't in its graph, which is what
+  // an edge to a child of a collapsed container would be.
+  const { nodes: c4Nodes, relations: c4Relations } = projectToVisibleGraph(inputNodes, inputRelations)
   const elkNodeMap: ElkNodeMap = {}
   const childOpts = opts?.childOptions ?? CHILD_OPTIONS
 

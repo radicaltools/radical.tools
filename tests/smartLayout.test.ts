@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { computeCompositeScore, runSmartLayoutCore } from '../src/renderer/src/layout/smartLayout'
-import type { C4Node, C4Relation } from '../src/renderer/src/types/c4'
+import type { C4Node, C4Relation, PositionMap } from '../src/renderer/src/types/c4'
 
 function node(id: string, x: number, y: number, w = 200, h = 100, parentId?: string): C4Node {
   return { id, type: 'system', label: id, x, y, width: w, height: h, collapsed: false, parentId }
@@ -117,5 +117,87 @@ describe('runSmartLayoutCore (end-to-end ensemble + SA refinement)', () => {
     expect(result.winner.score.composite).toBeLessThanOrEqual(baselineScore.composite)
     // And for this deliberately-crossed fixture, it should actually improve it.
     expect(result.winner.metrics.weightedCost).toBeLessThan(result.baseline.weightedCost)
+  })
+})
+
+/** Person → web app → two services → database, plus an external system, all dumped on top of each other. */
+function pileUp(): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } {
+  const nodes: Record<string, C4Node> = {
+    user: { ...node('user', 0, 0, 120, 70), type: 'person' },
+    sys: node('sys', 10, 10, 900, 500),
+    web: { ...node('web', 20, 120, 200, 90, 'sys'), type: 'container' },
+    api: { ...node('api', 30, 130, 200, 90, 'sys'), type: 'container' },
+    jobs: { ...node('jobs', 40, 140, 200, 90, 'sys'), type: 'container' },
+    db: { ...node('db', 50, 150, 130, 80, 'sys'), type: 'database' },
+    pay: { ...node('pay', 20, 20, 240, 110), external: true },
+    crm: node('crm', 30, 30, 240, 110),
+  }
+  const relations: Record<string, C4Relation> = {
+    r1: rel('r1', 'user', 'web'),
+    r2: rel('r2', 'web', 'api'),
+    r3: rel('r3', 'api', 'db'),
+    r4: rel('r4', 'jobs', 'db'),
+    r5: rel('r5', 'api', 'pay'),
+    r6: rel('r6', 'jobs', 'crm'),
+    r7: rel('r7', 'user', 'crm'),
+  }
+  return { nodes, relations }
+}
+
+function applyPositions(nodes: Record<string, C4Node>, positions: PositionMap): Record<string, C4Node> {
+  const out: Record<string, C4Node> = {}
+  for (const [id, n] of Object.entries(nodes)) {
+    const p = positions[id]
+    out[id] = p ? { ...n, x: p.x, y: p.y, width: p.width ?? n.width, height: p.height ?? n.height } : n
+  }
+  return out
+}
+
+describe('runSmartLayoutCore guarantees', () => {
+  it('returns no overlapping siblings and never loses to its own best candidate', async () => {
+    const { nodes, relations } = pileUp()
+    const result = await runSmartLayoutCore(nodes, relations)
+    const placed = applyPositions(nodes, result.winner.positions)
+
+    const byParent = new Map<string, C4Node[]>()
+    for (const n of Object.values(placed)) {
+      const key = n.parentId ?? ''
+      byParent.set(key, [...(byParent.get(key) ?? []), n])
+    }
+    for (const siblings of byParent.values()) {
+      for (let i = 0; i < siblings.length; i++) {
+        for (let j = i + 1; j < siblings.length; j++) {
+          const a = siblings[i], b = siblings[j]
+          const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
+          const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y)
+          expect(ox > 0 && oy > 0, `${a.id} overlaps ${b.id}`).toBe(false)
+        }
+      }
+    }
+
+    const bestCandidate = Math.min(...result.candidates.map((c) => c.score.composite))
+    expect(result.winner.score.composite).toBeLessThanOrEqual(bestCandidate)
+    expect(result.winner.score.composite).toBeLessThanOrEqual(computeCompositeScore(nodes, relations).composite)
+  })
+
+  it('gives the same diagram the same layout every time', async () => {
+    const a = await runSmartLayoutCore(pileUp().nodes, pileUp().relations)
+    const b = await runSmartLayoutCore(pileUp().nodes, pileUp().relations)
+    expect(b.winner.positions).toEqual(a.winner.positions)
+  })
+
+  it('keeps the current layout when running again cannot beat it', async () => {
+    const { nodes, relations } = pileUp()
+    const first = await runSmartLayoutCore(nodes, relations)
+    const second = await runSmartLayoutCore(applyPositions(nodes, first.winner.positions), relations)
+    expect(second.keptCurrent).toBe(true)
+  })
+
+  it('runs every candidate when a collapsed container hides related children', async () => {
+    const { nodes, relations } = pileUp()
+    nodes.sys = { ...nodes.sys, collapsed: true }
+    const result = await runSmartLayoutCore(nodes, relations)
+    expect(result.candidates).toHaveLength(10)
+    expect(result.winner.positions.web).toBeUndefined()
   })
 })
