@@ -164,6 +164,50 @@ describe('goToSlide', () => {
     }, 60)
   })
 
+  describe('slides without a captured canvas (generated sample slides)', () => {
+    const slide = (id: string, viewId: string | null, snapshotId: string | null = null) =>
+      ({ id, name: id, viewId, snapshotId, viewport: { x: 0, y: 0, zoom: 1 } })
+
+    beforeEach(() => {
+      const live = useDiagramStore.getState()
+      useDiagramStore.setState({
+        views: {
+          'v-a': {
+            id: 'v-a', name: 'A', kind: 'static', nodeIds: [],
+            positions: { ctn1: { x: 999, y: 777, width: 240, height: 160 } },
+            viewport: { x: 0, y: 0, zoom: 1 },
+          },
+        },
+        snapshots: [{
+          id: 'snap-small', name: 'small', timestamp: 0,
+          nodes: { sys1: JSON.parse(JSON.stringify(live.c4Nodes['sys1'])) },
+          relations: {},
+        }],
+        presentationActive: true,
+      } as any)
+      ;(window as any).__prePresState = {
+        c4Nodes: live.c4Nodes, c4Relations: live.c4Relations, activeViewId: null,
+      }
+    })
+
+    it('lays nodes out with the linked view\'s saved positions', () => {
+      useDiagramStore.setState({ presentationSlides: [slide('s-a', 'v-a')] } as any)
+      useDiagramStore.getState().goToSlide(0)
+      const n = useDiagramStore.getState().c4Nodes['ctn1']
+      expect({ x: n.x, y: n.y }).toEqual({ x: 999, y: 777 })
+    })
+
+    it('shows the live model again after a milestone slide', () => {
+      useDiagramStore.setState({
+        presentationSlides: [slide('s-a', 'v-a'), slide('s-m', null, 'snap-small')],
+      } as any)
+      useDiagramStore.getState().goToSlide(1)
+      expect(Object.keys(useDiagramStore.getState().c4Nodes)).toEqual(['sys1'])
+      useDiagramStore.getState().goToSlide(0)
+      expect(useDiagramStore.getState().c4Nodes['ctn1']).toBeDefined()
+    })
+  })
+
   it('does NOT auto-activate presentation when called outside a running presentation', () => {
     useDiagramStore.getState().addPresentationSlide('a')
     expect(useDiagramStore.getState().presentationActive).toBe(false)

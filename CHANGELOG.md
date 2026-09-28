@@ -39,5 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Production desktop build showed a blank window: the CSP header handler dropped every other response header (including `Content-Type`), so the renderer's module scripts were refused
 - Hub concept files' `views` were ignored by the viewer and on import
 - Importing from the Hub no longer stacks one "Imported …" notification per concept over the template-parameter form
+- Presentation slides without a captured canvas (the sample model's walkthrough, imported slides) lay nodes out with their view's saved positions instead of whatever layout was on screen, so they no longer need a Smart Layout to look right; a slide after a milestone slide shows the live model again instead of the milestone's subset
 
 [Unreleased]: https://github.com/radicaltools/radical.tools/compare/HEAD

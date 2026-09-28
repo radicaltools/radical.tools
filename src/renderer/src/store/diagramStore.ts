@@ -4001,6 +4001,18 @@ export const useDiagramStore = create<DiagramStore>()(
               state.c4Relations = snap.relations as any
             })
           }
+        } else {
+          // A slide without its own model shows the live one — undo whatever
+          // a previous milestone slide swapped in.
+          const pre = (window as any).__prePresState as
+            | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation> }
+            | undefined
+          if (pre) {
+            set((state) => {
+              state.c4Nodes = pre.c4Nodes as any
+              state.c4Relations = pre.c4Relations as any
+            })
+          }
         }
 
         // Apply saved canvas state (positions + collapsed) — overrides snapshot positions.
@@ -4016,6 +4028,13 @@ export const useDiagramStore = create<DiagramStore>()(
               n.collapsed = ns.collapsed
             }
           })
+        } else if ((slide as any).viewId) {
+          // No captured canvas (generated / imported slides): show the view's
+          // saved layout, the same positions setActiveView would load.
+          const viewPositions = get().views[(slide as any).viewId]?.positions as Record<string, NodePosition> | undefined
+          if (viewPositions && Object.keys(viewPositions).length > 0) {
+            set((state) => { applyPositions(state.c4Nodes as Record<string, C4Node>, viewPositions) })
+          }
         }
 
         // Activate the view linked to this slide (or reset to "all" if none)
@@ -4113,6 +4132,13 @@ export const useDiagramStore = create<DiagramStore>()(
               n.collapsed = ns.collapsed
             }
           })
+        } else if ((slide as any).viewId) {
+          // No captured canvas (generated / imported slides): show the view's
+          // saved layout, the same positions setActiveView would load.
+          const viewPositions = get().views[(slide as any).viewId]?.positions as Record<string, NodePosition> | undefined
+          if (viewPositions && Object.keys(viewPositions).length > 0) {
+            set((state) => { applyPositions(state.c4Nodes as Record<string, C4Node>, viewPositions) })
+          }
         }
 
         // Navigate to the view linked to this slide (or reset to "all" if none).
