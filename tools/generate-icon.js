@@ -1,12 +1,22 @@
 #!/usr/bin/env node
 // Generates tools/vscode-radical/images/icon.png (128×128)
 // Uses only Node.js built-ins (zlib, fs, path) — no dependencies.
+//
+//   node tools/generate-icon.js                              → VS Code icon (128)
+//   node tools/generate-icon.js --size 512 --out build/icon.png   → desktop app icon
 
 const zlib = require('zlib')
 const fs   = require('fs')
 const path = require('path')
 
-const SIZE = 128
+function arg(name) {
+  const i = process.argv.indexOf(name)
+  return i !== -1 ? process.argv[i + 1] : undefined
+}
+
+const SIZE = Number(arg('--size') ?? 128)
+// The design is drawn on a 128-unit grid; scale it to the requested size.
+const s = (v) => Math.round(v * SIZE / 128)
 
 // ── PNG encoder ───────────────────────────────────────────────────────────────
 
@@ -93,50 +103,50 @@ const WHT  = [220, 231, 254]   // #dce7fe  near-white
 fillRect(0, 0, SIZE, SIZE, BG)
 
 // Inner card
-fillRect(10, 10, SIZE - 10, SIZE - 10, CARD)
+fillRect(s(10), s(10), SIZE - s(10), SIZE - s(10), CARD)
 
 // ── Graph nodes: C4-style hierarchy ─────────────────────────────────────────
 // Layout:  outer ring of 4 + center hub + 2 small satellites
 
-const C = [64, 64]   // center
-const N = [64, 28]   // north
-const W = [26, 64]   // west
-const E = [102, 64]  // east
-const S = [64, 100]  // south
-const NW = [38, 38]
-const NE = [90, 38]
+const C = [s(64), s(64)]   // center
+const N = [s(64), s(28)]   // north
+const W = [s(26), s(64)]   // west
+const E = [s(102), s(64)]  // east
+const S = [s(64), s(100)]  // south
+const NW = [s(38), s(38)]
+const NE = [s(90), s(38)]
 
 // Edges
-line(...N, ...C, BLUE, 2)
-line(...W, ...C, BLUE, 2)
-line(...E, ...C, BLUE, 2)
-line(...S, ...C, BLUE, 2)
-line(...NW, ...N, LBLU, 1)
-line(...NE, ...N, LBLU, 1)
-line(...NW, ...W, LBLU, 1)
-line(...NE, ...E, LBLU, 1)
+line(...N, ...C, BLUE, s(2))
+line(...W, ...C, BLUE, s(2))
+line(...E, ...C, BLUE, s(2))
+line(...S, ...C, BLUE, s(2))
+line(...NW, ...N, LBLU, s(1))
+line(...NE, ...N, LBLU, s(1))
+line(...NW, ...W, LBLU, s(1))
+line(...NE, ...E, LBLU, s(1))
 
 // Outer nodes (hollow: fill BG inside)
 for (const [nx, ny] of [N, W, E, S]) {
-  disc(nx, ny, 9, BLUE)
-  disc(nx, ny, 6, CARD)
-  disc(nx, ny, 3, LBLU)
+  disc(nx, ny, s(9), BLUE)
+  disc(nx, ny, s(6), CARD)
+  disc(nx, ny, s(3), LBLU)
 }
 
 // Satellite nodes (smaller)
 for (const [nx, ny] of [NW, NE]) {
-  disc(nx, ny, 6, BLUE)
-  disc(nx, ny, 4, CARD)
-  disc(nx, ny, 2, LBLU)
+  disc(nx, ny, s(6), BLUE)
+  disc(nx, ny, s(4), CARD)
+  disc(nx, ny, s(2), LBLU)
 }
 
 // Center hub (bright, larger)
-disc(C[0], C[1], 13, BLUE)
-disc(C[0], C[1], 9,  CARD)
-disc(C[0], C[1], 6,  WHT)
+disc(C[0], C[1], s(13), BLUE)
+disc(C[0], C[1], s(9), CARD)
+disc(C[0], C[1], s(6), WHT)
 
 // Rounded corners
-roundCorners(14, BG)
+roundCorners(s(14), BG)
 
 // ── Encode PNG ────────────────────────────────────────────────────────────────
 
@@ -164,8 +174,9 @@ const png = Buffer.concat([
   pngChunk('IEND', Buffer.alloc(0)),
 ])
 
-const outDir  = path.join(__dirname, 'vscode-radical', 'images')
-const outFile = path.join(outDir, 'icon.png')
-fs.mkdirSync(outDir, { recursive: true })
+const outFile = arg('--out')
+  ? path.resolve(arg('--out'))
+  : path.join(__dirname, 'vscode-radical', 'images', 'icon.png')
+fs.mkdirSync(path.dirname(outFile), { recursive: true })
 fs.writeFileSync(outFile, png)
 console.log(`icon.png  ${png.length} bytes  →  ${outFile}`)
