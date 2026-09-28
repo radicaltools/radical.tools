@@ -35,7 +35,10 @@ function AutoResizeTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElem
 
 function C4Icon({ type, size = 12 }: { type: C4ElementType; size?: number }) {
   return (
-    <svg viewBox="0 0 16 16" width={size} height={size} fill={NODE_COLORS[type]} style={{ flexShrink: 0 }}>
+    <svg
+      className="type-icon" viewBox="0 0 16 16" width={size} height={size}
+      style={{ flexShrink: 0, '--type-color': NODE_COLORS[type] } as React.CSSProperties}
+    >
       <path d={TYPE_ICON_PATHS[type]} />
     </svg>
   )

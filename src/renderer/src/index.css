@@ -10,32 +10,33 @@
   --c4-component:   #85bbf0;
   --c4-component-fg:#000;
 
-  /* UI chrome — deeper, slightly cooler dark */
-  --bg-app:       #131322;
-  --bg-panel:     #1c1c2e;
-  --bg-toolbar:   rgba(20, 20, 34, 0.78);
-  --bg-canvas:    #0f0f1c;
-  --border-color: #2b2b44;
-  --border-color-strong: #3a3a5c;
-  --text-primary: #eeeef8;
-  --text-secondary: #cacae0;
-  --text-muted:   #9898b8;
+  /* UI chrome — dimmed graphite, not near-black: the C4 palette is dark
+     (person #08427b, system #1168bd) and sank into a #0f0f1c canvas */
+  --bg-app:       #262b36;
+  --bg-panel:     #2d3340;
+  --bg-toolbar:   rgba(45, 51, 64, 0.85);
+  --bg-canvas:    #22262f;
+  --border-color: #3e4555;
+  --border-color-strong: #4f5769;
+  --text-primary: #e6e9f2;
+  --text-secondary: #c3c8d6;
+  --text-muted:   #a0a7ba;
   --accent:       #6ea8ff;
   --accent-rgb:   110,168,255;
   --accent-soft:  rgba(110,168,255,0.12);
   --danger:       #ff7373;
   --success:      #6bffb8;
   --warning:      #ffc36b;
-  --canvas-dots:  rgba(255,255,255,0.06);
-  --minimap-mask: rgba(15,15,28,0.7);
-  --hint-bg:      rgba(15,15,28,0.85);
-  --hover-bg:     rgba(255,255,255,0.07);
+  --canvas-dots:  rgba(255,255,255,0.10);
+  --minimap-mask: rgba(34,38,47,0.7);
+  --hint-bg:      rgba(34,38,47,0.9);
+  --hover-bg:     rgba(255,255,255,0.08);
   --hover-bg-subtle: rgba(255,255,255,0.05);
   --hover-bg-faint:  rgba(255,255,255,0.035);
-  --input-bg:     rgba(255,255,255,0.05);
+  --input-bg:     rgba(255,255,255,0.06);
   --handle-bg:    rgba(255,255,255,0.4);
   --handle-border:rgba(255,255,255,0.6);
-  --edge-label-bg:rgba(15,15,28,0.85);
+  --edge-label-bg:rgba(34,38,47,0.9);
   --edge-label-border:rgba(148,163,184,0.3);
 
   /* Design system tokens */
@@ -916,6 +917,12 @@ body {
   align-items: center;
   flex-shrink: 0;
 }
+
+/* Type icons in the node tree and filter chips. The C4 palette is dark (the
+   person navy all but vanishes on a dark panel), so lift it toward white in
+   the dark theme. Only here: node fills on the canvas are model data. */
+.type-icon { fill: color-mix(in srgb, var(--type-color) 62%, white); }
+[data-theme="light"] .type-icon { fill: var(--type-color); }
 
 .tree-view-toggle {
   flex-shrink: 0;
