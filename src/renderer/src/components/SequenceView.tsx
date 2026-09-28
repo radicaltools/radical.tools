@@ -1,23 +1,16 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
+import { NODE_COLORS, NODE_FG, TYPE_LABELS } from '../types/c4'
 import type { C4Node, C4Relation } from '../types/c4'
 
-// Same palette as TreemapView so types stay visually consistent.
-const TYPE_COLORS: Record<string, readonly [string, string, string]> = {
-  domain:    ['#0a1e38', '#1a4a7a', '#90bcdf'],
-  system:    ['#0d3a6e', '#1168bd', '#b0d4f5'],
-  container: ['#154f88', '#3880c4', '#c5e2f8'],
-  component: ['#1e5f9e', '#5e9fd8', '#daeefb'],
-  database:  ['#321060', '#7e3dbf', '#c9a8f0'],
-  webapp:    ['#0a3a1e', '#20924f', '#9de2b8'],
-  queue:     ['#4a2000', '#c47a10', '#f0c88a'],
-  person:    ['#4a0a10', '#b83020', '#f0a8a8'],
-}
-const FALLBACK: readonly [string, string, string] = ['#181830', '#36366a', '#9090b8']
+// Participants use the same fills and shapes as the C4 nodes on the canvas
+// (see components/nodes/C4Nodes.tsx), so a flow reads like the structure view.
+const EXTERNAL_COLOR = '#6b6b6b'
+const HEAD_STROKE    = 'rgba(0,0,0,0.25)'
 
 // Layout constants
-const HEAD_W       = 160   // participant box width
-const HEAD_H       = 44    // participant box height
+const HEAD_W       = 170   // participant box width
+const HEAD_H       = 60    // participant box height
 const HEAD_GAP     = 56    // horizontal gap between participants
 const TOP_PAD      = 24
 const HEAD_BOT_PAD = 28    // gap below header before first step
@@ -238,31 +231,35 @@ export function SequenceView(): React.ReactElement {
   const renderHeader = (yTop: number): React.ReactElement[] =>
     participants.map((p) => {
       const cx = xOf(p.id)
-      const [fill, border, fg] = TYPE_COLORS[p.type] ?? FALLBACK
       const isSel = p.id === selectedNodeId
       const dk = showDiff ? diffHighlight[p.id] as 'new' | 'changed' | 'removed' | undefined : undefined
       const diffColor = dk === 'new' ? '#4ade80' : dk === 'removed' ? '#f87171' : dk === 'changed' ? '#fb923c' : null
       const diffLabel = dk === 'new' ? 'NEW' : dk === 'removed' ? 'REMOVED' : dk === 'changed' ? 'CHANGED' : null
+      const external = p.external && (p.type === 'person' || p.type === 'system')
+      const fill = external ? EXTERNAL_COLOR : NODE_COLORS[p.type] ?? EXTERNAL_COLOR
+      const fg   = NODE_FG[p.type] ?? '#fff'
+      const typeLabel = TYPE_LABELS[p.type] ?? p.type
+      const { shape, textTop, textBottom } = participantShape(p.type, {
+        x: cx - HEAD_W / 2,
+        y: yTop,
+        w: HEAD_W,
+        h: HEAD_H,
+        fill,
+        stroke: isSel ? '#ffd84d' : diffColor ?? HEAD_STROKE,
+        strokeWidth: isSel ? 2.5 : diffColor ? 2.5 : 1.5,
+        dash: dk === 'removed' ? '6 3' : undefined,
+      })
+      const textMid = (textTop + textBottom) / 2
       return (
         <g
           key={`hd-${yTop}-${p.id}`}
           style={{ cursor: 'pointer', opacity: dk === 'removed' ? 0.65 : 1 }}
           onClick={(e) => { e.stopPropagation(); selectNode(p.id) }}
         >
-          <rect
-            x={cx - HEAD_W / 2}
-            y={yTop}
-            width={HEAD_W}
-            height={HEAD_H}
-            rx={6}
-            fill={fill}
-            stroke={isSel ? '#ffd84d' : diffColor ?? border}
-            strokeWidth={isSel ? 2 : diffColor ? 2.5 : 1}
-            strokeDasharray={dk === 'removed' ? '6 3' : undefined}
-          />
+          {shape}
           <text
-            x={cx} y={yTop + HEAD_H / 2 - 4}
-            fill={fg} fontSize={13} fontWeight={600}
+            x={cx} y={textMid - 5}
+            fill={fg} fontSize={13} fontWeight={700}
             textAnchor="middle" dominantBaseline="middle"
             fontFamily="system-ui, -apple-system, sans-serif"
             pointerEvents="none"
@@ -270,24 +267,31 @@ export function SequenceView(): React.ReactElement {
             {truncate(p.label, 22)}
           </text>
           <text
-            x={cx} y={yTop + HEAD_H / 2 + 11}
-            fill={fg} fontSize={9} opacity={0.75}
+            x={cx} y={textMid + 10}
+            fill={fg} fontSize={8.5} fontWeight={700} opacity={0.85}
+            letterSpacing="0.08em"
             textAnchor="middle" dominantBaseline="middle"
             fontFamily="system-ui, -apple-system, sans-serif"
             pointerEvents="none"
           >
-            «{p.type}»
+            {(external ? `External ${typeLabel}` : typeLabel).toUpperCase()}
           </text>
           {diffLabel && (
-            <text
-              x={cx + HEAD_W / 2 - 5} y={yTop + 9}
-              fill={diffColor!} fontSize={8} fontWeight={800}
-              textAnchor="end" dominantBaseline="middle"
-              fontFamily="system-ui, -apple-system, sans-serif"
-              pointerEvents="none"
-            >
-              {diffLabel}
-            </text>
+            <g pointerEvents="none">
+              <rect
+                x={cx + HEAD_W / 2 - diffLabel.length * 5.6 - 10} y={yTop - 7}
+                width={diffLabel.length * 5.6 + 8} height={13} rx={3}
+                fill={diffColor!}
+              />
+              <text
+                x={cx + HEAD_W / 2 - 6} y={yTop}
+                fill={dk === 'new' ? '#000' : '#fff'} fontSize={8} fontWeight={800}
+                textAnchor="end" dominantBaseline="middle"
+                fontFamily="system-ui, -apple-system, sans-serif"
+              >
+                {diffLabel}
+              </text>
+            </g>
           )}
         </g>
       )
@@ -598,6 +602,105 @@ export function SequenceView(): React.ReactElement {
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
+
+interface ShapeBox {
+  x: number
+  y: number
+  w: number
+  h: number
+  fill: string
+  stroke: string
+  strokeWidth: number
+  dash?: string
+}
+
+/** Draws a participant head in the C4 shape of its type and returns the
+ *  vertical band the label text should be centred in. */
+function participantShape(
+  type: string,
+  { x, y, w, h, fill, stroke, strokeWidth, dash }: ShapeBox,
+): { shape: React.ReactElement; textTop: number; textBottom: number } {
+  const line = { stroke, strokeWidth, strokeDasharray: dash }
+  switch (type) {
+    case 'person': {
+      // Head overlapping the top edge of the body, like C4-PlantUML's Person.
+      const r = 11
+      const bodyY = y + r + 4
+      return {
+        shape: (
+          <>
+            <rect x={x} y={bodyY} width={w} height={h - (bodyY - y)} rx={10} fill={fill} {...line} />
+            <circle cx={x + w / 2} cy={y + r} r={r} fill={fill} {...line} />
+            <circle cx={x + w / 2} cy={y + r} r={r - 2.5} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={1.2} />
+          </>
+        ),
+        textTop: y + r * 2 + 2,
+        textBottom: y + h,
+      }
+    }
+    case 'database': {
+      const ry = 8
+      return {
+        shape: (
+          <>
+            <path
+              d={`M${x},${y + ry} V${y + h - ry} A${w / 2},${ry} 0 0,0 ${x + w},${y + h - ry} V${y + ry}`}
+              fill={fill} {...line}
+            />
+            <ellipse cx={x + w / 2} cy={y + ry} rx={w / 2} ry={ry} fill={fill} {...line} />
+            <ellipse cx={x + w / 2} cy={y + ry} rx={w / 2 - 2} ry={ry - 2} fill="rgba(255,255,255,0.08)" />
+          </>
+        ),
+        textTop: y + ry * 2,
+        textBottom: y + h - ry / 2,
+      }
+    }
+    case 'queue': {
+      const rx = 12
+      return {
+        shape: (
+          <>
+            <path
+              d={`M${x + rx},${y} H${x + w - rx} A${rx},${h / 2} 0 0,1 ${x + w - rx},${y + h} H${x + rx}`}
+              fill={fill} {...line}
+            />
+            <ellipse cx={x + rx} cy={y + h / 2} rx={rx} ry={h / 2} fill={fill} {...line} />
+            <ellipse cx={x + rx} cy={y + h / 2} rx={rx - 2} ry={h / 2 - 2} fill="rgba(255,255,255,0.08)" />
+          </>
+        ),
+        textTop: y,
+        textBottom: y + h,
+      }
+    }
+    case 'webapp': {
+      const barH = 12
+      return {
+        shape: (
+          <>
+            <rect x={x} y={y} width={w} height={h} rx={6} fill={fill} {...line} />
+            <path
+              d={`M${x + 1},${y + barH} V${y + 6} A5,5 0 0,1 ${x + 6},${y + 1} H${x + w - 6} A5,5 0 0,1 ${x + w - 1},${y + 6} V${y + barH} Z`}
+              fill="rgba(0,0,0,0.25)"
+            />
+            <circle cx={x + 8}  cy={y + barH / 2 + 0.5} r={2.2} fill="#ff5f57" />
+            <circle cx={x + 15} cy={y + barH / 2 + 0.5} r={2.2} fill="#febc2e" />
+            <circle cx={x + 22} cy={y + barH / 2 + 0.5} r={2.2} fill="#28c840" />
+          </>
+        ),
+        textTop: y + barH,
+        textBottom: y + h,
+      }
+    }
+    default: {
+      const rx = type === 'component' ? 5 : type === 'container' ? 6 : type === 'domain' || type === 'group' ? 12 : 8
+      return {
+        shape: <rect x={x} y={y} width={w} height={h} rx={rx} fill={fill} {...line} />,
+        textTop: y,
+        textBottom: y + h,
+      }
+    }
+  }
+}
 
 function truncate(text: string, max: number): string {
   if (!text) return ''
