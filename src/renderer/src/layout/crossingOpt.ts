@@ -27,8 +27,11 @@
  *
  * ## Complexity
  *
- * O(passes × |siblings|² × (|edges|² + |edges| × |nodes|)) per group.
- * For typical C4 diagrams this runs in < 5 ms total.
+ * Each candidate move is scored by `localCost` — only the pairs involving
+ * the edges and rects it moves — so one evaluation costs
+ * O(|moved edges| × (|edges| + |nodes|) + |edges| × |moved nodes|) instead
+ * of re-scoring the whole group. Decisions are identical to comparing full
+ * costs, since both are exact integer counts.
  *
  * References:
  *   Jünger & Mutzel (1997), "2-Layer Straightline Crossing Minimisation"
@@ -149,6 +152,62 @@ function layoutCost(
       const r3 = pos[b.src], r4 = pos[b.tgt]
       if (!r3 || !r4) continue
       if (intersects(p1, p2, centre(r3), centre(r4))) crossings++
+    }
+  }
+
+  return crossings * CROSSING_WEIGHT + overdraws * OVERDRAW_WEIGHT
+}
+
+/**
+ * The part of `layoutCost` a move can change: edge pairs where at least one
+ * edge touches a moved node (`touched`), and (edge, node) pairs where the
+ * edge is touched or the node itself moved. Each pair is visited once, and
+ * which pairs are visited depends only on `touched`/`movedIds` — so
+ * `localCost` after a move minus `localCost` before it equals the change in
+ * `layoutCost`, without re-testing every pair the move cannot affect.
+ */
+function localCost(
+  pos: Record<string, Rect>,
+  edges: EdgePair[],
+  touched: boolean[],
+  movedIds: string[],
+  ancestors: Record<string, Set<string>>,
+  allIds: string[]
+): number {
+  let crossings = 0
+  let overdraws = 0
+  const noAncestors = new Set<string>()
+
+  for (let i = 0; i < edges.length; i++) {
+    const a = edges[i]
+    const r1 = pos[a.src], r2 = pos[a.tgt]
+    if (!r1 || !r2) continue
+    const p1 = centre(r1), p2 = centre(r2)
+    const srcAnc = ancestors[a.src] ?? noAncestors
+    const tgtAnc = ancestors[a.tgt] ?? noAncestors
+
+    if (touched[i]) {
+      for (const nid of allIds) {
+        if (nid === a.src || nid === a.tgt) continue
+        if (srcAnc.has(nid) || tgtAnc.has(nid)) continue
+        const rect = pos[nid]
+        if (rect && segmentIntersectsRect(p1, p2, rect)) overdraws++
+      }
+      for (let j = 0; j < edges.length; j++) {
+        if (j === i || (touched[j] && j < i)) continue
+        const b = edges[j]
+        if (a.src === b.src || a.src === b.tgt || a.tgt === b.src || a.tgt === b.tgt) continue
+        const r3 = pos[b.src], r4 = pos[b.tgt]
+        if (!r3 || !r4) continue
+        if (intersects(p1, p2, centre(r3), centre(r4))) crossings++
+      }
+    } else {
+      for (const nid of movedIds) {
+        if (nid === a.src || nid === a.tgt) continue
+        if (srcAnc.has(nid) || tgtAnc.has(nid)) continue
+        const rect = pos[nid]
+        if (rect && segmentIntersectsRect(p1, p2, rect)) overdraws++
+      }
     }
   }
 
@@ -309,6 +368,13 @@ export function minimizeCrossings(
     childrenOf.get(key)!.push(n.id)
   }
 
+  /** The node plus all its descendants. */
+  function subtreeOf(nodeId: string, out: string[] = []): string[] {
+    out.push(nodeId)
+    for (const childId of childrenOf.get(nodeId) ?? []) subtreeOf(childId, out)
+    return out
+  }
+
   /** Shift all descendants' absolute positions after a parent swap */
   function shiftDescendants(nodeId: string, dx: number, dy: number): void {
     for (const childId of childrenOf.get(nodeId) ?? []) {
@@ -378,14 +444,18 @@ export function minimizeCrossings(
           const ia = swapIds[i], ib = swapIds[j]
           const ra = abs[ia], rb = abs[ib]
 
-          const before = layoutCost(abs, relevant, ancestors, allIds)
+          // Only the two rects move while the swap is evaluated (their
+          // descendants follow once it is accepted).
+          const moved = [ia, ib]
+          const touched = relevant.map(e => e.src === ia || e.src === ib || e.tgt === ia || e.tgt === ib)
+          const before = localCost(abs, relevant, touched, moved, ancestors, allIds)
 
           // Swap top-left positions; each node retains its own dimensions
           const sx = ra.x, sy = ra.y
           ra.x = rb.x; ra.y = rb.y
           rb.x = sx;   rb.y = sy
 
-          const after = layoutCost(abs, relevant, ancestors, allIds)
+          const after = localCost(abs, relevant, touched, moved, ancestors, allIds)
 
           if (after < before) {
             // Accept swap — propagate position deltas to descendants
@@ -450,7 +520,10 @@ export function minimizeCrossings(
       for (const id of swapIds) {
         const r = abs[id]
         if (!r) continue
-        const baseCost = layoutCost(abs, relevant, ancestors, allIds)
+        const moved = subtreeOf(id)
+        const movedSet = new Set(moved)
+        const touched = relevant.map(e => movedSet.has(e.src) || movedSet.has(e.tgt))
+        const baseCost = localCost(abs, relevant, touched, moved, ancestors, allIds)
         let bestDx = 0, bestDy = 0, bestCost = baseCost
 
         // X axis
@@ -458,7 +531,7 @@ export function minimizeCrossings(
           if (wouldCollide(id, r, dx, 0)) continue
           r.x += dx
           shiftDescendants(id, dx, 0)
-          const c = layoutCost(abs, relevant, ancestors, allIds)
+          const c = localCost(abs, relevant, touched, moved, ancestors, allIds)
           if (c < bestCost) { bestCost = c; bestDx = dx; bestDy = 0 }
           r.x -= dx
           shiftDescendants(id, -dx, 0)
@@ -468,7 +541,7 @@ export function minimizeCrossings(
           if (wouldCollide(id, r, 0, dy)) continue
           r.y += dy
           shiftDescendants(id, 0, dy)
-          const c = layoutCost(abs, relevant, ancestors, allIds)
+          const c = localCost(abs, relevant, touched, moved, ancestors, allIds)
           if (c < bestCost) { bestCost = c; bestDx = 0; bestDy = dy }
           r.y -= dy
           shiftDescendants(id, 0, -dy)

@@ -7,6 +7,8 @@ import { describe, it, expect } from 'vitest'
 import { projectToVisibleGraph } from '../src/renderer/src/layout/geometry'
 import { finalizeLayout, separateBoxes, ROOT_GAP } from '../src/renderer/src/layout/layoutFinalize'
 import { applyElkLayout } from '../src/renderer/src/layout/elkLayout'
+import { minimizeCrossings, totalLayoutCost } from '../src/renderer/src/layout/crossingOpt'
+import { runSmartLayoutELKPhase, type SmartLayoutProgress } from '../src/renderer/src/layout/smartLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, NODE_SIZES, type C4Node, type C4Relation } from '../src/renderer/src/types/c4'
 
 function node(id: string, type: C4Node['type'], extras: Partial<C4Node> = {}): C4Node {
@@ -81,5 +83,42 @@ describe('finalizeLayout', () => {
     expect(out.c.x).toBeGreaterThan(0)
     expect(out.S.width).toBeGreaterThanOrEqual(NODE_SIZES.system.width)
     expect(out.S.height).toBeGreaterThanOrEqual(120 + 60)
+  })
+})
+
+/** Six systems in a row wired so that the row order crosses edges. */
+function crossedRow(): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } {
+  const nodes: Record<string, C4Node> = {}
+  for (let i = 0; i < 6; i++) nodes[`s${i}`] = node(`s${i}`, 'system', { x: i * 300, y: 0 })
+  nodes.p = node('p', 'person', { x: 700, y: -300 })
+  nodes.q = node('q', 'person', { x: 700, y: 400 })
+  const relations: Record<string, C4Relation> = {
+    r1: rel('r1', 'p', 's0'), r2: rel('r2', 'p', 's5'), r3: rel('r3', 'q', 's1'),
+    r4: rel('r4', 'q', 's4'), r5: rel('r5', 's0', 's3'), r6: rel('r6', 's2', 's5'),
+  }
+  return { nodes, relations }
+}
+
+describe('minimizeCrossings', () => {
+  it('never increases the crossing/overdraw cost', () => {
+    const { nodes, relations } = crossedRow()
+    const updates = minimizeCrossings(nodes, relations)
+    const after: Record<string, C4Node> = {}
+    for (const [id, n] of Object.entries(nodes)) after[id] = updates[id] ? { ...n, ...updates[id] } : n
+    expect(Object.keys(updates).length).toBeGreaterThan(0)
+    expect(totalLayoutCost(after, relations)).toBeLessThan(totalLayoutCost(nodes, relations))
+  })
+})
+
+describe('runSmartLayoutELKPhase', () => {
+  it('only runs the engines, one at a time, reporting each', async () => {
+    const { nodes, relations } = crossedRow()
+    const progress: SmartLayoutProgress[] = []
+    const result = await runSmartLayoutELKPhase(nodes, relations, undefined, (p) => progress.push(p))
+    if (result.done) throw new Error('expected candidates')
+
+    expect(result.raw).toHaveLength(10)
+    expect(result.raw.every((c) => !('score' in c))).toBe(true)
+    expect(progress.map((p) => ('done' in p ? p.done : -1))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
   })
 })

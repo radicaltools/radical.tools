@@ -44,6 +44,7 @@ const IconInfo = () => (
 function smartLayoutProgressLabel(p: SmartLayoutProgress | null): string | null {
   if (!p) return null
   if (p.phase === 'candidates') return `Trying ${p.total} algorithms… ${p.done}/${p.total}`
+  if (p.phase === 'ranking') return `Scoring layouts… ${p.done}/${p.total}`
   if (p.phase === 'refining-a') return 'Refining with simulated annealing…'
   if (p.phase === 'refining-b') return 'Refining containers…'
   return 'Polishing…'
