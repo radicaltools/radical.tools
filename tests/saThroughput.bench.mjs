@@ -1,13 +1,15 @@
 /**
- * Benchmark: SA iterations achieved within a fixed wall-clock budget.
+ * Benchmark: Smart Layout wall-clock time and SA throughput.
  *
- * Runs `runSmartLayout` on a moderately complex scenario (the fintech-ish
- * synthetic graph below) and reports SA throughput as iterations/second.
+ * Runs `runSmartLayoutCore` on a moderately complex scenario (the
+ * fintech-ish synthetic graph below) and reports SA throughput as
+ * iterations/second. Budgets are work-based, so iterations and composite
+ * should be identical on every run — only the wall-clock time varies.
  *
  * Run: node --import tsx tests/saThroughput.bench.mjs
  */
 
-const { runSmartLayout } = await import(
+const { runSmartLayoutCore } = await import(
   '../src/renderer/src/layout/smartLayout.ts'
 )
 
@@ -71,7 +73,7 @@ const totals = { wall: [], iter: [], composite: [] }
 for (let i = 0; i < RUNS; i++) {
   const { nodes, relations } = fintechLike()
   const t0 = performance.now()
-  const result = await runSmartLayout(nodes, relations)
+  const result = await runSmartLayoutCore(nodes, relations)
   const dt = performance.now() - t0
   totals.wall.push(dt)
   totals.iter.push(result.refinement.iterations)

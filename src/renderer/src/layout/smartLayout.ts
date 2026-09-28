@@ -47,33 +47,34 @@ import { applyRadicalLayout } from './radicalLayout'
 import { minimizeCrossings, computeLayoutMetrics, type LayoutMetrics } from './crossingOpt'
 import { pickSides } from './portAllocator'
 import { ELK_ROOT_SPACING, ELK_CHILD_SPACING } from './elkSpacingBase'
+import { compoundPadding, projectToVisibleGraph } from './geometry'
+import { finalizeLayout, ROOT_GAP, CHILD_GAP } from './layoutFinalize'
+import {
+  anneal, buildLayoutGraph, createRng, graphSeed, FunctionEnergy, ProxyEnergy,
+  type AnnealOptions, type Bounds, type LayoutGraph, type Rng,
+} from './annealing'
+import {
+  W_CROSS, W_OVERDRAW, W_STUBLOOP, W_LONG, W_LMEAN, W_LMAX, W_LEAF, W_ASPECT, W_COMPACT, W_SYMMETRY,
+  LEN_MEAN_KNEE, LEN_MAX_KNEE, overlapCost, aspectPenalty,
+} from './scoreWeights'
 
 // ─── Composite aesthetic score ────────────────────────────────────────────
 //
 // Davidson-Harel (1996) cost function adapted to architecture diagrams.
-// Six components, each normalised so the weights are commensurable:
+// Components, each normalised so the weights (scoreWeights.ts) are
+// commensurable:
 //
-//   crossings        — straight-line edge crossings (oracle from crossingOpt)
+//   crossings        — Bézier-sampled edge crossings, as rendered
 //   overdraws        — edge passing through unrelated node bbox
-//   nodeOverlap      — overlap area between sibling pairs / overall, scaled
-//                       to mean node area  (catches layouts that visually
-//                       collide even if they have 0 crossings)
-//   edgeLengthExcess — (edges far longer than the median count more)
-//                       penalises spaghetti where one edge spans the canvas
-//   aspectPenalty    — bounding-box aspect ratio deviation from sqrt(2);
-//                       prevents 5000-px-wide tape layouts that look bad in
-//                       any presentation viewport
-//   compactness      — total area of bounding box / sum of node areas;
-//                       discourages sparseness without coupling to overlap
-//
-// Weights tuned so that:
-//   1 visible crossing  ≈ 100
-//   1 unit node overlap ≈ 50
-//   1 long edge         ≈ 5
-//   bad aspect ratio    ≈ 10–40
-//   sparse compactness  ≈ 0–30
-// → crossings still dominate, but the SA / ranking has *gradient* even
-//   when the crossing count is locally constant.
+//   nodeOverlap      — overlap area between non-nested pairs, scaled to
+//                       mean node area
+//   edgeLengthExcess — edges far longer than the median
+//   edgeLengthMean   — mean edge length in node sizes
+//   edgeLengthMax    — longest edge in node sizes
+//   leafCentrality   — low-degree nodes sitting near the centre of mass
+//   aspectPenalty    — bounding-box aspect ratio deviation from sqrt(2)
+//   compactness      — bounding-box area / sum of node areas
+//   symmetry         — distance from a mirror-symmetric arrangement
 
 interface CompositeScore {
   crossings: number
@@ -95,34 +96,6 @@ interface CompositeScore {
   symmetryDeficit: number
   composite: number
 }
-
-// Empirically-tuned weights, revised after observing real failure modes
-// (Person/External-System placed centrally with very long edges through
-// the diagram). Two new dominant signals:
-//   - edgeLengthMean: catches uniformly-spread layouts the old
-//     edgeLengthExcess (outliers only) couldn't see.
-//   - leafCentrality: pushes degree-1/2 nodes to the periphery so they
-//     stop sitting between two clusters and crossing everything.
-const W_CROSS    = 80
-const W_OVERDRAW = 12
-const W_STUBLOOP = 30
-const W_OVERLAP  = 150  // raised from 50 — SA was happy to push leaves *into*
-                        //   foreign compound containers if it shortened edges.
-                        //   With knee=5 on edgeLengthMax that bias was strong.
-const W_LONG     = 5    // edgeLengthExcess (long-tail outliers)
-const W_LMEAN    = 25   // edgeLengthMean (global tightness)
-const W_LMAX     = 30   // edgeLengthMax (single longest edge in node-sizes) — NEW
-                        //   catches diagrams where mean is fine but one edge
-                        //   spans the whole canvas (the failure mode in the
-                        //   tall-layout screenshot — a few super-long verticals
-                        //   between top and bottom system).
-const W_LEAF     = 20   // leafCentrality
-const W_ASPECT   = 30   // raised from 10 — tall (>2:1) layouts are very hard
-                        //   to read in any presentation viewport. Combined with
-                        //   the new cubic exponent below this dominates SA's
-                        //   choice between portrait and landscape arrangements.
-const W_COMPACT  = 8
-const W_SYMMETRY = 4
 
 function buildAbsCenters(
   nodes: Record<string, C4Node>,
@@ -256,7 +229,12 @@ function computeRenderAwareEdgeMetrics(
   // 8 was occasionally letting overdraw through.
   const SAMPLES = 16
   // Pre-build all sample polylines + endpoints.
-  const polys: { samples: { x: number; y: number }[]; sId: string; tId: string }[] = []
+  const polys: {
+    samples: { x: number; y: number }[]
+    sId: string
+    tId: string
+    minX: number; minY: number; maxX: number; maxY: number
+  }[] = []
   let stubLoopPenalty = 0
 
   for (const e of edges) {
@@ -289,11 +267,15 @@ function computeRenderAwareEdgeMetrics(
       if (dotT < 0) stubLoopPenalty += dotT * dotT
     }
 
-    polys.push({
-      samples: sampleCubicBezier(sb.x, sb.y, c1x, c1y, c2x, c2y, tb.x, tb.y, SAMPLES),
-      sId: e.sourceId,
-      tId: e.targetId,
-    })
+    const samples = sampleCubicBezier(sb.x, sb.y, c1x, c1y, c2x, c2y, tb.x, tb.y, SAMPLES)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const pt of samples) {
+      if (pt.x < minX) minX = pt.x
+      if (pt.y < minY) minY = pt.y
+      if (pt.x > maxX) maxX = pt.x
+      if (pt.y > maxY) maxY = pt.y
+    }
+    polys.push({ samples, sId: e.sourceId, tId: e.targetId, minX, minY, maxX, maxY })
   }
 
   // Crossings on actual sampled polylines.
@@ -304,6 +286,7 @@ function computeRenderAwareEdgeMetrics(
       const B = polys[j]
       // Edges sharing an endpoint trivially "meet" — don't count those.
       if (A.sId === B.sId || A.sId === B.tId || A.tId === B.sId || A.tId === B.tId) continue
+      if (A.maxX < B.minX || B.maxX < A.minX || A.maxY < B.minY || B.maxY < A.minY) continue
       let crossed = false
       // Inner double loop — break early once we found one crossing per pair.
       // (One "crossing" between two edges is the same visual artefact whether
@@ -322,25 +305,24 @@ function computeRenderAwareEdgeMetrics(
     }
   }
 
-  // Overdraws: sample points landing in unrelated bboxes.
-  // We tolerate the first/last sample (which is on the source/target border).
+  // Overdraws: sample points landing in unrelated bboxes, counted once per
+  // (edge, node). The first/last sample sits on the source/target border.
+  // Ancestors and descendants of either endpoint are not obstacles — the
+  // renderer excludes them the same way.
   const ids = Object.keys(abs)
   let renderedOverdraws = 0
   for (const P of polys) {
-    const seen = new Set<string>()
-    for (let i = 1; i < P.samples.length - 1; i++) {
-      const pt = P.samples[i]
-      for (const id of ids) {
-        if (id === P.sId || id === P.tId) continue
-        // Skip ancestors of source/target — the edge is inside a parent box.
-        if (ancestors[P.sId]?.has(id) || ancestors[P.tId]?.has(id)) continue
-        if (seen.has(id)) continue
-        const r = abs[id]
-        // Skip parent-of-someone if the sample is also in some descendant box;
-        // we still penalise once per (edge, container) pair to avoid over-counting.
+    for (const id of ids) {
+      if (id === P.sId || id === P.tId) continue
+      if (ancestors[P.sId]?.has(id) || ancestors[P.tId]?.has(id)) continue
+      if (ancestors[id]?.has(P.sId) || ancestors[id]?.has(P.tId)) continue
+      const r = abs[id]
+      if (r.x > P.maxX || r.x + r.w < P.minX || r.y > P.maxY || r.y + r.h < P.minY) continue
+      for (let i = 1; i < P.samples.length - 1; i++) {
+        const pt = P.samples[i]
         if (pointInBox(pt.x, pt.y, r.x, r.y, r.w, r.h, -2)) {
           renderedOverdraws++
-          seen.add(id)
+          break
         }
       }
     }
@@ -354,6 +336,18 @@ export function computeCompositeScore(
   relations: Record<string, C4Relation>,
 ): CompositeScore {
   const base = computeLayoutMetrics(nodes, relations)
+  return { ...scoreParts(nodes, relations), crossings: base.crossings, overdraws: base.overdraws }
+}
+
+/** Composite cost only — what the polishing annealer minimises. */
+export function compositeEnergy(nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): number {
+  return scoreParts(nodes, relations).composite
+}
+
+function scoreParts(
+  nodes: Record<string, C4Node>,
+  relations: Record<string, C4Relation>,
+): Omit<CompositeScore, 'crossings' | 'overdraws'> {
   const abs = buildAbsCenters(nodes)
   const ancestors = buildAncestors(nodes)
   const ids = Object.keys(abs)
@@ -410,7 +404,7 @@ export function computeCompositeScore(
   // Express mean edge length in "node sizes". Below 3 is tight (good),
   // above 5 is spread, above 8 is bad. Quadratic above the threshold.
   const lenInNodes = meanDimForLen > 0 ? meanLen / meanDimForLen : 0
-  const edgeLengthMean = Math.max(0, lenInNodes - 3) ** 2
+  const edgeLengthMean = Math.max(0, lenInNodes - LEN_MEAN_KNEE) ** 2
 
   // ── 2d. Edge-length MAX in node sizes ─────────────────────────────────
   // Mean is misleading when many short intra-container edges drag it down
@@ -419,7 +413,7 @@ export function computeCompositeScore(
   // edge separately, with a knee at 8 node-sizes.
   const maxLen = lengths.length > 0 ? lengths[lengths.length - 1] : 0
   const maxInNodes = meanDimForLen > 0 ? maxLen / meanDimForLen : 0
-  const edgeLengthMax = Math.max(0, maxInNodes - 5) ** 2
+  const edgeLengthMax = Math.max(0, maxInNodes - LEN_MAX_KNEE) ** 2
 
   // ── 2c. Leaf centrality ─ low-degree nodes should sit on the periphery ─
   // Compute degree from relations. Compound-children of a low-degree leaf
@@ -470,16 +464,10 @@ export function computeCompositeScore(
     if (r.y + r.h > maxY) maxY = r.y + r.h
   }
   const bbW = maxX - minX, bbH = maxY - minY
-  let aspectPenalty = 0
-  if (bbW > 0 && bbH > 0) {
-    const ar = Math.max(bbW / bbH, bbH / bbW)
-    const TARGET = Math.SQRT2  // ≈ 1.414, golden-ish
-    // Cubic instead of quadratic — a 2.5:1 portrait layout (the screenshot
-    // failure mode) was scoring ar-target ≈ 1.1, squared ≈ 1.2, basically
-    // negligible. Cubed ≈ 1.3 × W_ASPECT(30) = 40, which finally dominates
-    // the swap between a tall single-column layout and a square one.
-    aspectPenalty = Math.max(0, ar - TARGET) ** 3
-  }
+  // Cubic, not quadratic — a 2.5:1 portrait layout scored ≈ 1.2 squared,
+  // basically negligible; cubed × W_ASPECT it finally outweighs the swap
+  // between a tall single-column layout and a square one.
+  const aspect = aspectPenalty(bbW, bbH)
 
   // ── 4. Compactness: bbox area / sum of node areas ─────────────────────
   let compactness = 0
@@ -500,22 +488,17 @@ export function computeCompositeScore(
       render.renderedCrossings * W_CROSS
     + render.renderedOverdraws * W_OVERDRAW
     + render.stubLoopPenalty   * W_STUBLOOP
-    + nodeOverlap              * W_OVERLAP
-    + nodeOverlap * nodeOverlap * W_OVERLAP * 5  // quadratic shock — any overlap > ~30%
-                                                  // dwarfs every aesthetic gain. Keeps SA
-                                                  // from shoving leaves into compounds.
+    + overlapCost(nodeOverlap)
     + lengthExcess             * W_LONG
     + edgeLengthMean           * W_LMEAN
     + edgeLengthMax            * W_LMAX
     + leafCentrality           * W_LEAF
-    + aspectPenalty            * W_ASPECT
+    + aspect                   * W_ASPECT
     + compactness              * W_COMPACT
     + symNorm                  * W_SYMMETRY
 
   return {
-    crossings: base.crossings,
     renderedCrossings: render.renderedCrossings,
-    overdraws: base.overdraws,
     renderedOverdraws: render.renderedOverdraws,
     stubLoopPenalty: render.stubLoopPenalty,
     nodeOverlap,
@@ -523,7 +506,7 @@ export function computeCompositeScore(
     edgeLengthMean,
     edgeLengthMax,
     leafCentrality,
-    aspectPenalty,
+    aspectPenalty: aspect,
     compactness,
     symmetryDeficit: symNorm,
     composite,
@@ -580,10 +563,13 @@ const COMMON_SPACING: LayoutOptions = {
   'elk.layered.crossingMinimization.greedySwitch.type': 'TWO_SIDED',
 }
 
+const CHILD_PAD = compoundPadding('container')
 const CHILD_SPACING: LayoutOptions = {
   ...COMMON_SPACING,
   ...ELK_CHILD_SPACING,
-  'elk.padding': '[top=40, right=20, bottom=20, left=20]',
+  // Same header room finalizeLayout gives every compound, so ELK plans
+  // for the size the container will actually have.
+  'elk.padding': `[top=${CHILD_PAD.top}, right=${CHILD_PAD.side}, bottom=${CHILD_PAD.bottom}, left=${CHILD_PAD.side}]`,
 }
 
 function elkLayered(
@@ -779,19 +765,22 @@ function computePlanarityScore(
   return { crossingEdges: crossed.size, totalEdges: total, ratio, verdict }
 }
 
-// ─── Simulated-annealing position refinement ──────────────────────────────
+// ─── Simulated-annealing refinement ───────────────────────────────────────
 //
-// Davidson-Harel 1996. After the ensemble winner is chosen, perturb each
-// root-level node's position by Gaussian noise (subtree shifts together
-// because root-relative children inherit the parent's translation
-// implicitly — we only mutate root-level (x, y)). Accept the new
-// arrangement with Metropolis probability exp(-ΔE / T); cool T
-// geometrically.
+// Davidson-Harel 1996 (engine in annealing.ts). After the ensemble ranks
+// the candidates, three phases refine the winner:
 //
-// Why this matters: ELK's layered already runs sibling-swap per layer,
-// but it cannot move a node *between layers* or shift one root by 200 px
-// to clear a crossing. SA can — and it escapes the local minima where
-// greedy sibling-swap (crossingOpt.ts) gets stuck.
+//   A. root nodes, cheap incremental proxy energy, run on the top two
+//      candidates — whichever ends in the better basin continues;
+//   B. the children of every compound, same proxy, confined to the parent
+//      so containers don't balloon and collide with their neighbours;
+//   C. root nodes again, full render-aware composite, gentle polish.
+//
+// Budgets are counted in estimated work (pairwise geometry tests), not
+// milliseconds, so the same diagram always gets the same layout on any
+// machine. They are sized to roughly 0.3–0.5 s per phase on a large
+// diagram; the deadlines sit well above that and only cap pathological
+// inputs or very slow machines.
 
 interface SARefinement {
   positions: PositionMap
@@ -800,293 +789,154 @@ interface SARefinement {
   iterations: number
 }
 
-// ─── Fast SA energy: precomputed context + incremental abs ──────────────
-//
-// SA evaluates energy thousands of times per chain. The original
-// proxy implementation rebuilt ancestors / abs / edge-list / mean-area
-// on every call (and internally `computeLayoutMetrics` rebuilt them again
-// — double work). All of these are *invariant* during SA (topology +
-// node dimensions never change — only positions). Hoisting them into a
-// context cuts per-eval cost roughly in half and removes per-call
-// allocations.
-//
-// Additional incremental win: when SA perturbs a single root, only that
-// root's *subtree* changes absolute position. We shift those entries in
-// `ctx.abs` in-place by (dx, dy) and revert on rejection — no full rebuild.
-//
-// Net effect: ~3–5× more SA iterations in the same wall-clock budget.
+/** Phase A work per candidate, in pairwise tests. */
+const PHASE_A_WORK = 4e6
+/** Phase B work shared by all compounds, in pairwise tests. */
+const PHASE_B_WORK = 5e6
+/** Phase C work, in units of E² + E·n + n² (one full composite score). */
+const PHASE_C_WORK = 3e6
+/** How far (as a fraction of the parent's size) phase B lets children reshape it. */
+const COMPOUND_SLACK = 0.5
+const PHASE_A_DEADLINE_MS = 3000
+const PHASE_B_DEADLINE_MS = 1500
+const PHASE_C_DEADLINE_MS = 1500
 
-interface AbsRect {
-  x: number; y: number; w: number; h: number; cx: number; cy: number
+const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now())
+const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
+
+/**
+ * Sweeps per restart that fit `work` pairwise tests. A proxy probe moving
+ * one member re-tests its subtree's nodes and incident edges against every
+ * edge and node: ≈ (E + n) · (|subtree| + |incident edges|).
+ */
+function sweepsFor(
+  g: LayoutGraph, group: number[], work: number, restarts: number, min: number, max: number,
+): number {
+  let moved = 0
+  for (const i of group) {
+    const sub = g.subtree[i]
+    moved += sub.length
+    for (const k of sub) moved += g.incident[k].length
+  }
+  const probeCost = (g.E + g.n) * (moved / group.length) + group.length
+  const probes = work / probeCost
+  return clamp(Math.round(probes / (restarts * (group.length + 1))), min, max)
 }
 
-interface EnergyContext {
-  ids: string[]                         // all node ids (stable order)
-  edgesSrc: string[]                    // parallel arrays = no per-call .filter()
-  edgesTgt: string[]
-  edgeCount: number
-  ancestors: Record<string, Set<string>>
-  descendants: Record<string, string[]> // closure of children, for incremental shifts
-  meanDim: number                       // constant — node W/H never change
-  meanArea: number                      // constant
-  abs: Record<string, AbsRect>          // mutable buffer, reused across evals
+function readPositions(g: LayoutGraph): PositionMap {
+  const out: PositionMap = {}
+  for (let i = 0; i < g.n; i++) {
+    out[g.ids[i]] = { x: g.relX[i], y: g.relY[i], width: g.w[i], height: g.h[i] }
+  }
+  return out
 }
 
-function buildDescendants(nodes: Record<string, C4Node>): Record<string, string[]> {
-  const children: Record<string, string[]> = {}
-  for (const n of Object.values(nodes)) {
-    if (n.parentId) (children[n.parentId] ??= []).push(n.id)
-  }
-  const descendants: Record<string, string[]> = {}
-  const collect = (id: string, out: string[]): void => {
-    out.push(id)
-    const kids = children[id]
-    if (kids) for (const c of kids) collect(c, out)
-  }
-  for (const id of Object.keys(nodes)) {
-    const out: string[] = []
-    collect(id, out)
-    descendants[id] = out
-  }
-  return descendants
+function rootsOf(g: LayoutGraph): number[] {
+  const roots: number[] = []
+  for (let i = 0; i < g.n; i++) if (g.parent[i] === -1) roots.push(i)
+  return roots
 }
 
-function buildEnergyContext(
+function refineRoots(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
-): EnergyContext {
-  const ids = Object.keys(nodes)
-  const ancestors = buildAncestors(nodes)
-  const descendants = buildDescendants(nodes)
+  positions: PositionMap,
+  rng: Rng,
+  deadline: number,
+): SARefinement {
+  const g = buildLayoutGraph(projectPositions(nodes, positions), relations)
+  const group = rootsOf(g)
+  const restarts = 4
+  const res = anneal(new ProxyEnergy(g), g, group, {
+    rng, restarts,
+    sweeps: sweepsFor(g, group, PHASE_A_WORK, restarts, 12, 150),
+    stepFactor: 0.06, tempFactor: 1, calibrationSamples: 24,
+    gap: ROOT_GAP, deadline,
+  })
+  return { positions: readPositions(g), before: res.before, after: res.after, iterations: res.evaluations }
+}
 
-  let totalArea = 0
-  let meanDimSum = 0
-  for (const id of ids) {
-    const n = nodes[id]
-    totalArea += n.width * n.height
-    meanDimSum += (n.width + n.height) / 2
+function refineCompounds(
+  nodes: Record<string, C4Node>,
+  relations: Record<string, C4Relation>,
+  positions: PositionMap,
+  rng: Rng,
+  deadline: number,
+): SARefinement {
+  const work = projectPositions(nodes, positions)
+  const g = buildLayoutGraph(work, relations)
+  const ev = new ProxyEnergy(g)
+  const before = ev.energy()
+
+  const groups = new Map<number, number[]>()
+  for (let i = 0; i < g.n; i++) {
+    const p = g.parent[i]
+    if (p === -1) continue
+    const list = groups.get(p)
+    if (list) list.push(i)
+    else groups.set(p, [i])
   }
-  const meanArea = totalArea / Math.max(ids.length, 1)
-  const meanDim = ids.length > 0 ? meanDimSum / ids.length : 1
+  const depth = (i: number): number => {
+    let d = 0
+    for (let p = g.parent[i]; p !== -1; p = g.parent[p]) d++
+    return d
+  }
+  const parents = [...groups.keys()].sort((a, b) => depth(b) - depth(a) || a - b)
 
-  const edgesSrc: string[] = []
-  const edgesTgt: string[] = []
-  for (const r of Object.values(relations)) {
-    if (nodes[r.sourceId] && nodes[r.targetId]) {
-      edgesSrc.push(r.sourceId)
-      edgesTgt.push(r.targetId)
+  let iterations = 0
+  const restarts = 2
+  const compounds = parents.filter((p) => groups.get(p)!.length >= 2).length
+  for (const p of parents) {
+    const group = groups.get(p)!
+    if (group.length < 2) continue
+    // Children may reshape their parent by up to half its size (the parent
+    // is refitted and roots re-separated afterwards) but not wander off.
+    const pad = compoundPadding(work[g.ids[p]].type)
+    const slackX = g.w[p] * COMPOUND_SLACK
+    const slackY = g.h[p] * COMPOUND_SLACK
+    const bounds: Bounds = {
+      minX: pad.side - slackX,
+      minY: pad.top,
+      maxX: g.w[p] - pad.side + slackX,
+      maxY: g.h[p] - pad.bottom + slackY,
     }
+    const res = anneal(ev, g, group, {
+      rng, restarts,
+      sweeps: sweepsFor(g, group, PHASE_B_WORK / compounds, restarts, 6, 100),
+      stepFactor: 0.08, tempFactor: 1, calibrationSamples: 12,
+      gap: CHILD_GAP, bounds, deadline,
+    })
+    iterations += res.evaluations
   }
-
-  const abs: Record<string, AbsRect> = {}
-  for (const id of ids) {
-    const n = nodes[id]
-    abs[id] = { x: 0, y: 0, w: n.width, h: n.height, cx: 0, cy: 0 }
-  }
-
-  return {
-    ids,
-    edgesSrc, edgesTgt, edgeCount: edgesSrc.length,
-    ancestors, descendants,
-    meanDim, meanArea,
-    abs,
-  }
+  return { positions: readPositions(g), before, after: ev.energy(), iterations }
 }
 
-/** Full abs rebuild from current `work` positions. O(N + ΣdepthChain). */
-function recomputeAbs(work: Record<string, C4Node>, ctx: EnergyContext): void {
-  const visited = new Set<string>()
-  const visit = (id: string): void => {
-    if (visited.has(id)) return
-    const n = work[id]
-    if (!n) { visited.add(id); return }
-    const a = ctx.abs[id]
-    if (!a) { visited.add(id); return }
-    if (!n.parentId) {
-      a.x = n.x; a.y = n.y
-    } else {
-      visit(n.parentId)
-      const p = ctx.abs[n.parentId]
-      if (p) { a.x = p.x + n.x; a.y = p.y + n.y }
-      else { a.x = n.x; a.y = n.y }
-    }
-    a.cx = a.x + a.w / 2
-    a.cy = a.y + a.h / 2
-    visited.add(id)
+function polishRoots(
+  nodes: Record<string, C4Node>,
+  relations: Record<string, C4Relation>,
+  positions: PositionMap,
+  rng: Rng,
+  deadline: number,
+): SARefinement {
+  const work = projectPositions(nodes, positions)
+  const g = buildLayoutGraph(work, relations)
+  const group = rootsOf(g)
+  // Every probe is a full render-aware re-score, so size the run by cost.
+  const probeCost = g.E * g.E + g.E * g.n + g.n * g.n + 1
+  const probes = clamp(Math.round(PHASE_C_WORK / probeCost), 30, 4000)
+  const opts: AnnealOptions = {
+    rng, restarts: 1,
+    sweeps: clamp(Math.round(probes / (group.length + 1)), 2, 200),
+    stepFactor: 0.02, tempFactor: 0.25, calibrationSamples: 6,
+    gap: ROOT_GAP, deadline,
   }
-  for (const id of ctx.ids) visit(id)
-}
-
-/** Shift a node's whole subtree in `ctx.abs` by (dx, dy). O(|subtree|). */
-function shiftSubtreeAbs(rootId: string, dx: number, dy: number, ctx: EnergyContext): void {
-  const sub = ctx.descendants[rootId]
-  if (!sub) return
-  for (const id of sub) {
-    const a = ctx.abs[id]
-    if (a) { a.x += dx; a.y += dy; a.cx += dx; a.cy += dy }
-  }
-}
-
-// Geometry primitives inlined to avoid Point/Rect object allocations
-// inside the hot loop. Mirrors crossingOpt.ts: strict CCW intersection,
-// rect shrunk by 1 px so grazing edges don't count as overdraw.
-function _segCrossXY(
-  ax: number, ay: number, bx: number, by: number,
-  cx: number, cy: number, dx: number, dy: number,
-): boolean {
-  const o1 = (dy - cy) * (bx - cx) - (by - cy) * (dx - cx) > 0
-  const o2 = (dy - cy) * (ax - cx) - (ay - cy) * (dx - cx) > 0
-  if (o1 === o2) return false
-  const o3 = (by - ay) * (cx - ax) - (cy - ay) * (bx - ax) > 0
-  const o4 = (by - ay) * (dx - ax) - (dy - ay) * (bx - ax) > 0
-  return o3 !== o4
-}
-
-function _segHitsRect(
-  px: number, py: number, qx: number, qy: number,
-  rx: number, ry: number, rw: number, rh: number,
-): boolean {
-  const x0 = rx + 1, y0 = ry + 1
-  const x1 = rx + rw - 1, y1 = ry + rh - 1
-  if (x1 <= x0 || y1 <= y0) return false
-  if (px > x0 && px < x1 && py > y0 && py < y1) return true
-  if (qx > x0 && qx < x1 && qy > y0 && qy < y1) return true
-  // Liang-Barsky-style: clip segment against rect.
-  let t0 = 0, t1 = 1
-  const ddx = qx - px, ddy = qy - py
-  const ps = [-ddx, ddx, -ddy, ddy]
-  const qs = [px - x0, x1 - px, py - y0, y1 - py]
-  for (let i = 0; i < 4; i++) {
-    if (ps[i] === 0) {
-      if (qs[i] < 0) return false
-    } else {
-      const t = qs[i] / ps[i]
-      if (ps[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t }
-      else            { if (t < t0) return false; if (t < t1) t1 = t }
-    }
-  }
-  return true
+  const res = anneal(new FunctionEnergy(g, work, relations, compositeEnergy), g, group, opts)
+  return { positions: readPositions(g), before: res.before, after: res.after, iterations: res.evaluations }
 }
 
 /**
- * Context-based energy proxy used inside the SA inner loop.
- *
- * Hot inner loop — avoids:
- *   - rebuilding ancestors / abs / edge-list / mean-area / mean-dim
- *   - calls to computeLayoutMetrics (which would rebuild them again)
- *   - Object.values / Object.keys allocations
- *   - Math.hypot (sqrt is amortised — total length only)
- *
- * Caller MUST keep `ctx.abs` in sync with `work` (via recomputeAbs once,
- * then shiftSubtreeAbs for incremental moves).
- */
-function proxyEnergyCtx(ctx: EnergyContext): number {
-  const { ids, edgesSrc, edgesTgt, edgeCount, ancestors, meanDim, meanArea, abs } = ctx
-  const N = ids.length
-
-  // Crossings + overdraws.
-  let crossings = 0
-  let overdraws = 0
-  for (let i = 0; i < edgeCount; i++) {
-    const a_src = edgesSrc[i], a_tgt = edgesTgt[i]
-    const r1 = abs[a_src], r2 = abs[a_tgt]
-    const p1x = r1.cx, p1y = r1.cy
-    const p2x = r2.cx, p2y = r2.cy
-    const srcAnc = ancestors[a_src]
-    const tgtAnc = ancestors[a_tgt]
-
-    for (let k = 0; k < N; k++) {
-      const nid = ids[k]
-      if (nid === a_src || nid === a_tgt) continue
-      if (srcAnc && srcAnc.has(nid)) continue
-      if (tgtAnc && tgtAnc.has(nid)) continue
-      const r = abs[nid]
-      if (_segHitsRect(p1x, p1y, p2x, p2y, r.x, r.y, r.w, r.h)) overdraws++
-    }
-
-    for (let j = i + 1; j < edgeCount; j++) {
-      const b_src = edgesSrc[j], b_tgt = edgesTgt[j]
-      if (a_src === b_src || a_src === b_tgt || a_tgt === b_src || a_tgt === b_tgt) continue
-      const r3 = abs[b_src], r4 = abs[b_tgt]
-      if (_segCrossXY(p1x, p1y, p2x, p2y, r3.cx, r3.cy, r4.cx, r4.cy)) crossings++
-    }
-  }
-
-  // Pairwise sibling overlap (skip ancestor/descendant pairs).
-  let overlapArea = 0
-  for (let i = 0; i < N; i++) {
-    const id_i = ids[i]
-    const a = abs[id_i]
-    const anc_i = ancestors[id_i]
-    const ax2 = a.x + a.w
-    const ay2 = a.y + a.h
-    for (let j = i + 1; j < N; j++) {
-      const id_j = ids[j]
-      if (anc_i && anc_i.has(id_j)) continue
-      const anc_j = ancestors[id_j]
-      if (anc_j && anc_j.has(id_i)) continue
-      const b = abs[id_j]
-      const ox = (ax2 < b.x + b.w ? ax2 : b.x + b.w) - (a.x > b.x ? a.x : b.x)
-      if (ox <= 0) continue
-      const oy = (ay2 < b.y + b.h ? ay2 : b.y + b.h) - (a.y > b.y ? a.y : b.y)
-      if (oy <= 0) continue
-      overlapArea += ox * oy
-    }
-  }
-  const overlap = meanArea > 0 ? overlapArea / meanArea : 0
-
-  // Edge length stats (squared lengths first; sqrt only for final mean+max).
-  let totalLen = 0
-  let maxLenSq = 0
-  for (let i = 0; i < edgeCount; i++) {
-    const a = abs[edgesSrc[i]], b = abs[edgesTgt[i]]
-    const dx = a.cx - b.cx, dy = a.cy - b.cy
-    const lenSq = dx * dx + dy * dy
-    totalLen += Math.sqrt(lenSq)
-    if (lenSq > maxLenSq) maxLenSq = lenSq
-  }
-  const meanLen = edgeCount > 0 ? totalLen / edgeCount : 0
-  const maxLen = Math.sqrt(maxLenSq)
-  const lenInNodes = meanDim > 0 ? meanLen / meanDim : 0
-  const maxInNodes = meanDim > 0 ? maxLen / meanDim : 0
-  const edgeLengthMean = Math.max(0, lenInNodes - 3) ** 2
-  const edgeLengthMax = Math.max(0, maxInNodes - 5) ** 2
-
-  // Aspect penalty.
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (let i = 0; i < N; i++) {
-    const r = abs[ids[i]]
-    if (r.x < minX) minX = r.x
-    if (r.y < minY) minY = r.y
-    const rx2 = r.x + r.w, ry2 = r.y + r.h
-    if (rx2 > maxX) maxX = rx2
-    if (ry2 > maxY) maxY = ry2
-  }
-  const bbW = maxX - minX, bbH = maxY - minY
-  let aspectPenalty = 0
-  if (bbW > 0 && bbH > 0) {
-    const ar = bbW > bbH ? bbW / bbH : bbH / bbW
-    aspectPenalty = Math.max(0, ar - Math.SQRT2) ** 3
-  }
-
-  const aestheticBoost = crossings === 0 ? 2 : 1
-
-  return crossings * W_CROSS
-       + overdraws * W_OVERDRAW
-       + overlap * W_OVERLAP
-       + overlap * overlap * W_OVERLAP * 5
-       + edgeLengthMean * W_LMEAN  * aestheticBoost
-       + edgeLengthMax  * W_LMAX   * aestheticBoost
-       + aspectPenalty  * W_ASPECT * aestheticBoost
-}
-
-/**
- * Yields control back to the browser event loop so the UI can paint the
- * layout spinner and process input events between SA restarts.
- *
- * Uses `scheduler.yield()` (Chrome 129+ / Electron 32+) when available —
- * it re-queues as a high-priority task with near-zero overhead. Falls back
- * to `setTimeout(0)` (~1 ms in non-throttled Electron) on older runtimes.
+ * Yields control back to the event loop between phases so progress
+ * messages are delivered and, on the in-thread fallback, the UI can paint.
  */
 function yieldToUI(): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1095,367 +945,6 @@ function yieldToUI(): Promise<void> {
     return _sched.yield() as Promise<void>
   }
   return new Promise<void>((resolve) => setTimeout(resolve, 0))
-}
-
-async function refineWithSimulatedAnnealing(
-  nodes: Record<string, C4Node>,
-  relations: Record<string, C4Relation>,
-  positions: PositionMap,
-  rootIds: string[],
-  budgetMs = 250,
-  options: { energyFn?: (n: Record<string, C4Node>, r: Record<string, C4Relation>) => number; initialTempFactor?: number } = {},
-): Promise<SARefinement> {
-  if (rootIds.length < 2) {
-    const m = computeCompositeScore(nodes, relations)
-    return { positions, before: m.composite, after: m.composite, iterations: 0 }
-  }
-
-  const work: Record<string, C4Node> = {}
-  for (const [id, n] of Object.entries(nodes)) {
-    const p = positions[id]
-    work[id] = p
-      ? { ...n, x: p.x, y: p.y, width: p.width ?? n.width, height: p.height ?? n.height }
-      : { ...n }
-  }
-
-  // SA energy: by default the cheap proxy (now context-based, ~3-5× faster
-  // per evaluation than a fresh-allocating proxy). Phase C passes a custom
-  // energyFn (full render-aware composite) and falls back to the slow path
-  // because the composite sampling can't share our incremental abs buffer
-  // cleanly.
-  const customEnergy = options.energyFn
-  const ctx = customEnergy ? null : buildEnergyContext(nodes, relations)
-  const energy = (): number => {
-    if (customEnergy) return customEnergy(work, relations)
-    recomputeAbs(work, ctx!) // initial / post-restore full sync
-    return proxyEnergyCtx(ctx!)
-  }
-  // Fast incremental version: caller already kept ctx.abs in sync.
-  const energyIncremental = (): number => {
-    if (customEnergy) return customEnergy(work, relations)
-    return proxyEnergyCtx(ctx!)
-  }
-  const before = energy()
-  let curCost = before
-  let bestCost = before
-  const bestSnapshot: Record<string, { x: number; y: number }> = {}
-  for (const id of rootIds) bestSnapshot[id] = { x: work[id].x, y: work[id].y }
-
-  // Temperature schedule. Start with a perturbation near 8 % of bbox span so
-  // the first sweeps can swap two roots; cool to a few px so the final
-  // sweeps polish positions. `initialTempFactor` lets the polish phase
-  // start at a much lower T (gentle fine-tuning, no large jumps).
-  const tempScale = options.initialTempFactor ?? 1
-  const bbox = computeRootBBox(work, rootIds)
-  const span = Math.max(bbox.w, bbox.h, 200)
-
-  // Snapshot of the input positions — restart 0 starts here for diversity
-  // (restarts 1+ start from the best basin found so far). Without this every
-  // restart converges to the same local minimum and the multi-restart loop
-  // is wasted work.
-  const initialSnapshot: Record<string, { x: number; y: number }> = {}
-  for (const id of rootIds) initialSnapshot[id] = { x: work[id].x, y: work[id].y }
-
-  const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now())
-
-  // Multi-restart SA with diversified seeding + reheat-on-stagnation.
-  //   • Restart 0 → starts from the input (preserves ELK/winner intent).
-  //   • Restart k>0 → starts from best basin perturbed by initial T (escapes
-  //     to a neighbouring basin while retaining the structural backbone).
-  //   • Inside each chain: when no improvement for STAGNATION_LIMIT sweeps,
-  //     reheat T to 60 % of initial. Davidson-Harel "kick" — recovers SA
-  //     when it gets trapped in a bad minimum after greedy descent.
-  const RESTARTS = 4
-  const perRun = budgetMs / RESTARTS
-  let totalIter = 0
-  // Reheat after this many consecutive sweeps with no new global-best cost.
-  const STAGNATION_LIMIT = 12
-
-  for (let restart = 0; restart < RESTARTS; restart++) {
-    // Seed positions: restart 0 = input, restart k>0 = best so far.
-    const seed = restart === 0 ? initialSnapshot : bestSnapshot
-    for (const id of rootIds) {
-      work[id].x = seed[id].x
-      work[id].y = seed[id].y
-    }
-    if (ctx) recomputeAbs(work, ctx)
-    curCost = restart === 0 ? before : bestCost
-    // For restart 0 the seed equals the input; recompute to be safe in case
-    // `before` was computed against an out-of-sync abs buffer.
-    if (restart === 0 && ctx) curCost = proxyEnergyCtx(ctx)
-
-    // Initial temperature: restart 0 modest, later restarts hotter so they
-    // can leap out of the seed's basin.
-    const T0 = span * (0.06 + 0.04 * restart) * tempScale  // 6/10/14/18 % × scale
-    let T = T0
-    const T_END = 3
-    const cooling = 0.95
-    const t0 = now()
-    let sweepsSinceImprovement = 0
-
-    while (now() - t0 < perRun && T > T_END) {
-      const bestBeforeSweep = bestCost
-      // One sweep = one perturbation per root node, plus one swap.
-      // Mixing translation + swap follows Davidson-Harel (1996) — pure
-      // translation SA gets stuck because swapping two roots is many
-      // small Gaussian steps away.
-      for (const id of rootIds) {
-        const n = work[id]
-        const oldX = n.x
-        const oldY = n.y
-        const dx = gaussian() * T
-        const dy = gaussian() * T
-        n.x += dx
-        n.y += dy
-        if (ctx) shiftSubtreeAbs(id, dx, dy, ctx)
-        const cost = energyIncremental()
-        const dE = cost - curCost
-        if (dE < 0 || Math.random() < Math.exp(-dE / Math.max(T, 0.5))) {
-          curCost = cost
-          if (cost < bestCost) {
-            bestCost = cost
-            for (const rid of rootIds) bestSnapshot[rid] = { x: work[rid].x, y: work[rid].y }
-          }
-        } else {
-          n.x = oldX
-          n.y = oldY
-          if (ctx) shiftSubtreeAbs(id, -dx, -dy, ctx)
-        }
-        totalIter++
-      }
-      // Discrete swap move once per sweep (large neighbourhood jump).
-      // Bias toward swapping spatially-nearby roots — random global swaps
-      // are almost always destructive and rejected. Nearby swaps are more
-      // likely to be accepted (small absolute cost change) and effective at
-      // unsticking from a bad basin.
-      if (rootIds.length >= 2) {
-        const i = Math.floor(Math.random() * rootIds.length)
-        let j = i
-        // 3 candidate picks, choose the one closest to i. O(1) extra cost
-        // and noticeably improves swap acceptance ratio in practice.
-        let bestDist = Infinity
-        const a = work[rootIds[i]]
-        for (let trial = 0; trial < 3; trial++) {
-          let cand = Math.floor(Math.random() * rootIds.length)
-          if (cand === i) cand = (cand + 1) % rootIds.length
-          const c = work[rootIds[cand]]
-          const d = (c.x - a.x) ** 2 + (c.y - a.y) ** 2
-          if (d < bestDist) { bestDist = d; j = cand }
-        }
-        const idA = rootIds[i], idB = rootIds[j]
-        const aa = work[idA]
-        const bb = work[idB]
-        const ax = aa.x, ay = aa.y
-        const bx = bb.x, by = bb.y
-        const dxA = bx - ax, dyA = by - ay
-        aa.x = bx; aa.y = by
-        bb.x = ax; bb.y = ay
-        if (ctx) {
-          shiftSubtreeAbs(idA, dxA, dyA, ctx)
-          shiftSubtreeAbs(idB, -dxA, -dyA, ctx)
-        }
-        const cost = energyIncremental()
-        const dE = cost - curCost
-        // Swap is a large jump; tighten the temperature for uphill acceptance.
-        if (dE < 0 || Math.random() < Math.exp(-dE / Math.max(T * 0.5, 0.5))) {
-          curCost = cost
-          if (cost < bestCost) {
-            bestCost = cost
-            for (const rid of rootIds) bestSnapshot[rid] = { x: work[rid].x, y: work[rid].y }
-          }
-        } else {
-          aa.x = ax; aa.y = ay
-          bb.x = bx; bb.y = by
-          if (ctx) {
-            shiftSubtreeAbs(idA, -dxA, -dyA, ctx)
-            shiftSubtreeAbs(idB, dxA, dyA, ctx)
-          }
-        }
-        totalIter++
-      }
-
-      if (bestCost < bestBeforeSweep) {
-        sweepsSinceImprovement = 0
-        T *= cooling
-      } else {
-        sweepsSinceImprovement++
-        if (sweepsSinceImprovement >= STAGNATION_LIMIT) {
-          // Davidson-Harel "kick": no new global best for a while means the
-          // chain is trapped in a basin greedy descent can't climb out of.
-          // Reheat instead of cooling further so the next sweeps can jump
-          // to a neighbouring basin.
-          T = T0 * 0.6
-          sweepsSinceImprovement = 0
-        } else {
-          T *= cooling
-        }
-      }
-    }
-    // Yield between SA restarts so the event loop can paint the spinner
-    // and handle input. Each restart is ~perRun ms of sync CPU work.
-    await yieldToUI()
-  }
-
-  // Restore best positions and emit them.
-  for (const id of rootIds) {
-    work[id].x = bestSnapshot[id].x
-    work[id].y = bestSnapshot[id].y
-  }
-  const out: PositionMap = { ...positions }
-  for (const id of rootIds) {
-    const prev = positions[id] ?? { x: 0, y: 0 }
-    out[id] = { ...prev, x: bestSnapshot[id].x, y: bestSnapshot[id].y }
-  }
-  return { positions: out, before, after: bestCost, iterations: totalIter }
-}
-
-function computeRootBBox(
-  nodes: Record<string, C4Node>,
-  rootIds: string[],
-): { w: number; h: number } {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const id of rootIds) {
-    const n = nodes[id]
-    if (!n) continue
-    if (n.x < minX) minX = n.x
-    if (n.y < minY) minY = n.y
-    if (n.x + n.width > maxX) maxX = n.x + n.width
-    if (n.y + n.height > maxY) maxY = n.y + n.height
-  }
-  if (!isFinite(minX)) return { w: 0, h: 0 }
-  return { w: maxX - minX, h: maxY - minY }
-}
-
-/** Box-Muller transform — N(0, 1). */
-function gaussian(): number {
-  let u = 0, v = 0
-  while (u === 0) u = Math.random()
-  while (v === 0) v = Math.random()
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
-}
-
-/**
- * Per-compound SA pass (#1).
- *
- * Root-only SA cannot rearrange children inside a compound — if ELK packed
- * the components of a Container suboptimally, no amount of root shuffling
- * fixes it. This walks every parent with ≥ 2 children and runs a small SA
- * on those children's (parent-relative) positions. Energy is the same
- * proxy, evaluated globally — children moves still affect global crossings,
- * which is exactly what we want.
- *
- * Budget is split evenly across compound groups so a diagram with many
- * containers doesn't blow the wall-clock target.
- */
-async function refinePerCompound(
-  nodes: Record<string, C4Node>,
-  relations: Record<string, C4Relation>,
-  positions: PositionMap,
-  budgetMs: number,
-): Promise<SARefinement> {
-  const byParent: Record<string, string[]> = {}
-  for (const n of Object.values(nodes)) {
-    if (n.parentId) (byParent[n.parentId] ??= []).push(n.id)
-  }
-  const groups = Object.values(byParent).filter((g) => g.length >= 2)
-  if (groups.length === 0) {
-    return { positions, before: 0, after: 0, iterations: 0 }
-  }
-  const perGroup = Math.max(60, budgetMs / groups.length)
-  let pos = positions
-  let before = 0
-  let after = 0
-  let iterations = 0
-  for (let i = 0; i < groups.length; i++) {
-    const childIds = groups[i]
-    const result = await refineWithSimulatedAnnealing(nodes, relations, pos, childIds, perGroup)
-    if (i === 0) before = result.before
-    after = result.after
-    iterations += result.iterations
-    pos = result.positions
-  }
-  return { positions: pos, before, after, iterations }
-}
-
-/**
- * Re-fit every compound parent to the bounding box of its (possibly moved)
- * children. SA per-compound rearranges children in parent-relative space
- * but does NOT enforce that they stay inside the parent's original bbox —
- * children can drift outside, leaving the parent visually empty while
- * components float in the void next to it. This pass restores the
- * "container hugs its children" invariant.
- *
- * For each parent (deepest first):
- *   1. Compute child-bbox in parent-relative coords.
- *   2. Translate every child by (-bboxMinX + padX, -bboxMinY + padY) so the
- *      bbox starts at the padding offset.
- *   3. Set parent width/height to bboxW + 2·padX (resp. height + topPad + padY).
- *
- * Padding mirrors the values used by ELK / fitParentToChildren in the store.
- */
-const PARENT_PAD_X = 16
-const PARENT_PAD_TOP = 120  // header (30) + 2-line label (~52) + breathing room
-const PARENT_PAD_BOTTOM = 16
-
-function fitParentsToChildren(
-  nodes: Record<string, C4Node>,
-  positions: PositionMap,
-): PositionMap {
-  // Build child list per parent.
-  const byParent: Record<string, string[]> = {}
-  for (const n of Object.values(nodes)) {
-    if (n.parentId) (byParent[n.parentId] ??= []).push(n.id)
-  }
-  const parentIds = Object.keys(byParent)
-  if (parentIds.length === 0) return positions
-
-  // Sort parents deepest-first so a container is fitted before its system.
-  const depthOf = (id: string): number => {
-    let d = 0, cur: C4Node | undefined = nodes[id]
-    while (cur?.parentId) { d++; cur = nodes[cur.parentId] }
-    return d
-  }
-  parentIds.sort((a, b) => depthOf(b) - depthOf(a))
-
-  const out: PositionMap = { ...positions }
-  const px = (id: string): { x: number; y: number; w: number; h: number } => {
-    const p = out[id]
-    const n = nodes[id]
-    return {
-      x: p?.x ?? n.x,
-      y: p?.y ?? n.y,
-      w: p?.width ?? n.width,
-      h: p?.height ?? n.height,
-    }
-  }
-
-  for (const pid of parentIds) {
-    const childIds = byParent[pid]
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const cid of childIds) {
-      const c = px(cid)
-      if (c.x < minX) minX = c.x
-      if (c.y < minY) minY = c.y
-      if (c.x + c.w > maxX) maxX = c.x + c.w
-      if (c.y + c.h > maxY) maxY = c.y + c.h
-    }
-    if (!isFinite(minX)) continue
-
-    // Shift children so they start at (PARENT_PAD_X, PARENT_PAD_TOP).
-    const dx = PARENT_PAD_X - minX
-    const dy = PARENT_PAD_TOP - minY
-    for (const cid of childIds) {
-      const c = px(cid)
-      out[cid] = { x: c.x + dx, y: c.y + dy, width: c.w, height: c.h }
-    }
-
-    // Resize parent to fit shifted children.
-    const newW = (maxX - minX) + 2 * PARENT_PAD_X
-    const newH = (maxY - minY) + PARENT_PAD_TOP + PARENT_PAD_BOTTOM
-    const p = px(pid)
-    out[pid] = { x: p.x, y: p.y, width: newW, height: newH }
-  }
-  return out
 }
 
 // ─── Candidate runner ─────────────────────────────────────────────────────
@@ -1475,8 +964,10 @@ export interface SmartLayoutResult {
   baseline: LayoutMetrics
   /** Planarity verdict of the winning layout. */
   planarity: PlanarityScore
-  /** SA refinement statistics (cost before vs. after annealing). */
+  /** Composite cost of the refined candidate before and after annealing. */
   refinement: { before: number; after: number; iterations: number }
+  /** True when nothing Smart Layout produced beat the layout it was given. */
+  keptCurrent: boolean
 }
 
 function projectPositions(nodes: Record<string, C4Node>, positions: PositionMap): Record<string, C4Node> {
@@ -1497,19 +988,18 @@ async function runCandidate(
   positionsPromise: Promise<PositionMap> | PositionMap,
 ): Promise<SmartLayoutCandidate | null> {
   try {
-    const positions = await positionsPromise
-    if (Object.keys(positions).length === 0) return null
-    // Score after geometric crossing minimisation so all candidates compete fairly.
-    const projected = projectPositions(nodes, positions)
-    const swap = minimizeCrossings(projected, relations)
-    if (Object.keys(swap).length > 0) {
-      for (const [id, p] of Object.entries(swap)) {
-        const n = projected[id]
-        if (n) { n.x = p.x; n.y = p.y }
-        const prev = positions[id]
-        if (prev) positions[id] = { ...prev, x: p.x, y: p.y }
-      }
+    const raw = await positionsPromise
+    if (Object.keys(raw).length === 0) return null
+    // Score after geometric crossing minimisation so all candidates compete
+    // fairly, and after finalising (sibling swaps can collide boxes of
+    // different sizes) so the score describes what would be rendered.
+    const swap = minimizeCrossings(projectPositions(nodes, raw), relations)
+    for (const [id, p] of Object.entries(swap)) {
+      const prev = raw[id]
+      if (prev) raw[id] = { ...prev, x: p.x, y: p.y }
     }
+    const positions = finalizeLayout(nodes, raw)
+    const projected = projectPositions(nodes, positions)
     const metrics = computeLayoutMetrics(projected, relations)
     const score = computeCompositeScore(projected, relations)
     return { name, positions, metrics, score }
@@ -1524,12 +1014,21 @@ async function runCandidate(
  *
  * `done: true`  — all candidates failed; `result` is a baseline fallback and
  *                 the SA phase should be skipped.
- * `done: false` — ranked candidates are ready; pass `valid / rootIds / baseline`
- *                 to `runSmartLayoutSAPhase` (or the SA Web Worker).
+ * `done: false` — ranked candidates are ready; pass `nodes / relations /
+ *                 valid / baseline` to `runSmartLayoutSAPhase` (or the SA
+ *                 Web Worker). `nodes` and `relations` are the visible
+ *                 projection of the input — the SA phase must use them, not
+ *                 the raw input.
  */
 export type ELKPhaseResult =
   | { done: true; result: SmartLayoutResult }
-  | { done: false; valid: SmartLayoutCandidate[]; rootIds: string[]; baseline: LayoutMetrics }
+  | {
+      done: false
+      nodes: Record<string, C4Node>
+      relations: Record<string, C4Relation>
+      valid: SmartLayoutCandidate[]
+      baseline: LayoutMetrics
+    }
 
 /**
  * In-run progress, reported so the UI can show that Smart Layout is actually
@@ -1550,11 +1049,12 @@ export type SmartLayoutOnProgress = (progress: SmartLayoutProgress) => void
  * the ranked candidate set ready for `runSmartLayoutSAPhase` (`done: false`).
  */
 export async function runSmartLayoutELKPhase(
-  nodes: Record<string, C4Node>,
-  relations: Record<string, C4Relation>,
+  inputNodes: Record<string, C4Node>,
+  inputRelations: Record<string, C4Relation>,
   metamodel?: Metamodel,
   onProgress?: SmartLayoutOnProgress,
 ): Promise<ELKPhaseResult> {
+  const { nodes, relations } = projectToVisibleGraph(inputNodes, inputRelations)
   // Dynamic import so ELK (with its elk-worker.min.js CJS dependency) is NOT
   // bundled into the Web Worker chunk — it's code-split and fetched only when
   // this function is called from the main thread.
@@ -1669,6 +1169,7 @@ export async function runSmartLayoutELKPhase(
         candidates: [],
         planarity: computePlanarityScore(nodes, relations),
         refinement: { before: baselineScore.composite, after: baselineScore.composite, iterations: 0 },
+        keptCurrent: true,
       },
     }
   }
@@ -1679,8 +1180,7 @@ export async function runSmartLayoutELKPhase(
   // raw crossing count alone.
   valid.sort((a, b) => a.score.composite - b.score.composite)
 
-  const rootIds = Object.values(nodes).filter((n) => !n.parentId).map((n) => n.id)
-  return { done: false, valid, rootIds, baseline }
+  return { done: false, nodes, relations, valid, baseline }
 }
 
 export async function runSmartLayoutCore(
@@ -1691,7 +1191,7 @@ export async function runSmartLayoutCore(
 ): Promise<SmartLayoutResult> {
   const elkResult = await runSmartLayoutELKPhase(nodes, relations, metamodel, onProgress)
   if (elkResult.done) return elkResult.result
-  return runSmartLayoutSAPhase(nodes, relations, elkResult.valid, elkResult.rootIds, elkResult.baseline, onProgress)
+  return runSmartLayoutSAPhase(elkResult.nodes, elkResult.relations, elkResult.valid, elkResult.baseline, onProgress)
 }
 
 /**
@@ -1703,71 +1203,76 @@ export async function runSmartLayoutCore(
  * script that cannot be imported inside another worker). The ELK candidate
  * generation always runs on the main thread; this function handles the
  * CPU-intensive SA refinement off-thread.
+ *
+ * `nodes` / `relations` must be the visible projection returned by the ELK
+ * phase. `seed` overrides the structure-derived seed (a "try another
+ * arrangement" action would pass a different one).
  */
 export async function runSmartLayoutSAPhase(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
   valid: SmartLayoutCandidate[],  // sorted ascending by composite score
-  rootIds: string[],
   baseline: LayoutMetrics,
   onProgress?: SmartLayoutOnProgress,
+  options: { seed?: number } = {},
 ): Promise<SmartLayoutResult> {
-  // Phase A multi-start: refine the top-K ELK candidates independently and
-  // pick whichever Phase A leaves in the best basin.
-  onProgress?.({ phase: 'refining-a' })
-  const PHASEA_K = Math.min(2, valid.length)
-  const phaseABudget = 400
-  let phaseA = await refineWithSimulatedAnnealing(nodes, relations, valid[0].positions, rootIds, phaseABudget)
-  let winner = valid[0]
-  for (let k = 1; k < PHASEA_K; k++) {
-    const alt = await refineWithSimulatedAnnealing(nodes, relations, valid[k].positions, rootIds, phaseABudget)
-    if (alt.after < phaseA.after) {
-      phaseA = alt
-      winner = valid[k]
-    }
-  }
-  // Refit parents in case root SA loosened sibling spacing.
-  const fittedA = fitParentsToChildren(nodes, phaseA.positions)
-  onProgress?.({ phase: 'refining-b' })
-  const phaseB = await refinePerCompound(nodes, relations, fittedA, 200)
-  // Critical: per-compound SA mutates child positions in parent-relative
-  // space WITHOUT enforcing they stay inside the parent. Refit so containers
-  // hug their (possibly drifted) children before the final polish.
-  const fittedB = fitParentsToChildren(nodes, phaseB.positions)
-  onProgress?.({ phase: 'refining-c' })
-  const phaseC = await refineWithSimulatedAnnealing(
-    nodes, relations, fittedB, rootIds, 200,
-    {
-      energyFn: (n, r) => computeCompositeScore(n, r).composite,
-      initialTempFactor: 0.4, // gentle fine-tuning, no large jumps
-    },
-  )
-  const finalPositions = fitParentsToChildren(nodes, phaseC.positions)
-  const sa: SARefinement = {
-    positions: finalPositions,
-    before: phaseA.before,
-    after: phaseC.after,
-    iterations: phaseA.iterations + phaseB.iterations + phaseC.iterations,
-  }
+  const rng = createRng(options.seed ?? graphSeed(nodes, relations))
 
-  const refined = projectPositions(nodes, sa.positions)
-  const refinedMetrics = computeLayoutMetrics(refined, relations)
-  const refinedScore = computeCompositeScore(refined, relations)
-  const finalWinner: SmartLayoutCandidate = {
-    name: winner.name,
-    positions: sa.positions,
-    metrics: refinedMetrics,
-    score: refinedScore,
+  // Phase A multi-start: refine the top-K candidates independently and
+  // continue with whichever scores better as it would be rendered (the
+  // proxy energy only approximates that).
+  onProgress?.({ phase: 'refining-a' })
+  const deadlineA = now() + PHASE_A_DEADLINE_MS
+  let best: { from: SmartLayoutCandidate; run: SARefinement; positions: PositionMap; composite: number } | null = null
+  let iterationsA = 0
+  for (let k = 0; k < Math.min(2, valid.length); k++) {
+    const run = refineRoots(nodes, relations, valid[k].positions, rng, deadlineA)
+    iterationsA += run.iterations
+    const positions = finalizeLayout(nodes, run.positions)
+    const composite = compositeEnergy(projectPositions(nodes, positions), relations)
+    if (!best || composite < best.composite) best = { from: valid[k], run, positions, composite }
   }
-  const planarity = computePlanarityScore(refined, relations)
+  const refinedFrom = best!.from
+  await yieldToUI()
+
+  onProgress?.({ phase: 'refining-b' })
+  const phaseB = refineCompounds(nodes, relations, best!.positions, rng, now() + PHASE_B_DEADLINE_MS)
+  await yieldToUI()
+
+  onProgress?.({ phase: 'refining-c' })
+  const phaseC = polishRoots(nodes, relations, finalizeLayout(nodes, phaseB.positions), rng, now() + PHASE_C_DEADLINE_MS)
+  const finalPositions = finalizeLayout(nodes, phaseC.positions)
+  const refined = projectPositions(nodes, finalPositions)
+
+  // Never hand back something worse than we already had: the refined
+  // layout competes with the best unrefined candidate and with the layout
+  // the user is looking at right now, all scored the same way.
+  let winner: SmartLayoutCandidate = {
+    name: refinedFrom.name,
+    positions: finalPositions,
+    metrics: computeLayoutMetrics(refined, relations),
+    score: computeCompositeScore(refined, relations),
+  }
+  if (valid[0].score.composite < winner.score.composite) winner = valid[0]
+
+  const currentScore = computeCompositeScore(nodes, relations)
+  const keptCurrent = currentScore.composite <= winner.score.composite
+  if (keptCurrent) {
+    const positions: PositionMap = {}
+    for (const n of Object.values(nodes)) positions[n.id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+    winner = { name: 'Current layout', positions, metrics: baseline, score: currentScore }
+  }
 
   return {
     baseline,
-    winner: finalWinner,
+    winner,
     candidates: valid,
-    planarity,
-    refinement: { before: sa.before, after: sa.after, iterations: sa.iterations },
+    planarity: computePlanarityScore(projectPositions(nodes, winner.positions), relations),
+    refinement: {
+      before: refinedFrom.score.composite,
+      after: winner.score.composite,
+      iterations: iterationsA + phaseB.iterations + phaseC.iterations,
+    },
+    keptCurrent,
   }
 }
-
-

@@ -674,4 +674,64 @@ describe('Radical Layout — Edge Cases', () => {
       }
     }
   })
+
+  it('lays out nested systems and non-container children (databases, queues)', () => {
+    const nodes: Record<string, C4Node> = {
+      sys: { id: 'sys', type: 'system', label: 'Platform', collapsed: false, x: 0, y: 0, ...NODE_SIZES.system },
+      sub: { id: 'sub', type: 'system', label: 'Payments', parentId: 'sys', collapsed: false, x: 0, y: 0, ...NODE_SIZES.system },
+      api: { id: 'api', type: 'container', label: 'API', parentId: 'sub', collapsed: false, x: 0, y: 0, ...NODE_SIZES.container },
+      db: { id: 'db', type: 'database', label: 'DB', parentId: 'sub', collapsed: false, x: 0, y: 0, ...NODE_SIZES.database },
+      q: { id: 'q', type: 'queue', label: 'Queue', parentId: 'sys', collapsed: false, x: 0, y: 0, ...NODE_SIZES.queue },
+    }
+    const relations: Record<string, C4Relation> = {
+      r1: { id: 'r1', sourceId: 'api', targetId: 'db' },
+      r2: { id: 'r2', sourceId: 'api', targetId: 'q' },
+    }
+    const positions = applyRadicalLayout(nodes, relations)
+
+    for (const id of Object.keys(nodes)) expect(positions[id], `missing ${id}`).toBeDefined()
+    for (const n of Object.values(nodes)) {
+      if (!n.parentId) continue
+      const p = positions[n.id], parent = positions[n.parentId]
+      expect(p.x + (p.width ?? n.width), `${n.id} sticks out of ${n.parentId}`).toBeLessThanOrEqual(parent.width!)
+      expect(p.y + (p.height ?? n.height), `${n.id} sticks out of ${n.parentId}`).toBeLessThanOrEqual(parent.height!)
+    }
+    expect(overlaps(
+      positions.api.x, positions.api.y, positions.api.width!, positions.api.height!,
+      positions.db.x, positions.db.y, positions.db.width!, positions.db.height!,
+    )).toBe(false)
+  })
+
+  it('keeps the entry system above the system that calls back into it', () => {
+    const sys = (id: string): C4Node => ({ id, type: 'system', label: id, collapsed: false, x: 0, y: 0, ...NODE_SIZES.system })
+    const nodes: Record<string, C4Node> = {
+      user: { id: 'user', type: 'person', label: 'User', collapsed: false, x: 0, y: 0, ...NODE_SIZES.person },
+      A: sys('A'), B: sys('B'), C: sys('C'),
+    }
+    const relations: Record<string, C4Relation> = {
+      r1: { id: 'r1', sourceId: 'user', targetId: 'A' },
+      r2: { id: 'r2', sourceId: 'A', targetId: 'B' },
+      r3: { id: 'r3', sourceId: 'B', targetId: 'A' },
+      r4: { id: 'r4', sourceId: 'B', targetId: 'C' },
+    }
+    const positions = applyRadicalLayout(nodes, relations)
+    expect(positions.A.y).toBeLessThan(positions.B.y)
+    expect(positions.B.y).toBeLessThan(positions.C.y)
+  })
+
+  it('sizes an expanded external system around its children', () => {
+    const nodes: Record<string, C4Node> = {
+      S: { id: 'S', type: 'system', label: 'S', collapsed: false, x: 0, y: 0, ...NODE_SIZES.system },
+      X: { id: 'X', type: 'system', label: 'X', external: true, collapsed: false, x: 0, y: 0, ...NODE_SIZES.system },
+      x1: { id: 'x1', type: 'container', label: 'x1', parentId: 'X', collapsed: false, x: 0, y: 0, ...NODE_SIZES.container },
+      x2: { id: 'x2', type: 'container', label: 'x2', parentId: 'X', collapsed: false, x: 0, y: 0, ...NODE_SIZES.container },
+    }
+    const relations: Record<string, C4Relation> = { r1: { id: 'r1', sourceId: 'S', targetId: 'x1' } }
+    const positions = applyRadicalLayout(nodes, relations)
+    for (const id of ['x1', 'x2']) {
+      expect(positions[id]).toBeDefined()
+      expect(positions[id].x + positions[id].width!).toBeLessThanOrEqual(positions.X.width!)
+      expect(positions[id].y + positions[id].height!).toBeLessThanOrEqual(positions.X.height!)
+    }
+  })
 })
