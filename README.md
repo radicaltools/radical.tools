@@ -5,11 +5,10 @@
 **Open-source architecture studio: C4 models, ADRs, fitness functions and requirements in one living model, with an AI co-architect.**
 
 [![CI](https://github.com/radicaltools/radical.tools/actions/workflows/ci.yml/badge.svg)](https://github.com/radicaltools/radical.tools/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/radicaltools/radical.tools?label=desktop%20app)](https://github.com/radicaltools/radical.tools/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Try it in the browser](https://img.shields.io/badge/try%20it-studio.radical.tools-387bf3)](https://studio.radical.tools)
 
-[**Try it in the browser**](https://studio.radical.tools) · [**Download the desktop app**](https://github.com/radicaltools/radical.tools/releases/latest) · [Architecture Hub](https://hub.radical.tools) · [Manual](https://radical.tools/manual.html)
+[**Try it in the browser**](https://studio.radical.tools) · [Architecture Hub](https://hub.radical.tools) · [Manual](https://radical.tools/manual.html)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="website/screenshots/views-dark.png">
@@ -22,7 +21,7 @@
 
 Architecture diagrams go stale because they are pictures. In radical.tools they are **views of one model**. Every element lives once, and the canvas, dependency matrix, sequence diagram, table and wiki all read from it. The decisions, requirements and fitness functions that explain the architecture live in the same model, linked to the elements they govern.
 
-- **No account, no server.** Runs in the browser or as a desktop app. Your model stays in local storage or plain files you can commit.
+- **No account, nothing to install.** Open it in the browser and start modelling. Your model stays in local storage or plain files you can commit.
 - **C4 without the busywork.** Smart Layout places nodes, minimises crossings and fits groups for you.
 - **From a paragraph to a model.** Radical Forge turns a system description into requirements, fitness functions, Gherkin scenarios, UI mockups and a C4 model, one reviewable stage at a time.
 - **Bring your own AI.** OpenAI, Anthropic, Gemini, or a local model through Ollama.
@@ -39,23 +38,11 @@ Architecture diagrams go stale because they are pictures. In radical.tools they 
   </tr>
 </table>
 
-## Install
+## Try it
 
-**Browser:** open [studio.radical.tools](https://studio.radical.tools). Nothing to install.
+Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothing to install.
 
-**Desktop:** grab the installer for your platform from the [latest release](https://github.com/radicaltools/radical.tools/releases/latest):
-
-| Platform | File |
-|---|---|
-| macOS (Apple Silicon) | `radical-studio-<version>-mac-arm64.dmg` |
-| macOS (Intel) | `radical-studio-<version>-mac-x64.dmg` |
-| Windows | `radical-studio-<version>-win-x64.exe` |
-| Linux | `radical-studio-<version>-linux-x86_64.AppImage` |
-
-> [!NOTE]
-> The installers are not code-signed yet.
-> **macOS:** if the app "is damaged" or "can't be opened", run `xattr -cr /Applications/radical.studio.app` once.
-> **Windows:** SmartScreen may warn about an unknown publisher. Choose *More info → Run anyway*.
+**Desktop app:** there are no prebuilt installers yet. To run it as an Electron app, build it from source (see [Getting started](#getting-started)): `npm install && npm run dist` produces an installer for your OS in `dist/`.
 
 **VS Code:** an extension that opens `.radical` files right in the editor lives in [tools/vscode-radical](tools/vscode-radical).
 
@@ -117,7 +104,7 @@ npm run dist
 npm run build:web
 ```
 
-### Releasing
+### Releasing the desktop app (maintainers)
 
 Bump the version and push the tag:
 
