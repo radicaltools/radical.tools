@@ -134,6 +134,47 @@ Two layers of suggestions: **functional** (what the user sees / can do) and **te
 
 ---
 
+## Part 3 — Repository structure: split the monorepo
+
+radical.tools is a family of apps, but everything lives in one repo (`radicaltools/radical.tools`): Studio, the Hub site and its catalogue, the marketing website, the VS Code extension and the Terraform infra. One `deploy.yml` ships all of them. Proposal (added 2026-09-28): one repo per product so each has its own README, issues, releases and contributors.
+
+### Target repos
+
+| Repo | Contents (today's path) | Deploys to |
+|---|---|---|
+| `radical-studio` | `src/`, `tests/`, `build/`, `electron-builder.yml`, release workflow | studio.radical.tools, desktop installers |
+| `radical-hub` | concept catalogue `hub/**/*.radical`, `tools/hubCatalogue.ts`, hub site entry (`hub.html`, `src/renderer/src/hub/`) | hub.radical.tools |
+| `radical-website` | `website/` (landing, manual, screenshots) | radical.tools |
+| `radical-vscode` | `tools/vscode-radical/` | VS Code Marketplace |
+| `radical-infra` (private) | `infra/` Terraform | AWS |
+| `radical-format` (npm package) | `.radical` schema and types (`src/renderer/src/hub/hubFormat.ts`, `conceptToDiagram.ts`), the Claude skill `.claude/skills/radical-diagram/` | npm |
+
+### Coupling to untangle first
+
+1. **The Hub site is the Studio bundle.** [HubApp.tsx](src/renderer/src/hub/HubApp.tsx) imports Studio's `Canvas`, `RightPanel`, `TableView`, `WikiView` and `diagramStore`, and `hub.html` is a second entry in [vite.web.config.ts](vite.web.config.ts). Options:
+   - (a) publish the Studio viewer as a package (`@radical/studio-viewer`) that the Hub consumes, or
+   - (b) the Hub keeps embedding a pinned Studio build, pulled as a release artifact.
+
+   (a) is cleaner; (b) is quicker.
+2. **Catalogue content vs. Studio.** Studio in production already fetches the catalogue from `https://hub.radical.tools/hub/` ([hubStore.ts](src/renderer/src/store/hubStore.ts#L92)), bundling it only as a fallback. Moving the `.radical` files out is therefore cheap. Pattern contributors then open PRs against `radical-hub` without touching app code.
+3. **Shared `.radical` format.** Studio, Hub, the VS Code extension and the `radical-diagram` Claude skill all read and write `.radical` files, and validation exists at least twice: `tools/hubCatalogue.ts` and the skill's own `scripts/validate.mjs` + `references/radical-file-format.md`. Extract one schema and validator into `radical-format` so every repo validates the same way.
+4. **VS Code extension bundles `out/renderer`** (`bundle-webview` copies `../../out/renderer`). After the split it should consume a published Studio web build (release artifact or npm) instead of a relative path.
+5. **README assets.** The Studio README uses images from `website/screenshots/`. Copy the ones it needs into `radical-studio/docs/media/` so each repo is self-contained.
+
+### How to split
+
+- Use `git filter-repo --subdirectory-filter <dir>` (or `--path` for multiple paths) per product so each new repo keeps its history.
+- Keep `radicaltools/radical.tools` as the Studio repo and rename it to `radical-studio`. GitHub redirects the old URL, and existing stars, issues and forks stay with the flagship product.
+- Split one product at a time, in order of least coupling: `website` → `infra` → `hub` catalogue content → `vscode` → Hub site (needs 1 above).
+- Each repo gets its own deploy workflow; drop the matching steps from `deploy.yml` as each split lands.
+
+### Trade-offs
+
+- **Pro:** focused READMEs and issue trackers; a smaller clone for Studio contributors; content contributors (Hub patterns) don't need the app toolchain; independent release cadence.
+- **Con:** cross-repo changes to the `.radical` format need a package release plus version bumps; GitHub stars and activity spread across several repos. Pin the repos in the `radicaltools` org profile and point every README back to the others.
+
+---
+
 ## Appendix - Dynamic views (current usage)
 
 Current status:
