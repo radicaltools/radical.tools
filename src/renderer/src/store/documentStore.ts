@@ -38,6 +38,11 @@ const LS_LEGACY_KEY = 'radical-diagram-v1'
  *  user's files with an empty/stale model after a reload. */
 const connectedWebFolders = new Set<string>()
 
+/** Id of the document ensureActive() seeded on this boot because the index was
+ *  empty, i.e. a first visit. The welcome screen hides it from "recent" so a
+ *  newcomer is not greeted by a model they never made. */
+let bootSeededId: string | null = null
+
 /** Md-folder docs (source==='md') loaded lazily: docId → nodeId → relative
  *  .md file path, for node bodies not read into memory at load time. Static
  *  once populated — "already hydrated" is tracked by the caller (diagramStore),
@@ -358,6 +363,9 @@ export interface DocumentsAPI {
   /** Convenience: ensure there's at least one document; create an empty LS
    *  doc if the index is empty. Returns the active doc. */
   ensureActive(seedIfEmpty: () => DiagramData): { meta: DocumentMeta; seeded: boolean }
+
+  /** True for the document ensureActive() seeded on this boot (first visit). */
+  isBootSeeded(id: string): boolean
 }
 
 export const documents: DocumentsAPI = {
@@ -761,6 +769,7 @@ export const documents: DocumentsAPI = {
     if (idx.docs.length === 0) {
       const seed = seedIfEmpty()
       const meta = this.createLSDocument('Untitled', seed)
+      bootSeededId = meta.id
       return { meta, seeded: true }
     }
     if (!idx.activeId || !idx.docs.some(d => d.id === idx.activeId)) {
@@ -770,6 +779,10 @@ export const documents: DocumentsAPI = {
     }
     const meta = idx.docs.find(d => d.id === idx.activeId)!
     return { meta, seeded: false }
+  },
+
+  isBootSeeded(id) {
+    return id === bootSeededId
   },
 }
 

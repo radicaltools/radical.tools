@@ -1,14 +1,87 @@
 import React, { useState } from 'react'
 import { documents } from '../store/documentStore'
 import { buildFintechSampleRaw } from '../store/fintechSample'
+import { useDiagramStore } from '../store/diagramStore'
+import { formatRoute } from '../route'
 import { availableMetamodels } from '../types/metamodel'
+
+/** The sample's System Context view (fintechSampleData.json). */
+const SAMPLE_START_VIEW = 'view-ctx'
 
 interface Props {
   onDismiss: () => void
 }
 
+/** Stylised slice of the fintech sample: the C4 core with the ADR,
+ *  requirement and mockup layers hanging off it. Labels are real nodes. */
+function SamplePreview(): React.ReactElement {
+  const font = 'system-ui, sans-serif'
+  return (
+    <svg className="welcome-sample-preview" width="100%" viewBox="0 0 280 150" fill="none" aria-hidden="true">
+      <defs>
+        <marker id="welcome-arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#9aa3b8"/>
+        </marker>
+      </defs>
+
+      {/* governance / product links (dashed) */}
+      <g stroke="#b8bfd0" strokeWidth="1" strokeDasharray="3 2">
+        <path d="M45 96 C45 70 120 70 128 52"/>
+        <path d="M139 96 L139 52"/>
+        <path d="M232 78 C232 64 170 66 158 52"/>
+      </g>
+
+      {/* architecture links */}
+      <g stroke="#9aa3b8" strokeWidth="1">
+        <line x1="66" y1="30" x2="98" y2="30" markerEnd="url(#welcome-arr)"/>
+        <line x1="190" y1="30" x2="212" y2="30" markerEnd="url(#welcome-arr)"/>
+      </g>
+
+      {/* Retail Customer */}
+      <rect x="6" y="14" width="60" height="32" rx="4" fill="#0b3d6e"/>
+      <circle cx="36" cy="9" r="4" fill="#0b3d6e"/>
+      <text x="36" y="28" textAnchor="middle" fill="#fff" fontSize="7" fontWeight="600" fontFamily={font}>Retail</text>
+      <text x="36" y="37" textAnchor="middle" fill="#fff" fontSize="7" fontWeight="600" fontFamily={font}>Customer</text>
+
+      {/* Core Banking Platform */}
+      <rect x="100" y="8" width="90" height="44" rx="4" fill="#1565c0"/>
+      <text x="106" y="19" fill="#cfe0f7" fontSize="5" fontWeight="600" letterSpacing="0.4" fontFamily={font}>SOFTWARE SYSTEM</text>
+      <text x="106" y="31" fill="#fff" fontSize="7.5" fontWeight="700" fontFamily={font}>Core Banking</text>
+      <text x="106" y="41" fill="#fff" fontSize="7.5" fontWeight="700" fontFamily={font}>Platform</text>
+
+      {/* SWIFT Network (external) */}
+      <rect x="214" y="12" width="60" height="36" rx="4" fill="#6b7280"/>
+      <text x="219" y="22" fill="#e5e7eb" fontSize="5" fontWeight="600" letterSpacing="0.4" fontFamily={font}>EXTERNAL</text>
+      <text x="219" y="34" fill="#fff" fontSize="7.5" fontWeight="700" fontFamily={font}>SWIFT</text>
+
+      {/* ADR */}
+      <rect x="6" y="98" width="78" height="26" rx="4" fill="#fdf3ea" stroke="#b4581a"/>
+      <text x="12" y="108" fill="#b4581a" fontSize="5" fontWeight="700" letterSpacing="0.4" fontFamily={font}>ADR-001</text>
+      <text x="12" y="118" fill="#5c2e0e" fontSize="6.5" fontWeight="600" fontFamily={font}>Event-Driven Core</text>
+
+      {/* Requirement */}
+      <rect x="96" y="98" width="86" height="26" rx="4" fill="#e8f6f6" stroke="#0f766e"/>
+      <text x="102" y="108" fill="#0f766e" fontSize="5" fontWeight="700" letterSpacing="0.4" fontFamily={font}>REQUIREMENT</text>
+      <text x="102" y="118" fill="#134e4a" fontSize="6.5" fontWeight="600" fontFamily={font}>Strong customer auth</text>
+
+      {/* Mockup with a wireframe */}
+      <rect x="196" y="80" width="78" height="64" rx="4" fill="#fff" stroke="#b3134f"/>
+      <path d="M196 84a4 4 0 0 1 4-4h70a4 4 0 0 1 4 4v6h-78z" fill="#b3134f"/>
+      <text x="201" y="88" fill="#fff" fontSize="5" fontWeight="700" letterSpacing="0.3" fontFamily={font}>New Transfer</text>
+      <g fill="#e5e7eb">
+        <rect x="202" y="96" width="40" height="4" rx="1"/>
+        <rect x="202" y="104" width="66" height="7" rx="1.5"/>
+        <rect x="202" y="114" width="66" height="7" rx="1.5"/>
+      </g>
+      <rect x="202" y="127" width="30" height="9" rx="2" fill="#3b6fe6"/>
+    </svg>
+  )
+}
+
 export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
-  const existingDocs = documents.listDocuments()
+  // The doc auto-seeded on a first visit is not the user's work: leave it out
+  // so newcomers get the first-visit layout with the sample front and centre.
+  const existingDocs = documents.listDocuments().filter(d => !documents.isBootSeeded(d.id))
   const hasExisting  = existingDocs.length > 0
   const lastDoc      = hasExisting ? existingDocs[0] : null
   const presets = availableMetamodels()
@@ -54,11 +127,33 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
     })
   }
 
+  // Land on System Context rather than the default canvas, which holds all
+  // 62 elements at once and reads as noise on a first look. The doc loads
+  // asynchronously, so wait for the view to exist, then hand it to route
+  // sync (App starts it once the splash is dismissed) through the hash.
   function handleSample(): void {
+    // Views of the doc open right now; the sample's arrive as a new object.
+    // (The open doc may be an earlier sample copy with the same view ids.)
+    const viewsBefore = useDiagramStore.getState().views
     const data = buildFintechSampleRaw()
     const meta = documents.createLSDocument('Fintech Banking Platform', data)
     documents.setActiveId(meta.id)
-    onDismiss()
+    const loaded = (views: typeof viewsBefore): boolean =>
+      views !== viewsBefore && !!views[SAMPLE_START_VIEW]
+
+    let done = false
+    const finish = (): void => {
+      if (done) return
+      done = true
+      unsub()
+      clearTimeout(timer)
+      if (loaded(useDiagramStore.getState().views)) {
+        history.replaceState(null, '', formatRoute({ mode: 'designer', view: SAMPLE_START_VIEW }))
+      }
+      onDismiss()
+    }
+    const unsub = useDiagramStore.subscribe((s) => { if (loaded(s.views)) finish() })
+    const timer = setTimeout(finish, 1500)
   }
 
   return (
@@ -117,7 +212,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
             </button>
             <div className="welcome-btn-group">
             <button
-              className={lastDoc ? 'welcome-btn welcome-btn-ghost' : 'welcome-btn welcome-btn-primary'}
+              className="welcome-btn welcome-btn-ghost"
               onClick={handleNew}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -164,11 +259,13 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
             </button>
           </div>
 
-          <div className="welcome-sample-link">
-            <button type="button" className="welcome-link" onClick={handleSample}>
-              or open a sample model
-            </button>
-          </div>
+          {hasExisting && (
+            <div className="welcome-sample-link">
+              <button type="button" className="welcome-link" onClick={handleSample}>
+                or open a sample model
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── Right column ── */}
@@ -200,24 +297,32 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
               </div>
             </>
           ) : (
-            <div className="welcome-preview">
-              <svg width="100%" viewBox="0 0 260 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="10"  y="20"  width="100" height="60" rx="6" fill="rgba(59,111,230,0.07)" stroke="rgba(59,111,230,0.3)" strokeWidth="1"/>
-                <text x="60"  y="53"  textAnchor="middle" fill="rgba(59,111,230,0.6)" fontSize="9" fontFamily="system-ui">System A</text>
-                <rect x="150" y="20"  width="100" height="60" rx="6" fill="rgba(59,111,230,0.07)" stroke="rgba(59,111,230,0.3)" strokeWidth="1"/>
-                <text x="200" y="53"  textAnchor="middle" fill="rgba(59,111,230,0.6)" fontSize="9" fontFamily="system-ui">System B</text>
-                <rect x="80"  y="115" width="100" height="50" rx="6" fill="rgba(59,111,230,0.07)" stroke="rgba(59,111,230,0.3)" strokeWidth="1"/>
-                <text x="130" y="143" textAnchor="middle" fill="rgba(59,111,230,0.6)" fontSize="9" fontFamily="system-ui">Database</text>
-                <line x1="110" y1="50" x2="150" y2="50" stroke="rgba(59,111,230,0.35)" strokeWidth="1" markerEnd="url(#arr)"/>
-                <line x1="60"  y1="80" x2="100" y2="115" stroke="rgba(59,111,230,0.35)" strokeWidth="1"/>
-                <line x1="200" y1="80" x2="165" y2="115" stroke="rgba(59,111,230,0.35)" strokeWidth="1"/>
-                <defs>
-                  <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                    <path d="M0,0 L6,3 L0,6 Z" fill="rgba(59,111,230,0.5)"/>
-                  </marker>
-                </defs>
-              </svg>
-            </div>
+            // First visit: the sample is the fastest way to see what the
+            // tool does (no AI key, no blank canvas), so it gets the whole
+            // column. Counts mirror fintechSampleData.json.
+            <>
+              <p className="welcome-right-label">Explore a sample</p>
+              <button type="button" className="welcome-sample-card" onClick={handleSample}>
+                <SamplePreview />
+                <span className="welcome-sample-title">Fintech Banking Platform</span>
+                <span className="welcome-sample-desc">
+                  A complete model to click through, from C4 views down to
+                  the decisions, requirements and screens behind them.
+                </span>
+                <span className="welcome-sample-tags">
+                  {['C4 views', 'ADRs', 'Requirements', 'UI mockups', 'Wiki', 'Slides'].map(t => (
+                    <span key={t} className="welcome-sample-tag">{t}</span>
+                  ))}
+                </span>
+                <span className="welcome-sample-stats">62 elements · 15 views · 12 slides</span>
+                <span className="welcome-btn welcome-btn-primary welcome-sample-cta">
+                  Explore the sample
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </span>
+              </button>
+            </>
           )}
         </div>
 
