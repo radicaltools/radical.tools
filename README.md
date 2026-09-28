@@ -10,10 +10,7 @@
 
 [**Try it in the browser**](https://studio.radical.tools) · [Architecture Hub](https://hub.radical.tools) · [Manual](https://radical.tools/manual.html)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="website/screenshots/views-dark.png">
-  <img alt="Radical Studio showing a Core Banking container view: domains, containers, databases and the relations between them, with the list of views on the left and the model tree on the right" src="website/screenshots/views-light.png" width="900">
-</picture>
+<img alt="Demo: opening the sample banking model and switching between its views: system context, container view, payment sequence, dependency matrix, governance table and generated wiki" src="website/screenshots/demo.gif" width="880">
 
 </div>
 
