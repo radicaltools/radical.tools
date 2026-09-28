@@ -72,7 +72,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: false,
     titleBarStyle: 'default',
-    title: 'Radical.Tools',
+    title: 'radical.studio',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -96,9 +96,12 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
     // Apply CSP only in production (dev HMR needs inline scripts and eval)
-    mainWindow.webContents.session.webRequest.onHeadersReceived((_details, callback) => {
+    // Keep the original headers — dropping Content-Type makes Chromium refuse
+    // the renderer's module scripts and the window stays blank.
+    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
       callback({
         responseHeaders: {
+          ...details.responseHeaders,
           'Content-Security-Policy': [
             "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; font-src 'self' data:"
           ]

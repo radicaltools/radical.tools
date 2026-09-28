@@ -24,11 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mockup relations: Illustrates (→ requirement / scenario), Presented by (→ web app / container), Navigates to (→ mockup) for screen flows
 - Radical Forge: Mockups stage before C4 with batch wireframe generation, "Finish here" at every stage with a summary step, and a single footer action bar
 - Hub blueprints: per-actor screen flows (79 mockups in 19 flows) and named views — canvas: System context, Containers, Governance map, Mockups, technical flow, one per screen flow; wiki: Governance, Requirements; a per-mode view selector and `/cv/<viewId>` deep links in the Hub; views are imported with the concept
+- Desktop installers for macOS (dmg, Apple Silicon + Intel), Windows (NSIS) and Linux (AppImage), built by electron-builder and drafted as a GitHub Release when a `v*` tag is pushed
+- App icon for the desktop builds
 
 ### Changed
+- The Studio app is named radical.studio (installers, window and page title); radical.tools names the family of apps
 - Radical Hub uses its own emerald palette (accent, background, borders) in both themes so it reads apart from radical.tools; Studio keeps its blue
 
 ### Fixed
+- Production desktop build showed a blank window: the CSP header handler dropped every other response header (including `Content-Type`), so the renderer's module scripts were refused
 - Hub concept files' `views` were ignored by the viewer and on import
 - Importing from the Hub no longer stacks one "Imported …" notification per concept over the template-parameter form
 
