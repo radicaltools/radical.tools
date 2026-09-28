@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Studio app is named radical.studio (installers, window and page title); radical.tools names the family of apps
 - Radical Hub uses its own emerald palette (accent, background, borders) in both themes so it reads apart from radical.tools; Studio keeps its blue
 - Dark theme is a dimmed graphite instead of near-black (canvas, panels, borders, muted text), so the dark C4 palette stays visible; type icons in the node tree and filter chips are lightened in the dark theme
+- Sequence view participants are drawn as their C4 shapes (person, database cylinder, queue, web app, boxes) in the canvas node colours, instead of one dark box style for every type
 
 ### Fixed
 - Production desktop build showed a blank window: the CSP header handler dropped every other response header (including `Content-Type`), so the renderer's module scripts were refused
