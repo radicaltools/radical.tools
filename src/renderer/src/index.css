@@ -6241,12 +6241,80 @@ body {
   flex-shrink: 0;
 }
 
-.welcome-preview {
+.welcome-sample-card {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.85;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e3e6ef;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 0.14s, box-shadow 0.14s, transform 0.14s;
+}
+
+.welcome-sample-card:hover {
+  border-color: #b9c9f5;
+  box-shadow: 0 6px 20px rgba(59, 111, 230, 0.12);
+  transform: translateY(-1px);
+}
+
+.welcome-sample-card:focus-visible {
+  outline: 2px solid #3b6fe6;
+  outline-offset: 2px;
+}
+
+.welcome-sample-preview {
+  display: block;
+  margin-bottom: 6px;
+  padding: 10px;
+  background: #f5f7fb;
+  border-radius: 8px;
+}
+
+.welcome-sample-title {
+  font-size: 15px;
+  font-weight: 650;
+  color: #111827;
+  letter-spacing: -0.2px;
+}
+
+.welcome-sample-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+.welcome-sample-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.welcome-sample-tag {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eef2fd;
+  color: #3b4eab;
+}
+
+.welcome-sample-stats {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.welcome-sample-cta {
+  margin-top: auto;
+}
+
+.welcome-sample-card:hover .welcome-sample-cta {
+  background: #2d5fd4;
+  border-color: #2d5fd4;
 }
 
 /* ─── Treemap view ───────────────────────────────────────────────────── */

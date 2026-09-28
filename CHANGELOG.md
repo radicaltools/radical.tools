@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Radical Forge: Mockups stage before C4 with batch wireframe generation, "Finish here" at every stage with a summary step, and a single footer action bar
 - Hub blueprints: per-actor screen flows (79 mockups in 19 flows) and named views — canvas: System context, Containers, Governance map, Mockups, technical flow, one per screen flow; wiki: Governance, Requirements; a per-mode view selector and `/cv/<viewId>` deep links in the Hub; views are imported with the concept
 - Sample model showcases the product layer: 10 EARS requirements (with a `derives` decomposition), 5 Gherkin scenarios and 13 UI mockups with wireframes in three per-actor screen flows (customer, corporate, operator), a Back Office Console web app and an accessibility fitness function; new views — Screen Map, one flow view per journey, Requirements Traceability, Requirements Register (table) and a multi-page Product Wiki — a v4 "Product & UX" milestone and matching presentation slides
+- Welcome screen: on a first visit the sample model gets its own card (preview, what it contains, "Explore the sample") in place of the placeholder diagram, and opens on the System Context view instead of the all-elements canvas
 - Desktop installers for macOS (dmg, Apple Silicon + Intel), Windows (NSIS) and Linux (AppImage), built by electron-builder and drafted as a GitHub Release when a `v*` tag is pushed
 - App icon for the desktop builds
 
