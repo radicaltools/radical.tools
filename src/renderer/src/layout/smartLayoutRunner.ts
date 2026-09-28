@@ -33,7 +33,8 @@ export type { SmartLayoutProgress, SmartLayoutOnProgress }
  * Protocol (split across main thread / worker):
  *   1. Main thread: ELK candidate generation (elk-worker.min.js cannot run
  *      inside a nested worker, so this must stay on the main thread).
- *   2. Worker: SA refinement phases A / B / C — CPU-intensive, off-thread.
+ *   2. Worker: candidate ranking (crossing minimisation, scoring) and the
+ *      annealing phases A / B / C — CPU-intensive, off-thread.
  *
  * Falls back to `runSmartLayoutCore` in-thread when the Worker API is not
  * available (Node.js / Vitest).
@@ -56,9 +57,9 @@ export async function runSmartLayout(
     return elkResult.result
   }
 
-  const { nodes: visibleNodes, relations: visibleRelations, valid, baseline } = elkResult
+  const { nodes: visibleNodes, relations: visibleRelations, raw } = elkResult
 
-  // Phase 2: SA refinement in the worker.
+  // Phase 2: ranking + annealing in the worker.
   return new Promise<SmartLayoutResult>((resolve, reject) => {
     const worker = new SmartLayoutWorkerClass()
 
@@ -84,6 +85,6 @@ export async function runSmartLayout(
       reject(new Error(e.message ?? 'smartLayout worker error'))
     }
 
-    worker.postMessage({ nodes: visibleNodes, relations: visibleRelations, valid, baseline })
+    worker.postMessage({ nodes: visibleNodes, relations: visibleRelations, raw })
   })
 }

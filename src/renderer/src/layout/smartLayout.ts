@@ -981,18 +981,38 @@ function projectPositions(nodes: Record<string, C4Node>, positions: PositionMap)
   return out
 }
 
-async function runCandidate(
+/** A candidate layout straight out of its engine, before any post-processing. */
+export interface RawCandidate {
+  name: string
+  positions: PositionMap
+}
+
+/** Run one engine; failures and empty results drop the candidate. */
+async function generateCandidate(
   name: string,
+  run: () => Promise<PositionMap> | PositionMap,
+): Promise<RawCandidate | null> {
+  try {
+    const positions = await run()
+    return Object.keys(positions).length === 0 ? null : { name, positions }
+  } catch (err) {
+    console.warn(`[smartLayout] candidate ${name} failed:`, err)
+    return null
+  }
+}
+
+/**
+ * Score one raw candidate after geometric crossing minimisation, so all
+ * candidates compete fairly, and after finalising (sibling swaps can collide
+ * boxes of different sizes), so the score describes what would be rendered.
+ */
+function scoreCandidate(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
-  positionsPromise: Promise<PositionMap> | PositionMap,
-): Promise<SmartLayoutCandidate | null> {
+  candidate: RawCandidate,
+): SmartLayoutCandidate | null {
   try {
-    const raw = await positionsPromise
-    if (Object.keys(raw).length === 0) return null
-    // Score after geometric crossing minimisation so all candidates compete
-    // fairly, and after finalising (sibling swaps can collide boxes of
-    // different sizes) so the score describes what would be rendered.
+    const raw: PositionMap = { ...candidate.positions }
     const swap = minimizeCrossings(projectPositions(nodes, raw), relations)
     for (const [id, p] of Object.entries(swap)) {
       const prev = raw[id]
@@ -1002,10 +1022,27 @@ async function runCandidate(
     const projected = projectPositions(nodes, positions)
     const metrics = computeLayoutMetrics(projected, relations)
     const score = computeCompositeScore(projected, relations)
-    return { name, positions, metrics, score }
+    return { name: candidate.name, positions, metrics, score }
   } catch (err) {
-    console.warn(`[smartLayout] candidate ${name} failed:`, err)
+    console.warn(`[smartLayout] candidate ${candidate.name} failed:`, err)
     return null
+  }
+}
+
+/** Result when no candidate survived: leave the diagram as it is. */
+function unchangedResult(
+  nodes: Record<string, C4Node>,
+  relations: Record<string, C4Relation>,
+): SmartLayoutResult {
+  const baseline = computeLayoutMetrics(nodes, relations)
+  const score = computeCompositeScore(nodes, relations)
+  return {
+    baseline,
+    winner: { name: 'baseline', metrics: baseline, score, positions: {} },
+    candidates: [],
+    planarity: computePlanarityScore(nodes, relations),
+    refinement: { before: score.composite, after: score.composite, iterations: 0 },
+    keptCurrent: true,
   }
 }
 
@@ -1013,12 +1050,12 @@ async function runCandidate(
  * Result of the ELK candidate-generation phase.
  *
  * `done: true`  — all candidates failed; `result` is a baseline fallback and
- *                 the SA phase should be skipped.
- * `done: false` — ranked candidates are ready; pass `nodes / relations /
- *                 valid / baseline` to `runSmartLayoutSAPhase` (or the SA
- *                 Web Worker). `nodes` and `relations` are the visible
- *                 projection of the input — the SA phase must use them, not
- *                 the raw input.
+ *                 the worker phase should be skipped.
+ * `done: false` — raw candidates are ready; pass `nodes / relations / raw`
+ *                 to `runSmartLayoutWorkerPhase` (normally in the Web
+ *                 Worker). `nodes` and `relations` are the visible
+ *                 projection of the input — the worker phase must use them,
+ *                 not the raw input.
  */
 export type ELKPhaseResult =
   | { done: true; result: SmartLayoutResult }
@@ -1026,8 +1063,7 @@ export type ELKPhaseResult =
       done: false
       nodes: Record<string, C4Node>
       relations: Record<string, C4Relation>
-      valid: SmartLayoutCandidate[]
-      baseline: LayoutMetrics
+      raw: RawCandidate[]
     }
 
 /**
@@ -1035,7 +1071,7 @@ export type ELKPhaseResult =
  * trying multiple algorithms rather than just spinning opaquely.
  */
 export type SmartLayoutProgress =
-  | { phase: 'candidates'; done: number; total: number }
+  | { phase: 'candidates' | 'ranking'; done: number; total: number }
   | { phase: 'refining-a' | 'refining-b' | 'refining-c' }
 
 export type SmartLayoutOnProgress = (progress: SmartLayoutProgress) => void
@@ -1045,8 +1081,9 @@ export type SmartLayoutOnProgress = (progress: SmartLayoutProgress) => void
  *
  * elk-worker.min.js is a standalone Web Worker script and cannot be imported
  * inside another worker, so this phase must never be called from inside the
- * SA worker. The result is either an early-exit baseline (`done: true`) or
- * the ranked candidate set ready for `runSmartLayoutSAPhase` (`done: false`).
+ * Smart Layout worker. It only runs the engines; everything CPU-heavy that
+ * follows (crossing minimisation, scoring, annealing) belongs to
+ * `runSmartLayoutWorkerPhase`, off the main thread.
  */
 export async function runSmartLayoutELKPhase(
   inputNodes: Record<string, C4Node>,
@@ -1059,128 +1096,98 @@ export async function runSmartLayoutELKPhase(
   // bundled into the Web Worker chunk — it's code-split and fetched only when
   // this function is called from the main thread.
   const { applyElkLayout } = await import('./elkLayout')
-  const baseline = computeLayoutMetrics(nodes, relations)
   const depth = maxContainmentDepth(metamodel)
   const mmDirection: 'DOWN' | 'RIGHT' = depth >= 2 ? 'RIGHT' : 'DOWN'
 
-  // Ten structurally different candidates run in parallel.
-  // stress / force / mrtree may degrade on compound graphs — runCandidate
-  // swallows failures so the remaining set still wins.
-  const candidatePromises: Promise<SmartLayoutCandidate | null>[] = [
-    runCandidate(
+  // Ten structurally different candidates. stress / force / mrtree may
+  // degrade on compound graphs — generateCandidate swallows failures so the
+  // remaining set still wins.
+  const engines: [name: string, run: () => Promise<PositionMap> | PositionMap][] = [
+    [
       'Layered TB · Brandes-Köpf · model-order',
-      nodes, relations,
-      applyElkLayout(nodes, relations, {
+      () => applyElkLayout(nodes, relations, {
         rootOptions: elkLayered('DOWN', 'BRANDES_KOEPF', true),
         childOptions: elkLayeredChild('RIGHT', 'BRANDES_KOEPF'),
       }),
-    ),
-    runCandidate(
+    ],
+    [
       'Layered LR · Brandes-Köpf · model-order',
-      nodes, relations,
-      applyElkLayout(nodes, relations, {
+      () => applyElkLayout(nodes, relations, {
         rootOptions: elkLayered('RIGHT', 'BRANDES_KOEPF', true),
         childOptions: elkLayeredChild('DOWN', 'BRANDES_KOEPF'),
       }),
-    ),
-    runCandidate(
+    ],
+    [
       'Layered TB · NetworkSimplex',
-      nodes, relations,
-      applyElkLayout(nodes, relations, {
+      () => applyElkLayout(nodes, relations, {
         rootOptions: elkLayered('DOWN', 'NETWORK_SIMPLEX', false),
         childOptions: elkLayeredChild('RIGHT', 'NETWORK_SIMPLEX'),
       }),
-    ),
-    runCandidate(
+    ],
+    [
       'Layered TB · Longest-Path · Brandes-Köpf',
-      nodes, relations,
-      applyElkLayout(nodes, relations, {
+      () => applyElkLayout(nodes, relations, {
         rootOptions: elkLayered('DOWN', 'BRANDES_KOEPF', true, 'LONGEST_PATH'),
         childOptions: elkLayeredChild('RIGHT', 'BRANDES_KOEPF'),
       }),
-    ),
-    runCandidate(
+    ],
+    [
       'Layered TB · MinWidth · Brandes-Köpf',
-      nodes, relations,
-      applyElkLayout(nodes, relations, {
+      () => applyElkLayout(nodes, relations, {
         rootOptions: elkLayered('DOWN', 'BRANDES_KOEPF', true, 'MIN_WIDTH'),
         childOptions: elkLayeredChild('RIGHT', 'BRANDES_KOEPF'),
       }),
-    ),
-    runCandidate(
+    ],
+    [
       `Metamodel-aware (root ${mmDirection}, Brandes-Köpf)`,
-      nodes, relations,
-      applyElkLayout(nodes, relations, {
+      () => applyElkLayout(nodes, relations, {
         rootOptions: elkLayered(mmDirection, 'BRANDES_KOEPF', true),
         childOptions: elkLayeredChild(mmDirection === 'DOWN' ? 'RIGHT' : 'DOWN', 'BRANDES_KOEPF'),
       }),
-    ),
-    runCandidate(
+    ],
+    [
       'Stress majorisation (Gansner)',
-      nodes, relations,
-      applyElkLayout(nodes, relations, {
+      () => applyElkLayout(nodes, relations, {
         rootOptions: elkStress(),
         childOptions: elkLayeredChild('RIGHT', 'BRANDES_KOEPF'),
       }),
-    ),
-    runCandidate(
+    ],
+    [
       'Force-directed (Eades)',
-      nodes, relations,
-      applyElkLayout(nodes, relations, {
+      () => applyElkLayout(nodes, relations, {
         rootOptions: elkForce(),
         childOptions: elkLayeredChild('RIGHT', 'BRANDES_KOEPF'),
       }),
-    ),
-    runCandidate(
+    ],
+    [
       'Mr.Tree (Reingold-Tilford)',
-      nodes, relations,
-      applyElkLayout(nodes, relations, {
+      () => applyElkLayout(nodes, relations, {
         rootOptions: elkMrTree(),
         childOptions: elkLayeredChild('RIGHT', 'BRANDES_KOEPF'),
       }),
-    ),
-    runCandidate(
+    ],
+    [
       'Radical (semantic C4)',
-      nodes, relations,
-      applyRadicalLayout(nodes, relations),
-    ),
+      () => applyRadicalLayout(nodes, relations),
+    ],
   ]
 
-  // Report progress as each candidate settles (order of completion, not of
-  // the array above) so the UI can show "N/10 algorithms tried" live instead
-  // of a single opaque spinner for the whole ~1s ensemble run.
-  const total = candidatePromises.length
-  let doneCount = 0
+  // Engines run one at a time with a yield in between: bundled ELK runs a
+  // whole layout synchronously on this (main) thread, so queueing all ten at
+  // once would freeze the UI for their combined time. One at a time, the
+  // longest freeze is a single layout and "N/10 algorithms tried" advances live.
+  const total = engines.length
+  const raw: RawCandidate[] = []
   onProgress?.({ phase: 'candidates', done: 0, total })
-  const tracked = candidatePromises.map((p) => p.finally(() => {
-    doneCount++
-    onProgress?.({ phase: 'candidates', done: doneCount, total })
-  }))
-  const candidates = await Promise.all(tracked)
-
-  const valid = candidates.filter((c): c is SmartLayoutCandidate => c !== null)
-  if (valid.length === 0) {
-    const baselineScore = computeCompositeScore(nodes, relations)
-    return {
-      done: true,
-      result: {
-        baseline,
-        winner: { name: 'baseline', metrics: baseline, score: baselineScore, positions: {} },
-        candidates: [],
-        planarity: computePlanarityScore(nodes, relations),
-        refinement: { before: baselineScore.composite, after: baselineScore.composite, iterations: 0 },
-        keptCurrent: true,
-      },
-    }
+  for (let i = 0; i < total; i++) {
+    const [name, run] = engines[i]
+    const candidate = await generateCandidate(name, run)
+    if (candidate) raw.push(candidate)
+    onProgress?.({ phase: 'candidates', done: i + 1, total })
+    await yieldToUI()
   }
-
-  // Composite ranking — crossings dominate (W=100) but the layout still
-  // gets penalised for node overlap, edge-length spaghetti, and bad aspect
-  // ratio. This matches what users *perceive* as messy far better than
-  // raw crossing count alone.
-  valid.sort((a, b) => a.score.composite - b.score.composite)
-
-  return { done: false, nodes, relations, valid, baseline }
+  if (raw.length === 0) return { done: true, result: unchangedResult(nodes, relations) }
+  return { done: false, nodes, relations, raw }
 }
 
 export async function runSmartLayoutCore(
@@ -1191,31 +1198,47 @@ export async function runSmartLayoutCore(
 ): Promise<SmartLayoutResult> {
   const elkResult = await runSmartLayoutELKPhase(nodes, relations, metamodel, onProgress)
   if (elkResult.done) return elkResult.result
-  return runSmartLayoutSAPhase(elkResult.nodes, elkResult.relations, elkResult.valid, elkResult.baseline, onProgress)
+  return runSmartLayoutWorkerPhase(elkResult.nodes, elkResult.relations, elkResult.raw, onProgress)
 }
 
 /**
- * SA-only refinement phase — runs phases A / B / C of the smart layout
- * pipeline on pre-computed ELK candidates.
+ * Everything after the engines have run: rank the raw candidates (crossing
+ * minimisation, finalising, scoring), then refine the winner with annealing
+ * phases A / B / C.
  *
  * Separated from runSmartLayoutCore so that it can be executed in a Web
  * Worker that does NOT include ELK (elk-worker.min.js is a standalone worker
- * script that cannot be imported inside another worker). The ELK candidate
- * generation always runs on the main thread; this function handles the
- * CPU-intensive SA refinement off-thread.
+ * script that cannot be imported inside another worker). Only the engines
+ * run on the main thread; all of this runs off it.
  *
  * `nodes` / `relations` must be the visible projection returned by the ELK
  * phase. `seed` overrides the structure-derived seed (a "try another
  * arrangement" action would pass a different one).
  */
-export async function runSmartLayoutSAPhase(
+export async function runSmartLayoutWorkerPhase(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
-  valid: SmartLayoutCandidate[],  // sorted ascending by composite score
-  baseline: LayoutMetrics,
+  raw: RawCandidate[],
   onProgress?: SmartLayoutOnProgress,
   options: { seed?: number } = {},
 ): Promise<SmartLayoutResult> {
+  const baseline = computeLayoutMetrics(nodes, relations)
+
+  // Composite ranking — crossings dominate but the layout still gets
+  // penalised for node overlap, edge-length spaghetti and bad aspect ratio,
+  // which matches what users *perceive* as messy far better than raw
+  // crossing count alone.
+  const valid: SmartLayoutCandidate[] = []
+  onProgress?.({ phase: 'ranking', done: 0, total: raw.length })
+  for (let i = 0; i < raw.length; i++) {
+    const scored = scoreCandidate(nodes, relations, raw[i])
+    if (scored) valid.push(scored)
+    onProgress?.({ phase: 'ranking', done: i + 1, total: raw.length })
+    await yieldToUI()
+  }
+  if (valid.length === 0) return unchangedResult(nodes, relations)
+  valid.sort((a, b) => a.score.composite - b.score.composite)
+
   const rng = createRng(options.seed ?? graphSeed(nodes, relations))
 
   // Phase A multi-start: refine the top-K candidates independently and

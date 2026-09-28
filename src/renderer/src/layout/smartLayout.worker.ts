@@ -1,33 +1,32 @@
 /**
- * Web Worker entry point for Smart Layout — SA refinement only.
+ * Web Worker entry point for Smart Layout — everything after the engines.
  *
  * The ELK candidate generation phase runs on the main thread (elk-worker.min.js
  * is itself a web-worker script and cannot be imported inside another worker).
- * This worker receives the pre-ranked ELK candidates and runs the CPU-intensive
- * SA refinement phases A / B / C off the main thread.
+ * This worker receives the raw candidates and does the CPU-intensive rest off
+ * the main thread: crossing minimisation and scoring of every candidate, then
+ * the annealing phases A / B / C.
  *
  * Protocol
  * ─────────
- * Main → Worker  { nodes, relations, valid, baseline }   (nodes/relations = visible projection from the ELK phase)
+ * Main → Worker  { nodes, relations, raw }   (nodes/relations = visible projection from the ELK phase)
  * Worker → Main  { type: 'result', result: SmartLayoutResult }
  *              | { type: 'error',  message: string }
  *              | { type: 'progress', progress: SmartLayoutProgress }
  */
 
-import { runSmartLayoutSAPhase, type SmartLayoutResult, type SmartLayoutCandidate, type SmartLayoutProgress } from './smartLayout'
+import { runSmartLayoutWorkerPhase, type SmartLayoutResult, type RawCandidate, type SmartLayoutProgress } from './smartLayout'
 import type { C4Node, C4Relation } from '../types/c4'
-import type { LayoutMetrics } from './crossingOpt'
 
 self.onmessage = async (e: MessageEvent) => {
-  const { nodes, relations, valid, baseline } = e.data as {
+  const { nodes, relations, raw } = e.data as {
     nodes: Record<string, C4Node>
     relations: Record<string, C4Relation>
-    valid: SmartLayoutCandidate[]
-    baseline: LayoutMetrics
+    raw: RawCandidate[]
   }
   try {
-    const result: SmartLayoutResult = await runSmartLayoutSAPhase(
-      nodes, relations, valid, baseline,
+    const result: SmartLayoutResult = await runSmartLayoutWorkerPhase(
+      nodes, relations, raw,
       (progress: SmartLayoutProgress) => self.postMessage({ type: 'progress', progress }),
     )
     self.postMessage({ type: 'result', result })
