@@ -11,6 +11,7 @@
 const ELK = require('elkjs/lib/elk.bundled.js')
 const { writeFileSync } = require('fs')
 const { resolve } = require('path')
+const product = require('./sample-product')
 
 const elk = new ELK()
 
@@ -59,6 +60,10 @@ const CHILD_OPTIONS = {
   'elk.padding': '[top=110, right=20, bottom=20, left=20]',
 }
 
+const FIXED_OPTIONS = {
+  'elk.algorithm': 'fixed',
+}
+
 // ── ELK helpers (mirror elkLayout.ts) ─────────────────────────────────────────
 
 function ancestorChain(nodeId, nodes) {
@@ -87,11 +92,15 @@ function buildElkNode(n, allNodes, elkNodeMap) {
   const childC4 = isCollapsed ? [] : Object.values(allNodes).filter(c => c.parentId === n.id)
   const children = childC4.map(c => buildElkNode(c, allNodes, elkNodeMap))
 
+  // Screen-flow groups keep their step grid (see sample-product.js)
+  const isScreenFlow = n.type === 'group' && childC4.length > 0 && childC4.every(c => c.type === 'mockup')
+  if (isScreenFlow) childC4.forEach((c, i) => Object.assign(children[i], { x: c.x, y: c.y }))
+
   const elkNode = {
     id: n.id,
     width,
     height,
-    layoutOptions: children.length > 0 ? CHILD_OPTIONS : undefined,
+    layoutOptions: isScreenFlow ? FIXED_OPTIONS : children.length > 0 ? CHILD_OPTIONS : undefined,
     children,
     edges: [],
   }
@@ -200,6 +209,17 @@ function recordToPos(nodeMap) {
   return out
 }
 
+/**
+ * Lays out the subset of the model a view shows; returns its positions (over
+ * the default ones, like the other views) and a viewport framing it.
+ */
+async function layoutView(ids, allNodeMap, allRels, defaultPositions, zoom) {
+  const nodes = buildViewSubset(ids, allNodeMap)
+  const rels  = Object.values(buildRelSubset(nodes, allRels))
+  applyPositions(nodes, await applyElkLayout(nodes, rels))
+  return { positions: Object.assign({}, defaultPositions, recordToPos(nodes)), viewport: computeViewport(nodes, zoom) }
+}
+
 /** Compute a reasonable viewport for a set of root-level nodes. */
 function computeViewport(nodeMap, zoom) {
   zoom = zoom || 0.55
@@ -213,7 +233,8 @@ function computeViewport(nodeMap, zoom) {
   return { x: Math.round(-minX * zoom + 80), y: Math.round(-minY * zoom + 80), zoom }
 }
 
-// ── Sample model definition (mirrors fintechSample.ts _makeBaseData) ──────────
+// ── Sample model definition (fintechSample.ts _makeBaseData is an older,
+//    architecture-only fallback copy) ─────────────────────────────────────────
 
 function makeBaseData() {
   const allNodes = [
@@ -272,16 +293,19 @@ function makeBaseData() {
       'Immutable append-only ledger of all financial transactions', 'PostgreSQL 15 / Patroni',
       640, 145, 190, 130, { parentId: 'dom-risk' }),
 
-    // Digital Channels (system → 2 webapps)
+    // Digital Channels (system → 3 webapps)
     nd('sys-channels', 'system', 'Digital Channels',
-      'Customer-facing web portal and native mobile app', 'React / React Native',
-      2360, 80, 270, 450),
+      'Customer web portal, native mobile app and the internal back-office console', 'React / React Native',
+      2360, 80, 270, 650),
     nd('ctn-web', 'webapp', 'Web Banking',
       'Full-featured banking portal for browsers', 'React 18 / TypeScript',
       30, 100, 210, 140, { parentId: 'sys-channels' }),
     nd('ctn-mobile', 'webapp', 'Mobile App',
       'Native banking app for iOS and Android', 'React Native / Expo',
       30, 300, 210, 140, { parentId: 'sys-channels' }),
+    nd('ctn-backoffice', 'webapp', 'Back Office Console',
+      'Internal console for fraud case handling and customer support', 'React 18 / TypeScript',
+      30, 500, 210, 140, { parentId: 'sys-channels' }),
 
     // External systems
     nd('sys-swift', 'system', 'SWIFT Network',      'International wire transfer messaging',   'SWIFT MT / ISO 20022', 200,  1060, 360, 260, { external: true }),
@@ -334,9 +358,10 @@ function makeBaseData() {
   const allRels = [
     rl('r-cust-web',    'p-customer',   'ctn-web',      'Views accounts & transfers',  'HTTPS / Browser'),
     rl('r-corp-web',    'p-corp',       'ctn-web',      'Bulk payments & treasury',    'HTTPS / Browser'),
-    rl('r-ops-apigw',   'p-ops',        'ctn-apigw',    'Admin & support operations',  'HTTPS / Admin API'),
+    rl('r-ops-bo',      'p-ops',        'ctn-backoffice', 'Works fraud cases & supports customers', 'HTTPS / SSO'),
     rl('r-web-apigw',   'ctn-web',      'ctn-apigw',    'API calls', 'HTTPS / REST'),
     rl('r-mob-apigw',   'ctn-mobile',   'ctn-apigw',    'API calls', 'HTTPS / REST'),
+    rl('r-bo-apigw',    'ctn-backoffice', 'ctn-apigw',  'Admin API calls', 'HTTPS / Admin API'),
     rl('r-apigw-auth',  'ctn-apigw',    'ctn-auth',     'Validates token',  'JWT / OIDC'),
     rl('r-apigw-pay',   'ctn-apigw',    'ctn-payments', 'Routes',           'HTTP/2 / gRPC'),
     rl('r-apigw-acc',   'ctn-apigw',    'ctn-accounts', 'Routes',           'HTTP/2 / gRPC'),
@@ -360,6 +385,10 @@ function makeBaseData() {
     gr('g-ffLedger-dbtx',  'ff-ledger',  'ctn-db-tx',    'constrains', 'Durability'),
     gr('g-ffLedger-impl',  'ff-ledger',  'adr-ledger',   'implements'),
   ]
+
+  // ── Product layer: requirements, scenarios, screen flows (see sample-product.js)
+  allNodes.push(...product.productNodes())
+  allRels.push(...product.productRelations())
 
   return { allNodes, allRels }
 }
@@ -399,12 +428,12 @@ const TREEMAP_IDS = [
   'dom-access', 'ctn-apigw', 'ctn-auth',
   'dom-banking', 'ctn-payments', 'comp-validator', 'comp-fx', 'ctn-accounts', 'ctn-evtbus',
   'dom-risk', 'ctn-fraud', 'ctn-db-acc', 'ctn-db-tx',
-  'sys-channels', 'ctn-web', 'ctn-mobile',
+  'sys-channels', 'ctn-web', 'ctn-mobile', 'ctn-backoffice',
 ]
 
 // Matrix (DSM): the concrete services/stores that exchange traffic
 const MATRIX_IDS = [
-  'ctn-web', 'ctn-mobile', 'ctn-apigw', 'ctn-auth',
+  'ctn-web', 'ctn-mobile', 'ctn-backoffice', 'ctn-apigw', 'ctn-auth',
   'ctn-payments', 'ctn-accounts', 'ctn-evtbus', 'ctn-fraud',
   'ctn-db-acc', 'ctn-db-tx',
 ]
@@ -416,7 +445,33 @@ const GOVERNANCE_IDS = [
   'dom-banking', 'ctn-payments', 'comp-validator', 'comp-fx', 'ctn-accounts', 'ctn-evtbus',
   'dom-risk', 'ctn-fraud', 'ctn-db-acc', 'ctn-db-tx',
   'adr-evt', 'adr-ledger', 'adr-jwt', 'adr-mono',
-  'ff-latency', 'ff-ledger',
+  'ff-latency', 'ff-ledger', 'ff-a11y',
+]
+
+// Screen map: actors → the apps they use → every screen those apps render
+const SCREENS_IDS = [
+  'p-customer', 'p-corp', 'p-ops',
+  'sys-channels', 'ctn-web', 'ctn-mobile', 'ctn-backoffice',
+  ...product.FLOWS.flatMap(f => [f.id, ...f.screens.map(([id]) => id)]),
+]
+
+// Traceability: requirements ↔ the scenarios that verify them ↔ the decisions
+// and fitness functions they trace to
+const TRACE_IDS = [
+  ...product.REQUIREMENT_IDS,
+  ...product.SCENARIO_IDS,
+  'adr-evt', 'adr-ledger', 'adr-jwt', 'ff-latency', 'ff-ledger',
+]
+
+// Requirements register (table): the product layer, one tab per type
+const REGISTER_IDS = [...product.REQUIREMENT_IDS, ...product.SCENARIO_IDS, ...product.MOCKUP_IDS]
+
+// Product wiki: journeys with their screens, requirements and scenarios
+const PRODUCT_WIKI_IDS = [
+  ...product.FLOWS.flatMap(f => [f.id, ...f.screens.map(([id]) => id)]),
+  ...product.REQUIREMENT_IDS,
+  ...product.SCENARIO_IDS,
+  'ff-a11y',
 ]
 
 const V1_NODES = [
@@ -436,6 +491,10 @@ const V2_RELS = [
   'r-apigw-pay', 'r-pay-dbtx', 'r-pay-evtbus', 'r-acc-evtbus', 'r-pay-swift',
 ]
 
+// v3 is the whole platform before the product layer; v4 (the live model) adds it
+const PRODUCT_NODE_IDS = new Set(product.productNodes().map(n => n.id))
+const PRODUCT_REL_IDS  = new Set(product.productRelations().map(r => r.id))
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -448,9 +507,26 @@ async function main() {
   for (const r of allRels)  allRelMap[r.id]  = Object.assign({}, r)
 
   // 1. Main layout (all nodes)
+  // Laid out in bands so the product layer does not tangle the architecture:
+  // architecture + governance (ELK, as before), then requirements & scenarios
+  // (ELK), then the screen flows stacked in journey order.
   console.log('Computing main layout...')
-  const mainPos = await applyElkLayout(allNodeMap, allRels)
-  applyPositions(allNodeMap, mainPos)
+  const PRODUCT_TYPES = new Set(['requirement', 'scenario', 'group', 'mockup'])
+  const layoutBand = async (ids, top) => {
+    const band = Object.fromEntries(ids.map(id => [id, allNodeMap[id]]))
+    applyPositions(band, await applyElkLayout(band, allRels))
+    const roots = Object.values(band).filter(n => !n.parentId)
+    const dy = top - Math.min(...roots.map(n => n.y))
+    for (const n of roots) n.y += dy
+    return Math.max(...roots.map(n => n.y + n.height))
+  }
+  let bandBottom = await layoutBand(allNodes.filter(n => !PRODUCT_TYPES.has(n.type)).map(n => n.id), 0)
+  bandBottom = await layoutBand(allNodes.filter(n => n.type === 'requirement' || n.type === 'scenario').map(n => n.id), bandBottom + 200)
+  for (const flow of product.FLOWS) {
+    const g = allNodeMap[flow.id]
+    Object.assign(g, { x: 30, y: bandBottom + 200 })
+    bandBottom = g.y + g.height
+  }
   const defaultPositions = recordToPos(allNodeMap)
 
   // 2. Context view
@@ -504,9 +580,25 @@ async function main() {
   const v2Pos = await applyElkLayout(v2NodeMap, v2RelList)
   applyPositions(v2NodeMap, v2Pos)
 
-  // 9. Milestone v3 (full model) uses the main layout positions
+  // 9. Milestones v3 (platform, before the product layer) and v4 (full model)
+  //    use the main layout positions
   const v3NodeMap = {}
-  for (const n of Object.values(allNodeMap)) v3NodeMap[n.id] = Object.assign({}, n)
+  const v4NodeMap = {}
+  for (const n of Object.values(allNodeMap)) {
+    if (!PRODUCT_NODE_IDS.has(n.id)) v3NodeMap[n.id] = Object.assign({}, n)
+    v4NodeMap[n.id] = Object.assign({}, n)
+  }
+  const v3RelMap = Object.fromEntries(allRels.filter(r => !PRODUCT_REL_IDS.has(r.id)).map(r => [r.id, r]))
+
+  // 10. Product views: screen map, one dynamic view per journey, traceability
+  console.log('Computing product view layouts...')
+  const screens = await layoutView(SCREENS_IDS, allNodeMap, allRels, defaultPositions, 0.4)
+  const trace   = await layoutView(TRACE_IDS, allNodeMap, allRels, defaultPositions, 0.6)
+  const journeys = []
+  for (const flow of product.FLOWS) {
+    const ids = [flow.id, ...flow.screens.map(([id]) => id)]
+    journeys.push({ flow, ids, layout: await layoutView(ids, allNodeMap, allRels, defaultPositions, 0.6) })
+  }
 
   // Compute viewports
   const ctxVp     = computeViewport(ctxNodes, 0.55)
@@ -516,6 +608,7 @@ async function main() {
   const treemapVp = { x: 80, y: 80, zoom: 0.6 }
   const mainVp    = computeViewport(allNodeMap, 0.4)
   const v1Vp      = computeViewport(v1NodeMap, 0.6)
+  const tableVp   = { x: 0, y: 0, zoom: 1 }
 
   const data = {
     nodes: Object.values(allNodeMap),
@@ -533,35 +626,50 @@ async function main() {
         'Fraud Detection scores transaction',
         'Sends wire via SWIFT',
       ],
-    }],
+    }, ...product.productSequences()],
     views: [
       { id: 'view-ctx',      name: 'System Context',    kind: 'static',  nodeIds: CTX_IDS,     positions: ctxPositions,     viewport: ctxVp     },
       { id: 'view-core',     name: 'Core Banking',       kind: 'static',  nodeIds: CORE_IDS,    positions: corePositions,    viewport: coreVp    },
       { id: 'view-payments', name: 'Payments Domain',    kind: 'static',  nodeIds: PAY_IDS,     positions: payPositions,     viewport: payVp     },
       { id: 'view-payflow',  name: 'Payment Flow',       kind: 'dynamic', nodeIds: PAYFLOW_IDS, positions: payflowPositions, viewport: payflowVp, sequenceId: 'seq-payment-flow' },
+      { id: 'view-screens',  name: 'Screen Map',         kind: 'static',  nodeIds: SCREENS_IDS, positions: screens.positions, viewport: screens.viewport },
+      ...journeys.map(({ flow, ids, layout }) => ({
+        id: `view-${flow.id}`, name: flow.name.split(' — ')[0], kind: 'dynamic', nodeIds: ids,
+        positions: layout.positions, viewport: layout.viewport, sequenceId: `seq-${flow.id}`,
+      })),
+      { id: 'view-trace',    name: 'Requirements Traceability', kind: 'static', nodeIds: TRACE_IDS, positions: trace.positions, viewport: trace.viewport },
+      { id: 'view-register', name: 'Requirements Register', kind: 'table', nodeIds: REGISTER_IDS, positions: defaultPositions, viewport: tableVp, tableActiveTab: 'requirement' },
       { id: 'view-treemap',  name: 'Platform Hierarchy', kind: 'treemap', nodeIds: TREEMAP_IDS, positions: treemapPositions, viewport: treemapVp },
-      { id: 'view-matrix',   name: 'Dependency Matrix', kind: 'matrix', nodeIds: MATRIX_IDS, positions: defaultPositions, viewport: { x: 0, y: 0, zoom: 1 } },
-      { id: 'view-governance', name: 'Governance', kind: 'table', nodeIds: GOVERNANCE_IDS, positions: defaultPositions, viewport: { x: 0, y: 0, zoom: 1 } },
-      { id: 'view-wiki', name: 'Architecture Wiki', kind: 'wiki', nodeIds: CORE_IDS, positions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
+      { id: 'view-matrix',   name: 'Dependency Matrix', kind: 'matrix', nodeIds: MATRIX_IDS, positions: defaultPositions, viewport: tableVp },
+      { id: 'view-governance', name: 'Governance', kind: 'table', nodeIds: GOVERNANCE_IDS, positions: defaultPositions, viewport: tableVp },
+      { id: 'view-wiki', name: 'Architecture Wiki', kind: 'wiki', nodeIds: CORE_IDS, positions: {}, viewport: tableVp },
+      // Opens on the customer journey in multi-page mode: the journey page followed
+      // by every screen's full page, wireframes included
+      { id: 'view-product-wiki', name: 'Product Wiki', kind: 'wiki', nodeIds: PRODUCT_WIKI_IDS, positions: {}, viewport: tableVp, wikiFocusId: 'flow-customer', wikiPageMode: 'multi' },
     ],
     snapshots: [
-      { id: 'snap-v1', name: 'v1 – Core & Accounts',   timestamp: Date.now() - 90 * 86400000, nodes: v1NodeMap, relations: Object.fromEntries(v1RelList.map(r => [r.id, r])) },
-      { id: 'snap-v2', name: 'v2 – Payments & Events', timestamp: Date.now() - 45 * 86400000, nodes: v2NodeMap, relations: Object.fromEntries(v2RelList.map(r => [r.id, r])) },
-      { id: 'snap-v3', name: 'v3 – Full Platform',     timestamp: Date.now(),                 nodes: v3NodeMap, relations: allRelMap },
+      { id: 'snap-v1', name: 'v1 – Core & Accounts',   timestamp: Date.now() - 120 * 86400000, nodes: v1NodeMap, relations: Object.fromEntries(v1RelList.map(r => [r.id, r])) },
+      { id: 'snap-v2', name: 'v2 – Payments & Events', timestamp: Date.now() - 75 * 86400000,  nodes: v2NodeMap, relations: Object.fromEntries(v2RelList.map(r => [r.id, r])) },
+      { id: 'snap-v3', name: 'v3 – Full Platform',     timestamp: Date.now() - 30 * 86400000,  nodes: v3NodeMap, relations: v3RelMap },
+      { id: 'snap-v4', name: 'v4 – Product & UX',      timestamp: Date.now(),                  nodes: v4NodeMap, relations: allRelMap },
     ],
     presentations: [{
       id: 'pres-walkthrough',
       name: 'Architecture Walkthrough',
       slides: [
-        { id: 'slide-ctx',      name: '1 – System Context',     snapshotId: null,      viewId: 'view-ctx',      viewport: ctxVp     },
-        { id: 'slide-core',     name: '2 – Core Banking',        snapshotId: null,      viewId: 'view-core',     viewport: coreVp    },
-        { id: 'slide-payments', name: '3 – Payments Domain',     snapshotId: null,      viewId: 'view-payments', viewport: payVp     },
-        { id: 'slide-payflow',  name: '4 – Payment Flow',        snapshotId: null,      viewId: 'view-payflow',  viewport: payflowVp },
-        { id: 'slide-treemap',  name: '5 – Platform Hierarchy',  snapshotId: null,      viewId: 'view-treemap',  viewport: treemapVp },
-        { id: 'slide-matrix',   name: '6 – Dependency Matrix',   snapshotId: null,      viewId: 'view-matrix',     viewport: { x: 0, y: 0, zoom: 1 } },
-        { id: 'slide-governance', name: '7 – Governance',        snapshotId: null,      viewId: 'view-governance', viewport: { x: 0, y: 0, zoom: 1 } },
-        { id: 'slide-v1',       name: '8 – v1 MVP (Milestone)',  snapshotId: 'snap-v1', viewId: null,            viewport: v1Vp      },
-      ],
+        { id: 'slide-ctx',        name: 'System Context',            snapshotId: null,      viewId: 'view-ctx',          viewport: ctxVp },
+        { id: 'slide-core',       name: 'Core Banking',              snapshotId: null,      viewId: 'view-core',         viewport: coreVp },
+        { id: 'slide-payments',   name: 'Payments Domain',           snapshotId: null,      viewId: 'view-payments',     viewport: payVp },
+        { id: 'slide-payflow',    name: 'Payment Flow',              snapshotId: null,      viewId: 'view-payflow',      viewport: payflowVp },
+        { id: 'slide-screens',    name: 'Screen Map',                snapshotId: null,      viewId: 'view-screens',      viewport: screens.viewport },
+        { id: 'slide-journey',    name: 'Customer Journey',          snapshotId: null,      viewId: 'view-flow-customer', viewport: journeys[0].layout.viewport },
+        { id: 'slide-trace',      name: 'Requirements Traceability', snapshotId: null,      viewId: 'view-trace',        viewport: trace.viewport },
+        { id: 'slide-treemap',    name: 'Platform Hierarchy',        snapshotId: null,      viewId: 'view-treemap',      viewport: treemapVp },
+        { id: 'slide-matrix',     name: 'Dependency Matrix',         snapshotId: null,      viewId: 'view-matrix',       viewport: tableVp },
+        { id: 'slide-governance', name: 'Governance',                snapshotId: null,      viewId: 'view-governance',   viewport: tableVp },
+        { id: 'slide-wiki',       name: 'Product Wiki',              snapshotId: null,      viewId: 'view-product-wiki', viewport: tableVp },
+        { id: 'slide-v1',         name: 'v1 MVP (Milestone)',        snapshotId: 'snap-v1', viewId: null,                viewport: v1Vp },
+      ].map((s, i) => Object.assign(s, { name: `${i + 1} – ${s.name}` })),
     }],
     defaultPositions,
     defaultViewport: mainVp,
