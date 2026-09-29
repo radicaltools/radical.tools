@@ -1,5 +1,9 @@
 // ─── AI integration: shared types ───────────────────────────────────────────
 
+import type { ToolDef } from '@radical/common/ai/tools'
+
+export type { ToolDef }
+
 export type AIProviderId = 'ollama' | 'openai' | 'anthropic' | 'gemini'
 
 // ─── Chat wire format (provider-agnostic) ───────────────────────────────────
@@ -26,15 +30,6 @@ export interface ChatMessage {
    *  run (e.g. the metamodel message in systemPrompt.ts), never on ones that
    *  change every round (e.g. the live diagram-state message). */
   cacheBreakpoint?: boolean
-}
-
-export interface ToolDef {
-  name: string
-  description: string
-  /** Conservative common-subset JSON Schema (type/properties/required/enum/
-   *  items/description/additionalProperties) — kept identical across every
-   *  adapter so none has to translate a provider-specific schema dialect. */
-  inputSchema: Record<string, unknown>
 }
 
 export interface ChatRequest {

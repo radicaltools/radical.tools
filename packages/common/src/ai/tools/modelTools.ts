@@ -1,8 +1,7 @@
 // ─── Model tools: search_model / focus_node / reset_diagram ─────────────────
 
 import { MODEL_QUERY_LANGUAGE_HELP, runModelQuery } from '../queryLanguage'
-import type { ToolDef } from '../types'
-import { fail, type ToolHandler } from './types'
+import { fail, type ToolDef, type ToolHandler } from './types'
 
 export function buildModelToolDefs(): ToolDef[] {
   return [

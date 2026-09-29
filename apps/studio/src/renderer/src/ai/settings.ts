@@ -3,7 +3,7 @@
 // API keys are stored client-side in plain text. This is an explicit trade-off
 // in favour of the web build: no server, no Electron requirement.
 
-import type { AIProviderId, AISettings, ProviderConfig } from '@radical/common/ai/types'
+import type { AIProviderId, AISettings, ProviderConfig } from './types'
 
 export const AI_SETTINGS_KEY = 'radical-ai-settings'
 

@@ -2,8 +2,7 @@
 
 import { NODE_SIZES, type C4ElementType, type C4Node } from '../../c4'
 import type { Metamodel } from '../../metamodel'
-import type { ToolDef } from '../types'
-import { fail, type ToolHandler } from './types'
+import { fail, type ToolDef, type ToolHandler } from './types'
 import { validateProperties } from './propertyBag'
 
 export function buildNodeToolDefs(mm: Metamodel | undefined): ToolDef[] {

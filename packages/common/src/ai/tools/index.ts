@@ -4,12 +4,11 @@
 // type added via the Metamodel Editor gets full AI support automatically.
 
 import type { Metamodel } from '../../metamodel'
-import type { ToolDef } from '../types'
 import { buildModelToolDefs, buildModelToolHandlers } from './modelTools'
 import { buildNodeToolDefs, buildNodeToolHandlers } from './nodeTools'
 import { buildRelationToolDefs, buildRelationToolHandlers } from './relationTools'
 import { buildViewToolDefs, buildViewToolHandlers } from './viewTools'
-import type { ToolHandler } from './types'
+import type { ToolDef, ToolHandler } from './types'
 
 export function buildToolDefs(metamodel: Metamodel | undefined): ToolDef[] {
   return [
@@ -29,4 +28,4 @@ export function buildToolHandlers(): Map<string, ToolHandler> {
   }))
 }
 
-export type { ToolHandler, ToolRunContext, ToolResult } from './types'
+export type { ToolDef, ToolHandler, ToolRunContext, ToolResult } from './types'

@@ -2,8 +2,7 @@
 
 import type { C4Relation } from '../../c4'
 import type { Metamodel } from '../../metamodel'
-import type { ToolDef } from '../types'
-import { fail, type ToolHandler } from './types'
+import { fail, type ToolDef, type ToolHandler } from './types'
 import { validateProperties } from './propertyBag'
 
 export function buildRelationToolDefs(mm: Metamodel | undefined): ToolDef[] {

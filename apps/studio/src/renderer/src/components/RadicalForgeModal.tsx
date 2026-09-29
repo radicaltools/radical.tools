@@ -18,7 +18,7 @@ import {
   HUB_MATCHES_QUESTION_ID,
   type ClarifyStageQuestion,
 } from '../ai/forgeClarify'
-import { addTokenUsage, type AISettings, type TokenUsage } from '@radical/common/ai/types'
+import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
 import { generateWireframe } from '../ai/mockupWireframe'
 

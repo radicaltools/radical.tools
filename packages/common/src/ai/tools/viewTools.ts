@@ -1,8 +1,7 @@
 // ─── View tools: create_view / set_view_nodes / delete_view / set_active_view
 
 import type { DiagramView } from '../../c4'
-import type { ToolDef } from '../types'
-import { fail, type ToolHandler } from './types'
+import { fail, type ToolDef, type ToolHandler } from './types'
 
 // 'dynamic' is deliberately excluded: it needs a sequenceId, and there is no
 // tool here to create one — exposing it would let the model build a broken view.

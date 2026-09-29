@@ -11,7 +11,7 @@
 // button: getAdapter(id).chat({...}, cfg) then textOf(res.content).
 
 import { getAdapter } from './registry'
-import { textOf, type AISettings, type TokenUsage } from '@radical/common/ai/types'
+import { textOf, type AISettings, type TokenUsage } from './types'
 import type { HubConceptSummary } from '../store/hubStore'
 
 export interface ClarifyStageQuestion {

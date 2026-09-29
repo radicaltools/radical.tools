@@ -9,7 +9,7 @@ import { emptyReport, mergeReport, type ApplyReport, type DiagramFacade } from '
 import { getAdapter } from './registry'
 import { buildContextMessage, buildSystemMessages } from './systemPrompt'
 import { buildToolDefs, buildToolHandlers, type ToolRunContext } from '@radical/common/ai/tools'
-import { addTokenUsage, textOf, toolCallsOf, type AISettings, type ChatContentBlock, type ChatMessage, type TokenUsage } from '@radical/common/ai/types'
+import { addTokenUsage, textOf, toolCallsOf, type AISettings, type ChatContentBlock, type ChatMessage, type TokenUsage } from './types'
 
 export interface RunAIResult {
   summary: string

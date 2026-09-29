@@ -10,7 +10,7 @@
 // so views can show wireframes without pulling in the AI providers.
 
 import { getAdapter } from './registry'
-import { textOf, type AISettings, type TokenUsage } from '@radical/common/ai/types'
+import { textOf, type AISettings, type TokenUsage } from './types'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { WIREFRAME_HEIGHT, WIREFRAME_WIDTH, sanitizeWireframeSvg } from '@radical/common/wireframe'
 

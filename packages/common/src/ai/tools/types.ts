@@ -2,6 +2,16 @@
 
 import type { DiagramFacade } from '../diagramFacade'
 
+/** A tool as offered to a model (an AI chat provider or an MCP client). */
+export interface ToolDef {
+  name: string
+  description: string
+  /** Conservative common-subset JSON Schema (type/properties/required/enum/
+   *  items/description/additionalProperties) — kept identical across every
+   *  adapter so none has to translate a provider-specific schema dialect. */
+  inputSchema: Record<string, unknown>
+}
+
 export interface ToolRunContext {
   diagram: DiagramFacade
   /** tempId or real id -> real id (identity when not a known tempId). */

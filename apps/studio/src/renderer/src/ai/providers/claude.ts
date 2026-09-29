@@ -8,7 +8,7 @@
 // inside a `user`-role message, no separate 'tool' role. Every other
 // provider's adapter expands/repacks from this shape.
 
-import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '@radical/common/ai/types'
+import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '../types'
 
 const DEFAULT_BASE = 'https://api.anthropic.com/v1'
 const ANTHROPIC_VERSION = '2023-06-01'

@@ -5,7 +5,7 @@
 
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 import type { Metamodel } from '@radical/common/metamodel'
-import type { ChatMessage } from '@radical/common/ai/types'
+import type { ChatMessage } from './types'
 
 const FALLBACK_TYPES = [
   'person', 'system', 'container', 'component', 'database', 'webapp', 'queue',

@@ -4,7 +4,7 @@
 // exists too, but Chat Completions remains supported and is what this app
 // already targets).
 
-import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '@radical/common/ai/types'
+import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '../types'
 
 const DEFAULT_BASE = 'https://api.openai.com/v1'
 

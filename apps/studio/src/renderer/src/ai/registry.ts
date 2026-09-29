@@ -4,7 +4,7 @@ import { claudeAdapter } from './providers/claude'
 import { geminiAdapter } from './providers/gemini'
 import { ollamaAdapter } from './providers/ollama'
 import { openaiAdapter } from './providers/openai'
-import type { AIProviderId, ProviderAdapter } from '@radical/common/ai/types'
+import type { AIProviderId, ProviderAdapter } from './types'
 
 export const ADAPTERS: Record<AIProviderId, ProviderAdapter> = {
   ollama: ollamaAdapter,
