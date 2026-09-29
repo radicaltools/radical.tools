@@ -9,8 +9,10 @@
 
 import type { C4ElementType } from '@radical/common/c4'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, TYPE_ICON_PATHS } from '@radical/common/c4'
+import type { HubCategory } from '@radical/common/hubFormat'
 
-export type HubCategory = 'pattern' | 'fitness-function' | 'requirement' | 'adr' | 'blueprint'
+export type { HubCategory }
+
 
 export const HUB_CATEGORIES: readonly HubCategory[] = [
   'pattern',
