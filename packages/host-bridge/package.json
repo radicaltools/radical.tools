@@ -1,0 +1,19 @@
+{
+  "name": "@radical/host-bridge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The typed contract between Studio's renderer and its host (Electron, VS Code webview, browser), and the VS Code webview protocol.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vscode": "./src/vscode.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.4"
+  }
+}

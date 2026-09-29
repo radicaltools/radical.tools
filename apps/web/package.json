@@ -1,0 +1,5 @@
+{
+  "name": "@radical/web",
+  "private": true,
+  "description": "Marketing site and manual (radical.tools). Static files, deployed as-is."
+}

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Generates tools/vscode-radical/images/icon.png (128×128)
+// Generates apps/vscode/images/icon.png (128×128)
 // Uses only Node.js built-ins (zlib, fs, path) — no dependencies.
 //
 //   node tools/generate-icon.js                              → VS Code icon (128)
-//   node tools/generate-icon.js --size 512 --out build/icon.png   → desktop app icon
+//   node tools/generate-icon.js --size 512 --out apps/studio/build/icon.png   → desktop app icon
 
 const zlib = require('zlib')
 const fs   = require('fs')
@@ -176,7 +176,7 @@ const png = Buffer.concat([
 
 const outFile = arg('--out')
   ? path.resolve(arg('--out'))
-  : path.join(__dirname, 'vscode-radical', 'images', 'icon.png')
+  : path.join(__dirname, '..', 'apps', 'vscode', 'images', 'icon.png')
 fs.mkdirSync(path.dirname(outFile), { recursive: true })
 fs.writeFileSync(outFile, png)
 console.log(`icon.png  ${png.length} bytes  →  ${outFile}`)

@@ -1,0 +1,1751 @@
+import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useDiagramStore } from '../store/diagramStore'
+import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, PropertyDef } from '@radical/common/metamodel'
+import { useOutsideClick } from '../hooks/useOutsideClick'
+import { EarsQuickEntry } from './EarsQuickEntry'
+import { MockupWireframe } from './MockupWireframe'
+import { wireframeDataUri } from '@radical/common/wireframe'
+import { loadStudioSettings, STUDIO_SETTINGS_CHANGED_EVENT } from '../studioSettings'
+import {
+  C4Node,
+  C4Relation,
+  C4ElementType,
+  NODE_COLORS,
+  NODE_FG,
+  NODE_SIZES,
+  TYPE_LABELS,
+  TYPE_ICON_PATHS,
+} from '@radical/common/c4'
+
+type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
+type AddNode = ReturnType<typeof useDiagramStore.getState>['addNode']
+type AddRelation = ReturnType<typeof useDiagramStore.getState>['addRelation']
+type UpdateNode = ReturnType<typeof useDiagramStore.getState>['updateNode']
+type UpdateRelation = ReturnType<typeof useDiagramStore.getState>['updateRelation']
+type TypeMeta = (type: string) => { label: string; color: string; fg: string; iconPath: string }
+
+type TypeOption = { id: string; label: string; color: string }
+
+// All node types known to the document, preferring the metamodel and falling
+// back to the built-in C4 type list when no metamodel is present.
+function allNodeTypeIds(metamodel: Metamodel): string[] {
+  const fromMeta = metamodel?.nodeTypes ? Object.keys(metamodel.nodeTypes) : []
+  if (fromMeta.length) return fromMeta
+  return Object.keys(TYPE_LABELS)
+}
+
+// Node types that may be created as a child of `parentType` (undefined → root).
+function childTypeOptions(
+  metamodel: Metamodel,
+  parentType: string | undefined,
+  typeMeta: TypeMeta,
+): TypeOption[] {
+  return allNodeTypeIds(metamodel)
+    .filter((t) => isParentAllowed(metamodel, t, parentType))
+    .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
+
+// Resolve display metadata for a node type, preferring the document metamodel
+// (supports custom types) and falling back to the built-in C4 constants.
+function useTypeMeta(): TypeMeta {
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  return useMemo(() => {
+    return (type: string) => {
+      const def = metamodel?.nodeTypes?.[type]
+      return {
+        label: def?.label ?? TYPE_LABELS[type as C4ElementType] ?? type,
+        color: def?.color ?? NODE_COLORS[type as C4ElementType] ?? '#334155',
+        fg: def?.fg ?? NODE_FG[type as C4ElementType] ?? '#fff',
+        iconPath: def?.iconPath ?? TYPE_ICON_PATHS[type as C4ElementType] ?? '',
+      }
+    }
+  }, [metamodel])
+}
+
+function TypeChip({ type, typeMeta }: { type: string; typeMeta: TypeMeta }): React.ReactElement {
+  const meta = typeMeta(type)
+  return (
+    <span
+      className="wiki-chip"
+      style={{ background: `${meta.color}1f`, color: meta.color, borderColor: `${meta.color}55` }}
+    >
+      {meta.iconPath && (
+        <svg viewBox="0 0 16 16" width="11" height="11" fill={meta.color}>
+          <path d={meta.iconPath} />
+        </svg>
+      )}
+      {meta.label}
+    </span>
+  )
+}
+
+// ─── Add menu (dropdown picker used to create nodes / relations) ─────────────
+
+type AddMenuOption = { id: string; label: string; color?: string; sub?: string }
+
+function AddMenu({
+  label,
+  options,
+  emptyHint,
+  onPick,
+  variant = 'default',
+}: {
+  label: string
+  options: AddMenuOption[]
+  emptyHint?: string
+  onPick: (id: string) => void
+  variant?: 'default' | 'ghost'
+}): React.ReactElement {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const ref = useRef<HTMLDivElement | null>(null)
+  useOutsideClick([ref], open, () => setOpen(false))
+
+  const lower = query.trim().toLowerCase()
+  const filtered = lower
+    ? options.filter((o) => o.label.toLowerCase().includes(lower) || o.sub?.toLowerCase().includes(lower))
+    : options
+
+  return (
+    <div className="wiki-add" ref={ref}>
+      <button
+        className={`wiki-add-btn ${variant === 'ghost' ? 'ghost' : ''}`}
+        onClick={() => {
+          setOpen((o) => !o)
+          setQuery('')
+        }}
+      >
+        <span className="wiki-add-plus">+</span>
+        {label}
+      </button>
+      {open && (
+        <div className="wiki-add-menu">
+          {options.length > 6 && (
+            <input
+              className="wiki-add-search"
+              placeholder="Search…"
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          )}
+          <div className="wiki-add-list">
+            {filtered.length === 0 ? (
+              <div className="wiki-add-empty">{emptyHint ?? 'Nothing available'}</div>
+            ) : (
+              filtered.map((o) => (
+                <button
+                  key={o.id}
+                  className="wiki-add-item"
+                  onClick={() => {
+                    onPick(o.id)
+                    setOpen(false)
+                  }}
+                >
+                  {o.color && <span className="wiki-add-dot" style={{ background: o.color }} />}
+                  <span className="wiki-add-item-label">{o.label}</span>
+                  {o.sub && <span className="wiki-add-item-sub">{o.sub}</span>}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function WikiView(): React.ReactElement {
+  const views = useDiagramStore((s) => s.views)
+  const activeViewId = useDiagramStore((s) => s.activeViewId)
+  const c4Nodes = useDiagramStore((s) => s.c4Nodes)
+  const c4Relations = useDiagramStore((s) => s.c4Relations)
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  const updateNode = useDiagramStore((s) => s.updateNode)
+  const updateRelation = useDiagramStore((s) => s.updateRelation)
+  const addNode = useDiagramStore((s) => s.addNode)
+  const removeNode = useDiagramStore((s) => s.removeNode)
+  const addRelation = useDiagramStore((s) => s.addRelation)
+  const removeRelation = useDiagramStore((s) => s.removeRelation)
+  const pushNotification = useDiagramStore((s) => s.pushNotification)
+  const setWikiFocus = useDiagramStore((s) => s.setWikiFocus)
+  const setWikiPageMode = useDiagramStore((s) => s.setWikiPageMode)
+  const appMode = useDiagramStore((s) => s.appMode)
+
+  const readOnly = appMode !== 'designer'
+  const typeMeta = useTypeMeta()
+
+  const view = activeViewId ? views[activeViewId] : null
+  const focusId = view?.wikiFocusId ?? null
+  const pageMode = view?.wikiPageMode ?? 'single'
+
+  const [filter, setFilter] = useState('')
+
+  // Studio-wide preference (see components/Toolbar.tsx's "Wiki multi-page
+  // depth" control) — how many levels 'multi' page mode embeds inline.
+  const [multiPageDepth, setMultiPageDepth] = useState(() => loadStudioSettings().wikiMultiPageDepth)
+  useEffect(() => {
+    const onChange = (): void => setMultiPageDepth(loadStudioSettings().wikiMultiPageDepth)
+    window.addEventListener(STUDIO_SETTINGS_CHANGED_EVENT, onChange)
+    return () => window.removeEventListener(STUDIO_SETTINGS_CHANGED_EVENT, onChange)
+  }, [])
+
+  // Respect the right-panel visibility filter: a view's nodeIds defines the
+  // visible set (empty = show all). Ancestors are included so the hierarchy
+  // stays navigable, mirroring the canvas/treemap behaviour.
+  const visibleSet = useMemo<Set<string> | null>(() => {
+    if (!view || view.nodeIds.length === 0) return null
+    const result = new Set<string>()
+    for (const id of view.nodeIds) {
+      let cur: string | undefined = id
+      while (cur && c4Nodes[cur]) {
+        result.add(cur)
+        cur = c4Nodes[cur].parentId ?? undefined
+      }
+    }
+    return result
+  }, [view, c4Nodes])
+
+  const focusNode = focusId ? c4Nodes[focusId] : null
+  const focus = focusNode && (!visibleSet || visibleSet.has(focusNode.id)) ? focusNode : null
+
+  const nodeList = useMemo(
+    () => Object.values(c4Nodes).filter((n) => !visibleSet || visibleSet.has(n.id)),
+    [c4Nodes, visibleSet],
+  )
+
+  const childrenOf = useMemo(() => {
+    const map: Record<string, C4Node[]> = {}
+    for (const n of nodeList) {
+      const key = n.parentId ?? '__root__'
+      ;(map[key] ??= []).push(n)
+    }
+    for (const k of Object.keys(map)) {
+      map[k].sort((a, b) => a.label.localeCompare(b.label))
+    }
+    return map
+  }, [nodeList])
+
+  const goTo = (id: string | null) => {
+    if (view) setWikiFocus(view.id, id)
+  }
+
+  // Create a node of `type` (optionally inside `parentId`), then navigate to
+  // it. addNode validates metamodel rules and emits its own error toast on
+  // failure (returning ''). `onCreated` runs before navigating — e.g. to
+  // wire up a hierarchyRelation edge (see WikiElementPage's onCreateChild
+  // for a hierarchyRelation-typed node, such as a Requirement "deriving
+  // from" the one it's a child of).
+  const createNode = (type: string, parentId: string | undefined, onCreated?: (id: string) => void) => {
+    const def = metamodel?.nodeTypes[type]
+    const label = `New ${def?.label ?? TYPE_LABELS[type as C4ElementType] ?? type}`
+    const size = NODE_SIZES[type as C4ElementType]
+    const id = addNode({
+      type: type as C4ElementType,
+      label,
+      description: '',
+      technology: '',
+      collapsed: false,
+      external: false,
+      parentId,
+      x: 0,
+      y: 0,
+      width: def?.width ?? size?.width ?? 160,
+      height: def?.height ?? size?.height ?? 90,
+    })
+    if (id) {
+      onCreated?.(id)
+      pushNotification(`${label} added.`, 'info')
+      goTo(id)
+    }
+  }
+
+  const deleteNode = (id: string) => {
+    const target = c4Nodes[id]
+    if (!target) return
+    const kids = Object.values(c4Nodes).filter((n) => n.parentId === id)
+    const extra = kids.length ? ` and its ${kids.length} child element${kids.length === 1 ? '' : 's'}` : ''
+    if (!window.confirm(`Delete "${target.label}"${extra}? This cannot be undone from here.`)) return
+    const parentId = target.parentId ?? null
+    removeNode(id)
+    pushNotification(`"${target.label}" deleted.`, 'info')
+    if (focusId === id || (focusId && !c4Nodes[focusId])) goTo(parentId)
+  }
+
+  const createRelation = (sourceId: string, targetId: string, relationType?: string) => {
+    addRelation({ sourceId, targetId, ...(relationType ? { relationType } : {}) })
+  }
+
+  const deleteRelation = (id: string) => {
+    removeRelation(id)
+  }
+
+  if (!view) {
+    return (
+      <div className="wiki-view">
+        <div className="wiki-empty">No active view.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="wiki-view">
+      <WikiNav
+        filter={filter}
+        setFilter={setFilter}
+        childrenOf={childrenOf}
+        focusId={focusId}
+        onSelect={goTo}
+        typeMeta={typeMeta}
+      />
+      <div className="wiki-page">
+        <div className="wiki-page-mode-toggle">
+          <button
+            className={pageMode === 'single' ? 'active' : ''}
+            onClick={() => view && setWikiPageMode(view.id, 'single')}
+            title="Children show as short preview cards — click through one page at a time"
+          >
+            Single page
+          </button>
+          <button
+            className={pageMode === 'multi' ? 'active' : ''}
+            onClick={() => view && setWikiPageMode(view.id, 'multi')}
+            title="Each direct child's full content is shown inline, on this same page"
+          >
+            Multi page
+          </button>
+        </div>
+        {focus ? (
+          <WikiElementPage
+            key={focus.id}
+            node={focus}
+            nodes={c4Nodes}
+            relations={c4Relations}
+            visibleSet={visibleSet}
+            metamodel={metamodel}
+            updateNode={updateNode}
+            updateRelation={updateRelation}
+            onNavigate={goTo}
+            createNode={createNode}
+            onDeleteNode={deleteNode}
+            createRelation={createRelation}
+            onDeleteRelation={deleteRelation}
+            readOnly={readOnly}
+            typeMeta={typeMeta}
+            pageMode={pageMode}
+            remainingDepth={multiPageDepth}
+          />
+        ) : (
+          <WikiOverview
+            roots={childrenOf['__root__'] ?? []}
+            childrenOf={childrenOf}
+            nodes={c4Nodes}
+            relations={c4Relations}
+            visibleSet={visibleSet}
+            metamodel={metamodel}
+            updateNode={updateNode}
+            updateRelation={updateRelation}
+            onNavigate={goTo}
+            createNode={createNode}
+            onCreateRoot={(type) => createNode(type, undefined)}
+            onDeleteNode={deleteNode}
+            createRelation={createRelation}
+            onDeleteRelation={deleteRelation}
+            readOnly={readOnly}
+            totalNodes={nodeList.length}
+            totalRelations={Object.keys(c4Relations).length}
+            typeMeta={typeMeta}
+            pageMode={pageMode}
+            remainingDepth={multiPageDepth}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Navigation (left column) ────────────────────────────────────────────────
+
+// Root-level elements are split into named sections so the rail reads as an
+// organised document outline instead of one flat, type-agnostic list —
+// the C4/DDD structural model, then the governance layer (ADRs, fitness
+// functions, requirements, blueprints) that references it.
+const ARCHITECTURE_ROOT_TYPES: ReadonlySet<string> = new Set([
+  'person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group',
+])
+// Governance items are further split by type — a flat "Governance" bucket
+// mixing ADRs, fitness functions and requirements is just a smaller version
+// of the same illegible wall, so each type gets its own labelled subgroup.
+const GOVERNANCE_TYPE_ORDER: readonly string[] = ['requirement', 'scenario', 'mockup', 'adr', 'fitness-fn', 'blueprint']
+const GOVERNANCE_ROOT_TYPES: ReadonlySet<string> = new Set(GOVERNANCE_TYPE_ORDER)
+
+type RootSectionId = 'architecture' | 'governance' | 'other'
+
+const ROOT_SECTIONS: Array<{ id: RootSectionId; label: string }> = [
+  { id: 'architecture', label: 'C4' },
+  { id: 'governance', label: 'Governance' },
+  { id: 'other', label: 'Other' },
+]
+
+function rootSectionOf(type: string): RootSectionId {
+  if (ARCHITECTURE_ROOT_TYPES.has(type)) return 'architecture'
+  if (GOVERNANCE_ROOT_TYPES.has(type)) return 'governance'
+  return 'other'
+}
+
+interface NavSubgroup { key: string; label: string; count: number; rendered: React.ReactNode[] }
+interface NavSection { id: RootSectionId; label: string; count: number; rendered?: React.ReactNode[]; subgroups?: NavSubgroup[] }
+
+function WikiNav({
+  filter,
+  setFilter,
+  childrenOf,
+  focusId,
+  onSelect,
+  typeMeta,
+}: {
+  filter: string
+  setFilter: (v: string) => void
+  childrenOf: Record<string, C4Node[]>
+  focusId: string | null
+  onSelect: (id: string | null) => void
+  typeMeta: TypeMeta
+}): React.ReactElement {
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
+  const lower = filter.trim().toLowerCase()
+
+  const renderNode = (n: C4Node, depth: number): React.ReactNode => {
+    const matches = !lower || n.label.toLowerCase().includes(lower)
+    const childItems = childrenOf[n.id] ?? []
+    const childNodes = childItems.map((c) => renderNode(c, depth + 1))
+    const hasMatchingChild = childNodes.some(Boolean)
+    if (lower && !matches && !hasMatchingChild) return null
+    const meta = typeMeta(n.type)
+    return (
+      <div key={n.id}>
+        <button
+          className={`wiki-nav-item ${focusId === n.id ? 'active' : ''}`}
+          style={{ paddingLeft: 10 + depth * 13 }}
+          onClick={() => onSelect(n.id)}
+          title={n.label}
+        >
+          <span className="wiki-nav-dot" style={{ background: meta.color }} />
+          <span className="wiki-nav-text">{n.label}</span>
+        </button>
+        {childNodes}
+      </div>
+    )
+  }
+
+  const roots = childrenOf['__root__'] ?? []
+  const sections: NavSection[] = ROOT_SECTIONS.map(({ id, label }) => {
+    const items = roots.filter((n) => rootSectionOf(n.type) === id)
+    if (id === 'governance') {
+      const byType = new Map<string, C4Node[]>()
+      for (const n of items) {
+        const list = byType.get(n.type) ?? []
+        list.push(n)
+        byType.set(n.type, list)
+      }
+      const typeOrder = [
+        ...GOVERNANCE_TYPE_ORDER.filter((t) => byType.has(t)),
+        ...[...byType.keys()].filter((t) => !GOVERNANCE_TYPE_ORDER.includes(t)),
+      ]
+      const subgroups = typeOrder.map((type) => {
+        const typeItems = byType.get(type)!
+        return {
+          key: type,
+          label: typeMeta(type).label,
+          count: typeItems.length,
+          rendered: typeItems.map((n) => renderNode(n, 2)).filter(Boolean),
+        }
+      })
+      return { id, label, count: items.length, subgroups }
+    }
+    return { id, label, count: items.length, rendered: items.map((n) => renderNode(n, 1)).filter(Boolean) }
+  }).filter((s) => s.count > 0)
+
+  const toggleSection = (id: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  return (
+    <div className="wiki-nav">
+      <div className="wiki-nav-head">Contents</div>
+      <input
+        className="wiki-nav-search"
+        placeholder="Filter…"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+      />
+      <button
+        className={`wiki-nav-item wiki-nav-home ${focusId === null ? 'active' : ''}`}
+        onClick={() => onSelect(null)}
+      >
+        <span className="wiki-nav-text">Overview</span>
+      </button>
+      <div className="wiki-nav-tree">
+        {sections.map(({ id, label, count, rendered, subgroups }) => {
+          // Hide a section entirely once filtering leaves nothing in it, but
+          // only when the user is actually filtering — an empty count is
+          // never possible unfiltered since the section wouldn't exist.
+          const empty = subgroups
+            ? subgroups.every((g) => g.rendered.every((r) => !r))
+            : rendered!.every((r) => !r)
+          if (lower && empty) return null
+          const isCollapsed = collapsed.has(id)
+          return (
+            <div className="wiki-nav-section" key={id}>
+              <button className="wiki-nav-section-head" onClick={() => toggleSection(id)}>
+                <span className={`wiki-nav-section-chevron ${isCollapsed ? 'collapsed' : ''}`}>▾</span>
+                {label}
+                <span className="wiki-nav-section-count">{count}</span>
+              </button>
+              {!isCollapsed && (subgroups ? (
+                subgroups.map(({ key, label: subLabel, count: subCount, rendered: subRendered }) => {
+                  if (lower && subRendered.every((r) => !r)) return null
+                  const subId = `${id}:${key}`
+                  const subCollapsed = collapsed.has(subId)
+                  return (
+                    <div className="wiki-nav-subsection" key={subId}>
+                      <button className="wiki-nav-subsection-head" onClick={() => toggleSection(subId)}>
+                        <span className={`wiki-nav-section-chevron ${subCollapsed ? 'collapsed' : ''}`}>▾</span>
+                        {subLabel}
+                        <span className="wiki-nav-section-count">{subCount}</span>
+                      </button>
+                      {!subCollapsed && subRendered}
+                    </div>
+                  )
+                })
+              ) : rendered)}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Overview page ───────────────────────────────────────────────────────────
+
+// Shared element card used on the overview and element pages. Rendered as a
+// container so an optional delete button can live alongside the open button
+// (nested <button> elements are invalid HTML).
+function WikiNodeCard({
+  node,
+  metaLabel,
+  color,
+  sub,
+  onOpen,
+  onDelete,
+}: {
+  node: C4Node
+  metaLabel: string
+  color: string
+  sub?: string
+  onOpen: () => void
+  onDelete?: () => void
+}): React.ReactElement {
+  return (
+    <div className="wiki-card">
+      <button className="wiki-card-open" onClick={onOpen}>
+        <span className="wiki-card-bar" style={{ background: color }} />
+        <span className="wiki-card-body">
+          <span className="wiki-card-title">{node.label}</span>
+          <span className="wiki-card-meta">
+            {metaLabel}
+            {sub}
+          </span>
+          {node.description && <span className="wiki-card-desc">{node.description}</span>}
+          {node.type === 'mockup' && typeof (node as unknown as Record<string, unknown>).wireframe === 'string' && (
+            <img
+              className="wiki-card-thumb"
+              src={wireframeDataUri((node as unknown as Record<string, string>).wireframe)}
+              alt=""
+            />
+          )}
+        </span>
+      </button>
+      {onDelete && (
+        <button
+          className="wiki-card-del"
+          title="Delete element"
+          aria-label={`Delete ${node.label}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete()
+          }}
+        >
+          ×
+        </button>
+      )}
+    </div>
+  )
+}
+
+function WikiOverview({
+  roots,
+  childrenOf,
+  nodes,
+  relations,
+  visibleSet,
+  metamodel,
+  updateNode,
+  updateRelation,
+  onNavigate,
+  createNode,
+  onCreateRoot,
+  onDeleteNode,
+  createRelation,
+  onDeleteRelation,
+  readOnly,
+  totalNodes,
+  totalRelations,
+  typeMeta,
+  pageMode,
+  remainingDepth = 1,
+}: {
+  roots: C4Node[]
+  childrenOf: Record<string, C4Node[]>
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  visibleSet: Set<string> | null
+  metamodel: Metamodel
+  updateNode: UpdateNode
+  updateRelation: UpdateRelation
+  onNavigate: (id: string) => void
+  createNode: (type: string, parentId: string | undefined, onCreated?: (id: string) => void) => void
+  onCreateRoot: (type: string) => void
+  onDeleteNode: (id: string) => void
+  createRelation: (sourceId: string, targetId: string, relationType?: string) => void
+  onDeleteRelation: (id: string) => void
+  readOnly: boolean
+  totalNodes: number
+  totalRelations: number
+  typeMeta: TypeMeta
+  /** Mirrors WikiElementPage's pageMode — 'multi' embeds each root element's
+   *  full content inline on the Overview page instead of a preview-card grid. */
+  pageMode: 'single' | 'multi'
+  remainingDepth?: number
+}): React.ReactElement {
+  const rootTypes = useMemo(
+    () => childTypeOptions(metamodel, undefined, typeMeta),
+    [metamodel, typeMeta],
+  )
+  return (
+    <article className="wiki-doc">
+      <header className="wiki-doc-header">
+        <div className="wiki-title-row">
+          <h1 className="wiki-doc-title">Overview</h1>
+          {!readOnly && (
+            <AddMenu
+              label="Add element"
+              options={rootTypes}
+              emptyHint="No root types in metamodel"
+              onPick={onCreateRoot}
+            />
+          )}
+        </div>
+        <p className="wiki-doc-sub">
+          {totalNodes} element{totalNodes === 1 ? '' : 's'} · {totalRelations} relation
+          {totalRelations === 1 ? '' : 's'}
+        </p>
+      </header>
+      {roots.length === 0 ? (
+        <p className="wiki-muted">No elements yet.</p>
+      ) : pageMode === 'multi' && remainingDepth > 0 ? (
+        <div className="wiki-embedded-children">
+          {roots.map((n) => (
+            <div className="wiki-embedded-child" key={n.id}>
+              <WikiElementPage
+                node={n}
+                nodes={nodes}
+                relations={relations}
+                visibleSet={visibleSet}
+                metamodel={metamodel}
+                updateNode={updateNode}
+                updateRelation={updateRelation}
+                onNavigate={onNavigate}
+                createNode={createNode}
+                onDeleteNode={onDeleteNode}
+                createRelation={createRelation}
+                onDeleteRelation={onDeleteRelation}
+                readOnly={readOnly}
+                typeMeta={typeMeta}
+                pageMode={pageMode}
+                embedded
+                remainingDepth={remainingDepth - 1}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="wiki-card-grid">
+          {roots.map((n) => {
+            const kids = childrenOf[n.id] ?? []
+            const meta = typeMeta(n.type)
+            return (
+              <WikiNodeCard
+                key={n.id}
+                node={n}
+                color={meta.color}
+                metaLabel={meta.label}
+                sub={kids.length > 0 ? ` · ${kids.length} child${kids.length === 1 ? '' : 'ren'}` : ''}
+                onOpen={() => onNavigate(n.id)}
+                onDelete={readOnly ? undefined : () => onDeleteNode(n.id)}
+              />
+            )
+          })}
+        </div>
+      )}
+    </article>
+  )
+}
+
+// ─── Element page ────────────────────────────────────────────────────────────
+
+const TECH_TYPES: ReadonlySet<string> = new Set([
+  'container',
+  'component',
+  'database',
+  'webapp',
+  'queue',
+])
+
+// Free-text fields that read as short, scannable metadata (e.g.
+// "Technology: React", "Date: 2024-01") and therefore belong in the
+// at-a-glance infobox rather than the main body. Every other `text` field is
+// treated as substantive content and rendered as a prose section so it does
+// not get buried in the sidebar (e.g. a Fitness Function's success criteria).
+const INFOBOX_TEXT_KEYS: ReadonlySet<string> = new Set([
+  'technology',
+  'date',
+  'version',
+  'owner',
+  'author',
+  'team',
+  'url',
+  'link',
+  'repo',
+  'repository',
+  'reference',
+  'ref',
+  'tags',
+  'tag',
+])
+
+// A property is an "infobox fact" when it is a short classifier — enums,
+// booleans, numbers, and the curated short-text metadata above. Substantive
+// text/textarea content stays in the main body.
+function isInfoboxFact(p: PropertyDef): boolean {
+  if (p.type === 'enum' || p.type === 'boolean' || p.type === 'number') return true
+  if (p.type === 'text') return INFOBOX_TEXT_KEYS.has(p.key)
+  return false
+}
+
+function WikiElementPage({
+  node,
+  nodes,
+  relations,
+  visibleSet,
+  metamodel,
+  updateNode,
+  updateRelation,
+  onNavigate,
+  createNode,
+  onDeleteNode,
+  createRelation,
+  onDeleteRelation,
+  readOnly,
+  typeMeta,
+  pageMode,
+  embedded = false,
+  remainingDepth = 1,
+}: {
+  node: C4Node
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  visibleSet: Set<string> | null
+  metamodel: Metamodel
+  updateNode: UpdateNode
+  updateRelation: UpdateRelation
+  onNavigate: (id: string) => void
+  createNode: (type: string, parentId: string | undefined, onCreated?: (id: string) => void) => void
+  onDeleteNode: (id: string) => void
+  createRelation: (sourceId: string, targetId: string, relationType?: string) => void
+  onDeleteRelation: (id: string) => void
+  readOnly: boolean
+  typeMeta: TypeMeta
+  /** 'single' (default) = children as short preview cards. 'multi' = each
+   *  direct child's full content shown inline below, on this same page. */
+  pageMode: 'single' | 'multi'
+  /** True for a child rendered inline by a 'multi' page mode parent —
+   *  suppresses the breadcrumb and shows "Open as its own page" instead. */
+  embedded?: boolean
+  /** How many more levels 'multi' page mode may still embed inline, from
+   *  here down — the Studio-wide "Wiki multi-page depth" setting at the top
+   *  level, decremented by one on each embedded recursion. 0 = show this
+   *  node's own children as preview cards even in 'multi' mode (the depth
+   *  budget is spent). Defaults to 1 for any caller that doesn't pass it. */
+  remainingDepth?: number
+}): React.ReactElement {
+  // Types that nest via a relation instead of canvas containment (e.g. a
+  // Requirement "derives" from the one it decomposes — allowedParents can't
+  // express that, since containment and this relation are different things).
+  const hierarchyRelationType = metamodel?.nodeTypes[node.type]?.hierarchyRelation
+
+  const onCreateChild = (type: string) => {
+    if (hierarchyRelationType) {
+      // New child inherits the same structural container (system/domain/
+      // group) as `node`, if any, then gets a hierarchyRelation edge back
+      // to `node` — e.g. child --derives--> node.
+      createNode(type, node.parentId, (newId) => createRelation(newId, node.id, hierarchyRelationType))
+    } else {
+      createNode(type, node.id)
+    }
+  }
+  const onCreateRelation = (targetId: string) => createRelation(node.id, targetId)
+
+  const breadcrumb = useMemo(() => {
+    const chain: C4Node[] = []
+    let cur: C4Node | undefined = node
+    const seen = new Set<string>()
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id)
+      chain.unshift(cur)
+      cur = cur.parentId ? nodes[cur.parentId] : undefined
+    }
+    return chain
+  }, [node, nodes])
+
+  const children = useMemo(
+    () =>
+      hierarchyRelationType
+        ? Object.values(relations)
+            .filter((r) => r.relationType === hierarchyRelationType && r.targetId === node.id)
+            .map((r) => nodes[r.sourceId])
+            .filter((n): n is C4Node => !!n && (!visibleSet || visibleSet.has(n.id)))
+            .sort((a, b) => a.label.localeCompare(b.label))
+        : Object.values(nodes)
+            .filter((n) => n.parentId === node.id && (!visibleSet || visibleSet.has(n.id)))
+            .sort((a, b) => a.label.localeCompare(b.label)),
+    [nodes, relations, node.id, visibleSet, hierarchyRelationType],
+  )
+
+  const outgoing = useMemo(
+    () =>
+      Object.values(relations).filter(
+        (r) => r.sourceId === node.id && (!visibleSet || visibleSet.has(r.targetId)),
+      ),
+    [relations, node.id, visibleSet],
+  )
+  const incoming = useMemo(
+    () =>
+      Object.values(relations).filter(
+        (r) => r.targetId === node.id && (!visibleSet || visibleSet.has(r.sourceId)),
+      ),
+    [relations, node.id, visibleSet],
+  )
+
+  const nodeTypeDef = metamodel?.nodeTypes[node.type]
+  // For requirements, EARS sentence fields are edited inline in the sentence editor
+  const earsSentenceKeys = new Set(['trigger', 'precondition', 'unwanted_condition', 'feature', 'action'])
+  const allProps = useMemo(
+    () => (nodeTypeDef?.properties ?? []).filter(
+      (p) => p.key !== 'label'
+        && isPropertyVisible(p, node as unknown as Record<string, unknown>)
+        && !(node.type === 'requirement' && earsSentenceKeys.has(p.key))
+    ),
+    [nodeTypeDef, node],
+  )
+
+  // Split metamodel props so the page reads like a document:
+  //  • lead     — the primary description (textarea), shown under the title
+  //  • sections — substantive content (other textareas + long-form text
+  //               fields like "Success criteria") rendered as prose sections
+  //  • facts    — short classifiers (enum/boolean/number + short-text
+  //               metadata) shown in the at-a-glance infobox
+  const { leadProp, sectionProps, factProps } = useMemo(() => {
+    let lead: PropertyDef | undefined
+    const sections: PropertyDef[] = []
+    const facts: PropertyDef[] = []
+    for (const p of allProps) {
+      if (isInfoboxFact(p)) {
+        facts.push(p)
+      } else if (!lead && p.type === 'textarea' && p.key === 'description') {
+        lead = p
+      } else {
+        sections.push(p)
+      }
+    }
+    return { leadProp: lead, sectionProps: sections, factProps: facts }
+  }, [allProps])
+
+  // Fallback fields when the document carries no metamodel for this type.
+  const hasMeta = !!nodeTypeDef
+  const fallbackLead: PropertyDef | undefined = hasMeta
+    ? leadProp
+    : { key: 'description', label: 'Description', type: 'textarea' }
+  const fallbackFacts: PropertyDef[] = hasMeta
+    ? factProps
+    : [
+        ...(TECH_TYPES.has(node.type)
+          ? [{ key: 'technology', label: 'Technology', type: 'text' as const }]
+          : []),
+        { key: 'external', label: 'External', type: 'boolean' as const },
+      ]
+
+  const parentCandidates = useMemo(
+    () =>
+      Object.values(nodes)
+        .filter((n) => n.id !== node.id && isParentAllowed(metamodel, node.type, n.type))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [nodes, node, metamodel],
+  )
+
+  // Node types that may be created as a child of this element — via
+  // allowedParents normally, or via the hierarchyRelation's allowedPairs
+  // (whichever type(s) may derive-from/etc. this node's type) when set.
+  const childTypeChoices = useMemo(() => {
+    if (hierarchyRelationType) {
+      const relDef = metamodel?.relationTypes[hierarchyRelationType]
+      const fromTypes = new Set(
+        (relDef?.allowedPairs ?? []).filter((p) => p.to === node.type).map((p) => p.from),
+      )
+      return [...fromTypes]
+        .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+    }
+    return childTypeOptions(metamodel, node.type, typeMeta)
+  }, [metamodel, node.type, typeMeta, hierarchyRelationType])
+
+  // Existing nodes that may become the target of a new outgoing relation,
+  // restricted to those the metamodel permits and that are visible.
+  const relationTargets = useMemo<AddMenuOption[]>(
+    () =>
+      Object.values(nodes)
+        .filter(
+          (n) =>
+            n.id !== node.id &&
+            (!visibleSet || visibleSet.has(n.id)) &&
+            isRelationAllowed(metamodel, node.type, n.type),
+        )
+        .sort((a, b) => a.label.localeCompare(b.label))
+        .map((n) => ({
+          id: n.id,
+          label: n.label,
+          color: typeMeta(n.type).color,
+          sub: typeMeta(n.type).label,
+        })),
+    [nodes, node.id, node.type, visibleSet, metamodel, typeMeta],
+  )
+
+  const meta = typeMeta(node.type)
+  const parent = node.parentId ? nodes[node.parentId] : undefined
+  const getVal = (key: string) => (node as unknown as Record<string, unknown>)[key]
+  const lead = fallbackLead
+
+  return (
+    <article
+      className={`wiki-doc ${embedded ? 'wiki-doc-embedded' : ''}`}
+      style={{ ['--type-color' as string]: meta.color }}
+    >
+      {!embedded && (
+        <nav className="wiki-breadcrumb">
+          {breadcrumb.map((b, i) => (
+            <React.Fragment key={b.id}>
+              {i > 0 && <span className="wiki-breadcrumb-sep">›</span>}
+              {b.id === node.id ? (
+                <span className="wiki-breadcrumb-current">{b.label}</span>
+              ) : (
+                <button className="wiki-link" onClick={() => onNavigate(b.id)}>
+                  {b.label}
+                </button>
+              )}
+            </React.Fragment>
+          ))}
+        </nav>
+      )}
+
+      <header className="wiki-doc-header">
+        <div className="wiki-kicker">
+          <span className="wiki-kicker-icon" style={{ color: meta.color }}>
+            {meta.iconPath && (
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+                <path d={meta.iconPath} />
+              </svg>
+            )}
+          </span>
+          {meta.label}
+          {node.external && <span className="wiki-kicker-tag">external</span>}
+        </div>
+        <div className="wiki-title-row">
+          <InlineText
+            className="wiki-doc-title"
+            value={node.label}
+            placeholder="Untitled element"
+            readOnly={readOnly}
+            onCommit={(v) => updateNode(node.id, { label: v })}
+          />
+          {embedded && (
+            <button
+              className="wiki-link wiki-embedded-open"
+              title="Focus this element on its own page"
+              onClick={() => onNavigate(node.id)}
+            >
+              Open as its own page ↗
+            </button>
+          )}
+          {!readOnly && (
+            <button
+              className="wiki-danger-btn"
+              title="Delete this element"
+              onClick={() => onDeleteNode(node.id)}
+            >
+              Delete
+            </button>
+          )}
+        </div>
+        <dl className="wiki-meta-row">
+          <div className="wiki-meta-item">
+            <dt>Parent</dt>
+            <dd>
+              <InlineSelect
+                value={node.parentId ?? ''}
+                readOnly={readOnly}
+                options={[
+                  { value: '', label: '— none —' },
+                  ...parentCandidates.map((n) => ({ value: n.id, label: n.label })),
+                ]}
+                display={
+                  parent ? (
+                    <button
+                      className="wiki-link"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onNavigate(parent.id)
+                      }}
+                    >
+                      {parent.label}
+                    </button>
+                  ) : (
+                    <span className="wiki-muted">none</span>
+                  )
+                }
+                onCommit={(v) => updateNode(node.id, { parentId: v || undefined })}
+              />
+            </dd>
+          </div>
+
+          {(hasMeta ? factProps : fallbackFacts).map((p) => (
+            <div className="wiki-meta-item" key={p.key}>
+              <dt>{p.label}</dt>
+              <dd>
+                <WikiFactValue
+                  def={p}
+                  value={getVal(p.key)}
+                  readOnly={readOnly}
+                  onCommit={(v) =>
+                    updateNode(node.id, { [p.key]: v } as Parameters<UpdateNode>[1])
+                  }
+                />
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        {lead && (
+          <InlineText
+            multiline
+            className="wiki-lead"
+            value={String(getVal(lead.key) ?? '')}
+            placeholder={readOnly ? '' : 'Add a description…'}
+            readOnly={readOnly}
+            onCommit={(v) =>
+              updateNode(node.id, { [lead.key]: v } as Parameters<UpdateNode>[1])
+            }
+          />
+        )}
+        {node.type === 'requirement' && (
+          <div className="wiki-ears-sentence">
+            <EarsSentenceEditor
+              node={node as unknown as Record<string, unknown>}
+              nodeId={node.id}
+              subject={resolveEarsSubject(node.id, relations, nodes)}
+              readOnly={readOnly}
+              updateNode={(id, patch) => updateNode(id, patch as Parameters<UpdateNode>[1])}
+            />
+            <EarsQuickEntry
+              nodeId={node.id}
+              readOnly={readOnly}
+              updateNode={(id, patch) => updateNode(id, patch as Parameters<UpdateNode>[1])}
+            />
+          </div>
+        )}
+      </header>
+
+      <div className="wiki-main">
+        {node.type === 'mockup' && (
+          <MockupWireframe
+            nodeId={node.id}
+            readOnly={readOnly}
+            className="wiki-prose-section mockup-wf"
+            heading={<h2 className="wiki-h2">Wireframe</h2>}
+          />
+        )}
+
+        {/* Long-form sections */}
+        {(hasMeta ? sectionProps : []).map((p) => (
+          <section className="wiki-prose-section" key={p.key}>
+            <h2 className="wiki-h2">{p.label}</h2>
+            <InlineText
+              multiline={p.type === 'textarea'}
+              className="wiki-prose"
+              value={String(getVal(p.key) ?? '')}
+              placeholder={readOnly ? '—' : `Add ${p.label.toLowerCase()}…`}
+              readOnly={readOnly}
+              onCommit={(v) =>
+                updateNode(node.id, { [p.key]: v } as Parameters<UpdateNode>[1])
+              }
+            />
+          </section>
+        ))}
+
+        {/* Children */}
+        <section className="wiki-prose-section">
+          <div className="wiki-section-head">
+            <h2 className="wiki-h2">
+              Contains <span className="wiki-count">{children.length}</span>
+            </h2>
+            {!readOnly && (
+              <AddMenu
+                label="Add child"
+                variant="ghost"
+                options={childTypeChoices}
+                emptyHint="No child types allowed here"
+                onPick={onCreateChild}
+              />
+            )}
+          </div>
+          {children.length === 0 ? (
+            <p className="wiki-muted">No child elements.</p>
+          ) : pageMode === 'multi' && remainingDepth > 0 ? (
+            <div className="wiki-embedded-children">
+              {children.map((c) => (
+                <div className="wiki-embedded-child" key={c.id}>
+                  <WikiElementPage
+                    node={c}
+                    nodes={nodes}
+                    relations={relations}
+                    visibleSet={visibleSet}
+                    metamodel={metamodel}
+                    updateNode={updateNode}
+                    updateRelation={updateRelation}
+                    onNavigate={onNavigate}
+                    createNode={createNode}
+                    onDeleteNode={onDeleteNode}
+                    createRelation={createRelation}
+                    onDeleteRelation={onDeleteRelation}
+                    readOnly={readOnly}
+                    typeMeta={typeMeta}
+                    pageMode={pageMode}
+                    embedded
+                    remainingDepth={remainingDepth - 1}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="wiki-card-grid">
+              {children.map((c) => {
+                const cm = typeMeta(c.type)
+                return (
+                  <WikiNodeCard
+                    key={c.id}
+                    node={c}
+                    color={cm.color}
+                    metaLabel={cm.label}
+                    onOpen={() => onNavigate(c.id)}
+                    onDelete={readOnly ? undefined : () => onDeleteNode(c.id)}
+                  />
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Relations */}
+        <section className="wiki-prose-section">
+          <div className="wiki-section-head">
+            <h2 className="wiki-h2">
+              Relationships{' '}
+              <span className="wiki-count">{outgoing.length + incoming.length}</span>
+            </h2>
+            {!readOnly && (
+              <AddMenu
+                label="Add relationship"
+                variant="ghost"
+                options={relationTargets}
+                emptyHint="No valid targets"
+                onPick={onCreateRelation}
+              />
+            )}
+          </div>
+          {outgoing.length === 0 && incoming.length === 0 ? (
+            <p className="wiki-muted">No relationships.</p>
+          ) : (
+            <div className="wiki-rel-list">
+              {outgoing.map((r) => (
+                <WikiRelationLine
+                  key={r.id}
+                  direction="out"
+                  otherNode={nodes[r.targetId]}
+                  relation={r}
+                  nodes={nodes}
+                  metamodel={metamodel}
+                  readOnly={readOnly}
+                  onNavigate={onNavigate}
+                  updateRelation={updateRelation}
+                  onDeleteRelation={onDeleteRelation}
+                  typeMeta={typeMeta}
+                />
+              ))}
+              {incoming.map((r) => (
+                <WikiRelationLine
+                  key={r.id}
+                  direction="in"
+                  otherNode={nodes[r.sourceId]}
+                  relation={r}
+                  nodes={nodes}
+                  metamodel={metamodel}
+                  readOnly={readOnly}
+                  onNavigate={onNavigate}
+                  updateRelation={updateRelation}
+                  onDeleteRelation={onDeleteRelation}
+                  typeMeta={typeMeta}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </article>
+  )
+}
+
+// ─── Relation line (readable, inline-editable) ───────────────────────────────
+
+function WikiRelationLine({
+  direction,
+  otherNode,
+  relation,
+  nodes,
+  metamodel,
+  readOnly,
+  onNavigate,
+  updateRelation,
+  onDeleteRelation,
+  typeMeta,
+}: {
+  direction: 'in' | 'out'
+  otherNode: C4Node | undefined
+  relation: C4Relation
+  nodes: Record<string, C4Node>
+  metamodel: Metamodel
+  readOnly: boolean
+  onNavigate: (id: string) => void
+  updateRelation: UpdateRelation
+  onDeleteRelation: (id: string) => void
+  typeMeta: TypeMeta
+}): React.ReactElement {
+  const relTypeDef = relation.relationType
+    ? metamodel?.relationTypes[relation.relationType]
+    : undefined
+  const srcNode = nodes[relation.sourceId]
+  const dstNode = nodes[relation.targetId]
+  const compatibleTypes = useMemo(
+    () =>
+      metamodel
+        ? Object.values(metamodel.relationTypes).filter(
+            (rt) =>
+              rt.allowedPairs.length === 0 ||
+              rt.allowedPairs.some((p) => p.from === srcNode?.type && p.to === dstNode?.type),
+          )
+        : [],
+    [metamodel, srcNode, dstNode],
+  )
+  const relMetaProps = relTypeDef?.properties ?? []
+  const getVal = (key: string) => (relation as unknown as Record<string, unknown>)[key]
+
+  return (
+    <div className="wiki-rel">
+      <span className={`wiki-rel-arrow ${direction}`}>{direction === 'out' ? '→' : '←'}</span>
+      <div className="wiki-rel-main">
+        <div className="wiki-rel-head">
+          <span className="wiki-rel-verb">
+            {relTypeDef?.label ?? (direction === 'out' ? 'relates to' : 'related from')}
+          </span>
+          {otherNode ? (
+            <button className="wiki-link wiki-rel-target" onClick={() => onNavigate(otherNode.id)}>
+              {otherNode.label}
+            </button>
+          ) : (
+            <span className="wiki-muted">(missing)</span>
+          )}
+          {otherNode && <TypeChip type={otherNode.type} typeMeta={typeMeta} />}
+        </div>
+
+        <div className="wiki-rel-attrs">
+          <InlineText
+            className="wiki-rel-label"
+            value={relation.label ?? ''}
+            placeholder={readOnly ? '' : 'add label'}
+            readOnly={readOnly}
+            onCommit={(v) => updateRelation(relation.id, { label: v })}
+          />
+
+          {compatibleTypes.length > 1 && (
+            <span className="wiki-rel-pill">
+              <InlineSelect
+                value={relation.relationType ?? ''}
+                readOnly={readOnly}
+                options={[
+                  { value: '', label: 'generic' },
+                  ...compatibleTypes.map((rt) => ({ value: rt.id, label: rt.label })),
+                ]}
+                display={<span>{relTypeDef?.label ?? 'generic'}</span>}
+                onCommit={(v) =>
+                  updateRelation(relation.id, {
+                    relationType: v || undefined,
+                  } as Parameters<UpdateRelation>[1])
+                }
+              />
+            </span>
+          )}
+
+          {relMetaProps.length > 0
+            ? relMetaProps.map((p) => (
+                <span className="wiki-rel-attr" key={p.key}>
+                  <span className="wiki-rel-attr-key">{p.label}:</span>{' '}
+                  <WikiFactValue
+                    def={p}
+                    value={getVal(p.key)}
+                    readOnly={readOnly}
+                    inline
+                    onCommit={(v) =>
+                      updateRelation(relation.id, {
+                        [p.key]: v,
+                      } as Parameters<UpdateRelation>[1])
+                    }
+                  />
+                </span>
+              ))
+            : !relTypeDef &&
+              (relation.technology || !readOnly) && (
+                <span className="wiki-rel-attr">
+                  <span className="wiki-rel-attr-key">Tech:</span>{' '}
+                  <InlineText
+                    value={relation.technology ?? ''}
+                    placeholder="add"
+                    readOnly={readOnly}
+                    onCommit={(v) => updateRelation(relation.id, { technology: v })}
+                  />
+                </span>
+              )}
+        </div>
+      </div>
+      {!readOnly && (
+        <button
+          className="wiki-rel-del"
+          title="Remove relationship"
+          aria-label="Remove relationship"
+          onClick={() => onDeleteRelation(relation.id)}
+        >
+          ×
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Infobox / inline fact value (display-first, edit on click) ──────────────
+
+function WikiFactValue({
+  def,
+  value,
+  readOnly = false,
+  inline = false,
+  onCommit,
+}: {
+  def: PropertyDef
+  value: unknown
+  readOnly?: boolean
+  inline?: boolean
+  onCommit: (v: string | number | boolean) => void
+}): React.ReactElement {
+  if (def.type === 'boolean') {
+    const on = Boolean(value)
+    return (
+      <button
+        className={`wiki-bool ${on ? 'on' : 'off'}`}
+        disabled={readOnly}
+        onClick={() => !readOnly && onCommit(!on)}
+      >
+        {on ? 'Yes' : 'No'}
+      </button>
+    )
+  }
+
+  if (def.type === 'enum' && def.options) {
+    const cur = String(value ?? '')
+    return (
+      <InlineSelect
+        value={cur}
+        readOnly={readOnly}
+        options={[
+          { value: '', label: '—' },
+          ...def.options.map((o) => ({ value: o, label: o })),
+        ]}
+        display={
+          cur ? (
+            <span className={`wiki-enum-pill enum-${cur}`}>{cur}</span>
+          ) : (
+            <span className="wiki-muted">—</span>
+          )
+        }
+        onCommit={(v) => onCommit(v)}
+      />
+    )
+  }
+
+  return (
+    <InlineText
+      className={inline ? '' : 'wiki-fact-text'}
+      value={value == null ? '' : String(value)}
+      placeholder={readOnly ? '—' : 'add'}
+      readOnly={readOnly}
+      onCommit={(v) => onCommit(def.type === 'number' ? Number(v) : v)}
+    />
+  )
+}
+
+// ─── EARS inline sentence editor ─────────────────────────────────────────────
+
+interface EarsSentenceEditorProps {
+  node: Record<string, unknown>
+  nodeId: string
+  subject?: string
+  readOnly?: boolean
+  updateNode: (id: string, patch: Record<string, unknown>) => void
+}
+
+function EarsSlot({
+  value,
+  placeholder,
+  fieldKey,
+  nodeId,
+  readOnly,
+  updateNode,
+}: {
+  value: string
+  placeholder: string
+  fieldKey: string
+  nodeId: string
+  readOnly?: boolean
+  updateNode: (id: string, patch: Record<string, unknown>) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { setDraft(value) }, [value])
+  useEffect(() => { if (editing && ref.current) ref.current.focus() }, [editing])
+
+  if (readOnly || !editing) {
+    return (
+      <span
+        className={`ears-slot ${value ? 'ears-slot-filled' : 'ears-slot-empty'}`}
+        onClick={() => !readOnly && setEditing(true)}
+        title={readOnly ? undefined : `Click to edit: ${placeholder}`}
+      >
+        {value || placeholder}
+      </span>
+    )
+  }
+
+  return (
+    <input
+      ref={ref}
+      className="ears-slot-input"
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        setEditing(false)
+        if (draft !== value) updateNode(nodeId, { [fieldKey]: draft || undefined })
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.currentTarget.blur() }
+        if (e.key === 'Escape') { setDraft(value); setEditing(false) }
+      }}
+    />
+  )
+}
+
+function EarsSentenceEditor({ node, nodeId, subject: subjectProp, readOnly, updateNode }: EarsSentenceEditorProps) {
+  const earsType = String(node.ears_type ?? 'ubiquitous')
+  const subject = subjectProp || 'the system'
+  const action = String(node.action ?? '')
+  const trigger = String(node.trigger ?? '')
+  const precondition = String(node.precondition ?? '')
+  const unwanted = String(node.unwanted_condition ?? '')
+  const feature = String(node.feature ?? '')
+
+  const slot = (val: string, placeholder: string, key: string) => (
+    <EarsSlot
+      value={val}
+      placeholder={placeholder}
+      fieldKey={key}
+      nodeId={nodeId}
+      readOnly={readOnly}
+      updateNode={updateNode}
+    />
+  )
+
+  const shallClause = (
+    <>
+      <span className="ears-subject">{subject}</span>
+      <span className="ears-fixed"> shall </span>
+      {slot(action, '‹action›', 'action')}
+      <span className="ears-fixed">.</span>
+    </>
+  )
+
+  let content: React.ReactNode
+  switch (earsType) {
+    case 'event-driven':
+      content = (
+        <>
+          <span className="ears-fixed">When </span>
+          {slot(trigger, '‹trigger›', 'trigger')}
+          <span className="ears-fixed">, </span>
+          {shallClause}
+        </>
+      )
+      break
+    case 'state-driven':
+      content = (
+        <>
+          <span className="ears-fixed">While </span>
+          {slot(precondition, '‹precondition›', 'precondition')}
+          <span className="ears-fixed">, </span>
+          {shallClause}
+        </>
+      )
+      break
+    case 'unwanted-behaviour':
+      content = (
+        <>
+          <span className="ears-fixed">If </span>
+          {slot(unwanted, '‹condition›', 'unwanted_condition')}
+          <span className="ears-fixed">, then </span>
+          {shallClause}
+        </>
+      )
+      break
+    case 'optional':
+      content = (
+        <>
+          <span className="ears-fixed">Where </span>
+          {slot(feature, '‹feature›', 'feature')}
+          <span className="ears-fixed">, </span>
+          {shallClause}
+        </>
+      )
+      break
+    case 'complex':
+      content = (
+        <>
+          <span className="ears-fixed">While </span>
+          {slot(precondition, '‹precondition›', 'precondition')}
+          <span className="ears-fixed">, when </span>
+          {slot(trigger, '‹trigger›', 'trigger')}
+          {unwanted || feature ? (
+            <>
+              {unwanted && (<><span className="ears-fixed">, if </span>{slot(unwanted, '‹condition›', 'unwanted_condition')}</>)}
+              {feature && (<><span className="ears-fixed">, where </span>{slot(feature, '‹feature›', 'feature')}</>)}
+            </>
+          ) : null}
+          <span className="ears-fixed">, </span>
+          {shallClause}
+        </>
+      )
+      break
+    default: // ubiquitous
+      content = (
+        <>
+          <span className="ears-subject">{subject.charAt(0).toUpperCase() + subject.slice(1)}</span>
+          <span className="ears-fixed"> shall </span>
+          {slot(action, '‹action›', 'action')}
+          <span className="ears-fixed">.</span>
+        </>
+      )
+  }
+
+  return (
+    <blockquote className="ears-sentence ears-editable">
+      {content}
+    </blockquote>
+  )
+}
+
+// ─── Inline editors ──────────────────────────────────────────────────────────
+
+function InlineText({
+  value,
+  placeholder = '',
+  className = '',
+  multiline = false,
+  readOnly = false,
+  onCommit,
+}: {
+  value: string
+  placeholder?: string
+  className?: string
+  multiline?: boolean
+  readOnly?: boolean
+  onCommit: (v: string) => void
+}): React.ReactElement {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    if (!editing) setDraft(value)
+  }, [value, editing])
+
+  useLayoutEffect(() => {
+    if (editing && inputRef.current) {
+      const el = inputRef.current
+      el.focus()
+      const len = el.value.length
+      el.setSelectionRange(len, len)
+      if (multiline) autoSize(el as HTMLTextAreaElement)
+    }
+  }, [editing, multiline])
+
+  const commit = () => {
+    setEditing(false)
+    if (draft !== value) onCommit(draft)
+  }
+  const cancel = () => {
+    setDraft(value)
+    setEditing(false)
+  }
+
+  if (editing && !readOnly) {
+    return multiline ? (
+      <textarea
+        ref={(el) => (inputRef.current = el)}
+        className={`wiki-inline-input wiki-inline-textarea ${className}`}
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          autoSize(e.target)
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') cancel()
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commit()
+        }}
+      />
+    ) : (
+      <input
+        ref={(el) => (inputRef.current = el)}
+        className={`wiki-inline-input ${className}`}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') cancel()
+          if (e.key === 'Enter') commit()
+        }}
+      />
+    )
+  }
+
+  const empty = value.trim() === ''
+  return (
+    <span
+      className={`wiki-inline-view ${className} ${empty ? 'empty' : ''} ${
+        readOnly ? 'readonly' : ''
+      }`}
+      onClick={() => !readOnly && setEditing(true)}
+      title={readOnly ? undefined : 'Click to edit'}
+    >
+      {empty ? placeholder : value}
+    </span>
+  )
+}
+
+function InlineSelect({
+  value,
+  options,
+  display,
+  readOnly = false,
+  onCommit,
+}: {
+  value: string
+  options: { value: string; label: string }[]
+  display: React.ReactNode
+  readOnly?: boolean
+  onCommit: (v: string) => void
+}): React.ReactElement {
+  const [editing, setEditing] = useState(false)
+  const ref = useRef<HTMLSelectElement | null>(null)
+
+  useLayoutEffect(() => {
+    if (editing && ref.current) ref.current.focus()
+  }, [editing])
+
+  if (editing && !readOnly) {
+    return (
+      <select
+        ref={ref}
+        className="wiki-inline-input wiki-inline-select"
+        value={value}
+        onChange={(e) => {
+          onCommit(e.target.value)
+          setEditing(false)
+        }}
+        onBlur={() => setEditing(false)}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    )
+  }
+
+  return (
+    <span
+      className={`wiki-inline-view ${readOnly ? 'readonly' : ''}`}
+      onClick={() => !readOnly && setEditing(true)}
+      title={readOnly ? undefined : 'Click to edit'}
+    >
+      {display}
+    </span>
+  )
+}
+
+function autoSize(el: HTMLTextAreaElement) {
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}

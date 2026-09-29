@@ -1,0 +1,30 @@
+{
+  "name": "@radical/hub",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Radical Hub (hub.radical.tools): the curated concept catalogue and its read-only viewer.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radical/common": "*",
+    "@radical/ui": "*",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "reactflow": "^11.11.4"
+  },
+  "devDependencies": {
+    "@radical/hub-catalogue": "*",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "vitest": "^4.1.4"
+  }
+}

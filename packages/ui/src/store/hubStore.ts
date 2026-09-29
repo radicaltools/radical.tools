@@ -1,0 +1,242 @@
+import { create } from 'zustand'
+import {
+  HUB_INDEX_FILE,
+  docToConcept,
+  type HubConcept,
+  type HubConceptSummary,
+  type HubRadicalDoc,
+} from '@radical/common/hubFormat'
+
+export type { HubConcept, HubConceptMeta, HubConceptSummary, HubCategory, HubImportRecord, TemplateParam } from '@radical/common/hubFormat'
+
+// ─── Hub catalogue ───────────────────────────────────────────────────────────
+//
+// `hub/index.json` lists concept summaries; each concept is a Radical Studio
+// document at `hub/<category>/<id>.radical` fetched on demand (see hubFormat.ts).
+
+// ─── Store types ────────────────────────────────────────────────────────────
+
+interface HubState {
+  concepts: HubConceptSummary[]
+  /** Fully loaded concepts keyed by id. */
+  loaded: Record<string, HubConcept>
+  /** Raw catalogue documents keyed by id (exact file contents, for download / copy). */
+  docs: Record<string, HubRadicalDoc>
+  loading: boolean
+  error: string | null
+  lastFetched: number | null
+
+  // Filters
+  activeCategory: string | null
+  searchQuery: string
+  /** Multiple tags OR together (any match) — same facet, so union not intersection. */
+  activeTags: Set<string>
+  /** Same OR-within-facet semantics as tags. Values are the raw `preview.status`
+   *  strings, which aren't a single shared enum across categories (e.g. a
+   *  requirement's "draft" and an ADR's "proposed" are different fields), but
+   *  browsing by the literal word is still useful. */
+  activeStatuses: Set<string>
+  sortBy: HubSortKey
+
+  // Actions
+  fetchConcepts: () => Promise<void>
+  /** Fetch a concept file (cached). Throws on network / parse errors. */
+  loadConcept: (id: string) => Promise<HubConcept>
+  loadConcepts: (ids: string[]) => Promise<HubConcept[]>
+  setCategory: (cat: string | null) => void
+  setSearch: (q: string) => void
+  toggleTag: (tag: string) => void
+  setTags: (tags: Set<string>) => void
+  toggleStatus: (status: string) => void
+  setStatuses: (statuses: Set<string>) => void
+  setSortBy: (sort: HubSortKey) => void
+  resetFilters: () => void
+
+  // Computed-like
+  filteredConcepts: () => HubConceptSummary[]
+  allTags: () => Array<{ tag: string; count: number }>
+  allStatuses: () => Array<{ status: string; count: number }>
+}
+
+export type HubSortKey = 'name' | 'category' | 'connections'
+
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+const REMOTE_BASE = 'https://hub.radical.tools/hub/'
+const LOCAL_BASE = '/hub/'
+const HUB_BASE = import.meta.env.DEV ? LOCAL_BASE : REMOTE_BASE
+const FALLBACK_BASE = import.meta.env.DEV ? REMOTE_BASE : LOCAL_BASE
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+async function fetchJson<T>(path: string): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(HUB_BASE + path)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  } catch {
+    res = await fetch(FALLBACK_BASE + path)
+    if (!res.ok) throw new Error(`Fallback fetch failed: HTTP ${res.status}`)
+  }
+  // Guard against HTML error pages being returned instead of JSON
+  const ct = res.headers.get('content-type') ?? ''
+  if (!ct.includes('json')) {
+    throw new Error('Hub returned non-JSON response. CORS or network issue.')
+  }
+  return (await res.json()) as T
+}
+
+const inflight = new Map<string, Promise<HubConcept>>()
+
+// ─── Store ──────────────────────────────────────────────────────────────────
+
+export const useHubStore = create<HubState>()((set, get) => ({
+  concepts: [],
+  loaded: {},
+  docs: {},
+  loading: false,
+  error: null,
+  lastFetched: null,
+
+  activeCategory: null,
+  searchQuery: '',
+  activeTags: new Set(),
+  activeStatuses: new Set(),
+  sortBy: 'name',
+
+  async fetchConcepts() {
+    const { lastFetched, loading } = get()
+    if (loading) return
+    if (lastFetched && Date.now() - lastFetched < CACHE_TTL_MS) return
+
+    set({ loading: true, error: null })
+    try {
+      const data = await fetchJson<HubConceptSummary[]>(HUB_INDEX_FILE)
+      set({ concepts: data, lastFetched: Date.now(), loading: false })
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Failed to fetch hub data',
+        loading: false,
+      })
+    }
+  },
+
+  loadConcept(id) {
+    const cached = get().loaded[id]
+    if (cached) return Promise.resolve(cached)
+    const pending = inflight.get(id)
+    if (pending) return pending
+    const summary = get().concepts.find((c) => c.id === id)
+    if (!summary) return Promise.reject(new Error(`Unknown hub concept "${id}"`))
+    const p = fetchJson<HubRadicalDoc>(summary.file)
+      .then((doc) => {
+        const concept = docToConcept(doc)
+        set((s) => ({ loaded: { ...s.loaded, [id]: concept }, docs: { ...s.docs, [id]: doc } }))
+        return concept
+      })
+      .finally(() => inflight.delete(id))
+    inflight.set(id, p)
+    return p
+  },
+
+  loadConcepts(ids) {
+    return Promise.all(ids.map((id) => get().loadConcept(id)))
+  },
+
+  setCategory(cat) {
+    set({ activeCategory: cat })
+  },
+  setSearch(q) {
+    set({ searchQuery: q })
+  },
+  toggleTag(tag) {
+    set((s) => ({ activeTags: toggleInSet(s.activeTags, tag) }))
+  },
+  setTags(tags) {
+    set({ activeTags: tags })
+  },
+  toggleStatus(status) {
+    set((s) => ({ activeStatuses: toggleInSet(s.activeStatuses, status) }))
+  },
+  setStatuses(statuses) {
+    set({ activeStatuses: statuses })
+  },
+  setSortBy(sort) {
+    set({ sortBy: sort })
+  },
+  resetFilters() {
+    set({ activeCategory: null, searchQuery: '', activeTags: new Set(), activeStatuses: new Set() })
+  },
+
+  filteredConcepts() {
+    const { concepts, activeCategory, searchQuery, activeTags, activeStatuses, sortBy } = get()
+    const q = searchQuery.toLowerCase().trim()
+    const filtered = concepts.filter((c) => {
+      if (activeCategory && c.category !== activeCategory) return false
+      // Multiple tags/statuses are the same facet — OR within it (broadens),
+      // combined with everything else via AND (narrows).
+      if (activeTags.size > 0 && !c.tags.some((t) => activeTags.has(t))) return false
+      if (activeStatuses.size > 0 && !activeStatuses.has(c.preview.status ?? '')) return false
+      if (q) {
+        const haystack = `${c.name} ${c.description} ${c.tags.join(' ')}`.toLowerCase()
+        if (!haystack.includes(q)) return false
+      }
+      return true
+    })
+    // One comparator per sort key (built once, not one `[...].sort()` branch
+    // per key) — and connections is looked up from a map built once, not
+    // recomputed per comparison (that was O(n² log n) for this sort alone).
+    const connectionCounts = sortBy === 'connections' ? buildConnectionCounts(concepts) : undefined
+    const byName = (a: HubConceptSummary, b: HubConceptSummary) => a.name.localeCompare(b.name)
+    const cmp: (a: HubConceptSummary, b: HubConceptSummary) => number =
+      sortBy === 'category' ? (a, b) => a.category.localeCompare(b.category) || byName(a, b)
+      : sortBy === 'connections' ? (a, b) => (connectionCounts!.get(b.id) ?? 0) - (connectionCounts!.get(a.id) ?? 0) || byName(a, b)
+      : byName
+    return [...filtered].sort(cmp)
+  },
+
+  allTags() {
+    const counts = new Map<string, number>()
+    for (const c of get().concepts) {
+      for (const t of c.tags) counts.set(t, (counts.get(t) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+  },
+
+  allStatuses() {
+    const counts = new Map<string, number>()
+    for (const c of get().concepts) {
+      const status = c.preview.status
+      if (status) counts.set(status, (counts.get(status) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .map(([status, count]) => ({ status, count }))
+      .sort((a, b) => b.count - a.count)
+  },
+
+}))
+
+/** Toggle membership of `value` in `set`, returning a new Set (immutable). */
+export function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set)
+  if (next.has(value)) next.delete(value); else next.add(value)
+  return next
+}
+
+/**
+ * Outgoing hubRefs + incoming references, for every concept, in one O(n)
+ * pass — self-references and duplicate ids within one concept's own hubRefs
+ * are ignored so they can't inflate its count.
+ */
+export function buildConnectionCounts(concepts: HubConceptSummary[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  const bump = (id: string, by: number) => counts.set(id, (counts.get(id) ?? 0) + by)
+  for (const c of concepts) {
+    const refs = new Set(c.hubRefs ?? [])
+    refs.delete(c.id)
+    bump(c.id, refs.size)
+    for (const r of refs) bump(r, 1)
+  }
+  return counts
+}

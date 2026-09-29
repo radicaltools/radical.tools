@@ -1,0 +1,216 @@
+/**
+ * Embedded Hub viewer — pure helpers.
+ *
+ *   - conceptToDiagramData: hub concept → self-contained DiagramData
+ *     (ids preserved, governance metamodel, synthetic wiki/table views,
+ *     template defaults substituted, dangling parents/relations dropped)
+ *   - defaultViewKind: single governance element → wiki, bundles → canvas
+ *   - conceptViewsToDiagram: concept views kept in the viewer / remapped on import
+ *   - parseHubHash / formatHubHash round-trip
+ */
+import { describe, it, expect } from 'vitest'
+import {
+  conceptToDiagramData,
+  defaultViewKind,
+  kindForViewId,
+  substituteTemplateDefaults,
+  HUB_WIKI_VIEW_ID,
+  HUB_TABLE_VIEW_ID,
+} from '../src/conceptToDiagram'
+import { parseHubHash, formatHubHash, studioImportUrl } from '../src/hubRoute'
+import type { HubConcept } from '@radical/common/hubFormat'
+import { conceptViewsToDiagram } from '@radical/ui/viewer'
+
+const requirement: HubConcept = {
+  id: 'req-api-response-time',
+  category: 'requirement',
+  name: 'API response time',
+  description: 'p95 latency budget',
+  tags: ['performance'],
+  templateParams: [
+    { key: 'ENDPOINT', label: 'Endpoint', defaultValue: '/orders' },
+    { key: 'LATENCY_MS', label: 'Latency', hint: '250' },
+    { key: 'OWNER', label: 'Owner' },
+  ],
+  nodes: [
+    {
+      id: 'req-1', type: 'requirement', label: 'Latency of {{ENDPOINT}}',
+      ears_type: 'event-driven', trigger: 'a request hits {{ENDPOINT}}',
+      action: 'respond within {{LATENCY_MS}} ms (owner: {{OWNER}})',
+      templateParams: [{ key: 'ENDPOINT', label: 'Endpoint' }],
+    },
+  ],
+}
+
+const pattern: HubConcept = {
+  id: 'pattern-cqrs',
+  category: 'pattern',
+  name: 'CQRS',
+  description: 'Split reads and writes',
+  tags: [],
+  nodes: [
+    { id: 'sys', type: 'system', label: 'Shop', x: 0, y: 0, width: 360, height: 260 },
+    { id: 'cmd', type: 'container', label: 'Command side', parentId: 'sys', x: 20, y: 60 },
+    { id: 'orphan', type: 'container', label: 'Orphan', parentId: 'missing' },
+  ],
+  relations: [
+    { id: 'r1', sourceId: 'cmd', targetId: 'sys', label: 'writes to {{X}}' },
+    { sourceId: 'cmd', targetId: 'ghost' },
+  ],
+}
+
+describe('conceptToDiagramData', () => {
+  it('keeps ids, attaches governance metamodel and synthetic views', () => {
+    const data = conceptToDiagramData(requirement)
+    expect(data.nodes.map((n) => n.id)).toEqual(['req-1'])
+    expect(data.metamodel?.id).toBe('c4-ddd-governance-builtin')
+    const kinds = Object.fromEntries((data.views ?? []).map((v) => [v.id, v.kind]))
+    expect(kinds).toEqual({ [HUB_WIKI_VIEW_ID]: 'wiki', [HUB_TABLE_VIEW_ID]: 'table' })
+    const wiki = data.views!.find((v) => v.id === HUB_WIKI_VIEW_ID)!
+    expect(wiki.nodeIds).toEqual(['req-1'])
+    expect(wiki.wikiFocusId).toBe('req-1')
+  })
+
+  it('substitutes template defaults but keeps them bracketed, and leaves unresolved keys visible', () => {
+    const data = conceptToDiagramData(requirement)
+    const n = data.nodes[0] as unknown as Record<string, unknown>
+    expect(n.label).toBe('Latency of {{/orders}}')
+    expect(n.trigger).toBe('a request hits {{/orders}}')
+    expect(n.action).toBe('respond within {{250}} ms (owner: {{OWNER}})')
+    expect(n.ears_type).toBe('event-driven')
+    expect('templateParams' in n).toBe(false)
+  })
+
+  it('fills geometry defaults from NODE_SIZES and drops dangling refs', () => {
+    const data = conceptToDiagramData(pattern)
+    const cmd = data.nodes.find((n) => n.id === 'cmd')!
+    expect(cmd.parentId).toBe('sys')
+    expect(cmd.width).toBeGreaterThan(0)
+    expect(cmd.height).toBeGreaterThan(0)
+    expect(cmd.collapsed).toBe(false)
+    const orphan = data.nodes.find((n) => n.id === 'orphan')!
+    expect(orphan.parentId).toBeUndefined()
+    expect(data.relations).toHaveLength(1)
+    expect(data.relations[0]).toMatchObject({ id: 'r1', sourceId: 'cmd', targetId: 'sys', label: 'writes to {{X}}' })
+  })
+})
+
+describe('defaultViewKind', () => {
+  it('opens single governance elements in wiki, bundles on canvas', () => {
+    expect(defaultViewKind(requirement)).toBe('wiki')
+    expect(defaultViewKind(pattern)).toBe('canvas')
+    expect(defaultViewKind({ ...requirement, category: 'blueprint' })).toBe('canvas')
+  })
+})
+
+describe('substituteTemplateDefaults', () => {
+  it('is a no-op without params', () => {
+    expect(substituteTemplateDefaults('{{A}}', undefined)).toBe('{{A}}')
+    expect(substituteTemplateDefaults('{{A}}', [])).toBe('{{A}}')
+  })
+
+  it('keeps the {{…}} wrapper around a substituted default so it stays visually distinct from fixed prose', () => {
+    const params = [{ key: 'A', label: 'A', defaultValue: '42' }]
+    expect(substituteTemplateDefaults('cap at {{A}} items', params)).toBe('cap at {{42}} items')
+  })
+
+  it('falls back to the hint when there is no defaultValue, still bracketed', () => {
+    const params = [{ key: 'A', label: 'A', hint: 'e.g. 42' }]
+    expect(substituteTemplateDefaults('cap at {{A}} items', params)).toBe('cap at {{e.g. 42}} items')
+  })
+
+  it('leaves a key with neither default nor hint as the raw token', () => {
+    const params = [{ key: 'A', label: 'A' }]
+    expect(substituteTemplateDefaults('cap at {{A}} items', params)).toBe('cap at {{A}} items')
+  })
+
+  it('substitutes an explicit empty-string default instead of treating it as absent', () => {
+    const params = [{ key: 'A', label: 'A', defaultValue: '' }]
+    expect(substituteTemplateDefaults('suffix: {{A}}', params)).toBe('suffix: {{}}')
+  })
+})
+
+describe('hub route', () => {
+  it('round-trips concept + view + filters', () => {
+    const r = { browse: true, concept: 'req-a b', view: 'wiki' as const, category: 'requirement', tag: 'perf/latency' }
+    const hash = formatHubHash(r)
+    expect(hash).toBe('#/c/req-a%20b/v/wiki/cat/requirement/tag/perf%2Flatency')
+    expect(parseHubHash(hash)).toEqual(r)
+  })
+
+  it('round-trips a named view in any mode', () => {
+    const r = { browse: true, concept: 'bp-x', view: 'canvas' as const, namedView: 'view-flow-shopper' }
+    const hash = formatHubHash(r)
+    expect(hash).toBe('#/c/bp-x/v/canvas/cv/view-flow-shopper')
+    expect(parseHubHash(hash)).toEqual(r)
+    const wiki = { ...r, view: 'wiki' as const, namedView: 'view-wiki-governance' }
+    expect(parseHubHash(formatHubHash(wiki))).toEqual(wiki)
+    expect(formatHubHash({ concept: 'bp-x', namedView: 'v' })).toBe('#/c/bp-x')
+  })
+
+  it('omits view without a concept and ignores unknown view kinds', () => {
+    expect(formatHubHash({ view: 'table', category: 'adr' })).toBe('#/cat/adr')
+    expect(parseHubHash('#/c/x/v/bogus')).toEqual({ browse: true, concept: 'x' })
+  })
+
+  it('distinguishes landing (empty hash) from the bare catalogue (#/browse)', () => {
+    expect(parseHubHash('')).toEqual({})
+    expect(formatHubHash({})).toBe('')
+    expect(formatHubHash({ browse: true })).toBe('#/browse')
+    expect(parseHubHash('#/browse')).toEqual({ browse: true })
+    expect(parseHubHash('#/browse/cat/adr')).toEqual({ browse: true, category: 'adr' })
+  })
+
+  it('builds the studio import deep link', () => {
+    expect(studioImportUrl('https://studio.radical.tools', ['a', 'b'])).toBe('https://studio.radical.tools?hub=a%2Cb')
+  })
+
+  it('round-trips multi-value tag/status facets and a sort key', () => {
+    const r = { browse: true, category: 'requirement', tag: 'security,performance', status: 'draft,proposed', sort: 'connections' as const }
+    const hash = formatHubHash(r)
+    expect(hash).toBe('#/cat/requirement/tag/security%2Cperformance/status/draft%2Cproposed/sort/connections')
+    expect(parseHubHash(hash)).toEqual(r)
+  })
+
+  it('ignores an unknown sort key', () => {
+    expect(parseHubHash('#/sort/bogus')).toEqual({})
+  })
+})
+
+describe('concept views', () => {
+  const withViews: HubConcept = {
+    ...pattern,
+    sequences: [{ id: 's1', name: 'Write', relationIds: ['r1'] }],
+    views: [
+      { id: 'v-flow', name: 'Write flow', kind: 'dynamic', sequenceId: 's1', nodeIds: ['sys', 'cmd'],
+        positions: { sys: { x: 5, y: 6, width: 360, height: 260 }, cmd: { x: 1, y: 2 } } },
+      { id: 'v-wiki', name: 'Docs', kind: 'wiki', nodeIds: ['sys'], wikiFocusId: 'sys' },
+      { id: 'v-matrix', name: 'Unsupported kind', kind: 'matrix', nodeIds: ['sys'] },
+      { id: 'v-empty', name: 'Only ghosts', kind: 'static', nodeIds: ['ghost'] },
+    ],
+  }
+
+  it('shows the concept\'s canvas and wiki views in the viewer, before the synthetic wiki / table, with complete positions only', () => {
+    const views = conceptToDiagramData(withViews).views!
+    expect(views.map((v) => v.id)).toEqual(['v-flow', 'v-wiki', HUB_WIKI_VIEW_ID, HUB_TABLE_VIEW_ID])
+    expect(views[1]).toMatchObject({ kind: 'wiki', wikiFocusId: 'sys', nodeIds: ['sys'] })
+    const byId = Object.fromEntries(views.map((v) => [v.id, v]))
+    expect(kindForViewId('v-wiki', byId)).toBe('wiki')
+    expect(kindForViewId('v-flow', byId)).toBe('canvas')
+    expect(views[0]).toMatchObject({ kind: 'dynamic', sequenceId: 's1', nodeIds: ['sys', 'cmd'] })
+    expect(views[0].positions).toEqual({ sys: { x: 5, y: 6, width: 360, height: 260 } })
+  })
+
+  it('remaps ids on import, drops unmapped elements and positions, and falls back to static without the sequence', () => {
+    let n = 0
+    const views = conceptViewsToDiagram(
+      withViews.views,
+      { node: (id) => (id === 'sys' ? 'new-sys' : undefined), relation: () => undefined, sequence: () => undefined },
+      { newId: () => `id-${++n}`, namePrefix: 'CQRS' },
+    )
+    expect(views).toEqual([
+      { id: 'id-1', name: 'CQRS — Write flow', kind: 'static', nodeIds: ['new-sys'], positions: {} },
+      { id: 'id-2', name: 'CQRS — Docs', kind: 'wiki', nodeIds: ['new-sys'], positions: {}, wikiFocusId: 'new-sys' },
+    ])
+  })
+})

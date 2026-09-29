@@ -1,0 +1,129 @@
+// ─── Headless diagram facade ─────────────────────────────────────────────────
+//
+// A DiagramFacade over a plain DiagramData document, with no store or UI, so
+// the AI tool catalogue (./tools) can edit a model outside Studio (the MCP
+// server). It applies the same metamodel rules and edits as Studio's store,
+// through ../model.
+//
+// What it does not do, because it has no canvas: undo, notifications,
+// per-view node positions, and fitting a parent's size around a new child.
+// Lay the result out with @radical/layout if positions matter.
+
+import type { C4Node, C4Relation, DiagramData, DiagramView } from '../c4'
+import * as model from '../model'
+import type { DiagramFacade } from './diagramFacade'
+
+export interface ModelFacade extends DiagramFacade {
+  /** The edited model as a document. Fields the facade does not edit
+   *  (sequences, snapshots, presentations, …) are carried over from the input. */
+  toDiagramData(): DiagramData
+  /** Why the most recent refused change was refused, or null. */
+  readonly lastError: string | null
+}
+
+export interface ModelFacadeOptions {
+  /** Id generator for new nodes, relations and views. Defaults to crypto.randomUUID. */
+  newId?: () => string
+}
+
+const randomId = (): string =>
+  (globalThis as unknown as { crypto: { randomUUID(): string } }).crypto.randomUUID()
+
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
+
+const byId = <T extends { id: string }>(items: T[] | undefined): Record<string, T> =>
+  Object.fromEntries((items ?? []).map((item) => [item.id, clone(item)]))
+
+export function createModelFacade(data: DiagramData, options: ModelFacadeOptions = {}): ModelFacade {
+  const newId = options.newId ?? randomId
+  const { nodes, relations, views, ...rest } = data
+  let carried: Omit<DiagramData, 'nodes' | 'relations' | 'views'> = clone(rest)
+  const state: model.ModelState = {
+    c4Nodes: byId(nodes),
+    c4Relations: byId(relations),
+    views: byId(views),
+    activeViewId: null,
+    metamodel: model.documentMetamodel(data.metamodel),
+  }
+  let lastError: string | null = null
+  const refuse = (reason: string): void => { lastError = reason }
+
+  return {
+    get lastError() { return lastError },
+
+    getNodes: () => state.c4Nodes,
+    getRelations: () => state.c4Relations,
+    getMetamodel: () => state.metamodel,
+    getViews: () => state.views,
+    getActiveView: () => {
+      const view = state.activeViewId ? state.views[state.activeViewId] : undefined
+      return view ? { id: view.id, name: view.name, nodeIds: view.nodeIds } : null
+    },
+
+    addNode(node: Omit<C4Node, 'id'>) {
+      const refused = model.checkAddNode(state, node)
+      if (refused) { refuse(refused); return '' }
+      const id = newId()
+      model.insertNode(state, id, node)
+      return id
+    },
+    updateNode(id: string, updates: Partial<Omit<C4Node, 'id'>>) {
+      if (!state.c4Nodes[id]) return
+      const refused = model.checkNodeUpdate(state, id, updates)
+      if (refused) { refuse(refused); return }
+      model.patchNode(state, id, updates)
+    },
+    removeNode(id: string) {
+      model.deleteNode(state, id)
+    },
+
+    addRelation(rel: Omit<C4Relation, 'id'>) {
+      const refused = model.checkAddRelation(state, rel)
+      if (refused) { refuse(refused); return }
+      model.insertRelation(state, newId(), rel)
+    },
+    updateRelation(id: string, updates: Partial<Omit<C4Relation, 'id'>>) {
+      model.patchRelation(state, id, updates)
+    },
+    removeRelation(id: string) {
+      model.deleteRelation(state, id)
+    },
+
+    addView(name: string) {
+      const id = newId()
+      model.insertView(state, id, name)
+      return id
+    },
+    setViewNodes(viewId: string, nodeIds: string[]) {
+      model.setViewNodeIds(state, viewId, nodeIds)
+    },
+    removeView(id: string) {
+      delete state.views[id]
+      if (state.activeViewId === id) state.activeViewId = null
+    },
+    setActiveView(id: string | null) {
+      state.activeViewId = id
+    },
+    setViewKind(id: string, kind: DiagramView['kind']) {
+      model.setViewKind(state, id, kind)
+    },
+
+    // Same as Studio's reset: everything goes except the metamodel.
+    clearDiagram() {
+      state.c4Nodes = {}
+      state.c4Relations = {}
+      state.views = {}
+      state.activeViewId = null
+      carried = carried.metamodel ? { metamodel: carried.metamodel } : {}
+    },
+
+    toDiagramData(): DiagramData {
+      return clone({
+        ...carried,
+        nodes: Object.values(state.c4Nodes),
+        relations: Object.values(state.c4Relations),
+        views: Object.values(state.views),
+      })
+    },
+  }
+}

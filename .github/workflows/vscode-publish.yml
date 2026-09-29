@@ -35,7 +35,7 @@ jobs:
           cache: npm
 
       # ── Quality gate ────────────────────────────────────────────────────────
-      - name: Install root dependencies
+      - name: Install dependencies (all workspaces)
         run: npm ci
 
       - name: Type-check
@@ -47,42 +47,38 @@ jobs:
       # ── Build web renderer ───────────────────────────────────────────────────
       - name: Build web renderer
         run: npm run build:web
-        # Produces: out/renderer/index.html  +  out/renderer/assets/**
+        # Produces: apps/studio/out/renderer/index.html  +  apps/studio/out/renderer/assets/**
 
       # ── Generate icon (idempotent) ───────────────────────────────────────────
       - name: Generate extension icon
         run: node tools/generate-icon.js
 
       # ── Extension ────────────────────────────────────────────────────────────
-      - name: Install extension dependencies
-        working-directory: tools/vscode-radical
-        run: npm ci
-
       - name: Bundle web renderer into extension
-        working-directory: tools/vscode-radical
+        working-directory: apps/vscode
         run: npm run bundle-webview
-        # Copies out/renderer → tools/vscode-radical/webview/
+        # Copies apps/studio/out/renderer → apps/vscode/webview/
 
       - name: Compile extension
-        working-directory: tools/vscode-radical
+        working-directory: apps/vscode
         run: npm run compile
 
       # ── Package (always) ─────────────────────────────────────────────────────
       - name: Package VSIX
-        working-directory: tools/vscode-radical
+        working-directory: apps/vscode
         run: npx @vscode/vsce package --no-dependencies
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
           name: vscode-radical-vsix
-          path: tools/vscode-radical/*.vsix
+          path: apps/vscode/*.vsix
           retention-days: 30
 
       # ── Publish (skipped on dry-run) ─────────────────────────────────────────
       - name: Publish to VS Code Marketplace
         if: ${{ !inputs.dry_run }}
-        working-directory: tools/vscode-radical
+        working-directory: apps/vscode
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: npx @vscode/vsce publish --no-dependencies --packagePath *.vsix

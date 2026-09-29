@@ -1,0 +1,28 @@
+{
+  "name": "@radical/hub-catalogue",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Architecture Hub's concept catalogue (.radical documents), its validation and index, and the Vite plugin that serves and bundles it.",
+  "type": "module",
+  "exports": {
+    ".": "./src/catalogue.ts",
+    "./vite": {
+      "types": "./vite.d.cts",
+      "default": "./vite.cjs"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@radical/common": "*",
+    "tsx": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.39",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "vitest": "^4.1.4"
+  }
+}
