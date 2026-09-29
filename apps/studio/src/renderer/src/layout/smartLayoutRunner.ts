@@ -10,15 +10,15 @@
  * smartLayout.ts (computation) and never references this file.
  */
 
-import type { C4Node, C4Relation } from '../types/c4'
-import type { Metamodel } from '../types/metamodel'
+import type { C4Node, C4Relation } from '@radical/common/c4'
+import type { Metamodel } from '@radical/common/metamodel'
 import {
   runSmartLayoutCore,
   runSmartLayoutELKPhase,
   type SmartLayoutResult,
   type SmartLayoutProgress,
   type SmartLayoutOnProgress,
-} from './smartLayout'
+} from '@radical/layout/smartLayout'
 // Vite ?worker import — processed at build time into a separate worker chunk.
 // Static top-level import is required for Vite's worker plugin to detect it.
 import SmartLayoutWorkerClass from './smartLayout.worker?worker'

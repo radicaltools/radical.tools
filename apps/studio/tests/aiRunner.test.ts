@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { runAIPrompt } from '../src/renderer/src/ai/runner'
 import { defaultAISettings } from '../src/renderer/src/ai/settings'
-import type { DiagramFacade } from '../src/renderer/src/ai/diagramFacade'
-import type { C4Node, C4Relation } from '../src/renderer/src/types/c4'
+import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 
 function makeFacade(): DiagramFacade & { _nodes: Record<string, C4Node>; _rels: Record<string, C4Relation> } {
   const nodes: Record<string, C4Node> = {}

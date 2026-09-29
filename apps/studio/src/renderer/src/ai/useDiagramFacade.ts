@@ -8,7 +8,7 @@
 
 import { useMemo } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import type { DiagramFacade } from './diagramFacade'
+import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
 
 export function useDiagramFacade(): DiagramFacade {
   return useMemo<DiagramFacade>(() => ({

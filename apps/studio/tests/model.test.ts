@@ -10,8 +10,8 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
-import { builtInGovernanceMetamodel } from '../src/renderer/src/types/metamodel'
-import type { C4Node, C4Relation, DiagramView } from '../src/renderer/src/types/c4'
+import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 
 // Snapshot the pristine sample on import so each test starts from the same
 // state. We only need the bits the model actions touch.

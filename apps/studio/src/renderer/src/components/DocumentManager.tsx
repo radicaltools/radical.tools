@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { documents, useDocumentsStore, type DocumentMeta, type DocumentSource } from '../store/documentStore'
 import { useDiagramStore } from '../store/diagramStore'
-import { availableMetamodels } from '../types/metamodel'
-import { parseStructurizrDsl } from '../import/structurizrDsl'
+import { availableMetamodels } from '@radical/common/metamodel'
+import { parseStructurizrDsl } from '@radical/common/formats/structurizrDsl'
 import { webFolderSupported } from '../persist/webFolder'
 
 interface Props {

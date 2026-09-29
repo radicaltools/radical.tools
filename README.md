@@ -126,17 +126,21 @@ apps/
     src/preload/    contextBridge API surface exposed to renderer
     src/renderer/src/
       components/   React UI (Canvas, Toolbar, Panels, Modals, …)
-      layout/       Layout algorithms (smartLayout, elkLayout, colaLayout, …)
+      layout/       Smart Layout worker wrapper and live webcola physics
       store/        Zustand stores (diagramStore, documentStore, hubStore)
-      ai/           AI integration (providers: OpenAI, Anthropic, Gemini, Ollama)
-      types/        C4 + metamodel TypeScript types
+      ai/           AI chat, providers (OpenAI, Anthropic, Gemini, Ollama), Forge
       hub/          Radical Hub, the embedded read-only catalogue viewer
-    tests/          Vitest unit/integration tests + layout benchmarks
+    tests/          Vitest unit/integration tests
     tools/          hubCatalogue.ts (Vite plugin: validates content/hub,
                     emits hub/index.json + legacy hub-data.json), sample generator
     build/          Desktop app icon used by electron-builder
   vscode/         VS Code extension; bundles the Studio web build as its webview
   web/            Marketing site and manual (radical.tools)
+packages/
+  common/         @radical/common: C4 + metamodel types, file formats, query
+                  language, AI tool catalogue. No UI dependencies
+  layout/         @radical/layout: Smart Layout and the headless layout engines,
+                  with their tests, benchmark and visual harness
 content/
   hub/            The concept catalogue: one Radical Studio document per
                   concept (<category>/<id>.radical with a `hub` metadata block)

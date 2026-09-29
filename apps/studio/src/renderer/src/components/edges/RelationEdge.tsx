@@ -7,9 +7,9 @@ import {
   useStore,
   useStoreApi,
 } from 'reactflow'
-import { C4EdgeRFData } from '../../types/c4'
-import { computeRoutedEdge, RoutingObstacle } from '../../layout/edgeRouting'
-import { allocatePorts } from '../../layout/portAllocator'
+import { C4EdgeRFData } from '@radical/common/c4'
+import { computeRoutedEdge, RoutingObstacle } from '@radical/layout/edgeRouting'
+import { allocatePorts } from '@radical/layout/portAllocator'
 import { useDiagramStore } from '../../store/diagramStore'
 
 // ─── Floating-edge helpers ────────────────────────────────────────────────────
@@ -225,8 +225,9 @@ export const RelationEdge = memo(
     let srcSide: Position, tgtSide: Position
     let sp: { x: number; y: number }, tp: { x: number; y: number }
     if (alloc) {
-      srcSide = alloc.sourceSide
-      tgtSide = alloc.targetSide
+      // @radical/layout's sides carry the same string values as reactflow's enum
+      srcSide = alloc.sourceSide as Position
+      tgtSide = alloc.targetSide as Position
       sp = alloc.sourcePoint
       tp = alloc.targetPoint
     } else {

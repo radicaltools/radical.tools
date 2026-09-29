@@ -10,7 +10,7 @@
 // The read/write helpers are handle-driven and side-effect-isolated so they can
 // be unit-tested against an in-memory fake directory handle.
 
-import type { FolderFiles } from './mdFolder'
+import type { FolderFiles } from '@radical/common/formats/mdFolder'
 
 // Minimal structural typings for the File System Access API (avoids depending
 // on lib.dom variants that may not ship these definitions).

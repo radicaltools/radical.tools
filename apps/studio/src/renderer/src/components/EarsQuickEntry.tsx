@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { parseEarsSentence } from '../types/metamodel'
+import { parseEarsSentence } from '@radical/common/metamodel'
 
 const EARS_TYPE_LABEL: Record<string, string> = {
   ubiquitous: 'ubiquitous',

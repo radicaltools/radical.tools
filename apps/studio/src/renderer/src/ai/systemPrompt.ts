@@ -3,9 +3,9 @@
 // from prose describing a JSON shape — this file only supplies domain/policy
 // guidance plus the live metamodel + diagram-state context messages.
 
-import type { C4Node, C4Relation, DiagramView } from '../types/c4'
-import type { Metamodel } from '../types/metamodel'
-import type { ChatMessage } from './types'
+import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
+import type { Metamodel } from '@radical/common/metamodel'
+import type { ChatMessage } from '@radical/common/ai/types'
 
 const FALLBACK_TYPES = [
   'person', 'system', 'container', 'component', 'database', 'webapp', 'queue',

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { isRelationAllowed } from '../types/metamodel'
+import { isRelationAllowed } from '@radical/common/metamodel'
 
 /**
  * Floating action bar that appears over the canvas whenever a single

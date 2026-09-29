@@ -1,14 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '../store/diagramStore'
-import { builtInC4Metamodel, validateModel } from '../types/metamodel'
+import { builtInC4Metamodel, validateModel } from '@radical/common/metamodel'
 import type {
   NodeTypeDef,
   RelationTypeDef,
   RelationPair,
   PropertyDef,
   PropertyType,
-} from '../types/metamodel'
+} from '@radical/common/metamodel'
 
 // ── small icon helpers ─────────────────────────────────────────────────────
 

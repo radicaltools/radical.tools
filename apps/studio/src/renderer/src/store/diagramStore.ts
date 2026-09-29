@@ -28,7 +28,7 @@ import {
   COLLAPSED_HEIGHT,
   COLLAPSED_WIDTH,
   isContainerType,
-} from '../types/c4'
+} from '@radical/common/c4'
 import {
   Metamodel,
   NodeTypeDef,
@@ -40,13 +40,13 @@ import {
   isParentAllowed,
   canAddMoreOfType,
   inferRelationType,
-} from '../types/metamodel'
+} from '@radical/common/metamodel'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
-import { applyTreeLayout } from '../layout/elkLayout'
-import { applyRadicalLayout } from '../layout/radicalLayout'
+import { applyTreeLayout } from '@radical/layout/elkLayout'
+import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
-import { minimizeCrossings } from '../layout/crossingOpt'
-import { compoundPadding } from '../layout/geometry'
+import { minimizeCrossings } from '@radical/layout/crossingOpt'
+import { compoundPadding } from '@radical/layout/geometry'
 import { LiveColaLayout } from '../layout/liveColaLayout'
 import { documents, useDocumentsStore } from './documentStore'
 import { isViewerProfile } from '../runtime'

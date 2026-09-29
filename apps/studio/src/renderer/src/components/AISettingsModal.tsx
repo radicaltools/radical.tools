@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { loadAISettings, saveAISettings } from '../ai/settings'
 import { listAdapters, getAdapter } from '../ai/registry'
-import type { AIProviderId, AISettings } from '../ai/types'
-import { textOf } from '../ai/types'
+import type { AIProviderId, AISettings } from '@radical/common/ai/types'
+import { textOf } from '@radical/common/ai/types'
 
 interface Props {
   open: boolean

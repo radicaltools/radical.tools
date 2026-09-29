@@ -14,9 +14,9 @@
 import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
 import { readCatalogue, validateCatalogue, buildIndex } from '../tools/hubCatalogue'
-import { conceptToDoc, docToConcept, summarize, type HubRadicalDoc } from '../src/renderer/src/hub/hubFormat'
+import { conceptToDoc, docToConcept, summarize, type HubRadicalDoc } from '@radical/common/hubFormat'
 import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
-import { builtInGovernanceMetamodel, isParentAllowed } from '../src/renderer/src/types/metamodel'
+import { builtInGovernanceMetamodel, isParentAllowed } from '@radical/common/metamodel'
 import { sanitizeWireframeSvg } from '../src/renderer/src/ai/mockupWireframe'
 
 const HUB_DIR = resolve(__dirname, '../../../content/hub')

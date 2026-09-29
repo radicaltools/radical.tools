@@ -15,8 +15,8 @@ import { useDiagramStore } from '../store/diagramStore'
 import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
-import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT } from '../types/c4'
-import { isParentAllowed, isRelationAllowed } from '../types/metamodel'
+import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT } from '@radical/common/c4'
+import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
 
 // Node and edge type registrations
 const nodeTypes: NodeTypes = {

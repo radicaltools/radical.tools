@@ -5,41 +5,14 @@ import {
   type HubConcept,
   type HubConceptSummary,
   type HubRadicalDoc,
-  type TemplateParam,
-} from '../hub/hubFormat'
+} from '@radical/common/hubFormat'
 
-export type { HubConcept, HubConceptMeta, HubConceptSummary, HubCategory, TemplateParam } from '../hub/hubFormat'
+export type { HubConcept, HubConceptMeta, HubConceptSummary, HubCategory, HubImportRecord, TemplateParam } from '@radical/common/hubFormat'
 
 // ─── Hub catalogue ───────────────────────────────────────────────────────────
 //
 // `hub/index.json` lists concept summaries; each concept is a Radical Studio
 // document at `hub/<category>/<id>.radical` fetched on demand (see hubFormat.ts).
-
-/**
- * Persisted record of a hub concept import that used template parameters.
- * Stored in the diagram so the user can reconfigure values later.
- */
-export interface HubImportRecord {
-  conceptId: string
-  conceptName: string
-  templateParams: TemplateParam[]
-  /** Current substitution values (may change on reconfigure). */
-  paramValues: Record<string, string>
-  /** New node IDs (UUIDs) that were created by this import. */
-  nodeIds: string[]
-  /**
-   * Original template nodes keyed by new node UUID.
-   * Contains the {{TOKEN}} placeholders before substitution.
-   * Positions (x/y/width/height) are excluded — they are user-managed.
-   */
-  originalNodes: Record<string, Record<string, unknown>>
-  /**
-   * Per-node template params keyed by new node UUID.
-   * Derived from node-level templateParams at import time.
-   * Used by RightPanel to show only the params relevant to a given node.
-   */
-  nodeParams?: Record<string, TemplateParam[]>
-}
 
 // ─── Store types ────────────────────────────────────────────────────────────
 

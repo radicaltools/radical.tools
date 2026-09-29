@@ -13,7 +13,7 @@
 // pseudo-tool-call text in `content` instead of populating `tool_calls` —
 // documented limitation, not a bug to chase here.
 
-import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '../types'
+import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '@radical/common/ai/types'
 
 const DEFAULT_BASE = 'http://localhost:11434'
 

@@ -5,9 +5,9 @@ import {
   isNodeHidden,
   getViewVisibleAncestor,
 } from '../store/diagramStore'
-import type { C4Node } from '../types/c4'
-import { NODE_COLORS, TYPE_LABELS } from '../types/c4'
-import { isRelationAllowed } from '../types/metamodel'
+import type { C4Node } from '@radical/common/c4'
+import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
+import { isRelationAllowed } from '@radical/common/metamodel'
 
 // ─── Tree ordering helper (hierarchical, parents before children) ────────────
 

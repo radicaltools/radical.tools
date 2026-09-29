@@ -16,7 +16,7 @@
 // them on the viewport, so it drops them and the view keeps the imported
 // layout.
 
-import type { DiagramView, NodePosition } from '../types/c4'
+import type { DiagramView, NodePosition } from '@radical/common/c4'
 
 type Raw = Record<string, unknown>
 type IdMap = (id: string) => string | undefined

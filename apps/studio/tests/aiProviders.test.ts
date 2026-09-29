@@ -4,7 +4,7 @@ import { openaiAdapter } from '../src/renderer/src/ai/providers/openai'
 import { claudeAdapter } from '../src/renderer/src/ai/providers/claude'
 import { geminiAdapter } from '../src/renderer/src/ai/providers/gemini'
 import { ADAPTERS, getAdapter, listAdapters } from '../src/renderer/src/ai/registry'
-import type { ChatMessage, ChatRequest } from '../src/renderer/src/ai/types'
+import type { ChatMessage, ChatRequest } from '@radical/common/ai/types'
 
 interface CapturedCall {
   url: string

@@ -6,7 +6,8 @@ import { loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
 import { FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, buildForgeStagePrompt, buildPriorStagesBlock, type ForgeStageId } from '../ai/forgePrompts'
-import { buildGherkinFiles, downloadGherkinFiles } from '../export/exportGherkin'
+import { buildGherkinFiles } from '@radical/common/formats/exportGherkin'
+import { downloadGherkinFiles } from '../export/downloadGherkinFiles'
 import { AIReportLine } from './AIReportLine'
 import { useHubStore, type HubCategory, type HubConceptSummary } from '../store/hubStore'
 import { findRelevantConcepts } from '../hub/matchConcepts'
@@ -17,8 +18,8 @@ import {
   HUB_MATCHES_QUESTION_ID,
   type ClarifyStageQuestion,
 } from '../ai/forgeClarify'
-import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
-import type { ApplyReport } from '../ai/diagramFacade'
+import { addTokenUsage, type AISettings, type TokenUsage } from '@radical/common/ai/types'
+import type { ApplyReport } from '@radical/common/ai/diagramFacade'
 import { generateWireframe } from '../ai/mockupWireframe'
 
 type ClarifyStatus = 'asking' | 'form' | 'done'

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { documents } from '../src/renderer/src/store/documentStore'
 import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
-import type { DiagramData } from '../src/renderer/src/types/c4'
+import type { DiagramData } from '@radical/common/c4'
 
 class MemLS {
   private map = new Map<string, string>()

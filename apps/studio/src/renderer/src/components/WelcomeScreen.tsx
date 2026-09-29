@@ -3,7 +3,7 @@ import { documents } from '../store/documentStore'
 import { buildFintechSampleRaw } from '../store/fintechSample'
 import { useDiagramStore } from '../store/diagramStore'
 import { formatRoute } from '../route'
-import { availableMetamodels } from '../types/metamodel'
+import { availableMetamodels } from '@radical/common/metamodel'
 
 /** The sample's System Context view (fintechSampleData.json). */
 const SAMPLE_START_VIEW = 'view-ctx'

@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
-import type { C4Node, C4Relation } from '../src/renderer/src/types/c4'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 
 const initial = (() => {
   const s = useDiagramStore.getState()

@@ -19,13 +19,17 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import type { Plugin } from 'vite'
+// Relative on purpose: this file is loaded by the Vite / electron-vite config
+// loader, which leaves bare imports such as `@radical/common/hubFormat` for
+// Node to load, and Node cannot run the package's .ts source. A relative path
+// gets bundled into the config instead.
 import {
   HUB_INDEX_FILE,
   summarize,
   toLegacyCatalogue,
   type HubConceptSummary,
   type HubRadicalDoc,
-} from '../src/renderer/src/hub/hubFormat'
+} from '../../../packages/common/src/hubFormat'
 
 export const HUB_DIR = 'hub'
 export const LEGACY_FILE = 'hub-data.json'

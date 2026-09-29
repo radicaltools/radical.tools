@@ -1,8 +1,8 @@
 import React, { memo, useCallback } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
-import { C4NodeRFData, NODE_COLORS, TYPE_ICON_PATHS } from '../../types/c4'
+import { C4NodeRFData, NODE_COLORS, TYPE_ICON_PATHS } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
-import { composeEarsSentence, resolveEarsSubject } from '../../types/metamodel'
+import { composeEarsSentence, resolveEarsSubject } from '@radical/common/metamodel'
 import { wireframeDataUri } from '../../ai/mockupWireframe'
 
 // ─── Diff highlight overlay ────────────────────────────────────────────────

@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import sample from '../src/renderer/src/store/fintechSampleData.json'
-import { builtInGovernanceMetamodel, isParentAllowed } from '../src/renderer/src/types/metamodel'
+import { builtInGovernanceMetamodel, isParentAllowed } from '@radical/common/metamodel'
 import { sanitizeWireframeSvg } from '../src/renderer/src/ai/mockupWireframe'
 
 type Node = { id: string; type: string; parentId?: string; [k: string]: unknown }

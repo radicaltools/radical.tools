@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
 import { readCatalogue, buildIndex } from '../tools/hubCatalogue'
 import { findRelevantConcepts, scoreConceptRelevance } from '../src/renderer/src/hub/matchConcepts'
-import type { HubConceptSummary } from '../src/renderer/src/hub/hubFormat'
+import type { HubConceptSummary } from '@radical/common/hubFormat'
 
 const HUB_DIR = resolve(__dirname, '../../../content/hub')
 const concepts: HubConceptSummary[] = buildIndex(readCatalogue(HUB_DIR))

@@ -12,8 +12,8 @@
 // if something later inlines it.
 
 import { getAdapter } from './registry'
-import { textOf, type AISettings, type TokenUsage } from './types'
-import type { C4Node, C4Relation } from '../types/c4'
+import { textOf, type AISettings, type TokenUsage } from '@radical/common/ai/types'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 
 export const WIREFRAME_WIDTH = 400
 export const WIREFRAME_HEIGHT = 300

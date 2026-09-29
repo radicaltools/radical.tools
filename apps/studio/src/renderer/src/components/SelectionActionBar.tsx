@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { isParentAllowed } from '../types/metamodel'
+import { isParentAllowed } from '@radical/common/metamodel'
 
 /**
  * Floating action bar that appears over the canvas whenever one or more

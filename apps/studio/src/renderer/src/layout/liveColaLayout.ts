@@ -12,8 +12,8 @@ import { d3adaptor, Layout, InputNode, Group, Link } from 'webcola'
 import { dispatch } from 'd3-dispatch'
 import { timer } from 'd3-timer'
 import { drag as d3drag } from 'd3-drag'
-import { C4Node, C4Relation } from '../types/c4'
-import { effectiveWidth, effectiveHeight, isVisible } from './geometry'
+import { C4Node, C4Relation } from '@radical/common/c4'
+import { effectiveWidth, effectiveHeight, isVisible } from '@radical/layout/geometry'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

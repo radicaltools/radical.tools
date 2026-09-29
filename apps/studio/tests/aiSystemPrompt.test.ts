@@ -5,8 +5,8 @@ import {
   buildMetamodelMessage,
   buildSystemMessages,
 } from '../src/renderer/src/ai/systemPrompt'
-import type { C4Node, C4Relation } from '../src/renderer/src/types/c4'
-import type { Metamodel } from '../src/renderer/src/types/metamodel'
+import type { C4Node, C4Relation } from '@radical/common/c4'
+import type { Metamodel } from '@radical/common/metamodel'
 
 const node = (over: Partial<C4Node>): C4Node => ({
   id: 'n', type: 'system', label: 'L', collapsed: false,

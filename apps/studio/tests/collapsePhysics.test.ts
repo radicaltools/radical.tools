@@ -12,8 +12,8 @@
  */
 import { describe, it, expect } from 'vitest'
 import { LiveColaLayout } from '../src/renderer/src/layout/liveColaLayout'
-import type { C4Node, C4Relation } from '../src/renderer/src/types/c4'
-import { NODE_SIZES } from '../src/renderer/src/types/c4'
+import type { C4Node, C4Relation } from '@radical/common/c4'
+import { NODE_SIZES } from '@radical/common/c4'
 
 function wait(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))

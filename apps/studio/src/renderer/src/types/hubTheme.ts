@@ -7,8 +7,8 @@
 // node on the canvas. `hub/theme.js` is generated from this file
 // (`npm run hub:theme`); never edit it by hand.
 
-import type { C4ElementType } from './c4'
-import { NODE_COLORS, NODE_FG, TYPE_LABELS, TYPE_ICON_PATHS } from './c4'
+import type { C4ElementType } from '@radical/common/c4'
+import { NODE_COLORS, NODE_FG, TYPE_LABELS, TYPE_ICON_PATHS } from '@radical/common/c4'
 
 export type HubCategory = 'pattern' | 'fitness-function' | 'requirement' | 'adr' | 'blueprint'
 

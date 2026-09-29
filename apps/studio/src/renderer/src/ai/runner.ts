@@ -5,11 +5,11 @@
 // a single user turn, and repeats until the model returns a plain-text final
 // answer (no more tool calls) or `maxIterations` is hit.
 
-import { emptyReport, mergeReport, type ApplyReport, type DiagramFacade } from './diagramFacade'
+import { emptyReport, mergeReport, type ApplyReport, type DiagramFacade } from '@radical/common/ai/diagramFacade'
 import { getAdapter } from './registry'
 import { buildContextMessage, buildSystemMessages } from './systemPrompt'
-import { buildToolDefs, buildToolHandlers, type ToolRunContext } from './tools'
-import { addTokenUsage, textOf, toolCallsOf, type AISettings, type ChatContentBlock, type ChatMessage, type TokenUsage } from './types'
+import { buildToolDefs, buildToolHandlers, type ToolRunContext } from '@radical/common/ai/tools'
+import { addTokenUsage, textOf, toolCallsOf, type AISettings, type ChatContentBlock, type ChatMessage, type TokenUsage } from '@radical/common/ai/types'
 
 export interface RunAIResult {
   summary: string

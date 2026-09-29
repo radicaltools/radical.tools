@@ -9,12 +9,12 @@
 // (plain functions + zustand store) so the diagram store can wire into it.
 
 import { create } from 'zustand'
-import type { DiagramData, C4Node } from '../types/c4'
+import type { DiagramData, C4Node } from '@radical/common/c4'
 import {
   serializeToMdFolder,
   deserializeFromMdFolder,
   extractNodeBody,
-} from '../persist/mdFolder'
+} from '@radical/common/formats/mdFolder'
 import {
   webFolderSupported,
   pickWebDirectory,

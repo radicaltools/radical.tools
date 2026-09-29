@@ -15,8 +15,8 @@
  *              | { type: 'progress', progress: SmartLayoutProgress }
  */
 
-import { runSmartLayoutWorkerPhase, type SmartLayoutResult, type RawCandidate, type SmartLayoutProgress } from './smartLayout'
-import type { C4Node, C4Relation } from '../types/c4'
+import { runSmartLayoutWorkerPhase, type SmartLayoutResult, type RawCandidate, type SmartLayoutProgress } from '@radical/layout/smartLayout'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 
 self.onmessage = async (e: MessageEvent) => {
   const { nodes, relations, raw } = e.data as {

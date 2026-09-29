@@ -1,6 +1,6 @@
 import React from 'react'
 import { useDiagramStore, nodeEffectivelyCollapsedInView } from '../store/diagramStore'
-import { C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS } from '../types/c4'
+import { C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS } from '@radical/common/c4'
 
 function C4Icon({ type, size = 12 }: { type: C4ElementType; size?: number }) {
   const mm = useDiagramStore((s) => s.metamodel)

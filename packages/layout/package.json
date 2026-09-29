@@ -1,0 +1,22 @@
+{
+  "name": "@radical/layout",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Smart Layout and the other headless layout engines (ELK ensemble, Radical semantic C4 layout, crossing minimisation, annealing, port allocation, edge routing).",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@radical/common": "*",
+    "elkjs": "^0.9.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.4"
+  }
+}

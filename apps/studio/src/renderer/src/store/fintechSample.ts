@@ -20,9 +20,9 @@
 import type {
   DiagramData, C4Node, C4Relation, DiagramSequence, DiagramSnapshot, DiagramView,
   NodePosition, Presentation,
-} from '../types/c4'
-import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH } from '../types/c4'
-import { builtInGovernanceMetamodel } from '../types/metamodel'
+} from '@radical/common/c4'
+import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH } from '@radical/common/c4'
+import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { runSmartLayout } from '../layout/smartLayoutRunner'
 import savedSampleData from './fintechSampleData.json'
 

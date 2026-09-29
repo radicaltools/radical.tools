@@ -21,7 +21,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
 import { documents } from '../src/renderer/src/store/documentStore'
-import type { C4Node, C4Relation } from '../src/renderer/src/types/c4'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 
 // The default node test env has no localStorage, so the document-persistence
 // layer is otherwise a no-op. Provide a minimal in-memory implementation so

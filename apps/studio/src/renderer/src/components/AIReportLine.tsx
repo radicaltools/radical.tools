@@ -1,5 +1,5 @@
 import React from 'react'
-import type { ApplyReport } from '../ai/diagramFacade'
+import type { ApplyReport } from '@radical/common/ai/diagramFacade'
 
 /** Compact one-line summary of an AI run's `ApplyReport` — "+3 nodes,
  *  +2 relations" etc. — plus any tool errors. Shared by every AI entry point

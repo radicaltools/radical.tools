@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import type { C4Node, C4Relation } from '../types/c4'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 
 // ─── Color palette per C4 type ──────────────────────────────────────────────
 const TYPE_COLORS_LIGHT: Record<string, readonly [string, string, string]> = {

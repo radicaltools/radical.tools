@@ -6,8 +6,8 @@ out/
 .playwright-mcp/
 
 # Visual layout harness output (regenerated locally; large binaries)
-apps/studio/tests/visual/out-*.svg
-apps/studio/tests/visual/out-*.png
+packages/layout/tests/visual/out-*.svg
+packages/layout/tests/visual/out-*.png
 
 # VS Code extension: the webview is the Studio web build, copied in by
 # `npm run bundle-webview -w vscode-radical`; packaged .vsix files are CI artifacts

@@ -33,14 +33,16 @@ apps/
     src/main/       — Electron main process
     src/preload/    — Electron preload bridge
     src/renderer/src/
-      ai/           — AI provider integrations and query language
+      ai/           — AI chat, providers and Forge
       components/   — React UI components
       hooks/        — Custom React hooks
       store/        — Zustand state management
-      types/        — Shared TypeScript types
     tests/          — Vitest unit tests
   vscode/         — VS Code extension
   web/            — Marketing site (radical.tools)
+packages/
+  common/         — @radical/common: model types, metamodels, formats, AI tools (no UI deps)
+  layout/         — @radical/layout: Smart Layout and headless layout engines
 content/hub/      — Architecture Hub concept catalogue (.radical files)
 ```
 

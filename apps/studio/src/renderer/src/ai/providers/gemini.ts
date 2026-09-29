@@ -14,7 +14,7 @@
 // calls route by name only, so if Gemini itself doesn't guarantee ordering
 // there's no way to tell two such results apart on this end either.
 
-import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '../types'
+import type { ChatContentBlock, ChatMessage, ChatRequest, ChatResponse, ProviderAdapter, ProviderConfig, TokenUsage } from '@radical/common/ai/types'
 
 const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, PropertyDef } from '../types/metamodel'
+import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, PropertyDef } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { MockupWireframe } from './MockupWireframe'
@@ -15,7 +15,7 @@ import {
   NODE_SIZES,
   TYPE_LABELS,
   TYPE_ICON_PATHS,
-} from '../types/c4'
+} from '@radical/common/c4'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
 type AddNode = ReturnType<typeof useDiagramStore.getState>['addNode']

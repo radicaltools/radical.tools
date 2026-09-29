@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { NODE_COLORS, NODE_FG, TYPE_LABELS } from '../types/c4'
-import type { C4Node, C4Relation } from '../types/c4'
+import { NODE_COLORS, NODE_FG, TYPE_LABELS } from '@radical/common/c4'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 
 // Participants use the same fills and shapes as the C4 nodes on the canvas
 // (see components/nodes/C4Nodes.tsx), so a flow reads like the structure view.

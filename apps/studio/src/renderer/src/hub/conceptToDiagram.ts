@@ -8,9 +8,9 @@
 // are provided so the viewer can switch presentation without any store
 // mutations beyond `setActiveView`.
 
-import type { C4Node, C4Relation, C4ElementType, DiagramData, DiagramSequence, DiagramView } from '../types/c4'
-import { NODE_SIZES } from '../types/c4'
-import { builtInGovernanceMetamodel } from '../types/metamodel'
+import type { C4Node, C4Relation, C4ElementType, DiagramData, DiagramSequence, DiagramView } from '@radical/common/c4'
+import { NODE_SIZES } from '@radical/common/c4'
+import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import type { HubConcept, TemplateParam } from '../store/hubStore'
 import { conceptViewsToDiagram } from './conceptViews'
 

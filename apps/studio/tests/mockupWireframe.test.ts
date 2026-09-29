@@ -9,9 +9,9 @@ import {
   sanitizeWireframeSvg,
   MAX_WIREFRAME_CHARS,
 } from '../src/renderer/src/ai/mockupWireframe'
-import { builtInGovernanceMetamodel, inferRelationType, isRelationAllowed } from '../src/renderer/src/types/metamodel'
-import { serializeToMdFolder, deserializeFromMdFolder } from '../src/renderer/src/persist/mdFolder'
-import type { C4Node, C4Relation } from '../src/renderer/src/types/c4'
+import { builtInGovernanceMetamodel, inferRelationType, isRelationAllowed } from '@radical/common/metamodel'
+import { serializeToMdFolder, deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 
 function node(partial: Partial<C4Node> & Pick<C4Node, 'id' | 'type' | 'label'> & Record<string, unknown>): C4Node {
   return { collapsed: false, x: 0, y: 0, width: 220, height: 190, ...partial } as C4Node

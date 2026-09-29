@@ -7,8 +7,8 @@ import { getAdapter, listAdapters } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
 import { AIReportLine } from './AIReportLine'
 import { openAISettings } from './AISettingsModal'
-import type { AISettings, ChatMessage, TokenUsage } from '../ai/types'
-import type { ApplyReport } from '../ai/diagramFacade'
+import type { AISettings, ChatMessage, TokenUsage } from '@radical/common/ai/types'
+import type { ApplyReport } from '@radical/common/ai/diagramFacade'
 
 /**
  * Cmd/Ctrl+P quick-search palette.
