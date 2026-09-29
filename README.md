@@ -135,6 +135,7 @@ apps/
                     emits hub/index.json + legacy hub-data.json), sample generator
     build/          Desktop app icon used by electron-builder
   vscode/         VS Code extension; bundles the Studio web build as its webview
+  mcp/            MCP server for radical models (empty for now)
   web/            Marketing site and manual (radical.tools)
 packages/
   common/         @radical/common: C4 + metamodel types, file formats, query

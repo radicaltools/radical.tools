@@ -39,6 +39,7 @@ apps/
       store/        — Zustand state management
     tests/          — Vitest unit tests
   vscode/         — VS Code extension
+  mcp/            — MCP server (empty for now)
   web/            — Marketing site (radical.tools)
 packages/
   common/         — @radical/common: model types, metamodels, formats, AI tools (no UI deps)

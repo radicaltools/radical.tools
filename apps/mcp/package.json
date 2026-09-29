@@ -1,0 +1,17 @@
+{
+  "name": "@radical/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MCP server for radical models (not implemented yet).",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radical/common": "*",
+    "@radical/layout": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
