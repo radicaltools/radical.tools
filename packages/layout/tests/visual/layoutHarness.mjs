@@ -1,5 +1,5 @@
 /**
- * Visual harness: runs `runSmartLayout` on a set of scenarios, renders each
+ * Visual harness: runs `runSmartLayoutCore` on a set of scenarios, renders each
  * resulting layout to an SVG file under tests/visual/out-*.svg, and prints a
  * compact metrics breakdown.
  *
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
-const { runSmartLayout, computeCompositeScore } = await import(
+const { runSmartLayoutCore, computeCompositeScore } = await import(
   '@radical/layout/smartLayout'
 )
 const { pickSides } = await import('@radical/layout/portAllocator')
@@ -306,7 +306,7 @@ mkdirSync(here, { recursive: true })
 
 for (const [name, scene] of scenarios) {
   const t0 = Date.now()
-  const result = await runSmartLayout(scene.nodes, scene.relations)
+  const result = await runSmartLayoutCore(scene.nodes, scene.relations)
   const dt = Date.now() - t0
   const projected = applyPositions(scene.nodes, result.winner.positions)
   const score = computeCompositeScore(projected, scene.relations)
