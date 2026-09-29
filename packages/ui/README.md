@@ -16,6 +16,6 @@ It has no documents, host bridge or AI. Apps plug those in:
   the store empty and read-only (the Hub).
 
 Entry points are listed in `exports` in package.json. `@radical/ui/viewer`
-bundles everything the Hub needs; `@radical/ui/styles.css` is the global
-stylesheet; `@radical/ui/testing/setup` stubs `window` and
+bundles everything the Hub needs; `@radical/ui/styles.css` is the stylesheet
+for these components (Studio adds its own `studio.css` after it); `@radical/ui/testing/setup` stubs `window` and
 `requestAnimationFrame` for tests under node.

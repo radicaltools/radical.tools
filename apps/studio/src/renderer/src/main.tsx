@@ -5,6 +5,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import '@radical/ui/styles.css'
+import './studio.css'
 import 'reactflow/dist/style.css'
 import { ErrorBoundary } from '@radical/ui/components/ErrorBoundary'
 
