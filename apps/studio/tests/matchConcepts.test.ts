@@ -5,13 +5,11 @@
  * surfacing/steering by relevant prior art.
  */
 import { describe, it, expect } from 'vitest'
-import { resolve } from 'node:path'
-import { readCatalogue, buildIndex } from '../../hub/tools/hubCatalogue'
+import { readCatalogue, buildIndex } from '@radical/hub-catalogue'
 import { findRelevantConcepts, scoreConceptRelevance } from '../src/renderer/src/hub/matchConcepts'
 import type { HubConceptSummary } from '@radical/common/hubFormat'
 
-const HUB_DIR = resolve(__dirname, '../../hub/catalogue')
-const concepts: HubConceptSummary[] = buildIndex(readCatalogue(HUB_DIR))
+const concepts: HubConceptSummary[] = buildIndex(readCatalogue())
 
 describe('findRelevantConcepts', () => {
   it('ranks the Anti-Corruption Layer pattern top for a legacy-integration description', () => {

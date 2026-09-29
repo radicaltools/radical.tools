@@ -7,9 +7,7 @@
   },
   "include": [
     "src/**/*",
-    "tools/**/*",
     "vite.config.ts",
-    "vitest.config.ts",
-    "../studio/src/preload/index.d.ts"
+    "vitest.config.ts"
   ]
 }

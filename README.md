@@ -137,12 +137,8 @@ apps/
     tests/          Vitest unit/integration tests
     tools/          Sample model generator
     build/          Desktop app icon used by electron-builder
-  hub/            Architecture Hub (hub.radical.tools)
-    catalogue/      One Radical Studio document per concept
-                    (<category>/<id>.radical with a `hub` metadata block)
-    src/            Read-only viewer, built on radical-model/viewer
-    tools/          hubCatalogue.ts: Vite plugin that validates the catalogue
-                    and emits hub/index.json (+ legacy hub-data.json)
+  hub/            Architecture Hub (hub.radical.tools): read-only viewer,
+                  built on radical-model/viewer
   vscode/         VS Code extension; bundles the Studio web build as its webview
   mcp/            MCP server for radical models (empty for now)
   web/            Marketing site and manual (radical.tools)
@@ -151,6 +147,9 @@ packages/
                   language, AI tool catalogue. No UI dependencies
   layout/         @radical/layout: Smart Layout and the headless layout engines,
                   with their tests, benchmark and visual harness
+  hub-catalogue/  @radical/hub-catalogue: the Hub's concept catalogue (one
+                  .radical document per concept), its validation and the Vite
+                  plugin that serves and bundles it for the Hub and Studio
 infra/            Terraform: AWS S3 + CloudFront + Route53 + IAM (OIDC)
 tools/            Repo-wide scripts (generate-icon.js)
 docs/             Architecture notes and improvement log

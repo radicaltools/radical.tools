@@ -8,7 +8,7 @@ Thank you for your interest in contributing! This document explains how to get i
 - **Request features** — open a [feature request](https://github.com/radicaltools/radical.tools/issues/new?template=feature_request.md)
 - **Submit code** — fork the repo and open a pull request
 - **Improve documentation** — fix typos, clarify explanations, add examples
-- **Share architecture patterns** — contribute to the [Architecture Hub](https://hub.radical.tools)
+- **Share architecture patterns** — contribute to the [Architecture Hub](https://hub.radical.tools) by adding a `.radical` concept under `packages/hub-catalogue/catalogue/`
 
 ## Development setup
 
@@ -39,12 +39,13 @@ apps/
       store/        — Zustand state management
     tests/          — Vitest unit tests
   vscode/         — VS Code extension
-  hub/            — Architecture Hub: catalogue/ (.radical concepts) + read-only viewer
+  hub/            — Architecture Hub read-only viewer
   mcp/            — MCP server (empty for now)
   web/            — Marketing site (radical.tools)
 packages/
   common/         — @radical/common: model types, metamodels, formats, AI tools (no UI deps)
   layout/         — @radical/layout: Smart Layout and headless layout engines
+  hub-catalogue/  — @radical/hub-catalogue: Hub concepts (.radical files), validation, Vite plugin
 ```
 
 ## Daily workflow (for maintainers)

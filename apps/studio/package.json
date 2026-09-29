@@ -9,7 +9,8 @@
   "exports": {
     "./viewer": "./src/renderer/src/viewer.ts",
     "./styles.css": "./src/renderer/src/index.css",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./testing/setup": "./tests/setup.ts"
   },
   "scripts": {
     "dev": "electron-vite dev",
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@radical/common": "*",
+    "@radical/hub-catalogue": "*",
     "@radical/layout": "*",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

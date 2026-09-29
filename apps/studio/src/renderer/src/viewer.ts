@@ -1,3 +1,4 @@
+/// <reference path="../../preload/index.d.ts" />
 // ─── Viewer kit ──────────────────────────────────────────────────────────────
 //
 // The part of Studio that apps/hub (the read-only Hub viewer) builds on,
@@ -5,7 +6,8 @@
 // here is something a later packages/ui extraction has to carry.
 //
 // Set `window.__RADICAL_PROFILE = 'viewer'` before importing this module; the
-// diagram store reads the profile at import time.
+// diagram store reads the profile at import time. The reference above brings
+// the `window.electronAPI` types the store is written against.
 
 export { Canvas } from './components/Canvas'
 export { WikiView } from './components/WikiView'

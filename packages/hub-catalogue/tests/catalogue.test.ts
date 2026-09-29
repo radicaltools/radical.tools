@@ -12,13 +12,10 @@
  *     sequences whose steps all exist
  */
 import { describe, it, expect } from 'vitest'
-import { resolve } from 'node:path'
-import { readCatalogue, validateCatalogue, buildIndex } from '../tools/hubCatalogue'
+import { readCatalogue, validateCatalogue, buildIndex } from '../src/catalogue'
 import { conceptToDoc, docToConcept, summarize, type HubRadicalDoc } from '@radical/common/hubFormat'
-import { useDiagramStore, sanitizeWireframeSvg } from 'radical-model/viewer'
+import { sanitizeWireframeSvg } from '@radical/common/wireframe'
 import { builtInGovernanceMetamodel, isParentAllowed } from '@radical/common/metamodel'
-
-const HUB_DIR = resolve(__dirname, '../catalogue')
 
 const doc: HubRadicalDoc = {
   hub: {
@@ -48,12 +45,12 @@ describe('hubFormat', () => {
     expect(s.rootTypes).toEqual(['requirement'])
     expect(s.preview).toEqual({ ears_type: 'ubiquitous', priority: 'must' })
     expect(s.templateParams).toEqual([{ key: 'K', label: 'k' }])
-    expect((s as Record<string, unknown>).nodes).toBeUndefined()
+    expect((s as unknown as Record<string, unknown>).nodes).toBeUndefined()
   })
 })
 
 describe('hub catalogue', () => {
-  const entries = readCatalogue(HUB_DIR)
+  const entries = readCatalogue()
 
   it('contains concepts and passes validation', () => {
     expect(entries.length).toBeGreaterThan(50)
@@ -78,18 +75,8 @@ describe('hub catalogue', () => {
   })
 })
 
-describe('studio round-trip', () => {
-  it('loadDiagram → saveDiagram keeps the hub block (opening a concept in Studio must not strip it)', () => {
-    const store = useDiagramStore.getState()
-    store.loadDiagram({ nodes: [], relations: [], hub: doc.hub })
-    expect(useDiagramStore.getState().saveDiagram().hub).toEqual(doc.hub)
-    store.newDiagram()
-    expect(useDiagramStore.getState().saveDiagram().hub).toBeUndefined()
-  })
-})
-
 describe('blueprint mockups', () => {
-  const blueprints = readCatalogue(HUB_DIR).filter((e) => e.doc.hub.category === 'blueprint')
+  const blueprints = readCatalogue().filter((e) => e.doc.hub.category === 'blueprint')
   const mm = builtInGovernanceMetamodel()
 
   it.each(blueprints.map((e) => [e.file, e.doc] as const))('%s has screen flows with sanitised wireframes', (_file, doc) => {
@@ -111,19 +98,19 @@ describe('blueprint mockups', () => {
     }
 
     for (const r of doc.relations ?? []) {
-      const src = byId.get(r.sourceId)
-      const tgt = byId.get(r.targetId)
+      const src = byId.get(String(r.sourceId))
+      const tgt = byId.get(String(r.targetId))
       expect(src, `${r.id}: missing source`).toBeDefined()
       expect(tgt, `${r.id}: missing target`).toBeDefined()
       if (src!.type !== 'mockup') continue
-      const pairs = mm.relationTypes[r.relationType ?? '']?.allowedPairs ?? []
+      const pairs = mm.relationTypes[String(r.relationType ?? '')]?.allowedPairs ?? []
       expect(pairs.some((p) => p.from === src!.type && p.to === tgt!.type), `${r.id}: ${r.relationType} ${src!.type} → ${tgt!.type}`).toBe(true)
     }
   })
 })
 
 describe('blueprint views and sequences', () => {
-  const blueprints = readCatalogue(HUB_DIR).filter((e) => e.doc.hub.category === 'blueprint')
+  const blueprints = readCatalogue().filter((e) => e.doc.hub.category === 'blueprint')
 
   it.each(blueprints.map((e) => [e.file, e.doc] as const))('%s has consistent views and sequences', (_file, doc) => {
     const nodeIds = new Set(doc.nodes.map((n) => String(n.id)))

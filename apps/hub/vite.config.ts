@@ -9,10 +9,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
-import { hubCataloguePlugin } from './tools/hubCatalogue'
+import { hubCataloguePlugin } from '@radical/hub-catalogue/vite'
 
 export default defineConfig({
-  plugins: [react(), hubCataloguePlugin({ hubDir: resolve(__dirname, 'catalogue') })],
+  plugins: [react(), hubCataloguePlugin()],
   base: './',
   build: {
     outDir: resolve(__dirname, 'out'),
