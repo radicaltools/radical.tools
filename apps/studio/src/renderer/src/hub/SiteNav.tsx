@@ -1,8 +1,8 @@
 // ─── Shared site navigation ──────────────────────────────────────────────────
 //
-// The same bar as radical.tools / docs (website/landing.css `.site-nav`):
+// The same bar as radical.tools / docs (apps/web/landing.css `.site-nav`):
 // Home · Docs | Hub · Studio | GitHub · theme. Keep markup and class
-// names in sync with website/index.html and website/manual.html.
+// names in sync with apps/web/index.html and apps/web/manual.html.
 
 import React from 'react'
 

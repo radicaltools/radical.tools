@@ -19,7 +19,7 @@ import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
 import { builtInGovernanceMetamodel, isParentAllowed } from '../src/renderer/src/types/metamodel'
 import { sanitizeWireframeSvg } from '../src/renderer/src/ai/mockupWireframe'
 
-const HUB_DIR = resolve(__dirname, '../hub')
+const HUB_DIR = resolve(__dirname, '../../../content/hub')
 
 const doc: HubRadicalDoc = {
   hub: {

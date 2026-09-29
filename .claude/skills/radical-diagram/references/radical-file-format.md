@@ -1,6 +1,6 @@
 # .radical file reference
 
-Full schema lives in `src/renderer/src/types/c4.ts` (`DiagramData`) and `src/renderer/src/types/metamodel.ts` (`Metamodel`). This file summarises the optional sections beyond `nodes` + `relations`.
+Full schema lives in `apps/studio/src/renderer/src/types/c4.ts` (`DiagramData`) and `apps/studio/src/renderer/src/types/metamodel.ts` (`Metamodel`). This file summarises the optional sections beyond `nodes` + `relations`.
 
 ## Top-level shape (`DiagramData`)
 
@@ -95,7 +95,7 @@ Available when using an extended built-in metamodel. Set `"metamodel": { "id": "
 
 ## Custom metamodel
 
-Embed a full custom `metamodel` only when built-in presets do not provide the needed types. It needs `id`, `name`, `nodeTypes`, and `relationTypes`. Each node type needs `id`, `label`, `color`, `fg`, `iconPath` (16×16 SVG path), `width`, and `height`; add optional `collapsedWidth`, `collapsedHeight`, `allowedParents`, `allowedAtRoot`, and `properties` as needed. Each relation type needs `id`, `label`, and `allowedPairs: [{from,to}]`. Use `src/renderer/src/types/metamodel.ts` as the authoritative shape.
+Embed a full custom `metamodel` only when built-in presets do not provide the needed types. It needs `id`, `name`, `nodeTypes`, and `relationTypes`. Each node type needs `id`, `label`, `color`, `fg`, `iconPath` (16×16 SVG path), `width`, and `height`; add optional `collapsedWidth`, `collapsedHeight`, `allowedParents`, `allowedAtRoot`, and `properties` as needed. Each relation type needs `id`, `label`, and `allowedPairs: [{from,to}]`. Use `apps/studio/src/renderer/src/types/metamodel.ts` as the authoritative shape.
 
 ## Collapsed sizes
 

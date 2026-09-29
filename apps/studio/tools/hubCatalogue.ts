@@ -1,9 +1,9 @@
 // ─── Hub catalogue build plugin ──────────────────────────────────────────────
 //
 // The catalogue is a folder of Radical Studio documents (top-level
-// hub/<category>/<id>.radical, see hubFormat.ts) — content curated by
-// contributors, kept at the repo root alongside website/ and docs/ rather
-// than inside src/renderer, since it isn't app source. This plugin serves
+// content/hub/<category>/<id>.radical, see hubFormat.ts) — content curated
+// by contributors, kept in the monorepo's content/ folder rather than inside
+// apps/studio, since it isn't app source. This plugin serves
 // and bundles it under the same /hub/ URL prefix the app already expects:
 //
 //   hub/<category>/<id>.radical — the concept documents themselves

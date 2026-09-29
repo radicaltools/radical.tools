@@ -6,8 +6,13 @@ out/
 .playwright-mcp/
 
 # Visual layout harness output (regenerated locally; large binaries)
-tests/visual/out-*.svg
-tests/visual/out-*.png
+apps/studio/tests/visual/out-*.svg
+apps/studio/tests/visual/out-*.png
+
+# VS Code extension: the webview is the Studio web build, copied in by
+# `npm run bundle-webview -w vscode-radical`; packaged .vsix files are CI artifacts
+apps/vscode/webview/
+*.vsix
 
 # Editor / OS
 .vscode/
@@ -24,5 +29,5 @@ infra/tfplan
 infra/override.tf
 infra/override.tf.json
 # Note: infra/.terraform.lock.hcl IS committed (pins provider versions)
-# Note: hub/**/*.radical (repo root) IS committed — it is the canonical
+# Note: content/hub/**/*.radical IS committed — it is the canonical
 # concept catalogue served at hub.radical.tools/hub/ (index.json is generated)

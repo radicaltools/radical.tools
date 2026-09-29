@@ -5,7 +5,7 @@ description: Create or edit .radical diagram files (C4 architecture models for r
 
 # Creating .radical diagram files
 
-A `.radical` file is a JSON document (`DiagramData` in `src/renderer/src/types/c4.ts`) that radical.tools opens directly. You can author one by hand from a structure description — no UI needed.
+A `.radical` file is a JSON document (`DiagramData` in `apps/studio/src/renderer/src/types/c4.ts`) that radical.tools opens directly. You can author one by hand from a structure description — no UI needed.
 
 ## Workflow
 

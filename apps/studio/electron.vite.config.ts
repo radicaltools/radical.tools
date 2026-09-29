@@ -11,7 +11,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()]
   },
   renderer: {
-    plugins: [react(), hubCataloguePlugin({ hubDir: resolve(__dirname, 'hub') })],
+    plugins: [react(), hubCataloguePlugin({ hubDir: resolve(__dirname, '../../content/hub') })],
     define: {
       __DEV_SAMPLE_DATA_PATH__: JSON.stringify(
         resolve(__dirname, 'src/renderer/src/store/fintechSampleData.json')

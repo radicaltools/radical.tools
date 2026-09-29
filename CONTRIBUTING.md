@@ -25,18 +25,23 @@ npm run typecheck  # Type-check
 
 ## Project structure
 
+npm workspaces monorepo; run commands from the repo root.
+
 ```
-src/
-  main/       — Electron main process
-  preload/    — Electron preload bridge
-  renderer/
-    src/
-      ai/         — AI provider integrations and query language
-      components/ — React UI components
-      hooks/      — Custom React hooks
-      store/      — Zustand state management
-      types/      — Shared TypeScript types
-tests/            — Vitest unit tests
+apps/
+  studio/         — Radical Studio (Electron + web) and the Hub viewer
+    src/main/       — Electron main process
+    src/preload/    — Electron preload bridge
+    src/renderer/src/
+      ai/           — AI provider integrations and query language
+      components/   — React UI components
+      hooks/        — Custom React hooks
+      store/        — Zustand state management
+      types/        — Shared TypeScript types
+    tests/          — Vitest unit tests
+  vscode/         — VS Code extension
+  web/            — Marketing site (radical.tools)
+content/hub/      — Architecture Hub concept catalogue (.radical files)
 ```
 
 ## Daily workflow (for maintainers)
@@ -76,7 +81,7 @@ Branch naming: `feature/<name>`, `hotfix/<name>`, `docs/<name>`.
 
 - TypeScript strict mode; no `any` unless unavoidable
 - React functional components with hooks
-- State via Zustand + Immer slices in `src/renderer/src/store/`
+- State via Zustand + Immer slices in `apps/studio/src/renderer/src/store/`
 - Tests live in `tests/` and use Vitest
 
 ## Commit style

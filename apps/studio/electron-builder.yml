@@ -6,7 +6,7 @@ copyright: Copyright © 2024 radical.tools contributors
 artifactName: radical-studio-${version}-${os}-${arch}.${ext}
 
 directories:
-  buildResources: build # icon.png (512×512) — node tools/generate-icon.js --size 512 --out build/icon.png
+  buildResources: build # icon.png (512×512) — node ../../tools/generate-icon.js --size 512 --out build/icon.png
   output: dist
 
 # electron-vite bundles everything into out/; runtime deps come from package.json.

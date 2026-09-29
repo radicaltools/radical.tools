@@ -10,7 +10,7 @@
 
 [**Try it in the browser**](https://studio.radical.tools) · [Architecture Hub](https://hub.radical.tools) · [Manual](https://radical.tools/manual.html)
 
-<img alt="Demo: opening the sample banking model and switching between its views: system context, container view, payment sequence, dependency matrix, governance table and generated wiki" src="website/screenshots/demo.gif" width="880">
+<img alt="Demo: opening the sample banking model and switching between its views: system context, container view, payment sequence, dependency matrix, governance table and generated wiki" src="apps/web/screenshots/demo.gif" width="880">
 
 </div>
 
@@ -26,12 +26,12 @@ Architecture diagrams go stale because they are pictures. In radical.tools they 
 
 <table>
   <tr>
-    <td width="50%"><img alt="Screen-flow of low-fi UI mockups linked by navigation relations" src="website/screenshots/mockups-light.png"><br><sub><b>UI mockups & screen flows</b>, AI-generated wireframes linked to requirements</sub></td>
-    <td width="50%"><img alt="Architecture Hub catalogue of patterns, ADRs and blueprints" src="website/screenshots/hub-catalogue-light.png"><br><sub><b>Architecture Hub</b>, curated concepts you can import in one click</sub></td>
+    <td width="50%"><img alt="Screen-flow of low-fi UI mockups linked by navigation relations" src="apps/web/screenshots/mockups-light.png"><br><sub><b>UI mockups & screen flows</b>, AI-generated wireframes linked to requirements</sub></td>
+    <td width="50%"><img alt="Architecture Hub catalogue of patterns, ADRs and blueprints" src="apps/web/screenshots/hub-catalogue-light.png"><br><sub><b>Architecture Hub</b>, curated concepts you can import in one click</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img alt="Dependency matrix view of containers" src="website/screenshots/matrix-light.png"><br><sub><b>Dependency matrix</b>, one of six views over the same model</sub></td>
-    <td width="50%"><img alt="Generated architecture wiki page" src="website/screenshots/wiki-light.png"><br><sub><b>Architecture wiki</b>, documentation generated from the model</sub></td>
+    <td width="50%"><img alt="Dependency matrix view of containers" src="apps/web/screenshots/matrix-light.png"><br><sub><b>Dependency matrix</b>, one of six views over the same model</sub></td>
+    <td width="50%"><img alt="Generated architecture wiki page" src="apps/web/screenshots/wiki-light.png"><br><sub><b>Architecture wiki</b>, documentation generated from the model</sub></td>
   </tr>
 </table>
 
@@ -41,7 +41,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 
 **Desktop app:** there are no prebuilt installers yet. To run it as an Electron app, build it from source (see [Getting started](#getting-started)): `npm install && npm run dist` produces an installer for your OS in `dist/`.
 
-**VS Code:** an extension that opens `.radical` files right in the editor lives in [tools/vscode-radical](tools/vscode-radical).
+**VS Code:** an extension that opens `.radical` files right in the editor lives in [apps/vscode](apps/vscode).
 
 ## Features
 
@@ -88,13 +88,13 @@ npm run typecheck
 # Run tests
 npm test
 
-# Production build (outputs to out/)
+# Production build (outputs to apps/studio/out/)
 npm run build
 
 # Run built Electron app
 npm start
 
-# Desktop installers for the current OS (outputs to dist/)
+# Desktop installers for the current OS (outputs to apps/studio/dist/)
 npm run dist
 
 # Build web-only renderer (for deployment to studio.radical.tools)
@@ -106,7 +106,8 @@ npm run build:web
 Bump the version and push the tag:
 
 ```bash
-npm version 1.1.0   # updates package.json and creates the v1.1.0 tag
+npm version 1.1.0 -w radical-model   # bumps apps/studio/package.json
+git commit -am "release: v1.1.0" && git tag v1.1.0
 git push --follow-tags
 ```
 
@@ -114,31 +115,33 @@ The [Release Desktop App](.github/workflows/release.yml) workflow builds the mac
 
 ## Project structure
 
+The repo is an npm workspaces monorepo. Run every command from the root; it
+forwards to the right workspace.
+
 ```
-src/
-  main/           Electron main process (IPC handlers, file dialogs)
-  preload/        contextBridge API surface exposed to renderer
-  renderer/src/
-    components/   React UI (Canvas, Toolbar, Panels, Modals, …)
-    layout/       Layout algorithms (smartLayout, elkLayout, colaLayout, …)
-    store/        Zustand stores (diagramStore, documentStore, hubStore)
-    ai/           AI integration (providers: OpenAI, Anthropic, Gemini, Ollama)
-    types/        C4 + metamodel TypeScript types
-    hub/          Radical Hub — embedded read-only viewer of the concept
-                  catalogue (hub.html entry → hub.radical.tools)
-hub/              The concept catalogue — one Radical Studio document per
-                  concept (<category>/<id>.radical with a `hub` metadata
-                  block); content, kept at the repo root next to website/
-                  rather than under src/. hub/index.json is generated at
-                  build time
-build/            Desktop app icon used by electron-builder
-website/          Marketing site (radical.tools)
-infra/            Terraform — AWS S3 + CloudFront + Route53 + IAM (OIDC)
-tools/
-  hubCatalogue.ts Vite plugin — validates hub/**.radical, emits
-                  hub/index.json (+ legacy hub-data.json)
-  vscode-radical/ VS Code extension for .radical file syntax highlighting
-tests/            Vitest unit/integration tests + layout benchmarks
+apps/
+  studio/         Radical Studio: Electron app + web SPA (studio.radical.tools),
+                  and the Hub viewer (hub.html entry → hub.radical.tools)
+    src/main/       Electron main process (IPC handlers, file dialogs)
+    src/preload/    contextBridge API surface exposed to renderer
+    src/renderer/src/
+      components/   React UI (Canvas, Toolbar, Panels, Modals, …)
+      layout/       Layout algorithms (smartLayout, elkLayout, colaLayout, …)
+      store/        Zustand stores (diagramStore, documentStore, hubStore)
+      ai/           AI integration (providers: OpenAI, Anthropic, Gemini, Ollama)
+      types/        C4 + metamodel TypeScript types
+      hub/          Radical Hub, the embedded read-only catalogue viewer
+    tests/          Vitest unit/integration tests + layout benchmarks
+    tools/          hubCatalogue.ts (Vite plugin: validates content/hub,
+                    emits hub/index.json + legacy hub-data.json), sample generator
+    build/          Desktop app icon used by electron-builder
+  vscode/         VS Code extension; bundles the Studio web build as its webview
+  web/            Marketing site and manual (radical.tools)
+content/
+  hub/            The concept catalogue: one Radical Studio document per
+                  concept (<category>/<id>.radical with a `hub` metadata block)
+infra/            Terraform: AWS S3 + CloudFront + Route53 + IAM (OIDC)
+tools/            Repo-wide scripts (generate-icon.js)
 docs/             Architecture notes and improvement log
 ```
 

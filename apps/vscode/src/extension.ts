@@ -168,7 +168,10 @@ function getOutDir(projectRoot: string): string {
     const bundled = path.join(extensionPath, 'webview')
     if (fs.existsSync(path.join(bundled, 'index.html'))) return bundled
   }
-  // Fall back to local source build (developer install)
+  // Fall back to local source build (developer install): the monorepo keeps
+  // the Studio build in apps/studio/out, older checkouts at the root
+  const monorepoOut = path.join(projectRoot, 'apps', 'studio', 'out', 'renderer')
+  if (fs.existsSync(path.join(projectRoot, 'apps', 'studio'))) return monorepoOut
   return path.join(projectRoot, 'out', 'renderer')
 }
 

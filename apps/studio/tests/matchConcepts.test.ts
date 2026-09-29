@@ -10,7 +10,7 @@ import { readCatalogue, buildIndex } from '../tools/hubCatalogue'
 import { findRelevantConcepts, scoreConceptRelevance } from '../src/renderer/src/hub/matchConcepts'
 import type { HubConceptSummary } from '../src/renderer/src/hub/hubFormat'
 
-const HUB_DIR = resolve(__dirname, '../hub')
+const HUB_DIR = resolve(__dirname, '../../../content/hub')
 const concepts: HubConceptSummary[] = buildIndex(readCatalogue(HUB_DIR))
 
 describe('findRelevantConcepts', () => {
