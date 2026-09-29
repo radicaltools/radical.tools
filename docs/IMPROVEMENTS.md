@@ -76,135 +76,41 @@ Two layers of suggestions: **functional** (what the user sees / can do) and **te
 
 ## Part 2 — Technical / code-quality improvements
 
-### High impact
+Status as of 2026-09-29, after the monorepo restructuring (branch
+`refactor/monorepo-workspaces`). Paths are relative to the repo root.
 
-1. **Delete dead components** — verified unreferenced anywhere in source:
-   - [src/renderer/src/components/Sidebar.tsx](src/renderer/src/components/Sidebar.tsx) (158 lines)
-   - [src/renderer/src/components/ViewBar.tsx](src/renderer/src/components/ViewBar.tsx) (92 lines)
-   - [src/renderer/src/components/PropertiesPanel.tsx](src/renderer/src/components/PropertiesPanel.tsx) (224 lines)
-   - Plus orphaned CSS: [`.sidebar*` rules](src/renderer/src/index.css#L659-L710) and [`grid-area: viewbar`](src/renderer/src/index.css#L585). Keep `.sidebar-section` / `.sidebar-section-title` — still used by [RightPanel.tsx](src/renderer/src/components/RightPanel.tsx#L680-L681).
-   - ≈ 470 LOC + ~60 CSS lines, zero behaviour change.
+### Done
 
-2. **Split `diagramStore.ts` (2474 lines)** into zustand slices in [src/renderer/src/store/](src/renderer/src/store):
-   - `modelSlice.ts` — `c4Nodes`, `c4Relations`, CRUD, selection, `toggleCollapse`.
-   - `viewSlice.ts` — `views`, `activeViewId`, `addNodeToView`.
-   - `layoutSlice.ts` — `runRadicalLayout`, `runColaLayout`, `runElkLayout`, `runReferenceLayout`, live-cola wiring.
-   - `snapshotSlice.ts` — milestones + diff/restore.
-   - `presentationSlice.ts` — slides, presentations, HUD nav, viewport capture/restore.
-   - `rfDerivationSlice.ts` — `rfNodes`/`rfEdges` build pipeline.
-   - Compose via slice pattern; public API stays identical.
+- **Dead components and CSS removed.** Sidebar, ViewBar, PropertiesPanel,
+  TimeTravelBar, ExportMenu, DevSampleToolbar and PresentationBar's SlidesColumn
+  are gone, along with 182 CSS rules for UI that no longer exists.
+- **CSS split by owner.** `packages/ui/src/index.css` holds the shared canvas,
+  panel and view styles; `apps/studio/src/renderer/src/studio.css` holds
+  Studio-only UI.
+- **Side effects out of store actions, partly.** The model rules and edits
+  behind node, relation and view changes live in `packages/common/src/model.ts`
+  and are shared with a headless facade. Persistence moved out of the store
+  into `apps/studio/src/renderer/src/persistence/`.
+- **Store tests.** The diagram-store tests live in `packages/ui/tests` and run
+  without any app's persistence.
 
-3. **Replace `(window as any).__rfGetViewport` etc.** with a typed canvas-API slice or React context exposing `useReactFlow()`. Removes most of the ~160 `any` casts and makes things testable.
+### Still open
 
-4. **`TimeTravelBar` cleanup** — after the latest change [TimeTravelBar.tsx](src/renderer/src/components/TimeTravelBar.tsx) only renders for `viewer` mode. Either rename to `ViewerSlideStrip.tsx` or reuse the new `PresenterDock` in `readOnly` mode and delete `TimeTravelBar`.
-
-### Medium impact
-
-5. **Modularise `index.css` (2079 lines)** — split into `tokens.css`, `layout.css`, `panels.css`, `presentation.css`, `nodes.css`. Vite handles multi-import; reduces merge conflicts.
-
-6. **Extract hooks from `Canvas.tsx` (627 lines)** — `useCanvasDnD`, `useViewportCapture`, `useCanvasKeyboard`.
-
-7. **Side-effects out of actions** — `setActiveView` and `toggleCollapse` embed sibling-separation / parent-fitting math. Extract pure helpers (`fitParentToChildren`, `separateSiblings`) into `layout/`; easier to unit test and reuse.
-
-8. **Persistence robustness** — schema-validate parsed JSON in `documentStore.ts`/persist layer; recover gracefully from corruption; wrap localStorage writes in try/catch (quota / private mode).
-
-### Low impact / polish
-
-9. **Stricter `tsconfig`** — enable `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`. Many `any` casts will surface as real refinements.
-
-10. **Tests for store** — `presentationSlice.test.ts` (slide add/remove/reorder/link integrity), `snapshotSlice.test.ts` (milestone diff/restore round-trip).
-
-11. **Memoisation in `RightPanel.tsx`** — `TreeNodeItem` runs several store selectors per node; large models re-render the whole tree. Build a children-by-parent map once per render.
-
-12. **Consolidate icons** — [PresentationBar.tsx](src/renderer/src/components/PresentationBar.tsx#L7-L60), [Toolbar.tsx](src/renderer/src/components/Toolbar.tsx), [RightPanel.tsx](src/renderer/src/components/RightPanel.tsx#L131-L175), [TimeTravelBar.tsx](src/renderer/src/components/TimeTravelBar.tsx#L4-L14) each define their own SVG icon set. Move to `components/icons.tsx`.
-
-13. **File-naming / split** —
-    - [PresentationBar.tsx](src/renderer/src/components/PresentationBar.tsx) now exports `PresenterHUD`, `SlidesColumn`, `PresenterDock`, `PresentationBar`. Consider a `presentation/` folder, one component per file.
-    - [RightPanel.tsx](src/renderer/src/components/RightPanel.tsx) (704 lines) actually exports both `LeftPanel` and `RightPanel`. Split.
-
-### Suggested execution order
-
-1. Delete dead components & CSS (5 min, zero risk).
-2. Replace TimeTravelBar with read-only PresenterDock.
-3. Split RightPanel.tsx + centralise icons.
-4. Slice `diagramStore.ts` (biggest win, biggest care).
-5. Replace `window.__rf*` with typed canvas-API slice.
-6. Modularise CSS.
-7. Strict TS + store tests.
-
----
-
-## Appendix - Dynamic views (current usage)
-
-Current status:
-
-- The dynamic-view work is currently a domain/test foundation, not a finished editor feature.
-- There is no dedicated UI, store CRUD, or renderer for sequence views yet.
-- Today you use it by constructing `DiagramData` with `contexts` and `dynamicViews`, then calling the helper functions from [src/renderer/src/dynamicViews.ts](src/renderer/src/dynamicViews.ts).
-
-Data model:
-
-- Add business/journey/scenario definitions in `contexts`.
-- Tag participating nodes and relations with `contextIds`.
-- Define a `dynamicViews` entry with:
-   - `contextId` - the business context anchoring the sequence
-   - `viewId` - optional structural view scope
-   - `lifelineOrder` - explicit participant order
-   - `steps` - ordered interactions between existing nodes
-
-Core types live in [src/renderer/src/types/c4.ts](src/renderer/src/types/c4.ts).
-
-Minimal shape:
-
-      {
-         "contexts": [
-            { "id": "checkout", "name": "Checkout Journey", "kind": "journey" }
-         ],
-         "nodes": [
-            { "id": "user", "label": "User", "type": "person", "collapsed": false, "x": 0, "y": 0, "width": 100, "height": 100, "contextIds": ["checkout"] },
-            { "id": "api", "label": "API", "type": "container", "collapsed": false, "x": 0, "y": 0, "width": 100, "height": 100, "contextIds": ["checkout"] }
-         ],
-         "relations": [
-            { "id": "r1", "sourceId": "user", "targetId": "api", "label": "starts checkout", "contextIds": ["checkout"] }
-         ],
-         "dynamicViews": [
-            {
-               "id": "dv-checkout",
-               "name": "Checkout Payment",
-               "contextId": "checkout",
-               "lifelineOrder": ["user", "api"],
-               "steps": [
-                  {
-                     "id": "s1",
-                     "seq": "1",
-                     "fromId": "user",
-                     "toId": "api",
-                     "relationId": "r1",
-                     "label": "Start checkout",
-                     "kind": "sync"
-                  }
-               ]
-            }
-         ]
-      }
-
-Helper flow:
-
-1. `normalizeDynamicViewCollections(data)`
-    Use this first to normalize optional fields, remove duplicate tags/lifelines, and fill nullable values.
-2. `getContextualElements({ nodes, relations }, contextId)`
-    Use this to fetch only the model slice relevant to a given business context.
-3. `validateDynamicView(view, { contexts, nodes, relations, views })`
-    Use this to validate a sequence against the live structural model.
-
-Validation rules currently check:
-
-- the context exists
-- the scoped structural view exists, when provided
-- lifeline nodes exist and are unique
-- every step source/target exists and is present in `lifelineOrder`
-- optional `relationId` exists and matches the step endpoints
-- warnings when lifelines or relations are outside the selected context
-- warnings when lifelines are outside the scoped structural view
-
-Best working example: [tests/dynamicViews.test.ts](tests/dynamicViews.test.ts).
+1. **Split `diagramStore.ts`** (`packages/ui/src/store/diagramStore.ts`,
+   4383 lines) into zustand slices: model, views, layout, snapshots,
+   presentation, and ReactFlow derivation. The public API stays identical.
+2. **Replace `(window as any).__rf*` globals** (13 in the store) with a typed
+   canvas API or React context. This removes most of the store's 155
+   `as any` casts and makes the canvas plumbing testable.
+3. **Extract hooks from `Canvas.tsx`** (`packages/ui/src/components/Canvas.tsx`,
+   1021 lines): `useCanvasDnD`, `useViewportCapture`, `useCanvasKeyboard`.
+4. **Split `RightPanel.tsx`** (2185 lines). It exports both `LeftPanel` and
+   `RightPanel`. Memoise the tree: `TreeNodeItem` runs several store
+   selectors per node.
+5. **Consolidate icons.** PresentationBar, Toolbar and RightPanel each define
+   their own SVG icon set.
+6. **Persistence robustness.** Schema-validate documents on load in
+   `apps/studio/src/renderer/src/store/documentStore.ts`.
+7. **Stricter `tsconfig`**: `noUncheckedIndexedAccess`,
+   `exactOptionalPropertyTypes`. Type-check the tests that `apps/studio` and
+   `apps/hub` still leave out.
