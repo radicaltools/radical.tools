@@ -1,3 +1,6 @@
+// First: document persistence configures the store before it is created.
+import './persistence/autosave'
+import './ai/wireframeGenerator'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'

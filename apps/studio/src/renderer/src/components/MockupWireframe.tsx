@@ -1,11 +1,12 @@
 // ─── Mockup wireframe section ───────────────────────────────────────────────
 // Preview of a Mockup node's AI-generated low-fi wireframe plus its actions
 // (generate / regenerate, remove, open the external design link). Shared by
-// the properties panel and the Wiki element page.
+// the properties panel and the Wiki element page. Generation is offered only
+// when the app registered a generator (see wireframeGeneration.ts).
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { loadAISettings } from '../ai/settings'
+import { wireframeGenerator } from './wireframeGeneration'
 import { wireframeDataUri } from '@radical/common/wireframe'
 
 export function isHttpUrl(value: string): boolean {
@@ -43,21 +44,19 @@ export function MockupWireframe({
   if (!node) return null
   const wireframe = typeof node.wireframe === 'string' ? node.wireframe : ''
   const link = typeof node.link === 'string' ? node.link.trim() : ''
-  const aiEnabled = loadAISettings().enabled
+  const generator = wireframeGenerator()
+  const aiEnabled = generator?.enabled() ?? false
 
   const generate = async (): Promise<void> => {
-    const settings = loadAISettings()
+    if (!generator) return
     abortRef.current?.abort()
     const ac = new AbortController()
     abortRef.current = ac
     setBusy(true)
     setStatus(null)
     try {
-      // Loaded on demand: it pulls in every AI provider adapter, which the
-      // read-only Hub viewer (also rendering this component) never needs.
-      const { generateWireframe } = await import('../ai/mockupWireframe')
       const { c4Nodes, c4Relations } = useDiagramStore.getState()
-      const { svg, usage } = await generateWireframe(nodeId, c4Nodes, c4Relations, settings, ac.signal)
+      const { svg, usage } = await generator.generate(nodeId, c4Nodes, c4Relations, ac.signal)
       updateNode(nodeId, { wireframe: svg } as Parameters<typeof updateNode>[1])
       setStatus(usage ? { kind: 'info', text: `${usage.inputTokens + usage.outputTokens} tokens` } : null)
     } catch (err) {

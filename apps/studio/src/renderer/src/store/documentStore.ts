@@ -99,6 +99,11 @@ function lsKeyFor(id: string): string {
   return LS_DOC_PREFIX + id
 }
 
+/** The stored content of a localStorage document, read synchronously. */
+export function readLocalDocument(id: string): DiagramData | null {
+  return readLSPayload(id)
+}
+
 function readLSPayload(id: string): DiagramData | null {
   if (typeof localStorage === 'undefined') return null
   try {
