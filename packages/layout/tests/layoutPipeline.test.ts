@@ -4,11 +4,11 @@
  * one that gets rendered (finalizeLayout).
  */
 import { describe, it, expect } from 'vitest'
-import { projectToVisibleGraph } from '@radical/layout/geometry'
-import { finalizeLayout, separateBoxes, ROOT_GAP } from '@radical/layout/layoutFinalize'
-import { applyElkLayout } from '@radical/layout/elkLayout'
-import { minimizeCrossings, totalLayoutCost } from '@radical/layout/crossingOpt'
-import { runSmartLayoutELKPhase, type SmartLayoutProgress } from '@radical/layout/smartLayout'
+import { projectToVisibleGraph } from '../src/geometry'
+import { finalizeLayout, separateBoxes, ROOT_GAP } from '../src/layoutFinalize'
+import { applyElkLayout } from '../src/elkLayout'
+import { minimizeCrossings, totalLayoutCost } from '../src/crossingOpt'
+import { runSmartLayoutELKPhase, type SmartLayoutProgress } from '../src/smartLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, NODE_SIZES, type C4Node, type C4Relation } from '@radical/common/c4'
 
 function node(id: string, type: C4Node['type'], extras: Partial<C4Node> = {}): C4Node {

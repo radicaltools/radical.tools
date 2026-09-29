@@ -10,7 +10,7 @@
  */
 
 const { runSmartLayoutCore } = await import(
-  '@radical/layout/smartLayout'
+  '../src/smartLayout.ts'
 )
 
 function N(id, type, label, w, h, extras = {}) {

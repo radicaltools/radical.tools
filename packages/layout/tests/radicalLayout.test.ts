@@ -18,8 +18,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { applyRadicalLayout } from '@radical/layout/radicalLayout'
-import { computeLayoutMetrics } from '@radical/layout/crossingOpt'
+import { applyRadicalLayout } from '../src/radicalLayout'
+import { computeLayoutMetrics } from '../src/crossingOpt'
 import type { C4Node, C4Relation, PositionMap } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
 

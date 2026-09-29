@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { composeEarsSentence, resolveEarsSubject, parseEarsSentence } from '@radical/common/metamodel'
+import { composeEarsSentence, resolveEarsSubject, parseEarsSentence } from '../src/metamodel/index'
 
 describe('composeEarsSentence', () => {
   it('ubiquitous with subject: "<Subject> shall <action>."', () => {

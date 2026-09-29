@@ -9,7 +9,7 @@
  * instead of being a standalone script nobody runs.
  */
 import { describe, it, expect } from 'vitest'
-import { computeCompositeScore } from '@radical/layout/smartLayout'
+import { computeCompositeScore } from '../src/smartLayout.ts'
 
 // ─── Scene ──────────────────────────────────────────────────────────────────
 //

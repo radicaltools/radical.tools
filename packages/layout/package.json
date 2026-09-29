@@ -5,7 +5,14 @@
   "description": "Smart Layout and the other headless layout engines (ELK ensemble, Radical semantic C4 layout, crossing minimisation, annealing, port allocation, edge routing).",
   "type": "module",
   "exports": {
-    "./*": "./src/*.ts"
+    "./smartLayout": "./src/smartLayout.ts",
+    "./elkLayout": "./src/elkLayout.ts",
+    "./radicalLayout": "./src/radicalLayout.ts",
+    "./crossingOpt": "./src/crossingOpt.ts",
+    "./geometry": "./src/geometry.ts",
+    "./portAllocator": "./src/portAllocator.ts",
+    "./edgeRouting": "./src/edgeRouting.ts",
+    "./side": "./src/side.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

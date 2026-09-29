@@ -9,7 +9,7 @@
  * the end-to-end ensemble never hands back something worse than it started.
  */
 import { describe, it, expect } from 'vitest'
-import { computeCompositeScore, runSmartLayoutCore } from '@radical/layout/smartLayout'
+import { computeCompositeScore, runSmartLayoutCore } from '../src/smartLayout'
 import type { C4Node, C4Relation, PositionMap } from '@radical/common/c4'
 
 function node(id: string, x: number, y: number, w = 200, h = 100, parentId?: string): C4Node {

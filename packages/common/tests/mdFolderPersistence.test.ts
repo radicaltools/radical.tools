@@ -4,8 +4,8 @@ import {
   deserializeFromMdFolder,
   isMdFolder,
   MD_MANIFEST_FILE,
-} from '@radical/common/formats/mdFolder'
-import type { DiagramData, C4Node } from '@radical/common/c4'
+} from '../src/formats/mdFolder'
+import type { DiagramData, C4Node } from '../src/c4'
 
 function node(partial: Partial<C4Node> & Pick<C4Node, 'id' | 'type' | 'label'>): C4Node {
   return {

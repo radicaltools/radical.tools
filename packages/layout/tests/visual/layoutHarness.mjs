@@ -16,9 +16,9 @@ import { fileURLToPath } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 
 const { runSmartLayoutCore, computeCompositeScore } = await import(
-  '@radical/layout/smartLayout'
+  '../../src/smartLayout.ts'
 )
-const { pickSides } = await import('@radical/layout/portAllocator')
+const { pickSides } = await import('../../src/portAllocator.ts')
 
 // ─── Scenarios ────────────────────────────────────────────────────────────
 

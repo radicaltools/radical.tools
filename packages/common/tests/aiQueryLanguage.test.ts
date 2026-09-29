@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { formatModelQueryResults, runModelQuery } from '@radical/common/ai/queryLanguage'
-import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
+import { formatModelQueryResults, runModelQuery } from '../src/ai/queryLanguage'
+import type { C4Node, C4Relation, DiagramView } from '../src/c4'
 
 const nodes: Record<string, C4Node> = {
   sys1: {

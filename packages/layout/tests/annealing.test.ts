@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   anneal, buildLayoutGraph, createRng, graphSeed, ProxyEnergy, type LayoutGraph,
-} from '@radical/layout/annealing'
+} from '../src/annealing'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 function node(id: string, x: number, y: number, w = 200, h = 100, parentId?: string): C4Node {

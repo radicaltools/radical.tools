@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { buildToolDefs, buildToolHandlers } from '@radical/common/ai/tools'
-import type { ToolRunContext } from '@radical/common/ai/tools/types'
-import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
-import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
-import type { Metamodel } from '@radical/common/metamodel'
+import { buildToolDefs, buildToolHandlers } from '../src/ai/tools/index'
+import type { ToolRunContext } from '../src/ai/tools/types'
+import type { DiagramFacade } from '../src/ai/diagramFacade'
+import type { C4Node, C4Relation, DiagramView } from '../src/c4'
+import type { Metamodel } from '../src/metamodel/index'
 
 function makeFacade(mm?: Metamodel): DiagramFacade & {
   _nodes: Record<string, C4Node>

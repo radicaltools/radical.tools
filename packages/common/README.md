@@ -17,3 +17,5 @@ Rules:
 - AI tools are written against `DiagramFacade`, not against Studio's store,
   so the MCP server can serve the same tools over a headless model.
 - Consumers import `.ts` source directly; there is no build step.
+- Only the subpaths listed in `exports` in package.json are public. Tests
+  import internals by relative path.
