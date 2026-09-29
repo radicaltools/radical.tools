@@ -1,7 +1,7 @@
 /**
  * Hub catalogue — one Radical Studio document per concept.
  *
- *   - every top-level hub/<category>/<id>.radical is valid (hub block, ids, refs)
+ *   - every catalogue/<category>/<id>.radical is valid (hub block, ids, refs)
  *   - index.json summaries carry what the cards / drop-target check need
  *   - doc ↔ concept mapping round-trips
  *   - blueprint mockups form per-actor screen flows (flow groups linked by
@@ -15,11 +15,10 @@ import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
 import { readCatalogue, validateCatalogue, buildIndex } from '../tools/hubCatalogue'
 import { conceptToDoc, docToConcept, summarize, type HubRadicalDoc } from '@radical/common/hubFormat'
-import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
+import { useDiagramStore, sanitizeWireframeSvg } from 'radical-model/viewer'
 import { builtInGovernanceMetamodel, isParentAllowed } from '@radical/common/metamodel'
-import { sanitizeWireframeSvg } from '../src/renderer/src/ai/mockupWireframe'
 
-const HUB_DIR = resolve(__dirname, '../../../content/hub')
+const HUB_DIR = resolve(__dirname, '../catalogue')
 
 const doc: HubRadicalDoc = {
   hub: {

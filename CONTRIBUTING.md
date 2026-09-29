@@ -39,12 +39,12 @@ apps/
       store/        — Zustand state management
     tests/          — Vitest unit tests
   vscode/         — VS Code extension
+  hub/            — Architecture Hub: catalogue/ (.radical concepts) + read-only viewer
   mcp/            — MCP server (empty for now)
   web/            — Marketing site (radical.tools)
 packages/
   common/         — @radical/common: model types, metamodels, formats, AI tools (no UI deps)
   layout/         — @radical/layout: Smart Layout and headless layout engines
-content/hub/      — Architecture Hub concept catalogue (.radical files)
 ```
 
 ## Daily workflow (for maintainers)

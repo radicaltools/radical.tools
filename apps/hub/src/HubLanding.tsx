@@ -4,8 +4,8 @@
 // search, pick a category, or open a featured concept straight in the viewer.
 
 import React, { useMemo, useState } from 'react'
-import type { HubConceptSummary } from '../store/hubStore'
-import { HUB_CATEGORIES, categoryTheme, type HubCategory } from '../types/hubTheme'
+import type { HubCategory, HubConceptSummary } from '@radical/common/hubFormat'
+import { HUB_CATEGORIES, categoryTheme } from 'radical-model/viewer'
 import { SiteNav } from './SiteNav'
 
 const CATEGORY_BLURB: Record<HubCategory, string> = {

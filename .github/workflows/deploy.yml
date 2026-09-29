@@ -35,9 +35,14 @@ jobs:
 
       - name: Build web renderer
         run: npm run build:web
-        # Output: apps/studio/out/renderer/{index.html,hub.html,hub-data.json} + apps/studio/out/renderer/assets/**
-        #         + apps/studio/out/renderer/hub/{index.json,<category>/<id>.radical}
-        # index.html → studio.radical.tools, hub.html → hub.radical.tools (same bundle)
+        # Output: apps/studio/out/renderer/index.html + apps/studio/out/renderer/assets/**
+        # → studio.radical.tools
+
+      - name: Build Architecture Hub
+        run: npm run build:hub
+        # Output: apps/hub/out/{index.html,hub-data.json} + apps/hub/out/assets/**
+        #         + apps/hub/out/hub/{index.json,<category>/<id>.radical}
+        # → hub.radical.tools
 
       - name: Configure AWS credentials (OIDC — no long-lived keys)
         uses: aws-actions/configure-aws-credentials@v4
@@ -100,18 +105,18 @@ jobs:
             --paths "/index.html" "/manual.html" "/style.css" "/landing.css" "/theme.js"
 
       # ── Architecture Hub (hub.radical.tools) ─────────────────────────
-      # The hub is the same renderer bundle booted from hub.html (embedded
-      # viewer profile). Assets are content-hashed and shared with the studio.
+      # Built from apps/hub (the viewer runs on Studio's canvas and panels,
+      # bundled in). Assets are content-hashed.
       - name: Sync hub assets to S3
         run: |
-          aws s3 sync apps/studio/out/renderer/assets/ \
+          aws s3 sync apps/hub/out/assets/ \
             s3://${{ secrets.HUB_S3_BUCKET }}/assets/ \
             --cache-control "public, max-age=31536000, immutable" \
             --delete
 
       - name: Upload hub index.html (no-cache)
         run: |
-          aws s3 cp apps/studio/out/renderer/hub.html \
+          aws s3 cp apps/hub/out/index.html \
             s3://${{ secrets.HUB_S3_BUCKET }}/index.html \
             --cache-control "no-store" \
             --content-type "text/html; charset=utf-8"
@@ -120,7 +125,7 @@ jobs:
         run: |
           # hub/index.json + one .radical (JSON) document per concept.
           # Served as JSON so fetch() content-type checks pass for .radical.
-          aws s3 sync apps/studio/out/renderer/hub/ \
+          aws s3 sync apps/hub/out/hub/ \
             s3://${{ secrets.HUB_S3_BUCKET }}/hub/ \
             --delete \
             --cache-control "no-store" \
@@ -129,7 +134,7 @@ jobs:
       - name: Upload legacy hub-data.json (no-cache)
         run: |
           # Single-file catalogue kept for older desktop builds.
-          aws s3 cp apps/studio/out/renderer/hub-data.json \
+          aws s3 cp apps/hub/out/hub-data.json \
             s3://${{ secrets.HUB_S3_BUCKET }}/hub-data.json \
             --cache-control "no-store" \
             --content-type "application/json; charset=utf-8"

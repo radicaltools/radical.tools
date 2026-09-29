@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src/**/*",
+    "tools/**/*",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "../studio/src/preload/index.d.ts"
+  ]
+}

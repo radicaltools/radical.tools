@@ -99,6 +99,10 @@ npm run dist
 
 # Build web-only renderer (for deployment to studio.radical.tools)
 npm run build:web
+
+# Architecture Hub (hub.radical.tools): dev server / production build
+npm run dev:hub
+npm run build:hub
 ```
 
 ### Releasing the desktop app (maintainers)
@@ -120,8 +124,7 @@ forwards to the right workspace.
 
 ```
 apps/
-  studio/         Radical Studio: Electron app + web SPA (studio.radical.tools),
-                  and the Hub viewer (hub.html entry → hub.radical.tools)
+  studio/         Radical Studio: Electron app + web SPA (studio.radical.tools)
     src/main/       Electron main process (IPC handlers, file dialogs)
     src/preload/    contextBridge API surface exposed to renderer
     src/renderer/src/
@@ -129,11 +132,17 @@ apps/
       layout/       Smart Layout worker wrapper and live webcola physics
       store/        Zustand stores (diagramStore, documentStore, hubStore)
       ai/           AI chat, providers (OpenAI, Anthropic, Gemini, Ollama), Forge
-      hub/          Radical Hub, the embedded read-only catalogue viewer
+      hub/          Importing Hub concepts into a model
+      viewer.ts     Canvas, panels and stores the Hub app builds on
     tests/          Vitest unit/integration tests
-    tools/          hubCatalogue.ts (Vite plugin: validates content/hub,
-                    emits hub/index.json + legacy hub-data.json), sample generator
+    tools/          Sample model generator
     build/          Desktop app icon used by electron-builder
+  hub/            Architecture Hub (hub.radical.tools)
+    catalogue/      One Radical Studio document per concept
+                    (<category>/<id>.radical with a `hub` metadata block)
+    src/            Read-only viewer, built on radical-model/viewer
+    tools/          hubCatalogue.ts: Vite plugin that validates the catalogue
+                    and emits hub/index.json (+ legacy hub-data.json)
   vscode/         VS Code extension; bundles the Studio web build as its webview
   mcp/            MCP server for radical models (empty for now)
   web/            Marketing site and manual (radical.tools)
@@ -142,9 +151,6 @@ packages/
                   language, AI tool catalogue. No UI dependencies
   layout/         @radical/layout: Smart Layout and the headless layout engines,
                   with their tests, benchmark and visual harness
-content/
-  hub/            The concept catalogue: one Radical Studio document per
-                  concept (<category>/<id>.radical with a `hub` metadata block)
 infra/            Terraform: AWS S3 + CloudFront + Route53 + IAM (OIDC)
 tools/            Repo-wide scripts (generate-icon.js)
 docs/             Architecture notes and improvement log

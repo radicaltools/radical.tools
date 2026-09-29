@@ -3,9 +3,9 @@
 // Every hub concept is a regular Radical Studio document (`DiagramData`:
 // nodes + relations, openable in the studio as-is) with one extra top-level
 // `hub` block carrying the catalogue metadata. The catalogue lives in the
-// monorepo's content/hub/<category>/<id>.radical (it's content, not app
-// source) and is served verbatim under hub/;
-// `hub/index.json` (generated at build time, see tools/hubCatalogue.ts) lists
+// monorepo's apps/hub/catalogue/<category>/<id>.radical and is served
+// verbatim under hub/;
+// `hub/index.json` (generated at build time, see apps/hub/tools/hubCatalogue.ts) lists
 // lightweight summaries so the UI can browse without downloading every file.
 //
 // This module is imported by both the renderer and the node-side build

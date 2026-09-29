@@ -14,7 +14,7 @@
 // implies the catalogue too).
 
 import type { HubViewKind } from './conceptToDiagram'
-import type { HubSortKey } from '../store/hubStore'
+import type { HubSortKey } from 'radical-model/viewer'
 
 export interface HubRoute {
   /** Catalogue is open (implied when concept / category / tag / status is set). */

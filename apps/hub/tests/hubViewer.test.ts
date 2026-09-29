@@ -16,10 +16,10 @@ import {
   substituteTemplateDefaults,
   HUB_WIKI_VIEW_ID,
   HUB_TABLE_VIEW_ID,
-} from '../src/renderer/src/hub/conceptToDiagram'
-import { parseHubHash, formatHubHash, studioImportUrl } from '../src/renderer/src/hub/hubRoute'
-import { conceptViewsToDiagram } from '../src/renderer/src/hub/conceptViews'
-import type { HubConcept } from '../src/renderer/src/store/hubStore'
+} from '../src/conceptToDiagram'
+import { parseHubHash, formatHubHash, studioImportUrl } from '../src/hubRoute'
+import type { HubConcept } from '@radical/common/hubFormat'
+import { conceptViewsToDiagram } from 'radical-model/viewer'
 
 const requirement: HubConcept = {
   id: 'req-api-response-time',

@@ -9,16 +9,22 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlowProvider } from 'reactflow'
-import { useDiagramStore } from '../store/diagramStore'
-import { useHubStore, buildConnectionCounts, toggleInSet, type HubConcept, type HubConceptSummary, type HubSortKey } from '../store/hubStore'
-import type { HubRadicalDoc } from '@radical/common/hubFormat'
-import { Canvas } from '../components/Canvas'
-import { WikiView } from '../components/WikiView'
-import { TableView } from '../components/TableView'
-import { RightPanel } from '../components/RightPanel'
-import { NotificationHost } from '../components/NotificationHost'
-import { SmartLayoutButton } from '../components/SmartLayoutButton'
-import { HUB_CATEGORIES, categoryTheme, type HubCategory } from '../types/hubTheme'
+import type { HubCategory, HubConcept, HubConceptSummary, HubRadicalDoc } from '@radical/common/hubFormat'
+import {
+  Canvas,
+  HUB_CATEGORIES,
+  NotificationHost,
+  RightPanel,
+  SmartLayoutButton,
+  TableView,
+  WikiView,
+  buildConnectionCounts,
+  categoryTheme,
+  toggleInSet,
+  useDiagramStore,
+  useHubStore,
+  type HubSortKey,
+} from 'radical-model/viewer'
 import {
   conceptToDiagramData,
   defaultViewKind,

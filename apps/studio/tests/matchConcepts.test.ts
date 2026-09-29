@@ -6,11 +6,11 @@
  */
 import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
-import { readCatalogue, buildIndex } from '../tools/hubCatalogue'
+import { readCatalogue, buildIndex } from '../../hub/tools/hubCatalogue'
 import { findRelevantConcepts, scoreConceptRelevance } from '../src/renderer/src/hub/matchConcepts'
 import type { HubConceptSummary } from '@radical/common/hubFormat'
 
-const HUB_DIR = resolve(__dirname, '../../../content/hub')
+const HUB_DIR = resolve(__dirname, '../../hub/catalogue')
 const concepts: HubConceptSummary[] = buildIndex(readCatalogue(HUB_DIR))
 
 describe('findRelevantConcepts', () => {

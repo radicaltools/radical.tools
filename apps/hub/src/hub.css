@@ -3,7 +3,7 @@
    right. Relies on the design tokens and component styles from index.css. */
 
 /* ═══ Hub palette — emerald, so the Hub reads apart from radical.tools ═══ */
-/* Overrides index.css tokens; this file is loaded only by hub.html, so Studio
+/* Overrides index.css tokens; this file is loaded only by the Hub app, so Studio
    keeps its blue. Both blocks repeat every token because :root here comes after
    index.css's [data-theme="light"] and would otherwise win in light mode. */
 :root {
