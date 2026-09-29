@@ -48,6 +48,19 @@ packages/
   hub-catalogue/  — @radical/hub-catalogue: Hub concepts (.radical files), validation, Vite plugin
 ```
 
+## Workspace boundaries
+
+`npm run check:workspaces` (run in CI) enforces these rules:
+
+- Packages (`packages/*`) depend only on other packages. Apps (`apps/*`) depend
+  on packages, never on each other. The exceptions are listed with a reason in
+  `tools/check-workspaces.mjs`.
+- Reach another workspace through its package name and the entry points in
+  its `exports`, never through a relative path.
+- Declare every package you import in your workspace's `package.json`.
+- Every workspace with `src/` has a `typecheck` script, and every workspace
+  with tests has a `test` script.
+
 ## Daily workflow (for maintainers)
 
 The `main` branch is protected — direct pushes are rejected. All changes go through a PR.

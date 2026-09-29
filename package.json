@@ -23,6 +23,10 @@
     "dist": "npm run dist -w radical-model",
     "test": "npm run test --workspaces --if-present",
     "test:watch": "npm run test:watch -w radical-model",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check:workspaces": "node tools/check-workspaces.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
   }
 }

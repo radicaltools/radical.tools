@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check workspace boundaries
+        run: npm run check:workspaces
+
       - name: Type-check
         run: npm run typecheck
 
