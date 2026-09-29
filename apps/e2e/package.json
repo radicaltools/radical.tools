@@ -1,0 +1,20 @@
+{
+  "name": "@radical/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end regression suite (Playwright) for the web builds of Studio and Hub.",
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@radical/hub": "*",
+    "@types/node": "^20.19.39",
+    "radical-model": "*",
+    "typescript": "^5.3.3"
+  }
+}

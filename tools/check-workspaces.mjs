@@ -30,6 +30,10 @@ const APP_TO_APP = {
   'vscode-radical': {
     'radical-model': 'the extension ships Studio\'s web build (out/renderer) as its webview',
   },
+  '@radical/e2e': {
+    'radical-model': 'the e2e suite serves and drives Studio\'s web build (out/renderer)',
+    '@radical/hub': 'the e2e suite serves and drives Hub\'s build (out/)',
+  },
 }
 
 /** Modules a host provides at runtime, so they are never in package.json. */
