@@ -50,9 +50,6 @@ export interface HostCapabilities {
   getWatchedPath?(): Promise<string | null>
   /** Called when the watched file changes outside Studio. */
   onFileChanged?(listener: (change: FileChange) => void): void
-  /** Development only: write / read the sample model override. */
-  devSaveSample?(json: string): Promise<HostResult>
-  devLoadSample?(): Promise<ReadFileResult>
 }
 
 export interface HostBridge extends HostCapabilities {

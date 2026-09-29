@@ -77,15 +77,6 @@ export function separateBoxes(boxes: Box[], gap: number, maxPasses = 200): void 
   }
 }
 
-/**
- * Fit every compound parent to its children (deepest first). Children are
- * shifted so their bounding box starts at the padding origin, and the parent
- * is resized to hug them.
- */
-export function fitParentsToChildren(nodes: Record<string, C4Node>, positions: PositionMap): PositionMap {
-  return finalize(nodes, positions, false)
-}
-
 /** Separate overlapping siblings at every level, fit parents, separate roots. */
 export function finalizeLayout(nodes: Record<string, C4Node>, positions: PositionMap): PositionMap {
   return finalize(nodes, positions, true)

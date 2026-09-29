@@ -1,6 +1,5 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
 import { hubCataloguePlugin } from '@radical/hub-catalogue/vite'
 
 export default defineConfig({
@@ -12,11 +11,6 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react(), hubCataloguePlugin()],
-    define: {
-      __DEV_SAMPLE_DATA_PATH__: JSON.stringify(
-        resolve(__dirname, 'src/renderer/src/store/fintechSampleData.json')
-      ),
-    },
     optimizeDeps: {
       include: ['reactflow', 'webcola']
     },

@@ -225,30 +225,6 @@ app.whenReady().then(() => {
     },
   )
 
-  // ── DEV: sample model source file helpers ─────────────────────────────────
-  // Path is resolved once in the main process — no Vite define needed.
-  if (is.dev) {
-    const SAMPLE_JSON = resolve(__dirname, '../../src/renderer/src/store/fintechSampleData.json')
-
-    ipcMain.handle('dev:saveSample', async (_event, json: string) => {
-      try {
-        await writeFileAsync(SAMPLE_JSON, json, 'utf-8')
-        return { success: true }
-      } catch (e) {
-        return { success: false, error: (e as Error).message }
-      }
-    })
-
-    ipcMain.handle('dev:loadSample', async () => {
-      try {
-        const content = await readFileAsync(SAMPLE_JSON, 'utf-8')
-        return { success: true, content }
-      } catch (e) {
-        return { success: false, error: (e as Error).message }
-      }
-    })
-  }
-
   // ── File watcher: push external changes to renderer ───────────────────────
   // When launched with --file or RADICAL_FILE, watch the file with polling
   // (reliable on all mounts including /Volumes) and push its new content to

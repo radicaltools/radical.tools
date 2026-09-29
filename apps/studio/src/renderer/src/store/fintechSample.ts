@@ -24,7 +24,6 @@ import type {
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { runSmartLayout } from '@radical/ui/layout/smartLayoutRunner'
-import { host } from '../platform/host'
 import savedSampleData from './fintechSampleData.json'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -433,26 +432,6 @@ function _buildPresentations(): Presentation[] {
       { id: 'slide-v1',       name: '8 – v1 MVP (Milestone)',  snapshotId: 'snap-v1',  viewId: null,            viewport: { x: 200, y: 80,  zoom: 0.65 } },
     ],
   }]
-}
-
-/**
- * Reads the developer override file from disk at runtime via the dedicated
- * `dev:loadSample` IPC channel (bypasses the static Vite bundle cache).
- * Falls back to buildFintechSampleRaw() when no override is present or when
- * running outside Electron dev mode.
- */
-export async function loadFintechSample(): Promise<DiagramData> {
-  const api = host()
-  if (api.devLoadSample) {
-    try {
-      const res = await api.devLoadSample()
-      if (res.success && res.content) {
-        const parsed = JSON.parse(res.content) as { nodes?: unknown }
-        if (parsed.nodes) return parsed as DiagramData
-      }
-    } catch { /* fall through */ }
-  }
-  return buildFintechSampleRaw()
 }
 
 /**

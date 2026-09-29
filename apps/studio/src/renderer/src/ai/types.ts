@@ -94,20 +94,6 @@ export function toolCallsOf(content: ChatContentBlock[]): Array<Extract<ChatCont
   return content.filter((b): b is Extract<ChatContentBlock, { type: 'tool_call' }> => b.type === 'tool_call')
 }
 
-/** Flattens any message content — including tool_call/tool_result blocks —
- *  to plain text. Used by providers that don't implement real tool-calling
- *  yet, so a message inherited from a tool-calling-capable provider (e.g.
- *  after a mid-session provider switch) degrades to readable text instead of
- *  crashing the request. */
-export function contentToText(content: string | ChatContentBlock[]): string {
-  if (typeof content === 'string') return content
-  return content.map((b) => {
-    if (b.type === 'text') return b.text
-    if (b.type === 'tool_call') return `[called ${b.name}(${JSON.stringify(b.input)})]`
-    return `[tool result: ${b.content}]`
-  }).join('\n')
-}
-
 /** Provider configuration entry stored in settings. */
 export interface ProviderConfig {
   /** API key (not used for Ollama). */

@@ -269,8 +269,6 @@ function PresenterHUD() {
   )
 }
 
-// ── SlidesColumn — embeddable slides panel ────────────────────────────────────
-
 function PresentationPicker() {
   const presentations = useDiagramStore(s => s.presentations)
   const activeId = useDiagramStore(s => s.activePresentationId)
@@ -336,80 +334,6 @@ function PresentationPicker() {
     </div>
   )
 }
-
-export function SlidesColumn({ readOnly = false }: { readOnly?: boolean } = {}): React.ReactElement {
-  const slides = useDiagramStore(s => s.presentationSlides)
-  const idx = useDiagramStore(s => s.presentationSlideIndex)
-  const presentationActive = useDiagramStore(s => s.presentationActive)
-  const snapshots = useDiagramStore(s => s.snapshots)
-  const views = useDiagramStore(s => s.views)
-
-  const addPresentationSlide = useDiagramStore(s => s.addPresentationSlide)
-  const removePresentationSlide = useDiagramStore(s => s.removePresentationSlide)
-  const renamePresentationSlide = useDiagramStore(s => s.renamePresentationSlide)
-  const captureSlideViewport = useDiagramStore(s => s.captureSlideViewport)
-  const linkSnapshotToSlide = useDiagramStore(s => s.linkSnapshotToSlide)
-  const linkViewToSlide = useDiagramStore(s => s.linkViewToSlide)
-  const startPresentation = useDiagramStore(s => s.startPresentation)
-  const stopPresentation = useDiagramStore(s => s.stopPresentation)
-  const goToSlide = useDiagramStore(s => s.goToSlide)
-  const previewSlide = useDiagramStore(s => s.previewSlide)
-
-  const snapshotNames: Record<string, string> = {}
-  for (const s of snapshots) snapshotNames[s.id] = s.name
-
-  const viewNames: Record<string, string> = {}
-  for (const v of Object.values(views)) viewNames[v.id] = v.name
-
-  const handleSlideSelect = (i: number) => {
-    if (presentationActive) {
-      if (i === idx) stopPresentation()
-      else goToSlide(i)
-    } else {
-      previewSlide(i)
-    }
-  }
-
-  return (
-    <div className="pres-slides-inline">
-      <PresentationPicker />
-      <div className="pres-slides-actions">
-        <button className="pres-panel-btn primary" onClick={startPresentation}
-          disabled={slides.length === 0} title="Start presentation (F5)">
-          <IconPresent />Present
-        </button>
-        {!readOnly && (
-          <button className="pres-panel-btn" onClick={() => addPresentationSlide()}
-            title="Add slide from current canvas state">
-            <IconAdd />Add slide
-          </button>
-        )}
-      </div>
-      <div className="pres-slide-list">
-        {slides.length === 0 && (
-          <div className="pres-empty">
-            {readOnly ? 'No slides in this presentation.' : <>No slides yet — click <strong>Add slide</strong>.</>}
-          </div>
-        )}
-        {slides.map((slide, i) => (
-          <SlideCard key={slide.id} slide={slide} index={i} isActive={i === idx}
-            snapshotNames={snapshotNames}
-            viewNames={viewNames}
-            views={views}
-            onSelect={() => handleSlideSelect(i)}
-            onDelete={() => removePresentationSlide(slide.id)}
-            onRename={(name) => renamePresentationSlide(slide.id, name)}
-            onCapture={() => captureSlideViewport(slide.id)}
-            onLinkSnapshot={(snapId) => linkSnapshotToSlide(slide.id, snapId)}
-            onLinkView={(viewId) => linkViewToSlide(slide.id, viewId)}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ── PresenterDock — horizontal slides bar at the bottom (presenter mode) ─────
 
 export function PresenterDock({ readOnly = false }: { readOnly?: boolean } = {}): React.ReactElement {
   const slides = useDiagramStore(s => s.presentationSlides)
