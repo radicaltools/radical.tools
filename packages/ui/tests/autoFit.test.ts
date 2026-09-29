@@ -10,7 +10,7 @@
  *   - re-init via setFitViewFn doesn't break an active loop
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { useDiagramStore } from '../src/store/diagramStore'
 
 // jsdom-like minimal window stub for the timer registry the store uses.
 beforeEach(() => {

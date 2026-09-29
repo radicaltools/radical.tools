@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { useDiagramStore } from '../src/store/diagramStore'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, NODE_SIZES, type C4Node, type DiagramView } from '@radical/common/c4'
 
 const initial = (() => {

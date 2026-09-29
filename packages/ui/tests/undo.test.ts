@@ -9,7 +9,7 @@
  *   - undo on an empty stack is a no-op
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { useDiagramStore } from '../src/store/diagramStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 const initial = (() => {

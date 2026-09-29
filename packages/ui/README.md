@@ -19,3 +19,6 @@ Entry points are listed in `exports` in package.json. `@radical/ui/viewer`
 bundles everything the Hub needs; `@radical/ui/styles.css` is the stylesheet
 for these components (Studio adds its own `studio.css` after it); `@radical/ui/testing/setup` stubs `window` and
 `requestAnimationFrame` for tests under node.
+
+`npm test -w @radical/ui` runs the store and component tests under node, without
+any app's documents or AI.

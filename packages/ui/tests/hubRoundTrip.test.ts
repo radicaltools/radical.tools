@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { HubRadicalDoc } from '@radical/common/hubFormat'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { useDiagramStore } from '../src/store/diagramStore'
 
 const doc: HubRadicalDoc = {
   hub: {

@@ -18,7 +18,7 @@
  *   - presenter → viewer transition keeps snapshot intact
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { useDiagramStore } from '../src/store/diagramStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 const initial = (() => {
@@ -122,7 +122,7 @@ describe('mutation sandboxing in presenter', () => {
   it('a node added in presenter is reverted when returning to designer', () => {
     useDiagramStore.getState().setAppMode('presenter')
     const countBefore = Object.keys(initial.c4Nodes).length
-    useDiagramStore.getState().addNode({ type: 'system', label: 'SandboxedNode', x: 0, y: 0 })
+    useDiagramStore.getState().addNode({ type: 'system', label: 'SandboxedNode', x: 0, y: 0 } as Omit<C4Node, 'id'>)
     expect(Object.keys(useDiagramStore.getState().c4Nodes).length).toBe(countBefore + 1)
     useDiagramStore.getState().setAppMode('designer')
     // snapshot restores original — the added node is gone

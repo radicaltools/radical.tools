@@ -18,7 +18,7 @@
  *     presentation mode; sets presentationSlideIndex so Present starts there
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { useDiagramStore } from '../src/store/diagramStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 const initial = (() => {
@@ -146,7 +146,7 @@ describe('goToSlide', () => {
     return new Promise<void>((resolve) => {
       setTimeout(() => {
         expect(setVP).toHaveBeenCalled()
-        const [vpArg] = setVP.mock.calls.at(-1)!
+        const [vpArg] = setVP.mock.calls[setVP.mock.calls.length - 1]
         expect(vpArg).toEqual({ x: 100, y: 200, zoom: 1.5 })
         resolve()
       }, 100)
