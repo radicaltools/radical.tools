@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import sample from '../src/renderer/src/store/fintechSampleData.json'
 import { builtInGovernanceMetamodel, isParentAllowed } from '@radical/common/metamodel'
-import { sanitizeWireframeSvg } from '../src/renderer/src/ai/mockupWireframe'
+import { sanitizeWireframeSvg } from '@radical/common/wireframe'
 
 type Node = { id: string; type: string; parentId?: string; [k: string]: unknown }
 type Relation = { id: string; sourceId: string; targetId: string; relationType?: string }

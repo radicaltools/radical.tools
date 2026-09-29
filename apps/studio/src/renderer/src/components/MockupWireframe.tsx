@@ -6,7 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
 import { loadAISettings } from '../ai/settings'
-import { generateWireframe, wireframeDataUri } from '../ai/mockupWireframe'
+import { wireframeDataUri } from '@radical/common/wireframe'
 
 export function isHttpUrl(value: string): boolean {
   try {
@@ -53,6 +53,9 @@ export function MockupWireframe({
     setBusy(true)
     setStatus(null)
     try {
+      // Loaded on demand: it pulls in every AI provider adapter, which the
+      // read-only Hub viewer (also rendering this component) never needs.
+      const { generateWireframe } = await import('../ai/mockupWireframe')
       const { c4Nodes, c4Relations } = useDiagramStore.getState()
       const { svg, usage } = await generateWireframe(nodeId, c4Nodes, c4Relations, settings, ac.signal)
       updateNode(nodeId, { wireframe: svg } as Parameters<typeof updateNode>[1])

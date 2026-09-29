@@ -4,11 +4,8 @@
  * wireframe surviving an md-folder round-trip as multi-line frontmatter.
  */
 import { describe, it, expect } from 'vitest'
-import {
-  buildWireframePrompt,
-  sanitizeWireframeSvg,
-  MAX_WIREFRAME_CHARS,
-} from '../src/renderer/src/ai/mockupWireframe'
+import { buildWireframePrompt } from '../src/renderer/src/ai/mockupWireframe'
+import { sanitizeWireframeSvg, MAX_WIREFRAME_CHARS } from '@radical/common/wireframe'
 import { builtInGovernanceMetamodel, inferRelationType, isRelationAllowed } from '@radical/common/metamodel'
 import { serializeToMdFolder, deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 import type { C4Node, C4Relation } from '@radical/common/c4'

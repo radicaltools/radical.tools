@@ -3,7 +3,7 @@ import { NodeProps, Handle, Position } from 'reactflow'
 import { C4NodeRFData, NODE_COLORS, TYPE_ICON_PATHS } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
 import { composeEarsSentence, resolveEarsSubject } from '@radical/common/metamodel'
-import { wireframeDataUri } from '../../ai/mockupWireframe'
+import { wireframeDataUri } from '@radical/common/wireframe'
 
 // ─── Diff highlight overlay ────────────────────────────────────────────────
 function DiffOverlay({ c4id }: { c4id: string }) {

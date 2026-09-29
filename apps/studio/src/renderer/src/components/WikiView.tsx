@@ -4,7 +4,7 @@ import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubje
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { MockupWireframe } from './MockupWireframe'
-import { wireframeDataUri } from '../ai/mockupWireframe'
+import { wireframeDataUri } from '@radical/common/wireframe'
 import { loadStudioSettings, STUDIO_SETTINGS_CHANGED_EVENT } from '../studioSettings'
 import {
   C4Node,
