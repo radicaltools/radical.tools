@@ -20,6 +20,7 @@ cd radical.tools
 npm install
 npm run dev        # Electron app with hot-reload
 npm test           # Run tests
+npm run e2e        # End-to-end suite (Playwright), see apps/e2e/README.md
 npm run typecheck  # Type-check
 ```
 
@@ -40,6 +41,7 @@ apps/
     tests/          — Vitest unit tests
   vscode/         — VS Code extension
   hub/            — Architecture Hub read-only viewer
+  e2e/            — End-to-end regression suite (Playwright)
   mcp/            — MCP server (empty for now)
   web/            — Marketing site (radical.tools)
 packages/
@@ -66,7 +68,7 @@ packages/
 ## Daily workflow (for maintainers)
 
 The `main` branch is protected — direct pushes are rejected. All changes go through a PR.
-CI (`Type-check & Test`) must pass before merging.
+CI (`Type-check & Test` and `E2E`) must pass before merging.
 
 Recommended git aliases (set up once globally):
 

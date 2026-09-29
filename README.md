@@ -141,6 +141,8 @@ apps/
   hub/            Architecture Hub (hub.radical.tools): read-only viewer,
                   built on @radical/ui
   vscode/         VS Code extension; bundles the Studio web build as its webview
+  e2e/            End-to-end regression suite (Playwright) for the web builds
+                  of Studio and Hub, with screenshot baselines
   mcp/            MCP server for radical models (empty for now)
   web/            Marketing site and manual (radical.tools)
 packages/
@@ -170,7 +172,13 @@ npm test
 
 # Watch mode
 npm run test:watch
+
+# End-to-end regression suite (Playwright) against the web builds
+npm run e2e
 ```
+
+See [apps/e2e/README.md](apps/e2e/README.md) for the e2e suite and its
+screenshot baselines.
 
 ## Contributing
 
