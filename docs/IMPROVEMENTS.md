@@ -114,3 +114,31 @@ Status as of 2026-09-29, after the monorepo restructuring (branch
 7. **Stricter `tsconfig`**: `noUncheckedIndexedAccess`,
    `exactOptionalPropertyTypes`. Type-check the tests that `apps/studio` and
    `apps/hub` still leave out.
+
+### Bugs found by the e2e suite (2026-09-29)
+
+Each has a `test.fail` test in `apps/e2e/tests/studio/known-issues.spec.ts`
+that turns red once the bug is fixed.
+
+1. **Live layout never settles in views with nested elements.** The live
+   WebCoLa layout (`packages/ui/src/layout/liveColaLayout.ts`) keeps ticking
+   when group constraints and link forces disagree, so nodes drift (80–320 px
+   in 10 s on the bookstore fixture; also the Fintech sample's Core Banking,
+   Payments and "All elements" views, and Hub concept canvases). There is no
+   iteration cap or movement threshold in live mode.
+2. **Autosave starves while that happens.** Every tick replaces `c4Nodes`, which
+   restarts the 400 ms debounce in
+   `apps/studio/src/renderer/src/persistence/autosave.ts`, so edits reach
+   localStorage only on `pagehide`, together with the drifted positions.
+3. **Double-click on the empty canvas does not add a system.** React Flow's
+   `zoomOnDoubleClick` (default on) swallows the event before
+   `Canvas.onCanvasDoubleClick` sees it.
+4. **The Quick Search bar covers Undo/Redo** in the toolbar on canvas views at
+   1440 px width.
+5. **Hub's local catalogue fallback fails for concepts.** When
+   `hub.radical.tools` is unreachable, `fetchJson` in
+   `packages/ui/src/store/hubStore.ts` falls back to `/hub/`, but rejects the
+   `.radical` files that `vite preview` serves as `application/octet-stream`,
+   so a concept deep link lands on the catalogue instead.
+6. **Property labels are not tied to their inputs** in `RightPanel.tsx`
+   (`<label>` without `htmlFor`), so the fields have no accessible name.

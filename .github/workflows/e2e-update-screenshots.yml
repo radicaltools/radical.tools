@@ -1,0 +1,70 @@
+name: E2E — update screenshots
+
+# Regenerates the e2e screenshot baselines in the same Playwright image that
+# compares them, and commits them to the PR branch.
+#
+# Trigger: add the `update-screenshots` label to a PR (the label is removed
+# again when the run ends). Only baselines that changed or are missing are
+# rewritten. Review the new images in the PR diff before merging.
+#
+# A push made with GITHUB_TOKEN does not start other workflows: re-run the
+# CI checks on the PR afterwards (or push any commit).
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: e2e-update-screenshots-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Update screenshot baselines
+    if: github.event.label.name == 'update-screenshots' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build Studio and Hub
+        run: npm run build:web && npm run build:hub
+      - name: Regenerate baselines
+        # Failures other than screenshot diffs still fail the run below; the
+        # baselines are written either way.
+        run: npm run e2e -w @radical/e2e -- --update-snapshots=changed --retries=0 || true
+      - name: Verify
+        run: npm run e2e -w @radical/e2e -- --retries=0
+      - name: Commit
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/e2e/tests
+          if git diff --cached --quiet; then
+            echo "Screenshots are up to date."
+          else
+            git commit -m "test(e2e): update screenshot baselines"
+            git push
+          fi
+      - name: Remove the label
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/update-screenshots"

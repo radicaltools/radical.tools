@@ -1,0 +1,67 @@
+{
+  "nodes": [
+    { "id": "customer", "type": "person", "label": "Customer",
+      "description": "Buys books online", "x": 355, "y": 0,
+      "width": 150, "height": 170, "collapsed": false },
+    { "id": "bookstore", "type": "system", "label": "Bookstore",
+      "description": "Online book shop", "x": 0, "y": 270,
+      "width": 860, "height": 350, "collapsed": false },
+    { "id": "web", "type": "webapp", "label": "Web App", "technology": "React",
+      "description": "Catalogue and checkout UI", "parentId": "bookstore",
+      "x": 30, "y": 120, "width": 210, "height": 140, "collapsed": false },
+    { "id": "api", "type": "container", "label": "API", "technology": "Node.js",
+      "description": "Orders and catalogue API", "parentId": "bookstore",
+      "x": 290, "y": 120, "width": 300, "height": 200, "collapsed": false },
+    { "id": "db", "type": "database", "label": "Orders DB", "technology": "PostgreSQL",
+      "description": "Orders and stock", "parentId": "bookstore",
+      "x": 640, "y": 155, "width": 190, "height": 130, "collapsed": false },
+    { "id": "payments", "type": "system", "label": "Payment Provider", "external": true,
+      "description": "Card payments", "x": 960, "y": 355,
+      "width": 300, "height": 180, "collapsed": false }
+  ],
+  "relations": [
+    { "id": "r1", "sourceId": "customer", "targetId": "web", "label": "browses and orders", "technology": "HTTPS" },
+    { "id": "r2", "sourceId": "web", "targetId": "api", "label": "calls", "technology": "JSON/HTTPS" },
+    { "id": "r3", "sourceId": "api", "targetId": "db", "label": "reads/writes", "technology": "SQL" },
+    { "id": "r4", "sourceId": "api", "targetId": "payments", "label": "charges card", "technology": "REST" }
+  ],
+  "sequences": [
+    { "id": "seq-order", "name": "Place Order", "relationIds": ["r1", "r2", "r3", "r4"],
+      "stepDescriptions": ["submits the order", "posts the order", "stores the order", "charges the card"] }
+  ],
+  "views": [
+    { "id": "v-context", "name": "System Context", "kind": "static",
+      "nodeIds": ["customer", "bookstore", "payments"],
+      "positions": {
+        "customer": { "x": 355, "y": 0, "width": 150, "height": 170 },
+        "bookstore": { "x": 250, "y": 270, "width": 360, "height": 260 },
+        "payments": { "x": 710, "y": 310, "width": 300, "height": 180 }
+      },
+      "hiddenRelationIds": [] },
+    { "id": "v-containers", "name": "Containers", "kind": "static",
+      "nodeIds": ["customer", "bookstore", "web", "api", "db", "payments"],
+      "positions": {
+        "customer": { "x": 355, "y": 0, "width": 150, "height": 170 },
+        "bookstore": { "x": 0, "y": 270, "width": 860, "height": 350 },
+        "web": { "x": 30, "y": 120, "width": 210, "height": 140 },
+        "api": { "x": 290, "y": 120, "width": 300, "height": 200 },
+        "db": { "x": 640, "y": 155, "width": 190, "height": 130 },
+        "payments": { "x": 960, "y": 355, "width": 300, "height": 180 }
+      },
+      "hiddenRelationIds": [] },
+    { "id": "v-order", "name": "Place Order Flow", "kind": "dynamic",
+      "nodeIds": ["customer", "web", "api", "db", "payments"],
+      "sequenceId": "seq-order", "positions": {}, "hiddenRelationIds": [] },
+    { "id": "v-table", "name": "Element Table", "kind": "table",
+      "nodeIds": [], "positions": {}, "hiddenRelationIds": [] }
+  ],
+  "snapshots": [],
+  "presentations": [
+    { "id": "pres-main", "name": "Main", "slides": [
+      { "id": "slide-1", "name": "Context", "snapshotId": null, "viewId": "v-context",
+        "viewport": { "x": 0, "y": 0, "zoom": 1 } },
+      { "id": "slide-2", "name": "Containers", "snapshotId": null, "viewId": "v-containers",
+        "viewport": { "x": 0, "y": 0, "zoom": 1 } }
+    ] }
+  ]
+}

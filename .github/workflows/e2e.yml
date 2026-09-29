@@ -1,0 +1,42 @@
+name: E2E
+
+# End-to-end regression suite (apps/e2e): Playwright against the production
+# web builds of Studio and Hub, including screenshot comparison.
+#
+# Called by ci.yml and deploy.yml. Runs inside the Playwright image so fonts
+# and rendering match the committed screenshot baselines; keep the image tag
+# equal to the @playwright/test version in apps/e2e/package.json.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build Studio and Hub
+        run: npm run build:web && npm run build:hub
+      - name: Run the suite
+        run: npm run e2e -w @radical/e2e
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            apps/e2e/playwright-report/
+            apps/e2e/test-results/
+          retention-days: 14
