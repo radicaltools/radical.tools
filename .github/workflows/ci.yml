@@ -21,3 +21,7 @@ jobs:
       - run: npm run check:workspaces
       - run: npm run typecheck
       - run: npm test
+
+  e2e:
+    name: E2E
+    uses: ./.github/workflows/e2e.yml

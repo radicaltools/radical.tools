@@ -10,8 +10,13 @@ permissions:
   contents: read
 
 jobs:
+  e2e:
+    name: E2E
+    uses: ./.github/workflows/e2e.yml
+
   deploy:
     name: Build & Deploy
+    needs: e2e
     runs-on: ubuntu-latest
 
     steps:
