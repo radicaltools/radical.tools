@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { ReactFlowProvider } from 'reactflow'
+import { host } from './platform/host'
 import { Toolbar } from './components/Toolbar'
 import { Canvas } from './components/Canvas'
 import { TreemapView } from './components/TreemapView'
@@ -49,8 +50,7 @@ function AppInner(): React.ReactElement {
   // arrived via a deep link (the hash already encodes a destination) so the
   // pasted URL lands straight on its target instead of behind the splash.
   const [showWelcome, setShowWelcome] = useState(() => {
-    const hasElectron = !!(window as unknown as { electronAPI?: unknown }).electronAPI
-    if (hasElectron) return false
+    if (host().kind !== 'web') return false
     return !parseHash(window.location.hash)
   })
   // Only sync the URL once the welcome splash is gone: while it's up the user

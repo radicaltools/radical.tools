@@ -18,6 +18,7 @@ import React, { useState } from 'react'
 import { documents } from '../store/documentStore'
 import { buildFintechSampleRaw, loadFintechSample } from '../store/fintechSample'
 import { useDiagramStore } from '../store/diagramStore'
+import { host } from '../platform/host'
 
 interface Props {
   onSampleLoaded?: () => void
@@ -37,7 +38,8 @@ export function DevSampleToolbar({ onSampleLoaded }: Props): React.ReactElement 
   }
 
   async function handleSave(): Promise<void> {
-    if (!window.electronAPI?.devSaveSample) {
+    const h = host()
+    if (!h.devSaveSample) {
       alert('devSaveSample IPC not available — are you running in Electron dev mode?')
       return
     }
@@ -45,7 +47,7 @@ export function DevSampleToolbar({ onSampleLoaded }: Props): React.ReactElement 
     try {
       const data = saveDiagram()
       const json = JSON.stringify(data, null, 2)
-      const res = await window.electronAPI.devSaveSample(json)
+      const res = await h.devSaveSample(json)
       if (res.success) {
         setLastSaved(new Date().toLocaleTimeString())
       } else {
@@ -57,9 +59,10 @@ export function DevSampleToolbar({ onSampleLoaded }: Props): React.ReactElement 
   }
 
   async function handleReset(): Promise<void> {
-    if (!window.electronAPI?.devSaveSample) return
+    const h = host()
+    if (!h.devSaveSample) return
     if (!confirm('Reset fintechSampleData.json to empty ({})? Next "Open sample model" will use hardcoded positions.')) return
-    await window.electronAPI.devSaveSample('{}')
+    await h.devSaveSample('{}')
     setLastSaved(null)
   }
 

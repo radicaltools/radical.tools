@@ -1,39 +1,25 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { FileChange, HostCapabilities } from '@radical/host-bridge'
 
-// Expose a minimal safe API to renderer
+// The Electron implementation of Studio's host bridge: each capability is one
+// IPC channel handled in src/main. The renderer reaches it through host()
+// (src/renderer/src/platform/host.ts), never through window.electronAPI.
 const api = {
-  platform: process.platform,
-  send: (channel: string, ...args: unknown[]) => ipcRenderer.send(channel, ...args),
-  on: (channel: string, listener: (...args: unknown[]) => void) => {
-    ipcRenderer.on(channel, (_event, ...args) => listener(...args))
+  saveDiagram: (json) => ipcRenderer.invoke('dialog:save', json),
+  openDiagram: () => ipcRenderer.invoke('dialog:open'),
+  readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
+  writeFile: (filePath, json) => ipcRenderer.invoke('file:write', filePath, json),
+  openFolder: () => ipcRenderer.invoke('folder:open'),
+  pickFolder: () => ipcRenderer.invoke('folder:pick'),
+  readFolder: (folderPath) => ipcRenderer.invoke('folder:read', folderPath),
+  writeFolder: (folderPath, files) => ipcRenderer.invoke('folder:write', folderPath, files),
+  devSaveSample: (json) => ipcRenderer.invoke('dev:saveSample', json),
+  devLoadSample: () => ipcRenderer.invoke('dev:loadSample'),
+  getWatchedPath: () => ipcRenderer.invoke('file:getWatchedPath'),
+  onFileChanged: (listener) => {
+    ipcRenderer.on('file:external-change', (_event, data) => listener(data as FileChange))
   },
-  invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
-  saveDiagram: (json: string): Promise<{ success: boolean; filePath?: string }> =>
-    ipcRenderer.invoke('dialog:save', json),
-  openDiagram: (): Promise<{ success: boolean; filePath?: string; content?: string }> =>
-    ipcRenderer.invoke('dialog:open'),
-  readFile: (filePath: string): Promise<{ success: boolean; content?: string; error?: string }> =>
-    ipcRenderer.invoke('file:read', filePath),
-  writeFile: (filePath: string, json: string): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('file:write', filePath, json),
-  openFolder: (): Promise<{ success: boolean; folderPath?: string; files?: Record<string, string>; error?: string }> =>
-    ipcRenderer.invoke('folder:open'),
-  pickFolder: (): Promise<{ success: boolean; folderPath?: string }> =>
-    ipcRenderer.invoke('folder:pick'),
-  readFolder: (folderPath: string): Promise<{ success: boolean; files?: Record<string, string>; error?: string }> =>
-    ipcRenderer.invoke('folder:read', folderPath),
-  writeFolder: (folderPath: string, files: Record<string, string>): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('folder:write', folderPath, files),
-  devSaveSample: (json: string): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('dev:saveSample', json),
-  devLoadSample: (): Promise<{ success: boolean; content?: string; error?: string }> =>
-    ipcRenderer.invoke('dev:loadSample'),
-  getWatchedPath: (): Promise<string | null> =>
-    ipcRenderer.invoke('file:getWatchedPath'),
-  onFileChanged: (listener: (data: { filePath: string; content: string }) => void): void => {
-    ipcRenderer.on('file:external-change', (_event, data) => listener(data as { filePath: string; content: string }))
-  },
-}
+} satisfies Required<HostCapabilities>
 
 if (process.contextIsolated) {
   try {

@@ -5,6 +5,7 @@ import { useDiagramStore } from '../store/diagramStore'
 import { availableMetamodels } from '@radical/common/metamodel'
 import { parseStructurizrDsl } from '@radical/common/formats/structurizrDsl'
 import { webFolderSupported } from '../persist/webFolder'
+import { host } from '../platform/host'
 
 interface Props {
   open: boolean
@@ -18,7 +19,7 @@ function fmtTime(ts: number): string {
   return d.toLocaleString()
 }
 
-const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.openFolder
+const isElectron = !!host().openFolder
 /** Folder-of-Markdown mode works in Electron and in Chromium browsers (File
  *  System Access API). */
 const folderSupported = isElectron || webFolderSupported()

@@ -132,6 +132,7 @@ apps/
       layout/       Smart Layout worker wrapper and live webcola physics
       store/        Zustand stores (diagramStore, documentStore, hubStore)
       ai/           AI chat, providers (OpenAI, Anthropic, Gemini, Ollama), Forge
+      platform/     host(): which host Studio runs in (see @radical/host-bridge)
       hub/          Importing Hub concepts into a model
       viewer.ts     Canvas, panels and stores the Hub app builds on
     tests/          Vitest unit/integration tests
@@ -147,6 +148,8 @@ packages/
                   language, AI tool catalogue. No UI dependencies
   layout/         @radical/layout: Smart Layout and the headless layout engines,
                   with their tests, benchmark and visual harness
+  host-bridge/    @radical/host-bridge: typed contract between Studio and its
+                  host (Electron, VS Code webview, browser)
   hub-catalogue/  @radical/hub-catalogue: the Hub's concept catalogue (one
                   .radical document per concept), its validation and the Vite
                   plugin that serves and bundles it for the Hub and Studio

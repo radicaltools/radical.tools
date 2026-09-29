@@ -10,6 +10,7 @@
 
 import { create } from 'zustand'
 import type { DiagramData, C4Node } from '@radical/common/c4'
+import { host } from '../platform/host'
 import {
   serializeToMdFolder,
   deserializeFromMdFolder,
@@ -32,7 +33,7 @@ const LS_DOC_PREFIX = 'radical-doc:'
 /** Legacy single-slot key from the previous persistence iteration. */
 const LS_LEGACY_KEY = 'radical-diagram-v1'
 
-/** Web md-folder docs (source==='md', no electronAPI) whose directory handle
+/** Web md-folder docs (source==='md', no native host folder access) whose directory handle
  *  has verified read/write permission this session. Writes are skipped until a
  *  folder is "connected" so a permission-pending handle can never clobber the
  *  user's files with an empty/stale model after a reload. */
@@ -137,17 +138,18 @@ function defaultNameFromFolder(folderPath: string): string {
 /** Fetch one md-folder node's body from disk (Electron file or web handle),
  *  without caching it anywhere — the caller decides what to do with it. */
 async function fetchNodeBody(id: string, nodeId: string): Promise<string | undefined> {
+  const h = host()
   const meta = readIndex().docs.find(d => d.id === id)
   if (!meta) return undefined
   const relPath = mdBodyPaths.get(id)?.[nodeId]
   if (!relPath) return undefined
   try {
-    if (meta.folderPath && window.electronAPI?.readFile) {
-      const res = await window.electronAPI.readFile(`${meta.folderPath}/${relPath}`)
+    if (meta.folderPath && h.readFile) {
+      const res = await h.readFile(`${meta.folderPath}/${relPath}`)
       if (!res.success || res.content === undefined) return undefined
       return extractNodeBody(res.content)
     }
-    if (!window.electronAPI?.readFile && webFolderSupported()) {
+    if (!h.readFile && webFolderSupported()) {
       const handle = await loadHandle(id)
       if (!handle) return undefined
       const content = await readOneFileFromHandle(handle, relPath)
@@ -438,16 +440,17 @@ export const documents: DocumentsAPI = {
   },
 
   async loadDocument(id) {
+    const h = host()
     const meta = readIndex().docs.find(d => d.id === id)
     if (!meta) return null
     if (meta.source === 'ls') return readLSPayload(id)
-    if (meta.source === 'fs' && meta.filePath && window.electronAPI?.readFile) {
-      const res = await window.electronAPI.readFile(meta.filePath)
+    if (meta.source === 'fs' && meta.filePath && h.readFile) {
+      const res = await h.readFile(meta.filePath)
       if (!res.success || !res.content) return null
       try { return JSON.parse(res.content) as DiagramData } catch { return null }
     }
-    if (meta.source === 'md' && meta.folderPath && window.electronAPI?.readFolder) {
-      const res = await window.electronAPI.readFolder(meta.folderPath)
+    if (meta.source === 'md' && meta.folderPath && h.readFolder) {
+      const res = await h.readFolder(meta.folderPath)
       if (!res.success || !res.files) return null
       if (Object.keys(res.files).length === 0) return null // empty/new folder
       try {
@@ -456,7 +459,7 @@ export const documents: DocumentsAPI = {
         return data
       } catch { return null }
     }
-    if (meta.source === 'md' && !window.electronAPI?.readFolder && webFolderSupported()) {
+    if (meta.source === 'md' && !h.readFolder && webFolderSupported()) {
       const handle = await loadHandle(id)
       if (!handle) return null
       if (!(await verifyPermission(handle, 'readwrite', false))) return null // needs reconnect
@@ -481,27 +484,28 @@ export const documents: DocumentsAPI = {
   },
 
   async saveDocument(id, data) {
+    const h = host()
     const idx = readIndex()
     const meta = idx.docs.find(d => d.id === id)
     if (!meta) return
     if (meta.source === 'ls') {
       writeLSPayload(id, data)
-    } else if (meta.source === 'fs' && meta.filePath && window.electronAPI?.writeFile) {
+    } else if (meta.source === 'fs' && meta.filePath && h.writeFile) {
       const json = JSON.stringify(data, null, 2)
-      const res = await window.electronAPI.writeFile(meta.filePath, json)
+      const res = await h.writeFile(meta.filePath, json)
       if (!res.success) {
         console.warn('[documentStore] FS write failed for', meta.filePath, res.error)
         return
       }
-    } else if (meta.source === 'md' && meta.folderPath && window.electronAPI?.writeFolder) {
+    } else if (meta.source === 'md' && meta.folderPath && h.writeFolder) {
       const nodes = await nodesForMdSave(id, data)
       const files = serializeToMdFolder({ ...data, nodes }, meta.name)
-      const res = await window.electronAPI.writeFolder(meta.folderPath, files)
+      const res = await h.writeFolder(meta.folderPath, files)
       if (!res.success) {
         console.warn('[documentStore] folder write failed for', meta.folderPath, res.error)
         return
       }
-    } else if (meta.source === 'md' && !window.electronAPI?.writeFolder && webFolderSupported()) {
+    } else if (meta.source === 'md' && !h.writeFolder && webFolderSupported()) {
       // Never write until the handle's permission is verified this session,
       // so a reload with a permission-pending handle can't overwrite files.
       if (!connectedWebFolders.has(id)) {
@@ -552,10 +556,11 @@ export const documents: DocumentsAPI = {
   },
 
   async importFromFile(pickerOverride) {
+    const h = host()
     // ── Electron path: native open dialog returns an absolute filePath we
     //    can read/write through preload IPC. We register an FS-backed doc.
-    if (typeof window !== 'undefined' && window.electronAPI?.openDiagram) {
-      const res = await window.electronAPI.openDiagram()
+    if (h.openDiagram) {
+      const res = await h.openDiagram()
       if (!res.success || !res.filePath) return null
       const idx = readIndex()
       // De-dupe by path: if we already track this file, just activate it.
@@ -604,12 +609,13 @@ export const documents: DocumentsAPI = {
   },
 
   async saveAsFile(id, data, downloadOverride) {
+    const h = host()
     const json = JSON.stringify(data, null, 2)
 
     // ── Electron path: native Save dialog returns an absolute path; we
     //    convert the doc into FS-backed and drop any LS payload.
-    if (typeof window !== 'undefined' && window.electronAPI?.saveDiagram) {
-      const res = await window.electronAPI.saveDiagram(json)
+    if (h.saveDiagram) {
+      const res = await h.saveDiagram(json)
       if (!res.success || !res.filePath) return null
       const idx = readIndex()
       const meta = idx.docs.find(d => d.id === id)
@@ -646,9 +652,10 @@ export const documents: DocumentsAPI = {
   },
 
   async importFromFolder() {
+    const h = host()
     // ── Electron: native directory dialog → read via IPC. ──
-    if (typeof window !== 'undefined' && window.electronAPI?.openFolder) {
-      const res = await window.electronAPI.openFolder()
+    if (h.openFolder) {
+      const res = await h.openFolder()
       if (!res.success || !res.folderPath) return null
       const idx = readIndex()
       const existing = idx.docs.find((d) => d.source === 'md' && d.folderPath === res.folderPath)
@@ -696,16 +703,17 @@ export const documents: DocumentsAPI = {
   },
 
   async saveAsFolder(id, data) {
+    const h = host()
     // ── Electron: pick a destination folder, write via IPC. ──
-    if (typeof window !== 'undefined' && window.electronAPI?.pickFolder && window.electronAPI?.writeFolder) {
+    if (h.pickFolder && h.writeFolder) {
       const idx = readIndex()
       const meta = idx.docs.find((d) => d.id === id)
       if (!meta) return null
-      const picked = await window.electronAPI.pickFolder()
+      const picked = await h.pickFolder()
       if (!picked.success || !picked.folderPath) return null
       const name = defaultNameFromFolder(picked.folderPath)
       const files = serializeToMdFolder(data, name)
-      const res = await window.electronAPI.writeFolder(picked.folderPath, files)
+      const res = await h.writeFolder(picked.folderPath, files)
       if (!res.success) {
         console.warn('[documentStore] saveAsFolder write failed:', res.error)
         return null

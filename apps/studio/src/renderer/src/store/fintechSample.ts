@@ -24,6 +24,7 @@ import type {
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { runSmartLayout } from '../layout/smartLayoutRunner'
+import { host } from '../platform/host'
 import savedSampleData from './fintechSampleData.json'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -441,8 +442,8 @@ function _buildPresentations(): Presentation[] {
  * running outside Electron dev mode.
  */
 export async function loadFintechSample(): Promise<DiagramData> {
-  const api = (window as { electronAPI?: { devLoadSample?: () => Promise<{ success: boolean; content?: string }> } }).electronAPI
-  if (api?.devLoadSample) {
+  const api = host()
+  if (api.devLoadSample) {
     try {
       const res = await api.devLoadSample()
       if (res.success && res.content) {

@@ -45,6 +45,7 @@ apps/
 packages/
   common/         — @radical/common: model types, metamodels, formats, AI tools (no UI deps)
   layout/         — @radical/layout: Smart Layout and headless layout engines
+  host-bridge/    — @radical/host-bridge: Studio ↔ host contract (Electron, VS Code, browser)
   hub-catalogue/  — @radical/hub-catalogue: Hub concepts (.radical files), validation, Vite plugin
 ```
 

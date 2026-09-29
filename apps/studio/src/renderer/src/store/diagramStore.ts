@@ -50,6 +50,7 @@ import { compoundPadding } from '@radical/layout/geometry'
 import { LiveColaLayout } from '../layout/liveColaLayout'
 import { documents, useDocumentsStore } from './documentStore'
 import { isViewerProfile } from '../runtime'
+import { host } from '../platform/host'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -4668,7 +4669,7 @@ if (typeof window !== 'undefined' && !isViewerProfile()) {
     const activeId = documents.getActiveId()
     if (!activeId) return
     const meta = documents.listDocuments().find(d => d.id === activeId)
-    // FS writes go through async electronAPI and won't reliably complete
+    // FS writes go through the async host bridge and won't reliably complete
     // on pagehide; LS writes are synchronous and always make it to disk.
     if (meta?.source !== 'ls') {
       // Best effort — fire-and-forget. Pending FS save may still complete
@@ -4708,8 +4709,9 @@ if (typeof window !== 'undefined' && !isViewerProfile()) {
   //
   // Writing back from the app is handled by the existing auto-persist path
   // (saveDocument → file:write IPC), which already targets FS-backed docs.
-  if (window.electronAPI?.getWatchedPath) {
-    void window.electronAPI.getWatchedPath().then((watchedPath) => {
+  const h = host()
+  if (h.getWatchedPath) {
+    void h.getWatchedPath().then((watchedPath) => {
       if (!watchedPath) return
       const meta = documents.createFSDocument(watchedPath)
       // Activate (triggers the switch-doc subscriber above → loads the file).
@@ -4717,8 +4719,8 @@ if (typeof window !== 'undefined' && !isViewerProfile()) {
     })
   }
 
-  if (window.electronAPI?.onFileChanged) {
-    window.electronAPI.onFileChanged(({ content }) => {
+  if (h.onFileChanged) {
+    h.onFileChanged(({ content }) => {
       _suspended = true
       try {
         const data = JSON.parse(content) as DiagramData

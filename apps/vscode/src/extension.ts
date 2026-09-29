@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import * as path from 'path'
 import * as cp from 'child_process'
 import * as fs from 'fs'
+import { vscodeBootScript, type ExtensionMessage, type WebviewMessage } from '@radical/host-bridge/vscode'
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -83,13 +84,13 @@ class RadicalEditorProvider implements vscode.CustomTextEditorProvider {
         type: 'file:external-change',
         filePath,
         content: e.document.getText(),
-      })
+      } satisfies ExtensionMessage)
     })
 
     // File I/O bridge: messages from the webview
-    webviewPanel.webview.onDidReceiveMessage(async (msg: Record<string, unknown>) => {
+    webviewPanel.webview.onDidReceiveMessage(async (msg: WebviewMessage) => {
       if (msg.type === 'writeFile') {
-        const content = msg.content as string
+        const content = msg.content
         entry.lastWrittenAt = Date.now()
         const edit = new vscode.WorkspaceEdit()
         const fullRange = new vscode.Range(
@@ -104,7 +105,7 @@ class RadicalEditorProvider implements vscode.CustomTextEditorProvider {
           id: msg.id,
           success: true,
           content: document.getText(),
-        })
+        } satisfies ExtensionMessage)
       }
     })
 
@@ -327,16 +328,16 @@ async function openInWebview(filePath: string | null): Promise<void> {
       if (Date.now() - entry.lastWrittenAt < 2000) return
       try {
         const content = fs.readFileSync(fp, 'utf-8')
-        panel.webview.postMessage({ type: 'file:external-change', filePath: fp, content })
+        panel.webview.postMessage({ type: 'file:external-change', filePath: fp, content } satisfies ExtensionMessage)
       } catch { /* ignore */ }
     })
     unwatchFn = () => fs.unwatchFile(fp)
   }
 
-  panel.webview.onDidReceiveMessage(async (msg: Record<string, unknown>) => {
+  panel.webview.onDidReceiveMessage(async (msg: WebviewMessage) => {
     if (msg.type === 'writeFile') {
-      const fp = msg.filePath as string
-      const content = msg.content as string
+      const fp = msg.filePath
+      const content = msg.content
       try {
         entry.lastWrittenAt = Date.now()
         fs.writeFileSync(fp, content, 'utf-8')
@@ -344,12 +345,12 @@ async function openInWebview(filePath: string | null): Promise<void> {
         outputChannel.appendLine(`[Radical.Tools] writeFile error: ${err}`)
       }
     } else if (msg.type === 'readFile') {
-      const fp = msg.filePath as string
+      const fp = msg.filePath
       try {
         const content = fs.readFileSync(fp, 'utf-8')
-        panel.webview.postMessage({ type: 'readFile:response', id: msg.id, success: true, content })
+        panel.webview.postMessage({ type: 'readFile:response', id: msg.id, success: true, content } satisfies ExtensionMessage)
       } catch (err) {
-        panel.webview.postMessage({ type: 'readFile:response', id: msg.id, success: false, error: String(err) })
+        panel.webview.postMessage({ type: 'readFile:response', id: msg.id, success: false, error: String(err) } satisfies ExtensionMessage)
       }
     }
   })
@@ -389,8 +390,9 @@ function buildWebviewHtml(
     return `${attr}="${webview.asWebviewUri(vscode.Uri.file(abs))}"`
   })
 
-  const filePathJson = JSON.stringify(filePath)
-  const polyfill = `
+  // Studio's renderer builds its host bridge itself (createVsCodeWebviewHost in
+  // @radical/host-bridge/vscode); the page only needs the boot data.
+  const head = `
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'none';
     script-src ${webview.cspSource} 'unsafe-inline' 'unsafe-eval';
@@ -398,52 +400,6 @@ function buildWebviewHtml(
     img-src    ${webview.cspSource} data: blob:;
     font-src   ${webview.cspSource} data:;
     worker-src ${webview.cspSource} blob:;">
-<script>(function () {
-  var _vscode = acquireVsCodeApi();
-  var _listeners = [];
-  var _pending = Object.create(null);
-  var _seq = 0;
-
-  window.electronAPI = {
-    getWatchedPath: function () {
-      return Promise.resolve(${filePathJson});
-    },
-
-    onFileChanged: function (cb) {
-      _listeners.push(cb);
-    },
-
-    readFile: function (fp) {
-      return new Promise(function (resolve, reject) {
-        var id = String(++_seq);
-        _pending[id] = { resolve: resolve, reject: reject };
-        _vscode.postMessage({ type: 'readFile', id: id, filePath: fp });
-      });
-    },
-
-    writeFile: function (fp, content) {
-      _vscode.postMessage({ type: 'writeFile', filePath: fp, content: content });
-      return Promise.resolve({ success: true });
-    },
-  };
-
-  window.addEventListener('message', function (ev) {
-    var msg = ev.data;
-    if (!msg || !msg.type) return;
-
-    if (msg.type === 'file:external-change') {
-      for (var i = 0; i < _listeners.length; i++) {
-        _listeners[i]({ filePath: msg.filePath, content: msg.content });
-      }
-    } else if (msg.type === 'readFile:response') {
-      var p = _pending[msg.id];
-      if (!p) return;
-      delete _pending[msg.id];
-      if (msg.success) p.resolve({ success: true, content: msg.content });
-      else p.reject(new Error(msg.error || 'readFile failed'));
-    }
-  });
-})();</script>`
-
-  return html.replace('<head>', '<head>\n' + polyfill)
+${vscodeBootScript({ filePath })}`
+  return html.replace('<head>', '<head>\n' + head)
 }

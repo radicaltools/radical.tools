@@ -117,6 +117,7 @@
     "publish": "npm run compile && npx @vscode/vsce publish --no-dependencies"
   },
   "devDependencies": {
+    "@radical/host-bridge": "*",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^2.24.0",

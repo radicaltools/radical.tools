@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@radical/common": "*",
+    "@radical/host-bridge": "*",
     "@radical/hub-catalogue": "*",
     "@radical/layout": "*",
     "@types/react": "^18.2.0",

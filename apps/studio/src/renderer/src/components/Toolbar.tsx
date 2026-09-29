@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
+import { host } from '../platform/host'
 import { SmartLayoutButton } from './SmartLayoutButton'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { DocumentManagerModal } from './DocumentManager'
@@ -511,7 +512,9 @@ export function Toolbar(): React.ReactElement {
   const [managerOpen, setManagerOpen] = useState(false)
 
 
-  const isVSCode = !!(window as any).electronAPI
+  // Only the VS Code webview follows the editor theme; the desktop app and
+  // the browser keep the user's own choice.
+  const isVSCode = host().kind === 'vscode'
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (isVSCode) {
