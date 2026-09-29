@@ -11,7 +11,12 @@ import { useDiagramStore } from '../store/diagramStore'
 import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
 
 export function useDiagramFacade(): DiagramFacade {
-  return useMemo<DiagramFacade>(() => ({
+  return useMemo(createStoreFacade, [])
+}
+
+/** The facade over the live store; also usable outside React (tests). */
+export function createStoreFacade(): DiagramFacade {
+  return {
     getNodes: () => useDiagramStore.getState().c4Nodes,
     getRelations: () => useDiagramStore.getState().c4Relations,
     getMetamodel: () => useDiagramStore.getState().metamodel,
@@ -55,5 +60,5 @@ export function useDiagramFacade(): DiagramFacade {
         metamodel: s.metamodel,
       })
     },
-  }), [])
+  }
 }

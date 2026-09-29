@@ -41,6 +41,7 @@ import {
   canAddMoreOfType,
   inferRelationType,
 } from '@radical/common/metamodel'
+import * as model from '@radical/common/model'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
@@ -1503,54 +1504,16 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // ── nodes ────────────────────────────────────────────────────────────
       addNode(node) {
-        const state0 = get()
-        const mm = state0.metamodel
-        const def = mm?.nodeTypes[node.type]
-        const typeLabel = def?.label ?? node.type
-        // Cardinality.max
-        const count = Object.values(state0.c4Nodes).filter(n => n.type === node.type).length
-        if (!canAddMoreOfType(mm, node.type, count)) {
-          get().pushNotification(
-            `Cannot add another ${typeLabel}: maximum (${def?.cardinality?.max}) reached in the metamodel.`,
-            'error',
-          )
-          return ''
-        }
-        // Parent containment
-        const parent = node.parentId ? state0.c4Nodes[node.parentId] : undefined
-        if (!isParentAllowed(mm, node.type, parent?.type)) {
-          const allowed = def?.allowedParents
-          const parentLabel = parent
-            ? (mm?.nodeTypes[parent.type]?.label ?? parent.type)
-            : 'the canvas root'
-          const allowedStr = allowed && allowed.length
-            ? allowed.map(t => mm?.nodeTypes[t]?.label ?? t).join(', ')
-            : 'the canvas root'
-          get().pushNotification(
-            `Cannot place ${typeLabel} inside ${parentLabel}. Allowed parents: ${allowedStr}.`,
-            'error',
-          )
+        // Cardinality and parent containment (metamodel rules)
+        const refused = model.checkAddNode(get(), node)
+        if (refused) {
+          get().pushNotification(refused, 'error')
           return ''
         }
         get()._pushUndo()
         get()._markMilestoneEdit()
         const id = uid()
-        set((state) => {
-          // Materialize metamodel property defaults (e.g. requirement
-          // ears_type='ubiquitous') so they exist on the node — and thus
-          // reach persistence — instead of living only in UI fallbacks.
-          const newNode = { id, ...node } as C4Node & Record<string, unknown>
-          for (const p of def?.properties ?? []) {
-            if (p.default !== undefined && newNode[p.key] === undefined) {
-              newNode[p.key] = p.default
-            }
-          }
-          state.c4Nodes[id] = newNode
-          // Auto-add to active view
-          if (state.activeViewId && state.views[state.activeViewId]) {
-            state.views[state.activeViewId].nodeIds.push(id)
-          }
-        })
+        set((state) => { model.insertNode(state, id, node) })
         // Expand parent to fit the new child
         if (node.parentId) {
           get().fitParentToChildren(node.parentId)
@@ -1561,51 +1524,16 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       updateNode(id, updates) {
-        const state0 = get()
-        const existing = state0.c4Nodes[id]
-        if (!existing) return
-        // If a reparent or retype is requested, validate against metamodel.
-        if ('parentId' in updates || 'type' in updates) {
-          const newType = (updates.type as string | undefined) ?? existing.type
-          const newParentId = ('parentId' in updates
-            ? (updates.parentId as string | null | undefined)
-            : existing.parentId) ?? undefined
-          const parent = newParentId ? state0.c4Nodes[newParentId] : undefined
-          if (!isParentAllowed(state0.metamodel, newType, parent?.type)) {
-            const def = state0.metamodel?.nodeTypes[newType]
-            const allowed = def?.allowedParents
-            const typeLabel = def?.label ?? newType
-            const parentLabel = parent
-              ? (state0.metamodel?.nodeTypes[parent.type]?.label ?? parent.type)
-              : 'the canvas root'
-            const allowedStr = allowed && allowed.length
-              ? allowed.map(t => state0.metamodel?.nodeTypes[t]?.label ?? t).join(', ')
-              : 'the canvas root'
-            get().pushNotification(
-              `Cannot move ${typeLabel} "${existing.label}" into ${parentLabel}. Allowed parents: ${allowedStr}.`,
-              'error',
-            )
-            return
-          }
+        if (!get().c4Nodes[id]) return
+        // A reparent or retype must respect the metamodel's containment rules.
+        const refused = model.checkNodeUpdate(get(), id, updates)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
         }
         get()._pushUndo()
         get()._markMilestoneEdit()
-        set((state) => {
-          const node = state.c4Nodes[id] as (C4Node & Record<string, unknown>) | undefined
-          if (!node) return
-          Object.assign(node, updates)
-          // Retyping a node should materialize the new type's metamodel
-          // property defaults, same as addNode, so retyped and freshly
-          // created nodes of a type persist the same fields.
-          if ('type' in updates) {
-            const def = state.metamodel?.nodeTypes[node.type]
-            for (const p of def?.properties ?? []) {
-              if (p.default !== undefined && node[p.key] === undefined) {
-                node[p.key] = p.default
-              }
-            }
-          }
-        })
+        set((state) => { model.patchNode(state, id, updates) })
         get()._sync()
         // Only wake the live layout if the change actually affects geometry
         // or graph topology. Editing label / description / technology must
@@ -1663,25 +1591,8 @@ export const useDiagramStore = create<DiagramStore>()(
       removeNode(id) {
         get()._pushUndo()
         get()._markMilestoneEdit()
-        set((state) => {
-          // Remove node and all its descendants
-          const toRemove = new Set([id, ...getDescendants(id, state.c4Nodes)])
-          for (const nid of toRemove) delete state.c4Nodes[nid]
-          // Remove relations touching removed nodes
-          for (const [rid, rel] of Object.entries(state.c4Relations)) {
-            if (toRemove.has(rel.sourceId) || toRemove.has(rel.targetId)) {
-              delete state.c4Relations[rid]
-            }
-          }
-          // Remove from all views (nodeIds and per-view collapse state)
-          for (const view of Object.values(state.views)) {
-            view.nodeIds = view.nodeIds.filter((nid) => !toRemove.has(nid))
-            if (view.collapsedNodeIds?.length)
-              view.collapsedNodeIds = view.collapsedNodeIds.filter((nid) => !toRemove.has(nid))
-            if (view.expandedNodeIds?.length)
-              view.expandedNodeIds = view.expandedNodeIds.filter((nid) => !toRemove.has(nid))
-          }
-        })
+        // The node, its descendants, their relations and every view reference
+        set((state) => { model.deleteNode(state, id) })
         get()._sync()
         _liveLayout?.invalidate()
       },
@@ -1874,29 +1785,16 @@ export const useDiagramStore = create<DiagramStore>()(
         // whose (from, to) type pair is not permitted by the active
         // metamodel. Existing in-memory relations are left untouched and
         // surface as Issues instead.
-        const state0 = get()
-        const src = state0.c4Nodes[rel.sourceId]
-        const dst = state0.c4Nodes[rel.targetId]
-        if (src && dst && !isRelationAllowed(state0.metamodel, src.type, dst.type)) {
-          const srcLabel = state0.metamodel?.nodeTypes[src.type]?.label ?? src.type
-          const dstLabel = state0.metamodel?.nodeTypes[dst.type]?.label ?? dst.type
-          get().pushNotification(
-            `Relation not allowed: ${srcLabel} \u2192 ${dstLabel}. The metamodel does not permit this connection.`,
-            'error',
-          )
+        const refused = model.checkAddRelation(get(), rel)
+        if (refused) {
+          get().pushNotification(refused, 'error')
           return
         }
-        // Auto-infer relationType from metamodel when not explicitly provided.
-        const relationType =
-          rel.relationType ?? (src && dst
-            ? inferRelationType(state0.metamodel, src.type, dst.type)
-            : undefined)
         get()._pushUndo()
         get()._markMilestoneEdit()
         const id = uid()
-        set((state) => {
-          state.c4Relations[id] = { id, ...rel, ...(relationType ? { relationType } : {}) }
-        })
+        // relationType is inferred from the metamodel when not given
+        set((state) => { model.insertRelation(state, id, rel) })
         get()._sync()
         _liveLayout?.invalidate()
       },
@@ -1904,19 +1802,14 @@ export const useDiagramStore = create<DiagramStore>()(
       updateRelation(id, updates) {
         get()._pushUndo()
         get()._markMilestoneEdit()
-        set((state) => {
-          if (!state.c4Relations[id]) return
-          Object.assign(state.c4Relations[id], updates)
-        })
+        set((state) => { model.patchRelation(state, id, updates) })
         get()._sync()
       },
 
       removeRelation(id) {
         get()._pushUndo()
         get()._markMilestoneEdit()
-        set((state) => {
-          delete state.c4Relations[id]
-        })
+        set((state) => { model.deleteRelation(state, id) })
         get()._sync()
         _liveLayout?.invalidate()
       },
@@ -2334,9 +2227,7 @@ export const useDiagramStore = create<DiagramStore>()(
       // ── views ────────────────────────────────────────────────────────────
       addView(name) {
         const id = uid()
-        set((state) => {
-          state.views[id] = { id, name, nodeIds: [], positions: {} }
-        })
+        set((state) => { model.insertView(state, id, name) })
         return id
       },
       removeView(id) {
@@ -2471,21 +2362,10 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
       },
       setViewNodes(viewId, nodeIds) {
-        const state0 = get()
-        if (!state0.views[viewId]) return
-        // Filter out unknown ids defensively — the AI may emit a stale id.
-        const valid = nodeIds.filter((id) => id in state0.c4Nodes)
-        // Dedupe while preserving order.
-        const seen = new Set<string>()
-        const ordered: string[] = []
-        for (const id of valid) {
-          if (!seen.has(id)) { seen.add(id); ordered.push(id) }
-        }
+        if (!get().views[viewId]) return
         get()._pushUndo()
-        set((state) => {
-          const view = state.views[viewId]
-          if (view) view.nodeIds = ordered
-        })
+        // Unknown ids are dropped (the AI may emit a stale one) and the rest deduplicated
+        set((state) => { model.setViewNodeIds(state, viewId, nodeIds) })
         get()._sync()
         _liveLayout?.invalidate()
       },
@@ -2510,11 +2390,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       setViewKind(viewId, kind) {
-        set((state) => {
-          const view = state.views[viewId]
-          if (!view) return
-          view.kind = kind
-        })
+        set((state) => { model.setViewKind(state, viewId, kind) })
         get()._sync()
       },
 
@@ -4297,14 +4173,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.presentationSlides = presInit.presentations[0].slides as any
           state.presentationActive = false
           state.presentationSlideIndex = 0
-          state.metamodel = ((): any => {
-            const dm = data.metamodel
-            if (!dm) return builtInC4Metamodel()
-            if (dm.id === 'c4-builtin') return builtInC4Metamodel()
-            if (dm.id === 'c4-ddd-builtin') return builtInDddC4Metamodel()
-            if (dm.id === 'c4-ddd-governance-builtin') return builtInGovernanceMetamodel()
-            return dm
-          })()
+          state.metamodel = model.documentMetamodel(data.metamodel) as any
           state.hubTemplates = (data.hubTemplates ?? {}) as any
           state.hubMeta = data.hub ?? null
         })
