@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 
 // These tests guard the memory-dedup refactor in diagramStore.ts: snapshots,
 // undo history, and presentation slides now reference the live model instead

@@ -1,7 +1,6 @@
 /**
  * Radical Hub (hub.radical.tools): the concept catalogue plus the read-only
- * viewer. The viewer is built on Studio's canvas and panels, imported from
- * `radical-model/viewer`.
+ * viewer, built on the canvas and panels in @radical/ui.
  *
  * Output: out/index.html + out/assets/** + out/hub/{index.json,<category>/<id>.radical}
  * + out/hub-data.json (legacy single-file catalogue for older desktop builds).

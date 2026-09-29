@@ -1,0 +1,50 @@
+{
+  "name": "@radical/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The canvas, panels, views and diagram store shared by Studio and the read-only Hub viewer. No documents, host or AI: apps plug those in (store/documentBackend, components/wireframeGeneration).",
+  "type": "module",
+  "exports": {
+    "./viewer": "./src/viewer.ts",
+    "./styles.css": "./src/index.css",
+    "./store/diagramStore": "./src/store/diagramStore.ts",
+    "./store/hubStore": "./src/store/hubStore.ts",
+    "./store/documentBackend": "./src/store/documentBackend.ts",
+    "./components/Canvas": "./src/components/Canvas.tsx",
+    "./components/WikiView": "./src/components/WikiView.tsx",
+    "./components/TableView": "./src/components/TableView.tsx",
+    "./components/RightPanel": "./src/components/RightPanel.tsx",
+    "./components/NotificationHost": "./src/components/NotificationHost.tsx",
+    "./components/SmartLayoutButton": "./src/components/SmartLayoutButton.tsx",
+    "./components/ErrorBoundary": "./src/components/ErrorBoundary.tsx",
+    "./components/wireframeGeneration": "./src/components/wireframeGeneration.ts",
+    "./hooks/useOutsideClick": "./src/hooks/useOutsideClick.ts",
+    "./hub/conceptViews": "./src/hub/conceptViews.ts",
+    "./types/hubTheme": "./src/types/hubTheme.ts",
+    "./layout/smartLayoutRunner": "./src/layout/smartLayoutRunner.ts",
+    "./layout/liveColaLayout": "./src/layout/liveColaLayout.ts",
+    "./studioSettings": "./src/studioSettings.ts",
+    "./testing/setup": "./testing/setup.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radical/common": "*",
+    "@radical/layout": "*",
+    "d3-dispatch": "^3.0.1",
+    "d3-drag": "^3.0.0",
+    "d3-timer": "^3.0.1",
+    "immer": "^10.0.3",
+    "react": "^18.2.0",
+    "reactflow": "^11.11.4",
+    "webcola": "^3.4.0",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
+  }
+}

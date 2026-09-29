@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { runAIPrompt, type ForgeProgressEvent } from '../ai/runner'
 import { loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
@@ -9,7 +9,7 @@ import { FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, buildForgeStagePrompt, buildP
 import { buildGherkinFiles } from '@radical/common/formats/exportGherkin'
 import { downloadGherkinFiles } from '../export/downloadGherkinFiles'
 import { AIReportLine } from './AIReportLine'
-import { useHubStore, type HubCategory, type HubConceptSummary } from '../store/hubStore'
+import { useHubStore, type HubCategory, type HubConceptSummary } from '@radical/ui/store/hubStore'
 import { findRelevantConcepts } from '../hub/matchConcepts'
 import { importHubConceptIntoDiagram } from '../hub/importConcept'
 import {

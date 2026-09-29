@@ -4,7 +4,7 @@ import {
   computeViewCollapsedSet,
   isNodeHidden,
   getViewVisibleAncestor,
-} from '../store/diagramStore'
+} from '@radical/ui/store/diagramStore'
 import type { C4Node } from '@radical/common/c4'
 import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
 import { isRelationAllowed } from '@radical/common/metamodel'

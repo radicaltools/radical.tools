@@ -1,7 +1,7 @@
 // Registers Studio's AI wireframe generator with MockupWireframe. The
 // generator itself is loaded on first use: it pulls in every provider adapter.
 
-import { setWireframeGenerator } from '../components/wireframeGeneration'
+import { setWireframeGenerator } from '@radical/ui/components/wireframeGeneration'
 import { loadAISettings } from './settings'
 
 setWireframeGenerator({

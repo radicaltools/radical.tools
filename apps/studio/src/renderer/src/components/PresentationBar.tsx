@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { DiagramView, PresentationSlide } from '@radical/common/c4'
-import { useOutsideClick } from '../hooks/useOutsideClick'
+import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 
 // ── SVG icons ────────────────────────────────────────────────────────────────
 

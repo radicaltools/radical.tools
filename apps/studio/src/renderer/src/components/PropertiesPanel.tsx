@@ -1,5 +1,5 @@
 import React, { useCallback, ChangeEvent } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } from '@radical/common/c4'
 
 const TYPE_BG: Record<C4ElementType, string> = NODE_COLORS

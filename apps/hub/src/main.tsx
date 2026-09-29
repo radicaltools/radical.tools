@@ -1,8 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { ErrorBoundary } from 'radical-model/viewer'
+import { ErrorBoundary } from '@radical/ui/viewer'
 import HubApp from './HubApp'
-import 'radical-model/styles.css'
+import '@radical/ui/styles.css'
 import './hub.css'
 import 'reactflow/dist/style.css'
 

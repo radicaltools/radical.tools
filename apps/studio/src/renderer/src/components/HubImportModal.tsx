@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useHubStore, toggleInSet, type HubConcept, type HubConceptSummary, type TemplateParam, type HubImportRecord } from '../store/hubStore'
-import { useDiagramStore } from '../store/diagramStore'
+import { useHubStore, toggleInSet, type HubConcept, type HubConceptSummary, type TemplateParam, type HubImportRecord } from '@radical/ui/store/hubStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType, DiagramSequence } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
 import { isParentAllowed } from '@radical/common/metamodel'
-import { nodeTypeTheme } from '../types/hubTheme'
-import { conceptViewsToDiagram } from '../hub/conceptViews'
+import { nodeTypeTheme } from '@radical/ui/types/hubTheme'
+import { conceptViewsToDiagram } from '@radical/ui/hub/conceptViews'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 

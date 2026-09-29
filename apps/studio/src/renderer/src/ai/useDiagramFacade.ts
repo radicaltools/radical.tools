@@ -7,7 +7,7 @@
 // this store-binding boilerplate.
 
 import { useMemo } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
 
 export function useDiagramFacade(): DiagramFacade {

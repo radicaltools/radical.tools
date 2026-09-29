@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { documents } from '../store/documentStore'
 import { buildFintechSampleRaw } from '../store/fintechSample'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { formatRoute } from '../route'
 import { availableMetamodels } from '@radical/common/metamodel'
 

@@ -23,7 +23,7 @@ import type {
 } from '@radical/common/c4'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
-import { runSmartLayout } from '../layout/smartLayoutRunner'
+import { runSmartLayout } from '@radical/ui/layout/smartLayoutRunner'
 import { host } from '../platform/host'
 import savedSampleData from './fintechSampleData.json'
 

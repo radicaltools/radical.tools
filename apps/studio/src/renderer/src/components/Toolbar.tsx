@@ -1,13 +1,13 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { host } from '../platform/host'
-import { SmartLayoutButton } from './SmartLayoutButton'
+import { SmartLayoutButton } from '@radical/ui/components/SmartLayoutButton'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
 import { HubImportModal } from './HubImportModal'
 import { RadicalForgeModal } from './RadicalForgeModal'
-import { useOutsideClick } from '../hooks/useOutsideClick'
+import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { useExport } from '../hooks/useExport'
 import {
   loadStudioSettings,
@@ -16,7 +16,7 @@ import {
   WIKI_MULTI_PAGE_DEPTH_MIN,
   WIKI_MULTI_PAGE_DEPTH_MAX,
   type StudioSettings,
-} from '../studioSettings'
+} from '@radical/ui/studioSettings'
 
 // ── SVG icons ────────────────────────────────────────────────────────────────
 

@@ -34,9 +34,9 @@ apps/
     src/preload/    — Electron preload bridge
     src/renderer/src/
       ai/           — AI chat, providers and Forge
-      components/   — React UI components
-      hooks/        — Custom React hooks
-      store/        — Zustand state management
+      components/   — Studio's own UI (toolbar, extra views, modals)
+      persistence/  — Autosave between the diagram store and documents
+      store/        — documentStore
     tests/          — Vitest unit tests
   vscode/         — VS Code extension
   hub/            — Architecture Hub read-only viewer
@@ -45,6 +45,7 @@ apps/
 packages/
   common/         — @radical/common: model types, metamodels, formats, AI tools (no UI deps)
   layout/         — @radical/layout: Smart Layout and headless layout engines
+  ui/             — @radical/ui: canvas, panels, views and the diagram store (Studio + Hub)
   host-bridge/    — @radical/host-bridge: Studio ↔ host contract (Electron, VS Code, browser)
   hub-catalogue/  — @radical/hub-catalogue: Hub concepts (.radical files), validation, Vite plugin
 ```
@@ -99,7 +100,7 @@ Branch naming: `feature/<name>`, `hotfix/<name>`, `docs/<name>`.
 
 - TypeScript strict mode; no `any` unless unavoidable
 - React functional components with hooks
-- State via Zustand + Immer slices in `apps/studio/src/renderer/src/store/`
+- State via Zustand + Immer: the diagram store in `packages/ui/src/store/`, documents in `apps/studio/src/renderer/src/store/`
 - Tests live in `tests/` and use Vitest
 
 ## Commit style

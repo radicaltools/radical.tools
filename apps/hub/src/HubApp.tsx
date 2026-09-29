@@ -24,7 +24,7 @@ import {
   useDiagramStore,
   useHubStore,
   type HubSortKey,
-} from 'radical-model/viewer'
+} from '@radical/ui/viewer'
 import {
   conceptToDiagramData,
   defaultViewKind,

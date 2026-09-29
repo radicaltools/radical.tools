@@ -1,8 +1,7 @@
 // ─── Viewer kit ──────────────────────────────────────────────────────────────
 //
-// The part of Studio that apps/hub (the read-only Hub viewer) builds on,
-// exposed as `radical-model/viewer`. Keep this list narrow: everything added
-// here is something a later packages/ui extraction has to carry.
+// Everything the read-only Hub viewer (apps/hub) needs, as one entry point:
+// `@radical/ui/viewer`.
 //
 // Set `window.__RADICAL_PROFILE = 'viewer'` before importing this module; the
 // diagram store reads the profile at import time.

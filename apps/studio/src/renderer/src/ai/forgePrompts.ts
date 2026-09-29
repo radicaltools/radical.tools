@@ -24,7 +24,7 @@
 // wireframes are drawn by a separate per-mockup call (ai/mockupWireframe.ts),
 // triggered from the wizard.
 
-import type { HubConceptSummary } from '../store/hubStore'
+import type { HubConceptSummary } from '@radical/ui/store/hubStore'
 
 export type ForgeStageId = 'requirements' | 'fitness' | 'scenarios' | 'c4' | 'mockups'
 

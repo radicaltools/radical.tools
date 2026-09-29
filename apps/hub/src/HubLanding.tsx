@@ -5,7 +5,7 @@
 
 import React, { useMemo, useState } from 'react'
 import type { HubCategory, HubConceptSummary } from '@radical/common/hubFormat'
-import { HUB_CATEGORIES, categoryTheme } from 'radical-model/viewer'
+import { HUB_CATEGORIES, categoryTheme } from '@radical/ui/viewer'
 import { SiteNav } from './SiteNav'
 
 const CATEGORY_BLURB: Record<HubCategory, string> = {

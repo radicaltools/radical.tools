@@ -27,9 +27,6 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** App → app dependencies that are allowed for now, and why. */
 const APP_TO_APP = {
-  '@radical/hub': {
-    'radical-model': 'the Hub viewer runs on Studio\'s canvas and panels via radical-model/viewer, until packages/ui exists',
-  },
   'vscode-radical': {
     'radical-model': 'the extension ships Studio\'s web build (out/renderer) as its webview',
   },

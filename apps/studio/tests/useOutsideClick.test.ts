@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { useOutsideClick } from '../src/renderer/src/hooks/useOutsideClick'
+import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 
 // Minimal React renderer shim for the hook. We don't need a full DOM —
 // useOutsideClick only relies on:

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 
 describe('Connection via store actions', () => {
   it('startConnection sets connectSource', () => {

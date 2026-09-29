@@ -12,7 +12,7 @@ import type { C4Node, C4Relation, C4ElementType, DiagramData, DiagramSequence, D
 import { NODE_SIZES } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import type { HubConcept, TemplateParam } from '@radical/common/hubFormat'
-import { conceptViewsToDiagram } from 'radical-model/viewer'
+import { conceptViewsToDiagram } from '@radical/ui/viewer'
 
 export const HUB_WIKI_VIEW_ID = 'hub-wiki'
 export const HUB_TABLE_VIEW_ID = 'hub-table'

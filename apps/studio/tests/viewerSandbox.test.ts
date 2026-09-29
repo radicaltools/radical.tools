@@ -19,7 +19,7 @@
  *     unlike during a live presentation
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { documents } from '../src/renderer/src/store/documentStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 

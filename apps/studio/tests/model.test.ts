@@ -9,7 +9,7 @@
  *   - metamodel cardinality / parent containment is enforced
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 

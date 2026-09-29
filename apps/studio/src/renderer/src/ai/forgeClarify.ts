@@ -12,7 +12,7 @@
 
 import { getAdapter } from './registry'
 import { textOf, type AISettings, type TokenUsage } from './types'
-import type { HubConceptSummary } from '../store/hubStore'
+import type { HubConceptSummary } from '@radical/ui/store/hubStore'
 
 export interface ClarifyStageQuestion {
   id: string

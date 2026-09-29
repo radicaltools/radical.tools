@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 
 /**
  * Blocking modal that appears when the user tries to switch milestones

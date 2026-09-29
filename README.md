@@ -128,18 +128,18 @@ apps/
     src/main/       Electron main process (IPC handlers, file dialogs)
     src/preload/    contextBridge API surface exposed to renderer
     src/renderer/src/
-      components/   React UI (Canvas, Toolbar, Panels, Modals, …)
-      layout/       Smart Layout worker wrapper and live webcola physics
-      store/        Zustand stores (diagramStore, documentStore, hubStore)
+      components/   Studio's own UI (Toolbar, Matrix / Sequence / Treemap views,
+                    Forge, document manager, modals, …)
+      store/        documentStore (localStorage, files, markdown folders)
+      persistence/  Autosave: keeps the diagram store and the active document in sync
       ai/           AI chat, providers (OpenAI, Anthropic, Gemini, Ollama), Forge
       platform/     host(): which host Studio runs in (see @radical/host-bridge)
       hub/          Importing Hub concepts into a model
-      viewer.ts     Canvas, panels and stores the Hub app builds on
     tests/          Vitest unit/integration tests
     tools/          Sample model generator
     build/          Desktop app icon used by electron-builder
   hub/            Architecture Hub (hub.radical.tools): read-only viewer,
-                  built on radical-model/viewer
+                  built on @radical/ui
   vscode/         VS Code extension; bundles the Studio web build as its webview
   mcp/            MCP server for radical models (empty for now)
   web/            Marketing site and manual (radical.tools)
@@ -148,6 +148,10 @@ packages/
                   language, AI tool catalogue. No UI dependencies
   layout/         @radical/layout: Smart Layout and the headless layout engines,
                   with their tests, benchmark and visual harness
+  ui/             @radical/ui: the canvas, panels, Wiki / Table views and the
+                  diagram store, shared by Studio and the Hub. Documents and AI
+                  plug in from the app (store/documentBackend,
+                  components/wireframeGeneration)
   host-bridge/    @radical/host-bridge: typed contract between Studio and its
                   host (Electron, VS Code webview, browser)
   hub-catalogue/  @radical/hub-catalogue: the Hub's concept catalogue (one

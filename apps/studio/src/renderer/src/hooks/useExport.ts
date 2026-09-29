@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { toPng, toSvg } from 'html-to-image'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useDocumentsStore } from '../store/documentStore'
 
 function sanitizeFilename(name: string): string {

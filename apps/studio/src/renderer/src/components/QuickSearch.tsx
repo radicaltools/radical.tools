@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
-import { useOutsideClick } from '../hooks/useOutsideClick'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { runAIPrompt } from '../ai/runner'
 import { loadAISettings } from '../ai/settings'
 import { getAdapter, listAdapters } from '../ai/registry'

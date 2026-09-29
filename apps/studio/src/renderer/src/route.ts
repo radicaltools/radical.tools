@@ -22,7 +22,7 @@
 //             a presentation is actually running.
 
 import { useEffect } from 'react'
-import { useDiagramStore } from './store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from './store/documentStore'
 
 type Mode = 'designer' | 'viewer' | 'presenter' | 'metamodel'

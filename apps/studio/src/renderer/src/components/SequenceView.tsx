@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS } from '@radical/common/c4'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 

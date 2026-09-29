@@ -19,7 +19,7 @@ import {
 } from '../src/conceptToDiagram'
 import { parseHubHash, formatHubHash, studioImportUrl } from '../src/hubRoute'
 import type { HubConcept } from '@radical/common/hubFormat'
-import { conceptViewsToDiagram } from 'radical-model/viewer'
+import { conceptViewsToDiagram } from '@radical/ui/viewer'
 
 const requirement: HubConcept = {
   id: 'req-api-response-time',

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useDiagramStore } from '../store/diagramStore';
+import { useDiagramStore } from '@radical/ui/store/diagramStore';
 
 const IconPlay = () => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">

@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { toPng, toSvg } from 'html-to-image'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useDocumentsStore } from '../store/documentStore'
-import { useOutsideClick } from '../hooks/useOutsideClick'
+import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 

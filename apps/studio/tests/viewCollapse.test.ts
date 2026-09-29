@@ -14,7 +14,7 @@
  *     expanded in a named view without affecting other views.
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, type C4Node, type DiagramView } from '@radical/common/c4'
 
 const initial = (() => {

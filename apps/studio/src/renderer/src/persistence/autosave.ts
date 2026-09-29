@@ -13,7 +13,7 @@
 import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData, DiagramView, NodePosition } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from '../store/documentStore'
 import { host } from '../platform/host'
 

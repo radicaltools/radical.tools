@@ -8,9 +8,9 @@
 
 import type { C4ElementType, C4Node, C4Relation, DiagramSequence } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
-import { useDiagramStore } from '../store/diagramStore'
-import type { HubConcept, HubImportRecord, TemplateParam } from '../store/hubStore'
-import { conceptViewsToDiagram } from './conceptViews'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import type { HubConcept, HubImportRecord, TemplateParam } from '@radical/ui/store/hubStore'
+import { conceptViewsToDiagram } from '@radical/ui/hub/conceptViews'
 
 export interface ImportHubConceptResult {
   nodeIds: string[]

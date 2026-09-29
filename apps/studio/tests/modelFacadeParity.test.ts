@@ -14,7 +14,7 @@ import { buildToolHandlers } from '@radical/common/ai/tools'
 import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
 import type { ToolRunContext, ToolResult } from '@radical/common/ai/tools'
 import type { DiagramData } from '@radical/common/c4'
-import { useDiagramStore } from '../src/renderer/src/store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { createStoreFacade } from '../src/renderer/src/ai/useDiagramFacade'
 
 type Call = [tool: string, input: Record<string, unknown>]

@@ -17,7 +17,7 @@
 import React, { useState } from 'react'
 import { documents } from '../store/documentStore'
 import { buildFintechSampleRaw, loadFintechSample } from '../store/fintechSample'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { host } from '../platform/host'
 
 interface Props {

@@ -5,7 +5,7 @@
 // that simplicity. Used by Radical Forge to surface prior art from the Hub
 // and to ground the AI's own generation in it (see ai/forgePrompts.ts).
 
-import type { HubCategory, HubConceptSummary } from '../store/hubStore'
+import type { HubCategory, HubConceptSummary } from '@radical/ui/store/hubStore'
 
 const STOPWORDS = new Set([
   'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'her', 'was',
