@@ -28,6 +28,7 @@ The first time, install Chromium: `npx playwright install chromium`.
 | `studio/layout` | Smart Layout: no overlapping siblings, children inside their parent, same result on every run |
 | `studio/presentation` | Playing slides, keyboard navigation, slide deep links |
 | `studio/export` | PNG and SVG export produce real files |
+| `studio/folders` | Models stored as a folder of Markdown files: save as folder, reload, renames that move files, edits made outside Studio, files Studio must not touch |
 | `studio/known-issues` | Open bugs, marked `test.fail` (see below) |
 | `hub/hub` | Landing page, categories, search, concept canvas / wiki / table, `.radical` download |
 
@@ -38,6 +39,13 @@ tests the catalogue that is about to be deployed.
 
 Tests start from a known document instead of clicking one together: see
 `fixtures/bookstore.radical` and `Studio.seed()` in `support/fixtures.ts`.
+
+Folder tests (`support/folder.ts`) run the web build's File System Access
+code against a directory in the browser's origin-private file system: the
+directory picker is replaced with one that returns it, and the test edits it
+directly to play another editor. They run in a persistent browser profile,
+because Chromium crashes when an off-the-record page (Playwright's default)
+reads a stored directory handle back from IndexedDB.
 
 ## Screenshots
 
