@@ -7,16 +7,18 @@
 // survives reloads — though the browser re-prompts for permission on the next
 // session (a `verifyPermission` call within a user gesture re-grants it).
 //
-// The read/write helpers are handle-driven and side-effect-isolated so they can
-// be unit-tested against an in-memory fake directory handle.
+// Reads and writes go through an `MdFolderSession` over `handleFolderStorage`,
+// which is handle-driven and side-effect-isolated so it can be unit-tested
+// against an in-memory fake directory handle.
 
-import type { FolderFiles } from '@radical/common/formats/mdFolder'
+import { isMdFolderModelPath } from '@radical/common/formats/mdFolder'
+import type { MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 
 // Minimal structural typings for the File System Access API (avoids depending
 // on lib.dom variants that may not ship these definitions).
 export interface FsFileHandle {
   kind: 'file'
-  getFile(): Promise<{ text(): Promise<string> }>
+  getFile(): Promise<{ text(): Promise<string>; lastModified: number; size: number }>
   createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>
 }
 export interface FsDirHandle {
@@ -67,30 +69,6 @@ export async function verifyPermission(
   return false
 }
 
-function isManagedPath(rel: string): boolean {
-  return rel.startsWith('nodes/') || /^[^/]+\.json$/.test(rel) || rel === 'radical.md'
-}
-
-async function readInto(dir: FsDirHandle, prefix: string, out: FolderFiles): Promise<void> {
-  for await (const [name, entry] of dir.entries()) {
-    if (name.startsWith('.')) continue
-    const rel = prefix ? `${prefix}/${name}` : name
-    if (entry.kind === 'directory') {
-      await readInto(entry as FsDirHandle, rel, out)
-    } else if (/\.(md|json)$/i.test(name)) {
-      const file = await (entry as FsFileHandle).getFile()
-      out[rel] = await file.text()
-    }
-  }
-}
-
-/** Recursively read the `.md` / `.json` files under a directory handle. */
-export async function readFolderFromHandle(handle: FsDirHandle): Promise<FolderFiles> {
-  const out: FolderFiles = {}
-  await readInto(handle, '', out)
-  return out
-}
-
 /** Read a single file by its relative POSIX path (e.g. a lazily-loaded node
  *  body), without walking the rest of the tree. */
 export async function readOneFileFromHandle(handle: FsDirHandle, relPath: string): Promise<string> {
@@ -104,44 +82,55 @@ export async function readOneFileFromHandle(handle: FsDirHandle, relPath: string
   return file.text()
 }
 
-/** Write a file map into a directory handle, then prune our own stale managed
- *  files (`.md` under `nodes/` and known sidecars) that are no longer present. */
-export async function writeFolderToHandle(handle: FsDirHandle, files: FolderFiles): Promise<void> {
-  for (const [rel, content] of Object.entries(files)) {
-    const parts = rel.split('/')
-    let dir = handle
-    for (let i = 0; i < parts.length - 1; i++) {
-      dir = await dir.getDirectoryHandle(parts[i], { create: true })
-    }
-    const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: true })
-    const writable = await fileHandle.createWritable()
-    await writable.write(content)
-    await writable.close()
+/** A model folder behind a directory handle, for an `MdFolderSession`. Only
+ *  the manifest, the top-level sidecars and `nodes/**` are listed; hidden
+ *  entries are ignored. Stamps are the files' lastModified + size. */
+export function handleFolderStorage(root: FsDirHandle): MdFolderStorage {
+  const stampOf = async (file: FsFileHandle): Promise<string> => {
+    const f = await file.getFile()
+    return `${f.lastModified}:${f.size}`
   }
-
-  const existing: FolderFiles = {}
-  await readInto(handle, '', existing)
-  for (const rel of Object.keys(existing)) {
-    if (rel in files) continue
-    if (!isManagedPath(rel)) continue
-    const parts = rel.split('/')
-    let dir = handle
-    let reachable = true
-    for (let i = 0; i < parts.length - 1; i++) {
-      try {
-        dir = await dir.getDirectoryHandle(parts[i], { create: false })
-      } catch {
-        reachable = false
-        break
+  const dirFor = async (parts: string[], create: boolean): Promise<FsDirHandle> => {
+    let dir = root
+    for (const part of parts) dir = await dir.getDirectoryHandle(part, { create })
+    return dir
+  }
+  return {
+    async list() {
+      const stamps: Record<string, string> = {}
+      const walk = async (dir: FsDirHandle, rel: string): Promise<void> => {
+        for await (const [name, entry] of dir.entries()) {
+          if (name.startsWith('.')) continue
+          const child = rel ? `${rel}/${name}` : name
+          if (entry.kind === 'directory') {
+            if (rel || name === 'nodes') await walk(entry as FsDirHandle, child)
+          } else if (isMdFolderModelPath(child)) {
+            try { stamps[child] = await stampOf(entry as FsFileHandle) } catch { /* gone meanwhile */ }
+          }
+        }
       }
-    }
-    if (reachable) {
+      await walk(root, '')
+      return stamps
+    },
+    read: (rel) => readOneFileFromHandle(root, rel),
+    async write(rel, content) {
+      const parts = rel.split('/')
+      const dir = await dirFor(parts.slice(0, -1), true)
+      const file = await dir.getFileHandle(parts[parts.length - 1], { create: true })
+      const writable = await file.createWritable()
+      await writable.write(content)
+      await writable.close()
+      return stampOf(file)
+    },
+    async remove(rel) {
+      const parts = rel.split('/')
       try {
+        const dir = await dirFor(parts.slice(0, -1), false)
         await dir.removeEntry(parts[parts.length - 1])
       } catch {
-        /* best-effort prune */
+        /* already gone */
       }
-    }
+    },
   }
 }
 

@@ -12,6 +12,7 @@
     "./wireframe": "./src/wireframe.ts",
     "./formats/structurizrDsl": "./src/formats/structurizrDsl.ts",
     "./formats/mdFolder": "./src/formats/mdFolder.ts",
+    "./formats/mdFolderSync": "./src/formats/mdFolderSync.ts",
     "./formats/exportGherkin": "./src/formats/exportGherkin.ts",
     "./ai/queryLanguage": "./src/ai/queryLanguage.ts",
     "./ai/diagramFacade": "./src/ai/diagramFacade.ts",

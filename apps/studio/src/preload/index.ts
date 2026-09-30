@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FileChange, HostCapabilities } from '@radical/host-bridge'
+import type { FileChange, FolderChange, HostCapabilities } from '@radical/host-bridge'
 
 // The Electron implementation of Studio's host bridge: each capability is one
 // IPC channel handled in src/main. The renderer reaches it through host()
@@ -13,6 +13,10 @@ const api = {
   pickFolder: () => ipcRenderer.invoke('folder:pick'),
   readFolder: (folderPath) => ipcRenderer.invoke('folder:read', folderPath),
   writeFolder: (folderPath, files) => ipcRenderer.invoke('folder:write', folderPath, files),
+  watchFolder: (folderPath) => ipcRenderer.invoke('folder:watch', folderPath),
+  onFolderChanged: (listener) => {
+    ipcRenderer.on('folder:external-change', (_event, data) => listener(data as FolderChange))
+  },
   getWatchedPath: () => ipcRenderer.invoke('file:getWatchedPath'),
   onFileChanged: (listener) => {
     ipcRenderer.on('file:external-change', (_event, data) => listener(data as FileChange))

@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   serializeToMdFolder,
+  serializeToMdFolderWithPaths,
   deserializeFromMdFolder,
   isMdFolder,
+  staleMdFolderFiles,
   MD_MANIFEST_FILE,
 } from '../src/formats/mdFolder'
 import type { DiagramData, C4Node } from '../src/c4'
@@ -139,5 +141,29 @@ describe('md-folder persistence', () => {
     expect(keyLines).toEqual([...keyLines].sort())
     expect(files['_layout.json'].endsWith('\n')).toBe(true)
     expect(files['relations.json'].endsWith('\n')).toBe(true)
+  })
+})
+
+describe('md-folder ownership', () => {
+  it('reports where each node was written', () => {
+    const { files, nodePaths } = serializeToMdFolderWithPaths(sample)
+    expect(nodePaths.sys1).toBe('nodes/payment-system/_index.md')
+    expect(nodePaths.db1).toBe('nodes/payment-system/api/ledger-db.md')
+    for (const path of Object.values(nodePaths)) expect(files[path]).toBeDefined()
+  })
+
+  it('prunes only files the format owns', () => {
+    const next = serializeToMdFolder(sample)
+    const existing = {
+      ...next,
+      'nodes/old-name.md': '---\nid: "gone"\ntype: "system"\n---\n', // a node we wrote earlier
+      'hubTemplates.json': '{}', // a sidecar we wrote earlier
+      'package.json': '{}', // not ours
+      'tsconfig.json': '{}', // not ours
+      'nodes/README.md': '# Notes\n', // hand-written, no frontmatter
+      'nodes/draft.md': '---\ntitle: "x"\n---\n', // frontmatter without id/type
+      'docs/intro.md': '---\nid: "a"\ntype: "system"\n---\n', // outside nodes/
+    }
+    expect(staleMdFolderFiles(existing, next).sort()).toEqual(['hubTemplates.json', 'nodes/old-name.md'])
   })
 })
