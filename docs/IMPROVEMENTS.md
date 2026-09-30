@@ -142,3 +142,41 @@ that turns red once the bug is fixed.
    so a concept deep link lands on the catalogue instead.
 6. **Property labels are not tied to their inputs** in `RightPanel.tsx`
    (`<label>` without `htmlFor`), so the fields have no accessible name.
+
+### Markdown-folder persistence (review 2026-09-30)
+
+Fixed in `fix/md-folder-persistence`: lost descriptions after a rename, pruning
+files the format doesn't own, overlapping saves, loads landing in another
+document, and following outside edits (`packages/common/src/formats/mdFolderSync.ts`).
+Still open:
+
+1. **Opening a folder rewrites it.** `loadDiagram` changes the store, so
+   autosave writes 400 ms after every load, normalising hand-formatted files;
+   so does selecting a node (its body hydrates). Ignore load- and
+   hydration-driven store changes in `autosave.ts`.
+2. **No atomic writes, no flush on quit.** A file cut short by closing the
+   window loses its element (no `id` in the frontmatter). Write to a temp file
+   and rename; hold the Electron window's `close` until the last save lands.
+3. **Save failures are silent** (`console.warn` only), including a save refused
+   because the folder changed on disk. Show save state in the toolbar.
+4. **Disk wins without merging.** An in-app edit that has not been saved when
+   an outside edit arrives is dropped by the reload. A per-element three-way
+   merge (base / app / disk, keyed by element id) would keep both.
+5. **Frontmatter parser is minimal**: keys outside `[A-Za-z0-9_-]` are
+   dropped, `'single quotes'` are kept, `1e5` stays a string, a trailing
+   newline in a `|` block is lost. Use the `yaml` package for reading.
+6. **Duplicate ids** (a copied `.md` file) are not detected; `version` in
+   `radical.md` is never checked; `slugify` can produce names Windows refuses
+   (`con`, `nul`, `aux`, `com1`, …); an element in a directory without
+   `_index.md` becomes a root element instead of joining the nearest ancestor.
+7. **Empty directories stay** after a container is renamed or deleted.
+8. **Undoing the deletion of an element never opened** brings it back without
+   its description: the file is pruned by the save that followed the delete.
+9. **A folder- or file-backed model reloads onto the full canvas**: the async
+   load's `loadDiagram` resets the view a deep link (`/v/<view>`) selected.
+10. **`file:read` / `file:write` IPC take any path** from the renderer (folder
+    writes are confined to the model folder).
+11. **Incognito:** Chromium crashes when an off-the-record page reads a stored
+    directory handle from IndexedDB (seen with OPFS handles in the e2e suite,
+    which therefore uses a persistent profile). Check whether Chrome Incognito
+    users of folder mode hit it with real picker handles.
