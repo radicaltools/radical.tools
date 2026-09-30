@@ -14,8 +14,16 @@ import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData, DiagramView, NodePosition } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { documents, useDocumentsStore } from '../store/documentStore'
+import { documents, useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
+
+let reloadActive: () => void = () => {}
+
+/** Re-read the active document from its storage into the diagram store, e.g.
+ *  after a web folder regained permission. */
+export function reloadActiveDocument(): void {
+  reloadActive()
+}
 
 // ─── Auto-persist to the active document ────────────────────────────────────
 // Subscribe to model slices and debounce-save into whatever the current
@@ -100,45 +108,35 @@ if (typeof window !== 'undefined') {
     }
   })
 
-  // ── Hydrate FS-backed active doc on boot ─────────────────────────────────
-  // We rendered the sample synchronously above; if the active doc is FS,
-  // load the file now and replace the in-memory model. We suspend the
-  // auto-persist while doing this so the "sample → loaded" replacement
-  // doesn't overwrite the file with stale data.
-  const activeId = documents.getActiveId()
-  if (activeId) {
-    const meta = documents.listDocuments().find(d => d.id === activeId)
-    if (meta?.source === 'fs' || meta?.source === 'md') {
-      _suspended = true
-      documents.loadDocument(activeId).then((data) => {
-        if (data) {
-          useDiagramStore.getState().loadDiagram(data)
-        } else {
-          // New/empty file: initialize with the maximum built-in metamodel
-          useDiagramStore.getState().loadDiagram({
-            nodes: [],
-            relations: [],
-            metamodel: builtInGovernanceMetamodel(),
-          })
-        }
-      }).catch((e) => console.warn('[diagramStore] FS hydrate failed:', e))
-        .finally(() => { _suspended = false })
-    }
-  }
-
-  // ── React to active-document switches ────────────────────────────────────
-  // When the user picks a different document in the manager modal, load it.
-  let prevActive = documents.getActiveId()
-  useDocumentsStore.subscribe((s) => {
-    if (s.activeId === prevActive) return
-    prevActive = s.activeId
-    if (!s.activeId) return
+  // ── Load a document into the store ───────────────────────────────────────
+  // Auto-persist is suspended while loading so the "old model → loaded"
+  // replacement doesn't overwrite the document with stale data. Each load
+  // gets a sequence number: a load that finishes after a newer one started
+  // (the user switched again meanwhile) is dropped, so a slow folder read can
+  // never land in — and then be auto-saved into — another document.
+  let _loadSeq = 0
+  const loadActive = (
+    id: string,
+    source: DocumentSource | undefined,
+    opts?: { keepUi?: boolean },
+  ): void => {
+    const seq = ++_loadSeq
     _suspended = true
-    const switchMeta = documents.listDocuments().find(d => d.id === s.activeId)
-    documents.loadDocument(s.activeId).then((data) => {
+    if (_watchingId !== id) stopWatching()
+    documents.loadDocument(id).then((data) => {
+      if (seq !== _loadSeq || documents.getActiveId() !== id) return
       if (data) {
-        useDiagramStore.getState().loadDiagram(data)
-      } else if (switchMeta?.source === 'fs' || switchMeta?.source === 'md') {
+        const store = useDiagramStore.getState()
+        const { activeViewId, selectedNodeId } = store
+        store.loadDiagram(data)
+        // A reload of the same document keeps the user where they were.
+        if (opts?.keepUi) {
+          const next = useDiagramStore.getState()
+          if (activeViewId && next.views[activeViewId]) next.setActiveView(activeViewId)
+          if (selectedNodeId && next.c4Nodes[selectedNodeId]) next.selectNode(selectedNodeId)
+        }
+        if (source === 'md') watchActive(id)
+      } else if (source === 'fs' || source === 'md') {
         // New/empty file: initialize with the maximum built-in metamodel
         useDiagramStore.getState().loadDiagram({
           nodes: [],
@@ -146,8 +144,72 @@ if (typeof window !== 'undefined') {
           metamodel: builtInGovernanceMetamodel(),
         })
       }
-    }).catch((e) => console.warn('[diagramStore] switch-doc load failed:', e))
-      .finally(() => { _suspended = false })
+    }).catch((e) => console.warn('[diagramStore] document load failed:', e))
+      .finally(() => { if (seq === _loadSeq) _suspended = false })
+  }
+
+  // ── Follow outside edits to the active md-folder document ────────────────
+  // Once a folder is loaded, its storage is polled for edits made in another
+  // editor or by git; on one, the document is reloaded from disk. The disk
+  // wins: a save refused because of such an edit is dropped with the reload.
+  let _watchingId: string | null = null
+  let _stopWatch: () => void = () => {}
+  function stopWatching(): void {
+    _stopWatch()
+    _stopWatch = () => {}
+    _watchingId = null
+  }
+  function watchActive(id: string): void {
+    if (_watchingId === id) return
+    stopWatching()
+    _watchingId = id
+    _stopWatch = documents.watchDocument(id, () => {
+      if (documents.getActiveId() !== id) return
+      console.info('[diagramStore] document changed on disk — reloading')
+      loadActive(id, 'md', { keepUi: true })
+    })
+  }
+
+  reloadActive = () => {
+    const id = documents.getActiveId()
+    if (!id) return
+    loadActive(id, documents.listDocuments().find(d => d.id === id)?.source)
+  }
+
+  // ── Hydrate FS-backed active doc on boot ─────────────────────────────────
+  // We rendered the sample synchronously above; if the active doc is FS,
+  // load the file now and replace the in-memory model.
+  const activeId = documents.getActiveId()
+  if (activeId) {
+    const meta = documents.listDocuments().find(d => d.id === activeId)
+    if (meta?.source === 'fs' || meta?.source === 'md') loadActive(activeId, meta.source)
+  }
+
+  // ── React to active-document switches ────────────────────────────────────
+  // When the user picks a different document in the manager modal, load it.
+  let prevActive = documents.getActiveId()
+  useDocumentsStore.subscribe((s) => {
+    if (s.activeId === prevActive) {
+      // The active document became folder-backed without a reload ("Save as
+      // folder…"): start following its folder.
+      const active = s.docs.find(d => d.id === s.activeId)
+      if (active?.source === 'md' && !_suspended) watchActive(active.id)
+      return
+    }
+    const leaving = prevActive
+    prevActive = s.activeId
+    // An edit still inside the debounce window belongs to the document being
+    // left, which the store still holds: write it there before replacing it.
+    if (_persistTimer !== null && leaving && !_suspended) {
+      clearTimeout(_persistTimer)
+      _persistTimer = null
+      const data = buildPersistData()
+      _layoutSafePending = false
+      documents.saveDocument(leaving, data)
+        .catch((e) => console.warn('[diagramStore] persist on switch failed:', e))
+    }
+    if (!s.activeId) return
+    loadActive(s.activeId, documents.listDocuments().find(d => d.id === s.activeId)?.source)
   })
 
   // Expose hooks for other modules / future use.

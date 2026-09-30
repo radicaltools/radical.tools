@@ -44,6 +44,19 @@ const HUB_TEMPLATES_FILE = 'hubTemplates.json'
 const NODES_DIR = 'nodes'
 const INDEX_BASENAME = '_index.md'
 
+/** Top-level JSON sidecars this format writes. Only these (plus the manifest
+ *  and node `.md` files) are ever pruned from a folder — see `staleMdFolderFiles`. */
+const SIDECAR_FILES = new Set([
+  LAYOUT_FILE,
+  RELATIONS_FILE,
+  VIEWS_FILE,
+  SEQUENCES_FILE,
+  SNAPSHOTS_FILE,
+  PRESENTATIONS_FILE,
+  METAMODEL_FILE,
+  HUB_TEMPLATES_FILE,
+])
+
 const FORMAT_VERSION = 1
 
 /** Node keys that are layout/state, not semantic — kept out of the `.md`. */
@@ -189,7 +202,20 @@ function uniqueSlug(base: string, used: Set<string>): string {
 // ─── Serialize: DiagramData → folder files ───────────────────────────────────
 
 export function serializeToMdFolder(data: DiagramData, modelName?: string): FolderFiles {
+  return serializeToMdFolderWithPaths(data, modelName).files
+}
+
+export interface SerializeMdFolderResult {
+  files: FolderFiles
+  /** nodeId → relative path of the `.md` file holding that node. */
+  nodePaths: Record<string, string>
+}
+
+/** `serializeToMdFolder`, also reporting where each node's file landed —
+ *  paths move when a node is renamed, re-parented or gains its first child. */
+export function serializeToMdFolderWithPaths(data: DiagramData, modelName?: string): SerializeMdFolderResult {
   const files: FolderFiles = {}
+  const nodePaths: Record<string, string> = {}
   const layout: LayoutSidecar = { nodes: {} }
 
   // Manifest.
@@ -242,10 +268,12 @@ export function serializeToMdFolder(data: DiagramData, modelName?: string): Fold
     const isDir = isContainerType(node.type) || kids.length > 0
     if (isDir) {
       const nodeDir = `${dir}/${slug}`
-      files[`${nodeDir}/${INDEX_BASENAME}`] = md
+      nodePaths[node.id] = `${nodeDir}/${INDEX_BASENAME}`
+      files[nodePaths[node.id]] = md
       writeChildren(kids, nodeDir)
     } else {
-      files[`${dir}/${slug}.md`] = md
+      nodePaths[node.id] = `${dir}/${slug}.md`
+      files[nodePaths[node.id]] = md
     }
   }
 
@@ -282,7 +310,7 @@ export function serializeToMdFolder(data: DiagramData, modelName?: string): Fold
     files[HUB_TEMPLATES_FILE] = stableStringify(data.hubTemplates)
   }
 
-  return files
+  return { files, nodePaths }
 }
 
 function writeJsonIfPresent<T>(
@@ -410,6 +438,33 @@ export function deserializeFromMdFolder(
 /** True when the file map looks like a Radical md-folder (has the manifest). */
 export function isMdFolder(files: FolderFiles): boolean {
   return typeof files[MD_MANIFEST_FILE] === 'string'
+}
+
+/** True for a path where this format keeps model content: the manifest, a
+ *  known JSON sidecar, or a `.md` under `nodes/`. The files a folder session
+ *  reads, stamps and watches — everything else in the folder is ignored. */
+export function isMdFolderModelPath(path: string): boolean {
+  if (path === MD_MANIFEST_FILE || SIDECAR_FILES.has(path)) return true
+  return path.startsWith(NODES_DIR + '/') && path.endsWith('.md')
+}
+
+/** True for a file this format writes and may therefore delete: the manifest,
+ *  a known JSON sidecar, or a node `.md` under `nodes/` carrying an `id` and
+ *  `type` in its frontmatter. Anything else in the folder — a `package.json`,
+ *  a hand-written `nodes/README.md` — belongs to the user. */
+export function isOwnedMdFolderFile(path: string, content: string): boolean {
+  if (path === MD_MANIFEST_FILE || SIDECAR_FILES.has(path)) return true
+  if (!isMdFolderModelPath(path)) return false
+  const { front } = parseMarkdown(content)
+  return !!front.id && !!front.type
+}
+
+/** Paths in `existing` (what is on disk now) that a write of `next` leaves
+ *  stale: files we own that `next` no longer contains. */
+export function staleMdFolderFiles(existing: FolderFiles, next: FolderFiles): string[] {
+  return Object.keys(existing).filter(
+    (path) => !(path in next) && isOwnedMdFolderFile(path, existing[path]),
+  )
 }
 
 function readJson<T>(content: string | undefined): T | undefined {

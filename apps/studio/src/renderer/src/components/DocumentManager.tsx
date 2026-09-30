@@ -6,6 +6,7 @@ import { availableMetamodels } from '@radical/common/metamodel'
 import { parseStructurizrDsl } from '@radical/common/formats/structurizrDsl'
 import { webFolderSupported } from '../persist/webFolder'
 import { host } from '../platform/host'
+import { reloadActiveDocument } from '../persistence/autosave'
 
 interface Props {
   open: boolean
@@ -45,7 +46,6 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   const presets = useMemo(() => availableMetamodels(), [])
   const [newPresetId, setNewPresetId] = useState<string>('c4-ddd-governance-builtin')
   const saveDiagram = useDiagramStore((s) => s.saveDiagram)
-  const loadDiagram = useDiagramStore((s) => s.loadDiagram)
 
   // Default the visible tab to the source of the active document so users
   // land on the section they're most likely editing.
@@ -116,7 +116,11 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
 
   const handleSaveAsFolder = async (d: DocumentMeta): Promise<void> => {
     const data = saveDiagram()
-    const meta = await documents.saveAsFolder(d.id, data)
+    const meta = await documents.saveAsFolder(d.id, data, (folderName) => window.confirm(
+      `"${folderName}" already contains files and is not a Radical model folder.\n\n` +
+      'Save the model into it anyway? Existing files are kept, except ones with the ' +
+      "same names as the model's own files (nodes/…, views.json, metamodel.json, …).",
+    ))
     if (meta) setTab('md')
   }
 
@@ -128,9 +132,9 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
       window.alert('Could not get permission to access the folder.')
       return
     }
-    documents.setActiveId(d.id)
-    const data = await documents.loadDocument(d.id)
-    if (data) loadDiagram(data)
+    // Switching loads the document; if it already is the active one, reload it.
+    if (d.id === documents.getActiveId()) reloadActiveDocument()
+    else documents.setActiveId(d.id)
     onClose()
   }
 

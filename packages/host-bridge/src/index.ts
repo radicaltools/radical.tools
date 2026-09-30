@@ -27,9 +27,21 @@ export interface ReadFolderResult extends HostResult {
   files?: Record<string, string>
 }
 
+export interface WriteFolderResult extends HostResult {
+  /** Set when nothing was written because these files (relative paths)
+   *  changed on disk since the folder was last read. */
+  conflict?: string[]
+}
+
 export interface FileChange {
   filePath: string
   content: string
+}
+
+export interface FolderChange {
+  folderPath: string
+  /** Relative paths of the model files that changed. */
+  paths: string[]
 }
 
 /** What a host can do. Everything but `kind` is optional. */
@@ -40,12 +52,19 @@ export interface HostCapabilities {
   openDiagram?(): Promise<ReadFileResult & { filePath?: string }>
   readFile?(filePath: string): Promise<ReadFileResult>
   writeFile?(filePath: string, content: string): Promise<HostResult>
-  /** Folder dialog, then read every file in the chosen folder. */
+  /** Folder dialog, then read the model files in the chosen folder. */
   openFolder?(): Promise<ReadFolderResult & { folderPath?: string }>
   /** Folder dialog only. */
   pickFolder?(): Promise<HostResult & { folderPath?: string }>
+  /** Read the md-folder model files in a folder. */
   readFolder?(folderPath: string): Promise<ReadFolderResult>
-  writeFolder?(folderPath: string, files: Record<string, string>): Promise<HostResult>
+  /** Write an md-folder model, unless the folder changed on disk since it was
+   *  last read (then `conflict` lists what changed and nothing is written). */
+  writeFolder?(folderPath: string, files: Record<string, string>): Promise<WriteFolderResult>
+  /** Watch one md-folder for edits made outside Studio (null stops). */
+  watchFolder?(folderPath: string | null): Promise<void>
+  /** Called when the watched folder's model files change outside Studio. */
+  onFolderChanged?(listener: (change: FolderChange) => void): void
   /** The file the host opened Studio with (CLI --file, VS Code editor), if any. */
   getWatchedPath?(): Promise<string | null>
   /** Called when the watched file changes outside Studio. */

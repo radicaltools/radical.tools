@@ -1,54 +1,33 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join, resolve, dirname as pathDirname, relative, sep } from 'path'
+import { join, resolve } from 'path'
 import { watchFile, unwatchFile } from 'fs'
-import {
-  readFile as readFileAsync,
-  writeFile as writeFileAsync,
-  mkdir,
-  readdir,
-  rm,
-} from 'fs/promises'
+import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
+import { diskFolderStorage } from './diskFolderStorage'
 
-/** Recursively collect the `.md` / `.json` files under `root` as a map of
- *  POSIX-relative path → UTF-8 content. Ignores hidden files/dirs. */
-async function readFolderFiles(root: string): Promise<Record<string, string>> {
-  const files: Record<string, string> = {}
-  async function walk(dir: string): Promise<void> {
-    const entries = await readdir(dir, { withFileTypes: true })
-    for (const entry of entries) {
-      if (entry.name.startsWith('.')) continue
-      const abs = join(dir, entry.name)
-      if (entry.isDirectory()) {
-        await walk(abs)
-      } else if (entry.isFile() && /\.(md|json)$/i.test(entry.name)) {
-        const rel = relative(root, abs).split(sep).join('/')
-        files[rel] = await readFileAsync(abs, 'utf-8')
+/** One session per model folder, kept for the app's lifetime: it remembers
+ *  what the renderer last read, so writes never clobber outside edits. */
+const folderSessions = new Map<string, MdFolderSession>()
+
+/** The folder of the active md document, polled for outside edits. */
+let watchedFolder: string | null = null
+const FOLDER_POLL_MS = 1000
+
+function folderSession(folderPath: string): MdFolderSession {
+  const key = resolve(folderPath)
+  let session = folderSessions.get(key)
+  if (!session) {
+    session = new MdFolderSession(diskFolderStorage(key))
+    session.onExternalChange = (paths) => {
+      if (!watchedFolder || resolve(watchedFolder) !== key) return
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send('folder:external-change', { folderPath: watchedFolder, paths })
       }
     }
+    folderSessions.set(key, session)
   }
-  await walk(root)
-  return files
-}
-
-/** Write a file map into `root`, then prune our own stale files (`.md` under
- *  `nodes/` and known sidecars) that are no longer present, so removals /
- *  renames in the model are reflected on disk. Never touches unrelated files. */
-async function writeFolderFiles(root: string, files: Record<string, string>): Promise<void> {
-  await mkdir(root, { recursive: true })
-  for (const [rel, content] of Object.entries(files)) {
-    const abs = join(root, rel)
-    await mkdir(pathDirname(abs), { recursive: true })
-    await writeFileAsync(abs, content, 'utf-8')
-  }
-  // Prune stale managed files.
-  const existing = await readFolderFiles(root)
-  for (const rel of Object.keys(existing)) {
-    if (rel in files) continue
-    const managed = rel.startsWith('nodes/') || /^[^/]+\.json$/.test(rel) || rel === 'radical.md'
-    if (!managed) continue
-    await rm(join(root, rel), { force: true })
-  }
+  return session
 }
 
 // ── CLI-specified model file (--file /path/to/model.c4.json or RADICAL_FILE env) ──
@@ -187,7 +166,7 @@ app.whenReady().then(() => {
     if (result.canceled || result.filePaths.length === 0) return { success: false }
     const folderPath = result.filePaths[0]
     try {
-      const files = await readFolderFiles(folderPath)
+      const files = await folderSession(folderPath).readAll()
       return { success: true, folderPath, files }
     } catch (e) {
       return { success: false, error: (e as Error).message }
@@ -206,7 +185,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('folder:read', async (_event, folderPath: string) => {
     try {
-      const files = await readFolderFiles(folderPath)
+      const files = await folderSession(folderPath).readAll()
       return { success: true, files }
     } catch (e) {
       return { success: false, error: (e as Error).message }
@@ -217,13 +196,31 @@ app.whenReady().then(() => {
     'folder:write',
     async (_event, folderPath: string, files: Record<string, string>) => {
       try {
-        await writeFolderFiles(folderPath, files)
+        await mkdir(folderPath, { recursive: true })
+        const res = await folderSession(folderPath).write(files)
+        if (!res.ok) {
+          return { success: false, conflict: res.conflict, error: 'The folder changed on disk since it was read.' }
+        }
         return { success: true }
       } catch (e) {
         return { success: false, error: (e as Error).message }
       }
     },
   )
+
+  // ── Folder watcher: poll the active md document's folder ─────────────────
+  // Polling, like the --file watcher below: native change events are
+  // unreliable on external volumes. A poll only stats the model files and
+  // reads the ones whose stamp moved.
+  ipcMain.handle('folder:watch', (_event, folderPath: string | null) => {
+    watchedFolder = folderPath
+  })
+  const folderPoll = setInterval(() => {
+    if (watchedFolder) {
+      folderSession(watchedFolder).poll().catch((e) => console.warn('[main] folder poll failed:', e))
+    }
+  }, FOLDER_POLL_MS)
+  app.on('will-quit', () => clearInterval(folderPoll))
 
   // ── File watcher: push external changes to renderer ───────────────────────
   // When launched with --file or RADICAL_FILE, watch the file with polling

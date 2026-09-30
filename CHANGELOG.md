@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Welcome screen: on a first visit the sample model gets its own card (preview, what it contains, "Explore the sample") in place of the placeholder diagram, and opens on the System Context view instead of the all-elements canvas
 - Desktop installers for macOS (dmg, Apple Silicon + Intel), Windows (NSIS) and Linux (AppImage), built by electron-builder and drafted as a GitHub Release when a `v*` tag is pushed
 - App icon for the desktop builds
+- Markdown-folder models follow edits made outside Studio (another editor, `git pull`): the active document's folder is polled (desktop every second, browser every two) and reloaded from disk, keeping the open view and selection; a save never overwrites a file changed on disk since Studio read it
 
 ### Changed
 - The Studio app is named radical.studio (installers, window and page title); radical.tools names the family of apps
@@ -39,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Production desktop build showed a blank window: the CSP header handler dropped every other response header (including `Content-Type`), so the renderer's module scripts were refused
 - Hub concept files' `views` were ignored by the viewer and on import
 - Importing from the Hub no longer stacks one "Imported …" notification per concept over the template-parameter form
+- Markdown-folder models: renaming or moving an element whose description was never opened lost that description on the next save
+- Markdown-folder models: saving deleted files Studio did not write — any top-level `.json` (e.g. `package.json`) and any file under `nodes/`, such as a hand-written `README.md`; "Save as folder…" into a folder that holds other files but no model now asks first
+- Markdown-folder models: two saves overlapping (a slow disk, a large model) could delete an element's file altogether
+- Switching documents while a slow one was still loading could load it into — and autosave it over — the document switched to; an edit made just before a switch now lands in the document being left
+- Markdown-folder saves write only the files that changed, and only the model's own files are read (a folder inside a repository no longer walks `node_modules`)
 - Presentation slides without a captured canvas (the sample model's walkthrough, imported slides) lay nodes out with their view's saved positions instead of whatever layout was on screen, so they no longer need a Smart Layout to look right; a slide after a milestone slide shows the live model again instead of the milestone's subset
 
 [Unreleased]: https://github.com/radicaltools/radical.tools/compare/HEAD
