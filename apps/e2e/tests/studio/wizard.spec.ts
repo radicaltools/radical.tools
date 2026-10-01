@@ -19,7 +19,7 @@ test('dropping an ADR on the canvas opens its wizard; finishing creates it with 
   await expect(studio.nodes).toHaveCount(3)
 
   await wizard.getByLabel('Name').fill('Use PostgreSQL for orders')
-  await expect(wizard.getByLabel('Status')).toHaveValue('proposed')
+  await expect(wizard.getByRole('radio', { name: 'proposed' })).toHaveAttribute('aria-checked', 'true')
   await wizard.getByRole('button', { name: 'Next' }).click()
   await wizard.getByLabel('Context').fill('Orders need transactions.')
   await wizard.getByRole('button', { name: /Affected elements/ }).click()
