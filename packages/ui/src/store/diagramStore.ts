@@ -40,6 +40,10 @@ import {
   isParentAllowed,
   canAddMoreOfType,
   inferRelationType,
+  wizardFor,
+  sameWizardLink,
+  wizardLinksOf,
+  type WizardLink,
 } from '@radical/common/metamodel'
 import * as model from '@radical/common/model'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
@@ -51,6 +55,7 @@ import { compoundPadding } from '@radical/layout/geometry'
 import { LiveColaLayout } from '../layout/liveColaLayout'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
+import { loadStudioSettings } from '../studioSettings'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -944,6 +949,25 @@ function buildSampleDiagram(): {
   return { nodes: snap3nodes, relations: snap3rels, snapshots }
 }
 
+// ─── Node wizard session ─────────────────────────────────────────────────────
+
+export type NodeWizardSession =
+  | {
+      mode: 'create'
+      /** The node to create once the wizard finishes. */
+      draft: Omit<C4Node, 'id'>
+      /** Links offered pre-checked (e.g. the parent a wiki child derives from). */
+      initialLinks: WizardLink[]
+    }
+  | { mode: 'edit'; nodeId: string }
+
+export interface RequestCreateNodeOptions {
+  /** Create the node directly even if its type has a wizard. */
+  skipWizard?: boolean
+  links?: WizardLink[]
+  onCreated?: (id: string) => void
+}
+
 // ─── Store interface ─────────────────────────────────────────────────────────
 
 interface DiagramStore {
@@ -1009,6 +1033,27 @@ interface DiagramStore {
   scanDescriptions: (query: string) => Promise<Set<string>>
   removeNode: (id: string) => void
   toggleCollapse: (id: string) => void
+
+  // ── node wizard ──
+  /** Open wizard session, if any: a node waiting to be created, or an
+   *  existing node being filled in. */
+  nodeWizard: NodeWizardSession | null
+  /** Create a node the user asked for (canvas, table, wiki). When its type
+   *  has a create-time wizard (and the user hasn't turned wizards off), the
+   *  wizard opens instead and the node is only created when it finishes —
+   *  `onCreated` runs then. `links` are created with the node, or offered
+   *  pre-checked by the wizard. Returns the new id, or '' when the wizard
+   *  opened or the metamodel refused the node. AI tools and imports call
+   *  `addNode` directly and never open a wizard. */
+  requestCreateNode: (node: Omit<C4Node, 'id'>, opts?: RequestCreateNodeOptions) => string
+  /** Open the type's wizard for an existing node. */
+  openNodeWizard: (nodeId: string) => void
+  /** Apply the wizard's values and links as one undo step. In edit mode,
+   *  `links` is the complete set for the wizard's relation steps: links that
+   *  existed but aren't listed are removed. Returns the node id, or '' when
+   *  the metamodel refused the node (the wizard stays open). */
+  finishNodeWizard: (values: Record<string, unknown>, links: WizardLink[]) => string
+  cancelNodeWizard: () => void
 
   // ── actions: relations ──
   addRelation: (rel: Omit<C4Relation, 'id'>) => void
@@ -1248,6 +1293,26 @@ interface DiagramStore {
 
 let _liveLayout: LiveColaLayout | null = null
 
+// The open create-wizard's callback — a function, so it stays out of the
+// (immer-drafted) store state.
+let _wizardOnCreated: ((id: string) => void) | undefined
+
+/** Adds the wizard's links for `nodeId`, skipping ones the metamodel refuses
+ *  (the wizard only offers allowed pairs, so that's a stale pick) and ones
+ *  that already exist. */
+function _insertWizardLinks(state: model.ModelState, nodeId: string, links: WizardLink[]): void {
+  for (const link of links) {
+    const rel = link.direction === 'out'
+      ? { sourceId: nodeId, targetId: link.otherId, relationType: link.relationType }
+      : { sourceId: link.otherId, targetId: nodeId, relationType: link.relationType }
+    if (!state.c4Nodes[link.otherId] || model.checkAddRelation(state, rel)) continue
+    const exists = Object.values(state.c4Relations).some(
+      (r) => r.sourceId === rel.sourceId && r.targetId === rel.targetId && r.relationType === rel.relationType,
+    )
+    if (!exists) model.insertRelation(state, uid(), rel)
+  }
+}
+
 // Set to true during store init when an existing document was loaded from
 // localStorage. Used by the boot startLiveLayout() call to skip the
 // 110-iteration cola bulk phase (which would immediately overwrite the
@@ -1358,6 +1423,26 @@ export const useDiagramStore = create<DiagramStore>()(
       initMetamodel = builtInC4Metamodel()
     }
 
+    // addNode plus its wizard links, as one undo step.
+    const _createNodeWithLinks = (node: Omit<C4Node, 'id'>, links: WizardLink[]): string => {
+      const refused = model.checkAddNode(get(), node)
+      if (refused) {
+        get().pushNotification(refused, 'error')
+        return ''
+      }
+      get()._pushUndo()
+      get()._markMilestoneEdit()
+      const id = uid()
+      set((state) => {
+        model.insertNode(state, id, node)
+        _insertWizardLinks(state, id, links)
+      })
+      if (node.parentId) get().fitParentToChildren(node.parentId)
+      get()._sync()
+      _liveLayout?.invalidate()
+      return id
+    }
+
     return {
       c4Nodes: initNodes,
       c4Relations: initRelations,
@@ -1391,6 +1476,7 @@ export const useDiagramStore = create<DiagramStore>()(
       milestoneDirty: false,
       milestonePromptOpen: false,
       pendingDelete: null,
+      nodeWizard: null,
       diffHighlight: {},
       diffBaseSnapshotId: null,
       diffGhostNodes: {},
@@ -1513,6 +1599,88 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
         _liveLayout?.invalidate()
         return id
+      },
+
+      // ── node wizard ──────────────────────────────────────────────────────
+      requestCreateNode(node, opts = {}) {
+        const links = opts.links ?? []
+        const wizard = wizardFor(get().metamodel, node.type, 'create')
+        if (wizard && !opts.skipWizard && loadStudioSettings().nodeWizardOnCreate) {
+          // Refuse up front rather than after the user has filled it all in.
+          const refused = model.checkAddNode(get(), node)
+          if (refused) {
+            get().pushNotification(refused, 'error')
+            return ''
+          }
+          _wizardOnCreated = opts.onCreated
+          set((state) => { state.nodeWizard = { mode: 'create', draft: node, initialLinks: links } })
+          return ''
+        }
+        const id = links.length ? _createNodeWithLinks(node, links) : get().addNode(node)
+        if (id) opts.onCreated?.(id)
+        return id
+      },
+
+      openNodeWizard(nodeId) {
+        const node = get().c4Nodes[nodeId]
+        if (!node || !wizardFor(get().metamodel, node.type)) return
+        _wizardOnCreated = undefined
+        get().hydrateNode(nodeId)
+        set((state) => { state.nodeWizard = { mode: 'edit', nodeId } })
+      },
+
+      finishNodeWizard(values, links) {
+        const session = get().nodeWizard
+        if (!session) return ''
+
+        if (session.mode === 'create') {
+          const node = { ...session.draft, ...values } as Omit<C4Node, 'id'>
+          if (!String(node.label ?? '').trim()) node.label = session.draft.label
+          const id = _createNodeWithLinks(node, links)
+          if (!id) return ''
+          set((state) => { state.nodeWizard = null })
+          const onCreated = _wizardOnCreated
+          _wizardOnCreated = undefined
+          onCreated?.(id)
+          return id
+        }
+
+        const id = session.nodeId
+        const node = get().c4Nodes[id] as (C4Node & Record<string, unknown>) | undefined
+        const wizard = node ? wizardFor(get().metamodel, node.type) : undefined
+        if (!node || !wizard) {
+          set((state) => { state.nodeWizard = null })
+          return ''
+        }
+        // Only write what changed — a lazily-loaded description the wizard
+        // never saw must not be overwritten with its empty field.
+        const patch: Record<string, unknown> = {}
+        for (const [key, value] of Object.entries(values)) {
+          if (String(value ?? '') !== String(node[key] ?? '')) patch[key] = value
+        }
+        if ('label' in patch && !String(patch.label ?? '').trim()) delete patch.label
+        const before = wizardLinksOf(wizard, id, get().c4Relations)
+        const removed = before.filter((b) => !links.some((l) => sameWizardLink(l, b)))
+        const added = links.filter((l) => !before.some((b) => sameWizardLink(l, b)))
+
+        if (Object.keys(patch).length || removed.length || added.length) {
+          get()._pushUndo()
+          get()._markMilestoneEdit()
+          set((state) => {
+            model.patchNode(state, id, patch)
+            for (const r of removed) model.deleteRelation(state, r.relationId)
+            _insertWizardLinks(state, id, added)
+          })
+          get()._sync()
+          if (removed.length || added.length) _liveLayout?.invalidate()
+        }
+        set((state) => { state.nodeWizard = null })
+        return id
+      },
+
+      cancelNodeWizard() {
+        _wizardOnCreated = undefined
+        set((state) => { state.nodeWizard = null })
       },
 
       updateNode(id, updates) {
@@ -4159,6 +4327,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.activeViewId = null
           state.selectedNodeId = null
           state.selectedEdgeId = null
+          state.nodeWizard = null
           state.canUndo = false
           state.canRedo = false
           state.snapshots = snapshots as any
@@ -4247,6 +4416,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.defaultPositions = snapshotPositions(sample.nodes) as any
           state.selectedNodeId = null
           state.selectedEdgeId = null
+          state.nodeWizard = null
           state.canUndo = false
           state.canRedo = false
           state.snapshots = sample.snapshots as any
@@ -4283,6 +4453,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.defaultPositions = {} as any
           state.selectedNodeId = null
           state.selectedEdgeId = null
+          state.nodeWizard = null
           state.canUndo = false
           state.canRedo = false
           state.snapshots = [] as any

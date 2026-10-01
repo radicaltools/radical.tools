@@ -12,6 +12,7 @@ import { PresentationBar, PresenterDock } from './components/PresentationBar'
 import { RightPanel, LeftPanel } from '@radical/ui/components/RightPanel'
 import { MetamodelEditor } from './components/MetamodelEditor'
 import { NotificationHost } from '@radical/ui/components/NotificationHost'
+import { NodeWizard } from '@radical/ui/components/NodeWizard'
 import { SelectionActionBar } from './components/SelectionActionBar'
 import { EdgeActionBar } from './components/EdgeActionBar'
 import { QuickSearch } from './components/QuickSearch'
@@ -114,6 +115,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isCanvasView && <SelectionActionBar />}
       {!isPresenting && isCanvasView && <EdgeActionBar />}
       {isCanvasView && <QuickSearch />}
+      {isDesigner && <NodeWizard />}
       <NotificationHost />
       <MilestoneEditOverlay />
       {isMetamodel && !isPresenting && <MetamodelEditor />}

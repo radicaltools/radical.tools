@@ -198,6 +198,8 @@
   gap: 10px;
   padding: 6px 10px;
 }
+label.app-menu-row { cursor: pointer; }
+.app-menu-row input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 .app-menu-row-label {
   font-size: 12px;
   color: var(--text-secondary);

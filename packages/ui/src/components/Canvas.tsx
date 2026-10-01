@@ -111,7 +111,7 @@ function StructuralCanvas(): React.ReactElement {
   const onEdgesChange = useDiagramStore((s) => s.onEdgesChange)
   const selectNode = useDiagramStore((s) => s.selectNode)
   const selectEdge = useDiagramStore((s) => s.selectEdge)
-  const addNode = useDiagramStore((s) => s.addNode)
+  const requestCreateNode = useDiagramStore((s) => s.requestCreateNode)
   const liveGrab = useDiagramStore((s) => s.liveGrab)
   const liveDrag = useDiagramStore((s) => s.liveDrag)
   const liveRelease = useDiagramStore((s) => s.liveRelease)
@@ -521,7 +521,7 @@ function StructuralCanvas(): React.ReactElement {
         x: event.clientX,
         y: event.clientY,
       })
-      addNode({
+      requestCreateNode({
         type: 'system' as C4ElementType,
         label: 'New System',
         description: '',
@@ -532,7 +532,7 @@ function StructuralCanvas(): React.ReactElement {
         ...NODE_SIZES.system,
       })
     },
-    [addNode]
+    [requestCreateNode]
   )
 
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -739,7 +739,8 @@ function StructuralCanvas(): React.ReactElement {
       }
 
       const size = NODE_SIZES[typeStr]
-      addNode({
+      // Opens the type's wizard instead, when it has one.
+      requestCreateNode({
         type: typeStr,
         label: typeStr[0].toUpperCase() + typeStr.slice(1),
         description: '',
@@ -752,7 +753,7 @@ function StructuralCanvas(): React.ReactElement {
         ...size,
       })
     },
-    [addNode]
+    [requestCreateNode]
   )
 
   const onDragOver = useCallback((event: React.DragEvent) => {

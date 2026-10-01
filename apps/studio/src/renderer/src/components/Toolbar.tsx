@@ -291,6 +291,14 @@ function AppMenu({
       return next
     })
   }, [])
+  const setNodeWizardOnCreate = useCallback((on: boolean) => {
+    setStudioSettings((prev) => {
+      const next = { ...prev, nodeWizardOnCreate: on }
+      saveStudioSettings(next)
+      window.dispatchEvent(new Event(STUDIO_SETTINGS_CHANGED_EVENT))
+      return next
+    })
+  }, [])
 
   // Close on outside-click (covers pointerdown + mousedown, capture phase
   // so descendants that call stopPropagation can't keep the menu open).
@@ -421,6 +429,17 @@ function AppMenu({
                 <option value="meta">{isMac ? '⌘ Cmd' : '⊞ Win'}</option>
               </select>
             </div>
+            <label
+              className="app-menu-row"
+              title="Open a guided form when you create a node whose type has a wizard (ADR, Requirement, …). The wizard stays available from the properties panel either way."
+            >
+              <span className="app-menu-row-label">Wizard on create</span>
+              <input
+                type="checkbox"
+                checked={studioSettings.nodeWizardOnCreate}
+                onChange={(e) => setNodeWizardOnCreate(e.target.checked)}
+              />
+            </label>
           </div>
 
           <div className="app-menu-divider" />

@@ -1645,6 +1645,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
   const hubTemplates = useDiagramStore((s) => s.hubTemplates)
   const pendingBodyNodeIds = useDiagramStore((s) => s.pendingBodyNodeIds)
   const hydrateNode = useDiagramStore((s) => s.hydrateNode)
+  const openNodeWizard = useDiagramStore((s) => s.openNodeWizard)
 
   // Lazily-loaded md-folder docs don't have the description in memory until
   // the node is opened — fetch it now.
@@ -1845,6 +1846,11 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
           )}
           {badgeLabel.toUpperCase()}
         </div>
+        {!readOnly && nodeTypeDef?.wizard && (
+          <button className="props-wizard-btn" onClick={() => openNodeWizard(node.id)}>
+            Fill in with wizard…
+          </button>
+        )}
         {node.type === 'requirement' && (
           <div className="props-ears-sentence">
             <EarsSentencePreview node={node as unknown as Record<string, unknown>} nodeId={node.id} subject={resolveEarsSubject(node.id, c4Relations, c4Nodes)} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} />

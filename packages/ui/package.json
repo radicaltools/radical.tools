@@ -15,6 +15,7 @@
     "./components/TableView": "./src/components/TableView.tsx",
     "./components/RightPanel": "./src/components/RightPanel.tsx",
     "./components/NotificationHost": "./src/components/NotificationHost.tsx",
+    "./components/NodeWizard": "./src/components/NodeWizard.tsx",
     "./components/SmartLayoutButton": "./src/components/SmartLayoutButton.tsx",
     "./components/ErrorBoundary": "./src/components/ErrorBoundary.tsx",
     "./components/wireframeGeneration": "./src/components/wireframeGeneration.ts",
