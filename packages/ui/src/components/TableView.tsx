@@ -154,7 +154,7 @@ export function TableView(): React.ReactElement {
   const activeViewId     = useDiagramStore((s) => s.activeViewId)
   const activeView       = useDiagramStore((s) => s.activeViewId ? s.views[s.activeViewId] : undefined)
   const addNodeToView    = useDiagramStore((s) => s.addNodeToView)
-  const addNode          = useDiagramStore((s) => s.addNode)
+  const requestCreateNode = useDiagramStore((s) => s.requestCreateNode)
   const pushNotification = useDiagramStore((s) => s.pushNotification)
   const readOnly         = useDiagramStore((s) => s.appMode !== 'designer')
   const metamodel        = useDiagramStore((s) => s.metamodel)
@@ -355,9 +355,11 @@ export function TableView(): React.ReactElement {
         return
       }
 
-      // addNode validates parent/cardinality (pushes its own error toast on
-      // failure) and auto-adds the created node to the active view.
-      const newId = addNode({
+      // Validates parent/cardinality (pushes its own error toast on failure),
+      // opens the type's wizard when it has one, and auto-adds the created
+      // node to the active view.
+      const where = parentId ? ` inside "${nodes[parentId]?.label ?? parentId}"` : ''
+      requestCreateNode({
         type: typeStr as C4ElementType,
         label,
         description: '',
@@ -368,11 +370,9 @@ export function TableView(): React.ReactElement {
         x: 0,
         y: 0,
         ...size,
+      }, {
+        onCreated: () => pushNotification(`${label} added to the model${where}.`, 'info'),
       })
-      if (newId) {
-        const where = parentId ? ` inside "${nodes[parentId]?.label ?? parentId}"` : ''
-        pushNotification(`${label} added to the model${where}.`, 'info')
-      }
       return
     }
 
@@ -389,7 +389,7 @@ export function TableView(): React.ReactElement {
     }
     addNodeToView(activeViewId, nodeId)
     pushNotification(`"${node.label}" added to view.`, 'info')
-  }, [activeViewId, activeView, nodes, addNode, addNodeToView, pushNotification])
+  }, [activeViewId, activeView, nodes, requestCreateNode, addNodeToView, pushNotification])
 
   const commitEdit = useCallback(() => {
     if (!editCell) return
