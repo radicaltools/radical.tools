@@ -180,3 +180,27 @@ Still open:
     directory handle from IndexedDB (seen with OPFS handles in the e2e suite,
     which therefore uses a persistent profile). Check whether Chrome Incognito
     users of folder mode hit it with real picker handles.
+
+### Node wizards (2026-10-01)
+
+Added in `feat/node-wizard`: `NodeTypeDef.wizard` (metamodel data), wizards for
+ADR, fitness function, requirement, scenario and mockup, and
+`requestCreateNode` in the store so the canvas, table and wiki all open them
+(`packages/ui/src/components/NodeWizard.tsx`). Still open:
+
+1. **No editor for wizards.** The metamodel editor can't define or change a
+   type's wizard; a custom type gets one only through the metamodel JSON. Add
+   a "Wizard" section: trigger, steps, the fields of each step, help text.
+2. **The wizard for an existing element is hard to find.** It opens only from
+   "Fill in with wizard…" in the properties panel. Add it to the selection
+   action bar and to Wiki pages.
+3. **A palette drop on the canvas names the element after its type id**
+   ("Adr", "Fitness-fn"); the table and wiki use the metamodel label. Using
+   the label on the canvas changes C4 names too ("System" → "Software
+   System", which `editing.spec.ts` checks).
+4. **Superseding doesn't update the superseded ADR.** Linking `supersedes` in
+   the wizard could set the older ADR's status to `superseded`. ADRs also
+   have no numbering (ADR-007).
+5. **Fields have no per-field hint.** Guidance is per step, so steps with
+   several fields share one help text. A `PropertyDef.placeholder` would let
+   the properties panel show the same prompts.

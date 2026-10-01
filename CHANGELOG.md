@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Welcome screen: on a first visit the sample model gets its own card (preview, what it contains, "Explore the sample") in place of the placeholder diagram, and opens on the System Context view instead of the all-elements canvas
 - Desktop installers for macOS (dmg, Apple Silicon + Intel), Windows (NSIS) and Linux (AppImage), built by electron-builder and drafted as a GitHub Release when a `v*` tag is pushed
 - App icon for the desktop builds
+- Node wizards: creating an ADR, fitness function, requirement, scenario or mockup — on the canvas, in a table or from a wiki page — opens a step-by-step form with guidance per field and a final step for its relations (constrains, supersedes, satisfies…); the element is created when the wizard finishes, as one undo step. Reopen it for an existing element from the properties panel; turn the automatic wizard off with *Wizard on create* in the app menu. Wizards are metamodel data (`NodeTypeDef.wizard`), so custom node types can have them too
 - Markdown-folder models follow edits made outside Studio (another editor, `git pull`): the active document's folder is polled (desktop every second, browser every two) and reloaded from disk, keeping the open view and selection; a save never overwrites a file changed on disk since Studio read it
 
 ### Changed

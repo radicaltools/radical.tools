@@ -229,6 +229,10 @@
         <p>
           <strong>ADRs</strong> carry status (proposed → accepted → deprecated / superseded), date, context, decision, consequences and alternatives. <strong>Fitness functions</strong> carry category, trigger (on deploy / continuous / periodic), an <em>automated</em> flag, threshold and status. Both are ordinary elements: link them with <em>Constrains</em>, <em>Supersedes</em>, <em>Implements</em>, <em>Satisfies</em>, <em>Derives</em> and <em>Traces-to</em> relations to the parts of the architecture they govern, and they show up in the <a href="#view-table">Table</a>, <a href="#view-matrix">Matrix</a> and <a href="#view-wiki">Wiki</a> views like anything else.
         </p>
+        <h3>Wizards</h3>
+        <p>
+          Creating an ADR, fitness function, requirement, scenario or mockup — dropped on the canvas or a table, or added from a wiki page — opens a <strong>wizard</strong> that walks through its fields one step at a time, with a prompt for each, and ends with the relations that give it meaning (which elements an ADR <em>constrains</em>, which earlier ADR it <em>supersedes</em>…). The element is only created when you press <strong>Create</strong> (<kbd>⌘/Ctrl</kbd>+<kbd>Enter</kbd> from any step); <kbd>Esc</kbd> discards it. <strong>Fill in with wizard…</strong> in the properties panel reopens it for an existing element, and <em>Wizard on create</em> in the app menu turns the automatic wizard off. Wizards are part of the metamodel (<code>wizard</code> on a node type), so custom metamodels can define their own.
+        </p>
       </section>
 
       <section class="doc-section" id="mockups">
