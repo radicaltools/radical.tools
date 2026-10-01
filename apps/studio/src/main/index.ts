@@ -4,7 +4,7 @@ import { watchFile, unwatchFile } from 'fs'
 import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
-import { diskFolderStorage } from './diskFolderStorage'
+import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 
 /** One session per model folder, kept for the app's lifetime: it remembers
  *  what the renderer last read, so writes never clobber outside edits. */

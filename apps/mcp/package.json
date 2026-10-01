@@ -2,16 +2,24 @@
   "name": "@radical/mcp",
   "version": "0.0.0",
   "private": true,
-  "description": "MCP server for radical models (not implemented yet).",
+  "description": "Local MCP server for Radical Markdown model folders.",
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "test": "npm run build && vitest run"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "2.2.0",
     "@radical/common": "*",
-    "@radical/layout": "*"
+    "@radical/node-files": "*"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "@modelcontextprotocol/client": "2.2.0",
+    "@types/node": "^22.20.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.11"
   }
 }

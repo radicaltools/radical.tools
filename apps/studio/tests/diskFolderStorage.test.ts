@@ -5,7 +5,7 @@ import { existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
-import { diskFolderStorage } from '../src/main/diskFolderStorage'
+import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 
 const node = (id: string, body = ''): string => `---\nid: "${id}"\ntype: "system"\n---\n${body}`
 

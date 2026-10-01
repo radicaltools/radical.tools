@@ -37,6 +37,7 @@
     "@radical/common": "*",
     "@radical/host-bridge": "*",
     "@radical/hub-catalogue": "*",
+    "@radical/node-files": "*",
     "@radical/ui": "*",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

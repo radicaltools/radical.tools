@@ -23,7 +23,7 @@
     "dist": "npm run dist -w radical-model",
     "test": "npm run test --workspaces --if-present",
     "test:watch": "npm run test:watch -w radical-model",
-    "e2e": "npm run build:web && npm run build:hub && npm run e2e -w @radical/e2e",
+    "e2e": "npm run build:web && npm run build:hub && npm run build -w @radical/mcp && npm run e2e -w @radical/e2e",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check:workspaces": "node tools/check-workspaces.mjs"
   },

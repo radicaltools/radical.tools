@@ -140,12 +140,12 @@ export function buildRelationToolHandlers(): Record<string, ToolHandler> {
         effectiveType ? mm?.relationTypes[effectiveType]?.properties : undefined,
       )
 
-      const updates = {
+      const updates = Object.fromEntries(Object.entries({
         label: typeof input.label === 'string' ? input.label : undefined,
         technology: typeof input.technology === 'string' ? input.technology : undefined,
         relationType: typeof input.relationType === 'string' ? input.relationType : undefined,
         ...propValues,
-      } as Partial<Omit<C4Relation, 'id'>>
+      }).filter(([, value]) => value !== undefined)) as Partial<Omit<C4Relation, 'id'>>
 
       ctx.diagram.updateRelation(realId, updates)
       const resultText = notes.length ? `Updated relation ${realId}. ${notes.join('; ')}` : `Updated relation ${realId}.`
