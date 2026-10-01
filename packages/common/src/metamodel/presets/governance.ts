@@ -46,6 +46,26 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
     tableTab: true,
     properties: adrProps,
+    wizard: {
+      trigger: 'create',
+      prefill: { status: 'proposed', date: '{{today}}' },
+      steps: [
+        { kind: 'fields', title: 'Title & status', fields: ['label', 'status', 'date'],
+          help: 'Name the decision in a few words, e.g. "Use PostgreSQL for order storage".' },
+        { kind: 'fields', title: 'Context', fields: ['context'],
+          help: 'What forces are at play — the problem, constraints and drivers that make a decision necessary now?' },
+        { kind: 'fields', title: 'Decision', fields: ['decision'],
+          help: 'What did you decide? State it actively: "We will …".' },
+        { kind: 'fields', title: 'Alternatives', fields: ['alternatives'],
+          help: 'Which other options did you consider, and why were they rejected?' },
+        { kind: 'fields', title: 'Consequences', fields: ['consequences'],
+          help: 'What becomes easier or harder? Include the downsides and the risks you accept.' },
+        { kind: 'relations', title: 'Affected elements', relationType: 'constrains', direction: 'out',
+          help: 'Which parts of the architecture must follow this decision?' },
+        { kind: 'relations', title: 'Supersedes', relationType: 'supersedes', direction: 'out',
+          help: 'Does this decision replace an earlier one? Leave empty if not.' },
+      ],
+    },
   }
 
   const fitnessFnProps: PropertyDef[] = [
@@ -76,6 +96,21 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
     tableTab: true,
     properties: fitnessFnProps,
+    wizard: {
+      trigger: 'create',
+      steps: [
+        { kind: 'fields', title: 'Name & category', fields: ['label', 'category'],
+          help: 'Name the architectural characteristic this function protects, e.g. "Checkout p95 latency".' },
+        { kind: 'fields', title: 'What it measures', fields: ['description'],
+          help: 'How is the characteristic measured — a test, a metric, a static check?' },
+        { kind: 'fields', title: 'Success criteria', fields: ['threshold'],
+          help: 'When does it pass? Give a concrete threshold, e.g. "p95 < 300 ms".' },
+        { kind: 'relations', title: 'Verified decisions', relationType: 'implements', direction: 'out',
+          help: 'Which ADRs does this fitness function verify?' },
+        { kind: 'relations', title: 'Guarded elements', relationType: 'constrains', direction: 'out',
+          help: 'Which elements does it check?' },
+      ],
+    },
   }
 
   // ── EARS Requirement ──────────────────────────────────────────────────────
@@ -113,6 +148,25 @@ export function builtInGovernanceMetamodel(): Metamodel {
     tableTab: true,
     hierarchyRelation: 'derives',
     properties: requirementProps,
+    wizard: {
+      trigger: 'create',
+      steps: [
+        { kind: 'fields', title: 'Name', fields: ['label'],
+          help: 'A short name for the requirement, e.g. "Lock account after failed logins".' },
+        { kind: 'custom', title: 'Sentence', component: 'ears-quick-entry',
+          help: 'Type the requirement as one sentence and press Enter — the EARS fields are filled for you. Or skip and fill them in the next step.' },
+        { kind: 'fields', title: 'EARS fields', fields: ['ears_type', 'trigger', 'precondition', 'unwanted_condition', 'feature', 'action'],
+          help: 'Pick the EARS pattern; only the clauses it uses are shown.' },
+        { kind: 'fields', title: 'Rationale', fields: ['rationale'],
+          help: 'Why is this requirement needed? Who asked for it?' },
+        { kind: 'relations', title: 'Satisfied by', relationType: 'satisfies', direction: 'in',
+          help: 'Which elements must satisfy this requirement?' },
+        { kind: 'relations', title: 'Derives from', relationType: 'derives', direction: 'out',
+          help: 'Is this a refinement of a broader requirement?' },
+        { kind: 'relations', title: 'Traces to', relationType: 'traces-to', direction: 'out',
+          help: 'Which decisions or fitness functions follow from it?' },
+      ],
+    },
   }
 
   const constraintSources = ['adr', 'fitness-fn', 'requirement'] as const
@@ -211,6 +265,21 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
     tableTab: true,
     properties: scenarioProps,
+    wizard: {
+      trigger: 'create',
+      steps: [
+        { kind: 'fields', title: 'Name', fields: ['label'],
+          help: 'Name the behaviour, e.g. "Card payment declined".' },
+        { kind: 'fields', title: 'Given', fields: ['given'],
+          help: 'The starting state: who is involved and what is already true.' },
+        { kind: 'fields', title: 'When', fields: ['when'],
+          help: 'The single action or event under test.' },
+        { kind: 'fields', title: 'Then', fields: ['then', 'gherkin'],
+          help: 'The observable outcome. Add And/But steps below if needed.' },
+        { kind: 'relations', title: 'Verified requirements', relationType: 'verifies', direction: 'out',
+          help: 'Which requirements does this scenario verify?' },
+      ],
+    },
   }
 
   // scenario → requirement: this scenario verifies that requirement
@@ -289,6 +358,19 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
     tableTab: true,
     properties: mockupProps,
+    wizard: {
+      trigger: 'create',
+      steps: [
+        { kind: 'fields', title: 'Screen', fields: ['label', 'screen', 'description'],
+          help: 'Which screen is this, and what does the user do on it?' },
+        { kind: 'fields', title: 'Design link', fields: ['link'],
+          help: 'A Figma / Penpot link, if the design exists. You can generate a wireframe from the properties panel later.' },
+        { kind: 'relations', title: 'Illustrates', relationType: 'illustrates', direction: 'out',
+          help: 'Which requirements or scenarios does this screen show?' },
+        { kind: 'relations', title: 'Presented by', relationType: 'presented-by', direction: 'out',
+          help: 'Which part of the system renders it?' },
+      ],
+    },
   }
 
   // mockup → requirement / scenario: this screen illustrates that behaviour
