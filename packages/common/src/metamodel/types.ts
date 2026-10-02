@@ -63,6 +63,55 @@ export interface NodeTypeDef {
    *  requiring `allowedParents` to include this type, which it usually
    *  can't — containment and this kind of relation are different things). */
   hierarchyRelation?: string
+  /** Guided, step-by-step form for filling in a node of this type. */
+  wizard?: NodeWizardDef
+}
+
+// ─── Node wizard ─────────────────────────────────────────────────────────────
+//
+// A wizard walks the user through a node's properties (and the relations
+// that give it meaning — e.g. which elements an ADR constrains) one step at
+// a time, instead of leaving them to a wall of fields in the properties
+// panel. It is plain data, so custom metamodels get wizards too.
+
+export interface NodeWizardDef {
+  /** 'create' — opens whenever the user creates a node of this type (canvas,
+   *  table, wiki). 'manual' — only from the properties panel on an existing
+   *  node. */
+  trigger: 'create' | 'manual'
+  /** Values a new node starts with. The string `'{{today}}'` becomes the
+   *  current date (YYYY-MM-DD). */
+  prefill?: Record<string, string | number | boolean>
+  steps: WizardStep[]
+}
+
+export type WizardStep = WizardFieldsStep | WizardRelationsStep | WizardCustomStep
+
+interface WizardStepBase {
+  title: string
+  /** Guidance shown above the step's inputs. */
+  help?: string
+}
+
+export interface WizardFieldsStep extends WizardStepBase {
+  kind: 'fields'
+  /** Keys of the type's `properties`, plus the built-ins `label` and
+   *  `description`. Hidden properties (`visibleWhen`) are skipped. */
+  fields: string[]
+}
+
+export interface WizardRelationsStep extends WizardStepBase {
+  kind: 'relations'
+  /** RelationTypeDef id; its `allowedPairs` decide which nodes are offered. */
+  relationType: string
+  /** 'out' — the wizard's node is the source; 'in' — it is the target. */
+  direction: 'out' | 'in'
+}
+
+export interface WizardCustomStep extends WizardStepBase {
+  kind: 'custom'
+  /** A built-in editor the generic field/relation steps can't express. */
+  component: 'ears-quick-entry'
 }
 
 export interface RelationPair {

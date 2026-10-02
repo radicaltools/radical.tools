@@ -15,10 +15,12 @@ export interface StudioSettings {
    *  page content embedded inline before falling back to preview cards.
    *  1 = parent + direct children only (the original, fixed behaviour). */
   wikiMultiPageDepth: number
+  /** Open a node type's wizard when the user creates a node of that type. */
+  nodeWizardOnCreate: boolean
 }
 
 export function defaultStudioSettings(): StudioSettings {
-  return { wikiMultiPageDepth: WIKI_MULTI_PAGE_DEPTH_MIN }
+  return { wikiMultiPageDepth: WIKI_MULTI_PAGE_DEPTH_MIN, nodeWizardOnCreate: true }
 }
 
 export function normalizeStudioSettings(raw: unknown): StudioSettings {
@@ -30,6 +32,7 @@ export function normalizeStudioSettings(raw: unknown): StudioSettings {
     : base.wikiMultiPageDepth
   return {
     wikiMultiPageDepth: Math.min(WIKI_MULTI_PAGE_DEPTH_MAX, Math.max(WIKI_MULTI_PAGE_DEPTH_MIN, depth)),
+    nodeWizardOnCreate: typeof r.nodeWizardOnCreate === 'boolean' ? r.nodeWizardOnCreate : base.nodeWizardOnCreate,
   }
 }
 

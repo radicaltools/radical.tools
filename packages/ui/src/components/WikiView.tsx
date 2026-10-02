@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, PropertyDef } from '@radical/common/metamodel'
+import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, PropertyDef, type WizardLink } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { MockupWireframe } from './MockupWireframe'
@@ -164,7 +164,7 @@ export function WikiView(): React.ReactElement {
   const metamodel = useDiagramStore((s) => s.metamodel)
   const updateNode = useDiagramStore((s) => s.updateNode)
   const updateRelation = useDiagramStore((s) => s.updateRelation)
-  const addNode = useDiagramStore((s) => s.addNode)
+  const requestCreateNode = useDiagramStore((s) => s.requestCreateNode)
   const removeNode = useDiagramStore((s) => s.removeNode)
   const addRelation = useDiagramStore((s) => s.addRelation)
   const removeRelation = useDiagramStore((s) => s.removeRelation)
@@ -232,16 +232,16 @@ export function WikiView(): React.ReactElement {
   }
 
   // Create a node of `type` (optionally inside `parentId`), then navigate to
-  // it. addNode validates metamodel rules and emits its own error toast on
-  // failure (returning ''). `onCreated` runs before navigating — e.g. to
-  // wire up a hierarchyRelation edge (see WikiElementPage's onCreateChild
-  // for a hierarchyRelation-typed node, such as a Requirement "deriving
-  // from" the one it's a child of).
-  const createNode = (type: string, parentId: string | undefined, onCreated?: (id: string) => void) => {
+  // it — once its wizard finishes, when the type has one. requestCreateNode
+  // validates metamodel rules and emits its own error toast on failure.
+  // `link` is created along with the node (and offered pre-checked by the
+  // wizard) — e.g. the hierarchyRelation edge for a Requirement "deriving
+  // from" the one it's a child of (see WikiElementPage's onCreateChild).
+  const createNode = (type: string, parentId: string | undefined, link?: WizardLink) => {
     const def = metamodel?.nodeTypes[type]
     const label = `New ${def?.label ?? TYPE_LABELS[type as C4ElementType] ?? type}`
     const size = NODE_SIZES[type as C4ElementType]
-    const id = addNode({
+    requestCreateNode({
       type: type as C4ElementType,
       label,
       description: '',
@@ -253,12 +253,14 @@ export function WikiView(): React.ReactElement {
       y: 0,
       width: def?.width ?? size?.width ?? 160,
       height: def?.height ?? size?.height ?? 90,
+    }, {
+      links: link ? [link] : [],
+      onCreated: (id) => {
+        const created = useDiagramStore.getState().c4Nodes[id]?.label ?? label
+        pushNotification(`${created} added.`, 'info')
+        goTo(id)
+      },
     })
-    if (id) {
-      onCreated?.(id)
-      pushNotification(`${label} added.`, 'info')
-      goTo(id)
-    }
   }
 
   const deleteNode = (id: string) => {
@@ -619,7 +621,7 @@ function WikiOverview({
   updateNode: UpdateNode
   updateRelation: UpdateRelation
   onNavigate: (id: string) => void
-  createNode: (type: string, parentId: string | undefined, onCreated?: (id: string) => void) => void
+  createNode: (type: string, parentId: string | undefined, link?: WizardLink) => void
   onCreateRoot: (type: string) => void
   onDeleteNode: (id: string) => void
   createRelation: (sourceId: string, targetId: string, relationType?: string) => void
@@ -775,7 +777,7 @@ function WikiElementPage({
   updateNode: UpdateNode
   updateRelation: UpdateRelation
   onNavigate: (id: string) => void
-  createNode: (type: string, parentId: string | undefined, onCreated?: (id: string) => void) => void
+  createNode: (type: string, parentId: string | undefined, link?: WizardLink) => void
   onDeleteNode: (id: string) => void
   createRelation: (sourceId: string, targetId: string, relationType?: string) => void
   onDeleteRelation: (id: string) => void
@@ -804,7 +806,7 @@ function WikiElementPage({
       // New child inherits the same structural container (system/domain/
       // group) as `node`, if any, then gets a hierarchyRelation edge back
       // to `node` — e.g. child --derives--> node.
-      createNode(type, node.parentId, (newId) => createRelation(newId, node.id, hierarchyRelationType))
+      createNode(type, node.parentId, { relationType: hierarchyRelationType, direction: 'out', otherId: node.id })
     } else {
       createNode(type, node.id)
     }
