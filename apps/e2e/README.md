@@ -9,8 +9,8 @@ with [Playwright](https://playwright.dev). It drives the production bundles
 From the repo root:
 
 ```bash
-npm run e2e                                   # build Studio + Hub, run the suite
-npm run e2e -w @radical/e2e                   # run it against the existing builds
+npm run e2e                                   # build Studio + Hub + MCP, run the suite
+npm run e2e -w @radical/e2e                   # build MCP, run against the existing web builds
 npm run e2e -w @radical/e2e -- -g "undo"      # one test by name
 npm run e2e:ui -w @radical/e2e                # Playwright UI mode
 npm run e2e:report -w @radical/e2e            # open the last HTML report
@@ -28,7 +28,7 @@ The first time, install Chromium: `npx playwright install chromium`.
 | `studio/layout` | Smart Layout: no overlapping siblings, children inside their parent, same result on every run |
 | `studio/presentation` | Playing slides, keyboard navigation, slide deep links |
 | `studio/export` | PNG and SVG export produce real files |
-| `studio/folders` | Models stored as a folder of Markdown files: save as folder, reload, renames that move files, edits made outside Studio, files Studio must not touch |
+| `studio/folders` | Models stored as a folder of Markdown files: save as folder, reload, renames that move files, outside edits (including MCP), files Studio must not touch |
 | `studio/known-issues` | Open bugs, marked `test.fail` (see below) |
 | `hub/hub` | Landing page, categories, search, concept canvas / wiki / table, `.radical` download |
 

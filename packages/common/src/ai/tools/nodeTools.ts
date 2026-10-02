@@ -121,14 +121,14 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       const effectiveType = typeof input.type === 'string' ? input.type : nodes[realId].type
       const { values: propValues, notes } = validateProperties(input.properties, mm?.nodeTypes[effectiveType]?.properties)
 
-      const updates = {
+      const updates = Object.fromEntries(Object.entries({
         label: typeof input.label === 'string' ? input.label : undefined,
         description: typeof input.description === 'string' ? input.description : undefined,
         technology: typeof input.technology === 'string' ? input.technology : undefined,
         external: typeof input.external === 'boolean' ? input.external : undefined,
         type: typeof input.type === 'string' ? (input.type as C4ElementType) : undefined,
         ...propValues,
-      } as Partial<Omit<C4Node, 'id'>>
+      }).filter(([, value]) => value !== undefined)) as Partial<Omit<C4Node, 'id'>>
 
       ctx.diagram.updateNode(realId, updates)
       const resultText = notes.length ? `Updated node ${realId}. ${notes.join('; ')}` : `Updated node ${realId}.`

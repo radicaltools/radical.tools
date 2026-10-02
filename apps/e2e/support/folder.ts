@@ -50,10 +50,19 @@ export class ModelFolder {
     return this.page.evaluate(async (name) => {
       const out: Record<string, string> = {}
       const walk = async (dir: FileSystemDirectoryHandle, prefix: string): Promise<void> => {
-        for await (const [entryName, entry] of (dir as unknown as AsyncIterable<[string, FileSystemHandle]>)) {
-          const rel = prefix ? `${prefix}/${entryName}` : entryName
-          if (entry.kind === 'directory') await walk(entry as FileSystemDirectoryHandle, rel)
-          else out[rel] = await (await (entry as FileSystemFileHandle).getFile()).text()
+        try {
+          for await (const [entryName, entry] of (dir as unknown as AsyncIterable<[string, FileSystemHandle]>)) {
+            const rel = prefix ? `${prefix}/${entryName}` : entryName
+            try {
+              if (entry.kind === 'directory') await walk(entry as FileSystemDirectoryHandle, rel)
+              else out[rel] = await (await (entry as FileSystemFileHandle).getFile()).text()
+            } catch (error) {
+              // Folder saves can rename an entry between iteration and read.
+              if ((error as DOMException).name !== 'NotFoundError') throw error
+            }
+          }
+        } catch (error) {
+          if ((error as DOMException).name !== 'NotFoundError') throw error
         }
       }
       const root = await (await navigator.storage.getDirectory()).getDirectoryHandle(name, { create: true })
@@ -77,5 +86,14 @@ export class ModelFolder {
       await writable.write(text)
       await writable.close()
     }, [this.name, path, content] as const)
+  }
+
+  async remove(path: string): Promise<void> {
+    await this.page.evaluate(async ([name, rel]) => {
+      let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle(name)
+      const parts = rel.split('/')
+      for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part)
+      await dir.removeEntry(parts[parts.length - 1])
+    }, [this.name, path] as const)
   }
 }

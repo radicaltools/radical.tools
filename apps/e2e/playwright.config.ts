@@ -4,7 +4,7 @@
  * The suite drives the production bundles (`vite preview` of out/), not the
  * dev servers, so it checks what is deployed. Build them first:
  *
- *   npm run e2e            (root: builds Studio + Hub, then runs this suite)
+ *   npm run e2e            (root: builds Studio + Hub; E2E script builds MCP)
  *
  * Screenshot baselines are Linux-only: they are generated and compared in CI,
  * inside the Playwright Docker image, where fonts and rasterisation are fixed.

@@ -1,6 +1,14 @@
 import { expect } from '../../support/fixtures'
 import { ModelFolder, test } from '../../support/folder'
 import type { Page } from '@playwright/test'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Client } from '@modelcontextprotocol/client'
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
+import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
+import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 
 // Models persisted as a folder of Markdown files (web build: File System
 // Access API over an OPFS directory, see support/folder.ts). Systems and
@@ -109,13 +117,49 @@ test('an edit made outside the app shows up on the canvas', async ({ page, studi
 
   // The folder is polled every couple of seconds.
   await expect(studio.node('customer')).toContainText('Book Lover', { timeout: 10_000 })
-  // The app never wrote its own version back over the edit; its next save
-  // just files the element under its new name.
-  await expect.poll(() => folder.paths()).toContain('nodes/book-lover.md')
+  // Reloading an outside edit must not immediately queue an autosave.
   await page.waitForTimeout(3000)
   const files = await folder.files()
-  expect(files['nodes/book-lover.md']).toContain('label: "Book Lover"')
+  expect(files['nodes/customer.md']).toContain('label: "Book Lover"')
   expect(Object.values(files).some((c) => c.includes('label: "Customer"'))).toBe(false)
+})
+
+test('an MCP model edit appears in the open browser canvas', async ({ page, studio }) => {
+  await saveAsFolder(page)
+  const disk = await mkdtemp(join(tmpdir(), 'radical-mcp-browser-'))
+  try {
+    // The native directory picker cannot be driven by Playwright. Mirror the
+    // real model bytes from its OPFS handle into a temporary OS directory,
+    // mutate them through the MCP model service, then deliver those bytes to
+    // the handle that Studio polls.
+    const before = await folder.files()
+    for (const [path, content] of Object.entries(before)) {
+      await mkdir(dirname(join(disk, path)), { recursive: true })
+      await writeFile(join(disk, path), content)
+    }
+    const client = new Client({ name: 'radical-browser-test', version: '1.0.0' })
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [fileURLToPath(new URL('../../../mcp/dist/index.js', import.meta.url)), '--folder', disk],
+    })
+    try {
+      await client.connect(transport)
+      const change = await client.callTool({ name: 'update_node', arguments: { id: 'customer', label: 'MCP Customer' } })
+      expect(change.isError, JSON.stringify(change.content)).not.toBe(true)
+    } finally {
+      await client.close()
+    }
+    const after = await new MdFolderSession(diskFolderStorage(disk)).readAll()
+    for (const [path, content] of Object.entries(after)) {
+      if (content !== before[path]) await folder.write(path, content)
+    }
+    for (const path of Object.keys(before)) if (!(path in after)) await folder.remove(path)
+    await expect(studio.node('customer')).toContainText('MCP Customer', { timeout: 10_000 })
+    await page.waitForTimeout(3000)
+    expect((await folder.files())['nodes/mcp-customer.md']).toContain('label: "MCP Customer"')
+  } finally {
+    await rm(disk, { recursive: true, force: true })
+  }
 })
 
 test('files the model does not own are left alone', async ({ page, studio }) => {

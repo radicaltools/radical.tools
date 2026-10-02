@@ -74,6 +74,9 @@ if (typeof window !== 'undefined') {
 
   let prev = useDiagramStore.getState()
   useDiagramStore.subscribe((s) => {
+    // Loading an outside edit replaces the model in memory. Treat that state
+    // as the new baseline instead of queueing an autosave of the reload.
+    if (_suspended) { prev = s; return }
     // In viewer/presenter ("explore" mode), drags / collapses mutate the
     // model temporarily but must NEVER reach disk. The setAppMode snapshot
     // restores everything on the way back to designer, so by simply not
@@ -122,6 +125,10 @@ if (typeof window !== 'undefined') {
   ): void => {
     const seq = ++_loadSeq
     _suspended = true
+    if (_persistTimer !== null) {
+      clearTimeout(_persistTimer)
+      _persistTimer = null
+    }
     if (_watchingId !== id) stopWatching()
     documents.loadDocument(id).then((data) => {
       if (seq !== _loadSeq || documents.getActiveId() !== id) return
