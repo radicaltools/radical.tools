@@ -1,5 +1,6 @@
-import { Ajv2020, type AnySchema, type ErrorObject } from 'ajv/dist/2020.js'
-import { fromMarkdown } from 'mdast-util-from-markdown'
+import { Ajv2020, type AnySchema } from 'ajv/dist/2020.js'
+import type { Configuration, Rule } from 'markdownlint'
+import { lint } from 'markdownlint/sync'
 import { isMap, parseDocument } from 'yaml'
 
 /** Zero-based UTF-16 offsets into the original text. End is exclusive. */
@@ -13,167 +14,168 @@ export interface MarkdownDocument {
   text: string
 }
 
-export interface Heading {
-  title: string
-  level: number
-  children: Heading[]
-}
-
-/** The JSON representation evaluated by a document's schema. */
-export interface DocumentStructure {
-  frontmatter: Record<string, unknown>
-  headings: Heading[]
-}
-
 export type JsonSchema = AnySchema
-/** Keys match frontmatter.type exactly. Schemas use JSON Schema draft 2020-12. */
-export type DocumentSchemas = Readonly<Record<string, JsonSchema>>
+export type MarkdownlintConfig = Configuration
+export type MarkdownlintRule = Rule
+
+export interface TypeRules {
+  /** Standard markdownlint configuration, overriding the base configuration per rule. */
+  markdownlint?: MarkdownlintConfig
+  /** Optional JSON Schema draft 2020-12 applied directly to frontmatter. */
+  frontmatterSchema?: JsonSchema
+}
+
+export interface ValidatorOptions {
+  /** Standard markdownlint configuration. Omit to use upstream defaults. */
+  markdownlint?: MarkdownlintConfig
+  /** Type keys match frontmatter.type exactly. Unknown and absent types use base rules. */
+  types?: Readonly<Record<string, TypeRules>>
+  /** Optional metadata schema applied to every document, including plain Markdown as {}. */
+  frontmatterSchema?: JsonSchema
+  /** Standard markdownlint custom rules for company-specific extensions. */
+  customRules?: readonly MarkdownlintRule[]
+}
 
 export interface Diagnostic {
-  code: 'FRONTMATTER_INVALID' | 'TYPE_MISSING' | 'SCHEMA_VALIDATION'
+  code: string
+  source: 'markdownlint' | 'frontmatter'
   message: string
-  severity: 'error'
+  severity: 'error' | 'warning'
   uri: string
   range: SourceRange
-  /** JSON Pointer into DocumentStructure, for schema diagnostics. */
+  /** JSON Pointer into frontmatter, for schema diagnostics. */
   instancePath?: string
   schemaPath?: string
   keyword?: string
 }
 
-interface TextNode {
-  type: string
-  value?: string
-  alt?: string | null
-  children?: readonly TextNode[]
+interface FrontmatterResult {
+  value: Record<string, unknown>
+  range: SourceRange
+  diagnostics: Diagnostic[]
 }
 
-const headingText = (node: TextNode): string =>
-  node.children ? node.children.map(headingText).join('') : node.value ?? node.alt ?? ''
-
-function locateError(error: ErrorObject, ranges: Map<string, SourceRange>): SourceRange {
-  let path = error.instancePath
-  // Point at the first excess heading, rather than only its parent section.
-  if (error.keyword === 'maxItems' || error.keyword === 'items') {
-    const extra = `${path}/${error.params.limit}`
-    if (ranges.has(extra)) path = extra
+function readFrontmatter({ uri, text }: MarkdownDocument): FrontmatterResult {
+  const result: FrontmatterResult = { value: {}, range: { start: 0, end: 0 }, diagnostics: [] }
+  const report = (code: string, message: string, range = result.range): void => {
+    result.diagnostics.push({ code, source: 'frontmatter', message, severity: 'error', uri, range })
   }
-  while (!ranges.has(path)) path = path.slice(0, path.lastIndexOf('/'))
-  return ranges.get(path)!
+  const opening = /^(?:\uFEFF)?---[ \t]*(?:\r\n|\n|\r|$)/.exec(text)
+  if (!opening) return result
+  const yamlStart = opening[0].length
+  const closing = /^(?:---|\.\.\.)[ \t]*(?:\r\n|\n|\r|$)/m.exec(text.slice(yamlStart))
+  result.range = { start: 0, end: yamlStart }
+  if (!closing) {
+    report('FRONTMATTER_INVALID', 'Frontmatter is missing its closing delimiter.')
+    return result
+  }
+  const yamlEnd = yamlStart + closing.index
+  result.range.end = yamlEnd + closing[0].length
+  // Normalize bare CR without changing YAML source offsets.
+  const yaml = parseDocument(text.slice(yamlStart, yamlEnd).replace(/\r(?!\n)/g, '\n'))
+  if (yaml.errors.length) {
+    for (const error of yaml.errors) {
+      report('FRONTMATTER_INVALID', error.message, {
+        start: Math.min(yamlStart + error.pos[0], yamlEnd),
+        end: Math.min(yamlStart + error.pos[1], yamlEnd),
+      })
+    }
+    return result
+  }
+  // An empty frontmatter block is equivalent to absent metadata.
+  if (yaml.contents === null) return result
+  if (!isMap(yaml.contents)) {
+    report('FRONTMATTER_INVALID', 'Frontmatter must be a YAML mapping.')
+    return result
+  }
+  try {
+    result.value = JSON.parse(JSON.stringify(yaml.toJS({ maxAliasCount: 100 }))) as Record<string, unknown>
+  } catch {
+    report('FRONTMATTER_INVALID', 'Frontmatter could not be resolved safely.')
+  }
+  return result
 }
 
 /**
- * Compile schemas once, then validate document text on each editor change.
- * Invalid schemas throw during creation. Invalid documents return diagnostics.
- * No filesystem access, editor dependency, or remote schema loading is performed.
+ * Build a reusable validator: markdownlint defaults, type overrides, optional metadata schemas.
+ * Configuration errors throw; document errors return diagnostics. No files or remote schemas are loaded.
  */
-export function createValidator(schemas: DocumentSchemas = {}): (document: MarkdownDocument) => Diagnostic[] {
+export function createValidator(options: ValidatorOptions = {}): (document: MarkdownDocument) => Diagnostic[] {
+  const baseConfig = { ...options.markdownlint }
+  const types = new Map(Object.entries(options.types ?? {}))
   const ajv = new Ajv2020({ allErrors: true, strict: true })
-  for (const [type, schema] of Object.entries(schemas)) ajv.addSchema(schema, type)
-  const validators = new Map(Object.keys(schemas).map(type => {
-    const validator = ajv.getSchema(type)!
-    if ('$async' in validator && validator.$async) throw new TypeError('Document schemas must be synchronous.')
-    return [type, validator] as const
+  if (options.frontmatterSchema !== undefined) ajv.addSchema(options.frontmatterSchema, 'base')
+  for (const [type, rules] of types) {
+    if (rules.frontmatterSchema !== undefined) ajv.addSchema(rules.frontmatterSchema, `type:${type}`)
+  }
+  const schemaKeys = [
+    ...(options.frontmatterSchema !== undefined ? ['base'] : []),
+    ...[...types].filter(([, rules]) => rules.frontmatterSchema !== undefined).map(([type]) => `type:${type}`),
+  ]
+  const schemas = new Map(schemaKeys.map(key => {
+    const validator = ajv.getSchema(key)!
+    if ('$async' in validator && validator.$async) throw new TypeError('Frontmatter schemas must be synchronous.')
+    return [key, validator] as const
   }))
 
-  return ({ text, uri }) => {
-    const diagnostics: Diagnostic[] = []
-    const report = (code: Diagnostic['code'], message: string, range: SourceRange): void => {
-      diagnostics.push({ code, message, severity: 'error', uri, range })
-    }
-    const opening = /^(?:\uFEFF)?---[ \t]*(?:\r\n|\n|\r|$)/.exec(text)
-    if (!opening) return diagnostics
-    const yamlStart = opening[0].length
-    const closing = /^(?:---|\.\.\.)[ \t]*(?:\r\n|\n|\r|$)/m.exec(text.slice(yamlStart))
-    if (!closing) {
-      report('FRONTMATTER_INVALID', 'Frontmatter is missing its closing delimiter.', { start: 0, end: yamlStart })
-      return diagnostics
-    }
-    const yamlEnd = yamlStart + closing.index
-    const bodyStart = yamlEnd + closing[0].length
-    const frontmatterRange = { start: 0, end: bodyStart }
-    // Normalize bare CR without changing string length or source offsets.
-    const yaml = parseDocument(text.slice(yamlStart, yamlEnd).replace(/\r(?!\n)/g, '\n'))
-    if (yaml.errors.length) {
-      for (const error of yaml.errors) {
-        report('FRONTMATTER_INVALID', error.message, {
-          start: Math.min(yamlStart + error.pos[0], yamlEnd),
-          end: Math.min(yamlStart + error.pos[1], yamlEnd),
-        })
-      }
-      return diagnostics
-    }
-    if (!isMap(yaml.contents)) {
-      report('FRONTMATTER_INVALID', 'Frontmatter must be a YAML mapping.', frontmatterRange)
-      return diagnostics
-    }
-    let frontmatter: Record<string, unknown>
-    try {
-      // JSON Schema consumes JSON data, so circular YAML aliases are invalid here.
-      frontmatter = JSON.parse(JSON.stringify(yaml.toJS({ maxAliasCount: 100 }))) as Record<string, unknown>
-    } catch {
-      report('FRONTMATTER_INVALID', 'Frontmatter could not be resolved safely.', frontmatterRange)
-      return diagnostics
-    }
-    if (typeof frontmatter.type !== 'string' || !frontmatter.type.trim()) {
-      report('TYPE_MISSING', 'Frontmatter field "type" must be a non-empty string.', frontmatterRange)
-      return diagnostics
-    }
-    const validator = validators.get(frontmatter.type)
-    if (!validator) return diagnostics
-
-    const headings: Heading[] = []
-    const stack: Heading[] = []
-    const headingRanges = new Map<Heading, SourceRange>()
-    for (const node of fromMarkdown(text.slice(bodyStart)).children) {
-      // Only document-level headings count; headings inside quotes, lists, or code do not.
-      if (node.type !== 'heading') continue
-      const heading: Heading = {
-        title: headingText(node).trim().replace(/\s+/g, ' '),
-        level: node.depth,
-        children: [],
-      }
-      while (stack.length && stack[stack.length - 1].level >= heading.level) stack.pop()
-      const siblings = stack.length ? stack[stack.length - 1].children : headings
-      siblings.push(heading)
-      stack.push(heading)
-      headingRanges.set(heading, {
-        start: bodyStart + (node.position?.start.offset ?? 0),
-        end: bodyStart + (node.position?.end.offset ?? 0),
+  return document => {
+    const { text, uri } = document
+    const frontmatter = readFrontmatter(document)
+    const diagnostics = [...frontmatter.diagnostics]
+    const type = frontmatter.value.type
+    if (type !== undefined && (typeof type !== 'string' || !type.trim())) {
+      diagnostics.push({
+        code: 'TYPE_INVALID', source: 'frontmatter',
+        message: 'Frontmatter field "type" must be a non-empty string when supplied.',
+        severity: 'error', uri, range: frontmatter.range,
       })
     }
-    const ranges = new Map<string, SourceRange>([
-      ['', frontmatterRange], ['/frontmatter', frontmatterRange], ['/headings', frontmatterRange],
-    ])
-    const mapRanges = (nodes: Heading[], path: string): void => {
-      nodes.forEach((heading, index) => {
-        const headingPath = `${path}/${index}`
-        ranges.set(headingPath, headingRanges.get(heading)!)
-        ranges.set(`${headingPath}/children`, headingRanges.get(heading)!)
-        mapRanges(heading.children, `${headingPath}/children`)
+    const typeRules = typeof type === 'string' ? types.get(type) : undefined
+    const config = { ...baseConfig, ...typeRules?.markdownlint }
+    // Normalize input for the engine; map its line/column results back to the original text.
+    const bomLength = text.startsWith('\uFEFF') ? 1 : 0
+    const lintText = text.slice(bomLength).replace(/\r\n|\r/g, '\n')
+    const lineStarts = [0]
+    for (const match of text.matchAll(/\r\n|\r|\n/g)) lineStarts.push(match.index! + match[0].length)
+    const lines = text.split(/\r\n|\r|\n/)
+    const errors = lint({
+      strings: { document: lintText }, config,
+      customRules: options.customRules ? [...options.customRules] : undefined,
+      frontMatter: /^---[ \t]*\n[\s\S]*?^(?:---|\.\.\.)[ \t]*(?:\n|$)/m,
+    }).document
+    for (const error of errors) {
+      const index = Math.max(0, Math.min(error.lineNumber - 1, lines.length - 1))
+      const lineStart = lineStarts[index] + (index === 0 ? bomLength : 0)
+      const lineEnd = lineStarts[index] + lines[index].length
+      const start = Math.min(lineStart + (error.errorRange ? error.errorRange[0] - 1 : 0), lineEnd)
+      const end = error.errorRange ? Math.min(start + error.errorRange[1], lineEnd) : lineEnd
+      diagnostics.push({
+        code: error.ruleNames[0], source: 'markdownlint',
+        message: error.ruleDescription + (error.errorDetail ? `: ${error.errorDetail}` : ''),
+        severity: error.severity, uri, range: { start, end },
       })
     }
-    mapRanges(headings, '/headings')
-    const structure: DocumentStructure = { frontmatter, headings }
-    if (!validator(structure)) {
-      for (const error of validator.errors ?? []) {
-        const detail = error.keyword === 'const' ? ` ${JSON.stringify(error.params.allowedValue)}` : ''
-        diagnostics.push({
-          code: 'SCHEMA_VALIDATION',
-          message: `${error.instancePath || '/'}: ${error.message ?? 'Schema validation failed'}${detail}`,
-          severity: 'error', uri,
-          range: locateError(error, ranges),
-          instancePath: error.instancePath,
-          schemaPath: error.schemaPath,
-          keyword: error.keyword,
-        })
+    // Malformed YAML already has parser diagnostics; avoid cascading schema failures.
+    if (!frontmatter.diagnostics.length) {
+      for (const key of ['base', ...(typeRules ? [`type:${type}`] : [])]) {
+        const validator = schemas.get(key)
+        if (!validator || validator(frontmatter.value)) continue
+        for (const error of validator.errors ?? []) {
+          const detail = error.keyword === 'const' ? ` ${JSON.stringify(error.params.allowedValue)}` : ''
+          diagnostics.push({
+            code: 'SCHEMA_VALIDATION', source: 'frontmatter',
+            message: `${error.instancePath || '/'}: ${error.message ?? 'Schema validation failed'}${detail}`,
+            severity: 'error', uri, range: frontmatter.range,
+            instancePath: error.instancePath, schemaPath: error.schemaPath, keyword: error.keyword,
+          })
+        }
       }
     }
     return diagnostics
   }
 }
 
-/** Convenience for one-off validation. Use createValidator to reuse compiled schemas. */
-export function validateDocument(document: MarkdownDocument, schemas: DocumentSchemas = {}): Diagnostic[] {
-  return createValidator(schemas)(document)
+/** Convenience for one-off validation. Use createValidator for repeated editor changes. */
+export function validateDocument(document: MarkdownDocument, options: ValidatorOptions = {}): Diagnostic[] {
+  return createValidator(options)(document)
 }

@@ -2,6 +2,8 @@
 type: x
 ---
 
+# Example document
+
 ## Overview
 
 Describe what this document is about.

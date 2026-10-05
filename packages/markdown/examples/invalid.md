@@ -2,6 +2,8 @@
 type: x
 ---
 
+# Example document
+
 ## Details
 
 ### Outputs

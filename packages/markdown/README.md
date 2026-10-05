@@ -1,20 +1,61 @@
 # @radical/markdown
 
-Validate Markdown headings and subheadings using rules written in JSON Schema.
+Markdownlint by default, with type-specific rules and optional frontmatter schemas.
 
-**Status:** the initial package works. It includes a built library, TypeScript
-declarations, example schemas and documents, and editor-independent diagnostics.
-It remains private while public release preparation is pending. The larger plan
-below remains available for later work.
+**Status:** the initial package works. It includes JavaScript, TypeScript
+declarations, runnable examples, and diagnostics for a consuming editor. It is
+private while public release preparation is pending. Requires Node.js 20 or newer.
 
-## Phase 0 — Simple package example
+## Phase 0 — Start with markdownlint
 
-For a document with frontmatter `type: x`, require this structure:
+```js
+import { validateDocument } from '@radical/markdown';
+
+const diagnostics = validateDocument({
+  uri: 'notes.md',
+  text: '# Notes\n\nText with trailing spaces   \n'
+});
+// Includes markdownlint's MD009 finding with a source range.
+```
+
+Every document runs through markdownlint, using its upstream default rules.
+Plain Markdown, missing types, and unknown types still receive ordinary style
+checks. The package adds type selection and a shared diagnostic format.
+
+## Add required headings for a document type
+
+Rules live in [`examples/config.json`](examples/config.json):
+
+```json
+{
+  "types": {
+    "x": {
+      "markdownlint": {
+        "MD043": {
+          "headings": [
+            "# Example document",
+            "## Overview",
+            "## Details",
+            "### Inputs",
+            "### Outputs",
+            "## Acceptance"
+          ],
+          "match_case": true
+        }
+      }
+    }
+  }
+}
+```
+
+A document with `type: x` uses these rules in addition to the defaults:
 
 ```md
 ---
 type: x
 ---
+
+# Example document
 
 ## Overview
 
@@ -27,11 +68,12 @@ type: x
 ## Acceptance
 ```
 
-The package checks the heading names, levels, parent sections, and order. The
-rules live in [`examples/x.schema.json`](examples/x.schema.json), a standard
-JSON Schema draft 2020-12 document. No document types are built into the library.
+MD043 checks heading names, levels, and order. It reports the first mismatch, or
+an EOF location when a required heading is missing. It also supports `?`, `*`,
+and `+` for unspecified headings; see the [upstream rule documentation](https://github.com/DavidAnson/markdownlint/blob/v0.40.0/doc/md043.md).
+This uses markdownlint's parsing and matching behavior directly.
 
-### Run it
+## Run the example
 
 From the repository root:
 
@@ -41,97 +83,107 @@ npm run example -w @radical/markdown
 ```
 
 The example checks [`valid.md`](examples/valid.md) and
-[`invalid.md`](examples/invalid.md). The valid file returns no diagnostics. The
-invalid file has reversed headings/subheadings and a missing Acceptance section.
-See [`examples/validate.mjs`](examples/validate.mjs) for the complete runnable code.
+[`invalid.md`](examples/invalid.md). The valid document has no diagnostics; the
+invalid one reports MD043. See [`examples/validate.mjs`](examples/validate.mjs)
+for the complete runnable code.
 
-### Use the package
+## Configuration and extension points
 
 ```js
 import { readFile } from 'node:fs/promises';
 import { createValidator } from '@radical/markdown';
 
-const schema = JSON.parse(await readFile('./x.schema.json', 'utf8'));
-const validate = createValidator({ x: schema });
-
+const config = JSON.parse(await readFile('./config.json', 'utf8'));
+const validate = createValidator(config);
 const text = await readFile('./document.md', 'utf8');
 const diagnostics = validate({ uri: 'document.md', text });
-console.log(diagnostics);
 ```
 
-Create the validator once and reuse it when document text changes. For a one-off
-call, `validateDocument({ uri, text }, { x: schema })` provides the same behavior.
-Add another schema under another type key to validate additional document types.
+Create a validator once and reuse it for editor changes. For a single call, use
+`validateDocument({ uri, text }, options)`.
 
-### How JSON Schema expresses the rules
+| Option | Purpose |
+| --- | --- |
+| `markdownlint` | Base native markdownlint configuration; upstream defaults when omitted |
+| `types` | Type-specific `markdownlint` overrides and optional `frontmatterSchema` |
+| `frontmatterSchema` | Optional JSON Schema applied directly to every document's metadata |
+| `customRules` | Standard markdownlint custom rules for company-specific checks |
 
-Markdown is parsed into a JSON structure with `frontmatter` and a heading tree.
-For example, the Details section becomes:
+Type keys match frontmatter `type` exactly. Type configuration overrides base
+configuration per key; each rule's options object is replaced as a whole. Use
+consistent rule IDs across layers when overriding a rule. Native options such as
+`default: false`, rule aliases, severity settings, and inline suppression comments
+keep markdownlint's behavior. A type override's `default` setting applies to the
+entire merged configuration for that document.
 
-```json
-{
-  "title": "Details",
-  "level": 2,
-  "children": [
-    { "title": "Inputs", "level": 3, "children": [] },
-    { "title": "Outputs", "level": 3, "children": [] }
-  ]
-}
+The core only accepts text and configuration objects. Consumers load their own
+`.markdownlint.json`, YAML configs, and schema files, then pass the parsed objects
+in. Configuration file discovery and `extends` resolution belong to the caller.
+
+Company plugins use markdownlint's [custom rule API](https://github.com/DavidAnson/markdownlint/blob/v0.40.0/doc/CustomRules.md)
+and receive the same diagnostic output as built-in rules.
+
+## Optional metadata validation and Google OKF
+
+JSON Schema remains available for frontmatter fields. It validates the metadata
+object directly, independently of Markdown style or heading checks:
+
+```js
+const validate = createValidator({
+  types: {
+    x: {
+      markdownlint: { MD043: { headings: ['# Summary', '## Details'] } },
+      frontmatterSchema: {
+        type: 'object',
+        required: ['owner'],
+        properties: { owner: { enum: ['team-a', 'team-b'] } }
+      }
+    }
+  }
+});
 ```
 
-The schema validates this structure using standard keywords:
+For documents without frontmatter, a base `frontmatterSchema` receives `{}` and
+can require metadata explicitly. Base and selected type schemas both apply.
+Malformed YAML produces parser diagnostics while ordinary style checks still run;
+metadata schemas are skipped for that document to avoid cascading errors.
+If supplied, `type` must be a non-empty string; an absent `type` is allowed unless
+a schema requires it. `id` is optional.
 
-- `const` fixes a heading title or level.
-- `prefixItems` defines the order of headings in an array.
-- `minItems` makes every listed heading required.
-- `maxItems` limits extra or duplicate headings.
-- `properties.children` applies the same rules to subheadings under their parent.
-- `properties.frontmatter` can also check company fields such as `owner`.
+Google's [Open Knowledge Format specification](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+uses generic Markdown concepts with a required `type`, path-based identity, and
+no prescribed body sections for ordinary concepts. This package can add company
+heading rules on top of that convention. The
+[`okf-frontmatter.schema.json`](examples/okf-frontmatter.schema.json) example only
+checks the basic concept `type` field; it is not a complete OKF bundle validator.
+Reserved index/log files need separate rules from concept documents.
 
-The example schema requires exactly three root sections and exactly two children
-under Details. It accepts prose between headings. Heading titles are case
-sensitive; inline Markdown formatting is removed and whitespace is normalized.
-Real Markdown parsing handles both `#` and underlined headings, while ignoring
-headings inside code, quotes, lists, and HTML comments.
+Schemas use draft 2020-12 and compile in Ajv strict mode. Invalid schemas throw
+when creating a validator. Schemas must be synchronous, with references resolved
+from the supplied schemas; the library does not fetch remote schemas or supply
+extra format validators. Schema errors currently highlight the frontmatter block.
 
-A `# Document title` is a real heading and becomes a parent of following `##`
-sections. If you add one, adapt the schema to wrap the section rules under that
-heading's `children`. Schemas always describe the actual heading tree.
+## Handoff to your colleague
 
-### Package contract for your colleague
-
-The package accepts `{ uri, text }` and returns `Diagnostic[]`. It has no filesystem
-or editor dependencies; the consuming application loads documents and schemas.
-Each diagnostic contains:
+Your colleague owns VS Code activation, document events, squiggles, and the
+Problems panel. The package returns `Diagnostic[]` with:
 
 | Field | Meaning |
 | --- | --- |
-| `code` | `FRONTMATTER_INVALID`, `TYPE_MISSING`, or `SCHEMA_VALIDATION` |
+| `code` | Native markdownlint rule ID, `TYPE_INVALID`, `FRONTMATTER_INVALID`, or `SCHEMA_VALIDATION` |
+| `source` | `markdownlint` or `frontmatter` |
 | `message` | Description of the failed check |
-| `severity` | `error` in this version |
+| `severity` | Upstream severity for markdownlint; `error` for metadata checks |
 | `uri` | The caller's document URI |
 | `range` | Zero-based UTF-16 offsets into the original text; end is exclusive |
-| `instancePath` | JSON Pointer into the parsed structure, for schema errors |
-| `schemaPath`, `keyword` | The failed JSON Schema constraint, for schema errors |
+| `instancePath`, `schemaPath`, `keyword` | JSON Schema failure details, when applicable |
 
-Heading errors point at the corresponding heading. Missing subheadings point at
-the parent heading; missing root headings and frontmatter errors use the
-frontmatter block. YAML syntax errors use the parser's source range. LF, CRLF,
-bare CR, and non-ASCII text preserve original offsets.
+Convert offsets using `document.positionAt()`. LF, CRLF, bare CR, non-ASCII text,
+and a leading BOM preserve original positions. When upstream reports no specific
+column range, the diagnostic covers that line. The package reports findings and
+leaves fixes, display, and gating to consumers.
 
-Your colleague owns the VS Code extension and can map these offsets using
-`document.positionAt()`. Their integration can start with this function and the
-example schema. Extension implementation is a separate work package.
-
-Plain Markdown without frontmatter is ignored. Documents with frontmatter need a
-non-empty string `type`; `id` is optional in this initial version. Unconfigured
-types receive frontmatter checks only. Invalid documents return diagnostics.
-Invalid schemas throw when creating the validator. Schemas compile in Ajv strict
-mode, are synchronous, and use draft 2020-12; references must resolve within the
-supplied schemas. The library
-does not fetch remote schemas or provide extra format validators.
-
-### Build and handoff
+The initial package exports ESM. Build and share it with:
 
 ```bash
 npm run typecheck -w @radical/markdown
@@ -140,10 +192,10 @@ npm run build -w @radical/markdown
 npm pack -w @radical/markdown
 ```
 
-The tarball includes JavaScript, declarations, the MIT license, this README, and
-runnable examples. A colleague can install it in another project using
-`npm install /path/to/radical-markdown-0.0.0.tgz` and import `@radical/markdown`.
-The package currently exports ESM. Public npm publication remains part of WP10.
+Install the tarball from another project with
+`npm install /path/to/radical-markdown-0.0.0.tgz`. It includes JavaScript,
+declarations, the MIT license, this README, and runnable examples. Public npm
+publication remains part of WP10.
 
 ## Purpose
 
@@ -214,7 +266,7 @@ WP04, and WP06 respectively.
 ## Work packages
 
 Phase 0 above is implemented. The broader work packages below describe further
-work; the initial heading validator does not complete them. Each has a deliverable
+work; the initial markdownlint wrapper does not complete them. Each has a deliverable
 and a completion condition so it can become a separate issue or pull request.
 
 | Work package | Deliverable | Depends on |
@@ -338,8 +390,8 @@ first release is ready.
 
 ## Delivery order
 
-0. **Initial package (implemented):** validate one document against a type-specific
-   JSON Schema and hand the package to the extension author.
+0. **Initial package (implemented):** lint Markdown by default, add type-specific
+   markdownlint configuration and hand the package to the extension author.
 1. **Generic library:** WP01–WP05 establish parsing, indexing, references, and
    validation without domain assumptions.
 2. **Company pilot:** WP08 proves external use with one custom validator. WP10
@@ -357,8 +409,8 @@ consumer check.
 
 This package is registered through the root `packages/*` npm workspace pattern.
 Its public entry point exports `createValidator`, `validateDocument`, and the
-document, heading, schema, diagnostic, and range types. Inspect its metadata from
-the repository root with:
+document, options, markdownlint configuration/rule, schema, diagnostic, and range
+types. Inspect its metadata from the repository root with:
 
 ```bash
 npm pkg get name version private -w @radical/markdown

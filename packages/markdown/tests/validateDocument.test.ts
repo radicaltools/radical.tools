@@ -1,185 +1,201 @@
 import { describe, expect, it } from 'vitest'
-import schema from '../examples/x.schema.json'
-import { createValidator, validateDocument, type DocumentSchemas } from '../src/index.js'
+import { lint } from 'markdownlint/sync'
+import config from '../examples/config.json'
+import { createValidator, validateDocument, type MarkdownlintRule, type ValidatorOptions } from '../src/index.js'
 
-const validate = createValidator({ x: schema })
-const body = '## Overview\n\n## Details\n\n### Inputs\n\n### Outputs\n\n## Acceptance\n'
-const wrap = (bodyText: string, type = 'x') => `---\ntype: ${type}\n---\n\n${bodyText}`
-const check = (text: string) => validate({ uri: 'test.md', text })
+const body = '# Example document\n\n## Overview\n\n## Details\n\n### Inputs\n\n### Outputs\n\n## Acceptance\n'
+const wrap = (content: string, type = 'x') => `---\ntype: ${type}\n---\n\n${content}`
+const headingOptions: ValidatorOptions = {
+  markdownlint: { default: false }, types: config.types,
+}
+const checkHeadings = (text: string) => validateDocument({ uri: 'test.md', text }, headingOptions)
+const check = (text: string, options: ValidatorOptions = {}) => validateDocument({ uri: 'test.md', text }, options)
+const metadataOnly = { markdownlint: { default: false } }
 
-describe('JSON Schema document rules', () => {
-  it('accepts required headings and subheadings in order', () => {
-    expect(check(wrap(body))).toEqual([])
+describe('markdownlint defaults', () => {
+  it('matches upstream defaults for ordinary Markdown', () => {
+    const text = '# Hello\n\nText with trailing spaces   \n'
+    const upstream = lint({ strings: { document: text } }).document
+    expect(check(text).map(diagnostic => diagnostic.code)).toEqual(upstream.map(error => error.ruleNames[0]))
+    expect(check(text).some(diagnostic => diagnostic.code === 'MD009')).toBe(true)
+    expect(check(text).every(diagnostic => diagnostic.source === 'markdownlint')).toBe(true)
   })
 
-  it('selects schemas by exact type and supports multiple types', () => {
-    const schemas: DocumentSchemas = { x: schema, note: {
-      type: 'object', properties: { frontmatter: {
-        type: 'object', required: ['owner'], properties: { owner: { type: 'string' } },
-      } },
-    } }
-    expect(validateDocument({ uri: 'note.md', text: wrap('## Anything', 'note') }, schemas)
-      .some(diagnostic => diagnostic.instancePath === '/frontmatter')).toBe(true)
-    expect(check(wrap('## Anything', 'unconfigured'))).toEqual([])
-    expect(check(wrap('## Anything', 'X'))).toEqual([])
-    expect(check(wrap('## Anything'))).not.toEqual([])
+  it('lints documents without type metadata and unknown document types', () => {
+    expect(check('Hello\n').some(diagnostic => diagnostic.code === 'MD041')).toBe(true)
+    expect(check(wrap('Hello\n', 'unknown'), headingOptions)).toEqual([])
+    expect(check(wrap('Hello\n', 'unknown')).some(diagnostic => diagnostic.code === 'MD041')).toBe(true)
   })
 
-  it('reports missing top-level headings at the frontmatter', () => {
-    const text = wrap(body.replace('## Acceptance\n', ''))
-    const diagnostic = check(text).find(diagnostic => diagnostic.keyword === 'minItems')!
-    expect(diagnostic.instancePath).toBe('/headings')
-    expect(text.slice(diagnostic.range.start, diagnostic.range.end)).toBe('---\ntype: x\n---\n')
-    expect(diagnostic.uri).toBe('test.md')
-    expect(diagnostic.severity).toBe('error')
+  it('accepts caller configuration and preserves upstream severities', () => {
+    expect(check('# Hello\n\nText   \n', { markdownlint: { MD009: false } })).toEqual([])
+    const [diagnostic] = check('# Hello\n\nText   \n', { markdownlint: { default: false, MD009: 'warning' } })
+    expect(diagnostic.code).toBe('MD009')
+    expect(diagnostic.severity).toBe('warning')
   })
 
-  it('reports missing subheadings at their parent', () => {
-    const text = wrap(body.replace('### Outputs\n', ''))
-    const [diagnostic] = check(text)
-    expect(diagnostic.keyword).toBe('minItems')
-    expect(text.slice(diagnostic.range.start, diagnostic.range.end)).toBe('## Details')
+  it('supports upstream inline rule suppression', () => {
+    expect(check('# Hello\n\n<!-- markdownlint-disable MD009 -->\nText   \n')).toEqual([])
+  })
+})
+
+describe('type-specific rules built on MD043', () => {
+  it('accepts the example with upstream defaults plus type overrides', () => {
+    expect(check(wrap(body), config)).toEqual([])
   })
 
-  it('reports swapped sections and subheadings through prefixItems', () => {
-    const text = wrap('## Details\n### Outputs\n### Inputs\n## Overview\n## Acceptance')
-    expect(check(text).some(diagnostic => diagnostic.instancePath === '/headings/0/title')).toBe(true)
-    const swapped = wrap(body.replace('### Inputs\n\n### Outputs', '### Outputs\n\n### Inputs'))
-    expect(check(swapped).filter(diagnostic => diagnostic.keyword === 'const')).toHaveLength(2)
-  })
-
-  it('does not accept subheadings under another parent or after another section', () => {
-    for (const content of [
-      '## Overview\n### Inputs\n### Outputs\n## Details\n## Acceptance',
-      '## Overview\n## Details\n## Extra\n### Inputs\n### Outputs\n## Acceptance',
+  it('reports incorrect heading order, nesting levels, names, and missing headings', () => {
+    for (const invalid of [
+      body.replace('## Overview\n\n## Details', '## Details\n\n## Overview'),
+      body.replace('### Inputs', '#### Inputs'),
+      body.replace('### Inputs\n\n### Outputs', '### Outputs\n\n### Inputs'),
+      body.replace('### Inputs', '### Unknown'),
+      body.replace('## Acceptance\n', ''),
+      body.replace('## Details\n\n### Inputs\n\n### Outputs', '### Inputs\n\n### Outputs\n\n## Details'),
     ]) {
-      expect(check(wrap(content)).some(diagnostic =>
-        diagnostic.keyword === 'minItems' && diagnostic.instancePath === '/headings/1/children')).toBe(true)
+      expect(checkHeadings(wrap(invalid)).map(diagnostic => diagnostic.code)).toEqual(['MD043'])
     }
   })
 
-  it('checks heading levels and points at the incorrect heading', () => {
-    const text = wrap(body.replace('### Inputs', '#### Inputs'))
-    const diagnostic = check(text).find(diagnostic => diagnostic.instancePath?.endsWith('/level'))!
-    expect(diagnostic.keyword).toBe('const')
-    expect(text.slice(diagnostic.range.start, diagnostic.range.end)).toBe('#### Inputs')
+  it('reports an extra or duplicate heading', () => {
+    expect(checkHeadings(wrap(body + '\n## Overview\n'))[0].code).toBe('MD043')
   })
 
-  it('rejects duplicates and extra headings according to the example schema', () => {
-    for (const extra of ['## Acceptance', '## Extra']) {
-      const text = wrap(body + extra)
-      const diagnostic = check(text).find(diagnostic => diagnostic.keyword === 'maxItems')!
-      expect(text.slice(diagnostic.range.start, diagnostic.range.end)).toBe(extra)
-    }
+  it('keeps base rules active while adding or overriding a type rule', () => {
+    const text = wrap(body.replace('## Overview', '## overview') + '\nTrailing spaces   \n')
+    const diagnostics = check(text, { ...config, markdownlint: { MD013: false } })
+    expect(diagnostics.some(diagnostic => diagnostic.code === 'MD043')).toBe(true)
+    expect(diagnostics.some(diagnostic => diagnostic.code === 'MD009')).toBe(true)
+    const options: ValidatorOptions = { ...config, markdownlint: { MD009: false }, types: {
+      ...config.types, x: { markdownlint: { ...config.types.x.markdownlint, MD009: true } },
+    } }
+    expect(check(text, options).some(diagnostic => diagnostic.code === 'MD009')).toBe(true)
   })
 
-  it('supports arbitrary standard schema constraints on frontmatter', () => {
-    const validateOwner = createValidator({ x: {
-      type: 'object', properties: { frontmatter: {
-        type: 'object', required: ['owner'], properties: { owner: { enum: ['team-a', 'team-b'] } },
-      } },
-    } })
-    expect(validateOwner({ uri: 'x.md', text: '---\ntype: x\nowner: team-a\n---' })).toEqual([])
-    expect(validateOwner({ uri: 'x.md', text: '---\ntype: x\nowner: unknown\n---' })[0].keyword).toBe('enum')
+  it('selects by exact type and isolates types from one another', () => {
+    const options: ValidatorOptions = { ...headingOptions, types: {
+      ...config.types, decision: { markdownlint: { MD043: { headings: ['# Decision'] } } },
+    } }
+    expect(check(wrap('# Decision\n', 'decision'), options)).toEqual([])
+    expect(check(wrap(body), options)).toEqual([])
+    expect(check(wrap('# Anything\n', 'X'), options)).toEqual([])
   })
 
-  it('reuses compiled schemas without retaining diagnostics between calls', () => {
-    const text = wrap(body)
-    expect(check(text.replace('### Outputs', '### Wrong'))).not.toEqual([])
-    expect(check(text)).toEqual([])
-  })
-})
-
-describe('Markdown parsing and locations', () => {
-  it('ignores headings in fenced/indented code, blockquotes, lists, and HTML comments', () => {
-    const fake = '```md\n## Overview\n```\n\n    ## Overview\n\n> ## Overview\n\n- ## Overview\n\n<!--\n## Overview\n-->\n'
-    expect(check(wrap(fake + body))).toEqual([])
-    expect(check(wrap(fake))).not.toEqual([])
+  it('supports MD043 wildcard headings', () => {
+    const options: ValidatorOptions = { markdownlint: {
+      default: false, MD043: { headings: ['?', '## Overview', '*', '## Acceptance'], match_case: true },
+    } }
+    expect(check('# Any title\n\n## Overview\n\n### Optional\n\n## Acceptance\n', options)).toEqual([])
   })
 
-  it('supports setext headings, closing hashes, and inline formatting', () => {
-    expect(check(wrap(body.replace('## Overview', '**Overview**\n------------')
-      .replace('### Inputs', '### `Inputs` ###')))).toEqual([])
-  })
-
-  it('normalizes whitespace but keeps title case significant', () => {
-    expect(check(wrap(body.replace('## Overview', '##   Overview   ')))).toEqual([])
-    expect(check(wrap(body.replace('## Overview', '## overview')))).not.toEqual([])
-  })
-
-  it.each(['\n', '\r\n', '\r'])('preserves original UTF-16 offsets with %j line endings', newline => {
-    const text = wrap('😀 Intro\n' + body.replace('### Inputs', '#### Inputs')).split('\n').join(newline)
-    const diagnostic = check(text).find(diagnostic => diagnostic.instancePath?.endsWith('/level'))!
-    expect(diagnostic.range).toEqual({
-      start: text.indexOf('#### Inputs'), end: text.indexOf('#### Inputs') + '#### Inputs'.length,
-    })
-  })
-
-  it('accepts a BOM and YAML end marker', () => {
-    expect(check(`\uFEFF---\ntype: x\n...\n${body}`)).toEqual([])
-  })
-
-  it('retains a level-one document title in the heading tree', () => {
-    const withTitle = createValidator({ x: {
-      type: 'object', properties: { headings: {
-        type: 'array', minItems: 1, maxItems: 1, prefixItems: [{
-          type: 'object', properties: { level: { const: 1 }, children: schema.properties.headings },
-        }],
-      } },
-    } })
-    expect(withTitle({ uri: 'x.md', text: wrap('# Title\n' + body) })).toEqual([])
-  })
-})
-
-describe('frontmatter', () => {
-  it('ignores ordinary Markdown and does not require an id', () => {
-    expect(check('')).toEqual([])
-    expect(check('# Hello')).toEqual([])
-    expect(check(wrap(body))).toEqual([])
-  })
-
-  it.each(['', '123', 'null', '[]', '{}', '" "'])('rejects invalid type %j', type => {
-    expect(check(wrap(body, type)).map(diagnostic => diagnostic.code)).toEqual(['TYPE_MISSING'])
-  })
-
-  it('reports a missing type', () => {
-    expect(check('---\nid: hello\n---\n')[0].code).toBe('TYPE_MISSING')
-  })
-
-  it.each(['---\ntype: [\n---\n', '---\ntype: x\ntype: y\n---\n', '---\n- x\n---\n', '---\n---\n'])
-    ('reports malformed or non-mapping YAML', text => {
-      const diagnostics = check(text)
-      expect(diagnostics.length).toBeGreaterThan(0)
-      expect(diagnostics.every(diagnostic => diagnostic.code === 'FRONTMATTER_INVALID')).toBe(true)
-      expect(diagnostics.every(diagnostic => diagnostic.range.start >= 0 && diagnostic.range.end <= text.length)).toBe(true)
-    })
-
-  it('reports an unclosed frontmatter block', () => {
-    expect(check('---\ntype: x')[0].code).toBe('FRONTMATTER_INVALID')
-    expect(check('---')[0].code).toBe('FRONTMATTER_INVALID')
-  })
-
-  it('reports circular YAML aliases instead of allowing cyclic schema input', () => {
-    expect(check('---\ntype: x\nloop: &loop { self: *loop }\n---')[0].code).toBe('FRONTMATTER_INVALID')
-  })
-})
-
-describe('schema configuration', () => {
-  it('resolves references to supplied schemas regardless of registration order', () => {
-    const validate = createValidator({
-      x: { $ref: 'urn:example:shape' },
-      shape: { ...schema, $id: 'urn:example:shape' },
-    })
+  it('reuses a validator without carrying type settings between documents', () => {
+    const validate = createValidator(headingOptions)
+    expect(validate({ uri: 'x.md', text: wrap('# Wrong\n') })[0].code).toBe('MD043')
+    expect(validate({ uri: 'plain.md', text: '# Wrong\n' })).toEqual([])
     expect(validate({ uri: 'x.md', text: wrap(body) })).toEqual([])
   })
+})
 
-  it('throws at creation for invalid schemas and unsupported keywords', () => {
-    expect(() => createValidator({ x: { type: 'nonexistent' } })).toThrow()
-    expect(() => createValidator({ x: { magicHeadings: true } })).toThrow()
+describe('diagnostic locations', () => {
+  it.each(['\n', '\r\n', '\r'])('preserves UTF-16 offsets and frontmatter lines with %j endings', newline => {
+    const text = wrap(body.replace('### Inputs', '#### Inputs')).split('\n').join(newline)
+    const [diagnostic] = checkHeadings(text)
+    expect(text.slice(diagnostic.range.start, diagnostic.range.end)).toBe('#### Inputs')
+    expect(diagnostic.range.start).toBe(text.indexOf('#### Inputs'))
+    expect(diagnostic.uri).toBe('test.md')
   })
 
-  it('rejects async schemas and unresolved remote references', () => {
-    expect(() => createValidator({ x: { $async: true, type: 'object' } })).toThrow('synchronous')
-    expect(() => createValidator({ x: { $ref: 'https://example.test/schema' } })).toThrow()
+  it('preserves ranges after non-ASCII text and a BOM', () => {
+    const text = '\uFEFF# Hello\n\n😀 text   \n'
+    const [diagnostic] = check(text, { markdownlint: { default: false, MD009: true } })
+    expect(text.slice(diagnostic.range.start, diagnostic.range.end)).toBe('   ')
+    expect(diagnostic.range.start).toBe(text.indexOf('   '))
+  })
+
+  it('maps columns on the first line with a BOM', () => {
+    const text = '\uFEFF# Hello   \n'
+    const [diagnostic] = check(text, { markdownlint: { default: false, MD009: true } })
+    expect(text.slice(diagnostic.range.start, diagnostic.range.end)).toBe('   ')
+  })
+
+  it('keeps ranges bounded for an empty file and missing headings at EOF', () => {
+    for (const text of ['', wrap(body.replace('## Acceptance\n', ''))]) {
+      expect(checkHeadings(text).every(diagnostic =>
+        diagnostic.range.start >= 0 && diagnostic.range.start <= diagnostic.range.end && diagnostic.range.end <= text.length)).toBe(true)
+    }
+  })
+})
+
+describe('optional frontmatter schemas', () => {
+  const schema = { type: 'object', required: ['owner'], properties: { owner: { enum: ['team-a', 'team-b'] } } }
+
+  it('validates frontmatter directly with a type-specific schema', () => {
+    const options = { ...metadataOnly, types: { x: { frontmatterSchema: schema } } }
+    expect(check('---\ntype: x\nowner: team-a\n---', options)).toEqual([])
+    const [diagnostic] = check('---\ntype: x\nowner: unknown\n---', options)
+    expect(diagnostic.source).toBe('frontmatter')
+    expect(diagnostic.code).toBe('SCHEMA_VALIDATION')
+    expect(diagnostic.instancePath).toBe('/owner')
+    expect(diagnostic.keyword).toBe('enum')
+  })
+
+  it('can require metadata for plain Markdown through the base schema', () => {
+    const [diagnostic] = check('# Plain\n', { ...metadataOnly, frontmatterSchema: schema })
+    expect(diagnostic.keyword).toBe('required')
+    expect(diagnostic.range).toEqual({ start: 0, end: 0 })
+  })
+
+  it('applies both base and selected type schemas', () => {
+    const options: ValidatorOptions = { ...metadataOnly, frontmatterSchema: schema, types: { x: {
+      frontmatterSchema: { type: 'object', required: ['status'], properties: { status: { type: 'string' } } },
+    } } }
+    expect(check(wrap(body), options).map(diagnostic => diagnostic.keyword)).toEqual(['required', 'required'])
+  })
+
+  it('throws for invalid schemas and unresolved references during creation', () => {
+    expect(() => createValidator({ frontmatterSchema: { type: 'nonexistent' } })).toThrow()
+    expect(() => createValidator({ frontmatterSchema: { $ref: 'https://example.test/schema' } })).toThrow()
+    expect(() => createValidator({ frontmatterSchema: { $async: true, type: 'object' } })).toThrow('synchronous')
+  })
+})
+
+describe('frontmatter parsing', () => {
+  it('allows absent type, absent id, and empty metadata', () => {
+    expect(check('---\nowner: team-a\n---\n\n# Hello\n')).toEqual([])
+    expect(check(wrap(body), config)).toEqual([])
+    expect(check('---\n---\n\n# Hello\n')).toEqual([])
+  })
+
+  it.each(['null', '123', '[]', '{}', '" "'])('rejects a supplied invalid type %j', type => {
+    expect(check(wrap(body, type), metadataOnly)[0].code).toBe('TYPE_INVALID')
+  })
+
+  it.each(['---\ntype: [\n---\n', '---\ntype: x\ntype: y\n---\n', '---\n- x\n---\n', '---\ntype: x', '---\ntype: x\nloop: &loop { self: *loop }\n---'])
+    ('reports malformed frontmatter', text => {
+      const diagnostics = check(text, metadataOnly)
+      expect(diagnostics.length).toBeGreaterThan(0)
+      expect(diagnostics.every(diagnostic => diagnostic.code === 'FRONTMATTER_INVALID')).toBe(true)
+    })
+
+  it('continues base linting after malformed YAML without cascading schema failures', () => {
+    const diagnostics = check('---\ntype: [\n---\n\n# Hello   \n', { frontmatterSchema: { type: 'object' } })
+    expect(diagnostics.some(diagnostic => diagnostic.code === 'FRONTMATTER_INVALID')).toBe(true)
+    expect(diagnostics.some(diagnostic => diagnostic.code === 'MD009')).toBe(true)
+    expect(diagnostics.some(diagnostic => diagnostic.code === 'SCHEMA_VALIDATION')).toBe(false)
+  })
+})
+
+describe('company extensions', () => {
+  it('runs standard markdownlint custom rules with the same diagnostic contract', () => {
+    const companyRule: MarkdownlintRule = {
+      names: ['COMPANY001', 'company-no-todo'], description: 'Unresolved company TODO', tags: ['company'],
+      parser: 'micromark', function: (params, onError) => {
+        if (params.lines[0].includes('TODO')) onError({ lineNumber: 1 })
+      },
+    }
+    const [diagnostic] = check('# TODO\n', { markdownlint: { default: false, COMPANY001: true }, customRules: [companyRule] })
+    expect(diagnostic.code).toBe('COMPANY001')
+    expect(diagnostic.source).toBe('markdownlint')
+    expect(diagnostic.range).toEqual({ start: 0, end: '# TODO'.length })
   })
 })
