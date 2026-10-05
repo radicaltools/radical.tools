@@ -1,0 +1,18 @@
+{
+  "name": "@radical/markdown",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Generic Markdown node validation and extensible document rules for use in Radical Tools and other applications. Planning scaffold; implementation is pending.",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://github.com/radicaltools/radical.tools/tree/main/packages/markdown",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/radicaltools/radical.tools.git",
+    "directory": "packages/markdown"
+  },
+  "files": [
+    "README.md",
+    "LICENSE"
+  ]
+}
