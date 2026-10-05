@@ -4,7 +4,7 @@
 // applyPatch.ts — there is no single "apply a whole patch" function anymore,
 // each tool applies its own single change.
 
-import type { C4Node, C4Relation, DiagramView } from '../c4'
+import type { C4Node, C4Relation, DiagramSequence, DiagramView, Presentation } from '../c4'
 import type { Metamodel } from '../metamodel'
 
 export interface ApplyReport {
@@ -62,6 +62,9 @@ export interface DiagramFacade {
   addNode(node: Omit<C4Node, 'id'>): string
   updateNode(id: string, updates: Partial<Omit<C4Node, 'id'>>): void
   removeNode(id: string): void
+  /** Optional — moves sibling nodes under a new parent (null = the root),
+   *  keeping their canvas position. move_node checks the move first. */
+  moveNodes?(ids: string[], parentId: string | null): void
   addRelation(rel: Omit<C4Relation, 'id'>): void
   updateRelation?(id: string, updates: Partial<Omit<C4Relation, 'id'>>): void
   removeRelation(id: string): void
@@ -70,8 +73,28 @@ export interface DiagramFacade {
   setViewNodes?(viewId: string, nodeIds: string[]): void
   removeView?(id: string): void
   setActiveView?(id: string | null): void
-  /** Optional — sets a view's kind (table/treemap/wiki/matrix/static). */
+  /** Optional — sets a view's kind (table/treemap/wiki/matrix/static/dynamic). */
   setViewKind?(id: string, kind: DiagramView['kind']): void
+  renameView?(id: string, name: string): void
+  /** Optional — links a dynamic view to a sequence (null unlinks it). */
+  setViewSequence?(id: string, sequenceId: string | null): void
+  /** Optional — hides exactly these relations in the view. */
+  setViewHiddenRelations?(id: string, relationIds: string[]): void
+  /** Optional sequence actions — omitted = AI sequence tools report a clear error. */
+  getSequences?(): Record<string, DiagramSequence>
+  addSequence?(name: string): string
+  renameSequence?(id: string, name: string): void
+  /** Replaces the steps, in order; a relation may repeat. */
+  setSequenceSteps?(id: string, steps: Array<{ relationId: string; description?: string }>): void
+  removeSequence?(id: string): void
+  /** Optional — replaces the document's metamodel (metamodel tools). */
+  setMetamodel?(metamodel: Metamodel): void
+  /** Optional presentation access — omitted = presentation tools report a clear error. */
+  getPresentations?(): Presentation[]
+  setPresentations?(presentations: Presentation[]): void
+  /** Optional — runs Smart Layout over All elements (no viewId) or one
+   *  static/dynamic view, and keeps the result. */
+  runLayout?(viewId?: string): Promise<{ ok: boolean; text: string }>
   /** Optional — clears the entire diagram (nodes, relations, views) so the
    *  AI can build a fresh model from scratch. Omitting it means reset_diagram
    *  calls fail with a descriptive error. */

@@ -61,6 +61,29 @@ describe('createModelFacade', () => {
     expect(f.getNodes()[api].parentId).toBe(sys)
   })
 
+  it('moves nodes into another parent, keeping their canvas position', () => {
+    const f = facade()
+    const a = f.addNode(node('system', 'A', { x: 100, y: 50 }))
+    const b = f.addNode(node('system', 'B', { x: 600, y: 0 }))
+    const api = f.addNode(node('container', 'API', { parentId: a, x: 20, y: 130 }))
+    f.moveNodes!([api], b)
+    expect(f.lastError).toBeNull()
+    // Absolute (120, 180) stays put, now relative to B at (600, 0).
+    expect(f.getNodes()[api]).toMatchObject({ parentId: b, x: -480, y: 180 })
+  })
+
+  it('refuses moves into a descendant or a forbidden parent, leaving the node unchanged', () => {
+    const f = facade()
+    const a = f.addNode(node('system', 'A'))
+    const api = f.addNode(node('container', 'API', { parentId: a }))
+    f.moveNodes!([a], api)
+    expect(f.lastError).toBe('Cannot move a node into itself or one of its descendants.')
+    f.moveNodes!([api], null)
+    expect(f.lastError).toBe('Cannot place Container "API" inside the canvas root. Allowed parents: System.')
+    expect(f.getNodes()[api].parentId).toBe(a)
+    expect(f.getNodes()[a].parentId).toBeUndefined()
+  })
+
   it('infers the relation type and refuses pairs the metamodel does not allow', () => {
     const f = facade()
     const a = f.addNode(node('system', 'A'))

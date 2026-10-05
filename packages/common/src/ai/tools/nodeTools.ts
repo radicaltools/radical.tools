@@ -1,7 +1,8 @@
-// ─── Node tools: add_node / update_node / delete_node ───────────────────────
+// ─── Node tools: add_node / update_node / move_node / delete_node ───────────
 
 import { NODE_SIZES, type C4ElementType, type C4Node } from '../../c4'
 import type { Metamodel } from '../../metamodel'
+import { checkReparent } from '../../model'
 import { fail, type ToolDef, type ToolHandler } from './types'
 import { validateProperties } from './propertyBag'
 
@@ -51,6 +52,19 @@ export function buildNodeToolDefs(mm: Metamodel | undefined): ToolDef[] {
       },
     },
     {
+      name: 'move_node',
+      description: 'Move an existing node (with its children) into another parent, or to the root with parentId null. Its canvas position is kept; the metamodel\'s allowedParents applies.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Real node id or a tempId used earlier in this run.' },
+          parentId: { type: ['string', 'null'], description: 'New parent: real node id or tempId, or null for the root.' },
+        },
+        required: ['id', 'parentId'],
+        additionalProperties: false,
+      },
+    },
+    {
       name: 'delete_node',
       description: 'Delete an existing node.',
       inputSchema: {
@@ -78,11 +92,11 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       const { values: propValues, notes } = validateProperties(input.properties, mm?.nodeTypes[input.type]?.properties)
 
       const size = NODE_SIZES[input.type as C4ElementType] ?? { width: 240, height: 140 }
-      const pos = ctx.placeNext()
       const parentReal = typeof input.parentId === 'string' && input.parentId ? ctx.resolveId(input.parentId) : undefined
       if (parentReal && !(parentReal in ctx.diagram.getNodes())) {
         return fail(`add_node "${input.label}": unknown parentId "${input.parentId}"`)
       }
+      const pos = ctx.placeNext(parentReal)
 
       const nodeInput = {
         type: input.type as C4ElementType,
@@ -133,6 +147,31 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       ctx.diagram.updateNode(realId, updates)
       const resultText = notes.length ? `Updated node ${realId}. ${notes.join('; ')}` : `Updated node ${realId}.`
       return { ok: true, resultText, updated: { nodes: 1 } }
+    },
+
+    move_node: (rawInput, ctx) => {
+      const input = rawInput as { id?: unknown; parentId?: unknown }
+      if (typeof input.id !== 'string' || !input.id) return fail('move_node: id is required')
+      if (input.parentId !== null && (typeof input.parentId !== 'string' || !input.parentId)) {
+        return fail('move_node: parentId must be a node id or null')
+      }
+      if (!ctx.diagram.moveNodes) return fail('move_node: nodes cannot be moved in this context')
+      const realId = ctx.resolveId(input.id)
+      const nodes = ctx.diagram.getNodes()
+      if (!(realId in nodes)) return fail(`move_node: unknown id "${input.id}"`)
+      const parentReal = input.parentId === null ? null : ctx.resolveId(input.parentId)
+      if (parentReal && !(parentReal in nodes)) return fail(`move_node: unknown parentId "${input.parentId}"`)
+      if ((nodes[realId].parentId ?? null) === parentReal) return { ok: true, resultText: `Node ${realId} is already there.` }
+      const refused = checkReparent({
+        c4Nodes: nodes,
+        c4Relations: ctx.diagram.getRelations(),
+        views: ctx.diagram.getViews?.() ?? {},
+        activeViewId: null,
+        metamodel: ctx.diagram.getMetamodel?.(),
+      }, [realId], parentReal)
+      if (refused) return fail(`move_node: ${refused}`)
+      ctx.diagram.moveNodes([realId], parentReal)
+      return { ok: true, resultText: `Moved node ${realId} to ${parentReal ?? 'the root'}.`, updated: { nodes: 1 } }
     },
 
     delete_node: (rawInput, ctx) => {

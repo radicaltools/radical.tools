@@ -204,3 +204,31 @@ ADR, fitness function, requirement, scenario and mockup, and
 5. **Fields have no per-field hint.** Guidance is per step, so steps with
    several fields share one help text. A `PropertyDef.placeholder` would let
    the properties panel show the same prompts.
+
+### AI tool catalogue and MCP server (2026-10-05)
+
+One catalogue in `packages/common/src/ai/tools` serves Studio's AI
+(QuickSearch chat, Radical Forge) and `apps/mcp`: nodes (including
+`move_node`), relations, views (`update_view`, dynamic views), sequences,
+presentations, the metamodel and `smart_layout` (All elements or one view).
+Forge leaves out the metamodel and presentation groups
+(`excludeToolGroups`). The facade decides how a tool lands: Studio's store or
+the headless model, which the MCP server writes to the folder. Editing a
+built-in metamodel (in the Metamodel Editor or through a tool) now works on a
+`…-custom` copy, because `documentMetamodel` swaps a preset id back to the
+preset on load. Still open:
+
+1. **Studio's smart_layout switches the active view.** Studio lays out what
+   is on screen, so the tool first activates the requested view (or All
+   elements). The facade's `runLayout` is not covered by a test, because Smart
+   Layout needs ELK, which the Studio unit tests don't run.
+2. **No wizard editing through the tools.** `upsert_node_type` sets look, containment,
+   cardinality, table tab and properties, not `wizard` or
+   `hierarchyRelation`.
+3. **Slides are framed by fit.** Tool-made slides have no captured viewport or
+   canvas state, so Studio fits the slide's view; framing is captured only in
+   Studio.
+4. **Polish characters in folder slugs.** `slugify` in
+   `packages/common/src/formats/mdFolder.ts` turns "zamówienie" into
+   "zamo-wienie" (NFKD leaves the accent as a separate mark, which becomes a
+   dash). Check whether fixing it renames files in existing folders.

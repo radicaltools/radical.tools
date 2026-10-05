@@ -17,6 +17,7 @@
     "./ai/queryLanguage": "./src/ai/queryLanguage.ts",
     "./ai/diagramFacade": "./src/ai/diagramFacade.ts",
     "./ai/modelFacade": "./src/ai/modelFacade.ts",
+    "./ai/metamodelContext": "./src/ai/metamodelContext.ts",
     "./ai/tools": "./src/ai/tools/index.ts"
   },
   "scripts": {
