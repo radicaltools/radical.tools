@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { builtInC4Metamodel, validateModel } from '@radical/common/metamodel'
+import { forkPresetMetamodel } from '@radical/common/model'
 import type {
   NodeTypeDef,
   RelationTypeDef,
@@ -552,7 +553,7 @@ export function MetamodelEditor(): React.ReactElement {
             <input
               className="mm-input mm-name"
               value={metamodel.name}
-              onChange={(e) => setMetamodel({ ...metamodel, name: e.target.value })}
+              onChange={(e) => setMetamodel({ ...(forkPresetMetamodel(metamodel) ?? metamodel), name: e.target.value })}
             />
             <div className="mm-subhead">
               Per-document metamodel · {nodeTypes.length} node type(s) · {relationTypes.length} relation type(s)

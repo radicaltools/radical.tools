@@ -41,6 +41,60 @@ export function compoundPadding(type: string): { top: number; side: number; bott
 }
 
 /**
+ * The size a compound node takes to wrap its children (boxes in the
+ * parent's own coordinates, at their effective size), never smaller than
+ * its type's default size. The store's fitParentToChildren measures the
+ * children for the active view; fitAncestors measures them headlessly.
+ */
+export function fittedParentSize(
+  parent: C4Node,
+  children: Array<{ x: number; y: number; width: number; height: number }>,
+): { width: number; height: number } {
+  const pad = compoundPadding(parent.type)
+  let maxRight = 0
+  let maxBottom = 0
+  for (const child of children) {
+    maxRight = Math.max(maxRight, child.x + child.width)
+    maxBottom = Math.max(maxBottom, child.y + child.height)
+  }
+  return {
+    width: Math.max(maxRight + pad.side, NODE_SIZES[parent.type].width),
+    height: Math.max(maxBottom + pad.bottom, NODE_SIZES[parent.type].height),
+  }
+}
+
+/** Refits `startId` (when it is a compound node) and then every ancestor
+ *  above it to wrap their children. Mutates `nodes`; collapsed and
+ *  childless nodes keep their size. For callers without a canvas. */
+export function fitAncestors(nodes: Record<string, C4Node>, startId: string | undefined): void {
+  const seen = new Set<string>()
+  let cur = startId ? nodes[startId] : undefined
+  while (cur && !seen.has(cur.id)) {
+    seen.add(cur.id)
+    const parentId = cur.id
+    const children = Object.values(nodes).filter((n) => n.parentId === parentId)
+    if (isContainerType(cur.type) && !cur.collapsed && children.length > 0) {
+      const size = fittedParentSize(cur, children.map((c) => ({ x: c.x, y: c.y, width: effectiveWidth(c), height: effectiveHeight(c) })))
+      cur.width = size.width
+      cur.height = size.height
+    }
+    cur = cur.parentId ? nodes[cur.parentId] : undefined
+  }
+}
+
+/** Where a new node goes before any layout runs: inside its parent below
+ *  the header, right of the last sibling; at the root, right of every root
+ *  node. Positions are relative to the parent, like C4Node.x/y. */
+export function placeNewNode(nodes: Record<string, C4Node>, parentId: string | undefined): { x: number; y: number } {
+  const parent = parentId ? nodes[parentId] : undefined
+  const siblings = Object.values(nodes).filter((n) => (n.parentId ?? undefined) === (parent?.id ?? undefined))
+  const right = Math.max(...siblings.map((n) => n.x + effectiveWidth(n)))
+  if (!parent) return { x: siblings.length ? right + 80 : 0, y: 0 }
+  const pad = compoundPadding(parent.type)
+  return { x: siblings.length ? right + 20 : pad.side, y: pad.top }
+}
+
+/**
  * The graph as the canvas draws it: nodes hidden under a collapsed ancestor
  * are dropped, collapsed containers take their collapsed size, and every
  * relation is re-attached to the nearest visible ancestor of each endpoint

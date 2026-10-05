@@ -226,3 +226,60 @@ describe('group nesting', () => {
     expect(useDiagramStore.getState().c4Nodes[sysId].parentId).toBe(groupId)
   })
 })
+
+describe('reparentNodes', () => {
+  const add = (node: Omit<C4Node, 'id'>): string => useDiagramStore.getState().addNode(node)
+  const base = { collapsed: false, width: 200, height: 100 }
+
+  beforeEach(() => {
+    useDiagramStore.setState({ metamodel: builtInGovernanceMetamodel(), activeViewId: null, notifications: [] } as any)
+  })
+
+  it('moves a node into another parent, keeping its canvas position', () => {
+    const shop = add({ ...base, type: 'domain', label: 'Shop', x: 1000, y: 500, width: 800, height: 600 } as Omit<C4Node, 'id'>)
+    const sys = add({ ...base, type: 'system', label: 'Orders', x: 1100, y: 700 } as Omit<C4Node, 'id'>)
+    useDiagramStore.getState().reparentNodes([sys], shop)
+    const moved = useDiagramStore.getState().c4Nodes[sys]
+    expect(moved.parentId).toBe(shop)
+    const parent = useDiagramStore.getState().c4Nodes[shop]
+    expect({ x: parent.x + moved.x, y: parent.y + moved.y }).toEqual({ x: 1100, y: 700 })
+  })
+
+  it('refuses a move into a descendant with a notification, leaving the tree unchanged', () => {
+    const outer = add({ ...base, type: 'domain', label: 'Outer', x: 0, y: 0 } as Omit<C4Node, 'id'>)
+    const inner = add({ ...base, type: 'domain', label: 'Inner', parentId: outer, x: 20, y: 130 } as Omit<C4Node, 'id'>)
+    useDiagramStore.getState().reparentNodes([outer], inner)
+    const s = useDiagramStore.getState()
+    expect(s.c4Nodes[outer].parentId).toBeUndefined()
+    expect(s.notifications[s.notifications.length - 1]?.message).toBe('Cannot move a node into itself or one of its descendants.')
+  })
+})
+
+describe('metamodel edits on a built-in preset', () => {
+  it('work on a custom copy, so reloading keeps them', () => {
+    useDiagramStore.setState({ metamodel: builtInGovernanceMetamodel() } as any)
+    const s = useDiagramStore.getState()
+    s.upsertNodeType({ ...s.metamodel.nodeTypes.adr, id: 'risk', label: 'Risk', builtin: false })
+    const mm = useDiagramStore.getState().metamodel
+    expect(mm.id).toBe('c4-ddd-governance-custom')
+    expect(mm.name).toBe('C4 + DDD + Governance (custom)')
+    expect(mm.nodeTypes.risk.label).toBe('Risk')
+    const saved = useDiagramStore.getState().saveDiagram()
+    useDiagramStore.getState().loadDiagram(saved)
+    expect(useDiagramStore.getState().metamodel.nodeTypes.risk?.label).toBe('Risk')
+  })
+})
+
+describe('setPresentations', () => {
+  it('replaces the list, keeps a valid active presentation and never leaves none', () => {
+    const s = useDiagramStore.getState()
+    s.setPresentations([{ id: 'p1', name: 'Pitch', slides: [{ id: 's1', name: 'All', snapshotId: null, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } }] }])
+    let after = useDiagramStore.getState()
+    expect(after.activePresentationId).toBe('p1')
+    expect(after.presentationSlides.map((slide) => slide.id)).toEqual(['s1'])
+    s.setPresentations([])
+    after = useDiagramStore.getState()
+    expect(after.presentations).toHaveLength(1)
+    expect(after.activePresentationId).toBe(after.presentations[0].id)
+  })
+})

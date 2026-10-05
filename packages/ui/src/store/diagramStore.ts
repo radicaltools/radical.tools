@@ -51,7 +51,18 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { compoundPadding } from '@radical/layout/geometry'
+import { fittedParentSize } from '@radical/layout/geometry'
+import {
+  applyLayoutPositions,
+  computeViewCollapsedSet,
+  computeViewNodeSet,
+  filterForView,
+  isEffectivelyCollapsed,
+  viewLayoutInput,
+  type LayoutInput,
+} from '@radical/layout/viewInput'
+// Re-exported for components that read view collapse state from the store module.
+export { computeViewCollapsedSet, isEffectivelyCollapsed }
 import { LiveColaLayout } from '../layout/liveColaLayout'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
@@ -262,67 +273,6 @@ function computeDiffGhosts(
   return { nodes, relations }
 }
 
-/** Compute the effective set of node IDs for a view: explicit nodeIds + all their ancestors */
-function computeViewNodeSet(view: DiagramView | undefined, nodes: Record<string, C4Node>): Set<string> | undefined {
-  if (!view) return undefined
-  if (view.nodeIds.length === 0) return undefined
-  const result = new Set<string>()
-  for (const id of view.nodeIds) {
-    let cur = id
-    while (cur && nodes[cur]) {
-      result.add(cur)
-      cur = nodes[cur].parentId ?? ''
-    }
-  }
-  return result
-}
-
-/**
- * Compute which nodes should be treated as collapsed in a view.
- * A parent (system/container) is view-collapsed if:
- * - it has children in the full model, AND
- * - none of those children are in the view filter, AND
- * - it is not already collapsed on the model.
- * Returns empty set when no view filter is active.
- */
-export function computeViewCollapsedSet(
-  viewFilter: Set<string> | undefined,
-  allNodes: Record<string, C4Node>
-): Set<string> {
-  const result = new Set<string>()
-  if (!viewFilter) return result
-
-  // Which parents have at least one child in the view?
-  const parentHasViewChild = new Set<string>()
-  for (const n of Object.values(allNodes)) {
-    if (n.parentId && viewFilter.has(n.id)) parentHasViewChild.add(n.parentId)
-  }
-
-  for (const [id, n] of Object.entries(allNodes)) {
-    if (!viewFilter.has(id)) continue
-    if (!isContainerType(n.type)) continue
-    if (n.collapsed) continue // already collapsed on the model
-    if (parentHasViewChild.has(id)) continue // has visible children
-
-    // Check it actually has children in the full model
-    const hasChildInModel = Object.values(allNodes).some(c => c.parentId === id)
-    if (hasChildInModel) result.add(id)
-  }
-  return result
-}
-
-/** Is the node effectively collapsed (model-collapsed OR view-collapsed)?
- *  Pass `expandedSet` (from `view.expandedNodeIds`) to allow a named view to
- *  override a model-level collapse. */
-export function isEffectivelyCollapsed(
-  node: C4Node,
-  viewCollapsedSet?: Set<string>,
-  expandedSet?: Set<string>
-): boolean {
-  if (expandedSet?.has(node.id)) return false  // view-level explicit expansion
-  return node.collapsed || (viewCollapsedSet?.has(node.id) ?? false)
-}
-
 /**
  * Compute whether a node is effectively collapsed in a given named view.
  * Used by tree-panel components (Sidebar, RightPanel) to show ▶/▼ correctly
@@ -344,82 +294,9 @@ export function nodeEffectivelyCollapsedInView(
   )
 }
 
-/** Return the subset of nodes/relations visible in the active view (or all if no view). */
-function filterForView(
-  allNodes: Record<string, C4Node>,
-  allRelations: Record<string, C4Relation>,
-  viewFilter: Set<string> | undefined,
-  viewCollapsedSet?: Set<string>
-): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } {
-  if (!viewFilter) return { nodes: allNodes, relations: allRelations }
-  const nodes: Record<string, C4Node> = {}
-  for (const [id, n] of Object.entries(allNodes)) {
-    if (viewFilter.has(id)) {
-      nodes[id] = viewCollapsedSet?.has(id) ? { ...n, collapsed: true } : n
-    }
-  }
-
-  const relations: Record<string, C4Relation> = {}
-  for (const [id, r] of Object.entries(allRelations)) {
-    if (viewFilter.has(r.sourceId) && viewFilter.has(r.targetId)) relations[id] = r
-  }
-  return { nodes, relations }
-}
-
-interface LayoutInput {
-  nodes: Record<string, C4Node>
-  relations: Record<string, C4Relation>
-  viewFilter: Set<string> | undefined
-  viewCollapsedSet: Set<string>
-  expandedSet: Set<string> | undefined
-}
-
-/**
- * The graph a layout algorithm should see for the active view: the same
- * node filter, collapse rules (view-collapsed, per-view collapsed and
- * expanded overrides) and hidden relations the canvas applies when it
- * renders. `collapsed` on the returned nodes is the effective state.
- */
+/** The layout input for the store's active view. */
 function layoutInputForView(state: DiagramStore): LayoutInput {
-  const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-  const viewFilter = computeViewNodeSet(view, state.c4Nodes)
-  const viewCollapsedSet = computeViewCollapsedSet(viewFilter, state.c4Nodes)
-  for (const id of view?.collapsedNodeIds ?? []) viewCollapsedSet.add(id)
-  const expandedSet = view?.expandedNodeIds?.length ? new Set(view.expandedNodeIds) : undefined
-
-  const filtered = filterForView(state.c4Nodes, state.c4Relations, viewFilter)
-  const nodes: Record<string, C4Node> = {}
-  for (const [id, n] of Object.entries(filtered.nodes)) {
-    const collapsed = isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet)
-    nodes[id] = collapsed === n.collapsed ? n : { ...n, collapsed }
-  }
-  const hidden = new Set(view?.hiddenRelationIds ?? [])
-  const relations: Record<string, C4Relation> = {}
-  for (const [id, r] of Object.entries(filtered.relations)) {
-    if (!hidden.has(id)) relations[id] = r
-  }
-  return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet }
-}
-
-/**
- * Write a layout result into the model. Collapsed nodes keep their stored
- * size: the canvas draws them at the collapsed size anyway, and the stored
- * one is what they expand back to.
- */
-function applyLayoutPositions(
-  c4Nodes: Record<string, C4Node>,
-  positions: PositionMap,
-  input: LayoutInput,
-): void {
-  for (const [id, pos] of Object.entries(positions)) {
-    const node = c4Nodes[id]
-    if (!node) continue
-    node.x = pos.x
-    node.y = pos.y
-    if (input.nodes[id]?.collapsed) continue
-    if (pos.width)  node.width  = pos.width
-    if (pos.height) node.height = pos.height
-  }
+  return viewLayoutInput(state.activeViewId ? state.views[state.activeViewId] : undefined, state.c4Nodes, state.c4Relations)
 }
 
 /**
@@ -1255,6 +1132,9 @@ interface DiagramStore {
   presentationActive: boolean
   presentationSlideIndex: number
   addPresentation: (name?: string) => string
+  /** Replace every presentation (AI tools). Keeps the active one when it
+   *  still exists; an empty list leaves one empty presentation. */
+  setPresentations: (presentations: Presentation[]) => void
   removePresentation: (id: string) => void
   renamePresentation: (id: string, name: string) => void
   setActivePresentation: (id: string) => void
@@ -2273,96 +2153,27 @@ export const useDiagramStore = create<DiagramStore>()(
 
       reparentNodes(ids, newParentId) {
         const state0 = get()
-        const mm = state0.metamodel
         const nodes = ids
           .map((id) => state0.c4Nodes[id])
           .filter((n): n is C4Node => !!n)
         if (nodes.length === 0) return
-
-        // All selected nodes must currently share the same parent so we don't
-        // silently merge two different sub-trees.
         const oldParentId = nodes[0].parentId ?? null
-        if (!nodes.every((n) => (n.parentId ?? null) === oldParentId)) {
-          state0.pushNotification(
-            'Cannot move: selected nodes have different parents. Select siblings only.',
-            'error',
-          )
-          return
-        }
-        if ((newParentId ?? null) === oldParentId) {
-          // Nothing to do — new parent is the current parent.
-          return
-        }
+        // Same parent for every selected node: nothing to do.
+        if ((newParentId ?? null) === oldParentId && nodes.every((n) => (n.parentId ?? null) === oldParentId)) return
 
+        const refused = model.checkReparent(state0, ids, newParentId)
+        if (refused) {
+          state0.pushNotification(refused, 'error')
+          return
+        }
         const newParent = newParentId ? state0.c4Nodes[newParentId] : undefined
-        if (newParentId && !newParent) {
-          state0.pushNotification('Target parent no longer exists.', 'error')
-          return
-        }
         const newParentLabel = newParent
-          ? (mm?.nodeTypes[newParent.type]?.label ?? newParent.type)
+          ? (state0.metamodel?.nodeTypes[newParent.type]?.label ?? newParent.type)
           : 'the canvas root'
-
-        // Cycle guard: new parent must not be one of the moved nodes nor any
-        // of their descendants.
-        const movedSet = new Set(ids)
-        for (const id of ids) {
-          for (const d of getDescendants(id, state0.c4Nodes)) movedSet.add(d)
-        }
-        if (newParentId && movedSet.has(newParentId)) {
-          state0.pushNotification(
-            'Cannot move a node into itself or one of its descendants.',
-            'error',
-          )
-          return
-        }
-
-        // Metamodel: each moved node's type must be allowed inside the target.
-        for (const n of nodes) {
-          if (!isParentAllowed(mm, n.type, newParent?.type)) {
-            const childDef = mm?.nodeTypes[n.type]
-            const childLabel = childDef?.label ?? n.type
-            const allowed = childDef?.allowedParents
-            const allowedStr = allowed && allowed.length
-              ? allowed.map((t) => mm?.nodeTypes[t]?.label ?? t).join(', ')
-              : 'the canvas root'
-            state0.pushNotification(
-              `Cannot place ${childLabel} "${n.label}" inside ${newParentLabel}. Allowed: ${allowedStr}.`,
-              'error',
-            )
-            return
-          }
-        }
-
-        // Compute absolute (root-space) coords by walking up the parent chain.
-        const absOf = (id: string): { x: number; y: number } => {
-          let x = 0, y = 0
-          let cur: C4Node | undefined = state0.c4Nodes[id]
-          const seen = new Set<string>()
-          while (cur && !seen.has(cur.id)) {
-            seen.add(cur.id)
-            x += cur.x
-            y += cur.y
-            cur = cur.parentId ? state0.c4Nodes[cur.parentId] : undefined
-          }
-          return { x, y }
-        }
-        const newParentAbs = newParentId
-          ? absOf(newParentId)
-          : { x: 0, y: 0 }
 
         get()._pushUndo()
         get()._markMilestoneEdit()
-        set((state) => {
-          for (const n of nodes) {
-            const sn = state.c4Nodes[n.id]
-            if (!sn) continue
-            const a = absOf(n.id) // computed against the original tree (state0)
-            sn.parentId = newParentId ?? undefined
-            sn.x = a.x - newParentAbs.x
-            sn.y = a.y - newParentAbs.y
-          }
-        })
+        set((state) => { model.reparentNodes(state, ids, newParentId) })
 
         // Refit both sides of the move bottom-up so containers grow/shrink.
         const refitChain = (startId: string | null | undefined): void => {
@@ -2901,21 +2712,12 @@ export const useDiagramStore = create<DiagramStore>()(
         if (viewFilter) children = children.filter((c) => viewFilter.has(c.id))
         if (children.length === 0) return
 
-        const pad = compoundPadding(parent.type)
-        const padRight  = pad.side
-        const padBottom = pad.bottom
-
-        let maxRight = 0
-        let maxBottom = 0
-        for (const child of children) {
-          const h = effectiveNodeHeight(child, viewCollapsedSet, expandedSet)
-          const w = effectiveNodeWidth(child, viewCollapsedSet, expandedSet)
-          maxRight  = Math.max(maxRight,  child.x + w)
-          maxBottom = Math.max(maxBottom, child.y + h)
-        }
-
-        const newW = Math.max(maxRight + padRight, NODE_SIZES[parent.type].width)
-        const newH = Math.max(maxBottom + padBottom, NODE_SIZES[parent.type].height)
+        const { width: newW, height: newH } = fittedParentSize(parent, children.map((child) => ({
+          x: child.x,
+          y: child.y,
+          width: effectiveNodeWidth(child, viewCollapsedSet, expandedSet),
+          height: effectiveNodeHeight(child, viewCollapsedSet, expandedSet),
+        })))
 
         set((state) => {
           const n = state.c4Nodes[parentId]
@@ -3855,28 +3657,33 @@ export const useDiagramStore = create<DiagramStore>()(
       resetMetamodelToC4() {
         set((state) => { state.metamodel = builtInC4Metamodel() as any })
       },
+      // Editing a built-in preset works on a custom copy: on load,
+      // documentMetamodel swaps a preset id back to the preset, which would
+      // silently drop the edit.
       upsertNodeType(def) {
         set((state) => {
-          (state.metamodel as Metamodel).nodeTypes[def.id] = def
+          state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
+          ;(state.metamodel as Metamodel).nodeTypes[def.id] = def
         })
       },
       removeNodeType(id) {
         set((state) => {
-          const mm = state.metamodel as Metamodel
-          if (mm.nodeTypes[id]?.builtin) return
-          delete mm.nodeTypes[id]
+          if ((state.metamodel as Metamodel).nodeTypes[id]?.builtin) return
+          state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
+          delete (state.metamodel as Metamodel).nodeTypes[id]
         })
       },
       upsertRelationType(def) {
         set((state) => {
-          (state.metamodel as Metamodel).relationTypes[def.id] = def
+          state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
+          ;(state.metamodel as Metamodel).relationTypes[def.id] = def
         })
       },
       removeRelationType(id) {
         set((state) => {
-          const mm = state.metamodel as Metamodel
-          if (mm.relationTypes[id]?.builtin) return
-          delete mm.relationTypes[id]
+          if ((state.metamodel as Metamodel).relationTypes[id]?.builtin) return
+          state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
+          delete (state.metamodel as Metamodel).relationTypes[id]
         })
       },
 
@@ -3899,6 +3706,19 @@ export const useDiagramStore = create<DiagramStore>()(
           state.presentationSlideIndex = 0
         })
         return id
+      },
+
+      setPresentations(presentations) {
+        set((state) => {
+          state.presentations = (presentations.length ? presentations : [{ id: uid(), name: 'Presentation 1', slides: [] }]) as any
+          if (!state.presentations.some((p) => p.id === state.activePresentationId)) {
+            state.activePresentationId = state.presentations[0].id
+            state.presentationSlideIndex = 0
+          }
+          const active = state.presentations.find((p) => p.id === state.activePresentationId)!
+          state.presentationSlides = active.slides
+          state.presentationSlideIndex = Math.min(state.presentationSlideIndex, Math.max(0, active.slides.length - 1))
+        })
       },
 
       removePresentation(id) {

@@ -9,13 +9,14 @@
 // per-view node positions, and fitting a parent's size around a new child.
 // Lay the result out with @radical/layout if positions matter.
 
-import type { C4Node, C4Relation, DiagramData, DiagramView } from '../c4'
+import type { C4Node, C4Relation, DiagramData, DiagramView, Presentation } from '../c4'
+import type { Metamodel } from '../metamodel'
 import * as model from '../model'
 import type { DiagramFacade } from './diagramFacade'
 
 export interface ModelFacade extends DiagramFacade {
   /** The edited model as a document. Fields the facade does not edit
-   *  (sequences, snapshots, presentations, …) are carried over from the input. */
+   *  (snapshots, layout positions, …) are carried over from the input. */
   toDiagramData(): DiagramData
   /** Why the most recent refused change was refused, or null. */
   readonly lastError: string | null
@@ -24,6 +25,10 @@ export interface ModelFacade extends DiagramFacade {
 export interface ModelFacadeOptions {
   /** Id generator for new nodes, relations and views. Defaults to crypto.randomUUID. */
   newId?: () => string
+  /** Lays out a document (All elements, or one view) and returns the result
+   *  as `data`, or no data when nothing changed. Enables runLayout; the MCP
+   *  server passes Smart Layout from @radical/layout. */
+  runLayout?: (doc: DiagramData, viewId?: string) => Promise<{ ok: boolean; text: string; data?: DiagramData }>
 }
 
 const randomId = (): string =>
@@ -36,15 +41,30 @@ const byId = <T extends { id: string }>(items: T[] | undefined): Record<string, 
 
 export function createModelFacade(data: DiagramData, options: ModelFacadeOptions = {}): ModelFacade {
   const newId = options.newId ?? randomId
-  const { nodes, relations, views, ...rest } = data
-  let carried: Omit<DiagramData, 'nodes' | 'relations' | 'views'> = clone(rest)
-  const state: model.ModelState = {
-    c4Nodes: byId(nodes),
-    c4Relations: byId(relations),
-    views: byId(views),
-    activeViewId: null,
-    metamodel: model.documentMetamodel(data.metamodel),
+  let carried: Omit<DiagramData, 'nodes' | 'relations' | 'views' | 'sequences'> = {}
+  const state: model.ModelState & { sequences: NonNullable<model.ModelState['sequences']> } = {
+    c4Nodes: {}, c4Relations: {}, views: {}, activeViewId: null, sequences: {},
   }
+  // Keep an input's (possibly empty) sequences list; a cleared model drops it.
+  let keepSequences = false
+  const load = (doc: DiagramData): void => {
+    const { nodes, relations, views, sequences, ...rest } = doc
+    carried = clone(rest)
+    state.c4Nodes = byId(nodes)
+    state.c4Relations = byId(relations)
+    state.views = byId(views)
+    state.sequences = byId(sequences)
+    state.metamodel = model.documentMetamodel(doc.metamodel)
+    keepSequences = sequences !== undefined
+  }
+  load(data)
+  const toDiagramData = (): DiagramData => clone({
+    ...carried,
+    nodes: Object.values(state.c4Nodes),
+    relations: Object.values(state.c4Relations),
+    views: Object.values(state.views),
+    ...(keepSequences || Object.keys(state.sequences).length ? { sequences: Object.values(state.sequences) } : {}),
+  })
   let lastError: string | null = null
   const refuse = (reason: string): void => { lastError = reason }
 
@@ -75,6 +95,11 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     },
     removeNode(id: string) {
       model.deleteNode(state, id)
+    },
+    moveNodes(ids: string[], parentId: string | null) {
+      const refused = model.checkReparent(state, ids, parentId)
+      if (refused) { refuse(refused); return }
+      model.reparentNodes(state, ids, parentId)
     },
 
     addRelation(rel: Omit<C4Relation, 'id'>) {
@@ -107,23 +132,61 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     setViewKind(id: string, kind: DiagramView['kind']) {
       model.setViewKind(state, id, kind)
     },
+    renameView(id: string, name: string) {
+      model.renameView(state, id, name)
+    },
+    setViewSequence(id: string, sequenceId: string | null) {
+      model.setViewSequence(state, id, sequenceId)
+    },
+    setViewHiddenRelations(id: string, relationIds: string[]) {
+      model.setViewHiddenRelations(state, id, relationIds)
+    },
+
+    getSequences: () => state.sequences,
+    addSequence(name: string) {
+      const id = newId()
+      model.insertSequence(state, id, name)
+      return id
+    },
+    renameSequence(id: string, name: string) {
+      model.renameSequence(state, id, name)
+    },
+    setSequenceSteps(id: string, steps: model.SequenceStep[]) {
+      model.setSequenceSteps(state, id, steps)
+    },
+    removeSequence(id: string) {
+      model.deleteSequence(state, id)
+    },
+
+    setMetamodel(metamodel: Metamodel) {
+      state.metamodel = clone(metamodel)
+      carried.metamodel = clone(metamodel)
+    },
+
+    getPresentations: () => carried.presentations ?? [],
+    setPresentations(presentations: Presentation[]) {
+      carried.presentations = clone(presentations)
+    },
+
+    ...(options.runLayout ? {
+      async runLayout(viewId?: string) {
+        const outcome = await options.runLayout!(toDiagramData(), viewId)
+        if (outcome.data) load(outcome.data)
+        return { ok: outcome.ok, text: outcome.text }
+      },
+    } : {}),
 
     // Same as Studio's reset: everything goes except the metamodel.
     clearDiagram() {
       state.c4Nodes = {}
       state.c4Relations = {}
       state.views = {}
+      state.sequences = {}
+      keepSequences = false
       state.activeViewId = null
       carried = carried.metamodel ? { metamodel: carried.metamodel } : {}
     },
 
-    toDiagramData(): DiagramData {
-      return clone({
-        ...carried,
-        nodes: Object.values(state.c4Nodes),
-        relations: Object.values(state.c4Relations),
-        views: Object.values(state.views),
-      })
-    },
+    toDiagramData,
   }
 }

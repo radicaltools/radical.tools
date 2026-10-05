@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import type { C4Node, C4Relation, DiagramView } from './c4'
+import type { C4Node, C4Relation, DiagramSequence, DiagramView } from './c4'
 import {
   builtInC4Metamodel,
   builtInDddC4Metamodel,
@@ -28,6 +28,8 @@ export interface ModelState {
   views: Record<string, DiagramView>
   activeViewId: string | null
   metamodel?: Metamodel
+  /** Optional so callers that only check node rules can omit it. */
+  sequences?: Record<string, DiagramSequence>
 }
 
 type NodeRecord = C4Node & Record<string, unknown>
@@ -41,6 +43,17 @@ export function documentMetamodel(stored: Metamodel | undefined): Metamodel {
   if (stored.id === 'c4-ddd-builtin') return builtInDddC4Metamodel()
   if (stored.id === 'c4-ddd-governance-builtin') return builtInGovernanceMetamodel()
   return stored
+}
+
+const PRESET_IDS = new Set(['c4-builtin', 'c4-ddd-builtin', 'c4-ddd-governance-builtin'])
+
+/** A copy of a built-in preset under a custom id, or null when `mm` is
+ *  already custom. Edit the copy: documentMetamodel swaps a preset id back
+ *  to the current preset on load, which would drop the edit. */
+export function forkPresetMetamodel(mm: Metamodel): Metamodel | null {
+  if (!PRESET_IDS.has(mm.id)) return null
+  const copy = JSON.parse(JSON.stringify(mm)) as Metamodel
+  return { ...copy, id: `${mm.id.replace(/-builtin$/, '')}-custom`, name: `${mm.name} (custom)` }
 }
 
 /** Ids of every node below `id` in the containment tree. */
@@ -127,6 +140,55 @@ export function patchNode(state: ModelState, id: string, updates: Partial<Omit<C
   if ('type' in updates) materializeDefaults(node, state.metamodel)
 }
 
+/** Why `ids` cannot move under `newParentId` (null = the root), or null.
+ *  The nodes must be siblings, the target must exist and sit outside the
+ *  moved subtrees, and every moved type must be allowed inside it. */
+export function checkReparent(state: ModelState, ids: string[], newParentId: string | null): string | null {
+  const nodes = ids.map((id) => state.c4Nodes[id]).filter((n): n is C4Node => !!n)
+  if (nodes.length === 0) return 'Nothing to move: no such node.'
+  const oldParentId = nodes[0].parentId ?? null
+  if (!nodes.every((n) => (n.parentId ?? null) === oldParentId)) {
+    return 'Cannot move: selected nodes have different parents. Select siblings only.'
+  }
+  const newParent = newParentId ? state.c4Nodes[newParentId] : undefined
+  if (newParentId && !newParent) return 'Target parent no longer exists.'
+  const moved = new Set(nodes.flatMap((n) => [n.id, ...descendantIds(n.id, state.c4Nodes)]))
+  if (newParentId && moved.has(newParentId)) return 'Cannot move a node into itself or one of its descendants.'
+  for (const n of nodes) {
+    if (!isParentAllowed(state.metamodel, n.type, newParent?.type)) {
+      return `Cannot place ${typeLabel(state.metamodel, n.type)} "${n.label}" inside ${placementError(state.metamodel, n.type, newParent)}`
+    }
+  }
+  return null
+}
+
+/** Moves the nodes under `newParentId` (null = the root), keeping each one
+ *  where it is on the canvas: positions are relative to the parent, so they
+ *  are rebased onto the new parent's absolute position. */
+export function reparentNodes(state: ModelState, ids: string[], newParentId: string | null): void {
+  const absOf = (id: string | null): { x: number; y: number } => {
+    let x = 0, y = 0
+    let cur: C4Node | undefined = id ? state.c4Nodes[id] : undefined
+    const seen = new Set<string>()
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id)
+      x += cur.x
+      y += cur.y
+      cur = cur.parentId ? state.c4Nodes[cur.parentId] : undefined
+    }
+    return { x, y }
+  }
+  const target = absOf(newParentId)
+  // Measure every node against the original tree before changing any parent.
+  const placed = ids.filter((id) => state.c4Nodes[id]).map((id) => ({ id, abs: absOf(id) }))
+  for (const { id, abs } of placed) {
+    const node = state.c4Nodes[id]
+    node.parentId = newParentId ?? undefined
+    node.x = abs.x - target.x
+    node.y = abs.y - target.y
+  }
+}
+
 /** Removes the node, its descendants, their relations and every view
  *  reference to them. Returns the removed node ids. */
 export function deleteNode(state: ModelState, id: string): Set<string> {
@@ -191,4 +253,67 @@ export function setViewNodeIds(state: ModelState, viewId: string, nodeIds: strin
 export function setViewKind(state: ModelState, viewId: string, kind: DiagramView['kind']): void {
   const view = state.views[viewId]
   if (view) view.kind = kind
+}
+
+export function renameView(state: ModelState, viewId: string, name: string): void {
+  const view = state.views[viewId]
+  if (view) view.name = name
+}
+
+/** Links a dynamic view to a sequence (null unlinks it). */
+export function setViewSequence(state: ModelState, viewId: string, sequenceId: string | null): void {
+  const view = state.views[viewId]
+  if (view) view.sequenceId = sequenceId ?? undefined
+}
+
+/** Hides exactly these relations in the view; unknown ids are dropped. */
+export function setViewHiddenRelations(state: ModelState, viewId: string, relationIds: string[]): void {
+  const view = state.views[viewId]
+  if (view) view.hiddenRelationIds = [...new Set(relationIds.filter((id) => id in state.c4Relations))]
+}
+
+// ── Sequences ────────────────────────────────────────────────────────────────
+
+export interface SequenceStep {
+  relationId: string
+  description?: string
+}
+
+export function insertSequence(state: ModelState, id: string, name: string): void {
+  state.sequences ??= {}
+  state.sequences[id] = { id, name, relationIds: [] }
+}
+
+export function renameSequence(state: ModelState, id: string, name: string): void {
+  const sequence = state.sequences?.[id]
+  if (sequence) sequence.name = name
+}
+
+/** Replaces the steps. A relation may appear more than once; the caller
+ *  checks the relation ids exist. */
+export function setSequenceSteps(state: ModelState, id: string, steps: SequenceStep[]): void {
+  const sequence = state.sequences?.[id]
+  if (!sequence) return
+  sequence.relationIds = steps.map((step) => step.relationId)
+  // Like Studio's step list: descriptions run up to the last described step.
+  const last = steps.reduce((end, step, i) => (step.description ? i + 1 : end), 0)
+  sequence.stepDescriptions = steps.slice(0, last).map((step) => step.description || undefined)
+}
+
+/** Removes the sequence and unlinks the views that showed it. */
+export function deleteSequence(state: ModelState, id: string): void {
+  if (state.sequences) delete state.sequences[id]
+  for (const view of Object.values(state.views)) {
+    if (view.sequenceId === id) view.sequenceId = undefined
+  }
+}
+
+/** The nodes a dynamic view of the sequence shows: every step's endpoints. */
+export function sequenceNodeIds(state: ModelState, id: string): string[] {
+  const nodes = new Set<string>()
+  for (const relationId of state.sequences?.[id]?.relationIds ?? []) {
+    const relation = state.c4Relations[relationId]
+    if (relation) { nodes.add(relation.sourceId); nodes.add(relation.targetId) }
+  }
+  return [...nodes]
 }

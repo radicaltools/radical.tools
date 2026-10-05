@@ -40,6 +40,10 @@ describe('folder-backed MCP model', () => {
       const tools = await client.listTools()
       expect(tools.tools.map((tool) => tool.name)).toContain('add_node')
       expect(tools.tools.map((tool) => tool.name)).not.toContain('reset_diagram')
+      expect(client.getInstructions()).toContain('get_model_summary')
+      const summary = JSON.stringify((await client.callTool({ name: 'get_model_summary', arguments: {} })).content)
+      expect(summary).toContain('ears_type')
+      expect(summary).toContain('allowedPairs')
       const result = await client.callTool({ name: 'add_node', arguments: { tempId: 'new-system', type: 'system', label: 'New System' } })
       expect(result.isError).not.toBe(true)
       const message = JSON.stringify(result.content)
@@ -67,10 +71,76 @@ describe('folder-backed MCP model', () => {
       expect(update.isError, JSON.stringify(update.content)).not.toBe(true)
       const updated = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
       expect(updated.nodes.find((node) => node.id === id)?.label).toBe('Renamed System')
+
+      const domain = await client.callTool({ name: 'add_node', arguments: { tempId: 'shop', type: 'domain', label: 'Shop' } })
+      expect(domain.isError, JSON.stringify(domain.content)).not.toBe(true)
+      const moved = await client.callTool({ name: 'move_node', arguments: { id: 'new-system', parentId: 'shop' } })
+      expect(moved.isError, JSON.stringify(moved.content)).not.toBe(true)
+      const view = await client.callTool({ name: 'create_view', arguments: { tempId: 'ctx', name: 'Context', nodeIds: ['actor', 'new-system'] } })
+      expect(view.isError, JSON.stringify(view.content)).not.toBe(true)
+      expect(JSON.stringify(view.content)).toContain('views.json')
+      const final = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      const domainId = final.nodes.find((node) => node.label === 'Shop')?.id
+      expect(final.nodes.find((node) => node.id === id)?.parentId).toBe(domainId)
+      expect(final.views).toEqual([expect.objectContaining({ name: 'Context', nodeIds: expect.arrayContaining([id]) })])
     } finally {
       await client.close()
     }
   })
+
+  it('places children inside their parent, keeps defaultPositions in step and runs Smart Layout', async () => {
+    const folder = await fixture()
+    const files = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+    // Studio writes defaultPositions; give the fixture an (empty) map like a saved model.
+    const layout = JSON.parse(files['_layout.json'] ?? '{}')
+    await writeFile(join(folder, '_layout.json'), JSON.stringify({ ...layout, defaultPositions: {} }))
+    const client = new Client({ name: 'radical-test', version: '1.0.0' })
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [join(import.meta.dirname, '../dist/index.js'), '--folder', folder],
+    })
+    const read = async () => deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    try {
+      await client.connect(transport)
+      for (const args of [
+        { tempId: 'shop', type: 'domain', label: 'Shop' },
+        { tempId: 'orders', type: 'system', label: 'Orders', parentId: 'shop' },
+        { tempId: 'billing', type: 'system', label: 'Billing', parentId: 'shop' },
+        { tempId: 'crm', type: 'system', label: 'CRM' },
+      ]) {
+        const added = await client.callTool({ name: 'add_node', arguments: args })
+        expect(added.isError, JSON.stringify(added.content)).not.toBe(true)
+      }
+      let data = await read()
+      const byLabel = (label: string) => data.nodes.find((node) => node.label === label)!
+      const [shop, orders, billing] = [byLabel('Shop'), byLabel('Orders'), byLabel('Billing')]
+      expect(orders).toMatchObject({ x: 30, y: 120 })
+      expect(billing.x).toBeGreaterThan(orders.x + orders.width)
+      // The parent grew to wrap both children.
+      expect(shop.width).toBeGreaterThanOrEqual(billing.x + billing.width + 30)
+      expect(shop.height).toBeGreaterThanOrEqual(orders.y + orders.height + 30)
+
+      const moved = await client.callTool({ name: 'move_node', arguments: { id: 'crm', parentId: 'shop' } })
+      expect(moved.isError, JSON.stringify(moved.content)).not.toBe(true)
+      data = await read()
+      const crm = byLabel('CRM')
+      expect(crm.parentId).toBe(shop.id)
+      expect(data.defaultPositions?.[crm.id]).toEqual({ x: crm.x, y: crm.y, width: crm.width, height: crm.height })
+
+      const user = await client.callTool({ name: 'add_node', arguments: { tempId: 'user', type: 'person', label: 'Buyer' } })
+      expect(user.isError).not.toBe(true)
+      await client.callTool({ name: 'add_relation', arguments: { sourceId: 'user', targetId: 'orders', relationType: 'interacts' } })
+      const laidOut = await client.callTool({ name: 'smart_layout', arguments: {} })
+      expect(laidOut.isError, JSON.stringify(laidOut.content)).not.toBe(true)
+      expect(JSON.stringify(laidOut.content)).toMatch(/Smart Layout/)
+      data = await read()
+      for (const node of data.nodes) {
+        expect(data.defaultPositions?.[node.id]).toEqual({ x: node.x, y: node.y, width: node.width, height: node.height })
+      }
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
 
   it('rejects a changed folder before writing', async () => {
     const folder = await fixture()

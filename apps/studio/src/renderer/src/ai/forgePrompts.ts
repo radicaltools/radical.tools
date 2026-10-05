@@ -38,7 +38,7 @@ export interface ForgeStage {
 /** The node type(s) each stage is actually meant to create — used to scope
  *  the metamodel context message down to full detail for these (plus
  *  whatever's already in the diagram) and abbreviated for the rest (see
- *  ai/systemPrompt.ts's `buildMetamodelMessage`). */
+ *  @radical/common/ai/metamodelContext's `buildMetamodelMessage`). */
 export const PRIMARY_TYPE_IDS_FOR_STAGE: Record<ForgeStageId, string[]> = {
   requirements: ['requirement'],
   fitness: ['fitness-fn'],

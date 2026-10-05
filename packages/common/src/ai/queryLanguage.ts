@@ -1,4 +1,4 @@
-import type { C4Node, C4Relation, DiagramView } from '../c4'
+import type { C4Node, C4Relation, DiagramSequence, DiagramView } from '../c4'
 
 export const MODEL_QUERY_LANGUAGE_HELP = `Query the CURRENT diagram structure with a small built-in query language —
 use this whenever you need exact data before answering or acting, instead of
@@ -12,9 +12,11 @@ Syntax:
 - LIST RELATIONS WHERE <expr> [LIMIT n]
 - LIST VIEWS
 - LIST VIEWS WHERE <expr> [LIMIT n]
+- LIST SEQUENCES
 - LIST TECHNOLOGIES
 - GET NODE <id>
 - GET VIEW <id>
+- GET SEQUENCE <id>
 - GET CHILDREN OF <id>
 - GET NEIGHBORS OF <id> [DEPTH n]
 - GET DEPENDENCIES OF <id> [DEPTH n]
@@ -56,6 +58,7 @@ export interface ModelQueryContext {
   nodes: Record<string, C4Node>
   relations: Record<string, C4Relation>
   views?: Record<string, DiagramView>
+  sequences?: Record<string, DiagramSequence>
 }
 
 export interface ModelQueryResult {
@@ -536,6 +539,30 @@ export function runModelQuery(query: string, ctx: ModelQueryContext): ModelQuery
       command: 'LIST VIEWS',
       result: { total: rows.length, rows: limited.map((view) => summarizeView(view, ctx.nodes, ctx.relations)) },
     }
+  }
+
+  if (upper === 'LIST SEQUENCES') {
+    const rows = Object.values(ctx.sequences ?? {})
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+      .map((sequence) => ({ id: sequence.id, name: sequence.name, stepCount: sequence.relationIds.length }))
+    return { query: raw, command: 'LIST SEQUENCES', result: { total: rows.length, rows } }
+  }
+
+  const getSequenceMatch = raw.match(/^GET\s+SEQUENCE\s+(.+)$/i)
+  if (getSequenceMatch) {
+    const sequenceId = stripQuotes(getSequenceMatch[1])
+    const sequence = ctx.sequences?.[sequenceId]
+    if (!sequence) throw new Error(`Unknown sequence id: ${sequenceId}`)
+    const steps = sequence.relationIds.map((relationId, i) => {
+      const rel = ctx.relations[relationId]
+      return {
+        step: i + 1,
+        ...(rel ? summarizeRelation(rel, ctx.nodes) : { id: relationId, missing: true }),
+        ...(sequence.stepDescriptions?.[i] ? { stepDescription: sequence.stepDescriptions[i] } : {}),
+      }
+    })
+    const shownIn = Object.values(views).filter((view) => view.sequenceId === sequence.id).map((view) => ({ id: view.id, name: view.name }))
+    return { query: raw, command: 'GET SEQUENCE', result: { id: sequence.id, name: sequence.name, steps, views: shownIn } }
   }
 
   if (upper === 'LIST TECHNOLOGIES') {

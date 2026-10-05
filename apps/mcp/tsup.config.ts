@@ -6,5 +6,5 @@ export default defineConfig({
   platform: 'node',
   target: 'node20',
   outDir: 'dist',
-  noExternal: ['@radical/common', '@radical/node-files'],
+  noExternal: ['@radical/common', '@radical/layout', '@radical/node-files'],
 })
