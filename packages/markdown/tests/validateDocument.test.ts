@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { lint } from 'markdownlint/sync'
 import config from '../examples/config.json'
@@ -86,6 +87,21 @@ describe('type-specific rules built on MD043', () => {
       default: false, MD043: { headings: ['?', '## Overview', '*', '## Acceptance'], match_case: true },
     } }
     expect(check('# Any title\n\n## Overview\n\n### Optional\n\n## Acceptance\n', options)).toEqual([])
+  })
+
+  it.each(['flexible.md', 'flexible-minimal.md'])('accepts the runnable wildcard example %s', name => {
+    const text = readFileSync(new URL(`../examples/${name}`, import.meta.url), 'utf8')
+    expect(check(text, config)).toEqual([])
+  })
+
+  it('keeps required sections mandatory and ordered when using wildcards', () => {
+    const text = readFileSync(new URL('../examples/flexible.md', import.meta.url), 'utf8')
+    for (const invalid of [
+      text.replace('## Acceptance', '## Something else'),
+      text.replace('## Overview', '## Acceptance').replace('## Acceptance\n\n### Manual', '## Overview\n\n### Manual'),
+    ]) {
+      expect(check(invalid, config).some(diagnostic => diagnostic.code === 'MD043')).toBe(true)
+    }
   })
 
   it('reuses a validator without carrying type settings between documents', () => {

@@ -14,6 +14,20 @@
           "match_case": true
         }
       }
+    },
+    "flexible": {
+      "markdownlint": {
+        "MD043": {
+          "headings": [
+            "?",
+            "## Overview",
+            "*",
+            "## Acceptance",
+            "*"
+          ],
+          "match_case": true
+        }
+      }
     }
   }
 }

@@ -73,6 +73,53 @@ an EOF location when a required heading is missing. It also supports `?`, `*`,
 and `+` for unspecified headings; see the [upstream rule documentation](https://github.com/DavidAnson/markdownlint/blob/v0.40.0/doc/md043.md).
 This uses markdownlint's parsing and matching behavior directly.
 
+## Allow multiple optional headings
+
+The `flexible` type in the same config uses this MD043 pattern:
+
+```json
+{
+  "headings": ["?", "## Overview", "*", "## Acceptance", "*"],
+  "match_case": true
+}
+```
+
+`?` accepts one heading with any title. Each `*` accepts zero or more unspecified
+headings. Overview and Acceptance remain required and must appear in that order.
+
+[`flexible.md`](examples/flexible.md) shows several optional headings and
+subheadings, including a heading with bold text:
+
+```md
+---
+type: flexible
+---
+
+# Any document title
+
+## Overview
+
+## **Background**
+
+### Constraints
+
+## Details
+
+### Inputs
+
+### Outputs
+
+## Acceptance
+
+### Manual checks
+
+### Automated checks
+```
+
+[`flexible-minimal.md`](examples/flexible-minimal.md) uses the same configuration
+with only a title, Overview, and Acceptance. Both documents pass. Ordinary
+markdownlint rules still apply to optional headings.
+
 ## Run the example
 
 From the repository root:
@@ -84,8 +131,8 @@ npm run example -w @radical/markdown
 
 The example checks [`valid.md`](examples/valid.md) and
 [`invalid.md`](examples/invalid.md). The valid document has no diagnostics; the
-invalid one reports MD043. See [`examples/validate.mjs`](examples/validate.mjs)
-for the complete runnable code.
+invalid one reports MD043. It also checks both flexible documents, which pass.
+See [`examples/validate.mjs`](examples/validate.mjs) for the complete runnable code.
 
 ## Configuration and extension points
 
