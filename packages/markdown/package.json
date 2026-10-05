@@ -2,7 +2,7 @@
   "name": "@radical/markdown",
   "version": "0.0.0",
   "private": true,
-  "description": "Generic Markdown node validation and extensible document rules for use in Radical Tools and other applications. Planning scaffold; implementation is pending.",
+  "description": "Validate type-specific Markdown heading structure with editor-independent diagnostics.",
   "license": "MIT",
   "type": "module",
   "homepage": "https://github.com/radicaltools/radical.tools/tree/main/packages/markdown",
@@ -11,8 +11,34 @@
     "url": "https://github.com/radicaltools/radical.tools.git",
     "directory": "packages/markdown"
   },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "example": "npm run build && node examples/validate.mjs",
+    "prepack": "npm run build"
+  },
   "files": [
+    "dist",
+    "examples",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "mdast-util-from-markdown": "^2.1.0",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
 }

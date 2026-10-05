@@ -1,10 +1,149 @@
 # @radical/markdown
 
-Generic Markdown node validation for Radical Tools and other applications.
+Validate Markdown headings and subheadings using rules written in JSON Schema.
 
-**Status:** planning scaffold. This workspace contains a delivery plan, with no
-parser, validator, CLI, or editor integration implemented yet. It is private
-until the first release work package is complete.
+**Status:** the initial package works. It includes a built library, TypeScript
+declarations, example schemas and documents, and editor-independent diagnostics.
+It remains private while public release preparation is pending. The larger plan
+below remains available for later work.
+
+## Phase 0 — Simple package example
+
+For a document with frontmatter `type: x`, require this structure:
+
+```md
+---
+type: x
+---
+
+## Overview
+
+## Details
+
+### Inputs
+
+### Outputs
+
+## Acceptance
+```
+
+The package checks the heading names, levels, parent sections, and order. The
+rules live in [`examples/x.schema.json`](examples/x.schema.json), a standard
+JSON Schema draft 2020-12 document. No document types are built into the library.
+
+### Run it
+
+From the repository root:
+
+```bash
+npm install
+npm run example -w @radical/markdown
+```
+
+The example checks [`valid.md`](examples/valid.md) and
+[`invalid.md`](examples/invalid.md). The valid file returns no diagnostics. The
+invalid file has reversed headings/subheadings and a missing Acceptance section.
+See [`examples/validate.mjs`](examples/validate.mjs) for the complete runnable code.
+
+### Use the package
+
+```js
+import { readFile } from 'node:fs/promises';
+import { createValidator } from '@radical/markdown';
+
+const schema = JSON.parse(await readFile('./x.schema.json', 'utf8'));
+const validate = createValidator({ x: schema });
+
+const text = await readFile('./document.md', 'utf8');
+const diagnostics = validate({ uri: 'document.md', text });
+console.log(diagnostics);
+```
+
+Create the validator once and reuse it when document text changes. For a one-off
+call, `validateDocument({ uri, text }, { x: schema })` provides the same behavior.
+Add another schema under another type key to validate additional document types.
+
+### How JSON Schema expresses the rules
+
+Markdown is parsed into a JSON structure with `frontmatter` and a heading tree.
+For example, the Details section becomes:
+
+```json
+{
+  "title": "Details",
+  "level": 2,
+  "children": [
+    { "title": "Inputs", "level": 3, "children": [] },
+    { "title": "Outputs", "level": 3, "children": [] }
+  ]
+}
+```
+
+The schema validates this structure using standard keywords:
+
+- `const` fixes a heading title or level.
+- `prefixItems` defines the order of headings in an array.
+- `minItems` makes every listed heading required.
+- `maxItems` limits extra or duplicate headings.
+- `properties.children` applies the same rules to subheadings under their parent.
+- `properties.frontmatter` can also check company fields such as `owner`.
+
+The example schema requires exactly three root sections and exactly two children
+under Details. It accepts prose between headings. Heading titles are case
+sensitive; inline Markdown formatting is removed and whitespace is normalized.
+Real Markdown parsing handles both `#` and underlined headings, while ignoring
+headings inside code, quotes, lists, and HTML comments.
+
+A `# Document title` is a real heading and becomes a parent of following `##`
+sections. If you add one, adapt the schema to wrap the section rules under that
+heading's `children`. Schemas always describe the actual heading tree.
+
+### Package contract for your colleague
+
+The package accepts `{ uri, text }` and returns `Diagnostic[]`. It has no filesystem
+or editor dependencies; the consuming application loads documents and schemas.
+Each diagnostic contains:
+
+| Field | Meaning |
+| --- | --- |
+| `code` | `FRONTMATTER_INVALID`, `TYPE_MISSING`, or `SCHEMA_VALIDATION` |
+| `message` | Description of the failed check |
+| `severity` | `error` in this version |
+| `uri` | The caller's document URI |
+| `range` | Zero-based UTF-16 offsets into the original text; end is exclusive |
+| `instancePath` | JSON Pointer into the parsed structure, for schema errors |
+| `schemaPath`, `keyword` | The failed JSON Schema constraint, for schema errors |
+
+Heading errors point at the corresponding heading. Missing subheadings point at
+the parent heading; missing root headings and frontmatter errors use the
+frontmatter block. YAML syntax errors use the parser's source range. LF, CRLF,
+bare CR, and non-ASCII text preserve original offsets.
+
+Your colleague owns the VS Code extension and can map these offsets using
+`document.positionAt()`. Their integration can start with this function and the
+example schema. Extension implementation is a separate work package.
+
+Plain Markdown without frontmatter is ignored. Documents with frontmatter need a
+non-empty string `type`; `id` is optional in this initial version. Unconfigured
+types receive frontmatter checks only. Invalid documents return diagnostics.
+Invalid schemas throw when creating the validator. Schemas compile in Ajv strict
+mode, are synchronous, and use draft 2020-12; references must resolve within the
+supplied schemas. The library
+does not fetch remote schemas or provide extra format validators.
+
+### Build and handoff
+
+```bash
+npm run typecheck -w @radical/markdown
+npm run test -w @radical/markdown
+npm run build -w @radical/markdown
+npm pack -w @radical/markdown
+```
+
+The tarball includes JavaScript, declarations, the MIT license, this README, and
+runnable examples. A colleague can install it in another project using
+`npm install /path/to/radical-markdown-0.0.0.tgz` and import `@radical/markdown`.
+The package currently exports ESM. Public npm publication remains part of WP10.
 
 ## Purpose
 
@@ -74,8 +213,9 @@ WP04, and WP06 respectively.
 
 ## Work packages
 
-All work packages below are pending. Each has a deliverable and a completion
-condition so it can become a separate issue or pull request.
+Phase 0 above is implemented. The broader work packages below describe further
+work; the initial heading validator does not complete them. Each has a deliverable
+and a completion condition so it can become a separate issue or pull request.
 
 | Work package | Deliverable | Depends on |
 | --- | --- | --- |
@@ -93,9 +233,9 @@ condition so it can become a separate issue or pull request.
 ### WP01 — Core contracts and source locations
 
 Define public types for nodes (`id`, `type`, optional `title`, URI, frontmatter,
-body), symbols, references, diagnostics, related locations, and text edits. Define
-whether ranges use offsets or line/column positions, their indexing convention,
-and how positions map back to the original document.
+body), symbols, references, diagnostics, related locations, and text edits. Keep
+the initial zero-based UTF-16 offset convention and define how additional symbol
+locations map back to the original document.
 
 **Done when:** contracts type-check without browser or editor dependencies and
 location examples cover LF, CRLF, and non-ASCII text. Domain fields remain
@@ -103,7 +243,7 @@ extension-owned.
 
 ### WP02 — Markdown and frontmatter parsing
 
-Choose the Markdown/YAML parsing approach and document supported syntax. Preserve
+Extend the initial Markdown/YAML parsing and document supported node syntax. Preserve
 the body and original source positions. Report malformed frontmatter, missing or
 invalid `id`/`type`, and invalid optional fields as diagnostics. Decide explicitly
 how plain Markdown without node frontmatter is handled.
@@ -198,6 +338,8 @@ first release is ready.
 
 ## Delivery order
 
+0. **Initial package (implemented):** validate one document against a type-specific
+   JSON Schema and hand the package to the extension author.
 1. **Generic library:** WP01–WP05 establish parsing, indexing, references, and
    validation without domain assumptions.
 2. **Company pilot:** WP08 proves external use with one custom validator. WP10
@@ -213,17 +355,18 @@ consumer check.
 
 ## Current workspace
 
-This scaffold is registered through the root `packages/*` npm workspace pattern.
-It has no runtime exports, dependencies, or build step yet. Inspect its metadata
-from the repository root with:
+This package is registered through the root `packages/*` npm workspace pattern.
+Its public entry point exports `createValidator`, `validateDocument`, and the
+document, heading, schema, diagnostic, and range types. Inspect its metadata from
+the repository root with:
 
 ```bash
 npm pkg get name version private -w @radical/markdown
 npm run check:workspaces
 ```
 
-Implementation work should add public API documentation and runnable examples as
-the corresponding work packages are completed.
+Keep the public API documentation and examples current as further work packages
+are completed.
 
 ## License
 
