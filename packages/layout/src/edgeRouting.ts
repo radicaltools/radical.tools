@@ -356,10 +356,32 @@ function routeAround(
   return simplifyPath([s, ...head, ...grid, ...tail, t])
 }
 
+/** Padding of the direct curve's hit test: smaller than the routing OBS_PAD,
+ *  so an edge is re-routed only when its curve clearly goes *through* a node,
+ *  not when it grazes the padding zone (otherwise nearly every edge would be). */
+const HIT_PAD = 4
+
+/** The box the direct curve stays in (its control points' box), padded for
+ *  the hit test: an obstacle outside it cannot make computeRoutedEdge re-route. */
+export function directCurveBox(
+  sx: number, sy: number, srcSide: Position,
+  tx: number, ty: number, tgtSide: Position,
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  const { c1, c2 } = bezierControlPoints({ x: sx, y: sy }, srcSide, { x: tx, y: ty }, tgtSide)
+  return {
+    minX: Math.min(sx, tx, c1.x, c2.x) - HIT_PAD, minY: Math.min(sy, ty, c1.y, c2.y) - HIT_PAD,
+    maxX: Math.max(sx, tx, c1.x, c2.x) + HIT_PAD, maxY: Math.max(sy, ty, c1.y, c2.y) + HIT_PAD,
+  }
+}
+
+/** `obstacles` are tested against the direct curve; when it hits one, the
+ *  edge is routed around `allObstacles()` (default: the same list). Callers
+ *  with many nodes pass only those inside directCurveBox as `obstacles`. */
 export function computeRoutedEdge(
   sx: number, sy: number, srcSide: Position,
   tx: number, ty: number, tgtSide: Position,
   obstacles: RoutingObstacle[],
+  allObstacles?: () => RoutingObstacle[],
 ): { path: string; labelX: number; labelY: number } {
   // Prefer a single cubic bezier with control points pulled along each
   // side's exit normal — clean arrowhead alignment, natural flow.
@@ -369,10 +391,6 @@ export function computeRoutedEdge(
   const t = { x: tx, y: ty }
   const { c1, c2 } = bezierControlPoints(s, srcSide, t, tgtSide)
 
-  // Padding for the hit test is smaller than the routing OBS_PAD: we only
-  // re-route when the curve clearly goes *through* a node, not when it just
-  // grazes the padding zone. Otherwise nearly every edge would be re-routed.
-  const HIT_PAD = 4
   const hits = bezierHitsObstacles(s, c1, c2, t, obstacles, HIT_PAD)
 
   if (!hits) {
@@ -383,7 +401,7 @@ export function computeRoutedEdge(
   }
 
   // Direct curve hits at least one node — route around with A*.
-  const polyline = routeAround(s, srcSide, t, tgtSide, obstacles)
+  const polyline = routeAround(s, srcSide, t, tgtSide, allObstacles ? allObstacles() : obstacles)
   if (!polyline || polyline.length < 2) {
     // Routing failed (grid too big, or unreachable) — fall back to direct.
     const path = buildBezierPath(s, srcSide, t, tgtSide)

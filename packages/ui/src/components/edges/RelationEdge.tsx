@@ -8,7 +8,7 @@ import {
   useStoreApi,
 } from 'reactflow'
 import { C4EdgeRFData } from '@radical/common/c4'
-import { computeRoutedEdge, RoutingObstacle } from '@radical/layout/edgeRouting'
+import { computeRoutedEdge, directCurveBox, RoutingObstacle } from '@radical/layout/edgeRouting'
 import { allocatePorts } from '@radical/layout/portAllocator'
 import { useDiagramStore } from '../../store/diagramStore'
 
@@ -189,6 +189,43 @@ function ReconnectHandle({
 
 // ─── Edge component ───────────────────────────────────────────────────────────
 
+// ─── Shared per frame ────────────────────────────────────────────────────────
+// Every edge re-renders when the live layout moves its ends, i.e. every
+// frame. Port allocation and the obstacle list depend on the whole graph, not
+// on the edge, so they are computed once per React Flow state and reused by
+// all edges (they used to be recomputed by each edge: quadratic per frame).
+
+type NodeInternals = ReturnType<ReturnType<typeof useStoreApi>['getState']>['nodeInternals']
+type RFEdges = ReturnType<ReturnType<typeof useStoreApi>['getState']>['edges']
+
+let portCache: { nodes: NodeInternals; edges: RFEdges; result: ReturnType<typeof allocatePorts> } | null = null
+function portsFor(nodes: NodeInternals, edges: RFEdges): ReturnType<typeof allocatePorts> {
+  if (portCache?.nodes !== nodes || portCache.edges !== edges) {
+    portCache = { nodes, edges, result: allocatePorts(nodes as any, edges as any) }
+  }
+  return portCache.result
+}
+
+interface ObstacleCandidate { id: string; rect: RoutingObstacle; ancestors: string[] }
+let obstacleCache: { nodes: NodeInternals; list: ObstacleCandidate[]; byId: Map<string, ObstacleCandidate> } | null = null
+function obstacleCandidates(nodes: NodeInternals): { list: ObstacleCandidate[]; byId: Map<string, ObstacleCandidate> } {
+  if (obstacleCache?.nodes !== nodes) {
+    const list: ObstacleCandidate[] = []
+    const byId = new Map<string, ObstacleCandidate>()
+    for (const n of nodes.values()) {
+      const ancestors: string[] = []
+      for (let cur = n.parentNode ? nodes.get(n.parentNode) : undefined; cur; cur = cur.parentNode ? nodes.get(cur.parentNode) : undefined) {
+        ancestors.push(cur.id)
+      }
+      const c = { id: n.id, ancestors, rect: { x: n.positionAbsolute?.x ?? 0, y: n.positionAbsolute?.y ?? 0, w: n.width ?? 0, h: n.height ?? 0 } }
+      byId.set(n.id, c)
+      if (!n.hidden && n.width && n.height) list.push(c)
+    }
+    obstacleCache = { nodes, list, byId }
+  }
+  return obstacleCache
+}
+
 export const RelationEdge = memo(
   ({
     id,
@@ -216,11 +253,7 @@ export const RelationEdge = memo(
     // Resolve sides + ports from the central allocator (groups parallel
     // edges so they don't all collide at the centre of a side).
     const stateSnapshot = storeApi.getState()
-    const allocations = allocatePorts(
-      stateSnapshot.nodeInternals as any,
-      stateSnapshot.edges as any
-    )
-    const alloc = allocations.get(id)
+    const alloc = portsFor(stateSnapshot.nodeInternals, stateSnapshot.edges).get(id)
 
     let srcSide: Position, tgtSide: Position
     let sp: { x: number; y: number }, tp: { x: number; y: number }
@@ -258,40 +291,28 @@ export const RelationEdge = memo(
       tp = borderPoint(targetNode, tgtSide, sc)
     }
 
-    // Collect obstacles imperatively (no reactive subscription to all nodes)
-    const nodeInternals = stateSnapshot.nodeInternals
-    const allNodes = Array.from(nodeInternals.values())
-    const excludeIds = new Set<string>([source, target])
-
-    // Exclude ancestors of source and target (edge crosses their borders)
-    let walker: (typeof sourceNode) | undefined = sourceNode
-    while (walker?.parentNode) { excludeIds.add(walker.parentNode); walker = nodeInternals.get(walker.parentNode) }
-    walker = targetNode
-    while (walker?.parentNode) { excludeIds.add(walker.parentNode); walker = nodeInternals.get(walker.parentNode) }
-
-    const obstacles: RoutingObstacle[] = []
-    for (const n of allNodes) {
-      if (excludeIds.has(n.id) || n.hidden || !n.width || !n.height) continue
-      // Exclude descendants of source or target (they're inside those nodes)
-      let isDescendant = false
-      let cur: (typeof n) | undefined = n
-      while (cur?.parentNode) {
-        if (cur.parentNode === source || cur.parentNode === target) { isDescendant = true; break }
-        cur = nodeInternals.get(cur.parentNode)
-      }
-      if (isDescendant) continue
-      obstacles.push({
-        x: n.positionAbsolute?.x ?? 0,
-        y: n.positionAbsolute?.y ?? 0,
-        w: n.width,
-        h: n.height,
-      })
+    // Obstacles: every visible node except the two ends, their ancestors
+    // (the edge crosses their borders) and their descendants (inside them).
+    const candidates = obstacleCandidates(stateSnapshot.nodeInternals)
+    const ends = candidates.byId
+    const excludeIds = new Set<string>([source, target, ...(ends.get(source)?.ancestors ?? []), ...(ends.get(target)?.ancestors ?? [])])
+    const excluded = (c: ObstacleCandidate): boolean =>
+      excludeIds.has(c.id) || c.ancestors.includes(source) || c.ancestors.includes(target)
+    // Only nodes near the direct curve can make it re-route; the full list is
+    // built only when it does.
+    const box = directCurveBox(sp.x, sp.y, srcSide, tp.x, tp.y, tgtSide)
+    const near: RoutingObstacle[] = []
+    for (const c of candidates.list) {
+      const r = c.rect
+      if (r.x > box.maxX || r.x + r.w < box.minX || r.y > box.maxY || r.y + r.h < box.minY || excluded(c)) continue
+      near.push(r)
     }
 
     const { path: edgePath, labelX, labelY } = computeRoutedEdge(
       sp.x, sp.y, srcSide,
       tp.x, tp.y, tgtSide,
-      obstacles,
+      near,
+      () => candidates.list.filter((c) => !excluded(c)).map((c) => c.rect),
     )
 
     const strokeColor = selected ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'
