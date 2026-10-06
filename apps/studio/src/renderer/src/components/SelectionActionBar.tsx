@@ -302,7 +302,7 @@ export function SelectionActionBar(): React.ReactElement | null {
             onClick={() => {
               const ids = [...selectedNodeIds]
               setSelectedNodeIds([])
-              for (const id of ids) removeNodeFromView(activeViewId, id)
+              removeNodeFromView(activeViewId, ids)
             }}
             title="Hide selected nodes from the active view (model is not changed)"
           >

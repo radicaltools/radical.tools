@@ -78,7 +78,7 @@ export function MockupWireframe({
         <div className="mockup-wf-empty">
           {aiEnabled
             ? 'Link requirements / scenarios with “Illustrates”, then generate a low-fi wireframe.'
-            : 'Enable AI in settings to generate a wireframe, or add a design link.'}
+            : 'Set up an AI provider in settings to generate a wireframe, or add a design link.'}
         </div>
       )}
       <div className="mockup-wf-actions">

@@ -12,7 +12,7 @@ import {
   C4ElementType,
   NODE_COLORS,
   NODE_FG,
-  NODE_SIZES,
+  nodeTypeSize,
   TYPE_LABELS,
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
@@ -240,7 +240,7 @@ export function WikiView(): React.ReactElement {
   const createNode = (type: string, parentId: string | undefined, link?: WizardLink) => {
     const def = metamodel?.nodeTypes[type]
     const label = `New ${def?.label ?? TYPE_LABELS[type as C4ElementType] ?? type}`
-    const size = NODE_SIZES[type as C4ElementType]
+    const size = nodeTypeSize(type, metamodel)
     requestCreateNode({
       type: type as C4ElementType,
       label,
@@ -251,8 +251,7 @@ export function WikiView(): React.ReactElement {
       parentId,
       x: 0,
       y: 0,
-      width: def?.width ?? size?.width ?? 160,
-      height: def?.height ?? size?.height ?? 90,
+      ...size,
     }, {
       links: link ? [link] : [],
       onCreated: (id) => {

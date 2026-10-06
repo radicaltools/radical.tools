@@ -27,7 +27,7 @@ export function buildModelToolDefs(): ToolDef[] {
     },
     {
       name: 'reset_diagram',
-      description: 'Erase EVERY node, relation and view. Use ONLY when the user explicitly asks to start from scratch or replace the whole model. Call this before any other tool in the same task.',
+      description: 'Erase EVERY node, relation, view and sequence (milestones, presentations and the metamodel stay). Use ONLY when the user explicitly asks to start from scratch or replace the whole model. Call this before any other tool in the same task.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     },
   ]

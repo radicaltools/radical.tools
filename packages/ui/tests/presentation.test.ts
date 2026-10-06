@@ -197,6 +197,19 @@ describe('goToSlide', () => {
       expect({ x: n.x, y: n.y }).toEqual({ x: 999, y: 777 })
     })
 
+    it('a milestone linked to a slide wins over the copy taken when the slide was added', () => {
+      useDiagramStore.getState().addPresentationSlide('s-new')
+      const added = (useDiagramStore.getState().presentationSlides as any[])[0]
+      expect(added.modelSnapshot).toBeDefined()
+      useDiagramStore.getState().linkSnapshotToSlide(added.id, 'snap-small')
+      useDiagramStore.getState().goToSlide(0)
+      expect(Object.keys(useDiagramStore.getState().c4Nodes)).toEqual(['sys1'])
+      // Unlinked, the slide shows its own copy again.
+      useDiagramStore.getState().linkSnapshotToSlide(added.id, null)
+      useDiagramStore.getState().goToSlide(0)
+      expect(useDiagramStore.getState().c4Nodes['ctn1']).toBeDefined()
+    })
+
     it('shows the live model again after a milestone slide', () => {
       useDiagramStore.setState({
         presentationSlides: [slide('s-a', 'v-a'), slide('s-m', null, 'snap-small')],

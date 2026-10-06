@@ -15,7 +15,7 @@ import { useDiagramStore } from '../store/diagramStore'
 import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
-import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT } from '@radical/common/c4'
+import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize } from '@radical/common/c4'
 import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
 
 // Node and edge type registrations
@@ -739,7 +739,7 @@ function StructuralCanvas(): React.ReactElement {
         return
       }
 
-      const size = NODE_SIZES[typeStr]
+      const size = nodeTypeSize(typeStr, mm)
       // Opens the type's wizard instead, when it has one.
       requestCreateNode({
         type: typeStr,

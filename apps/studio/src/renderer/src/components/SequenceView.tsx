@@ -179,10 +179,9 @@ export function SequenceView(): React.ReactElement {
     if (!el) return
     el.addEventListener('wheel', onWheel, { passive: false })
     const handler = (e: KeyboardEvent) => {
+      // ⌘+ / ⌘− are handled app-wide (Toolbar) through __radicalZoomIn/Out.
       if (!(e.ctrlKey || e.metaKey)) return
-      if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom((z) => clampZoom(z * 1.2)) }
-      else if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom((z) => clampZoom(z / 1.2)) }
-      else if (e.key === '0') { e.preventDefault(); fitFnRef.current() }
+      if (e.key === '0') { e.preventDefault(); fitFnRef.current() }
     }
     el.addEventListener('keydown', handler)
     return () => {
