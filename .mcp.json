@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "radical-architecture": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["apps/mcp/dist/index.js", "--folder", "architecture"]
+    }
+  }
+}
