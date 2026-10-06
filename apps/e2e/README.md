@@ -76,6 +76,11 @@ automatically; start CI by hand from the Actions tab (*Run workflow*) if you
 need it. A new push to a PR cancels the checks still running for the previous
 commit. On `main`, `deploy.yml` runs this suite before every deploy.
 
+**Skipping it on a PR:** add the `skip-e2e` label. The next CI run (the next
+push, or *Run workflow*) skips the E2E job; type-check and unit tests still
+run. Adding the label does not start a run by itself. Remove the label to get
+the suite back; it runs before the deploy from `main` either way.
+
 ## Known issues
 
 `tests/studio/known-issues.spec.ts` holds tests for bugs that are not fixed
