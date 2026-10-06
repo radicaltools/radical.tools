@@ -55,6 +55,20 @@ function toAbsoluteTopLeft(n: C4Node, all: Record<string, C4Node>): { x: number;
   return { x, y }
 }
 
+// ─── Pace ────────────────────────────────────────────────────────────────────
+
+/** A tick that arrives this long after the previous one marks a heavy graph
+ *  (physics plus rendering no longer fit a frame). */
+const HEAVY_TICK_MS = 40
+/** On a heavy graph, render one tick in this many: the physics then settles
+ *  about twice as fast (measured on 450 nodes), at a lower visual frame rate. */
+const HEAVY_RENDER_EVERY = 3
+/** Settled: no node moved more than SETTLE_PX for SETTLE_TICKS ticks in a row.
+ *  WebCoLa's own test (alpha < threshold) never passes once groups are
+ *  projected, so nested views used to move (and re-render) forever. */
+const SETTLE_PX = 0.5
+const SETTLE_TICKS = 15
+
 // ─── Public interface ────────────────────────────────────────────────────────
 
 export interface LiveColaCallbacks {
@@ -81,6 +95,11 @@ export class LiveColaLayout {
    * cleared after they are applied.
    */
   private seedPositions = new Map<string, { x: number; y: number }>()
+  /** Pace bookkeeping (see HEAVY_TICK_MS and SETTLE_PX). */
+  private lastTickAt = 0
+  private skippedRenders = 0
+  private quietTicks = 0
+  private prevCentres = new Map<ColaNode, { x: number; y: number }>()
 
   constructor(callbacks: LiveColaCallbacks) {
     this.callbacks = callbacks
@@ -198,6 +217,7 @@ export class LiveColaLayout {
 
   grab(nodeId: string, rfX: number, rfY: number): void {
     this._grabbedId = nodeId
+    this.resetPace()
     const cn = this.idToNode.get(nodeId)
     if (cn) {
       Layout.dragStart(cn)
@@ -293,8 +313,29 @@ export class LiveColaLayout {
 
   // ─── Build / rebuild ───────────────────────────────────────────────────────
 
+  private resetPace(): void {
+    this.lastTickAt = 0
+    this.skippedRenders = 0
+    this.quietTicks = 0
+    this.prevCentres.clear()
+  }
+
+  /** True once no node has moved more than SETTLE_PX for SETTLE_TICKS ticks. */
+  private settled(): boolean {
+    let moved = 0
+    for (const cn of this.colaNodes) {
+      const prev = this.prevCentres.get(cn)
+      if (prev) moved = Math.max(moved, Math.abs(cn.x - prev.x), Math.abs(cn.y - prev.y))
+      else moved = Infinity
+      this.prevCentres.set(cn, { x: cn.x, y: cn.y })
+    }
+    this.quietTicks = moved <= SETTLE_PX ? this.quietTicks + 1 : 0
+    return this.quietTicks >= SETTLE_TICKS && !this._grabbedId
+  }
+
   private rebuild(firstRun: boolean = false): void {
     if (this.cola) this.cola.stop()
+    this.resetPace()
 
     const { nodes, relations } = this.callbacks.getModel()
     this.allNodes = nodes
@@ -583,6 +624,19 @@ export class LiveColaLayout {
 
     layout.on('tick', () => {
       if (!this._running) return
+      const now = performance.now()
+      const heavy = this.lastTickAt > 0 && now - this.lastTickAt > HEAVY_TICK_MS
+      this.lastTickAt = now
+      if (this.settled()) {
+        // Stop the timer; a drag wakes it again (grab/drag → resume()) and
+        // a model change rebuilds the layout.
+        this.cola?.stop()
+        this.resetPace()
+        this.emitPositions()
+        return
+      }
+      if (heavy && ++this.skippedRenders < HEAVY_RENDER_EVERY) return
+      this.skippedRenders = 0
       this.emitPositions()
     })
 
