@@ -95,7 +95,7 @@ export interface DiagramFacade {
   /** Optional — runs Smart Layout over All elements (no viewId) or one
    *  static/dynamic view, and keeps the result. */
   runLayout?(viewId?: string): Promise<{ ok: boolean; text: string }>
-  /** Optional — clears the entire diagram (nodes, relations, views) so the
+  /** Optional — clears the diagram (nodes, relations, views, sequences) so the
    *  AI can build a fresh model from scratch. Omitting it means reset_diagram
    *  calls fail with a descriptive error. */
   clearDiagram?(): void

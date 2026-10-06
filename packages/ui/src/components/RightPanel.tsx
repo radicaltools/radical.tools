@@ -2092,7 +2092,7 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
   const handleShowMatches = () => { if (activeViewId && nodesMatchedSet) setViewNodes(activeViewId, Array.from(nodesMatchedSet)) }
   const handleHideMatches = () => {
     if (!activeViewId || !nodesMatchedSet) return
-    for (const id of nodesMatchedSet) removeNodeFromView(activeViewId, id)
+    removeNodeFromView(activeViewId, Array.from(nodesMatchedSet))
   }
 
   // Pane 2 is shown when any item is selected

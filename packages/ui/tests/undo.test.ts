@@ -95,3 +95,62 @@ describe('undo / redo', () => {
     expect(restoredChildren).toBe(sys1Children)
   })
 })
+
+describe('view visibility is undoable', () => {
+  it('hiding several nodes from a view is one undo step', () => {
+    const s = useDiagramStore.getState()
+    const viewId = s.addView('V')
+    const [a, b] = Object.keys(useDiagramStore.getState().c4Nodes).filter((id) => !useDiagramStore.getState().c4Nodes[id].parentId)
+    const before = useDiagramStore.getState().views[viewId].nodeIds
+    useDiagramStore.getState().removeNodeFromView(viewId, [a, b])
+    expect(useDiagramStore.getState().views[viewId].nodeIds).not.toContain(a)
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().views[viewId].nodeIds).toEqual(before)
+  })
+
+  it('hiding a relation from a view can be undone and redone', () => {
+    const viewId = useDiagramStore.getState().addView('V')
+    const relId = Object.keys(useDiagramStore.getState().c4Relations)[0]
+    useDiagramStore.getState().hideRelationFromView(viewId, relId)
+    expect(useDiagramStore.getState().views[viewId].hiddenRelationIds).toEqual([relId])
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().views[viewId].hiddenRelationIds ?? []).toEqual([])
+    useDiagramStore.getState().redo()
+    expect(useDiagramStore.getState().views[viewId].hiddenRelationIds).toEqual([relId])
+  })
+
+  it('a no-op hide records nothing', () => {
+    const viewId = useDiagramStore.getState().addView('V')
+    const relId = Object.keys(useDiagramStore.getState().c4Relations)[0]
+    useDiagramStore.getState().hideRelationFromView(viewId, relId)
+    useDiagramStore.getState().hideRelationFromView(viewId, relId)
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().views[viewId].hiddenRelationIds ?? []).toEqual([])
+  })
+})
+
+describe('clearModel (the AI reset) is undoable', () => {
+  it('undo brings back nodes, relations, views and sequences; milestones stay', () => {
+    const s = useDiagramStore.getState()
+    s.addView('V')
+    s.addSequence('Flow')
+    s.createSnapshot('v1')
+    const before = useDiagramStore.getState()
+    const { c4Nodes, c4Relations, views, sequences, snapshots } = before
+
+    useDiagramStore.getState().clearModel()
+    const cleared = useDiagramStore.getState()
+    expect([Object.keys(cleared.c4Nodes).length, Object.keys(cleared.views).length, Object.keys(cleared.sequences).length]).toEqual([0, 0, 0])
+    expect(cleared.snapshots).toBe(snapshots)
+
+    useDiagramStore.getState().undo()
+    const after = useDiagramStore.getState()
+    expect(after.c4Nodes).toBe(c4Nodes)
+    expect(after.c4Relations).toBe(c4Relations)
+    expect(after.views).toBe(views)
+    expect(after.sequences).toBe(sequences)
+
+    useDiagramStore.getState().redo()
+    expect(Object.keys(useDiagramStore.getState().sequences)).toHaveLength(0)
+  })
+})

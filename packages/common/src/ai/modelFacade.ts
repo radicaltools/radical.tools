@@ -186,7 +186,9 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       state.sequences = {}
       keepSequences = false
       state.activeViewId = null
-      carried = carried.metamodel ? { metamodel: carried.metamodel } : {}
+      // Milestones and presentations stay, as in Studio.
+      const { metamodel, snapshots, presentations } = carried
+      carried = { ...(metamodel ? { metamodel } : {}), ...(snapshots ? { snapshots } : {}), ...(presentations ? { presentations } : {}) }
     },
 
     toDiagramData,
