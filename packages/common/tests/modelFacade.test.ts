@@ -140,12 +140,14 @@ describe('createModelFacade', () => {
     expect(input.nodes[0].label).toBe('S') // the input is not mutated
   })
 
-  it('clearDiagram keeps only the metamodel', () => {
-    const f = facade({ sequences: [{ id: 'seq', name: 'Flow', steps: [] } as never] })
+  it('clearDiagram keeps the metamodel, milestones and presentations', () => {
+    const snapshots = [{ id: 'm1', name: 'v1', nodes: {}, relations: {} } as never]
+    const presentations = [{ id: 'p1', name: 'Deck', slides: [] } as never]
+    const f = facade({ sequences: [{ id: 'seq', name: 'Flow', steps: [] } as never], snapshots, presentations, defaultPositions: {} })
     f.addNode(node('system', 'A'))
     f.addView!('V')
     f.clearDiagram!()
-    expect(f.toDiagramData()).toEqual({ nodes: [], relations: [], views: [], metamodel: MM })
+    expect(f.toDiagramData()).toEqual({ nodes: [], relations: [], views: [], metamodel: MM, snapshots, presentations })
   })
 
   it('applies the C4 metamodel when the document has none', () => {

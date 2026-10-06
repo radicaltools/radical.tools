@@ -259,13 +259,14 @@ function NodeTypeCard({
 
           <div className="mm-section-label">Allowed parents</div>
           <div className="mm-parent-grid">
-            <label className="mm-checkbox">
+            <label className="mm-checkbox" title="Elements of this type may sit at the top level, outside any parent.">
               <input
                 type="checkbox"
-                checked={!def.allowedParents || def.allowedParents.length === 0}
-                onChange={(e) => onChange({ allowedParents: e.target.checked ? undefined : [] })}
+                // Same rule as isParentAllowed: allowedAtRoot wins, else a type with no parents.
+                checked={def.allowedAtRoot ?? (!def.allowedParents || def.allowedParents.length === 0)}
+                onChange={(e) => onChange({ allowedAtRoot: e.target.checked })}
               />
-              Root only
+              At the root
             </label>
             {allTypes
               .filter((t) => t.id !== def.id)

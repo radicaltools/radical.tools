@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { runAIPrompt, type ForgeProgressEvent } from '../ai/runner'
-import { loadAISettings } from '../ai/settings'
+import { activeProviderNeedsKey, loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
 import { FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, buildForgeStagePrompt, buildPriorStagesBlock, needLabelFromDescription, type ForgeNeedRef, type ForgeStageId } from '../ai/forgePrompts'
@@ -21,6 +21,7 @@ import {
 import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
 import { generateWireframe } from '../ai/mockupWireframe'
+import { addedSince, currentModelIds, removeAdded, type ModelIds } from '../ai/forgeStageOutput'
 
 type ClarifyStatus = 'asking' | 'form' | 'done'
 
@@ -164,6 +165,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   // — a ref, not state, so starting a fetch doesn't itself change an effect
   // dependency (see the effect for why that would matter).
   const clarifyStartedRef = useRef<Set<ForgeStageId>>(new Set())
+  // What each stage's last run added, so Regenerate can take it out first.
+  const stageAddedRef = useRef<Partial<Record<ForgeStageId, ModelIds>>>({})
   const diagram = useDiagramFacade()
 
   const currentStageId: ForgeStageId | null = FORGE_STAGES.some((s) => s.id === step) ? (step as ForgeStageId) : null
@@ -197,6 +200,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setReachedIndex(0)
     setFinishedAt(null)
     clarifyStartedRef.current = new Set()
+    stageAddedRef.current = {}
   }, [open])
 
   useEffect(() => {
@@ -222,9 +226,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     return () => window.removeEventListener('keydown', onKey)
   }, [open, busy, onClose])
 
-  const providerCfg = aiSettings.providers[aiSettings.active]
   const providerLabel = getAdapter(aiSettings.active).label
-  const needsKey = aiSettings.active !== 'ollama' && !providerCfg.apiKey
+  const needsKey = activeProviderNeedsKey(aiSettings)
   const unavailableReason = !aiSettings.enabled
     ? 'AI features are disabled.'
     : needsKey
@@ -351,6 +354,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (busy || unavailableReason) return
     setBusy(true)
     setError(null)
+    // Regenerate replaces the previous attempt instead of adding a second copy.
+    const previous = stageAddedRef.current[stageId]
+    if (previous) removeAdded(previous)
+    const before = currentModelIds()
     setProgressByStage((p) => ({ ...p, [stageId]: { round: 0, entries: [] } }))
     const ctl = new AbortController()
     abortRef.current = ctl
@@ -401,6 +408,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     } catch (err) {
       setError((err as Error).message || String(err))
     } finally {
+      stageAddedRef.current[stageId] = addedSince(before)
       abortRef.current = null
       setBusy(false)
     }

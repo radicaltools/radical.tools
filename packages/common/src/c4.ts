@@ -289,6 +289,17 @@ function pluckPerType<T>(fn: (def: NodeTypeDef) => T): Record<C4ElementType, T> 
 export const NODE_SIZES: Record<C4ElementType, { width: number; height: number }> =
   pluckPerType(def => ({ width: def.width, height: def.height }))
 
+/** Size of a new node of `type`: the active metamodel's type first (custom
+ *  types are only there), then the built-in size, then a default. */
+export function nodeTypeSize(type: string, metamodel?: Metamodel | null): { width: number; height: number } {
+  const def = metamodel?.nodeTypes[type]
+  const builtIn = NODE_SIZES[type as C4ElementType] as { width: number; height: number } | undefined
+  return {
+    width: def?.width ?? builtIn?.width ?? 160,
+    height: def?.height ?? builtIn?.height ?? 90,
+  }
+}
+
 export const COLLAPSED_HEIGHT: Record<C4ElementType, number> =
   pluckPerType(def => def.collapsedHeight ?? def.height)
 

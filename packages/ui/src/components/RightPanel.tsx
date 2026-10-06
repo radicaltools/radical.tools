@@ -8,6 +8,12 @@ import { MockupWireframe } from './MockupWireframe'
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 
+/** A view with no node list shows the whole model. */
+function viewNodeCount(view: { nodeIds: string[] }): string {
+  const n = view.nodeIds.length
+  return n === 0 ? 'All nodes' : `${n} ${n === 1 ? 'node' : 'nodes'}`
+}
+
 function AutoResizeTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -947,7 +953,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
       )}
       <div>
         <div className="props-section-title">Nodes</div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{view.nodeIds.length} node{view.nodeIds.length !== 1 ? 's' : ''}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{viewNodeCount(view)}</div>
       </div>
       {!readOnly && (
         <button className="props-delete" onClick={() => { removeView(view.id); setActiveView(null); onClose() }}>
@@ -1083,7 +1089,7 @@ function ViewList({ readOnly = false, onOpenProps }: { readOnly?: boolean; onOpe
               <div className="lp-card-body">
                 <div className="lp-card-title">{v.name}</div>
                 <div className="lp-card-meta">
-                  <span>{v.nodeIds.length} {v.nodeIds.length === 1 ? 'node' : 'nodes'}</span>
+                  <span>{viewNodeCount(v)}</span>
                   {isDynamic && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>flow</span>}
                   {isTreemap && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>hierarchy</span>}
                   {isTable && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>table</span>}
@@ -2086,7 +2092,7 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
   const handleShowMatches = () => { if (activeViewId && nodesMatchedSet) setViewNodes(activeViewId, Array.from(nodesMatchedSet)) }
   const handleHideMatches = () => {
     if (!activeViewId || !nodesMatchedSet) return
-    for (const id of nodesMatchedSet) removeNodeFromView(activeViewId, id)
+    removeNodeFromView(activeViewId, Array.from(nodesMatchedSet))
   }
 
   // Pane 2 is shown when any item is selected

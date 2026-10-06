@@ -222,9 +222,29 @@ export function insertRelation(state: ModelState, id: string, rel: Omit<C4Relati
   state.c4Relations[id] = { id, ...rel, ...(relationType ? { relationType } : {}) }
 }
 
+/** Refusal for moving a relation's source or target, as for a new relation. */
+export function checkPatchRelation(state: ModelState, id: string, updates: Partial<Omit<C4Relation, 'id'>>): string | null {
+  const rel = state.c4Relations[id]
+  if (!rel || (updates.sourceId === undefined && updates.targetId === undefined)) return null
+  return checkAddRelation(state, { ...rel, ...updates })
+}
+
 export function patchRelation(state: ModelState, id: string, updates: Partial<Omit<C4Relation, 'id'>>): void {
   const rel = state.c4Relations[id]
-  if (rel) Object.assign(rel, updates)
+  if (!rel) return
+  const moved = (updates.sourceId !== undefined && updates.sourceId !== rel.sourceId)
+    || (updates.targetId !== undefined && updates.targetId !== rel.targetId)
+  Object.assign(rel, updates)
+  // A moved end can leave the relation type behind; infer it again, as on insert.
+  if (!moved || updates.relationType !== undefined || !rel.relationType) return
+  const src = state.c4Nodes[rel.sourceId]
+  const dst = state.c4Nodes[rel.targetId]
+  const def = state.metamodel?.relationTypes[rel.relationType]
+  if (!src || !dst || !def) return
+  if (def.allowedPairs.length === 0 || def.allowedPairs.some((p) => p.from === src.type && p.to === dst.type)) return
+  const inferred = inferRelationType(state.metamodel, src.type, dst.type)
+  if (inferred) rel.relationType = inferred
+  else delete rel.relationType
 }
 
 export function deleteRelation(state: ModelState, id: string): void {
