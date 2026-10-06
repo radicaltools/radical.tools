@@ -119,3 +119,26 @@ test.describe('custom metamodel', () => {
     await expect(external).toHaveText('✓')
   })
 })
+
+test.describe('hidden relations', () => {
+  // "charges card" (api → payments) is hidden in the table and the matrix view.
+  test.beforeEach(async ({ studio }) => {
+    const doc = JSON.parse(fixture('bookstore'))
+    const views = doc.views.map((v: { id: string }) => (v.id === 'v-table' ? { ...v, hiddenRelationIds: ['r4'] } : v))
+    views.push({ id: 'v-matrix', name: 'Matrix', kind: 'matrix', nodeIds: [], positions: {}, hiddenRelationIds: ['r4'] })
+    await studio.seedDocument(JSON.stringify({ ...doc, views }))
+  })
+
+  test('stay out of the Relations tab', async ({ page, studio }) => {
+    await studio.open('v-table')
+    await page.locator('.tv-tabs').getByRole('button', { name: /^Relations\s*3$/ }).click()
+    await expect(page.locator('tbody tr')).toHaveCount(3)
+    await expect(page.locator('tbody')).not.toContainText('charges card')
+  })
+
+  test('stay out of the matrix', async ({ page, studio }) => {
+    await studio.open('v-matrix')
+    await expect(page.locator('.mx-cell.mx-has-rel')).toHaveCount(3)
+    await expect(page.locator('.mx-cell[title*="charges card"]')).toHaveCount(0)
+  })
+})

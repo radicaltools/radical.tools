@@ -114,7 +114,9 @@ export function MatrixView(): React.ReactElement {
 
   const relMap = useMemo(() => {
     const m = new Map<string, Map<string, string[]>>()
+    const hidden = new Set(activeView?.hiddenRelationIds ?? [])
     for (const rel of Object.values(relations)) {
+      if (hidden.has(rel.id)) continue
       const visSource = getViewVisibleAncestor(rel.sourceId, nodes, viewFilter, viewCollapsedSet, expandedSet)
       const visTarget = getViewVisibleAncestor(rel.targetId, nodes, viewFilter, viewCollapsedSet, expandedSet)
       if (!visSource || !visTarget || visSource === visTarget) continue
@@ -129,7 +131,7 @@ export function MatrixView(): React.ReactElement {
       }
     }
     return m
-  }, [relations, nodes, viewFilter, viewCollapsedSet, expandedSet, visibleNodeIdSet])
+  }, [relations, nodes, viewFilter, viewCollapsedSet, expandedSet, visibleNodeIdSet, activeView])
 
   const relColor = useCallback(
     (relationType: string | undefined): string => {
