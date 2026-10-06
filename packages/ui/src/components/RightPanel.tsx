@@ -1,5 +1,6 @@
 import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useDiagramStore, nodeEffectivelyCollapsedInView } from '../store/diagramStore'
+import { useChildIds, useNodeContent, useNodeLabels } from '../store/nodeSelectors'
 import { C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '@radical/common/c4'
 import { resolveEarsSubject, NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
@@ -100,11 +101,12 @@ function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
   /** Nodes that directly match the active filter (vs. shown only as an ancestor path) — used to highlight them. */
   matchedSet?: Set<string> | null
 }) {
-  const node = useDiagramStore((s) => s.c4Nodes[nodeId])
+  // Content, not geometry: the live layout moves nodes every frame.
+  const node = useNodeContent(nodeId)
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
   const selectNode = useDiagramStore((s) => s.selectNode)
   const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
-  const allNodes = useDiagramStore((s) => s.c4Nodes)
+  const childIds = useChildIds(nodeId)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const activeView = useDiagramStore((s) => s.activeViewId ? s.views[s.activeViewId] : undefined)
   const addNodeToView = useDiagramStore((s) => s.addNodeToView)
@@ -112,7 +114,7 @@ function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
 
   if (!node) return null
 
-  const children = Object.values(allNodes).filter((n) => n.parentId === nodeId && (!filterSet || filterSet.has(n.id)))
+  const children = childIds.filter((id) => !filterSet || filterSet.has(id))
   const hasChildren = children.length > 0
   const isSelected = selectedNodeId === nodeId
   const canCollapse = isContainerType(node.type) && hasChildren
@@ -166,8 +168,8 @@ function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
           </span>
         )}
       </div>
-      {!isEffectivelyCollapsed && children.map((c) => (
-        <TreeNodeItem key={c.id} nodeId={c.id} depth={depth + 1} filterSet={filterSet} matchedSet={matchedSet} />
+      {!isEffectivelyCollapsed && children.map((childId) => (
+        <TreeNodeItem key={childId} nodeId={childId} depth={depth + 1} filterSet={filterSet} matchedSet={matchedSet} />
       ))}
     </>
   )
@@ -243,17 +245,18 @@ function RelationListItem({ relationId }: { relationId: string }): React.ReactEl
 
 function RelationsSection(): React.ReactElement {
   const relations = useDiagramStore((s) => s.c4Relations)
-  const c4Nodes = useDiagramStore((s) => s.c4Nodes)
+  // Labels only: the live layout replaces c4Nodes every frame.
+  const labels = useNodeLabels()
   const ids = useMemo(() => {
     return Object.values(relations)
-      .filter((r) => c4Nodes[r.sourceId] && c4Nodes[r.targetId])
+      .filter((r) => labels.has(r.sourceId) && labels.has(r.targetId))
       .sort((a, b) => {
-        const sa = (c4Nodes[a.sourceId]?.label || '').localeCompare(c4Nodes[b.sourceId]?.label || '')
+        const sa = (labels.get(a.sourceId) || '').localeCompare(labels.get(b.sourceId) || '')
         if (sa !== 0) return sa
-        return (c4Nodes[a.targetId]?.label || '').localeCompare(c4Nodes[b.targetId]?.label || '')
+        return (labels.get(a.targetId) || '').localeCompare(labels.get(b.targetId) || '')
       })
       .map((r) => r.id)
-  }, [relations, c4Nodes])
+  }, [relations, labels])
 
   if (ids.length === 0) {
     return <div className="lp-empty-state" style={{ padding: '4px 12px 8px' }}>No relations.</div>

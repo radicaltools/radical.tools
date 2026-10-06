@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeRoutedEdge, directCurveBox, type RoutingObstacle } from '../src/edgeRouting'
+import { computeRoutedEdge, directCurveBox, ObstacleGrid, type RoutingObstacle } from '../src/edgeRouting'
 import { Position } from '../src/side'
 
 /** Small deterministic PRNG so the scenes are the same on every run. */
@@ -22,6 +22,26 @@ describe('directCurveBox', () => {
       const near = obstacles.filter((o) => !(o.x > box.maxX || o.x + o.w < box.minX || o.y > box.maxY || o.y + o.h < box.minY))
       expect(computeRoutedEdge(sx, sy, ss, tx, ty, ts, near, () => obstacles))
         .toEqual(computeRoutedEdge(sx, sy, ss, tx, ty, ts, obstacles))
+    }
+  })
+})
+
+describe('ObstacleGrid', () => {
+  it('routes exactly as with the full obstacle list, exclusions included', () => {
+    const random = rng(11)
+    const sides = [Position.Top, Position.Right, Position.Bottom, Position.Left]
+    for (let scene = 0; scene < 300; scene++) {
+      // Small scenes route around nodes; large ones exceed routeAround's grid.
+      const extent = scene % 3 === 0 ? 8000 : 2000
+      const items = Array.from({ length: 80 }, (_, i) => ({
+        id: i, rect: { x: random() * extent * 1.5, y: random() * extent, w: 80 + random() * 160, h: 50 + random() * 100 },
+      }))
+      const skip = new Set([Math.floor(random() * 80), Math.floor(random() * 80)])
+      const [sx, sy, tx, ty] = [random() * extent * 1.5, random() * extent, random() * extent * 1.5, random() * extent]
+      const [ss, ts] = [sides[Math.floor(random() * 4)], sides[Math.floor(random() * 4)]]
+      const grid = new ObstacleGrid(items)
+      expect(computeRoutedEdge(sx, sy, ss, tx, ty, ts, grid.without((item) => skip.has(item.id))))
+        .toEqual(computeRoutedEdge(sx, sy, ss, tx, ty, ts, items.filter((item) => !skip.has(item.id)).map((item) => item.rect)))
     }
   })
 })

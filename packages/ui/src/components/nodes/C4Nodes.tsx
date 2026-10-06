@@ -1,10 +1,10 @@
 import React, { memo, useCallback } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { C4NodeRFData, NODE_COLORS, TYPE_ICON_PATHS } from '@radical/common/c4'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useDiagramStore } from '../../store/diagramStore'
+import { useNodeContent } from '../../store/nodeSelectors'
 import { composeEarsSentence } from '@radical/common/metamodel'
-import type { C4Node, C4Relation } from '@radical/common/c4'
+import type { C4Relation } from '@radical/common/c4'
 import { wireframeDataUri } from '@radical/common/wireframe'
 
 // ─── Diff highlight overlay ────────────────────────────────────────────────
@@ -16,24 +16,6 @@ import { wireframeDataUri } from '@radical/common/wireframe'
 /** Card props equality: React Flow also passes xPos/yPos, which change every frame. */
 function sameCard(a: NodeProps<C4NodeRFData>, b: NodeProps<C4NodeRFData>): boolean {
   return a.data === b.data && a.selected === b.selected
-}
-
-const GEOMETRY = new Set(['x', 'y', 'width', 'height'])
-
-/** Equal unless something other than the node's geometry changed. */
-function sameContent(a: C4Node | undefined, b: C4Node | undefined): boolean {
-  if (a === b) return true
-  if (!a || !b) return false
-  const ra = a as unknown as Record<string, unknown>
-  const rb = b as unknown as Record<string, unknown>
-  for (const key in ra) if (!GEOMETRY.has(key) && ra[key] !== rb[key]) return false
-  for (const key in rb) if (!GEOMETRY.has(key) && !(key in ra)) return false
-  return true
-}
-
-/** The model node behind a card, ignoring moves and resizes. */
-function useNodeContent(c4id: string): C4Node | undefined {
-  return useStoreWithEqualityFn(useDiagramStore, (s) => s.c4Nodes[c4id], sameContent)
 }
 
 /** requirement id → the node that satisfies it, per relations object. */

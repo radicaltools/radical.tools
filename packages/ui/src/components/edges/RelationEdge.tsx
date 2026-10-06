@@ -8,7 +8,7 @@ import {
   useStoreApi,
 } from 'reactflow'
 import { C4EdgeRFData } from '@radical/common/c4'
-import { computeRoutedEdge, directCurveBox, RoutingObstacle } from '@radical/layout/edgeRouting'
+import { computeRoutedEdge, ObstacleGrid, type RoutingObstacle } from '@radical/layout/edgeRouting'
 import { allocatePorts } from '@radical/layout/portAllocator'
 import { useDiagramStore } from '../../store/diagramStore'
 
@@ -207,10 +207,17 @@ function portsFor(nodes: NodeInternals, edges: RFEdges): ReturnType<typeof alloc
 }
 
 interface ObstacleCandidate { id: string; rect: RoutingObstacle; ancestors: string[] }
-let obstacleCache: { nodes: NodeInternals; list: ObstacleCandidate[]; byId: Map<string, ObstacleCandidate> } | null = null
-function obstacleCandidates(nodes: NodeInternals): { list: ObstacleCandidate[]; byId: Map<string, ObstacleCandidate> } {
+interface ObstacleCandidates {
+  nodes: NodeInternals
+  byId: Map<string, ObstacleCandidate>
+  /** The visible nodes. */
+  grid: ObstacleGrid<ObstacleCandidate>
+}
+
+let obstacleCache: ObstacleCandidates | null = null
+function obstacleCandidates(nodes: NodeInternals): ObstacleCandidates {
   if (obstacleCache?.nodes !== nodes) {
-    const list: ObstacleCandidate[] = []
+    const visible: ObstacleCandidate[] = []
     const byId = new Map<string, ObstacleCandidate>()
     for (const n of nodes.values()) {
       const ancestors: string[] = []
@@ -219,9 +226,9 @@ function obstacleCandidates(nodes: NodeInternals): { list: ObstacleCandidate[]; 
       }
       const c = { id: n.id, ancestors, rect: { x: n.positionAbsolute?.x ?? 0, y: n.positionAbsolute?.y ?? 0, w: n.width ?? 0, h: n.height ?? 0 } }
       byId.set(n.id, c)
-      if (!n.hidden && n.width && n.height) list.push(c)
+      if (!n.hidden && n.width && n.height) visible.push(c)
     }
-    obstacleCache = { nodes, list, byId }
+    obstacleCache = { nodes, byId, grid: new ObstacleGrid(visible) }
   }
   return obstacleCache
 }
@@ -298,21 +305,12 @@ export const RelationEdge = memo(
     const excludeIds = new Set<string>([source, target, ...(ends.get(source)?.ancestors ?? []), ...(ends.get(target)?.ancestors ?? [])])
     const excluded = (c: ObstacleCandidate): boolean =>
       excludeIds.has(c.id) || c.ancestors.includes(source) || c.ancestors.includes(target)
-    // Only nodes near the direct curve can make it re-route; the full list is
-    // built only when it does.
-    const box = directCurveBox(sp.x, sp.y, srcSide, tp.x, tp.y, tgtSide)
-    const near: RoutingObstacle[] = []
-    for (const c of candidates.list) {
-      const r = c.rect
-      if (r.x > box.maxX || r.x + r.w < box.minX || r.y > box.maxY || r.y + r.h < box.minY || excluded(c)) continue
-      near.push(r)
-    }
-
+    // The curve's hit test asks the grid point by point; the full list is
+    // built only when the edge has to route around something.
     const { path: edgePath, labelX, labelY } = computeRoutedEdge(
       sp.x, sp.y, srcSide,
       tp.x, tp.y, tgtSide,
-      near,
-      () => candidates.list.filter((c) => !excluded(c)).map((c) => c.rect),
+      candidates.grid.without(excluded),
     )
 
     const strokeColor = selected ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'
