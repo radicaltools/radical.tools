@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useDiagramStore, nodeEffectivelyCollapsedInView } from '../store/diagramStore'
 import { C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '@radical/common/c4'
-import { resolveEarsSubject } from '@radical/common/metamodel'
+import { resolveEarsSubject, NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
@@ -62,14 +62,7 @@ const PALETTE_SUBLABELS: Record<string, string> = {
 const PALETTE_ORDER = ['domain', 'group', 'person', 'system', 'container', 'component', 'database', 'webapp', 'queue']
 
 // Groups shown in the palette. Types not listed here fall into "Custom".
-const PALETTE_GROUPS: { label: string; types: string[] }[] = [
-  { label: 'C4',          types: ['person', 'system', 'container', 'component', 'database', 'webapp', 'queue'] },
-  { label: 'Domain',      types: ['domain'] },
-  { label: 'Governance',  types: ['adr', 'fitness-fn', 'blueprint'] },
-  { label: 'Requirements',types: ['need', 'requirement', 'scenario'] },
-  { label: 'UX',          types: ['mockup'] },
-  { label: 'Other',       types: ['group'] },
-]
+const PALETTE_GROUPS = NODE_TYPE_CATEGORIES
 
 function PaletteItem({ typeId, label, sublabel, color, iconPath }: {
   typeId: string
@@ -1189,7 +1182,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
       .filter(g => g.items.length > 0)
 
     if (customTypes.length > 0) {
-      groups.push({ label: 'Custom', items: customTypes.map(makeItem) })
+      groups.push({ label: CUSTOM_CATEGORY.label, items: customTypes.map(makeItem) })
     }
 
     return groups

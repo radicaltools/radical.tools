@@ -232,3 +232,25 @@ preset on load. Still open:
    `packages/common/src/formats/mdFolder.ts` turns "zamówienie" into
    "zamo-wienie" (NFKD leaves the accent as a separate mark, which becomes a
    dash). Check whether fixing it renames files in existing folders.
+
+### Metamodel diagram (2026-10-06)
+
+Added in `feat/metamodel-diagram`: a Diagram tab in the metamodel editor
+(`apps/studio/src/renderer/src/components/metamodel/`). Node types are boxes
+in a frame per palette category (`NODE_TYPE_CATEGORIES`, now shared with the
+Elements palette), containment and relation types are edges, placed by Smart
+Layout and then settled by the live WebCoLa physics, as on the canvas. Still
+open:
+
+1. **No dragging.** The canvas lets you drag nodes while the physics runs;
+   the diagram does not. `LiveColaLayout.drag` takes positions relative to
+   the cola group bounds, while the diagram keeps absolute ones.
+2. **The physics has a time budget (4 s).** WebCoLa does not always converge
+   with nested groups (`known-issues.spec.ts`), so the diagram stops it
+   instead of waiting for convergence.
+3. **Blueprint has no relation type.** In the Governance preset it can only
+   be placed inside a Domain or Group; nothing relates it to systems, ADRs
+   or requirements.
+4. **Dense presets stay dense.** With every edge shown, Governance has ~96
+   edges over 16 types; the legend filters and selection focus are the way
+   to read it.
