@@ -382,7 +382,10 @@ export const RelationEdge = memo(
                 maxWidth:        200,
                 textAlign:       'center',
                 lineHeight:      1.4,
-                backdropFilter:  'blur(4px)',
+                // No backdrop-filter: every label would become its own
+                // compositor layer re-blurred on each pan/zoom frame, which
+                // drops large diagrams to ~8 fps on Retina GPUs. The
+                // background is ~90% opaque, so the blur was barely visible.
                 zIndex:          1000,
               }}
               className="nodrag nopan"
