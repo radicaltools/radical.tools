@@ -29,9 +29,14 @@ export class Studio {
    * Stop the page clock (timers, requestAnimationFrame, Date) before the app
    * loads; time then moves only through `advance()`. Screenshot tests use
    * this so animations and the live layout render the same frame on every
-   * run. Call before the first navigation.
+   * run. Call before the first navigation. The page clock does not reach a
+   * Web Worker, so the live layout runs on the page thread instead of its
+   * worker; physics.spec.ts covers the worker on a real clock.
    */
   async freezeTime(): Promise<void> {
+    await this.page.addInitScript(() => {
+      (window as { __RADICAL_LIVE_LAYOUT?: string }).__RADICAL_LIVE_LAYOUT = 'thread'
+    })
     await this.page.clock.install({ time: new Date('2026-01-01T09:00:00Z') })
     await this.page.clock.pauseAt(new Date('2026-01-01T09:00:01Z'))
     this.frozen = true

@@ -2,10 +2,37 @@ import React, { memo, useCallback } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { C4NodeRFData, NODE_COLORS, TYPE_ICON_PATHS } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
-import { composeEarsSentence, resolveEarsSubject } from '@radical/common/metamodel'
+import { useNodeContent } from '../../store/nodeSelectors'
+import { composeEarsSentence } from '@radical/common/metamodel'
+import type { C4Relation } from '@radical/common/c4'
 import { wireframeDataUri } from '@radical/common/wireframe'
 
 // ─── Diff highlight overlay ────────────────────────────────────────────────
+// ─── Rendering under live physics ───────────────────────────────────────────
+// The live layout moves nodes every frame. Nothing a card shows depends on
+// where it is, so cards re-render only when their content changes: with
+// hundreds of nodes, re-rendering every card each frame made dragging crawl.
+
+/** Card props equality: React Flow also passes xPos/yPos, which change every frame. */
+function sameCard(a: NodeProps<C4NodeRFData>, b: NodeProps<C4NodeRFData>): boolean {
+  return a.data === b.data && a.selected === b.selected
+}
+
+/** requirement id → the node that satisfies it, per relations object. */
+const satisfierCache = new WeakMap<Record<string, C4Relation>, Map<string, string>>()
+function satisfierOf(relations: Record<string, C4Relation>, reqId: string): string | undefined {
+  let map = satisfierCache.get(relations)
+  if (!map) {
+    map = new Map()
+    // First satisfies relation wins, as in resolveEarsSubject.
+    for (const rel of Object.values(relations)) {
+      if (rel.relationType === 'satisfies' && !map.has(rel.targetId)) map.set(rel.targetId, rel.sourceId)
+    }
+    satisfierCache.set(relations, map)
+  }
+  return map.get(reqId)
+}
+
 function DiffOverlay({ c4id }: { c4id: string }) {
   const diff = useDiagramStore(s => s.showDiff ? s.diffHighlight[c4id] : undefined)
   if (!diff) return null
@@ -129,7 +156,7 @@ export const PersonNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       </div>
     </div>
   )
-})
+}, sameCard)
 
 PersonNode.displayName = 'PersonNode'
 
@@ -189,7 +216,7 @@ export const SystemNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       {/* Children are rendered by React Flow as separate nodes */}
     </div>
   )
-})
+}, sameCard)
 
 SystemNode.displayName = 'SystemNode'
 
@@ -246,7 +273,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
       )}
     </div>
   )
-})
+}, sameCard)
 
 ContainerNode.displayName = 'ContainerNode'
 
@@ -292,7 +319,7 @@ export const ComponentNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
       )}
     </div>
   )
-})
+}, sameCard)
 
 ComponentNode.displayName = 'ComponentNode'
 
@@ -370,7 +397,7 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) =
       </div>
     </div>
   )
-})
+}, sameCard)
 
 DatabaseNode.displayName = 'DatabaseNode'
 
@@ -442,7 +469,7 @@ export const WebAppNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       </div>
     </div>
   )
-})
+}, sameCard)
 
 WebAppNode.displayName = 'WebAppNode'
 
@@ -517,7 +544,7 @@ export const QueueNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
       </div>
     </div>
   )
-})
+}, sameCard)
 
 QueueNode.displayName = 'QueueNode'
 
@@ -574,7 +601,7 @@ export const DomainNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       )}
     </div>
   )
-})
+}, sameCard)
 
 DomainNode.displayName = 'DomainNode'
 
@@ -628,7 +655,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
       )}
     </div>
   )
-})
+}, sameCard)
 
 GroupNode.displayName = 'GroupNode'
 
@@ -639,7 +666,7 @@ GroupNode.displayName = 'GroupNode'
 const ADR_COLOR = '#92400e'
 
 export const AdrNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useDiagramStore(s => s.c4Nodes[data.c4id])
+  const node = useNodeContent(data.c4id)
   const status = (node as unknown as Record<string, string> | undefined)?.status ?? 'proposed'
   const statusColor: Record<string, string> = {
     proposed:   '#fbbf24',
@@ -685,7 +712,7 @@ export const AdrNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
       </div>
     </div>
   )
-})
+}, sameCard)
 
 AdrNode.displayName = 'AdrNode'
 
@@ -729,7 +756,7 @@ export const FitnessFnNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
       </div>
     </div>
   )
-})
+}, sameCard)
 
 FitnessFnNode.displayName = 'FitnessFnNode'
 
@@ -740,7 +767,7 @@ FitnessFnNode.displayName = 'FitnessFnNode'
 const SCENARIO_COLOR = '#166534'
 
 export const ScenarioNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useDiagramStore(s => s.c4Nodes[data.c4id]) as unknown as Record<string, unknown> | undefined
+  const node = useNodeContent(data.c4id) as unknown as Record<string, unknown> | undefined
   const given = String(node?.given ?? '').trim()
   const when = String(node?.when ?? '').trim()
   const then = String(node?.then ?? '').trim()
@@ -786,7 +813,7 @@ export const ScenarioNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) =
       </div>
     </div>
   )
-})
+}, sameCard)
 
 ScenarioNode.displayName = 'ScenarioNode'
 
@@ -799,7 +826,7 @@ ScenarioNode.displayName = 'ScenarioNode'
 const MOCKUP_COLOR = '#be185d'
 
 export const MockupNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useDiagramStore(s => s.c4Nodes[data.c4id]) as unknown as Record<string, unknown> | undefined
+  const node = useNodeContent(data.c4id) as unknown as Record<string, unknown> | undefined
   const wireframe = typeof node?.wireframe === 'string' ? node.wireframe : ''
   const link = typeof node?.link === 'string' ? node.link.trim() : ''
   const screen = typeof node?.screen === 'string' ? node.screen.trim() : ''
@@ -853,7 +880,7 @@ export const MockupNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       </div>
     </div>
   )
-})
+}, sameCard)
 
 MockupNode.displayName = 'MockupNode'
 
@@ -865,7 +892,7 @@ MockupNode.displayName = 'MockupNode'
 const NEED_COLOR = '#475569'
 
 export const NeedNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useDiagramStore(s => s.c4Nodes[data.c4id])
+  const node = useNodeContent(data.c4id)
   const kind = (node as unknown as Record<string, string> | undefined)?.kind ?? 'brief'
   const text = (node?.description ?? '').trim()
 
@@ -912,7 +939,7 @@ export const NeedNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
       </div>
     </div>
   )
-})
+}, sameCard)
 
 NeedNode.displayName = 'NeedNode'
 
@@ -923,10 +950,11 @@ NeedNode.displayName = 'NeedNode'
 const REQ_COLOR = '#0e7490'
 
 export const RequirementNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useDiagramStore(s => s.c4Nodes[data.c4id])
-  const c4Relations = useDiagramStore(s => s.c4Relations)
-  const c4Nodes = useDiagramStore(s => s.c4Nodes)
-  const subject = resolveEarsSubject(data.c4id, c4Relations, c4Nodes)
+  const node = useNodeContent(data.c4id)
+  const subject = useDiagramStore((s) => {
+    const by = satisfierOf(s.c4Relations, data.c4id)
+    return by ? s.c4Nodes[by]?.label : undefined
+  })
   const { sentence, complete } = composeEarsSentence((node ?? {}) as unknown as Record<string, unknown>, subject)
 
   return (
@@ -969,7 +997,7 @@ export const RequirementNode = memo(({ data, selected }: NodeProps<C4NodeRFData>
       </div>
     </div>
   )
-})
+}, sameCard)
 
 RequirementNode.displayName = 'RequirementNode'
 
@@ -1041,7 +1069,7 @@ export const BlueprintNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
       )}
     </div>
   )
-})
+}, sameCard)
 
 BlueprintNode.displayName = 'BlueprintNode'
 
