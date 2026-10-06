@@ -450,6 +450,28 @@ function StructuralCanvas(): React.ReactElement {
     }
   }, [])
 
+  // React Flow passes an event only for camera moves the user makes (wheel,
+  // pinch, dragging the pane); fits and focus pass none. The user's camera
+  // wins: stop auto-fit and any fit still animating, which would otherwise
+  // pull the view back on every frame.
+  const takeCamera = useCallback(() => {
+    if (fitAnimRef.current != null) {
+      cancelAnimationFrame(fitAnimRef.current)
+      fitAnimRef.current = null
+    }
+    useDiagramStore.getState().stopAutoFit()
+  }, [])
+  const onUserMoveStart = useCallback((event: unknown) => { if (event) takeCamera() }, [takeCamera])
+  // d3-zoom folds wheel events within ~150 ms into one gesture and reports its
+  // start only once, so a wheel that lands while a fit animates would not
+  // reach onMoveStart: every wheel takes the camera.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    el.addEventListener('wheel', takeCamera, { capture: true, passive: true })
+    return () => el.removeEventListener('wheel', takeCamera, { capture: true })
+  }, [takeCamera])
+
   const onInit = useCallback((instance: ReactFlowInstance) => {
     rfInstanceRef.current = instance
     setFitViewFn(
@@ -502,13 +524,13 @@ function StructuralCanvas(): React.ReactElement {
     }, 100)
 
     // Register global zoom helpers used by the Toolbar zoom buttons.
-    ;(window as any).__radicalZoomIn  = () => instance.zoomIn({ duration: 300 })
-    ;(window as any).__radicalZoomOut = () => instance.zoomOut({ duration: 300 })
+    ;(window as any).__radicalZoomIn  = () => { takeCamera(); instance.zoomIn({ duration: 300 }) }
+    ;(window as any).__radicalZoomOut = () => { takeCamera(); instance.zoomOut({ duration: 300 }) }
     return () => {
       delete (window as any).__radicalZoomIn
       delete (window as any).__radicalZoomOut
     }
-  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit])
+  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera])
 
   // Double-click on the canvas background → add a new System at that position
   const onCanvasDoubleClick = useCallback(
@@ -940,6 +962,7 @@ function StructuralCanvas(): React.ReactElement {
         onEdgeClick={onEdgeClick as any}
         onPaneClick={onPaneClick}
         onInit={onInit}
+        onMoveStart={onUserMoveStart}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         nodesDraggable={!presentationActive}

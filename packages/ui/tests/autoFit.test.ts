@@ -158,3 +158,13 @@ describe('Auto-fit toggle', () => {
     expect(instant).not.toHaveBeenCalled()
   })
 })
+
+describe('zooming by hand', () => {
+  it('turns auto-fit off so the next tick does not undo it', () => {
+    if (!useDiagramStore.getState().autoFitActive) useDiagramStore.getState().toggleAutoFit()
+    useDiagramStore.getState().zoomIn()
+    expect(useDiagramStore.getState().autoFitActive).toBe(false)
+    useDiagramStore.getState().zoomOut()
+    expect(useDiagramStore.getState().autoFitActive).toBe(false)
+  })
+})

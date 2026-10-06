@@ -1159,6 +1159,8 @@ interface DiagramStore {
   setFitViewFn: (fn: (() => void) | null, instantFn?: (() => void) | null) => void
   fitAll: () => void
   toggleAutoFit: () => void
+  /** Turns auto-fit off, e.g. once the user zooms or pans by hand. */
+  stopAutoFit: () => void
   zoomIn: () => void
   zoomOut: () => void
 
@@ -4336,10 +4338,17 @@ export const useDiagramStore = create<DiagramStore>()(
         _getFitViewFn()?.()
       },
       zoomIn() {
+        get().stopAutoFit()
         ;(window as any).__radicalZoomIn?.()
       },
       zoomOut() {
+        get().stopAutoFit()
         ;(window as any).__radicalZoomOut?.()
+      },
+      stopAutoFit() {
+        // A hand-picked camera wins: auto-fit re-fits every 300 ms while the
+        // live layout moves nodes, which used to undo every zoom and pan.
+        if (get().autoFitActive) get().toggleAutoFit()
       },
       toggleAutoFit() {
         // Always cancel any existing timer first
