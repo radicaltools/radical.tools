@@ -6,9 +6,10 @@ import {
   Position,
   useStore,
   useStoreApi,
+  type Node as RFNode,
 } from 'reactflow'
 import { C4EdgeRFData } from '@radical/common/c4'
-import { computeRoutedEdge, RoutingObstacle } from '@radical/layout/edgeRouting'
+import { computeRoutedEdge, ObstacleGrid, type RoutingObstacle } from '@radical/layout/edgeRouting'
 import { allocatePorts } from '@radical/layout/portAllocator'
 import { useDiagramStore } from '../../store/diagramStore'
 
@@ -189,6 +190,58 @@ function ReconnectHandle({
 
 // ─── Edge component ───────────────────────────────────────────────────────────
 
+// ─── Shared per frame ────────────────────────────────────────────────────────
+// Every edge re-renders when the live layout moves its ends, i.e. every
+// frame. Port allocation and the obstacle list depend on the whole graph, not
+// on the edge, so they are computed once per React Flow state and reused by
+// all edges (they used to be recomputed by each edge: quadratic per frame).
+
+type NodeInternals = ReturnType<ReturnType<typeof useStoreApi>['getState']>['nodeInternals']
+type RFEdges = ReturnType<ReturnType<typeof useStoreApi>['getState']>['edges']
+
+let portCache: { nodes: NodeInternals; edges: RFEdges; result: ReturnType<typeof allocatePorts> } | null = null
+function portsFor(nodes: NodeInternals, edges: RFEdges): ReturnType<typeof allocatePorts> {
+  if (portCache?.nodes !== nodes || portCache.edges !== edges) {
+    portCache = { nodes, edges, result: allocatePorts(nodes as any, edges as any) }
+  }
+  return portCache.result
+}
+
+interface ObstacleCandidate { id: string; rect: RoutingObstacle; ancestors: string[] }
+interface ObstacleCandidates {
+  nodes: NodeInternals
+  byId: Map<string, ObstacleCandidate>
+  /** The visible nodes. */
+  grid: ObstacleGrid<ObstacleCandidate>
+}
+
+let obstacleCache: ObstacleCandidates | null = null
+function obstacleCandidates(nodes: NodeInternals): ObstacleCandidates {
+  if (obstacleCache?.nodes !== nodes) {
+    const visible: ObstacleCandidate[] = []
+    const byId = new Map<string, ObstacleCandidate>()
+    for (const n of nodes.values()) {
+      const ancestors: string[] = []
+      for (let cur = n.parentNode ? nodes.get(n.parentNode) : undefined; cur; cur = cur.parentNode ? nodes.get(cur.parentNode) : undefined) {
+        ancestors.push(cur.id)
+      }
+      const c = { id: n.id, ancestors, rect: { x: n.positionAbsolute?.x ?? 0, y: n.positionAbsolute?.y ?? 0, w: n.width ?? 0, h: n.height ?? 0 } }
+      byId.set(n.id, c)
+      if (!n.hidden && n.width && n.height) visible.push(c)
+    }
+    obstacleCache = { nodes, byId, grid: new ObstacleGrid(visible) }
+  }
+  return obstacleCache
+}
+
+/** Same position, size and visibility: nothing an edge draws from changed. */
+function sameEnd(a: RFNode | undefined, b: RFNode | undefined): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  return a.positionAbsolute?.x === b.positionAbsolute?.x && a.positionAbsolute?.y === b.positionAbsolute?.y
+    && a.width === b.width && a.height === b.height && a.hidden === b.hidden && a.parentNode === b.parentNode
+}
+
 export const RelationEdge = memo(
   ({
     id,
@@ -202,8 +255,13 @@ export const RelationEdge = memo(
     // Targeted selectors: only re-render when THIS edge's source or target changes
     const sourceSelector = useCallback((s: any) => s.nodeInternals.get(source), [source])
     const targetSelector = useCallback((s: any) => s.nodeInternals.get(target), [target])
-    const sourceNode = useStore(sourceSelector)
-    const targetNode = useStore(targetSelector)
+    // React Flow rebuilds every node's internals on each update, so compare
+    // the geometry: with hundreds of nodes only a few move at a time.
+    const sourceNode = useStore(sourceSelector, sameEnd)
+    const targetNode = useStore(targetSelector, sameEnd)
+    // Ports and routes also depend on other edges and nodes; re-render once
+    // with everything when the layout comes to rest.
+    useDiagramStore((s) => s.liveLayoutMoving)
     const diffKind = useDiagramStore(s => s.showDiff ? s.diffHighlight[id] : undefined)
     const storeApi = useStoreApi()
 
@@ -216,11 +274,7 @@ export const RelationEdge = memo(
     // Resolve sides + ports from the central allocator (groups parallel
     // edges so they don't all collide at the centre of a side).
     const stateSnapshot = storeApi.getState()
-    const allocations = allocatePorts(
-      stateSnapshot.nodeInternals as any,
-      stateSnapshot.edges as any
-    )
-    const alloc = allocations.get(id)
+    const alloc = portsFor(stateSnapshot.nodeInternals, stateSnapshot.edges).get(id)
 
     let srcSide: Position, tgtSide: Position
     let sp: { x: number; y: number }, tp: { x: number; y: number }
@@ -258,40 +312,19 @@ export const RelationEdge = memo(
       tp = borderPoint(targetNode, tgtSide, sc)
     }
 
-    // Collect obstacles imperatively (no reactive subscription to all nodes)
-    const nodeInternals = stateSnapshot.nodeInternals
-    const allNodes = Array.from(nodeInternals.values())
-    const excludeIds = new Set<string>([source, target])
-
-    // Exclude ancestors of source and target (edge crosses their borders)
-    let walker: (typeof sourceNode) | undefined = sourceNode
-    while (walker?.parentNode) { excludeIds.add(walker.parentNode); walker = nodeInternals.get(walker.parentNode) }
-    walker = targetNode
-    while (walker?.parentNode) { excludeIds.add(walker.parentNode); walker = nodeInternals.get(walker.parentNode) }
-
-    const obstacles: RoutingObstacle[] = []
-    for (const n of allNodes) {
-      if (excludeIds.has(n.id) || n.hidden || !n.width || !n.height) continue
-      // Exclude descendants of source or target (they're inside those nodes)
-      let isDescendant = false
-      let cur: (typeof n) | undefined = n
-      while (cur?.parentNode) {
-        if (cur.parentNode === source || cur.parentNode === target) { isDescendant = true; break }
-        cur = nodeInternals.get(cur.parentNode)
-      }
-      if (isDescendant) continue
-      obstacles.push({
-        x: n.positionAbsolute?.x ?? 0,
-        y: n.positionAbsolute?.y ?? 0,
-        w: n.width,
-        h: n.height,
-      })
-    }
-
+    // Obstacles: every visible node except the two ends, their ancestors
+    // (the edge crosses their borders) and their descendants (inside them).
+    const candidates = obstacleCandidates(stateSnapshot.nodeInternals)
+    const ends = candidates.byId
+    const excludeIds = new Set<string>([source, target, ...(ends.get(source)?.ancestors ?? []), ...(ends.get(target)?.ancestors ?? [])])
+    const excluded = (c: ObstacleCandidate): boolean =>
+      excludeIds.has(c.id) || c.ancestors.includes(source) || c.ancestors.includes(target)
+    // The curve's hit test asks the grid point by point; the full list is
+    // built only when the edge has to route around something.
     const { path: edgePath, labelX, labelY } = computeRoutedEdge(
       sp.x, sp.y, srcSide,
       tp.x, tp.y, tgtSide,
-      obstacles,
+      candidates.grid.without(excluded),
     )
 
     const strokeColor = selected ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'

@@ -64,6 +64,7 @@ import {
 // Re-exported for components that read view collapse state from the store module.
 export { computeViewCollapsedSet, isEffectivelyCollapsed }
 import { LiveColaLayout } from '../layout/liveColaLayout'
+import { LOCAL_PHYSICS_MIN_NODES } from '../layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings } from '../studioSettings'
@@ -134,6 +135,42 @@ function _pushUndo(state: DiagramStore): void {
   _undoStack.push(_captureState(state))
   if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
   _redoStack.length = 0 // clear redo on new change
+}
+
+/** A large diagram where many elements overlap their siblings has not been
+ *  laid out yet; its live layout is local only (LOCAL_PHYSICS_MIN_NODES), so
+ *  only Smart Layout will arrange it. */
+function looksUnarranged(nodes: Record<string, C4Node>): boolean {
+  const list = Object.values(nodes)
+  if (list.length < LOCAL_PHYSICS_MIN_NODES) return false
+  const byParent = new Map<string, C4Node[]>()
+  for (const n of list) {
+    const key = n.parentId ?? ''
+    const siblings = byParent.get(key)
+    if (siblings) siblings.push(n)
+    else byParent.set(key, [n])
+  }
+  const overlapping = new Set<string>()
+  for (const siblings of byParent.values()) {
+    for (let i = 0; i < siblings.length; i++) {
+      const a = siblings[i]
+      for (let j = i + 1; j < siblings.length; j++) {
+        const b = siblings[j]
+        if (a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height) {
+          overlapping.add(a.id)
+          overlapping.add(b.id)
+        }
+      }
+    }
+  }
+  return overlapping.size > list.length * 0.1
+}
+
+/** Called after a document loads (at boot or on switching documents). */
+function suggestSmartLayoutIfUnarranged(): void {
+  const s = useDiagramStore.getState()
+  if (!looksUnarranged(s.c4Nodes)) return
+  s.pushNotification('This large diagram is not laid out yet. The live layout only moves what you drag or add here: use Smart Layout to arrange it.', 'info')
 }
 
 /** Snapshot all node positions from c4Nodes into a positions map */
@@ -903,6 +940,9 @@ interface DiagramStore {
   /** Full candidate ranking + SA stats from the last Smart Layout run — powers the "why this layout" panel. */
   lastSmartLayoutReport: SmartLayoutReport | null
   liveLayoutActive: boolean
+  /** The live layout is moving nodes; false once it reports rest. Edges skip
+   *  costly routing while it moves and route fully when it stops. */
+  liveLayoutMoving: boolean
 
   // ── connect mode ──
   connectSource: string | null
@@ -1179,6 +1219,8 @@ interface DiagramStore {
   setFitViewFn: (fn: (() => void) | null, instantFn?: (() => void) | null) => void
   fitAll: () => void
   toggleAutoFit: () => void
+  /** Turns auto-fit off, e.g. once the user zooms or pans by hand. */
+  stopAutoFit: () => void
   zoomIn: () => void
   zoomOut: () => void
 
@@ -1365,6 +1407,7 @@ export const useDiagramStore = create<DiagramStore>()(
       smartLayoutProgress: null,
       lastSmartLayoutReport: null,
       liveLayoutActive: true,
+      liveLayoutMoving: false,
       connectSource: null,
       connectionModifier: 'alt' as const,
       autoFitActive: true,
@@ -3062,8 +3105,12 @@ export const useDiagramStore = create<DiagramStore>()(
               vcs
             )
           },
+          onSettled: () => {
+            set((state) => { state.liveLayoutMoving = false })
+          },
           applyPositions: (positions) => {
             set((state) => {
+              state.liveLayoutMoving = true
               // Update c4Nodes (source of truth) and patch rfNodes positions
               // in-place. Avoids full _sync() re-derive which would rebuild
               // all rfNodes/rfEdges arrays every animation frame.
@@ -4203,6 +4250,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // skipBulk=true: loaded positions are already correct; the 110-iteration
         // cola bulk phase would immediately rearrange and overwrite them.
         get().startLiveLayout({ skipBulk: true })
+        suggestSmartLayoutIfUnarranged()
         // Apply restored camera (loaded as activeViewId=null → default view).
         if (defaultVP) {
           requestAnimationFrame(() => {
@@ -4374,10 +4422,17 @@ export const useDiagramStore = create<DiagramStore>()(
         _getFitViewFn()?.()
       },
       zoomIn() {
+        get().stopAutoFit()
         ;(window as any).__radicalZoomIn?.()
       },
       zoomOut() {
+        get().stopAutoFit()
         ;(window as any).__radicalZoomOut?.()
+      },
+      stopAutoFit() {
+        // A hand-picked camera wins: auto-fit re-fits every 300 ms while the
+        // live layout moves nodes, which used to undo every zoom and pan.
+        if (get().autoFitActive) get().toggleAutoFit()
       },
       toggleAutoFit() {
         // Always cancel any existing timer first
@@ -4409,4 +4464,5 @@ if (typeof requestAnimationFrame !== 'undefined') {
   // cola's 110-iteration synchronous bulk phase doesn't immediately
   // overwrite the persisted positions.
   useDiagramStore.getState().startLiveLayout({ skipBulk: _initLoadedFromDisk })
+  if (_initLoadedFromDisk) suggestSmartLayoutIfUnarranged()
 }
