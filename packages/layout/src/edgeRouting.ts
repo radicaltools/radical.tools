@@ -273,12 +273,105 @@ function cubicAt(
 }
 
 /** Does the cubic bezier pass through any obstacle rect (with padding)?  */
+/** Obstacles a caller can query point by point (e.g. through a spatial
+ *  index) instead of handing over a list the hit test scans in full. */
+export interface ObstacleSet {
+  /** True when (x, y) is within `pad` of an obstacle. */
+  hits(x: number, y: number, pad: number): boolean
+  /** Every obstacle, for routing around them. */
+  all(): RoutingObstacle[]
+  /** The obstacles' bounding box (null when there are none), so a route that
+   *  routeAround would give up on is skipped without listing them all. */
+  bounds?(): ObstacleBounds | null
+}
+
+export interface ObstacleBounds { minX: number; minY: number; maxX: number; maxY: number }
+
+/** Cells routeAround allows; past this it gives up and the edge stays direct. */
+const MAX_ROUTING_CELLS = 60_000
+
+/** routeAround's grid size for the endpoints and obstacles: the same box. */
+function routingCells(s: Pt, t: Pt, obstacles: ObstacleBounds | null): number {
+  const margin = OBS_PAD * 2 + EXIT_DIST * 2
+  let minX = Math.min(s.x, t.x), minY = Math.min(s.y, t.y)
+  let maxX = Math.max(s.x, t.x), maxY = Math.max(s.y, t.y)
+  if (obstacles) {
+    minX = Math.min(minX, obstacles.minX - OBS_PAD)
+    minY = Math.min(minY, obstacles.minY - OBS_PAD)
+    maxX = Math.max(maxX, obstacles.maxX + OBS_PAD)
+    maxY = Math.max(maxY, obstacles.maxY + OBS_PAD)
+  }
+  minX -= margin; minY -= margin
+  maxX += margin; maxY += margin
+  return Math.max(4, Math.ceil((maxX - minX) / CELL)) * Math.max(4, Math.ceil((maxY - minY) / CELL))
+}
+
+/** A uniform grid over obstacles, built once and queried by many edges:
+ *  each point of a curve's hit test looks at one cell instead of every
+ *  obstacle. Items carry their rect plus whatever the caller filters on. */
+export class ObstacleGrid<T extends { rect: RoutingObstacle }> {
+  private readonly cells = new Map<number, T[]>()
+  /** Items by left, top, right and bottom edge, outermost first. */
+  private readonly extremes: [T[], T[], T[], T[]]
+
+  /** `pad` bounds the pad a query may use (the hit test uses HIT_PAD). */
+  constructor(readonly items: T[], private readonly cell = 256, private readonly pad = 8) {
+    this.extremes = [
+      [...items].sort((a, b) => a.rect.x - b.rect.x),
+      [...items].sort((a, b) => a.rect.y - b.rect.y),
+      [...items].sort((a, b) => b.rect.x + b.rect.w - (a.rect.x + a.rect.w)),
+      [...items].sort((a, b) => b.rect.y + b.rect.h - (a.rect.y + a.rect.h)),
+    ]
+    for (const item of items) {
+      const r = item.rect
+      for (let cx = Math.floor((r.x - pad) / cell); cx <= Math.floor((r.x + r.w + pad) / cell); cx++) {
+        for (let cy = Math.floor((r.y - pad) / cell); cy <= Math.floor((r.y + r.h + pad) / cell); cy++) {
+          const list = this.cells.get(this.key(cx, cy))
+          if (list) list.push(item)
+          else this.cells.set(this.key(cx, cy), [item])
+        }
+      }
+    }
+  }
+
+  private key(cx: number, cy: number): number {
+    return cx * 1_048_576 + cy
+  }
+
+  /** The obstacles that are not `excluded`, e.g. an edge's own ends. */
+  without(excluded: (item: T) => boolean): ObstacleSet {
+    return {
+      hits: (x, y, pad) => {
+        if (pad > this.pad) throw new Error(`ObstacleGrid: pad ${pad} exceeds the grid's ${this.pad}`)
+        for (const item of this.cells.get(this.key(Math.floor(x / this.cell), Math.floor(y / this.cell))) ?? []) {
+          const r = item.rect
+          if (x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad && !excluded(item)) return true
+        }
+        return false
+      },
+      all: () => this.items.filter((item) => !excluded(item)).map((item) => item.rect),
+      bounds: () => {
+        const [left, top, right, bottom] = this.extremes.map((list) => list.find((item) => !excluded(item)))
+        if (!left || !top || !right || !bottom) return null
+        return { minX: left.rect.x, minY: top.rect.y, maxX: right.rect.x + right.rect.w, maxY: bottom.rect.y + bottom.rect.h }
+      },
+    }
+  }
+}
+
 function bezierHitsObstacles(
   s: Pt, c1: Pt, c2: Pt, t: Pt,
-  obstacles: RoutingObstacle[],
+  obstacles: RoutingObstacle[] | ObstacleSet,
   pad: number,
   samples = 16,
 ): boolean {
+  if (!Array.isArray(obstacles)) {
+    for (let i = 1; i < samples; i++) {
+      const p = cubicAt(s.x, s.y, c1.x, c1.y, c2.x, c2.y, t.x, t.y, i / samples)
+      if (obstacles.hits(p.x, p.y, pad)) return true
+    }
+    return false
+  }
   if (obstacles.length === 0) return false
   for (let i = 1; i < samples; i++) {
     const u = i / samples
@@ -316,7 +409,7 @@ function routeAround(
   const cols = Math.max(4, Math.ceil((maxX - minX) / CELL))
   const rows = Math.max(4, Math.ceil((maxY - minY) / CELL))
   // Bail out on pathological grids — keeps worst-case cost bounded.
-  if (cols * rows > 60_000) return null
+  if (cols * rows > MAX_ROUTING_CELLS) return null
 
   const blocked = new Uint8Array(cols * rows)
   for (const o of obstacles) {
@@ -356,10 +449,33 @@ function routeAround(
   return simplifyPath([s, ...head, ...grid, ...tail, t])
 }
 
+/** Padding of the direct curve's hit test: smaller than the routing OBS_PAD,
+ *  so an edge is re-routed only when its curve clearly goes *through* a node,
+ *  not when it grazes the padding zone (otherwise nearly every edge would be). */
+const HIT_PAD = 4
+
+/** The box the direct curve stays in (its control points' box), padded for
+ *  the hit test: an obstacle outside it cannot make computeRoutedEdge re-route. */
+export function directCurveBox(
+  sx: number, sy: number, srcSide: Position,
+  tx: number, ty: number, tgtSide: Position,
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  const { c1, c2 } = bezierControlPoints({ x: sx, y: sy }, srcSide, { x: tx, y: ty }, tgtSide)
+  return {
+    minX: Math.min(sx, tx, c1.x, c2.x) - HIT_PAD, minY: Math.min(sy, ty, c1.y, c2.y) - HIT_PAD,
+    maxX: Math.max(sx, tx, c1.x, c2.x) + HIT_PAD, maxY: Math.max(sy, ty, c1.y, c2.y) + HIT_PAD,
+  }
+}
+
+/** `obstacles` are tested against the direct curve; when it hits one, the
+ *  edge is routed around `allObstacles()` (default: the same list). Callers
+ *  with many nodes pass only those inside directCurveBox as `obstacles`, or
+ *  an ObstacleSet answering point queries from a spatial index. */
 export function computeRoutedEdge(
   sx: number, sy: number, srcSide: Position,
   tx: number, ty: number, tgtSide: Position,
-  obstacles: RoutingObstacle[],
+  obstacles: RoutingObstacle[] | ObstacleSet,
+  allObstacles?: () => RoutingObstacle[],
 ): { path: string; labelX: number; labelY: number } {
   // Prefer a single cubic bezier with control points pulled along each
   // side's exit normal — clean arrowhead alignment, natural flow.
@@ -369,10 +485,6 @@ export function computeRoutedEdge(
   const t = { x: tx, y: ty }
   const { c1, c2 } = bezierControlPoints(s, srcSide, t, tgtSide)
 
-  // Padding for the hit test is smaller than the routing OBS_PAD: we only
-  // re-route when the curve clearly goes *through* a node, not when it just
-  // grazes the padding zone. Otherwise nearly every edge would be re-routed.
-  const HIT_PAD = 4
   const hits = bezierHitsObstacles(s, c1, c2, t, obstacles, HIT_PAD)
 
   if (!hits) {
@@ -383,7 +495,11 @@ export function computeRoutedEdge(
   }
 
   // Direct curve hits at least one node — route around with A*.
-  const polyline = routeAround(s, srcSide, t, tgtSide, obstacles)
+  // A set that knows its bounds lets a hopeless route (one routeAround would
+  // refuse as too big) skip listing every obstacle.
+  const set = Array.isArray(obstacles) ? null : obstacles
+  const hopeless = !allObstacles && !!set?.bounds && routingCells(s, t, set.bounds()) > MAX_ROUTING_CELLS
+  const polyline = hopeless ? null : routeAround(s, srcSide, t, tgtSide, allObstacles ? allObstacles() : set ? set.all() : obstacles as RoutingObstacle[])
   if (!polyline || polyline.length < 2) {
     // Routing failed (grid too big, or unreachable) — fall back to direct.
     const path = buildBezierPath(s, srcSide, t, tgtSide)

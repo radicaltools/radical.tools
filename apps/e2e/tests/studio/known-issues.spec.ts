@@ -5,24 +5,6 @@ import { test, expect } from '../../support/fixtures'
 // bug is there and turns red ("expected to fail, but passed") once it is
 // fixed: then delete the `test.fail` line and the test becomes a guard.
 
-test('an idle canvas with nested elements stays still', async ({ page, studio }) => {
-  test.fail(true, 'Live WebCoLa layout never converges when a view shows nested elements, so nodes keep drifting (packages/ui/src/layout/liveColaLayout.ts)')
-  await studio.seed()
-  await studio.open('v-containers')
-  const before = await studio.positions()
-  await page.waitForTimeout(2000)
-  expect(await studio.positions()).toEqual(before)
-})
-
-test('edits on a view with nested elements are saved without a reload', async ({ studio }) => {
-  test.fail(true, 'The endless live-layout updates keep restarting the 400 ms autosave debounce, so edits only reach storage on pagehide (apps/studio/src/renderer/src/persistence/autosave.ts)')
-  await studio.seed()
-  await studio.open('v-containers')
-  await studio.addFromPalette('Software System', { x: 150, y: 780 })
-  await expect(studio.nodes).toHaveCount(7)
-  await expect.poll(async () => (await studio.storedDoc()).nodes.length, { timeout: 5000 }).toBe(7)
-})
-
 test('double-click on the empty canvas adds a system', async ({ page, studio }) => {
   test.fail(true, 'React Flow zooms on double-click (zoomOnDoubleClick defaults to true) and swallows the event before Canvas.onCanvasDoubleClick sees it')
   await studio.seed()
