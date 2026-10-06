@@ -2,8 +2,9 @@
  * Live WebCoLa layout, main-thread side. The engine (liveColaEngine.ts) runs
  * in a Web Worker (liveCola.worker.ts): a physics step on a few hundred nodes
  * takes tens of milliseconds, which used to come out of every frame. Where
- * workers are unavailable (Node / Vitest) or fail to load, the engine runs
- * on the main thread, pacing its renders on heavy graphs.
+ * workers are unavailable (Node / Vitest) or fail to load, or the page asks
+ * for it, the engine runs on the main thread, pacing its renders on heavy
+ * graphs.
  *
  * Kept in a separate module from the engine, like smartLayoutRunner.ts: the
  * worker imports the engine, so the ?worker import must not live there.
@@ -25,6 +26,16 @@ export type LiveColaMessage =
   | { type: 'seed' | 'grab' | 'drag'; id: string; x: number; y: number }
   | { type: 'release'; id: string }
 
+/**
+ * The host page can keep the engine on the main thread by setting
+ * `window.__RADICAL_LIVE_LAYOUT = 'thread'` before the app loads. Screenshot
+ * tests do: a frozen page clock drives the page's timers and frames but not a
+ * worker's, which would keep stepping in real time between frozen frames.
+ */
+function inThreadRequested(): boolean {
+  return (globalThis as { __RADICAL_LIVE_LAYOUT?: unknown }).__RADICAL_LIVE_LAYOUT === 'thread'
+}
+
 export class LiveColaLayout {
   private worker: Worker | null = null
   private engine: LiveColaEngine | null = null
@@ -35,7 +46,7 @@ export class LiveColaLayout {
   private frame = 0
 
   constructor(private readonly callbacks: LiveColaCallbacks) {
-    if (typeof Worker !== 'undefined') {
+    if (typeof Worker !== 'undefined' && !inThreadRequested()) {
       try {
         this.worker = new LiveColaWorkerClass()
         this.worker.onmessage = (e: MessageEvent<{ type: 'positions'; positions: LiveColaPositions } | { type: 'settled' }>) => {
