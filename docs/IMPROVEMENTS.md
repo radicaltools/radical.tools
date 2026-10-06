@@ -289,6 +289,65 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
    web app is a container type (fit, collapse, layout padding, folder format),
    draws as a dashed frame when expanded, and the physics groups every parent
    that cannot nest (container, web app, blueprint).
+9. **Adding one node to a view means resending the whole view.**
+   `set_view_nodes` only replaces the node set, so putting two new external
+   systems on "System context" and "Containers" took a `GET VIEW` per view
+   and a full id list back. An `add_to_view` / `remove_from_view` pair (or a
+   `viewIds` argument on `add_node`) would make it one call and remove the
+   risk of dropping a node by accident.
+10. **No check that the model still matches the code.** A review against the
+   repo (2026-10-06) found 11 drifts: missing "bundled into" edges that the
+   workspace imports prove, an ADR that contradicted `APP_TO_APP` in
+   `tools/check-workspaces.mjs`, a stale path in a fitness function, and
+   external services (VS Code Marketplace, Google Fonts) missing. A fitness
+   function that compares package-to-app edges with the `@radical/*`
+   dependencies in every `package.json` would catch the first kind
+   automatically.
+11. **No MCP tool collapses or expands nodes.** `update_node` and
+   `update_view` take no `collapsed`, `collapsedNodeIds` or `expandedNodeIds`,
+   and the catalogue has no collapse tool, so collapsing every parent on the
+   Structure view meant editing `_layout.json` by hand. It also showed that a
+   model-level collapse leaks into every named view: each view that shows a
+   collapsed parent's children needed that parent in `expandedNodeIds` in
+   `views.json` to stay as it was. A `set_collapsed` tool (ids, collapsed,
+   optional viewId) should write the Structure view's state without changing
+   the named views.
+12. **`move_node` drops a node outside its new parent, and Smart Layout keeps
+   it there.** Moving 36 root elements into four new layer groups kept their
+   old canvas coordinates as parent-relative ones (Shared packages landed at
+   x = −4233 inside a 520 px wide group), and the parents were not refitted.
+   `smart_layout` on All elements then answered "the current layout already
+   scores best" (`keptCurrent`): the composite score does not penalise a
+   child outside its parent's frame. Resetting the moved nodes to 0,0 made it
+   lay out again (crossings 570 → 117). Two fixes: `move_node` should place
+   the node inside the new parent and refit it, and the layout score should
+   count out-of-frame children as overlaps.
+13. **Moves and renames leave empty folders behind.** After `move_node` and a
+   label change on a folder node, the old directories (`nodes/github/`,
+   `nodes/requirements-views/`, …) stayed on disk empty; a later reader that
+   expects `_index.md` in every directory fails. `MdFolderSession` should
+   remove directories it emptied.
+14. **Views pull in every ancestor.** `computeViewNodeSet` adds all ancestors
+   of a listed node, so wrapping the model in top-level groups puts a group
+   frame into every named view, and a model-level collapse of an ancestor
+   that the view never listed hides the view's nodes (see 11). A view should
+   be able to start at a chosen level, or skip pure grouping ancestors.
+15. ~~**The live physics ignored a view's own collapse overrides.**~~ Fixed:
+   `startLiveLayout` built its graph with `filterForView` and the derived
+   collapsed set only, without the view's `expandedNodeIds` and
+   `collapsedNodeIds`. A node collapsed on All elements but expanded in a view
+   (radical.tools in every "Components:" view) was a leaf for WebCoLa, so the
+   frames around it shrank to the collapsed box and its parent (the layer
+   group) no longer enclosed it. The physics now takes `layoutInputForView`,
+   the input Smart Layout and the canvas use, which also leaves hidden
+   relations out of the simulation. Found by loading `architecture/` into the
+   web build with Playwright and running `layoutViolations` on every view.
+16. **No way to check a model's views for layout faults.** The e2e helper
+   `layoutViolations` (overlapping siblings, children outside their parent)
+   found the fault above in minutes, but only through a throwaway spec. As an
+   MCP tool (`check_views`) or a Studio command it would let an agent or a
+   user audit every view after a big change; it also missed a group frame
+   overlapping a container frame once, so it should compare frames too.
 
 ### Reverse-engineered requirements (2026-10-06)
 

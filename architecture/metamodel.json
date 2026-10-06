@@ -406,7 +406,8 @@
     "group": {
       "allowedAtRoot": true,
       "allowedParents": [
-        "group"
+        "group",
+        "system"
       ],
       "builtin": true,
       "collapsedHeight": 220,

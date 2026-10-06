@@ -56,7 +56,6 @@ import {
   applyLayoutPositions,
   computeViewCollapsedSet,
   computeViewNodeSet,
-  filterForView,
   isEffectivelyCollapsed,
   viewLayoutInput,
   type LayoutInput,
@@ -3093,17 +3092,12 @@ export const useDiagramStore = create<DiagramStore>()(
           return
         }
         _liveLayout = new LiveColaLayout({
+          // The same graph Smart Layout and the canvas see: the view's own
+          // collapsed/expanded overrides included, so a node collapsed on All
+          // elements but expanded in this view is a group here, not a leaf.
           getModel: () => {
-            const state = get()
-            const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-            const vf = computeViewNodeSet(view as DiagramView | undefined, state.c4Nodes as Record<string, C4Node>)
-            const vcs = computeViewCollapsedSet(vf, state.c4Nodes as Record<string, C4Node>)
-            return filterForView(
-              state.c4Nodes as Record<string, C4Node>,
-              state.c4Relations as Record<string, C4Relation>,
-              vf,
-              vcs
-            )
+            const { nodes, relations } = layoutInputForView(get())
+            return { nodes, relations }
           },
           onSettled: () => {
             set((state) => { state.liveLayoutMoving = false })

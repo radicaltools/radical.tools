@@ -1,0 +1,11 @@
+---
+id: "845b36fd-6167-46a8-9d47-4081bf588b16"
+type: "adr"
+label: "Model in two layers"
+alternatives: "Requirements inside the radical.tools system: needs a metamodel change and buries the containers under about 400 records. Separate Requirements and Decisions groups next to the system: tidier, but keeps the layers implicit. Separate logical and physical layers (tried on 2026-10-06 and merged the same day): C4 already mixes the two, so the line was arbitrary and the physical layer held only the shared packages, which belong inside the system (ADR Groups inside a system). DDD domains per product area linked with realises: the areas are product features rather than bounded contexts."
+consequences: "The Structure view shows three frames, and the satisfies relations carry the trace from requirements to the parts that meet them. Every named view also shows its layer's frame, because views include all ancestors of their nodes. C4 is both logical and physical (containers name their technology, packages are code), so the model does not split the two."
+context: "The root of architecture/ held 35 elements side by side: the radical.tools system, six requirement groups, a loose need and five loose requirements, nine ADRs, five fitness functions, the people, the external systems and the shared packages. Requirements cannot simply move into the system: the metamodel does not allow a group inside a system, and a C4 system boundary holds what runs, not what is asked of it. The shared packages are code of radical.tools, but a component cannot sit directly in a system either."
+date: "2026-10-06"
+decision: "The root holds three groups and nothing else. 1 Conceptual: what the product must do and why (needs, EARS requirements and scenarios, one group per product area, plus Product principles for the cross-cutting ones). 2 Logical & physical: what it is made of and how it is built, in C4 (people, external systems, and the radical.tools system with its containers, components and shared packages; deployment nodes once the C4 preset has a type for them). Decisions: ADRs and fitness functions, beside the layers because they cut across them. A new element goes into the layer it describes. Layers are linked by relations (satisfies, derives, verifies, constrains, traces-to), never by containment."
+status: "accepted"
+---

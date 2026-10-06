@@ -81,6 +81,7 @@ describe('buildMetamodelGraph', () => {
     expect(g.edges.filter((e) => e.type === CONTAINS_EDGE).map((e) => e.id).sort()).toEqual([
       'contains:domain>blueprint',
       'contains:group>blueprint',
+      'contains:system>group',
     ])
     const linked = new Set(g.edges.flatMap((e) => [e.source, e.target]))
     expect(g.nodes.filter((n) => !linked.has(n.id)).map((n) => n.id)).toEqual([])
