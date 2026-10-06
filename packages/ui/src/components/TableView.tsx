@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType } from '@radical/common/c4'
-import { NODE_COLORS, NODE_FG, TYPE_LABELS, NODE_SIZES } from '@radical/common/c4'
+import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
 import type { Metamodel, PropertyDef } from '@radical/common/metamodel'
 import { isParentAllowed, composeEarsSentence, resolveEarsSubject } from '@radical/common/metamodel'
 
@@ -318,8 +318,8 @@ export function TableView(): React.ReactElement {
     // ── Case 1: new node dragged from the palette/toolbar ──────────────────
     const typeStr = e.dataTransfer.getData('application/c4-type')
     if (typeStr) {
-      const size = NODE_SIZES[typeStr as C4ElementType] ?? { width: 200, height: 100 }
       const mm = useDiagramStore.getState().metamodel
+      const size = nodeTypeSize(typeStr, mm)
       const def = mm?.nodeTypes[typeStr]
       const label = def?.label ?? (typeStr[0].toUpperCase() + typeStr.slice(1))
       const allowedParents = def?.allowedParents ?? []
