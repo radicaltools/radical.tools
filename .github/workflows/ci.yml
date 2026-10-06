@@ -8,6 +8,11 @@ name: CI
 #
 # The "Protect main" ruleset requires the "Type-check & Test" check, which
 # the pull_request run reports.
+#
+# The `skip-e2e` label on a PR skips the E2E job (Type-check & Test still
+# runs). Labels are read when a run starts, so add it before pushing, or push
+# again; adding a label does not start a run. The E2E suite still runs before
+# every deploy from main (deploy.yml).
 
 on:
   pull_request:
@@ -36,4 +41,5 @@ jobs:
 
   e2e:
     name: E2E
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
     uses: ./.github/workflows/e2e.yml
