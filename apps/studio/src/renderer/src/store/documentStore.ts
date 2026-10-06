@@ -170,9 +170,13 @@ function deleteLSPayload(id: string): void {
   try { localStorage.removeItem(lsKeyFor(id)) } catch { /* noop */ }
 }
 
+/** A model file's name without its extension (.radical, .c4.json or .json). */
+function stripModelExtension(fileName: string): string {
+  return fileName.replace(/\.radical$/i, '').replace(/\.c4\.json$/i, '').replace(/\.json$/i, '') || fileName
+}
+
 function defaultNameFromPath(filePath: string): string {
-  const base = filePath.split(/[\\/]/).pop() ?? filePath
-  return base.replace(/\.c4\.json$/i, '').replace(/\.json$/i, '') || base
+  return stripModelExtension(filePath.split(/[\\/]/).pop() ?? filePath)
 }
 
 function defaultNameFromFolder(folderPath: string): string {
@@ -337,7 +341,7 @@ function defaultWebFilePicker(): Promise<{ name: string; content: string } | nul
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.json,application/json'
+    input.accept = '.radical,.json,application/json'
     input.style.display = 'none'
     let settled = false
     const finish = (v: { name: string; content: string } | null): void => {
@@ -739,8 +743,7 @@ export const documents: DocumentsAPI = {
       console.warn('[documentStore] importFromFile: not a DiagramData payload')
       return null
     }
-    const name = picked.name.replace(/\.c4\.json$/i, '').replace(/\.json$/i, '') || picked.name
-    return this.createLSDocument(name, parsed)
+    return this.createLSDocument(stripModelExtension(picked.name), parsed)
   },
 
   async saveAsFile(id, data, downloadOverride) {
