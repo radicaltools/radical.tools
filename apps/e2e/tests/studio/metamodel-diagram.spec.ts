@@ -75,7 +75,15 @@ test('selecting a type shows its rules; Edit opens it in the list', async ({ pag
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 30_000 })
   const zoom = async (): Promise<number> =>
     diagram.locator('.react-flow__viewport').evaluate((el) => Number(/scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform)?.[1]))
-  const overview = await zoom()
+  // The fit after the physics animates; read the overview once it has stopped.
+  let overview = await zoom()
+  await expect
+    .poll(async () => {
+      const prev = overview
+      overview = await zoom()
+      return overview === prev
+    }, { intervals: [150] })
+    .toBe(true)
 
   // Selecting a type frames it with what it is connected to.
   await diagram.getByTestId('rf__node-blueprint').click()
@@ -108,4 +116,18 @@ test('selecting a type shows its rules; Edit opens it in the list', async ({ pag
   await inspector.getByRole('button', { name: 'Edit type' }).click()
   await expect(editor.getByRole('tab', { name: 'List' })).toHaveAttribute('aria-selected', 'true')
   await expect(editor.locator('.mm-card.focused input.mm-input').first()).toHaveValue('Requirement')
+})
+
+// CI runners are slow: there the last frame of the physics used to leave the
+// type boxes unmeasured, hidden and without edges. A throttled CPU reproduces it.
+test('the diagram stays drawn on a slow machine', async ({ page, studio }) => {
+  await studio.open('v-context', 'metamodel')
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 })
+  const editor = page.getByRole('dialog', { name: 'Metamodel editor' })
+  await editor.getByRole('tab', { name: 'Diagram' }).click()
+  const diagram = editor.locator('.mmd-canvas')
+  await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 60_000 })
+  await expect(diagram.locator('.react-flow__edge')).toHaveCount(96)
+  await expect(diagram.getByTestId('rf__node-requirement')).toBeVisible()
 })

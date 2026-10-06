@@ -527,6 +527,11 @@ function DiagramInner({ metamodel, filter, selection, onSelect, onEdit }: Props)
         height: inner.height + CATEGORY_PADDING.top + CATEGORY_PADDING.bottom,
       }
     }
+    // Every node carries its size: ReactFlow rebuilds its node state from
+    // these objects (it does not keep the measured size), and a node without
+    // one is hidden along with its edges until it is measured again — which,
+    // with the physics replacing the nodes every frame, can leave the last
+    // frame blank on a slow machine.
     return [
       // Frames first and lowest so the types and edges paint over them.
       ...layout.graph.categories.map((category) => {
@@ -535,6 +540,8 @@ function DiagramInner({ metamodel, filter, selection, onSelect, onEdit }: Props)
           id: category.id,
           type: 'mmCategory',
           position: frame ? { x: frame.x, y: frame.y } : { x: 0, y: 0 },
+          width: (frame ?? frames[category.id]).width,
+          height: (frame ?? frames[category.id]).height,
           hidden: !frame,
           draggable: false,
           connectable: false,
@@ -547,6 +554,8 @@ function DiagramInner({ metamodel, filter, selection, onSelect, onEdit }: Props)
         id: n.id,
         type: 'mmType',
         position: positions[n.id] ?? { x: 0, y: 0 },
+        width: n.width,
+        height: n.height,
         hidden: onlyFocus && !focus!.nodes.has(n.id),
         draggable: false,
         connectable: false,
