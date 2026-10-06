@@ -41,6 +41,9 @@ interface C4Group extends Group {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Walk parent chain to compute absolute top-left from relative positions. */
+/** Parent types that can hold other parents; every other parent is a flat group. */
+const NESTING_TYPES: ReadonlySet<string> = new Set(['system', 'domain', 'group'])
+
 function toAbsoluteTopLeft(n: C4Node, all: Record<string, C4Node>): { x: number; y: number } {
   let x = n.x
   let y = n.y
@@ -400,11 +403,12 @@ export class LiveColaLayout {
     this.colaNodes.forEach((cn, i) => nodeIndex.set(cn.c4id, i))
 
     // ── Groups bottom-up (leaf-containers like 'container' first) ──
-    // First pass: containers whose children are all leaves (no further nesting
-    // among groups). 'container' is a flat container in the C4 metamodel.
+    // First pass: every parent that cannot nest another parent — a container,
+    // a web app, a blueprint — groups its leaf children. Systems, domains and
+    // groups nest, so the second pass builds them from their child groups.
     for (const n of visibleNodes) {
       if (!parentIds.has(n.id)) continue
-      if (n.type !== 'container') continue
+      if (NESTING_TYPES.has(n.type)) continue
       const leafIndices = leafNodes
         .filter((c) => c.parentId === n.id)
         .map((c) => nodeIndex.get(c.id))
@@ -437,7 +441,7 @@ export class LiveColaLayout {
       return d
     }
     const outerContainerNodes = visibleNodes
-      .filter(n => parentIds.has(n.id) && (n.type === 'system' || n.type === 'domain' || n.type === 'group'))
+      .filter(n => parentIds.has(n.id) && NESTING_TYPES.has(n.type))
       .sort((a, b) => depthOf(b.id) - depthOf(a.id))
 
     for (const n of outerContainerNodes) {
