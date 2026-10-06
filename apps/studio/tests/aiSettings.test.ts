@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   AI_SETTINGS_KEY,
+  aiReady,
   defaultAISettings,
   loadAISettings,
   normalizeAISettings,
   saveAISettings,
 } from '../src/renderer/src/ai/settings'
+import type { AISettings } from '../src/renderer/src/ai/types'
 
 function makeStore(): {
   getItem: (k: string) => string | null
@@ -77,5 +79,21 @@ describe('aiSettings', () => {
     const parsed = JSON.parse(store.data[AI_SETTINGS_KEY])
     expect(parsed.active).toBe('openai')
     expect(parsed.providers.gemini.baseUrl).toBe('')
+  })
+})
+
+describe('aiReady', () => {
+  const settings = (patch: Partial<AISettings>): AISettings => ({ ...defaultAISettings(), ...patch })
+
+  it('needs AI switched on and a key for a cloud provider', () => {
+    const keyed = defaultAISettings()
+    keyed.providers.openai.apiKey = 'sk-test'
+    expect(aiReady(settings({ enabled: true, active: 'openai' }))).toBe(false)
+    expect(aiReady({ ...keyed, enabled: true, active: 'openai' })).toBe(true)
+    expect(aiReady({ ...keyed, enabled: false, active: 'openai' })).toBe(false)
+  })
+
+  it('needs no key for Ollama', () => {
+    expect(aiReady(settings({ enabled: true, active: 'ollama' }))).toBe(true)
   })
 })

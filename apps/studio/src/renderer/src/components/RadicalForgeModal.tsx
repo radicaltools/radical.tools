@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { runAIPrompt, type ForgeProgressEvent } from '../ai/runner'
-import { loadAISettings } from '../ai/settings'
+import { activeProviderNeedsKey, loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
 import { FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, buildForgeStagePrompt, buildPriorStagesBlock, needLabelFromDescription, type ForgeNeedRef, type ForgeStageId } from '../ai/forgePrompts'
@@ -226,9 +226,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     return () => window.removeEventListener('keydown', onKey)
   }, [open, busy, onClose])
 
-  const providerCfg = aiSettings.providers[aiSettings.active]
   const providerLabel = getAdapter(aiSettings.active).label
-  const needsKey = aiSettings.active !== 'ollama' && !providerCfg.apiKey
+  const needsKey = activeProviderNeedsKey(aiSettings)
   const unavailableReason = !aiSettings.enabled
     ? 'AI features are disabled.'
     : needsKey
