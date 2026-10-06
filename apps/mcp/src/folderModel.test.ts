@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join, dirname } from 'node:path'
+import { basename, join, dirname, relative } from 'node:path'
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
@@ -164,4 +165,85 @@ describe('folder-backed MCP model', () => {
     await symlink(outside, join(folder, 'nodes'))
     await expect(FolderModel.open(folder)).rejects.toThrow('symlink in model path')
   })
+})
+
+describe('starting a model', () => {
+  async function tempDir(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'radical-new-'))
+    folders.push(dir)
+    return dir
+  }
+  const summaryOf = async (model: FolderModel) => JSON.parse((await model.call('get_model_summary', {})).text.split('\n')[0])
+
+  it('turns an empty folder into a Governance model, as Studio would write it', async () => {
+    const dir = await tempDir()
+    await mkdir(join(dir, '.git'))
+    const model = await FolderModel.open(dir)
+    const manifest = await readFile(join(dir, 'radical.md'), 'utf8')
+    expect(manifest).toMatch(/radicalFormat: "md-folder"/)
+    expect(manifest).toContain(`name: "${basename(dir)}"`)
+    const summary = await summaryOf(model)
+    expect(summary.metamodel.id).toBe('c4-ddd-governance-builtin')
+    expect(summary.nodeTypes).toContain('need')
+  })
+
+  it('creates a missing folder, relative to the working directory, with the chosen metamodel', async () => {
+    const dir = join(await tempDir(), 'docs', 'architecture')
+    const model = await FolderModel.open(relative(process.cwd(), dir), { metamodel: 'c4' })
+    expect((await summaryOf(model)).metamodel.id).toBe('c4-builtin')
+    expect(await readFile(join(dir, 'radical.md'), 'utf8')).toContain('name: "architecture"')
+  })
+
+  it('leaves a folder with other files alone and says how to start one', async () => {
+    const dir = await tempDir()
+    await writeFile(join(dir, 'README.md'), '# Not a model\n')
+    await expect(FolderModel.open(dir)).rejects.toThrow(/empty or new folder/)
+    expect(await readdir(dir)).toEqual(['README.md'])
+  })
+
+  it('keeps an existing model and its metamodel', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder, { metamodel: 'c4' })
+    expect((await summaryOf(model)).metamodel.id).toBe('c4-ddd-governance-builtin')
+  })
+})
+
+describe('long Smart Layout runs', () => {
+  async function modelWithNodes(): Promise<{ folder: string; model: FolderModel }> {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    for (const args of [
+      { tempId: 'a', type: 'system', label: 'A' },
+      { tempId: 'b', type: 'system', label: 'B' },
+      { tempId: 'u', type: 'person', label: 'User' },
+    ]) expect((await model.call('add_node', args)).ok).toBe(true)
+    expect((await model.call('add_relation', { sourceId: 'u', targetId: 'a', relationType: 'interacts' })).ok).toBe(true)
+    return { folder, model }
+  }
+
+  it('reports each step to a client that asked for progress', async () => {
+    const { model } = await modelWithNodes()
+    const steps: { progress: number; message: string }[] = []
+    const outcome = await model.call('smart_layout', {}, { onProgress: (p) => steps.push(p) })
+    expect(outcome.ok, outcome.text).toBe(true)
+    expect(steps.map((s) => s.message)).toContain('Smart Layout: candidates 1/10')
+    expect(steps.map((s) => s.progress)).toEqual(steps.map((_, i) => i + 1))
+  }, 60_000)
+
+  it('stops at the next step once the client cancels, and writes nothing', async () => {
+    const { folder, model } = await modelWithNodes()
+    const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+    const cancel = new AbortController()
+    const outcome = await model.call('smart_layout', {}, { signal: cancel.signal, onProgress: () => cancel.abort() })
+    expect(outcome).toMatchObject({ ok: false, text: expect.stringMatching(/cancelled/) })
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
+  }, 60_000)
+
+  it('exits when the client closes its end', async () => {
+    const folder = await fixture()
+    const server = spawn(process.execPath, [join(import.meta.dirname, '../dist/index.js'), '--folder', folder], { stdio: ['pipe', 'ignore', 'ignore'] })
+    const exited = new Promise<number | null>((done) => server.once('exit', done))
+    server.stdin.end()
+    expect(await exited).toBe(0)
+  }, 15_000)
 })
