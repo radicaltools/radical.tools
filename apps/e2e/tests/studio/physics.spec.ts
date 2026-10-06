@@ -50,3 +50,42 @@ test('zooming with the wheel wins over a fit still animating', async ({ page, st
   expect(await scale()).toBeCloseTo(settled, 3)
   expect(settled).toBeGreaterThan(fitted * 1.3)
 })
+
+/** A 15 × 15 grid of linked containers, laid out near rest. */
+function gridDocument(): string {
+  const nodes = [], relations = []
+  for (let r = 0; r < 15; r++) for (let c = 0; c < 15; c++) {
+    nodes.push({ id: `n${r}_${c}`, type: 'container', label: `N ${r},${c}`, description: '', x: c * 420, y: r * 300, width: 240, height: 110, collapsed: false })
+    if (c > 0) relations.push({ id: `h${r}_${c}`, sourceId: `n${r}_${c - 1}`, targetId: `n${r}_${c}` })
+    if (r > 0) relations.push({ id: `v${r}_${c}`, sourceId: `n${r - 1}_${c}`, targetId: `n${r}_${c}` })
+  }
+  return JSON.stringify({ nodes, relations, views: [] })
+}
+
+test('on a large diagram a drag moves only the dragged node\'s surroundings', async ({ page, studio }) => {
+  await studio.seedDocument(gridDocument())
+  await studio.open('canvas')
+  // Wait for rest, then count the nodes whose position changes while dragging.
+  let previous = await studio.positions()
+  await expect.poll(async () => {
+    await page.waitForTimeout(1000)
+    const current = await studio.positions()
+    const still = JSON.stringify(current) === JSON.stringify(previous)
+    previous = current
+    return still
+  }, { timeout: 30_000, intervals: [0] }).toBe(true)
+  const box = (await studio.node('n7_7').boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  for (let i = 1; i <= 20; i++) {
+    await page.mouse.move(box.x + box.width / 2 + i * 4, box.y + box.height / 2 + i * 2)
+    await page.waitForTimeout(40)
+  }
+  await page.mouse.up()
+  await page.waitForTimeout(1500)
+  const after = await studio.positions()
+  const moved = Object.keys(after).filter((id) => after[id] !== previous[id])
+  // 225 nodes; the drag may move its 40 nearest, the rest stays put.
+  expect(moved.length).toBeGreaterThan(1)
+  expect(moved.length).toBeLessThanOrEqual(40)
+})

@@ -88,6 +88,16 @@ export interface LiveColaCallbacks {
 /** A node is reported again once it moved or resized by more than this. */
 const REPORT_PX = 0.5
 
+/** From this many nodes, a drag moves only the dragged node's surroundings:
+ *  its nearest LOCAL_DRAG_SIZE nodes by relation and containment steps
+ *  (hubs would otherwise pull in most of the graph within two steps). The
+ *  rest stays frozen until the layout rests again. Smaller diagrams respond
+ *  as a whole. */
+const LOCAL_DRAG_MIN_NODES = 150
+const LOCAL_DRAG_SIZE = 40
+/** cola's `fixed` is a bit mask (2 = dragged); this bit marks frozen nodes. */
+const FROZEN = 8
+
 export interface LiveColaEngineOptions {
   /** Render only some ticks of a heavy graph (HEAVY_RENDER_EVERY). For the
    *  main thread, where physics and rendering share the frame; a worker
@@ -119,6 +129,9 @@ export class LiveColaEngine {
   private skippedRenders = 0
   private quietTicks = 0
   private prevCentres = new Map<ColaNode, { x: number; y: number }>()
+  /** c4 id → ids one relation or containment step away (rebuilt with the layout). */
+  private neighbours = new Map<string, Set<string>>()
+  private frozen = false
   /** Positions last handed to applyPositions, to report only changes. */
   private reported = new Map<string, { x: number; y: number; width?: number; height?: number }>()
 
@@ -242,6 +255,7 @@ export class LiveColaEngine {
   grab(nodeId: string, rfX: number, rfY: number): void {
     this._grabbedId = nodeId
     this.resetPace()
+    if (this.colaNodes.length >= LOCAL_DRAG_MIN_NODES) this.freezeAllBut(nodeId)
     const cn = this.idToNode.get(nodeId)
     if (cn) {
       Layout.dragStart(cn)
@@ -313,6 +327,46 @@ export class LiveColaEngine {
       }
       this._dragStartPositions.clear()
     }
+  }
+
+  /** Freezes every node but the LOCAL_DRAG_SIZE nearest to `id`. */
+  private freezeAllBut(id: string): void {
+    const near = new Set<string>([id])
+    const queue = [id]
+    while (queue.length && near.size < LOCAL_DRAG_SIZE) {
+      for (const n of this.neighbours.get(queue.shift()!) ?? []) {
+        if (near.size >= LOCAL_DRAG_SIZE) break
+        if (!near.has(n)) { near.add(n); queue.push(n) }
+      }
+    }
+    // A dragged group moves its leaves, so they count as near too.
+    for (const leaf of this.groupLeaves(id)) near.add(leaf.c4id)
+    for (const cn of this.colaNodes) {
+      if (near.has(cn.c4id)) continue
+      cn.fixed = (cn.fixed ?? 0) | FROZEN
+      cn.px = cn.x
+      cn.py = cn.y
+    }
+    this.frozen = true
+  }
+
+  /** Puts frozen nodes back exactly: cola's locks are springs, and overlap
+   *  projection moves locked nodes too, so they would drift. */
+  private pinFrozen(): void {
+    if (!this.frozen) return
+    const x = (this.cola as { _descent?: { x: number[][] } } | null)?._descent?.x
+    this.colaNodes.forEach((cn, i) => {
+      if (!((cn.fixed ?? 0) & FROZEN) || cn.px === undefined || cn.py === undefined) return
+      cn.x = cn.px
+      cn.y = cn.py
+      if (x) { x[0][i] = cn.px; x[1][i] = cn.py }
+    })
+  }
+
+  private unfreeze(): void {
+    if (!this.frozen) return
+    for (const cn of this.colaNodes) cn.fixed = (cn.fixed ?? 0) & ~FROZEN
+    this.frozen = false
   }
 
   // ─── Coordinate conversion (RF ↔ cola) ─────────────────────────────────────
@@ -453,11 +507,24 @@ export class LiveColaEngine {
     }
 
     // ── Links ───────────────────────────────────────────────────────────
+    // Neighbourhoods for local drags: relations (between visible ends) and containment.
+    this.neighbours.clear()
+    this.frozen = false
+    const link = (a: string, b: string) => {
+      if (!this.neighbours.has(a)) this.neighbours.set(a, new Set())
+      if (!this.neighbours.has(b)) this.neighbours.set(b, new Set())
+      this.neighbours.get(a)!.add(b)
+      this.neighbours.get(b)!.add(a)
+    }
+    for (const n of visibleNodes) if (n.parentId) link(n.id, n.parentId)
     const colaLinks: Link<ColaNode>[] = []
     for (const rel of Object.values(relations)) {
       const src = this.findLeaf(rel.sourceId, visibleNodes)
       const tgt = this.findLeaf(rel.targetId, visibleNodes)
-      if (src && tgt && src !== tgt) colaLinks.push({ source: src, target: tgt })
+      if (src && tgt && src !== tgt) {
+        colaLinks.push({ source: src, target: tgt })
+        link(src.c4id, tgt.c4id)
+      }
     }
 
     // ── Build index maps for groups ─────────────────────────────────────
@@ -651,6 +718,7 @@ export class LiveColaEngine {
 
     layout.on('tick', () => {
       if (!this._running) return
+      this.pinFrozen()
       const now = performance.now()
       const heavy = this.lastTickAt > 0 && now - this.lastTickAt > HEAVY_TICK_MS
       this.lastTickAt = now
@@ -660,6 +728,7 @@ export class LiveColaEngine {
         this.cola?.stop()
         this.resetPace()
         this.emitPositions()
+        this.unfreeze()
         this.callbacks.onSettled?.()
         return
       }
