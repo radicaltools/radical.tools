@@ -52,6 +52,18 @@ test.describe('bookstore views', () => {
   })
 })
 
+test.describe('views panel', () => {
+  test.beforeEach(async ({ studio }) => {
+    await studio.seed()
+  })
+
+  test('a whole-model view says it shows all nodes', async ({ page, studio }) => {
+    await studio.open('v-context')
+    await expect(page.locator('.lp-view-card').filter({ hasText: 'Element Table' })).toContainText('All nodes')
+    await expect(page.locator('.lp-view-card').filter({ hasText: 'System Context' })).toContainText('3 nodes')
+  })
+})
+
 test.describe('sample views', () => {
   for (const [view, name] of [
     ['view-core', 'Core Banking'],
