@@ -79,8 +79,14 @@ export type LiveColaPositions = Record<string, { x: number; y: number; width?: n
 
 export interface LiveColaCallbacks {
   getModel: () => { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
+  /** Only the nodes that moved or resized since they were last reported. */
   applyPositions: (positions: LiveColaPositions) => void
+  /** The layout came to rest (after its last applyPositions). */
+  onSettled?: () => void
 }
+
+/** A node is reported again once it moved or resized by more than this. */
+const REPORT_PX = 0.5
 
 export interface LiveColaEngineOptions {
   /** Render only some ticks of a heavy graph (HEAVY_RENDER_EVERY). For the
@@ -113,6 +119,8 @@ export class LiveColaEngine {
   private skippedRenders = 0
   private quietTicks = 0
   private prevCentres = new Map<ColaNode, { x: number; y: number }>()
+  /** Positions last handed to applyPositions, to report only changes. */
+  private reported = new Map<string, { x: number; y: number; width?: number; height?: number }>()
 
   private readonly paceRenders: boolean
 
@@ -352,6 +360,9 @@ export class LiveColaEngine {
   private rebuild(firstRun: boolean = false): void {
     if (this.cola) this.cola.stop()
     this.resetPace()
+    // The store may hold other positions now (view switch, undo, load):
+    // report everything once.
+    this.reported.clear()
 
     const { nodes, relations } = this.callbacks.getModel()
     this.allNodes = nodes
@@ -649,6 +660,7 @@ export class LiveColaEngine {
         this.cola?.stop()
         this.resetPace()
         this.emitPositions()
+        this.callbacks.onSettled?.()
         return
       }
       if (this.paceRenders && heavy && ++this.skippedRenders < HEAVY_RENDER_EVERY) return
@@ -776,7 +788,21 @@ export class LiveColaEngine {
       }
     }
 
-    this.callbacks.applyPositions(result)
+    // Report only what moved: with hundreds of nodes most are still, and
+    // every reported node costs the main thread a React Flow update.
+    const changed: typeof result = {}
+    let any = false
+    for (const [id, pos] of Object.entries(result)) {
+      const last = this.reported.get(id)
+      if (last
+        && Math.abs(last.x - pos.x) <= REPORT_PX && Math.abs(last.y - pos.y) <= REPORT_PX
+        && Math.abs((last.width ?? 0) - (pos.width ?? 0)) <= REPORT_PX
+        && Math.abs((last.height ?? 0) - (pos.height ?? 0)) <= REPORT_PX) continue
+      this.reported.set(id, pos)
+      changed[id] = pos
+      any = true
+    }
+    if (any) this.callbacks.applyPositions(changed)
   }
 }
 

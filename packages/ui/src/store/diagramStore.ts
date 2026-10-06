@@ -903,6 +903,9 @@ interface DiagramStore {
   /** Full candidate ranking + SA stats from the last Smart Layout run — powers the "why this layout" panel. */
   lastSmartLayoutReport: SmartLayoutReport | null
   liveLayoutActive: boolean
+  /** The live layout is moving nodes; false once it reports rest. Edges skip
+   *  costly routing while it moves and route fully when it stops. */
+  liveLayoutMoving: boolean
 
   // ── connect mode ──
   connectSource: string | null
@@ -1367,6 +1370,7 @@ export const useDiagramStore = create<DiagramStore>()(
       smartLayoutProgress: null,
       lastSmartLayoutReport: null,
       liveLayoutActive: true,
+      liveLayoutMoving: false,
       connectSource: null,
       connectionModifier: 'alt' as const,
       autoFitActive: true,
@@ -3064,8 +3068,12 @@ export const useDiagramStore = create<DiagramStore>()(
               vcs
             )
           },
+          onSettled: () => {
+            set((state) => { state.liveLayoutMoving = false })
+          },
           applyPositions: (positions) => {
             set((state) => {
+              state.liveLayoutMoving = true
               // Update c4Nodes (source of truth) and patch rfNodes positions
               // in-place. Avoids full _sync() re-derive which would rebuild
               // all rfNodes/rfEdges arrays every animation frame.

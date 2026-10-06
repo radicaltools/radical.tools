@@ -8,7 +8,7 @@
  * Main → Worker  { type: 'start', skipBulk, model } | { type: 'invalidate' | 'reset', model }
  *              | { type: 'stop' } | { type: 'seed', id, x, y }
  *              | { type: 'grab' | 'drag', id, x, y } | { type: 'release', id }
- * Worker → Main  { type: 'positions', positions }
+ * Worker → Main  { type: 'positions', positions } | { type: 'settled' }
  *
  * `model` is the store's nodes and relations at the time of the call; the
  * engine reads it whenever it rebuilds.
@@ -22,6 +22,7 @@ let model: Extract<LiveColaMessage, { model: unknown }>['model'] = { nodes: {}, 
 const engine = new LiveColaEngine({
   getModel: () => model,
   applyPositions: (positions) => self.postMessage({ type: 'positions', positions }),
+  onSettled: () => self.postMessage({ type: 'settled' }),
 })
 
 self.onmessage = (e: MessageEvent<LiveColaMessage>) => {

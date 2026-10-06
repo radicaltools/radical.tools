@@ -6,6 +6,7 @@ import {
   Position,
   useStore,
   useStoreApi,
+  type Node as RFNode,
 } from 'reactflow'
 import { C4EdgeRFData } from '@radical/common/c4'
 import { computeRoutedEdge, ObstacleGrid, type RoutingObstacle } from '@radical/layout/edgeRouting'
@@ -233,6 +234,14 @@ function obstacleCandidates(nodes: NodeInternals): ObstacleCandidates {
   return obstacleCache
 }
 
+/** Same position, size and visibility: nothing an edge draws from changed. */
+function sameEnd(a: RFNode | undefined, b: RFNode | undefined): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  return a.positionAbsolute?.x === b.positionAbsolute?.x && a.positionAbsolute?.y === b.positionAbsolute?.y
+    && a.width === b.width && a.height === b.height && a.hidden === b.hidden && a.parentNode === b.parentNode
+}
+
 export const RelationEdge = memo(
   ({
     id,
@@ -246,8 +255,13 @@ export const RelationEdge = memo(
     // Targeted selectors: only re-render when THIS edge's source or target changes
     const sourceSelector = useCallback((s: any) => s.nodeInternals.get(source), [source])
     const targetSelector = useCallback((s: any) => s.nodeInternals.get(target), [target])
-    const sourceNode = useStore(sourceSelector)
-    const targetNode = useStore(targetSelector)
+    // React Flow rebuilds every node's internals on each update, so compare
+    // the geometry: with hundreds of nodes only a few move at a time.
+    const sourceNode = useStore(sourceSelector, sameEnd)
+    const targetNode = useStore(targetSelector, sameEnd)
+    // Ports and routes also depend on other edges and nodes; re-render once
+    // with everything when the layout comes to rest.
+    useDiagramStore((s) => s.liveLayoutMoving)
     const diffKind = useDiagramStore(s => s.showDiff ? s.diffHighlight[id] : undefined)
     const storeApi = useStoreApi()
 

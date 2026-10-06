@@ -38,8 +38,10 @@ export class LiveColaLayout {
     if (typeof Worker !== 'undefined') {
       try {
         this.worker = new LiveColaWorkerClass()
-        this.worker.onmessage = (e: MessageEvent<{ type: 'positions'; positions: LiveColaPositions }>) => {
-          if (this._running) this.applyNextFrame(e.data.positions)
+        this.worker.onmessage = (e: MessageEvent<{ type: 'positions'; positions: LiveColaPositions } | { type: 'settled' }>) => {
+          if (!this._running) return
+          if (e.data.type === 'positions') this.applyNextFrame(e.data.positions)
+          else this.settleAfterPending()
         }
         this.worker.onerror = () => this.runInThread()
       } catch {
@@ -69,6 +71,16 @@ export class LiveColaLayout {
       this.pending = null
       if (next && this._running) this.callbacks.applyPositions(next)
     }) as unknown as number
+  }
+
+  /** Reports rest after the positions still waiting for a frame. */
+  private settleAfterPending(): void {
+    if (this.frame) {
+      const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (f: FrameRequestCallback) => setTimeout(() => f(0), 16)
+      raf(() => { if (this._running) this.callbacks.onSettled?.() })
+    } else {
+      this.callbacks.onSettled?.()
+    }
   }
 
   private post(message: LiveColaMessage): void {
