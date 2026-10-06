@@ -544,6 +544,7 @@ codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.
     }
   }
 }</code></pre>
+        <p>The folder may also be relative to the directory the client starts the server in. A missing or empty folder becomes a new, empty model; <code>--metamodel c4</code>, <code>c4-ddd</code> or <code>governance</code> picks its metamodel (default <code>governance</code>, C4 + DDD + Governance). A folder with other files and no <code>radical.md</code> is refused, so the server never writes into a folder that isn't a model.</p>
         <h3>Working alongside Studio</h3>
         <p>
           Open the <em>same</em> folder in Studio: in the desktop app, or in a Chromium browser through <em>Manage models…</em> (the browser asks for folder access; a model kept only in browser storage cannot be reached by the server). Studio reloads the folder when the agent changes it, so new elements appear on the open canvas. Then ask the agent to call <code>get_model_summary</code> first; the server's instructions tell it to as well.
