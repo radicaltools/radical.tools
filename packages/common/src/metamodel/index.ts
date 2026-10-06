@@ -7,6 +7,7 @@
 //   • validate.ts — validateModel + Issue
 //   • ears.ts     — EARS sentence compose/parse for the Requirement node type
 //   • wizard.ts   — step / field / relation helpers behind the node wizard
+//   • categories.ts — palette / diagram grouping of node types (C4, Governance, …)
 //   • presets/    — the built-in C4, C4+DDD, and C4+DDD+Governance presets
 
 export * from './types'
@@ -14,4 +15,5 @@ export * from './lookup'
 export * from './validate'
 export * from './ears'
 export * from './wizard'
+export * from './categories'
 export * from './presets'
