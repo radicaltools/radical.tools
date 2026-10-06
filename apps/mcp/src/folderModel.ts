@@ -1,12 +1,12 @@
-import { realpath, stat } from 'node:fs/promises'
-import { isAbsolute, resolve } from 'node:path'
+import { mkdir, readdir, realpath, stat } from 'node:fs/promises'
+import { basename, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import { buildToolDefs, runTool, type ToolDef, type ToolRunContext } from '@radical/common/ai/tools'
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
-import { deserializeFromMdFolder, isMdFolder, isOwnedMdFolderFile, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
+import { deserializeFromMdFolder, isMdFolder, isOwnedMdFolderFile, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
-import { validateModel, type Metamodel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, validateModel, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
@@ -44,11 +44,24 @@ export interface CallOutcome {
   toolsChanged?: boolean
 }
 
+/** Metamodels a new folder can start with (`--metamodel`). */
+export const PRESETS = {
+  c4: builtInC4Metamodel,
+  'c4-ddd': builtInDddC4Metamodel,
+  governance: builtInGovernanceMetamodel,
+} as const
+export type PresetName = keyof typeof PRESETS
+
+export interface OpenOptions {
+  /** Metamodel for a folder that holds no model yet; Governance by default, as in Studio. */
+  metamodel?: PresetName
+}
+
 function checkFiles(files: FolderFiles): void {
   if (!isMdFolder(files)
     || !/^radicalFormat:\s*["']?md-folder["']?\s*$/m.test(files['radical.md'])
     || !/^version:\s*1\s*$/m.test(files['radical.md'])) {
-    throw new Error('Folder is missing a valid radical.md Markdown-folder manifest')
+    throw new Error('Folder is missing a valid radical.md Markdown-folder manifest. Point --folder at an empty or new folder to start a model there.')
   }
   for (const path of JSON_FILES) {
     if (!(path in files)) continue
@@ -135,11 +148,24 @@ export class FolderModel {
     return true
   }
 
-  static async open(folder: string): Promise<FolderModel> {
-    if (!folder || !isAbsolute(folder)) throw new Error('--folder must be an absolute path')
-    const canonical = await realpath(resolve(folder))
+  /** Opens the model in `folder` (relative to the working directory, created
+   *  when missing). An empty folder becomes a new model, written as Studio's
+   *  Save as folder writes one. */
+  static async open(folder: string, options: OpenOptions = {}): Promise<FolderModel> {
+    if (!folder) throw new Error('--folder is required')
+    const path = resolve(folder)
+    await mkdir(path, { recursive: true })
+    const canonical = await realpath(path)
     if (!(await stat(canonical)).isDirectory()) throw new Error(`Not a directory: ${folder}`)
-    const files = await new MdFolderSession(diskFolderStorage(canonical)).readAll()
+    const session = new MdFolderSession(diskFolderStorage(canonical))
+    let files = await session.readAll()
+    // Dot entries (.git, .DS_Store) don't count: a fresh repo folder is still empty.
+    if ((await readdir(canonical)).every((name) => name.startsWith('.'))) {
+      const metamodel = PRESETS[options.metamodel ?? 'governance']()
+      const created = await session.write(serializeToMdFolder({ nodes: [], relations: [], metamodel }, basename(canonical)))
+      if (!created.ok) throw new Error(`Could not start a model in ${canonical}: it changed while being written`)
+      files = await session.readAll()
+    }
     checkFiles(files)
     const data = deserializeFromMdFolder(files).data
     checkData(data)

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, dirname } from 'node:path'
+import { basename, join, dirname, relative } from 'node:path'
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
@@ -163,5 +163,46 @@ describe('folder-backed MCP model', () => {
     await rm(join(folder, 'nodes'), { recursive: true })
     await symlink(outside, join(folder, 'nodes'))
     await expect(FolderModel.open(folder)).rejects.toThrow('symlink in model path')
+  })
+})
+
+describe('starting a model', () => {
+  async function tempDir(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'radical-new-'))
+    folders.push(dir)
+    return dir
+  }
+  const summaryOf = async (model: FolderModel) => JSON.parse((await model.call('get_model_summary', {})).text.split('\n')[0])
+
+  it('turns an empty folder into a Governance model, as Studio would write it', async () => {
+    const dir = await tempDir()
+    await mkdir(join(dir, '.git'))
+    const model = await FolderModel.open(dir)
+    const manifest = await readFile(join(dir, 'radical.md'), 'utf8')
+    expect(manifest).toMatch(/radicalFormat: "md-folder"/)
+    expect(manifest).toContain(`name: "${basename(dir)}"`)
+    const summary = await summaryOf(model)
+    expect(summary.metamodel.id).toBe('c4-ddd-governance-builtin')
+    expect(summary.nodeTypes).toContain('need')
+  })
+
+  it('creates a missing folder, relative to the working directory, with the chosen metamodel', async () => {
+    const dir = join(await tempDir(), 'docs', 'architecture')
+    const model = await FolderModel.open(relative(process.cwd(), dir), { metamodel: 'c4' })
+    expect((await summaryOf(model)).metamodel.id).toBe('c4-builtin')
+    expect(await readFile(join(dir, 'radical.md'), 'utf8')).toContain('name: "architecture"')
+  })
+
+  it('leaves a folder with other files alone and says how to start one', async () => {
+    const dir = await tempDir()
+    await writeFile(join(dir, 'README.md'), '# Not a model\n')
+    await expect(FolderModel.open(dir)).rejects.toThrow(/empty or new folder/)
+    expect(await readdir(dir)).toEqual(['README.md'])
+  })
+
+  it('keeps an existing model and its metamodel', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder, { metamodel: 'c4' })
+    expect((await summaryOf(model)).metamodel.id).toBe('c4-ddd-governance-builtin')
   })
 })

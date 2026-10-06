@@ -1,13 +1,24 @@
 #!/usr/bin/env node
 import { McpServer, fromJsonSchema, type RegisteredTool } from '@modelcontextprotocol/server'
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
-import { FolderModel, READ_ONLY_TOOLS } from './folderModel'
+import { FolderModel, PRESETS, READ_ONLY_TOOLS, type OpenOptions } from './folderModel'
 
-function folderArg(args: string[]): string {
-  if (args.length !== 2 || args[0] !== '--folder' || !args[1]) {
-    throw new Error('Usage: radical-mcp --folder /absolute/path/to/model-folder')
+const USAGE = `Usage: radical-mcp --folder <model-folder> [--metamodel ${Object.keys(PRESETS).join('|')}]
+  --folder     the Markdown model folder, absolute or relative to the working directory;
+               a missing or empty folder becomes a new model
+  --metamodel  the metamodel of a new model (default: governance)`
+
+function parseArgs(args: string[]): { folder: string } & OpenOptions {
+  const values = new Map<string, string>()
+  for (let i = 0; i < args.length; i += 2) {
+    const [flag, value] = [args[i], args[i + 1]]
+    if ((flag !== '--folder' && flag !== '--metamodel') || !value || values.has(flag)) throw new Error(USAGE)
+    values.set(flag, value)
   }
-  return args[1]
+  const folder = values.get('--folder')
+  const metamodel = values.get('--metamodel')
+  if (!folder || (metamodel !== undefined && !(metamodel in PRESETS))) throw new Error(USAGE)
+  return { folder, metamodel: metamodel as OpenOptions['metamodel'] }
 }
 
 const INSTRUCTIONS = [
@@ -23,7 +34,8 @@ const INSTRUCTIONS = [
 ].join(' ')
 
 async function main(): Promise<void> {
-  const model = await FolderModel.open(folderArg(process.argv.slice(2)))
+  const { folder, metamodel } = parseArgs(process.argv.slice(2))
+  const model = await FolderModel.open(folder, { metamodel })
   const server = new McpServer({ name: 'radical-folder', version: '0.1.0' }, { instructions: INSTRUCTIONS })
   const registered = new Map<string, RegisteredTool>()
   const advertise = (): void => {
