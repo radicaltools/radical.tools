@@ -71,3 +71,14 @@ test('edits survive a reload', async ({ page, studio }) => {
   await expect(studio.nodes).toHaveCount(4)
   await expect(studio.edges).toHaveCount(3)
 })
+
+test('⌘+ and ⌘− zoom the canvas, as the toolbar tooltips say', async ({ page, studio }) => {
+  const scale = () => page.locator('.react-flow__viewport').evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a)
+  await studio.pane.click()
+  const start = await scale()
+  await page.keyboard.press('ControlOrMeta+=')
+  await expect.poll(scale).toBeGreaterThan(start)
+  const zoomedIn = await scale()
+  await page.keyboard.press('ControlOrMeta+-')
+  await expect.poll(scale).toBeLessThan(zoomedIn)
+})
