@@ -224,6 +224,8 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .tile-n { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .tile-text { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .tile-text b { color: var(--text-2); font-weight: 600; }
+.tile-text a { color: var(--accent); }
+.tile-text a:hover { text-decoration: underline; }
 
 /* ── Feature list ────────────────────────────────────────────────── */
 .features { padding: 0 0 64px; }
