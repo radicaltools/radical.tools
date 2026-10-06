@@ -6,6 +6,8 @@
 //   • constrains  — adr / fitness-fn → any C4 element
 //   • supersedes  — adr → adr (replaces an older decision)
 //   • implements  — fitness-fn → adr ("this FF verifies ADR-003")
+//   • need        — raw free-text input (brief, notes, raw requirements) that
+//                   EARS requirements are derived from (requirement → need)
 //   • mockup      — a UI screen (design link or AI-generated wireframe),
 //                   linked via illustrates / presented-by / navigates-to
 
@@ -113,6 +115,63 @@ export function builtInGovernanceMetamodel(): Metamodel {
     },
   }
 
+  // ── Need (ISO/IEC/IEEE 29148 "stakeholder need") ─────────────────────────
+  //
+  // Raw, unstructured input — a brief, user story, meeting notes, a quoted
+  // regulation, raw requirements — kept verbatim as the node's `description`
+  // (so it is the Markdown body of its file in an md-folder model). EARS
+  // requirements are derived from it (requirement --derives--> need), and a
+  // need nests under a broader one the same way (need --derives--> need); it is
+  // deliberately not a requirement itself, so nothing `satisfies` or
+  // `verifies` it. It has no status: being in the model means it is
+  // accepted. Radical Forge stores its input description as one.
+
+  const needProps: PropertyDef[] = [
+    { key: 'description', label: 'Text', type: 'textarea' },
+    {
+      key: 'kind',
+      label: 'Kind',
+      type: 'enum',
+      options: ['brief', 'user-story', 'stakeholder-note', 'meeting-notes', 'regulation', 'other'],
+      default: 'brief',
+    },
+    { key: 'source', label: 'Source (who / where from)', type: 'text' },
+  ]
+
+  const need: NodeTypeDef = {
+    id: 'need',
+    label: 'Need',
+    color: '#475569',
+    fg: '#fff',
+    // Speech bubble with text lines
+    iconPath: 'M3 2a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 3 12h1.5v2.5L8 12h5a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 13 2H3Zm1.5 3h7v1h-7V5Zm0 2.5h5v1h-5v-1Z',
+    width: 200,
+    height: 80,
+    collapsedWidth: 180,
+    collapsedHeight: 80,
+    allowedParents: ['system', 'domain', 'group'],
+    allowedAtRoot: true,
+    builtin: true,
+    tableTab: true,
+    // A need's wiki page and table tab list what derives from it — sub-needs
+    // and requirements — as its children; "add child" creates either.
+    hierarchyRelation: 'derives',
+    properties: needProps,
+    wizard: {
+      trigger: 'create',
+      steps: [
+        { kind: 'fields', title: 'Name & kind', fields: ['label', 'kind'],
+          help: 'A short name, e.g. "Checkout brief from Sales". Pick what kind of input it is.' },
+        { kind: 'fields', title: 'Text', fields: ['description'],
+          help: 'Paste the input as-is — a brief, user story, notes or raw requirements. No format needed; Radical Forge or you can turn it into EARS requirements later.' },
+        { kind: 'fields', title: 'Source', fields: ['source'],
+          help: 'Who it came from or where it lives (a person, meeting, ticket or link).' },
+        { kind: 'relations', title: 'Part of', relationType: 'derives', direction: 'out',
+          help: 'Is this part of a broader need, e.g. one stakeholder\'s notes within a discovery? Leave empty if not.' },
+      ],
+    },
+  }
+
   // ── EARS Requirement ──────────────────────────────────────────────────────
 
   const requirementProps: PropertyDef[] = [
@@ -162,7 +221,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
         { kind: 'relations', title: 'Satisfied by', relationType: 'satisfies', direction: 'in',
           help: 'Which elements must satisfy this requirement?' },
         { kind: 'relations', title: 'Derives from', relationType: 'derives', direction: 'out',
-          help: 'Is this a refinement of a broader requirement?' },
+          help: 'Is this a refinement of a broader requirement, or derived from a need?' },
         { kind: 'relations', title: 'Traces to', relationType: 'traces-to', direction: 'out',
           help: 'Which decisions or fitness functions follow from it?' },
       ],
@@ -217,11 +276,16 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
-  // requirement → requirement decomposition
+  // requirement → requirement decomposition, requirement → need (the raw
+  // input it was derived from) and need → need (a need within a broader one)
   const derives: RelationTypeDef = {
     id: 'derives',
     label: 'Derives from',
-    allowedPairs: [{ from: 'requirement', to: 'requirement' }],
+    allowedPairs: [
+      { from: 'requirement', to: 'requirement' },
+      { from: 'requirement', to: 'need' },
+      { from: 'need', to: 'need' },
+    ],
     properties: [],
     color: '#0d9488',
     builtin: true,
@@ -415,6 +479,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
       ...base.nodeTypes,
       adr,
       'fitness-fn': fitnessFn,
+      need,
       requirement,
       scenario,
       blueprint,

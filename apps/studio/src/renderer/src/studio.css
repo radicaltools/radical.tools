@@ -637,6 +637,30 @@ label.app-menu-row { cursor: pointer; }
   outline: none;
 }
 .forge-textarea:focus { border-color: var(--accent, #3b82f6); }
+.forge-need-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, var(--text-primary));
+}
+.forge-need-picker select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  font: inherit;
+  background: var(--bg-input, var(--bg-toolbar));
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+}
+.forge-need-hint {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--text-secondary, var(--text-primary));
+  opacity: 0.8;
+}
 .forge-stage-card {
   padding: 2px 0;
 }

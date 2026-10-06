@@ -130,6 +130,30 @@ function buildClarificationsBlock(clarifications: string | undefined): string {
   ].join('\n')
 }
 
+/** The `need` node holding this run's description (see RadicalForgeModal's
+ *  ensureNeed) — the requirements stage links what it extracts back to it. */
+export interface ForgeNeedRef {
+  id: string
+  label: string
+}
+
+const NEED_LABEL_MAX = 60
+
+/** A short label for the `need` node that stores a Forge description: its
+ *  first non-empty line with Markdown heading/list markers stripped, cut at
+ *  a word boundary when longer than NEED_LABEL_MAX. */
+export function needLabelFromDescription(description: string): string {
+  const first = description
+    .split('\n')
+    .map((l) => l.replace(/^\s*(#+|[-*+]|\d+[.)])\s+/, '').trim())
+    .find(Boolean)
+  if (!first) return 'Forge brief'
+  if (first.length <= NEED_LABEL_MAX) return first.replace(/[.:;,]+$/, '')
+  const cut = first.slice(0, NEED_LABEL_MAX)
+  const space = cut.lastIndexOf(' ')
+  return `${(space > NEED_LABEL_MAX / 2 ? cut.slice(0, space) : cut).replace(/[.:;,]+$/, '')}…`
+}
+
 /** Builds the task instruction for one stage. `description` is the original
  *  free-text system description the user provided in the Input step — later
  *  stages still get it for grounding, even though the requirements/model it
@@ -139,13 +163,15 @@ function buildClarificationsBlock(clarifications: string | undefined): string {
  *  stay the same set, no separate "what did the AI see" mystery.
  *  `clarifications` is the formatted Q&A from the pre-stage clarify step
  *  (ai/forgeClarify.ts), when the user answered any. `priorStageSummaries`
- *  is the pre-formatted output of `buildPriorStagesBlock` above. */
+ *  is the pre-formatted output of `buildPriorStagesBlock` above. `need` is
+ *  the node the description is stored in, when the metamodel has that type. */
 export function buildForgeStagePrompt(
   stageId: ForgeStageId,
   description: string,
   hubMatches?: HubConceptSummary[],
   clarifications?: string,
   priorStageSummaries?: string,
+  need?: ForgeNeedRef,
 ): string {
   const descBlock = [
     'Original system description (provided by the user in the Radical Forge wizard):',
@@ -169,6 +195,16 @@ export function buildForgeStagePrompt(
         'clearly refines another, link child → parent with a `derives` relation.',
         'Create only requirement nodes in this stage — no systems, containers, fitness',
         'functions, or scenarios yet.',
+        ...(need
+          ? [
+              '',
+              `The description is stored in the model as the \`need\` node "${need.label}"`,
+              `(id ${need.id}). Link every top-level requirement you create to it with a`,
+              '`derives` relation FROM the requirement TO that need; a requirement that',
+              'derives from another requirement links only to its parent requirement.',
+              'Do not edit the need node itself.',
+            ]
+          : []),
       ].join('\n')
 
     case 'c4':

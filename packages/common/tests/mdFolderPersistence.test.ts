@@ -104,6 +104,27 @@ describe('md-folder persistence', () => {
     expect(req.priority).toBe('must')
   })
 
+  it('stores a need\'s free text as the Markdown body of its file', () => {
+    const text = '# Checkout brief\n\nCustomers want to pay with a saved card.\n\n- Must work on mobile\n- GDPR applies'
+    const data: DiagramData = {
+      ...sample,
+      nodes: [node({ id: 'need1', type: 'need', label: 'Checkout brief', description: text, ...({
+        kind: 'brief',
+      } as Record<string, unknown>) })],
+      relations: [],
+      views: [],
+      sequences: [],
+      defaultPositions: {},
+    }
+    const files = serializeToMdFolder(data)
+    const md = files['nodes/checkout-brief.md']
+    expect(md).toContain('type: "need"')
+    expect(md.split('---').slice(2).join('---').trim()).toBe(text)
+    const back = deserializeFromMdFolder(files).data.nodes[0] as unknown as Record<string, unknown>
+    expect(back.description).toBe(text)
+    expect(back.kind).toBe('brief')
+  })
+
   it('does not confuse numeric-looking strings with numbers', () => {
     const data: DiagramData = {
       nodes: [node({ id: 'n1', type: 'adr', label: '123', ...({ date: '2026-01-01', ref: '007' } as Record<string, unknown>) })],

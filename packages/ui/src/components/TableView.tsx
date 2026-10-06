@@ -247,10 +247,14 @@ export function TableView(): React.ReactElement {
     const m = new Map<string, string>()
     for (const r of relList) {
       if (r.relationType !== treeRelationType) continue
+      // Only same-type edges form this tab's tree — e.g. a Requirement
+      // deriving from a Need stays a root here rather than an orphan whose
+      // parent row isn't in the tab.
+      if (nodes[r.targetId]?.type !== tab) continue
       if (!m.has(r.sourceId)) m.set(r.sourceId, r.targetId)
     }
     return m
-  }, [relList, treeRelationType])
+  }, [relList, treeRelationType, nodes, tab])
 
   const typeTreeRows = useMemo<TreeRow[]>(() => {
     if (!relationParentOf) return []

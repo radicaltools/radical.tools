@@ -122,9 +122,9 @@
           On first launch you land on the <strong>Welcome screen</strong>:
         </p>
         <ul>
-          <li><strong>New model</strong> — pick the metamodel first: <em>C4</em>, <em>C4 + DDD</em> (adds Domains) or <em>C4 + DDD + Governance</em> (adds ADRs, fitness functions, requirements and blueprints). You can change it later in the metamodel editor.</li>
+          <li><strong>New model</strong> — pick the metamodel first: <em>C4</em>, <em>C4 + DDD</em> (adds Domains) or <em>C4 + DDD + Governance</em> (adds ADRs, fitness functions, needs, requirements and blueprints). You can change it later in the metamodel editor.</li>
           <li><strong>Open file</strong> — a <code>.radical</code> / <code>.json</code> model from disk.</li>
-          <li><strong>Load the sample</strong> — the <em>Fintech Banking Platform</em> used throughout this guide: 62 elements — architecture, ADRs and fitness functions, EARS requirements, Gherkin scenarios and 13 UI mockups with wireframes in three screen flows — 15 views of every kind, four sequences, four milestones and a ready-made presentation.</li>
+          <li><strong>Load the sample</strong> — the <em>Fintech Banking Platform</em> used throughout this guide: 65 elements — architecture, ADRs and fitness functions, the needs behind it (a regulation, a product brief and a client's feedback), the EARS requirements derived from them, Gherkin scenarios and 13 UI mockups with wireframes in three screen flows — 15 views of every kind, four sequences, four milestones and a ready-made presentation.</li>
           <li><strong>Recent</strong> — models you already have in this browser.</li>
         </ul>
         <figure class="doc-shot">
@@ -219,6 +219,13 @@
         <p>
           Every element has a label, description and parent; C4 runtime elements add <em>technology</em> and an <em>external</em> flag. Everything else is defined by the metamodel: text, long text, number, boolean and enum fields, optionally shown only when another field has a given value.
         </p>
+        <h3>Needs</h3>
+        <p>
+          A <strong>Need</strong> (palette group <em>Requirements</em>) keeps raw input exactly as it arrived: a brief, a user story, meeting notes, a quoted regulation or a list of raw requirements. The text is free-form and is the element's description, so in a <a href="#formats">Markdown folder</a> it is simply the body of its file. <em>Kind</em> says what it is and <em>Source</em> who or where it came from. There is no status: a need in the model is an accepted one.
+        </p>
+        <p>
+          Needs are where EARS requirements come from. A requirement links to the need it was written from with <em>Derives from</em> (the same relation that links a sub-requirement to its parent), so every requirement traces back to the words someone actually wrote. Needs nest the same way: a need that is part of a broader one (one stakeholder's notes within a discovery, one chapter of a regulation) links to it with <em>Derives from</em>, which its wizard asks as <em>Part of</em>. A need's <a href="#view-wiki">Wiki</a> page lists its sub-needs and the requirements derived from it under <em>Derives from this</em>, and adding a child there creates either, already linked; the <em>Need</em> tab of a <a href="#view-table">Table</a> shows them as a tree. Nothing <em>satisfies</em> or <em>verifies</em> a need directly; that is what its requirements are for.
+        </p>
         <h3>Requirements (EARS)</h3>
         <p>
           A Requirement is edited as a sentence. Pick the EARS pattern — <em>ubiquitous</em>, <em>event-driven</em> (<em>When …</em>), <em>state-driven</em> (<em>While …</em>), <em>unwanted behaviour</em> (<em>If …, then …</em>), <em>optional</em> (<em>Where …</em>) or <em>complex</em> — and click the highlighted slots to fill trigger, condition and action. Or just type the whole thing into the quick-entry box:
@@ -231,7 +238,7 @@
         </p>
         <h3>Wizards</h3>
         <p>
-          Creating an ADR, fitness function, requirement, scenario or mockup — dropped on the canvas or a table, or added from a wiki page — opens a <strong>wizard</strong> that walks through its fields one step at a time, with a prompt for each, and ends with the relations that give it meaning (which elements an ADR <em>constrains</em>, which earlier ADR it <em>supersedes</em>…). The element is only created when you press <strong>Create</strong> (<kbd>⌘/Ctrl</kbd>+<kbd>Enter</kbd> from any step); <kbd>Esc</kbd> discards it. <strong>Fill in with wizard…</strong> in the properties panel reopens it for an existing element, and <em>Wizard on create</em> in the app menu turns the automatic wizard off. Wizards are part of the metamodel (<code>wizard</code> on a node type), so custom metamodels can define their own.
+          Creating an ADR, fitness function, need, requirement, scenario or mockup — dropped on the canvas or a table, or added from a wiki page — opens a <strong>wizard</strong> that walks through its fields one step at a time, with a prompt for each, and ends with the relations that give it meaning (which elements an ADR <em>constrains</em>, which earlier ADR it <em>supersedes</em>…). The element is only created when you press <strong>Create</strong> (<kbd>⌘/Ctrl</kbd>+<kbd>Enter</kbd> from any step); <kbd>Esc</kbd> discards it. <strong>Fill in with wizard…</strong> in the properties panel reopens it for an existing element, and <em>Wizard on create</em> in the app menu turns the automatic wizard off. Wizards are part of the metamodel (<code>wizard</code> on a node type), so custom metamodels can define their own.
         </p>
       </section>
 
@@ -350,7 +357,7 @@
           <figcaption>The <em>Governance</em> table. Each tab has the columns that matter for that kind of element.</figcaption>
         </figure>
         <p>
-          <strong>All nodes</strong> shows the containment tree as indented rows; <strong>ADRs</strong>, <strong>Fitness Functions</strong> and <strong>Requirements</strong> expose their governance fields (status, priority, EARS pattern and slots…) as columns; <strong>Relations</strong> lists every edge with source, target, label, technology and type. Click a cell to edit it in place — enums become dropdowns, and columns that depend on another value (an EARS trigger only exists for event-driven requirements) grey out when they do not apply. Drop a palette item onto a row to add a child of that element.
+          <strong>All nodes</strong> shows the containment tree as indented rows; <strong>ADRs</strong>, <strong>Fitness Functions</strong>, <strong>Needs</strong> and <strong>Requirements</strong> expose their governance fields (status, kind, EARS pattern and slots…) as columns; <strong>Relations</strong> lists every edge with source, target, label, technology and type. Click a cell to edit it in place — enums become dropdowns, and columns that depend on another value (an EARS trigger only exists for event-driven requirements) grey out when they do not apply. Drop a palette item onto a row to add a child of that element.
         </p>
       </section>
 
@@ -374,7 +381,7 @@
           <figcaption>The <em>Architecture Wiki</em> view. Every element is a page; every field on it is editable inline.</figcaption>
         </figure>
         <p>
-          The overview page lists the view's elements as a table of contents; each element page shows its description as prose, short facts (status, technology, priority…) in an infobox, long fields as sections, children, and incoming and outgoing relations as links. Requirements show their EARS sentence with editable slots. You can add child elements and relations directly from a page. The page you are on is saved with the view, so a deep link lands on it.
+          The overview page lists the view's elements as a table of contents; each element page shows its description as prose, short facts (status, technology, priority…) in an infobox, long fields as sections, children, and incoming and outgoing relations as links. Requirements show their EARS sentence with editable slots; a need's page lists the requirements derived from it. You can add child elements and relations directly from a page. The page you are on is saved with the view, so a deep link lands on it.
         </p>
       </section>
 
@@ -494,7 +501,7 @@
         <ul>
           <li><strong>Answer questions</strong> — “what depends on the Event Bus?”, “which containers have no owner?”. It queries the model with a small query language (<code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>STATS MODEL</code>) rather than guessing.</li>
           <li><strong>Change the model</strong> — “add a Redis cache between the API gateway and the accounts service”. The answer is a <em>patch</em> (add / update / delete nodes and relations, add views) that is validated against the metamodel, applied atomically and undoable like any other edit.</li>
-          <li><strong>Draft governance</strong> — turn a paragraph into EARS requirements or an ADR with the right fields filled.</li>
+          <li><strong>Draft governance</strong> — turn a paragraph or a <a href="#properties">need</a> into EARS requirements (linked back to the need) or an ADR with the right fields filled.</li>
         </ul>
       </section>
 
@@ -504,6 +511,7 @@
           <strong>Radical Forge</strong> (<em>Start with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
         </p>
         <ul>
+          <li><strong>The description is kept as a <a href="#properties">Need</a>.</strong> When you press <em>Start</em>, the text is saved in the model as a need (named after its first line), and the Requirements stage links every requirement it writes to it with <em>Derives from</em>. If the model already has needs, <em>Start from</em> on the Description step loads one instead, and your edits are saved back to it. Going back and starting again updates the same need instead of adding a second one.</li>
           <li><strong>Mockups</strong> come before C4: the stage creates the user-facing screens with <em>Illustrates</em> and <em>Navigates to</em> links, then <em>Generate wireframes</em> draws a wireframe for every mockup that has none. The C4 stage then designs the front-ends the screens need and links each mockup to its container with <em>Presented by</em>.</li>
           <li><strong>Finish here</strong> ends the run at any stage and keeps what has been generated. The final step summarises every stage (what was added, what was skipped) and exports the scenarios as <code>.feature</code> files; <em>← Back</em> resumes where you stopped.</li>
         </ul>

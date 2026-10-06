@@ -857,6 +857,65 @@ export const MockupNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
 
 MockupNode.displayName = 'MockupNode'
 
+// ─── Need Node ────────────────────────────────────────────────────────────────
+//
+// Compact pill: slate header strip with the kind, label, then the start of
+// the raw free text (its description) — the input requirements derive from.
+
+const NEED_COLOR = '#475569'
+
+export const NeedNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useDiagramStore(s => s.c4Nodes[data.c4id])
+  const kind = (node as unknown as Record<string, string> | undefined)?.kind ?? 'brief'
+  const text = (node?.description ?? '').trim()
+
+  return (
+    <div
+      className="c4-node"
+      style={{
+        position: 'relative',
+        width: data.width,
+        height: data.height,
+        background: NEED_COLOR,
+        border: `2px solid ${selected ? 'var(--accent)' : 'rgba(0,0,0,0.25)'}`,
+        borderRadius: 6,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+
+      {/* Row 1: type + kind */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
+        <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' }}>
+          NEED
+        </span>
+        <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)' }}>
+          {kind}
+        </span>
+      </div>
+
+      {/* Row 2: label */}
+      <div style={{ padding: '2px 7px 0', overflow: 'hidden' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+          {data.label}
+        </span>
+      </div>
+
+      {/* Row 3: start of the free text */}
+      <div style={{ flex: 1, padding: '2px 7px 4px', overflow: 'hidden' }}>
+        <span style={{ fontSize: 9, color: text ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', fontStyle: text ? 'normal' : 'italic', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {text || 'No text yet'}
+        </span>
+      </div>
+    </div>
+  )
+})
+
+NeedNode.displayName = 'NeedNode'
+
 // ─── Requirement Node (EARS) ──────────────────────────────────────────────────
 //
 // Compact pill: teal/cyan header strip with the EARS sentence below.

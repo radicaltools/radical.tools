@@ -1473,6 +1473,9 @@ body {
   font-size: 16px;
   line-height: 1.6;
   color: var(--text-secondary);
+  /* Keep paragraphs and line breaks, as .wiki-prose does — a Need's text is
+     often several paragraphs or a list. */
+  white-space: pre-wrap;
 }
 
 /* EARS sentence blockquote */

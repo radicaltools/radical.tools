@@ -128,7 +128,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
   }
 
   // Land on System Context rather than the default canvas, which holds all
-  // 62 elements at once and reads as noise on a first look. The doc loads
+  // 65 elements at once and reads as noise on a first look. The doc loads
   // asynchronously, so wait for the view to exist, then hand it to route
   // sync (App starts it once the splash is dismissed) through the hash.
   function handleSample(): void {
@@ -314,7 +314,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
                     <span key={t} className="welcome-sample-tag">{t}</span>
                   ))}
                 </span>
-                <span className="welcome-sample-stats">62 elements · 15 views · 12 slides</span>
+                <span className="welcome-sample-stats">65 elements · 15 views · 12 slides</span>
                 <span className="welcome-btn welcome-btn-primary welcome-sample-cta">
                   Explore the sample
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">

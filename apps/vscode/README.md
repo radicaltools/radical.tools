@@ -8,7 +8,7 @@ Model your software architecture with nodes, relations, and multiple synchronize
 ## Features
 
 - **Visual drag-and-drop editor** for `.radical` files — opens automatically on double-click
-- **Multiple metamodels** — start from C4, C4 + DDD Domains, or C4 + DDD + Governance (ADRs, Fitness Functions, Requirements)
+- **Multiple metamodels** — start from C4, C4 + DDD Domains, or C4 + DDD + Governance (ADRs, Fitness Functions, Needs, Requirements)
 - **Multiple views per model** — Canvas, Treemap, Matrix, Sequence, Table, Wiki — all driven from one source of truth
 - **JSON Schema validation** — IntelliSense, autocomplete and error highlighting for `.c4.json` files
 - **Live VS Code theme sync** — diagram UI automatically follows your editor's light / dark theme
@@ -76,7 +76,7 @@ Three built-in presets ship with the extension:
 |--------|---------------------|
 | **C4** | Person, System, Container, Component, Database, Web App, Queue, Group |
 | **C4 + DDD** | All C4 types + recursive **Domain** container |
-| **C4 + DDD + Governance** | All above + **ADR**, **Fitness Function**, **Requirement**, **Blueprint** |
+| **C4 + DDD + Governance** | All above + **ADR**, **Fitness Function**, **Need**, **Requirement**, **Scenario**, **Blueprint**, **Mockup** |
 
 New files are initialised with the **C4 + DDD + Governance** preset.  
 The metamodel can be customised per-document via the Radical menu → Schema → Metamodel editor.

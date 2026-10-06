@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildForgeStagePrompt, buildPriorStagesBlock, FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE } from '../src/renderer/src/ai/forgePrompts'
+import { buildForgeStagePrompt, buildPriorStagesBlock, needLabelFromDescription, FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE } from '../src/renderer/src/ai/forgePrompts'
 
 describe('buildPriorStagesBlock', () => {
   it('returns "" when there are no prior stages with a summary yet', () => {
@@ -58,5 +58,40 @@ describe('buildForgeStagePrompt — mockups stage', () => {
     const prompt = buildForgeStagePrompt('c4', 'A web shop.')
     expect(prompt).toContain('mockups already in the model')
     expect(prompt).toContain('`presented-by` relation FROM the mockup TO that element')
+  })
+})
+
+describe('buildForgeStagePrompt — need', () => {
+  const need = { id: 'n-42', label: 'Checkout brief' }
+
+  it('has the requirements stage link top-level requirements to the need with derives', () => {
+    const prompt = buildForgeStagePrompt('requirements', 'A web shop.', undefined, undefined, '', need)
+    expect(prompt).toContain('`need` node "Checkout brief"')
+    expect(prompt).toContain('(id n-42)')
+    expect(prompt).toContain('`derives` relation FROM the requirement TO that need')
+    expect(prompt).toContain('Do not edit the need node itself.')
+  })
+
+  it('says nothing about a need without one, or in other stages', () => {
+    expect(buildForgeStagePrompt('requirements', 'A web shop.')).not.toContain('`need` node')
+    expect(buildForgeStagePrompt('scenarios', 'A web shop.', undefined, undefined, '', need)).not.toContain('n-42')
+  })
+})
+
+describe('needLabelFromDescription', () => {
+  it('uses the first non-empty line without Markdown markers', () => {
+    expect(needLabelFromDescription('\n\n# Checkout brief\nmore')).toBe('Checkout brief')
+    expect(needLabelFromDescription('- Customers pay by card.\n- more')).toBe('Customers pay by card')
+  })
+
+  it('cuts long lines at a word boundary', () => {
+    const label = needLabelFromDescription('A marketplace where independent sellers list handmade goods and buyers pay with cards')
+    expect(label.endsWith('…')).toBe(true)
+    expect(label.length).toBeLessThanOrEqual(61)
+    expect(label).toBe('A marketplace where independent sellers list handmade goods…')
+  })
+
+  it('falls back when there is no text', () => {
+    expect(needLabelFromDescription('   \n ')).toBe('Forge brief')
   })
 })
