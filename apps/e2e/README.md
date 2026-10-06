@@ -63,8 +63,18 @@ animations and the live layout render the same frame on every run.
 **Updating baselines** after an intended visual change: add the
 `update-screenshots` label to the PR. The `E2E — update screenshots` workflow
 regenerates the baselines that changed, commits them to the branch and removes
-the label. Check the images in the PR diff, then re-run the CI checks (a bot
-push does not start them).
+the label. Check the images in the PR diff, then push a commit to start the CI
+checks (`git commit --allow-empty -m "ci: re-run checks" && git push`): a bot
+push does not start them, and re-running an earlier run tests its old commit
+with the old baselines.
+
+## CI
+
+`ci.yml` runs type-check, unit tests and this suite once per pull request into
+`main`, on the PR's merge commit. Branches without a PR are not checked
+automatically; start CI by hand from the Actions tab (*Run workflow*) if you
+need it. A new push to a PR cancels the checks still running for the previous
+commit. On `main`, `deploy.yml` runs this suite before every deploy.
 
 ## Known issues
 
