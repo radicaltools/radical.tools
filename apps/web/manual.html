@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Docs — Radical.Tools</title>
-  <meta name="description" content="Radical.Tools documentation: modelling with C4, DDD and governance, UI mockups and screen flows, six view kinds, milestones, presentations, Markdown-folder persistence, the metamodel editor, the Concept Hub and the AI assistant." />
+  <meta name="description" content="Radical.Tools documentation: modelling with C4, DDD and governance, UI mockups and screen flows, six view kinds, milestones, presentations, Markdown-folder persistence, the metamodel editor, the Concept Hub, the AI assistant and the MCP server for coding agents." />
   <!-- Before any stylesheet: sets data-theme for the first paint and is not blocked by a slow font CDN. -->
   <script src="theme.js?v=__BUILD__"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -80,6 +80,7 @@
             <li><a href="#hub">Concept Hub</a></li>
             <li><a href="#ai">AI assistant</a></li>
             <li><a href="#forge">Radical Forge</a></li>
+            <li><a href="#mcp">MCP server</a></li>
           </ul>
         </div>
         <div class="toc-group">
@@ -103,7 +104,7 @@
         <p class="doc-hero-sub">
           One model of your architecture; every diagram, table and wiki page derived from it.
           This guide walks through modelling, the six view kinds, milestones, presentations,
-          files, the metamodel editor, the Concept Hub and the AI assistant.
+          files, the metamodel editor, the Concept Hub, the AI assistant and the MCP server that lets coding agents edit the model.
         </p>
         <div class="doc-hero-actions">
           <a class="cta" href="https://studio.radical.tools" target="_blank" rel="noopener">Open Studio</a>
@@ -503,6 +504,7 @@
           <li><strong>Change the model</strong> — “add a Redis cache between the API gateway and the accounts service”. The answer is a <em>patch</em> (add / update / delete nodes and relations, add views) that is validated against the metamodel, applied atomically and undoable like any other edit.</li>
           <li><strong>Draft governance</strong> — turn a paragraph or a <a href="#properties">need</a> into EARS requirements (linked back to the need) or an ADR with the right fields filled.</li>
         </ul>
+        <p>The same tools are available outside Studio: the <a href="#mcp">MCP server</a> hands them to Claude Code, Claude Desktop, Codex or any other MCP client.</p>
       </section>
 
       <section class="doc-section" id="forge">
@@ -515,6 +517,60 @@
           <li><strong>Mockups</strong> come before C4: the stage creates the user-facing screens with <em>Illustrates</em> and <em>Navigates to</em> links, then <em>Generate wireframes</em> draws a wireframe for every mockup that has none. The C4 stage then designs the front-ends the screens need and links each mockup to its container with <em>Presented by</em>.</li>
           <li><strong>Finish here</strong> ends the run at any stage and keeps what has been generated. The final step summarises every stage (what was added, what was skipped) and exports the scenarios as <code>.feature</code> files; <em>← Back</em> resumes where you stopped.</li>
         </ul>
+      </section>
+
+      <section class="doc-section" id="mcp">
+        <h2>MCP server</h2>
+        <p>
+          The <strong>MCP server</strong> lets a coding agent work on your model directly: <strong>Claude Code</strong>, <strong>Claude Desktop</strong>, <strong>Codex</strong> or any other client that speaks the <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">Model Context Protocol</a>. It runs locally over stdio, is bound to one <a href="#formats">Markdown folder</a>, and offers the same tools as the <a href="#ai">AI assistant</a> in Studio, so the agent can read the architecture, ADRs and requirements before it writes code and update the model when the design changes. Nothing leaves your machine except what your agent sends to its own provider.
+        </p>
+        <h3>Set it up</h3>
+        <p>Build it once with Node.js 20 or newer, from a clone of the repository (see <a href="#vscode">local install</a>):</p>
+<pre class="code"><code>npm install
+npm run build -w @radical/mcp
+node apps/mcp/dist/index.js --folder /absolute/path/to/my-model   <span class="cm"># waits for MCP messages on stdin</span></code></pre>
+        <p>Then register that command with your client, using absolute paths:</p>
+<pre class="code"><code><span class="cm"># Claude Code</span>
+claude mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.js --folder /path/to/my-model
+
+<span class="cm"># Codex</span>
+codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.js --folder /path/to/my-model</code></pre>
+        <p>For <strong>Claude Desktop</strong>, add it under <code>mcpServers</code> in <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (on Windows <code>%APPDATA%\Claude\claude_desktop_config.json</code>) and restart the app. Give the full path to <code>node</code>, because the app does not see your shell's <code>PATH</code>:</p>
+<pre class="code"><code>{
+  "mcpServers": {
+    "radical-folder": {
+      "command": "/usr/local/bin/node",
+      "args": ["/path/to/radical.tools/apps/mcp/dist/index.js", "--folder", "/path/to/my-model"]
+    }
+  }
+}</code></pre>
+        <h3>Working alongside Studio</h3>
+        <p>
+          Open the <em>same</em> folder in Studio: in the desktop app, or in a Chromium browser through <em>Manage models…</em> (the browser asks for folder access; a model kept only in browser storage cannot be reached by the server). Studio reloads the folder when the agent changes it, so new elements appear on the open canvas. Then ask the agent to call <code>get_model_summary</code> first; the server's instructions tell it to as well.
+        </p>
+        <div class="doc-tip">
+          <strong>Tip:</strong> while the agent writes, keep Studio in <a href="#presenting">Viewer</a>. A change spans several files and the two processes share no lock: the server refuses to write over a file that changed since it read it, but editing the same folder from both sides at once can still race.
+        </div>
+        <h3>Tools</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Group</th><th>Tools</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Read</strong></td><td><code>get_model_summary</code> — counts, views, sequences, presentations and the metamodel rules (property keys and enum options, allowed parents, cardinality, allowed relation pairs) · <code>search_model</code> — the assistant's query language (<code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>LIST SEQUENCES</code>…)</td></tr>
+              <tr><td><strong>Elements &amp; relations</strong></td><td><code>add_node</code>, <code>update_node</code>, <code>delete_node</code>, <code>move_node</code> (change the parent) · <code>add_relation</code>, <code>update_relation</code>, <code>delete_relation</code></td></tr>
+              <tr><td><strong>Views</strong></td><td><code>create_view</code>, <code>update_view</code>, <code>set_view_nodes</code>, <code>delete_view</code> · <code>smart_layout</code> for All elements or one view</td></tr>
+              <tr><td><strong>Sequences &amp; slides</strong></td><td><code>create_sequence</code>, <code>update_sequence</code>, <code>delete_sequence</code> · <code>create_presentation</code>, <code>update_presentation</code>, <code>delete_presentation</code></td></tr>
+              <tr><td><strong>Metamodel</strong></td><td><code>upsert_node_type</code>, <code>delete_node_type</code>, <code>upsert_relation_type</code>, <code>delete_relation_type</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li><strong>Validated like Studio.</strong> Writes go through the same schemas and metamodel rules as the editor; an invalid parent, type or relation pair is refused with a message the agent can act on. A tool reports success only after the files are written.</li>
+          <li><strong>Placement.</strong> New elements land inside their parent and parents grow to fit; call <code>smart_layout</code> to tidy up. New elements show in <em>All elements</em> until a view lists them (<code>create_view</code>, <code>set_view_nodes</code>).</li>
+          <li><strong>Metamodel edits.</strong> Changing a built-in metamodel saves it as a <code>…-custom</code> copy, like the <a href="#metamodel">Metamodel editor</a>. The server then re-announces the element and relation tools with the new types.</li>
+          <li><strong>Plain files.</strong> Unrelated files and the text of <code>radical.md</code> are left as they were, so the agent's changes show up as small Git diffs.</li>
+        </ul>
+        <p>Single <code>.radical</code> files, milestones, canvas-only actions (switching or focusing the view in Studio) and remote HTTP connections are not supported.</p>
       </section>
 
       <!-- ═══════════════ REFERENCE ═══════════════ -->
@@ -538,7 +594,7 @@
 ├─ metamodel.json · hubTemplates.json
 └─ _layout.json               <span class="cm"># positions &amp; camera — the only noisy file</span></code></pre>
         <p>
-          Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the element's properties, sorted) and the description as body. Hierarchy is the directory tree. Output is deterministic — sorted keys, stable file names — so Git diffs show what changed and nothing else. Edit the files by hand; the app picks them up.
+          Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the element's properties, sorted) and the description as body. Hierarchy is the directory tree. Output is deterministic — sorted keys, stable file names — so Git diffs show what changed and nothing else. Edit the files by hand, or let an agent edit them through the <a href="#mcp">MCP server</a>; the app picks them up.
         </p>
       </section>
 
@@ -593,7 +649,8 @@ npm install
 npm run dev              <span class="cm"># Electron, hot reload</span>
 npm run build &amp;&amp; npm start
 npm run dev:web          <span class="cm"># browser build of Studio</span>
-npm run dev:hub          <span class="cm"># Architecture Hub</span></code></pre>
+npm run dev:hub          <span class="cm"># Architecture Hub</span>
+npm run build -w @radical/mcp   <span class="cm"># MCP server for coding agents</span></code></pre>
         <p>The desktop app adds native file dialogs, Markdown folders without browser permissions and <code>--file</code> watching. Everything else is identical to the browser build.</p>
       </section>
 
