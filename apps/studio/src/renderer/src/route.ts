@@ -184,13 +184,15 @@ function applyViewModeFocus(route: Route): void {
         useDiagramStore.getState().setWikiFocus(targetView, route.focus)
       }
     }
-    // Milestone (snapshot). Apply-only: we restore the requested milestone but
+    // Milestone (snapshot). Apply-only: we view the requested milestone but
     // never auto-discard on back-nav (discarding can drop unsaved edits). The
     // forward direction — exiting a milestone in-app — still updates the URL.
+    // View it with selectMilestone, which parks the live model in liveBackup
+    // so autosave keeps saving it; restoreSnapshot would replace it.
     if (route.snap) {
       const s = useDiagramStore.getState()
       if (s.activeSnapshotId !== route.snap && s.snapshots.some((sn) => sn.id === route.snap)) {
-        s.restoreSnapshot(route.snap)
+        s.selectMilestone(route.snap)
       }
     }
   })

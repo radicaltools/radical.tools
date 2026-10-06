@@ -53,13 +53,8 @@ export function createStoreFacade(): DiagramFacade {
     renameView: (id: string, name: string) => useDiagramStore.getState().renameView(id, name),
     setViewSequence: (id: string, sequenceId: string | null) =>
       useDiagramStore.getState().setViewSequence(id, sequenceId),
-    setViewHiddenRelations: (id: string, relationIds: string[]) => {
-      const s = useDiagramStore.getState()
-      const hidden = new Set(s.views[id]?.hiddenRelationIds ?? [])
-      const wanted = new Set(relationIds)
-      for (const rid of hidden) if (!wanted.has(rid)) s.unhideRelationInView(id, rid)
-      for (const rid of wanted) if (!hidden.has(rid)) s.hideRelationFromView(id, rid)
-    },
+    setViewHiddenRelations: (id: string, relationIds: string[]) =>
+      useDiagramStore.getState().setViewHiddenRelations(id, relationIds),
     // ── sequences ──
     getSequences: () => useDiagramStore.getState().sequences,
     addSequence: (name: string) => useDiagramStore.getState().addSequence(name),
@@ -88,18 +83,6 @@ export function createStoreFacade(): DiagramFacade {
       return { ok: true, text: `Ran Smart Layout on ${name}.` }
     },
     // ── diagram-level ──
-    clearDiagram: () => {
-      const s = useDiagramStore.getState()
-      s.loadDiagram({
-        nodes: [],
-        relations: [],
-        views: [],
-        defaultPositions: {},
-        defaultViewport: null,
-        snapshots: [],
-        presentations: [],
-        metamodel: s.metamodel,
-      })
-    },
+    clearDiagram: () => useDiagramStore.getState().clearModel(),
   }
 }

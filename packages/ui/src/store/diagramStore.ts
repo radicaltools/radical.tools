@@ -110,6 +110,8 @@ interface HistoryEntry {
   c4Nodes: Record<string, C4Node>
   c4Relations: Record<string, C4Relation>
   views: Record<string, DiagramView>
+  /** Only on entries that also change sequences (clearModel). */
+  sequences?: Record<string, DiagramSequence>
 }
 
 const MAX_HISTORY = 100
@@ -149,6 +151,18 @@ function applyPositions(nodes: Record<string, C4Node>, positions: Record<string,
     const n = nodes[id]
     if (n) { n.x = pos.x; n.y = pos.y; n.width = pos.width; n.height = pos.height }
   }
+}
+
+/** The model a slide shows: its linked milestone when it has one (linked by
+ *  hand, so it wins), else the copy captured when the slide was added. A slide
+ *  with neither shows the live model. */
+function slideModel(
+  slide: PresentationSlide,
+  snapshots: DiagramSnapshot[],
+): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } | undefined {
+  const milestone = slide.snapshotId ? snapshots.find((s) => s.id === slide.snapshotId) : undefined
+  if (milestone) return { nodes: milestone.nodes as Record<string, C4Node>, relations: milestone.relations as Record<string, C4Relation> }
+  return (slide as { modelSnapshot?: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } }).modelSnapshot
 }
 
 /** Capture all node positions + collapsed state for a presentation slide */
@@ -964,13 +978,16 @@ interface DiagramStore {
   renameView: (id: string, name: string) => void
   setActiveView: (id: string | null) => void
   addNodeToView: (viewId: string, nodeId: string) => void
-  removeNodeFromView: (viewId: string, nodeId: string) => void
+  /** Hide one node or several (one undo step) and their descendants from a view. */
+  removeNodeFromView: (viewId: string, nodeIds: string | string[]) => void
   /** Replace the entire visible-nodes set of a view. Unknown ids are ignored. */
   setViewNodes: (viewId: string, nodeIds: string[]) => void
   /** Hide a specific relation from the view, even if both endpoints are visible. */
   hideRelationFromView: (viewId: string, relationId: string) => void
   /** Reverse `hideRelationFromView`. */
   unhideRelationInView: (viewId: string, relationId: string) => void
+  /** Replace the view's hidden relations (one undo step). Unknown ids are ignored. */
+  setViewHiddenRelations: (viewId: string, relationIds: string[]) => void
   /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', and 'wiki'. */
   setViewKind: (viewId: string, kind: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki') => void
   /** Persist treemap drill-down focus (null = top "All"). */
@@ -1039,6 +1056,9 @@ interface DiagramStore {
   loadDiagram: (data: DiagramData) => void
   saveDiagram: () => DiagramData
   resetDiagram: () => void
+  /** Erase nodes, relations, views and sequences as one undo step; milestones,
+   *  presentations and the metamodel stay (the AI's reset_diagram). */
+  clearModel: () => void
 
   // ── actions: undo / redo ──
   undo: () => void
@@ -1844,6 +1864,12 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       updateRelation(id, updates) {
+        // Moving an end obeys the same metamodel rules as adding a relation.
+        const refused = model.checkPatchRelation(get(), id, updates)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
         get()._pushUndo()
         get()._markMilestoneEdit()
         set((state) => { model.patchRelation(state, id, updates) })
@@ -2306,21 +2332,23 @@ export const useDiagramStore = create<DiagramStore>()(
         _liveLayout?.reset()
       },
       addNodeToView(viewId, nodeId) {
-        set((state) => {
-          const view = state.views[viewId]
-          if (view && !view.nodeIds.includes(nodeId)) view.nodeIds.push(nodeId)
-        })
+        const view = get().views[viewId]
+        if (!view || view.nodeIds.includes(nodeId)) return
+        get()._pushUndo()
+        set((state) => { state.views[viewId].nodeIds.push(nodeId) })
         get()._sync()
       },
-      removeNodeFromView(viewId, nodeId) {
+      removeNodeFromView(viewId, nodeIds) {
+        const ids = typeof nodeIds === 'string' ? [nodeIds] : nodeIds
+        if (!get().views[viewId] || ids.length === 0) return
+        get()._pushUndo()
         set((state) => {
           const view = state.views[viewId]
-          if (!view) return
-          // Remove the node AND all its descendants as one unit.
+          // Remove the nodes AND all their descendants as one unit.
           // Without cascading, children remaining in nodeIds cause
           // computeViewNodeSet to re-include the parent (ancestor walk),
           // so the parent would keep appearing even after its eye was toggled off.
-          const toRemove = new Set([nodeId, ...getDescendants(nodeId, state.c4Nodes)])
+          const toRemove = new Set(ids.flatMap((id) => [id, ...getDescendants(id, state.c4Nodes)]))
           if (view.nodeIds.length === 0) {
             // Empty nodeIds means "show all". First removal transitions to
             // "show all except this subtree" by explicitly listing every other node.
@@ -2345,22 +2373,29 @@ export const useDiagramStore = create<DiagramStore>()(
         _liveLayout?.invalidate()
       },
       hideRelationFromView(viewId, relationId) {
+        const view = get().views[viewId]
+        if (!view || view.hiddenRelationIds?.includes(relationId)) return
+        get()._pushUndo()
         set((state) => {
-          const view = state.views[viewId]
-          if (!view) return
-          if (!view.hiddenRelationIds) view.hiddenRelationIds = []
-          if (!view.hiddenRelationIds.includes(relationId)) {
-            view.hiddenRelationIds.push(relationId)
-          }
+          const v = state.views[viewId]
+          v.hiddenRelationIds = [...(v.hiddenRelationIds ?? []), relationId]
         })
         get()._sync()
       },
       unhideRelationInView(viewId, relationId) {
+        const view = get().views[viewId]
+        if (!view?.hiddenRelationIds?.includes(relationId)) return
+        get()._pushUndo()
         set((state) => {
-          const view = state.views[viewId]
-          if (!view || !view.hiddenRelationIds) return
-          view.hiddenRelationIds = view.hiddenRelationIds.filter((id) => id !== relationId)
+          const v = state.views[viewId]
+          v.hiddenRelationIds = (v.hiddenRelationIds ?? []).filter((id) => id !== relationId)
         })
+        get()._sync()
+      },
+      setViewHiddenRelations(viewId, relationIds) {
+        if (!get().views[viewId]) return
+        get()._pushUndo()
+        set((state) => { model.setViewHiddenRelations(state, viewId, relationIds) })
         get()._sync()
       },
 
@@ -2817,6 +2852,8 @@ export const useDiagramStore = create<DiagramStore>()(
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const positions = await applyTreeLayout(input.nodes, input.relations)
+          // One undo step for the whole layout. Viewer reverts positions on exit anyway.
+          if (get().appMode === 'designer') get()._pushUndo()
           get()._markMilestoneEdit()
           set((state) => { applyLayoutPositions(state.c4Nodes, positions, input) })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
@@ -2888,6 +2925,8 @@ export const useDiagramStore = create<DiagramStore>()(
             get().pushNotification('Smart layout: the current layout already scores best — nothing changed.', 'info')
             return
           }
+          // One undo step for the whole layout. Viewer reverts positions on exit anyway.
+          if (get().appMode === 'designer') get()._pushUndo()
           get()._markMilestoneEdit()
           set((state) => { applyLayoutPositions(state.c4Nodes, result.winner.positions, input) })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
@@ -3109,13 +3148,35 @@ export const useDiagramStore = create<DiagramStore>()(
         if (_undoStack.length === 0) return
         const entry = _undoStack.pop()!
         // push current state to redo
-        _redoStack.push(_captureState(get()))
+        _redoStack.push({ ..._captureState(get()), ...(entry.sequences ? { sequences: get().sequences } : {}) })
         set((state) => {
           state.c4Nodes = entry.c4Nodes as any
           state.c4Relations = entry.c4Relations as any
           state.views = entry.views as any
+          if (entry.sequences) state.sequences = entry.sequences as any
           state.canUndo = _undoStack.length > 0
           state.canRedo = true
+        })
+        get()._sync()
+        _liveLayout?.reset()
+      },
+
+      clearModel() {
+        _undoStack.push({ ..._captureState(get()), sequences: get().sequences })
+        if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
+        _redoStack.length = 0
+        get()._markMilestoneEdit()
+        set((state) => {
+          state.c4Nodes = {} as any
+          state.c4Relations = {} as any
+          state.views = {} as any
+          state.sequences = {} as any
+          state.activeViewId = null
+          state.selectedNodeId = null
+          state.selectedNodeIds = []
+          state.selectedEdgeId = null
+          state.canUndo = true
+          state.canRedo = false
         })
         get()._sync()
         _liveLayout?.reset()
@@ -3125,11 +3186,12 @@ export const useDiagramStore = create<DiagramStore>()(
         if (_redoStack.length === 0) return
         const entry = _redoStack.pop()!
         // push current state to undo
-        _undoStack.push(_captureState(get()))
+        _undoStack.push({ ..._captureState(get()), ...(entry.sequences ? { sequences: get().sequences } : {}) })
         set((state) => {
           state.c4Nodes = entry.c4Nodes as any
           state.c4Relations = entry.c4Relations as any
           state.views = entry.views as any
+          if (entry.sequences) state.sequences = entry.sequences as any
           state.canUndo = true
           state.canRedo = _redoStack.length > 0
         })
@@ -3869,25 +3931,12 @@ export const useDiagramStore = create<DiagramStore>()(
         // Disable physics while presenting
         get().stopLiveLayout()
 
-        // Restore inline model snapshot first (preferred — captured at
-        // slide-creation time so it always reflects what was on screen).
-        // Fall back to the linked milestone snapshot for legacy slides.
-        const inline = (slide as any).modelSnapshot as
-          | { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
-          | undefined
-        if (inline) {
+        const shown = slideModel(slide, get().snapshots)
+        if (shown) {
           set((state) => {
-            state.c4Nodes = inline.nodes as any
-            state.c4Relations = inline.relations as any
+            state.c4Nodes = shown.nodes as any
+            state.c4Relations = shown.relations as any
           })
-        } else if (slide.snapshotId) {
-          const snap = get().snapshots.find(s => s.id === slide.snapshotId)
-          if (snap) {
-            set((state) => {
-              state.c4Nodes = snap.nodes as any
-              state.c4Relations = snap.relations as any
-            })
-          }
         } else {
           // A slide without its own model shows the live one — undo whatever
           // a previous milestone slide swapped in.
@@ -3989,23 +4038,12 @@ export const useDiagramStore = create<DiagramStore>()(
         const slide = presentationSlides[i]
         set((state) => { state.presentationSlideIndex = i })
 
-        // Restore inline model snapshot (preferred) or linked milestone snapshot.
-        const inline = (slide as any).modelSnapshot as
-          | { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
-          | undefined
-        if (inline) {
+        const shown = slideModel(slide, get().snapshots)
+        if (shown) {
           set((state) => {
-            state.c4Nodes = inline.nodes as any
-            state.c4Relations = inline.relations as any
+            state.c4Nodes = shown.nodes as any
+            state.c4Relations = shown.relations as any
           })
-        } else if (slide.snapshotId) {
-          const snap = get().snapshots.find(s => s.id === slide.snapshotId)
-          if (snap) {
-            set((state) => {
-              state.c4Nodes = snap.nodes as any
-              state.c4Relations = snap.relations as any
-            })
-          }
         }
 
         // Apply saved canvas state (positions + collapsed).

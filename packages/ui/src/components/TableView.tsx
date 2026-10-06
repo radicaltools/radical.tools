@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType } from '@radical/common/c4'
-import { NODE_COLORS, NODE_FG, TYPE_LABELS, NODE_SIZES } from '@radical/common/c4'
+import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
 import type { Metamodel, PropertyDef } from '@radical/common/metamodel'
 import { isParentAllowed, composeEarsSentence, resolveEarsSubject } from '@radical/common/metamodel'
 
@@ -214,13 +214,20 @@ export function TableView(): React.ReactElement {
     [relations, visibleNodeIds],
   )
 
+  // The Relations tab leaves out relations hidden in this view; trees still
+  // follow every relation, since hiding one does not change the model.
+  const shownRelList = useMemo(() => {
+    const hidden = activeView?.hiddenRelationIds
+    return hidden?.length ? relList.filter(r => !hidden.includes(r.id)) : relList
+  }, [relList, activeView])
+
   // Sparse union: base relation columns + every extra property declared by a
-  // relation type that actually appears in `relList`, deduped by key (two
+  // relation type that actually appears in `shownRelList`, deduped by key (two
   // relation types sharing a property key share the same underlying field).
   const relCols = useMemo<ColDef[]>(() => {
     const seen = new Set(REL_BASE_COLS.map(c => c.key))
     const extra: ColDef[] = []
-    for (const r of relList) {
+    for (const r of shownRelList) {
       const def = metamodel.relationTypes[r.relationType ?? 'interacts']
       for (const p of def?.properties ?? []) {
         if (seen.has(p.key)) continue
@@ -229,7 +236,7 @@ export function TableView(): React.ReactElement {
       }
     }
     return [...REL_BASE_COLS, ...extra]
-  }, [relList, metamodel])
+  }, [shownRelList, metamodel])
 
   const treeRows = useMemo<TreeRow[]>(() =>
     tab === 'all' ? buildTreeRows(nodeList, n => n.parentId ?? null) : [],
@@ -270,7 +277,7 @@ export function TableView(): React.ReactElement {
     : ALL_NODES_COLS
 
   const rows: (C4Node | C4Relation)[] =
-    tab === 'relations' ? relList
+    tab === 'relations' ? shownRelList
     : tab === 'all'       ? treeRows.map(r => r.node)
     : treeRelationType    ? typeTreeRows.map(r => r.node)
     : (nodesByType.get(tab) ?? [])
@@ -318,8 +325,8 @@ export function TableView(): React.ReactElement {
     // ── Case 1: new node dragged from the palette/toolbar ──────────────────
     const typeStr = e.dataTransfer.getData('application/c4-type')
     if (typeStr) {
-      const size = NODE_SIZES[typeStr as C4ElementType] ?? { width: 200, height: 100 }
       const mm = useDiagramStore.getState().metamodel
+      const size = nodeTypeSize(typeStr, mm)
       const def = mm?.nodeTypes[typeStr]
       const label = def?.label ?? (typeStr[0].toUpperCase() + typeStr.slice(1))
       const allowedParents = def?.allowedParents ?? []
@@ -426,8 +433,9 @@ export function TableView(): React.ReactElement {
   }, [tab, selectNode, selectEdge])
 
   const handleBoolToggle = useCallback((rowId: string, colKey: string, current: string) => {
+    if (readOnly) return
     updateNode(rowId, { [colKey]: current !== 'true' } as Parameters<typeof updateNode>[1])
-  }, [updateNode])
+  }, [readOnly, updateNode])
 
   function renderCell(row: C4Node | C4Relation, col: ColDef, depth = 0): React.ReactNode {
     const isNodeRow = tab !== 'relations'
@@ -466,6 +474,7 @@ export function TableView(): React.ReactElement {
 
     if (col.type === 'boolean') {
       const checked = rawVal === 'true'
+      if (readOnly) return <span className={`tv-bool tv-bool-readonly ${checked ? 'tv-bool-on' : ''}`}>{checked ? '✓' : '—'}</span>
       return (
         <button
           className={`tv-bool ${checked ? 'tv-bool-on' : ''}`}
@@ -596,7 +605,7 @@ export function TableView(): React.ReactElement {
         {TABS.map(t => {
           const count =
             t.id === 'all'       ? nodeList.length
-            : t.id === 'relations' ? relList.length
+            : t.id === 'relations' ? shownRelList.length
             : nodesByType.get(t.id)?.length ?? 0
           return (
             <button

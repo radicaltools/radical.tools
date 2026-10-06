@@ -106,6 +106,7 @@ app.whenReady().then(() => {
       defaultPath: 'diagram.c4.json',
       filters: [
         { name: 'C4 Diagram', extensions: ['c4.json'] },
+        { name: 'Radical model', extensions: ['radical'] },
         { name: 'JSON', extensions: ['json'] },
       ],
     })
@@ -120,7 +121,7 @@ app.whenReady().then(() => {
     const result = await dialog.showOpenDialog(win!, {
       title: 'Open Diagram',
       filters: [
-        { name: 'C4 Diagram', extensions: ['c4.json', 'json'] },
+        { name: 'Radical model', extensions: ['radical', 'c4.json', 'json'] },
       ],
       properties: ['openFile'],
     })

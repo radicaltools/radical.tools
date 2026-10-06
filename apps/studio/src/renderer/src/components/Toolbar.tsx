@@ -579,6 +579,11 @@ export function Toolbar(): React.ReactElement {
       } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
         e.preventDefault()
         useDiagramStore.getState().redo()
+      } else if ((e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') && (window as any).__radicalZoomIn) {
+        // The canvas and the Flow view register zoom; elsewhere the browser zooms the page.
+        e.preventDefault()
+        if (e.key === '+' || e.key === '=') useDiagramStore.getState().zoomIn()
+        else useDiagramStore.getState().zoomOut()
       }
     }
     window.addEventListener('keydown', handler)

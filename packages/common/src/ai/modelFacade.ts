@@ -108,6 +108,8 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       model.insertRelation(state, newId(), rel)
     },
     updateRelation(id: string, updates: Partial<Omit<C4Relation, 'id'>>) {
+      const refused = model.checkPatchRelation(state, id, updates)
+      if (refused) { refuse(refused); return }
       model.patchRelation(state, id, updates)
     },
     removeRelation(id: string) {
@@ -184,7 +186,9 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       state.sequences = {}
       keepSequences = false
       state.activeViewId = null
-      carried = carried.metamodel ? { metamodel: carried.metamodel } : {}
+      // Milestones and presentations stay, as in Studio.
+      const { metamodel, snapshots, presentations } = carried
+      carried = { ...(metamodel ? { metamodel } : {}), ...(snapshots ? { snapshots } : {}), ...(presentations ? { presentations } : {}) }
     },
 
     toDiagramData,

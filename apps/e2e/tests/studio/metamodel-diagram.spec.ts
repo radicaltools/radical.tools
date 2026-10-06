@@ -131,3 +131,20 @@ test('the diagram stays drawn on a slow machine', async ({ page, studio }) => {
   await expect(diagram.locator('.react-flow__edge')).toHaveCount(96)
   await expect(diagram.getByTestId('rf__node-requirement')).toBeVisible()
 })
+
+test('"At the root" shows and sets whether a type may sit at the top level', async ({ page, studio }) => {
+  await studio.open('v-context', 'metamodel')
+  const editor = page.getByRole('dialog', { name: 'Metamodel editor' })
+  const system = editor.locator('.mm-card').filter({ has: page.locator('.mm-type-label', { hasText: /^Software System$/ }) })
+  await system.locator('.mm-card-header').click()
+  const atRoot = system.getByRole('checkbox', { name: 'At the root' })
+  // A Software System may sit inside a System, Domain or Group, and at the root.
+  await expect(atRoot).toBeChecked()
+  await atRoot.uncheck()
+  await expect(atRoot).not.toBeChecked()
+  await expect.poll(() => page.evaluate(() => {
+    const docs = JSON.parse(localStorage.getItem('radical-docs-index') ?? '{}')
+    const doc = JSON.parse(localStorage.getItem(`radical-doc:${docs.activeId}`) ?? '{}')
+    return doc.metamodel?.nodeTypes?.system?.allowedAtRoot
+  })).toBe(false)
+})

@@ -3387,6 +3387,8 @@ body {
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .tv-bool:hover { border-color: var(--accent, #3b82f6); }
+.tv-bool-readonly { cursor: default; }
+.tv-bool-readonly:not(.tv-bool-on):hover { border-color: var(--border-color); }
 .tv-bool-on {
   background: var(--accent, #3b82f6);
   border-color: var(--accent, #3b82f6);

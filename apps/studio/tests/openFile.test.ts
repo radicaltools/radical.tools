@@ -51,6 +51,15 @@ describe('documents.importFromFile — "Open file…" button', () => {
     expect((data!.nodes[0] as any).id).toBe('sys1')
   })
 
+  it('web fallback: opens a .radical file downloaded from the Hub', async () => {
+    const concept = { hub: { id: 'pattern-cqrs', name: 'CQRS' }, nodes: [{ id: 'cmd', type: 'container', label: 'Commands' }], relations: [] }
+    const meta = await documents.importFromFile(async () => ({ name: 'pattern-cqrs.radical', content: JSON.stringify(concept) }))
+    expect(meta!.name).toBe('pattern-cqrs')
+    const data = await documents.loadDocument(meta!.id)
+    expect(data!.nodes).toHaveLength(1)
+    expect((data as any).hub.id).toBe('pattern-cqrs')
+  })
+
   it('web fallback: returns null when the user cancels the picker', async () => {
     const before = documents.listDocuments().length
     const meta = await documents.importFromFile(async () => null)
