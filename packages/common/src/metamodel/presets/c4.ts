@@ -125,6 +125,7 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'person', to: 'system' },
     { from: 'person', to: 'container' },
     { from: 'person', to: 'webapp' },
+    { from: 'person', to: 'component' },
 
     // System-level dependencies
     { from: 'system', to: 'person' },
@@ -133,6 +134,7 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'system', to: 'database' },
     { from: 'system', to: 'webapp' },
     { from: 'system', to: 'queue' },
+    { from: 'system', to: 'component' },
 
     // Container-level calls
     { from: 'container', to: 'person' },
@@ -161,6 +163,7 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'component', to: 'webapp' },
     { from: 'component', to: 'database' },
     { from: 'component', to: 'queue' },
+    { from: 'component', to: 'system' },
   ]
 
   const relationTypes: Record<string, RelationTypeDef> = {

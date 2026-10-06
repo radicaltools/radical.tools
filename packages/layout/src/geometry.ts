@@ -36,7 +36,7 @@ export function isVisible(node: C4Node, allNodes: Record<string, C4Node>): boole
  * Layout scores is the size that ends up on the canvas.
  */
 export function compoundPadding(type: string): { top: number; side: number; bottom: number } {
-  const margin = type === 'container' ? 20 : 30
+  const margin = type === 'container' || type === 'webapp' ? 20 : 30
   return { top: 120, side: margin, bottom: margin }
 }
 

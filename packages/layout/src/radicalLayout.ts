@@ -189,7 +189,7 @@ function layoutCompound(id: string, ctx: Ctx): void {
   const order = topoSort(breakCycles(dag, []))
 
   const allLeaves = kids.every((k) => !ctx.children.has(k.id))
-  const cols = node.type === 'container' && allLeaves
+  const cols = (node.type === 'container' || node.type === 'webapp') && allLeaves
     ? (order.length > MAX_SINGLE_COLUMN ? 2 : 1)
     : (order.length > MAX_SINGLE_ROW ? Math.ceil(Math.sqrt(order.length * 1.6)) : order.length)
   const rows = Math.ceil(order.length / cols)

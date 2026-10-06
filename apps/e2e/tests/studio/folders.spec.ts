@@ -11,10 +11,11 @@ import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 
 // Models persisted as a folder of Markdown files (web build: File System
-// Access API over an OPFS directory, see support/folder.ts). Systems and
-// containers get a directory with an _index.md, other elements a file: the
-// bookstore fixture becomes nodes/customer.md, nodes/payment-provider/_index.md
-// and nodes/bookstore/_index.md with api/_index.md, web-app.md, orders-db.md.
+// Access API over an OPFS directory, see support/folder.ts). Systems,
+// containers and web apps get a directory with an _index.md, other elements a
+// file: the bookstore fixture becomes nodes/customer.md,
+// nodes/payment-provider/_index.md and nodes/bookstore/_index.md with
+// api/_index.md, web-app/_index.md, orders-db.md.
 
 let folder: ModelFolder
 
@@ -60,7 +61,7 @@ test('save as folder writes one Markdown file per element', async ({ page }) => 
     'nodes/customer.md',
     'nodes/bookstore/_index.md',
     'nodes/bookstore/api/_index.md',
-    'nodes/bookstore/web-app.md',
+    'nodes/bookstore/web-app/_index.md',
     'nodes/bookstore/orders-db.md',
     'nodes/payment-provider/_index.md',
     'relations.json',
@@ -103,7 +104,7 @@ test('moving files keeps the descriptions of elements never opened', async ({ pa
 
   const files = await folder.files()
   expect(files['nodes/online-shop/api/_index.md']).toContain('Orders and catalogue API')
-  expect(files['nodes/online-shop/web-app.md']).toContain('Catalogue and checkout UI')
+  expect(files['nodes/online-shop/web-app/_index.md']).toContain('Catalogue and checkout UI')
   expect(files['nodes/online-shop/orders-db.md']).toContain('Orders and stock')
   expect(Object.keys(files).some((p) => p.startsWith('nodes/bookstore/'))).toBe(false)
 })

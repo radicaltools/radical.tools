@@ -63,6 +63,18 @@ describe('md-folder persistence', () => {
     expect(paths.some((p) => p.startsWith('nodes/use-event-sourcing'))).toBe(true)
   })
 
+  it('stores a web app as a directory, with or without components, and reads its old flat file', () => {
+    const web = node({ id: 'web1', type: 'webapp', label: 'Portal', parentId: 'sys1' })
+    const data = { ...sample, nodes: [...sample.nodes, web] }
+    const files = serializeToMdFolder(data)
+    expect(Object.keys(files)).toContain('nodes/payment-system/portal/_index.md')
+    // A folder written before web apps held components keeps a flat file.
+    const flat: Record<string, string> = { ...files, 'nodes/payment-system/portal.md': files['nodes/payment-system/portal/_index.md'] }
+    delete flat['nodes/payment-system/portal/_index.md']
+    const back = deserializeFromMdFolder(flat).data.nodes.find((n) => n.id === 'web1')
+    expect(back).toMatchObject({ type: 'webapp', parentId: 'sys1' })
+  })
+
   it('keeps positions out of the markdown and in the layout sidecar', () => {
     const files = serializeToMdFolder(sample)
     const md = files['nodes/payment-system/_index.md']

@@ -28,6 +28,16 @@ describe('fitAncestors', () => {
     fitAncestors(nodes, 'shut')
     expect(nodes.shut).toMatchObject({ width: 10, height: 10 })
   })
+
+  it('wraps the components of a web app, as it does a container\'s', () => {
+    const nodes: Record<string, C4Node> = {
+      web: node('web', 'webapp'),
+      ui: node('ui', 'component', { parentId: 'web', x: 20, y: 120 }),
+      api: node('api', 'component', { parentId: 'web', x: 240, y: 120 }),
+    }
+    fitAncestors(nodes, 'web')
+    expect(nodes.web).toMatchObject({ width: 240 + NODE_SIZES.component.width + 20, height: 120 + NODE_SIZES.component.height + 20 })
+  })
 })
 
 describe('placeNewNode', () => {

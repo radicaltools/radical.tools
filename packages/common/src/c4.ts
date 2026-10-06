@@ -6,7 +6,7 @@ export type C4ElementType = 'person' | 'system' | 'container' | 'component' | 'd
 
 /** Types that act as containers (can hold children, collapse, auto-resize). */
 export const CONTAINER_TYPES: ReadonlySet<string> = new Set([
-  'system', 'container', 'domain', 'group', 'blueprint',
+  'system', 'container', 'webapp', 'domain', 'group', 'blueprint',
 ])
 
 /** True when the given node-type id behaves as a parent container. */

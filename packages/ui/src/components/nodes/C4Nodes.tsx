@@ -404,21 +404,32 @@ DatabaseNode.displayName = 'DatabaseNode'
 // ─── Web App Node ─────────────────────────────────────────────────────────────
 
 export const WebAppNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const w = data.width ?? 220
-  const h = data.height ?? 140
+  const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
+  const canEdit = useDiagramStore((s) => s.appMode !== 'metamodel' && !s.presentationActive)
+  const onToggle = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      toggleCollapse(data.c4id)
+    },
+    [data.c4id, toggleCollapse]
+  )
+
+  // A web app holds components like a container does: expanded, it becomes a
+  // dashed frame around them and keeps only its browser bar and label.
+  const isExpanded = data.hasChildren && !data.collapsed
   const bg = NODE_COLORS.webapp
-  const borderColor = selected ? 'var(--accent)' : 'rgba(0,0,0,0.25)'
+  const borderColor = selected ? 'var(--accent)' : (isExpanded ? bg : 'rgba(0,0,0,0.25)')
   const barH = 18
 
   return (
     <div
-      className="c4-node c4-webapp-node"
+      className={`c4-node c4-webapp-node${isExpanded ? ' c4-node-expanded' : ''}`}
       style={{
-        width: w,
-        height: h,
+        width: '100%',
+        height: '100%',
         position: 'relative',
-        background: bg,
-        border: `2px solid ${borderColor}`,
+        background: isExpanded ? 'transparent' : bg,
+        border: `2px ${isExpanded ? 'dashed' : 'solid'} ${borderColor}`,
         borderRadius: 8,
         overflow: 'hidden',
         display: 'flex',
@@ -432,7 +443,7 @@ export const WebAppNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       <div
         style={{
           height: barH,
-          background: 'rgba(0,0,0,0.25)',
+          background: isExpanded ? 'transparent' : 'rgba(0,0,0,0.25)',
           display: 'flex',
           alignItems: 'center',
           gap: 4,
@@ -443,30 +454,44 @@ export const WebAppNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5f57' }} />
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#febc2e' }} />
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#28c840' }} />
+        {data.hasChildren && canEdit && (
+          <button className="c4-node-collapse-btn" style={{ marginLeft: 'auto' }} onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+            {data.collapsed ? '+' : '−'}
+          </button>
+        )}
       </div>
 
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '6px 8px',
-          textAlign: 'center',
-        }}
-      >
-        <div className="c4-node-label">{data.label}</div>
-        <div className="c4-node-tech" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
-          Web App
+      {isExpanded ? (
+        <>
+          <div className="c4-node-tech" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: bg, padding: '4px 8px 0' }}>
+            Web App
+          </div>
+          <div className="c4-node-label" style={{ fontSize: 12, color: bg }}>{data.label}</div>
+        </>
+      ) : (
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '6px 8px',
+            textAlign: 'center',
+          }}
+        >
+          <div className="c4-node-label">{data.label}</div>
+          <div className="c4-node-tech" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+            Web App
+          </div>
+          {data.technology && (
+            <div className="c4-node-tech">[{data.technology}]</div>
+          )}
+          {data.description && (
+            <div className="c4-node-desc">{data.description}</div>
+          )}
         </div>
-        {data.technology && (
-          <div className="c4-node-tech">[{data.technology}]</div>
-        )}
-        {data.description && (
-          <div className="c4-node-desc">{data.description}</div>
-        )}
-      </div>
+      )}
     </div>
   )
 }, sameCard)
