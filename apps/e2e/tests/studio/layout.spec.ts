@@ -44,6 +44,10 @@ test('bookstore containers', async ({ browser, page, studio }) => {
 
 for (const view of ['view-ctx', 'view-core', 'view-payments', 'view-screens', 'view-trace', 'canvas']) {
   test(`sample ${view}`, async ({ browser, page, studio }) => {
+    // Smart Layout of the sample in a second context plus a reopen on a
+    // frozen clock: 'canvas' took ~40 s of the 60 s budget on CI runners
+    // before the sample grew, so give these the slow-test timeout.
+    test.slow()
     const saved = await smartLayoutResult(browser, (s) => s.openSample(view))
     await studio.seedDocument(saved)
     await studio.open(view)
