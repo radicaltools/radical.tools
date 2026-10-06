@@ -1842,6 +1842,12 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       updateRelation(id, updates) {
+        // Moving an end obeys the same metamodel rules as adding a relation.
+        const refused = model.checkPatchRelation(get(), id, updates)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
         get()._pushUndo()
         get()._markMilestoneEdit()
         set((state) => { model.patchRelation(state, id, updates) })
