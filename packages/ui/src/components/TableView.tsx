@@ -426,8 +426,9 @@ export function TableView(): React.ReactElement {
   }, [tab, selectNode, selectEdge])
 
   const handleBoolToggle = useCallback((rowId: string, colKey: string, current: string) => {
+    if (readOnly) return
     updateNode(rowId, { [colKey]: current !== 'true' } as Parameters<typeof updateNode>[1])
-  }, [updateNode])
+  }, [readOnly, updateNode])
 
   function renderCell(row: C4Node | C4Relation, col: ColDef, depth = 0): React.ReactNode {
     const isNodeRow = tab !== 'relations'
@@ -466,6 +467,7 @@ export function TableView(): React.ReactElement {
 
     if (col.type === 'boolean') {
       const checked = rawVal === 'true'
+      if (readOnly) return <span className={`tv-bool tv-bool-readonly ${checked ? 'tv-bool-on' : ''}`}>{checked ? '✓' : '—'}</span>
       return (
         <button
           className={`tv-bool ${checked ? 'tv-bool-on' : ''}`}

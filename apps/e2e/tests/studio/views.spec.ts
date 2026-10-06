@@ -1,4 +1,5 @@
-import { test, expect } from '../../support/fixtures'
+import { builtInC4Metamodel } from '@radical/common/metamodel'
+import { test, expect, fixture } from '../../support/fixtures'
 
 // Every view kind renders, from a deep link, the same way it did before.
 // Screenshots run on a frozen clock so animations and the live layout land
@@ -94,5 +95,27 @@ test.describe('perspectives', () => {
     await studio.advance(500)
     await expect(page).toHaveURL(/\/m\/designer\/v\/v-containers$/)
     await expect(page.locator('.palette-item').first()).toBeVisible()
+  })
+})
+
+test.describe('custom metamodel', () => {
+  // Built-in presets have no boolean column on a type with its own table tab,
+  // so give Software System a tab: its External column is a boolean.
+  test.beforeEach(async ({ studio }) => {
+    const doc = JSON.parse(fixture('bookstore'))
+    const metamodel = builtInC4Metamodel()
+    metamodel.id = 'c4-system-tab'
+    metamodel.nodeTypes.system.tableTab = true
+    await studio.seedDocument(JSON.stringify({ ...doc, metamodel }))
+  })
+
+  test('boolean table cells are read-only in Viewer', async ({ page, studio }) => {
+    await studio.open('v-table', 'viewer')
+    await page.locator('.tv-tabs').getByRole('button', { name: /^Software System/ }).click()
+    const external = page.locator('tbody tr').filter({ hasText: 'Payment Provider' }).locator('.tv-bool')
+    await expect(external).toHaveText('✓')
+    await external.click()
+    await studio.advance(500)
+    await expect(external).toHaveText('✓')
   })
 })
