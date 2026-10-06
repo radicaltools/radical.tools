@@ -4,6 +4,8 @@
  * stay internally consistent:
  *   - every node sits under a parent the governance metamodel allows
  *   - every typed relation is an allowed pair for its relation type
+ *   - every need has requirements derived from it, and every top-level
+ *     requirement traces back to a need
  *   - mockups live in screen-flow groups, are linked into their flow, have one
  *     presented-by and carry wireframes that are already sanitised
  *   - views, sequences, milestones and slides only reference things that exist
@@ -26,7 +28,7 @@ describe('fintech sample model', () => {
   // preset does not formally allow (it expects system-in-domain) — so this
   // checks the governance and product layers only.
   it('places governance and product nodes under an allowed parent', () => {
-    const layers = new Set(['adr', 'fitness-fn', 'requirement', 'scenario', 'mockup', 'group'])
+    const layers = new Set(['adr', 'fitness-fn', 'need', 'requirement', 'scenario', 'mockup', 'group'])
     const bad: string[] = []
     for (const n of nodes.filter((n) => layers.has(n.type))) {
       const parent = n.parentId ? byId.get(n.parentId) : undefined
@@ -57,6 +59,25 @@ describe('fintech sample model', () => {
     for (const t of ['derives', 'verifies', 'satisfies', 'traces-to', 'illustrates', 'presented-by', 'navigates-to']) {
       expect(types.has(t), t).toBe(true)
     }
+  })
+
+  it('traces every requirement back to a need', () => {
+    const derives = relations.filter((r) => r.relationType === 'derives')
+    const needs = nodes.filter((n) => n.type === 'need')
+    expect(needs.length).toBeGreaterThanOrEqual(2)
+    for (const need of needs) {
+      expect(String(need.description ?? '').trim(), `${need.id}: no text`).not.toBe('')
+      expect(derives.some((r) => r.targetId === need.id), `${need.id}: nothing derives from it`).toBe(true)
+    }
+    // A requirement reaches a need directly or through the parent it derives from.
+    const reachesNeed = (id: string, seen = new Set<string>()): boolean => {
+      if (seen.has(id)) return false
+      seen.add(id)
+      return derives.filter((r) => r.sourceId === id).some((r) =>
+        byId.get(r.targetId)?.type === 'need' || reachesNeed(r.targetId, seen))
+    }
+    const orphans = nodes.filter((n) => n.type === 'requirement' && !reachesNeed(n.id)).map((n) => n.id)
+    expect(orphans).toEqual([])
   })
 
   it('has mockups in screen flows with sanitised wireframes', () => {

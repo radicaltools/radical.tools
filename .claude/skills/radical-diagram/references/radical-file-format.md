@@ -31,7 +31,7 @@ Full schema lives in `packages/common/src/c4.ts` (`DiagramData`) and `packages/c
 }
 ```
 
-Built-in C4 relation types: `interacts` (general use; database never a source). The DDD preset adds `realises`, `depends-on`, `partnership`; the governance preset adds `constrains`, `supersedes`, `implements`, `satisfies`, `derives`, `traces-to`. If `relationType` is omitted the default type is assumed.
+Built-in C4 relation types: `interacts` (general use; database never a source). The DDD preset adds `realises`, `depends-on`, `partnership`; the governance preset adds `constrains`, `supersedes`, `implements`, `satisfies`, `derives` (requirement → requirement, requirement → the `need` it was written from, need → a broader need), `traces-to`, `verifies`, `illustrates`, `presented-by`, `navigates-to`. If `relationType` is omitted the default type is assumed.
 
 ## Views (filtered perspectives)
 
@@ -89,8 +89,13 @@ Available when using an extended built-in metamodel. Set `"metamodel": { "id": "
 | domain      | 520×360     | domain, group           | yes |
 | adr         | 180×52      | system, domain, group   | yes |
 | fitness-fn  | 180×52      | system, domain, group   | yes |
+| need        | 200×80      | system, domain, group   | yes |
 | requirement | 200×80      | system, domain, group   | yes |
+| scenario    | 200×80      | system, domain, group   | yes |
+| mockup      | 220×190     | system, domain, group   | yes |
 | blueprint   | 520×360     | domain, group           | yes |
+
+A `need` holds raw free-text input (brief, user story, notes, raw requirements) in its `description`, plus optional `kind` (brief / user-story / stakeholder-note / meeting-notes / regulation / other) and `source`. Model EARS requirements as separate `requirement` nodes deriving from it; nest a need under a broader one with `derives` (need → need), not with `parentId`.
 | system (DDD)| 360×260     | system, domain, group   | yes |
 
 ## Custom metamodel

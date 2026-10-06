@@ -12,7 +12,7 @@ import ReactFlow, {
   getViewportForBounds,
 } from 'reactflow'
 import { useDiagramStore } from '../store/diagramStore'
-import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode } from './nodes/C4Nodes'
+import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT } from '@radical/common/c4'
@@ -31,6 +31,7 @@ const nodeTypes: NodeTypes = {
   group: GroupNode as any,
   adr: AdrNode as any,
   'fitness-fn': FitnessFnNode as any,
+  need: NeedNode as any,
   requirement: RequirementNode as any,
   scenario: ScenarioNode as any,
   blueprint: BlueprintNode as any,

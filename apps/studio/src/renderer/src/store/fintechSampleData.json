@@ -421,6 +421,45 @@
       "threshold": "0 critical / serious axe violations on any release build"
     },
     {
+      "id": "need-regulation",
+      "type": "need",
+      "label": "PSD2 & AMLD6 obligations",
+      "description": "Summary of the regulatory obligations attached to our EU payment-institution licence:\n\n- PSD2: every payment initiated from a digital channel needs strong customer authentication, and customers must see all charges and the exchange rate before they confirm.\n- AMLD6: no account may be used before customer due diligence (identity, sanctions, PEP and AML screening) is complete.\n- Record keeping: decisions on suspicious payments must be reconstructable for at least five years, including who decided and why.",
+      "x": 1150,
+      "y": 2566,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "kind": "regulation",
+      "source": "Compliance — licence conditions memo"
+    },
+    {
+      "id": "need-retail-brief",
+      "type": "need",
+      "label": "Retail payments brief",
+      "description": "Our customers move money from the mobile app and the web, and they need to trust what they see.\n\nSupport tells us people send a payment again when they are not sure the first one went through; duplicates are the top reason for calls. Balances in the app sometimes disagree with statements for a few minutes, and that worries people. Last quarter we refunded €1.2M of authorised push-payment fraud, and most of it could have been stopped if someone had looked at the payment before it left.\n\nWe want customers to always know where a payment is, to see the same balance everywhere, and suspicious payments to be caught before settlement.",
+      "x": 1150,
+      "y": 2726,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "kind": "brief",
+      "source": "Head of Digital Payments — product kick-off"
+    },
+    {
+      "id": "need-corporate-feedback",
+      "type": "need",
+      "label": "Corporate treasurer feedback",
+      "description": "Notes from the quarterly call with the treasurer of one of our larger corporate clients:\n\n- Payroll goes in as one bulk file of about 4,000 lines. Last month one bad IBAN stopped the file halfway and half the staff were paid a day late. They want to hear about all problems before anything is sent.\n- Their auditors require a second signatory on every batch; today they enforce it by e-mail.\n- They would like to see afterwards who approved what.",
+      "x": 1150,
+      "y": 2886,
+      "width": 200,
+      "height": 80,
+      "collapsed": false,
+      "kind": "stakeholder-note",
+      "source": "Relationship manager — quarterly call with a corporate client"
+    },
+    {
       "id": "req-psd2",
       "type": "requirement",
       "label": "PSD2-compliant payments",
@@ -1055,6 +1094,62 @@
       "id": "d-req-payment-status",
       "sourceId": "req-payment-status",
       "targetId": "req-psd2",
+      "relationType": "derives",
+      "label": "",
+      "technology": ""
+    },
+    {
+      "id": "dn-req-psd2",
+      "sourceId": "req-psd2",
+      "targetId": "need-regulation",
+      "relationType": "derives",
+      "label": "",
+      "technology": ""
+    },
+    {
+      "id": "dn-req-kyc",
+      "sourceId": "req-kyc",
+      "targetId": "need-regulation",
+      "relationType": "derives",
+      "label": "",
+      "technology": ""
+    },
+    {
+      "id": "dn-req-case-audit",
+      "sourceId": "req-case-audit",
+      "targetId": "need-regulation",
+      "relationType": "derives",
+      "label": "",
+      "technology": ""
+    },
+    {
+      "id": "dn-req-fraud-hold",
+      "sourceId": "req-fraud-hold",
+      "targetId": "need-retail-brief",
+      "relationType": "derives",
+      "label": "",
+      "technology": ""
+    },
+    {
+      "id": "dn-req-balance-ledger",
+      "sourceId": "req-balance-ledger",
+      "targetId": "need-retail-brief",
+      "relationType": "derives",
+      "label": "",
+      "technology": ""
+    },
+    {
+      "id": "dn-req-bulk-validation",
+      "sourceId": "req-bulk-validation",
+      "targetId": "need-corporate-feedback",
+      "relationType": "derives",
+      "label": "",
+      "technology": ""
+    },
+    {
+      "id": "dn-req-dual-approval",
+      "sourceId": "req-dual-approval",
+      "targetId": "need-corporate-feedback",
       "relationType": "derives",
       "label": "",
       "technology": ""
@@ -4932,7 +5027,10 @@
         "adr-ledger",
         "adr-jwt",
         "ff-latency",
-        "ff-ledger"
+        "ff-ledger",
+        "need-regulation",
+        "need-retail-brief",
+        "need-corporate-feedback"
       ],
       "positions": {
         "p-customer": {
@@ -5306,6 +5404,24 @@
           "y": 110,
           "width": 220,
           "height": 190
+        },
+        "need-regulation": {
+          "x": 30,
+          "y": -100,
+          "width": 200,
+          "height": 80
+        },
+        "need-retail-brief": {
+          "x": 1023,
+          "y": -100,
+          "width": 200,
+          "height": 80
+        },
+        "need-corporate-feedback": {
+          "x": 450,
+          "y": -100,
+          "width": 200,
+          "height": 80
         }
       },
       "viewport": {
@@ -5346,7 +5462,10 @@
         "mk-approvals",
         "mk-case-queue",
         "mk-case-review",
-        "mk-customer-360"
+        "mk-customer-360",
+        "need-regulation",
+        "need-retail-brief",
+        "need-corporate-feedback"
       ],
       "positions": {
         "p-customer": {
@@ -7000,7 +7119,10 @@
         "sc-fraud-hold",
         "sc-bulk-errors",
         "sc-dual-approval",
-        "ff-a11y"
+        "ff-a11y",
+        "need-regulation",
+        "need-retail-brief",
+        "need-corporate-feedback"
       ],
       "positions": {},
       "viewport": {
@@ -8947,6 +9069,45 @@
           "height": 190,
           "collapsed": false,
           "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\"><rect x=\"0\" y=\"0\" width=\"400\" height=\"300\" fill=\"#fff\"/><rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/><rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/><text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Nova Back Office</text><text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Audit</text><text x=\"349\" y=\"19\" font-size=\"9\" fill=\"#2563eb\" font-weight=\"bold\" text-anchor=\"end\">Customers</text><line x1=\"304\" y1=\"29\" x2=\"349\" y2=\"29\" stroke=\"#2563eb\"/><text x=\"290\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Cases</text><circle cx=\"34\" cy=\"58\" r=\"16\" fill=\"#e5e7eb\"/><text x=\"58\" y=\"55\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Anna Schmidt</text><text x=\"58\" y=\"68\" font-size=\"8\" fill=\"#666\">Customer since 2019 · Retail · Berlin</text><rect x=\"248\" y=\"48\" width=\"57\" height=\"11\" rx=\"5\" fill=\"#dcfce7\"/><text x=\"253\" y=\"56\" font-size=\"7\" fill=\"#166534\" font-weight=\"bold\">KYC verified</text><rect x=\"314\" y=\"48\" width=\"45\" height=\"11\" rx=\"5\" fill=\"#dcfce7\"/><text x=\"319\" y=\"56\" font-size=\"7\" fill=\"#166534\" font-weight=\"bold\">AML clear</text><text x=\"16\" y=\"98\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Accounts</text><rect x=\"16\" y=\"104\" width=\"180\" height=\"18\" fill=\"#f3f4f6\"/><text x=\"22\" y=\"116\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Account</text><text x=\"122\" y=\"116\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Balance</text><text x=\"22\" y=\"134\" font-size=\"8\" fill=\"#333\">Current</text><text x=\"122\" y=\"134\" font-size=\"8\" fill=\"#333\">€4,218.40</text><line x1=\"16\" y1=\"140\" x2=\"196\" y2=\"140\" stroke=\"#e5e7eb\"/><text x=\"22\" y=\"152\" font-size=\"8\" fill=\"#333\">Savings</text><text x=\"122\" y=\"152\" font-size=\"8\" fill=\"#333\">€12,050.00</text><line x1=\"16\" y1=\"158\" x2=\"196\" y2=\"158\" stroke=\"#e5e7eb\"/><text x=\"212\" y=\"98\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Identity checks</text><rect x=\"212\" y=\"104\" width=\"172\" height=\"18\" fill=\"#f3f4f6\"/><text x=\"218\" y=\"116\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Check</text><text x=\"318\" y=\"116\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Result</text><text x=\"218\" y=\"134\" font-size=\"8\" fill=\"#333\">ID document</text><rect x=\"318\" y=\"126\" width=\"34\" height=\"11\" rx=\"5\" fill=\"#dcfce7\"/><text x=\"323\" y=\"134\" font-size=\"7\" fill=\"#166534\" font-weight=\"bold\">Passed</text><line x1=\"212\" y1=\"140\" x2=\"384\" y2=\"140\" stroke=\"#e5e7eb\"/><text x=\"218\" y=\"152\" font-size=\"8\" fill=\"#333\">Sanctions list</text><rect x=\"318\" y=\"144\" width=\"41\" height=\"11\" rx=\"5\" fill=\"#dcfce7\"/><text x=\"323\" y=\"152\" font-size=\"7\" fill=\"#166534\" font-weight=\"bold\">No match</text><line x1=\"212\" y1=\"158\" x2=\"384\" y2=\"158\" stroke=\"#e5e7eb\"/><text x=\"16\" y=\"178\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Case history</text><line x1=\"24\" y1=\"188\" x2=\"24\" y2=\"244\" stroke=\"#ccc\"/><circle cx=\"24\" cy=\"192\" r=\"4\" fill=\"#92400e\"/><text x=\"36\" y=\"195\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">28 Sep</text><text x=\"74\" y=\"195\" font-size=\"8\" fill=\"#333\">CASE-88412 opened — score 0.91</text><circle cx=\"24\" cy=\"216\" r=\"4\" fill=\"#166534\"/><text x=\"36\" y=\"219\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">02 Jun</text><text x=\"74\" y=\"219\" font-size=\"8\" fill=\"#333\">CASE-71020 released — false positive</text><circle cx=\"24\" cy=\"240\" r=\"4\" fill=\"#166534\"/><text x=\"36\" y=\"243\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">14 Jan</text><text x=\"74\" y=\"243\" font-size=\"8\" fill=\"#333\">Onboarded — KYC &amp; AML screening passed</text><rect x=\"284\" y=\"262\" width=\"100\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/><text x=\"334\" y=\"275\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Back to case</text></svg>"
+        },
+        "need-regulation": {
+          "id": "need-regulation",
+          "type": "need",
+          "label": "PSD2 & AMLD6 obligations",
+          "description": "Summary of the regulatory obligations attached to our EU payment-institution licence:\n\n- PSD2: every payment initiated from a digital channel needs strong customer authentication, and customers must see all charges and the exchange rate before they confirm.\n- AMLD6: no account may be used before customer due diligence (identity, sanctions, PEP and AML screening) is complete.\n- Record keeping: decisions on suspicious payments must be reconstructable for at least five years, including who decided and why.",
+          "x": 1150,
+          "y": 2566,
+          "width": 200,
+          "height": 80,
+          "collapsed": false,
+          "kind": "regulation",
+          "source": "Compliance — licence conditions memo"
+        },
+        "need-retail-brief": {
+          "id": "need-retail-brief",
+          "type": "need",
+          "label": "Retail payments brief",
+          "description": "Our customers move money from the mobile app and the web, and they need to trust what they see.\n\nSupport tells us people send a payment again when they are not sure the first one went through; duplicates are the top reason for calls. Balances in the app sometimes disagree with statements for a few minutes, and that worries people. Last quarter we refunded €1.2M of authorised push-payment fraud, and most of it could have been stopped if someone had looked at the payment before it left.\n\nWe want customers to always know where a payment is, to see the same balance everywhere, and suspicious payments to be caught before settlement.",
+          "x": 1150,
+          "y": 2726,
+          "width": 200,
+          "height": 80,
+          "collapsed": false,
+          "kind": "brief",
+          "source": "Head of Digital Payments — product kick-off"
+        },
+        "need-corporate-feedback": {
+          "id": "need-corporate-feedback",
+          "type": "need",
+          "label": "Corporate treasurer feedback",
+          "description": "Notes from the quarterly call with the treasurer of one of our larger corporate clients:\n\n- Payroll goes in as one bulk file of about 4,000 lines. Last month one bad IBAN stopped the file halfway and half the staff were paid a day late. They want to hear about all problems before anything is sent.\n- Their auditors require a second signatory on every batch; today they enforce it by e-mail.\n- They would like to see afterwards who approved what.",
+          "x": 1150,
+          "y": 2886,
+          "width": 200,
+          "height": 80,
+          "collapsed": false,
+          "kind": "stakeholder-note",
+          "source": "Relationship manager — quarterly call with a corporate client"
         }
       },
       "relations": {
@@ -9748,6 +9909,62 @@
           "relationType": "illustrates",
           "label": "",
           "technology": ""
+        },
+        "dn-req-psd2": {
+          "id": "dn-req-psd2",
+          "sourceId": "req-psd2",
+          "targetId": "need-regulation",
+          "relationType": "derives",
+          "label": "",
+          "technology": ""
+        },
+        "dn-req-kyc": {
+          "id": "dn-req-kyc",
+          "sourceId": "req-kyc",
+          "targetId": "need-regulation",
+          "relationType": "derives",
+          "label": "",
+          "technology": ""
+        },
+        "dn-req-case-audit": {
+          "id": "dn-req-case-audit",
+          "sourceId": "req-case-audit",
+          "targetId": "need-regulation",
+          "relationType": "derives",
+          "label": "",
+          "technology": ""
+        },
+        "dn-req-fraud-hold": {
+          "id": "dn-req-fraud-hold",
+          "sourceId": "req-fraud-hold",
+          "targetId": "need-retail-brief",
+          "relationType": "derives",
+          "label": "",
+          "technology": ""
+        },
+        "dn-req-balance-ledger": {
+          "id": "dn-req-balance-ledger",
+          "sourceId": "req-balance-ledger",
+          "targetId": "need-retail-brief",
+          "relationType": "derives",
+          "label": "",
+          "technology": ""
+        },
+        "dn-req-bulk-validation": {
+          "id": "dn-req-bulk-validation",
+          "sourceId": "req-bulk-validation",
+          "targetId": "need-corporate-feedback",
+          "relationType": "derives",
+          "label": "",
+          "technology": ""
+        },
+        "dn-req-dual-approval": {
+          "id": "dn-req-dual-approval",
+          "sourceId": "req-dual-approval",
+          "targetId": "need-corporate-feedback",
+          "relationType": "derives",
+          "label": "",
+          "technology": ""
         }
       }
     }
@@ -10264,6 +10481,24 @@
       "y": 110,
       "width": 220,
       "height": 190
+    },
+    "need-regulation": {
+      "x": 1150,
+      "y": 2566,
+      "width": 200,
+      "height": 80
+    },
+    "need-retail-brief": {
+      "x": 1150,
+      "y": 2726,
+      "width": 200,
+      "height": 80
+    },
+    "need-corporate-feedback": {
+      "x": 1150,
+      "y": 2886,
+      "width": 200,
+      "height": 80
     }
   },
   "defaultViewport": {

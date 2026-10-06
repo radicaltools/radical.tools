@@ -5,7 +5,8 @@
  * tools/generate-sample.js (+ tools/sample-product.js). It contains:
  *  - All node types incl. governance and product: person, system, domain,
  *    container, component, database, webapp, queue, adr, fitness-fn,
- *    requirement (EARS), scenario (Gherkin), mockup (with wireframe), group
+ *    need (raw input: regulation, brief, stakeholder note), requirement
+ *    (EARS), scenario (Gherkin), mockup (with wireframe), group
  *  - C4 + DDD + Governance metamodel, with satisfies / verifies / derives /
  *    traces-to / illustrates / presented-by / navigates-to relations
  *  - 15 named views: static, dynamic (payment flow + one per screen flow),

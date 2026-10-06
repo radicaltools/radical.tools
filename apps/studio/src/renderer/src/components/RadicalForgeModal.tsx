@@ -5,7 +5,7 @@ import { runAIPrompt, type ForgeProgressEvent } from '../ai/runner'
 import { loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
-import { FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, buildForgeStagePrompt, buildPriorStagesBlock, type ForgeStageId } from '../ai/forgePrompts'
+import { FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, buildForgeStagePrompt, buildPriorStagesBlock, needLabelFromDescription, type ForgeNeedRef, type ForgeStageId } from '../ai/forgePrompts'
 import { buildGherkinFiles } from '@radical/common/formats/exportGherkin'
 import { downloadGherkinFiles } from '../export/downloadGherkinFiles'
 import { AIReportLine } from './AIReportLine'
@@ -130,6 +130,10 @@ function pickTextFile(): Promise<string | null> {
 export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement | null {
   const [step, setStep] = useState<WizardStep>('input')
   const [description, setDescription] = useState('')
+  /** The `need` node the description lives in — picked on the Description
+   *  step, or created from the typed text when the run starts (ensureNeed).
+   *  null = a new need will be created. */
+  const [needId, setNeedId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stageReports, setStageReports] = useState<Partial<Record<ForgeStageId, ApplyReport>>>({})
@@ -168,12 +172,16 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const fetchHubConcepts = useHubStore((s) => s.fetchConcepts)
   const loadHubConcept = useHubStore((s) => s.loadConcept)
   const activeMetamodelId = useDiagramStore((s) => s.metamodel?.id)
+  // Metamodels without the governance `need` type (plain C4, custom ones)
+  // run Forge as before, without storing the description in the model.
+  const hasNeedType = useDiagramStore((s) => !!s.metamodel?.nodeTypes.need)
 
   // Reset to a clean run every time the wizard is (re)opened.
   useEffect(() => {
     if (!open) return
     setStep('input')
     setDescription('')
+    setNeedId(null)
     setBusy(false)
     setError(null)
     setStageReports({})
@@ -375,7 +383,9 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       const priorStageSummaries = buildPriorStagesBlock(
         FORGE_STAGES.slice(0, stageIdx).map((s) => ({ title: s.title, summary: stageSummaries[s.id] ?? '' })),
       )
-      const prompt = buildForgeStagePrompt(stageId, description, effectiveMatches, clarifications, priorStageSummaries)
+      const needNode = needId ? useDiagramStore.getState().c4Nodes[needId] : undefined
+      const needRef: ForgeNeedRef | undefined = needNode ? { id: needNode.id, label: needNode.label } : undefined
+      const prompt = buildForgeStagePrompt(stageId, description, effectiveMatches, clarifications, priorStageSummaries, needRef)
       const relevantTypeIds = new Set(PRIMARY_TYPE_IDS_FOR_STAGE[stageId])
       const result = await runAIPrompt({
         prompt, settings: aiSettings, diagram, signal: ctl.signal, onProgress, relevantTypeIds,
@@ -394,7 +404,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       abortRef.current = null
       setBusy(false)
     }
-  }, [busy, unavailableReason, description, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries])
+  }, [busy, unavailableReason, description, needId, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries])
 
   const cancelStage = useCallback(() => { abortRef.current?.abort() }, [])
 
@@ -467,6 +477,38 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setReachedIndex((r) => Math.max(r, stepIndex + 1))
     setFinishedAt(null)
   }, [stepIndex])
+  /** Stores the description as a `need` node before the first stage runs:
+   *  a picked need gets the (possibly edited) text written back, otherwise a
+   *  new need is created — and remembered, so going Back and starting again
+   *  updates it instead of adding a duplicate. */
+  const ensureNeed = useCallback(() => {
+    if (!hasNeedType) return
+    const { c4Nodes, addNode, updateNode } = useDiagramStore.getState()
+    const text = description.trim()
+    const existing = needId ? c4Nodes[needId] : undefined
+    if (existing) {
+      if ((existing.description ?? '').trim() !== text) updateNode(existing.id, { description: text })
+      return
+    }
+    const def = useDiagramStore.getState().metamodel?.nodeTypes.need
+    const id = addNode({
+      type: 'need',
+      label: needLabelFromDescription(text),
+      description: text,
+      kind: 'brief',
+      source: 'Radical Forge',
+      collapsed: false,
+      x: 80,
+      y: -200,
+      width: def?.width ?? 200,
+      height: def?.height ?? 80,
+    } as Parameters<typeof addNode>[0])
+    if (id) setNeedId(id)
+  }, [hasNeedType, description, needId])
+  const startRun = useCallback(() => {
+    ensureNeed()
+    goNext()
+  }, [ensureNeed, goNext])
   const goBack = useCallback(() => {
     // Back from an early finish resumes the run where it was stopped.
     if (step === 'export' && finishedAt) {
@@ -489,6 +531,19 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const nodes = useDiagramStore((s) => s.c4Nodes)
   const relations = useDiagramStore((s) => s.c4Relations)
   const gherkinFiles = useMemo(() => buildGherkinFiles(nodes, relations), [nodes, relations])
+  const needs = useMemo(
+    () => Object.values(nodes).filter((n) => n.type === 'need').sort((a, b) => a.label.localeCompare(b.label)),
+    [nodes],
+  )
+  /** Picking a need loads its text; going back to "A new description"
+   *  clears the textarea only if it still holds that need's text. */
+  const pickNeed = useCallback((id: string | null) => {
+    const picked = id ? nodes[id] : undefined
+    const previous = needId ? nodes[needId] : undefined
+    setNeedId(picked ? picked.id : null)
+    if (picked) setDescription(picked.description ?? '')
+    else if (previous && description === (previous.description ?? '')) setDescription('')
+  }, [nodes, needId, description])
   const mockupStats = useMemo(() => {
     const mockups = Object.values(nodes).filter((n) => n.type === 'mockup')
     const missing = mockups.filter((n) => !(n as unknown as Record<string, unknown>).wireframe).length
@@ -615,6 +670,20 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         <div className="forge-body">
           {step === 'input' && (
             <>
+              {hasNeedType && needs.length > 0 && (
+                <label className="forge-need-picker">
+                  <span>Start from</span>
+                  <select
+                    value={needId ?? ''}
+                    onChange={(e) => pickNeed(e.target.value || null)}
+                  >
+                    <option value="">A new description</option>
+                    {needs.map((n) => (
+                      <option key={n.id} value={n.id}>{n.label}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <textarea
                 className="forge-textarea"
                 placeholder="Describe the system in plain language — who uses it, what it does, the main flows and constraints…"
@@ -626,6 +695,13 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
               <button type="button" className="forge-btn forge-btn-secondary forge-btn-sm" onClick={handleUpload} style={{ marginTop: 8 }}>
                 Upload .txt / .md file…
               </button>
+              {hasNeedType && (
+                <p className="forge-need-hint">
+                  {needId
+                    ? 'Edits are saved back to this need, and the generated requirements are linked to it.'
+                    : 'Saved in the model as a Need when you start, so every generated requirement traces back to it.'}
+                </p>
+              )}
             </>
           )}
 
@@ -854,7 +930,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
             <button
               type="button"
               className="forge-btn forge-btn-primary"
-              onClick={goNext}
+              onClick={startRun}
               disabled={!description.trim()}
             >
               Start →
