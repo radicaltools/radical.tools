@@ -254,3 +254,128 @@ open:
 4. **Dense presets stay dense.** With every edge shown, Governance has ~96
    edges over 16 types; the legend filters and selection focus are the way
    to read it.
+
+### Dogfooding (2026-10-06)
+
+`architecture/` now holds the model of radical.tools itself, built through the
+MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
+
+1. ~~**The MCP server cannot start a model.**~~ Fixed in #119: an empty or
+   missing folder becomes a new model.
+2. ~~**No way to pick a metamodel for a new folder.**~~ Fixed in #119:
+   `--metamodel c4|c4-ddd|governance` (default `governance`).
+3. ~~**`--folder` must be absolute.**~~ Fixed in #119: a relative path resolves
+   against the working directory, so `.mcp.json` calls `node` directly.
+4. ~~**Webapps and containers are stored differently.**~~ Fixed with 8: a web
+   app is a directory (`studio/_index.md`) like a container, with or without
+   components; an old flat file still loads.
+5. ~~**Components could not talk to external systems.**~~ The C4 preset had
+   no `component → system`, `system → component` or `person → component` pair
+   for `interacts`, so a component diagram could not show an AI component
+   calling the AI providers, or a coding agent calling the MCP server's stdio
+   component. The three pairs are added to `presets/c4.ts`, which all
+   three presets share.
+6. **`create_view` requires a `tempId`** even when no later call refers to
+   the view; five calls failed on it. It should be optional, as it is on
+   `add_node`.
+7. ~~**Smart Layout traded crossings for the composite score**~~ on
+   "Components: Studio" (15 → 18). The cause was 8; after the fix it goes
+   18 → 10 with every component inside Studio.
+8. ~~**A web app could hold components but behaved as a leaf.**~~ The
+   metamodel lets a component sit in a web app, but `CONTAINER_TYPES` left
+   `webapp` out and the live physics grouped only `container`: the web app
+   never grew around its components, could not collapse, was dropped from the
+   WebCoLa simulation, and its components could be dragged out of it. Now a
+   web app is a container type (fit, collapse, layout padding, folder format),
+   draws as a dashed frame when expanded, and the physics groups every parent
+   that cannot nest (container, web app, blueprint).
+
+### Reverse-engineered requirements (2026-10-06)
+
+`architecture/` now holds 36 needs, 246 EARS requirements and 123 scenarios,
+one group and one table view per area, reconstructed from the code, the e2e
+tests and the manual. Each requirement cites its evidence (file:line) in
+`rationale`; each scenario names the test that covers it, or says none does.
+The comparison found these gaps.
+
+**Probable bugs** (found by reading the code). All 13 fixed in #118, each with
+a unit or e2e test:
+
+1. **A milestone link can overwrite the live model.** `route.ts:190-194`
+   applies `/s/<id>` with `restoreSnapshot`, which swaps in the milestone
+   without a `liveBackup`. `saveDiagram` only protects the live model when
+   that backup exists (`diagramStore.ts:4187`), so reloading while viewing a
+   milestone saves the milestone as the live model. `selectMilestone` keeps
+   the backup.
+2. **Dropping a custom node type probably throws.** The palette lists custom
+   types, but `Canvas.tsx:742-754` looks their size up in `NODE_SIZES`, which
+   only knows the built-in types.
+3. **Dragging a relation endpoint skips the metamodel check.**
+   `RelationEdge.tsx:118-129` calls `updateRelation`, which does not validate,
+   so a forbidden pair can be created.
+4. **Boolean table cells toggle in Viewer** (`TableView.tsx:428-430`); every
+   other cell is read-only there.
+5. **Hidden relations still show** in the matrix and the Relations tab, which
+   ignore `hiddenRelationIds` (`MatrixView.tsx:115-135`, `TableView.tsx:210-215`).
+6. **View cards say "0 nodes" for whole-model views** (`RightPanel.tsx:1085`
+   prints `nodeIds.length`, and an empty list means every node).
+7. **"Root only" in the metamodel editor reads the wrong field**: it checks an
+   empty `allowedParents`, not `allowedAtRoot` (`MetamodelEditor.tsx:262-268`).
+8. **Not undoable:** Smart Layout and tree layout runs
+   (`diagramStore.ts:2811-2995`), hiding an element or relation from a view
+   (`diagramStore.ts:2306-2363`), and the AI's `reset_diagram`, which clears
+   both undo stacks (`useDiagramFacade.ts:91-102`).
+9. **Studio cannot open the `.radical` files the Hub downloads**: the desktop
+   and browser pickers accept only `.c4.json`/`.json`
+   (`apps/studio/src/main/index.ts:105-124`, `documentStore.ts:340`).
+10. **Forge's Regenerate stacks a second copy** of the stage on top of the
+    first (`RadicalForgeModal.tsx:350-404`).
+11. **Generate wireframe shows without an API key** and then fails
+    (`wireframeGenerator.ts:8` checks only the AI switch).
+12. **Linking a milestone to a slide has no effect** on slides that carry
+    their own model copy, which every new slide does
+    (`diagramStore.ts:3870-3887, 4087-4095`).
+13. **Canvas zoom tooltips advertise ⌘− / ⌘+** (`Toolbar.tsx:682, 689`), but
+    only the Flow view handles those keys.
+
+**Manual out of step with the code** (fix the manual, or build the feature):
+
+- *Elements, relations, selection:* ⌘/Ctrl- and Alt-click do not add to the
+  selection (only Shift); the selection bar appears with one node; the Delete
+  key opens a dialog while the bar's Delete removes at once; dragging a node
+  into a container does not re-parent it and nothing highlights; "everything
+  is undoable" did not hold (bug 8, fixed in #118).
+- *Getting started:* the Welcome screen shows on every browser load without a
+  route, never in desktop or VS Code; New model uses C4 + DDD + Governance
+  unless the dropdown was opened first.
+- *Properties & governance:* the EARS subject comes from the element that
+  *satisfies* the requirement, not the one it *constrains*; requirements have
+  no status or MoSCoW priority; fitness functions have no trigger, automated
+  flag or status.
+- *Metamodel editor:* no controls for icon, collapsed size, root placement,
+  enum default, "visible only when" or relation colour; presets are picked when
+  a model is created, not in the editor; the Diagram tab is undocumented; the
+  second preset is called "C4 + DDD Domains".
+- *Views:* a new view starts with the whole model, not what is on screen;
+  every card has a settings button and the treemap's Size/Levels live in its
+  toolbar; the treemap drills in on double-click and has no inline expand; the
+  matrix also creates and deletes relations; Scenario, Blueprint and Mockup
+  have table tabs too; the wiki's single/multi page toggle is undocumented; a
+  Flow view draws mockups as plain boxes; "create Flow view" shows only while
+  no view plays the sequence.
+- *Layout:* Smart Layout runs ten engines and anneals the best two (annealing
+  is not a candidate); the live physics runs all the time, not only while
+  dragging.
+- *Presenting:* slides cannot be reordered; a Flow-view slide does not step
+  through its sequence; Present hides the chrome but does not go full screen.
+- *AI and Forge:* AI changes are applied call by call, not as one atomic,
+  undoable patch; Hub suggestions appear in three stages, not every stage;
+  the Gherkin export covers every scenario in the model; Enter in Quick Search
+  and the Forge button in its bar are undocumented.
+- *Files and VS Code:* Studio saves `.c4.json`, not `.radical` (it opens
+  `.radical` since #118, bug 9); in the
+  browser "Save as file…" downloads a copy and the model stays local; the
+  VS Code commands are "Radical.Tools: Open current file / Open app", open
+  only `*.c4.json`, leave the document unsaved after an edit, and use the
+  local `apps/studio/out` build outside a packaged install.
+- *README:* says `apps/mcp` is "empty for now".
