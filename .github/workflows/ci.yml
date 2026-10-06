@@ -1,11 +1,23 @@
 name: CI
 
+# Runs once per pull request into main, on the PR's merge commit (the branch
+# as it would land). There is no `push` trigger: on a branch with an open PR
+# it ran the same jobs a second time, on the bare branch head. To check a
+# branch without a PR, start this workflow by hand (workflow_dispatch). On
+# main, deploy.yml runs the E2E suite before every deploy.
+#
+# The "Protect main" ruleset requires the "Type-check & Test" check, which
+# the pull_request run reports.
+
 on:
   pull_request:
     branches: [main]
-  push:
-    branches-ignore: [main]
   workflow_dispatch:
+
+# A new push to the PR makes the running checks for the old commit moot.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
