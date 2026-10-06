@@ -153,6 +153,18 @@ function applyPositions(nodes: Record<string, C4Node>, positions: Record<string,
   }
 }
 
+/** The model a slide shows: its linked milestone when it has one (linked by
+ *  hand, so it wins), else the copy captured when the slide was added. A slide
+ *  with neither shows the live model. */
+function slideModel(
+  slide: PresentationSlide,
+  snapshots: DiagramSnapshot[],
+): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } | undefined {
+  const milestone = slide.snapshotId ? snapshots.find((s) => s.id === slide.snapshotId) : undefined
+  if (milestone) return { nodes: milestone.nodes as Record<string, C4Node>, relations: milestone.relations as Record<string, C4Relation> }
+  return (slide as { modelSnapshot?: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } }).modelSnapshot
+}
+
 /** Capture all node positions + collapsed state for a presentation slide */
 function captureCanvasState(nodes: Record<string, C4Node>): SlideCanvasState {
   const result: SlideCanvasState['nodes'] = {}
@@ -3917,25 +3929,12 @@ export const useDiagramStore = create<DiagramStore>()(
         // Disable physics while presenting
         get().stopLiveLayout()
 
-        // Restore inline model snapshot first (preferred — captured at
-        // slide-creation time so it always reflects what was on screen).
-        // Fall back to the linked milestone snapshot for legacy slides.
-        const inline = (slide as any).modelSnapshot as
-          | { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
-          | undefined
-        if (inline) {
+        const shown = slideModel(slide, get().snapshots)
+        if (shown) {
           set((state) => {
-            state.c4Nodes = inline.nodes as any
-            state.c4Relations = inline.relations as any
+            state.c4Nodes = shown.nodes as any
+            state.c4Relations = shown.relations as any
           })
-        } else if (slide.snapshotId) {
-          const snap = get().snapshots.find(s => s.id === slide.snapshotId)
-          if (snap) {
-            set((state) => {
-              state.c4Nodes = snap.nodes as any
-              state.c4Relations = snap.relations as any
-            })
-          }
         } else {
           // A slide without its own model shows the live one — undo whatever
           // a previous milestone slide swapped in.
@@ -4037,23 +4036,12 @@ export const useDiagramStore = create<DiagramStore>()(
         const slide = presentationSlides[i]
         set((state) => { state.presentationSlideIndex = i })
 
-        // Restore inline model snapshot (preferred) or linked milestone snapshot.
-        const inline = (slide as any).modelSnapshot as
-          | { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
-          | undefined
-        if (inline) {
+        const shown = slideModel(slide, get().snapshots)
+        if (shown) {
           set((state) => {
-            state.c4Nodes = inline.nodes as any
-            state.c4Relations = inline.relations as any
+            state.c4Nodes = shown.nodes as any
+            state.c4Relations = shown.relations as any
           })
-        } else if (slide.snapshotId) {
-          const snap = get().snapshots.find(s => s.id === slide.snapshotId)
-          if (snap) {
-            set((state) => {
-              state.c4Nodes = snap.nodes as any
-              state.c4Relations = snap.relations as any
-            })
-          }
         }
 
         // Apply saved canvas state (positions + collapsed).
