@@ -72,7 +72,9 @@ export function builtInC4Metamodel(): Metamodel {
   //  • component                 → inside a container or group
   //  • database / webapp / queue → inside a system or group
   //  • group                     → root OR inside another group (recursive,
-  //                                purely organisational — no semantics)
+  //                                purely organisational — no semantics) OR
+  //                                inside a system, to group its parts as
+  //                                Structurizr groups do
   const allowedParentsMap: Record<string, string[] | undefined> = {
     person:    ['group'],
     system:    ['system', 'group'],
@@ -81,7 +83,7 @@ export function builtInC4Metamodel(): Metamodel {
     database:  ['system', 'group'],
     webapp:    ['system', 'group'],
     queue:     ['system', 'group'],
-    group:     ['group'],
+    group:     ['group', 'system'],
   }
 
   const techTypes = new Set(['container', 'component', 'database', 'webapp', 'queue'])

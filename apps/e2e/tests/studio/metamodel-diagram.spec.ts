@@ -41,14 +41,15 @@ test('the Diagram tab draws every node type and its relations', async ({ page, s
   // By default every containment edge and every type's properties are shown.
   await expect(legend.getByRole('checkbox', { name: 'Show Contains' })).toBeChecked()
   await expect(legend.getByRole('checkbox', { name: 'Show properties on boxes' })).toBeChecked()
-  await expect(diagram.locator('.react-flow__edge[data-testid^="rf__edge-contains:"]')).toHaveCount(35)
+  await expect(diagram.locator('.react-flow__edge[data-testid^="rf__edge-contains:"]')).toHaveCount(36)
   await expect(diagram.getByTestId('rf__node-requirement').getByText('ears_type')).toBeVisible()
 
-  // With Contains off, Blueprint (no relation type reaches it) still shows
-  // its two allowed parents (Domain, Group), so it does not float.
+  // With Contains off, Blueprint and Group (no relation type reaches them)
+  // still show their allowed parents (Blueprint: Domain, Group; Group:
+  // System), so they do not float.
   await legend.getByRole('checkbox', { name: 'Show Contains' }).uncheck()
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 30_000 })
-  await expect(diagram.locator('.react-flow__edge[data-testid^="rf__edge-contains:"]')).toHaveCount(2)
+  await expect(diagram.locator('.react-flow__edge[data-testid^="rf__edge-contains:"]')).toHaveCount(3)
 
   // "none" hides every edge; one relation type back on shows only its edges.
   await legend.getByRole('button', { name: 'none' }).click()
@@ -128,7 +129,7 @@ test('the diagram stays drawn on a slow machine', async ({ page, studio }) => {
   await editor.getByRole('tab', { name: 'Diagram' }).click()
   const diagram = editor.locator('.mmd-canvas')
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 60_000 })
-  await expect(diagram.locator('.react-flow__edge')).toHaveCount(98)
+  await expect(diagram.locator('.react-flow__edge')).toHaveCount(99)
   await expect(diagram.getByTestId('rf__node-requirement')).toBeVisible()
 })
 
