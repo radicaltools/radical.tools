@@ -88,12 +88,15 @@ export interface LiveColaCallbacks {
 /** A node is reported again once it moved or resized by more than this. */
 const REPORT_PX = 0.5
 
-/** From this many nodes, a drag moves only the dragged node's surroundings:
- *  its nearest LOCAL_DRAG_SIZE nodes by relation and containment steps
- *  (hubs would otherwise pull in most of the graph within two steps). The
- *  rest stays frozen until the layout rests again. Smaller diagrams respond
- *  as a whole. */
-const LOCAL_DRAG_MIN_NODES = 150
+/** From this many nodes the physics is local only. Relaxing the whole graph
+ *  takes minutes (about 95 s on 450 nodes) and spreads it over tens of
+ *  thousands of pixels, so: rebuilds (open, view switch, undo, Smart Layout)
+ *  keep the positions they get; new nodes and drags move only their nearest
+ *  LOCAL_DRAG_SIZE nodes by relation and containment steps (hubs would
+ *  otherwise pull in most of the graph within two steps); the rest stays
+ *  frozen until the layout rests. Arranging the whole diagram is Smart
+ *  Layout's job. Smaller diagrams relax as a whole. */
+export const LOCAL_PHYSICS_MIN_NODES = 150
 const LOCAL_DRAG_SIZE = 40
 /** cola's `fixed` is a bit mask (2 = dragged); this bit marks frozen nodes. */
 const FROZEN = 8
@@ -255,7 +258,7 @@ export class LiveColaEngine {
   grab(nodeId: string, rfX: number, rfY: number): void {
     this._grabbedId = nodeId
     this.resetPace()
-    if (this.colaNodes.length >= LOCAL_DRAG_MIN_NODES) this.freezeAllBut(nodeId)
+    if (this.colaNodes.length >= LOCAL_PHYSICS_MIN_NODES) this.freezeAllBut(nodeId)
     const cn = this.idToNode.get(nodeId)
     if (cn) {
       Layout.dragStart(cn)
@@ -329,18 +332,22 @@ export class LiveColaEngine {
     }
   }
 
-  /** Freezes every node but the LOCAL_DRAG_SIZE nearest to `id`. */
-  private freezeAllBut(id: string): void {
-    const near = new Set<string>([id])
-    const queue = [id]
-    while (queue.length && near.size < LOCAL_DRAG_SIZE) {
-      for (const n of this.neighbours.get(queue.shift()!) ?? []) {
-        if (near.size >= LOCAL_DRAG_SIZE) break
-        if (!near.has(n)) { near.add(n); queue.push(n) }
+  /** Freezes every node but the LOCAL_DRAG_SIZE nearest to each of `ids`. */
+  private freezeAllBut(...ids: string[]): void {
+    const near = new Set<string>(ids)
+    for (const id of ids) {
+      const local = new Set<string>([id])
+      const queue = [id]
+      while (queue.length && local.size < LOCAL_DRAG_SIZE) {
+        for (const n of this.neighbours.get(queue.shift()!) ?? []) {
+          if (local.size >= LOCAL_DRAG_SIZE) break
+          if (!local.has(n)) { local.add(n); queue.push(n) }
+        }
       }
+      for (const n of local) near.add(n)
+      // A dragged group moves its leaves, so they count as near too.
+      for (const leaf of this.groupLeaves(id)) near.add(leaf.c4id)
     }
-    // A dragged group moves its leaves, so they count as near too.
-    for (const leaf of this.groupLeaves(id)) near.add(leaf.c4id)
     for (const cn of this.colaNodes) {
       if (near.has(cn.c4id)) continue
       cn.fixed = (cn.fixed ?? 0) | FROZEN
@@ -744,17 +751,25 @@ export class LiveColaEngine {
     // from current positions to the new equilibrium. Persisting prevPos
     // across rebuilds means newly-added nodes start near their neighbours
     // instead of jumping in from the origin.
+    // Large diagrams: no bulk arrangement and no global relaxation. Only nodes
+    // that are new since the previous build (added, or shown by an expand)
+    // move, with their surroundings; with none, the timer does not start.
+    const local = this.colaNodes.length >= LOCAL_PHYSICS_MIN_NODES
+    const fresh = local && prevPos.size > 0 ? leafNodes.filter((n) => !prevPos.has(n.id)).map((n) => n.id) : []
+    if (fresh.length) this.freezeAllBut(...fresh)
     try {
-      if (firstRun) {
+      if (firstRun && !local) {
         ;(layout as any).start(30, 30, 50, 0, true, true)
       } else {
-        ;(layout as any).start(0, 0, 0, 0, true, false)
+        ;(layout as any).start(0, 0, 0, 0, !local || fresh.length > 0, false)
       }
     } catch (err) {
       console.error('[cola] start() failed:', err)
     }
 
     this.cola = layout
+    // Nothing to move on a large diagram: it is at rest as built.
+    if (local && !fresh.length) this.callbacks.onSettled?.()
 
     // Restore grab state if rebuild happened during drag
     if (this._grabbedId) {

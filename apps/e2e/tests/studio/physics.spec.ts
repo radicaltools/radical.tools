@@ -51,11 +51,12 @@ test('zooming with the wheel wins over a fit still animating', async ({ page, st
   expect(settled).toBeGreaterThan(fitted * 1.3)
 })
 
-/** A 15 × 15 grid of linked containers, laid out near rest. */
-function gridDocument(): string {
+/** A 15 × 15 grid of linked systems, laid out near rest (or squeezed so
+ *  they overlap, far from it). */
+function gridDocument(spacing = { x: 420, y: 300 }): string {
   const nodes = [], relations = []
   for (let r = 0; r < 15; r++) for (let c = 0; c < 15; c++) {
-    nodes.push({ id: `n${r}_${c}`, type: 'container', label: `N ${r},${c}`, description: '', x: c * 420, y: r * 300, width: 240, height: 110, collapsed: false })
+    nodes.push({ id: `n${r}_${c}`, type: 'container', label: `N ${r},${c}`, description: '', x: c * spacing.x, y: r * spacing.y, width: 240, height: 110, collapsed: false })
     if (c > 0) relations.push({ id: `h${r}_${c}`, sourceId: `n${r}_${c - 1}`, targetId: `n${r}_${c}` })
     if (r > 0) relations.push({ id: `v${r}_${c}`, sourceId: `n${r - 1}_${c}`, targetId: `n${r}_${c}` })
   }
@@ -87,5 +88,29 @@ test('on a large diagram a drag moves only the dragged node\'s surroundings', as
   const moved = Object.keys(after).filter((id) => after[id] !== previous[id])
   // 225 nodes; the drag may move its 40 nearest, the rest stays put.
   expect(moved.length).toBeGreaterThan(1)
+  expect(moved.length).toBeLessThanOrEqual(40)
+})
+
+test('a large diagram keeps its positions on open and suggests Smart Layout when it is not laid out', async ({ page, studio }) => {
+  await studio.seedDocument(gridDocument({ x: 120, y: 60 }))
+  // The hint is a toast that dismisses itself: watch for it while opening.
+  await Promise.all([
+    expect(page.getByText(/This large diagram is not laid out yet/)).toBeVisible({ timeout: 15_000 }),
+    studio.open('canvas'),
+  ])
+  const before = await studio.positions()
+  await page.waitForTimeout(2000)
+  expect(await studio.positions()).toEqual(before)
+})
+
+test('adding an element to a large diagram moves only its surroundings', async ({ page, studio }) => {
+  await studio.seedDocument(gridDocument())
+  await studio.open('canvas')
+  const before = await studio.positions()
+  await studio.addFromPalette('Software System', { x: 400, y: 400 })
+  await expect(studio.nodes).toHaveCount(226)
+  await page.waitForTimeout(3000)
+  const after = await studio.positions()
+  const moved = Object.keys(before).filter((id) => after[id] !== before[id])
   expect(moved.length).toBeLessThanOrEqual(40)
 })

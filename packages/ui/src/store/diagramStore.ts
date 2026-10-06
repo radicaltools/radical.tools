@@ -64,6 +64,7 @@ import {
 // Re-exported for components that read view collapse state from the store module.
 export { computeViewCollapsedSet, isEffectivelyCollapsed }
 import { LiveColaLayout } from '../layout/liveColaLayout'
+import { LOCAL_PHYSICS_MIN_NODES } from '../layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings } from '../studioSettings'
@@ -134,6 +135,42 @@ function _pushUndo(state: DiagramStore): void {
   _undoStack.push(_captureState(state))
   if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
   _redoStack.length = 0 // clear redo on new change
+}
+
+/** A large diagram where many elements overlap their siblings has not been
+ *  laid out yet; its live layout is local only (LOCAL_PHYSICS_MIN_NODES), so
+ *  only Smart Layout will arrange it. */
+function looksUnarranged(nodes: Record<string, C4Node>): boolean {
+  const list = Object.values(nodes)
+  if (list.length < LOCAL_PHYSICS_MIN_NODES) return false
+  const byParent = new Map<string, C4Node[]>()
+  for (const n of list) {
+    const key = n.parentId ?? ''
+    const siblings = byParent.get(key)
+    if (siblings) siblings.push(n)
+    else byParent.set(key, [n])
+  }
+  const overlapping = new Set<string>()
+  for (const siblings of byParent.values()) {
+    for (let i = 0; i < siblings.length; i++) {
+      const a = siblings[i]
+      for (let j = i + 1; j < siblings.length; j++) {
+        const b = siblings[j]
+        if (a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height) {
+          overlapping.add(a.id)
+          overlapping.add(b.id)
+        }
+      }
+    }
+  }
+  return overlapping.size > list.length * 0.1
+}
+
+/** Called after a document loads (at boot or on switching documents). */
+function suggestSmartLayoutIfUnarranged(): void {
+  const s = useDiagramStore.getState()
+  if (!looksUnarranged(s.c4Nodes)) return
+  s.pushNotification('This large diagram is not laid out yet. The live layout only moves what you drag or add here: use Smart Layout to arrange it.', 'info')
 }
 
 /** Snapshot all node positions from c4Nodes into a positions map */
@@ -4213,6 +4250,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // skipBulk=true: loaded positions are already correct; the 110-iteration
         // cola bulk phase would immediately rearrange and overwrite them.
         get().startLiveLayout({ skipBulk: true })
+        suggestSmartLayoutIfUnarranged()
         // Apply restored camera (loaded as activeViewId=null → default view).
         if (defaultVP) {
           requestAnimationFrame(() => {
@@ -4426,4 +4464,5 @@ if (typeof requestAnimationFrame !== 'undefined') {
   // cola's 110-iteration synchronous bulk phase doesn't immediately
   // overwrite the persisted positions.
   useDiagramStore.getState().startLiveLayout({ skipBulk: _initLoadedFromDisk })
+  if (_initLoadedFromDisk) suggestSmartLayoutIfUnarranged()
 }
