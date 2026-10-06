@@ -38,6 +38,7 @@ async function main(): Promise<void> {
   const model = await FolderModel.open(folder, { metamodel })
   const server = new McpServer({ name: 'radical-folder', version: '0.1.0' }, { instructions: INSTRUCTIONS })
   const registered = new Map<string, RegisteredTool>()
+  const gone = new AbortController()
   const advertise = (): void => {
     for (const tool of model.tools) {
       const existing = registered.get(tool.name)
@@ -49,8 +50,13 @@ async function main(): Promise<void> {
         description: tool.description,
         inputSchema: fromJsonSchema(tool.inputSchema),
         annotations: { readOnlyHint: READ_ONLY_TOOLS.has(tool.name) },
-      }, async (input) => {
-        const outcome = await model.call(tool.name, input)
+      }, async (input, ctx) => {
+        // Progress goes out only to a client that asked for it with a token.
+        const token = ctx.mcpReq._meta?.progressToken
+        const onProgress = token === undefined ? undefined : ({ progress, message }: { progress: number; message: string }) => {
+          void ctx.mcpReq.notify({ method: 'notifications/progress', params: { progressToken: token, progress, message } })
+        }
+        const outcome = await model.call(tool.name, input, { onProgress, signal: AbortSignal.any([ctx.mcpReq.signal, gone.signal]) })
         if (outcome.toolsChanged) advertise()
         return { content: [{ type: 'text', text: outcome.text }], isError: !outcome.ok }
       }))
@@ -58,6 +64,12 @@ async function main(): Promise<void> {
   }
   advertise()
   await server.connect(new StdioServerTransport())
+  // The client is gone: stop instead of computing (and writing) a result nobody
+  // will read. A running Smart Layout notices at its next step.
+  process.stdin.once('end', () => {
+    gone.abort()
+    void model.idle().then(() => process.exit(0))
+  })
 }
 
 main().catch((error: unknown) => {

@@ -37,6 +37,14 @@ const buildTools = (metamodel: Metamodel | undefined): ToolDef[] => [
   ...buildToolDefs(metamodel).filter((tool) => !EXCLUDED_TOOLS.has(tool.name)),
 ]
 
+/** Per call: progress for a client that asked for it, and the client's cancel. */
+export interface CallOptions {
+  onProgress?: (progress: { progress: number; message: string }) => void
+  signal?: AbortSignal
+}
+
+const CANCELLED = 'The client cancelled the call; nothing was written.'
+
 export interface CallOutcome {
   ok: boolean
   text: string
@@ -172,14 +180,20 @@ export class FolderModel {
     return new FolderModel(canonical, createModelFacade(data).getMetamodel?.())
   }
 
-  call(name: string, input: unknown): Promise<CallOutcome> {
-    const run = this.tail.then(() => this.run(name, input))
+  /** Resolves once every queued call has finished. */
+  idle(): Promise<void> {
+    return this.tail.then(() => undefined)
+  }
+
+  call(name: string, input: unknown, options: CallOptions = {}): Promise<CallOutcome> {
+    const run = this.tail.then(() => this.run(name, input, options))
     this.tail = run.catch(() => {})
     return run
   }
 
-  private async run(name: string, input: unknown): Promise<CallOutcome> {
+  private async run(name: string, input: unknown, options: CallOptions): Promise<CallOutcome> {
     if (!this.tools.some((tool) => tool.name === name)) return { ok: false, text: `Unknown tool ${name}` }
+    if (options.signal?.aborted) return { ok: false, text: CANCELLED }
     try {
       const session = new MdFolderSession(diskFolderStorage(this.folder))
       const before = await session.readAll()
@@ -188,7 +202,7 @@ export class FolderModel {
       checkData(data)
       const facade = createModelFacade(data, {
         runLayout: async (doc, viewId) => {
-          const layout = await this.smartLayout(doc, documentMetamodel(doc.metamodel), viewId)
+          const layout = await this.smartLayout(doc, documentMetamodel(doc.metamodel), viewId, options)
           return { ok: layout.ok, text: layout.text, data: layout.changed }
         },
       })
@@ -263,7 +277,7 @@ export class FolderModel {
    *  changes. A view's result goes to its own saved positions, like the
    *  positions Studio keeps per view. */
   private async smartLayout(
-    data: DiagramData, metamodel: Metamodel | undefined, viewId: string | undefined,
+    data: DiagramData, metamodel: Metamodel | undefined, viewId: string | undefined, options: CallOptions = {},
   ): Promise<{ ok: boolean; text: string; changed?: DiagramData }> {
     const changed = JSON.parse(JSON.stringify(data)) as DiagramData
     const view = viewId === undefined ? undefined : changed.views?.find((v) => v.id === viewId)
@@ -279,7 +293,15 @@ export class FolderModel {
     }
     const input = viewLayoutInput(view, nodes, byId(changed.relations))
     if (!Object.keys(input.nodes).length) return { ok: true, text: 'Smart Layout: there are no nodes to lay out.' }
-    const result = await runSmartLayoutCore(input.nodes, input.relations, metamodel)
+    // Large models take minutes: report each step, and stop at the next one
+    // once the client has cancelled (or gone away) rather than finish unseen.
+    let step = 0
+    const result = await runSmartLayoutCore(input.nodes, input.relations, metamodel, (p) => {
+      if (options.signal?.aborted) throw new Error(CANCELLED)
+      const count = 'done' in p ? ` ${p.done}/${p.total}` : ''
+      options.onProgress?.({ progress: ++step, message: `Smart Layout: ${p.phase}${count}` })
+    })
+    if (options.signal?.aborted) return { ok: false, text: CANCELLED }
     if (!result.candidates.length) return { ok: false, text: 'Smart Layout: no candidate produced a result.' }
     if (result.keptCurrent) return { ok: true, text: 'Smart Layout: the current layout already scores best; nothing changed.' }
     applyLayoutPositions(nodes, result.winner.positions, input)
