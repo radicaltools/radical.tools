@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  AI_SYSTEM_PROMPT,
-  buildContextMessage,
-  buildSystemMessages,
-} from '../src/renderer/src/ai/systemPrompt'
+import { AI_SYSTEM_PROMPT, buildContextMessage } from '@radical/common/ai/systemPrompt'
+import { buildSystemMessages } from '../src/renderer/src/ai/systemPrompt'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import type { Metamodel } from '@radical/common/metamodel'
 

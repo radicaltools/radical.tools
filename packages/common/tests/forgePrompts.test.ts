@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildForgeStagePrompt, buildPriorStagesBlock, needLabelFromDescription, FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE } from '../src/renderer/src/ai/forgePrompts'
+import { buildForgeStagePrompt, buildPriorStagesBlock, needLabelFromDescription, FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE } from '../src/ai/forge/prompts'
 
 describe('buildPriorStagesBlock', () => {
   it('returns "" when there are no prior stages with a summary yet', () => {

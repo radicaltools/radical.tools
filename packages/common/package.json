@@ -2,13 +2,15 @@
   "name": "@radical/common",
   "version": "0.0.0",
   "private": true,
-  "description": "The radical model shared by Studio, the VS Code extension and the MCP server: C4 types, metamodels, file formats, query language and AI tool definitions. No UI or browser dependencies.",
+  "description": "The radical model shared by Studio, the VS Code extension and the MCP server: C4 types, metamodels, file formats, query language, AI tool definitions and Radical Forge prompts. No UI or browser dependencies.",
   "type": "module",
   "exports": {
     "./c4": "./src/c4.ts",
     "./metamodel": "./src/metamodel/index.ts",
     "./model": "./src/model.ts",
     "./hubFormat": "./src/hubFormat.ts",
+    "./hubViews": "./src/hubViews.ts",
+    "./hubImport": "./src/hubImport.ts",
     "./wireframe": "./src/wireframe.ts",
     "./formats/structurizrDsl": "./src/formats/structurizrDsl.ts",
     "./formats/mdFolder": "./src/formats/mdFolder.ts",
@@ -18,7 +20,9 @@
     "./ai/diagramFacade": "./src/ai/diagramFacade.ts",
     "./ai/modelFacade": "./src/ai/modelFacade.ts",
     "./ai/metamodelContext": "./src/ai/metamodelContext.ts",
-    "./ai/tools": "./src/ai/tools/index.ts"
+    "./ai/systemPrompt": "./src/ai/systemPrompt.ts",
+    "./ai/tools": "./src/ai/tools/index.ts",
+    "./ai/forge": "./src/ai/forge/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

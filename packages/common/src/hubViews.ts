@@ -1,9 +1,10 @@
 // ─── Hub concept views → studio views ───────────────────────────────────────
 // A concept file may carry named canvas views (`views`: static diagrams such
 // as "Containers" or a screen flow, and dynamic views that play a sequence).
-// The same translation is needed in three places — the Hub viewer (ids kept
-// as-is) and both studio import paths (ids remapped to the freshly created
-// nodes / relations / sequences) — so it lives here once.
+// The same translation is needed in several places — the Hub viewer (ids kept
+// as-is), and Studio's two import paths and the MCP server's Forge import
+// through ./hubImport.ts (ids remapped to the freshly created nodes /
+// relations / sequences) — so it lives here once.
 //
 // Canvas (static / dynamic), wiki and table views are taken over; the Hub
 // adds its own all-elements wiki / table views on top. A view keeps only the elements that exist
@@ -12,11 +13,11 @@
 // sequence did not survive falls back to a static view of the same nodes.
 //
 // Per-view positions are only meaningful where node ids and coordinates are
-// the concept's own (the Hub viewer); an import re-ids nodes and re-centres
-// them on the viewport, so it drops them and the view keeps the imported
-// layout.
+// the concept's own (the Hub viewer); an import re-ids nodes and moves them
+// (Studio centres them on the viewport), so it drops them and the view keeps
+// the imported layout.
 
-import type { DiagramView, NodePosition } from '@radical/common/c4'
+import type { DiagramView, NodePosition } from './c4'
 
 type Raw = Record<string, unknown>
 type IdMap = (id: string) => string | undefined
