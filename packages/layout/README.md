@@ -7,7 +7,9 @@ and `elkjs` only.
 
 Public entry points are the ones listed in `exports` in package.json
 (`smartLayout`, `elkLayout`, `radicalLayout`, `crossingOpt`, `geometry`,
-`portAllocator`, `edgeRouting`, `side`). The annealing refinement, score
+`portAllocator`, `edgeRouting`, `side`, `viewInput`, `constraints`).
+`constraints` applies the user's kept rows, columns and grids
+(`LayoutConstraint` in `@radical/common`) to a layout. The annealing refinement, score
 weights, ELK spacing and finalising steps are internal.
 
 Studio keeps the browser-specific parts: the Web Worker wrapper

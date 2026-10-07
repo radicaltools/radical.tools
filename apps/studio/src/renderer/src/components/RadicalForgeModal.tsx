@@ -20,6 +20,7 @@ import {
 } from '../ai/forgeClarify'
 import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 import { generateWireframe } from '../ai/mockupWireframe'
 import { addedSince, currentModelIds, removeAdded, type ModelIds } from '../ai/forgeStageOutput'
 
@@ -127,6 +128,9 @@ function pickTextFile(): Promise<string | null> {
     input.click()
   })
 }
+
+const NO_NODES: Record<string, C4Node> = {}
+const NO_RELATIONS: Record<string, C4Relation> = {}
 
 export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement | null {
   const [step, setStep] = useState<WizardStep>('input')
@@ -536,8 +540,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setStep('export')
   }, [busy, currentStageId])
 
-  const nodes = useDiagramStore((s) => s.c4Nodes)
-  const relations = useDiagramStore((s) => s.c4Relations)
+  // Only while open: the dialog stays mounted, and the live layout replaces
+  // c4Nodes every frame.
+  const nodes = useDiagramStore((s) => (open ? s.c4Nodes : NO_NODES))
+  const relations = useDiagramStore((s) => (open ? s.c4Relations : NO_RELATIONS))
   const gherkinFiles = useMemo(() => buildGherkinFiles(nodes, relations), [nodes, relations])
   const needs = useMemo(
     () => Object.values(nodes).filter((n) => n.type === 'need').sort((a, b) => a.label.localeCompare(b.label)),

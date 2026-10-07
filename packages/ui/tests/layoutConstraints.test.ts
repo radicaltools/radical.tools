@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { activeLayoutConstraints, childrenInView, useDiagramStore } from '../src/store/diagramStore'
 import { LiveColaLayout } from '../src/layout/liveColaLayout'
+import { LiveColaEngine } from '../src/layout/liveColaEngine'
 import { NODE_SIZES, type AlignConstraint, type C4Node, type C4Relation, type DiagramView } from '@radical/common/c4'
 import type { Alignment } from '@radical/layout/constraints'
 
@@ -329,6 +330,72 @@ describe('Live layout physics with alignments', () => {
     expect(Math.abs(cx('con') - line)).toBeLessThanOrEqual(1)
     expect(Math.abs(cx('dec') - cx('log'))).toBeLessThanOrEqual(1)
     expect(Math.abs(cx('con') - cx('log'))).toBeLessThanOrEqual(1)
+  })
+
+  // From the repo's own architecture model: a column of groups, the first
+  // holding a grid of groups. Expanding one of those on a large model left
+  // the canvas shaking for good, the groups flipping between two places
+  // thousands of pixels apart. Both mechanisms are checked on the engine.
+  describe('alignments nested in an aligned container', () => {
+    const nested = (g1Children = 3): Record<string, C4Node> => {
+      // Children first: a local neighbourhood then fills up with g1's
+      // children before it reaches top, as it does on the real model.
+      const nodes: Record<string, C4Node> = {}
+      for (const [g, count] of [['g1', g1Children], ['g2', 3]] as const) {
+        for (let i = 0; i < count; i++) nodes[`${g}c${i}`] = node(`${g}c${i}`, 'container', { parentId: g, x: 30 + (i % 3) * 280, y: 120 + Math.floor(i / 3) * 200 })
+      }
+      return {
+        ...nodes,
+        g1: node('g1', 'group', { parentId: 'top', x: 60, y: 120, width: 900, height: 400 }),
+        g2: node('g2', 'group', { parentId: 'top', x: 1100, y: 120, width: 900, height: 400 }),
+        top: node('top', 'group', { x: 0, y: 0, width: 2400, height: 1000 }),
+        side: node('side', 'system', { x: 2500, y: 1600 }),
+      }
+    }
+    const alignments: Alignment[] = [
+      { axis: 'x', ids: ['top', 'side'], orders: [['top', 'side']] },
+      { axis: 'y', ids: ['g1', 'g2'], orders: [['g1', 'g2']] },
+    ]
+    /** The engine's internals these tests look at. */
+    interface Internals {
+      start(skipBulk: boolean): void
+      stop(): void
+      groupAlignments: Array<{ axis: 'x' | 'y'; members: Array<{ id: string }>; line?: number }>
+      colaNodes: Array<{ c4id: string; fixed?: number }>
+      shiftMember(m: { id: string }, axis: 'x' | 'y', d: number): void
+      projectGroupAlignments(): void
+      freezeAllBut(...ids: string[]): void
+    }
+    const engine = (nodes: Record<string, C4Node>): Internals =>
+      new LiveColaEngine({ getModel: () => ({ nodes, relations: {}, alignments }), applyPositions: () => {} }) as unknown as Internals
+
+    it('moves the lines inside a container with it', () => {
+      const e = engine(nested())
+      e.start(true)
+      e.stop()
+      e.projectGroupAlignments()
+      const row = e.groupAlignments.find((a) => a.axis === 'y')!
+      const column = e.groupAlignments.find((a) => a.axis === 'x')!
+      const before = row.line!
+      // The outer column moves the container down: the row inside follows.
+      e.shiftMember(column.members.find((m) => m.id === 'top')!, 'y', 500)
+      expect(row.line).toBeCloseTo(before + 500)
+      // Outer lines project first, so the row is not pulled back first.
+      expect(e.groupAlignments.indexOf(column)).toBeLessThan(e.groupAlignments.indexOf(row))
+    })
+
+    it('frees the partners of a container a moving element is inside', () => {
+      // More children than a local neighbourhood holds: top is not in g1c0's.
+      const e = engine(nested(45))
+      e.start(true)
+      e.stop()
+      // g1c0 moves (shown by an expand, dragged): g1 and top move with it,
+      // so top's column partner side follows, as do g1's row partner g2 and
+      // its leaves.
+      e.freezeAllBut('g1c0')
+      const frozen = new Set(e.colaNodes.filter((n) => ((n.fixed ?? 0) & 8) !== 0).map((n) => n.c4id))
+      for (const id of ['g2c0', 'g2c1', 'g2c2', 'side']) expect(frozen.has(id)).toBe(false)
+    })
   })
 
   it('holds a column of expanded containers', async () => {

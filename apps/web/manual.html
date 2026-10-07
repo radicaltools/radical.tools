@@ -278,6 +278,7 @@
           <li><strong>Wrap into…</strong> — create a new container of an allowed type around the selection.</li>
           <li><strong>Move to…</strong> — re-parent the selection into another container.</li>
           <li><strong>Unwrap</strong> — remove a container but keep its children and their relations.</li>
+          <li><strong>Align…</strong> — keep the elements in a row, a column or a grid on this canvas, optionally in the order you selected them (see <a href="#alignments">Alignments</a>). With a single container selected it reads <strong>Align children…</strong>.</li>
           <li><strong>Hide from view</strong> — take the elements out of the active view without touching the model.</li>
           <li><strong>Delete</strong> — remove from the model (with children); <kbd>Delete</kbd> does the same. Everything is undoable with <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd>.</li>
         </ul>
@@ -396,7 +397,7 @@
         </p>
         <h3>Live physics</h3>
         <p>While you drag, a light force simulation nudges neighbours out of the way and keeps containers hugging their children. It never fights you: the node you hold stays where you put it.</p>
-        <h3>Alignments</h3>
+        <h3 id="alignments">Alignments</h3>
         <p>Select two or more elements and choose <strong>Align… → Keep in a row</strong> (centres on one horizontal line) or <strong>Keep in a column</strong> (one vertical line). The rule belongs to the canvas you made it on — <em>All elements</em> or one view — and every layout keeps it: drag one member and the others follow, the live physics holds the line, Smart Layout picks its best arrangement with the alignment applied. Members may sit in different containers, and expanded containers can be aligned by their boxes.</p>
         <p>With <strong>Keep their order</strong> ticked in the same menu (the default; Studio remembers your choice) the elements also keep the order you selected them in, left to right or top to bottom — select them right to left and the row swaps them round. Drag one past its neighbour and the neighbour is pushed ahead, and Smart Layout never swaps them. Dashed guides show each alignment, with arrowheads when the order is kept; select a member to get buttons that switch order-keeping and remove the alignment, or use <em>Align… → Stop keeping aligned</em>. A view's alignments are also listed in its properties, each with an <em>in order</em> switch (the order they are listed in, which is the order they were selected in).</p>
         <p><strong>Align… → Keep in a grid</strong> (three or more elements) puts them in a grid filled row by row in the order you selected them, and lays it out in even cells. Pick the number of columns with − / + in the menu (about square by default); later, select a member and use − / + on the guide, or the <em>columns</em> field in the view's properties. Every row stays a row and every column a column, in order, whatever moves.</p>
@@ -584,7 +585,7 @@ codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.
       <section class="doc-section" id="formats">
         <h2>File formats</h2>
         <h3><code>.radical</code> (JSON)</h3>
-        <p>One file: <code>nodes</code>, <code>relations</code>, <code>sequences</code>, <code>views</code> (with per-view positions and camera), <code>snapshots</code> (milestones), <code>presentations</code>, the <code>metamodel</code> and Hub template records. Older <code>.c4.json</code> files open unchanged.</p>
+        <p>One file: <code>nodes</code>, <code>relations</code>, <code>sequences</code>, <code>views</code> (with per-view positions, camera and <code>layoutConstraints</code> — the alignments and grids), <code>defaultLayoutConstraints</code> (alignments on <em>All elements</em>), <code>snapshots</code> (milestones), <code>presentations</code>, the <code>metamodel</code> and Hub template records. Older <code>.c4.json</code> files open unchanged.</p>
         <h3>Markdown folder</h3>
 <pre class="code"><code>my-model/
 ├─ radical.md                 <span class="cm"># manifest</span>
@@ -598,7 +599,7 @@ codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.
 ├─ relations.json
 ├─ views.json · sequences.json · snapshots.json · presentations.json
 ├─ metamodel.json · hubTemplates.json
-└─ _layout.json               <span class="cm"># positions &amp; camera — the only noisy file</span></code></pre>
+└─ _layout.json               <span class="cm"># positions, camera &amp; All-elements alignments — the only noisy file</span></code></pre>
         <p>
           Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the element's properties, sorted) and the description as body. Hierarchy is the directory tree. Output is deterministic — sorted keys, stable file names — so Git diffs show what changed and nothing else. Edit the files by hand, or let an agent edit them through the <a href="#mcp">MCP server</a>; the app picks them up.
         </p>
