@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { NODE_SIZES, type C4Node, type C4Relation, type LayoutConstraint, type PositionMap } from '@radical/common/c4'
-import { alignmentError, enforceAlignments, resolveAlignments } from '../src/constraints'
+import { NODE_SIZES, type AlignConstraint, type C4Node, type C4Relation, type LayoutConstraint, type PositionMap } from '@radical/common/c4'
+import { alignmentError, arrangeGrid, enforceAlignments, resolveAlignments, standingOrder } from '../src/constraints'
 import { runSmartLayoutCore } from '../src/smartLayout'
 
 const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
@@ -8,11 +8,14 @@ const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
 
 const byId = (...nodes: C4Node[]): Record<string, C4Node> => Object.fromEntries(nodes.map((n) => [n.id, n]))
 
-const align = (axis: LayoutConstraint['axis'], ...nodeIds: string[]): LayoutConstraint =>
+const align = (axis: AlignConstraint['axis'], ...nodeIds: string[]): AlignConstraint =>
   ({ id: nodeIds.join('+'), type: 'align', axis, nodeIds })
 
-const ordered = (axis: LayoutConstraint['axis'], ...nodeIds: string[]): LayoutConstraint =>
+const ordered = (axis: AlignConstraint['axis'], ...nodeIds: string[]): AlignConstraint =>
   ({ ...align(axis, ...nodeIds), ordered: true })
+
+const grid = (columns: number, ...nodeIds: string[]): LayoutConstraint =>
+  ({ id: 'grid', type: 'grid', columns, nodeIds })
 
 /** Drawn centres of `ids` along x, root nodes only. */
 const xs = (nodes: Record<string, C4Node>, positions: PositionMap, ids: string[]): number[] =>
@@ -205,6 +208,60 @@ describe('ordered alignments', () => {
     const alignments = resolveAlignments([ordered('vertical', 'api', 'db')], nodes)
     const out = enforceAlignments(nodes, {}, alignments)
     expect(alignmentError(nodes, out, alignments)).toBeLessThanOrEqual(0.5)
+  })
+})
+
+describe('grids', () => {
+  const cells = ['a', 'b', 'c', 'd', 'e']
+  const five = (): Record<string, C4Node> => byId(...cells.map((id, i) => node(id, 'component', { x: (4 - i) * 300, y: (i % 2) * 700 })))
+
+  it('resolve to ordered, ranked rows and columns', () => {
+    expect(resolveAlignments([grid(2, ...cells)], five())).toEqual([
+      { axis: 'x', ids: ['a', 'c', 'e'], orders: [['a', 'c', 'e']], rank: { key: 'grid:columns', index: 0 } },
+      { axis: 'x', ids: ['b', 'd'], orders: [['b', 'd']], rank: { key: 'grid:columns', index: 1 } },
+      { axis: 'y', ids: ['a', 'b'], orders: [['a', 'b']], rank: { key: 'grid:rows', index: 0 } },
+      { axis: 'y', ids: ['c', 'd'], orders: [['c', 'd']], rank: { key: 'grid:rows', index: 1 } },
+    ])
+  })
+
+  it('put a scrambled layout back into rows and columns, in reading order', () => {
+    const nodes = five()
+    const alignments = resolveAlignments([grid(2, ...cells)], nodes)
+    const out = enforceAlignments(nodes, {}, alignments)
+    expect(alignmentError(nodes, out, alignments)).toBeLessThanOrEqual(0.5)
+    const c = (id: string) => ({ x: out[id].x + out[id].width! / 2, y: out[id].y + out[id].height! / 2 })
+    expect(c('a').x).toBeLessThan(c('b').x)
+    expect(c('a').y).toBeLessThan(c('c').y)
+    expect(c('c').y).toBeLessThan(c('e').y)
+    expect(overlapping(cells.map((id) => out[id]) as never)).toBe(false)
+  })
+
+  it('arrange into even cells from the top-left of the members', () => {
+    const nodes = five()
+    const out = arrangeGrid(nodes, {}, { columns: 2, nodeIds: cells })
+    const w = NODE_SIZES.component.width
+    const h = NODE_SIZES.component.height
+    expect(out.a).toMatchObject({ x: 0, y: 0 })
+    expect(out.b).toMatchObject({ x: w + 60, y: 0 })
+    expect(out.c).toMatchObject({ x: 0, y: h + 60 })
+    expect(out.e).toMatchObject({ x: 0, y: 2 * (h + 60) })
+  })
+})
+
+describe('standingOrder', () => {
+  // c   a
+  //   d    b      (d and b a little lower than c and a, still one row)
+  //  e
+  const box = (id: string, x: number, y: number) => ({ id, x, y, width: 100, height: 80 })
+  const boxes = [box('a', 300, 0), box('b', 450, 30), box('c', 0, 10), box('d', 150, 35), box('e', 50, 200)]
+
+  it('reads a row left to right and a column top to bottom', () => {
+    expect(standingOrder(boxes, 'horizontal')).toEqual(['c', 'e', 'd', 'a', 'b'])
+    expect(standingOrder(boxes, 'vertical')).toEqual(['a', 'c', 'b', 'd', 'e'])
+  })
+
+  it('reads a grid row by row', () => {
+    expect(standingOrder(boxes, 'grid')).toEqual(['c', 'd', 'a', 'b', 'e'])
   })
 })
 

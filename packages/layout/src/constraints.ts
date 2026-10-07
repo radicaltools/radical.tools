@@ -2,9 +2,10 @@
  * User layout constraints (`LayoutConstraint`): which ones hold on a canvas,
  * and a headless pass that makes a layout satisfy them.
  *
- * Only alignments exist so far: the centres of two or more elements share
- * one coordinate — a row (equal centre y) or a column (equal centre x) —
- * and, when the rule is ordered, keep their order along it.
+ * Rules are alignments: the centres of two or more elements share one
+ * coordinate — a row (equal centre y) or a column (equal centre x) — and,
+ * when the rule is ordered, keep their order along it. A grid is a set of
+ * ordered rows and columns whose lines also keep their order (rank).
  * Priorities, highest first: the alignment and its order hold, children stay
  * inside their parents, boxes do not overlap. Overlaps are resolved without
  * breaking an alignment: boxes that carry one move together along its axis,
@@ -17,18 +18,21 @@
  * without physics: Smart Layout's finalisation, a rule just created, the
  * MCP server.
  */
-import { C4Node, LayoutConstraint, NODE_SIZES, PositionMap } from '@radical/common/c4'
+import { C4Node, GridConstraint, LayoutConstraint, NODE_SIZES, PositionMap, gridCells } from '@radical/common/c4'
 import { compoundPadding, drawnSize, isVisible } from './geometry'
 import { CHILD_GAP, ROOT_GAP } from './layoutFinalize'
 
 /** One alignment as the layout applies it. `axis` is the coordinate the
  *  members' centres share: 'y' keeps them in a row, 'x' in a column.
  *  `orders` are the ordered rules on this line: member ids whose centres
- *  must increase along the other axis (left to right, top to bottom). */
+ *  must increase along the other axis (left to right, top to bottom).
+ *  `rank` places the line among others of one grid: lines with the same key
+ *  run in `index` order (rows top to bottom, columns left to right). */
 export interface Alignment {
   axis: 'x' | 'y'
   ids: string[]
   orders: string[][]
+  rank?: { key: string; index: number }
 }
 
 /** The axis along a line: x along a row, y along a column. */
@@ -44,9 +48,21 @@ const MAX_ROUNDS = 6
 
 type Box = { x: number; y: number; width: number; height: number }
 
-/** The coordinate a constraint's members share. */
-export function alignmentAxis(c: LayoutConstraint): 'x' | 'y' {
-  return c.axis === 'horizontal' ? 'y' : 'x'
+/** A rule as the lines it keeps (a grid: its rows and its columns). */
+interface Line {
+  axis: 'x' | 'y'
+  ids: string[]
+  ordered: boolean
+  rank?: Alignment['rank']
+}
+
+function linesOf(c: LayoutConstraint): Line[] {
+  if (c.type === 'align') return [{ axis: c.axis === 'horizontal' ? 'y' : 'x', ids: c.nodeIds, ordered: !!c.ordered }]
+  const { rows, columns } = gridCells(c)
+  return [
+    ...rows.map((ids, index): Line => ({ axis: 'y', ids, ordered: true, rank: { key: `${c.id}:rows`, index } })),
+    ...columns.map((ids, index): Line => ({ axis: 'x', ids, ordered: true, rank: { key: `${c.id}:columns`, index } })),
+  ]
 }
 
 function isAncestor(nodes: Record<string, C4Node>, ancestorId: string, id: string): boolean {
@@ -79,16 +95,18 @@ export function resolveAlignments(
     }
     const order: string[] = []
     const chains: string[][] = []
-    for (const c of constraints) {
-      if (c.type !== 'align' || alignmentAxis(c) !== axis) continue
-      const drawn = [...new Set(c.nodeIds)].filter((id) => nodes[id] && isVisible(nodes[id], nodes))
+    const ranked: Array<{ id: string; rank: NonNullable<Alignment['rank']> }> = []
+    for (const line of constraints.flatMap(linesOf)) {
+      if (line.axis !== axis) continue
+      const drawn = [...new Set(line.ids)].filter((id) => nodes[id] && isVisible(nodes[id], nodes))
       const members = drawn.filter((id) => !drawn.some((other) => other !== id && isAncestor(nodes, id, other)))
       if (members.length < 2) continue
       for (const id of members) {
         if (!parent.has(id)) { parent.set(id, id); order.push(id) }
       }
       for (const id of members.slice(1)) parent.set(find(id), find(members[0]))
-      if (c.ordered) chains.push(members)
+      if (line.ordered) chains.push(members)
+      if (line.rank) ranked.push({ id: members[0], rank: line.rank })
     }
     const lines = new Map<string, string[]>()
     for (const id of order) {
@@ -98,7 +116,8 @@ export function resolveAlignments(
       else lines.set(root, [id])
     }
     for (const [root, ids] of lines) {
-      out.push({ axis, ids, orders: chains.filter((chain) => find(chain[0]) === root) })
+      const rank = ranked.find((r) => find(r.id) === root)?.rank
+      out.push({ axis, ids, orders: chains.filter((chain) => find(chain[0]) === root), ...(rank ? { rank } : {}) })
     }
   }
   return out
@@ -124,9 +143,89 @@ export function alignmentError(
       for (let k = 0; k + 1 < cs.length; k++) worst = Math.max(worst, cs[k] - cs[k + 1] + MIN_STEP)
     }
   }
+  for (const lines of rankedLines(alignments)) {
+    const at = lines.map((a) => lineAt(nodes, boxes, parents, a))
+    for (let k = 0; k + 1 < at.length; k++) worst = Math.max(worst, at[k] - at[k + 1] + MIN_STEP)
+  }
   return worst
 }
 
+/** Lines of one grid, rows or columns, in rank order. */
+function rankedLines(alignments: readonly Alignment[]): Alignment[][] {
+  const byKey = new Map<string, Alignment[]>()
+  for (const a of alignments) {
+    if (!a.rank) continue
+    const list = byKey.get(a.rank.key)
+    if (list) list.push(a)
+    else byKey.set(a.rank.key, [a])
+  }
+  return [...byKey.values()].map((list) => list.sort((p, q) => p.rank!.index - q.rank!.index)).filter((list) => list.length > 1)
+}
+
+/** Where a line runs: its members' mean centre on its axis. */
+function lineAt(nodes: Record<string, C4Node>, boxes: Record<string, Box>, parents: Set<string>, a: Alignment): number {
+  return a.ids.reduce((sum, id) => sum + centre(nodes, boxes, parents, id, a.axis), 0) / a.ids.length
+}
+
+
+/**
+ * Ids of sibling boxes (one frame: parent-relative, as drawn) in the order
+ * they stand: left to right for a row, top to bottom for a column, and in
+ * reading order for a grid — boxes whose centres fall within a box's half
+ * height of a row's first box join that row, rows top to bottom, each left
+ * to right.
+ */
+export function standingOrder(
+  boxes: ReadonlyArray<Box & { id: string }>, layout: 'horizontal' | 'vertical' | 'grid',
+): string[] {
+  const cx = (b: Box): number => b.x + b.width / 2
+  const cy = (b: Box): number => b.y + b.height / 2
+  if (layout === 'horizontal') return [...boxes].sort((a, b) => cx(a) - cx(b)).map((b) => b.id)
+  if (layout === 'vertical') return [...boxes].sort((a, b) => cy(a) - cy(b)).map((b) => b.id)
+  const rows: Array<Array<Box & { id: string }>> = []
+  for (const b of [...boxes].sort((p, q) => cy(p) - cy(q))) {
+    const row = rows[rows.length - 1]
+    if (row && cy(b) - cy(row[0]) <= Math.max(row[0].height, b.height) / 2) row.push(b)
+    else rows.push([b])
+  }
+  return rows.flatMap((row) => row.sort((p, q) => cx(p) - cx(q)).map((b) => b.id))
+}
+
+/** Space between a grid's cells when it is laid out. */
+const GRID_GAP = 60
+
+/**
+ * Lays a grid out in even cells: each column as wide as its widest member,
+ * each row as tall as its tallest, `GRID_GAP` apart, from the top-left
+ * corner of the members' current extent. `nodes` is the graph as drawn
+ * (projectToVisibleGraph); a member not drawn leaves its cell empty.
+ * Returns a box for every node, the members moved; run enforceAlignments
+ * after it to make room around the grid.
+ */
+export function arrangeGrid(nodes: Record<string, C4Node>, positions: PositionMap, grid: Pick<GridConstraint, 'columns' | 'nodeIds'>): PositionMap {
+  const boxes = boxesOf(nodes, positions)
+  const parents = parentIdsOf(nodes)
+  const { rows, columns } = gridCells(grid)
+  const drawn = (id: string): boolean => !!nodes[id] && isVisible(nodes[id], nodes)
+  const size = (id: string): { width: number; height: number } => (parents.has(id) ? boxes[id] : drawnSize(nodes[id], false))
+  const widths = columns.map((col) => Math.max(0, ...col.filter(drawn).map((id) => size(id).width)))
+  const heights = rows.map((row) => Math.max(0, ...row.filter(drawn).map((id) => size(id).height)))
+  const members = grid.nodeIds.filter(drawn)
+  if (!members.length) return boxes
+  const left = Math.min(...members.map((id) => centre(nodes, boxes, parents, id, 'x') - size(id).width / 2))
+  const top = Math.min(...members.map((id) => centre(nodes, boxes, parents, id, 'y') - size(id).height / 2))
+  const cols = columns.length
+  grid.nodeIds.forEach((id, i) => {
+    if (!drawn(id)) return
+    const r = Math.floor(i / cols)
+    const k = i % cols
+    const x = left + widths.slice(0, k).reduce((s, w) => s + w + GRID_GAP, 0) + widths[k] / 2
+    const y = top + heights.slice(0, r).reduce((s, h) => s + h + GRID_GAP, 0) + heights[r] / 2
+    boxes[id].x += x - centre(nodes, boxes, parents, id, 'x')
+    boxes[id].y += y - centre(nodes, boxes, parents, id, 'y')
+  })
+  return boxes
+}
 
 function boxesOf(nodes: Record<string, C4Node>, positions: PositionMap): Record<string, Box> {
   const out: Record<string, Box> = {}
@@ -198,6 +297,15 @@ export function enforceAlignments(
   })
 
   const snap = (): void => {
+    // A grid's rows (columns) out of order: the rows take the places the
+    // rows hold, in order, whole — moving single cells would break them.
+    for (const lines of rankedLines(alignments)) {
+      const at = lines.map((a) => lineAt(nodes, boxes, parents, a))
+      if (at.every((c, k) => k === 0 || c - at[k - 1] >= MIN_STEP)) continue
+      const slots = [...at].sort((p, q) => p - q)
+      for (let k = 1; k < slots.length; k++) slots[k] = Math.max(slots[k], slots[k - 1] + MIN_STEP)
+      lines.forEach((a, k) => { for (const id of a.ids) boxes[id][a.axis] += slots[k] - at[k] })
+    }
     for (const a of alignments) {
       const centres = a.ids.map((id) => centre(nodes, boxes, parents, id, a.axis))
       const target = centres.reduce((s, c) => s + c, 0) / centres.length

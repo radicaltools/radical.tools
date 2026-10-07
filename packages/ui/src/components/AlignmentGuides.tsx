@@ -1,15 +1,17 @@
 import React from 'react'
 import { useStore, type Node } from 'reactflow'
-import type { LayoutConstraint } from '@radical/common/c4'
+import { constraintLines, type LayoutConstraint } from '@radical/common/c4'
 import { activeLayoutConstraints, useDiagramStore } from '../store/diagramStore'
 
 /**
  * Dashed guides between the elements of each alignment on the active canvas
  * (a row or a column the user asked to keep). Drawn in the gaps between
  * consecutive members, so a guide never covers a box; an alignment that
- * keeps its order has arrowheads pointing along it. Faint by default; when a
- * member is selected the guide is drawn fully and offers buttons that
- * switch order-keeping and remove the alignment.
+ * keeps its order has arrowheads pointing along it; a grid draws each of its
+ * rows and columns. Faint by default; when a member, or the container all
+ * members sit in, is selected the guide is
+ * drawn fully and offers buttons: order on/off for an alignment, fewer or
+ * more columns for a grid, and remove.
  *
  * Rendered as a ReactFlow child, outside the viewport element that exports
  * capture. The lines sit under React Flow's renderer (z-index 4), so boxes
@@ -31,6 +33,7 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
   const selectedNodeIds = useDiagramStore((s) => s.selectedNodeIds)
   const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
   const setAlignmentOrdered = useDiagramStore((s) => s.setAlignmentOrdered)
+  const setGridColumns = useDiagramStore((s) => s.setGridColumns)
   const [tx, ty, zoom] = useStore((s) => s.transform)
   const nodeInternals = useStore((s) => s.nodeInternals)
   const selected = new Set(selectedNodeIds)
@@ -43,21 +46,27 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
   }
 
   const guides = constraints.flatMap((c) => {
-    const boxes = c.nodeIds.map(boxOf).filter((b): b is Box => !!b)
-    if (boxes.length < 2) return []
-    const row = c.axis === 'horizontal'
-    boxes.sort((a, b) => (row ? a.x - b.x : a.y - b.y))
-    const line = boxes.reduce((sum, b) => sum + (row ? b.y + b.height / 2 : b.x + b.width / 2), 0) / boxes.length
-    const segments: Segment[] = []
-    for (let i = 0; i + 1 < boxes.length; i++) {
-      const a = boxes[i]
-      const b = boxes[i + 1]
-      const from = row ? a.x + a.width : a.y + a.height
-      const to = row ? b.x : b.y
-      if (to - from < 4) continue
-      segments.push(row ? { x1: from, y1: line, x2: to, y2: line } : { x1: line, y1: from, x2: line, y2: to })
+    const segments: Array<Segment & { ordered: boolean }> = []
+    for (const l of constraintLines([c])) {
+      const boxes = l.nodeIds.map(boxOf).filter((b): b is Box => !!b)
+      if (boxes.length < 2) continue
+      const row = l.axis === 'horizontal'
+      boxes.sort((a, b) => (row ? a.x - b.x : a.y - b.y))
+      const line = boxes.reduce((sum, b) => sum + (row ? b.y + b.height / 2 : b.x + b.width / 2), 0) / boxes.length
+      for (let i = 0; i + 1 < boxes.length; i++) {
+        const a = boxes[i]
+        const b = boxes[i + 1]
+        const from = row ? a.x + a.width : a.y + a.height
+        const to = row ? b.x : b.y
+        if (to - from < 4) continue
+        const ordered = !!l.ordered
+        segments.push(row ? { x1: from, y1: line, x2: to, y2: line, ordered } : { x1: line, y1: from, x2: line, y2: to, ordered })
+      }
     }
+    if (!segments.length) return []
+    const parentOf = (id: string): string | undefined => nodeInternals.get(id)?.parentNode
     const active = c.nodeIds.some((id) => selected.has(id))
+      || (selected.size === 1 && c.nodeIds.every((id) => { const p = parentOf(id); return !!p && selected.has(p) }))
     return [{ c, segments, active }]
   })
 
@@ -75,7 +84,7 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
             {segments.map((s, i) => (
               <g key={i}>
                 <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} strokeDasharray="6 4"
-                  markerEnd={c.ordered ? 'url(#alignment-guide-arrow)' : undefined} />
+                  markerEnd={s.ordered ? 'url(#alignment-guide-arrow)' : undefined} />
                 {/* End ticks across the line mark where it meets each box. */}
                 {s.y1 === s.y2 ? (
                   <>
@@ -95,7 +104,38 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
       </svg>
       <div style={{ ...layer, zIndex: 5 }}>
         {guides.filter((g) => g.active && g.segments.length > 0).map(({ c, segments }) => {
-          const s = segments[0]
+          // The buttons go on the longest gap, where they cover the least.
+          const s = segments.reduce((best, x) => (Math.hypot(x.x2 - x.x1, x.y2 - x.y1) > Math.hypot(best.x2 - best.x1, best.y2 - best.y1) ? x : best))
+          if (c.type === 'grid') {
+            return (
+              <div key={c.id} className="alignment-guide-actions" style={{ left: (s.x1 + s.x2) / 2, top: (s.y1 + s.y2) / 2 }}>
+                <button
+                  type="button"
+                  className="alignment-guide-btn"
+                  title="Fewer columns"
+                  aria-label="Fewer grid columns"
+                  disabled={c.columns <= 1}
+                  onClick={() => setGridColumns(c.id, c.columns - 1)}
+                >−</button>
+                <span className="alignment-guide-count" title="Columns">{c.columns}</span>
+                <button
+                  type="button"
+                  className="alignment-guide-btn"
+                  title="More columns"
+                  aria-label="More grid columns"
+                  disabled={c.columns >= c.nodeIds.length}
+                  onClick={() => setGridColumns(c.id, c.columns + 1)}
+                >+</button>
+                <button
+                  type="button"
+                  className="alignment-guide-btn"
+                  title="Stop keeping this grid"
+                  aria-label="Remove grid"
+                  onClick={() => removeLayoutConstraint(c.id)}
+                >×</button>
+              </div>
+            )
+          }
           const noun = c.axis === 'horizontal' ? 'row' : 'column'
           const direction = c.axis === 'horizontal' ? 'left to right' : 'top to bottom'
           return (

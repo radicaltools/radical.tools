@@ -799,6 +799,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const setViewLayoutMode = useDiagramStore((s) => s.setViewLayoutMode)
   const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
   const setAlignmentOrdered = useDiagramStore((s) => s.setAlignmentOrdered)
+  const setGridColumns = useDiagramStore((s) => s.setGridColumns)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
   const labels = useNodeLabels()
   const [editingName, setEditingName] = useState(false)
@@ -941,24 +942,43 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {view.layoutConstraints!.map((c) => (
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{c.axis === 'horizontal' ? 'Row' : 'Column'}</span>
+                <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{c.type === 'grid' ? 'Grid' : c.axis === 'horizontal' ? 'Row' : 'Column'}</span>
                 <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}
-                  title={c.nodeIds.map((id) => labels.get(id) ?? id).join(c.ordered ? ' → ' : ', ')}>
-                  {c.nodeIds.map((id) => labels.get(id) ?? id).join(c.ordered ? ' → ' : ', ')}
+                  title={c.nodeIds.map((id) => labels.get(id) ?? id).join(c.type === 'grid' || c.ordered ? ' → ' : ', ')}>
+                  {c.nodeIds.map((id) => labels.get(id) ?? id).join(c.type === 'grid' || c.ordered ? ' → ' : ', ')}
                 </span>
-                <label
-                  style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, color: 'var(--text-muted)', cursor: readOnly ? 'default' : 'pointer' }}
-                  title={c.axis === 'horizontal' ? 'Keep them left to right in the order listed (the order they were selected in)' : 'Keep them top to bottom in the order listed (the order they were selected in)'}
-                >
-                  <input
-                    type="checkbox"
-                    checked={!!c.ordered}
-                    disabled={readOnly}
-                    onChange={(e) => setAlignmentOrdered(c.id, e.target.checked, view.id)}
-                    style={{ margin: 0 }}
-                  />
-                  in order
-                </label>
+                {c.type === 'grid' ? (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, color: 'var(--text-muted)' }} title="Columns; the cells fill row by row in the order listed">
+                    <input
+                      type="number"
+                      min={1}
+                      max={c.nodeIds.length}
+                      value={c.columns}
+                      disabled={readOnly}
+                      onChange={(e) => {
+                        const n = Math.round(Number(e.target.value))
+                        if (n >= 1 && n <= c.nodeIds.length) setGridColumns(c.id, n, view.id)
+                      }}
+                      className="props-input"
+                      style={{ width: 40, padding: '1px 4px', fontSize: 11 }}
+                    />
+                    columns
+                  </label>
+                ) : (
+                  <label
+                    style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, color: 'var(--text-muted)', cursor: readOnly ? 'default' : 'pointer' }}
+                    title={c.axis === 'horizontal' ? 'Keep them left to right in the order listed (the order they were selected in)' : 'Keep them top to bottom in the order listed (the order they were selected in)'}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!c.ordered}
+                      disabled={readOnly}
+                      onChange={(e) => setAlignmentOrdered(c.id, e.target.checked, view.id)}
+                      style={{ margin: 0 }}
+                    />
+                    in order
+                  </label>
+                )}
                 {!readOnly && (
                   <button
                     type="button"

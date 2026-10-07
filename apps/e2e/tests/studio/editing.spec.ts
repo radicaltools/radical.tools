@@ -82,3 +82,21 @@ test('⌘+ and ⌘− zoom the canvas, as the toolbar tooltips say', async ({ pa
   await page.keyboard.press('ControlOrMeta+-')
   await expect.poll(scale).toBeLessThan(zoomedIn)
 })
+
+test('a click on a collapse button reaches it even when an edge lies over it', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  const btn = studio.node('bookstore').locator('.c4-node-collapse-btn').first()
+  await expect(btn).toHaveAttribute('title', 'Collapse')
+  const r = (await btn.boundingBox())!
+  // Edges between a container's children are drawn above the container;
+  // stand in for one with an element over the button.
+  await page.evaluate(([x, y, w, h]) => {
+    const cover = document.createElement('div')
+    cover.className = 'test-cover'
+    Object.assign(cover.style, { position: 'fixed', left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px`, zIndex: '1000' })
+    document.querySelector('.react-flow')!.appendChild(cover)
+  }, [r.x - 4, r.y - 4, r.width + 8, r.height + 8])
+  await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2)
+  await expect(studio.node('bookstore').locator('.c4-node-collapse-btn').first()).toHaveAttribute('title', 'Expand')
+})

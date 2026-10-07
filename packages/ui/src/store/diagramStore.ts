@@ -25,6 +25,8 @@ import {
   NodePosition,
   PositionMap,
   LayoutConstraint,
+  AlignConstraint,
+  defaultGridColumns,
   NODE_SIZES,
   COLLAPSED_HEIGHT,
   COLLAPSED_WIDTH,
@@ -52,7 +54,8 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { fittedParentSize } from '@radical/layout/geometry'
+import { fittedParentSize, projectToVisibleGraph } from '@radical/layout/geometry'
+import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
   applyLayoutPositions,
@@ -356,6 +359,19 @@ export function activeLayoutConstraints(
   state: Pick<DiagramStore, 'activeViewId' | 'views' | 'defaultLayoutConstraints'>,
 ): LayoutConstraint[] {
   return (state.activeViewId ? state.views[state.activeViewId]?.layoutConstraints : state.defaultLayoutConstraints) ?? NO_CONSTRAINTS
+}
+
+/** Direct children of `parentId` in the active view, with their boxes in
+ *  the parent's frame. `drawn` is false while the parent is collapsed: the
+ *  boxes are then where the children were last drawn. */
+export function childrenInView(
+  state: Pick<DiagramStore, 'rfNodes'>, parentId: string,
+): { drawn: boolean; boxes: Array<{ id: string; x: number; y: number; width: number; height: number }> } {
+  const children = state.rfNodes.filter((n) => n.parentNode === parentId)
+  return {
+    drawn: children.some((n) => !n.hidden),
+    boxes: children.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y, width: n.data.width, height: n.data.height })),
+  }
 }
 
 /** The layout input for the store's active view. */
@@ -1071,7 +1087,17 @@ interface DiagramStore {
    * the user selected them in. Returns the constraint's id, or null when
    * refused (the reason is notified).
    */
-  addAlignment: (axis: LayoutConstraint['axis'], nodeIds: string[], options?: { ordered?: boolean }) => string | null
+  addAlignment: (axis: AlignConstraint['axis'], nodeIds: string[], options?: { ordered?: boolean }) => string | null
+  /**
+   * Keeps `nodeIds` in a grid of `columns` columns (default: about square)
+   * on the active canvas, filled row by row in the order given — the order
+   * the user selected them in — and lays them out in even cells now.
+   * Returns the constraint's id, or null when refused (notified).
+   */
+  addGrid: (nodeIds: string[], columns?: number) => string | null
+  /** Gives a grid another number of columns and lays it out again, on its
+   *  canvas (null = All elements; undefined = the active canvas). */
+  setGridColumns: (id: string, columns: number, viewId?: string | null) => void
   /** Makes an alignment keep the order of its members as listed (the order
    *  they were selected in) on its canvas (null = All elements; undefined =
    *  the active canvas), or stop keeping it. */
@@ -1266,6 +1292,9 @@ interface DiagramStore {
   /** Moves the active canvas's elements so its layout constraints hold
    *  (no undo step of its own). */
   _enforceLayoutConstraints: () => void
+  /** Lays grid `id` of the active canvas out in even cells, then keeps the
+   *  constraints (no undo step of its own). */
+  _arrangeGrid: (id: string) => void
 }
 
 // ─── Live layout singleton (not serialisable → kept outside store) ───────────
@@ -2582,10 +2611,71 @@ export const useDiagramStore = create<DiagramStore>()(
         return id
       },
 
+      addGrid(nodeIds, columns) {
+        const viewId = get().activeViewId
+        const ids = [...new Set(nodeIds)]
+        const cols = columns ?? defaultGridColumns(ids.length)
+        const refused = model.checkAddGrid(get(), viewId, ids, cols)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return null
+        }
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        const id = uid()
+        set((state) => { model.insertGrid(state, viewId, id, ids, cols) })
+        get()._arrangeGrid(id)
+        _liveLayout?.reset()
+        return id
+      },
+
+      setGridColumns(id, columns, viewIdArg) {
+        const viewId = viewIdArg === undefined ? get().activeViewId : viewIdArg
+        const c = model.layoutConstraintsOf(get(), viewId).find((x) => x.id === id)
+        if (!c || c.type !== 'grid' || c.columns === columns) return
+        const refused = model.checkGridColumns(get(), viewId, id, columns)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        set((state) => { model.setGridColumns(state, viewId, id, columns) })
+        if (viewId === get().activeViewId) {
+          get()._arrangeGrid(id)
+          _liveLayout?.reset()
+        }
+      },
+
+      _arrangeGrid(id) {
+        const c = activeLayoutConstraints(get()).find((x) => x.id === id)
+        if (!c || c.type !== 'grid') return
+        const input = layoutInputForView(get())
+        // Members inside a collapsed container are laid out as if it were
+        // open, so the grid is in place when it is expanded.
+        const open = { ...input.nodes }
+        for (const member of c.nodeIds) {
+          for (let p = open[member]?.parentId; p && open[p]; p = open[p].parentId) {
+            if (open[p].collapsed) open[p] = { ...open[p], collapsed: false }
+          }
+        }
+        const { nodes } = projectToVisibleGraph(open, input.relations)
+        const positions = arrangeGrid(nodes, {}, c)
+        set((state) => {
+          for (const member of c.nodeIds) {
+            const n = state.c4Nodes[member]
+            const p = positions[member]
+            if (n && p) { n.x = p.x; n.y = p.y }
+          }
+        })
+        get()._sync()
+        get()._enforceLayoutConstraints()
+      },
+
       setAlignmentOrdered(id, ordered, viewIdArg) {
         const viewId = viewIdArg === undefined ? get().activeViewId : viewIdArg
         const c = model.layoutConstraintsOf(get(), viewId).find((x) => x.id === id)
-        if (!c || !!c.ordered === ordered) return
+        if (!c || c.type !== 'align' || !!c.ordered === ordered) return
         const ids = ordered ? c.nodeIds : null
         if (ids) {
           const refused = model.checkAlignmentOrder(get(), viewId, id, ids)

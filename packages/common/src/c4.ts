@@ -172,21 +172,64 @@ export interface DiagramView {
 
 /**
  * A layout rule that holds on one canvas whatever moves: drags, the live
- * physics, Smart Layout.
- *
- * 'align' keeps the centres of `nodeIds` on one line — a row
- * (`axis: 'horizontal'`, equal centre y) or a column (`axis: 'vertical'`,
- * equal centre x). With `ordered`, the members also keep the order of
- * `nodeIds` along that line: left to right in a row, top to bottom in a
- * column. Members hidden on the canvas (outside the view, under a collapsed
- * parent) are skipped; with fewer than two left the rule rests.
+ * physics, Smart Layout. Members hidden on the canvas (outside the view,
+ * under a collapsed parent) are skipped; a line left with fewer than two
+ * members rests.
  */
-export interface LayoutConstraint {
+export type LayoutConstraint = AlignConstraint | GridConstraint
+
+/**
+ * Keeps the centres of `nodeIds` on one line — a row (`axis: 'horizontal'`,
+ * equal centre y) or a column (`axis: 'vertical'`, equal centre x). With
+ * `ordered`, the members also keep the order of `nodeIds` along that line:
+ * left to right in a row, top to bottom in a column.
+ */
+export interface AlignConstraint {
   id: string
   type: 'align'
   axis: 'horizontal' | 'vertical'
   nodeIds: string[]
   ordered?: boolean
+}
+
+/**
+ * Keeps `nodeIds` in a grid of `columns` columns, filled row by row in the
+ * order of `nodeIds`: every row is an ordered row, every column an ordered
+ * column (gridCells).
+ */
+export interface GridConstraint {
+  id: string
+  type: 'grid'
+  columns: number
+  nodeIds: string[]
+}
+
+/** Columns for a grid of `count` elements when none are asked for: about square. */
+export function defaultGridColumns(count: number): number {
+  return Math.max(1, Math.ceil(Math.sqrt(count)))
+}
+
+/** A grid's rows and columns, each listed in order. */
+export function gridCells(c: Pick<GridConstraint, 'columns' | 'nodeIds'>): { rows: string[][]; columns: string[][] } {
+  const cols = Math.max(1, Math.min(Math.floor(c.columns), c.nodeIds.length))
+  const rows: string[][] = []
+  for (let i = 0; i < c.nodeIds.length; i += cols) rows.push(c.nodeIds.slice(i, i + cols))
+  const columns: string[][] = []
+  for (let k = 0; k < cols; k++) columns.push(c.nodeIds.filter((_, i) => i % cols === k))
+  return { rows, columns }
+}
+
+/** Every rule as the lines it keeps: alignments as they are, a grid as its
+ *  ordered rows and columns. */
+export function constraintLines(constraints: readonly LayoutConstraint[]): AlignConstraint[] {
+  return constraints.flatMap((c): AlignConstraint[] => {
+    if (c.type === 'align') return [c]
+    const { rows, columns } = gridCells(c)
+    return [
+      ...rows.map((ids, r): AlignConstraint => ({ id: `${c.id}:row${r}`, type: 'align', axis: 'horizontal', nodeIds: ids, ordered: true })),
+      ...columns.map((ids, k): AlignConstraint => ({ id: `${c.id}:col${k}`, type: 'align', axis: 'vertical', nodeIds: ids, ordered: true })),
+    ]
+  })
 }
 
 /** Named snapshot (version) of the diagram state */

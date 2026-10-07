@@ -10,9 +10,9 @@
  *     also while a member is dragged
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { activeLayoutConstraints, useDiagramStore } from '../src/store/diagramStore'
+import { activeLayoutConstraints, childrenInView, useDiagramStore } from '../src/store/diagramStore'
 import { LiveColaLayout } from '../src/layout/liveColaLayout'
-import { NODE_SIZES, type C4Node, type C4Relation, type DiagramView } from '@radical/common/c4'
+import { NODE_SIZES, type AlignConstraint, type C4Node, type C4Relation, type DiagramView } from '@radical/common/c4'
 import type { Alignment } from '@radical/layout/constraints'
 
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -113,11 +113,11 @@ describe('addAlignment', () => {
     expect(cx('mail')).toBeLessThan(cx('user'))
 
     useDiagramStore.getState().setAlignmentOrdered(id, false)
-    expect(useDiagramStore.getState().defaultLayoutConstraints[0].ordered).toBeUndefined()
+    expect((useDiagramStore.getState().defaultLayoutConstraints[0] as AlignConstraint).ordered).toBeUndefined()
     useDiagramStore.getState().setAlignmentOrdered(id, true)
     expect(useDiagramStore.getState().defaultLayoutConstraints[0]).toMatchObject({ nodeIds: ['mail', 'user'], ordered: true })
     useDiagramStore.getState().undo()
-    expect(useDiagramStore.getState().defaultLayoutConstraints[0].ordered).toBeUndefined()
+    expect((useDiagramStore.getState().defaultLayoutConstraints[0] as AlignConstraint).ordered).toBeUndefined()
   })
 
   it('refuses an order that contradicts another one', () => {
@@ -125,6 +125,64 @@ describe('addAlignment', () => {
     expect(store.addAlignment('horizontal', ['mail', 'user'], { ordered: true })).toBeTruthy()
     expect(useDiagramStore.getState().addAlignment('horizontal', ['user', 'bank', 'mail'], { ordered: true })).toBeNull()
     expect(useDiagramStore.getState().addAlignment('horizontal', ['bank', 'mail', 'user'], { ordered: true })).toBeTruthy()
+  })
+
+  it('lays a grid out in selection order, re-lays it with other columns, and undoes it', () => {
+    const store = useDiagramStore.getState()
+    const ids = ['mail', 'user', 'bank', 'shop']
+    const id = store.addGrid(ids)!
+    expect(useDiagramStore.getState().defaultLayoutConstraints).toEqual([{ id, type: 'grid', columns: 2, nodeIds: ids }])
+    const centre = (nid: string) => {
+      const n = useDiagramStore.getState().rfNodes.find((r) => r.id === nid)!
+      return { x: n.position.x + (n.data.width as number) / 2, y: n.position.y + (n.data.height as number) / 2 }
+    }
+    // mail user / bank shop
+    expect(Math.abs(centre('mail').y - centre('user').y)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(centre('mail').x - centre('bank').x)).toBeLessThanOrEqual(0.5)
+    expect(centre('mail').x).toBeLessThan(centre('user').x)
+    expect(centre('mail').y).toBeLessThan(centre('bank').y)
+
+    useDiagramStore.getState().setGridColumns(id, 4)
+    const ys = ids.map((nid) => centre(nid).y)
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThanOrEqual(0.5)
+    expect(centre('bank').x).toBeLessThan(centre('shop').x)
+
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().defaultLayoutConstraints[0]).toMatchObject({ columns: 2 })
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().defaultLayoutConstraints).toEqual([])
+  })
+
+  it('refuses a grid that puts two elements of one row into one column', () => {
+    useDiagramStore.getState().addAlignment('horizontal', ['user', 'bank'])
+    // user above bank in one column of a 1-column grid: they are already in one row.
+    expect(useDiagramStore.getState().addGrid(['user', 'bank', 'mail'], 1)).toBeNull()
+    expect(useDiagramStore.getState().addGrid(['user', 'bank', 'mail'], 2)).toBeTruthy()
+  })
+
+  it('reflows a grid when one of its elements is deleted', () => {
+    useDiagramStore.getState().addGrid(['mail', 'user', 'bank', 'shop'], 2)
+    useDiagramStore.getState().removeNode('user')
+    expect(useDiagramStore.getState().defaultLayoutConstraints[0]).toMatchObject({ nodeIds: ['mail', 'bank', 'shop'], columns: 2 })
+  })
+
+  it('lists a container\'s children in the view, drawn or behind a collapse', () => {
+    expect(childrenInView(useDiagramStore.getState(), 'shop')).toMatchObject({ drawn: true, boxes: [{ id: 'api' }] })
+    useDiagramStore.getState().toggleCollapse('shop')
+    expect(childrenInView(useDiagramStore.getState(), 'shop')).toMatchObject({ drawn: false, boxes: [{ id: 'api' }] })
+  })
+
+  it('lays out a grid of a collapsed container\'s children, ready for the expand', () => {
+    const store = useDiagramStore.getState()
+    store.addNode({ type: 'container', label: 'web', parentId: 'shop', collapsed: false, x: 400, y: 300, width: 240, height: 120 })
+    store.addNode({ type: 'container', label: 'db', parentId: 'shop', collapsed: false, x: 30, y: 500, width: 240, height: 120 })
+    useDiagramStore.getState().toggleCollapse('shop')
+    const ids = Object.values(useDiagramStore.getState().c4Nodes).filter((n) => n.parentId === 'shop').map((n) => n.id)
+    expect(ids).toHaveLength(3)
+    const gridId = useDiagramStore.getState().addGrid(ids, 3)
+    expect(gridId).toBeTruthy()
+    const ys = ids.map((nid) => useDiagramStore.getState().c4Nodes[nid].y)
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThanOrEqual(0.5)
   })
 
   it('drops a deleted element from its alignments, and an alignment left with one', () => {

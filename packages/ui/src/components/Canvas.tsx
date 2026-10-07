@@ -227,6 +227,9 @@ function StructuralCanvas(): React.ReactElement {
   // bias zoom-out so the new nodes are guaranteed to be in frame, even
   // if cola is still pushing them around).
   const recentlyAddedIdsRef = useRef<Set<string>>(new Set())
+  // When the user last moved the camera by hand: the "diagram left the
+  // screen" refit waits a moment after that, so it never fights a gesture.
+  const lastUserCameraRef = useRef<number>(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
   /**
@@ -319,8 +322,22 @@ function StructuralCanvas(): React.ReactElement {
         recentlyAddedIdsRef.current = new Set(newlyVisible.map((n) => n.id))
       }
     }
-    // Outside the active window with no fresh change → camera stays put.
-    if (now > fitWindowUntilRef.current) return null
+    // Outside the active window with no fresh change → camera stays put,
+    // unless the diagram has left the screen altogether (the physics moved
+    // it after the window closed): Smart fit keeps it in view.
+    if (now > fitWindowUntilRef.current) {
+      const HANDS_OFF_MS = 2000
+      if (now - lastUserCameraRef.current < HANDS_OFF_MS) return null
+      const vp = inst.getViewport()
+      const view = { x: -vp.x / vp.zoom, y: -vp.y / vp.zoom, width: rect.width / vp.zoom, height: rect.height / vp.zoom }
+      const onScreen = visible.some((n) => {
+        const p = n.positionAbsolute ?? n.position
+        const w = n.width ?? 0
+        const h = n.height ?? 0
+        return p.x < view.x + view.width && p.x + w > view.x && p.y < view.y + view.height && p.y + h > view.y
+      })
+      if (onScreen) return null
+    }
 
     // Inside the active window: include all currently-visible nodes
     // PLUS any recently-added nodes (in case cola has temporarily pushed
@@ -458,6 +475,7 @@ function StructuralCanvas(): React.ReactElement {
   // tick leaves the camera alone. Smart fit itself stays on (it is a
   // setting); it reacts again to the next expand or collapse.
   const takeCamera = useCallback(() => {
+    lastUserCameraRef.current = performance.now()
     if (fitAnimRef.current != null) {
       cancelAnimationFrame(fitAnimRef.current)
       fitAnimRef.current = null
@@ -835,10 +853,29 @@ function StructuralCanvas(): React.ReactElement {
       )
     : rfNodes
 
+  // Edges between a container's children are drawn above the container (so
+  // they stay visible and clickable), and one can lie over its expand /
+  // collapse button. A click there is meant for the button: hand it over
+  // before the edge sees it. Same reach as the button's own hit area (CSS).
+  const onClickCapture = useCallback((e: React.MouseEvent) => {
+    if ((e.target as Element).closest('.c4-node-collapse-btn')) return
+    const reach = 10
+    for (const btn of containerRef.current?.querySelectorAll<HTMLElement>('.c4-node-collapse-btn') ?? []) {
+      const r = btn.getBoundingClientRect()
+      if (e.clientX >= r.left - reach && e.clientX <= r.right + reach && e.clientY >= r.top - reach && e.clientY <= r.bottom + reach) {
+        e.stopPropagation()
+        e.preventDefault()
+        btn.click()
+        return
+      }
+    }
+  }, [])
+
   return (
     <div
       ref={containerRef}
       className={canvasClasses.join(' ')}
+      onClickCapture={onClickCapture}
       onDrop={isViewMode ? undefined : onDrop}
       onDragOver={isViewMode ? undefined : onDragOver}
       onDoubleClick={isViewMode ? undefined : onCanvasDoubleClick}

@@ -4,7 +4,7 @@
 // applyPatch.ts — there is no single "apply a whole patch" function anymore,
 // each tool applies its own single change.
 
-import type { C4Node, C4Relation, DiagramSequence, DiagramView, LayoutConstraint, Presentation } from '../c4'
+import type { AlignConstraint, C4Node, C4Relation, DiagramSequence, DiagramView, LayoutConstraint, Presentation } from '../c4'
 import type { Metamodel } from '../metamodel'
 
 export interface ApplyReport {
@@ -84,7 +84,10 @@ export interface DiagramFacade {
   getLayoutConstraints?(viewId: string | null): LayoutConstraint[]
   /** Keeps nodes on one line on a canvas (with `ordered`, in the order of
    *  `nodeIds`); the new constraint's id, or why it was refused. */
-  addAlignment?(viewId: string | null, axis: LayoutConstraint['axis'], nodeIds: string[], ordered?: boolean): { id: string } | { error: string }
+  addAlignment?(viewId: string | null, axis: AlignConstraint['axis'], nodeIds: string[], ordered?: boolean): { id: string } | { error: string }
+  /** Keeps nodes in a grid of `columns` columns, filled row by row in the
+   *  order of `nodeIds`; the new constraint's id, or why it was refused. */
+  addGrid?(viewId: string | null, nodeIds: string[], columns: number): { id: string } | { error: string }
   removeLayoutConstraints?(viewId: string | null, ids: string[]): void
   /** Optional sequence actions — omitted = AI sequence tools report a clear error. */
   getSequences?(): Record<string, DiagramSequence>
