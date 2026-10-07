@@ -32,3 +32,18 @@ test('export as SVG', async ({ page }) => {
     expect(svg).toContain(label)
   }
 })
+
+test('an export zoomed out keeps the relation labels the canvas hides', async ({ page, studio }) => {
+  const zoomOut = page.getByTitle('Zoom out (⌘−)')
+  for (let i = 0; i < 15 && (await studio.canvas.getAttribute('data-edge-labels')) !== 'none'; i++) {
+    await zoomOut.click()
+    await page.waitForTimeout(350)
+  }
+  await expect(studio.canvas).toHaveAttribute('data-edge-labels', 'none')
+  const svg = (await exportAs(page, 'Export as SVG…')).data.toString('utf8')
+  const labels = svg.match(/<div[^>]*class="[^"]*relation-label[^"]*"[^>]*>/g) ?? []
+  expect(labels.length).toBeGreaterThan(0)
+  expect(labels.filter((label) => /display:\s*none/.test(label)).length, 'hidden labels in the export').toBe(0)
+  // The canvas hides them again afterwards.
+  await expect(studio.canvas).toHaveAttribute('data-edge-labels', 'none')
+})

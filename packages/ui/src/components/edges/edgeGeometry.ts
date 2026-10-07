@@ -19,6 +19,20 @@ export const LABEL_BOX: LabelBoxStyle & { fontSize: number; techFontSize: number
   maxWidth: 200, padX: 8, padY: 3, border: 1, lineHeight: 1.4, fontSize: 17, techFontSize: 14,
 }
 
+/**
+ * How much of the relation labels a zoom shows. The label text is 17px and
+ * the technology 14px: below these zooms they are too small to read and
+ * only cover the diagram, so the technology goes first, then the whole
+ * label. Canvas puts the level on its container as data-edge-labels.
+ */
+export type EdgeLabelDetail = 'full' | 'name' | 'none'
+const TECH_HIDDEN_BELOW = 0.5
+const LABEL_HIDDEN_BELOW = 0.3
+
+export function edgeLabelDetail(zoom: number): EdgeLabelDetail {
+  return zoom < LABEL_HIDDEN_BELOW ? 'none' : zoom < TECH_HIDDEN_BELOW ? 'name' : 'full'
+}
+
 /** The lines RelationEdge shows in a relation's label (none: no label). */
 function labelLines(data: C4EdgeRFData | undefined): LabelTextLine[] {
   const lines: LabelTextLine[] = []

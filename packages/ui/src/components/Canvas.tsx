@@ -15,6 +15,7 @@ import { zoomIdentity } from 'd3-zoom'
 import { useDiagramStore } from '../store/diagramStore'
 import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
+import { edgeLabelDetail } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { AlignmentGuides } from './AlignmentGuides'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize } from '@radical/common/c4'
@@ -262,6 +263,19 @@ function StructuralCanvas(): React.ReactElement {
   // in the first frame React Flow draws them (see placeCamera).
   const snapIdsRef = useRef<Set<string> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // How much of the relation labels the zoom shows (see edgeLabelDetail and
+  // index.css). Set on the container from a store subscription, so crossing
+  // a threshold restyles the labels without re-rendering the canvas.
+  useEffect(() => {
+    const apply = (zoom: number): void => {
+      const el = containerRef.current
+      const detail = edgeLabelDetail(zoom)
+      if (el && el.dataset.edgeLabels !== detail) el.dataset.edgeLabels = detail
+    }
+    apply(rfStore.getState().transform[2])
+    return rfStore.subscribe((s, prev) => { if (s.transform !== prev.transform) apply(s.transform[2]) })
+  }, [rfStore])
 
   /**
    * Full fit-all target — everything visible (used for explicit Fit-All
