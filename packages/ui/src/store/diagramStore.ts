@@ -1942,13 +1942,14 @@ export const useDiagramStore = create<DiagramStore>()(
         // Walk up the ancestor chain:
         // At each level: separate siblings of current node, then refit the parent.
         // This propagates size changes upward so grandparent containers also shrink/grow.
-        // Not under live physics: it makes room and sizes the groups itself,
-        // so this arrangement would only be drawn until its first reply —
-        // the toggled group pushed off its centre, siblings pushed aside,
-        // all snapping back a few frames later.
-        let currentId: string | undefined = _liveLayout?.running ? undefined : id
+        // Under live physics no separation: the physics makes room itself, so
+        // this arrangement would only be drawn until its first reply — the
+        // toggled group pushed off its centre, siblings pushed aside, all
+        // snapping back a few frames later.
+        const separate = !_liveLayout?.running
+        let currentId: string | undefined = id
         while (currentId) {
-          const overlapUpdates = separateSiblings(currentId, get().c4Nodes)
+          const overlapUpdates = separate ? separateSiblings(currentId, get().c4Nodes) : {}
           if (Object.keys(overlapUpdates).length > 0) {
             set((state) => {
               for (const [sid, pos] of Object.entries(overlapUpdates)) {
