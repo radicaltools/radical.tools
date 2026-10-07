@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import type { C4Node, C4Relation, DiagramSequence, DiagramView, LayoutConstraint } from './c4'
+import { constraintLines, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
 import {
   builtInC4Metamodel,
   builtInDddC4Metamodel,
@@ -312,18 +312,21 @@ export function layoutConstraintsOf(state: ModelState, viewId: string | null): L
   return (viewId ? state.views[viewId]?.layoutConstraints : state.defaultLayoutConstraints) ?? []
 }
 
+type Axis = AlignConstraint['axis']
+
 const AXIS_NOUN = { horizontal: 'row', vertical: 'column' } as const
+const across = (axis: Axis): Axis => (axis === 'horizontal' ? 'vertical' : 'horizontal')
 
 /** Which line along `axis` each node is on (a node on none is its own line). */
-function alignmentLines(constraints: LayoutConstraint[], axis: LayoutConstraint['axis']): (id: string) => string {
+function alignmentLines(lines: readonly AlignConstraint[], axis: Axis): (id: string) => string {
   const parent = new Map<string, string>()
   const find = (id: string): string => {
     let root = id
     while (parent.has(root) && parent.get(root) !== root) root = parent.get(root)!
     return root
   }
-  for (const c of constraints) {
-    if (c.type !== 'align' || c.axis !== axis || !c.nodeIds.length) continue
+  for (const c of lines) {
+    if (c.axis !== axis || !c.nodeIds.length) continue
     for (const id of c.nodeIds.slice(1)) {
       const a = find(id)
       const b = find(c.nodeIds[0])
@@ -333,12 +336,12 @@ function alignmentLines(constraints: LayoutConstraint[], axis: LayoutConstraint[
   return find
 }
 
-/** Two elements the ordered alignments along `axis` put both before and
- *  after each other, or null when their orders agree. */
-function orderConflict(constraints: LayoutConstraint[], axis: LayoutConstraint['axis']): [string, string] | null {
+/** Two elements the ordered lines along `axis` put both before and after
+ *  each other, or null when their orders agree. */
+function orderConflict(lines: readonly AlignConstraint[], axis: Axis): [string, string] | null {
   const next = new Map<string, Set<string>>()
-  for (const c of constraints) {
-    if (c.type !== 'align' || c.axis !== axis || !c.ordered) continue
+  for (const c of lines) {
+    if (c.axis !== axis || !c.ordered) continue
     for (let i = 0; i + 1 < c.nodeIds.length; i++) {
       const set = next.get(c.nodeIds[i]) ?? new Set<string>()
       set.add(c.nodeIds[i + 1])
@@ -367,11 +370,9 @@ function orderConflict(constraints: LayoutConstraint[], axis: LayoutConstraint['
   return null
 }
 
-/** Refusal for aligning `nodeIds` in a row ('horizontal') or a column; with
- *  `ordered`, in that order (left to right, top to bottom). */
-export function checkAddAlignment(
-  state: ModelState, viewId: string | null, axis: LayoutConstraint['axis'], nodeIds: string[], ordered = false,
-): string | null {
+/** Refusals every new rule shares: the canvas and elements exist, at least
+ *  two, none inside another. */
+function checkMembers(state: ModelState, viewId: string | null, nodeIds: string[]): string | null {
   if (viewId && !state.views[viewId]) return `Unknown view "${viewId}".`
   const ids = [...new Set(nodeIds)]
   const unknown = ids.find((id) => !state.c4Nodes[id])
@@ -383,44 +384,105 @@ export function checkAddAlignment(
     const nested = ids.find((other) => inside.includes(other))
     if (nested) return `"${label(nested)}" is inside "${label(id)}"; an element cannot be aligned with its own container.`
   }
-  const existing = layoutConstraintsOf(state, viewId)
-  const before = alignmentLines(existing, axis)
-  if (ids.every((id) => before(id) === before(ids[0]))) {
-    // Already on one line: only adding their order is news.
-    if (!ordered) return `These elements are already in one ${AXIS_NOUN[axis]}.`
-    const key = ids.join('\u0000')
-    if (existing.some((c) => c.axis === axis && c.ordered && c.nodeIds.join('\u0000').includes(key))) {
-      return `These elements already keep this order in one ${AXIS_NOUN[axis]}.`
-    }
+  return null
+}
+
+/** Refusal when the `added` lines, with the canvas's `others`, contradict
+ *  an order or put two elements in one row and one column (they would sit
+ *  on top of each other). */
+function checkLines(state: ModelState, others: readonly AlignConstraint[], added: readonly AlignConstraint[]): string | null {
+  const label = (id: string): string => state.c4Nodes[id]?.label || id
+  const all = [...others, ...added]
+  for (const axis of ['horizontal', 'vertical'] as const) {
+    const conflict = orderConflict(all, axis)
+    if (conflict) return `Another ${AXIS_NOUN[axis]} keeps "${label(conflict[1])}" before "${label(conflict[0])}"; this order contradicts it.`
   }
-  const conflict = ordered && orderConflict([...existing, { id: '', type: 'align', axis, nodeIds: ids, ordered }], axis)
-  if (conflict) return `Another ${AXIS_NOUN[axis]} keeps "${label(conflict[1])}" before "${label(conflict[0])}"; this order contradicts it.`
-  // In one row and one column at once, two elements would share a spot.
-  const after = alignmentLines([...existing, { id: '', type: 'align', axis, nodeIds: ids }], axis)
-  const across = alignmentLines(existing, axis === 'horizontal' ? 'vertical' : 'horizontal')
-  const line = Object.keys(state.c4Nodes).filter((id) => after(id) === after(ids[0]))
-  for (let i = 0; i < line.length; i++) {
-    for (let j = i + 1; j < line.length; j++) {
-      if (across(line[i]) === across(line[j])) {
-        const other = AXIS_NOUN[axis === 'horizontal' ? 'vertical' : 'horizontal']
-        return `"${label(line[i])}" and "${label(line[j])}" are already in one ${other}; in one ${AXIS_NOUN[axis]} as well they would sit on top of each other.`
+  for (const line of added) {
+    if (line.nodeIds.length < 2) continue
+    const along = alignmentLines(all, line.axis)
+    const cross = alignmentLines(all, across(line.axis))
+    const members = Object.keys(state.c4Nodes).filter((id) => along(id) === along(line.nodeIds[0]))
+    for (let i = 0; i < members.length; i++) {
+      for (let j = i + 1; j < members.length; j++) {
+        if (cross(members[i]) === cross(members[j])) {
+          return `"${label(members[i])}" and "${label(members[j])}" would be in one row and one column at once, on top of each other.`
+        }
       }
     }
   }
   return null
 }
 
-/** Adds an alignment (checkAddAlignment passed) to a view or All elements. */
-export function insertAlignment(
-  state: ModelState, viewId: string | null, id: string, axis: LayoutConstraint['axis'], nodeIds: string[], ordered = false,
-): void {
-  const constraint: LayoutConstraint = { id, type: 'align', axis, nodeIds: [...new Set(nodeIds)], ...(ordered ? { ordered } : {}) }
+function setConstraints(state: ModelState, viewId: string | null, next: LayoutConstraint[]): void {
   if (viewId) {
     const view = state.views[viewId]
-    if (view) view.layoutConstraints = [...(view.layoutConstraints ?? []), constraint]
+    if (view) view.layoutConstraints = next
   } else {
-    state.defaultLayoutConstraints = [...(state.defaultLayoutConstraints ?? []), constraint]
+    state.defaultLayoutConstraints = next
   }
+}
+
+/** Refusal for aligning `nodeIds` in a row ('horizontal') or a column; with
+ *  `ordered`, in that order (left to right, top to bottom). */
+export function checkAddAlignment(
+  state: ModelState, viewId: string | null, axis: Axis, nodeIds: string[], ordered = false,
+): string | null {
+  const refused = checkMembers(state, viewId, nodeIds)
+  if (refused) return refused
+  const ids = [...new Set(nodeIds)]
+  const lines = constraintLines(layoutConstraintsOf(state, viewId))
+  const before = alignmentLines(lines, axis)
+  if (ids.every((id) => before(id) === before(ids[0]))) {
+    // Already on one line: only adding their order is news.
+    if (!ordered) return `These elements are already in one ${AXIS_NOUN[axis]}.`
+    const key = ids.join('\u0000')
+    if (lines.some((c) => c.axis === axis && c.ordered && c.nodeIds.join('\u0000').includes(key))) {
+      return `These elements already keep this order in one ${AXIS_NOUN[axis]}.`
+    }
+  }
+  return checkLines(state, lines, [{ id: '', type: 'align', axis, nodeIds: ids, ordered }])
+}
+
+/** Adds an alignment (checkAddAlignment passed) to a view or All elements. */
+export function insertAlignment(
+  state: ModelState, viewId: string | null, id: string, axis: Axis, nodeIds: string[], ordered = false,
+): void {
+  const constraint: AlignConstraint = { id, type: 'align', axis, nodeIds: [...new Set(nodeIds)], ...(ordered ? { ordered } : {}) }
+  setConstraints(state, viewId, [...layoutConstraintsOf(state, viewId), constraint])
+}
+
+/** Refusal for keeping `nodeIds` in a grid of `columns` columns, filled
+ *  row by row in that order. */
+export function checkAddGrid(state: ModelState, viewId: string | null, nodeIds: string[], columns: number): string | null {
+  const refused = checkMembers(state, viewId, nodeIds)
+  if (refused) return refused
+  if (!Number.isInteger(columns) || columns < 1) return 'A grid needs a whole number of columns, at least one.'
+  const ids = [...new Set(nodeIds)]
+  const existing = layoutConstraintsOf(state, viewId)
+  if (existing.some((c) => c.type === 'grid' && c.columns === columns && c.nodeIds.join('\u0000') === ids.join('\u0000'))) {
+    return 'These elements are already in this grid.'
+  }
+  return checkLines(state, constraintLines(existing), constraintLines([{ id: '', type: 'grid', columns, nodeIds: ids }]))
+}
+
+/** Adds a grid (checkAddGrid passed) to a view or All elements. */
+export function insertGrid(state: ModelState, viewId: string | null, id: string, nodeIds: string[], columns: number): void {
+  const constraint: GridConstraint = { id, type: 'grid', columns, nodeIds: [...new Set(nodeIds)] }
+  setConstraints(state, viewId, [...layoutConstraintsOf(state, viewId), constraint])
+}
+
+/** Refusal for giving grid `id` `columns` columns. */
+export function checkGridColumns(state: ModelState, viewId: string | null, id: string, columns: number): string | null {
+  const list = layoutConstraintsOf(state, viewId)
+  const c = list.find((x) => x.id === id)
+  if (!c || c.type !== 'grid') return `No grid "${id}" on this canvas.`
+  if (!Number.isInteger(columns) || columns < 1) return 'A grid needs a whole number of columns, at least one.'
+  return checkLines(state, constraintLines(list.filter((x) => x.id !== id)), constraintLines([{ ...c, columns }]))
+}
+
+/** Gives a grid (checkGridColumns passed) `columns` columns. */
+export function setGridColumns(state: ModelState, viewId: string | null, id: string, columns: number): void {
+  setConstraints(state, viewId, layoutConstraintsOf(state, viewId).map((c) => (c.id === id && c.type === 'grid' ? { ...c, columns } : c)))
 }
 
 /** Refusal for making alignment `id` keep the order of `nodeIds` (its
@@ -428,36 +490,28 @@ export function insertAlignment(
 export function checkAlignmentOrder(state: ModelState, viewId: string | null, id: string, nodeIds: string[]): string | null {
   const list = layoutConstraintsOf(state, viewId)
   const c = list.find((x) => x.id === id)
-  if (!c) return `No alignment "${id}" on this canvas.`
-  const conflict = orderConflict(list.map((x) => (x.id === id ? { ...x, nodeIds, ordered: true } : x)), c.axis)
-  if (!conflict) return null
-  const label = (nid: string): string => state.c4Nodes[nid]?.label || nid
-  return `Another ${AXIS_NOUN[c.axis]} keeps "${label(conflict[1])}" before "${label(conflict[0])}"; this order contradicts it.`
+  if (!c || c.type !== 'align') return `No alignment "${id}" on this canvas.`
+  return checkLines(state, constraintLines(list.filter((x) => x.id !== id)), [{ ...c, nodeIds, ordered: true }])
 }
 
 /** Makes an alignment keep the order of `nodeIds` (checkAlignmentOrder
  *  passed), or stop keeping any order when `nodeIds` is null. */
 export function setAlignmentOrder(state: ModelState, viewId: string | null, id: string, nodeIds: string[] | null): void {
-  const list = layoutConstraintsOf(state, viewId)
-  const next = list.map((c) => {
-    if (c.id !== id) return c
+  setConstraints(state, viewId, layoutConstraintsOf(state, viewId).map((c) => {
+    if (c.id !== id || c.type !== 'align') return c
     if (!nodeIds) {
       const { ordered: _ordered, ...rest } = c
       return rest
     }
     return { ...c, nodeIds: [...nodeIds], ordered: true }
-  })
-  if (viewId) state.views[viewId].layoutConstraints = next
-  else state.defaultLayoutConstraints = next
+  }))
 }
 
 /** Removes a layout constraint. False when the canvas has no such constraint. */
 export function deleteLayoutConstraint(state: ModelState, viewId: string | null, id: string): boolean {
   const list = layoutConstraintsOf(state, viewId)
   if (!list.some((c) => c.id === id)) return false
-  const next = list.filter((c) => c.id !== id)
-  if (viewId) state.views[viewId].layoutConstraints = next
-  else state.defaultLayoutConstraints = next
+  setConstraints(state, viewId, list.filter((c) => c.id !== id))
   return true
 }
 

@@ -3,7 +3,7 @@
 // the facade runs it: Studio through its store, the MCP server headlessly.
 // Alignments are layout constraints every later layout keeps.
 
-import type { LayoutConstraint } from '../../c4'
+import { defaultGridColumns, type AlignConstraint, type LayoutConstraint } from '../../c4'
 import { fail, type AsyncToolHandler, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 
 const AXIS_ENUM = ['horizontal', 'vertical'] as const
@@ -21,8 +21,9 @@ function canvasFor(ctx: ToolRunContext, tool: string, raw: unknown): { viewId: s
   return { viewId }
 }
 
-const describeConstraint = (c: LayoutConstraint): string =>
-  `${c.id} (${c.axis === 'horizontal' ? 'row' : 'column'}${c.ordered ? ' in order' : ''}: ${c.nodeIds.join(', ')})`
+const describeConstraint = (c: LayoutConstraint): string => c.type === 'grid'
+  ? `${c.id} (grid of ${c.columns} columns: ${c.nodeIds.join(', ')})`
+  : `${c.id} (${c.axis === 'horizontal' ? 'row' : 'column'}${c.ordered ? ' in order' : ''}: ${c.nodeIds.join(', ')})`
 
 export function buildLayoutToolDefs(): ToolDef[] {
   return [
@@ -51,8 +52,22 @@ export function buildLayoutToolDefs(): ToolDef[] {
       },
     },
     {
+      name: 'grid_nodes',
+      description: "Keep elements in a grid on a canvas: `columns` columns, filled row by row in the order of nodeIds (left to right, then the next row). Every row stays a row and every column a column, in that order, through every later layout. Without viewId it applies to the All elements canvas; with the id of a static or dynamic view, to that view only. Studio arranges them when it shows the canvas; smart_layout keeps the grid. Remove it with remove_alignment.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          nodeIds: { type: 'array', items: { type: 'string' }, description: 'Two or more node ids or tempIds, in reading order; none inside another.' },
+          columns: { type: 'number', description: 'Columns of the grid. Defaults to the smallest that makes it about square (ceil of the square root of the count).' },
+          viewId: { type: 'string', description: 'A static or dynamic view (real id or tempId); omit for All elements.' },
+        },
+        required: ['nodeIds'],
+        additionalProperties: false,
+      },
+    },
+    {
       name: 'remove_alignment',
-      description: 'Stop keeping elements aligned on a canvas: remove one alignment by id, or every alignment whose elements are all among nodeIds. The positions stay as they are.',
+      description: 'Stop keeping elements aligned on a canvas: remove one alignment or grid by id, or every alignment and grid whose elements are all among nodeIds. The positions stay as they are.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -77,10 +92,23 @@ export function buildAlignmentToolHandlers(): Record<string, ToolHandler> {
       const canvas = canvasFor(ctx, 'align_nodes', input.viewId)
       if ('error' in canvas) return fail(canvas.error)
       const nodeIds = (input.nodeIds as string[]).map((id) => ctx.resolveId(id))
-      const added = ctx.diagram.addAlignment(canvas.viewId, input.axis as LayoutConstraint['axis'], nodeIds, input.keepOrder === true)
+      const added = ctx.diagram.addAlignment(canvas.viewId, input.axis as AlignConstraint['axis'], nodeIds, input.keepOrder === true)
       if ('error' in added) return fail(`align_nodes: ${added.error}`)
       const order = input.keepOrder === true ? ', in the order given' : ''
       return { ok: true, resultText: `Aligned ${nodeIds.length} elements in a ${input.axis === 'horizontal' ? 'row' : 'column'}${order}. Alignment ID: ${added.id}.`, updated: { views: 1 } }
+    },
+    grid_nodes: (rawInput, ctx) => {
+      const input = (rawInput ?? {}) as { nodeIds?: unknown; columns?: unknown; viewId?: unknown }
+      if (!ctx.diagram.addGrid) return fail('grid_nodes: grids are not editable in this context')
+      if (!Array.isArray(input.nodeIds) || input.nodeIds.some((id) => typeof id !== 'string')) return fail('grid_nodes: nodeIds must be an array of node ids')
+      if (input.columns !== undefined && (typeof input.columns !== 'number' || !Number.isInteger(input.columns) || input.columns < 1)) return fail('grid_nodes: columns must be a whole number, at least 1')
+      const canvas = canvasFor(ctx, 'grid_nodes', input.viewId)
+      if ('error' in canvas) return fail(canvas.error)
+      const nodeIds = (input.nodeIds as string[]).map((id) => ctx.resolveId(id))
+      const columns = (input.columns as number | undefined) ?? defaultGridColumns(nodeIds.length)
+      const added = ctx.diagram.addGrid(canvas.viewId, nodeIds, columns)
+      if ('error' in added) return fail(`grid_nodes: ${added.error}`)
+      return { ok: true, resultText: `Kept ${nodeIds.length} elements in a grid of ${columns} columns. Alignment ID: ${added.id}.`, updated: { views: 1 } }
     },
     remove_alignment: (rawInput, ctx) => {
       const input = (rawInput ?? {}) as { id?: unknown; nodeIds?: unknown; viewId?: unknown }

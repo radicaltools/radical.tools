@@ -99,3 +99,77 @@ test('a row keeps the selection order through a drag past a neighbour and Smart 
   await expect(page.getByRole('button', { name: 'Keep row order' })).toHaveAttribute('aria-pressed', 'false')
   await expect.poll(async () => (await studio.storedDoc() as { defaultLayoutConstraints?: Array<{ ordered?: boolean }> }).defaultLayoutConstraints?.[0]?.ordered, { timeout: 10_000 }).toBeUndefined()
 })
+
+test('a grid fills in selection order and takes another column from the canvas', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  // Three containers inside Bookstore and the external Payment Provider.
+  const cells = ['db', 'web', 'payments', 'api']
+  await select(studio, cells)
+  await page.getByRole('button', { name: /^Align/ }).click()
+  await page.getByRole('menuitem', { name: /Keep in a grid/ }).click()
+  const centre = async (id: string): Promise<{ x: number; y: number }> => {
+    const b = (await studio.boxes())[id]
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+  }
+  // db web / payments api
+  await expect.poll(() => spread(studio, ['db', 'web'], 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
+  await expect.poll(() => spread(studio, ['payments', 'api'], 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
+  await expect.poll(() => spread(studio, ['db', 'payments'], 'x'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
+  await expect.poll(() => spread(studio, ['web', 'api'], 'x'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
+  expect((await centre('db')).x).toBeLessThan((await centre('web')).x)
+  expect((await centre('db')).y).toBeLessThan((await centre('payments')).y)
+
+  // Three columns: db web payments / api.
+  await studio.node('db').click()
+  await page.getByRole('button', { name: 'More grid columns' }).click()
+  await expect.poll(() => spread(studio, ['db', 'web', 'payments'], 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
+  await expect.poll(() => spread(studio, ['db', 'api'], 'x'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
+  await expect.poll(async () => {
+    const doc = await studio.storedDoc() as { views: Array<{ id: string; layoutConstraints?: Array<{ type: string; columns?: number }> }> }
+    return doc.views.find((v) => v.id === 'v-containers')?.layoutConstraints?.[0]
+  }, { timeout: 10_000 }).toMatchObject({ type: 'grid', columns: 3 })
+})
+
+test('a selected container aligns its children, in the order they stand', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  const children = ['web', 'api', 'db']
+  const centreX = async (id: string): Promise<number> => {
+    const b = (await studio.boxes())[id]
+    return b.x + b.width / 2
+  }
+  const xs = await Promise.all(children.map(centreX))
+  const leftToRight = [...children].sort((a, b) => xs[children.indexOf(a)] - xs[children.indexOf(b)])
+
+  await studio.node('bookstore').click({ position: { x: 24, y: 12 } })
+  await page.getByRole('button', { name: /^Align children/ }).click()
+  await page.getByRole('menuitem', { name: /Keep in a row/ }).click()
+  await expect.poll(() => spread(studio, children, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
+  await expect.poll(async () => {
+    const doc = await studio.storedDoc() as { views: Array<{ id: string; layoutConstraints?: Array<{ nodeIds: string[] }> }> }
+    return doc.views.find((v) => v.id === 'v-containers')?.layoutConstraints?.[0]?.nodeIds
+  }, { timeout: 10_000 }).toEqual(leftToRight)
+  // With the container still selected, its children's guide offers its buttons.
+  await expect(page.getByRole('button', { name: 'Remove row alignment' })).toBeVisible()
+})
+
+test('a collapsed container aligns its children, which line up when it is expanded', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  const toggle = studio.node('bookstore').locator('.c4-node-collapse-btn').first()
+  await toggle.click({ force: true })
+  await expect(studio.node('web')).toBeHidden()
+  await studio.node('bookstore').click({ force: true })
+  await page.getByRole('button', { name: /^Align children/ }).click()
+  await expect(page.getByText(/its children line up when you expand it/)).toBeVisible()
+  await page.getByRole('menuitem', { name: /Keep in a row/ }).click()
+  await expect.poll(async () => {
+    const doc = await studio.storedDoc() as { views: Array<{ id: string; layoutConstraints?: Array<{ nodeIds: string[] }> }> }
+    return doc.views.find((v) => v.id === 'v-containers')?.layoutConstraints?.[0]?.nodeIds.length
+  }, { timeout: 10_000 }).toBe(3)
+
+  await toggle.click({ force: true })
+  await expect(studio.node('web')).toBeVisible()
+  await expect.poll(() => spread(studio, ['web', 'api', 'db'], 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
+})

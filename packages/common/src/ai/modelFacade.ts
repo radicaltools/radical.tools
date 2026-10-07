@@ -9,7 +9,7 @@
 // per-view node positions, and fitting a parent's size around a new child.
 // Lay the result out with @radical/layout if positions matter.
 
-import type { C4Node, C4Relation, DiagramData, DiagramView, LayoutConstraint, Presentation } from '../c4'
+import type { AlignConstraint, C4Node, C4Relation, DiagramData, DiagramView, Presentation } from '../c4'
 import type { Metamodel } from '../metamodel'
 import * as model from '../model'
 import type { DiagramFacade } from './diagramFacade'
@@ -146,11 +146,18 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       model.setViewHiddenRelations(state, id, relationIds)
     },
     getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(state, viewId),
-    addAlignment(viewId: string | null, axis: LayoutConstraint['axis'], nodeIds: string[], ordered = false) {
+    addAlignment(viewId: string | null, axis: AlignConstraint['axis'], nodeIds: string[], ordered = false) {
       const refused = model.checkAddAlignment(state, viewId, axis, nodeIds, ordered)
       if (refused) return { error: refused }
       const id = newId()
       model.insertAlignment(state, viewId, id, axis, nodeIds, ordered)
+      return { id }
+    },
+    addGrid(viewId: string | null, nodeIds: string[], columns: number) {
+      const refused = model.checkAddGrid(state, viewId, nodeIds, columns)
+      if (refused) return { error: refused }
+      const id = newId()
+      model.insertGrid(state, viewId, id, nodeIds, columns)
       return { id }
     },
     removeLayoutConstraints(viewId: string | null, ids: string[]) {

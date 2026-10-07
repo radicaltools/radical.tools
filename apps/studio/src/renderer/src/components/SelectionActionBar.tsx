@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
-import { activeLayoutConstraints, useDiagramStore } from '@radical/ui/store/diagramStore'
+import { activeLayoutConstraints, childrenInView, useDiagramStore } from '@radical/ui/store/diagramStore'
+import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, saveStudioSettings } from '@radical/ui/studioSettings'
 import { isParentAllowed } from '@radical/common/metamodel'
+import { defaultGridColumns } from '@radical/common/c4'
 
 /**
  * Floating action bar that appears over the canvas whenever one or more
@@ -11,6 +13,9 @@ import { isParentAllowed } from '@radical/common/metamodel'
  *    current sibling group),
  *  • an "Align…" menu: keep two or more nodes in a row or a column on this
  *    canvas (optionally in the order they were selected, a remembered choice),
+ *    or three or more in a grid filled in selection order; with one container
+ *    selected, the same for its children, in the order they stand (a
+ *    collapsed one's children line up when it is expanded),
  *    or stop keeping the alignments wholly inside the selection,
  *  • a destructive Delete button.
  */
@@ -28,12 +33,27 @@ export function SelectionActionBar(): React.ReactElement | null {
   const removeNodeFromView = useDiagramStore((s) => s.removeNodeFromView)
   const constraints = useDiagramStore(activeLayoutConstraints)
   const addAlignment = useDiagramStore((s) => s.addAlignment)
+  const addGrid = useDiagramStore((s) => s.addGrid)
   const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [moveMenuOpen, setMoveMenuOpen] = useState(false)
   const [alignMenuOpen, setAlignMenuOpen] = useState(false)
   const [keepOrder, setKeepOrder] = useState(() => loadStudioSettings().alignKeepsOrder)
+  // Grid columns offered for the current selection: about square until changed.
+  const [gridColumns, setGridColumns] = useState<{ count: number; columns: number } | null>(null)
+  // What Align… works on: the selection, or the one selected container's
+  // children in this view (ordered as they stand, or last stood while the
+  // container is collapsed, when applied).
+  const childCount = useDiagramStore((s) => (s.selectedNodeIds.length === 1 ? childrenInView(s, s.selectedNodeIds[0]).boxes.length : 0))
+  const childrenDrawn = useDiagramStore((s) => (s.selectedNodeIds.length === 1 ? childrenInView(s, s.selectedNodeIds[0]).drawn : false))
+  const ofChildren = selectedNodeIds.length === 1 && childCount >= 2
+  const alignCount = ofChildren ? childCount : selectedNodeIds.length
+  const alignIds = (layout: 'horizontal' | 'vertical' | 'grid'): string[] => (ofChildren
+    ? standingOrder(childrenInView(useDiagramStore.getState(), selectedNodeIds[0]).boxes, layout)
+    : [...selectedNodeIds])
+  const orderHint = ofChildren ? (childrenDrawn ? 'as they stand now' : 'as they last stood') : 'in selection order'
+  const columns = gridColumns?.count === alignCount ? gridColumns.columns : defaultGridColumns(alignCount)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const moveMenuRef = useRef<HTMLDivElement | null>(null)
   const alignMenuRef = useRef<HTMLDivElement | null>(null)
@@ -189,8 +209,8 @@ export function SelectionActionBar(): React.ReactElement | null {
   const hasChildren = !!onlyNode && Object.values(c4Nodes).some((n) => n.parentId === onlyNode.id)
   const canUnwrap = !!onlyNode && hasChildren
 
-  const selected = new Set(selectedNodeIds)
-  const alignedHere = constraints.filter((c) => c.nodeIds.every((id) => selected.has(id)))
+  const aligning = new Set(ofChildren ? childrenInView(useDiagramStore.getState(), selectedNodeIds[0]).boxes.map((c) => c.id) : selectedNodeIds)
+  const alignedHere = constraints.filter((c) => c.nodeIds.every((id) => aligning.has(id)))
 
   const onDelete = (): void => {
     // Use the same "model vs view" resolution that the Delete-key path uses.
@@ -310,45 +330,79 @@ export function SelectionActionBar(): React.ReactElement | null {
           <div className="sel-bar-divider" />
         </>
       )}
-      {selectedNodeIds.length >= 2 && (
+      {alignCount >= 2 && (
         <>
           <div className="sel-bar-wrap" ref={alignMenuRef}>
             <button
               type="button"
               className="sel-bar-btn"
               onClick={() => setAlignMenuOpen((o) => !o)}
-              title="Keep the selected nodes in a row or a column on this canvas"
+              style={{ whiteSpace: 'nowrap' }}
+              title={ofChildren ? 'Keep the children of this element in a row, a column or a grid on this canvas' : 'Keep the selected nodes in a row, a column or a grid on this canvas'}
             >
               <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
                 <rect x="1.5" y="5" width="3.5" height="6" rx="0.8" />
                 <rect x="10.5" y="4" width="4" height="8" rx="0.8" />
                 <path d="M5 8h5.5" strokeDasharray="1.5 1.5" />
               </svg>
-              Align…
+              {ofChildren ? 'Align children…' : 'Align…'}
               <svg viewBox="0 0 10 10" width="9" height="9" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
                 <path d="M2 4l3 3 3-3" />
               </svg>
             </button>
             {alignMenuOpen && (
-              <div className="sel-bar-menu" role="menu">
+              <div className="sel-bar-menu sel-bar-menu-wide" role="menu">
+                {ofChildren && !childrenDrawn && (
+                  <div className="sel-bar-menu-note">Collapsed: its children line up when you expand it.</div>
+                )}
                 <button
                   type="button"
                   role="menuitem"
                   className="sel-bar-menu-item"
-                  onClick={() => { setAlignMenuOpen(false); addAlignment('horizontal', [...selectedNodeIds], { ordered: keepOrder }) }}
+                  onClick={() => { setAlignMenuOpen(false); addAlignment('horizontal', alignIds('horizontal'), { ordered: keepOrder }) }}
                 >
                   <span>Keep in a row</span>
-                  <span className="sel-bar-menu-reason">Centres on one horizontal line{keepOrder ? ', left to right in selection order' : ''}</span>
+                  <span className="sel-bar-menu-reason">Centres on one horizontal line{keepOrder ? `, left to right ${orderHint}` : ''}</span>
                 </button>
                 <button
                   type="button"
                   role="menuitem"
                   className="sel-bar-menu-item"
-                  onClick={() => { setAlignMenuOpen(false); addAlignment('vertical', [...selectedNodeIds], { ordered: keepOrder }) }}
+                  onClick={() => { setAlignMenuOpen(false); addAlignment('vertical', alignIds('vertical'), { ordered: keepOrder }) }}
                 >
                   <span>Keep in a column</span>
-                  <span className="sel-bar-menu-reason">Centres on one vertical line{keepOrder ? ', top to bottom in selection order' : ''}</span>
+                  <span className="sel-bar-menu-reason">Centres on one vertical line{keepOrder ? `, top to bottom ${orderHint}` : ''}</span>
                 </button>
+                {alignCount >= 3 && (
+                  <div className="sel-bar-menu-grid">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="sel-bar-menu-item"
+                      onClick={() => { setAlignMenuOpen(false); addGrid(alignIds('grid'), columns) }}
+                    >
+                      <span>Keep in a grid</span>
+                      <span className="sel-bar-menu-reason">
+                        {columns} {columns === 1 ? 'column' : 'columns'}, row by row {orderHint}
+                      </span>
+                    </button>
+                    <div className="sel-bar-stepper" role="group" aria-label="Grid columns">
+                      <button
+                        type="button"
+                        aria-label="Fewer columns"
+                        disabled={columns <= 1}
+                        onClick={() => setGridColumns({ count: alignCount, columns: columns - 1 })}
+                      >−</button>
+                      <span>{columns}</span>
+                      <button
+                        type="button"
+                        aria-label="More columns"
+                        disabled={columns >= alignCount}
+                        onClick={() => setGridColumns({ count: alignCount, columns: columns + 1 })}
+                      >+</button>
+                    </div>
+                  </div>
+                )}
                 <button
                   type="button"
                   role="menuitemcheckbox"
@@ -367,7 +421,7 @@ export function SelectionActionBar(): React.ReactElement | null {
                     </svg>
                     Keep their order
                   </span>
-                  <span className="sel-bar-menu-reason">The order you selected them in; no layout may swap them</span>
+                  <span className="sel-bar-menu-reason">{ofChildren ? 'The order they stand in now' : 'The order you selected them in'}; no layout may swap them</span>
                 </button>
                 {alignedHere.length > 0 && (
                   <button
@@ -378,7 +432,7 @@ export function SelectionActionBar(): React.ReactElement | null {
                   >
                     <span>Stop keeping aligned</span>
                     <span className="sel-bar-menu-reason">
-                      {alignedHere.length === 1 ? '1 alignment' : `${alignedHere.length} alignments`} in this selection
+                      {alignedHere.length === 1 ? '1 alignment' : `${alignedHere.length} alignments`} {ofChildren ? 'of these children' : 'in this selection'}
                     </span>
                   </button>
                 )}

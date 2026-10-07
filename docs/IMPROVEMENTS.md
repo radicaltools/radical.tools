@@ -458,7 +458,12 @@ headless pass for Smart Layout, a new rule and the MCP server. Still open:
    use the stored one, so such nodes keep more space than they show.
    `deriveRFNodes` should use `drawnSize` once the layout does too (measure
    Smart Layout before and after).
-2. **Only alignment, optionally ordered.** Equal spacing along a row,
+2. **Alignments (optionally ordered) and grids.** A grid is its ordered
+   rows and columns plus a rank per line (`gridCells`, `constraintLines`);
+   it is laid out in even cells only when made or given other columns
+   (`arrangeGrid`), so later layouts may space its rows unevenly. A grid
+   mixing elements inside and outside a container pulls the outside ones
+   into the container's frame. Equal spacing along a row,
    "A left of B" without a shared line, a fixed position (Part 1, item 27)
    and a right angle would use the same `LayoutConstraint` type and both
    solvers. An ordered line keeps its members apart by the physics' own

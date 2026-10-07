@@ -116,3 +116,23 @@ test('adding an element to a large diagram moves only its surroundings', async (
   const moved = Object.keys(before).filter((id) => after[id] !== before[id])
   expect(moved.length).toBeLessThanOrEqual(40)
 })
+
+test('Smart fit brings the diagram back when it has left the screen', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await expect(page.locator('.autofit-active')).toHaveCount(1)
+  const onScreen = () => page.evaluate(() => {
+    const pane = document.querySelector('.react-flow')!.getBoundingClientRect()
+    return Array.from(document.querySelectorAll('.react-flow__node')).filter((el) => {
+      const r = el.getBoundingClientRect()
+      return r.width > 0 && r.right > pane.left && r.left < pane.right && r.bottom > pane.top && r.top < pane.bottom
+    }).length
+  })
+  expect(await onScreen()).toBeGreaterThan(0)
+  // Not a gesture: the camera ends up away from the diagram, as when the
+  // physics carries the diagram off after an expand.
+  const cameraX = () => page.locator('.react-flow__viewport').evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).e)
+  await page.evaluate(() => (window as unknown as { __rfSetViewport: (vp: object) => void }).__rfSetViewport({ x: 60000, y: 60000, zoom: 1 }))
+  expect(await cameraX()).toBeGreaterThan(50000)
+  await expect.poll(onScreen, { timeout: 5000 }).toBeGreaterThan(0)
+})

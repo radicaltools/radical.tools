@@ -142,6 +142,37 @@ describe('MCP document tools', () => {
     }
   }, 90_000)
 
+  it('keeps a grid through Smart Layout', async () => {
+    const { client, read } = await connect()
+    try {
+      const names = ['One', 'Two', 'Three', 'Four', 'Five']
+      for (const label of names) await call(client, 'add_node', { tempId: label, type: 'system', label })
+      await call(client, 'add_relation', { sourceId: 'Five', targetId: 'One', relationType: 'interacts' })
+      await call(client, 'add_relation', { sourceId: 'Four', targetId: 'Two', relationType: 'interacts' })
+      expect(await call(client, 'grid_nodes', { nodeIds: names })).toContain('grid of 3 columns')
+      await call(client, 'smart_layout', {})
+      const data = await read()
+      expect(data.defaultLayoutConstraints).toEqual([expect.objectContaining({ type: 'grid', columns: 3 })])
+      const byLabel = Object.fromEntries(data.nodes.map((n) => [n.label, n]))
+      const c = (label: string) => {
+        const n = byLabel[label]
+        const size = drawnSize(n, false)
+        return { x: n.x + size.width / 2, y: n.y + size.height / 2 }
+      }
+      // One Two Three / Four Five
+      expect(Math.abs(c('One').y - c('Three').y)).toBeLessThanOrEqual(0.5)
+      expect(Math.abs(c('One').x - c('Four').x)).toBeLessThanOrEqual(0.5)
+      expect(Math.abs(c('Two').x - c('Five').x)).toBeLessThanOrEqual(0.5)
+      expect(c('One').x).toBeLessThan(c('Two').x)
+      expect(c('Two').x).toBeLessThan(c('Three').x)
+      expect(c('One').y).toBeLessThan(c('Four').y)
+      await call(client, 'remove_alignment', { nodeIds: names })
+      expect((await read()).defaultLayoutConstraints).toBeUndefined()
+    } finally {
+      await client.close()
+    }
+  }, 90_000)
+
   it('copies a built-in metamodel on the first edit, persists it and refreshes tool schemas', async () => {
     const { client, read } = await connect()
     try {
