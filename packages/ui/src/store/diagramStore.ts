@@ -1785,6 +1785,21 @@ export const useDiagramStore = create<DiagramStore>()(
               }
             }
           }
+        } else if (_liveLayout) {
+          // Collapsing: the node turns from a cola group into a leaf the
+          // layout has no position for, and a new leaf spawns among its
+          // neighbours. Seed it where its collapsed box sits now.
+          const allNodes = get().c4Nodes
+          const node = allNodes[id]
+          if (node && isContainerType(node.type)) {
+            let absX = node.x
+            let absY = node.y
+            for (let p = node.parentId ? allNodes[node.parentId] : undefined; p; p = p.parentId ? allNodes[p.parentId] : undefined) {
+              absX += p.x
+              absY += p.y
+            }
+            _liveLayout.seedPosition(id, absX + COLLAPSED_WIDTH[node.type] / 2, absY + COLLAPSED_HEIGHT[node.type] / 2)
+          }
         }
 
         // NOTE: no intermediate _sync() here — it would push a render with the
@@ -3120,8 +3135,12 @@ export const useDiagramStore = create<DiagramStore>()(
                 const pos = positions[rfNode.id]
                 if (!pos) continue
                 rfNode.position = { x: pos.x, y: pos.y }
+                const data = rfNode.data as C4NodeRFData
+                // The layout sizes only groups that show children. A size for
+                // a node drawn collapsed is a stale group box (a tick from
+                // before the collapse) and would leave a big empty rectangle.
+                if (data.collapsed || !data.hasChildren) continue
                 if (pos.width != null || pos.height != null) {
-                  const data = rfNode.data as C4NodeRFData
                   if (pos.width != null) {
                     data.width = pos.width
                     rfNode.width = pos.width
