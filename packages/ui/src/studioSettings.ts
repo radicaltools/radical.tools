@@ -17,10 +17,14 @@ export interface StudioSettings {
   wikiMultiPageDepth: number
   /** Open a node type's wizard when the user creates a node of that type. */
   nodeWizardOnCreate: boolean
+  /** Smart fit: the camera follows the diagram (fit on open, zoom out to
+   *  show what an expand reveals). Zooming or panning by hand cancels the
+   *  fit in progress but leaves this on. */
+  smartFit: boolean
 }
 
 export function defaultStudioSettings(): StudioSettings {
-  return { wikiMultiPageDepth: WIKI_MULTI_PAGE_DEPTH_MIN, nodeWizardOnCreate: true }
+  return { wikiMultiPageDepth: WIKI_MULTI_PAGE_DEPTH_MIN, nodeWizardOnCreate: true, smartFit: true }
 }
 
 export function normalizeStudioSettings(raw: unknown): StudioSettings {
@@ -33,6 +37,7 @@ export function normalizeStudioSettings(raw: unknown): StudioSettings {
   return {
     wikiMultiPageDepth: Math.min(WIKI_MULTI_PAGE_DEPTH_MAX, Math.max(WIKI_MULTI_PAGE_DEPTH_MIN, depth)),
     nodeWizardOnCreate: typeof r.nodeWizardOnCreate === 'boolean' ? r.nodeWizardOnCreate : base.nodeWizardOnCreate,
+    smartFit: typeof r.smartFit === 'boolean' ? r.smartFit : base.smartFit,
   }
 }
 

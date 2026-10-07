@@ -5,29 +5,33 @@
  *
  * Protocol
  * ─────────
- * Main → Worker  { type: 'start', skipBulk, model } | { type: 'invalidate' | 'reset', model }
+ * Main → Worker  { type: 'start', skipBulk, model, gen } | { type: 'invalidate' | 'reset', model, gen }
  *              | { type: 'stop' } | { type: 'seed', id, x, y }
  *              | { type: 'grab' | 'drag', id, x, y } | { type: 'release', id }
- * Worker → Main  { type: 'positions', positions } | { type: 'settled' }
+ * Worker → Main  { type: 'positions', positions, gen } | { type: 'settled', gen }
  *
  * `model` is the store's nodes and relations at the time of the call; the
- * engine reads it whenever it rebuilds.
+ * engine reads it whenever it rebuilds. `gen` numbers that model; replies
+ * carry the one they were computed from, so the main thread can drop replies
+ * already in flight when a newer model was sent.
  */
 
 import { LiveColaEngine } from './liveColaEngine'
-import type { LiveColaMessage } from './liveColaLayout'
+import type { LiveColaMessage, LiveColaReply } from './liveColaLayout'
 
 let model: Extract<LiveColaMessage, { model: unknown }>['model'] = { nodes: {}, relations: {} }
+let gen = 0
+const reply = (message: LiveColaReply) => self.postMessage(message)
 
 const engine = new LiveColaEngine({
   getModel: () => model,
-  applyPositions: (positions) => self.postMessage({ type: 'positions', positions }),
-  onSettled: () => self.postMessage({ type: 'settled' }),
+  applyPositions: (positions) => reply({ type: 'positions', positions, gen }),
+  onSettled: () => reply({ type: 'settled', gen }),
 })
 
 self.onmessage = (e: MessageEvent<LiveColaMessage>) => {
   const m = e.data
-  if ('model' in m) model = m.model
+  if ('model' in m) { model = m.model; gen = m.gen }
   switch (m.type) {
     case 'start': engine.start(m.skipBulk); break
     case 'invalidate': engine.invalidate(); break

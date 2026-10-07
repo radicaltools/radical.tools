@@ -452,14 +452,16 @@ function StructuralCanvas(): React.ReactElement {
 
   // React Flow passes an event only for camera moves the user makes (wheel,
   // pinch, dragging the pane); fits and focus pass none. The user's camera
-  // wins: stop auto-fit and any fit still animating, which would otherwise
-  // pull the view back on every frame.
+  // wins: cancel any fit still animating, which would otherwise pull the
+  // view back on every frame, and close the active-fit window so the next
+  // tick leaves the camera alone. Smart fit itself stays on (it is a
+  // setting); it reacts again to the next expand or collapse.
   const takeCamera = useCallback(() => {
     if (fitAnimRef.current != null) {
       cancelAnimationFrame(fitAnimRef.current)
       fitAnimRef.current = null
     }
-    useDiagramStore.getState().stopAutoFit()
+    fitWindowUntilRef.current = 0
   }, [])
   const onUserMoveStart = useCallback((event: unknown) => { if (event) takeCamera() }, [takeCamera])
   // d3-zoom folds wheel events within ~150 ms into one gesture and reports its

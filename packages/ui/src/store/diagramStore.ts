@@ -66,7 +66,7 @@ import { LiveColaLayout } from '../layout/liveColaLayout'
 import { LOCAL_PHYSICS_MIN_NODES } from '../layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
-import { loadStudioSettings } from '../studioSettings'
+import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -1217,9 +1217,8 @@ interface DiagramStore {
   autoFitActive: boolean
   setFitViewFn: (fn: (() => void) | null, instantFn?: (() => void) | null) => void
   fitAll: () => void
+  /** Flips the Smart fit setting and saves it to the studio settings. */
   toggleAutoFit: () => void
-  /** Turns auto-fit off, e.g. once the user zooms or pans by hand. */
-  stopAutoFit: () => void
   zoomIn: () => void
   zoomOut: () => void
 
@@ -1409,7 +1408,7 @@ export const useDiagramStore = create<DiagramStore>()(
       liveLayoutMoving: false,
       connectSource: null,
       connectionModifier: 'alt' as const,
-      autoFitActive: true,
+      autoFitActive: loadStudioSettings().smartFit,
       canUndo: false,
       canRedo: false,
       snapshots: initSnapshots,
@@ -1785,6 +1784,21 @@ export const useDiagramStore = create<DiagramStore>()(
                 })
               }
             }
+          }
+        } else if (_liveLayout) {
+          // Collapsing: the node turns from a cola group into a leaf the
+          // layout has no position for, and a new leaf spawns among its
+          // neighbours. Seed it where its collapsed box sits now.
+          const allNodes = get().c4Nodes
+          const node = allNodes[id]
+          if (node && isContainerType(node.type)) {
+            let absX = node.x
+            let absY = node.y
+            for (let p = node.parentId ? allNodes[node.parentId] : undefined; p; p = p.parentId ? allNodes[p.parentId] : undefined) {
+              absX += p.x
+              absY += p.y
+            }
+            _liveLayout.seedPosition(id, absX + COLLAPSED_WIDTH[node.type] / 2, absY + COLLAPSED_HEIGHT[node.type] / 2)
           }
         }
 
@@ -3121,8 +3135,12 @@ export const useDiagramStore = create<DiagramStore>()(
                 const pos = positions[rfNode.id]
                 if (!pos) continue
                 rfNode.position = { x: pos.x, y: pos.y }
+                const data = rfNode.data as C4NodeRFData
+                // The layout sizes only groups that show children. A size for
+                // a node drawn collapsed is a stale group box (a tick from
+                // before the collapse) and would leave a big empty rectangle.
+                if (data.collapsed || !data.hasChildren) continue
                 if (pos.width != null || pos.height != null) {
-                  const data = rfNode.data as C4NodeRFData
                   if (pos.width != null) {
                     data.width = pos.width
                     rfNode.width = pos.width
@@ -4416,17 +4434,10 @@ export const useDiagramStore = create<DiagramStore>()(
         _getFitViewFn()?.()
       },
       zoomIn() {
-        get().stopAutoFit()
         ;(window as any).__radicalZoomIn?.()
       },
       zoomOut() {
-        get().stopAutoFit()
         ;(window as any).__radicalZoomOut?.()
-      },
-      stopAutoFit() {
-        // A hand-picked camera wins: auto-fit re-fits every 300 ms while the
-        // live layout moves nodes, which used to undo every zoom and pan.
-        if (get().autoFitActive) get().toggleAutoFit()
       },
       toggleAutoFit() {
         // Always cancel any existing timer first
@@ -4437,6 +4448,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         const next = !get().autoFitActive
         set((state) => { state.autoFitActive = next })
+        saveStudioSettings({ ...loadStudioSettings(), smartFit: next })
         if (next) {
           _getFitViewFn()?.()  // start immediately (animated)
           const t = setInterval(() => {

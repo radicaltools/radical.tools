@@ -18,10 +18,12 @@ export type { LiveColaCallbacks, LiveColaPositions }
 
 type Model = { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
 
-/** Messages from LiveColaLayout to its worker (see liveCola.worker.ts). */
+/** Messages from LiveColaLayout to its worker (see liveCola.worker.ts).
+ *  `gen` numbers the builds: the worker tags its replies with the build they
+ *  come from. */
 export type LiveColaMessage =
-  | { type: 'start'; skipBulk: boolean; model: Model }
-  | { type: 'invalidate' | 'reset'; model: Model }
+  | { type: 'start'; skipBulk: boolean; model: Model; gen: number }
+  | { type: 'invalidate' | 'reset'; model: Model; gen: number }
   | { type: 'stop' }
   | { type: 'seed' | 'grab' | 'drag'; id: string; x: number; y: number }
   | { type: 'release'; id: string }
@@ -36,6 +38,11 @@ function inThreadRequested(): boolean {
   return (globalThis as { __RADICAL_LIVE_LAYOUT?: unknown }).__RADICAL_LIVE_LAYOUT === 'thread'
 }
 
+/** Messages from the worker to LiveColaLayout, tagged with their build. */
+export type LiveColaReply =
+  | { type: 'positions'; positions: LiveColaPositions; gen: number }
+  | { type: 'settled'; gen: number }
+
 export class LiveColaLayout {
   private worker: Worker | null = null
   private engine: LiveColaEngine | null = null
@@ -44,13 +51,19 @@ export class LiveColaLayout {
   /** Positions from the worker not applied yet: applied once per frame. */
   private pending: LiveColaPositions | null = null
   private frame = 0
+  /** Build sent to the worker last (see LiveColaMessage). */
+  private gen = 0
 
   constructor(private readonly callbacks: LiveColaCallbacks) {
     if (typeof Worker !== 'undefined' && !inThreadRequested()) {
       try {
         this.worker = new LiveColaWorkerClass()
-        this.worker.onmessage = (e: MessageEvent<{ type: 'positions'; positions: LiveColaPositions } | { type: 'settled' }>) => {
+        this.worker.onmessage = (e: MessageEvent<LiveColaReply>) => {
           if (!this._running) return
+          // A reply the worker sent before it got the latest model (collapse,
+          // undo, view switch) holds that model's sizes: applied now, a
+          // collapsed group would get back its expanded box.
+          if (e.data.gen !== this.gen) return
           if (e.data.type === 'positions') this.applyNextFrame(e.data.positions)
           else this.settleAfterPending()
         }
@@ -94,6 +107,12 @@ export class LiveColaLayout {
     }
   }
 
+  /** Starts a new build: replies and positions of the previous one are void. */
+  private nextGen(): number {
+    this.pending = null
+    return ++this.gen
+  }
+
   private post(message: LiveColaMessage): void {
     this.worker?.postMessage(message)
   }
@@ -107,7 +126,7 @@ export class LiveColaLayout {
     this._running = true
     this.lastSkipBulk = skipBulk
     if (this.engine) this.engine.start(skipBulk)
-    else this.post({ type: 'start', skipBulk, model: this.callbacks.getModel() })
+    else this.post({ type: 'start', skipBulk, model: this.callbacks.getModel(), gen: this.nextGen() })
   }
 
   stop(): void {
@@ -119,12 +138,12 @@ export class LiveColaLayout {
 
   invalidate(): void {
     if (this.engine) this.engine.invalidate()
-    else if (this._running) this.post({ type: 'invalidate', model: this.callbacks.getModel() })
+    else if (this._running) this.post({ type: 'invalidate', model: this.callbacks.getModel(), gen: this.nextGen() })
   }
 
   reset(): void {
     if (this.engine) this.engine.reset()
-    else this.post({ type: 'reset', model: this.callbacks.getModel() })
+    else this.post({ type: 'reset', model: this.callbacks.getModel(), gen: this.nextGen() })
   }
 
   seedPosition(id: string, x: number, y: number): void {

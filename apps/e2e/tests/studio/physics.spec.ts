@@ -49,6 +49,8 @@ test('zooming with the wheel wins over a fit still animating', async ({ page, st
   await page.waitForTimeout(1000)
   expect(await scale()).toBeCloseTo(settled, 3)
   expect(settled).toBeGreaterThan(fitted * 1.3)
+  // The hand zoom cancels the fit, not the Smart fit setting.
+  await expect(page.locator('.autofit-active')).toHaveCount(1)
 })
 
 /** A 15 × 15 grid of linked systems, laid out near rest (or squeezed so
