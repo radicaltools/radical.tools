@@ -19,6 +19,28 @@ import { host } from '../platform/host'
 
 let reloadActive: () => void = () => {}
 
+// ─── Load notifications ──────────────────────────────────────────────────────
+// A file or folder document reaches the store asynchronously, after the sample
+// has rendered (boot) or after the switch (Models dialog, a deep link). The
+// router waits for it before it applies a view, milestone or slide from the
+// URL; loadDiagram would reset them otherwise.
+
+let _loadingId: string | null = null
+const _loadListeners = new Set<(id: string) => void>()
+
+/** The document whose load into the store is in flight, or null. */
+export function loadingDocumentId(): string | null {
+  return _loadingId
+}
+
+/** Calls `listener` with the document id each time a load of the active
+ *  document into the store has finished (including a load that found
+ *  nothing). Returns the unsubscribe function. */
+export function onDocumentLoaded(listener: (id: string) => void): () => void {
+  _loadListeners.add(listener)
+  return () => { _loadListeners.delete(listener) }
+}
+
 /** Re-read the active document from its storage into the diagram store, e.g.
  *  after a web folder regained permission. */
 export function reloadActiveDocument(): void {
@@ -126,6 +148,7 @@ if (typeof window !== 'undefined') {
   ): void => {
     const seq = ++_loadSeq
     _suspended = true
+    _loadingId = id
     if (_persistTimer !== null) {
       clearTimeout(_persistTimer)
       _persistTimer = null
@@ -153,7 +176,12 @@ if (typeof window !== 'undefined') {
         })
       }
     }).catch((e) => console.warn('[diagramStore] document load failed:', e))
-      .finally(() => { if (seq === _loadSeq) _suspended = false })
+      .finally(() => {
+        if (seq !== _loadSeq) return
+        _suspended = false
+        _loadingId = null
+        if (documents.getActiveId() === id) for (const listener of [..._loadListeners]) listener(id)
+      })
   }
 
   // ── Follow outside edits to the active md-folder document ────────────────

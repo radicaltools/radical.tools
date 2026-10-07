@@ -615,7 +615,8 @@ mode   designer | viewer | presenter | metamodel
 view   a view id, or <span class="cm">canvas</span> for the default Structure view
 f      element page (Wiki views)      s   active milestone
 p / sl presentation and 0-based slide while presenting
-d      <span class="cm">ls:&lt;uuid&gt;</span> or <span class="cm">fs:&lt;path&gt;</span> — which model (local to this machine)</code></pre>
+d      <span class="cm">ls:&lt;id&gt;</span>, <span class="cm">fs:&lt;path&gt;</span> or <span class="cm">md:&lt;folder&gt;</span> — which model (local to this machine)</code></pre>
+        <p>A model kept in a file or a <a href="#formats">Markdown folder</a> loads a moment after Studio opens; the link is applied once it has. A browser folder that needs <em>Reconnect…</em> keeps the link until you reconnect it. File and folder paths only open in the desktop app; in the browser a folder is identified by its id, so its links work in the browser that opened it.</p>
         <p>The Hub uses <code>#/c/&lt;conceptId&gt;/v/canvas|wiki|table</code> (plus <code>/cv/&lt;viewId&gt;</code> for one of a concept's named views) and <code>studio.radical.tools/?hub=id1,id2</code> opens Studio with those concepts queued for import.</p>
       </section>
 

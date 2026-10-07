@@ -86,6 +86,21 @@ test('a folder-backed model survives a reload', async ({ page, studio }) => {
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
 })
 
+test('a deep link into a folder-backed model survives a reload', async ({ page, studio }) => {
+  await saveAsFolder(page)
+  // The folder loads after the first paint; the link must wait for it.
+  await page.reload()
+  await studio.ready()
+  await expect(page).toHaveURL(/\/v\/v-context$/)
+  await expect(studio.nodes).toHaveCount(3)
+
+  await page.goto('/#/d/ls%3Ae2e-doc/m/presenter/v/v-containers/p/pres-main/play/1/sl/1')
+  await page.reload()
+  await studio.ready()
+  await expect(page.getByText('2 / 2')).toBeVisible()
+  await expect(page).toHaveURL(/\/p\/pres-main\/play\/1\/sl\/1$/)
+})
+
 test('moving files keeps the descriptions of elements never opened', async ({ page, studio }) => {
   await saveAsFolder(page)
   // After a reload, descriptions are read from the files only on demand.
@@ -93,8 +108,8 @@ test('moving files keeps the descriptions of elements never opened', async ({ pa
   await studio.ready()
 
   // Renaming the system moves its children's files, whose bodies were
-  // never loaded; a second save must not lose them. (The reload lands on the
-  // full canvas, where Bookstore is expanded: click its header.)
+  // never loaded; a second save must not lose them. (Click Bookstore by its
+  // header.)
   await studio.node('bookstore').click({ position: { x: 24, y: 12 } })
   await rename(page, 'Bookstore', 'Online Shop')
   await expect.poll(() => folder.paths()).toContain('nodes/online-shop/api/_index.md')

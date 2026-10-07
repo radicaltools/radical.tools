@@ -524,6 +524,10 @@ export interface DocumentsAPI {
   /** True when a web md-folder document has verified permission this session. */
   isFolderConnected(id: string): boolean
 
+  /** True for a browser folder document still waiting for Reconnect: until
+   *  the user grants access again, it loads as an empty model. */
+  awaitsReconnect(id: string): boolean
+
   /** Call `onExternalChange` when a document's storage is edited outside
    *  Studio (another editor, git) — md-folder docs only: Electron's main
    *  process polls the folder, the web build polls the directory handle.
@@ -918,6 +922,11 @@ export const documents: DocumentsAPI = {
 
   isFolderConnected(id) {
     return connectedWebFolders.has(id)
+  },
+
+  awaitsReconnect(id) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    return meta?.source === 'md' && !host().readFolder && !connectedWebFolders.has(id)
   },
 
   watchDocument(id, onExternalChange) {
