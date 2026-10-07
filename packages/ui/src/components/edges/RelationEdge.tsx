@@ -156,6 +156,14 @@ export const RelationEdge = memo(
     )
     const geometry = useStore(geometrySelector)
     const diffKind = useDiagramStore(s => s.showDiff ? s.diffHighlight[id] : undefined)
+    // Zoomed out, labels are hidden (see edgeLabelDetail); the relation the
+    // user points at, or one of a selected node, keeps its label.
+    const [hovered, setHovered] = useState(false)
+    const endSelectedSelector = useCallback(
+      (s: ReactFlowState) => !!(s.nodeInternals.get(source)?.selected || s.nodeInternals.get(target)?.selected),
+      [source, target],
+    )
+    const endSelected = useStore(endSelectedSelector)
 
     // Not drawable yet (an end is hidden or not measured).
     if (!geometry) return null
@@ -179,20 +187,22 @@ export const RelationEdge = memo(
 
     return (
       <>
-        <BaseEdge
-          id={id}
-          path={edgePath}
-          style={{
-            ...style,
-            stroke:          diffStroke ?? strokeColor,
-            strokeWidth:     diffStroke ? 3 : selected ? 2 : 1.5,
-            strokeDasharray: diffDash ?? strokeDash,
-            strokeLinejoin:  'round',
-            strokeLinecap:   'round',
-            opacity:         diffOpacity,
-            filter:          diffStroke ? `drop-shadow(0 0 4px ${diffStroke})` : undefined,
-          }}
-        />
+        <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+          <BaseEdge
+            id={id}
+            path={edgePath}
+            style={{
+              ...style,
+              stroke:          diffStroke ?? strokeColor,
+              strokeWidth:     diffStroke ? 3 : selected ? 2 : 1.5,
+              strokeDasharray: diffDash ?? strokeDash,
+              strokeLinejoin:  'round',
+              strokeLinecap:   'round',
+              opacity:         diffOpacity,
+              filter:          diffStroke ? `drop-shadow(0 0 4px ${diffStroke})` : undefined,
+            }}
+          />
+        </g>
         {/* Custom arrowhead drawn at the target point */}
         <Arrow x={tp.x} y={tp.y} side={tgtSide} color={diffStroke ?? strokeColor} size={selected ? 10 : 8} />
 
@@ -226,14 +236,18 @@ export const RelationEdge = memo(
                 // background is ~90% opaque, so the blur was barely visible.
                 zIndex:          1000,
               }}
-              className="nodrag nopan"
+              className={[
+                'nodrag nopan relation-label',
+                selected || hovered || endSelected ? 'relation-label-active' : '',
+                data.label || data.relationType ? '' : 'relation-label-tech-only',
+              ].join(' ')}
             >
               {data.label
                 ? <div>{data.label}</div>
                 : data.relationType && <div style={{ opacity: 0.85, fontStyle: 'italic' }}>{data.relationType}</div>
               }
               {data.technology && (
-                <div style={{ fontStyle: 'italic', opacity: 0.85, fontSize: LABEL_BOX.techFontSize }}>
+                <div className="relation-label-tech" style={{ fontStyle: 'italic', opacity: 0.85, fontSize: LABEL_BOX.techFontSize }}>
                   [{data.technology}]
                 </div>
               )}

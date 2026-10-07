@@ -2010,6 +2010,16 @@ body {
   font-family: inherit;
 }
 
+/* Relation labels by zoom (Canvas sets data-edge-labels, see
+   edgeLabelDetail): zoomed out the technology goes first, then the whole
+   label. A selected or hovered relation, or one of a selected node, keeps
+   its full label. */
+.canvas-area[data-edge-labels='name'] .relation-label:not(.relation-label-active) .relation-label-tech,
+.canvas-area[data-edge-labels='name'] .relation-label-tech-only:not(.relation-label-active),
+.canvas-area[data-edge-labels='none'] .relation-label:not(.relation-label-active) {
+  display: none;
+}
+
 .c4-node-header {
   display: flex;
   align-items: center;

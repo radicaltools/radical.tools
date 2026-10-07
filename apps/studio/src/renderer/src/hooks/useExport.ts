@@ -16,6 +16,18 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
+/** Zoomed out, the canvas hides relation labels it is too small to read
+ *  (data-edge-labels, see Canvas). An export is read at its own size, so it
+ *  shows them all; returns the undo. */
+function showAllEdgeLabels(el: HTMLElement): () => void {
+  const detail = el.dataset.edgeLabels
+  el.dataset.edgeLabels = 'full'
+  return () => {
+    if (detail === undefined) delete el.dataset.edgeLabels
+    else el.dataset.edgeLabels = detail
+  }
+}
+
 export function useExport(): {
   exportBusy: boolean
   exportAs: (format: 'png' | 'svg') => void
@@ -47,6 +59,7 @@ export function useExport(): {
     const el = document.querySelector('.canvas-area') as HTMLElement | null
     if (!el) return
     setExportBusy(true)
+    const restoreLabels = showAllEdgeLabels(el)
     const filename = buildFilename()
     const options = {
       cacheBust: true,
@@ -66,13 +79,14 @@ export function useExport(): {
       : toSvg(el, options).then((d) => fetch(d).then((r) => r.blob()).then((b) => downloadBlob(b, `${filename}.svg`)))
     run
       .catch((err) => console.error('[Export]', err))
-      .finally(() => setExportBusy(false))
+      .finally(() => { restoreLabels(); setExportBusy(false) })
   }, [buildFilename])
 
   const copyToClipboard = useCallback(() => {
     const el = document.querySelector('.canvas-area') as HTMLElement | null
     if (!el) return
     setExportBusy(true)
+    const restoreLabels = showAllEdgeLabels(el)
     const options = {
       cacheBust: true,
       backgroundColor: getComputedStyle(el).backgroundColor || '#1e1e2e',
@@ -93,7 +107,7 @@ export function useExport(): {
         return navigator.clipboard.write([item])
       })
       .catch((err) => console.error('[Export] clipboard', err))
-      .finally(() => setExportBusy(false))
+      .finally(() => { restoreLabels(); setExportBusy(false) })
   }, [])
 
   return { exportBusy, exportAs, copyToClipboard }
