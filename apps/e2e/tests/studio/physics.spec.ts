@@ -1,4 +1,4 @@
-import { test, expect } from '../../support/fixtures'
+import { test, expect, fixture } from '../../support/fixtures'
 
 // The live WebCoLa layout (packages/ui/src/layout/liveColaLayout.ts) on a
 // real clock. Its own convergence test never passes once groups are
@@ -131,8 +131,80 @@ test('Smart fit brings the diagram back when it has left the screen', async ({ p
   expect(await onScreen()).toBeGreaterThan(0)
   // Not a gesture: the camera ends up away from the diagram, as when the
   // physics carries the diagram off after an expand.
-  const cameraX = () => page.locator('.react-flow__viewport').evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).e)
-  await page.evaluate(() => (window as unknown as { __rfSetViewport: (vp: object) => void }).__rfSetViewport({ x: 60000, y: 60000, zoom: 1 }))
-  expect(await cameraX()).toBeGreaterThan(50000)
+  // Read back one frame later in the same call: Smart fit starts pulling the
+  // camera back right away, often before a separate read under load.
+  const cameraX = await page.evaluate(async () => {
+    ;(window as unknown as { __rfSetViewport: (vp: object) => void }).__rfSetViewport({ x: 60000, y: 60000, zoom: 1 })
+    await new Promise(requestAnimationFrame)
+    return new DOMMatrix(getComputedStyle(document.querySelector('.react-flow__viewport')!).transform).e
+  })
+  expect(cameraX).toBeGreaterThan(50000)
   await expect.poll(onScreen, { timeout: 5000 }).toBeGreaterThan(0)
+})
+
+test('opening a view puts its saved camera in place at once and Smart fit keeps it', async ({ page, studio }) => {
+  // Views keep their own coordinates: a flight from the previous view's
+  // camera crossed empty canvas (the diagram gone, then sliding in from an
+  // edge), and Smart fit then took the view's nodes for newly revealed
+  // content and moved the camera a second time.
+  const doc = JSON.parse(fixture('bookstore'))
+  const saved = { x: 150, y: 150, zoom: 0.8 }
+  doc.views.find((v: { id: string }) => v.id === 'v-containers').viewport = saved
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-context')
+  await expect(page.locator('.autofit-active')).toHaveCount(1)
+  const cameras = await page.evaluate(async () => {
+    const camera = () => {
+      const m = new DOMMatrix(getComputedStyle(document.querySelector('.react-flow__viewport')!).transform)
+      return { x: m.e, y: m.f, zoom: m.a }
+    }
+    location.hash = location.hash.replace(/\/v\/[^/]+$/, '/v/v-containers')
+    // From the first frame that draws the view's nodes, for 1.5 s.
+    const end = performance.now() + 4000
+    while (document.querySelectorAll('.react-flow__node').length !== 6 && performance.now() < end) {
+      await new Promise(requestAnimationFrame)
+    }
+    const seen = []
+    for (const until = performance.now() + 1500; performance.now() < until;) {
+      seen.push(camera())
+      await new Promise(requestAnimationFrame)
+    }
+    return seen
+  })
+  expect(cameras.length).toBeGreaterThan(10)
+  for (const c of cameras) {
+    expect(c.x).toBeCloseTo(saved.x, 0)
+    expect(c.y).toBeCloseTo(saved.y, 0)
+    expect(c.zoom).toBeCloseTo(saved.zoom, 3)
+  }
+})
+
+test('an expanded element grows around the centre of its collapsed box', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  const toggle = studio.node('bookstore').locator('.c4-node-collapse-btn').first()
+  await toggle.evaluate((b) => (b as HTMLElement).click())
+  await expect(toggle).toHaveAttribute('title', 'Expand')
+  await page.waitForTimeout(2500)
+  // The box from the frame before the click to the first frame drawn at the
+  // expanded size: from the collapsed box's top-left corner, the group used
+  // to run right and down by half its size.
+  const [before, after] = await page.evaluate(async () => {
+    const box = () => {
+      const el = document.querySelector('[data-id="bookstore"]') as HTMLElement
+      const t = new DOMMatrix(getComputedStyle(el).transform)
+      return { x: t.e, y: t.f, w: el.offsetWidth, h: el.offsetHeight }
+    }
+    const first = box()
+    ;(document.querySelector('[data-id="bookstore"] .c4-node-collapse-btn') as HTMLElement).click()
+    for (let i = 0; i < 120; i++) {
+      await new Promise(requestAnimationFrame)
+      const b = box()
+      if (b.w !== first.w || b.h !== first.h) return [first, b]
+    }
+    return [first, box()]
+  })
+  expect(after.w).toBeGreaterThan(before.w * 1.5)
+  expect(after.x + after.w / 2).toBeCloseTo(before.x + before.w / 2, -2)
+  expect(after.y + after.h / 2).toBeCloseTo(before.y + before.h / 2, -2)
 })
