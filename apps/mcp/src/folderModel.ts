@@ -13,6 +13,7 @@ import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { viewLayoutInput, applyAlignments, applyLayoutPositions, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import type { C4Node, DiagramData, NodePosition } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
+import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
 
 /** The shared AI catalogue minus its Studio-only tools: set_active_view and
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
@@ -30,11 +31,12 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
 ]
 
 /** Read-only tools, for MCP annotations. */
-export const READ_ONLY_TOOLS = READ_ONLY
+export const READ_ONLY_TOOLS = new Set([...READ_ONLY, ...FORGE_READ_ONLY])
 
 const buildTools = (metamodel: Metamodel | undefined): ToolDef[] => [
   ...SERVER_TOOL_DEFS,
   ...buildToolDefs(metamodel).filter((tool) => !EXCLUDED_TOOLS.has(tool.name)),
+  ...FORGE_TOOL_DEFS,
 ]
 
 /** Per call: progress for a client that asked for it, and the client's cancel. */
@@ -134,6 +136,7 @@ function settleGeometry(before: DiagramData, after: DiagramData): void {
 
 export class FolderModel {
   private readonly tempIds = new Map<string, string>()
+  private readonly forge = new Forge()
   private readonly folder: string
   private metamodelKey: string
   /** Every tool the server offers; node/relation schemas follow the metamodel. */
@@ -256,20 +259,29 @@ export class FolderModel {
         resetTempIds: () => this.tempIds.clear(),
         placeNext: (parentId) => placeNewNode(facade.getNodes(), parentId),
       }
-      const result = await runTool(name, input, ctx)
+      const result: ForgeResult = FORGE_TOOLS.has(name)
+        ? await this.forge.call(name, input, ctx, facade)
+        : await runTool(name, input, ctx)
       if (!result.ok || facade.lastError) {
         this.restoreTempIds(priorTempIds)
         return { ok: false, text: facade.lastError ?? result.resultText }
       }
-      if (READ_ONLY.has(name)) return { ok: true, text: result.resultText }
+      if (READ_ONLY.has(name) || result.readOnly) {
+        result.commit?.()
+        return { ok: true, text: result.resultText }
+      }
 
-      const changed = facade.toDiagramData()
+      const changed = result.data ?? facade.toDiagramData()
       settleGeometry(data, changed)
       const metamodel = facade.getMetamodel?.()
       const outcome = await this.commit(session, before, data, changed, metamodel, result.resultText)
-      if (!outcome.ok) this.restoreTempIds(priorTempIds)
+      if (!outcome.ok) {
+        this.restoreTempIds(priorTempIds)
+        return outcome
+      }
+      result.commit?.()
       // A metamodel tool changed the types: re-advertise the schemas.
-      else if (this.refreshTools(metamodel)) return { ...outcome, toolsChanged: true }
+      if (this.refreshTools(metamodel)) return { ...outcome, toolsChanged: true }
       return outcome
     } catch (error) {
       if (priorTempIds) this.restoreTempIds(priorTempIds)

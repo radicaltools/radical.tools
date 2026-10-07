@@ -2,6 +2,7 @@
 import { McpServer, fromJsonSchema, type RegisteredTool } from '@modelcontextprotocol/server'
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import { FolderModel, PRESETS, READ_ONLY_TOOLS, type OpenOptions } from './folderModel'
+import { FORGE_PROCEDURE } from './forge'
 
 const USAGE = `Usage: radical-mcp --folder <model-folder> [--metamodel ${Object.keys(PRESETS).join('|')}]
   --folder     the Markdown model folder, absolute or relative to the working directory;
@@ -31,7 +32,25 @@ const INSTRUCTIONS = [
   'A `need` node keeps raw free-text input (brief, notes, raw requirements) in its description; derive EARS `requirement` nodes from it rather than rewriting it, linking each requirement → need with `derives`.',
   'Sequences (create_sequence) are ordered relation flows that dynamic views play; presentations are slides over views.',
   'Metamodel tools (upsert_node_type, upsert_relation_type, …) change the types; the tool schemas refresh after them.',
+  'To turn a free-text description into requirements, fitness functions, scenarios, mockups and a C4 model the way Studio\'s Radical Forge does, start with forge_start and follow the steps it returns.',
 ].join(' ')
+
+const FORGE_ARGS = fromJsonSchema({
+  type: 'object',
+  properties: { description: { type: 'string', description: 'The system to forge, in plain language. Leave empty to be asked, or to start from an existing need.' } },
+})
+
+/** The `forge` prompt: Radical Forge as one command (a slash command in Claude Code). */
+function forgePrompt(description: string): string {
+  return [
+    'Run Radical Forge on the model of the radical MCP server.',
+    description
+      ? `The system:\n"""\n${description}\n"""`
+      : 'Ask me to describe the system first, or offer the needs already in the model (search_model: LIST NODES WHERE type = "need").',
+    '',
+    FORGE_PROCEDURE,
+  ].join('\n')
+}
 
 async function main(): Promise<void> {
   const { folder, metamodel } = parseArgs(process.argv.slice(2))
@@ -63,6 +82,14 @@ async function main(): Promise<void> {
     }
   }
   advertise()
+  server.registerPrompt('forge', {
+    title: 'Radical Forge',
+    description: 'Turn a system description into requirements, fitness functions, Gherkin scenarios, mockups and a C4 model, one reviewed stage at a time.',
+    argsSchema: FORGE_ARGS,
+  }, (args) => {
+    const { description } = (args ?? {}) as { description?: unknown }
+    return { messages: [{ role: 'user', content: { type: 'text', text: forgePrompt(typeof description === 'string' ? description.trim() : '') } }] }
+  })
   await server.connect(new StdioServerTransport())
   // The client is gone: stop instead of computing (and writing) a result nobody
   // will read. A running Smart Layout notices at its next step.
