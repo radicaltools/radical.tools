@@ -356,6 +356,15 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
    user audit every view after a big change; it also missed a group frame
    overlapping a container frame once, so it should compare frames too.
 
+17. **No bulk edit through the tools.** Moving the Forge code to
+    `@radical/common` (2026-10-07) left 21 requirements and scenarios citing
+    old file paths in their Evidence. `update_node` takes one node at a
+    time, so the fix was a script driving the MCP client. A find-and-replace
+    tool over node fields would do it in one call.
+18. **`set_view_nodes` replaces the whole list.** Adding two elements to a
+    view of 78 meant reading `views.json` (or `GET VIEW`) and sending all
+    80 ids back. An `add`/`remove` form would avoid it.
+
 ### Reverse-engineered requirements (2026-10-06)
 
 `architecture/` now holds 36 needs, 246 EARS requirements and 123 scenarios,
@@ -499,3 +508,29 @@ headless pass for Smart Layout, a new rule and the MCP server. Still open:
    alignment now stops after 4 s (`MAX_PROJECTED_RUN_MS`). A lasting fix
    would let WebCoLa hold the line, for example through a leaf per container
    pinned to its centre, or keep aligned containers rigid in the physics.
+
+### Radical Forge over MCP (2026-10-07)
+
+Added in `feat/forge-mcp`: the MCP server runs Radical Forge with the
+client's own model (`apps/mcp/src/forge.ts`: `forge_start`, `forge_clarify`,
+`forge_generate`, `forge_complete_stage`, `forge_wireframe`,
+`forge_import_hub_concept`, `forge_finish`, and a `forge` prompt). The stages,
+their prompts, the clarifying-question prompt, the Hub matches per stage, the
+wireframe prompt and the Hub import moved from Studio to
+`packages/common/src/ai/forge`, `ai/systemPrompt.ts` and `hubImport.ts`, so
+the wizard and the server send the same text. Still open:
+
+1. **The run lives in the server's memory.** Restarting the server (or the
+   client) loses the answers, the stage summaries and what each stage added;
+   `forge_start` with the run's `needId` starts over from the same need.
+2. **The agent asks the clarifying questions in its chat.** MCP elicitation
+   could show them as a form, like the wizard, where the client supports it.
+3. **The server's Hub catalogue is the copy bundled at build time**, while
+   Studio in production reads hub.radical.tools; after a catalogue change the
+   two can suggest different concepts until the server is rebuilt.
+4. **Nothing arranges the new elements during a run.** Studio's live layout
+   places each stage's elements as they arrive; over MCP they get the simple
+   placement, and `forge_finish` suggests `smart_layout`.
+5. **The agent's own tools are not limited during a stage.** Studio leaves
+   the metamodel and presentation tools out of a Forge stage; the server only
+   tells the agent not to use them.
