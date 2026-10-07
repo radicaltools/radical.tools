@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { activeLayoutConstraints, useDiagramStore } from '@radical/ui/store/diagramStore'
+import { loadStudioSettings, saveStudioSettings } from '@radical/ui/studioSettings'
 import { isParentAllowed } from '@radical/common/metamodel'
 
 /**
@@ -8,6 +9,9 @@ import { isParentAllowed } from '@radical/common/metamodel'
  *  • the selection count,
  *  • a "Wrap into…" menu (only types that the metamodel allows for the
  *    current sibling group),
+ *  • an "Align…" menu: keep two or more nodes in a row or a column on this
+ *    canvas (optionally in the order they were selected, a remembered choice),
+ *    or stop keeping the alignments wholly inside the selection,
  *  • a destructive Delete button.
  */
 export function SelectionActionBar(): React.ReactElement | null {
@@ -22,15 +26,21 @@ export function SelectionActionBar(): React.ReactElement | null {
   const appMode = useDiagramStore((s) => s.appMode)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const removeNodeFromView = useDiagramStore((s) => s.removeNodeFromView)
+  const constraints = useDiagramStore(activeLayoutConstraints)
+  const addAlignment = useDiagramStore((s) => s.addAlignment)
+  const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [moveMenuOpen, setMoveMenuOpen] = useState(false)
+  const [alignMenuOpen, setAlignMenuOpen] = useState(false)
+  const [keepOrder, setKeepOrder] = useState(() => loadStudioSettings().alignKeepsOrder)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const moveMenuRef = useRef<HTMLDivElement | null>(null)
+  const alignMenuRef = useRef<HTMLDivElement | null>(null)
 
   // Close menu on outside click.
   useEffect(() => {
-    if (!menuOpen && !moveMenuOpen) return
+    if (!menuOpen && !moveMenuOpen && !alignMenuOpen) return
     const onDown = (e: MouseEvent) => {
       if (menuOpen && menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false)
@@ -38,10 +48,13 @@ export function SelectionActionBar(): React.ReactElement | null {
       if (moveMenuOpen && moveMenuRef.current && !moveMenuRef.current.contains(e.target as Node)) {
         setMoveMenuOpen(false)
       }
+      if (alignMenuOpen && alignMenuRef.current && !alignMenuRef.current.contains(e.target as Node)) {
+        setAlignMenuOpen(false)
+      }
     }
     window.addEventListener('mousedown', onDown)
     return () => window.removeEventListener('mousedown', onDown)
-  }, [menuOpen, moveMenuOpen])
+  }, [menuOpen, moveMenuOpen, alignMenuOpen])
 
   // Compute wrapper candidates for the current selection. We surface ALL
   // node types from the metamodel and mark each one as enabled/disabled with
@@ -176,6 +189,9 @@ export function SelectionActionBar(): React.ReactElement | null {
   const hasChildren = !!onlyNode && Object.values(c4Nodes).some((n) => n.parentId === onlyNode.id)
   const canUnwrap = !!onlyNode && hasChildren
 
+  const selected = new Set(selectedNodeIds)
+  const alignedHere = constraints.filter((c) => c.nodeIds.every((id) => selected.has(id)))
+
   const onDelete = (): void => {
     // Use the same "model vs view" resolution that the Delete-key path uses.
     // Simpler: drop them straight from the model (consistent with explicit
@@ -291,6 +307,84 @@ export function SelectionActionBar(): React.ReactElement | null {
             </svg>
             Unwrap
           </button>
+          <div className="sel-bar-divider" />
+        </>
+      )}
+      {selectedNodeIds.length >= 2 && (
+        <>
+          <div className="sel-bar-wrap" ref={alignMenuRef}>
+            <button
+              type="button"
+              className="sel-bar-btn"
+              onClick={() => setAlignMenuOpen((o) => !o)}
+              title="Keep the selected nodes in a row or a column on this canvas"
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1.5" y="5" width="3.5" height="6" rx="0.8" />
+                <rect x="10.5" y="4" width="4" height="8" rx="0.8" />
+                <path d="M5 8h5.5" strokeDasharray="1.5 1.5" />
+              </svg>
+              Align…
+              <svg viewBox="0 0 10 10" width="9" height="9" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+                <path d="M2 4l3 3 3-3" />
+              </svg>
+            </button>
+            {alignMenuOpen && (
+              <div className="sel-bar-menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="sel-bar-menu-item"
+                  onClick={() => { setAlignMenuOpen(false); addAlignment('horizontal', [...selectedNodeIds], { ordered: keepOrder }) }}
+                >
+                  <span>Keep in a row</span>
+                  <span className="sel-bar-menu-reason">Centres on one horizontal line{keepOrder ? ', left to right in selection order' : ''}</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="sel-bar-menu-item"
+                  onClick={() => { setAlignMenuOpen(false); addAlignment('vertical', [...selectedNodeIds], { ordered: keepOrder }) }}
+                >
+                  <span>Keep in a column</span>
+                  <span className="sel-bar-menu-reason">Centres on one vertical line{keepOrder ? ', top to bottom in selection order' : ''}</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={keepOrder}
+                  className="sel-bar-menu-item sel-bar-menu-check"
+                  onClick={() => {
+                    const next = !keepOrder
+                    setKeepOrder(next)
+                    saveStudioSettings({ ...loadStudioSettings(), alignKeepsOrder: next })
+                  }}
+                >
+                  <span>
+                    <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="0.7" y="0.7" width="10.6" height="10.6" rx="2" />
+                      {keepOrder && <path d="M3 6.2l2 2 4-4.4" />}
+                    </svg>
+                    Keep their order
+                  </span>
+                  <span className="sel-bar-menu-reason">The order you selected them in; no layout may swap them</span>
+                </button>
+                {alignedHere.length > 0 && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="sel-bar-menu-item"
+                    onClick={() => { setAlignMenuOpen(false); removeLayoutConstraint(alignedHere.map((c) => c.id)) }}
+                  >
+                    <span>Stop keeping aligned</span>
+                    <span className="sel-bar-menu-reason">
+                      {alignedHere.length === 1 ? '1 alignment' : `${alignedHere.length} alignments`} in this selection
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div className="sel-bar-divider" />
         </>
       )}

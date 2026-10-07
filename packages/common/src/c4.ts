@@ -163,6 +163,30 @@ export interface DiagramView {
    * affecting other views or the default "all nodes" view.
    */
   expandedNodeIds?: string[]
+  /**
+   * Layout rules the user set for this view's canvas; every layout (live
+   * physics, Smart Layout, MCP) keeps them. Optional for backwards compat.
+   */
+  layoutConstraints?: LayoutConstraint[]
+}
+
+/**
+ * A layout rule that holds on one canvas whatever moves: drags, the live
+ * physics, Smart Layout.
+ *
+ * 'align' keeps the centres of `nodeIds` on one line — a row
+ * (`axis: 'horizontal'`, equal centre y) or a column (`axis: 'vertical'`,
+ * equal centre x). With `ordered`, the members also keep the order of
+ * `nodeIds` along that line: left to right in a row, top to bottom in a
+ * column. Members hidden on the canvas (outside the view, under a collapsed
+ * parent) are skipped; with fewer than two left the rule rests.
+ */
+export interface LayoutConstraint {
+  id: string
+  type: 'align'
+  axis: 'horizontal' | 'vertical'
+  nodeIds: string[]
+  ordered?: boolean
 }
 
 /** Named snapshot (version) of the diagram state */
@@ -220,6 +244,8 @@ export interface DiagramData {
   defaultPositions?: Record<string, NodePosition>
   /** Camera state (pan + zoom) for the "All" (default) view */
   defaultViewport?: { x: number; y: number; zoom: number } | null
+  /** Layout constraints of the "All" (default) view; a named view keeps its own. */
+  defaultLayoutConstraints?: LayoutConstraint[]
   /** Named snapshots (versions) */
   snapshots?: DiagramSnapshot[]
   /** Multiple named presentations */

@@ -13,7 +13,8 @@
     "./portAllocator": "./src/portAllocator.ts",
     "./edgeRouting": "./src/edgeRouting.ts",
     "./side": "./src/side.ts",
-    "./viewInput": "./src/viewInput.ts"
+    "./viewInput": "./src/viewInput.ts",
+    "./constraints": "./src/constraints.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

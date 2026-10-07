@@ -24,6 +24,7 @@ import type {
   DiagramView,
   DiagramSnapshot,
   Presentation,
+  LayoutConstraint,
   NodePosition,
 } from '../c4'
 import { isContainerType } from '../c4'
@@ -78,6 +79,7 @@ interface LayoutSidecar {
   nodes: Record<string, NodeLayout>
   defaultPositions?: Record<string, NodePosition>
   defaultViewport?: { x: number; y: number; zoom: number } | null
+  defaultLayoutConstraints?: LayoutConstraint[]
 }
 
 // ─── YAML frontmatter (minimal, lossless for our scalar/multiline needs) ─────
@@ -293,6 +295,7 @@ export function serializeToMdFolderWithPaths(data: DiagramData, modelName?: stri
   // Layout sidecar.
   if (data.defaultPositions) layout.defaultPositions = data.defaultPositions
   if (data.defaultViewport !== undefined) layout.defaultViewport = data.defaultViewport
+  if (data.defaultLayoutConstraints?.length) layout.defaultLayoutConstraints = data.defaultLayoutConstraints
   files[LAYOUT_FILE] = stableStringify(layout)
 
   // Non-semantic / structurally-complex collections → JSON sidecars.
@@ -431,6 +434,7 @@ export function deserializeFromMdFolder(
 
   if (layout.defaultPositions) data.defaultPositions = layout.defaultPositions
   if (layout.defaultViewport !== undefined) data.defaultViewport = layout.defaultViewport
+  if (layout.defaultLayoutConstraints?.length) data.defaultLayoutConstraints = layout.defaultLayoutConstraints
 
   return lazy ? { data, bodyPaths } : { data }
 }

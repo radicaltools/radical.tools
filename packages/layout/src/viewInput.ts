@@ -3,8 +3,9 @@
 // rules and hidden relations the canvas applies when it renders — and how
 // its result is written back. Shared by Studio's store and the MCP server.
 
-import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, type C4Node, type C4Relation, type DiagramView, type PositionMap } from '@radical/common/c4'
-import { fittedParentSize } from './geometry'
+import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, type C4Node, type C4Relation, type DiagramView, type LayoutConstraint, type PositionMap } from '@radical/common/c4'
+import { alignmentError, enforceAlignments, resolveAlignments, type Alignment } from './constraints'
+import { fittedParentSize, projectToVisibleGraph } from './geometry'
 
 /** Compute the effective set of node IDs for a view: explicit nodeIds + all their ancestors */
 export function computeViewNodeSet(view: DiagramView | undefined, nodes: Record<string, C4Node>): Set<string> | undefined {
@@ -95,6 +96,8 @@ export interface LayoutInput {
   viewFilter: Set<string> | undefined
   viewCollapsedSet: Set<string>
   expandedSet: Set<string> | undefined
+  /** The view's alignment rules that hold on this canvas (resolveAlignments). */
+  alignments: Alignment[]
 }
 
 /**
@@ -103,11 +106,14 @@ export interface LayoutInput {
  * node filter, collapse rules (view-collapsed, per-view collapsed and
  * expanded overrides) and hidden relations the canvas applies when it
  * renders. `collapsed` on the returned nodes is the effective state.
+ * `constraints` defaults to the view's own; All elements keeps its rules in
+ * the document (DiagramData.defaultLayoutConstraints), so pass those.
  */
 export function viewLayoutInput(
   view: DiagramView | undefined,
   allNodes: Record<string, C4Node>,
   allRelations: Record<string, C4Relation>,
+  constraints: readonly LayoutConstraint[] | undefined = view?.layoutConstraints,
 ): LayoutInput {
   const viewFilter = computeViewNodeSet(view, allNodes)
   const viewCollapsedSet = computeViewCollapsedSet(viewFilter, allNodes)
@@ -125,7 +131,7 @@ export function viewLayoutInput(
   for (const [id, r] of Object.entries(filtered.relations)) {
     if (!hidden.has(id)) relations[id] = r
   }
-  return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet }
+  return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet, alignments: resolveAlignments(constraints, nodes) }
 }
 
 /**
@@ -147,6 +153,19 @@ export function applyLayoutPositions(
     if (pos.width)  node.width  = pos.width
     if (pos.height) node.height = pos.height
   }
+}
+
+/**
+ * Moves `c4Nodes` (the model, mutated) so the view's alignments hold, when
+ * they do not yet. `input` must describe the current positions. True when
+ * anything moved.
+ */
+export function applyAlignments(c4Nodes: Record<string, C4Node>, input: LayoutInput): boolean {
+  if (!input.alignments.length) return false
+  const { nodes } = projectToVisibleGraph(input.nodes, input.relations)
+  if (alignmentError(nodes, {}, input.alignments) <= 0.5) return false
+  applyLayoutPositions(c4Nodes, enforceAlignments(nodes, {}, input.alignments), input)
+  return true
 }
 
 /**

@@ -21,10 +21,12 @@ export interface StudioSettings {
    *  show what an expand reveals). Zooming or panning by hand cancels the
    *  fit in progress but leaves this on. */
   smartFit: boolean
+  /** Align… keeps the elements' current order along the new row or column. */
+  alignKeepsOrder: boolean
 }
 
 export function defaultStudioSettings(): StudioSettings {
-  return { wikiMultiPageDepth: WIKI_MULTI_PAGE_DEPTH_MIN, nodeWizardOnCreate: true, smartFit: true }
+  return { wikiMultiPageDepth: WIKI_MULTI_PAGE_DEPTH_MIN, nodeWizardOnCreate: true, smartFit: true, alignKeepsOrder: true }
 }
 
 export function normalizeStudioSettings(raw: unknown): StudioSettings {
@@ -38,6 +40,7 @@ export function normalizeStudioSettings(raw: unknown): StudioSettings {
     wikiMultiPageDepth: Math.min(WIKI_MULTI_PAGE_DEPTH_MAX, Math.max(WIKI_MULTI_PAGE_DEPTH_MIN, depth)),
     nodeWizardOnCreate: typeof r.nodeWizardOnCreate === 'boolean' ? r.nodeWizardOnCreate : base.nodeWizardOnCreate,
     smartFit: typeof r.smartFit === 'boolean' ? r.smartFit : base.smartFit,
+    alignKeepsOrder: typeof r.alignKeepsOrder === 'boolean' ? r.alignKeepsOrder : base.alignKeepsOrder,
   }
 }
 

@@ -10,13 +10,12 @@
  * worker imports the engine, so the ?worker import must not live there.
  */
 
-import type { C4Node, C4Relation } from '@radical/common/c4'
-import { LiveColaEngine, type LiveColaCallbacks, type LiveColaPositions } from './liveColaEngine'
+import { LiveColaEngine, type LiveColaCallbacks, type LiveColaModel, type LiveColaPositions } from './liveColaEngine'
 import LiveColaWorkerClass from './liveCola.worker?worker'
 
 export type { LiveColaCallbacks, LiveColaPositions }
 
-type Model = { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
+type Model = LiveColaModel
 
 /** Messages from LiveColaLayout to its worker (see liveCola.worker.ts).
  *  `gen` numbers the builds: the worker tags its replies with the build they

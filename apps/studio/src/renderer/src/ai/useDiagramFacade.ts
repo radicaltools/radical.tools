@@ -9,7 +9,8 @@
 import { useMemo } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
-import type { Presentation } from '@radical/common/c4'
+import type { LayoutConstraint, Presentation } from '@radical/common/c4'
+import * as model from '@radical/common/model'
 import type { Metamodel } from '@radical/common/metamodel'
 
 export function useDiagramFacade(): DiagramFacade {
@@ -55,6 +56,18 @@ export function createStoreFacade(): DiagramFacade {
       useDiagramStore.getState().setViewSequence(id, sequenceId),
     setViewHiddenRelations: (id: string, relationIds: string[]) =>
       useDiagramStore.getState().setViewHiddenRelations(id, relationIds),
+    getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(useDiagramStore.getState(), viewId),
+    addAlignment: (viewId: string | null, axis: LayoutConstraint['axis'], nodeIds: string[], ordered = false) => {
+      // The store aligns on the canvas on screen, so switch to the requested one first.
+      const s = useDiagramStore.getState()
+      const refused = model.checkAddAlignment(s, viewId, axis, nodeIds, ordered)
+      if (refused) return { error: refused }
+      if (viewId !== s.activeViewId) s.setActiveView(viewId)
+      const id = useDiagramStore.getState().addAlignment(axis, nodeIds, { ordered })
+      return id ? { id } : { error: 'The alignment was refused.' }
+    },
+    removeLayoutConstraints: (viewId: string | null, ids: string[]) =>
+      useDiagramStore.getState().removeLayoutConstraint(ids, viewId),
     // ── sequences ──
     getSequences: () => useDiagramStore.getState().sequences,
     addSequence: (name: string) => useDiagramStore.getState().addSequence(name),

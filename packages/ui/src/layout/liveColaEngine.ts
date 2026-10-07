@@ -17,7 +17,8 @@ import { dispatch } from 'd3-dispatch'
 import { timer } from 'd3-timer'
 import { drag as d3drag } from 'd3-drag'
 import { C4Node, C4Relation } from '@radical/common/c4'
-import { effectiveWidth, effectiveHeight, isVisible } from '@radical/layout/geometry'
+import { drawnSize, effectiveWidth, effectiveHeight, isVisible } from '@radical/layout/geometry'
+import { alongAxis, type Alignment } from '@radical/layout/constraints'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,26 @@ interface C4Group extends Group {
   /** Visual shrink applied when emitting bounds (collision uses full padding,
    * but we render a smaller box so sibling group borders don't touch). */
   visualShrink?: number
+}
+
+/** An alignment WebCoLa cannot hold itself because a member is a group:
+ *  the tick handler projects it (projectGroupAlignments). */
+type AlignedMember = { id: string; node?: ColaNode; group?: C4Group }
+
+interface GroupAlignment {
+  axis: 'x' | 'y'
+  members: AlignedMember[]
+  /** Where the line runs: the members' mean when the layout is built, then
+   *  wherever a dragged member takes it. Fixed otherwise, so the physics
+   *  cannot drag the whole line along a step at a time. */
+  line?: number
+}
+
+/** An ordered alignment with a group member: the tick handler keeps each
+ *  member after the previous one along `along` (projectGroupAlignments). */
+interface GroupOrder {
+  along: 'x' | 'y'
+  members: AlignedMember[]
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -80,8 +101,15 @@ const SETTLE_TICKS = 15
 
 export type LiveColaPositions = Record<string, { x: number; y: number; width?: number; height?: number }>
 
+export interface LiveColaModel {
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  /** User alignments that hold on the canvas (resolveAlignments). */
+  alignments?: Alignment[]
+}
+
 export interface LiveColaCallbacks {
-  getModel: () => { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
+  getModel: () => LiveColaModel
   /** Only the nodes that moved or resized since they were last reported. */
   applyPositions: (positions: LiveColaPositions) => void
   /** The layout came to rest (after its last applyPositions). */
@@ -138,6 +166,10 @@ export class LiveColaEngine {
   /** c4 id → ids one relation or containment step away (rebuilt with the layout). */
   private neighbours = new Map<string, Set<string>>()
   private frozen = false
+  /** c4 id → the other members of its alignments (rebuilt with the layout). */
+  private alignedWith = new Map<string, Set<string>>()
+  private groupAlignments: GroupAlignment[] = []
+  private groupOrders: GroupOrder[] = []
   /** Positions last handed to applyPositions, to report only changes. */
   private reported = new Map<string, { x: number; y: number; width?: number; height?: number }>()
 
@@ -220,6 +252,8 @@ export class LiveColaEngine {
     this.idToNode.clear()
     this.colaGroups = []
     this.idToGroup.clear()
+    // The positions are new: so are the lines the alignments run along.
+    this.groupAlignments = []
     if (this._running) this.rebuild(false)
   }
 
@@ -280,9 +314,10 @@ export class LiveColaEngine {
   drag(nodeId: string, rfX: number, rfY: number): void {
     const cn = this.idToNode.get(nodeId)
     if (cn) {
-      // Convert RF relative top-left → cola absolute center
+      // Convert RF relative top-left → cola absolute center. React Flow
+      // draws the real size; cn.width/height include the overlap margin.
       // Use cola group bounds (not store positions) for consistency
-      const abs = this.rfToAbsCenter(nodeId, rfX, rfY, cn.width, cn.height)
+      const abs = this.rfToAbsCenter(nodeId, rfX, rfY, cn.realWidth, cn.realHeight)
       Layout.drag(cn, abs)
     } else {
       // Group drag: compute delta from group bounds and move all leaves
@@ -350,6 +385,13 @@ export class LiveColaEngine {
       for (const n of local) near.add(n)
       // A dragged group moves its leaves, so they count as near too.
       for (const leaf of this.groupLeaves(id)) near.add(leaf.c4id)
+    }
+    // Aligned elements follow the moved ones wherever they are.
+    for (const id of [...near]) {
+      for (const other of this.alignedWith.get(id) ?? []) {
+        near.add(other)
+        for (const leaf of this.groupLeaves(other)) near.add(leaf.c4id)
+      }
     }
     for (const cn of this.colaNodes) {
       if (near.has(cn.c4id)) continue
@@ -428,7 +470,7 @@ export class LiveColaEngine {
     // report everything once.
     this.reported.clear()
 
-    const { nodes, relations } = this.callbacks.getModel()
+    const { nodes, relations, alignments = [] } = this.callbacks.getModel()
     this.allNodes = nodes
 
     const visibleNodes = Object.values(nodes).filter((n) => isVisible(n, nodes))
@@ -692,13 +734,10 @@ export class LiveColaEngine {
       else if (n.external) externalIdx.push(i)
       else internalIdx.push(i)
     })
-    const constraints: Array<{
-      type: 'separation'
-      axis: 'x' | 'y'
-      left: number
-      right: number
-      gap: number
-    }> = []
+    const constraints: Array<
+      | { type: 'separation'; axis: 'x' | 'y'; left: number; right: number; gap: number }
+      | { type: 'alignment'; axis: 'x' | 'y'; offsets: Array<{ node: number; offset: number }> }
+    > = []
     const halfH = (i: number): number => this.colaNodes[i].height / 2
     const halfW = (i: number): number => this.colaNodes[i].width / 2
     for (const p of personIdx) {
@@ -723,12 +762,68 @@ export class LiveColaEngine {
         })
       }
     }
+    // ── F: User alignments ───────────────────────────────────────────────
+    // Leaves only: WebCoLa holds them in its own projection, together with
+    // overlap removal. An alignment with a group member is projected by the
+    // tick handler instead (WebCoLa constraints cannot reference groups).
+    this.alignedWith.clear()
+    // A line keeps where it ran across rebuilds (an expand, a new node):
+    // re-anchoring at the members' new mean would jump it.
+    const lineKey = (axis: string, ids: string[]): string => `${axis}:${[...ids].sort().join(',')}`
+    const lines = new Map(this.groupAlignments.map((g) => [lineKey(g.axis, g.members.map((m) => m.id)), g.line]))
+    this.groupAlignments = []
+    this.groupOrders = []
+    const member = (id: string): AlignedMember => ({ id, node: this.idToNode.get(id), group: this.idToGroup.get(id) })
+    for (const a of alignments) {
+      // An ordered line keeps each member after the previous one. Leaves:
+      // WebCoLa separation constraints, at the distance overlap removal
+      // keeps anyway, so a dragged member pushes the next one ahead of it
+      // instead of passing it. With a group: the tick handler.
+      const along = alongAxis(a)
+      for (const ids of a.orders) {
+        const chain = ids.map(member).filter((m) => m.node || m.group)
+        if (chain.length < 2) continue
+        if (!chain.every((m) => m.node)) { this.groupOrders.push({ along, members: chain }); continue }
+        for (let k = 0; k + 1 < chain.length; k++) {
+          const left = chain[k].node!
+          const right = chain[k + 1].node!
+          const half = (cn: ColaNode): number => (along === 'x' ? cn.width : cn.height) / 2
+          constraints.push({ type: 'separation', axis: along, left: nodeIndex.get(left.c4id)!, right: nodeIndex.get(right.c4id)!, gap: half(left) + half(right) })
+        }
+      }
+      const members = a.ids.map(member).filter((m) => m.node || m.group)
+      if (members.length < 2) continue
+      for (const m of members) {
+        const set = this.alignedWith.get(m.id) ?? new Set<string>()
+        for (const other of members) if (other.id !== m.id) set.add(other.id)
+        this.alignedWith.set(m.id, set)
+      }
+      if (members.every((m) => m.node)) {
+        // Line up the boxes as drawn: a leaf may be drawn smaller than the
+        // box it takes here (drawnSize), from the same top-left corner.
+        const offset = (m: typeof members[number]): number => {
+          const drawn = drawnSize(this.allNodes[m.id], false)
+          return a.axis === 'x' ? (m.node!.realWidth - drawn.width) / 2 : (m.node!.realHeight - drawn.height) / 2
+        }
+        // WebCoLa places each member at the first one's position + offset.
+        const first = offset(members[0])
+        constraints.push({
+          type: 'alignment',
+          axis: a.axis,
+          offsets: members.map((m) => ({ node: nodeIndex.get(m.id)!, offset: offset(m) - first })),
+        })
+      } else {
+        this.groupAlignments.push({ axis: a.axis, members, line: lines.get(lineKey(a.axis, members.map((m) => m.id))) })
+      }
+    }
+
     if (constraints.length > 0) {
       ;(layout as any).constraints(constraints)
     }
 
     layout.on('tick', () => {
       if (!this._running) return
+      this.projectGroupAlignments()
       this.pinFrozen()
       const now = performance.now()
       const heavy = this.lastTickAt > 0 && now - this.lastTickAt > HEAVY_TICK_MS
@@ -780,6 +875,117 @@ export class LiveColaEngine {
       const cn = this.idToNode.get(this._grabbedId)
       if (cn) cn.fixed = (cn.fixed ?? 0) | 2
     }
+  }
+
+  /** Centre of an alignment member on `axis` as drawn: a leaf's (drawnSize),
+   *  a group's box. */
+  private memberCentre(m: AlignedMember, axis: 'x' | 'y'): number | undefined {
+    if (m.node) {
+      const drawn = drawnSize(this.allNodes[m.id], false)
+      return axis === 'x'
+        ? m.node.x - (m.node.realWidth - drawn.width) / 2
+        : m.node.y - (m.node.realHeight - drawn.height) / 2
+    }
+    const b = (m.group as any)?.bounds
+    if (!b) return undefined
+    return axis === 'x' ? (b.x + b.X) / 2 : (b.y + b.Y) / 2
+  }
+
+  /** True when the grabbed node is this member or inside it. */
+  private holdsGrabbed(id: string): boolean {
+    for (let cur: string | undefined = this._grabbedId ?? undefined; cur; cur = this.allNodes[cur]?.parentId) {
+      if (cur === id) return true
+    }
+    return false
+  }
+
+  /** Moves cola nodes by `d` on `axis`, in WebCoLa's solver state too. */
+  private shiftNodes(nodes: ColaNode[], axis: 'x' | 'y', d: number): void {
+    const x = (this.cola as { _descent?: { x: number[][] } } | null)?._descent?.x
+    const row = axis === 'x' ? 0 : 1
+    for (const cn of nodes) {
+      cn[axis] += d
+      const i = this.colaNodes.indexOf(cn)
+      if (x && i >= 0) x[row][i] += d
+    }
+  }
+
+  /** Moves a group's computed box, and its sub-groups' boxes, by `d`. */
+  private shiftBounds(g: C4Group, axis: 'x' | 'y', d: number): void {
+    const b = (g as any).bounds
+    if (b) {
+      if (axis === 'x') { b.x += d; b.X += d } else { b.y += d; b.Y += d }
+    }
+    for (const child of (g.groups ?? []) as any[]) {
+      const cg = typeof child === 'number' ? this.colaGroups[child] : child
+      if (cg) this.shiftBounds(cg as C4Group, axis, d)
+    }
+  }
+
+  /**
+   * Holds alignments that have a group member, after each WebCoLa step:
+   * every member moves onto the members' mean line, or onto the line of the
+   * member being dragged, which the others then follow.
+   */
+  private projectGroupAlignments(): void {
+    for (const a of this.groupAlignments) {
+      const centres = a.members.map((m) => this.memberCentre(m, a.axis))
+      if (centres.some((c) => c === undefined)) continue
+      const held = a.members.findIndex((m) => this.holdsGrabbed(m.id))
+      if (held >= 0) a.line = centres[held]!
+      else a.line ??= (centres as number[]).reduce((sum, c) => sum + c, 0) / centres.length
+      const target = a.line
+      a.members.forEach((m, i) => {
+        const d = target - centres[i]!
+        if (i === held || Math.abs(d) < 0.01) return
+        this.shiftMember(m, a.axis, d)
+      })
+      // Keep the members clear of each other along the line, in the order
+      // they stand: left to themselves, WebCoLa would separate two that
+      // overlap across the line, which the alignment then undoes, step
+      // after step.
+      const along = a.axis === 'y' ? 'x' : 'y'
+      const standing = a.members
+        .map((m) => ({ m, c: this.memberCentre(m, along) ?? 0 }))
+        .sort((p, q) => p.c - q.c)
+        .map((p) => p.m)
+      this.pushApart(standing, along)
+    }
+    // Ordered lines: the same, in the order asked for.
+    for (const o of this.groupOrders) this.pushApart(o.members, o.along)
+  }
+
+  /** Pushes each member clear of the previous one along `along`; when the
+   *  later one is being dragged, the earlier one gives way instead. */
+  private pushApart(members: AlignedMember[], along: 'x' | 'y'): void {
+    for (let k = 0; k + 1 < members.length; k++) {
+      const prev = members[k]
+      const next = members[k + 1]
+      const a = this.memberCentre(prev, along)
+      const b = this.memberCentre(next, along)
+      if (a === undefined || b === undefined) continue
+      const deficit = (this.memberExtent(prev, along) + this.memberExtent(next, along)) / 2 - (b - a)
+      if (deficit <= 0.01) continue
+      if (this.holdsGrabbed(next.id)) this.shiftMember(prev, along, -deficit)
+      else this.shiftMember(next, along, deficit)
+    }
+  }
+
+  private shiftMember(m: AlignedMember, axis: 'x' | 'y', d: number): void {
+    if (m.node) {
+      this.shiftNodes([m.node], axis, d)
+    } else if (m.group) {
+      this.shiftNodes(this.groupLeaves(m.id), axis, d)
+      this.shiftBounds(m.group, axis, d)
+    }
+  }
+
+  /** Room a member takes along `axis`, as overlap removal sees it. */
+  private memberExtent(m: AlignedMember, axis: 'x' | 'y'): number {
+    if (m.node) return axis === 'x' ? m.node.width : m.node.height
+    const b = (m.group as any)?.bounds
+    if (!b) return 0
+    return axis === 'x' ? b.X - b.x : b.Y - b.y
   }
 
   /**

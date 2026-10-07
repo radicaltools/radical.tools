@@ -18,6 +18,7 @@ import {
   type SmartLayoutResult,
   type SmartLayoutProgress,
   type SmartLayoutOnProgress,
+  type SmartLayoutOptions,
 } from '@radical/layout/smartLayout'
 // Vite ?worker import — processed at build time into a separate worker chunk.
 // Static top-level import is required for Vite's worker plugin to detect it.
@@ -44,10 +45,11 @@ export async function runSmartLayout(
   relations: Record<string, C4Relation>,
   metamodel?: Metamodel,
   onProgress?: SmartLayoutOnProgress,
+  options: SmartLayoutOptions = {},
 ): Promise<SmartLayoutResult> {
   // Node / Vitest — no Worker API, fall back to direct in-thread call.
   if (typeof Worker === 'undefined') {
-    return runSmartLayoutCore(nodes, relations, metamodel, onProgress)
+    return runSmartLayoutCore(nodes, relations, metamodel, onProgress, options)
   }
 
   // Phase 1: ELK candidate generation on the main thread.
@@ -85,6 +87,6 @@ export async function runSmartLayout(
       reject(new Error(e.message ?? 'smartLayout worker error'))
     }
 
-    worker.postMessage({ nodes: visibleNodes, relations: visibleRelations, raw })
+    worker.postMessage({ nodes: visibleNodes, relations: visibleRelations, raw, options })
   })
 }

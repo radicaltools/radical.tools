@@ -3194,3 +3194,12 @@ label.app-menu-row { cursor: pointer; }
   from { opacity: 0; transform: translateY(12px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
+.sel-bar-menu-check {
+  border-top: 1px solid var(--border-color);
+  border-radius: 0 0 6px 6px;
+}
+.sel-bar-menu-check > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
