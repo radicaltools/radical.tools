@@ -19,6 +19,7 @@
  *     node pairs touched by a move instead of the whole diagram.
  */
 import type { C4Node, C4Relation } from '@radical/common/c4'
+import type { PairGap } from './labelRoom'
 import {
   W_CROSS, W_OVERDRAW, W_LMEAN, W_LMAX, W_ASPECT,
   LEN_MEAN_KNEE, LEN_MAX_KNEE, overlapCost, aspectPenalty,
@@ -512,6 +513,8 @@ export interface AnnealOptions {
   calibrationSamples: number
   /** Minimum clear space between siblings. */
   gap: number
+  /** Larger gaps for some pairs (by node index): room for relation labels. */
+  pairGap?: (a: number, b: number) => PairGap | undefined
   bounds?: Bounds
   /** performance.now()-style timestamp after which the run stops early. */
   deadline: number
@@ -544,6 +547,19 @@ export function anneal(ev: Evaluator, g: LayoutGraph, group: number[], opts: Ann
   const gy = Float64Array.from(group, (i) => g.relY[i])
   const gw = Float64Array.from(group, (i) => g.w[i])
   const gh = Float64Array.from(group, (i) => g.h[i])
+  // Clear space per member pair and axis: `gap`, or more for a label.
+  const gapX = new Float64Array(G * G).fill(gap)
+  const gapY = new Float64Array(G * G).fill(gap)
+  if (opts.pairGap) {
+    for (let k = 0; k < G; k++) {
+      for (let m = k + 1; m < G; m++) {
+        const pg = opts.pairGap(group[k], group[m])
+        if (!pg) continue
+        gapX[k * G + m] = gapX[m * G + k] = Math.max(gap, pg.x)
+        gapY[k * G + m] = gapY[m * G + k] = Math.max(gap, pg.y)
+      }
+    }
+  }
 
   let cur = before
   let best = before
@@ -554,9 +570,9 @@ export function anneal(ev: Evaluator, g: LayoutGraph, group: number[], opts: Ann
     let sum = 0
     for (let m = 0; m < G; m++) {
       if (m === k) continue
-      const ox = Math.min(x + gw[k], gx[m] + gw[m]) - Math.max(x, gx[m]) + gap
+      const ox = Math.min(x + gw[k], gx[m] + gw[m]) - Math.max(x, gx[m]) + gapX[k * G + m]
       if (ox <= 0) continue
-      const oy = Math.min(y + gh[k], gy[m] + gh[m]) - Math.max(y, gy[m]) + gap
+      const oy = Math.min(y + gh[k], gy[m] + gh[m]) - Math.max(y, gy[m]) + gapY[k * G + m]
       if (oy > 0) sum += ox * oy
     }
     return sum

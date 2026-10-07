@@ -1,7 +1,7 @@
 import type { ReactFlowState } from 'reactflow'
 import type { C4EdgeRFData } from '@radical/common/c4'
 import { computeRoutedEdge, directCurveBox, ObstacleGrid, type ObstacleSet, type Pt, type RoutedEdge, type RoutingObstacle } from '@radical/layout/edgeRouting'
-import { estimateLabelSize, placeEdgeLabels, type LabelBoxStyle, type LabelEdge, type LabelObstacle, type LabelTextLine } from '@radical/layout/edgeLabels'
+import { placeEdgeLabels, relationLabelSize, RELATION_LABEL_BOX, type LabelEdge, type LabelObstacle } from '@radical/layout/edgeLabels'
 import { allocatePorts } from '@radical/layout/portAllocator'
 import type { Position } from '@radical/layout/side'
 
@@ -15,9 +15,7 @@ type NodeInternals = ReactFlowState['nodeInternals']
 type RFEdges = ReactFlowState['edges']
 
 /** The relation label box; RelationEdge draws it with these numbers. */
-export const LABEL_BOX: LabelBoxStyle & { fontSize: number; techFontSize: number } = {
-  maxWidth: 200, padX: 8, padY: 3, border: 1, lineHeight: 1.4, fontSize: 17, techFontSize: 14,
-}
+export const LABEL_BOX = RELATION_LABEL_BOX
 
 /**
  * How much of the relation labels a zoom shows. The label text is 17px and
@@ -31,15 +29,6 @@ const LABEL_HIDDEN_BELOW = 0.3
 
 export function edgeLabelDetail(zoom: number): EdgeLabelDetail {
   return zoom < LABEL_HIDDEN_BELOW ? 'none' : zoom < TECH_HIDDEN_BELOW ? 'name' : 'full'
-}
-
-/** The lines RelationEdge shows in a relation's label (none: no label). */
-function labelLines(data: C4EdgeRFData | undefined): LabelTextLine[] {
-  const lines: LabelTextLine[] = []
-  const name = data?.label || data?.relationType
-  if (name) lines.push({ text: name, fontSize: LABEL_BOX.fontSize })
-  if (data?.technology) lines.push({ text: `[${data.technology}]`, fontSize: LABEL_BOX.techFontSize })
-  return lines
 }
 
 /** A compound node keeps its name in a header this tall; the rest of it is
@@ -218,10 +207,10 @@ function placeLabels(edges: RFEdges, routes: Map<string, RouteEntry>, candidates
   for (const e of edges) {
     const entry = routes.get(e.id)
     if (!entry || e.hidden) continue
-    const lines = labelLines(e.data as C4EdgeRFData | undefined)
-    if (lines.length === 0) continue
+    const size = relationLabelSize((e.data ?? {}) as C4EdgeRFData)
+    if (!size) continue
     const { route } = entry
-    labelled.push({ id: e.id, points: route.points, anchor: { x: route.labelX, y: route.labelY }, size: estimateLabelSize(lines, LABEL_BOX) })
+    labelled.push({ id: e.id, points: route.points, anchor: { x: route.labelX, y: route.labelY }, size })
   }
   if (labelled.length === 0) return new Map()
 

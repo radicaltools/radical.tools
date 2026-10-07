@@ -9,9 +9,12 @@
  *
  * Separation is deterministic: pairs are visited in a fixed order and each
  * overlap is resolved along its axis of least penetration, split evenly.
+ * Siblings joined by labelled relations keep room for the labels between
+ * them (labelRoom.ts).
  */
 import { C4Node, NODE_SIZES, PositionMap } from '@radical/common/c4'
 import { compoundPadding } from './geometry'
+import { pairKey, type LabelGaps, type PairGap } from './labelRoom'
 
 /** Minimum clear space between root-level nodes. */
 export const ROOT_GAP = 40
@@ -49,17 +52,24 @@ function depthOf(nodes: Record<string, C4Node>, id: string): number {
   return d
 }
 
-/** Push boxes apart until no pair is closer than `gap`. Mutates `boxes`. */
-export function separateBoxes(boxes: Box[], gap: number, maxPasses = 200): void {
+/**
+ * Push boxes apart until no pair is closer than `gap`, or than the pair's
+ * own gap when `pairGap` gives a larger one. Mutates `boxes`.
+ */
+export function separateBoxes(
+  boxes: Box[], gap: number, maxPasses = 200,
+  pairGap?: (i: number, j: number) => PairGap | undefined,
+): void {
   for (let pass = 0; pass < maxPasses; pass++) {
     let moved = false
     for (let i = 0; i < boxes.length; i++) {
       const a = boxes[i]
       for (let j = i + 1; j < boxes.length; j++) {
         const b = boxes[j]
-        const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x) + gap
+        const pg = pairGap?.(i, j)
+        const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x) + (pg ? Math.max(gap, pg.x) : gap)
         if (ox <= 0) continue
-        const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y) + gap
+        const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y) + (pg ? Math.max(gap, pg.y) : gap)
         if (oy <= 0) continue
         moved = true
         if (ox <= oy) {
@@ -77,12 +87,16 @@ export function separateBoxes(boxes: Box[], gap: number, maxPasses = 200): void 
   }
 }
 
-/** Separate overlapping siblings at every level, fit parents, separate roots. */
-export function finalizeLayout(nodes: Record<string, C4Node>, positions: PositionMap): PositionMap {
-  return finalize(nodes, positions, true)
+/** Separate overlapping siblings at every level (with room for the labels in
+ *  `gaps`), fit parents, separate roots. */
+export function finalizeLayout(nodes: Record<string, C4Node>, positions: PositionMap, gaps?: LabelGaps): PositionMap {
+  return finalize(nodes, positions, true, gaps)
 }
 
-function finalize(nodes: Record<string, C4Node>, positions: PositionMap, separate: boolean): PositionMap {
+function finalize(nodes: Record<string, C4Node>, positions: PositionMap, separate: boolean, gaps?: LabelGaps): PositionMap {
+  const gapsOf = (ids: string[]) => gaps && gaps.size > 0
+    ? (i: number, j: number) => gaps.get(pairKey(ids[i], ids[j]))
+    : undefined
   const out: PositionMap = {}
   for (const id of Object.keys(nodes)) out[id] = boxOf(nodes, positions, id)
 
@@ -92,7 +106,7 @@ function finalize(nodes: Record<string, C4Node>, positions: PositionMap, separat
   for (const pid of parentIds) {
     const childIds = byParent.get(pid)!
     const boxes = childIds.map((id) => out[id] as Box)
-    if (separate) separateBoxes(boxes, CHILD_GAP)
+    if (separate) separateBoxes(boxes, CHILD_GAP, undefined, gapsOf(childIds))
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const b of boxes) {
@@ -114,8 +128,8 @@ function finalize(nodes: Record<string, C4Node>, positions: PositionMap, separat
   }
 
   if (separate) {
-    const roots = Object.values(nodes).filter((n) => !n.parentId || !nodes[n.parentId]).map((n) => out[n.id] as Box)
-    separateBoxes(roots, ROOT_GAP)
+    const rootIds = Object.values(nodes).filter((n) => !n.parentId || !nodes[n.parentId]).map((n) => n.id)
+    separateBoxes(rootIds.map((id) => out[id] as Box), ROOT_GAP, undefined, gapsOf(rootIds))
   }
   return out
 }

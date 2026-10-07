@@ -3296,7 +3296,7 @@ export const useDiagramStore = create<DiagramStore>()(
             '· planarity', result.planarity.verdict, `(${result.planarity.crossingEdges}/${result.planarity.totalEdges})`,
             '· winner score', result.winner.score,
             '· ranking:', result.candidates.map((c) =>
-              `${c.name} [composite=${c.score.composite.toFixed(0)} cross=${c.metrics.crossings}(rend${c.score.renderedCrossings}) over=${c.metrics.overdraws}(rend${c.score.renderedOverdraws}) loop=${c.score.stubLoopPenalty.toFixed(2)} olap=${c.score.nodeOverlap.toFixed(1)} long=${c.score.edgeLengthExcess.toFixed(1)} lmean=${c.score.edgeLengthMean.toFixed(2)} leaf=${c.score.leafCentrality.toFixed(2)} ar=${c.score.aspectPenalty.toFixed(2)} sym=${c.score.symmetryDeficit.toFixed(2)}]`,
+              `${c.name} [composite=${c.score.composite.toFixed(0)} cross=${c.metrics.crossings}(rend${c.score.renderedCrossings}) over=${c.metrics.overdraws}(rend${c.score.renderedOverdraws}) loop=${c.score.stubLoopPenalty.toFixed(2)} olap=${c.score.nodeOverlap.toFixed(1)} long=${c.score.edgeLengthExcess.toFixed(1)} lmean=${c.score.edgeLengthMean.toFixed(2)} leaf=${c.score.leafCentrality.toFixed(2)} ar=${c.score.aspectPenalty.toFixed(2)} sym=${c.score.symmetryDeficit.toFixed(2)} lbl=${c.score.labelCrowding.toFixed(2)}]`,
             ).join(' | '),
           )
           // Same ranking, surfaced to the UI (previously console-only) so a
