@@ -90,6 +90,7 @@ if (typeof window !== 'undefined') {
       s.views !== prev.views ||
       s.defaultPositions !== prev.defaultPositions ||
       s.defaultViewport !== prev.defaultViewport ||
+      s.defaultLayoutConstraints !== prev.defaultLayoutConstraints ||
       s.snapshots !== prev.snapshots ||
       s.presentations !== prev.presentations ||
       s.metamodel !== prev.metamodel

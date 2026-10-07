@@ -10,7 +10,7 @@ import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, 
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
-import { viewLayoutInput, applyLayoutPositions, resizeParentsBottomUp } from '@radical/layout/viewInput'
+import { viewLayoutInput, applyAlignments, applyLayoutPositions, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import type { C4Node, DiagramData, NodePosition } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
 
@@ -228,7 +228,12 @@ export class FolderModel {
           folder: this.folder,
           nodes: data.nodes.length,
           relations: data.relations.length,
-          views: (data.views ?? []).map((view) => ({ id: view.id, name: view.name, kind: view.kind ?? 'static', ...(view.sequenceId ? { sequenceId: view.sequenceId } : {}) })),
+          views: (data.views ?? []).map((view) => ({
+            id: view.id, name: view.name, kind: view.kind ?? 'static',
+            ...(view.sequenceId ? { sequenceId: view.sequenceId } : {}),
+            ...(view.layoutConstraints?.length ? { alignments: view.layoutConstraints } : {}),
+          })),
+          ...(data.defaultLayoutConstraints?.length ? { allElementsAlignments: data.defaultLayoutConstraints } : {}),
           sequences: (data.sequences ?? []).map((sequence) => ({ id: sequence.id, name: sequence.name, steps: sequence.relationIds.length })),
           presentations: (data.presentations ?? []).map((presentation) => ({
             id: presentation.id,
@@ -291,7 +296,8 @@ export class FolderModel {
       const node = nodes[id]
       if (node) Object.assign(node, { x: pos.x, y: pos.y, width: pos.width, height: pos.height })
     }
-    const input = viewLayoutInput(view, nodes, byId(changed.relations))
+    const constraints = view ? view.layoutConstraints : changed.defaultLayoutConstraints
+    const input = viewLayoutInput(view, nodes, byId(changed.relations), constraints)
     if (!Object.keys(input.nodes).length) return { ok: true, text: 'Smart Layout: there are no nodes to lay out.' }
     // Large models take minutes: report each step, and stop at the next one
     // once the client has cancelled (or gone away) rather than finish unseen.
@@ -300,12 +306,14 @@ export class FolderModel {
       if (options.signal?.aborted) throw new Error(CANCELLED)
       const count = 'done' in p ? ` ${p.done}/${p.total}` : ''
       options.onProgress?.({ progress: ++step, message: `Smart Layout: ${p.phase}${count}` })
-    })
+    }, { alignments: input.alignments })
     if (options.signal?.aborted) return { ok: false, text: CANCELLED }
     if (!result.candidates.length) return { ok: false, text: 'Smart Layout: no candidate produced a result.' }
     if (result.keptCurrent) return { ok: true, text: 'Smart Layout: the current layout already scores best; nothing changed.' }
     applyLayoutPositions(nodes, result.winner.positions, input)
     resizeParentsBottomUp(nodes, input)
+    // The refit knows nothing of the alignments; put them back.
+    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
     // All elements writes the nodes themselves (settleGeometry then syncs
     // defaultPositions); a view keeps its own positions.
     if (view) {

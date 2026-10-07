@@ -438,3 +438,38 @@ a unit or e2e test:
   only `*.c4.json`, leave the document unsaved after an edit, and use the
   local `apps/studio/out` build outside a packaged install.
 - *README:* says `apps/mcp` is "empty for now".
+
+### Alignments (2026-10-07)
+
+Added in `feat/layout-alignment-constraints`: elements kept in a row or a
+column per canvas (`LayoutConstraint` on `DiagramView.layoutConstraints`,
+`DiagramData.defaultLayoutConstraints` for All elements). WebCoLa holds an
+alignment of leaves itself; one with an expanded container is projected after
+each tick (`projectGroupAlignments`), since WebCoLa constraints cannot name a
+group; `enforceAlignments` (`packages/layout/src/constraints.ts`) is the
+headless pass for Smart Layout, a new rule and the MCP server. Still open:
+
+1. **The canvas and the layout disagree on sizes.** The canvas draws a
+   container without children at its collapsed size and record types (ADR,
+   requirement…) at their type's size (`deriveRFNodes`); Smart Layout and the
+   physics place the stored size, which for a childless system is 80 px
+   taller. Alignments centre on the drawn size (`drawnSize` in
+   `packages/layout/src/geometry.ts`), but overlap checks and scoring still
+   use the stored one, so such nodes keep more space than they show.
+   `deriveRFNodes` should use `drawnSize` once the layout does too (measure
+   Smart Layout before and after).
+2. **Only alignment, optionally ordered.** Equal spacing along a row,
+   "A left of B" without a shared line, a fixed position (Part 1, item 27)
+   and a right angle would use the same `LayoutConstraint` type and both
+   solvers. An ordered line keeps its members apart by the physics' own
+   overlap distance; there is no "at least N px apart" yet.
+3. **A row and a column that cross at two elements are refused**, rather
+   than solved; three-way conflicts through chains of rules are not
+   detected and leave overlaps. Contradicting orders on one axis are
+   refused (cycle check in `checkAddAlignment`), also across rows.
+4. **All elements' alignments are listed nowhere.** A view lists its own in
+   its properties; All elements has no properties panel, so its alignments
+   are seen and removed only on the canvas (guides, the × on a selected
+   member, *Align… → Stop keeping aligned*).
+5. **The MCP server aligns at the next `smart_layout`** (or when Studio shows
+   the canvas): `align_nodes` records the rule without moving anything.

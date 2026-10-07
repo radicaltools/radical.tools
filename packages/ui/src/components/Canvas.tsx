@@ -15,6 +15,7 @@ import { useDiagramStore } from '../store/diagramStore'
 import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
+import { AlignmentGuides } from './AlignmentGuides'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize } from '@radical/common/c4'
 import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
 
@@ -987,6 +988,7 @@ function StructuralCanvas(): React.ReactElement {
           size={1}
           color="var(--canvas-dots)"
         />
+        <AlignmentGuides />
       </ReactFlow>
 
       {connectSource && connectMouse && (

@@ -9,6 +9,7 @@ import { serializeToMdFolder, deserializeFromMdFolder } from '@radical/common/fo
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { drawnSize } from '@radical/layout/geometry'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
@@ -76,6 +77,70 @@ describe('MCP document tools', () => {
       await client.close()
     }
   }, 60_000)
+
+  it('keeps alignments through Smart Layout, per canvas, and removes them', async () => {
+    const { client, read } = await connect()
+    try {
+      for (const [tempId, type, label] of [['user', 'person', 'Buyer'], ['shop', 'system', 'Shop'], ['bank', 'system', 'Bank'], ['mail', 'system', 'Mail']]) {
+        await call(client, 'add_node', { tempId, type, label })
+      }
+      await call(client, 'add_relation', { sourceId: 'user', targetId: 'shop', relationType: 'interacts' })
+      await call(client, 'add_relation', { sourceId: 'shop', targetId: 'bank', relationType: 'interacts' })
+      await call(client, 'add_relation', { sourceId: 'shop', targetId: 'mail', relationType: 'interacts' })
+      await call(client, 'create_view', { tempId: 'ctx', name: 'Context' })
+      expect(await call(client, 'align_nodes', { nodeIds: ['user', 'bank', 'mail'], axis: 'horizontal' })).toContain('Alignment ID')
+      await call(client, 'align_nodes', { nodeIds: ['user', 'shop'], axis: 'vertical', viewId: 'ctx' })
+      const refused = await client.callTool({ name: 'align_nodes', arguments: { nodeIds: ['user', 'bank'], axis: 'horizontal' } })
+      expect(JSON.stringify(refused.content)).toContain('already in one row')
+
+      await call(client, 'smart_layout', {})
+      await call(client, 'smart_layout', { viewId: 'ctx' })
+      const data = await read()
+      expect(data.defaultLayoutConstraints).toEqual([expect.objectContaining({ axis: 'horizontal', nodeIds: expect.any(Array) })])
+      const byLabel = Object.fromEntries(data.nodes.map((n) => [n.label, n]))
+      // Centres as the canvas draws them: a system without children is drawn smaller.
+      const centreY = (label: string) => byLabel[label].y + drawnSize(byLabel[label], false).height / 2
+      expect(Math.abs(centreY('Buyer') - centreY('Bank'))).toBeLessThanOrEqual(0.5)
+      expect(Math.abs(centreY('Buyer') - centreY('Mail'))).toBeLessThanOrEqual(0.5)
+      const view = data.views![0]
+      expect(view.layoutConstraints).toEqual([expect.objectContaining({ axis: 'vertical' })])
+      const centreX = (label: string) => view.positions[byLabel[label].id].x + drawnSize(byLabel[label], false).width / 2
+      expect(Math.abs(centreX('Buyer') - centreX('Shop'))).toBeLessThanOrEqual(0.5)
+      expect(await call(client, 'get_model_summary', {})).toContain('allElementsAlignments')
+
+      await call(client, 'remove_alignment', { nodeIds: ['user', 'shop'], viewId: view.id })
+      await call(client, 'delete_node', { id: byLabel.Mail.id })
+      const after = await read()
+      expect(after.views![0].layoutConstraints).toEqual([])
+      expect(after.defaultLayoutConstraints![0].nodeIds.sort()).toEqual([byLabel.Buyer.id, byLabel.Bank.id].sort())
+    } finally {
+      await client.close()
+    }
+  }, 90_000)
+
+  it('keeps an ordered row in the order given through Smart Layout', async () => {
+    const { client, read } = await connect()
+    try {
+      for (const [tempId, label] of [['a', 'Alpha'], ['b', 'Beta'], ['c', 'Gamma'], ['hub', 'Hub']]) {
+        await call(client, 'add_node', { tempId, type: 'system', label })
+      }
+      // The relations would rather put Gamma first.
+      await call(client, 'add_relation', { sourceId: 'c', targetId: 'hub', relationType: 'interacts' })
+      await call(client, 'add_relation', { sourceId: 'hub', targetId: 'a', relationType: 'interacts' })
+      expect(await call(client, 'align_nodes', { nodeIds: ['a', 'b', 'c'], axis: 'horizontal', keepOrder: true })).toContain('in the order given')
+      const refused = await client.callTool({ name: 'align_nodes', arguments: { nodeIds: ['c', 'a'], axis: 'horizontal', keepOrder: true } })
+      expect(JSON.stringify(refused.content)).toContain('contradicts')
+      await call(client, 'smart_layout', {})
+      const data = await read()
+      expect(data.defaultLayoutConstraints).toEqual([expect.objectContaining({ ordered: true })])
+      const byLabel = Object.fromEntries(data.nodes.map((n) => [n.label, n]))
+      const centreX = (label: string) => byLabel[label].x + drawnSize(byLabel[label], false).width / 2
+      expect(centreX('Alpha')).toBeLessThan(centreX('Beta'))
+      expect(centreX('Beta')).toBeLessThan(centreX('Gamma'))
+    } finally {
+      await client.close()
+    }
+  }, 90_000)
 
   it('copies a built-in metamodel on the first edit, persists it and refreshes tool schemas', async () => {
     const { client, read } = await connect()

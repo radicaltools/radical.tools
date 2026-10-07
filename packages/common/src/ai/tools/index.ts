@@ -5,7 +5,7 @@
 // Studio's AI (QuickSearch chat, Radical Forge) and the MCP server share it.
 
 import type { Metamodel } from '../../metamodel'
-import { buildLayoutToolDefs, buildLayoutToolHandlers } from './layoutTools'
+import { buildAlignmentToolHandlers, buildLayoutToolDefs, buildLayoutToolHandlers } from './layoutTools'
 import { buildMetamodelToolDefs, buildMetamodelToolHandlers } from './metamodelTools'
 import { buildModelToolDefs, buildModelToolHandlers } from './modelTools'
 import { buildNodeToolDefs, buildNodeToolHandlers } from './nodeTools'
@@ -44,6 +44,7 @@ export function buildToolHandlers(): Map<string, ToolHandler> {
     ...buildNodeToolHandlers(),
     ...buildRelationToolHandlers(),
     ...buildViewToolHandlers(),
+    ...buildAlignmentToolHandlers(),
     ...buildSequenceToolHandlers(),
     ...buildModelToolHandlers(),
     ...buildPresentationToolHandlers(),

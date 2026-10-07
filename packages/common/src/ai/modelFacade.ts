@@ -9,7 +9,7 @@
 // per-view node positions, and fitting a parent's size around a new child.
 // Lay the result out with @radical/layout if positions matter.
 
-import type { C4Node, C4Relation, DiagramData, DiagramView, Presentation } from '../c4'
+import type { C4Node, C4Relation, DiagramData, DiagramView, LayoutConstraint, Presentation } from '../c4'
 import type { Metamodel } from '../metamodel'
 import * as model from '../model'
 import type { DiagramFacade } from './diagramFacade'
@@ -41,18 +41,19 @@ const byId = <T extends { id: string }>(items: T[] | undefined): Record<string, 
 
 export function createModelFacade(data: DiagramData, options: ModelFacadeOptions = {}): ModelFacade {
   const newId = options.newId ?? randomId
-  let carried: Omit<DiagramData, 'nodes' | 'relations' | 'views' | 'sequences'> = {}
+  let carried: Omit<DiagramData, 'nodes' | 'relations' | 'views' | 'sequences' | 'defaultLayoutConstraints'> = {}
   const state: model.ModelState & { sequences: NonNullable<model.ModelState['sequences']> } = {
     c4Nodes: {}, c4Relations: {}, views: {}, activeViewId: null, sequences: {},
   }
   // Keep an input's (possibly empty) sequences list; a cleared model drops it.
   let keepSequences = false
   const load = (doc: DiagramData): void => {
-    const { nodes, relations, views, sequences, ...rest } = doc
+    const { nodes, relations, views, sequences, defaultLayoutConstraints, ...rest } = doc
     carried = clone(rest)
     state.c4Nodes = byId(nodes)
     state.c4Relations = byId(relations)
     state.views = byId(views)
+    state.defaultLayoutConstraints = clone(defaultLayoutConstraints ?? [])
     state.sequences = byId(sequences)
     state.metamodel = model.documentMetamodel(doc.metamodel)
     keepSequences = sequences !== undefined
@@ -63,6 +64,7 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     nodes: Object.values(state.c4Nodes),
     relations: Object.values(state.c4Relations),
     views: Object.values(state.views),
+    ...(state.defaultLayoutConstraints?.length ? { defaultLayoutConstraints: state.defaultLayoutConstraints } : {}),
     ...(keepSequences || Object.keys(state.sequences).length ? { sequences: Object.values(state.sequences) } : {}),
   })
   let lastError: string | null = null
@@ -143,6 +145,17 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     setViewHiddenRelations(id: string, relationIds: string[]) {
       model.setViewHiddenRelations(state, id, relationIds)
     },
+    getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(state, viewId),
+    addAlignment(viewId: string | null, axis: LayoutConstraint['axis'], nodeIds: string[], ordered = false) {
+      const refused = model.checkAddAlignment(state, viewId, axis, nodeIds, ordered)
+      if (refused) return { error: refused }
+      const id = newId()
+      model.insertAlignment(state, viewId, id, axis, nodeIds, ordered)
+      return { id }
+    },
+    removeLayoutConstraints(viewId: string | null, ids: string[]) {
+      for (const id of ids) model.deleteLayoutConstraint(state, viewId, id)
+    },
 
     getSequences: () => state.sequences,
     addSequence(name: string) {
@@ -183,6 +196,7 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       state.c4Nodes = {}
       state.c4Relations = {}
       state.views = {}
+      state.defaultLayoutConstraints = []
       state.sequences = {}
       keepSequences = false
       state.activeViewId = null

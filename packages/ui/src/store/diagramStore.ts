@@ -24,6 +24,7 @@ import {
   SlideCanvasState,
   NodePosition,
   PositionMap,
+  LayoutConstraint,
   NODE_SIZES,
   COLLAPSED_HEIGHT,
   COLLAPSED_WIDTH,
@@ -53,6 +54,7 @@ import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutR
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
 import { fittedParentSize } from '@radical/layout/geometry'
 import {
+  applyAlignments,
   applyLayoutPositions,
   computeViewCollapsedSet,
   computeViewNodeSet,
@@ -110,6 +112,7 @@ interface HistoryEntry {
   c4Nodes: Record<string, C4Node>
   c4Relations: Record<string, C4Relation>
   views: Record<string, DiagramView>
+  defaultLayoutConstraints: LayoutConstraint[]
   /** Only on entries that also change sequences (clearModel). */
   sequences?: Record<string, DiagramSequence>
 }
@@ -127,6 +130,7 @@ function _captureState(state: DiagramStore): HistoryEntry {
     c4Nodes: state.c4Nodes,
     c4Relations: state.c4Relations,
     views: state.views,
+    defaultLayoutConstraints: state.defaultLayoutConstraints,
   }
 }
 
@@ -344,9 +348,20 @@ export function nodeEffectivelyCollapsedInView(
   )
 }
 
+const NO_CONSTRAINTS: LayoutConstraint[] = []
+
+/** The layout constraints of the active canvas: the view's own, or All
+ *  elements' when no view is active. */
+export function activeLayoutConstraints(
+  state: Pick<DiagramStore, 'activeViewId' | 'views' | 'defaultLayoutConstraints'>,
+): LayoutConstraint[] {
+  return (state.activeViewId ? state.views[state.activeViewId]?.layoutConstraints : state.defaultLayoutConstraints) ?? NO_CONSTRAINTS
+}
+
 /** The layout input for the store's active view. */
 function layoutInputForView(state: DiagramStore): LayoutInput {
-  return viewLayoutInput(state.activeViewId ? state.views[state.activeViewId] : undefined, state.c4Nodes, state.c4Relations)
+  const view = state.activeViewId ? state.views[state.activeViewId] : undefined
+  return viewLayoutInput(view, state.c4Nodes, state.c4Relations, activeLayoutConstraints(state))
 }
 
 /**
@@ -914,6 +929,10 @@ interface DiagramStore {
   defaultPositions: Record<string, NodePosition>
   /** Camera state (pan + zoom) for the "All" (default) view */
   defaultViewport: { x: number; y: number; zoom: number } | null
+  /** Layout constraints of the "All" (default) view; a named view keeps its
+   *  own in `layoutConstraints`. Read the active canvas's with
+   *  activeLayoutConstraints(). */
+  defaultLayoutConstraints: LayoutConstraint[]
   /** Node ids on a lazily-loaded md-folder doc whose `description` hasn't
    *  been fetched from disk yet — see `hydrateNode`. Empty for other
    *  document sources. */
@@ -927,7 +946,8 @@ interface DiagramStore {
   selectedNodeId: string | null
   selectedEdgeId: string | null
   /**
-   * All currently selected node ids on the canvas. The first entry mirrors
+   * All currently selected node ids on the canvas, in the order they were
+   * selected (Align… keeps that order). The first entry mirrors
    * `selectedNodeId` (“primary” selection) when non-empty. Maintained from
    * ReactFlow selection changes; multi-select uses Shift/Cmd by default.
    */
@@ -1043,6 +1063,22 @@ interface DiagramStore {
   setTreemapMaxDepth: (viewId: string, depth: number | null) => void
   /** Choose the auto-layout strategy used for this view. */
   setViewLayoutMode: (viewId: string, mode: 'auto' | 'tree') => void
+  /**
+   * Keeps `nodeIds` on one line on the active canvas — a row ('horizontal')
+   * or a column ('vertical') — through drags, the live layout and Smart
+   * Layout, and lines them up now. With `ordered` they also keep the order
+   * of `nodeIds` along the line (left to right, top to bottom) — the order
+   * the user selected them in. Returns the constraint's id, or null when
+   * refused (the reason is notified).
+   */
+  addAlignment: (axis: LayoutConstraint['axis'], nodeIds: string[], options?: { ordered?: boolean }) => string | null
+  /** Makes an alignment keep the order of its members as listed (the order
+   *  they were selected in) on its canvas (null = All elements; undefined =
+   *  the active canvas), or stop keeping it. */
+  setAlignmentOrdered: (id: string, ordered: boolean, viewId?: string | null) => void
+  /** Removes layout constraints, as one undo step, from a view (null = All
+   *  elements; undefined = the active canvas). */
+  removeLayoutConstraint: (ids: string | string[], viewId?: string | null) => void
   /** Link/unlink a sequence to a dynamic view. */
   setViewSequence: (viewId: string, sequenceId: string | null) => void
   /**
@@ -1227,6 +1263,9 @@ interface DiagramStore {
   _pushUndo: () => void
   _markMilestoneEdit: () => void
   _resizeParentsBottomUp: (viewFilter?: Set<string>, viewCollapsedSet?: Set<string>, expandedSet?: Set<string>) => void
+  /** Moves the active canvas's elements so its layout constraints hold
+   *  (no undo step of its own). */
+  _enforceLayoutConstraints: () => void
 }
 
 // ─── Live layout singleton (not serialisable → kept outside store) ───────────
@@ -1394,6 +1433,7 @@ export const useDiagramStore = create<DiagramStore>()(
       activeViewId: null,
       defaultPositions: initDefaultPositions,
       defaultViewport: persisted?.defaultViewport ?? null,
+      defaultLayoutConstraints: persisted?.defaultLayoutConstraints ?? [],
       pendingBodyNodeIds: {},
       rfNodes: deriveRFNodes(initNodes),
       rfEdges: deriveRFEdges(initNodes, initRelations),
@@ -2381,6 +2421,9 @@ export const useDiagramStore = create<DiagramStore>()(
           })
         }
         set((state) => { delete (state as any).__pendingViewport })
+        // Alignments added elsewhere (the MCP server, another window) hold
+        // from the moment the canvas shows.
+        get()._enforceLayoutConstraints()
         // Drop cola's cached positions so the live layout doesn't immediately
         // overwrite the just-restored coordinates with stale ones.
         _liveLayout?.reset()
@@ -2519,6 +2562,63 @@ export const useDiagramStore = create<DiagramStore>()(
           view.layoutMode = mode
         })
         get()._sync()
+      },
+
+      addAlignment(axis, nodeIds, options = {}) {
+        const viewId = get().activeViewId
+        const ordered = !!options.ordered
+        const ids = [...new Set(nodeIds)]
+        const refused = model.checkAddAlignment(get(), viewId, axis, ids, ordered)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return null
+        }
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        const id = uid()
+        set((state) => { model.insertAlignment(state, viewId, id, axis, ids, ordered) })
+        get()._enforceLayoutConstraints()
+        _liveLayout?.reset()
+        return id
+      },
+
+      setAlignmentOrdered(id, ordered, viewIdArg) {
+        const viewId = viewIdArg === undefined ? get().activeViewId : viewIdArg
+        const c = model.layoutConstraintsOf(get(), viewId).find((x) => x.id === id)
+        if (!c || !!c.ordered === ordered) return
+        const ids = ordered ? c.nodeIds : null
+        if (ids) {
+          const refused = model.checkAlignmentOrder(get(), viewId, id, ids)
+          if (refused) {
+            get().pushNotification(refused, 'error')
+            return
+          }
+        }
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        set((state) => { model.setAlignmentOrder(state, viewId, id, ids) })
+        if (viewId === get().activeViewId) {
+          get()._enforceLayoutConstraints()
+          _liveLayout?.reset()
+        }
+      },
+
+      removeLayoutConstraint(ids, viewIdArg) {
+        const viewId = viewIdArg === undefined ? get().activeViewId : viewIdArg
+        const remove = new Set(typeof ids === 'string' ? [ids] : ids)
+        if (!model.layoutConstraintsOf(get(), viewId).some((c) => remove.has(c.id))) return
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        set((state) => { for (const id of remove) model.deleteLayoutConstraint(state, viewId, id) })
+        if (viewId === get().activeViewId) _liveLayout?.invalidate()
+      },
+
+      _enforceLayoutConstraints() {
+        const input = layoutInputForView(get())
+        if (!input.alignments.length) return
+        let moved = false
+        set((state) => { moved = applyAlignments(state.c4Nodes, input) })
+        if (moved) get()._sync()
       },
 
       setViewSequence(viewId, sequenceId) {
@@ -2687,13 +2787,20 @@ export const useDiagramStore = create<DiagramStore>()(
 
           // Track multi-selection driven by ReactFlow (shift/cmd-click,
           // selection box). We rebuild selectedNodeIds from the current
-          // rfNodes' selected flag so it reflects the true UI state.
+          // rfNodes' selected flag so it reflects the true UI state, in
+          // selection order: nodes still selected keep their place, newly
+          // selected ones follow in the order of the changes.
           const hasSelectChange = passthrough.some(c => c.type === 'select')
           if (hasSelectChange) {
-            const ids: string[] = []
+            const selectedNow = new Set<string>()
             for (const rn of state.rfNodes) {
-              if ((rn as any).selected) ids.push(rn.id)
+              if ((rn as any).selected) selectedNow.add(rn.id)
             }
+            const ids = state.selectedNodeIds.filter((id) => selectedNow.has(id))
+            for (const c of passthrough) {
+              if (c.type === 'select' && c.selected && selectedNow.has(c.id) && !ids.includes(c.id)) ids.push(c.id)
+            }
+            for (const id of selectedNow) if (!ids.includes(id)) ids.push(id)
             state.selectedNodeIds = ids
             state.selectedNodeId = ids[0] ?? state.selectedNodeId
             // Compatibility with single-select consumers: when nothing is
@@ -2894,6 +3001,7 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           }
           if (rootIds.length > 0) get()._sync()
+          get()._enforceLayoutConstraints()
         } finally {
           set((state) => { state.isLayoutRunning = false })
         }
@@ -2929,6 +3037,7 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           }
           get()._sync()
+          get()._enforceLayoutConstraints()
 
           // Drop cola caches so the live layout doesn't snap nodes back to
           // their pre-layout positions on the next rebuild.
@@ -2970,7 +3079,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const result = await runSmartLayout(input.nodes, input.relations, get().metamodel as Metamodel | undefined, (progress) => {
             set((s) => { s.smartLayoutProgress = progress })
-          })
+          }, { alignments: input.alignments })
           if (result.candidates.length === 0) {
             get().pushNotification('Smart layout: no candidate produced a result.', 'warning')
             return
@@ -3002,6 +3111,9 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           }
           get()._sync()
+          // The parent refit and root separation above know nothing of the
+          // user's alignments; put them back.
+          get()._enforceLayoutConstraints()
 
           // Drop cola caches so the live layout doesn't snap nodes back to
           // their pre-smart positions on the next rebuild.
@@ -3110,8 +3222,8 @@ export const useDiagramStore = create<DiagramStore>()(
           // collapsed/expanded overrides included, so a node collapsed on All
           // elements but expanded in this view is a group here, not a leaf.
           getModel: () => {
-            const { nodes, relations } = layoutInputForView(get())
-            return { nodes, relations }
+            const { nodes, relations, alignments } = layoutInputForView(get())
+            return { nodes, relations, alignments }
           },
           onSettled: () => {
             set((state) => { state.liveLayoutMoving = false })
@@ -3210,6 +3322,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.c4Nodes = entry.c4Nodes as any
           state.c4Relations = entry.c4Relations as any
           state.views = entry.views as any
+          state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
           if (entry.sequences) state.sequences = entry.sequences as any
           state.canUndo = _undoStack.length > 0
           state.canRedo = true
@@ -3227,6 +3340,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.c4Nodes = {} as any
           state.c4Relations = {} as any
           state.views = {} as any
+          state.defaultLayoutConstraints = []
           state.sequences = {} as any
           state.activeViewId = null
           state.selectedNodeId = null
@@ -3248,6 +3362,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.c4Nodes = entry.c4Nodes as any
           state.c4Relations = entry.c4Relations as any
           state.views = entry.views as any
+          state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
           if (entry.sequences) state.sequences = entry.sequences as any
           state.canUndo = true
           state.canRedo = _redoStack.length > 0
@@ -4241,6 +4356,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.views = views as any
           state.defaultPositions = defaultPos as any
           state.defaultViewport = defaultVP
+          state.defaultLayoutConstraints = (data.defaultLayoutConstraints ?? []) as any
           state.activeViewId = null
           state.selectedNodeId = null
           state.selectedEdgeId = null
@@ -4259,6 +4375,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.hubMeta = data.hub ?? null
         })
         get()._sync()
+        get()._enforceLayoutConstraints()
         // skipBulk=true: loaded positions are already correct; the 110-iteration
         // cola bulk phase would immediately rearrange and overwrite them.
         get().startLiveLayout({ skipBulk: true })
@@ -4310,6 +4427,7 @@ export const useDiagramStore = create<DiagramStore>()(
           views: savedViews,
           defaultPositions: savedDefaultPos,
           defaultViewport: savedDefaultVP,
+          ...(get().defaultLayoutConstraints.length ? { defaultLayoutConstraints: get().defaultLayoutConstraints as LayoutConstraint[] } : {}),
           snapshots: snapshots as DiagramSnapshot[],
           presentations: presentations as Presentation[],
           metamodel: metamodel as Metamodel,
@@ -4332,6 +4450,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.views = {} as any
           state.activeViewId = null
           state.defaultPositions = snapshotPositions(sample.nodes) as any
+          state.defaultLayoutConstraints = []
           state.selectedNodeId = null
           state.selectedEdgeId = null
           state.nodeWizard = null
@@ -4369,6 +4488,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.views = {} as any
           state.activeViewId = null
           state.defaultPositions = {} as any
+          state.defaultLayoutConstraints = []
           state.selectedNodeId = null
           state.selectedEdgeId = null
           state.nodeWizard = null

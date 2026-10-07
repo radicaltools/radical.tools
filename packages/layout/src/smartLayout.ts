@@ -48,7 +48,14 @@ import { minimizeCrossings, computeLayoutMetrics, type LayoutMetrics } from './c
 import { pickSides } from './portAllocator'
 import { ELK_ROOT_SPACING, ELK_CHILD_SPACING } from './elkSpacingBase'
 import { compoundPadding, projectToVisibleGraph } from './geometry'
-import { finalizeLayout, ROOT_GAP, CHILD_GAP } from './layoutFinalize'
+import { finalizeLayout as finalizeUnconstrained, ROOT_GAP, CHILD_GAP } from './layoutFinalize'
+import { alignmentError, enforceAlignments, type Alignment } from './constraints'
+
+/** finalizeLayout plus the user's alignments, so every stage scores and
+ *  refines what the canvas will keep. */
+function finalizeLayout(nodes: Record<string, C4Node>, positions: PositionMap, alignments: readonly Alignment[]): PositionMap {
+  return enforceAlignments(nodes, finalizeUnconstrained(nodes, positions), alignments)
+}
 import {
   anneal, buildLayoutGraph, createRng, graphSeed, FunctionEnergy, ProxyEnergy,
   type AnnealOptions, type Bounds, type LayoutGraph, type Rng,
@@ -1010,6 +1017,7 @@ function scoreCandidate(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
   candidate: RawCandidate,
+  alignments: readonly Alignment[],
 ): SmartLayoutCandidate | null {
   try {
     const raw: PositionMap = { ...candidate.positions }
@@ -1018,7 +1026,7 @@ function scoreCandidate(
       const prev = raw[id]
       if (prev) raw[id] = { ...prev, x: p.x, y: p.y }
     }
-    const positions = finalizeLayout(nodes, raw)
+    const positions = finalizeLayout(nodes, raw, alignments)
     const projected = projectPositions(nodes, positions)
     const metrics = computeLayoutMetrics(projected, relations)
     const score = computeCompositeScore(projected, relations)
@@ -1190,15 +1198,24 @@ export async function runSmartLayoutELKPhase(
   return { done: false, nodes, relations, raw }
 }
 
+export interface SmartLayoutOptions {
+  /** The structure-derived seed by default; a "try another arrangement"
+   *  action would pass a different one. */
+  seed?: number
+  /** User alignments (resolveAlignments) every candidate must keep. */
+  alignments?: readonly Alignment[]
+}
+
 export async function runSmartLayoutCore(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
   metamodel?: Metamodel,
   onProgress?: SmartLayoutOnProgress,
+  options: SmartLayoutOptions = {},
 ): Promise<SmartLayoutResult> {
   const elkResult = await runSmartLayoutELKPhase(nodes, relations, metamodel, onProgress)
   if (elkResult.done) return elkResult.result
-  return runSmartLayoutWorkerPhase(elkResult.nodes, elkResult.relations, elkResult.raw, onProgress)
+  return runSmartLayoutWorkerPhase(elkResult.nodes, elkResult.relations, elkResult.raw, onProgress, options)
 }
 
 /**
@@ -1220,8 +1237,9 @@ export async function runSmartLayoutWorkerPhase(
   relations: Record<string, C4Relation>,
   raw: RawCandidate[],
   onProgress?: SmartLayoutOnProgress,
-  options: { seed?: number } = {},
+  options: SmartLayoutOptions = {},
 ): Promise<SmartLayoutResult> {
+  const alignments = options.alignments ?? []
   const baseline = computeLayoutMetrics(nodes, relations)
 
   // Composite ranking — crossings dominate but the layout still gets
@@ -1231,7 +1249,7 @@ export async function runSmartLayoutWorkerPhase(
   const valid: SmartLayoutCandidate[] = []
   onProgress?.({ phase: 'ranking', done: 0, total: raw.length })
   for (let i = 0; i < raw.length; i++) {
-    const scored = scoreCandidate(nodes, relations, raw[i])
+    const scored = scoreCandidate(nodes, relations, raw[i], alignments)
     if (scored) valid.push(scored)
     onProgress?.({ phase: 'ranking', done: i + 1, total: raw.length })
     await yieldToUI()
@@ -1251,7 +1269,7 @@ export async function runSmartLayoutWorkerPhase(
   for (let k = 0; k < Math.min(2, valid.length); k++) {
     const run = refineRoots(nodes, relations, valid[k].positions, rng, deadlineA)
     iterationsA += run.iterations
-    const positions = finalizeLayout(nodes, run.positions)
+    const positions = finalizeLayout(nodes, run.positions, alignments)
     const composite = compositeEnergy(projectPositions(nodes, positions), relations)
     if (!best || composite < best.composite) best = { from: valid[k], run, positions, composite }
   }
@@ -1263,8 +1281,8 @@ export async function runSmartLayoutWorkerPhase(
   await yieldToUI()
 
   onProgress?.({ phase: 'refining-c' })
-  const phaseC = polishRoots(nodes, relations, finalizeLayout(nodes, phaseB.positions), rng, now() + PHASE_C_DEADLINE_MS)
-  const finalPositions = finalizeLayout(nodes, phaseC.positions)
+  const phaseC = polishRoots(nodes, relations, finalizeLayout(nodes, phaseB.positions, alignments), rng, now() + PHASE_C_DEADLINE_MS)
+  const finalPositions = finalizeLayout(nodes, phaseC.positions, alignments)
   const refined = projectPositions(nodes, finalPositions)
 
   // Never hand back something worse than we already had: the refined
@@ -1279,7 +1297,10 @@ export async function runSmartLayoutWorkerPhase(
   if (valid[0].score.composite < winner.score.composite) winner = valid[0]
 
   const currentScore = computeCompositeScore(nodes, relations)
+  // The layout on screen competes only while it keeps the alignments (a
+  // rule just added may not hold there yet).
   const keptCurrent = currentScore.composite <= winner.score.composite
+    && alignmentError(nodes, {}, alignments) <= 1
   if (keptCurrent) {
     const positions: PositionMap = {}
     for (const n of Object.values(nodes)) positions[n.id] = { x: n.x, y: n.y, width: n.width, height: n.height }

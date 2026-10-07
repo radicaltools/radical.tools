@@ -797,7 +797,10 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const setViewKind = useDiagramStore((s) => s.setViewKind)
   const setViewSequence = useDiagramStore((s) => s.setViewSequence)
   const setViewLayoutMode = useDiagramStore((s) => s.setViewLayoutMode)
+  const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
+  const setAlignmentOrdered = useDiagramStore((s) => s.setAlignmentOrdered)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
+  const labels = useNodeLabels()
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState('')
   const seqList = Object.values(sequences)
@@ -930,6 +933,44 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
             <option value="auto">Auto (Smart Layout)</option>
             <option value="tree">Hierarchical nested tree</option>
           </select>
+        </div>
+      )}
+      {(isStatic || isDynamic) && (view.layoutConstraints?.length ?? 0) > 0 && (
+        <div>
+          <div className="props-section-title">Alignments</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {view.layoutConstraints!.map((c) => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{c.axis === 'horizontal' ? 'Row' : 'Column'}</span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}
+                  title={c.nodeIds.map((id) => labels.get(id) ?? id).join(c.ordered ? ' → ' : ', ')}>
+                  {c.nodeIds.map((id) => labels.get(id) ?? id).join(c.ordered ? ' → ' : ', ')}
+                </span>
+                <label
+                  style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, color: 'var(--text-muted)', cursor: readOnly ? 'default' : 'pointer' }}
+                  title={c.axis === 'horizontal' ? 'Keep them left to right in the order listed (the order they were selected in)' : 'Keep them top to bottom in the order listed (the order they were selected in)'}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!c.ordered}
+                    disabled={readOnly}
+                    onChange={(e) => setAlignmentOrdered(c.id, e.target.checked, view.id)}
+                    style={{ margin: 0 }}
+                  />
+                  in order
+                </label>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => removeLayoutConstraint(c.id, view.id)}
+                    title="Stop keeping these elements aligned"
+                    aria-label="Remove alignment"
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, padding: '0 2px' }}
+                  >×</button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {isDynamic && (

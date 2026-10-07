@@ -4,7 +4,7 @@
 // applyPatch.ts — there is no single "apply a whole patch" function anymore,
 // each tool applies its own single change.
 
-import type { C4Node, C4Relation, DiagramSequence, DiagramView, Presentation } from '../c4'
+import type { C4Node, C4Relation, DiagramSequence, DiagramView, LayoutConstraint, Presentation } from '../c4'
 import type { Metamodel } from '../metamodel'
 
 export interface ApplyReport {
@@ -80,6 +80,12 @@ export interface DiagramFacade {
   setViewSequence?(id: string, sequenceId: string | null): void
   /** Optional — hides exactly these relations in the view. */
   setViewHiddenRelations?(id: string, relationIds: string[]): void
+  /** Optional layout constraints of a canvas: a view, or All elements (null). */
+  getLayoutConstraints?(viewId: string | null): LayoutConstraint[]
+  /** Keeps nodes on one line on a canvas (with `ordered`, in the order of
+   *  `nodeIds`); the new constraint's id, or why it was refused. */
+  addAlignment?(viewId: string | null, axis: LayoutConstraint['axis'], nodeIds: string[], ordered?: boolean): { id: string } | { error: string }
+  removeLayoutConstraints?(viewId: string | null, ids: string[]): void
   /** Optional sequence actions — omitted = AI sequence tools report a clear error. */
   getSequences?(): Record<string, DiagramSequence>
   addSequence?(name: string): string

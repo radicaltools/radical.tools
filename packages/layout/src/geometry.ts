@@ -20,6 +20,23 @@ export function effectiveHeight(n: C4Node): number {
   return n.height ?? NODE_SIZES[n.type].height
 }
 
+/** Record types the canvas always draws at their type's size. */
+const FIXED_SIZE_TYPES: ReadonlySet<string> = new Set(['adr', 'fitness-fn', 'need', 'requirement', 'scenario', 'mockup'])
+
+/**
+ * The size the canvas draws `n` at, by the rule deriveRFNodes applies:
+ * record types at their type's size, a collapsed container or one with no
+ * child on the canvas at its collapsed size. The layout engines place the
+ * stored size; alignments line up what is drawn.
+ */
+export function drawnSize(n: C4Node, hasChildren: boolean): { width: number; height: number } {
+  if (FIXED_SIZE_TYPES.has(n.type)) return NODE_SIZES[n.type]
+  if (isContainerType(n.type) && (n.collapsed || !hasChildren)) {
+    return { width: COLLAPSED_WIDTH[n.type], height: COLLAPSED_HEIGHT[n.type] }
+  }
+  return { width: n.width, height: n.height }
+}
+
 /** A node is visible if none of its ancestors are collapsed. */
 export function isVisible(node: C4Node, allNodes: Record<string, C4Node>): boolean {
   if (!node.parentId) return true
