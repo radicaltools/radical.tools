@@ -1825,6 +1825,29 @@ export const useDiagramStore = create<DiagramStore>()(
                 cur = p
               }
 
+              // Grow around the collapsed box's centre: the children's
+              // bounds (which the group's box is drawn around) are centred
+              // on it. From the box's top-left corner the group ran right
+              // and down, and pushed the diagram below and beside it away.
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+              for (const c of children) {
+                if (Math.abs(c.x) < 1 && Math.abs(c.y) < 1) continue // placed below
+                const w = c.collapsed ? COLLAPSED_WIDTH[c.type] : (c.width ?? 0)
+                const h = c.collapsed ? COLLAPSED_HEIGHT[c.type] : (c.height ?? 0)
+                minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x + w)
+                minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y + h)
+              }
+              if (minX <= maxX) {
+                const dx = COLLAPSED_WIDTH[parent.type] / 2 - (minX + maxX) / 2
+                const dy = COLLAPSED_HEIGHT[parent.type] / 2 - (minY + maxY) / 2
+                set((state) => {
+                  const p = state.c4Nodes[id]
+                  if (p) { p.x += dx; p.y += dy }
+                })
+                absX += dx
+                absY += dy
+              }
+
               // For children that have never been positioned (x≈0 and y≈0),
               // assign a default cluster so cola has somewhere to start.
               const unpositioned = children.filter((c) => Math.abs(c.x) < 1 && Math.abs(c.y) < 1)
@@ -1854,20 +1877,29 @@ export const useDiagramStore = create<DiagramStore>()(
               }
             }
           }
-        } else if (_liveLayout) {
-          // Collapsing: the node turns from a cola group into a leaf the
-          // layout has no position for, and a new leaf spawns among its
-          // neighbours. Seed it where its collapsed box sits now.
+        } else {
+          // Collapsing: shrink to the centre of the expanded box, the
+          // reverse of an expand. The node turns from a cola group into a
+          // leaf the layout has no position for, and a new leaf spawns among
+          // its neighbours: seed it there.
           const allNodes = get().c4Nodes
           const node = allNodes[id]
           if (node && isContainerType(node.type)) {
-            let absX = node.x
-            let absY = node.y
+            const dx = Math.max(0, ((node.width ?? 0) - COLLAPSED_WIDTH[node.type]) / 2)
+            const dy = Math.max(0, ((node.height ?? 0) - COLLAPSED_HEIGHT[node.type]) / 2)
+            if (dx > 0 || dy > 0) {
+              set((state) => {
+                const n = state.c4Nodes[id]
+                if (n) { n.x += dx; n.y += dy }
+              })
+            }
+            let absX = node.x + dx
+            let absY = node.y + dy
             for (let p = node.parentId ? allNodes[node.parentId] : undefined; p; p = p.parentId ? allNodes[p.parentId] : undefined) {
               absX += p.x
               absY += p.y
             }
-            _liveLayout.seedPosition(id, absX + COLLAPSED_WIDTH[node.type] / 2, absY + COLLAPSED_HEIGHT[node.type] / 2)
+            _liveLayout?.seedPosition(id, absX + COLLAPSED_WIDTH[node.type] / 2, absY + COLLAPSED_HEIGHT[node.type] / 2)
           }
         }
 
@@ -1910,7 +1942,11 @@ export const useDiagramStore = create<DiagramStore>()(
         // Walk up the ancestor chain:
         // At each level: separate siblings of current node, then refit the parent.
         // This propagates size changes upward so grandparent containers also shrink/grow.
-        let currentId: string | undefined = id
+        // Not under live physics: it makes room and sizes the groups itself,
+        // so this arrangement would only be drawn until its first reply —
+        // the toggled group pushed off its centre, siblings pushed aside,
+        // all snapping back a few frames later.
+        let currentId: string | undefined = _liveLayout?.running ? undefined : id
         while (currentId) {
           const overlapUpdates = separateSiblings(currentId, get().c4Nodes)
           if (Object.keys(overlapUpdates).length > 0) {
@@ -1964,6 +2000,18 @@ export const useDiagramStore = create<DiagramStore>()(
 
         get()._sync()
         _liveLayout?.invalidate()
+        // Smart fit frames the result as soon as the canvas shows it, not on
+        // its next 300 ms tick. React Flow takes the new nodes in an effect,
+        // a frame or two after this: ask again each frame meanwhile (a call
+        // before the change shows does nothing).
+        if (get().autoFitActive && typeof requestAnimationFrame !== 'undefined') {
+          let frames = 0
+          const kick = () => {
+            _getFitViewInstantFn()?.()
+            if (++frames < 5) requestAnimationFrame(kick)
+          }
+          requestAnimationFrame(kick)
+        }
       },
 
       // ── relations ────────────────────────────────────────────────────────
@@ -2436,18 +2484,14 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(state as any).__pendingViewport = incomingViewport
         })
         get()._sync()
-        // Apply restored camera. Defer so React Flow finishes rendering the
-        // newly-positioned nodes before we move the viewport.
+        // Apply the restored camera now, with the nodes it frames, not
+        // animated from the outgoing view's camera (see Canvas placeCamera).
         const pending = (get() as any).__pendingViewport as
           | { x: number; y: number; zoom: number }
           | null
         if (pending) {
-          requestAnimationFrame(() => {
-            const setVP = (window as any).__rfSetViewport as
-              | ((vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => void)
-              | null
-            setVP?.(pending, { duration: 250 })
-          })
+          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+          ;(window as any).__rfPlaceCamera?.(pending, shown)
         }
         set((state) => { delete (state as any).__pendingViewport })
         // Alignments added elsewhere (the MCP server, another window) hold
@@ -4472,12 +4516,8 @@ export const useDiagramStore = create<DiagramStore>()(
         suggestSmartLayoutIfUnarranged()
         // Apply restored camera (loaded as activeViewId=null → default view).
         if (defaultVP) {
-          requestAnimationFrame(() => {
-            const setVP = (window as any).__rfSetViewport as
-              | ((vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => void)
-              | null
-            setVP?.(defaultVP, { duration: 0 })
-          })
+          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+          ;(window as any).__rfPlaceCamera?.(defaultVP, shown)
         }
       },
 
