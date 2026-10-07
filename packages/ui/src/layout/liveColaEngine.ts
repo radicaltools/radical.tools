@@ -51,9 +51,12 @@ interface GroupAlignment {
   axis: 'x' | 'y'
   members: AlignedMember[]
   /** Where the line runs: the members' mean when the layout is built, then
-   *  wherever a dragged member takes it. Fixed otherwise, so the physics
-   *  cannot drag the whole line along a step at a time. */
+   *  wherever a dragged member takes it, or a group the whole line is
+   *  inside (shiftMember). Fixed otherwise, so the physics cannot drag the
+   *  whole line along a step at a time. */
   line?: number
+  /** Nesting depth of the shallowest member: outer lines project first. */
+  depth: number
 }
 
 /** An ordered alignment with a group member: the tick handler keeps each
@@ -96,6 +99,13 @@ const HEAVY_RENDER_EVERY = 3
  *  projected, so nested views used to move (and re-render) forever. */
 const SETTLE_PX = 0.5
 const SETTLE_TICKS = 15
+/** With an alignment that has a group member, a run stops after this long
+ *  even when nodes still move: those alignments are projected after each
+ *  WebCoLa step, outside its solver, and on a large nested model the two can
+ *  keep pulling against each other (seen on the repo's own architecture
+ *  model, grids of groups inside a column of groups). The run ends on a
+ *  projected step, so the alignments hold. */
+const MAX_PROJECTED_RUN_MS = 4000
 
 // ─── Public interface ────────────────────────────────────────────────────────
 
@@ -160,6 +170,8 @@ export class LiveColaEngine {
   private seedPositions = new Map<string, { x: number; y: number }>()
   /** Pace bookkeeping (see HEAVY_TICK_MS and SETTLE_PX). */
   private lastTickAt = 0
+  /** When the run started, or a drag began or ended (MAX_PROJECTED_RUN_MS). */
+  private runStartedAt = 0
   private skippedRenders = 0
   private quietTicks = 0
   private prevCentres = new Map<ColaNode, { x: number; y: number }>()
@@ -359,6 +371,7 @@ export class LiveColaEngine {
 
   release(nodeId: string): void {
     this._grabbedId = null
+    this.runStartedAt = 0
     const cn = this.idToNode.get(nodeId)
     if (cn) {
       Layout.dragEnd(cn)
@@ -386,11 +399,21 @@ export class LiveColaEngine {
       // A dragged group moves its leaves, so they count as near too.
       for (const leaf of this.groupLeaves(id)) near.add(leaf.c4id)
     }
-    // Aligned elements follow the moved ones wherever they are.
-    for (const id of [...near]) {
-      for (const other of this.alignedWith.get(id) ?? []) {
-        near.add(other)
-        for (const leaf of this.groupLeaves(other)) near.add(leaf.c4id)
+    // Aligned elements follow the moved ones wherever they are, and so do
+    // those aligned with a group a moved one is inside (the group moves and
+    // grows with it), and theirs in turn: a frozen member would be put back
+    // after every projection onto its line, and the line would flip
+    // between the two places for good.
+    const queue = [...near]
+    const seen = new Set<string>()
+    while (queue.length) {
+      for (let cur: string | undefined = queue.pop(); cur && !seen.has(cur); cur = this.allNodes[cur]?.parentId) {
+        seen.add(cur)
+        for (const other of this.alignedWith.get(cur) ?? []) {
+          for (const id of [other, ...this.groupLeaves(other).map((leaf) => leaf.c4id)]) {
+            if (!near.has(id)) { near.add(id); queue.push(id) }
+          }
+        }
       }
     }
     for (const cn of this.colaNodes) {
@@ -445,6 +468,7 @@ export class LiveColaEngine {
 
   private resetPace(): void {
     this.lastTickAt = 0
+    this.runStartedAt = 0
     this.skippedRenders = 0
     this.quietTicks = 0
     this.prevCentres.clear()
@@ -460,7 +484,12 @@ export class LiveColaEngine {
       this.prevCentres.set(cn, { x: cn.x, y: cn.y })
     }
     this.quietTicks = moved <= SETTLE_PX ? this.quietTicks + 1 : 0
-    return this.quietTicks >= SETTLE_TICKS && !this._grabbedId
+    if (this._grabbedId) return false
+    if (this.quietTicks >= SETTLE_TICKS) return true
+    if (!this.groupAlignments.length && !this.groupOrders.length) return false
+    const now = performance.now()
+    if (!this.runStartedAt) this.runStartedAt = now
+    return now - this.runStartedAt >= MAX_PROJECTED_RUN_MS
   }
 
   private rebuild(firstRun: boolean = false): void {
@@ -813,9 +842,17 @@ export class LiveColaEngine {
           offsets: members.map((m) => ({ node: nodeIndex.get(m.id)!, offset: offset(m) - first })),
         })
       } else {
-        this.groupAlignments.push({ axis: a.axis, members, line: lines.get(lineKey(a.axis, members.map((m) => m.id))) })
+        this.groupAlignments.push({
+          axis: a.axis,
+          members,
+          line: lines.get(lineKey(a.axis, members.map((m) => m.id))),
+          depth: Math.min(...members.map((m) => depthOf(m.id))),
+        })
       }
     }
+    // An outer line moves whole groups, and the lines inside them with them
+    // (shiftMember); the inner lines then project within.
+    this.groupAlignments.sort((a, b) => a.depth - b.depth)
 
     if (constraints.length > 0) {
       ;(layout as any).constraints(constraints)
@@ -977,7 +1014,21 @@ export class LiveColaEngine {
     } else if (m.group) {
       this.shiftNodes(this.groupLeaves(m.id), axis, d)
       this.shiftBounds(m.group, axis, d)
+      // Lines that run inside the group move with it: left where they were,
+      // they would pull their members back out of the place the group was
+      // moved to, and the group's own line would move it again, every tick.
+      for (const a of this.groupAlignments) {
+        if (a.axis === axis && a.line !== undefined && a.members.every((x) => this.isInside(x.id, m.id))) a.line += d
+      }
     }
+  }
+
+  /** True when `id` is a descendant of `ancestorId`. */
+  private isInside(id: string, ancestorId: string): boolean {
+    for (let cur = this.allNodes[id]?.parentId; cur; cur = this.allNodes[cur]?.parentId) {
+      if (cur === ancestorId) return true
+    }
+    return false
   }
 
   /** Room a member takes along `axis`, as overlap removal sees it. */

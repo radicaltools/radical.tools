@@ -478,3 +478,17 @@ headless pass for Smart Layout, a new rule and the MCP server. Still open:
    member, *Align… → Stop keeping aligned*).
 5. **The MCP server aligns at the next `smart_layout`** (or when Studio shows
    the canvas): `align_nodes` records the rule without moving anything.
+6. **Alignments with containers are held outside WebCoLa's solver.**
+   Dogfooding: on `architecture/` (a column of three layer groups, a grid of
+   seven groups in the first, a grid of 64–77 elements in each), expanding a
+   second requirements group left the canvas shaking for good. Two causes
+   are fixed: on a large model (local physics) the partners of the group the
+   new children sit in stayed frozen and were put back after every
+   projection, and a line inside a group stayed where it was when an outer
+   line moved the group. What is left: the projection and WebCoLa's overlap
+   removal can still pull against each other (overlap removal pushes a
+   container across its line, the projection pulls it back), and on that
+   model the physics did not come to rest by itself; a run with a projected
+   alignment now stops after 4 s (`MAX_PROJECTED_RUN_MS`). A lasting fix
+   would let WebCoLa hold the line, for example through a leaf per container
+   pinned to its centre, or keep aligned containers rigid in the physics.
