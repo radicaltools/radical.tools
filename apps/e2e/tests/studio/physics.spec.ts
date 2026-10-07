@@ -179,9 +179,9 @@ test('opening a view with Smart fit frames it at once, without a camera flight',
   const last = frames[frames.length - 1]
   expect(last.onScreen).toBe(6)
   // The saved camera for at most the frames React Flow takes to draw the
-  // nodes, then the fit: two cameras, no easing in between.
-  expect(new Set(frames.map((f) => f.camera)).size).toBeLessThanOrEqual(2)
-  expect(frames.findIndex((f) => f.camera === last.camera)).toBeLessThan(4)
+  // nodes, then the fit at once (no easing in from off screen); after that
+  // the camera only follows the view while it settles.
+  expect(frames.slice(3).every((f) => f.onScreen === 6)).toBe(true)
 })
 
 test('an expanded element grows around the centre of its collapsed box', async ({ page, studio }) => {

@@ -44,7 +44,11 @@ const edgeTypes: EdgeTypes = {
   c4relation: RelationEdge as any,
 }
 
-/** Longest Smart fit follows the live layout after an expand or collapse. */
+/** How long Smart fit keeps refitting after an expand or collapse (the live
+ *  layout settles siblings around the change meanwhile). */
+const ACTIVE_FIT_WINDOW_MS = 1500
+/** Longest Smart fit follows the live layout after an expand, a collapse or
+ *  opening a view. */
 const MAX_TRACK_MS = 6000
 
 // ─── Connection preview line (drawn while dragging) ────────────────────────────
@@ -336,7 +340,6 @@ function StructuralCanvas(): React.ReactElement {
     // Always update memory so a later expand still detects "new".
     prevVisibleIdsRef.current = currentIds
 
-    const ACTIVE_FIT_WINDOW_MS = 1500
     const now = performance.now()
     const hasChange = newlyVisible.length > 0 || removedCount > 0
     if (hasChange) {
@@ -388,6 +391,28 @@ function StructuralCanvas(): React.ReactElement {
     }
     return getViewportForBounds(padded, rect.width, rect.height, 0.05, 4, 0.18)
   }, [])
+
+  /** Puts the camera on `target`, then refits it every frame while the live
+   *  layout moves the diagram, until `trackUntilRef` (or the layout comes to
+   *  rest once the active-fit window has closed). */
+  const trackFit = useCallback((target: { x: number; y: number; zoom: number }) => {
+    if (fitAnimRef.current != null) cancelAnimationFrame(fitAnimRef.current)
+    trackingRef.current = true
+    const track = () => {
+      const now = performance.now()
+      const moving = useDiagramStore.getState().liveLayoutMoving
+      if (now > trackUntilRef.current || (!moving && now > fitWindowUntilRef.current)) {
+        trackingRef.current = false
+        fitAnimRef.current = null
+        return
+      }
+      const next = computeFitTarget()
+      if (next) setCameraNow(next)
+      fitAnimRef.current = requestAnimationFrame(track)
+    }
+    setCameraNow(target)
+    fitAnimRef.current = requestAnimationFrame(track)
+  }, [computeFitTarget, setCameraNow])
 
   /**
    * Request a smooth fit. `force=true` snaps deadband off and re-arms the
@@ -442,23 +467,7 @@ function StructuralCanvas(): React.ReactElement {
     // every 300 ms left the camera one to three seconds behind, and the
     // diagram, pushed aside by the group that grew, slid in from an edge.
     if (!force && performance.now() < trackUntilRef.current) {
-      if (trackingRef.current) return
-      if (fitAnimRef.current != null) cancelAnimationFrame(fitAnimRef.current)
-      trackingRef.current = true
-      const track = () => {
-        const now = performance.now()
-        const moving = useDiagramStore.getState().liveLayoutMoving
-        if (now > trackUntilRef.current || (!moving && now > fitWindowUntilRef.current)) {
-          trackingRef.current = false
-          fitAnimRef.current = null
-          return
-        }
-        const next = computeFitTarget()
-        if (next) setCameraNow(next)
-        fitAnimRef.current = requestAnimationFrame(track)
-      }
-      setCameraNow(target)
-      fitAnimRef.current = requestAnimationFrame(track)
+      if (!trackingRef.current) trackFit(target)
       return
     }
 
@@ -495,7 +504,7 @@ function StructuralCanvas(): React.ReactElement {
       fitAnimRef.current = requestAnimationFrame(tick)
     }
     void duration // duration kept in API for callers; loop is time-constant based
-  }, [computeFitTarget, computeSmartFitTarget, setCameraNow])
+  }, [computeFitTarget, computeSmartFitTarget, trackFit])
 
   /** Stops the camera animation or tracking in flight. */
   const stopFit = useCallback(() => {
@@ -573,10 +582,15 @@ function StructuralCanvas(): React.ReactElement {
       snapIdsRef.current = null
       prevVisibleIdsRef.current = new Set(visible.map((n) => n.id))
       const target = computeFitTarget()
-      if (target) setCameraNow(target)
+      if (!target) return
+      // Then follow the view while it settles (the live layout, group sizes).
+      const now = performance.now()
+      fitWindowUntilRef.current = now + ACTIVE_FIT_WINDOW_MS
+      trackUntilRef.current = now + MAX_TRACK_MS
+      trackFit(target)
     }
     fitAnimRef.current = requestAnimationFrame(snap)
-  }, [stopFit, setCameraNow, computeFitTarget])
+  }, [stopFit, setCameraNow, computeFitTarget, trackFit])
   // d3-zoom folds wheel events within ~150 ms into one gesture and reports its
   // start only once, so a wheel that lands while a fit animates would not
   // reach onMoveStart: every wheel takes the camera.
