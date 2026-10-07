@@ -11,6 +11,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useDiagramStore } from '../src/store/diagramStore'
+import { loadStudioSettings } from '../src/studioSettings'
 
 // jsdom-like minimal window stub for the timer registry the store uses.
 beforeEach(() => {
@@ -160,11 +161,27 @@ describe('Auto-fit toggle', () => {
 })
 
 describe('zooming by hand', () => {
-  it('turns auto-fit off so the next tick does not undo it', () => {
+  it('leaves the Smart fit setting on', () => {
     if (!useDiagramStore.getState().autoFitActive) useDiagramStore.getState().toggleAutoFit()
     useDiagramStore.getState().zoomIn()
-    expect(useDiagramStore.getState().autoFitActive).toBe(false)
+    expect(useDiagramStore.getState().autoFitActive).toBe(true)
     useDiagramStore.getState().zoomOut()
-    expect(useDiagramStore.getState().autoFitActive).toBe(false)
+    expect(useDiagramStore.getState().autoFitActive).toBe(true)
+  })
+})
+
+describe('Smart fit setting', () => {
+  it('is saved with the studio settings on each toggle', () => {
+    // Studio settings live in localStorage, which node doesn't have.
+    const memory = new Map<string, string>()
+    ;(globalThis as any).localStorage ??= {
+      getItem: (k: string) => memory.get(k) ?? null,
+      setItem: (k: string, v: string) => { memory.set(k, v) },
+    }
+    const s = useDiagramStore.getState()
+    s.toggleAutoFit()
+    expect(loadStudioSettings().smartFit).toBe(true)
+    useDiagramStore.getState().toggleAutoFit()
+    expect(loadStudioSettings().smartFit).toBe(false)
   })
 })
