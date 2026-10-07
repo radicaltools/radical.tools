@@ -13,7 +13,7 @@ export interface RoutingObstacle {
   h: number
 }
 
-interface Pt {
+export interface Pt {
   x: number
   y: number
 }
@@ -467,6 +467,17 @@ export function directCurveBox(
   }
 }
 
+export interface RoutedEdge {
+  /** SVG path data. */
+  path: string
+  /** The default label centre: the middle of the curve. */
+  labelX: number
+  labelY: number
+  /** The drawn path as a polyline from source to target (the corners of a
+   *  routed path, samples of a direct curve), for placing the label. */
+  points: Pt[]
+}
+
 /** `obstacles` are tested against the direct curve; when it hits one, the
  *  edge is routed around `allObstacles()` (default: the same list). Callers
  *  with many nodes pass only those inside directCurveBox as `obstacles`, or
@@ -476,7 +487,7 @@ export function computeRoutedEdge(
   tx: number, ty: number, tgtSide: Position,
   obstacles: RoutingObstacle[] | ObstacleSet,
   allObstacles?: () => RoutingObstacle[],
-): { path: string; labelX: number; labelY: number } {
+): RoutedEdge {
   // Prefer a single cubic bezier with control points pulled along each
   // side's exit normal — clean arrowhead alignment, natural flow.
   // Only fall back to obstacle-avoiding A* + smoothed polyline when the
@@ -487,12 +498,7 @@ export function computeRoutedEdge(
 
   const hits = bezierHitsObstacles(s, c1, c2, t, obstacles, HIT_PAD)
 
-  if (!hits) {
-    const path = buildBezierPath(s, srcSide, t, tgtSide)
-    const labelX = 0.125 * sx + 0.375 * c1.x + 0.375 * c2.x + 0.125 * tx
-    const labelY = 0.125 * sy + 0.375 * c1.y + 0.375 * c2.y + 0.125 * ty
-    return { path, labelX, labelY }
-  }
+  if (!hits) return bezierEdge(s, c1, c2, t, srcSide, tgtSide)
 
   // Direct curve hits at least one node — route around with A*.
   // A set that knows its bounds lets a hopeless route (one routeAround would
@@ -500,15 +506,27 @@ export function computeRoutedEdge(
   const set = Array.isArray(obstacles) ? null : obstacles
   const hopeless = !allObstacles && !!set?.bounds && routingCells(s, t, set.bounds()) > MAX_ROUTING_CELLS
   const polyline = hopeless ? null : routeAround(s, srcSide, t, tgtSide, allObstacles ? allObstacles() : set ? set.all() : obstacles as RoutingObstacle[])
-  if (!polyline || polyline.length < 2) {
-    // Routing failed (grid too big, or unreachable) — fall back to direct.
-    const path = buildBezierPath(s, srcSide, t, tgtSide)
-    const labelX = 0.125 * sx + 0.375 * c1.x + 0.375 * c2.x + 0.125 * tx
-    const labelY = 0.125 * sy + 0.375 * c1.y + 0.375 * c2.y + 0.125 * ty
-    return { path, labelX, labelY }
-  }
+  // Routing failed (grid too big, or unreachable) — fall back to direct.
+  if (!polyline || polyline.length < 2) return bezierEdge(s, c1, c2, t, srcSide, tgtSide)
 
   const path = buildSvgPath(polyline)
   const mid = polyMidpoint(polyline)
-  return { path, labelX: mid.x, labelY: mid.y }
+  return { path, labelX: mid.x, labelY: mid.y, points: polyline }
+}
+
+/** Samples of the direct curve in `points`: enough for label placement to
+ *  follow it within a few pixels. */
+const CURVE_SAMPLES = 24
+
+function bezierEdge(s: Pt, c1: Pt, c2: Pt, t: Pt, srcSide: Position, tgtSide: Position): RoutedEdge {
+  const points: Pt[] = []
+  for (let i = 0; i <= CURVE_SAMPLES; i++) {
+    points.push(cubicAt(s.x, s.y, c1.x, c1.y, c2.x, c2.y, t.x, t.y, i / CURVE_SAMPLES))
+  }
+  return {
+    path: buildBezierPath(s, srcSide, t, tgtSide),
+    labelX: 0.125 * s.x + 0.375 * c1.x + 0.375 * c2.x + 0.125 * t.x,
+    labelY: 0.125 * s.y + 0.375 * c1.y + 0.375 * c2.y + 0.125 * t.y,
+    points,
+  }
 }

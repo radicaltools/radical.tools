@@ -5,64 +5,11 @@ import {
   BaseEdge,
   Position,
   useStore,
-  useStoreApi,
-  type Node as RFNode,
+  type ReactFlowState,
 } from 'reactflow'
 import { C4EdgeRFData } from '@radical/common/c4'
-import { computeRoutedEdge, ObstacleGrid, type ObstacleSet, type RoutingObstacle } from '@radical/layout/edgeRouting'
-import { allocatePorts } from '@radical/layout/portAllocator'
 import { useDiagramStore } from '../../store/diagramStore'
-
-// ─── Floating-edge helpers ────────────────────────────────────────────────────
-
-function nodeCenter(node: { positionAbsolute?: { x: number; y: number }; width?: number | null; height?: number | null }) {
-  return {
-    x: (node.positionAbsolute?.x ?? 0) + (node.width ?? 0) / 2,
-    y: (node.positionAbsolute?.y ?? 0) + (node.height ?? 0) / 2,
-  }
-}
-
-/**
- * Pick the best exit/entry side based on direction vector.
- * Slightly biased toward vertical sides (Top/Bottom) because
- * C4 diagrams flow top→bottom, so near-diagonal edges look better
- * exiting vertically.
- */
-function bestSide(dx: number, dy: number, isTarget: boolean): Position {
-  // Vertical bias: treat vertical as dominant unless horizontal is clearly larger
-  const VERTICAL_BIAS = 1.15
-  if (Math.abs(dx) >= Math.abs(dy) * VERTICAL_BIAS) {
-    // horizontal dominant
-    const goingRight = dx > 0
-    return (goingRight !== isTarget) ? Position.Right : Position.Left
-  } else {
-    // vertical dominant (or near-diagonal → prefer vertical)
-    const goingDown = dy > 0
-    return (goingDown !== isTarget) ? Position.Bottom : Position.Top
-  }
-}
-
-/**
- * Compute the border point on a node given the chosen side.
- * Always returns the centre of the side for clean, consistent connections.
- */
-function borderPoint(
-  node: { positionAbsolute?: { x: number; y: number }; width?: number | null; height?: number | null },
-  side: Position,
-  _otherCenter?: { x: number; y: number }
-) {
-  const ax = node.positionAbsolute?.x ?? 0
-  const ay = node.positionAbsolute?.y ?? 0
-  const w  = node.width  ?? 0
-  const h  = node.height ?? 0
-
-  switch (side) {
-    case Position.Left:   return { x: ax,         y: ay + h / 2 }
-    case Position.Right:  return { x: ax + w,     y: ay + h / 2 }
-    case Position.Top:    return { x: ax + w / 2, y: ay         }
-    case Position.Bottom: return { x: ax + w / 2, y: ay + h     }
-  }
-}
+import { edgeGeometry, LABEL_BOX } from './edgeGeometry'
 
 // ─── Custom arrowhead ─────────────────────────────────────────────────────────
 
@@ -190,149 +137,33 @@ function ReconnectHandle({
 
 // ─── Edge component ───────────────────────────────────────────────────────────
 
-// ─── Shared per frame ────────────────────────────────────────────────────────
-// Every edge re-renders when the live layout moves its ends, i.e. every
-// frame. Port allocation and the obstacle list depend on the whole graph, not
-// on the edge, so they are computed once per React Flow state and reused by
-// all edges (they used to be recomputed by each edge: quadratic per frame).
-
-type NodeInternals = ReturnType<ReturnType<typeof useStoreApi>['getState']>['nodeInternals']
-type RFEdges = ReturnType<ReturnType<typeof useStoreApi>['getState']>['edges']
-
-let portCache: { nodes: NodeInternals; edges: RFEdges; result: ReturnType<typeof allocatePorts> } | null = null
-function portsFor(nodes: NodeInternals, edges: RFEdges): ReturnType<typeof allocatePorts> {
-  if (portCache?.nodes !== nodes || portCache.edges !== edges) {
-    portCache = { nodes, edges, result: allocatePorts(nodes as any, edges as any) }
-  }
-  return portCache.result
-}
-
-interface ObstacleCandidate { id: string; rect: RoutingObstacle; ancestors: string[] }
-interface ObstacleCandidates {
-  nodes: NodeInternals
-  byId: Map<string, ObstacleCandidate>
-  /** The visible nodes. */
-  grid: ObstacleGrid<ObstacleCandidate>
-}
-
-let obstacleCache: ObstacleCandidates | null = null
-function obstacleCandidates(nodes: NodeInternals): ObstacleCandidates {
-  if (obstacleCache?.nodes !== nodes) {
-    const visible: ObstacleCandidate[] = []
-    const byId = new Map<string, ObstacleCandidate>()
-    for (const n of nodes.values()) {
-      const ancestors: string[] = []
-      for (let cur = n.parentNode ? nodes.get(n.parentNode) : undefined; cur; cur = cur.parentNode ? nodes.get(cur.parentNode) : undefined) {
-        ancestors.push(cur.id)
-      }
-      const c = { id: n.id, ancestors, rect: { x: n.positionAbsolute?.x ?? 0, y: n.positionAbsolute?.y ?? 0, w: n.width ?? 0, h: n.height ?? 0 } }
-      byId.set(n.id, c)
-      if (!n.hidden && n.width && n.height) visible.push(c)
-    }
-    obstacleCache = { nodes, byId, grid: new ObstacleGrid(visible) }
-  }
-  return obstacleCache
-}
-
-/** Same position, size and visibility: nothing an edge draws from changed. */
-function sameEnd(a: RFNode | undefined, b: RFNode | undefined): boolean {
-  if (a === b) return true
-  if (!a || !b) return false
-  return a.positionAbsolute?.x === b.positionAbsolute?.x && a.positionAbsolute?.y === b.positionAbsolute?.y
-    && a.width === b.width && a.height === b.height && a.hidden === b.hidden && a.parentNode === b.parentNode
-}
-
 export const RelationEdge = memo(
   ({
     id,
     source,
     target,
     data,
-    markerEnd,
     style,
     selected,
   }: EdgeProps<C4EdgeRFData>) => {
-    // Targeted selectors: only re-render when THIS edge's source or target changes
-    const sourceSelector = useCallback((s: any) => s.nodeInternals.get(source), [source])
-    const targetSelector = useCallback((s: any) => s.nodeInternals.get(target), [target])
-    // React Flow rebuilds every node's internals on each update, so compare
-    // the geometry: with hundreds of nodes only a few move at a time.
-    const sourceNode = useStore(sourceSelector, sameEnd)
-    const targetNode = useStore(targetSelector, sameEnd)
-    // Ports and routes also depend on other edges and nodes; re-render once
-    // with everything when the layout comes to rest.
+    // Sides, ports, path and label spot come from one pass over the whole
+    // canvas (edgeGeometry.ts); the geometry object stays the same while
+    // nothing this edge draws changed, so only the edges that moved re-render.
     const moving = useDiagramStore((s) => s.liveLayoutMoving)
-    const diffKind = useDiagramStore(s => s.showDiff ? s.diffHighlight[id] : undefined)
-    const storeApi = useStoreApi()
-
-    // Fall back to a straight stub if node data is not ready yet
-    if (!sourceNode || !targetNode) return null
-
-    const sc = nodeCenter(sourceNode)
-    const tc = nodeCenter(targetNode)
-
-    // Resolve sides + ports from the central allocator (groups parallel
-    // edges so they don't all collide at the centre of a side).
-    const stateSnapshot = storeApi.getState()
-    const alloc = portsFor(stateSnapshot.nodeInternals, stateSnapshot.edges).get(id)
-
-    let srcSide: Position, tgtSide: Position
-    let sp: { x: number; y: number }, tp: { x: number; y: number }
-    if (alloc) {
-      // @radical/layout's sides carry the same string values as reactflow's enum
-      srcSide = alloc.sourceSide as Position
-      tgtSide = alloc.targetSide as Position
-      sp = alloc.sourcePoint
-      tp = alloc.targetPoint
-    } else {
-      // Fallback (e.g. virtual edges not in store)
-      const dx = tc.x - sc.x
-      const dy = tc.y - sc.y
-      const sax = sourceNode.positionAbsolute?.x ?? 0
-      const say = sourceNode.positionAbsolute?.y ?? 0
-      const sw  = sourceNode.width  ?? 0
-      const sh  = sourceNode.height ?? 0
-      const tax = targetNode.positionAbsolute?.x ?? 0
-      const tay = targetNode.positionAbsolute?.y ?? 0
-      const tw  = targetNode.width  ?? 0
-      const th  = targetNode.height ?? 0
-      const ntx = Math.max(tax, Math.min(tax + tw, sc.x))
-      const nty = Math.max(tay, Math.min(tay + th, sc.y))
-      let srcDx = ntx - sc.x
-      let srcDy = nty - sc.y
-      if (srcDx === 0 && srcDy === 0) { srcDx = dx; srcDy = dy }
-      const nsx = Math.max(sax, Math.min(sax + sw, tc.x))
-      const nsy = Math.max(say, Math.min(say + sh, tc.y))
-      let tgtDx = tc.x - nsx
-      let tgtDy = tc.y - nsy
-      if (tgtDx === 0 && tgtDy === 0) { tgtDx = dx; tgtDy = dy }
-      srcSide = bestSide(srcDx, srcDy, false)
-      tgtSide = bestSide(tgtDx, tgtDy, true)
-      sp = borderPoint(sourceNode, srcSide, tc)
-      tp = borderPoint(targetNode, tgtSide, sc)
-    }
-
-    // Obstacles: every visible node except the two ends, their ancestors
-    // (the edge crosses their borders) and their descendants (inside them).
-    // While the live layout moves the nodes, the edge is the plain curve:
-    // routing around obstacles (A*) every frame took a fifth of the frame
-    // time on a 150-node canvas, and the route is redone at rest.
-    const obstacles = (): RoutingObstacle[] | ObstacleSet => {
-      if (moving) return []
-      const candidates = obstacleCandidates(stateSnapshot.nodeInternals)
-      const ends = candidates.byId
-      const excludeIds = new Set<string>([source, target, ...(ends.get(source)?.ancestors ?? []), ...(ends.get(target)?.ancestors ?? [])])
-      const excluded = (c: ObstacleCandidate): boolean =>
-        excludeIds.has(c.id) || c.ancestors.includes(source) || c.ancestors.includes(target)
-      // The curve's hit test asks the grid point by point; the full list is
-      // built only when the edge has to route around something.
-      return candidates.grid.without(excluded)
-    }
-    const { path: edgePath, labelX, labelY } = computeRoutedEdge(
-      sp.x, sp.y, srcSide,
-      tp.x, tp.y, tgtSide,
-      obstacles(),
+    const geometrySelector = useCallback(
+      (s: ReactFlowState) => edgeGeometry(s.nodeInternals, s.edges, moving).get(id),
+      [id, moving],
     )
+    const geometry = useStore(geometrySelector)
+    const diffKind = useDiagramStore(s => s.showDiff ? s.diffHighlight[id] : undefined)
+
+    // Not drawable yet (an end is hidden or not measured).
+    if (!geometry) return null
+
+    const { sourcePoint: sp, targetPoint: tp, path: edgePath } = geometry
+    // @radical/layout's sides carry the same string values as reactflow's enum
+    const tgtSide = geometry.targetSide as Position
+    const { x: labelX, y: labelY } = geometry.label
 
     const strokeColor = selected ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'
     const strokeDash  = data?.isVirtual ? '6 3' : undefined
@@ -380,15 +211,15 @@ export const RelationEdge = memo(
                 position:        'absolute',
                 transform:       `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
                 background:      'var(--edge-label-bg)',
-                border:          '1px solid var(--edge-label-border)',
+                border:          `${LABEL_BOX.border}px solid var(--edge-label-border)`,
                 borderRadius:    4,
-                padding:         '3px 8px',
-                fontSize:        17,
+                padding:         `${LABEL_BOX.padY}px ${LABEL_BOX.padX}px`,
+                fontSize:        LABEL_BOX.fontSize,
                 color:           'var(--text-primary)',
                 pointerEvents:   'none',
-                maxWidth:        200,
+                maxWidth:        LABEL_BOX.maxWidth,
                 textAlign:       'center',
-                lineHeight:      1.4,
+                lineHeight:      LABEL_BOX.lineHeight,
                 // No backdrop-filter: every label would become its own
                 // compositor layer re-blurred on each pan/zoom frame, which
                 // drops large diagrams to ~8 fps on Retina GPUs. The
@@ -402,7 +233,7 @@ export const RelationEdge = memo(
                 : data.relationType && <div style={{ opacity: 0.85, fontStyle: 'italic' }}>{data.relationType}</div>
               }
               {data.technology && (
-                <div style={{ fontStyle: 'italic', opacity: 0.85, fontSize: 14 }}>
+                <div style={{ fontStyle: 'italic', opacity: 0.85, fontSize: LABEL_BOX.techFontSize }}>
                   [{data.technology}]
                 </div>
               )}
