@@ -2485,15 +2485,13 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(state as any).__pendingViewport = incomingViewport
         })
         get()._sync()
-        // Apply the restored camera now, with the nodes it frames, not
-        // animated from the outgoing view's camera (see Canvas placeCamera).
+        // The camera for the incoming view, in one step: no flight from the
+        // outgoing view's camera (see Canvas placeCamera).
         const pending = (get() as any).__pendingViewport as
           | { x: number; y: number; zoom: number }
           | null
-        if (pending) {
-          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
-          ;(window as any).__rfPlaceCamera?.(pending, shown)
-        }
+        const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+        ;(window as any).__rfPlaceCamera?.(pending ?? null, shown)
         set((state) => { delete (state as any).__pendingViewport })
         // Alignments added elsewhere (the MCP server, another window) hold
         // from the moment the canvas shows.
@@ -4516,10 +4514,8 @@ export const useDiagramStore = create<DiagramStore>()(
         get().startLiveLayout({ skipBulk: true })
         suggestSmartLayoutIfUnarranged()
         // Apply restored camera (loaded as activeViewId=null → default view).
-        if (defaultVP) {
-          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
-          ;(window as any).__rfPlaceCamera?.(defaultVP, shown)
-        }
+        const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+        ;(window as any).__rfPlaceCamera?.(defaultVP ?? null, shown)
       },
 
       saveDiagram() {

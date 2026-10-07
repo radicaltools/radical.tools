@@ -142,21 +142,25 @@ test('Smart fit brings the diagram back when it has left the screen', async ({ p
   await expect.poll(onScreen, { timeout: 5000 }).toBeGreaterThan(0)
 })
 
-test('opening a view puts its saved camera in place at once and Smart fit keeps it', async ({ page, studio }) => {
-  // Views keep their own coordinates: a flight from the previous view's
-  // camera crossed empty canvas (the diagram gone, then sliding in from an
-  // edge), and Smart fit then took the view's nodes for newly revealed
-  // content and moved the camera a second time.
+test('opening a view with Smart fit frames it at once, without a camera flight', async ({ page, studio }) => {
+  // Views keep their own coordinates: the camera used to fly over from the
+  // previous view's (the diagram gone, then sliding in from an edge), then
+  // Smart fit eased it to the fit. A saved camera that no longer frames the
+  // view (as in the sample) must not stick either.
   const doc = JSON.parse(fixture('bookstore'))
-  const saved = { x: 150, y: 150, zoom: 0.8 }
-  doc.views.find((v: { id: string }) => v.id === 'v-containers').viewport = saved
+  doc.views.find((v: { id: string }) => v.id === 'v-containers').viewport = { x: 3000, y: 3000, zoom: 0.8 }
   await studio.seedDocument(JSON.stringify(doc))
   await studio.open('v-context')
   await expect(page.locator('.autofit-active')).toHaveCount(1)
-  const cameras = await page.evaluate(async () => {
-    const camera = () => {
+  const frames = await page.evaluate(async () => {
+    const pane = document.querySelector('.react-flow')!.getBoundingClientRect()
+    const frame = () => {
       const m = new DOMMatrix(getComputedStyle(document.querySelector('.react-flow__viewport')!).transform)
-      return { x: m.e, y: m.f, zoom: m.a }
+      const onScreen = Array.from(document.querySelectorAll('.react-flow__node')).filter((el) => {
+        const r = el.getBoundingClientRect()
+        return r.right > pane.left && r.left < pane.right && r.bottom > pane.top && r.top < pane.bottom
+      }).length
+      return { camera: `${m.e.toFixed(1)} ${m.f.toFixed(1)} ${m.a.toFixed(4)}`, onScreen }
     }
     location.hash = location.hash.replace(/\/v\/[^/]+$/, '/v/v-containers')
     // From the first frame that draws the view's nodes, for 1.5 s.
@@ -166,17 +170,18 @@ test('opening a view puts its saved camera in place at once and Smart fit keeps 
     }
     const seen = []
     for (const until = performance.now() + 1500; performance.now() < until;) {
-      seen.push(camera())
+      seen.push(frame())
       await new Promise(requestAnimationFrame)
     }
     return seen
   })
-  expect(cameras.length).toBeGreaterThan(10)
-  for (const c of cameras) {
-    expect(c.x).toBeCloseTo(saved.x, 0)
-    expect(c.y).toBeCloseTo(saved.y, 0)
-    expect(c.zoom).toBeCloseTo(saved.zoom, 3)
-  }
+  expect(frames.length).toBeGreaterThan(10)
+  const last = frames[frames.length - 1]
+  expect(last.onScreen).toBe(6)
+  // The saved camera for at most the frames React Flow takes to draw the
+  // nodes, then the fit at once (no easing in from off screen); after that
+  // the camera only follows the view while it settles.
+  expect(frames.slice(3).every((f) => f.onScreen === 6)).toBe(true)
 })
 
 test('an expanded element grows around the centre of its collapsed box', async ({ page, studio }) => {
