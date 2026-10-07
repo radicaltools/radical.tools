@@ -50,18 +50,28 @@ import { ELK_ROOT_SPACING, ELK_CHILD_SPACING } from './elkSpacingBase'
 import { compoundPadding, projectToVisibleGraph } from './geometry'
 import { finalizeLayout as finalizeUnconstrained, ROOT_GAP, CHILD_GAP } from './layoutFinalize'
 import { alignmentError, enforceAlignments, type Alignment } from './constraints'
+import { labelGaps, labelNeed, labelSizeOf, pairKey, type PairGap } from './labelRoom'
 
-/** finalizeLayout plus the user's alignments, so every stage scores and
- *  refines what the canvas will keep. */
-function finalizeLayout(nodes: Record<string, C4Node>, positions: PositionMap, alignments: readonly Alignment[]): PositionMap {
-  return enforceAlignments(nodes, finalizeUnconstrained(nodes, positions), alignments)
+/** finalizeLayout (with room for relation labels) plus the user's
+ *  alignments, so every stage scores and refines what the canvas will keep. */
+function finalizeLayout(
+  nodes: Record<string, C4Node>, relations: Record<string, C4Relation>,
+  positions: PositionMap, alignments: readonly Alignment[],
+): PositionMap {
+  return enforceAlignments(nodes, finalizeUnconstrained(nodes, positions, labelGaps(nodes, relations)), alignments)
+}
+
+/** labelGaps by layout-graph node index, for the annealer. */
+function pairGapsOf(g: LayoutGraph, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): (a: number, b: number) => PairGap | undefined {
+  const gaps = labelGaps(nodes, relations)
+  return (a, b) => gaps.get(pairKey(g.ids[a], g.ids[b]))
 }
 import {
   anneal, buildLayoutGraph, createRng, graphSeed, FunctionEnergy, ProxyEnergy,
   type AnnealOptions, type Bounds, type LayoutGraph, type Rng,
 } from './annealing'
 import {
-  W_CROSS, W_OVERDRAW, W_STUBLOOP, W_LONG, W_LMEAN, W_LMAX, W_LEAF, W_ASPECT, W_COMPACT, W_SYMMETRY,
+  W_CROSS, W_OVERDRAW, W_STUBLOOP, W_LONG, W_LMEAN, W_LMAX, W_LEAF, W_ASPECT, W_COMPACT, W_SYMMETRY, W_LABEL,
   LEN_MEAN_KNEE, LEN_MAX_KNEE, overlapCost, aspectPenalty,
 } from './scoreWeights'
 
@@ -82,6 +92,7 @@ import {
 //   aspectPenalty    — bounding-box aspect ratio deviation from sqrt(2)
 //   compactness      — bounding-box area / sum of node areas
 //   symmetry         — distance from a mirror-symmetric arrangement
+//   labelCrowding    — labelled relations whose ends leave no room for the label
 
 interface CompositeScore {
   crossings: number
@@ -101,6 +112,8 @@ interface CompositeScore {
   aspectPenalty: number
   compactness: number
   symmetryDeficit: number
+  /** Σ over labelled relations of (missing share of the room its label needs)². */
+  labelCrowding: number
   composite: number
 }
 
@@ -491,6 +504,22 @@ function scoreParts(
   meanDim = ids.length > 0 ? meanDim / ids.length : 1
   const symNorm = meanDim > 0 ? symDeficit / meanDim : 0
 
+  // ── 6. Label room: a relation's label sits between its ends; ends closer
+  // than the label needs (along the axis they are apart on) leave it
+  // nowhere but over a node. 0 when there is room, 1 when the ends touch.
+  let labelCrowding = 0
+  for (const r of edges) {
+    const size = labelSizeOf(r)
+    if (!size) continue
+    if (ancestors[r.sourceId]?.has(r.targetId) || ancestors[r.targetId]?.has(r.sourceId)) continue
+    const a = abs[r.sourceId], b = abs[r.targetId]
+    const need = labelNeed(size)
+    const gapX = Math.max(a.x, b.x) - Math.min(a.x + a.w, b.x + b.w)
+    const gapY = Math.max(a.y, b.y) - Math.min(a.y + a.h, b.y + b.h)
+    const missing = Math.min(1, Math.max(0, 1 - Math.max(gapX / need.x, gapY / need.y)))
+    labelCrowding += missing * missing
+  }
+
   const composite =
       render.renderedCrossings * W_CROSS
     + render.renderedOverdraws * W_OVERDRAW
@@ -503,6 +532,7 @@ function scoreParts(
     + aspect                   * W_ASPECT
     + compactness              * W_COMPACT
     + symNorm                  * W_SYMMETRY
+    + labelCrowding            * W_LABEL
 
   return {
     renderedCrossings: render.renderedCrossings,
@@ -516,6 +546,7 @@ function scoreParts(
     aspectPenalty: aspect,
     compactness,
     symmetryDeficit: symNorm,
+    labelCrowding,
     composite,
   }
 }
@@ -858,7 +889,7 @@ function refineRoots(
     rng, restarts,
     sweeps: sweepsFor(g, group, PHASE_A_WORK, restarts, 12, 150),
     stepFactor: 0.06, tempFactor: 1, calibrationSamples: 24,
-    gap: ROOT_GAP, deadline,
+    gap: ROOT_GAP, pairGap: pairGapsOf(g, nodes, relations), deadline,
   })
   return { positions: readPositions(g), before: res.before, after: res.after, iterations: res.evaluations }
 }
@@ -874,6 +905,7 @@ function refineCompounds(
   const g = buildLayoutGraph(work, relations)
   const ev = new ProxyEnergy(g)
   const before = ev.energy()
+  const pairGap = pairGapsOf(g, nodes, relations)
 
   const groups = new Map<number, number[]>()
   for (let i = 0; i < g.n; i++) {
@@ -911,7 +943,7 @@ function refineCompounds(
       rng, restarts,
       sweeps: sweepsFor(g, group, PHASE_B_WORK / compounds, restarts, 6, 100),
       stepFactor: 0.08, tempFactor: 1, calibrationSamples: 12,
-      gap: CHILD_GAP, bounds, deadline,
+      gap: CHILD_GAP, pairGap, bounds, deadline,
     })
     iterations += res.evaluations
   }
@@ -935,7 +967,7 @@ function polishRoots(
     rng, restarts: 1,
     sweeps: clamp(Math.round(probes / (group.length + 1)), 2, 200),
     stepFactor: 0.02, tempFactor: 0.25, calibrationSamples: 6,
-    gap: ROOT_GAP, deadline,
+    gap: ROOT_GAP, pairGap: pairGapsOf(g, nodes, relations), deadline,
   }
   const res = anneal(new FunctionEnergy(g, work, relations, compositeEnergy), g, group, opts)
   return { positions: readPositions(g), before: res.before, after: res.after, iterations: res.evaluations }
@@ -1026,7 +1058,7 @@ function scoreCandidate(
       const prev = raw[id]
       if (prev) raw[id] = { ...prev, x: p.x, y: p.y }
     }
-    const positions = finalizeLayout(nodes, raw, alignments)
+    const positions = finalizeLayout(nodes, relations, raw, alignments)
     const projected = projectPositions(nodes, positions)
     const metrics = computeLayoutMetrics(projected, relations)
     const score = computeCompositeScore(projected, relations)
@@ -1269,7 +1301,7 @@ export async function runSmartLayoutWorkerPhase(
   for (let k = 0; k < Math.min(2, valid.length); k++) {
     const run = refineRoots(nodes, relations, valid[k].positions, rng, deadlineA)
     iterationsA += run.iterations
-    const positions = finalizeLayout(nodes, run.positions, alignments)
+    const positions = finalizeLayout(nodes, relations, run.positions, alignments)
     const composite = compositeEnergy(projectPositions(nodes, positions), relations)
     if (!best || composite < best.composite) best = { from: valid[k], run, positions, composite }
   }
@@ -1281,8 +1313,8 @@ export async function runSmartLayoutWorkerPhase(
   await yieldToUI()
 
   onProgress?.({ phase: 'refining-c' })
-  const phaseC = polishRoots(nodes, relations, finalizeLayout(nodes, phaseB.positions, alignments), rng, now() + PHASE_C_DEADLINE_MS)
-  const finalPositions = finalizeLayout(nodes, phaseC.positions, alignments)
+  const phaseC = polishRoots(nodes, relations, finalizeLayout(nodes, relations, phaseB.positions, alignments), rng, now() + PHASE_C_DEADLINE_MS)
+  const finalPositions = finalizeLayout(nodes, relations, phaseC.positions, alignments)
   const refined = projectPositions(nodes, finalPositions)
 
   // Never hand back something worse than we already had: the refined

@@ -75,6 +75,33 @@ export function estimateLabelSize(lines: LabelTextLine[], style: LabelBoxStyle):
   }
 }
 
+/** The box the canvas draws a relation's label in (RelationEdge). */
+export const RELATION_LABEL_BOX: LabelBoxStyle & { fontSize: number; techFontSize: number } = {
+  maxWidth: 200, padX: 8, padY: 3, border: 1, lineHeight: 1.4, fontSize: 17, techFontSize: 14,
+}
+
+/** What a relation shows in its label: its name (or type), then its technology. */
+export interface RelationLabelText {
+  label?: string
+  relationType?: string
+  technology?: string
+}
+
+/** The lines of a relation's label; none when it has no label. */
+export function relationLabelLines(r: RelationLabelText): LabelTextLine[] {
+  const lines: LabelTextLine[] = []
+  const name = r.label || r.relationType
+  if (name) lines.push({ text: name, fontSize: RELATION_LABEL_BOX.fontSize })
+  if (r.technology) lines.push({ text: `[${r.technology}]`, fontSize: RELATION_LABEL_BOX.techFontSize })
+  return lines
+}
+
+/** The size of a relation's label box, or null when it has no label. */
+export function relationLabelSize(r: RelationLabelText): LabelSize | null {
+  const lines = relationLabelLines(r)
+  return lines.length > 0 ? estimateLabelSize(lines, RELATION_LABEL_BOX) : null
+}
+
 // ── Placement ─────────────────────────────────────────────────────────
 
 export interface LabelEdge {

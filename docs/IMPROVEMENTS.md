@@ -29,11 +29,12 @@ Two layers of suggestions: **functional** (what the user sees / can do) and **te
 13. **Richer relation labels** — protocol (HTTPS/gRPC/Kafka), data direction, sync/async; today only `description`.
 14. **Auto-routing around labels** — arrows sometimes cross neighbouring labels.
     Labels now avoid nodes, other labels and other edges (`@radical/layout/edgeLabels`),
-    but routes still ignore labels, and a label has nowhere to go on an edge shorter
-    than itself (most of the overlaps left after placement). Next: Smart Layout should
-    leave room for labels — label sizes on ELK edges (`elk.edgeLabels.placement`), a
-    minimum edge length from the label size, and a label-overlap term in the score,
-    measured with `labelOverlaps` before and after.
+    hide when the zoom makes them unreadable, and Smart Layout leaves room for them
+    between neighbours (`labelRoom.ts`, `labelCrowding` in the score). Left: routes
+    still ignore labels; the room costs ~14% more crossings on the large blueprints
+    (110 → 125 over 5 seeds) — worth trying label sizes on ELK edges
+    (`elk.edgeLabels.placement`) so candidates plan the room instead of finalizeLayout
+    pushing it in, measured with `labelOverlaps` and crossings over several seeds.
 15. **Bundling parallel relations** — when A↔B has 3 relations, render them as a visual "bundle".
 
 ### Milestones (architecture over time)
