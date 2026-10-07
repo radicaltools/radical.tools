@@ -5,8 +5,8 @@
  * surfacing/steering by relevant prior art.
  */
 import { describe, it, expect } from 'vitest'
-import { readCatalogue, buildIndex } from '@radical/hub-catalogue'
-import { findRelevantConcepts, scoreConceptRelevance } from '../src/renderer/src/hub/matchConcepts'
+import { readCatalogue, buildIndex } from '../src/catalogue'
+import { findRelevantConcepts, forgeHubMatches, scoreConceptRelevance } from '@radical/common/ai/forge'
 import type { HubConceptSummary } from '@radical/common/hubFormat'
 
 const concepts: HubConceptSummary[] = buildIndex(readCatalogue())
@@ -52,5 +52,22 @@ describe('findRelevantConcepts', () => {
     const tagMatch: HubConceptSummary = { ...concepts[0], name: 'Something', description: 'unrelated', tags: ['integration'] }
     const proseMatch: HubConceptSummary = { ...concepts[0], name: 'Something', description: 'about integration', tags: [] }
     expect(scoreConceptRelevance(queryTokens, tagMatch)).toBeGreaterThan(scoreConceptRelevance(queryTokens, proseMatch))
+  })
+})
+
+describe('forgeHubMatches', () => {
+  const description = 'We are integrating with a legacy mainframe billing system and need to keep our clean domain model isolated from its quirks and technical debt.'
+
+  it('suggests patterns and ADRs for the C4 stage and nothing for scenarios or mockups', () => {
+    const byStage = forgeHubMatches(concepts, description, 'c4-ddd-governance-builtin')
+    expect(byStage.c4?.[0].id).toBe('pattern-anti-corruption-layer')
+    expect(byStage.c4?.every((c) => ['pattern', 'adr', 'requirement'].includes(c.category))).toBe(true)
+    expect(byStage.fitness?.every((c) => c.category === 'fitness-function')).toBe(true)
+    expect(byStage.scenarios).toBeUndefined()
+    expect(byStage.mockups).toBeUndefined()
+  })
+
+  it('suggests nothing without a description', () => {
+    expect(forgeHubMatches(concepts, '  ', undefined)).toEqual({})
   })
 })

@@ -1,29 +1,20 @@
 // ─── What one Radical Forge stage run added to the model ────────────────────
-// Regenerate runs a stage again on top of the model, so the previous attempt's
-// additions are removed first; otherwise every regeneration stacks a copy.
-// Updates and deletions an attempt made are not reverted.
+// Studio's side of @radical/common/ai/forge's stage output: reads the ids from
+// the store and removes a previous attempt's additions before Regenerate.
 
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { idsAddedSince, modelIdsOf, type ModelIds } from '@radical/common/ai/forge'
 
-export interface ModelIds {
-  nodes: string[]
-  relations: string[]
-  views: string[]
-}
+export type { ModelIds }
 
 export function currentModelIds(): ModelIds {
   const { c4Nodes, c4Relations, views } = useDiagramStore.getState()
-  return { nodes: Object.keys(c4Nodes), relations: Object.keys(c4Relations), views: Object.keys(views) }
+  return modelIdsOf({ nodes: c4Nodes, relations: c4Relations, views })
 }
 
 /** Ids in the model now that were not in `before`. */
 export function addedSince(before: ModelIds): ModelIds {
-  const now = currentModelIds()
-  const only = (ids: string[], old: string[]): string[] => {
-    const seen = new Set(old)
-    return ids.filter((id) => !seen.has(id))
-  }
-  return { nodes: only(now.nodes, before.nodes), relations: only(now.relations, before.relations), views: only(now.views, before.views) }
+  return idsAddedSince(before, currentModelIds())
 }
 
 /** Removes what is still there of an earlier run's additions. */

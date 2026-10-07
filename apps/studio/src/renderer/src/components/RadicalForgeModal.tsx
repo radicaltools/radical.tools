@@ -5,19 +5,25 @@ import { runAIPrompt, type ForgeProgressEvent } from '../ai/runner'
 import { activeProviderNeedsKey, loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
-import { FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, buildForgeStagePrompt, buildPriorStagesBlock, needLabelFromDescription, type ForgeNeedRef, type ForgeStageId } from '../ai/forgePrompts'
+import {
+  FORGE_STAGES,
+  HUB_MATCHES_QUESTION_ID,
+  PRIMARY_TYPE_IDS_FOR_STAGE,
+  buildForgeStagePrompt,
+  buildPriorStagesBlock,
+  forgeHubMatches,
+  formatClarificationAnswers,
+  needLabelFromDescription,
+  type ClarifyStageQuestion,
+  type ForgeNeedRef,
+  type ForgeStageId,
+} from '@radical/common/ai/forge'
 import { buildGherkinFiles } from '@radical/common/formats/exportGherkin'
 import { downloadGherkinFiles } from '../export/downloadGherkinFiles'
 import { AIReportLine } from './AIReportLine'
-import { useHubStore, type HubCategory, type HubConceptSummary } from '@radical/ui/store/hubStore'
-import { findRelevantConcepts } from '../hub/matchConcepts'
+import { useHubStore, type HubConceptSummary } from '@radical/ui/store/hubStore'
 import { importHubConceptIntoDiagram } from '../hub/importConcept'
-import {
-  askClarifyingQuestions,
-  formatClarificationAnswers,
-  HUB_MATCHES_QUESTION_ID,
-  type ClarifyStageQuestion,
-} from '../ai/forgeClarify'
+import { askClarifyingQuestions } from '../ai/forgeClarify'
 import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
 import type { C4Node, C4Relation } from '@radical/common/c4'
@@ -59,23 +65,6 @@ function formatTokenCount(n: number): string {
  *  the tail is ever shown anyway. */
 const PROGRESS_ENTRY_LIMIT = 40
 const PROGRESS_VISIBLE_COUNT = 7
-
-/** Hub categories worth surfacing as prior art for each stage — the C4 stage
- *  is where decomposition/coupling guidance (patterns, ADRs) matters most.
- *  `scenarios` has no matching Hub category (no Gherkin content there). */
-const HUB_CATEGORIES_FOR_STAGE: Partial<Record<ForgeStageId, HubCategory[]>> = {
-  requirements: ['requirement'],
-  c4: ['pattern', 'adr'],
-  fitness: ['fitness-function'],
-}
-
-/** Requirements tagged this way are generic, domain-agnostic engineering
- *  tenets (idempotency, least privilege, resource isolation, ...) rather
- *  than product-specific behaviour — a "principle" is modeled as a kind of
- *  requirement (a tag), not a new concept type. The C4 stage treats them as
- *  decomposition guidance alongside patterns/ADRs. */
-const PRINCIPLE_TAG = 'principle'
-const PRINCIPLE_MATCH_LIMIT = 2
 
 interface Props {
   open: boolean
@@ -247,21 +236,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (text) setDescription(text)
   }, [])
 
-  const hubMatchesByStage = useMemo(() => {
-    const out: Partial<Record<ForgeStageId, HubConceptSummary[]>> = {}
-    if (!description.trim()) return out
-    for (const stage of FORGE_STAGES) {
-      const categories = HUB_CATEGORIES_FOR_STAGE[stage.id]
-      if (categories) out[stage.id] = findRelevantConcepts(hubConcepts, categories, description, activeMetamodelId)
-    }
-    // Decomposition guidance for the C4 stage also draws on "principle"-tagged
-    // requirements (see PRINCIPLE_TAG above) — searched separately so they
-    // don't get crowded out by the (much larger) pattern/adr pool.
-    const principleReqs = hubConcepts.filter((c) => c.category === 'requirement' && c.tags.includes(PRINCIPLE_TAG))
-    const principleMatches = findRelevantConcepts(principleReqs, 'requirement', description, activeMetamodelId, PRINCIPLE_MATCH_LIMIT)
-    if (principleMatches.length) out.c4 = [...(out.c4 ?? []), ...principleMatches]
-    return out
-  }, [hubConcepts, description, activeMetamodelId])
+  const hubMatchesByStage = useMemo(
+    () => forgeHubMatches(hubConcepts, description, activeMetamodelId),
+    [hubConcepts, description, activeMetamodelId],
+  )
 
   // Fires once per stage, the moment it becomes current: asks the model
   // whether it needs clarifying questions before generating. Skips the call

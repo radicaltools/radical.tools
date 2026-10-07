@@ -1,11 +1,12 @@
 // ─── Radical Forge stage prompts ────────────────────────────────────────────
 // Radical Forge walks a free-text system description through five sequential
 // AI generation stages — requirements → fitness functions → Gherkin
-// scenarios → UI mockups → C4 model — each a normal `runAIPrompt` call sharing one
-// running `history` array — so a later stage sees everything an earlier
-// stage created (via buildContextMessage in systemPrompt.ts), same as any
-// multi-turn chat. No new AI infrastructure: these are just task-scoped
-// prompt strings.
+// scenarios → UI mockups → C4 model. In Studio each stage is a normal
+// `runAIPrompt` call, so a later stage sees everything an earlier stage
+// created (via buildContextMessage in ../systemPrompt.ts), same as any
+// multi-turn chat; over MCP the client's own model runs the stage with the
+// same prompt (apps/mcp/src/forge.ts). No new AI infrastructure: these are
+// just task-scoped prompt strings.
 //
 // C4 deliberately runs LAST: the behavior/quality spec (requirements,
 // fitness functions, scenarios, screens) is nailed down first, and the architecture
@@ -21,10 +22,10 @@
 // trick as fitness functions — with no webapp to point at yet, `presented-by`
 // (mockup → webapp/container) is added by the C4 stage once the elements
 // exist. The mockups stage only creates the mockup nodes and their links;
-// wireframes are drawn by a separate per-mockup call (ai/mockupWireframe.ts),
+// wireframes are drawn by a separate per-mockup call (./wireframe.ts),
 // triggered from the wizard.
 
-import type { HubConceptSummary } from '@radical/ui/store/hubStore'
+import type { HubConceptSummary } from '../../hubFormat'
 
 export type ForgeStageId = 'requirements' | 'fitness' | 'scenarios' | 'c4' | 'mockups'
 
@@ -75,7 +76,7 @@ export const FORGE_STAGES: ForgeStage[] = [
   },
 ]
 
-/** Formats Hub catalogue matches (see hub/matchConcepts.ts) as prior-art
+/** Formats Hub catalogue matches (see ./hubMatches.ts) as prior-art
  *  guidance: the model is told to apply the principles these concepts
  *  embody — proven decomposition/coupling patterns, ADR precedent, fitness-
  *  function thresholds — rather than re-deriving everything from scratch,
@@ -101,7 +102,7 @@ function buildHubGuidanceBlock(hubMatches: HubConceptSummary[] | undefined): str
 /** Formats a compact synopsis of earlier stages in this run — replaces
  *  carrying their full verbatim tool-call transcripts forward (which
  *  `RadicalForgeModal.tsx` used to do via a growing `history` array). The
- *  live diagram-context message (systemPrompt.ts's `buildContextMessage`)
+ *  live diagram-context message (../systemPrompt.ts's `buildContextMessage`)
  *  already re-sends the complete, authoritative current model state fresh
  *  every round, so replaying raw tool calls on top of that was mostly
  *  redundant — this keeps just the "what was decided and why" that a fresh
@@ -118,7 +119,7 @@ export function buildPriorStagesBlock(summaries: { title: string; summary: strin
 }
 
 /** Formats the user's answers to the pre-stage clarifying questions (see
- *  ai/forgeClarify.ts) as a block the model should treat as authoritative —
+ *  ./clarify.ts) as a block the model should treat as authoritative —
  *  it asked, the user answered, so these override any conflicting guess it
  *  would otherwise make from the free-text description alone. */
 function buildClarificationsBlock(clarifications: string | undefined): string {
@@ -159,10 +160,10 @@ export function needLabelFromDescription(description: string): string {
  *  stages still get it for grounding, even though the requirements/model it
  *  implies are by then already in the live diagram (and thus in `history`).
  *  `hubMatches` are the same Hub suggestions shown in the wizard UI for this
- *  stage (see RadicalForgeModal.tsx) — generation and what the user sees
+ *  stage (see RadicalForgeModal.tsx, or forge_clarify over MCP) — generation and what the user sees
  *  stay the same set, no separate "what did the AI see" mystery.
  *  `clarifications` is the formatted Q&A from the pre-stage clarify step
- *  (ai/forgeClarify.ts), when the user answered any. `priorStageSummaries`
+ *  (./clarify.ts), when the user answered any. `priorStageSummaries`
  *  is the pre-formatted output of `buildPriorStagesBlock` above. `need` is
  *  the node the description is stored in, when the metamodel has that type. */
 export function buildForgeStagePrompt(
