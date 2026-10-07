@@ -254,6 +254,9 @@ function StructuralCanvas(): React.ReactElement {
   // comes to rest and the active-fit window has closed.
   const trackUntilRef = useRef<number>(0)
   const trackingRef = useRef(false)
+  // A view just opened with Smart fit on: the nodes it shows, to fit at once
+  // in the first frame React Flow draws them (see placeCamera).
+  const snapIdsRef = useRef<Set<string> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   /**
@@ -401,6 +404,8 @@ function StructuralCanvas(): React.ReactElement {
     // auto-fit interval tick must not run — otherwise the zoom-in onto the
     // searched node is immediately overridden by fit-to-all on the next
     // 300ms tick. Manual / forced calls (Fit-All button) bypass this.
+    // A view just opened: placeCamera fits it as soon as it is drawn.
+    if (!force && snapIdsRef.current) return
     if (!force) {
       const until = (window as unknown as { __radicalAutoFitSuppressUntil?: number }).__radicalAutoFitSuppressUntil ?? 0
       if (performance.now() < until) {
@@ -500,6 +505,7 @@ function StructuralCanvas(): React.ReactElement {
     }
     trackingRef.current = false
     trackUntilRef.current = 0
+    snapIdsRef.current = null
   }, [])
 
   /**
@@ -534,22 +540,43 @@ function StructuralCanvas(): React.ReactElement {
   const onUserMoveStart = useCallback((event: unknown) => { if (event) takeCamera() }, [takeCamera])
 
   /**
-   * Put the camera saved with a view (or the default context) in place, in
-   * one step: each view keeps its own coordinates, so a flight from the
-   * previous view's camera crosses empty canvas and the diagram slides in
-   * from an edge. The nodes shown now become Smart fit's baseline (they are
-   * not "newly revealed" content to frame): it keeps this camera and reacts
-   * again to the next expand or collapse. `ids` are the nodes the store has
-   * just shown, which React Flow may not have received yet.
+   * The camera for a view just opened (or a document just loaded), in one
+   * step: each view keeps its own coordinates, so a flight from the previous
+   * view's camera crossed empty canvas and the diagram slid in from an edge.
+   * With Smart fit on, the view is fitted in the first frame React Flow draws
+   * its nodes (`ids`, which the store has just shown: React Flow takes them
+   * a frame or two later); the saved camera `vp` bridges those frames. With
+   * Smart fit off, the saved camera stays. Either way the shown nodes become
+   * Smart fit's baseline: it reacts again to the next expand or collapse.
    */
-  const placeCamera = useCallback((vp: { x: number; y: number; zoom: number }, ids?: string[]) => {
+  const placeCamera = useCallback((vp: { x: number; y: number; zoom: number } | null, ids?: string[]) => {
     const inst = rfInstanceRef.current
     if (!inst) return
     stopFit()
     fitWindowUntilRef.current = 0
-    prevVisibleIdsRef.current = new Set(ids ?? inst.getNodes().filter((n) => !n.hidden).map((n) => n.id))
-    setCameraNow(vp)
-  }, [stopFit, setCameraNow])
+    const shown = new Set(ids ?? inst.getNodes().filter((n) => !n.hidden).map((n) => n.id))
+    prevVisibleIdsRef.current = shown
+    if (vp) setCameraNow(vp)
+    if (!useDiagramStore.getState().autoFitActive) return
+    snapIdsRef.current = shown
+    let frames = 0
+    const snap = () => {
+      if (snapIdsRef.current !== shown) return // stopped, or a newer view
+      const visible = inst.getNodes().filter((n) => !n.hidden)
+      const drawn = visible.length > 0 && visible.every((n) => n.width && n.height)
+        && (shown.size === 0 || (visible.length === shown.size && visible.every((n) => shown.has(n.id))))
+      if (!drawn && ++frames < 30) {
+        fitAnimRef.current = requestAnimationFrame(snap)
+        return
+      }
+      fitAnimRef.current = null
+      snapIdsRef.current = null
+      prevVisibleIdsRef.current = new Set(visible.map((n) => n.id))
+      const target = computeFitTarget()
+      if (target) setCameraNow(target)
+    }
+    fitAnimRef.current = requestAnimationFrame(snap)
+  }, [stopFit, setCameraNow, computeFitTarget])
   // d3-zoom folds wheel events within ~150 ms into one gesture and reports its
   // start only once, so a wheel that lands while a fit animates would not
   // reach onMoveStart: every wheel takes the camera.
@@ -605,7 +632,7 @@ function StructuralCanvas(): React.ReactElement {
       const stored = s.activeViewId
         ? s.views[s.activeViewId]?.viewport ?? null
         : s.defaultViewport
-      if (stored) {
+      if (stored || s.autoFitActive) {
         placeCamera(stored)
       } else {
         instance.fitView({ padding: 0.12 })
