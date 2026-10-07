@@ -9,7 +9,7 @@ import {
   type Node as RFNode,
 } from 'reactflow'
 import { C4EdgeRFData } from '@radical/common/c4'
-import { computeRoutedEdge, ObstacleGrid, type RoutingObstacle } from '@radical/layout/edgeRouting'
+import { computeRoutedEdge, ObstacleGrid, type ObstacleSet, type RoutingObstacle } from '@radical/layout/edgeRouting'
 import { allocatePorts } from '@radical/layout/portAllocator'
 import { useDiagramStore } from '../../store/diagramStore'
 
@@ -261,7 +261,7 @@ export const RelationEdge = memo(
     const targetNode = useStore(targetSelector, sameEnd)
     // Ports and routes also depend on other edges and nodes; re-render once
     // with everything when the layout comes to rest.
-    useDiagramStore((s) => s.liveLayoutMoving)
+    const moving = useDiagramStore((s) => s.liveLayoutMoving)
     const diffKind = useDiagramStore(s => s.showDiff ? s.diffHighlight[id] : undefined)
     const storeApi = useStoreApi()
 
@@ -314,17 +314,24 @@ export const RelationEdge = memo(
 
     // Obstacles: every visible node except the two ends, their ancestors
     // (the edge crosses their borders) and their descendants (inside them).
-    const candidates = obstacleCandidates(stateSnapshot.nodeInternals)
-    const ends = candidates.byId
-    const excludeIds = new Set<string>([source, target, ...(ends.get(source)?.ancestors ?? []), ...(ends.get(target)?.ancestors ?? [])])
-    const excluded = (c: ObstacleCandidate): boolean =>
-      excludeIds.has(c.id) || c.ancestors.includes(source) || c.ancestors.includes(target)
-    // The curve's hit test asks the grid point by point; the full list is
-    // built only when the edge has to route around something.
+    // While the live layout moves the nodes, the edge is the plain curve:
+    // routing around obstacles (A*) every frame took a fifth of the frame
+    // time on a 150-node canvas, and the route is redone at rest.
+    const obstacles = (): RoutingObstacle[] | ObstacleSet => {
+      if (moving) return []
+      const candidates = obstacleCandidates(stateSnapshot.nodeInternals)
+      const ends = candidates.byId
+      const excludeIds = new Set<string>([source, target, ...(ends.get(source)?.ancestors ?? []), ...(ends.get(target)?.ancestors ?? [])])
+      const excluded = (c: ObstacleCandidate): boolean =>
+        excludeIds.has(c.id) || c.ancestors.includes(source) || c.ancestors.includes(target)
+      // The curve's hit test asks the grid point by point; the full list is
+      // built only when the edge has to route around something.
+      return candidates.grid.without(excluded)
+    }
     const { path: edgePath, labelX, labelY } = computeRoutedEdge(
       sp.x, sp.y, srcSide,
       tp.x, tp.y, tgtSide,
-      candidates.grid.without(excluded),
+      obstacles(),
     )
 
     const strokeColor = selected ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'

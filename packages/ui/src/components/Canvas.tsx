@@ -7,7 +7,7 @@ import ReactFlow, {
   EdgeTypes,
   NodeMouseHandler,
   ReactFlowInstance,
-  useViewport,
+  useStoreApi,
   getNodesBounds,
   getViewportForBounds,
 } from 'reactflow'
@@ -193,11 +193,17 @@ function StructuralCanvas(): React.ReactElement {
   const setFitViewFn = useDiagramStore((s) => s.setFitViewFn)
   const setViewportFns = useDiagramStore((s) => s.setViewportFns)
 
-  // Always keep window.__rfCurrentViewport up-to-date so slide capture is accurate
-  const vp = useViewport()
+  // Always keep window.__rfCurrentViewport up-to-date so slide capture is
+  // accurate. A subscription, not useViewport(): that re-rendered the whole
+  // canvas on every camera frame (Smart fit, pan, zoom).
+  const rfStore = useStoreApi()
   useEffect(() => {
-    ;(window as any).__rfCurrentViewport = { x: vp.x, y: vp.y, zoom: vp.zoom }
-  }, [vp.x, vp.y, vp.zoom])
+    const record = (transform: [number, number, number]): void => {
+      ;(window as any).__rfCurrentViewport = { x: transform[0], y: transform[1], zoom: transform[2] }
+    }
+    record(rfStore.getState().transform)
+    return rfStore.subscribe((s, prev) => { if (s.transform !== prev.transform) record(s.transform) })
+  }, [rfStore])
 
   // ── Auto-fit animation state ─────────────────────────────────────────
   // We run a single persistent rAF loop that *exponentially* eases the

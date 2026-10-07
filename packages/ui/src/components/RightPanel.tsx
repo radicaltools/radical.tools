@@ -1,7 +1,7 @@
-import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback, memo } from 'react'
 import { useDiagramStore, nodeEffectivelyCollapsedInView } from '../store/diagramStore'
 import { useChildIds, useNodeContent, useNodeLabels } from '../store/nodeSelectors'
-import { C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '@radical/common/c4'
+import { type C4Relation, C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '@radical/common/c4'
 import { resolveEarsSubject, NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import type { HubImportRecord } from '../store/hubStore'
@@ -183,39 +183,33 @@ function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
 
 // ── Relation row ──────────────────────────────────────────────────────────────
 
-function RelationListItem({ relationId }: { relationId: string }): React.ReactElement | null {
-  const rel = useDiagramStore((s) => s.c4Relations[relationId])
-  const sourceLabel = useDiagramStore((s) => {
-    const r = s.c4Relations[relationId]; if (!r) return ''
-    const n = s.c4Nodes[r.sourceId]; return n ? (n.label || n.type) : '?'
-  })
-  const targetLabel = useDiagramStore((s) => {
-    const r = s.c4Relations[relationId]; if (!r) return ''
-    const n = s.c4Nodes[r.targetId]; return n ? (n.label || n.type) : '?'
-  })
-  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+interface RelationListItemProps {
+  rel: C4Relation
+  sourceLabel: string
+  targetLabel: string
+  isSelected: boolean
+  /** Active view, when one is; then whether the relation is hidden there and
+   *  both its ends are in it. */
+  activeViewId: string | null
+  hidden: boolean
+  endpointsInView: boolean
+}
+
+/** One row of the Relations list. Props only: with a thousand relations,
+ *  a store subscription per row ran on every live-layout frame. */
+const RelationListItem = memo(function RelationListItem({
+  rel, sourceLabel, targetLabel, isSelected, activeViewId, hidden, endpointsInView,
+}: RelationListItemProps): React.ReactElement {
   const selectEdge = useDiagramStore((s) => s.selectEdge)
-  const activeViewId = useDiagramStore((s) => s.activeViewId)
-  const activeView = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
   const hideRelationFromView = useDiagramStore((s) => s.hideRelationFromView)
   const unhideRelationInView = useDiagramStore((s) => s.unhideRelationInView)
-
-  if (!rel) return null
-
-  // A relation is "in view" when no view is active OR the active view does
-  // not have it on its hidden list AND both endpoints are visible there.
-  const hidden = !!activeView?.hiddenRelationIds?.includes(relationId)
-  const endpointsInView = !activeView
-    || activeView.nodeIds.length === 0
-    || (activeView.nodeIds.includes(rel.sourceId) && activeView.nodeIds.includes(rel.targetId))
-  const inView = !activeView || (!hidden && endpointsInView)
-  const isSelected = selectedEdgeId === relationId
+  const inView = !activeViewId || (!hidden && endpointsInView)
 
   return (
     <div
       className={`tree-node ${isSelected ? 'selected' : ''}`}
       style={{ paddingLeft: 12, opacity: inView ? 1 : 0.35 }}
-      onClick={() => selectEdge(relationId)}
+      onClick={() => selectEdge(rel.id)}
       title={rel.label || `${sourceLabel} → ${targetLabel}`}
     >
       <span className="tree-toggle" style={{ opacity: 0.3 }}>·</span>
@@ -238,8 +232,8 @@ function RelationListItem({ relationId }: { relationId: string }): React.ReactEl
           title={hidden ? 'Show in view' : 'Hide from view'}
           onClick={(e) => {
             e.stopPropagation()
-            if (hidden) unhideRelationInView(activeViewId, relationId)
-            else hideRelationFromView(activeViewId, relationId)
+            if (hidden) unhideRelationInView(activeViewId, rel.id)
+            else hideRelationFromView(activeViewId, rel.id)
           }}
         >
           {hidden ? '👁‍🗨' : '👁'}
@@ -247,13 +241,16 @@ function RelationListItem({ relationId }: { relationId: string }): React.ReactEl
       )}
     </div>
   )
-}
+})
 
 function RelationsSection(): React.ReactElement {
   const relations = useDiagramStore((s) => s.c4Relations)
   // Labels only: the live layout replaces c4Nodes every frame.
   const labels = useNodeLabels()
-  const ids = useMemo(() => {
+  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+  const activeViewId = useDiagramStore((s) => s.activeViewId)
+  const activeView = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
+  const rels = useMemo(() => {
     return Object.values(relations)
       .filter((r) => labels.has(r.sourceId) && labels.has(r.targetId))
       .sort((a, b) => {
@@ -261,15 +258,32 @@ function RelationsSection(): React.ReactElement {
         if (sa !== 0) return sa
         return (labels.get(a.targetId) || '').localeCompare(labels.get(b.targetId) || '')
       })
-      .map((r) => r.id)
   }, [relations, labels])
+  // An element without a label is named by its type. Read once per change
+  // of labels: subscribing to c4Nodes would re-render on every frame.
+  const nameOf = (id: string): string => labels.get(id) || useDiagramStore.getState().c4Nodes[id]?.type || '?'
 
-  if (ids.length === 0) {
+  if (rels.length === 0) {
     return <div className="lp-empty-state" style={{ padding: '4px 12px 8px' }}>No relations.</div>
   }
+  // A relation is "in view" when no view is active OR the active view does
+  // not have it on its hidden list AND both endpoints are visible there.
+  const inViewNodes = activeView && activeView.nodeIds.length > 0 ? new Set(activeView.nodeIds) : null
+  const hiddenIds = new Set(activeView?.hiddenRelationIds ?? [])
   return (
     <>
-      {ids.map((id) => <RelationListItem key={id} relationId={id} />)}
+      {rels.map((r) => (
+        <RelationListItem
+          key={r.id}
+          rel={r}
+          sourceLabel={nameOf(r.sourceId)}
+          targetLabel={nameOf(r.targetId)}
+          isSelected={selectedEdgeId === r.id}
+          activeViewId={activeViewId}
+          hidden={hiddenIds.has(r.id)}
+          endpointsInView={!inViewNodes || (inViewNodes.has(r.sourceId) && inViewNodes.has(r.targetId))}
+        />
+      ))}
     </>
   )
 }
