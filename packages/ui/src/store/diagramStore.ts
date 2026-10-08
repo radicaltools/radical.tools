@@ -231,7 +231,7 @@ function buildPresentationsFromData(
   return { presentations: list, activeId: list[0].id }
 }
 
-function computeSnapDiff(
+export function computeSnapDiff(
   prevNodes: Record<string, C4Node>,
   currNodes: Record<string, C4Node>,
   prevRels: Record<string, C4Relation>,
@@ -314,7 +314,7 @@ function computeSeqDiff(
  * so they can be merged into the canvas at render time without polluting
  * the actual model.
  */
-function computeDiffGhosts(
+export function computeDiffGhosts(
   baseNodes: Record<string, C4Node>,
   currNodes: Record<string, C4Node>,
   baseRels: Record<string, C4Relation>,

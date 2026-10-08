@@ -171,6 +171,10 @@ test('an MCP model edit appears in the open browser canvas', async ({ page, stud
     }
     for (const path of Object.keys(before)) if (!(path in after)) await folder.remove(path)
     await expect(studio.node('customer')).toContainText('MCP Customer', { timeout: 10_000 })
+    // What changed is highlighted for a few seconds, then the badge goes.
+    await expect(studio.node('customer')).toContainText('CHANGED')
+    await expect(studio.node('bookstore')).not.toContainText('CHANGED')
+    await expect(studio.node('customer')).not.toContainText('CHANGED', { timeout: 8_000 })
     await page.waitForTimeout(3000)
     expect((await folder.files())['nodes/mcp-customer.md']).toContain('label: "MCP Customer"')
   } finally {
