@@ -26,6 +26,11 @@ test('a row on All elements holds through a drag, Smart Layout and a reload', as
   await page.getByRole('menuitem', { name: /Keep in a row/ }).click()
   await expect.poll(() => spread(studio, row, 'y')).toBeLessThanOrEqual(1.5)
   await expect(page.getByTestId('alignment-guides').locator('line').first()).toBeAttached()
+  // The guide shows only while a member is selected.
+  await studio.node('db').click()
+  await expect(page.getByTestId('alignment-guides').locator('line')).toHaveCount(0)
+  await studio.node('customer').click()
+  await expect(page.getByTestId('alignment-guides').locator('line').first()).toBeAttached()
 
   // Drag one member down: the others follow it onto its new line.
   const box = (await studio.node('payments').boundingBox())!

@@ -8,10 +8,10 @@ import { activeLayoutConstraints, useDiagramStore } from '../store/diagramStore'
  * (a row or a column the user asked to keep). Drawn in the gaps between
  * consecutive members, so a guide never covers a box; an alignment that
  * keeps its order has arrowheads pointing along it; a grid draws each of its
- * rows and columns. Faint by default; when a member, or the container all
- * members sit in, is selected the guide is
- * drawn fully and offers buttons: order on/off for an alignment, fewer or
- * more columns for a grid, and remove. A selected pinned element (one the
+ * rows and columns. A guide shows only while a member, or the container all
+ * members sit in, is selected, so a canvas full of alignments stays quiet;
+ * it then offers buttons: order on/off for an alignment, fewer or more
+ * columns for a grid, and remove. A selected pinned element (one the
  * user dropped after a drag) shows a pin at its corner that unpins it.
  *
  * Rendered as a ReactFlow child, outside the viewport element that exports
@@ -30,7 +30,7 @@ type Box = { x: number; y: number; width: number; height: number }
 
 interface Segment { x1: number; y1: number; x2: number; y2: number }
 
-function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.ReactElement {
+function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.ReactElement | null {
   const selectedNodeIds = useDiagramStore((s) => s.selectedNodeIds)
   const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
   const setAlignmentOrdered = useDiagramStore((s) => s.setAlignmentOrdered)
@@ -52,8 +52,12 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
     return b ? [{ id, x: b.x + b.width, y: b.y }] : []
   })
 
+  const parentOf = (id: string): string | undefined => nodeInternals.get(id)?.parentNode
   const guides = constraints.flatMap((c) => {
     if (c.type === 'pin') return []
+    const active = c.nodeIds.some((id) => selected.has(id))
+      || (selected.size === 1 && c.nodeIds.every((id) => { const p = parentOf(id); return !!p && selected.has(p) }))
+    if (!active) return []
     const segments: Array<Segment & { ordered: boolean }> = []
     for (const l of constraintLines([c])) {
       const boxes = l.nodeIds.map(boxOf).filter((b): b is Box => !!b)
@@ -72,11 +76,9 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
       }
     }
     if (!segments.length) return []
-    const parentOf = (id: string): string | undefined => nodeInternals.get(id)?.parentNode
-    const active = c.nodeIds.some((id) => selected.has(id))
-      || (selected.size === 1 && c.nodeIds.every((id) => { const p = parentOf(id); return !!p && selected.has(p) }))
-    return [{ c, segments, active }]
+    return [{ c, segments }]
   })
+  if (!guides.length && !pins.length) return null
 
   const layer = { position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' } as const
   return (
@@ -87,8 +89,8 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
             <path d="M0 0L8 4L0 8z" fill="var(--accent)" stroke="none" />
           </marker>
         </defs>
-        {guides.map(({ c, segments, active }) => (
-          <g key={c.id} opacity={active ? 0.95 : 0.4} stroke="var(--accent)" strokeWidth={active ? 1.8 : 1.4}>
+        {guides.map(({ c, segments }) => (
+          <g key={c.id} opacity={0.95} stroke="var(--accent)" strokeWidth={1.8}>
             {segments.map((s, i) => (
               <g key={i}>
                 <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} strokeDasharray="6 4"
@@ -111,7 +113,7 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
         ))}
       </svg>
       <div style={{ ...layer, zIndex: 5 }}>
-        {guides.filter((g) => g.active && g.segments.length > 0).map(({ c, segments }) => {
+        {guides.map(({ c, segments }) => {
           // The buttons go on the longest gap, where they cover the least.
           const s = segments.reduce((best, x) => (Math.hypot(x.x2 - x.x1, x.y2 - x.y1) > Math.hypot(best.x2 - best.x1, best.y2 - best.y1) ? x : best))
           if (c.type === 'grid') {
