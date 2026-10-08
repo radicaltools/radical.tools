@@ -233,8 +233,10 @@ preset on load. Still open:
    cardinality, table tab and properties, not `wizard` or
    `hierarchyRelation`.
 3. **Slides are framed by fit.** Tool-made slides have no captured viewport or
-   canvas state, so Studio fits the slide's view; framing is captured only in
-   Studio.
+   canvas state, so Studio fits the slide's view, or the slide's `focus`
+   elements (`focusNodeIds`), so several slides can zoom onto parts of one
+   view. The exact camera is captured only in Studio, and Studio's slide panel
+   neither shows nor edits a focus yet ("Capture viewport" overrides it).
 4. **Polish characters in folder slugs.** `slugify` in
    `packages/common/src/formats/mdFolder.ts` turns "zamówienie" into
    "zamo-wienie" (NFKD leaves the accent as a separate mark, which becomes a

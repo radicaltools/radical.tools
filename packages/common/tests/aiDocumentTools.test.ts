@@ -100,6 +100,43 @@ describe('presentation tools', () => {
   })
 })
 
+describe('presentation focus', () => {
+  it('zooms slides of one view onto its parts and validates the focus', async () => {
+    const { facade, call, ctx } = setup()
+    await call('add_node', { tempId: 's', type: 'system', label: 'Shop' })
+    await call('add_node', { tempId: 'a', type: 'container', label: 'API', parentId: 's' })
+    await call('add_node', { tempId: 'd', type: 'container', label: 'DB', parentId: 's' })
+    await call('add_node', { tempId: 'x', type: 'system', label: 'Bank' })
+    await call('create_view', { tempId: 'v', name: 'Containers', nodeIds: ['a', 'd'] })
+    const created = await call('create_presentation', {
+      name: 'Tour',
+      slides: [
+        { name: 'Overview', viewId: 'v' },
+        { name: 'API', viewId: 'v', focus: ['a'] },
+        // The system is shown as the containers' ancestor.
+        { name: 'Shop', viewId: 'v', focus: ['s', 'd'] },
+      ],
+    })
+    expect(created.ok, created.resultText).toBe(true)
+    const tour = facade.getPresentations!()[0]
+    expect(tour.slides.map((slide) => slide.focusNodeIds)).toEqual([undefined, [ctx.resolveId('a')], [ctx.resolveId('s'), ctx.resolveId('d')]])
+    expect(tour.slides.every((slide) => slide.viewId === ctx.resolveId('v') && slide.viewport.zoom === 0)).toBe(true)
+
+    expect((await call('update_presentation', { id: tour.id, slides: [{ name: 'Bank', viewId: 'v', focus: ['x'] }] })).resultText).toContain('not in view "Containers"')
+    expect((await call('update_presentation', { id: tour.id, slides: [{ name: 'Gone', viewId: 'v', focus: ['nope'] }] })).resultText).toContain('unknown node')
+
+    // A slide framed in Studio keeps its camera until a new focus replaces it.
+    const captured = { ...tour.slides[1], viewport: { x: 1, y: 2, zoom: 3 } }
+    facade.setPresentations!([{ ...tour, slides: [captured] }])
+    await call('update_presentation', { id: tour.id, slides: [{ id: captured.id, name: 'API!', viewId: 'v' }] })
+    expect(facade.getPresentations!()[0].slides[0]).toEqual({ ...captured, name: 'API!' })
+    await call('update_presentation', { id: tour.id, slides: [{ id: captured.id, name: 'DB', viewId: 'v', focus: ['d'] }] })
+    expect(facade.getPresentations!()[0].slides[0]).toEqual({ ...captured, name: 'DB', viewport: { x: 0, y: 0, zoom: 0 }, focusNodeIds: [ctx.resolveId('d')] })
+    await call('update_presentation', { id: tour.id, slides: [{ id: captured.id, name: 'All', viewId: 'v', focus: [] }] })
+    expect(facade.getPresentations!()[0].slides[0].focusNodeIds).toBeUndefined()
+  })
+})
+
 describe('smart_layout', () => {
   it('runs the injected layout and loads its result', async () => {
     const seen: Array<string | undefined> = []

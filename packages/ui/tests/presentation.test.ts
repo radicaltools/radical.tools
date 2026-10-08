@@ -251,6 +251,28 @@ describe('previewSlide', () => {
     expect(useDiagramStore.getState().c4Nodes['ctn1'].label).toBe('LIVE')
   })
 
+  it('zooms onto the focus elements of a slide without a captured camera', async () => {
+    const focusNodes = vi.fn()
+    const setVP = vi.fn()
+    ;(window as any).__rfFocusNodes = focusNodes
+    useDiagramStore.getState().setViewportFns(() => ({ x: 0, y: 0, zoom: 1 }), setVP)
+    const slides = [
+      { id: 'f', name: 'f', viewId: null, snapshotId: null, viewport: { x: 0, y: 0, zoom: 0 }, focusNodeIds: ['ctn1'] },
+      // A captured camera wins over the focus.
+      { id: 'c', name: 'c', viewId: null, snapshotId: null, viewport: { x: 5, y: 6, zoom: 1.2 }, focusNodeIds: ['ctn1'] },
+    ]
+    useDiagramStore.setState({ presentations: [{ id: 'p-test', name: 'P', slides }], presentationSlides: slides } as any)
+    useDiagramStore.getState().previewSlide(0)
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(focusNodes).toHaveBeenCalledWith(['ctn1'], { duration: 400 })
+    focusNodes.mockClear()
+    useDiagramStore.getState().previewSlide(1)
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(focusNodes).not.toHaveBeenCalled()
+    expect(setVP).toHaveBeenCalledWith({ x: 5, y: 6, zoom: 1.2 }, { duration: 400 })
+    delete (window as any).__rfFocusNodes
+  })
+
   it('startPresentation after previewSlide starts from the previewed slide index', () => {
     useDiagramStore.getState().addPresentationSlide('a')
     useDiagramStore.getState().addPresentationSlide('b')
