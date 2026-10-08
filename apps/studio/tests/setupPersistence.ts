@@ -3,3 +3,4 @@
 // evaluated before a module's own code.
 import '../src/renderer/src/persistence/autosave'
 import '../src/renderer/src/persistence/selection'
+import '../src/renderer/src/persistence/changeFlash'

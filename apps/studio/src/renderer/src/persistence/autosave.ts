@@ -41,6 +41,27 @@ export function onDocumentLoaded(listener: (id: string) => void): () => void {
   return () => { _loadListeners.delete(listener) }
 }
 
+/** The model as it was before a reload brought in an edit made outside
+ *  Studio: its nodes and relations, and what `documents` had for the
+ *  descriptions it had not read into memory yet. */
+export interface BeforeOutsideEdit {
+  id: string
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  pendingBodies: string[]
+  files: Record<string, string> | undefined
+}
+
+const _outsideEditListeners = new Set<(before: BeforeOutsideEdit) => void>()
+
+/** Calls `listener` each time the active document was reloaded because its
+ *  folder changed outside Studio (an MCP client, an editor, git), once the
+ *  new model is in the store. Returns the unsubscribe function. */
+export function onOutsideEditLoaded(listener: (before: BeforeOutsideEdit) => void): () => void {
+  _outsideEditListeners.add(listener)
+  return () => { _outsideEditListeners.delete(listener) }
+}
+
 /** Re-read the active document from its storage into the diagram store, e.g.
  *  after a web folder regained permission. */
 export function reloadActiveDocument(): void {
@@ -154,6 +175,10 @@ if (typeof window !== 'undefined') {
       _persistTimer = null
     }
     if (_watchingId !== id) stopWatching()
+    const live = useDiagramStore.getState()
+    const before: BeforeOutsideEdit | null = opts?.keepUi
+      ? { id, nodes: live.c4Nodes, relations: live.c4Relations, pendingBodies: documents.getPendingBodyNodeIds(id), files: documents.loadedFolderFiles(id) }
+      : null
     documents.loadDocument(id).then((data) => {
       if (seq !== _loadSeq || documents.getActiveId() !== id) return
       if (data) {
@@ -166,6 +191,7 @@ if (typeof window !== 'undefined') {
           if (activeViewId && next.views[activeViewId]) next.setActiveView(activeViewId)
           if (selectedNodeId && next.c4Nodes[selectedNodeId]) next.selectNode(selectedNodeId)
         }
+        if (before) for (const listener of [..._outsideEditListeners]) listener(before)
         if (source === 'md') watchActive(id)
       } else if (source === 'fs' || source === 'md') {
         // New/empty file: initialize with the maximum built-in metamodel

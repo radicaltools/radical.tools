@@ -55,6 +55,10 @@ let bootSeededId: string | null = null
  *  not here; re-fetching a path here is idempotent, just redundant I/O. */
 const mdBodyPaths = new Map<string, Record<string, string>>()
 
+/** docId → the md-folder files as `loadDocument` last read them, bodies
+ *  included, for the descriptions not yet hydrated (see changeFlash). */
+const mdLoadedFiles = new Map<string, Record<string, string>>()
+
 /** Per-document chain of disk writes (fs / md docs). A folder write is many
  *  files followed by a prune, so two overlapping writes can each prune what the
  *  other just wrote — a renamed node would lose both its old and new file.
@@ -460,6 +464,9 @@ export interface DocumentsAPI {
    *  result — empty for non-md docs or once nothing is pending. */
   getPendingBodyNodeIds(id: string): string[]
 
+  /** The md-folder files as `loadDocument` last read them, bodies included. */
+  loadedFolderFiles(id: string): Record<string, string> | undefined
+
   /** Fetch one node's body on demand (md-folder docs only). Pure fetch —
    *  does not cache or mutate any store; the caller merges the result. */
   hydrateNodeBody(id: string, nodeId: string): Promise<string | undefined>
@@ -637,6 +644,7 @@ export const documents: DocumentsAPI = {
       try {
         const { data, bodyPaths } = deserializeFromMdFolder(res.files, { lazy: true })
         mdBodyPaths.set(id, bodyPaths ?? {})
+        mdLoadedFiles.set(id, res.files)
         return data
       } catch { return null }
     }
@@ -650,6 +658,7 @@ export const documents: DocumentsAPI = {
         if (Object.keys(files).length === 0) return null // empty/new folder
         const { data, bodyPaths } = deserializeFromMdFolder(files, { lazy: true })
         mdBodyPaths.set(id, bodyPaths ?? {})
+        mdLoadedFiles.set(id, files)
         return data
       } catch { return null }
     }
@@ -658,6 +667,10 @@ export const documents: DocumentsAPI = {
 
   getPendingBodyNodeIds(id) {
     return Object.keys(mdBodyPaths.get(id) ?? {})
+  },
+
+  loadedFolderFiles(id) {
+    return mdLoadedFiles.get(id)
   },
 
   async hydrateNodeBody(id, nodeId) {
