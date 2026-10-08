@@ -7,6 +7,7 @@
 import type { Metamodel } from '../../metamodel'
 import { buildAlignmentToolHandlers, buildLayoutToolDefs, buildLayoutToolHandlers } from './layoutTools'
 import { buildMetamodelToolDefs, buildMetamodelToolHandlers } from './metamodelTools'
+import { buildMilestoneToolDefs, buildMilestoneToolHandlers } from './milestoneTools'
 import { buildModelToolDefs, buildModelToolHandlers } from './modelTools'
 import { buildNodeToolDefs, buildNodeToolHandlers } from './nodeTools'
 import { buildPresentationToolDefs, buildPresentationToolHandlers } from './presentationTools'
@@ -16,8 +17,8 @@ import { buildViewToolDefs, buildViewToolHandlers } from './viewTools'
 import type { AsyncToolHandler, ToolDef, ToolHandler, ToolResult, ToolRunContext } from './types'
 
 /** Tool groups a caller can leave out, e.g. Radical Forge, which only builds
- *  the model, leaves out 'metamodel' and 'presentation'. */
-export type ToolGroup = 'node' | 'relation' | 'view' | 'sequence' | 'model' | 'layout' | 'presentation' | 'metamodel'
+ *  the model, leaves out 'metamodel', 'presentation' and 'milestone'. */
+export type ToolGroup = 'node' | 'relation' | 'view' | 'sequence' | 'model' | 'layout' | 'presentation' | 'milestone' | 'metamodel'
 
 export interface ToolCatalogueOptions {
   exclude?: ToolGroup[]
@@ -32,6 +33,7 @@ export function buildToolDefs(metamodel: Metamodel | undefined, options: ToolCat
     model: buildModelToolDefs,
     layout: buildLayoutToolDefs,
     presentation: buildPresentationToolDefs,
+    milestone: buildMilestoneToolDefs,
     metamodel: buildMetamodelToolDefs,
   }
   const exclude = new Set(options.exclude ?? [])
@@ -48,6 +50,7 @@ export function buildToolHandlers(): Map<string, ToolHandler> {
     ...buildSequenceToolHandlers(),
     ...buildModelToolHandlers(),
     ...buildPresentationToolHandlers(),
+    ...buildMilestoneToolHandlers(),
     ...buildMetamodelToolHandlers(),
   }))
 }

@@ -9,14 +9,14 @@
 // per-view node positions, and fitting a parent's size around a new child.
 // Lay the result out with @radical/layout if positions matter.
 
-import type { AlignConstraint, C4Node, C4Relation, DiagramData, DiagramView, Presentation } from '../c4'
+import type { AlignConstraint, C4Node, C4Relation, DiagramData, DiagramSnapshot, DiagramView, Presentation } from '../c4'
 import type { Metamodel } from '../metamodel'
 import * as model from '../model'
 import type { DiagramFacade } from './diagramFacade'
 
 export interface ModelFacade extends DiagramFacade {
   /** The edited model as a document. Fields the facade does not edit
-   *  (snapshots, layout positions, …) are carried over from the input. */
+   *  (layout positions, …) are carried over from the input. */
   toDiagramData(): DiagramData
   /** Why the most recent refused change was refused, or null. */
   readonly lastError: string | null
@@ -183,6 +183,27 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     setMetamodel(metamodel: Metamodel) {
       state.metamodel = clone(metamodel)
       carried.metamodel = clone(metamodel)
+    },
+
+    getMilestones: () => carried.snapshots ?? [],
+    createMilestone(name: string) {
+      const id = newId()
+      const milestone: DiagramSnapshot = {
+        id,
+        name,
+        timestamp: Date.now(),
+        nodes: clone(state.c4Nodes),
+        relations: clone(state.c4Relations),
+        sequences: clone(state.sequences),
+      }
+      carried.snapshots = [...(carried.snapshots ?? []), milestone]
+      return id
+    },
+    renameMilestone(id: string, name: string) {
+      carried.snapshots = (carried.snapshots ?? []).map((m) => (m.id === id ? { ...m, name } : m))
+    },
+    removeMilestone(id: string) {
+      carried.snapshots = (carried.snapshots ?? []).filter((m) => m.id !== id)
     },
 
     getPresentations: () => carried.presentations ?? [],

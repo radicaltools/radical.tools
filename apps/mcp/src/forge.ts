@@ -494,7 +494,7 @@ export class Forge {
       FORGE_STAGES[stageIdx].blurb,
       '',
       'Carry out the task at the end with the model tools (add_node, add_relation, update_node, move_node, search_model, …).',
-      'A Forge stage only builds the model: do not change the metamodel or presentations.',
+      'A Forge stage only builds the model: do not change the metamodel, presentations or milestones.',
       `When the stage is done, call forge_complete_stage with stage "${id}" and a 1-3 sentence summary of what you created and why.`,
       '',
       'Rules:',
