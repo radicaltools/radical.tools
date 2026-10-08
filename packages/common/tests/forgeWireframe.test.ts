@@ -4,11 +4,11 @@
  * wireframe surviving an md-folder round-trip as multi-line frontmatter.
  */
 import { describe, it, expect } from 'vitest'
-import { buildWireframePrompt } from '../src/renderer/src/ai/mockupWireframe'
-import { sanitizeWireframeSvg, MAX_WIREFRAME_CHARS } from '@radical/common/wireframe'
-import { builtInGovernanceMetamodel, inferRelationType, isRelationAllowed } from '@radical/common/metamodel'
-import { serializeToMdFolder, deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
-import type { C4Node, C4Relation } from '@radical/common/c4'
+import { buildWireframePrompt } from '../src/ai/forge/wireframe'
+import { sanitizeWireframeSvg, MAX_WIREFRAME_CHARS } from '../src/wireframe'
+import { builtInGovernanceMetamodel, inferRelationType, isRelationAllowed } from '../src/metamodel'
+import { serializeToMdFolder, deserializeFromMdFolder } from '../src/formats/mdFolder'
+import type { C4Node, C4Relation } from '../src/c4'
 
 function node(partial: Partial<C4Node> & Pick<C4Node, 'id' | 'type' | 'label'> & Record<string, unknown>): C4Node {
   return { collapsed: false, x: 0, y: 0, width: 220, height: 190, ...partial } as C4Node

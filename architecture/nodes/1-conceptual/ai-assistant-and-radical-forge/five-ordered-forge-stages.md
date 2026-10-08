@@ -4,5 +4,5 @@ type: "requirement"
 label: "Five ordered Forge stages"
 action: "Radical Forge shall generate the model in five stages in this order: Requirements (EARS), Fitness functions, Gherkin scenarios, Mockups, C4 model."
 ears_type: "ubiquitous"
-rationale: "The behaviour and quality spec is settled first so the architecture follows from it. Evidence: apps/studio/src/renderer/src/ai/forgePrompts.ts:1-25,50-76; apps/studio/src/renderer/src/components/RadicalForgeModal.tsx:84-94; manual#forge"
+rationale: "The behaviour and quality spec is settled first so the architecture follows from it. Evidence: packages/common/src/ai/forge/prompts.ts:1-26,51-77; apps/studio/src/renderer/src/components/RadicalForgeModal.tsx:84-94; manual#forge"
 ---

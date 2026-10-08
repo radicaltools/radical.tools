@@ -6,7 +6,7 @@ import type { C4Node, C4Relation, C4ElementType, DiagramSequence } from '@radica
 import { NODE_SIZES } from '@radical/common/c4'
 import { isParentAllowed } from '@radical/common/metamodel'
 import { nodeTypeTheme } from '@radical/ui/types/hubTheme'
-import { conceptViewsToDiagram } from '@radical/ui/hub/conceptViews'
+import { conceptViewsToDiagram } from '@radical/common/hubViews'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 

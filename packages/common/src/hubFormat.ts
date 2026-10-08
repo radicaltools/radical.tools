@@ -58,7 +58,7 @@ export interface HubConcept extends HubConceptMeta {
   relations?: Array<Record<string, unknown>>
   /** Named flows over `relations` (Studio dynamic views). */
   sequences?: Array<Record<string, unknown>>
-  /** Named canvas views — see hub/conceptViews.ts. */
+  /** Named canvas views — see hubViews.ts. */
   views?: Array<Record<string, unknown>>
 }
 

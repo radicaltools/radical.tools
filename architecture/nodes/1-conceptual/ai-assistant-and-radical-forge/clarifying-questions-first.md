@@ -4,6 +4,6 @@ type: "requirement"
 label: "Clarifying questions first"
 action: "Radical Forge shall ask the provider for up to four short clarifying questions and keep Generate disabled until the user confirms the answers or skips them."
 ears_type: "event-driven"
-rationale: "Answers to a few targeted questions change what gets generated more than guesses do. Evidence: apps/studio/src/renderer/src/components/RadicalForgeModal.tsx:259-320,336-347,579-590; apps/studio/src/renderer/src/ai/forgeClarify.ts:61-114,149-172; manual#forge"
+rationale: "Answers to a few targeted questions change what gets generated more than guesses do. Evidence: apps/studio/src/renderer/src/components/RadicalForgeModal.tsx:259-320,336-347,579-590; packages/common/src/ai/forge/clarify.ts:63-135; apps/studio/src/renderer/src/ai/forgeClarify.ts:27-50; manual#forge"
 trigger: "a Forge stage is opened for the first time and AI is available"
 ---

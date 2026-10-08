@@ -7,7 +7,8 @@
 
 import { emptyReport, mergeReport, type ApplyReport, type DiagramFacade } from '@radical/common/ai/diagramFacade'
 import { getAdapter } from './registry'
-import { buildContextMessage, buildSystemMessages } from './systemPrompt'
+import { buildSystemMessages } from './systemPrompt'
+import { buildContextMessage } from '@radical/common/ai/systemPrompt'
 import { buildToolDefs, runTool, type ToolGroup, type ToolRunContext } from '@radical/common/ai/tools'
 import { addTokenUsage, textOf, toolCallsOf, type AISettings, type ChatContentBlock, type ChatMessage, type TokenUsage } from './types'
 

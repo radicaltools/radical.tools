@@ -5,4 +5,4 @@ label: "MCP server"
 technology: "Node.js, MCP over stdio"
 ---
 
-Local MCP server (apps/mcp) that gives coding agents one Markdown model folder as tools: summary with the metamodel rules, search, add and move elements, views, sequences, presentations, metamodel edits, Smart Layout. Every write is validated against the metamodel.
+Local MCP server (apps/mcp) that gives coding agents one Markdown model folder as tools: summary with the metamodel rules, search, add and move elements, views, sequences, presentations, metamodel edits, Smart Layout, and Radical Forge run with the agent's own model (forge_* tools and a forge prompt). Every write is validated against the metamodel.
