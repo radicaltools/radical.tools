@@ -605,3 +605,35 @@ row, column or grid and Smart Layout. Still open:
 4. **A stage whose view does not exist yet runs on All elements** in Studio
    (an empty view shows the whole model), so the user watches the whole
    model until the stage ends and its view opens.
+
+### Hub matching (2026-10-08)
+
+Added in `feat/hub-matching` (ADR "Hub matching ranks, the model picks"):
+IDF- and field-weighted keyword ranking with light stemming and synonym
+groups, `searchText` (node content) in the catalogue index, the fitting
+blueprint first with its `hubRefs` lifted, and the model picking at most
+five of up to 60 candidates per stage in the clarify call. Benchmark:
+`packages/hub-catalogue/tests/hubMatching.test.ts` (14 tuning briefs,
+6 holdout briefs). Holdout, keyword step: precision 0.18 → 0.41, recall
+0.23 → 0.44, expected concepts among the candidates 0.44 → 1.0. Still open:
+
+1. **The model's pick is not measured yet.** `hubMatchingModel.test.ts`
+   needs `HUB_BENCH_ANTHROPIC_KEY`; run it once and set floors from it.
+2. **The concept's content does not reach the stage prompt.** The model
+   gets a picked concept's name, description and tags, not its EARS
+   action, threshold, ADR decision or template parameters, so it
+   paraphrases instead of instantiating (step 4 of the proposal).
+3. **No provenance.** A generated element that follows a Hub concept only
+   names it in its description; recording the concept id (as
+   `HubImportRecord` does for imports) would allow de-duplication and
+   "update from the Hub" (step 5).
+4. **Import from Forge is not part of the run.** An imported concept lands
+   beside the model, outside the Forge views, unlinked to the need, with
+   template parameters not filled from the brief (step 6).
+5. **The blueprint threshold misses short briefs** (holdout: 1 of 3; food
+   delivery ranks e-commerce over marketplace). The model can still pick a
+   blueprint from the C4 candidates.
+6. **Synonym groups are hand-written and English**, and hub.radical.tools
+   serves `searchText` only after the Hub is redeployed.
+7. **Scenarios and Mockups get no Hub concepts**; the catalogue has no
+   Gherkin or screen content.
