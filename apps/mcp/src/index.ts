@@ -27,6 +27,7 @@ const INSTRUCTIONS = [
   'Call get_model_summary first: besides counts it returns the metamodel context message the other tools refer to,',
   'with each type\'s valid `properties` keys and enum options, allowedParents/allowedAtRoot/cardinality,',
   'and the node-type pairs each relation type allows. Use search_model for exact model data before changing it.',
+  'When the user refers to "the selected" element, mockup or view (or "this one") without naming it, call get_selection: it returns what is selected on Studio\'s canvas for this folder.',
   'New nodes appear only in Studio\'s All elements view until you list them in a view (create_view, set_view_nodes).',
   'move_node changes a node\'s parent. New and moved nodes get a simple placement; call smart_layout afterwards to arrange the model or one view.',
   'A `need` node keeps raw free-text input (brief, notes, raw requirements) in its description; derive EARS `requirement` nodes from it rather than rewriting it, linking each requirement → need with `derives`.',

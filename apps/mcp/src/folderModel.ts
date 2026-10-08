@@ -8,6 +8,8 @@ import { deserializeFromMdFolder, isMdFolder, isOwnedMdFolderFile, serializeToMd
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, validateModel, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { readSelectionFile } from '@radical/node-files/selectionFile'
+import { runModelQuery } from '@radical/common/ai/queryLanguage'
 import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { viewLayoutInput, applyAlignments, applyLayoutPositions, resizeParentsBottomUp } from '@radical/layout/viewInput'
@@ -19,13 +21,18 @@ import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult 
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
  *  external client. */
 const EXCLUDED_TOOLS = new Set(['set_active_view', 'focus_node', 'reset_diagram'])
-const READ_ONLY = new Set(['get_model_summary', 'search_model'])
+const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'search_model'])
 const JSON_FILES = ['_layout.json', 'relations.json', 'views.json', 'sequences.json', 'snapshots.json', 'presentations.json', 'metamodel.json', 'hubTemplates.json']
 
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
     name: 'get_model_summary',
     description: "Call this first. Shows counts, the views, sequences and presentations in the bound Radical model folder, plus the metamodel context message: each type's valid properties keys and enum options, allowed parents, cardinality and relation allowedPairs.",
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'get_selection',
+    description: 'What the user has selected on Studio\'s canvas for this model folder: the view on screen and each selected node in full (properties, parents, children, relations, views) plus selected relations. Call it whenever the user refers to "the selected", "this", "zaznaczony" element, mockup or view instead of naming it. updatedAt tells how fresh it is; an empty selection means nothing is selected or Studio left the model.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
 ]
@@ -219,6 +226,38 @@ export class FolderModel {
     }
   }
 
+  /** The canvas selection Studio wrote into the folder, resolved against
+   *  the model as it is now. */
+  private async selection(facade: ReturnType<typeof createModelFacade>): Promise<string> {
+    const selection = await readSelectionFile(this.folder)
+    if (!selection) {
+      return 'No selection: Studio has not had this folder open with a selection yet. Open the same folder in Studio and select something, or ask the user which element they mean.'
+    }
+    const query = {
+      nodes: facade.getNodes(),
+      relations: facade.getRelations(),
+      views: facade.getViews?.(),
+      sequences: facade.getSequences?.(),
+    }
+    const view = selection.viewId ? query.views?.[selection.viewId] : undefined
+    const missing = [...selection.nodeIds, ...selection.relationIds].filter((id) => !query.nodes[id] && !query.relations[id])
+    const result = {
+      updatedAt: selection.updatedAt,
+      secondsAgo: Math.max(0, Math.round((Date.now() - Date.parse(selection.updatedAt)) / 1000)),
+      view: view ? { id: view.id, name: view.name, kind: view.kind ?? 'static' } : { id: null, name: 'All elements' },
+      nodes: selection.nodeIds.filter((id) => query.nodes[id]).map((id) => runModelQuery(`GET NODE "${id}"`, query).result),
+      relations: selection.relationIds.map((id) => query.relations[id]).filter(Boolean)
+        .map(({ id, relationType, label, sourceId, targetId, technology }) => ({
+          id, relationType: relationType ?? null, label: label ?? null, technology: technology ?? null,
+          source: { id: sourceId, label: query.nodes[sourceId]?.label },
+          target: { id: targetId, label: query.nodes[targetId]?.label },
+        })),
+      ...(missing.length ? { missing } : {}),
+    }
+    const empty = result.nodes.length === 0 && result.relations.length === 0
+    return empty ? `Nothing is selected in Studio. ${JSON.stringify(result)}` : JSON.stringify(result)
+  }
+
   private async dispatch(
     name: string, input: unknown, session: MdFolderSession, before: FolderFiles,
     data: DiagramData, facade: ReturnType<typeof createModelFacade>,
@@ -251,6 +290,7 @@ export class FolderModel {
         // message" for property keys and pairing rules; MCP clients get it here.
         return { ok: true, text: `${summary}\n\n${buildMetamodelMessage(metamodel)}` }
       }
+      if (name === 'get_selection') return { ok: true, text: await this.selection(facade) }
       priorTempIds = new Map(this.tempIds)
       const ctx: ToolRunContext = {
         diagram: facade,

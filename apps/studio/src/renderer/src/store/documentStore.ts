@@ -30,6 +30,7 @@ import {
   saveHandle,
   loadHandle,
   removeHandle,
+  writeSelectionToHandle,
 } from '../persist/webFolder'
 
 const LS_INDEX_KEY = 'radical-docs-index'
@@ -535,6 +536,11 @@ export interface DocumentsAPI {
    *  function that stops watching. */
   watchDocument(id: string, onExternalChange: () => void): () => void
 
+  /** Write the canvas selection file (`serializeSelection`) into an md-folder
+   *  document's folder, for AI clients working on the same folder. No-op for
+   *  other documents and for a web folder not yet connected. */
+  publishSelection(id: string, content: string): Promise<void>
+
   /** Convenience: ensure there's at least one document; create an empty LS
    *  doc if the index is empty. Returns the active doc. */
   ensureActive(seedIfEmpty: () => DiagramData): { meta: DocumentMeta; seeded: boolean }
@@ -927,6 +933,22 @@ export const documents: DocumentsAPI = {
   awaitsReconnect(id) {
     const meta = readIndex().docs.find((d) => d.id === id)
     return meta?.source === 'md' && !host().readFolder && !connectedWebFolders.has(id)
+  },
+
+  async publishSelection(id, content) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') return
+    const h = host()
+    if (meta.folderPath && h.writeSelection) {
+      const res = await h.writeSelection(meta.folderPath, content)
+      if (!res.success) console.warn('[documentStore] selection write failed:', res.error)
+      return
+    }
+    if (h.readFolder || !connectedWebFolders.has(id)) return
+    const handle = await loadHandle(id)
+    if (!handle) return
+    try { await writeSelectionToHandle(handle, content) }
+    catch (e) { console.warn('[documentStore] selection write failed:', e) }
   },
 
   watchDocument(id, onExternalChange) {

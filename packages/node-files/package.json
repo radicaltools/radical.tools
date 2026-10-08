@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./diskFolderStorage": "./src/diskFolderStorage.ts"
+    "./diskFolderStorage": "./src/diskFolderStorage.ts",
+    "./selectionFile": "./src/selectionFile.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

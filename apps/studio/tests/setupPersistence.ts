@@ -2,3 +2,4 @@
 // file because it must run after setup.ts has stubbed window: imports are
 // evaluated before a module's own code.
 import '../src/renderer/src/persistence/autosave'
+import '../src/renderer/src/persistence/selection'

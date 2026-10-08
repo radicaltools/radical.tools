@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import {
   handleFolderStorage,
+  writeSelectionToHandle,
   type FsDirHandle,
   type FsFileHandle,
 } from '../src/renderer/src/persist/webFolder'
@@ -119,5 +120,17 @@ describe('webFolder read/write', () => {
     expect(await s.poll()).toEqual(['nodes/a.md'])
     expect(await s.write({ 'radical.md': 'x', 'nodes/a.md': 'app edit' })).toEqual({ ok: false, conflict: ['nodes/a.md'] })
     expect(file.data).toBe('edited elsewhere')
+  })
+
+  it('writes the canvas selection under .radical, gitignored, without it counting as a model change', async () => {
+    const root = new FakeDir('model')
+    const s = session(root)
+    await s.write({ 'radical.md': 'x' })
+    await writeSelectionToHandle(root, '{"nodeIds":["a"]}')
+    await writeSelectionToHandle(root, '{"nodeIds":["b"]}')
+    const dir = root.children.get('.radical') as FakeDir
+    expect((dir.children.get('selection.json') as FakeFile).data).toBe('{"nodeIds":["b"]}')
+    expect((dir.children.get('.gitignore') as FakeFile).data).toBe('*\n')
+    expect(await s.poll()).toEqual([])
   })
 })

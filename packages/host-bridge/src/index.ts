@@ -65,6 +65,9 @@ export interface HostCapabilities {
   watchFolder?(folderPath: string | null): Promise<void>
   /** Called when the watched folder's model files change outside Studio. */
   onFolderChanged?(listener: (change: FolderChange) => void): void
+  /** Write the canvas selection file (`.radical/selection.json`) into an
+   *  md-folder, for AI clients working on the same folder. */
+  writeSelection?(folderPath: string, content: string): Promise<HostResult>
   /** The file the host opened Studio with (CLI --file, VS Code editor), if any. */
   getWatchedPath?(): Promise<string | null>
   /** Called when the watched file changes outside Studio. */
