@@ -6,6 +6,7 @@ import ReactFlow, {
   NodeTypes,
   EdgeTypes,
   NodeMouseHandler,
+  NodeDragHandler,
   ReactFlowInstance,
   useStoreApi,
   getNodesBounds,
@@ -940,23 +941,39 @@ function StructuralCanvas(): React.ReactElement {
   // Cola-driven drag handlers
   const dragRafRef = useRef<number | null>(null)
 
-  const onNodeDragStart: NodeMouseHandler = useCallback(
-    (_event, node) => {
-      liveGrab(node.id, node.position.x, node.position.y)
+  // A drag moves only the element (calm); with Cmd/Ctrl held when it
+  // starts, the physics makes room around it (push). The connection
+  // modifier keeps its own key.
+  // React Flow drags the other selected nodes along: a calm drag moves
+  // them too (the physics would put them back).
+  const dragDragsAlong = useRef<string[]>([])
+  // React Flow reports a click as a drag too: only a move pins.
+  const dragFrom = useRef<{ x: number; y: number } | null>(null)
+  const onNodeDragStart: NodeDragHandler = useCallback(
+    (event, node, nodes) => {
+      const mod = useDiagramStore.getState().connectionModifier
+      const push = (mod !== 'meta' && event.metaKey) || (mod !== 'ctrl' && event.ctrlKey)
+      dragDragsAlong.current = push ? [] : nodes.filter((n) => n.id !== node.id).map((n) => n.id)
+      dragFrom.current = { ...node.position }
+      liveGrab(node.id, node.position.x, node.position.y, push ? 'push' : 'calm', node.positionAbsolute, dragDragsAlong.current)
     },
     [liveGrab]
   )
 
   const onNodeDrag: NodeMouseHandler = useCallback(
     (_event, node) => {
-      liveDrag(node.id, node.position.x, node.position.y)
+      liveDrag(node.id, node.position.x, node.position.y, node.positionAbsolute)
     },
     [liveDrag]
   )
 
   const onNodeDragStop: NodeMouseHandler = useCallback(
     (_event, node) => {
-      liveRelease(node.id)
+      const from = dragFrom.current
+      const moved = !from || Math.abs(node.position.x - from.x) > 0.5 || Math.abs(node.position.y - from.y) > 0.5
+      liveRelease(node.id, dragDragsAlong.current, moved)
+      dragDragsAlong.current = []
+      dragFrom.current = null
     },
     [liveRelease]
   )

@@ -23,7 +23,9 @@ function canvasFor(ctx: ToolRunContext, tool: string, raw: unknown): { viewId: s
 
 const describeConstraint = (c: LayoutConstraint): string => c.type === 'grid'
   ? `${c.id} (grid of ${c.columns} columns: ${c.nodeIds.join(', ')})`
-  : `${c.id} (${c.axis === 'horizontal' ? 'row' : 'column'}${c.ordered ? ' in order' : ''}: ${c.nodeIds.join(', ')})`
+  : c.type === 'pin'
+    ? `${c.id} (pinned where they stand: ${c.nodeIds.join(', ')})`
+    : `${c.id} (${c.axis === 'horizontal' ? 'row' : 'column'}${c.ordered ? ' in order' : ''}: ${c.nodeIds.join(', ')})`
 
 export function buildLayoutToolDefs(): ToolDef[] {
   return [
@@ -67,7 +69,7 @@ export function buildLayoutToolDefs(): ToolDef[] {
     },
     {
       name: 'remove_alignment',
-      description: 'Stop keeping elements aligned on a canvas: remove one alignment or grid by id, or every alignment and grid whose elements are all among nodeIds. The positions stay as they are.',
+      description: 'Stop keeping elements aligned on a canvas: remove one alignment or grid by id, or every alignment and grid whose elements are all among nodeIds. The positions stay as they are. The id of a canvas\'s pin (the elements a Studio user dropped after a drag, kept still by the live physics) unpins them all.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -119,8 +121,9 @@ export function buildAlignmentToolHandlers(): Record<string, ToolHandler> {
       const canvas = canvasFor(ctx, 'remove_alignment', input.viewId)
       if ('error' in canvas) return fail(canvas.error)
       const among = input.nodeIds ? new Set((input.nodeIds as string[]).map((id) => ctx.resolveId(id))) : null
+      // Pins (elements dropped after a drag in Studio) go only by id.
       const matches = ctx.diagram.getLayoutConstraints(canvas.viewId).filter((c) =>
-        (input.id === undefined || c.id === input.id) && (!among || c.nodeIds.every((id) => among.has(id))))
+        (input.id === undefined ? c.type !== 'pin' : c.id === input.id) && (!among || c.nodeIds.every((id) => among.has(id))))
       if (!matches.length) {
         const existing = ctx.diagram.getLayoutConstraints(canvas.viewId)
         return fail(`remove_alignment: no such alignment on this canvas.${existing.length ? ` It has: ${existing.map(describeConstraint).join('; ')}.` : ' It has none.'}`)

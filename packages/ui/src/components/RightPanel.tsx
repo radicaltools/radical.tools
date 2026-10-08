@@ -952,16 +952,16 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
       )}
       {(isStatic || isDynamic) && (view.layoutConstraints?.length ?? 0) > 0 && (
         <div>
-          <div className="props-section-title">Alignments</div>
+          <div className="props-section-title">Layout rules</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {view.layoutConstraints!.map((c) => (
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{c.type === 'grid' ? 'Grid' : c.axis === 'horizontal' ? 'Row' : 'Column'}</span>
+                <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{c.type === 'grid' ? 'Grid' : c.type === 'pin' ? 'Pinned' : c.axis === 'horizontal' ? 'Row' : 'Column'}</span>
                 <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}
-                  title={c.nodeIds.map((id) => labels.get(id) ?? id).join(c.type === 'grid' || c.ordered ? ' → ' : ', ')}>
-                  {c.nodeIds.map((id) => labels.get(id) ?? id).join(c.type === 'grid' || c.ordered ? ' → ' : ', ')}
+                  title={c.nodeIds.map((id) => labels.get(id) ?? id).join(c.type === 'grid' || (c.type === 'align' && c.ordered) ? ' → ' : ', ')}>
+                  {c.nodeIds.map((id) => labels.get(id) ?? id).join(c.type === 'grid' || (c.type === 'align' && c.ordered) ? ' → ' : ', ')}
                 </span>
-                {c.type === 'grid' ? (
+                {c.type === 'pin' ? null : c.type === 'grid' ? (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, color: 'var(--text-muted)' }} title="Columns; the cells fill row by row in the order listed">
                     <input
                       type="number"
@@ -997,8 +997,8 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
                   <button
                     type="button"
                     onClick={() => removeLayoutConstraint(c.id, view.id)}
-                    title="Stop keeping these elements aligned"
-                    aria-label="Remove alignment"
+                    title={c.type === 'pin' ? 'Unpin them: the live physics may move them again' : 'Stop keeping these elements aligned'}
+                    aria-label={c.type === 'pin' ? 'Unpin all' : 'Remove alignment'}
                     style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, padding: '0 2px' }}
                   >×</button>
                 )}

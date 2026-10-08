@@ -1,4 +1,5 @@
-import { test, expect, fixture } from '../../support/fixtures'
+import type { Locator, Page } from '@playwright/test'
+import { test, expect, fixture, type Studio } from '../../support/fixtures'
 
 // The live WebCoLa layout (packages/ui/src/layout/liveColaLayout.ts) on a
 // real clock. Its own convergence test never passes once groups are
@@ -65,10 +66,8 @@ function gridDocument(spacing = { x: 420, y: 300 }): string {
   return JSON.stringify({ nodes, relations, views: [] })
 }
 
-test('on a large diagram a drag moves only the dragged node\'s surroundings', async ({ page, studio }) => {
-  await studio.seedDocument(gridDocument())
-  await studio.open('canvas')
-  // Wait for rest, then count the nodes whose position changes while dragging.
+/** Wait until no node moves for a second. */
+async function untilStill(page: Page, studio: Studio): Promise<Record<string, string>> {
   let previous = await studio.positions()
   await expect.poll(async () => {
     await page.waitForTimeout(1000)
@@ -77,14 +76,59 @@ test('on a large diagram a drag moves only the dragged node\'s surroundings', as
     previous = current
     return still
   }, { timeout: 30_000, intervals: [0] }).toBe(true)
-  const box = (await studio.node('n7_7').boundingBox())!
+  return previous
+}
+
+/** Drag a node by (dx, dy) screen px, holding `modifier` from the start. */
+async function dragBy(page: Page, target: Locator, dx: number, dy: number, modifier?: 'Meta'): Promise<void> {
+  const box = (await target.boundingBox())!
+  if (modifier) await page.keyboard.down(modifier)
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await page.mouse.down()
   for (let i = 1; i <= 20; i++) {
-    await page.mouse.move(box.x + box.width / 2 + i * 4, box.y + box.height / 2 + i * 2)
+    await page.mouse.move(box.x + box.width / 2 + (dx * i) / 20, box.y + box.height / 2 + (dy * i) / 20)
     await page.waitForTimeout(40)
   }
   await page.mouse.up()
+  if (modifier) await page.keyboard.up(modifier)
+}
+
+test('a drag moves only the dragged node, and the drop pins it', async ({ page, studio }) => {
+  await studio.seedDocument(gridDocument())
+  await studio.open('canvas')
+  const previous = await untilStill(page, studio)
+  // The whole grid is in view, zoomed out: a short way, into no neighbour.
+  await dragBy(page, studio.node('n7_7'), 16, 8)
+  await page.waitForTimeout(1500)
+  const after = await studio.positions()
+  expect(Object.keys(after).filter((id) => after[id] !== previous[id])).toEqual(['n7_7'])
+  await expect.poll(async () => (await studio.storedDoc() as { defaultLayoutConstraints?: Array<{ type: string; nodeIds: string[] }> })
+    .defaultLayoutConstraints?.find((c) => c.type === 'pin')?.nodeIds).toEqual(['n7_7'])
+  // Selected, it offers to unpin.
+  await studio.node('n7_7').click()
+  await page.getByTestId('unpin-node').click()
+  await expect.poll(async () => (await studio.storedDoc() as { defaultLayoutConstraints?: unknown[] }).defaultLayoutConstraints ?? []).toEqual([])
+})
+
+test('a drop onto a node pushes that node clear and nothing else', async ({ page, studio }) => {
+  await studio.seedDocument(gridDocument())
+  await studio.open('canvas')
+  const previous = await untilStill(page, studio)
+  // Onto its right-hand neighbour, slightly offset.
+  const from = (await studio.node('n7_7').boundingBox())!
+  const onto = (await studio.node('n7_8').boundingBox())!
+  await dragBy(page, studio.node('n7_7'), onto.x - from.x - 10, onto.y - from.y + 10)
+  await page.waitForTimeout(1500)
+  const after = await studio.positions()
+  expect(Object.keys(after).filter((id) => after[id] !== previous[id]).sort()).toEqual(['n7_7', 'n7_8'])
+  expect(await studio.layoutViolations()).toEqual([])
+})
+
+test('a drag with Cmd held lets the physics move the surroundings', async ({ page, studio }) => {
+  await studio.seedDocument(gridDocument())
+  await studio.open('canvas')
+  const previous = await untilStill(page, studio)
+  await dragBy(page, studio.node('n7_7'), 80, 40, 'Meta')
   await page.waitForTimeout(1500)
   const after = await studio.positions()
   const moved = Object.keys(after).filter((id) => after[id] !== previous[id])
