@@ -176,6 +176,7 @@ if (typeof window !== 'undefined') {
     }
     if (_watchingId !== id) stopWatching()
     const live = useDiagramStore.getState()
+    const camera = opts?.keepUi ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
     const before: BeforeOutsideEdit | null = opts?.keepUi
       ? { id, nodes: live.c4Nodes, relations: live.c4Relations, pendingBodies: documents.getPendingBodyNodeIds(id), files: documents.loadedFolderFiles(id) }
       : null
@@ -190,6 +191,11 @@ if (typeof window !== 'undefined') {
           const next = useDiagramStore.getState()
           if (activeViewId && next.views[activeViewId]) next.setActiveView(activeViewId)
           if (selectedNodeId && next.c4Nodes[selectedNodeId]) next.selectNode(selectedNodeId)
+          // Loading put back the camera saved on disk; keep the one in use.
+          if (camera) {
+            const shown = useDiagramStore.getState().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+            ;(window as any).__rfPlaceCamera?.({ ...camera }, shown, { keep: true })
+          }
         }
         if (before) for (const listener of [..._outsideEditListeners]) listener(before)
         if (source === 'md') watchActive(id)
