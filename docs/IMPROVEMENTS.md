@@ -374,6 +374,10 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     "Unsupported query"; finding the ADRs about layout took a `LIST NODES
     WHERE (type = …) AND (label ~ … OR …)`. A plain query could fall back to
     a substring search over labels and descriptions.
+21. **View tools disagree on the view parameter.** `set_view_nodes` takes
+    `id`, while `smart_layout`, `align_nodes`, `grid_nodes` and
+    `remove_alignment` take `viewId` (2026-10-08, Forge views ADR): the first
+    call failed schema validation. One name across the view tools would do.
 
 ### Reverse-engineered requirements (2026-10-06)
 
@@ -571,9 +575,33 @@ the wizard and the server send the same text. Still open:
 3. **The server's Hub catalogue is the copy bundled at build time**, while
    Studio in production reads hub.radical.tools; after a catalogue change the
    two can suggest different concepts until the server is rebuilt.
-4. **Nothing arranges the new elements during a run.** Studio's live layout
-   places each stage's elements as they arrive; over MCP they get the simple
-   placement, and `forge_finish` suggests `smart_layout`.
+4. ~~**Nothing arranges the new elements during a run.**~~ Fixed in
+   `feat/forge-views-arrange`: each stage's elements are filed into their
+   view (Conceptual, Logical & physical, Governance) with a place beside what
+   is there, and `forge_complete_stage` has the agent ask about a row, column
+   or grid and Smart Layout (`forge_arrange`). All elements still gets the
+   single-row placement of `placeNewNode`.
 5. **The agent's own tools are not limited during a stage.** Studio leaves
    the metamodel and presentation tools out of a Forge stage; the server only
    tells the agent not to use them.
+
+### Forge views and arranging stages (2026-10-08)
+
+Added in `feat/forge-views-arrange` (ADR "Forge files its output into three
+views"): a Forge run files each element into Conceptual, Logical & physical
+or Governance, places new elements in a landscape block beside what the
+canvas shows (Studio's AI runner too), and after each stage asks about a
+row, column or grid and Smart Layout. Still open:
+
+1. **The Forge panel covers the middle of the canvas**, where a stage's new
+   elements land; the user sees them only around its edges until they close
+   or move past it.
+2. **Relations across layers show on none of the three views** (satisfies,
+   traces-to, constrains). A fourth "Traceability" view, or showing an
+   off-view endpoint as a ghost, would make them visible.
+3. **The arrangement covers the whole stage.** There is no per-type choice
+   (e.g. a grid of requirements but a row of people), and the panel cannot
+   take it back; Align… on the canvas or `remove_alignment` can.
+4. **A stage whose view does not exist yet runs on All elements** in Studio
+   (an empty view shows the whole model), so the user watches the whole
+   model until the stage ends and its view opens.
