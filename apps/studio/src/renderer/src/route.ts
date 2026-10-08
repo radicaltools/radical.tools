@@ -14,7 +14,10 @@
 //   <mode>    designer | viewer | presenter | metamodel   (default: designer)
 //   <viewId>  a view id, or `canvas` for the default Canvas (activeViewId null)
 //   <focusId> a Wiki element node id (only applied for wiki views)
-//   <docId>   `ls:<uuid>` or `fs:<absolutePath>`. Machine-local identity; when
+//   <docId>   `ls:<id>` (a model in this app's list: browser storage or a
+//             browser folder), `fs:<absolutePath>` (a .radical file) or
+//             `md:<absolutePath>` (a Markdown folder); paths only where the
+//             host reads the disk (desktop). Machine-local identity; when
 //             omitted or unresolvable we keep the currently-active document.
 //   <snapshotId>  active milestone (`s`). Restores that milestone's frozen model.
 //   <presId>/play/1/sl/<n>  presentation playback: which presentation (`p`), the
@@ -24,12 +27,14 @@
 import { useEffect } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from './store/documentStore'
+import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
+import { host } from './platform/host'
 
 type Mode = 'designer' | 'viewer' | 'presenter' | 'metamodel'
 const MODES: readonly Mode[] = ['designer', 'viewer', 'presenter', 'metamodel'] as const
 
 export interface Route {
-  /** `ls:<uuid>` or `fs:<absolutePath>`; undefined = keep active document. */
+  /** `ls:<id>`, `fs:<absolutePath>` or `md:<absolutePath>`; undefined = keep active document. */
   doc?: string
   mode: Mode
   /** view id, or `canvas` for the default Canvas. */
@@ -49,6 +54,12 @@ export interface Route {
 // Guards the state↔URL feedback loop: while we are applying a route to the
 // store we must not echo those mutations straight back into the URL.
 let applying = false
+
+// A route that waits for its document: a file or folder loads after the first
+// paint, and loading resets the view, milestone and slide, so the route is
+// applied once the load has landed. A browser folder that lost its access
+// keeps waiting until Reconnect loads it. While a route waits, the URL keeps it.
+let pending: { route: Route; docId: string } | null = null
 
 // ─── Parse / format ──────────────────────────────────────────────────────────
 
@@ -100,7 +111,9 @@ function currentDocToken(): string | undefined {
   if (!id) return undefined
   const meta = documents.listDocuments().find((d) => d.id === id)
   if (!meta) return undefined
-  return meta.source === 'fs' && meta.filePath ? 'fs:' + meta.filePath : 'ls:' + meta.id
+  if (meta.source === 'fs' && meta.filePath) return 'fs:' + meta.filePath
+  if (meta.source === 'md' && meta.folderPath) return 'md:' + meta.folderPath
+  return 'ls:' + meta.id
 }
 
 export function currentRoute(): Route {
@@ -149,15 +162,17 @@ function resolveDoc(doc: string): boolean {
       documents.setActiveId(id)
       return true
     }
-  } else if (doc.startsWith('fs:')) {
+  } else if (doc.startsWith('fs:') || doc.startsWith('md:')) {
+    // Paths only resolve where the host reads the disk (desktop); create*
+    // de-dupes by path.
     const path = doc.slice(3)
-    if (path) {
-      // createFSDocument de-dupes by path; only meaningful under Electron.
-      const meta = documents.createFSDocument(path)
-      if (meta.id !== activeId) {
-        documents.setActiveId(meta.id)
-        return true
-      }
+    const h = host()
+    const meta = !path ? null
+      : doc.startsWith('fs:') ? (h.readFile ? documents.createFSDocument(path) : null)
+      : (h.readFolder ? documents.createMdDocument(path) : null)
+    if (meta && meta.id !== activeId) {
+      documents.setActiveId(meta.id)
+      return true
     }
   }
   return false
@@ -221,33 +236,15 @@ function applyPresentation(route: Route): void {
   }
 }
 
-/** Apply view/mode/focus once the target view exists (after async doc load),
- *  with a timeout fallback so mode at least still takes effect. */
-function schedulePendingApply(route: Route): void {
-  const hasTarget = (): boolean =>
-    route.view === 'canvas' || !!useDiagramStore.getState().views[route.view]
-  if (hasTarget()) {
-    applyViewModeFocus(route)
+export function applyRoute(route: Route): void {
+  pending = null
+  const switched = route.doc ? resolveDoc(route.doc) : false
+  const activeId = documents.getActiveId()
+  if (activeId && (switched || loadingDocumentId() === activeId || documents.awaitsReconnect(activeId))) {
+    pending = { route, docId: activeId }
     return
   }
-  let done = false
-  const finish = (): void => {
-    if (done) return
-    done = true
-    unsub()
-    clearTimeout(timer)
-    applyViewModeFocus(route)
-  }
-  const unsub = useDiagramStore.subscribe(() => {
-    if (hasTarget()) finish()
-  })
-  const timer = setTimeout(finish, 4000)
-}
-
-export function applyRoute(route: Route): void {
-  const switched = route.doc ? resolveDoc(route.doc) : false
-  if (switched) schedulePendingApply(route)
-  else applyViewModeFocus(route)
+  applyViewModeFocus(route)
 }
 
 // ─── State → URL ─────────────────────────────────────────────────────────────
@@ -269,22 +266,38 @@ export function startRouteSync(): () => void {
   if (initial) applyRoute(initial)
   else writeUrl()
 
-  const onHash = (): void => {
-    if (applying) return
-    const r = parseHash(location.hash)
-    if (r) applyRoute(r)
-  }
-  window.addEventListener('hashchange', onHash)
-
   let timer: ReturnType<typeof setTimeout> | null = null
   const schedule = (): void => {
-    if (applying) return
+    if (applying || pending) return
     if (timer) clearTimeout(timer)
     timer = setTimeout(() => {
       timer = null
       writeUrl()
     }, 150)
   }
+
+  const unsubLoad = onDocumentLoaded((id) => {
+    if (!pending) return
+    // Another document was opened meanwhile: the route no longer applies.
+    if (id !== pending.docId) {
+      pending = null
+      schedule()
+      return
+    }
+    if (documents.awaitsReconnect(id)) return
+    const { route } = pending
+    pending = null
+    applyViewModeFocus(route)
+    // A view or slide the document doesn't have fell back; show what did open.
+    queueMicrotask(schedule)
+  })
+
+  const onHash = (): void => {
+    if (applying) return
+    const r = parseHash(location.hash)
+    if (r) applyRoute(r)
+  }
+  window.addEventListener('hashchange', onHash)
 
   const unsubDiagram = useDiagramStore.subscribe((s, p) => {
     if (
@@ -303,6 +316,8 @@ export function startRouteSync(): () => void {
 
   return () => {
     window.removeEventListener('hashchange', onHash)
+    unsubLoad()
+    pending = null
     unsubDiagram()
     unsubDocs()
     if (timer) clearTimeout(timer)
