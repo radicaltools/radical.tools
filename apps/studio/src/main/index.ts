@@ -5,6 +5,7 @@ import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'f
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { writeSelectionFile } from '@radical/node-files/selectionFile'
 
 /** One session per model folder, kept for the app's lifetime: it remembers
  *  what the renderer last read, so writes never clobber outside edits. */
@@ -208,6 +209,17 @@ app.whenReady().then(() => {
       }
     },
   )
+
+  // The canvas selection, for AI clients (the MCP server) on the same folder.
+  // Outside the model files, so it never trips the folder session's checks.
+  ipcMain.handle('folder:write-selection', async (_event, folderPath: string, content: string) => {
+    try {
+      await writeSelectionFile(folderPath, content)
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
 
   // ── Folder watcher: poll the active md document's folder ─────────────────
   // Polling, like the --file watcher below: native change events are

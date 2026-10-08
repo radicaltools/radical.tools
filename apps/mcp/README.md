@@ -28,6 +28,7 @@ Launch Studio with `npm run dev:web` from the repository root, open it in Chromi
 The server binds to one folder at launch, then reads it afresh for every tool call. Its tools are the shared AI tool catalogue from `@radical/common/ai/tools`, the one Studio's AI chat and Radical Forge use, minus the canvas-only `set_active_view` and `focus_node` and the destructive `reset_diagram`. It provides:
 
 - `get_model_summary` (counts, views, sequences, presentations and the metamodel rules) and `search_model` (a small query language, including `LIST SEQUENCES` and `GET SEQUENCE`);
+- `get_selection`: what is selected on Studio's canvas for this folder (the view on screen, each selected node in full, selected relations), so you can say "fix the selected mockup" instead of naming it. Studio writes it to `.radical/selection.json` in the model folder whenever the selection or the view changes, and clears it when you switch to another model; `.radical/` carries its own `.gitignore`, and the file is not part of the model, so writing it never conflicts with model edits;
 - `add_`, `update_` and `delete_` tools for nodes and relations, and `move_node` to change a node's parent (it keeps the node's canvas position and enforces the metamodel's `allowedParents`);
 - `create_view`, `update_view` (name, kind, linked sequence, hidden relations), `set_view_nodes` and `delete_view`;
 - `create_sequence`, `update_sequence` and `delete_sequence`: ordered relation flows that a `dynamic` view plays;

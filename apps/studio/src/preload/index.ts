@@ -17,6 +17,7 @@ const api = {
   onFolderChanged: (listener) => {
     ipcRenderer.on('folder:external-change', (_event, data) => listener(data as FolderChange))
   },
+  writeSelection: (folderPath, content) => ipcRenderer.invoke('folder:write-selection', folderPath, content),
   getWatchedPath: () => ipcRenderer.invoke('file:getWatchedPath'),
   onFileChanged: (listener) => {
     ipcRenderer.on('file:external-change', (_event, data) => listener(data as FileChange))

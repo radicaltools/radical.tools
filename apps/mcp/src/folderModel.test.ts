@@ -9,6 +9,8 @@ import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeToMdFolder, deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { writeSelectionFile } from '@radical/node-files/selectionFile'
+import { serializeSelection } from '@radical/common/formats/canvasSelection'
 import { FolderModel } from './folderModel'
 
 const folders: string[] = []
@@ -164,6 +166,42 @@ describe('folder-backed MCP model', () => {
     await rm(join(folder, 'nodes'), { recursive: true })
     await symlink(outside, join(folder, 'nodes'))
     await expect(FolderModel.open(folder)).rejects.toThrow('symlink in model path')
+  })
+})
+
+describe('canvas selection', () => {
+  it('returns what Studio selected, resolved against the model, and is not a model change', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    expect((await model.call('get_selection', {})).text).toMatch(/^No selection/)
+
+    const screen = await model.call('add_node', { tempId: 'screen', type: 'mockup', label: 'Checkout screen' })
+    const page = await model.call('add_node', { tempId: 'pay', type: 'requirement', label: 'Pay by card' })
+    expect([screen.text, page.text]).toEqual([expect.stringMatching(/^Created node/), expect.stringMatching(/^Created node/)])
+    const [mockupId, requirementId] = [screen, page].map((outcome) => /Created node ([^ .]+)\./.exec(outcome.text)![1])
+    for (const [tool, args] of [
+      ['add_relation', { sourceId: mockupId, targetId: requirementId, relationType: 'illustrates' }],
+      ['create_view', { tempId: 'screens', name: 'Screens', nodeIds: [mockupId] }],
+    ] as const) expect((await model.call(tool, args)).text).not.toMatch(/required|unknown|invalid|not allowed/i)
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const view = data.views!.find((v) => v.name === 'Screens')!
+    const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+
+    await writeSelectionFile(folder, serializeSelection({ viewId: view.id, nodeIds: [mockupId, 'gone'], relationIds: [] }))
+    expect(await readFile(join(folder, '.radical/.gitignore'), 'utf8')).toBe('*\n')
+    const outcome = await model.call('get_selection', {})
+    expect(outcome.ok).toBe(true)
+    const result = JSON.parse(outcome.text)
+    expect(result.view).toEqual({ id: view.id, name: 'Screens', kind: 'static' })
+    expect(result.nodes).toHaveLength(1)
+    expect(result.nodes[0].node).toMatchObject({ id: mockupId, type: 'mockup', label: 'Checkout screen' })
+    expect(result.nodes[0].outgoing[0]).toMatchObject({ targetId: requirementId })
+    expect(result.missing).toEqual(['gone'])
+
+    await writeSelectionFile(folder, serializeSelection({ viewId: null, nodeIds: [], relationIds: [] }))
+    expect((await model.call('get_selection', {})).text).toMatch(/^Nothing is selected in Studio/)
+    // The selection file sits outside the model: the folder's model files are untouched.
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
   })
 })
 

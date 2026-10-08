@@ -12,6 +12,7 @@
 // against an in-memory fake directory handle.
 
 import { isMdFolderModelPath } from '@radical/common/formats/mdFolder'
+import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import type { MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 
 // Minimal structural typings for the File System Access API (avoids depending
@@ -132,6 +133,21 @@ export function handleFolderStorage(root: FsDirHandle): MdFolderStorage {
       }
     },
   }
+}
+
+async function writeText(dir: FsDirHandle, name: string, content: string): Promise<void> {
+  const writable = await (await dir.getFileHandle(name, { create: true })).createWritable()
+  await writable.write(content)
+  await writable.close()
+}
+
+/** Writes the canvas selection file (see canvasSelection) under the model
+ *  folder's `.radical/`, with the `.gitignore` that keeps it out of git. */
+export async function writeSelectionToHandle(root: FsDirHandle, content: string): Promise<void> {
+  const dir = await root.getDirectoryHandle(SELECTION_DIR, { create: true })
+  try { await dir.getFileHandle('.gitignore') }
+  catch { await writeText(dir, '.gitignore', SELECTION_GITIGNORE_CONTENT) }
+  await writeText(dir, 'selection.json', content)
 }
 
 // ─── IndexedDB handle persistence ────────────────────────────────────────────
