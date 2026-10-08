@@ -12,7 +12,7 @@
  * User drag calls resume() to restart the timer.
  */
 
-import { d3adaptor, Layout, InputNode, Group, Link } from 'webcola'
+import { d3adaptor, Layout, InputNode, Group, Link, Rectangle, computeGroupBounds } from 'webcola'
 import { dispatch } from 'd3-dispatch'
 import { timer } from 'd3-timer'
 import { drag as d3drag } from 'd3-drag'
@@ -116,7 +116,24 @@ export interface LiveColaModel {
   relations: Record<string, C4Relation>
   /** User alignments that hold on the canvas (resolveAlignments). */
   alignments?: Alignment[]
+  /** Elements the physics leaves where they stand (PinConstraint). */
+  pinned?: string[]
 }
+
+/**
+ * How a drag moves the diagram. 'calm': only the dragged element moves, with
+ * the elements it is aligned with (along the line's cross axis, so the line
+ * holds); on drop, elements it now covers are pushed clear, nothing else
+ * moves. 'push': the physics runs during the drag and the rest of the
+ * diagram makes room.
+ */
+export type DragMode = 'calm' | 'push'
+
+/** A calm drop pushes what it covers until the drawn boxes are this far apart. */
+const CALM_GAP = 24
+/** At most this many pushes per calm drop: dense or blocked spots stop
+ *  there, overlaps left as they are. */
+const CALM_MAX_PUSHES = 400
 
 export interface LiveColaCallbacks {
   getModel: () => LiveColaModel
@@ -141,6 +158,27 @@ export const LOCAL_PHYSICS_MIN_NODES = 150
 const LOCAL_DRAG_SIZE = 40
 /** cola's `fixed` is a bit mask (2 = dragged); this bit marks frozen nodes. */
 const FROZEN = 8
+/** And this one pinned nodes (PinConstraint): held like frozen ones, for good. */
+const PINNED = 16
+
+type Box = { x: number; X: number; y: number; Y: number }
+
+/** A calm drag in progress (DragMode). */
+interface CalmDrag {
+  id: string
+  /** Other selected elements dragged along with it. */
+  with: string[]
+  /** The dragged element's absolute top-left on the canvas when grabbed. */
+  from: { x: number; y: number }
+  /** How far it has moved since. */
+  delta: { x: number; y: number }
+  /** Leaves that move, from where, on which axes. */
+  follow: Map<ColaNode, { x: number; y: number; mx: boolean; my: boolean }>
+  /** Elements aligned with the dragged one: they move with it. */
+  partners: string[]
+  /** It has moved: React Flow starts a drag on a mere click too. */
+  moving: boolean
+}
 
 export interface LiveColaEngineOptions {
   /** Render only some ticks of a heavy graph (HEAVY_RENDER_EVERY). For the
@@ -184,6 +222,21 @@ export class LiveColaEngine {
   private groupOrders: GroupOrder[] = []
   /** Positions last handed to applyPositions, to report only changes. */
   private reported = new Map<string, { x: number; y: number; width?: number; height?: number }>()
+  /** Absolute top-left last reported per element (calm drags, emitPositions). */
+  private reportedAbs = new Map<string, { x: number; y: number }>()
+  /** The canvas's alignments as last built. */
+  private alignments: Alignment[] = []
+  /** Pinned elements: the model's (LiveColaModel.pinned) and those dropped since. */
+  private pinnedIds = new Set<string>()
+  /** Alignment members that hold a pinned leaf: their line runs through them. */
+  private pinnedMembers = new Set<string>()
+  /** Group (or '' for the canvas) → the elements directly in it, as laid out. */
+  private childrenOf = new Map<string, string[]>()
+  /** Position of each cola node in colaNodes (WebCoLa's solver arrays). */
+  private nodeIndexOf = new Map<ColaNode, number>()
+  private calm: CalmDrag | null = null
+  /** A push drag's start, to tell a drag from a click on release. */
+  private pushFrom: { x: number; y: number; moved: boolean } | null = null
 
   private readonly paceRenders: boolean
 
@@ -304,9 +357,24 @@ export class LiveColaEngine {
 
   private _dragStartPositions = new Map<string, { x: number; y: number }>()
 
-  grab(nodeId: string, rfX: number, rfY: number): void {
+  /**
+   * A drag starts. `rfX`/`rfY` are React Flow's position (relative to the
+   * parent); `abs`, the absolute top-left on the canvas, is what a calm drag
+   * follows, since a parent that grows moves the relative one. `withIds`:
+   * other selected elements React Flow drags along (calm drags move them too).
+   */
+  grab(nodeId: string, rfX: number, rfY: number, mode: DragMode = 'push', abs?: { x: number; y: number }, withIds: string[] = []): void {
     this._grabbedId = nodeId
     this.resetPace()
+    if (mode === 'calm') {
+      // Held while the physics may still run, until it moves (calmDrag).
+      for (const leaf of this.leavesOf(nodeId)) Layout.dragStart(leaf)
+      this.calm = this.calmDrag(nodeId, withIds, abs ?? { x: rfX, y: rfY }, { x: 0, y: 0 })
+      return
+    }
+    for (const leaf of this.leavesOf(nodeId)) leaf.fixed = (leaf.fixed ?? 0) & ~PINNED
+    this.calm = null
+    this.pushFrom = { x: rfX, y: rfY, moved: false }
     if (this.colaNodes.length >= LOCAL_PHYSICS_MIN_NODES) this.freezeAllBut(nodeId)
     const cn = this.idToNode.get(nodeId)
     if (cn) {
@@ -323,7 +391,36 @@ export class LiveColaEngine {
     this.cola?.resume()
   }
 
-  drag(nodeId: string, rfX: number, rfY: number): void {
+  drag(nodeId: string, rfX: number, rfY: number, abs?: { x: number; y: number }): void {
+    if (this.calm) {
+      if (this.calm.id !== nodeId) return
+      const at = abs ?? { x: rfX, y: rfY }
+      this.calm.delta = { x: at.x - this.calm.from.x, y: at.y - this.calm.from.y }
+      if (!this.calm.moving) {
+        if (Math.abs(this.calm.delta.x) < REPORT_PX && Math.abs(this.calm.delta.y) < REPORT_PX) return
+        // It moves: the rest of the diagram stands still from here on. A
+        // drag moves a pinned element too; the drop pins it again.
+        this.cola?.stop()
+        this.unfreeze()
+        for (const id of [this.calm.id, ...this.calm.with]) {
+          for (const leaf of this.leavesOf(id)) {
+            Layout.dragEnd(leaf)
+            leaf.fixed = (leaf.fixed ?? 0) & ~PINNED
+          }
+        }
+        // From where everything stands now: the physics may have moved
+        // the others since the grab.
+        const fresh = this.calmDrag(this.calm.id, this.calm.with, this.calm.from, { x: 0, y: 0 })
+        if (!fresh) return
+        this.calm = { ...fresh, delta: this.calm.delta, moving: true }
+      }
+      this.applyCalm(this.calm)
+      this.refreshBounds()
+      this.keepOrders([this.calm.id, ...this.calm.with])
+      this.emitPositions()
+      return
+    }
+    if (this.pushFrom && (Math.abs(rfX - this.pushFrom.x) > REPORT_PX || Math.abs(rfY - this.pushFrom.y) > REPORT_PX)) this.pushFrom.moved = true
     const cn = this.idToNode.get(nodeId)
     if (cn) {
       // Convert RF relative top-left → cola absolute center. React Flow
@@ -372,6 +469,22 @@ export class LiveColaEngine {
   release(nodeId: string): void {
     this._grabbedId = null
     this.runStartedAt = 0
+    const calm = this.calm
+    this.calm = null
+    if (calm && !calm.moving) {
+      // A click: as it was.
+      for (const leaf of this.leavesOf(calm.id)) Layout.dragEnd(leaf)
+      this.applyPins()
+      return
+    }
+    if (calm) {
+      const moved = calm.id === nodeId ? [nodeId, ...calm.with] : [nodeId]
+      for (const id of moved) this.pin(id)
+      if (calm.id === nodeId) this.clearOverlaps([...moved, ...calm.partners])
+      this.emitPositions()
+      this.callbacks.onSettled?.()
+      return
+    }
     const cn = this.idToNode.get(nodeId)
     if (cn) {
       Layout.dragEnd(cn)
@@ -381,6 +494,255 @@ export class LiveColaEngine {
       }
       this._dragStartPositions.clear()
     }
+    if (this.pushFrom?.moved) this.pin(nodeId)
+    else this.applyPins()
+    this.pushFrom = null
+  }
+
+  // ─── Calm drags and pins ───────────────────────────────────────────────────
+
+  /** The cola leaves that make up an element: itself, or a group's. */
+  private leavesOf(id: string): ColaNode[] {
+    const cn = this.idToNode.get(id)
+    return cn ? [cn] : this.groupLeaves(id)
+  }
+
+  /** Keeps an element where it stands from now on (PINNED). */
+  private pin(id: string): void {
+    this.pinnedIds.add(id)
+    for (const leaf of this.leavesOf(id)) {
+      leaf.fixed = (leaf.fixed ?? 0) | PINNED
+      leaf.px = leaf.x
+      leaf.py = leaf.y
+    }
+    this.findPinnedMembers()
+  }
+
+  /** Sets PINNED on the leaves of the pinned elements, and only those. */
+  private applyPins(): void {
+    for (const cn of this.colaNodes) cn.fixed = (cn.fixed ?? 0) & ~PINNED
+    for (const id of this.pinnedIds) {
+      for (const leaf of this.leavesOf(id)) {
+        leaf.fixed = (leaf.fixed ?? 0) | PINNED
+        leaf.px = leaf.x
+        leaf.py = leaf.y
+      }
+    }
+    this.findPinnedMembers()
+  }
+
+  private findPinnedMembers(): void {
+    this.pinnedMembers.clear()
+    for (const a of this.groupAlignments) {
+      for (const m of a.members) {
+        if (this.leavesOf(m.id).some((leaf) => (leaf.fixed ?? 0) & PINNED)) this.pinnedMembers.add(m.id)
+      }
+    }
+  }
+
+  /** A calm drag of `id` (and `withIds`), grabbed at `from` and moved by
+   *  `delta` so far. */
+  private calmDrag(id: string, withIds: string[], from: { x: number; y: number }, delta: { x: number; y: number }): CalmDrag | null {
+    if (!this.idToNode.has(id) && !this.idToGroup.has(id)) return null
+    const follow: CalmDrag['follow'] = new Map()
+    const add = (member: string, mx: boolean, my: boolean): void => {
+      for (const leaf of this.leavesOf(member)) {
+        const f = follow.get(leaf) ?? { x: leaf.x, y: leaf.y, mx: false, my: false }
+        f.mx ||= mx
+        f.my ||= my
+        follow.set(leaf, f)
+      }
+    }
+    const moved = [id, ...withIds.filter((w) => w !== id && (this.idToNode.has(w) || this.idToGroup.has(w)))]
+    for (const m of moved) add(m, true, true)
+    // A row moves up and down with its dragged member, a column sideways;
+    // along the line the others stay.
+    const partners: string[] = []
+    for (const a of this.alignments) {
+      if (!a.ids.some((m) => moved.includes(m))) continue
+      for (const other of a.ids) {
+        if (moved.includes(other) || partners.includes(other)) continue
+        add(other, a.axis === 'x', a.axis === 'y')
+        partners.push(other)
+      }
+    }
+    // Rebuilt during the drag: the leaves already moved by `delta`.
+    for (const f of follow.values()) {
+      if (f.mx) f.x -= delta.x
+      if (f.my) f.y -= delta.y
+    }
+    return { id, with: moved.slice(1), from, delta, follow, partners, moving: delta.x !== 0 || delta.y !== 0 }
+  }
+
+  private applyCalm(c: CalmDrag): void {
+    for (const [cn, f] of c.follow) {
+      this.placeLeaf(cn, f.mx ? f.x + c.delta.x : cn.x, f.my ? f.y + c.delta.y : cn.y)
+    }
+  }
+
+  /**
+   * Ordered lines through the dragged elements: one dragged up to (or past)
+   * the next one pushes it ahead along the line, and that one the next, as
+   * the physics does; they are not pulled back when it turns round.
+   */
+  private keepOrders(moved: string[]): void {
+    for (const a of this.alignments) {
+      const along = alongAxis(a)
+      const lo = (b: Box): number => (along === 'x' ? b.x : b.y)
+      const hi = (b: Box): number => (along === 'x' ? b.X : b.Y)
+      for (const chain of a.orders) {
+        const k = chain.findIndex((id) => moved.includes(id))
+        if (k < 0) continue
+        for (let j = k + 1; j < chain.length && !moved.includes(chain[j]); j++) {
+          const prev = this.boxOf(chain[j - 1])
+          const b = this.boxOf(chain[j])
+          if (!prev || !b) break
+          const need = hi(prev) + CALM_GAP - lo(b)
+          if (need <= 0) break
+          this.translate(chain[j], along, need)
+        }
+        for (let j = k - 1; j >= 0 && !moved.includes(chain[j]); j--) {
+          const next = this.boxOf(chain[j + 1])
+          const b = this.boxOf(chain[j])
+          if (!next || !b) break
+          const need = hi(b) + CALM_GAP - lo(next)
+          if (need <= 0) break
+          this.translate(chain[j], along, -need)
+        }
+      }
+    }
+  }
+
+  /** Moves a leaf's centre, in WebCoLa's solver state and lock too. */
+  private placeLeaf(cn: ColaNode, x: number, y: number): void {
+    const descent = (this.cola as { _descent?: { x: number[][] } } | null)?._descent?.x
+    const i = this.nodeIndexOf.get(cn) ?? -1
+    if (cn.px !== undefined) cn.px += x - cn.x
+    if (cn.py !== undefined) cn.py += y - cn.y
+    cn.x = x
+    cn.y = y
+    if (descent && i >= 0) { descent[0][i] = x; descent[1][i] = y }
+  }
+
+  /** Group boxes from where the leaves stand, as WebCoLa computes them. */
+  private refreshBounds(): void {
+    for (const cn of this.colaNodes) {
+      ;(cn as any).bounds = new Rectangle(cn.x - cn.width / 2, cn.x + cn.width / 2, cn.y - cn.height / 2, cn.y + cn.height / 2)
+    }
+    for (const g of this.colaGroups) {
+      if (!(g as any).parent) computeGroupBounds(g as any)
+    }
+  }
+
+  /** An element's box as the canvas draws it: a leaf from its top-left at
+   *  its drawn size (drawnSize), which may differ from the one laid out. */
+  private boxOf(id: string): Box | undefined {
+    const cn = this.idToNode.get(id)
+    if (cn) {
+      const drawn = drawnSize(this.allNodes[id], false)
+      const x = cn.x - cn.realWidth / 2
+      const y = cn.y - cn.realHeight / 2
+      return { x, X: x + drawn.width, y, Y: y + drawn.height }
+    }
+    const g = this.idToGroup.get(id)
+    const b = (g as any)?.bounds
+    if (!b || !Number.isFinite(b.x)) return undefined
+    const s = g!.visualShrink ?? 0
+    return { x: b.x + s, X: b.X - s, y: b.y + s, Y: b.Y - s }
+  }
+
+  /** The group an element is laid out in, or '' for the canvas. */
+  private levelOf(id: string): string {
+    for (let p = this.allNodes[id]?.parentId; p; p = this.allNodes[p]?.parentId) {
+      if (this.idToGroup.has(p)) return p
+    }
+    return ''
+  }
+
+  /**
+   * After a calm drop: pushes the elements the moved ones now cover (drawn
+   * boxes closer than CALM_GAP) out of the way, whole and in one step, and
+   * whatever those cover in turn; a group that grew pushes its own
+   * neighbours the same way. Nothing else moves. Pinned elements, and
+   * elements a line holds on both axes, stay; an aligned one moves only
+   * along its line.
+   */
+  private clearOverlaps(seeds: string[]): void {
+    this.refreshBounds()
+    const pending = new Map<string, Set<string>>()
+    const push = (id: string): void => {
+      const level = this.levelOf(id)
+      const set = pending.get(level) ?? new Set<string>()
+      set.add(id)
+      pending.set(level, set)
+    }
+    for (const id of seeds) if (this.boxOf(id)) push(id)
+    const depth = (id: string): number => {
+      let d = 0
+      for (let p: string = id; p; p = this.levelOf(p)) d++
+      return d
+    }
+    let budget = CALM_MAX_PUSHES
+    while (pending.size && budget > 0) {
+      const level = [...pending.keys()].sort((a, b) => depth(b) - depth(a))[0]
+      const movers = pending.get(level)!
+      pending.delete(level)
+      const queue = [...movers]
+      while (queue.length && budget > 0) {
+        const a = queue.shift()!
+        const A = this.boxOf(a)
+        if (!A) continue
+        for (const b of this.childrenOf.get(level) ?? []) {
+          if (b === a || movers.has(b)) continue
+          const B = this.boxOf(b)
+          if (!B) continue
+          const ox = Math.min(A.X, B.X) - Math.max(A.x, B.x) + CALM_GAP
+          const oy = Math.min(A.Y, B.Y) - Math.max(A.y, B.y) + CALM_GAP
+          if (ox <= 0 || oy <= 0) continue
+          const axis = this.pushAxis(b, ox <= oy ? 'x' : 'y')
+          if (!axis) continue
+          const away = axis === 'x' ? (B.x + B.X) - (A.x + A.X) : (B.y + B.Y) - (A.y + A.Y)
+          this.translate(b, axis, (away >= 0 ? 1 : -1) * (axis === 'x' ? ox : oy))
+          queue.push(b)
+          if (--budget <= 0) break
+        }
+      }
+      // The group grew or moved with what is in it: it pushes its neighbours.
+      if (level) {
+        this.refreshBounds()
+        push(level)
+      }
+    }
+    this.refreshBounds()
+  }
+
+  /** The axis `id` may be pushed along, `preferred` if it can, or none. */
+  private pushAxis(id: string, preferred: 'x' | 'y'): 'x' | 'y' | null {
+    const cn = this.idToNode.get(id)
+    if (cn && (cn.fixed ?? 0) & PINNED) return null
+    // A line through it, or through an element inside it to one outside,
+    // holds it on the line's axis.
+    const inside = (x: string): boolean => x === id || this.isInside(x, id)
+    let lockX = false
+    let lockY = false
+    for (const a of this.alignments) {
+      if (!a.ids.some(inside) || a.ids.every(inside)) continue
+      if (a.axis === 'x') lockX = true
+      else lockY = true
+    }
+    const free = (axis: 'x' | 'y'): boolean => (axis === 'x' ? !lockX : !lockY)
+    if (free(preferred)) return preferred
+    const other = preferred === 'x' ? 'y' : 'x'
+    return free(other) ? other : null
+  }
+
+  /** Moves an element, and all inside it, by `d` on `axis`. */
+  private translate(id: string, axis: 'x' | 'y', d: number): void {
+    for (const leaf of this.leavesOf(id)) {
+      this.placeLeaf(leaf, axis === 'x' ? leaf.x + d : leaf.x, axis === 'y' ? leaf.y + d : leaf.y)
+    }
+    const g = this.idToGroup.get(id)
+    if (g) this.shiftBounds(g, axis, d)
   }
 
   /** Freezes every node but the LOCAL_DRAG_SIZE nearest to each of `ids`. */
@@ -425,13 +787,13 @@ export class LiveColaEngine {
     this.frozen = true
   }
 
-  /** Puts frozen nodes back exactly: cola's locks are springs, and overlap
-   *  projection moves locked nodes too, so they would drift. */
+  /** Puts frozen and pinned nodes back exactly: cola's locks are springs,
+   *  and overlap projection moves locked nodes too, so they would drift. */
   private pinFrozen(): void {
-    if (!this.frozen) return
+    if (!this.frozen && !this.pinnedIds.size) return
     const x = (this.cola as { _descent?: { x: number[][] } } | null)?._descent?.x
     this.colaNodes.forEach((cn, i) => {
-      if (!((cn.fixed ?? 0) & FROZEN) || cn.px === undefined || cn.py === undefined) return
+      if (!((cn.fixed ?? 0) & (FROZEN | PINNED)) || cn.px === undefined || cn.py === undefined) return
       cn.x = cn.px
       cn.y = cn.py
       if (x) { x[0][i] = cn.px; x[1][i] = cn.py }
@@ -498,9 +860,12 @@ export class LiveColaEngine {
     // The store may hold other positions now (view switch, undo, load):
     // report everything once.
     this.reported.clear()
+    this.reportedAbs.clear()
 
-    const { nodes, relations, alignments = [] } = this.callbacks.getModel()
+    const { nodes, relations, alignments = [], pinned = [] } = this.callbacks.getModel()
     this.allNodes = nodes
+    this.alignments = alignments
+    this.pinnedIds = new Set(pinned)
 
     const visibleNodes = Object.values(nodes).filter((n) => isVisible(n, nodes))
     if (visibleNodes.length === 0) {
@@ -613,7 +978,8 @@ export class LiveColaEngine {
     // When leaves are numbers, groups() converts them to objects AND sets
     // .parent = g, which is required for correct rootGroup computation.
     const nodeIndex = new Map<string, number>()
-    this.colaNodes.forEach((cn, i) => nodeIndex.set(cn.c4id, i))
+    this.nodeIndexOf.clear()
+    this.colaNodes.forEach((cn, i) => { nodeIndex.set(cn.c4id, i); this.nodeIndexOf.set(cn, i) })
 
     // ── Groups bottom-up (leaf-containers like 'container' first) ──
     // First pass: every parent that cannot nest another parent — a container,
@@ -685,6 +1051,16 @@ export class LiveColaEngine {
         groupIndex.set(n.id, this.colaGroups.length - 1)
         this.idToGroup.set(n.id, g)
       }
+    }
+
+    // What each group lays out directly (calm drops push among these).
+    this.childrenOf.clear()
+    for (const n of visibleNodes) {
+      if (!this.idToNode.has(n.id) && !this.idToGroup.has(n.id)) continue
+      const level = this.levelOf(n.id)
+      const list = this.childrenOf.get(level) ?? []
+      list.push(n.id)
+      this.childrenOf.set(level, list)
     }
 
     // ── Create d3adaptor — EXACTLY like smallgroups ──────────────────────
@@ -853,6 +1229,7 @@ export class LiveColaEngine {
     // An outer line moves whole groups, and the lines inside them with them
     // (shiftMember); the inner lines then project within.
     this.groupAlignments.sort((a, b) => a.depth - b.depth)
+    this.applyPins()
 
     if (constraints.length > 0) {
       ;(layout as any).constraints(constraints)
@@ -909,9 +1286,11 @@ export class LiveColaEngine {
 
     // Restore grab state if rebuild happened during drag
     if (this._grabbedId) {
+      for (const leaf of this.leavesOf(this._grabbedId)) leaf.fixed = (leaf.fixed ?? 0) & ~PINNED
       const cn = this.idToNode.get(this._grabbedId)
-      if (cn) cn.fixed = (cn.fixed ?? 0) | 2
+      if (cn && !this.calm?.moving) cn.fixed = (cn.fixed ?? 0) | 2
     }
+    if (this.calm?.moving) this.calm = this.calmDrag(this.calm.id, this.calm.with, this.calm.from, this.calm.delta)
   }
 
   /** Centre of an alignment member on `axis` as drawn: a leaf's (drawnSize),
@@ -968,7 +1347,9 @@ export class LiveColaEngine {
     for (const a of this.groupAlignments) {
       const centres = a.members.map((m) => this.memberCentre(m, a.axis))
       if (centres.some((c) => c === undefined)) continue
-      const held = a.members.findIndex((m) => this.holdsGrabbed(m.id))
+      let held = a.members.findIndex((m) => this.holdsGrabbed(m.id))
+      // A pinned member stays: the line runs through it.
+      if (held < 0) held = a.members.findIndex((m) => this.pinnedMembers.has(m.id))
       if (held >= 0) a.line = centres[held]!
       else a.line ??= (centres as number[]).reduce((sum, c) => sum + c, 0) / centres.length
       const target = a.line
@@ -1003,7 +1384,7 @@ export class LiveColaEngine {
       if (a === undefined || b === undefined) continue
       const deficit = (this.memberExtent(prev, along) + this.memberExtent(next, along)) / 2 - (b - a)
       if (deficit <= 0.01) continue
-      if (this.holdsGrabbed(next.id)) this.shiftMember(prev, along, -deficit)
+      if (this.holdsGrabbed(next.id) || (this.pinnedMembers.has(next.id) && !this.pinnedMembers.has(prev.id))) this.shiftMember(prev, along, -deficit)
       else this.shiftMember(next, along, deficit)
     }
   }
@@ -1075,9 +1456,9 @@ export class LiveColaEngine {
     // tick and the parent flickers. So compute the set of ids to skip:
     // the grabbed node itself + (if it's a group) all its descendants.
     const skip = new Set<string>()
-    if (this._grabbedId) {
-      skip.add(this._grabbedId)
-      const grabbedGroup = this.idToGroup.get(this._grabbedId)
+    for (const grabbedId of this._grabbedId ? [this._grabbedId, ...(this.calm?.with ?? [])] : []) {
+      skip.add(grabbedId)
+      const grabbedGroup = this.idToGroup.get(grabbedId)
       if (grabbedGroup) {
         const collect = (gid: string) => {
           const g = this.idToGroup.get(gid)
@@ -1096,7 +1477,7 @@ export class LiveColaEngine {
             }
           }
         }
-        collect(this._grabbedId)
+        collect(grabbedId)
       }
     }
 
@@ -1132,6 +1513,20 @@ export class LiveColaEngine {
         result[id] = pos
       }
     }
+
+    // A calm drag of a leaf whose parent moved (grew left or up): React Flow
+    // keeps the leaf's position relative to the parent until the pointer
+    // moves again, so report it relative to the parent's new place.
+    const grabbed = this.calm && this._grabbedId ? this.idToNode.get(this._grabbedId) : undefined
+    const grabbedParent = grabbed ? this.allNodes[grabbed.c4id]?.parentId : undefined
+    if (grabbed && grabbedParent && abs[grabbedParent]) {
+      const before = this.reportedAbs.get(grabbedParent)
+      const p = abs[grabbedParent]
+      if (!before || Math.abs(before.x - p.x) > REPORT_PX || Math.abs(before.y - p.y) > REPORT_PX) {
+        result[grabbed.c4id] = { x: grabbed.x - grabbed.realWidth / 2 - p.x, y: grabbed.y - grabbed.realHeight / 2 - p.y }
+      }
+    }
+    for (const [id, pos] of Object.entries(abs)) this.reportedAbs.set(id, { x: pos.x, y: pos.y })
 
     // Report only what moved: with hundreds of nodes most are still, and
     // every reported node costs the main thread a React Flow update.

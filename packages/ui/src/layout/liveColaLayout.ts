@@ -10,10 +10,10 @@
  * worker imports the engine, so the ?worker import must not live there.
  */
 
-import { LiveColaEngine, type LiveColaCallbacks, type LiveColaModel, type LiveColaPositions } from './liveColaEngine'
+import { LiveColaEngine, type DragMode, type LiveColaCallbacks, type LiveColaModel, type LiveColaPositions } from './liveColaEngine'
 import LiveColaWorkerClass from './liveCola.worker?worker'
 
-export type { LiveColaCallbacks, LiveColaPositions }
+export type { DragMode, LiveColaCallbacks, LiveColaPositions }
 
 type Model = LiveColaModel
 
@@ -24,7 +24,9 @@ export type LiveColaMessage =
   | { type: 'start'; skipBulk: boolean; model: Model; gen: number }
   | { type: 'invalidate' | 'reset'; model: Model; gen: number }
   | { type: 'stop' }
-  | { type: 'seed' | 'grab' | 'drag'; id: string; x: number; y: number }
+  | { type: 'seed'; id: string; x: number; y: number }
+  | { type: 'grab'; id: string; x: number; y: number; mode: DragMode; abs?: { x: number; y: number }; withIds?: string[] }
+  | { type: 'drag'; id: string; x: number; y: number; abs?: { x: number; y: number } }
   | { type: 'release'; id: string }
 
 /**
@@ -150,14 +152,15 @@ export class LiveColaLayout {
     else this.post({ type: 'seed', id, x, y })
   }
 
-  grab(id: string, x: number, y: number): void {
-    if (this.engine) this.engine.grab(id, x, y)
-    else this.post({ type: 'grab', id, x, y })
+  /** See LiveColaEngine.grab. */
+  grab(id: string, x: number, y: number, mode: DragMode = 'push', abs?: { x: number; y: number }, withIds?: string[]): void {
+    if (this.engine) this.engine.grab(id, x, y, mode, abs, withIds)
+    else this.post({ type: 'grab', id, x, y, mode, abs, withIds })
   }
 
-  drag(id: string, x: number, y: number): void {
-    if (this.engine) this.engine.drag(id, x, y)
-    else this.post({ type: 'drag', id, x, y })
+  drag(id: string, x: number, y: number, abs?: { x: number; y: number }): void {
+    if (this.engine) this.engine.drag(id, x, y, abs)
+    else this.post({ type: 'drag', id, x, y, abs })
   }
 
   release(id: string): void {

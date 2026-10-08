@@ -1,6 +1,6 @@
 import React from 'react'
 import { useStore, type Node } from 'reactflow'
-import { constraintLines, type LayoutConstraint } from '@radical/common/c4'
+import { constraintLines, pinnedNodeIds, type LayoutConstraint } from '@radical/common/c4'
 import { activeLayoutConstraints, useDiagramStore } from '../store/diagramStore'
 
 /**
@@ -11,7 +11,8 @@ import { activeLayoutConstraints, useDiagramStore } from '../store/diagramStore'
  * rows and columns. Faint by default; when a member, or the container all
  * members sit in, is selected the guide is
  * drawn fully and offers buttons: order on/off for an alignment, fewer or
- * more columns for a grid, and remove.
+ * more columns for a grid, and remove. A selected pinned element (one the
+ * user dropped after a drag) shows a pin at its corner that unpins it.
  *
  * Rendered as a ReactFlow child, outside the viewport element that exports
  * capture. The lines sit under React Flow's renderer (z-index 4), so boxes
@@ -34,6 +35,7 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
   const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
   const setAlignmentOrdered = useDiagramStore((s) => s.setAlignmentOrdered)
   const setGridColumns = useDiagramStore((s) => s.setGridColumns)
+  const unpinNodes = useDiagramStore((s) => s.unpinNodes)
   const [tx, ty, zoom] = useStore((s) => s.transform)
   const nodeInternals = useStore((s) => s.nodeInternals)
   const selected = new Set(selectedNodeIds)
@@ -45,7 +47,13 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
     return { x: p.x * zoom + tx, y: p.y * zoom + ty, width: n.width * zoom, height: n.height * zoom }
   }
 
+  const pins = pinnedNodeIds(constraints).filter((id) => selected.has(id)).flatMap((id) => {
+    const b = boxOf(id)
+    return b ? [{ id, x: b.x + b.width, y: b.y }] : []
+  })
+
   const guides = constraints.flatMap((c) => {
+    if (c.type === 'pin') return []
     const segments: Array<Segment & { ordered: boolean }> = []
     for (const l of constraintLines([c])) {
       const boxes = l.nodeIds.map(boxOf).filter((b): b is Box => !!b)
@@ -169,6 +177,22 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
             </div>
           )
         })}
+        {pins.map((p) => (
+          <div key={p.id} className="alignment-guide-actions" style={{ left: p.x, top: p.y }}>
+            <button
+              type="button"
+              className="alignment-guide-btn on"
+              title="Pinned: the live physics leaves it where you dropped it. Click to unpin."
+              aria-label="Unpin"
+              data-testid="unpin-node"
+              onClick={() => unpinNodes([p.id])}
+            >
+              <svg viewBox="0 0 12 12" width="10" height="10" fill="currentColor" stroke="none" aria-hidden="true">
+                <path d="M4 1h4v1l-.6.6v2.6L9 6.6V8H6.5v3L6 11.5 5.5 11V8H3V6.6l1.6-1.4V2.6L4 2z" />
+              </svg>
+            </button>
+          </div>
+        ))}
       </div>
     </>
   )

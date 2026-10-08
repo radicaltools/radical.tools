@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { constraintLines, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
+import { constraintLines, pinnedNodeIds, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
 import {
   builtInC4Metamodel,
   builtInDddC4Metamodel,
@@ -211,11 +211,12 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
   return removed
 }
 
-/** Constraints without the removed nodes; a rule left with one member goes. */
+/** Constraints without the removed nodes; a rule left with one member goes
+ *  (a pin with none). */
 function withoutNodes(constraints: LayoutConstraint[], removed: Set<string>): LayoutConstraint[] {
   return constraints
     .map((c) => (c.nodeIds.some((id) => removed.has(id)) ? { ...c, nodeIds: c.nodeIds.filter((id) => !removed.has(id)) } : c))
-    .filter((c) => c.nodeIds.length >= 2)
+    .filter((c) => c.nodeIds.length >= (c.type === 'pin' ? 1 : 2))
 }
 
 // ── Relations ────────────────────────────────────────────────────────────────
@@ -505,6 +506,21 @@ export function setAlignmentOrder(state: ModelState, viewId: string | null, id: 
     }
     return { ...c, nodeIds: [...nodeIds], ordered: true }
   }))
+}
+
+/** Pins (`pinned`) or unpins `nodeIds` on a canvas (see PinConstraint).
+ *  False when nothing changed. */
+export function setPinned(state: ModelState, viewId: string | null, nodeIds: string[], pinned: boolean, newId: () => string): boolean {
+  const list = layoutConstraintsOf(state, viewId)
+  const before = pinnedNodeIds(list)
+  const ids = pinned
+    ? [...before, ...nodeIds.filter((id, i) => !before.includes(id) && nodeIds.indexOf(id) === i)]
+    : before.filter((id) => !nodeIds.includes(id))
+  if (ids.length === before.length) return false
+  const pin = list.find((c) => c.type === 'pin')
+  const rest = list.filter((c) => c.type !== 'pin')
+  setConstraints(state, viewId, ids.length ? [...rest, { id: pin?.id ?? newId(), type: 'pin', nodeIds: ids }] : rest)
+  return true
 }
 
 /** Removes a layout constraint. False when the canvas has no such constraint. */

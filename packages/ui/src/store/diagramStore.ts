@@ -27,6 +27,7 @@ import {
   LayoutConstraint,
   AlignConstraint,
   defaultGridColumns,
+  pinnedNodeIds,
   NODE_SIZES,
   COLLAPSED_HEIGHT,
   COLLAPSED_WIDTH,
@@ -67,7 +68,7 @@ import {
 } from '@radical/layout/viewInput'
 // Re-exported for components that read view collapse state from the store module.
 export { computeViewCollapsedSet, isEffectivelyCollapsed }
-import { LiveColaLayout } from '../layout/liveColaLayout'
+import { LiveColaLayout, type DragMode } from '../layout/liveColaLayout'
 import { LOCAL_PHYSICS_MIN_NODES } from '../layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
@@ -1105,6 +1106,9 @@ interface DiagramStore {
   /** Removes layout constraints, as one undo step, from a view (null = All
    *  elements; undefined = the active canvas). */
   removeLayoutConstraint: (ids: string | string[], viewId?: string | null) => void
+  /** Lets the live physics move these elements of the active canvas again
+   *  (see PinConstraint), as one undo step. */
+  unpinNodes: (ids: string[]) => void
   /** Link/unlink a sequence to a dynamic view. */
   setViewSequence: (viewId: string, sequenceId: string | null) => void
   /**
@@ -1145,9 +1149,15 @@ interface DiagramStore {
   setLayoutMode: (mode: 'elk' | 'cola' | 'radical') => void
   startLiveLayout: (opts?: { skipBulk?: boolean }) => void
   stopLiveLayout: () => void
-  liveGrab: (nodeId: string, x: number, y: number) => void
-  liveDrag: (nodeId: string, x: number, y: number) => void
-  liveRelease: (nodeId: string) => void
+  /** A drag starts. 'calm' (the default) moves only the element (and the
+   *  rows and columns it keeps); 'push' lets the physics move the rest. */
+  liveGrab: (nodeId: string, x: number, y: number, mode?: DragMode, abs?: { x: number; y: number }, withIds?: string[]) => void
+  /** `abs`: the absolute top-left (React Flow's positionAbsolute). */
+  liveDrag: (nodeId: string, x: number, y: number, abs?: { x: number; y: number }) => void
+  /** A drag ends: when it `moved` (React Flow reports a click as a drag
+   *  too), the element and `withIds`, the other selected elements dragged
+   *  along, are pinned where they were dropped. */
+  liveRelease: (nodeId: string, withIds?: string[], moved?: boolean) => void
   setConnectionModifier: (mod: 'shift' | 'ctrl' | 'alt' | 'meta') => void
   startConnection: (sourceId: string) => void
   cancelConnection: () => void
@@ -1295,6 +1305,15 @@ interface DiagramStore {
   /** Lays grid `id` of the active canvas out in even cells, then keeps the
    *  constraints (no undo step of its own). */
   _arrangeGrid: (id: string) => void
+}
+
+/** A layout of the whole canvas places every element anew: the active
+ *  canvas's pins (elements dropped after a drag) go with the old places.
+ *  Designer only: Viewer puts the old positions back when it is left. */
+function unpinLaidOut(state: DiagramStore, appMode: DiagramStore['appMode']): void {
+  if (appMode !== 'designer') return
+  const pinned = pinnedNodeIds(model.layoutConstraintsOf(state, state.activeViewId))
+  if (pinned.length) model.setPinned(state, state.activeViewId, pinned, false, uid)
 }
 
 // ─── Live layout singleton (not serialisable → kept outside store) ───────────
@@ -2736,6 +2755,16 @@ export const useDiagramStore = create<DiagramStore>()(
         }
       },
 
+      unpinNodes(ids) {
+        const viewId = get().activeViewId
+        const pinned = pinnedNodeIds(model.layoutConstraintsOf(get(), viewId))
+        if (!ids.some((id) => pinned.includes(id))) return
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        set((state) => { model.setPinned(state, viewId, ids, false, uid) })
+        _liveLayout?.invalidate()
+      },
+
       removeLayoutConstraint(ids, viewIdArg) {
         const viewId = viewIdArg === undefined ? get().activeViewId : viewIdArg
         const remove = new Set(typeof ids === 'string' ? [ids] : ids)
@@ -3097,7 +3126,10 @@ export const useDiagramStore = create<DiagramStore>()(
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const positions = applyRadicalLayout(input.nodes, input.relations)
-          set((state) => { applyLayoutPositions(state.c4Nodes, positions, input) })
+          set((state) => {
+            applyLayoutPositions(state.c4Nodes, positions, input)
+            unpinLaidOut(state, get().appMode)
+          })
 
           // Resize parents bottom-up for any compound nodes not sized by radical
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
@@ -3150,7 +3182,10 @@ export const useDiagramStore = create<DiagramStore>()(
           // One undo step for the whole layout. Viewer reverts positions on exit anyway.
           if (get().appMode === 'designer') get()._pushUndo()
           get()._markMilestoneEdit()
-          set((state) => { applyLayoutPositions(state.c4Nodes, positions, input) })
+          set((state) => {
+            applyLayoutPositions(state.c4Nodes, positions, input)
+            unpinLaidOut(state, get().appMode)
+          })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level.
@@ -3224,7 +3259,10 @@ export const useDiagramStore = create<DiagramStore>()(
           // One undo step for the whole layout. Viewer reverts positions on exit anyway.
           if (get().appMode === 'designer') get()._pushUndo()
           get()._markMilestoneEdit()
-          set((state) => { applyLayoutPositions(state.c4Nodes, result.winner.positions, input) })
+          set((state) => {
+            applyLayoutPositions(state.c4Nodes, result.winner.positions, input)
+            unpinLaidOut(state, get().appMode)
+          })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level (same as ELK/Radical paths).
@@ -3356,7 +3394,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // elements but expanded in this view is a group here, not a leaf.
           getModel: () => {
             const { nodes, relations, alignments } = layoutInputForView(get())
-            return { nodes, relations, alignments }
+            return { nodes, relations, alignments, pinned: pinnedNodeIds(activeLayoutConstraints(get())) }
           },
           onSettled: () => {
             set((state) => { state.liveLayoutMoving = false })
@@ -3416,16 +3454,22 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { state.liveLayoutActive = false })
       },
 
-      liveGrab(nodeId, x, y) {
-        _liveLayout?.grab(nodeId, x, y)
+      liveGrab(nodeId, x, y, mode = 'calm', abs, withIds) {
+        _liveLayout?.grab(nodeId, x, y, mode, abs, withIds)
       },
 
-      liveDrag(nodeId, x, y) {
-        _liveLayout?.drag(nodeId, x, y)
+      liveDrag(nodeId, x, y, abs) {
+        _liveLayout?.drag(nodeId, x, y, abs)
       },
 
-      liveRelease(nodeId) {
+      liveRelease(nodeId, withIds = [], moved = true) {
         _liveLayout?.release(nodeId)
+        // The physics already holds it (release); the rule keeps it held
+        // after a rebuild and in the saved file. No undo step: the drag
+        // itself has none.
+        if (moved && get().appMode === 'designer') {
+          set((state) => { model.setPinned(state, state.activeViewId, [nodeId, ...withIds], true, uid) })
+        }
         // A drag while editing a milestone is a real edit too — mark dirty
         // so the user is asked how to persist it (propagate / save as new).
         // Without this, positions never make it into the snapshot and switching

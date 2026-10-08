@@ -7,7 +7,8 @@
  * ─────────
  * Main → Worker  { type: 'start', skipBulk, model, gen } | { type: 'invalidate' | 'reset', model, gen }
  *              | { type: 'stop' } | { type: 'seed', id, x, y }
- *              | { type: 'grab' | 'drag', id, x, y } | { type: 'release', id }
+ *              | { type: 'grab', id, x, y, mode, abs?, withIds? } | { type: 'drag', id, x, y, abs? }
+ *              | { type: 'release', id }
  * Worker → Main  { type: 'positions', positions, gen } | { type: 'settled', gen }
  *
  * `model` is the store's nodes and relations at the time of the call; the
@@ -38,8 +39,8 @@ self.onmessage = (e: MessageEvent<LiveColaMessage>) => {
     case 'reset': engine.reset(); break
     case 'stop': engine.stop(); break
     case 'seed': engine.seedPosition(m.id, m.x, m.y); break
-    case 'grab': engine.grab(m.id, m.x, m.y); break
-    case 'drag': engine.drag(m.id, m.x, m.y); break
+    case 'grab': engine.grab(m.id, m.x, m.y, m.mode, m.abs, m.withIds); break
+    case 'drag': engine.drag(m.id, m.x, m.y, m.abs); break
     case 'release': engine.release(m.id); break
   }
 }

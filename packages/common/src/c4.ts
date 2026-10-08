@@ -176,7 +176,7 @@ export interface DiagramView {
  * under a collapsed parent) are skipped; a line left with fewer than two
  * members rests.
  */
-export type LayoutConstraint = AlignConstraint | GridConstraint
+export type LayoutConstraint = AlignConstraint | GridConstraint | PinConstraint
 
 /**
  * Keeps the centres of `nodeIds` on one line — a row (`axis: 'horizontal'`,
@@ -204,6 +204,23 @@ export interface GridConstraint {
   nodeIds: string[]
 }
 
+/**
+ * Keeps `nodeIds` where they stand: the live physics does not move them (a
+ * drag still does). A canvas has at most one; dropping an element after a
+ * drag adds it. A layout of the whole canvas (Smart Layout) places every
+ * element anew and removes it.
+ */
+export interface PinConstraint {
+  id: string
+  type: 'pin'
+  nodeIds: string[]
+}
+
+/** The elements pinned on a canvas with these rules. */
+export function pinnedNodeIds(constraints: readonly LayoutConstraint[] | undefined): string[] {
+  return constraints?.find((c): c is PinConstraint => c.type === 'pin')?.nodeIds ?? []
+}
+
 /** Columns for a grid of `count` elements when none are asked for: about square. */
 export function defaultGridColumns(count: number): number {
   return Math.max(1, Math.ceil(Math.sqrt(count)))
@@ -220,10 +237,11 @@ export function gridCells(c: Pick<GridConstraint, 'columns' | 'nodeIds'>): { row
 }
 
 /** Every rule as the lines it keeps: alignments as they are, a grid as its
- *  ordered rows and columns. */
+ *  ordered rows and columns, a pin none. */
 export function constraintLines(constraints: readonly LayoutConstraint[]): AlignConstraint[] {
   return constraints.flatMap((c): AlignConstraint[] => {
     if (c.type === 'align') return [c]
+    if (c.type === 'pin') return []
     const { rows, columns } = gridCells(c)
     return [
       ...rows.map((ids, r): AlignConstraint => ({ id: `${c.id}:row${r}`, type: 'align', axis: 'horizontal', nodeIds: ids, ordered: true })),

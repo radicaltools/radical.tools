@@ -58,6 +58,7 @@ interface Line {
 
 function linesOf(c: LayoutConstraint): Line[] {
   if (c.type === 'align') return [{ axis: c.axis === 'horizontal' ? 'y' : 'x', ids: c.nodeIds, ordered: !!c.ordered }]
+  if (c.type === 'pin') return []
   const { rows, columns } = gridCells(c)
   return [
     ...rows.map((ids, index): Line => ({ axis: 'y', ids, ordered: true, rank: { key: `${c.id}:rows`, index } })),

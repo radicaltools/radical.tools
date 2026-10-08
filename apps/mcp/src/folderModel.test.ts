@@ -239,6 +239,23 @@ describe('long Smart Layout runs', () => {
     expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
   }, 60_000)
 
+  it('unpins the canvas it arranges', async () => {
+    // Elements on top of each other, two of them pinned in Studio.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = ['a', 'b', 'c'].map((id, i) => ({ id, type: 'system', label: id.toUpperCase(), x: i * 10, y: i * 10, width: 240, height: 160, collapsed: false }))
+    data.defaultLayoutConstraints = [{ id: 'p', type: 'pin', nodeIds: ['a', 'b'] }]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const outcome = await model.call('smart_layout', {})
+    expect(outcome.text).toContain('Unpinned 2 elements.')
+    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(after.defaultLayoutConstraints ?? []).toEqual([])
+  }, 60_000)
+
   it('exits when the client closes its end', async () => {
     const folder = await fixture()
     const server = spawn(process.execPath, [join(import.meta.dirname, '../dist/index.js'), '--folder', folder], { stdio: ['pipe', 'ignore', 'ignore'] })
