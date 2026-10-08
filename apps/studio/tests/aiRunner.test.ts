@@ -109,6 +109,25 @@ describe('runAIPrompt — end-to-end with mocked Anthropic tool-calling', () => 
     expect(Object.keys(facade._nodes)).toHaveLength(2)
   })
 
+  it('places a run\'s new nodes beside the canvas in a block that grows sideways, and the next run beside that', async () => {
+    const facade = makeFacade()
+    facade._nodes.old = { id: 'old', type: 'system', label: 'Old', x: 0, y: 40, width: 200, height: 100, collapsed: false } as C4Node
+    const addFive = (prefix: string): void => {
+      fakeAnthropicFetch([
+        { content: [1, 2, 3, 4, 5].map((i) => toolUse(`c${i}`, 'add_node', { tempId: `${prefix}${i}`, type: 'system', label: `${prefix}${i}` })), stop_reason: 'tool_use' },
+        { content: [text('Done.')], stop_reason: 'end_turn' },
+      ])
+    }
+    addFive('a')
+    await runAIPrompt({ prompt: 'Add five', settings: anthropicSettings(), diagram: facade })
+    const placed = (prefix: string) => Object.values(facade._nodes).filter((n) => n.label.startsWith(prefix)).map((n) => [n.x, n.y])
+    expect(placed('a')).toEqual([[320, 40], [680, 40], [320, 320], [680, 320], [1040, 40]])
+    addFive('b')
+    await runAIPrompt({ prompt: 'Add five more', settings: anthropicSettings(), diagram: facade })
+    const x0 = 1040 + facade._nodes[Object.keys(facade._nodes).find((id) => facade._nodes[id].label === 'a5')!].width + 120
+    expect(placed('b')[0]).toEqual([x0, 40])
+  })
+
   it('feeds a rejected tool call back as an error result and lets the model self-correct', async () => {
     // Round 1: adds a "database" with no parent -> facade rejects it (empty id).
     // Round 2: model adds the system first, then the database with parentId.

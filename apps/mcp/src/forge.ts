@@ -10,24 +10,36 @@
 // One run per server; forge_start begins a new one. The run lives in memory:
 // after a restart, forge_start with the run's needId starts over from the
 // same need.
+//
+// Each stage's elements are filed into the run's views — Conceptual, Logical
+// & physical, Governance — with a place beside what the view already shows,
+// and the client is told to ask the user how to arrange them (forge_arrange).
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  FORGE_ARRANGEMENTS,
   FORGE_STAGES,
+  FORGE_VIEW_NAMES,
   PRIMARY_TYPE_IDS_FOR_STAGE,
+  arrangeForgeGroup,
   buildClarifyPrompt,
   buildForgeStagePrompt,
   buildPriorStagesBlock,
   buildWireframePrompt,
+  fileIntoForgeViews,
+  forgeArrangeGroups,
   forgeHubMatches,
   formatClarificationAnswers,
   idsAddedSince,
   modelIdsOf,
   needLabelFromDescription,
+  outermostNodes,
   type ClarifyStageQuestion,
+  type FiledNodes,
+  type ForgeArrangement,
   type ForgeStageId,
   type ModelIds,
 } from '@radical/common/ai/forge'
@@ -41,6 +53,7 @@ import { docToConcept, type HubConceptSummary, type HubRadicalDoc } from '@radic
 import { buildConceptInsert } from '@radical/common/hubImport'
 import { sanitizeWireframeSvg } from '@radical/common/wireframe'
 import { CATALOGUE_DIR, buildIndex, readCatalogue } from '@radical/hub-catalogue'
+import { createBatchPlacer } from '@radical/layout/geometry'
 
 const STAGE_IDS = FORGE_STAGES.map((stage) => stage.id)
 
@@ -50,14 +63,17 @@ export const FORGE_PROCEDURE = [
   'UI mockups and a C4 model, one reviewed stage at a time, in this order:',
   FORGE_STAGES.map((stage) => `${stage.title} (${stage.id})`).join(' → ') + '.',
   '1. forge_start with the description, or the id of an existing need. The description is kept in the model as a need.',
+  `   Every element a stage adds goes into one of three views: ${Object.values(FORGE_VIEW_NAMES).join(', ')}.`,
   '2. For each stage, in order:',
   '   a. forge_clarify: read it and ask the user the clarifying questions it calls for, if any, including which',
   '      Hub matches to apply. Wait for the answers.',
   '   b. forge_generate with those answers and the Hub concepts the user kept. It returns the stage task:',
   '      carry it out with the model tools (add_node, add_relation, update_node, search_model, …).',
   '   c. forge_complete_stage with a short summary of what you created and why.',
-  '   d. Show the user what the stage added and ask whether to continue, regenerate the stage',
-  '      (forge_generate with regenerate: true, which first removes what the stage added) or finish here.',
+  '   d. Show the user what the stage added and ask them: keep its new elements in a row, a column or a grid',
+  '      on their view? Run Smart Layout on that view? Do what they choose with forge_arrange. Then ask whether',
+  '      to continue, regenerate the stage (forge_generate with regenerate: true, which first removes what the',
+  '      stage added) or finish here.',
   '   After the mockups stage, offer to draw the wireframes (forge_wireframe). A Hub match can also be',
   '   imported as it is with forge_import_hub_concept.',
   '3. forge_finish: what each stage added, and the Gherkin .feature files of the scenarios.',
@@ -130,6 +146,20 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
     },
   },
   {
+    name: 'forge_arrange',
+    description: `After a completed Forge stage, as the user chose: keep the stage's new elements in a row, a column or a grid on their view (${Object.values(FORGE_VIEW_NAMES).join(', ')}), and/or run Smart Layout on that view. Ask the user first.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        stage: stageEnum,
+        align: { type: 'string', enum: FORGE_ARRANGEMENTS, description: 'row and column keep the elements in the order they were created; grid fills a landscape grid row by row. Every later layout keeps it.' },
+        smartLayout: { type: 'boolean', description: 'Run Smart Layout on the views the stage added to, after aligning.' },
+      },
+      required: ['stage'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'forge_wireframe',
     description: 'Low-fi wireframe of a `mockup` node. Without svg: returns the drawing brief built from the requirements, scenarios and screens around it. With svg: stores that wireframe on the mockup.',
     inputSchema: {
@@ -167,7 +197,7 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
 
 export const FORGE_TOOLS = new Set(FORGE_TOOL_DEFS.map((tool) => tool.name))
 /** Forge tools that never write the folder. */
-export const FORGE_READ_ONLY = new Set(['forge_clarify', 'forge_complete_stage'])
+export const FORGE_READ_ONLY = new Set(['forge_clarify'])
 
 /** One forge_* call's result. `commit` updates the run once the call's
  *  changes are on disk, so a refused write leaves the run as it was. */
@@ -229,6 +259,34 @@ function countByType(nodes: Record<string, C4Node>, ids: string[]): string {
   return [...counts].map(([type, n]) => `${type} ${n}`).join(', ')
 }
 
+/** Gives the nodes just filed into views a place there, since a view keeps
+ *  its own positions: the outermost in a landscape block beside what the
+ *  view already showed, the rest where they sit inside their parent.
+ *  Mutates and returns `data`. */
+function placeInViews(data: DiagramData, filed: FiledNodes[]): DiagramData {
+  for (const { viewId, nodeIds } of filed) {
+    const view = data.views?.find((v) => v.id === viewId)
+    if (!view || !nodeIds.length) continue
+    const nodes: Record<string, C4Node> = Object.fromEntries(data.nodes.map((n) => [n.id, { ...n, ...view.positions[n.id] }]))
+    const fresh = new Set(nodeIds)
+    const shown = new Set<string>()
+    for (const id of view.nodeIds) {
+      if (fresh.has(id)) continue
+      for (let cur: string | undefined = id; cur && nodes[cur] && !shown.has(cur); cur = nodes[cur].parentId) shown.add(cur)
+    }
+    const place = createBatchPlacer(() => nodes, () => shown)
+    for (const id of outermostNodes(nodes, nodeIds)) {
+      const { x, y } = place(nodes[id].parentId)
+      nodes[id] = { ...nodes[id], x, y }
+    }
+    for (const id of nodeIds) {
+      const { x, y, width, height } = nodes[id]
+      view.positions[id] = { x, y, width, height }
+    }
+  }
+  return data
+}
+
 export class Forge {
   private run: ForgeRun | null = null
   private catalogue: Catalogue | null = null
@@ -251,6 +309,7 @@ export class Forge {
       case 'forge_clarify': return this.clarify(args)
       case 'forge_generate': return this.generate(args, facade)
       case 'forge_complete_stage': return this.complete(args, facade)
+      case 'forge_arrange': return this.arrange(args, facade)
       case 'forge_wireframe': return this.wireframe(args, ctx, facade)
       case 'forge_import_hub_concept': return this.importConcept(args, facade)
       case 'forge_finish': return this.finish(args, facade)
@@ -313,6 +372,15 @@ export class Forge {
         readOnly = false
       }
     }
+    // The run's views start with the need, on Conceptual.
+    let data: DiagramData | undefined
+    if (need) {
+      const filed = fileIntoForgeViews(facade, [need])
+      if (filed.some((f) => f.nodeIds.length)) {
+        data = placeInViews(facade.toDiagramData(), filed)
+        readOnly = false
+      }
+    }
     const run: ForgeRun = {
       description,
       needId: need,
@@ -330,7 +398,7 @@ export class Forge {
       '',
       `Next: forge_clarify with stage "${STAGE_IDS[0]}".`,
     ]
-    return ok(lines.join('\n'), { readOnly, commit: () => { this.run = run } })
+    return ok(lines.join('\n'), { readOnly, data, commit: () => { this.run = run } })
   }
 
   private clarify(args: Record<string, unknown>): ForgeResult {
@@ -450,11 +518,16 @@ export class Forge {
     if (state?.status !== 'generating') return fail(`forge_complete_stage: the ${stageTitle(id)} stage is not open; begin it with forge_generate`)
     const summary = typeof args.summary === 'string' && args.summary.trim() ? args.summary.trim() : 'Done.'
     const added = idsAddedSince(state.before, this.ids(facade))
+    const filed = fileIntoForgeViews(facade, added.nodes, id)
     const nodes = facade.getNodes()
     const byType = countByType(nodes, added.nodes)
     const lines = [
       `${stageTitle(id)} done: +${added.nodes.length} nodes${byType ? ` (${byType})` : ''}, +${added.relations.length} relations, +${added.views.length} views.`,
     ]
+    const intoViews = filed.filter((f) => f.nodeIds.length)
+    if (intoViews.length) {
+      lines.push(`Added to the views: ${intoViews.map((f) => `${FORGE_VIEW_NAMES[f.key]} (view ${f.viewId}) +${f.nodeIds.length}`).join(', ')}.`)
+    }
     if (id === 'mockups') {
       const mockups = Object.values(nodes).filter((n) => n.type === 'mockup')
       const missing = mockups.filter((n) => !(n as unknown as Record<string, unknown>).wireframe)
@@ -465,14 +538,59 @@ export class Forge {
         )
       }
     }
+    const groups = forgeArrangeGroups(facade, added.nodes, id)
+    const alignable = groups.filter((g) => g.nodeIds.length >= 2)
+    const viewNames = groups.map((g) => g.viewName).join(' and ')
+    if (groups.length) {
+      lines.push(`Now show the user what this stage added and ask them:${alignable.length ? `\n- Keep its ${alignable.map((g) => `${g.nodeIds.length} new elements on ${g.viewName}`).join(' and ')} in a row, a column or a grid?` : ''}\n- Run Smart Layout on ${viewNames}?`)
+      lines.push(`Do what they choose with forge_arrange (stage "${id}"${alignable.length ? ', align and/or smartLayout: true' : ', smartLayout: true'}).`)
+    }
     const next = STAGE_IDS[STAGE_IDS.indexOf(id) + 1]
     lines.push(next
-      ? `Next: show the user what this stage added and ask whether to continue with ${stageTitle(next)} (forge_clarify with stage "${next}"), regenerate this stage (forge_generate with regenerate: true) or finish here (forge_finish).`
-      : 'This was the last stage. Show the user what it added and ask whether to regenerate it (forge_generate with regenerate: true) or finish (forge_finish).')
+      ? `${groups.length ? 'Then' : 'Next: show the user what this stage added and'} ask whether to continue with ${stageTitle(next)} (forge_clarify with stage "${next}"), regenerate this stage (forge_generate with regenerate: true) or finish here (forge_finish).`
+      : `This was the last stage. ${groups.length ? 'Then' : 'Show the user what it added and'} ask whether to regenerate it (forge_generate with regenerate: true) or finish (forge_finish).`)
+    const changed = filed.some((f) => f.nodeIds.length)
     return ok(lines.join('\n'), {
-      readOnly: true,
+      readOnly: !changed,
+      data: changed ? placeInViews(facade.toDiagramData(), filed) : undefined,
       commit: () => { run.stages[id] = { ...state, status: 'done', added, summary } },
     })
+  }
+
+  private async arrange(args: Record<string, unknown>, facade: ModelFacade): Promise<ForgeResult> {
+    const run = this.run
+    if (!run) return fail('forge_arrange: no Forge run; call forge_start first')
+    const stage = this.stageArg(args, 'forge_arrange')
+    if (!STAGE_IDS.includes(stage as ForgeStageId)) return fail(stage)
+    const id = stage as ForgeStageId
+    const state = run.stages[id]
+    if (state?.status !== 'done' || !state.added) return fail(`forge_arrange: complete the ${stageTitle(id)} stage first (forge_complete_stage)`)
+    if (args.align !== undefined && !FORGE_ARRANGEMENTS.includes(args.align as ForgeArrangement)) {
+      return fail(`forge_arrange: align must be one of ${FORGE_ARRANGEMENTS.join(', ')}`)
+    }
+    if (args.smartLayout !== undefined && typeof args.smartLayout !== 'boolean') return fail('forge_arrange: smartLayout must be true or false')
+    const align = args.align as ForgeArrangement | undefined
+    if (!align && args.smartLayout !== true) return fail('forge_arrange: pass align, smartLayout: true, or both')
+    const groups = forgeArrangeGroups(facade, state.added.nodes, id)
+    if (!groups.length) return fail(`forge_arrange: the ${stageTitle(id)} stage added nothing that is on a Forge view`)
+    const lines: string[] = []
+    if (align) {
+      for (const group of groups) {
+        if (group.nodeIds.length < 2) { lines.push(`${group.viewName}: one new element, nothing to align.`); continue }
+        const outcome = arrangeForgeGroup(facade, group, align)
+        if (!outcome.ok) return fail(`forge_arrange: ${outcome.text}`)
+        lines.push(outcome.text)
+      }
+    }
+    if (args.smartLayout === true) {
+      if (!facade.runLayout) return fail('forge_arrange: Smart Layout is not available here')
+      for (const viewId of new Set(groups.map((g) => g.viewId))) {
+        const outcome = await facade.runLayout(viewId)
+        if (!outcome.ok) return fail(`forge_arrange: ${outcome.text}`)
+        lines.push(outcome.text)
+      }
+    }
+    return ok(lines.join('\n'))
   }
 
   private wireframe(args: Record<string, unknown>, ctx: ToolRunContext, facade: ModelFacade): ForgeResult {
@@ -538,7 +656,7 @@ export class Forge {
       lines.push(`${files.length} .feature files (pass gherkinDir to write them):`)
       for (const file of files) lines.push('', `--- ${file.filename}`, file.content)
     }
-    lines.push('', 'New elements have a simple placement; run smart_layout to arrange the model.')
+    lines.push('', `The elements are in the views ${Object.values(FORGE_VIEW_NAMES).join(', ')}; smart_layout with a viewId arranges one.`)
     return ok(lines.join('\n'), { readOnly: true })
   }
 

@@ -226,6 +226,41 @@ export function defaultGridColumns(count: number): number {
   return Math.max(1, Math.ceil(Math.sqrt(count)))
 }
 
+/** A landscape grid keeps up to this many columns per row. */
+const LANDSCAPE_WIDTH = 2
+
+/**
+ * Cell `index` of a grid that grows wider than tall: it adds a column while
+ * it has fewer than twice as many columns as rows, otherwise a row, and fills
+ * the new column or row before growing again. Cells already handed out never
+ * move, so elements placed one by one end up in a landscape block rather than
+ * a tall column or an endless row.
+ */
+export function landscapeSlot(index: number): { column: number; row: number } {
+  if (index <= 0) return { column: 0, row: 0 }
+  let columns = 1
+  let rows = 1
+  let filled = 1
+  for (;;) {
+    if (columns < LANDSCAPE_WIDTH * rows) {
+      if (index < filled + rows) return { column: columns, row: index - filled }
+      filled += rows
+      columns++
+    } else {
+      if (index < filled + columns) return { column: index - filled, row: rows }
+      filled += columns
+      rows++
+    }
+  }
+}
+
+/** Columns of the landscape grid (landscapeSlot) that holds `count` elements. */
+export function landscapeGridColumns(count: number): number {
+  let columns = 1
+  for (let i = 0; i < count; i++) columns = Math.max(columns, landscapeSlot(i).column + 1)
+  return columns
+}
+
 /** A grid's rows and columns, each listed in order. */
 export function gridCells(c: Pick<GridConstraint, 'columns' | 'nodeIds'>): { rows: string[][]; columns: string[][] } {
   const cols = Math.max(1, Math.min(Math.floor(c.columns), c.nodeIds.length))

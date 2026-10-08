@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fitAncestors, fittedParentSize, placeNewNode } from '../src/geometry'
+import { BATCH_CELL, createBatchPlacer, fitAncestors, fittedParentSize, placeNewNode } from '../src/geometry'
 import { NODE_SIZES, type C4Node } from '@radical/common/c4'
 
 const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
@@ -55,5 +55,34 @@ describe('placeNewNode', () => {
     }
     expect(placeNewNode({}, undefined)).toEqual({ x: 0, y: 0 })
     expect(placeNewNode(nodes, undefined)).toEqual({ x: 100 + NODE_SIZES.system.width + 80, y: 0 })
+  })
+})
+
+describe('createBatchPlacer', () => {
+  it('starts a batch right of what the canvas shows and grows it sideways', () => {
+    const nodes: Record<string, C4Node> = {
+      a: node('a', 'system', { x: 100, y: 50 }),
+      b: node('b', 'system', { x: 400, y: -20 }),
+      hidden: node('hidden', 'system', { x: 5000, y: 0 }),
+    }
+    const place = createBatchPlacer(() => nodes, () => new Set(['a', 'b']))
+    const x0 = 400 + NODE_SIZES.system.width + 120
+    const placed = Array.from({ length: 5 }, () => place(undefined))
+    expect(placed).toEqual([
+      { x: x0, y: -20 },
+      { x: x0 + BATCH_CELL.width, y: -20 },
+      { x: x0, y: -20 + BATCH_CELL.height },
+      { x: x0 + BATCH_CELL.width, y: -20 + BATCH_CELL.height },
+      { x: x0 + 2 * BATCH_CELL.width, y: -20 },
+    ])
+  })
+
+  it('keeps one batch per parent, inside its padding when it has no children yet', () => {
+    const nodes: Record<string, C4Node> = { sys: node('sys', 'system') }
+    const place = createBatchPlacer(() => nodes)
+    expect(place('sys')).toEqual({ x: 30, y: 120 })
+    expect(place('sys')).toEqual({ x: 30 + BATCH_CELL.width, y: 120 })
+    expect(place(undefined)).toEqual({ x: NODE_SIZES.system.width + 120, y: 0 })
+    expect(createBatchPlacer(() => ({}))(undefined)).toEqual({ x: 0, y: 0 })
   })
 })

@@ -6,15 +6,23 @@ import { activeProviderNeedsKey, loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
 import {
+  FORGE_ARRANGEMENTS,
   FORGE_STAGES,
+  FORGE_STAGE_VIEW,
   HUB_MATCHES_QUESTION_ID,
   PRIMARY_TYPE_IDS_FOR_STAGE,
+  arrangeForgeGroup,
   buildForgeStagePrompt,
   buildPriorStagesBlock,
+  fileIntoForgeViews,
+  findForgeView,
+  forgeArrangeGroups,
   forgeHubMatches,
   formatClarificationAnswers,
   needLabelFromDescription,
   type ClarifyStageQuestion,
+  type ForgeArrangeGroup,
+  type ForgeArrangement,
   type ForgeNeedRef,
   type ForgeStageId,
 } from '@radical/common/ai/forge'
@@ -44,6 +52,18 @@ interface WireframeRun {
   running: boolean
 }
 type ClarifyAnswers = Record<string, string | string[]>
+
+/** After a stage: its new elements per view, and what the user did with
+ *  them — kept in a row, column or grid, and/or laid out. */
+interface StageArrange {
+  groups: ForgeArrangeGroup[]
+  arranged?: ForgeArrangement
+  laidOut?: boolean
+  message?: string
+  failed?: boolean
+}
+
+const ARRANGEMENT_LABELS: Record<ForgeArrangement, string> = { row: 'Row', column: 'Column', grid: 'Grid' }
 
 interface ProgressEntry {
   id: number
@@ -143,6 +163,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
    *  undefined until the first stage with usage data completes. */
   const [sessionUsage, setSessionUsage] = useState<TokenUsage | undefined>(undefined)
   const [wireframeRun, setWireframeRun] = useState<WireframeRun | null>(null)
+  const [arrangeByStage, setArrangeByStage] = useState<Partial<Record<ForgeStageId, StageArrange>>>({})
+  const [layingOut, setLayingOut] = useState(false)
   /** Furthest step reached by normal forward navigation — stepper tabs past
    *  it stay disabled. An early finish jumps to the last step without
    *  raising this, so stages the user never reached can't be opened from
@@ -190,6 +212,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setProgressByStage({})
     setSessionUsage(undefined)
     setWireframeRun(null)
+    setArrangeByStage({})
     setReachedIndex(0)
     setFinishedAt(null)
     clarifyStartedRef.current = new Set()
@@ -339,6 +362,12 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     // Regenerate replaces the previous attempt instead of adding a second copy.
     const previous = stageAddedRef.current[stageId]
     if (previous) removeAdded(previous)
+    setArrangeByStage((a) => ({ ...a, [stageId]: undefined }))
+    // The stage builds on its view, so its elements land there as they come.
+    // A view it is the first to fill does not exist yet (an empty view shows
+    // the whole model): it is made from them afterwards, on All elements.
+    const stageView = findForgeView(useDiagramStore.getState().views, FORGE_STAGE_VIEW[stageId])
+    useDiagramStore.getState().setActiveView(stageView?.id ?? null)
     const before = currentModelIds()
     setProgressByStage((p) => ({ ...p, [stageId]: { round: 0, entries: [] } }))
     const ctl = new AbortController()
@@ -390,11 +419,55 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     } catch (err) {
       setError((err as Error).message || String(err))
     } finally {
-      stageAddedRef.current[stageId] = addedSince(before)
+      const added = addedSince(before)
+      stageAddedRef.current[stageId] = added
+      // Each element into its view (Conceptual, Logical & physical, Governance),
+      // and the stage's view on screen.
+      fileIntoForgeViews(diagram, added.nodes, stageId)
+      const target = findForgeView(useDiagramStore.getState().views, FORGE_STAGE_VIEW[stageId])
+      if (target) useDiagramStore.getState().setActiveView(target.id)
+      setArrangeByStage((a) => ({ ...a, [stageId]: { groups: forgeArrangeGroups(diagram, added.nodes, stageId) } }))
       abortRef.current = null
       setBusy(false)
     }
   }, [busy, unavailableReason, description, needId, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries])
+
+  /** Keeps the stage's new elements in a row, column or grid on their view. */
+  const arrangeStage = useCallback((stageId: ForgeStageId, arrangement: ForgeArrangement) => {
+    const current = arrangeByStage[stageId]
+    if (!current || busy || layingOut) return
+    const results = current.groups
+      .filter((g) => g.nodeIds.length >= 2)
+      .map((g) => arrangeForgeGroup(diagram, g, arrangement))
+    const failed = results.some((r) => !r.ok)
+    setArrangeByStage((a) => ({
+      ...a,
+      [stageId]: { ...current, arranged: failed ? current.arranged : arrangement, message: results.map((r) => r.text).join(' '), failed },
+    }))
+  }, [arrangeByStage, busy, layingOut, diagram])
+
+  /** Smart Layout on every view the stage added to, its own view last so it
+   *  stays on screen. */
+  const layoutStage = useCallback(async (stageId: ForgeStageId) => {
+    const current = arrangeByStage[stageId]
+    if (!current || busy || layingOut || !diagram.runLayout) return
+    const own = findForgeView(useDiagramStore.getState().views, FORGE_STAGE_VIEW[stageId])?.id
+    const viewIds = [...new Set(current.groups.map((g) => g.viewId))].sort((a, b) => Number(a === own) - Number(b === own))
+    setLayingOut(true)
+    try {
+      const texts: string[] = []
+      for (const viewId of viewIds) {
+        const outcome = await diagram.runLayout(viewId)
+        texts.push(outcome.text)
+        if (!outcome.ok) throw new Error(outcome.text)
+      }
+      setArrangeByStage((a) => ({ ...a, [stageId]: { ...current, laidOut: true, message: texts.join(' '), failed: false } }))
+    } catch (err) {
+      setArrangeByStage((a) => ({ ...a, [stageId]: { ...current, message: (err as Error).message || String(err), failed: true } }))
+    } finally {
+      setLayingOut(false)
+    }
+  }, [arrangeByStage, busy, layingOut, diagram])
 
   const cancelStage = useCallback(() => { abortRef.current?.abort() }, [])
 
@@ -473,13 +546,21 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
    *  updates it instead of adding a duplicate. */
   const ensureNeed = useCallback(() => {
     if (!hasNeedType) return
-    const { c4Nodes, addNode, updateNode } = useDiagramStore.getState()
+    const { c4Nodes, addNode, updateNode, setActiveView } = useDiagramStore.getState()
     const text = description.trim()
     const existing = needId ? c4Nodes[needId] : undefined
+    // The run's views start with the need, on Conceptual.
+    const showNeed = (id: string): void => {
+      const [filed] = fileIntoForgeViews(diagram, [id])
+      if (filed) useDiagramStore.getState().setActiveView(filed.viewId)
+    }
     if (existing) {
       if ((existing.description ?? '').trim() !== text) updateNode(existing.id, { description: text })
+      showNeed(existing.id)
       return
     }
+    // A new node joins the view on screen: make that Conceptual, or none yet.
+    setActiveView(findForgeView(useDiagramStore.getState().views, 'conceptual')?.id ?? null)
     const def = useDiagramStore.getState().metamodel?.nodeTypes.need
     const id = addNode({
       type: 'need',
@@ -493,8 +574,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       width: def?.width ?? 200,
       height: def?.height ?? 80,
     } as Parameters<typeof addNode>[0])
-    if (id) setNeedId(id)
-  }, [hasNeedType, description, needId])
+    if (!id) return
+    setNeedId(id)
+    showNeed(id)
+  }, [hasNeedType, description, needId, diagram])
   const startRun = useCallback(() => {
     ensureNeed()
     goNext()
@@ -565,8 +648,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (stageReports[currentStageId]) {
       return (
         <>
-          <button type="button" className="forge-btn forge-btn-secondary" onClick={() => runStage(currentStageId)} disabled={!!unavailableReason}>Regenerate</button>
-          <button type="button" className="forge-btn forge-btn-primary" onClick={goNext}>{isLastStage ? 'Finish →' : 'Continue →'}</button>
+          <button type="button" className="forge-btn forge-btn-secondary" onClick={() => runStage(currentStageId)} disabled={!!unavailableReason || layingOut}>Regenerate</button>
+          <button type="button" className="forge-btn forge-btn-primary" onClick={goNext} disabled={layingOut}>{isLastStage ? 'Finish →' : 'Continue →'}</button>
         </>
       )
     }
@@ -840,6 +923,49 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                   })()}
                 </div>
               )}
+              {stageReports[currentStage.id] && !!arrangeByStage[currentStage.id]?.groups.length && (() => {
+                const arrange = arrangeByStage[currentStage.id]!
+                const alignable = arrange.groups.filter((g) => g.nodeIds.length >= 2)
+                const viewNames = [...new Set(arrange.groups.map((g) => g.viewName))].join(' and ')
+                return (
+                  <div className="forge-arrange">
+                    <div className="forge-arrange-title">Arrange</div>
+                    {alignable.length > 0 && (
+                      <div className="forge-arrange-row">
+                        <span>
+                          Keep the {alignable.map((g) => `${g.nodeIds.length} new elements on ${g.viewName}`).join(' and ')} in a
+                        </span>
+                        {FORGE_ARRANGEMENTS.map((arrangement) => (
+                          <button
+                            key={arrangement}
+                            type="button"
+                            className={`forge-btn forge-btn-sm ${arrange.arranged === arrangement ? 'forge-btn-success' : 'forge-btn-secondary'}`}
+                            disabled={busy || layingOut || !!arrange.arranged}
+                            onClick={() => arrangeStage(currentStage.id, arrangement)}
+                          >
+                            {arrange.arranged === arrangement ? `✓ ${ARRANGEMENT_LABELS[arrangement]}` : ARRANGEMENT_LABELS[arrangement]}
+                          </button>
+                        ))}
+                        <span>?</span>
+                      </div>
+                    )}
+                    <div className="forge-arrange-row">
+                      <span>Run Smart Layout on {viewNames}?</span>
+                      <button
+                        type="button"
+                        className={`forge-btn forge-btn-sm ${arrange.laidOut ? 'forge-btn-success' : 'forge-btn-secondary'}`}
+                        disabled={busy || layingOut}
+                        onClick={() => void layoutStage(currentStage.id)}
+                      >
+                        {layingOut ? 'Laying out…' : arrange.laidOut ? '✓ Smart Layout' : 'Smart Layout'}
+                      </button>
+                    </div>
+                    {arrange.message && (
+                      <div className={`forge-arrange-message${arrange.failed ? ' forge-arrange-message-error' : ''}`}>{arrange.message}</div>
+                    )}
+                  </div>
+                )
+              })()}
               {currentStage.id === 'mockups' && stageReports.mockups && mockupStats.total > 0 && (
                 <div className="forge-wireframes">
                   <div className="forge-wireframes-title">Wireframes</div>

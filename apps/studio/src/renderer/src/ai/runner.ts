@@ -10,6 +10,7 @@ import { getAdapter } from './registry'
 import { buildSystemMessages } from './systemPrompt'
 import { buildContextMessage } from '@radical/common/ai/systemPrompt'
 import { buildToolDefs, runTool, type ToolGroup, type ToolRunContext } from '@radical/common/ai/tools'
+import { createBatchPlacer } from '@radical/layout/geometry'
 import { addTokenUsage, textOf, toolCallsOf, type AISettings, type ChatContentBlock, type ChatMessage, type TokenUsage } from './types'
 
 export interface RunAIResult {
@@ -127,22 +128,24 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
   // resolvable by a relation created in round 3, and reset_diagram (any
   // round) must invalidate every tempId registered before it.
   const tempToReal = new Map<string, string>()
-  let placedThisRun = 0
-  const PLACE_X0 = 80
-  const PLACE_Y0 = 80
-  const STEP_X = 360
-  const PER_ROW = 4
+  // New nodes go beside what the canvas on screen already shows, in a block
+  // that grows sideways (see createBatchPlacer).
+  const placeNext = createBatchPlacer(() => diagram.getNodes(), () => {
+    const view = diagram.getActiveView?.()
+    if (!view?.nodeIds.length) return undefined
+    const nodes = diagram.getNodes()
+    const shown = new Set<string>()
+    for (const id of view.nodeIds) {
+      for (let cur: string | undefined = id; cur && nodes[cur] && !shown.has(cur); cur = nodes[cur].parentId) shown.add(cur)
+    }
+    return shown
+  })
   const ctx: ToolRunContext = {
     diagram,
     resolveId: (id) => tempToReal.get(id) ?? id,
     registerTempId: (tempId, realId) => { tempToReal.set(tempId, realId) },
     resetTempIds: () => { tempToReal.clear() },
-    placeNext: () => {
-      const col = placedThisRun % PER_ROW
-      const row = Math.floor(placedThisRun / PER_ROW)
-      placedThisRun++
-      return { x: PLACE_X0 + col * STEP_X, y: PLACE_Y0 + row * 280 }
-    },
+    placeNext,
   }
 
   // Working transcript for THIS run — kept separate from the caller's

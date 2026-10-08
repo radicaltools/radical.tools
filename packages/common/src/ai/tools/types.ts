@@ -23,8 +23,9 @@ export interface ToolRunContext {
    *  point at nodes that no longer exist. */
   resetTempIds(): void
   /** Placement for a newly created node under `parentId` (undefined = the
-   *  root), relative to that parent. Studio's grid ignores the parent, since
-   *  its live layout reshuffles; the MCP server places it inside. */
+   *  root), relative to that parent. Studio places a run's nodes in a
+   *  landscape block beside what the canvas shows; the MCP server right of
+   *  the last sibling. */
   placeNext(parentId?: string): { x: number; y: number }
 }
 

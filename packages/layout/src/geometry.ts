@@ -8,7 +8,7 @@
  * silently mis-size such a node while the others handled it correctly.
  * Consolidated here so every caller shares one (correct) definition.
  */
-import { C4Node, C4Relation, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, NODE_SIZES, isContainerType } from '@radical/common/c4'
+import { C4Node, C4Relation, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, NODE_SIZES, isContainerType, landscapeSlot } from '@radical/common/c4'
 
 export function effectiveWidth(n: C4Node): number {
   if (isContainerType(n.type) && n.collapsed) return COLLAPSED_WIDTH[n.type]
@@ -109,6 +109,44 @@ export function placeNewNode(nodes: Record<string, C4Node>, parentId: string | u
   if (!parent) return { x: siblings.length ? right + 80 : 0, y: 0 }
   const pad = compoundPadding(parent.type)
   return { x: siblings.length ? right + 20 : pad.side, y: pad.top }
+}
+
+/** Spacing of the cells a batch placer hands out. */
+export const BATCH_CELL = { width: 360, height: 280 }
+/** Gap between the nodes already on a canvas and a new batch beside them. */
+const BATCH_GAP = 120
+
+/**
+ * Places a batch of new nodes, one call per node: under each parent, cell by
+ * cell of a landscape grid (landscapeSlot) that starts right of the siblings
+ * already there, top-aligned with them. A batch so grows the canvas sideways
+ * rather than down, and never lands on what an earlier batch placed. Only the
+ * siblings in `visible()` count, when it returns a set (the nodes a view
+ * shows). Positions are relative to the parent, like C4Node.x/y.
+ */
+export function createBatchPlacer(
+  getNodes: () => Record<string, C4Node>,
+  visible: () => Set<string> | undefined = () => undefined,
+): (parentId?: string) => { x: number; y: number } {
+  const batches = new Map<string, { x: number; y: number; placed: number }>()
+  return (parentId) => {
+    const key = parentId ?? ''
+    let batch = batches.get(key)
+    if (!batch) {
+      const nodes = getNodes()
+      const parent = parentId ? nodes[parentId] : undefined
+      const shown = visible()
+      const siblings = Object.values(nodes).filter((n) =>
+        (n.parentId ?? undefined) === (parent?.id ?? undefined) && (!shown || shown.has(n.id)))
+      const pad = parent ? compoundPadding(parent.type) : { top: 0, side: 0 }
+      batch = siblings.length
+        ? { x: Math.max(...siblings.map((n) => n.x + effectiveWidth(n))) + (parent ? pad.side : BATCH_GAP), y: Math.min(...siblings.map((n) => n.y)), placed: 0 }
+        : { x: pad.side, y: pad.top, placed: 0 }
+      batches.set(key, batch)
+    }
+    const { column, row } = landscapeSlot(batch.placed++)
+    return { x: batch.x + column * BATCH_CELL.width, y: batch.y + row * BATCH_CELL.height }
+  }
 }
 
 /**
