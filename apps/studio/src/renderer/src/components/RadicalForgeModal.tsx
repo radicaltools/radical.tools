@@ -17,7 +17,7 @@ import {
   fileIntoForgeViews,
   findForgeView,
   forgeArrangeGroups,
-  forgeHubMatches,
+  forgeHubCandidates,
   formatClarificationAnswers,
   needLabelFromDescription,
   type ClarifyStageQuestion,
@@ -164,6 +164,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const [sessionUsage, setSessionUsage] = useState<TokenUsage | undefined>(undefined)
   const [wireframeRun, setWireframeRun] = useState<WireframeRun | null>(null)
   const [arrangeByStage, setArrangeByStage] = useState<Partial<Record<ForgeStageId, StageArrange>>>({})
+  /** The Hub concepts the model picked from each stage's candidates. */
+  const [hubPicksByStage, setHubPicksByStage] = useState<Partial<Record<ForgeStageId, HubConceptSummary[]>>>({})
   const [layingOut, setLayingOut] = useState(false)
   /** Furthest step reached by normal forward navigation — stepper tabs past
    *  it stay disabled. An early finish jumps to the last step without
@@ -213,6 +215,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setSessionUsage(undefined)
     setWireframeRun(null)
     setArrangeByStage({})
+    setHubPicksByStage({})
     setReachedIndex(0)
     setFinishedAt(null)
     clarifyStartedRef.current = new Set()
@@ -259,9 +262,15 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (text) setDescription(text)
   }, [])
 
-  const hubMatchesByStage = useMemo(
-    () => forgeHubMatches(hubConcepts, description, activeMetamodelId),
+  // Per stage: the keyword-ranked candidates the clarify call lets the model
+  // pick from, and the few suggested until it has (or when there is no AI).
+  const hubByStage = useMemo(
+    () => forgeHubCandidates(hubConcepts, description, activeMetamodelId).stages,
     [hubConcepts, description, activeMetamodelId],
+  )
+  const hubMatchesByStage = useMemo(
+    () => Object.fromEntries(FORGE_STAGES.map((s) => [s.id, hubPicksByStage[s.id] ?? hubByStage[s.id]?.suggested])) as Partial<Record<ForgeStageId, HubConceptSummary[]>>,
+    [hubByStage, hubPicksByStage],
   )
 
   // Fires once per stage, the moment it becomes current: asks the model
@@ -276,7 +285,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   // re-run's own guard bailed out (status was already non-empty) — the
   // response would arrive, see `cancelled`, and silently no-op, leaving the
   // stage stuck on "Checking for clarifying questions…" forever. Reading
-  // stageReports/unavailableReason/description/hubMatchesByStage/aiSettings
+  // stageReports/unavailableReason/description/hubByStage/aiSettings
   // without listing them is deliberate for the same reason — this is a
   // fire-once-per-stage-entry effect, not a sync-on-every-change one.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -299,8 +308,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       .map((s) => formatClarificationAnswers(clarifyQuestionsByStage[s.id], clarifyAnswersByStage[s.id]))
       .filter(Boolean)
       .join('\n\n')
-    askClarifyingQuestions(stage.title, description, hubMatchesByStage[currentStageId], aiSettings, undefined, priorQA)
-      .then(({ questions, usage }) => {
+    askClarifyingQuestions(stage.title, description, hubByStage[currentStageId]?.candidates, aiSettings, undefined, priorQA)
+      .then(({ questions, picked, usage }) => {
+        // An unreadable reply keeps the keyword suggestions.
+        if (picked) setHubPicksByStage((p) => ({ ...p, [currentStageId]: picked }))
         setClarifyQuestionsByStage((q) => ({ ...q, [currentStageId]: questions }))
         // multiSelect questions (in practice, just hub_matches) default to
         // "everything selected" — unless the user deselects something,
@@ -784,9 +795,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
             <div className="forge-stage-card">
               <p className="milestone-modal-text" style={{ margin: '0 0 10px' }}>{currentStage.blurb}</p>
 
-              {!!hubMatchesByStage[currentStage.id]?.length && (
+              {/* Hidden while the model picks, so the list does not change under the cursor. */}
+              {!!hubMatchesByStage[currentStage.id]?.length && clarifyStatusByStage[currentStage.id] && clarifyStatusByStage[currentStage.id] !== 'asking' && (
                 <div className="forge-hub-suggestions">
-                  <div className="forge-hub-suggestions-label">Suggested from the Hub</div>
+                  <div className="forge-hub-suggestions-label">{hubPicksByStage[currentStage.id] ? 'Picked from the Hub' : 'Suggested from the Hub'}</div>
                   {hubMatchesByStage[currentStage.id]!.map((c) => {
                     const imported = importedHubIds.has(c.id)
                     const importing = importingHubId === c.id

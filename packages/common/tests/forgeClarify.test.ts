@@ -4,7 +4,7 @@
  * ignores the format) without ever throwing or blocking the wizard.
  */
 import { describe, it, expect } from 'vitest'
-import { parseClarifyResponse, formatClarificationAnswers, HUB_MATCHES_QUESTION_ID, buildClarifyPrompt } from '../src/ai/forge/clarify'
+import { parseClarifyResponse, parseClarifyReply, pickedHubConcepts, formatClarificationAnswers, HUB_MATCHES_QUESTION_ID, buildClarifyPrompt } from '../src/ai/forge/clarify'
 
 describe('parseClarifyResponse', () => {
   it('parses a clean JSON array', () => {
@@ -67,9 +67,31 @@ describe('buildClarifyPrompt', () => {
     const hub = [{ id: 'p1', category: 'pattern', name: 'Pattern One', description: 'd', tags: [] } as any]
     const ask = buildClarifyPrompt('C4 model', 'desc', hub, undefined, 'ask')
     expect(ask).toContain('Ask the user those questions')
-    expect(ask).toContain('which of these Hub matches')
+    expect(ask).toContain('ask the user which of your picks to apply')
+    expect(ask).toContain('- p1 | [pattern] Pattern One: d')
     expect(ask).not.toContain('JSON')
     expect(ask).not.toContain(HUB_MATCHES_QUESTION_ID)
+  })
+})
+
+describe('Hub picks', () => {
+  const candidates = [
+    { id: 'p1', category: 'pattern', name: 'Pattern One', description: 'd', tags: [] },
+    { id: 'p2', category: 'pattern', name: 'Pattern Two', description: 'd', tags: [] },
+  ] as any[]
+
+  it('maps the picked names to the candidates, in the model\'s order, and drops unknown ones', () => {
+    const questions = parseClarifyReply(`[{"id":"auth","question":"Which auth?","kind":"text"},{"id":"${HUB_MATCHES_QUESTION_ID}","question":"Apply?","kind":"select","multiSelect":true,"options":["pattern two","Invented","p1"]}]`)!
+    const { questions: rest, picked } = pickedHubConcepts(questions, candidates)
+    expect(picked.map((c) => c.id)).toEqual(['p2', 'p1'])
+    expect(rest.map((q) => q.id)).toEqual(['auth', HUB_MATCHES_QUESTION_ID])
+    expect(rest[1].options).toEqual(['Pattern Two', 'Pattern One'])
+  })
+
+  it('tells a reply without picks from one that is not a reply', () => {
+    expect(pickedHubConcepts(parseClarifyReply('[]')!, candidates).picked).toEqual([])
+    expect(parseClarifyReply('Sorry, I cannot help.')).toBeNull()
+    expect(parseClarifyResponse('Sorry, I cannot help.')).toEqual([])
   })
 })
 

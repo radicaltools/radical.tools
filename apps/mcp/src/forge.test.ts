@@ -61,6 +61,10 @@ describe('Radical Forge over MCP', () => {
 
       const clarify = await call(client, 'forge_clarify', { stage: 'requirements' })
       expect(clarify).toContain('"Requirements" stage')
+      // Every requirement in the Hub is a candidate to pick from, ranked.
+      expect(clarify).toContain('Hub catalogue candidates for this stage')
+      expect(clarify).toContain('- req-idempotency | [requirement] Idempotent Write Operations')
+      expect(clarify).toContain('ask the user which of your picks to apply')
       expect(clarify).toContain('Ask the user those questions')
       expect(clarify).not.toContain('JSON')
 
@@ -91,7 +95,9 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'Pick-up requirement.' })
 
       await call(client, 'forge_clarify', { stage: 'fitness' })
-      const fitness = await call(client, 'forge_generate', { stage: 'fitness', hubConcepts: [] })
+      expect(await refused(client, 'forge_generate', { stage: 'fitness', hubConcepts: ['req-idempotency'] })).toContain('not a Hub candidate of this stage')
+      const fitness = await call(client, 'forge_generate', { stage: 'fitness', hubConcepts: ['ff-ledger-balance-integrity'] })
+      expect(fitness).toContain('Ledger Balance Integrity Check')
       expect(fitness).toContain('- Requirements: Pick-up requirement.')
       expect(await refused(client, 'forge_generate', { stage: 'scenarios' })).toContain('still open')
     } finally {

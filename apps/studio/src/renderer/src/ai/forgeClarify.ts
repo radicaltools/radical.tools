@@ -8,13 +8,16 @@
 // provider-agnostic — same pattern AISettingsModal.tsx already uses for its
 // "Test connection" button: getAdapter(id).chat({...}, cfg) then textOf(res.content).
 
-import { buildClarifyPrompt, parseClarifyResponse, type ClarifyStageQuestion } from '@radical/common/ai/forge'
+import { buildClarifyPrompt, parseClarifyReply, pickedHubConcepts, type ClarifyStageQuestion } from '@radical/common/ai/forge'
 import type { HubConceptSummary } from '@radical/common/hubFormat'
 import { getAdapter } from './registry'
 import { textOf, type AISettings, type TokenUsage } from './types'
 
 export interface ClarifyResult {
   questions: ClarifyStageQuestion[]
+  /** The Hub candidates the model picked for this stage ([] = none fits), or
+   *  null when its reply could not be read. */
+  picked: HubConceptSummary[] | null
   /** From this call alone — the caller sums it into whatever running total
    *  it's tracking (the clarify call is real token spend too, same as any
    *  generation round; it just doesn't touch the diagram). */
@@ -27,7 +30,7 @@ export interface ClarifyResult {
 export async function askClarifyingQuestions(
   stageTitle: string,
   description: string,
-  hubMatches: HubConceptSummary[] | undefined,
+  hubCandidates: HubConceptSummary[] | undefined,
   settings: AISettings,
   signal?: AbortSignal,
   priorQA?: string,
@@ -41,10 +44,13 @@ export async function askClarifyingQuestions(
   // routes clarify there regardless of what generation is configured to use.
   const res = await adapter.chat({
     model: adapter.defaultModel,
-    messages: [{ role: 'user', content: buildClarifyPrompt(stageTitle, description, hubMatches, priorQA) }],
-    maxTokens: 700,
+    messages: [{ role: 'user', content: buildClarifyPrompt(stageTitle, description, hubCandidates, priorQA) }],
+    maxTokens: 900,
     temperature: 0.3,
     signal,
   }, cfg)
-  return { questions: parseClarifyResponse(textOf(res.content)), usage: res.usage }
+  const reply = parseClarifyReply(textOf(res.content))
+  if (!reply) return { questions: [], picked: null, usage: res.usage }
+  const { questions, picked } = pickedHubConcepts(reply, hubCandidates ?? [])
+  return { questions, picked, usage: res.usage }
 }
