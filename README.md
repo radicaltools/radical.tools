@@ -50,6 +50,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 - **UI mockups**: Mockup element with a design link or an AI-generated low-fi wireframe, linked to requirements and scenarios (*illustrates*), to the container that renders it (*presented by*) and to other screens (*navigates to*) to model screen flows
 - **Smart Layout**: SA-based auto-layout with crossing minimisation, edge-length optimisation, aspect-ratio penalty, and compound parent fitting
 - **Alignments**: keep elements in a row, a column or a grid per view, optionally in the order you selected them (or a container's children with *Align children…*); drags, live physics and Smart Layout hold them, and the AI tools and MCP server can set them
+- **Calm drags**: a drag moves only what you drag and pushes clear only what you drop it on; dropped elements stay pinned where you put them (⌘/Ctrl-drag lets the live physics make room instead)
 - **Multiple layout engines**: ELK (hierarchical/layered/force), webcola (live physics), custom Smart Layout pipeline
 - **AI assistant**: chat with OpenAI / Anthropic / Gemini / Ollama to generate and modify diagrams
 - **Radical Forge**: turn a system description into requirements, fitness functions, Gherkin scenarios, UI mockups and a C4 model, one reviewable stage at a time; the description is kept in the model as a Need the requirements derive from

@@ -364,6 +364,16 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
 18. **`set_view_nodes` replaces the whole list.** Adding two elements to a
     view of 78 meant reading `views.json` (or `GET VIEW`) and sending all
     80 ids back. An `add`/`remove` form would avoid it.
+19. **The project's MCP server cannot serve a worktree.** `.mcp.json` points
+    the server at `architecture/` in the main checkout; recording an ADR for
+    a branch checked out in a git worktree (2026-10-08, calm drags) meant a
+    throwaway script driving the worktree's own server over stdio, or
+    editing the user's working copy. A `folder` argument on the tools (or a
+    `switch_folder` tool) would let one server reach either.
+20. **`search_model` takes no free text.** `search_model "physics"` answers
+    "Unsupported query"; finding the ADRs about layout took a `LIST NODES
+    WHERE (type = …) AND (label ~ … OR …)`. A plain query could fall back to
+    a substring search over labels and descriptions.
 
 ### Reverse-engineered requirements (2026-10-06)
 
@@ -508,6 +518,38 @@ headless pass for Smart Layout, a new rule and the MCP server. Still open:
    alignment now stops after 4 s (`MAX_PROJECTED_RUN_MS`). A lasting fix
    would let WebCoLa hold the line, for example through a leaf per container
    pinned to its centre, or keep aligned containers rigid in the physics.
+
+### Calm drags and pins (2026-10-08)
+
+Added in `feat/calm-drag`: a drag moves only what is dragged and pins it on
+the drop (`DragMode` and `clearOverlaps` in
+`packages/ui/src/layout/liveColaEngine.ts`, `PinConstraint` in
+`packages/common/src/c4.ts`; ADR "Calm drags pin what they drop"). Still open:
+
+1. **Smart Layout ignores pins.** It is run on purpose to arrange the whole
+   canvas, so it places pinned elements like any other (they stay pinned
+   where it puts them). Honouring them means fixed positions inside the ELK
+   candidates and the annealer: a core-IP change that needs its own
+   benchmark.
+2. **Pins only accumulate.** Every drop pins; nothing unpins on its own, so a
+   diagram arranged by hand ends up mostly pinned and the physics has little
+   it may move (an expand next to pinned elements can leave overlaps). An
+   *Unpin all* on All elements (which has no properties panel), unpinning a
+   selection from the selection bar, or a setting that makes drops not pin,
+   are the obvious next steps.
+3. **A calm drop pushes rigidly and greedily.** Each covered element moves
+   whole along its axis of least overlap; it never chooses a direction with
+   more room, and after `CALM_MAX_PUSHES` pushes a dense spot keeps its
+   overlaps. A pinned element, or one held by lines on both axes (a grid
+   cell), is never pushed, so an overlap with it stays. A container holding a
+   pinned element is still pushed whole.
+4. **The push drag needs a key.** Alt is the default connection modifier, so
+   the physics drag is on ⌘/Ctrl; on macOS, Ctrl-click opens the context
+   menu, so it is ⌘ there. There is no menu switch for it.
+5. **A container grown by a calm drag of its child shifts the child for a
+   frame** when it grows left or up (React Flow keeps the child's position
+   relative to its parent until the pointer moves): the engine reports the
+   child relative to the parent's new place, one worker message late.
 
 ### Radical Forge over MCP (2026-10-07)
 
