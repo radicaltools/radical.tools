@@ -419,7 +419,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       const result = await runAIPrompt({
         prompt, settings: aiSettings, diagram, signal: ctl.signal, onProgress, relevantTypeIds,
         // Forge builds the model; editing types or slides is out of scope and costs schema tokens every stage.
-        excludeToolGroups: ['metamodel', 'presentation'],
+        excludeToolGroups: ['metamodel', 'presentation', 'milestone'],
       })
       setStageReports((r) => ({ ...r, [stageId]: result.report }))
       setStageSummaries((s) => ({ ...s, [stageId]: result.summary || 'Done.' }))

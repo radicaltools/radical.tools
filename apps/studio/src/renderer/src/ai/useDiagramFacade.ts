@@ -89,6 +89,11 @@ export function createStoreFacade(): DiagramFacade {
       })
     },
     removeSequence: (id: string) => useDiagramStore.getState().removeSequence(id),
+    // ── milestones ──
+    getMilestones: () => useDiagramStore.getState().snapshots,
+    createMilestone: (name: string) => useDiagramStore.getState().createSnapshot(name),
+    renameMilestone: (id: string, name: string) => useDiagramStore.getState().renameSnapshot(id, name),
+    removeMilestone: (id: string) => useDiagramStore.getState().removeSnapshot(id),
     // ── metamodel, presentations, layout ──
     setMetamodel: (metamodel: Metamodel) => useDiagramStore.getState().setMetamodel(metamodel),
     getPresentations: () => useDiagramStore.getState().presentations,

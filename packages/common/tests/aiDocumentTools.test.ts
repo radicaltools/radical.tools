@@ -23,9 +23,10 @@ describe('tool groups', () => {
   it('leave out the excluded groups, keeping the rest in order', () => {
     const all = buildToolDefs(builtInGovernanceMetamodel()).map((d) => d.name)
     expect(all).toEqual(expect.arrayContaining(['smart_layout', 'create_presentation', 'upsert_node_type']))
-    const forge = buildToolDefs(builtInGovernanceMetamodel(), { exclude: ['metamodel', 'presentation'] }).map((d) => d.name)
+    const forge = buildToolDefs(builtInGovernanceMetamodel(), { exclude: ['metamodel', 'presentation', 'milestone'] }).map((d) => d.name)
     expect(forge).not.toContain('upsert_node_type')
     expect(forge).not.toContain('create_presentation')
+    expect(forge).not.toContain('create_milestone')
     expect(forge).toContain('smart_layout')
     expect(forge).toEqual(all.filter((name) => forge.includes(name)))
     expect(hasTool('smart_layout')).toBe(true)
@@ -134,6 +135,81 @@ describe('presentation focus', () => {
     expect(facade.getPresentations!()[0].slides[0]).toEqual({ ...captured, name: 'DB', viewport: { x: 0, y: 0, zoom: 0 }, focusNodeIds: [ctx.resolveId('d')] })
     await call('update_presentation', { id: tour.id, slides: [{ id: captured.id, name: 'All', viewId: 'v', focus: [] }] })
     expect(facade.getPresentations!()[0].slides[0].focusNodeIds).toBeUndefined()
+  })
+})
+
+describe('milestone tools', () => {
+  it('save phases of the model, rename, compare and delete them', async () => {
+    const { facade, call, ctx } = setup()
+    expect((await call('list_milestones', {})).resultText).toContain('no milestones yet')
+    await call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await call('add_node', { tempId: 'erp', type: 'system', label: 'ERP' })
+    await call('add_relation', { sourceId: 'shop', targetId: 'erp', label: 'orders' })
+    const asIs = await call('create_milestone', { name: 'As-is' })
+    expect(asIs.ok, asIs.resultText).toBe(true)
+    expect(asIs.resultText).toContain('2 element(s), 1 relation(s)')
+    const asIsId = facade.getMilestones!()[0].id
+
+    // The next phase: a new system, a renamed one, the old relation gone.
+    await call('add_node', { tempId: 'pay', type: 'system', label: 'Payments' })
+    await call('update_node', { id: 'shop', label: 'Web shop' })
+    await call('delete_relation', { id: Object.keys(facade.getRelations())[0] })
+    await call('add_relation', { sourceId: 'shop', targetId: 'pay', label: 'pays' })
+    // Layout changes are not changes to the system.
+    facade.updateNode(ctx.resolveId('erp'), { x: 500 })
+    expect((await call('create_milestone', { name: 'Target' })).ok).toBe(true)
+    const [saved, target] = facade.getMilestones!()
+    expect(saved.nodes[ctx.resolveId('shop')].label).toBe('Shop')
+    expect(Object.keys(target.nodes)).toHaveLength(3)
+
+    const listed = JSON.parse((await call('list_milestones', {})).resultText)
+    expect(listed).toEqual([
+      expect.objectContaining({ id: asIsId, name: 'As-is', nodes: 2, relations: 1 }),
+      expect.objectContaining({ id: target.id, name: 'Target', nodes: 3, relations: 1 }),
+    ])
+
+    const compared = await call('compare_milestones', { from: asIsId, to: target.id })
+    expect(compared.ok, compared.resultText).toBe(true)
+    expect(compared.resultText).toContain('From milestone "As-is" to milestone "Target"')
+    expect(compared.resultText).toMatch(/Elements added:\n- Payments \(system, /)
+    expect(compared.resultText).toMatch(/Elements changed:\n- Web shop \(system, [^)]+\): label\n/)
+    expect(compared.resultText).toContain('Relations removed:\n- Shop → ERP "orders"')
+    expect(compared.resultText).toContain('Relations added:\n- Web shop → Payments "pays"')
+    expect(compared.resultText).not.toContain('ERP (system')
+    expect((await call('compare_milestones', { from: target.id })).resultText).toContain('No changes from milestone "Target" to the current model')
+    expect((await call('compare_milestones', { from: 'nope' })).ok).toBe(false)
+
+    expect((await call('update_milestone', { id: asIsId, name: 'Today' })).ok).toBe(true)
+    expect((await call('update_milestone', { id: asIsId, name: ' ' })).ok).toBe(false)
+    expect((await call('delete_milestone', { id: target.id })).ok).toBe(true)
+    expect(facade.toDiagramData().snapshots).toEqual([expect.objectContaining({ id: asIsId, name: 'Today' })])
+    expect((await call('delete_milestone', { id: target.id })).resultText).toContain('unknown milestone')
+    // The current model never changes.
+    expect(Object.keys(facade.getNodes())).toHaveLength(3)
+  })
+
+  it('let a slide show a milestone, its focus checked against that model', async () => {
+    const { facade, call, ctx } = setup()
+    await call('add_node', { tempId: 'old', type: 'system', label: 'Mainframe' })
+    await call('create_milestone', { name: 'As-is' })
+    const asIs = facade.getMilestones!()[0].id
+    await call('delete_node', { id: 'old' })
+    await call('add_node', { tempId: 'new', type: 'system', label: 'Cloud' })
+    const created = await call('create_presentation', {
+      name: 'Roadmap',
+      slides: [{ name: 'Today', milestone: asIs, focus: ['old'] }, { name: 'Tomorrow', focus: ['new'] }],
+    })
+    expect(created.ok, created.resultText).toBe(true)
+    const roadmap = facade.getPresentations!()[0]
+    expect(roadmap.slides.map((slide) => slide.snapshotId)).toEqual([asIs, null])
+    expect(roadmap.slides[0].focusNodeIds).toEqual([ctx.resolveId('old')])
+    // A kept slide keeps its milestone unless told otherwise.
+    await call('update_presentation', { id: roadmap.id, slides: [{ id: roadmap.slides[0].id, name: 'Before' }] })
+    expect(facade.getPresentations!()[0].slides[0].snapshotId).toBe(asIs)
+    await call('update_presentation', { id: roadmap.id, slides: [{ id: roadmap.slides[0].id, name: 'Now', milestone: null }] })
+    expect(facade.getPresentations!()[0].slides[0].snapshotId).toBeNull()
+    expect((await call('update_presentation', { id: roadmap.id, slides: [{ name: 'X', milestone: 'nope' }] })).resultText).toContain('unknown milestone')
+    expect((await call('update_presentation', { id: roadmap.id, slides: [{ name: 'X', focus: ['old'] }] })).resultText).toContain('unknown node')
   })
 })
 

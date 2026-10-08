@@ -205,6 +205,26 @@ describe('canvas selection', () => {
   })
 })
 
+describe('milestones', () => {
+  it('saves a milestone into the folder, lists it in the summary and compares without writing', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    expect(model.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(['list_milestones', 'create_milestone', 'compare_milestones']))
+    await model.call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    const saved = await model.call('create_milestone', { name: 'As-is' })
+    expect(saved.text).toMatch(/^Saved milestone "As-is"/)
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(data.snapshots).toEqual([expect.objectContaining({ name: 'As-is', nodes: { [data.nodes[0].id]: expect.objectContaining({ label: 'Shop' }) } })])
+    expect(JSON.parse((await model.call('get_model_summary', {})).text.split('\n\n')[0]).milestones).toEqual([{ id: data.snapshots![0].id, name: 'As-is' }])
+
+    await model.call('add_node', { tempId: 'pay', type: 'system', label: 'Payments' })
+    const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+    const compared = await model.call('compare_milestones', { from: data.snapshots![0].id })
+    expect(compared.text).toContain('Elements added:\n- Payments (system, ')
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
+  })
+})
+
 describe('starting a model', () => {
   async function tempDir(): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'radical-new-'))

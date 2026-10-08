@@ -53,7 +53,8 @@ export interface RunAIOptions {
    *  primary type(s); QuickSearch omits it for full detail always. */
   relevantTypeIds?: Set<string>
   /** Tool groups to leave out. Radical Forge only builds the model, so it
-   *  leaves out 'metamodel' and 'presentation'; QuickSearch's chat has all. */
+   *  leaves out 'metamodel', 'presentation' and 'milestone'; QuickSearch's chat
+   *  has all. */
   excludeToolGroups?: ToolGroup[]
 }
 

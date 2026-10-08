@@ -32,6 +32,7 @@ const INSTRUCTIONS = [
   'move_node changes a node\'s parent. New and moved nodes get a simple placement; call smart_layout afterwards to arrange the model or one view.',
   'A `need` node keeps raw free-text input (brief, notes, raw requirements) in its description; derive EARS `requirement` nodes from it rather than rewriting it, linking each requirement → need with `derives`.',
   'Sequences (create_sequence) are ordered relation flows that dynamic views play; presentations are slides over views.',
+  'Milestones are named copies of the model at phases of the system (e.g. "As-is", "Target 2027"): create_milestone saves the current model as the latest one, compare_milestones says what changed, and a slide can show a milestone.',
   'Metamodel tools (upsert_node_type, upsert_relation_type, …) change the types; the tool schemas refresh after them.',
   'To turn a free-text description into requirements, fitness functions, scenarios, mockups and a C4 model the way Studio\'s Radical Forge does, start with forge_start and follow the steps it returns.',
 ].join(' ')

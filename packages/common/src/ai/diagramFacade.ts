@@ -4,7 +4,7 @@
 // applyPatch.ts — there is no single "apply a whole patch" function anymore,
 // each tool applies its own single change.
 
-import type { AlignConstraint, C4Node, C4Relation, DiagramSequence, DiagramView, LayoutConstraint, Presentation } from '../c4'
+import type { AlignConstraint, C4Node, C4Relation, DiagramSequence, DiagramSnapshot, DiagramView, LayoutConstraint, Presentation } from '../c4'
 import type { Metamodel } from '../metamodel'
 
 export interface ApplyReport {
@@ -98,6 +98,13 @@ export interface DiagramFacade {
   removeSequence?(id: string): void
   /** Optional — replaces the document's metamodel (metamodel tools). */
   setMetamodel?(metamodel: Metamodel): void
+  /** Optional milestone access — omitted = milestone tools report a clear
+   *  error. Milestones are named copies of the model, oldest first. */
+  getMilestones?(): DiagramSnapshot[]
+  /** Saves the current nodes, relations and sequences as the latest milestone; its id. */
+  createMilestone?(name: string): string
+  renameMilestone?(id: string, name: string): void
+  removeMilestone?(id: string): void
   /** Optional presentation access — omitted = presentation tools report a clear error. */
   getPresentations?(): Presentation[]
   setPresentations?(presentations: Presentation[]): void

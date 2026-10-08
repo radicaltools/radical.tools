@@ -21,13 +21,13 @@ import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult 
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
  *  external client. */
 const EXCLUDED_TOOLS = new Set(['set_active_view', 'focus_node', 'reset_diagram'])
-const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'search_model'])
+const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'search_model', 'list_milestones', 'compare_milestones'])
 const JSON_FILES = ['_layout.json', 'relations.json', 'views.json', 'sequences.json', 'snapshots.json', 'presentations.json', 'metamodel.json', 'hubTemplates.json']
 
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
     name: 'get_model_summary',
-    description: "Call this first. Shows counts, the views, sequences and presentations in the bound Radical model folder, plus the metamodel context message: each type's valid properties keys and enum options, allowed parents, cardinality and relation allowedPairs.",
+    description: "Call this first. Shows counts, the views, sequences, milestones and presentations in the bound Radical model folder, plus the metamodel context message: each type's valid properties keys and enum options, allowed parents, cardinality and relation allowedPairs.",
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -280,8 +280,13 @@ export class FolderModel {
           presentations: (data.presentations ?? []).map((presentation) => ({
             id: presentation.id,
             name: presentation.name,
-            slides: presentation.slides.map((slide) => ({ id: slide.id, name: slide.name, viewId: slide.viewId ?? null, ...(slide.focusNodeIds?.length ? { focus: slide.focusNodeIds } : {}) })),
+            slides: presentation.slides.map((slide) => ({
+              id: slide.id, name: slide.name, viewId: slide.viewId ?? null,
+              ...(slide.snapshotId ? { milestone: slide.snapshotId } : {}),
+              ...(slide.focusNodeIds?.length ? { focus: slide.focusNodeIds } : {}),
+            })),
           })),
+          milestones: (data.snapshots ?? []).map((milestone) => ({ id: milestone.id, name: milestone.name })),
           metamodel: { id: metamodel?.id, name: metamodel?.name },
           nodeTypes: Object.keys(metamodel?.nodeTypes ?? {}),
           relationTypes: Object.keys(metamodel?.relationTypes ?? {}),
