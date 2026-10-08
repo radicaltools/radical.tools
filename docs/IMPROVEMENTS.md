@@ -44,6 +44,16 @@ Two layers of suggestions: **functional** (what the user sees / can do) and **te
 18. **Notes / changelog per milestone** — "what changed and why" field.
 19. **Branching milestones** — experimental architecture variant as a "branch" off v3, with optional merge.
 
+Added in `feat/mcp-milestones`: the AI tools (Studio's chat and the MCP
+server) list, save, rename, delete and compare milestones, and a slide can
+show one. Still open:
+
+- **The agent cannot look inside a milestone.** `search_model` reads only the
+  current model; `compare_milestones` is the only view of a milestone's content.
+- **The agent cannot change a milestone or load one.** Studio's edit workflow
+  (propagate to later milestones, or insert a new one) has no tool, and
+  loading one over the current model is left to the timeline on purpose.
+
 ### Presenter / Viewer
 
 20. **Presenter notes** — per slide, visible only to presenter.
@@ -584,8 +594,8 @@ the wizard and the server send the same text. Still open:
    or grid and Smart Layout (`forge_arrange`). All elements still gets the
    single-row placement of `placeNewNode`.
 5. **The agent's own tools are not limited during a stage.** Studio leaves
-   the metamodel and presentation tools out of a Forge stage; the server only
-   tells the agent not to use them.
+   the metamodel, presentation and milestone tools out of a Forge stage; the
+   server only tells the agent not to use them.
 
 ### Forge views and arranging stages (2026-10-08)
 
