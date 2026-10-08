@@ -1,9 +1,10 @@
 // ─── Presentation tools: create_presentation / update_presentation / delete_presentation
 // A presentation is an ordered list of slides, each showing one view (or
 // every node). Slides made here carry no captured viewport or canvas state,
-// so Studio's presenter mode frames each one to fit its view.
+// so Studio's presenter mode frames each one to fit its view, or to fit the
+// slide's focus elements: several slides can zoom onto parts of one view.
 
-import type { Presentation, PresentationSlide } from '../../c4'
+import type { C4Node, DiagramView, Presentation, PresentationSlide } from '../../c4'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 
 const randomId = (): string =>
@@ -11,13 +12,18 @@ const randomId = (): string =>
 
 const SLIDES_SCHEMA = {
   type: 'array',
-  description: "Slides in order. Each shows one view (or every node without viewId), framed to fit. Pass an existing slide's id to keep it (and any framing captured in Studio).",
+  description: "Slides in order. Each shows one view (or every node without viewId), framed to fit the whole view or only its focus elements; several slides may show the same view with different focus to zoom onto its parts. Pass an existing slide's id to keep it (and any framing captured in Studio).",
   items: {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'Existing slide id to keep; omit for a new slide.' },
       name: { type: 'string' },
       viewId: { type: ['string', 'null'], description: 'Real view id or a tempId from this run.' },
+      focus: {
+        type: 'array',
+        items: { type: 'string' },
+        description: "Node ids (or tempIds) the slide zooms onto, shown in the slide's view; the camera frames just these. Empty = the whole view. Omit on a kept slide to keep its focus and framing; passing it drops framing captured in Studio.",
+      },
     },
     required: ['name'],
     additionalProperties: false,
@@ -28,7 +34,7 @@ export function buildPresentationToolDefs(): ToolDef[] {
   return [
     {
       name: 'create_presentation',
-      description: 'Create a presentation: an ordered list of slides, each showing one view.',
+      description: 'Create a presentation: an ordered list of slides, each showing one view, whole or zoomed onto some of its elements (focus).',
       inputSchema: {
         type: 'object',
         properties: { name: { type: 'string' }, slides: SLIDES_SCHEMA },
@@ -59,9 +65,36 @@ export function buildPresentationToolDefs(): ToolDef[] {
   ]
 }
 
-const newSlide = (id: string, name: string, viewId: string | null): PresentationSlide =>
-  // A zero viewport and no canvas state make Studio fit the slide's view.
-  ({ id, name, snapshotId: null, viewId, viewport: { x: 0, y: 0, zoom: 0 } })
+const NO_VIEWPORT = { x: 0, y: 0, zoom: 0 }
+
+const newSlide = (id: string, name: string, viewId: string | null, focus: string[] | undefined): PresentationSlide =>
+  // A zero viewport and no canvas state make Studio fit the slide's view (or its focus).
+  ({ id, name, snapshotId: null, viewId, viewport: NO_VIEWPORT, ...(focus?.length ? { focusNodeIds: focus } : {}) })
+
+/** Nodes a view shows: its listed nodes and their ancestors (every node when it lists none). */
+function shownIn(view: DiagramView | undefined, nodes: Record<string, C4Node>): ((id: string) => boolean) {
+  if (!view || view.nodeIds.length === 0) return (id) => id in nodes
+  const shown = new Set<string>()
+  for (let id of view.nodeIds) {
+    while (id && nodes[id] && !shown.has(id)) {
+      shown.add(id)
+      id = nodes[id].parentId ?? ''
+    }
+  }
+  return (id) => shown.has(id)
+}
+
+function parseFocus(tool: string, i: number, raw: unknown, ctx: ToolRunContext, view: DiagramView | undefined): string[] | string {
+  if (!Array.isArray(raw) || raw.some((id) => typeof id !== 'string')) return `${tool}: slide ${i + 1} focus must be an array of node ids`
+  const nodes = ctx.diagram.getNodes()
+  const shown = shownIn(view, nodes)
+  const focus = [...new Set((raw as string[]).map((id) => ctx.resolveId(id)))]
+  const unknown = focus.filter((id) => !(id in nodes))
+  if (unknown.length) return `${tool}: slide ${i + 1} focuses on unknown node(s) ${unknown.map((id) => `"${id}"`).join(', ')}`
+  const outside = focus.filter((id) => !shown(id))
+  if (outside.length) return `${tool}: slide ${i + 1} focuses on node(s) not in view "${view!.name}": ${outside.map((id) => `${nodes[id].label} (${id})`).join(', ')}`
+  return focus
+}
 
 function parseSlides(tool: string, raw: unknown, ctx: ToolRunContext, existing: PresentationSlide[]): PresentationSlide[] | string {
   if (!Array.isArray(raw)) return `${tool}: slides must be an array`
@@ -69,7 +102,7 @@ function parseSlides(tool: string, raw: unknown, ctx: ToolRunContext, existing: 
   const kept = new Map(existing.map((slide) => [slide.id, slide]))
   const slides: PresentationSlide[] = []
   for (const [i, item] of raw.entries()) {
-    const s = item as { id?: unknown; name?: unknown; viewId?: unknown }
+    const s = item as { id?: unknown; name?: unknown; viewId?: unknown; focus?: unknown }
     if (typeof s?.name !== 'string' || !s.name.trim()) return `${tool}: slide ${i + 1} needs a name`
     let viewId: string | null = null
     if (s.viewId != null) {
@@ -77,13 +110,25 @@ function parseSlides(tool: string, raw: unknown, ctx: ToolRunContext, existing: 
       viewId = ctx.resolveId(s.viewId)
       if (!(viewId in views)) return `${tool}: slide ${i + 1} has unknown viewId "${s.viewId}"`
     }
+    let focus: string[] | undefined
+    if (s.focus !== undefined) {
+      const parsed = parseFocus(tool, i, s.focus, ctx, viewId ? views[viewId] : undefined)
+      if (typeof parsed === 'string') return parsed
+      focus = parsed
+    }
     const previous = typeof s.id === 'string' ? kept.get(s.id) : undefined
     if (typeof s.id === 'string' && !previous) return `${tool}: slide ${i + 1} has unknown id "${s.id}"`
     const name = s.name.trim()
-    if (!previous) slides.push(newSlide(randomId(), name, viewId))
+    if (!previous) slides.push(newSlide(randomId(), name, viewId, focus))
     // A slide moved to another view loses the framing captured for the old one.
-    else if ((previous.viewId ?? null) === viewId) slides.push({ ...previous, name })
-    else slides.push(newSlide(previous.id, name, viewId))
+    else if ((previous.viewId ?? null) !== viewId) slides.push(newSlide(previous.id, name, viewId, focus))
+    else if (!focus) slides.push({ ...previous, name })
+    else {
+      // A new focus replaces the camera captured in Studio, which would win over it.
+      const slide: PresentationSlide = { ...previous, name, viewport: NO_VIEWPORT, focusNodeIds: focus }
+      if (!focus.length) delete slide.focusNodeIds
+      slides.push(slide)
+    }
   }
   return slides
 }

@@ -4373,6 +4373,10 @@ export const useDiagramStore = create<DiagramStore>()(
             { x: vp.x, y: vp.y, zoom: vp.zoom },
             { duration: 600 },
           ))
+        } else if (slide.focusNodeIds?.length) {
+          // No captured camera: zoom onto the slide's focus elements.
+          const focus = slide.focusNodeIds
+          requestAnimationFrame(() => (window as any).__rfFocusNodes?.(focus, { duration: 600 }))
         } else {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => _getFitViewFn()?.())
@@ -4433,6 +4437,10 @@ export const useDiagramStore = create<DiagramStore>()(
             { x: vp.x, y: vp.y, zoom: vp.zoom },
             { duration: 400 },
           ))
+        } else if (slide.focusNodeIds?.length) {
+          // No captured camera: zoom onto the slide's focus elements.
+          const focus = slide.focusNodeIds
+          requestAnimationFrame(() => (window as any).__rfFocusNodes?.(focus, { duration: 400 }))
         } else {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => _getFitViewFn()?.())

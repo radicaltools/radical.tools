@@ -31,7 +31,7 @@ The server binds to one folder at launch, then reads it afresh for every tool ca
 - `add_`, `update_` and `delete_` tools for nodes and relations, and `move_node` to change a node's parent (it keeps the node's canvas position and enforces the metamodel's `allowedParents`);
 - `create_view`, `update_view` (name, kind, linked sequence, hidden relations), `set_view_nodes` and `delete_view`;
 - `create_sequence`, `update_sequence` and `delete_sequence`: ordered relation flows that a `dynamic` view plays;
-- `create_presentation`, `update_presentation` and `delete_presentation`: slides over views, which Studio frames to fit;
+- `create_presentation`, `update_presentation` and `delete_presentation`: slides over views, which Studio frames to fit the whole view or the slide's `focus` elements (several slides can zoom onto parts of one view);
 - `upsert_node_type`, `delete_node_type`, `upsert_relation_type` and `delete_relation_type`. A built-in metamodel is copied to a `…-custom` id on the first edit, because Studio replaces built-in metamodels with their preset on load. After a metamodel change (from these tools or from Studio) the server re-advertises the node and relation tool schemas;
 - `smart_layout`, for All elements or one static or dynamic view (`viewId`), which then gets its own saved positions;
 - `align_nodes` (a row or a column, with `keepOrder` to keep the listed order), `grid_nodes` (`columns` columns, filled row by row) and `remove_alignment`, for All elements or one view (`viewId`). Studio and `smart_layout` keep these rules in every later layout.

@@ -310,6 +310,11 @@ export interface PresentationSlide {
   /** null = show all nodes; string = activate this view when navigating to slide */
   viewId?: string | null
   viewport: { x: number; y: number; zoom: number }
+  /**
+   * Elements the slide zooms onto when it has no captured viewport: the
+   * camera frames just these, so several slides can show parts of one view.
+   */
+  focusNodeIds?: string[]
   /** Full node positions + collapsed flags at the time the slide was created/captured */
   canvasState?: SlideCanvasState
   /**

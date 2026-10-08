@@ -649,6 +649,38 @@ function StructuralCanvas(): React.ReactElement {
       suppressAutoFit(dur + 2500)
       instance.setCenter(px, py, { zoom: opts?.zoom ?? 1.1, duration: dur })
     }
+    // A presentation slide with focus elements frames just those, once React
+    // Flow has drawn them (the slide switch may have just swapped the view).
+    // Hidden ones (inside a collapsed group) are left out; with none shown,
+    // the slide falls back to fitting the whole view.
+    ;(window as any).__rfFocusNodes = (ids: string[], opts?: { duration?: number }) => {
+      const dur = opts?.duration ?? 600
+      const wanted = new Set(ids)
+      suppressAutoFit(dur + 1800)
+      let frames = 0
+      const frame = () => {
+        const focus = instance.getNodes().filter((n) => wanted.has(n.id) && !n.hidden)
+        const drawn = focus.length > 0 && focus.every((n) => n.width && n.height)
+        if (!drawn && ++frames < 30) {
+          requestAnimationFrame(frame)
+          return
+        }
+        const rect = containerRef.current?.getBoundingClientRect()
+        if (!drawn || !rect || rect.width === 0 || rect.height === 0) {
+          smoothFitView(dur, true)
+          return
+        }
+        const bounds = getNodesBounds(focus)
+        const MARGIN = 60
+        const target = getViewportForBounds(
+          { x: bounds.x - MARGIN, y: bounds.y - MARGIN, width: bounds.width + MARGIN * 2, height: bounds.height + MARGIN * 2 },
+          rect.width, rect.height, 0.05, 1.5, 0.08,
+        )
+        suppressAutoFit(dur + 1800)
+        instance.setViewport(target, { duration: dur })
+      }
+      requestAnimationFrame(frame)
+    }
     // Presentation slide navigation (diagramStore's goToSlide/previewSlide)
     // uses this to stop the auto-fit interval from fighting the slide's own
     // captured camera right after a slide switch swaps the visible node set.

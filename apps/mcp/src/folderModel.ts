@@ -241,7 +241,7 @@ export class FolderModel {
           presentations: (data.presentations ?? []).map((presentation) => ({
             id: presentation.id,
             name: presentation.name,
-            slides: presentation.slides.map((slide) => ({ id: slide.id, name: slide.name, viewId: slide.viewId ?? null })),
+            slides: presentation.slides.map((slide) => ({ id: slide.id, name: slide.name, viewId: slide.viewId ?? null, ...(slide.focusNodeIds?.length ? { focus: slide.focusNodeIds } : {}) })),
           })),
           metamodel: { id: metamodel?.id, name: metamodel?.name },
           nodeTypes: Object.keys(metamodel?.nodeTypes ?? {}),
