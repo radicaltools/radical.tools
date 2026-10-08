@@ -31,7 +31,7 @@ export function buildLayoutToolDefs(): ToolDef[] {
   return [
     {
       name: 'smart_layout',
-      description: "Run Smart Layout and keep the new positions and container sizes. Without viewId it arranges the All elements canvas; with the id of a static or dynamic view it arranges that view's own positions. Call it after adding or moving several nodes.",
+      description: "Run Smart Layout and keep the new positions and container sizes. Without viewId it arranges the All elements canvas; with the id of a static or dynamic view it arranges that view's own positions. Alignments and grids hold; the canvas's pins (elements a Studio user dropped after a drag) are removed, since every element gets a new place. Call it after adding or moving several nodes.",
       inputSchema: {
         type: 'object',
         properties: { viewId: { type: 'string', description: 'A static or dynamic view (real id or tempId); omit for All elements.' } },

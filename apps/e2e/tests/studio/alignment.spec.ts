@@ -35,11 +35,14 @@ test('a row on All elements holds through a drag, Smart Layout and a reload', as
   await page.mouse.up()
   await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
 
+  // The row, and the pin on the dropped element.
+  const types = async (): Promise<string[] | undefined> => (await studio.storedDoc() as { defaultLayoutConstraints?: Array<{ type: string }> }).defaultLayoutConstraints?.map((c) => c.type)
+  await expect.poll(types).toEqual(['align', 'pin'])
+
+  // Smart Layout keeps the row and unpins the canvas.
   await studio.smartLayout()
   await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
-
-  // The row, and the pin on the dropped element.
-  await expect.poll(async () => (await studio.storedDoc() as { defaultLayoutConstraints?: Array<{ type: string }> }).defaultLayoutConstraints?.map((c) => c.type)).toEqual(['align', 'pin'])
+  await expect.poll(types).toEqual(['align'])
   await studio.open('canvas')
   await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
 })

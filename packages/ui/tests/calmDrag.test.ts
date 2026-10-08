@@ -368,6 +368,25 @@ describe('Pins in the store', () => {
     expect(s().defaultLayoutConstraints).toEqual([])
   })
 
+  it('Smart Layout unpins the canvas it arranges, in the same undo step', async () => {
+    const s = useDiagramStore.getState
+    // On top of each other: Smart Layout has something to do.
+    useDiagramStore.setState({
+      c4Nodes: {
+        a: node('a', 'system', { x: 0, y: 0 }),
+        b: node('b', 'system', { x: 10, y: 10 }),
+        c: node('c', 'system', { x: 20, y: 20 }),
+      },
+    } as any)
+    s()._sync()
+    s().liveRelease('a', ['b'])
+    expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['a', 'b'])
+    await s().runSmartLayout()
+    expect(s().defaultLayoutConstraints).toEqual([])
+    s().undo()
+    expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['a', 'b'])
+  }, 60_000)
+
   it('pins in the active view only', () => {
     const s = useDiagramStore.getState
     const vid = s().addView('Context')

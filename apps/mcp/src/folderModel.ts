@@ -11,7 +11,7 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { viewLayoutInput, applyAlignments, applyLayoutPositions, resizeParentsBottomUp } from '@radical/layout/viewInput'
-import type { C4Node, DiagramData, NodePosition } from '@radical/common/c4'
+import { pinnedNodeIds, type C4Node, type DiagramData, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
 import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
 
@@ -324,6 +324,11 @@ export class FolderModel {
     if (result.keptCurrent) return { ok: true, text: 'Smart Layout: the current layout already scores best; nothing changed.' }
     applyLayoutPositions(nodes, result.winner.positions, input)
     resizeParentsBottomUp(nodes, input)
+    // Every element has a new place: pins (elements a Studio user dropped
+    // after a drag) go with the old ones.
+    const unpinned = pinnedNodeIds(constraints).length
+    if (view) view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
+    else changed.defaultLayoutConstraints = changed.defaultLayoutConstraints?.filter((c) => c.type !== 'pin')
     // The refit knows nothing of the alignments; put them back.
     applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
     // All elements writes the nodes themselves (settleGeometry then syncs
@@ -337,7 +342,7 @@ export class FolderModel {
     return {
       ok: true,
       changed,
-      text: `Smart Layout${view ? ` (${view.name})` : ''}: ${result.winner.name}; crossings ${before.crossings} -> ${after.crossings}, overdraws ${before.overdraws} -> ${after.overdraws}.`,
+      text: `Smart Layout${view ? ` (${view.name})` : ''}: ${result.winner.name}; crossings ${before.crossings} -> ${after.crossings}, overdraws ${before.overdraws} -> ${after.overdraws}.${unpinned ? ` Unpinned ${unpinned} element${unpinned === 1 ? '' : 's'}.` : ''}`,
     }
   }
 

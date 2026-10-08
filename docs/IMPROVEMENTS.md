@@ -526,17 +526,18 @@ the drop (`DragMode` and `clearOverlaps` in
 `packages/ui/src/layout/liveColaEngine.ts`, `PinConstraint` in
 `packages/common/src/c4.ts`; ADR "Calm drags pin what they drop"). Still open:
 
-1. **Smart Layout ignores pins.** It is run on purpose to arrange the whole
-   canvas, so it places pinned elements like any other (they stay pinned
-   where it puts them). Honouring them means fixed positions inside the ELK
-   candidates and the annealer: a core-IP change that needs its own
-   benchmark.
-2. **Pins only accumulate.** Every drop pins; nothing unpins on its own, so a
-   diagram arranged by hand ends up mostly pinned and the physics has little
-   it may move (an expand next to pinned elements can leave overlaps). An
-   *Unpin all* on All elements (which has no properties panel), unpinning a
-   selection from the selection bar, or a setting that makes drops not pin,
-   are the obvious next steps.
+1. **Smart Layout unpins rather than honours pins.** It is run on purpose
+   to arrange the whole canvas, so it places every element anew and removes
+   the canvas's pins (one undo step with the layout; nothing when it keeps
+   the current layout). Laying out around pinned elements would mean fixed
+   positions inside the ELK candidates and the annealer: a core-IP change
+   that needs its own benchmark.
+2. **Between layouts, pins only accumulate.** Every drop pins, so a diagram
+   arranged by hand ends up mostly pinned and the physics has little it may
+   move (an expand next to pinned elements can leave overlaps) until the
+   next Smart Layout. An *Unpin all* on All elements (which has no
+   properties panel), unpinning a selection from the selection bar, or a
+   setting that makes drops not pin, are the next steps.
 3. **A calm drop pushes rigidly and greedily.** Each covered element moves
    whole along its axis of least overlap; it never chooses a direction with
    more room, and after `CALM_MAX_PUSHES` pushes a dense spot keeps its

@@ -207,8 +207,8 @@ export interface GridConstraint {
 /**
  * Keeps `nodeIds` where they stand: the live physics does not move them (a
  * drag still does). A canvas has at most one; dropping an element after a
- * drag adds it. Smart Layout, which arranges the whole canvas when asked,
- * places them like any other element and they stay pinned where it puts them.
+ * drag adds it. A layout of the whole canvas (Smart Layout) places every
+ * element anew and removes it.
  */
 export interface PinConstraint {
   id: string

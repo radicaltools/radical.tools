@@ -1307,6 +1307,15 @@ interface DiagramStore {
   _arrangeGrid: (id: string) => void
 }
 
+/** A layout of the whole canvas places every element anew: the active
+ *  canvas's pins (elements dropped after a drag) go with the old places.
+ *  Designer only: Viewer puts the old positions back when it is left. */
+function unpinLaidOut(state: DiagramStore, appMode: DiagramStore['appMode']): void {
+  if (appMode !== 'designer') return
+  const pinned = pinnedNodeIds(model.layoutConstraintsOf(state, state.activeViewId))
+  if (pinned.length) model.setPinned(state, state.activeViewId, pinned, false, uid)
+}
+
 // ─── Live layout singleton (not serialisable → kept outside store) ───────────
 
 let _liveLayout: LiveColaLayout | null = null
@@ -3117,7 +3126,10 @@ export const useDiagramStore = create<DiagramStore>()(
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const positions = applyRadicalLayout(input.nodes, input.relations)
-          set((state) => { applyLayoutPositions(state.c4Nodes, positions, input) })
+          set((state) => {
+            applyLayoutPositions(state.c4Nodes, positions, input)
+            unpinLaidOut(state, get().appMode)
+          })
 
           // Resize parents bottom-up for any compound nodes not sized by radical
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
@@ -3170,7 +3182,10 @@ export const useDiagramStore = create<DiagramStore>()(
           // One undo step for the whole layout. Viewer reverts positions on exit anyway.
           if (get().appMode === 'designer') get()._pushUndo()
           get()._markMilestoneEdit()
-          set((state) => { applyLayoutPositions(state.c4Nodes, positions, input) })
+          set((state) => {
+            applyLayoutPositions(state.c4Nodes, positions, input)
+            unpinLaidOut(state, get().appMode)
+          })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level.
@@ -3244,7 +3259,10 @@ export const useDiagramStore = create<DiagramStore>()(
           // One undo step for the whole layout. Viewer reverts positions on exit anyway.
           if (get().appMode === 'designer') get()._pushUndo()
           get()._markMilestoneEdit()
-          set((state) => { applyLayoutPositions(state.c4Nodes, result.winner.positions, input) })
+          set((state) => {
+            applyLayoutPositions(state.c4Nodes, result.winner.positions, input)
+            unpinLaidOut(state, get().appMode)
+          })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level (same as ELK/Radical paths).
