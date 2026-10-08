@@ -1,7 +1,8 @@
 import type { Page, Route } from '@playwright/test'
 import { test, expect, fixture } from '../../support/fixtures'
 
-// Radical Forge files what each stage generates into the views Conceptual,
+// Radical Forge offers the Hub concepts the model picked from a stage's
+// candidates, files what each stage generates into the views Conceptual,
 // Logical & physical and Governance, places it beside what the view already
 // shows, and after the stage offers to keep it in a row, column or grid and
 // to run Smart Layout. The AI provider is scripted: no network, no key.
@@ -10,7 +11,8 @@ interface ToolUse { name: string; input: Record<string, unknown> }
 
 /** Answers Anthropic Messages calls: no clarifying questions, and per stage
  *  one round of add_node calls, then a summary. */
-async function scriptAnthropic(page: Page, stages: Array<{ task: RegExp; calls: ToolUse[] }>): Promise<void> {
+async function scriptAnthropic(page: Page, stages: Array<{ task: RegExp; calls: ToolUse[] }>): Promise<string[]> {
+  const stagePrompts: string[] = []
   await page.addInitScript(() => {
     localStorage.setItem('radical-ai-settings', JSON.stringify({
       enabled: true,
@@ -24,13 +26,22 @@ async function scriptAnthropic(page: Page, stages: Array<{ task: RegExp; calls: 
       contentType: 'application/json',
       body: JSON.stringify({ model: 'claude-haiku-4-5', content, stop_reason: stop, usage: { input_tokens: 10, output_tokens: 10 } }),
     })
-    if (!body.tools) return reply([{ type: 'text', text: '[]' }], 'end_turn')
+    if (!body.tools) {
+      // Clarify: pick one Hub candidate when the requirements stage offers it.
+      const prompt = JSON.stringify(body.messages)
+      const pick = prompt.includes('\\"Requirements\\" stage') && prompt.includes('- req-idempotency |')
+        ? [{ id: 'hub_matches', question: 'Apply these Hub concepts?', kind: 'select', multiSelect: true, options: ['Idempotent Write Operations'] }]
+        : []
+      return reply([{ type: 'text', text: JSON.stringify(pick) }], 'end_turn')
+    }
     const all = JSON.stringify(body.messages)
     if (all.includes('tool_result')) return reply([{ type: 'text', text: 'Done.' }], 'end_turn')
+    stagePrompts.push(all)
     const stage = stages.find((s) => s.task.test(all))
     if (!stage) return reply([{ type: 'text', text: 'Nothing to do.' }], 'end_turn')
     return reply(stage.calls.map((call, i) => ({ type: 'tool_use', id: `t${i}`, name: call.name, input: call.input })), 'tool_use')
   })
+  return stagePrompts
 }
 
 const requirement = (i: number): ToolUse => ({
@@ -51,7 +62,7 @@ test('Forge files each stage into its view and offers to arrange it', async ({ p
   const doc = JSON.parse(fixture('bookstore'))
   doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'C4 + DDD + Governance', nodeTypes: {}, relationTypes: {} }
   await studio.seedDocument(JSON.stringify(doc))
-  await scriptAnthropic(page, [
+  const stagePrompts = await scriptAnthropic(page, [
     { task: /extract its functional requirements/, calls: [1, 2, 3, 4, 5].map(requirement) },
     { task: /propose fitness functions/, calls: [1, 2].map(fitness) },
   ])
@@ -69,10 +80,19 @@ test('Forge files each stage into its view and offers to arrange it', async ({ p
   const conceptual = (await viewNamed('Conceptual'))!
   await expect(page).toHaveURL(new RegExp(`/v/${conceptual.id}$`))
 
+  // The model picked one of the stage's Hub candidates; the user confirms it.
+  const hub = page.locator('.forge-hub-suggestions')
+  await expect(hub.locator('.forge-hub-suggestions-label')).toHaveText('Picked from the Hub')
+  await expect(hub.locator('.forge-hub-card-name')).toHaveText(['Idempotent Write Operations'])
+  await expect(page.getByLabel('Idempotent Write Operations')).toBeChecked()
+  await page.getByRole('button', { name: 'Confirm answers' }).click()
+
   // Requirements: into Conceptual, then the arrange questions.
   await page.getByRole('button', { name: 'Generate requirements' }).click()
   const arrange = page.locator('.forge-arrange')
   await expect(arrange).toContainText('Keep the 5 new elements on Conceptual in a')
+  expect(stagePrompts[0]).toContain('Relevant prior art already in the Hub catalogue')
+  expect(stagePrompts[0]).toContain('Idempotent Write Operations')
   await expect(arrange).toContainText('Run Smart Layout on Conceptual?')
   await expect.poll(async () => (await viewNamed('Conceptual'))!.nodeIds.length).toBe(6)
   const requirements = (await stored()).nodes.filter((n) => n.type === 'requirement').map((n) => n.id)

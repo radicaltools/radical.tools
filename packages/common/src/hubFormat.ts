@@ -73,6 +73,10 @@ export interface HubConceptSummary extends HubConceptMeta {
   rootTypes: string[]
   /** Scalar governance fields of the first node, for card badges. */
   preview: Record<string, string>
+  /** What the concept's nodes say (labels, EARS actions, thresholds, ADR
+   *  decisions), template tokens removed: what Forge's Hub matching searches
+   *  besides the name, tags and description. Missing in older indexes. */
+  searchText?: string
 }
 
 /**
@@ -104,6 +108,22 @@ export interface HubImportRecord {
 export const HUB_INDEX_FILE = 'index.json'
 
 const PREVIEW_KEYS = ['ears_type', 'priority', 'status', 'category', 'trigger'] as const
+
+/** Node fields that say what a concept is about, for searchText. */
+const SEARCH_KEYS = ['label', 'description', 'trigger', 'action', 'threshold', 'decision'] as const
+const SEARCH_TEXT_MAX = 600
+
+function searchTextOf(nodes: Array<Record<string, unknown>>): string {
+  const parts: string[] = []
+  for (const node of nodes) {
+    for (const k of SEARCH_KEYS) {
+      const v = node[k]
+      if (typeof v === 'string' && v.trim()) parts.push(v.replace(/\{\{[A-Z0-9_]+\}\}/g, ' ').replace(/\s+/g, ' ').trim())
+    }
+  }
+  const text = [...new Set(parts)].join(' · ')
+  return text.length > SEARCH_TEXT_MAX ? `${text.slice(0, SEARCH_TEXT_MAX).replace(/\s+\S*$/, '')}…` : text
+}
 
 export function conceptFile(meta: Pick<HubConceptMeta, 'id' | 'category'>): string {
   return `${meta.category}/${meta.id}.radical`
@@ -139,6 +159,7 @@ export function summarize(doc: HubRadicalDoc, file: string = conceptFile(doc.hub
     relationCount: doc.relations?.length ?? 0,
     rootTypes: doc.nodes.filter((n) => !n.parentId).map((n) => (n.type as string) ?? 'component'),
     preview,
+    searchText: searchTextOf(doc.nodes),
   }
 }
 

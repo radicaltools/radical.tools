@@ -2,7 +2,7 @@
 // Studio's Forge wizard (RadicalForgeModal.tsx) calls its own provider for
 // every step. Here the MCP client's model is the one that thinks, so each
 // forge_* tool hands it what the wizard would have sent its provider — the
-// same stage prompts, clarifying-question prompt, Hub matches and wireframe
+// same stage prompts, clarifying-question prompt, Hub candidates and wireframe
 // prompt from @radical/common/ai/forge — and keeps the run's state: the need,
 // the answers, the stage summaries and what each stage added (so Regenerate
 // replaces it). The client builds the model with the ordinary catalogue tools.
@@ -31,7 +31,7 @@ import {
   buildWireframePrompt,
   fileIntoForgeViews,
   forgeArrangeGroups,
-  forgeHubMatches,
+  forgeHubCandidates,
   formatClarificationAnswers,
   idsAddedSince,
   modelIdsOf,
@@ -39,6 +39,7 @@ import {
   outermostNodes,
   type ClarifyStageQuestion,
   type FiledNodes,
+  type ForgeHubCandidates,
   type ForgeArrangement,
   type ForgeStageId,
   type ModelIds,
@@ -66,7 +67,7 @@ export const FORGE_PROCEDURE = [
   `   Every element a stage adds goes into one of three views: ${Object.values(FORGE_VIEW_NAMES).join(', ')}.`,
   '2. For each stage, in order:',
   '   a. forge_clarify: read it and ask the user the clarifying questions it calls for, if any, including which',
-  '      Hub matches to apply. Wait for the answers.',
+  '      Hub concepts you pick from its candidates to apply. Wait for the answers.',
   '   b. forge_generate with those answers and the Hub concepts the user kept. It returns the stage task:',
   '      carry it out with the model tools (add_node, add_relation, update_node, search_model, …).',
   '   c. forge_complete_stage with a short summary of what you created and why.',
@@ -96,7 +97,7 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'forge_clarify',
-    description: 'Before generating a Forge stage: returns the stage\'s Hub matches and what to clarify with the user first. Ask the user, then call forge_generate with the answers.',
+    description: 'Before generating a Forge stage: returns what to clarify with the user first and the stage\'s Hub candidates to pick from. Ask the user, then call forge_generate with the answers.',
     inputSchema: {
       type: 'object',
       properties: { stage: { ...stageEnum, description: 'The next stage of the run, or one already generated (to regenerate it with new answers).' } },
@@ -124,7 +125,7 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
         hubConcepts: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Ids of this stage\'s Hub matches (from forge_clarify) the user wants applied. Omit to apply all of them; [] applies none.',
+          description: 'Ids of this stage\'s Hub candidates (from forge_clarify) the user wants applied: the ones you picked and the user kept. Omit to apply the few best keyword matches; [] applies none.',
         },
         regenerate: { type: 'boolean', description: 'Required to run a stage again: removes what its previous run added first.' },
       },
@@ -177,7 +178,7 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
     description: 'Import a Hub catalogue concept (pattern, ADR, fitness function, requirement or blueprint) into the model as it is, beside the existing elements, as Forge\'s Import button does.',
     inputSchema: {
       type: 'object',
-      properties: { conceptId: { type: 'string', description: 'A Hub concept id, e.g. from forge_clarify\'s matches.' } },
+      properties: { conceptId: { type: 'string', description: 'A Hub concept id, e.g. from forge_clarify\'s candidates.' } },
       required: ['conceptId'],
       additionalProperties: false,
     },
@@ -216,14 +217,14 @@ interface StageState {
   added?: ModelIds
   summary?: string
   clarifications?: string
-  /** Ids of the Hub matches applied; undefined = all. */
+  /** Ids of the Hub concepts applied; undefined = the suggested ones. */
   hubConcepts?: string[]
 }
 
 interface ForgeRun {
   description: string
   needId?: string
-  hubMatches: Partial<Record<ForgeStageId, HubConceptSummary[]>>
+  hub: ForgeHubCandidates
   clarified: Set<ForgeStageId>
   stages: Partial<Record<ForgeStageId, StageState>>
 }
@@ -384,7 +385,7 @@ export class Forge {
     const run: ForgeRun = {
       description,
       needId: need,
-      hubMatches: forgeHubMatches(this.hub().summaries, description, metamodel?.id),
+      hub: forgeHubCandidates(this.hub().summaries, description, metamodel?.id),
       clarified: new Set(),
       stages: {},
     }
@@ -409,16 +410,16 @@ export class Forge {
     const id = stage as ForgeStageId
     const blocked = this.blocked(run, id)
     if (blocked) return fail(`forge_clarify: ${blocked}`)
-    const matches = run.hubMatches[id] ?? []
+    const candidates = run.hub.stages[id]?.candidates ?? []
     const priorQA = STAGE_IDS.slice(0, STAGE_IDS.indexOf(id))
       .map((prior) => run.stages[prior]?.clarifications ?? '')
       .filter(Boolean)
       .join('\n\n')
-    const lines = [buildClarifyPrompt(stageTitle(id), run.description, matches, priorQA, 'ask')]
-    if (matches.length) {
-      lines.push('', 'Hub matches (pass the ids the user keeps as hubConcepts):', ...matches.map((m) => `- ${m.id} [${m.category}] ${m.name}`))
+    const lines = [buildClarifyPrompt(stageTitle(id), run.description, candidates, priorQA, 'ask')]
+    if (id === 'c4' && run.hub.blueprint) {
+      lines.push('', `The blueprint ${run.hub.blueprint.id} fits the whole description; offering it to import as a skeleton (forge_import_hub_concept) is a good first pick.`)
     }
-    lines.push('', `Then call forge_generate with stage "${id}"${matches.length ? ', the answers and hubConcepts' : ' and the answers'}.`)
+    lines.push('', `Then call forge_generate with stage "${id}"${candidates.length ? ', the answers and hubConcepts' : ' and the answers'}.`)
     return ok(lines.join('\n'), { readOnly: true, commit: () => { run.clarified.add(id) } })
   }
 
@@ -450,15 +451,15 @@ export class Forge {
       })
       clarifications = formatClarificationAnswers(questions, answers)
     }
-    const matches = run.hubMatches[id] ?? []
+    const { candidates = [], suggested = [] } = run.hub.stages[id] ?? {}
     let hubConcepts = previous?.hubConcepts
     if (args.hubConcepts !== undefined) {
       if (!Array.isArray(args.hubConcepts) || args.hubConcepts.some((c) => typeof c !== 'string')) {
         return fail('forge_generate: hubConcepts must be an array of concept ids')
       }
-      const unknown = (args.hubConcepts as string[]).filter((c) => !matches.some((m) => m.id === c))
+      const unknown = (args.hubConcepts as string[]).filter((c) => !candidates.some((m) => m.id === c))
       if (unknown.length) {
-        return fail(`forge_generate: not a Hub match of this stage: ${unknown.join(', ')}. Matches: ${matches.map((m) => m.id).join(', ') || 'none'}`)
+        return fail(`forge_generate: not a Hub candidate of this stage: ${unknown.join(', ')}. See forge_clarify for the candidates${candidates.length ? '' : ' (this stage has none)'}.`)
       }
       hubConcepts = args.hubConcepts as string[]
     }
@@ -473,7 +474,9 @@ export class Forge {
     }
 
     const nodes = facade.getNodes()
-    const effectiveMatches = hubConcepts ? matches.filter((m) => hubConcepts!.includes(m.id)) : matches
+    const effectiveMatches = hubConcepts
+      ? hubConcepts.map((c) => candidates.find((m) => m.id === c)!).filter(Boolean)
+      : suggested
     const stageIdx = STAGE_IDS.indexOf(id)
     const priorSummaries = buildPriorStagesBlock(
       FORGE_STAGES.slice(0, stageIdx).map((s) => ({ title: s.title, summary: run.stages[s.id]?.summary ?? '' })),

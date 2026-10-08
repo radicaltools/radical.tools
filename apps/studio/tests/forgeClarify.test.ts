@@ -29,6 +29,30 @@ describe('askClarifyingQuestions', () => {
     vi.doUnmock('../src/renderer/src/ai/registry')
   })
 
+  it('returns the Hub candidates the model picked, or null when its reply is unreadable', async () => {
+    const candidates = [
+      { id: 'pattern-saga', category: 'pattern', name: 'Saga (Orchestrated)', description: 'd', tags: [] },
+      { id: 'pattern-cqrs', category: 'pattern', name: 'CQRS with Event Sourcing', description: 'd', tags: [] },
+    ] as any[]
+    const settings = { enabled: true, active: 'anthropic', providers: { anthropic: { apiKey: 'x' }, ollama: {}, openai: {}, gemini: {} } } as any
+    const ask = async (text: string) => {
+      vi.resetModules()
+      const chat = vi.fn(async () => ({ content: [{ type: 'text', text }], stopReason: 'end_turn' }))
+      vi.doMock('../src/renderer/src/ai/registry', () => ({ getAdapter: () => ({ id: 'anthropic', label: 'Claude', defaultModel: 'claude-x', chat }) }))
+      const { askClarifyingQuestions } = await import('../src/renderer/src/ai/forgeClarify')
+      const result = await askClarifyingQuestions('C4 model', 'Ticket sales', candidates, settings)
+      vi.doUnmock('../src/renderer/src/ai/registry')
+      return { result, prompt: (chat.mock.calls[0] as any)[0].messages[0].content as string }
+    }
+
+    const { result, prompt } = await ask('[{"id":"hub_matches","question":"Apply?","kind":"select","multiSelect":true,"options":["Saga (Orchestrated)"]}]')
+    expect(prompt).toContain('- pattern-cqrs | [pattern] CQRS with Event Sourcing: d')
+    expect(result.picked!.map((c) => c.id)).toEqual(['pattern-saga'])
+    expect(result.questions[0].options).toEqual(['Saga (Orchestrated)'])
+    expect((await ask('[]')).result.picked).toEqual([])
+    expect((await ask('I would rather not.')).result.picked).toBeNull()
+  })
+
   it('always routes to the adapter\'s cheap/fast defaultModel, ignoring a pricier model configured for generation', async () => {
     vi.resetModules()
     const chat = vi.fn(async () => ({

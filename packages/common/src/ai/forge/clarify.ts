@@ -1,7 +1,8 @@
 // ─── Radical Forge — clarifying questions ───────────────────────────────────
 // Before generating a stage, ask the model whether it needs 1-4 short
-// clarifying questions from the user (about the description, and — when
-// there are Hub matches — which of them to actually apply). In Studio this
+// clarifying questions from the user (about the description), and have it
+// pick, from the stage's Hub candidates (./hubMatches.ts), the few that fit
+// this system, which the user then confirms. In Studio this
 // is a SEPARATE, tool-less call to the provider adapter (askClarifyingQuestions
 // in apps/studio's ai/forgeClarify.ts), not a tool inside the runAIPrompt
 // loop: that loop runs every tool call to completion with no mechanism to
@@ -19,8 +20,8 @@ export interface ClarifyStageQuestion {
   multiSelect?: boolean
 }
 
-/** Reserved id for the (optional) question offering to pick which Hub
- *  matches should actually inform generation. */
+/** Reserved id for the (optional) question offering the Hub concepts the
+ *  model picked, for the user to confirm which should inform generation. */
 export const HUB_MATCHES_QUESTION_ID = 'hub_matches'
 
 function isValidQuestion(v: unknown): v is ClarifyStageQuestion {
@@ -40,19 +41,60 @@ function isValidQuestion(v: unknown): v is ClarifyStageQuestion {
  *  ignored the format entirely) so a bad response degrades straight to "no
  *  questions" rather than blocking the wizard. */
 export function parseClarifyResponse(text: string): ClarifyStageQuestion[] {
+  return parseClarifyReply(text) ?? []
+}
+
+/** Like parseClarifyResponse, but null when the reply is not a JSON array at
+ *  all — so a failed reply can fall back to the lexical Hub suggestions,
+ *  while a valid one without a hub_matches question means none fits. */
+export function parseClarifyReply(text: string): ClarifyStageQuestion[] | null {
   try {
     let s = text.trim()
     const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/)
     if (fence) s = fence[1].trim()
     const start = s.indexOf('[')
     const end = s.lastIndexOf(']')
-    if (start === -1 || end === -1 || end < start) return []
+    if (start === -1 || end === -1 || end < start) return null
     const parsed: unknown = JSON.parse(s.slice(start, end + 1))
-    if (!Array.isArray(parsed)) return []
+    if (!Array.isArray(parsed)) return null
     return parsed.filter(isValidQuestion)
   } catch {
-    return []
+    return null
   }
+}
+
+/** Most Hub concepts the model may pick for one stage. */
+export const HUB_PICK_LIMIT = 5
+const CANDIDATE_DESCRIPTION_MAX = 110
+
+/** One line per candidate, compact enough for 60 of them. */
+function candidateLine(c: HubConceptSummary): string {
+  const description = c.description.length > CANDIDATE_DESCRIPTION_MAX
+    ? `${c.description.slice(0, CANDIDATE_DESCRIPTION_MAX).replace(/\s+\S*$/, '')}…`
+    : c.description
+  return `- ${c.id} | [${c.category}] ${c.name}: ${description}${c.tags.length ? ` (${c.tags.join(', ')})` : ''}`
+}
+
+/** The concepts the model picked: the hub_matches question's options matched
+ *  to the candidates by name, in its order. The question is rewritten to the
+ *  exact names (and dropped when none match). [] when it picked none. */
+export function pickedHubConcepts(
+  questions: ClarifyStageQuestion[], candidates: HubConceptSummary[],
+): { questions: ClarifyStageQuestion[]; picked: HubConceptSummary[] } {
+  const byName = new Map(candidates.map((c) => [c.name.trim().toLowerCase(), c]))
+  const byId = new Map(candidates.map((c) => [c.id, c]))
+  const picked: HubConceptSummary[] = []
+  const rest: ClarifyStageQuestion[] = []
+  for (const q of questions) {
+    if (q.id !== HUB_MATCHES_QUESTION_ID) { rest.push(q); continue }
+    for (const option of q.options ?? []) {
+      const key = option.trim()
+      const c = byName.get(key.toLowerCase()) ?? byId.get(key)
+      if (c && !picked.includes(c) && picked.length < HUB_PICK_LIMIT) picked.push(c)
+    }
+    if (picked.length) rest.push({ ...q, kind: 'select', multiSelect: true, options: picked.map((c) => c.name) })
+  }
+  return { questions: rest, picked }
 }
 
 /** 'json': the model answers with the questions as a JSON array (Studio's
@@ -60,10 +102,12 @@ export function parseClarifyResponse(text: string): ClarifyStageQuestion[] {
  *  in its own chat (an MCP client). */
 export type ClarifyMode = 'json' | 'ask'
 
+/** `hubCandidates` are the stage's ranked Hub candidates; the model picks
+ *  the ones that fit (at most HUB_PICK_LIMIT) for the user to confirm. */
 export function buildClarifyPrompt(
   stageTitle: string,
   description: string,
-  hubMatches: HubConceptSummary[] | undefined,
+  hubCandidates: HubConceptSummary[] | undefined,
   priorQA?: string,
   mode: ClarifyMode = 'json',
 ): string {
@@ -85,11 +129,12 @@ export function buildClarifyPrompt(
     )
   }
 
-  if (hubMatches?.length) {
+  if (hubCandidates?.length) {
     lines.push(
       '',
-      'Hub catalogue matches available for this stage:',
-      ...hubMatches.map((m) => `- ${m.name}: ${m.description}`),
+      'Hub catalogue candidates for this stage (id | [category] name: description (tags)), best',
+      'keyword match first. The ranking is only a hint and the description may be in any language:',
+      ...hubCandidates.map(candidateLine),
     )
   }
 
@@ -105,11 +150,12 @@ export function buildClarifyPrompt(
       'Ask the user those questions and wait for the answers; offer options where',
       'an answer is a choice. If nothing needs clarifying, ask nothing.',
     )
-    if (hubMatches?.length) {
+    if (hubCandidates?.length) {
       lines.push(
         '',
-        'Additionally ask which of these Hub matches, if any, the user wants applied',
-        '(several can be picked; all of them unless the user deselects some).',
+        `Additionally pick the Hub candidates that clearly fit THIS system — at most ${HUB_PICK_LIMIT}, the most`,
+        'useful first, none if none fits — and ask the user which of your picks to apply (several can be',
+        'kept; all of them unless the user deselects some). Pass the ids they keep as hubConcepts.',
       )
     }
     return lines.join('\n')
@@ -121,13 +167,13 @@ export function buildClarifyPrompt(
     'If nothing needs clarifying, respond with exactly: []',
   )
 
-  if (hubMatches?.length) {
+  if (hubCandidates?.length) {
     lines.push(
       '',
-      `Additionally include exactly one question with id "${HUB_MATCHES_QUESTION_ID}",`,
-      'kind "select", multiSelect true, and options exactly equal to (same order):',
-      JSON.stringify(hubMatches.map((m) => m.name)),
-      'asking which of these Hub matches, if any, the user wants applied.',
+      `Additionally pick the Hub candidates that clearly fit THIS system — at most ${HUB_PICK_LIMIT}, the most`,
+      `useful first — and include one question with id "${HUB_MATCHES_QUESTION_ID}", kind "select",`,
+      'multiSelect true, whose options are the names of your picks exactly as written above, asking',
+      'which of them the user wants applied. If none fits, leave that question out.',
     )
   }
 
