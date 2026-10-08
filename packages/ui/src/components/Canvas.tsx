@@ -572,8 +572,14 @@ function StructuralCanvas(): React.ReactElement {
    * a frame or two later); the saved camera `vp` bridges those frames. With
    * Smart fit off, the saved camera stays. Either way the shown nodes become
    * Smart fit's baseline: it reacts again to the next expand or collapse.
+   * `keep` holds `vp` even with Smart fit on: a reload of the same model
+   * (an outside edit) leaves the camera where the user had it.
    */
-  const placeCamera = useCallback((vp: { x: number; y: number; zoom: number } | null, ids?: string[]) => {
+  const placeCamera = useCallback((
+    vp: { x: number; y: number; zoom: number } | null,
+    ids?: string[],
+    opts?: { keep?: boolean },
+  ) => {
     const inst = rfInstanceRef.current
     if (!inst) return
     stopFit()
@@ -581,7 +587,7 @@ function StructuralCanvas(): React.ReactElement {
     const shown = new Set(ids ?? inst.getNodes().filter((n) => !n.hidden).map((n) => n.id))
     prevVisibleIdsRef.current = shown
     if (vp) setCameraNow(vp)
-    if (!useDiagramStore.getState().autoFitActive) return
+    if (opts?.keep || !useDiagramStore.getState().autoFitActive) return
     snapIdsRef.current = shown
     let frames = 0
     const snap = () => {

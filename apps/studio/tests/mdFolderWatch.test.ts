@@ -79,6 +79,31 @@ describe('md-folder documents follow outside edits', () => {
     expect(s.selectedNodeId).toBe('sys2')
   })
 
+  it('keeps the camera in use instead of the one saved on disk', async () => {
+    const onDisk = { x: 0, y: 0, zoom: 1 }
+    const withView: DiagramData = {
+      ...SAMPLE,
+      views: [{ id: 'v1', name: 'Context', kind: 'static', nodeIds: [], positions: {}, viewport: onDisk } as any],
+    }
+    const folder = installFolderApi(serializeToMdFolder(withView, 'model'))
+    documents.createMdDocument('/tmp/model')
+    await settle()
+    useDiagramStore.getState().setActiveView('v1')
+    const place = vi.fn()
+    const w = (globalThis as any).window
+    w.__rfPlaceCamera = place
+    w.__rfCurrentViewport = { x: -480, y: -220, zoom: 0.6 }
+
+    folder.setDisk(serializeToMdFolder({ ...withView, nodes: [...SAMPLE.nodes, sys('sys3', 'Added outside')] }, 'model'))
+    folder.emit({ folderPath: '/tmp/model', paths: ['nodes/added-outside/_index.md'] })
+    await settle()
+    delete w.__rfPlaceCamera
+    delete w.__rfCurrentViewport
+
+    expect(useDiagramStore.getState().activeViewId).toBe('v1')
+    expect(place).toHaveBeenLastCalledWith({ x: -480, y: -220, zoom: 0.6 }, expect.any(Array), { keep: true })
+  })
+
   it('starts watching when the active document is saved as a folder', async () => {
     const folder = installFolderApi({})
     ;(folder.api as any).pickFolder = vi.fn(async () => ({ success: true, folderPath: '/tmp/saved' }))
