@@ -99,6 +99,56 @@ describe('Radical Forge over MCP', () => {
     }
   }, 60_000)
 
+  it('files each stage into its view beside what is there, and arranges it as the user chooses', async () => {
+    const { client, read } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF })
+      let data = await read()
+      const need = data.nodes.find((n) => n.type === 'need')!
+      const conceptual = data.views!.find((v) => v.name === 'Conceptual')!
+      expect(conceptual.nodeIds).toEqual([need.id])
+      expect(conceptual.positions[need.id]).toMatchObject({ x: 0, y: 0 })
+
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      await call(client, 'forge_generate', { stage: 'requirements' })
+      for (const [i, label] of ['Reserve online', 'Pick up in store', 'Confirm ready'].entries()) {
+        await call(client, 'add_node', { tempId: `r${i}`, type: 'requirement', label, properties: { ears_type: 'ubiquitous', action: label } })
+      }
+      const done = await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'Three requirements.' })
+      expect(done).toContain(`Added to the views: Conceptual (view ${conceptual.id}) +3`)
+      expect(done).toContain('Keep its 3 new elements on Conceptual in a row, a column or a grid?')
+      expect(done).toContain('Run Smart Layout on Conceptual?')
+      expect(done).toContain('forge_arrange')
+      data = await read()
+      const view = data.views!.find((v) => v.id === conceptual.id)!
+      const reqs = data.nodes.filter((n) => n.type === 'requirement').map((n) => n.id)
+      expect(view.nodeIds).toEqual([need.id, ...reqs])
+      // Right of the need, in a block that grows sideways.
+      const x0 = need.width + 120
+      expect(reqs.map((id) => [view.positions[id].x, view.positions[id].y])).toEqual([[x0, 0], [x0 + 360, 0], [x0, 280]])
+      expect(data.views!.map((v) => v.name)).toEqual(['Conceptual'])
+
+      expect(await refused(client, 'forge_arrange', { stage: 'requirements' })).toContain('align, smartLayout')
+      expect(await refused(client, 'forge_arrange', { stage: 'fitness', align: 'row' })).toContain('complete the Fitness functions stage first')
+      expect(await call(client, 'forge_arrange', { stage: 'requirements', align: 'grid' })).toContain('Conceptual: 3 elements in a grid of 2 columns.')
+      expect((await read()).views!.find((v) => v.id === conceptual.id)!.layoutConstraints)
+        .toEqual([{ id: expect.any(String), type: 'grid', columns: 2, nodeIds: reqs }])
+      expect(await call(client, 'forge_arrange', { stage: 'requirements', smartLayout: true })).toContain('Smart Layout (Conceptual)')
+
+      await call(client, 'forge_clarify', { stage: 'fitness' })
+      await call(client, 'forge_generate', { stage: 'fitness', hubConcepts: [] })
+      await call(client, 'add_node', { tempId: 'f1', type: 'fitness-fn', label: 'Ready within 2 h', properties: { category: 'performance', threshold: '2 h' } })
+      const fitness = await call(client, 'forge_complete_stage', { stage: 'fitness', summary: 'Pick-up time.' })
+      expect(fitness).not.toContain('row, a column or a grid')
+      expect(fitness).toContain('Run Smart Layout on Governance?')
+      data = await read()
+      const governance = data.views!.find((v) => v.name === 'Governance')!
+      expect(governance.nodeIds).toEqual(data.nodes.filter((n) => n.type === 'fitness-fn').map((n) => n.id))
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
   it('draws wireframes, imports Hub concepts and exports the Gherkin files', async () => {
     const { client, folder, read } = await connect()
     try {
