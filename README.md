@@ -149,6 +149,8 @@ apps/
   mcp/            MCP server for radical models (empty for now)
   web/            Marketing site and manual (radical.tools)
 packages/
+  markdown/       @radical/markdown: markdownlint defaults, type-specific rules,
+                  optional frontmatter schemas, and standalone examples
   common/         @radical/common: C4 + metamodel types, file formats, query
                   language, AI tool catalogue. No UI dependencies
   layout/         @radical/layout: Smart Layout and the headless layout engines,
