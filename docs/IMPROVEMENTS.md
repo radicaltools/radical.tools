@@ -677,13 +677,18 @@ canvas (ADR "State machines as nested states"). Still open:
 4. **Deleting a node leaves references to it dangling.** Transitions point
    at events by id (reference properties, ADR "Properties can reference
    nodes"), so a rename is safe, but deleting an event leaves its id in
-   `event` / `raises`: a warning in Issues and a marked entry in the picker
+   `event` / `raises`: a warning in the metamodel editor's Validation list and a marked entry in the picker
    until someone removes it. The store and the model facade could drop
    such ids in the same undo step as the delete.
-5. **Next steps of the plan:** a Radical Forge stage between scenarios and
-   mockups (one machine per entity with a real lifecycle, possibly none;
-   C4 adds `lifecycle-of`; one view per machine), playing a scenario as a
-   sequence of transitions, and SCXML / XState export.
-6. **Studio builds with terser** because Vite 5's bundled es-module-lexer
+5. **Next steps of the plan:** playing a scenario as a sequence of
+   transitions, and SCXML / XState export. The Radical Forge stage is done
+   (State machines, between scenarios and mockups, into one shared States
+   view rather than one view per machine); it is measured only by its
+   prompt tests, not yet on real briefs with a model.
+6. **Studio has no Issues panel outside the metamodel editor.** Statechart
+   warnings show only under *Validation* there (and from the MCP server); a
+   badge in the toolbar or on the machine itself would make them visible
+   while you build.
+7. **Studio builds with terser** because Vite 5's bundled es-module-lexer
    misreads a minified variable named `of` (ADR "Terser minifies Studio").
    Drop `apps/studio/rendererMinify.ts` when Vite bundles es-module-lexer 3.

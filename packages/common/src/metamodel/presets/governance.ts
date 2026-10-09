@@ -474,7 +474,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
-  // ── Behaviour: event-driven hierarchical state machines ─────────────────
+  // ── States: event-driven hierarchical state machines ─────────────────
   //
   // Statecharts with SCXML / XState semantics. A state machine holds states;
   // a state with child states is compound, and one of kind `parallel` has

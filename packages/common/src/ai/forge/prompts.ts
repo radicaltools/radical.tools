@@ -1,7 +1,7 @@
 // ─── Radical Forge stage prompts ────────────────────────────────────────────
-// Radical Forge walks a free-text system description through five sequential
+// Radical Forge walks a free-text system description through six sequential
 // AI generation stages — requirements → fitness functions → Gherkin
-// scenarios → UI mockups → C4 model. In Studio each stage is a normal
+// scenarios → state machines → UI mockups → C4 model. In Studio each stage is a normal
 // `runAIPrompt` call, so a later stage sees everything an earlier stage
 // created (via buildContextMessage in ../systemPrompt.ts), same as any
 // multi-turn chat; over MCP the client's own model runs the stage with the
@@ -24,10 +24,17 @@
 // exist. The mockups stage only creates the mockup nodes and their links;
 // wireframes are drawn by a separate per-mockup call (./wireframe.ts),
 // triggered from the wizard.
+//
+// State machines come between scenarios and mockups: a Gherkin scenario is
+// close to a transition already (Given the source state, When the event,
+// Then the target state and its effect), and the states of an entity the
+// user sees are what its screens show. Only entities with a real lifecycle
+// get one, often none at all. The machine's owner does not exist yet, so the
+// C4 stage adds `lifecycle-of` (and `emits` for the events elements publish).
 
 import type { HubConceptSummary } from '../../hubFormat'
 
-export type ForgeStageId = 'requirements' | 'fitness' | 'scenarios' | 'c4' | 'mockups'
+export type ForgeStageId = 'requirements' | 'fitness' | 'scenarios' | 'states' | 'c4' | 'mockups'
 
 export interface ForgeStage {
   id: ForgeStageId
@@ -44,6 +51,7 @@ export const PRIMARY_TYPE_IDS_FOR_STAGE: Record<ForgeStageId, string[]> = {
   requirements: ['requirement'],
   fitness: ['fitness-fn'],
   scenarios: ['scenario'],
+  states: ['state-machine', 'state', 'pseudostate', 'event'],
   mockups: ['mockup'],
   c4: ['person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group'],
 }
@@ -63,6 +71,11 @@ export const FORGE_STAGES: ForgeStage[] = [
     id: 'scenarios',
     title: 'Gherkin scenarios',
     blurb: 'Write Given/When/Then scenarios that verify each requirement.',
+  },
+  {
+    id: 'states',
+    title: 'State machines',
+    blurb: 'Model the lifecycle of the entities that have one as event-driven state machines, from the scenarios that move them.',
   },
   {
     id: 'mockups',
@@ -224,8 +237,11 @@ export function buildForgeStagePrompt(
         'relation, AND link each existing `fitness-fn` node to whichever new element(s)',
         'it actually constrains with a `constrains` relation, AND link each existing',
         '`mockup` node to the webapp or container that renders it with a',
-        '`presented-by` relation FROM the mockup TO that element (both only become',
-        'possible now that real elements exist to point at). Do not invent',
+        '`presented-by` relation FROM the mockup TO that element, AND link each',
+        'existing `state-machine` to the element whose lifecycle it models with a',
+        '`lifecycle-of` relation FROM the machine, and each element that publishes',
+        'one of the `event` nodes to it with `emits` (all only become possible now',
+        'that real elements exist to point at). Do not invent',
         'requirements at this stage; if the description implies something not yet',
         'covered by a requirement, model the C4 element anyway but leave it unlinked',
         'rather than fabricating a requirement here.',
@@ -256,6 +272,46 @@ export function buildForgeStagePrompt(
         'Link each scenario to the requirement it exercises with a `verifies` relation.',
       ].join('\n')
 
+    case 'states':
+      return [
+        descBlock,
+        '',
+        'Task: find the entities in the requirements and scenarios already in the',
+        'model that have a real lifecycle — something that moves through named states',
+        'over time in response to events (an order, a payment, a booking, a ticket).',
+        'Model each as a `state-machine` (usually 1-3; plain create/read/update/delete',
+        'data has no lifecycle worth one). If none has, create nothing and say so in',
+        'your summary.',
+        '',
+        'For each machine, in this order:',
+        '1. Add it at the root with `subject` set to the entity, then add an `event`',
+        '   node inside it for each thing that happens to the entity (a user action,',
+        '   a message from another system, a timeout: set `source` external, internal',
+        '   or timer). Name events in PascalCase, e.g. PaymentReceived.',
+        '2. Add its `state` nodes inside it. Nest states only where a group of states',
+        '   shares an exit (e.g. any of them can be cancelled): the shared transition',
+        '   then leaves the compound state. Use kind "parallel" only for things that',
+        '   truly progress at once (each child state is a region). Mark end states',
+        '   kind "final". Use `entry`/`exit`/`do` for what the system does in a state.',
+        '3. Give the machine and every compound state that is not parallel one',
+        '   `pseudostate` of kind "initial" with one transition to its default child',
+        '   state (each region of a parallel state gets its own).',
+        '4. Derive the transitions from the scenarios: Given is the source state, When',
+        '   is the event, Then is the target state and its effect. Add each as a',
+        '   relation of type "transition" whose `properties` hold `event` (the id or',
+        '   tempId of the event node), a `guard` where the scenario has a condition,',
+        '   `actions` for its effect, and `raises` (event ids) for events it publishes.',
+        '   Two transitions from one state on the same event need different guards.',
+        '   Cover the unwanted-behaviour scenarios too (declines, timeouts, cancels).',
+        '5. Link each scenario that moves the entity to the machine with `verifies`',
+        '   (scenario → state-machine), and the machine to the requirements it',
+        '   implements with `satisfies` (state-machine → requirement).',
+        '',
+        'Every state must be reachable from the initial state. No systems or',
+        'containers exist yet: the C4 stage links each machine to the element that',
+        'owns it, so do not create any here.',
+      ].join('\n')
+
     case 'mockups':
       return [
         descBlock,
@@ -269,7 +325,9 @@ export function buildForgeStagePrompt(
         'Link each mockup to the requirement(s) and scenario(s) it covers with',
         '`illustrates` (mockup → requirement / scenario), and model the main navigation',
         'between screens with `navigates-to` (mockup → mockup), using the relation',
-        'label for the user action that triggers it (e.g. "Pay"). No systems or',
+        'label for the user action that triggers it (e.g. "Pay"). Where a screen shows',
+        'an entity in one of its states (an order awaiting payment), also link the',
+        'mockup to that `state` with `illustrates`. No systems or',
         'containers exist yet (C4 runs next and will link each screen to the front-end',
         'that renders it), so do not create any here. Do not draw wireframes here —',
         'they are generated separately from these nodes. If the system has no user',

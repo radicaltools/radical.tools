@@ -69,7 +69,7 @@ describe('Radical Forge over MCP', () => {
       expect(clarify).not.toContain('JSON')
 
       const brief = await call(client, 'forge_generate', { stage: 'requirements', answers: [{ question: 'Which stores?', answer: 'All of them' }] })
-      expect(brief).toContain('stage 1 of 5: Requirements')
+      expect(brief).toContain('stage 1 of 6: Requirements')
       expect(brief).toContain('Keep labels short')
       expect(brief).toContain('Q: Which stores?\nA: All of them')
       expect(brief).toContain(`(id ${need.id})`)
@@ -150,6 +150,55 @@ describe('Radical Forge over MCP', () => {
       data = await read()
       const governance = data.views!.find((v) => v.name === 'Governance')!
       expect(governance.nodeIds).toEqual(data.nodes.filter((n) => n.type === 'fitness-fn').map((n) => n.id))
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
+  it('runs the state machine stage after the scenarios, into a States view', async () => {
+    const { client, read } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF })
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      await call(client, 'forge_generate', { stage: 'requirements' })
+      await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
+      await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement.' })
+      await call(client, 'forge_clarify', { stage: 'fitness' })
+      await call(client, 'forge_generate', { stage: 'fitness', hubConcepts: [] })
+      await call(client, 'forge_complete_stage', { stage: 'fitness', summary: 'None needed.' })
+      await call(client, 'forge_clarify', { stage: 'scenarios' })
+      await call(client, 'forge_generate', { stage: 'scenarios' })
+      await call(client, 'add_node', { tempId: 'sc', type: 'scenario', label: 'Order is ready', properties: { given: 'a reserved order', when: 'staff confirm it is ready', then: 'the order is ready for pick-up' } })
+      await call(client, 'add_relation', { sourceId: 'sc', targetId: 'req', relationType: 'verifies' })
+      await call(client, 'forge_complete_stage', { stage: 'scenarios', summary: 'One scenario.' })
+      // Mockups wait for the state machines.
+      expect(await refused(client, 'forge_clarify', { stage: 'mockups' })).toContain('State machines')
+
+      await call(client, 'forge_clarify', { stage: 'states' })
+      const brief = await call(client, 'forge_generate', { stage: 'states' })
+      expect(brief).toContain('stage 4 of 6: State machines')
+      expect(brief).toContain('real lifecycle')
+      expect(brief).toContain('Given is the source state, When')
+      expect(brief).toContain('"type":"ref","refType":"event"')
+
+      await call(client, 'add_node', { tempId: 'm', type: 'state-machine', label: 'Order lifecycle', properties: { subject: 'Order' } })
+      await call(client, 'add_node', { tempId: 'ready', type: 'event', label: 'OrderReady', parentId: 'm' })
+      await call(client, 'add_node', { tempId: 'i', type: 'pseudostate', label: 'Start', parentId: 'm', properties: { kind: 'initial' } })
+      await call(client, 'add_node', { tempId: 'reserved', type: 'state', label: 'Reserved', parentId: 'm' })
+      await call(client, 'add_node', { tempId: 'pickup', type: 'state', label: 'Ready for pick-up', parentId: 'm', properties: { kind: 'final' } })
+      await call(client, 'add_relation', { sourceId: 'i', targetId: 'reserved', relationType: 'transition' })
+      await call(client, 'add_relation', { sourceId: 'reserved', targetId: 'pickup', relationType: 'transition', properties: { event: 'ready' } })
+      await call(client, 'add_relation', { sourceId: 'sc', targetId: 'm', relationType: 'verifies' })
+      expect(await call(client, 'get_issues', {})).toContain('No issues')
+      const done = await call(client, 'forge_complete_stage', { stage: 'states', summary: 'The order lifecycle.' })
+      expect(done).toContain('States (view')
+
+      const data = await read()
+      const states = data.views!.find((v) => v.name === 'States')!
+      const machineIds = data.nodes.filter((n) => ['state-machine', 'state', 'pseudostate', 'event'].includes(n.type)).map((n) => n.id)
+      expect(states.nodeIds.sort()).toEqual(machineIds.sort())
+      expect(data.views!.find((v) => v.name === 'Conceptual')!.nodeIds).not.toContain(machineIds[0])
+      await call(client, 'forge_clarify', { stage: 'mockups' })
     } finally {
       await client.close()
     }

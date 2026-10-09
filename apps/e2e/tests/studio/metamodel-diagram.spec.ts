@@ -31,7 +31,7 @@ test('the Diagram tab draws every node type and its relations', async ({ page, s
   expect(overlaps).toEqual([])
 
   // Types sit in a frame per palette category.
-  await expect(diagram.locator('.mmd-category-label')).toHaveText(['C4', 'Domain', 'Governance', 'Requirements', 'Behaviour', 'UX', 'Other'])
+  await expect(diagram.locator('.mmd-category-label')).toHaveText(['C4', 'Domain', 'Governance', 'Requirements', 'States', 'UX', 'Other'])
   // Relation names are on the lines without selecting anything.
   await expect(diagram.locator('.mmd-edge-label', { hasText: 'Verifies' }).first()).toBeVisible()
   // A relation from a type to itself is a chip, not a loop.

@@ -33,7 +33,7 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'get_issues',
-    description: 'What breaks the rules in the model now, as Studio\'s Issues panel lists it: errors (wrong parent, relation the metamodel does not allow, unknown type) and warnings (missing required properties, references to no node, and state machine rules: a machine or compound state without one initial pseudostate, a parallel state with fewer than two regions, a final state with outgoing transitions, unreachable states, unguarded transitions competing for one event). Call it after building or changing a state machine, and before you report work as done.',
+    description: 'What breaks the rules in the model now, as the Validation list in Studio\'s metamodel editor shows it: errors (wrong parent, relation the metamodel does not allow, unknown type) and warnings (missing required properties, references to no node, and state machine rules: a machine or compound state without one initial pseudostate, a parallel state with fewer than two regions, a final state with outgoing transitions, unreachable states, unguarded transitions competing for one event). Call it after building or changing a state machine, and before you report work as done.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {

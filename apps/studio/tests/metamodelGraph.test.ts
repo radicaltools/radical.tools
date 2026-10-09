@@ -71,7 +71,7 @@ describe('buildMetamodelGraph', () => {
     const mm = builtInGovernanceMetamodel()
     mm.nodeTypes.custom1 = { ...mm.nodeTypes.system, id: 'custom1', label: 'Custom 1', builtin: false }
     const g = buildMetamodelGraph(mm)
-    expect(g.categories.map((c) => c.label)).toEqual(['C4', 'Domain', 'Governance', 'Requirements', 'Behaviour', 'UX', 'Other', 'Custom'])
+    expect(g.categories.map((c) => c.label)).toEqual(['C4', 'Domain', 'Governance', 'Requirements', 'States', 'UX', 'Other', 'Custom'])
     expect(g.categories.find((c) => c.label === 'Requirements')!.members).toEqual(['need', 'requirement', 'scenario'])
     expect(g.nodes.find((n) => n.id === 'adr')!.category).toBe('category:governance')
   })
@@ -100,7 +100,7 @@ describe('buildMetamodelGraph', () => {
       ['component', 'container', 'database', 'domain', 'person', 'queue', 'requirement', 'state-machine', 'system', 'webapp'],
     )
     expect(satisfies.edges.every((e) => e.type === 'satisfies')).toBe(true)
-    expect(satisfies.categories.map((c) => c.label)).toEqual(['C4', 'Domain', 'Requirements', 'Behaviour'])
+    expect(satisfies.categories.map((c) => c.label)).toEqual(['C4', 'Domain', 'Requirements', 'States'])
     // A relation drawn only as a chip (ADR supersedes ADR) still keeps its type.
     expect(buildMetamodelGraph(mm, only('supersedes')).nodes.map((n) => n.id)).toEqual(['adr'])
     // Nothing shown at all: every type stays, without edges.

@@ -61,16 +61,17 @@ const STAGE_IDS = FORGE_STAGES.map((stage) => stage.id)
 /** The whole flow, for forge_start's answer and the `forge` prompt. */
 export const FORGE_PROCEDURE = [
   'Radical Forge turns a free-text description into EARS requirements, fitness functions, Gherkin scenarios,',
-  'UI mockups and a C4 model, one reviewed stage at a time, in this order:',
+  'state machines, UI mockups and a C4 model, one reviewed stage at a time, in this order:',
   FORGE_STAGES.map((stage) => `${stage.title} (${stage.id})`).join(' → ') + '.',
   '1. forge_start with the description, or the id of an existing need. The description is kept in the model as a need.',
-  `   Every element a stage adds goes into one of three views: ${Object.values(FORGE_VIEW_NAMES).join(', ')}.`,
+  `   Every element a stage adds goes into one of ${Object.keys(FORGE_VIEW_NAMES).length} views: ${Object.values(FORGE_VIEW_NAMES).join(', ')}.`,
   '2. For each stage, in order:',
   '   a. forge_clarify: read it and ask the user the clarifying questions it calls for, if any, including which',
   '      Hub concepts you pick from its candidates to apply. Wait for the answers.',
   '   b. forge_generate with those answers and the Hub concepts the user kept. It returns the stage task:',
   '      carry it out with the model tools (add_node, add_relation, update_node, search_model, …).',
-  '   c. forge_complete_stage with a short summary of what you created and why.',
+  '   c. get_issues, and fix what the stage broke (a state machine without an initial state, an unreachable',
+  '      state, …). Then forge_complete_stage with a short summary of what you created and why.',
   '   d. Show the user what the stage added and ask them: keep its new elements in a row, a column or a grid',
   '      on their view? Run Smart Layout on that view? Do what they choose with forge_arrange. Then ask whether',
   '      to continue, regenerate the stage (forge_generate with regenerate: true, which first removes what the',
@@ -85,7 +86,7 @@ const stageEnum = { type: 'string', enum: STAGE_IDS }
 export const FORGE_TOOL_DEFS: ToolDef[] = [
   {
     name: 'forge_start',
-    description: 'Start a Radical Forge run (replacing any earlier run): turn a free-text system description into requirements, fitness functions, Gherkin scenarios, mockups and a C4 model in five reviewed stages. Stores the description as a `need` node (or uses an existing need) and explains the steps.',
+    description: 'Start a Radical Forge run (replacing any earlier run): turn a free-text system description into requirements, fitness functions, Gherkin scenarios, state machines, mockups and a C4 model in six reviewed stages. Stores the description as a `need` node (or uses an existing need) and explains the steps.',
     inputSchema: {
       type: 'object',
       properties: {
