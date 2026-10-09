@@ -107,6 +107,17 @@ function checkData(data: DiagramData): void {
   }
 }
 
+/** Creates `path` when missing and, when it holds nothing but dot entries
+ *  (.git, .DS_Store, Studio's .radical), writes a new model with the
+ *  `preset` metamodel into it. */
+async function startIfEmpty(path: string, preset: PresetName): Promise<void> {
+  await mkdir(path, { recursive: true })
+  if (!(await readdir(path)).every((name) => name.startsWith('.'))) return
+  const session = new MdFolderSession(diskFolderStorage(path))
+  const created = await session.write(serializeToMdFolder({ nodes: [], relations: [], metamodel: PRESETS[preset]() }, basename(path)))
+  if (!created.ok) throw new Error(`Could not start a model in ${path}: it changed while being written`)
+}
+
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
   Object.fromEntries(items.map((item) => [item.id, item]))
 
@@ -150,7 +161,7 @@ export class FolderModel {
   tools: ToolDef[]
   private tail: Promise<unknown> = Promise.resolve()
 
-  private constructor(folder: string, metamodel: Metamodel | undefined) {
+  private constructor(folder: string, private readonly preset: PresetName, metamodel: Metamodel | undefined) {
     this.folder = folder
     this.tools = buildTools(metamodel)
     this.metamodelKey = JSON.stringify(metamodel)
@@ -172,22 +183,15 @@ export class FolderModel {
   static async open(folder: string, options: OpenOptions = {}): Promise<FolderModel> {
     if (!folder) throw new Error('--folder is required')
     const path = resolve(folder)
-    await mkdir(path, { recursive: true })
+    const preset = options.metamodel ?? 'governance'
+    await startIfEmpty(path, preset)
     const canonical = await realpath(path)
     if (!(await stat(canonical)).isDirectory()) throw new Error(`Not a directory: ${folder}`)
-    const session = new MdFolderSession(diskFolderStorage(canonical))
-    let files = await session.readAll()
-    // Dot entries (.git, .DS_Store) don't count: a fresh repo folder is still empty.
-    if ((await readdir(canonical)).every((name) => name.startsWith('.'))) {
-      const metamodel = PRESETS[options.metamodel ?? 'governance']()
-      const created = await session.write(serializeToMdFolder({ nodes: [], relations: [], metamodel }, basename(canonical)))
-      if (!created.ok) throw new Error(`Could not start a model in ${canonical}: it changed while being written`)
-      files = await session.readAll()
-    }
+    const files = await new MdFolderSession(diskFolderStorage(canonical)).readAll()
     checkFiles(files)
     const data = deserializeFromMdFolder(files).data
     checkData(data)
-    return new FolderModel(canonical, createModelFacade(data).getMetamodel?.())
+    return new FolderModel(canonical, preset, createModelFacade(data).getMetamodel?.())
   }
 
   /** Resolves once every queued call has finished. */
@@ -205,6 +209,9 @@ export class FolderModel {
     if (!this.tools.some((tool) => tool.name === name)) return { ok: false, text: `Unknown tool ${name}` }
     if (options.signal?.aborted) return { ok: false, text: CANCELLED }
     try {
+      // The folder was emptied (or deleted) while the server ran, e.g. to try
+      // again from scratch: start over there, as on startup.
+      await startIfEmpty(this.folder, this.preset)
       const session = new MdFolderSession(diskFolderStorage(this.folder))
       const before = await session.readAll()
       checkFiles(before)
