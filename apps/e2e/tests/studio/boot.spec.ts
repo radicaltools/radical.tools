@@ -8,6 +8,7 @@ test.describe('first visit', () => {
     await expect(page.getByRole('button', { name: /Explore the sample/ })).toBeVisible()
     await expect(page.getByRole('button', { name: 'New model' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Open file…' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Open folder…' })).toBeVisible()
     // The URL stays clean until the user picks a model.
     expect(new URL(page.url()).hash).toBe('')
     await expect(page).toHaveScreenshot('welcome.png')
