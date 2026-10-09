@@ -20,7 +20,7 @@ const SLIDES_SCHEMA = {
       id: { type: 'string', description: 'Existing slide id to keep; omit for a new slide.' },
       name: { type: 'string' },
       viewId: { type: ['string', 'null'], description: 'Real view id or a tempId from this run.' },
-      milestone: { type: ['string', 'null'], description: 'Milestone id (list_milestones): the slide shows the model as saved in it. null = the current model. Omit on a kept slide to keep its milestone.' },
+      milestone: { type: ['string', 'null'], description: 'Milestone id (list_milestones): the slide shows the model as saved in it. null = the current model. Omit on a kept slide to keep its milestone; changing it resets the slide\'s framing.' },
       focus: {
         type: 'array',
         items: { type: 'string' },
@@ -130,12 +130,14 @@ function parseSlides(tool: string, raw: unknown, ctx: ToolRunContext, existing: 
     }
     const name = s.name.trim()
     if (!previous) slides.push(newSlide(randomId(), name, viewId, focus, snapshotId))
-    // A slide moved to another view loses the framing captured for the old one.
-    else if ((previous.viewId ?? null) !== viewId) slides.push(newSlide(previous.id, name, viewId, focus, snapshotId))
-    else if (!focus) slides.push({ ...previous, name, snapshotId })
+    // A slide moved to another view or milestone loses the framing, focus and
+    // model copy captured for the old one; Studio would replay them over the new.
+    else if ((previous.viewId ?? null) !== viewId || (previous.snapshotId ?? null) !== snapshotId) {
+      slides.push(newSlide(previous.id, name, viewId, focus, snapshotId))
+    } else if (!focus) slides.push({ ...previous, name })
     else {
       // A new focus replaces the camera captured in Studio, which would win over it.
-      const slide: PresentationSlide = { ...previous, name, snapshotId, viewport: NO_VIEWPORT, focusNodeIds: focus }
+      const slide: PresentationSlide = { ...previous, name, viewport: NO_VIEWPORT, focusNodeIds: focus }
       if (!focus.length) delete slide.focusNodeIds
       slides.push(slide)
     }

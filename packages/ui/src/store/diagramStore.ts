@@ -231,6 +231,9 @@ function buildPresentationsFromData(
   return { presentations: list, activeId: list[0].id }
 }
 
+/** What changed per element and relation id, for the diff highlight. The
+ *  same comparison as compare_milestones (model.compareModels): any field but
+ *  the layout. */
 export function computeSnapDiff(
   prevNodes: Record<string, C4Node>,
   currNodes: Record<string, C4Node>,
@@ -238,35 +241,11 @@ export function computeSnapDiff(
   currRels: Record<string, C4Relation>,
 ): Record<string, 'new' | 'changed' | 'removed'> {
   const result: Record<string, 'new' | 'changed' | 'removed'> = {}
-  for (const id of Object.keys(currNodes)) {
-    if (!prevNodes[id]) {
-      result[id] = 'new'
-    } else {
-      const p = prevNodes[id], c = currNodes[id]
-      if (p.label !== c.label || p.description !== c.description || p.technology !== c.technology ||
-          p.type !== c.type || p.parentId !== c.parentId || p.external !== c.external) {
-        result[id] = 'changed'
-      }
-    }
-  }
-  // Removed nodes: in base but not in current.
-  for (const id of Object.keys(prevNodes)) {
-    if (!currNodes[id]) result[id] = 'removed'
-  }
-  for (const id of Object.keys(currRels)) {
-    if (!prevRels[id]) {
-      result[id] = 'new'
-    } else {
-      const p = prevRels[id], c = currRels[id]
-      if (p.sourceId !== c.sourceId || p.targetId !== c.targetId ||
-          p.label !== c.label || p.technology !== c.technology) {
-        result[id] = 'changed'
-      }
-    }
-  }
-  // Removed relations: in base but not in current.
-  for (const id of Object.keys(prevRels)) {
-    if (!currRels[id]) result[id] = 'removed'
+  const changes = model.compareModels({ nodes: prevNodes, relations: prevRels }, { nodes: currNodes, relations: currRels })
+  for (const group of [changes.nodes, changes.relations]) {
+    for (const id of group.added) result[id] = 'new'
+    for (const { id } of group.changed) result[id] = 'changed'
+    for (const id of group.removed) result[id] = 'removed'
   }
   return result
 }
