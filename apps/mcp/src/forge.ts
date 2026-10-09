@@ -60,8 +60,8 @@ const STAGE_IDS = FORGE_STAGES.map((stage) => stage.id)
 
 /** The whole flow, for forge_start's answer and the `forge` prompt. */
 export const FORGE_PROCEDURE = [
-  'Radical Forge turns a free-text description into EARS requirements, fitness functions, Gherkin scenarios,',
-  'state machines, UI mockups and a C4 model, one reviewed stage at a time, in this order:',
+  'Radical Forge turns a free-text description into EARS requirements, a domain model, fitness functions,',
+  'Gherkin scenarios, state machines, UI mockups and a C4 model, one reviewed stage at a time, in this order:',
   FORGE_STAGES.map((stage) => `${stage.title} (${stage.id})`).join(' → ') + '.',
   '1. forge_start with the description, or the id of an existing need. The description is kept in the model as a need.',
   `   Every element a stage adds goes into one of ${Object.keys(FORGE_VIEW_NAMES).length} views: ${Object.values(FORGE_VIEW_NAMES).join(', ')}.`,
@@ -86,7 +86,7 @@ const stageEnum = { type: 'string', enum: STAGE_IDS }
 export const FORGE_TOOL_DEFS: ToolDef[] = [
   {
     name: 'forge_start',
-    description: 'Start a Radical Forge run (replacing any earlier run): turn a free-text system description into requirements, fitness functions, Gherkin scenarios, state machines, mockups and a C4 model in six reviewed stages. Stores the description as a `need` node (or uses an existing need) and explains the steps.',
+    description: 'Start a Radical Forge run (replacing any earlier run): turn a free-text system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, mockups and a C4 model in seven reviewed stages. Stores the description as a `need` node (or uses an existing need) and explains the steps.',
     inputSchema: {
       type: 'object',
       properties: {

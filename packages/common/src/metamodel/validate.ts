@@ -3,6 +3,7 @@
 import { C4Node, C4Relation } from '../c4'
 import { Metamodel, PropertyDef } from './types'
 import { validateStateMachines } from './statechart'
+import { validateDomainModel } from './domainModel'
 import { refIds, refProblem } from './refs'
 
 export type IssueSeverity = 'error' | 'warning'
@@ -156,6 +157,11 @@ export function validateModel(
     const src = nodes[r.sourceId]?.label ?? r.sourceId
     const dst = nodes[r.targetId]?.label ?? r.targetId
     checkRefs(r as unknown as Record<string, unknown>, def.properties, { relationId: r.id }, `${def.label} "${src}" → "${dst}"`)
+  }
+
+  // Aggregate rules, for metamodels that carry the built-in entity type.
+  if (metamodel.nodeTypes.entity && metamodel.relationTypes['part-of']) {
+    issues.push(...validateDomainModel(nodes, relations))
   }
 
   // Statechart rules, for metamodels that carry the built-in behaviour types.

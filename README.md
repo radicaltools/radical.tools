@@ -20,7 +20,7 @@ Architecture diagrams go stale because they are pictures. In radical.tools they 
 
 - **No account, nothing to install.** Open it in the browser and start modelling. Your model stays in local storage or plain files you can commit.
 - **C4 without the busywork.** Smart Layout places nodes, minimises crossings and fits groups for you, and keeps the rows, columns and grids you pin.
-- **From a paragraph to a model.** Radical Forge turns a system description into requirements, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model, one reviewable stage at a time.
+- **From a paragraph to a model.** Radical Forge turns a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model, one reviewable stage at a time.
 - **Bring your own AI.** OpenAI, Anthropic, Gemini, or a local model through Ollama.
 - **Don't start from zero.** Import from 120+ curated patterns, ADRs, fitness functions and blueprints in the [Architecture Hub](https://hub.radical.tools).
 
@@ -46,7 +46,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 ## Features
 
 - **C4 model**: Person, Software System, Container, Component, Database, Web App, Queue, Relation
-- **Domain & Governance elements**: Domain, Entity (aggregate root or entity), ADR, Fitness Function, Need (raw free-text input such as a brief or notes), Requirement (EARS, derived from needs), Blueprint
+- **Domain & Governance elements**: Domain, Entity (aggregate root or entity, with *part of* and *references* between entities), ADR, Fitness Function, Need (raw free-text input such as a brief or notes), Requirement (EARS, derived from needs), Blueprint
 - **State machines**: event-driven hierarchical statecharts (SCXML semantics) — State Machine, State (compound, parallel regions, final), Pseudostate (initial, history, choice) and Event, linked by transitions that point at their trigger and the events they raise; each machine is the lifecycle of a domain Entity and is implemented by C4 elements; Studio checks that each machine can run (initial states, reachability, unguarded conflicts)
 - **UI mockups**: Mockup element with a design link or an AI-generated low-fi wireframe, linked to requirements and scenarios (*illustrates*), to the container that renders it (*presented by*) and to other screens (*navigates to*) to model screen flows
 - **Smart Layout**: SA-based auto-layout with crossing minimisation, edge-length optimisation, aspect-ratio penalty, and compound parent fitting
@@ -54,7 +54,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 - **Calm drags**: a drag moves only what you drag and pushes clear only what you drop it on; dropped elements stay pinned where you put them (⌘/Ctrl-drag lets the live physics make room instead)
 - **Multiple layout engines**: ELK (hierarchical/layered/force), webcola (live physics), custom Smart Layout pipeline
 - **AI assistant**: chat with OpenAI / Anthropic / Gemini / Ollama to generate and modify diagrams
-- **Radical Forge**: turn a system description into requirements, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model, one reviewable stage at a time; the description is kept in the model as a Need the requirements derive from
+- **Radical Forge**: turn a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model, one reviewable stage at a time; the description is kept in the model as a Need the requirements derive from
 - **Architecture Hub**: browse and import 120+ curated architecture concepts (patterns, fitness functions, ADRs, requirements, blueprints) from [hub.radical.tools](https://hub.radical.tools); blueprints include per-actor screen flows and named views
 - **Multiple views**: Canvas, Matrix, Sequence, Treemap, Table, Wiki per diagram
 - **Presentation mode**: fullscreen slides with navigation bar

@@ -36,6 +36,9 @@ test('the Diagram tab draws every node type and its relations', async ({ page, s
   await expect(diagram.locator('.mmd-edge-label', { hasText: 'Verifies' }).first()).toBeVisible()
   // A relation from a type to itself is a chip, not a loop.
   await expect(diagram.getByTestId('rf__node-adr').getByText('↻ Supersedes')).toBeVisible()
+  // An aggregate's parts and its references to other aggregates are chips on Entity.
+  await expect(diagram.getByTestId('rf__node-entity').getByText('↻ Part of')).toBeVisible()
+  await expect(diagram.getByTestId('rf__node-entity').getByText('↻ References')).toBeVisible()
   if (process.env.E2E_SHOTS) await page.screenshot({ path: `${process.env.E2E_SHOTS}/diagram.png` })
 
   // By default every containment edge and every type's properties are shown.
@@ -129,7 +132,7 @@ test('the diagram stays drawn on a slow machine', async ({ page, studio }) => {
   await editor.getByRole('tab', { name: 'Diagram' }).click()
   const diagram = editor.locator('.mmd-canvas')
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 60_000 })
-  await expect(diagram.locator('.react-flow__edge')).toHaveCount(132)
+  await expect(diagram.locator('.react-flow__edge')).toHaveCount(133)
   await expect(diagram.getByTestId('rf__node-requirement')).toBeVisible()
 })
 

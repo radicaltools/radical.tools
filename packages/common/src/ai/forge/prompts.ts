@@ -1,7 +1,7 @@
 // ─── Radical Forge stage prompts ────────────────────────────────────────────
-// Radical Forge walks a free-text system description through six sequential
-// AI generation stages — requirements → fitness functions → Gherkin
-// scenarios → state machines → UI mockups → C4 model. In Studio each stage is a normal
+// Radical Forge walks a free-text system description through seven sequential
+// AI generation stages — requirements → domain model → fitness functions →
+// Gherkin scenarios → state machines → UI mockups → C4 model. In Studio each stage is a normal
 // `runAIPrompt` call, so a later stage sees everything an earlier stage
 // created (via buildContextMessage in ../systemPrompt.ts), same as any
 // multi-turn chat; over MCP the client's own model runs the stage with the
@@ -25,18 +25,26 @@
 // wireframes are drawn by a separate per-mockup call (./wireframe.ts),
 // triggered from the wizard.
 //
+// The domain model comes right after the requirements, which are its source:
+// the domains (bounded contexts) and the entities the requirements talk
+// about, how entities form aggregates (`part-of`) and refer to each other
+// (`references`), and how domains relate (the context map). Later stages
+// then speak its language: scenarios name its entities, the state machines
+// stage picks the entities with a lifecycle from it, and C4 maps elements to
+// its domains and entities (`realises`).
+//
 // State machines come between scenarios and mockups: a Gherkin scenario is
 // close to a transition already (Given the source state, When the event,
 // Then the target state and its effect), and the states of an entity the
 // user sees are what its screens show. Only entities with a real lifecycle
-// get one, often none at all: the stage adds the domain `entity` and its
-// machine (`lifecycle-of`). Nothing runs it yet, so the C4 stage adds the
+// get one, often none at all: the stage links each machine to its entity
+// from the domain model (`lifecycle-of`), adding the entity if it is missing. Nothing runs it yet, so the C4 stage adds the
 // elements that implement the machine and own the entity (`implements`,
 // `realises`, and `emits` for the events elements publish).
 
 import type { HubConceptSummary } from '../../hubFormat'
 
-export type ForgeStageId = 'requirements' | 'fitness' | 'scenarios' | 'states' | 'c4' | 'mockups'
+export type ForgeStageId = 'requirements' | 'domain' | 'fitness' | 'scenarios' | 'states' | 'c4' | 'mockups'
 
 export interface ForgeStage {
   id: ForgeStageId
@@ -51,6 +59,7 @@ export interface ForgeStage {
  *  @radical/common/ai/metamodelContext's `buildMetamodelMessage`). */
 export const PRIMARY_TYPE_IDS_FOR_STAGE: Record<ForgeStageId, string[]> = {
   requirements: ['requirement'],
+  domain: ['domain', 'entity'],
   fitness: ['fitness-fn'],
   scenarios: ['scenario'],
   states: ['entity', 'state-machine', 'state', 'pseudostate', 'event'],
@@ -63,6 +72,11 @@ export const FORGE_STAGES: ForgeStage[] = [
     id: 'requirements',
     title: 'Requirements',
     blurb: 'Extract functional requirements from the description, written as EARS statements.',
+  },
+  {
+    id: 'domain',
+    title: 'Domain model',
+    blurb: 'Find the domains and the entities the requirements talk about: aggregates, how entities refer to each other, and how the domains relate.',
   },
   {
     id: 'fitness',
@@ -223,12 +237,45 @@ export function buildForgeStagePrompt(
           : []),
       ].join('\n')
 
+    case 'domain':
+      return [
+        descBlock,
+        '',
+        'Task: build the domain model the requirements already in the model talk',
+        'about, in their own words (the ubiquitous language).',
+        '1. Add a `domain` node for each bounded context: a part of the business',
+        '   with its own language and rules (usually 1-4; a small system may have',
+        '   one). Set `kind`: core for what sets the system apart, supporting for what',
+        '   it needs but buys no edge, generic for what any system has (users,',
+        '   billing). Nest a subdomain only where one clearly splits.',
+        '2. Inside each domain, add an `entity` node for each thing with an identity',
+        '   that the requirements create, change or look up (a reservation, a',
+        '   customer, a product). Set `kind` "aggregate-root" for one that is changed',
+        '   as a whole and keeps its own rules, "entity" for a part that only lives',
+        '   inside one (an order line), and link the part to its root with `part-of`',
+        '   (entity → aggregate root). Plain values (an address, an amount) are not',
+        '   entities: mention them in the `description` of the entity that holds them.',
+        '   Use `description` to define the term in one or two sentences.',
+        '3. Where one aggregate refers to another (a reservation is for a customer),',
+        '   link them with `references` (entity → entity), with `cardinality` one or',
+        '   many. Aggregates refer to each other only by reference, never by `part-of`.',
+        '4. Map how the domains relate: `depends-on` (domain → domain it needs) or',
+        '   `partnership` with its `pattern` (customer-supplier, anti-corruption-layer,',
+        '   …) where the kind of relationship matters.',
+        '5. Link each entity to the requirement(s) that are about it with',
+        '   `satisfies` (entity → requirement).',
+        '',
+        'Name entities in the singular, as the requirements do. No systems,',
+        'containers, state machines or scenarios yet.',
+      ].join('\n')
+
     case 'c4':
       return [
         descBlock,
         '',
-        'Task: using the requirements, fitness functions, Gherkin scenarios and UI',
-        'mockups already in the model, plus the description above, derive the C4',
+        'Task: using the requirements, domain model, fitness functions, Gherkin',
+        'scenarios, state machines and UI mockups already in the model, plus the',
+        'description above, derive the C4',
         'structure — the people/systems/containers/components involved — and the',
         'relations between them. This is the last stage: the behavior and quality',
         'spec is already fully formed, so let the architecture follow from it rather',
@@ -242,7 +289,8 @@ export function buildForgeStagePrompt(
         '`presented-by` relation FROM the mockup TO that element, AND link the',
         'element that runs each existing `state-machine` to it with `implements`',
         '(element → machine), the element that owns the data of each `entity` to it',
-        'with `realises` (element → entity), and each element that publishes one of',
+        'with `realises` (element → entity), each system or container that serves a',
+        '`domain` to it with `realises` (element → domain), and each element that publishes one of',
         'the `event` nodes to it with `emits` (all only become possible now that',
         'real elements exist to point at). Do not invent',
         'requirements at this stage; if the description implies something not yet',
@@ -273,6 +321,8 @@ export function buildForgeStagePrompt(
         'or unwanted-behaviour case. Fill `given`/`when`/`then` with concrete steps (not',
         'placeholders) and use the `gherkin` field only for extra `And`/`But` steps.',
         'Link each scenario to the requirement it exercises with a `verifies` relation.',
+        'Speak the domain model\'s language: call things in the steps by the names',
+        'of its `entity` nodes.',
       ].join('\n')
 
     case 'states':
@@ -287,10 +337,10 @@ export function buildForgeStagePrompt(
         'your summary.',
         '',
         'For each machine, in this order:',
-        '1. Add the entity itself as an `entity` node at the root (kind',
-        '   "aggregate-root" unless it lives inside another aggregate), then the',
-        '   `state-machine` at the root linked to it with `lifecycle-of` (machine →',
-        '   entity; one machine per entity), then an `event`',
+        '1. Take its entity from the domain model (add an `entity` node to its',
+        '   `domain` only if it is missing), add the `state-machine` at the root and',
+        '   link it to the entity with `lifecycle-of` (machine → entity; one machine',
+        '   per entity), then add an `event`',
         '   node inside the machine for each thing that happens to the entity (a user action,',
         '   a message from another system, a timeout: set `source` external, internal',
         '   or timer). Name events in PascalCase, e.g. PaymentReceived.',

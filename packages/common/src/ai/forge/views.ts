@@ -1,11 +1,12 @@
 // ─── Where a Radical Forge run puts what it generates ───────────────────────
-// A run splits its output into four views from the start, the layers of a
+// A run splits its output into five views from the start, the layers of a
 // Radical architecture model: Conceptual (the need, requirements, scenarios,
-// mockups), States (the entities with a lifecycle, their state machines and
-// events), Logical & physical
-// (the C4 elements) and Governance (fitness functions and decisions). A view is created when its first element arrives,
-// since an empty view shows the whole model; a later run reuses the views by
-// name.
+// mockups, and for now the domain model too), Domain (the domains and their
+// entities), States (the state machines, their events and the entities they
+// are the lifecycle of), Logical & physical (the C4 elements) and Governance
+// (fitness functions and decisions). A type may go into several views. A view
+// is created when its first element arrives, since an empty view shows the
+// whole model; a later run reuses the views by name.
 //
 // After each stage the user is offered to keep the stage's new elements in a
 // row, a column or a grid on their view, and to run Smart Layout on it.
@@ -16,22 +17,25 @@ import { landscapeGridColumns, type C4Node, type DiagramView } from '../../c4'
 import type { DiagramFacade } from '../diagramFacade'
 import type { ForgeStageId } from './prompts'
 
-export type ForgeViewKey = 'conceptual' | 'states' | 'logical' | 'governance'
+export type ForgeViewKey = 'conceptual' | 'domain' | 'states' | 'logical' | 'governance'
 
 export const FORGE_VIEW_NAMES: Record<ForgeViewKey, string> = {
   conceptual: 'Conceptual',
+  domain: 'Domain',
   states: 'States',
   logical: 'Logical & physical',
   governance: 'Governance',
 }
 
-/** Node types with a fixed view; any other type goes where its stage does. */
-const VIEW_OF_TYPE: Record<string, ForgeViewKey> = {
+/** Node types with fixed views (the first is their own); any other type
+ *  goes where its stage does. */
+const VIEW_OF_TYPE: Record<string, ForgeViewKey | ForgeViewKey[]> = {
   need: 'conceptual',
   requirement: 'conceptual',
   scenario: 'conceptual',
   mockup: 'conceptual',
-  entity: 'states',
+  domain: ['domain', 'conceptual'],
+  entity: ['domain', 'conceptual'],
   'state-machine': 'states',
   state: 'states',
   pseudostate: 'states',
@@ -42,6 +46,7 @@ const VIEW_OF_TYPE: Record<string, ForgeViewKey> = {
 
 export const FORGE_STAGE_VIEW: Record<ForgeStageId, ForgeViewKey> = {
   requirements: 'conceptual',
+  domain: 'domain',
   fitness: 'governance',
   scenarios: 'conceptual',
   states: 'states',
@@ -49,8 +54,16 @@ export const FORGE_STAGE_VIEW: Record<ForgeStageId, ForgeViewKey> = {
   c4: 'logical',
 }
 
+/** Every view a node of `type` goes into, its own first. */
+export function forgeViewsOf(type: string, stage?: ForgeStageId): ForgeViewKey[] {
+  const fixed = VIEW_OF_TYPE[type]
+  if (fixed) return Array.isArray(fixed) ? fixed : [fixed]
+  return [stage ? FORGE_STAGE_VIEW[stage] : 'logical']
+}
+
+/** The view a node of `type` belongs to. */
 export function forgeViewOf(type: string, stage?: ForgeStageId): ForgeViewKey {
-  return VIEW_OF_TYPE[type] ?? (stage ? FORGE_STAGE_VIEW[stage] : 'logical')
+  return forgeViewsOf(type, stage)[0]
 }
 
 const isCanvas = (view: DiagramView): boolean => !view.kind || view.kind === 'static'
@@ -76,16 +89,24 @@ export interface FiledNodes {
   nodeIds: string[]
 }
 
-/** Adds each node to its view (forgeViewOf), creating the view when needed.
- *  Nodes already in their view are left alone. */
+/** Adds each node to its views (forgeViewsOf), creating a view when needed.
+ *  Nodes already in a view are left alone. A state machine brings along the
+ *  entity it is the lifecycle of, so the States view shows the link. */
 export function fileIntoForgeViews(facade: DiagramFacade, nodeIds: string[], stage?: ForgeStageId): FiledNodes[] {
   const nodes = facade.getNodes()
   const byKey = new Map<ForgeViewKey, string[]>()
+  const file = (key: ForgeViewKey, id: string): void => {
+    const ids = byKey.get(key) ?? []
+    if (!ids.includes(id)) byKey.set(key, [...ids, id])
+  }
   for (const id of nodeIds) {
     const node = nodes[id]
     if (!node) continue
-    const key = forgeViewOf(node.type, stage)
-    byKey.set(key, [...(byKey.get(key) ?? []), id])
+    for (const key of forgeViewsOf(node.type, stage)) file(key, id)
+  }
+  const machines = new Set(nodeIds.filter((id) => nodes[id]?.type === 'state-machine'))
+  for (const r of Object.values(facade.getRelations())) {
+    if (r.relationType === 'lifecycle-of' && machines.has(r.sourceId) && nodes[r.targetId]) file('states', r.targetId)
   }
   const filed: FiledNodes[] = []
   for (const [key, ids] of byKey) {
@@ -134,7 +155,7 @@ export function forgeArrangeGroups(facade: DiagramFacade, addedNodeIds: string[]
     const view = findForgeView(views, key)
     if (!view) continue
     const inView = new Set(view.nodeIds)
-    const ids = addedNodeIds.filter((id) => nodes[id] && inView.has(id) && forgeViewOf(nodes[id].type, stage) === key)
+    const ids = addedNodeIds.filter((id) => nodes[id] && inView.has(id) && forgeViewsOf(nodes[id].type, stage).includes(key))
     const nodeIds = outermostNodes(nodes, ids)
     if (nodeIds.length) groups.push({ viewId: view.id, viewName: view.name, nodeIds })
   }

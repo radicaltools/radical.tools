@@ -94,10 +94,10 @@ describe('buildMetamodelGraph', () => {
       showProperties: false,
       hiddenRelations: new Set(Object.keys(mm.relationTypes).filter((r) => r !== id)),
     })
-    // Satisfies: the eight C4 element types and State Machine → Requirement. No containment rescue.
+    // Satisfies: the eight C4 element types, Entity and State Machine → Requirement. No containment rescue.
     const satisfies = buildMetamodelGraph(mm, only('satisfies'))
     expect(satisfies.nodes.map((n) => n.id).sort()).toEqual(
-      ['component', 'container', 'database', 'domain', 'person', 'queue', 'requirement', 'state-machine', 'system', 'webapp'],
+      ['component', 'container', 'database', 'domain', 'entity', 'person', 'queue', 'requirement', 'state-machine', 'system', 'webapp'],
     )
     expect(satisfies.edges.every((e) => e.type === 'satisfies')).toBe(true)
     expect(satisfies.categories.map((c) => c.label)).toEqual(['C4', 'Domain', 'Requirements', 'States'])

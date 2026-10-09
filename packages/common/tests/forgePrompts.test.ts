@@ -39,7 +39,7 @@ describe('buildForgeStagePrompt — prior-stage summaries replace full transcrip
 
 describe('buildForgeStagePrompt — mockups stage', () => {
   it('runs before C4, as part of the spec the architecture follows from', () => {
-    expect(FORGE_STAGES.map((s) => s.id)).toEqual(['requirements', 'fitness', 'scenarios', 'states', 'mockups', 'c4'])
+    expect(FORGE_STAGES.map((s) => s.id)).toEqual(['requirements', 'domain', 'fitness', 'scenarios', 'states', 'mockups', 'c4'])
     expect(PRIMARY_TYPE_IDS_FOR_STAGE.mockups).toEqual(['mockup'])
   })
 
@@ -73,6 +73,30 @@ describe('buildForgeStagePrompt — mockups stage', () => {
   })
 })
 
+describe('buildForgeStagePrompt — domain model stage', () => {
+  it('runs right after the requirements, creating domains and entities', () => {
+    const ids = FORGE_STAGES.map((s) => s.id)
+    expect(ids.indexOf('domain')).toBe(1)
+    expect(PRIMARY_TYPE_IDS_FOR_STAGE.domain).toEqual(['domain', 'entity'])
+  })
+
+  it('asks for bounded contexts, aggregates, references and a context map in the requirements\' words', () => {
+    const prompt = buildForgeStagePrompt('domain', 'A library.')
+    expect(prompt).toContain('ubiquitous language')
+    expect(prompt).toContain('`domain` node for each bounded context')
+    expect(prompt).toContain('link the part to its root with `part-of`')
+    expect(prompt).toContain('`references` (entity → entity), with `cardinality` one or\n   many')
+    expect(prompt).toContain('`depends-on`')
+    expect(prompt).toContain('`satisfies` (entity → requirement)')
+    expect(prompt).toContain('No systems,\ncontainers, state machines or scenarios yet.')
+  })
+
+  it('makes the later stages use it', () => {
+    expect(buildForgeStagePrompt('scenarios', 'A library.')).toContain('names\nof its `entity` nodes')
+    expect(buildForgeStagePrompt('c4', 'A library.')).toContain('`realises` (element → domain)')
+  })
+})
+
 describe('buildForgeStagePrompt — state machines stage', () => {
   it('runs between the scenarios and the mockups, creating the statechart types', () => {
     const ids = FORGE_STAGES.map((s) => s.id)
@@ -89,7 +113,8 @@ describe('buildForgeStagePrompt — state machines stage', () => {
     expect(prompt).toContain('`event` (the id or\n   tempId of the event node)')
     expect(prompt).toContain('`pseudostate` of kind "initial"')
     expect(prompt).toContain('(scenario → state-machine)')
-    expect(prompt).toContain('linked to it with `lifecycle-of` (machine →\n   entity; one machine per entity)')
+    expect(prompt).toContain('Take its entity from the domain model')
+    expect(prompt).toContain('link it to the entity with `lifecycle-of` (machine → entity; one machine\n   per entity)')
     expect(prompt).toContain('do not create any here')
   })
 })
