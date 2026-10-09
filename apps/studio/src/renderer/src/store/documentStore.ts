@@ -31,6 +31,7 @@ import {
   loadHandle,
   removeHandle,
   writeSelectionToHandle,
+  readForgeRunFromHandle,
 } from '../persist/webFolder'
 
 const LS_INDEX_KEY = 'radical-docs-index'
@@ -568,6 +569,10 @@ export interface DocumentsAPI {
    *  other documents and for a web folder not yet connected. */
   publishSelection(id: string, content: string): Promise<void>
 
+  /** The agent Forge run status file of an md-folder document (written by
+   *  the MCP server), or null when there is none or it cannot be read. */
+  readForgeRun(id: string): Promise<string | null>
+
   /** Convenience: ensure there's at least one document; create an empty LS
    *  doc if the index is empty. Returns the active doc. */
   ensureActive(seedIfEmpty: () => DiagramData): { meta: DocumentMeta; seeded: boolean }
@@ -984,6 +989,19 @@ export const documents: DocumentsAPI = {
     if (!handle) return
     try { await writeSelectionToHandle(handle, content) }
     catch (e) { console.warn('[documentStore] selection write failed:', e) }
+  },
+
+  async readForgeRun(id) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') return null
+    const h = host()
+    if (meta.folderPath && h.readForgeRun) {
+      const res = await h.readForgeRun(meta.folderPath)
+      return res.success ? res.content ?? null : null
+    }
+    if (h.readFolder || !connectedWebFolders.has(id)) return null
+    const handle = await loadHandle(id)
+    return handle ? readForgeRunFromHandle(handle) : null
   },
 
   watchDocument(id, onExternalChange) {

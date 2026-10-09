@@ -150,6 +150,17 @@ export async function writeSelectionToHandle(root: FsDirHandle, content: string)
   await writeText(dir, 'selection.json', content)
 }
 
+/** The Forge run status file (see forgeRunStatus) under the model folder's
+ *  `.radical/`, or null when there is none. */
+export async function readForgeRunFromHandle(root: FsDirHandle): Promise<string | null> {
+  try {
+    const dir = await root.getDirectoryHandle(SELECTION_DIR)
+    return await (await (await dir.getFileHandle('forge-run.json')).getFile()).text()
+  } catch {
+    return null
+  }
+}
+
 // ─── IndexedDB handle persistence ────────────────────────────────────────────
 
 const DB_NAME = 'radical-fs'

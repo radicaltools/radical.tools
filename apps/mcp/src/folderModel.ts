@@ -9,7 +9,8 @@ import { deserializeFromMdFolder, isMdFolder, isOwnedMdFolderFile, serializeToMd
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { readSelectionFile } from '@radical/node-files/selectionFile'
+import { readSelectionFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
+import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
 import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
@@ -209,6 +210,29 @@ export class FolderModel {
     return new FolderModel(canonical, preset, createModelFacade(data).getMetamodel?.())
   }
 
+  /** The MCP client's name (claude-code, …), for the Forge run status. */
+  clientName: () => string | undefined = () => undefined
+
+  /** Writes where the agent's Forge run stands for Studio to show. A failed
+   *  write never fails the call: the status is a convenience. */
+  private async writeForgeStatus(closing = false): Promise<void> {
+    const status = this.forge.status(closing)
+    if (!status) return
+    try {
+      await writeForgeRunFile(this.folder, serializeForgeRun({ ...status, ...(this.clientName() ? { client: this.clientName() } : {}) }))
+    } catch {
+      // Read-only folder or a symlinked .radical: Studio just shows nothing.
+    }
+  }
+
+  /** The server is shutting down: an unfinished run shows as paused in
+   *  Studio right away instead of after FORGE_RUN_STALE_MS. */
+  async close(): Promise<void> {
+    await this.idle()
+    const status = this.forge.status()
+    if (status?.state === 'active') await this.writeForgeStatus(true)
+  }
+
   /** Resolves once every queued call has finished. */
   idle(): Promise<void> {
     return this.tail.then(() => undefined)
@@ -342,6 +366,7 @@ export class FolderModel {
       }
       if (READ_ONLY.has(name) || result.readOnly) {
         result.commit?.()
+        if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
         return { ok: true, text: result.resultText }
       }
 
@@ -354,6 +379,7 @@ export class FolderModel {
         return outcome
       }
       result.commit?.()
+      if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
       // A metamodel tool changed the types: re-advertise the schemas.
       if (this.refreshTools(metamodel)) return { ...outcome, toolsChanged: true }
       return outcome

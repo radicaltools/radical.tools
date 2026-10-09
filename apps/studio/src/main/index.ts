@@ -5,7 +5,8 @@ import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'f
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { writeSelectionFile } from '@radical/node-files/selectionFile'
+import { readEditorStateFile, writeSelectionFile } from '@radical/node-files/selectionFile'
+import { FORGE_RUN_FILE } from '@radical/common/formats/forgeRunStatus'
 
 /** One session per model folder, kept for the app's lifetime: it remembers
  *  what the renderer last read, so writes never clobber outside edits. */
@@ -216,6 +217,16 @@ app.whenReady().then(() => {
     try {
       await writeSelectionFile(folderPath, content)
       return { success: true }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
+
+  // Where an agent's Forge run on the same folder stands (the MCP server
+  // writes it), for Studio to show.
+  ipcMain.handle('folder:read-forge-run', async (_event, folderPath: string) => {
+    try {
+      return { success: true, content: await readEditorStateFile(folderPath, FORGE_RUN_FILE) }
     } catch (e) {
       return { success: false, error: (e as Error).message }
     }

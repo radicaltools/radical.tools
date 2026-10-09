@@ -16,6 +16,7 @@
     "./formats/mdFolder": "./src/formats/mdFolder.ts",
     "./formats/mdFolderSync": "./src/formats/mdFolderSync.ts",
     "./formats/canvasSelection": "./src/formats/canvasSelection.ts",
+    "./formats/forgeRunStatus": "./src/formats/forgeRunStatus.ts",
     "./formats/exportGherkin": "./src/formats/exportGherkin.ts",
     "./ai/queryLanguage": "./src/ai/queryLanguage.ts",
     "./ai/diagramFacade": "./src/ai/diagramFacade.ts",

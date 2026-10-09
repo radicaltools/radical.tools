@@ -94,7 +94,7 @@ interface Props {
 type WizardStep = 'input' | ForgeStageId | 'export'
 
 const STEP_ORDER: WizardStep[] = ['input', ...FORGE_STAGES.map((s) => s.id), 'export']
-const STEP_LABELS: Record<WizardStep, string> = {
+export const STEP_LABELS: Record<WizardStep, string> = {
   input: 'Description',
   requirements: 'Requirements',
   domain: 'Domain',

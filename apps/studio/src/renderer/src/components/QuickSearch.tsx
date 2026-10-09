@@ -9,6 +9,8 @@ import { AIReportLine } from './AIReportLine'
 import { openAISettings } from './AISettingsModal'
 import type { AISettings, ChatMessage, TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
+import { forgeRunClientName, forgeRunCurrentStage } from '@radical/common/formats/forgeRunStatus'
+import { agentForgePhase, useAgentForgeStore } from '../persistence/agentForge'
 
 /**
  * Cmd/Ctrl+P quick-search palette.
@@ -35,6 +37,28 @@ export function QuickSearch(): React.ReactElement | null {
   const pendingBodyNodeIds = useDiagramStore((s) => s.pendingBodyNodeIds)
   const scanDescriptions = useDiagramStore((s) => s.scanDescriptions)
   const [descScanning, setDescScanning] = useState(false)
+
+  // An agent's Forge run on this folder (over MCP): the Forge button pulses
+  // while it works or waits for the user, and opens a read-only view of it.
+  const agentStatus = useAgentForgeStore((s) => s.status)
+  const [agentNow, setAgentNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!agentStatus) return
+    setAgentNow(Date.now())
+    const timer = setInterval(() => setAgentNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [agentStatus])
+  const agentPhase = agentForgePhase(agentStatus, agentNow)
+  const agentCurrent = agentStatus ? forgeRunCurrentStage(agentStatus) : undefined
+  const agentBadge = agentPhase === 'done' ? '✓'
+    : agentPhase === 'paused' ? '‖'
+    : agentPhase && agentStatus && agentCurrent ? `${agentStatus.stages.indexOf(agentCurrent) + 1}/${agentStatus.stages.length}`
+    : null
+  const agentClient = forgeRunClientName(agentStatus?.client)
+  const agentForgeTitle = agentPhase === 'working' ? `${agentClient} is running Radical Forge on this model — click to follow it`
+    : agentPhase === 'waiting' ? `${agentClient}'s Radical Forge run is waiting for you — click to see where it stands`
+    : agentPhase === 'done' ? `${agentClient} finished a Radical Forge run — click to see it`
+    : `${agentClient}'s Radical Forge run stopped — click to see where it stands`
 
   const [q, setQ] = useState('')
   const [hover, setHover] = useState(0)
@@ -531,13 +555,14 @@ export function QuickSearch(): React.ReactElement | null {
         </button>
         <button
           type="button"
-          className="qs-forge-toggle"
-          title="Open Radical Forge — generate a model from a description"
-          aria-label="Open Radical Forge"
+          className={`qs-forge-toggle${agentPhase ? ` qs-forge-agent qs-forge-${agentPhase}` : ''}`}
+          title={agentPhase ? agentForgeTitle : 'Open Radical Forge — generate a model from a description'}
+          aria-label={agentPhase ? 'Show the agent\'s Radical Forge run' : 'Open Radical Forge'}
+          data-agent-phase={agentPhase ?? undefined}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             closeDropdown()
-            window.dispatchEvent(new CustomEvent('radical:open-forge'))
+            window.dispatchEvent(new CustomEvent(agentPhase ? 'radical:open-agent-forge' : 'radical:open-forge'))
           }}
         >
           <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -546,6 +571,7 @@ export function QuickSearch(): React.ReactElement | null {
             <path d="M2 14l2.5-2.5" />
             <circle cx="12.5" cy="3.5" r="1.5" fill="currentColor" stroke="none" />
           </svg>
+          {agentBadge && <span className="qs-forge-badge" aria-hidden>{agentBadge}</span>}
         </button>
         {aiBusy && (
           <button

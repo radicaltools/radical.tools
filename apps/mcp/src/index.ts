@@ -94,12 +94,14 @@ async function main(): Promise<void> {
     const { description } = (args ?? {}) as { description?: unknown }
     return { messages: [{ role: 'user', content: { type: 'text', text: forgePrompt(typeof description === 'string' ? description.trim() : '') } }] }
   })
+  // The Forge run status Studio shows names the client driving the run.
+  model.clientName = () => server.server.getClientVersion()?.name
   await server.connect(new StdioServerTransport())
   // The client is gone: stop instead of computing (and writing) a result nobody
   // will read. A running Smart Layout notices at its next step.
   process.stdin.once('end', () => {
     gone.abort()
-    void model.idle().then(() => process.exit(0))
+    void model.close().then(() => process.exit(0))
   })
 }
 

@@ -715,3 +715,23 @@ Conceptual too. Aggregate rules are in
 5. **The Forge step bar is full.** Nine steps fit on one line at the modal's
    width only with short labels (Fitness, C4) and tight pills; an eighth
    stage needs a different layout (two rows of stages, or numbers).
+
+### Agent Forge runs in Studio (2026-10-09)
+
+The MCP server writes where an agent's Radical Forge run stands to
+`.radical/forge-run.json` after every forge_* step (and `closed` when its
+client goes away); Studio polls it every 2 s for the open md-folder model,
+pulses the Forge button (blue working, amber waiting for the user) and opens
+a read-only view with the wizard's step bar. Still open:
+
+1. **Read only.** The user answers the agent in its chat; answering its
+   clarifying questions from Studio would need a channel back (Studio writes
+   answers, forge_generate reads them) and a rule for who wins.
+2. **One run per folder.** Two MCP servers on one folder (Desktop and Claude
+   Code) overwrite each other's status; the last writer wins.
+3. **A crash shows only after 30 minutes.** A killed server cannot mark its
+   run closed, so Studio shows it running until FORGE_RUN_STALE_MS passes.
+4. **Polling.** Studio reads the file every 2 s while a folder model is open,
+   whether or not an agent is connected; the folder watcher's change events
+   could drive it instead.
+
