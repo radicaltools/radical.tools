@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation } from '../src/c4'
 import { isContainerType } from '../src/c4'
-import { builtInC4Metamodel, builtInGovernanceMetamodel, raisedEvents, relationDisplayLabel, validateModel } from '../src/metamodel'
+import { builtInC4Metamodel, builtInGovernanceMetamodel, relationDisplayLabel, validateModel } from '../src/metamodel'
 
 const mm = builtInGovernanceMetamodel()
 const pairsOf = (rel: string) => mm.relationTypes[rel].allowedPairs.map((p) => `${p.from}->${p.to}`)
@@ -10,12 +10,12 @@ let seq = 0
 function node(type: string, label: string, parentId?: string, props: Record<string, string> = {}): C4Node {
   return { id: `${type}-${++seq}`, type, label, parentId, collapsed: false, x: 0, y: 0, width: 160, height: 60, ...props } as C4Node
 }
-function transition(source: C4Node, target: C4Node, props: Record<string, string> = {}): C4Relation {
+function transition(source: C4Node, target: C4Node, props: Record<string, string | string[]> = {}): C4Relation {
   return { id: `t-${++seq}`, sourceId: source.id, targetId: target.id, relationType: 'transition', ...props } as C4Relation
 }
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> => Object.fromEntries(items.map((i) => [i.id, i]))
-const issuesOf = (nodes: C4Node[], relations: C4Relation[]) =>
-  validateModel(byId(nodes), byId(relations), mm).filter((i) => i.id.startsWith('sm-'))
+const issuesOf = (nodes: C4Node[], relations: C4Relation[], prefix = 'sm-') =>
+  validateModel(byId(nodes), byId(relations), mm).filter((i) => i.id.startsWith(prefix))
 const kinds = (issues: { id: string }[]) => issues.map((i) => i.id.split(':')[0]).sort()
 
 /** Order: Pending → (pay) → Paid ⟨Packing ‖ Invoicing⟩ → (ship) → Shipped (final). */
@@ -31,14 +31,15 @@ function orderMachine() {
   const shipped = node('state', 'Shipped', machine.id, { kind: 'final' })
   const pay = node('event', 'PaymentReceived', machine.id)
   const ship = node('event', 'Shipped', machine.id)
-  const nodes = [machine, init, pending, paid, packing, packInit, picking, invoicing, shipped, pay, ship]
+  const orderPaid = node('event', 'OrderPaid', machine.id)
+  const nodes = [machine, init, pending, paid, packing, packInit, picking, invoicing, shipped, pay, ship, orderPaid]
   const relations = [
     transition(init, pending),
-    transition(pending, paid, { event: 'PaymentReceived', guard: 'amount covers total', actions: 'reserve stock' }),
+    transition(pending, paid, { event: pay.id, guard: 'amount covers total', actions: 'reserve stock', raises: [orderPaid.id] }),
     transition(packInit, picking),
-    transition(paid, shipped, { event: 'Shipped' }),
+    transition(paid, shipped, { event: ship.id }),
   ]
-  return { nodes, relations, machine, init, pending, paid, packing, picking, invoicing, shipped }
+  return { nodes, relations, machine, init, pending, paid, packing, picking, invoicing, shipped, pay, ship, orderPaid }
 }
 
 describe('state machine types (governance preset)', () => {
@@ -55,7 +56,6 @@ describe('state machine types (governance preset)', () => {
     expect(pairsOf('transition').sort()).toEqual([
       'pseudostate->pseudostate', 'pseudostate->state', 'state->pseudostate', 'state->state',
     ])
-    expect(mm.relationTypes.transition.properties?.map((p) => p.key)).toEqual(['event', 'guard', 'actions', 'kind'])
     expect(pairsOf('lifecycle-of')).toContain('state-machine->component')
     expect(pairsOf('emits')).toContain('component->event')
     // A state raises an event on entry, on exit or from its do activity.
@@ -66,29 +66,56 @@ describe('state machine types (governance preset)', () => {
     expect(pairsOf('illustrates')).toContain('mockup->state')
   })
 
+  it('points a transition at its trigger and the events it raises by reference', () => {
+    const props = Object.fromEntries((mm.relationTypes.transition.properties ?? []).map((p) => [p.key, p]))
+    expect(Object.keys(props)).toEqual(['event', 'guard', 'actions', 'raises', 'kind'])
+    expect(props.event).toMatchObject({ type: 'ref', refType: 'event' })
+    expect(props.event.multiple).toBeUndefined()
+    expect(props.raises).toMatchObject({ type: 'ref', refType: 'event', multiple: true })
+  })
+
   it('stays out of the C4 preset', () => {
     expect(builtInC4Metamodel().nodeTypes.state).toBeUndefined()
   })
 
-  it('labels a transition `event [guard] / actions` unless it has a label of its own', () => {
-    const { relations } = orderMachine()
-    expect(relationDisplayLabel(relations[1])).toBe('PaymentReceived [amount covers total] / reserve stock')
-    expect(relationDisplayLabel(relations[0])).toBeUndefined()
-    expect(relationDisplayLabel({ ...relations[1], label: 'pay' })).toBe('pay')
+  it('labels a transition `event [guard] / actions ^raised` by the events\' names', () => {
+    const { nodes, relations, pay } = orderMachine()
+    const all = byId(nodes)
+    expect(relationDisplayLabel(relations[1], all)).toBe('PaymentReceived [amount covers total] / reserve stock ^OrderPaid')
+    expect(relationDisplayLabel(relations[0], all)).toBeUndefined()
+    expect(relationDisplayLabel({ ...relations[1], label: 'pay' }, all)).toBe('pay')
+    // Renaming the event renames the label: the transition holds its id.
+    expect(relationDisplayLabel(relations[1], { ...all, [pay.id]: { ...pay, label: 'Paid' } })).toMatch(/^Paid \[/)
   })
 })
 
-describe('raisedEvents', () => {
-  it('reads the events an action raises, sends or emits, but not plain prose', () => {
-    expect(raisedEvents('raise OrderPaid; send "Order shipped", emit \'Stock low\'')).toEqual(['OrderPaid', 'Order shipped', 'Stock low'])
-    expect(raisedEvents('send a confirmation email, raise invoice')).toEqual([])
+describe('reference properties', () => {
+  it('accept the ids of nodes of their type', () => {
+    const { nodes, relations } = orderMachine()
+    expect(issuesOf(nodes, relations, 'bad-ref')).toEqual([])
+  })
+
+  it('flag an id with no node, and a node of another type', () => {
+    const m = orderMachine()
+    const relations = [
+      ...m.relations,
+      transition(m.pending, m.shipped, { event: 'gone', guard: 'x' }),
+      transition(m.picking, m.picking, { event: m.pending.id, raises: [m.orderPaid.id, 'gone-too'] }),
+    ]
+    const issues = issuesOf(m.nodes, relations, 'bad-ref')
+    expect(issues.map((i) => i.message)).toEqual([
+      'Transition "Pending" → "Shipped": "Event (trigger; none = completion)" points at nothing valid (no node has id "gone").',
+      'Transition "Picking" → "Picking": "Event (trigger; none = completion)" points at nothing valid ("Pending" is of type state, not event).',
+      'Transition "Picking" → "Picking": "Raises (events it publishes)" points at nothing valid (no node has id "gone-too").',
+    ])
+    expect(issues.every((i) => i.severity === 'warning' && i.relationId)).toBe(true)
   })
 })
 
 describe('state machine rules', () => {
   it('accepts a well-formed machine with a parallel state', () => {
     const { nodes, relations } = orderMachine()
-    expect(issuesOf(nodes, relations)).toEqual([])
+    expect(validateModel(byId(nodes), byId(relations), mm)).toEqual([])
   })
 
   it('wants one initial pseudostate in a machine and in each compound state, none in a parallel one', () => {
@@ -105,11 +132,11 @@ describe('state machine rules', () => {
   it('flags a parallel state with one region and a final state that is left', () => {
     const m = orderMachine()
     const nodes = m.nodes.filter((n) => n.id !== m.invoicing.id)
-    const relations = [...m.relations, transition(m.shipped, m.pending, { event: 'Shipped' })]
+    const relations = [...m.relations, transition(m.shipped, m.pending, { event: m.ship.id })]
     expect(kinds(issuesOf(nodes, relations))).toEqual(['sm-final-out', 'sm-parallel-regions'])
   })
 
-  it('flags unknown events, unguarded conflicts and transitions that leave the machine', () => {
+  it('flags unguarded conflicts and transitions that leave the machine', () => {
     const m = orderMachine()
     const other = node('state-machine', 'Payment')
     const otherInit = node('pseudostate', 'Start', other.id, { kind: 'initial' })
@@ -117,24 +144,14 @@ describe('state machine rules', () => {
     const relations = [
       ...m.relations,
       transition(otherInit, elsewhere),
-      transition(m.pending, m.shipped, { event: 'Shipped' }),
-      transition(m.pending, m.pending, { event: 'Shipped' }),
-      transition(m.pending, m.pending, { event: 'Cancelled', guard: 'within 14 days' }),
+      transition(m.pending, m.shipped, { event: m.ship.id }),
+      transition(m.pending, m.pending, { event: m.ship.id }),
+      transition(m.pending, m.pending, { event: m.pay.id, guard: 'within 14 days' }),
       transition(m.picking, elsewhere),
     ]
-    expect(kinds(issuesOf([...m.nodes, other, otherInit, elsewhere], relations))).toEqual([
-      'sm-cross-machine', 'sm-nondeterministic', 'sm-unknown-event',
-    ])
-  })
-
-  it('flags events raised in actions that no event node declares', () => {
-    const m = orderMachine()
-    const nodes = m.nodes.map((n) => n.id === m.pending.id ? { ...n, entry: 'start timer, emit "Payment requested"' } as C4Node : n)
-    const relations = m.relations.map((r) => r.targetId === m.shipped.id ? { ...r, actions: 'raise Shipped, send OrderClosed' } as C4Relation : r)
-    const issues = issuesOf(nodes, relations)
-    expect(issues.map((i) => i.id.split(':').slice(0, 1).concat(i.id.split(':').slice(2)).join(':')).sort()).toEqual([
-      'sm-unknown-raised:OrderClosed', 'sm-unknown-raised:Payment requested',
-    ])
+    const issues = issuesOf([...m.nodes, other, otherInit, elsewhere], relations)
+    expect(kinds(issues)).toEqual(['sm-cross-machine', 'sm-nondeterministic'])
+    expect(issues.find((i) => i.id.startsWith('sm-nondeterministic'))?.message).toBe('"Pending" has 2 unguarded transitions on "Shipped"; only one can fire.')
   })
 
   it('finds states no path from the initial state reaches', () => {
@@ -151,7 +168,7 @@ describe('state machine rules', () => {
     const m = orderMachine()
     const cancelled = node('state', 'Cancelled', m.machine.id, { kind: 'final' })
     const cancel = node('event', 'Cancel', m.machine.id)
-    const relations = [...m.relations, transition(m.paid, cancelled, { event: 'Cancel' })]
+    const relations = [...m.relations, transition(m.paid, cancelled, { event: cancel.id })]
     expect(issuesOf([...m.nodes, cancelled, cancel], relations)).toEqual([])
   })
 })

@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, PropertyDef, type WizardLink } from '@radical/common/metamodel'
+import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, refLabels, PropertyDef, type WizardLink } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { MockupWireframe } from './MockupWireframe'
+import { RefPicker } from './RefPicker'
 import { wireframeDataUri } from '@radical/common/wireframe'
 import { loadStudioSettings, STUDIO_SETTINGS_CHANGED_EVENT } from '../studioSettings'
 import {
@@ -744,7 +745,7 @@ const INFOBOX_TEXT_KEYS: ReadonlySet<string> = new Set([
 // booleans, numbers, and the curated short-text metadata above. Substantive
 // text/textarea content stays in the main body.
 function isInfoboxFact(p: PropertyDef): boolean {
-  if (p.type === 'enum' || p.type === 'boolean' || p.type === 'number') return true
+  if (p.type === 'enum' || p.type === 'boolean' || p.type === 'number' || p.type === 'ref') return true
   if (p.type === 'text') return INFOBOX_TEXT_KEYS.has(p.key)
   return false
 }
@@ -1381,6 +1382,21 @@ function WikiRelationLine({
 
 // ─── Infobox / inline fact value (display-first, edit on click) ──────────────
 
+/** A reference property: the labels of the nodes it points at, or a picker. */
+function WikiRefValue({ def, value, readOnly, onCommit }: {
+  def: PropertyDef
+  value: unknown
+  readOnly: boolean
+  onCommit: (v: string | string[]) => void
+}): React.ReactElement {
+  const nodes = useDiagramStore((s) => s.c4Nodes)
+  if (readOnly) {
+    const labels = refLabels(value, nodes)
+    return labels.length ? <span>{labels.join(', ')}</span> : <span className="wiki-muted">—</span>
+  }
+  return <RefPicker def={def} value={value} onChange={onCommit} className="wiki-ref-input" />
+}
+
 function WikiFactValue({
   def,
   value,
@@ -1392,8 +1408,10 @@ function WikiFactValue({
   value: unknown
   readOnly?: boolean
   inline?: boolean
-  onCommit: (v: string | number | boolean) => void
+  onCommit: (v: string | number | boolean | string[]) => void
 }): React.ReactElement {
+  if (def.type === 'ref') return <WikiRefValue def={def} value={value} readOnly={readOnly} onCommit={onCommit} />
+
   if (def.type === 'boolean') {
     const on = Boolean(value)
     return (

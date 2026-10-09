@@ -4,6 +4,7 @@ import type { C4Node, C4Relation, C4ElementType } from '@radical/common/c4'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
 import type { Metamodel, PropertyDef } from '@radical/common/metamodel'
 import { isParentAllowed, composeEarsSentence, resolveEarsSubject } from '@radical/common/metamodel'
+import { RefPicker } from './RefPicker'
 
 // ─── Column definitions ──────────────────────────────────────────────────────
 //
@@ -14,7 +15,7 @@ import { isParentAllowed, composeEarsSentence, resolveEarsSubject } from '@radic
 // This is what lets a custom type added via the Metamodel Editor show up
 // here automatically, with no code changes.
 
-type CellType = 'text' | 'textarea' | 'enum' | 'boolean' | 'number' | 'readonly'
+type CellType = 'text' | 'textarea' | 'enum' | 'boolean' | 'number' | 'ref' | 'readonly'
 
 interface ColDef {
   key: string
@@ -24,6 +25,8 @@ interface ColDef {
   options?: string[]
   /** Hide cell when another field on the same row doesn't match. */
   visibleWhen?: { key: string; values: string[] }
+  /** The property behind a 'ref' column (what it may point at). */
+  def?: PropertyDef
 }
 
 const ALL_NODES_COLS: ColDef[] = [
@@ -48,11 +51,12 @@ const DEFAULT_COL_WIDTH: Record<CellType, number> = {
   enum: 140,
   boolean: 90,
   number: 110,
+  ref: 180,
   readonly: 160,
 }
 
 function propToCol(p: PropertyDef): ColDef {
-  return { key: p.key, label: p.label, width: DEFAULT_COL_WIDTH[p.type], type: p.type, options: p.options, visibleWhen: p.visibleWhen }
+  return { key: p.key, label: p.label, width: DEFAULT_COL_WIDTH[p.type], type: p.type, options: p.options, visibleWhen: p.visibleWhen, ...(p.type === 'ref' ? { def: p } : {}) }
 }
 
 /** Computed (non-property) columns for specific node types, e.g. the EARS
@@ -447,6 +451,19 @@ export function TableView(): React.ReactElement {
       if (!col.visibleWhen.values.includes(cur)) {
         return <span className="tv-cell-value" style={{ color: 'var(--text-muted)', opacity: 0.4 }}>—</span>
       }
+    }
+
+    // A reference is picked in place: ids are stored, labels shown.
+    if (col.type === 'ref' && col.def) {
+      return (
+        <span className="tv-cell-value" onClick={(e) => e.stopPropagation()}>
+          <RefPicker def={col.def} className="tv-cell-input" readOnly={readOnly}
+            value={(row as unknown as Record<string, unknown>)[col.key]}
+            onChange={(v) => isNodeRow
+              ? updateNode(rowId, { [col.key]: v } as Parameters<typeof updateNode>[1])
+              : updateRelation(rowId, { [col.key]: v } as Partial<C4Relation>)} />
+        </span>
+      )
     }
 
     const rawVal = isNodeRow

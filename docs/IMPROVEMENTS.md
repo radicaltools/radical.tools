@@ -659,7 +659,9 @@ five of up to 60 candidates per stage in the clarify call. Benchmark:
 
 The governance preset has event-driven hierarchical state machines
 (`state-machine`, `state`, `pseudostate`, `event`; `transition`,
-`lifecycle-of`, `emits`) with SCXML semantics, statechart rules in
+`lifecycle-of`, `emits`) with SCXML semantics, reference properties for a
+transition's events (`packages/common/src/metamodel/refs.ts`), statechart
+rules in
 `packages/common/src/metamodel/statechart.ts` and statechart notation on the
 canvas (ADR "State machines as nested states"). Still open:
 
@@ -672,8 +674,12 @@ canvas (ADR "State machines as nested states"). Still open:
    type's 320×220 and is drawn at the collapsed 170×72 while it has no
    children; Smart Layout over MCP leaves gaps sized for the stored box.
 3. **Arrows stop at the final state's box,** not at its bullseye.
-4. **Renaming an event does not rename the transitions** that name it; they
-   get an unknown-event warning instead.
+4. **Deleting a node leaves references to it dangling.** Transitions point
+   at events by id (reference properties, ADR "Properties can reference
+   nodes"), so a rename is safe, but deleting an event leaves its id in
+   `event` / `raises`: a warning in Issues and a marked entry in the picker
+   until someone removes it. The store and the model facade could drop
+   such ids in the same undo step as the delete.
 5. **Next steps of the plan:** a Radical Forge stage between scenarios and
    mockups (one machine per entity with a real lifecycle, possibly none;
    C4 adds `lifecycle-of`; one view per machine), playing a scenario as a

@@ -8,7 +8,7 @@ import { builtInC4Metamodel, type Metamodel, type NodeTypeDef, type PropertyDef,
 import { forkPresetMetamodel } from '../../model'
 import { fail, type ToolDef, type ToolHandler, type ToolResult, type ToolRunContext } from './types'
 
-const PROPERTY_TYPES = ['text', 'textarea', 'boolean', 'number', 'enum']
+const PROPERTY_TYPES = ['text', 'textarea', 'boolean', 'number', 'enum', 'ref']
 const TYPE_ID = /^[a-z][a-z0-9-]*$/
 
 const PROPERTIES_SCHEMA = {
@@ -21,6 +21,8 @@ const PROPERTIES_SCHEMA = {
       label: { type: 'string' },
       type: { type: 'string', enum: PROPERTY_TYPES },
       options: { type: 'array', items: { type: 'string' }, description: "Allowed values, for type 'enum'." },
+      refType: { type: 'string', description: "The node type a 'ref' property points at (its value is that node's id)." },
+      multiple: { type: 'boolean', description: "For type 'ref': an array of node ids instead of one." },
       default: { type: ['string', 'number', 'boolean'] },
       required: { type: 'boolean' },
     },
@@ -114,11 +116,15 @@ function parseProperties(tool: string, raw: unknown): PropertyDef[] | string {
     if (p.type === 'enum' && (!Array.isArray(p.options) || !p.options.length || !p.options.every((o) => typeof o === 'string'))) {
       return `${tool}: enum property "${p.key}" needs string options`
     }
+    if (p.type === 'ref' && (typeof p.refType !== 'string' || !p.refType)) {
+      return `${tool}: ref property "${p.key}" needs a refType (a node type id)`
+    }
     out.push({
       key: p.key,
       label: p.label.trim(),
       type: p.type as PropertyDef['type'],
       ...(p.type === 'enum' ? { options: p.options } : {}),
+      ...(p.type === 'ref' ? { refType: p.refType, ...(p.multiple ? { multiple: true } : {}) } : {}),
       ...(p.default !== undefined ? { default: p.default } : {}),
       ...(p.required ? { required: true } : {}),
     })

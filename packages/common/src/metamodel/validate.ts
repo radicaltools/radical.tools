@@ -1,8 +1,9 @@
 // ─── Metamodel validator ─────────────────────────────────────────────────
 
 import { C4Node, C4Relation } from '../c4'
-import { Metamodel } from './types'
+import { Metamodel, PropertyDef } from './types'
 import { validateStateMachines } from './statechart'
+import { refIds, refProblem } from './refs'
 
 export type IssueSeverity = 'error' | 'warning'
 
@@ -126,6 +127,35 @@ export function validateModel(
         })
       }
     }
+  }
+
+  // Reference properties point at existing nodes of their type.
+  const checkRefs = (item: Record<string, unknown>, props: PropertyDef[] | undefined, at: { nodeId?: string; relationId?: string }, what: string): void => {
+    for (const p of props ?? []) {
+      if (p.type !== 'ref') continue
+      for (const id of refIds(item[p.key])) {
+        const problem = refProblem(p, id, nodes)
+        if (problem) {
+          issues.push({
+            id: `bad-ref:${at.nodeId ?? at.relationId}:${p.key}:${id}`,
+            severity: 'warning',
+            message: `${what}: "${p.label}" points at nothing valid (${problem}).`,
+            ...at,
+          })
+        }
+      }
+    }
+  }
+  for (const n of nodeList) {
+    const def = metamodel.nodeTypes[n.type]
+    if (def) checkRefs(n as unknown as Record<string, unknown>, def.properties, { nodeId: n.id }, `${def.label} "${n.label}"`)
+  }
+  for (const r of Object.values(relations)) {
+    const def = r.relationType ? metamodel.relationTypes[r.relationType] : undefined
+    if (!def) continue
+    const src = nodes[r.sourceId]?.label ?? r.sourceId
+    const dst = nodes[r.targetId]?.label ?? r.targetId
+    checkRefs(r as unknown as Record<string, unknown>, def.properties, { relationId: r.id }, `${def.label} "${src}" → "${dst}"`)
   }
 
   // Statechart rules, for metamodels that carry the built-in behaviour types.

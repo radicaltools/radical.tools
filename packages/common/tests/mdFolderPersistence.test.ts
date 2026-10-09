@@ -51,6 +51,16 @@ const sample: DiagramData = {
 }
 
 describe('md-folder persistence', () => {
+  it('keeps a list property (a multiple reference) as a list of ids', () => {
+    const risk = node({ id: 'risk1', type: 'adr', label: 'Vendor lock-in', ...({ owners: ['p1', 'p2'], note: '[not a list]' } as Record<string, unknown>) })
+    const files = serializeToMdFolder({ nodes: [risk], relations: [] }, 'Refs')
+    const md = Object.entries(files).find(([path]) => path.endsWith('.md') && path !== MD_MANIFEST_FILE)![1]
+    expect(md).toContain('owners: ["p1","p2"]')
+    const back = deserializeFromMdFolder(files).data.nodes[0] as unknown as Record<string, unknown>
+    expect(back.owners).toEqual(['p1', 'p2'])
+    expect(back.note).toBe('[not a list]')
+  })
+
   it('produces a manifest and one file per node', () => {
     const files = serializeToMdFolder(sample, 'Demo')
     expect(isMdFolder(files)).toBe(true)

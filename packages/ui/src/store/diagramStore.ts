@@ -805,7 +805,7 @@ function deriveRFEdges(
       const existing = rfEdges.find(
         (e) => e.source === visSource && e.target === visTarget
       )
-      const label = relationDisplayLabel(rel)
+      const label = relationDisplayLabel(rel, nodes)
       if (existing && label) {
         existing.label = existing.label ? `${existing.label}\n${label}` : label
       }
@@ -829,11 +829,11 @@ function deriveRFEdges(
       zIndex: edgeZIndex,
       markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
       style: { stroke: '#94a3b8', strokeWidth: 1.5 },
-      label: relationDisplayLabel(rel),
+      label: relationDisplayLabel(rel, nodes),
       data: {
         originalSourceId: rel.sourceId,
         originalTargetId: rel.targetId,
-        label: relationDisplayLabel(rel),
+        label: relationDisplayLabel(rel, nodes),
         technology: rel.technology,
         relationType: rel.relationType,
         isVirtual,

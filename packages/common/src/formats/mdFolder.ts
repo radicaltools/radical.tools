@@ -65,7 +65,9 @@ const NODE_LAYOUT_KEYS = new Set(['x', 'y', 'width', 'height', 'collapsed'])
 /** Node keys reconstructed from the folder structure / body, not frontmatter. */
 const NODE_NONFRONT_KEYS = new Set([...NODE_LAYOUT_KEYS, 'parentId', 'description'])
 
-type Scalar = string | number | boolean
+/** A frontmatter value: a scalar, or a list of strings (a multiple reference
+ *  property's node ids), written as a JSON array on one line. */
+type Scalar = string | number | boolean | string[]
 
 interface NodeLayout {
   x: number
@@ -117,6 +119,8 @@ function serializeFrontmatter(obj: Record<string, Scalar>): string {
       } else {
         lines.push(`${key}: ${JSON.stringify(value)}`)
       }
+    } else if (Array.isArray(value)) {
+      lines.push(`${key}: ${JSON.stringify(value)}`)
     } else {
       lines.push(`${key}: ${String(value)}`)
     }
@@ -129,6 +133,15 @@ function parseScalar(raw: string): Scalar {
   if (raw === 'true') return true
   if (raw === 'false') return false
   if (/^-?\d+(\.\d+)?$/.test(raw)) return Number(raw)
+  if (raw.startsWith('[')) {
+    try {
+      const list = JSON.parse(raw) as unknown
+      if (Array.isArray(list) && list.every((v) => typeof v === 'string')) return list as string[]
+    } catch {
+      // not a list after all: keep the text
+    }
+    return raw
+  }
   if (raw.startsWith('"')) {
     try {
       return JSON.parse(raw) as string
@@ -260,6 +273,7 @@ export function serializeToMdFolderWithPaths(data: DiagramData, modelName?: stri
     for (const key of extraKeys) {
       const value = (node as unknown as Record<string, unknown>)[key]
       if (value === undefined || value === null) continue
+      if (Array.isArray(value) && value.every((v) => typeof v === 'string')) { front[key] = value as string[]; continue }
       if (typeof value === 'object') continue // defensive: no nested props expected
       front[key] = value as Scalar
     }

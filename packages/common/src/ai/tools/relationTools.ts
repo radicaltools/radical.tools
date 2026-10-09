@@ -3,7 +3,7 @@
 import type { C4Relation } from '../../c4'
 import type { Metamodel } from '../../metamodel'
 import { fail, type ToolDef, type ToolHandler } from './types'
-import { validateProperties } from './propertyBag'
+import { validateProperties, type PropertyValue } from './propertyBag'
 
 export function buildRelationToolDefs(mm: Metamodel | undefined): ToolDef[] {
   const relTypeEnum = mm ? Object.keys(mm.relationTypes) : []
@@ -92,16 +92,16 @@ export function buildRelationToolHandlers(): Record<string, ToolHandler> {
         relationType = input.relationType
       }
 
-      let propValues: Record<string, string | number | boolean> = {}
+      let propValues: Record<string, PropertyValue> = {}
       let notes: string[] = []
       if (relationType) {
-        const validated = validateProperties(input.properties, mm?.relationTypes[relationType]?.properties)
+        const validated = validateProperties(input.properties, mm?.relationTypes[relationType]?.properties, { nodes, resolveId: ctx.resolveId })
         propValues = validated.values
         notes = validated.notes
       } else if (input.properties && typeof input.properties === 'object') {
         // Type wasn't given (will be auto-inferred by the store) — pass values
         // through as-is since we can't validate against an unknown type's schema.
-        propValues = input.properties as Record<string, string | number | boolean>
+        propValues = input.properties as Record<string, PropertyValue>
       }
 
       const beforeCount = Object.keys(ctx.diagram.getRelations()).length
@@ -138,6 +138,7 @@ export function buildRelationToolHandlers(): Record<string, ToolHandler> {
       const { values: propValues, notes } = validateProperties(
         input.properties,
         effectiveType ? mm?.relationTypes[effectiveType]?.properties : undefined,
+        { nodes: ctx.diagram.getNodes(), resolveId: ctx.resolveId },
       )
 
       const updates = Object.fromEntries(Object.entries({

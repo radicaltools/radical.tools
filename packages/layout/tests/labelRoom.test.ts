@@ -30,7 +30,7 @@ describe('labelGaps', () => {
       r2: rel('r2', 'b', 'a', 'Publishes accepted operations to subscribers', 'Kafka'),
     }
     const gaps = labelGaps(nodes, relations)
-    const big = labelNeed(labelSizeOf(relations.r2)!)
+    const big = labelNeed(labelSizeOf(relations.r2, nodes)!)
     expect(gaps.get(pairKey('a', 'b'))).toEqual(big)
     expect(big.y).toBeGreaterThan(3 * 17 * 1.4)
   })
@@ -64,7 +64,7 @@ describe('finalizeLayout with label gaps', () => {
     const nodes: Record<string, C4Node> = { a: node('a', 'system'), b: node('b', 'system', { y: NODE_SIZES.system.height + 5 }) }
     const relations = { r: rel('r', 'a', 'b', 'Sends invoices every night', 'SFTP') }
     const out = finalizeLayout(nodes, {}, labelGaps(nodes, relations))
-    const need = labelNeed(labelSizeOf(relations.r)!)
+    const need = labelNeed(labelSizeOf(relations.r, nodes)!)
     expect(out.b.y - (out.a.y + out.a.height!)).toBeGreaterThanOrEqual(need.y - 1e-6)
     expect(need.y).toBeGreaterThan(ROOT_GAP)
   })
@@ -93,7 +93,7 @@ describe('Smart Layout', () => {
     // Between siblings: the label plus its margins, on the axis they are apart on.
     const box = (id: string) => laid[id]
     for (const [a, b, r] of [['c1', 'c2', 'r2'], ['c2', 'c3', 'r3']] as const) {
-      const need = labelNeed(labelSizeOf(relations[r])!)
+      const need = labelNeed(labelSizeOf(relations[r], nodes)!)
       const gapX = Math.max(box(a).x, box(b).x) - Math.min(box(a).x + box(a).width, box(b).x + box(b).width)
       const gapY = Math.max(box(a).y, box(b).y) - Math.min(box(a).y + box(a).height, box(b).y + box(b).height)
       expect(gapX >= need.x - 1e-6 || gapY >= need.y - 1e-6).toBe(true)

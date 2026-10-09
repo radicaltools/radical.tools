@@ -43,6 +43,14 @@ const views: Record<string, DiagramView> = {
 }
 
 describe('runModelQuery', () => {
+  it('matches a list value (a multiple reference) when one of its ids does', () => {
+    const withList = { ...relations, r5: { ...relations.r4, id: 'r5', raises: ['e1', 'e2'] } as C4Relation, r6: { ...relations.r4, id: 'r6', raises: [] } as unknown as C4Relation }
+    const ids = (q: string) => (runModelQuery(q, { nodes, relations: withList, views }).result as { rows: { id: string }[] }).rows.map((r) => r.id)
+    expect(ids('LIST RELATIONS WHERE raises = "e2"')).toEqual(['r5'])
+    expect(ids('LIST RELATIONS WHERE raises = null')).toEqual(['r1', 'r2', 'r3', 'r4', 'r6'])
+    expect(ids('LIST RELATIONS WHERE raises != "e2"')).toEqual(['r1', 'r2', 'r3', 'r4', 'r6'])
+  })
+
   it('lists nodes with WHERE and LIMIT', () => {
     const result = runModelQuery('LIST NODES WHERE label ~ "api" LIMIT 1', { nodes, relations, views })
     expect(result.command).toBe('LIST NODES')

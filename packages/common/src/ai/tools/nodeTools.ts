@@ -89,7 +89,7 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       if (typeof input.label !== 'string' || !input.label.trim()) return fail('add_node: label is required')
 
       const mm = ctx.diagram.getMetamodel?.()
-      const { values: propValues, notes } = validateProperties(input.properties, mm?.nodeTypes[input.type]?.properties)
+      const { values: propValues, notes } = validateProperties(input.properties, mm?.nodeTypes[input.type]?.properties, { nodes: ctx.diagram.getNodes(), resolveId: ctx.resolveId })
 
       const size = NODE_SIZES[input.type as C4ElementType] ?? { width: 240, height: 140 }
       const parentReal = typeof input.parentId === 'string' && input.parentId ? ctx.resolveId(input.parentId) : undefined
@@ -133,7 +133,7 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
 
       const mm = ctx.diagram.getMetamodel?.()
       const effectiveType = typeof input.type === 'string' ? input.type : nodes[realId].type
-      const { values: propValues, notes } = validateProperties(input.properties, mm?.nodeTypes[effectiveType]?.properties)
+      const { values: propValues, notes } = validateProperties(input.properties, mm?.nodeTypes[effectiveType]?.properties, { nodes, resolveId: ctx.resolveId })
 
       const updates = Object.fromEntries(Object.entries({
         label: typeof input.label === 'string' ? input.label : undefined,

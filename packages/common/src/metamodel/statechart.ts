@@ -3,16 +3,17 @@
 // Checks a statechart the metamodel cannot express with allowedParents and
 // allowedPairs: how a machine and its compound states are entered, what a
 // parallel or final state may hold, transitions that leave their machine,
-// events no `event` node declares, two unguarded transitions on one event,
-// and states no path from the initial state reaches. Semantics follow SCXML:
-// entering a compound state enters its initial child, entering a parallel
-// state enters every child (region), and being in a state means being in all
-// its ancestors. Issues are warnings, like the rest of the soft validation.
-// Actions raise events by name as well (`raise OrderPaid`, `send "Order
-// paid"`), and those names are checked like a transition's trigger.
+// two unguarded transitions on one event, and states no path from the
+// initial state reaches. Semantics follow SCXML: entering a compound state
+// enters its initial child, entering a parallel state enters every child
+// (region), and being in a state means being in all its ancestors. Issues
+// are warnings, like the rest of the soft validation. A transition's `event`
+// and `raises` are reference properties; validateModel checks they point at
+// event nodes.
 
 import type { C4Node, C4Relation } from '../c4'
 import type { Issue } from './validate'
+import { refIds, refLabels } from './refs'
 
 type Props = Record<string, unknown>
 
@@ -26,31 +27,24 @@ const pseudoKind = (n: C4Node): string => prop(n, 'kind') || 'initial'
 const isState = (n: C4Node | undefined): n is C4Node => n?.type === 'state'
 const isPseudo = (n: C4Node | undefined): n is C4Node => n?.type === 'pseudostate'
 
-/** The text a transition shows on its edge: `event [guard] / actions`. */
-export function transitionLabel(r: C4Relation): string {
-  const event = prop(r, 'event')
+/** The text a transition shows on its edge: `event [guard] / actions
+ *  ^raised`, with the events' labels (`^` is the statechart notation for an
+ *  event a transition sends). */
+export function transitionLabel(r: C4Relation, nodes: Record<string, C4Node>): string {
+  const props = r as unknown as Props
+  const event = refLabels(props.event, nodes).join(', ')
   const guard = prop(r, 'guard')
   const actions = prop(r, 'actions')
-  return [event, guard && `[${guard}]`, actions && `/ ${actions}`].filter(Boolean).join(' ')
+  const raises = refLabels(props.raises, nodes).map((label) => `^${label}`).join(' ')
+  return [event, guard && `[${guard}]`, actions && `/ ${actions}`, raises].filter(Boolean).join(' ')
 }
 
 /** What a relation shows as its label: its own, else a transition's
- *  `event [guard] / actions`. */
-export function relationDisplayLabel(r: C4Relation): string | undefined {
+ *  `event [guard] / actions ^raised`. */
+export function relationDisplayLabel(r: C4Relation, nodes: Record<string, C4Node>): string | undefined {
   if (r.label) return r.label
-  if (r.relationType === 'transition') return transitionLabel(r) || undefined
+  if (r.relationType === 'transition') return transitionLabel(r, nodes) || undefined
   return undefined
-}
-
-/** Event names an action text raises: `raise X`, `send X` or `emit X`, where
- *  X is quoted or starts with a capital letter, as event names do. Plain
- *  prose ("send a confirmation email") names no event. */
-export function raisedEvents(actions: string): string[] {
-  const names: string[] = []
-  for (const m of actions.matchAll(/\b(?:raise|send|emit)\s+(?:"([^"]+)"|'([^']+)'|([A-Z][\w.-]*))/g)) {
-    names.push((m[1] ?? m[2] ?? m[3]).trim())
-  }
-  return names
 }
 
 export function validateStateMachines(
@@ -141,33 +135,11 @@ export function validateStateMachines(
   }
 
   // ── Transitions ─────────────────────────────────────────────────────────
-  const eventNames = new Set(nodeList.filter((n) => n.type === 'event').map((n) => n.label.trim()))
   for (const t of transitions) {
     const src = nodes[t.sourceId]
     const dst = nodes[t.targetId]
     if (machineOf(src) !== machineOf(dst)) {
       warn(`sm-cross-machine:${t.id}`, `Transition "${src.label}" → "${dst.label}" leaves its state machine.`, { relationId: t.id })
-    }
-    const event = prop(t, 'event')
-    if (event && !eventNames.has(event)) {
-      warn(`sm-unknown-event:${t.id}`, `Transition "${src.label}" → "${dst.label}" is triggered by "${event}", which no event node declares.`, { relationId: t.id })
-    }
-  }
-
-  // Events raised by actions, on transitions and in states.
-  for (const t of transitions) {
-    for (const name of raisedEvents(prop(t, 'actions'))) {
-      if (eventNames.has(name)) continue
-      warn(`sm-unknown-raised:${t.id}:${name}`, `Transition "${nodes[t.sourceId].label}" → "${nodes[t.targetId].label}" raises "${name}", which no event node declares.`, { relationId: t.id })
-    }
-  }
-  for (const n of nodeList) {
-    if (!isState(n)) continue
-    for (const key of ['entry', 'exit', 'do']) {
-      for (const name of raisedEvents(prop(n, key))) {
-        if (eventNames.has(name)) continue
-        warn(`sm-unknown-raised:${n.id}:${name}`, `State "${n.label}" raises "${name}" in its ${key} actions, which no event node declares.`, { nodeId: n.id })
-      }
     }
   }
 
@@ -175,14 +147,14 @@ export function validateStateMachines(
     const byEvent = new Map<string, C4Relation[]>()
     for (const t of out) {
       if (prop(t, 'guard')) continue
-      const key = prop(t, 'event')
+      const key = refIds((t as unknown as Props).event)[0] ?? ''
       const list = byEvent.get(key)
       if (list) list.push(t)
       else byEvent.set(key, [t])
     }
     for (const [event, list] of byEvent) {
       if (list.length < 2) continue
-      const on = event ? `on "${event}"` : 'without an event'
+      const on = event ? `on "${nodes[event]?.label ?? event}"` : 'without an event'
       warn(`sm-nondeterministic:${sourceId}:${event}`, `"${nodes[sourceId].label}" has ${list.length} unguarded transitions ${on}; only one can fire.`, { nodeId: sourceId })
     }
   }

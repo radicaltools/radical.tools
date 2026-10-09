@@ -481,9 +481,9 @@ export function builtInGovernanceMetamodel(): Metamodel {
   // its child states active at once (each child is a region). Nesting is
   // canvas containment, as for systems and containers. Every compound state
   // and the machine itself enter through an `initial` pseudostate, whose one
-  // transition points at the default child. A transition names its trigger
-  // in `event`, which should match an `event` node; a relation cannot point
-  // at a node, so the link is by name and statechart.ts checks it.
+  // transition points at the default child. A transition points at its
+  // trigger (`event`) and at the events it raises (`raises`) with reference
+  // properties: a relation cannot point at a node, a property can.
 
   const stateMachine: NodeTypeDef = {
     id: 'state-machine',
@@ -591,9 +591,10 @@ export function builtInGovernanceMetamodel(): Metamodel {
     label: 'Transition',
     allowedPairs: stateNodeTypes.flatMap(from => stateNodeTypes.map(to => ({ from, to }))),
     properties: [
-      { key: 'event',   label: 'Event (name of an event node; empty = completion)', type: 'text' },
+      { key: 'event',   label: 'Event (trigger; none = completion)', type: 'ref', refType: 'event' },
       { key: 'guard',   label: 'Guard [condition]', type: 'text' },
       { key: 'actions', label: 'Actions (/ effect)', type: 'text' },
+      { key: 'raises',  label: 'Raises (events it publishes)', type: 'ref', refType: 'event', multiple: true },
       {
         key: 'kind',
         label: 'Kind',
@@ -619,7 +620,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   // element → event it publishes. A state raises it from its entry, exit or
   // do activity (SCXML <raise>/<send> in onentry/onexit); a machine when it
   // is not yet known which state does. A transition cannot be a source (a
-  // relation cannot start at a relation): its `actions` say `raise <Event>`.
+  // relation cannot start at a relation): it lists them in `raises`.
   const emits: RelationTypeDef = {
     id: 'emits',
     label: 'Emits',

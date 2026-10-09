@@ -2,10 +2,11 @@ import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback, 
 import { useDiagramStore, nodeEffectivelyCollapsedInView } from '../store/diagramStore'
 import { useChildIds, useNodeContent, useNodeLabels } from '../store/nodeSelectors'
 import { type C4Relation, C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '@radical/common/c4'
-import { resolveEarsSubject, NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY } from '@radical/common/metamodel'
+import { resolveEarsSubject, NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
+import { RefPicker } from './RefPicker'
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 
@@ -1790,8 +1791,17 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
     }
 
     // Renders a metamodel PropertyDef as a form control, including enum selects.
-    const metamodelField = (p: { key: string; label: string; type: string; options?: string[]; default?: string | number | boolean }) => {
+    const metamodelField = (p: PropertyDef) => {
       const value = (node as unknown as Record<string, unknown>)[p.key]
+      if (p.type === 'ref') {
+        return (
+          <div className="props-field" key={p.key}>
+            <label className="props-label">{p.label}</label>
+            <RefPicker def={p} value={value} readOnly={readOnly}
+              onChange={(v) => !readOnly && updateNode(node.id, { [p.key]: v } as Parameters<typeof updateNode>[1])} />
+          </div>
+        )
+      }
       const onChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         if (readOnly) return
         updateNode(node.id, {
@@ -2064,7 +2074,15 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
             {relField('label', 'Label')}
             {/* Metamodel-driven properties; fallback to Technology only for relations with no type def */}
             {relMetaProps.length > 0
-              ? relMetaProps.map(p => relField(p.key, p.label, p.type, p.options))
+              ? relMetaProps.map(p => p.type === 'ref'
+                ? (
+                  <div className="props-field" key={p.key}>
+                    <label className="props-label">{p.label}</label>
+                    <RefPicker def={p} value={(rel as unknown as Record<string, unknown>)[p.key]} readOnly={readOnly}
+                      onChange={(v) => !readOnly && updateRelation(rel.id, { [p.key]: v } as Parameters<typeof updateRelation>[1])} />
+                  </div>
+                )
+                : relField(p.key, p.label, p.type, p.options))
               : !relTypeDef && relField('technology', 'Technology')
             }
           </div>

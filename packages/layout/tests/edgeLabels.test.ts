@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { estimateLabelSize, labelOverlaps, placeEdgeLabels, relationLabelLines, type LabelEdge } from '../src/edgeLabels'
+import { estimateLabelSize, labelOverlaps, placeEdgeLabels, relationLabelLines, type LabelEdge, type RelationLabelText } from '../src/edgeLabels'
+import type { C4Node } from '@radical/common/c4'
 import { computeRoutedEdge, type RoutingObstacle } from '../src/edgeRouting'
 import { Position } from '../src/side'
 
@@ -22,11 +23,16 @@ describe('estimateLabelSize', () => {
 })
 
 describe('relationLabelLines', () => {
-  it('gives a transition without a label room for `event [guard] / actions`', () => {
-    const lines = relationLabelLines({ relationType: 'transition', event: 'Pay', guard: 'ok', actions: 'reserve' })
-    expect(lines.map((l) => l.text)).toEqual(['Pay [ok] / reserve'])
-    expect(relationLabelLines({ relationType: 'transition', label: 'pay' }).map((l) => l.text)).toEqual(['pay'])
-    expect(relationLabelLines({ relationType: 'transition' })).toEqual([])
+  it('gives a transition room for `event [guard] / actions ^raised`, by event name', () => {
+    const nodes = {
+      pay: { id: 'pay', type: 'event', label: 'Pay', collapsed: false, x: 0, y: 0, width: 1, height: 1 },
+      paid: { id: 'paid', type: 'event', label: 'OrderPaid', collapsed: false, x: 0, y: 0, width: 1, height: 1 },
+    } as Record<string, C4Node>
+    const t = { relationType: 'transition', event: 'pay', guard: 'ok', actions: 'reserve', raises: ['paid'] } as RelationLabelText
+    expect(relationLabelLines(t, nodes).map((l) => l.text)).toEqual(['Pay [ok] / reserve ^OrderPaid'])
+    expect(relationLabelLines({ relationType: 'transition', label: 'pay' }, nodes).map((l) => l.text)).toEqual(['pay'])
+    // A completion transition has no label.
+    expect(relationLabelLines({ relationType: 'transition' }, nodes)).toEqual([])
   })
 })
 

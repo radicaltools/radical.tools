@@ -14,7 +14,7 @@
  */
 import type { Pt, RoutingObstacle } from './edgeRouting'
 import { transitionLabel } from '@radical/common/metamodel'
-import type { C4Relation } from '@radical/common/c4'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 
 // ── Label size ────────────────────────────────────────────────────────
 
@@ -87,27 +87,24 @@ export interface RelationLabelText {
   label?: string
   relationType?: string
   technology?: string
-  /** A transition's trigger, guard and effect, shown when it has no label. */
-  event?: string
-  guard?: string
-  actions?: string
 }
 
-/** The lines of a relation's label; none when it has no label. */
-export function relationLabelLines(r: RelationLabelText): LabelTextLine[] {
+/** The lines of a relation's label; none when it has no label. With the
+ *  model's nodes, a transition without a label shows `event [guard] /
+ *  actions ^raised` (its events by name), and nothing when it is a
+ *  completion transition. */
+export function relationLabelLines(r: RelationLabelText, nodes?: Record<string, C4Node>): LabelTextLine[] {
   const lines: LabelTextLine[] = []
-  // A transition without a label shows `event [guard] / actions`, and
-  // nothing at all when it is a completion transition.
   const name = r.label
-    || (r.relationType === 'transition' ? transitionLabel(r as C4Relation) : r.relationType)
+    || (r.relationType === 'transition' ? (nodes ? transitionLabel(r as C4Relation, nodes) : '') : r.relationType)
   if (name) lines.push({ text: name, fontSize: RELATION_LABEL_BOX.fontSize })
   if (r.technology) lines.push({ text: `[${r.technology}]`, fontSize: RELATION_LABEL_BOX.techFontSize })
   return lines
 }
 
 /** The size of a relation's label box, or null when it has no label. */
-export function relationLabelSize(r: RelationLabelText): LabelSize | null {
-  const lines = relationLabelLines(r)
+export function relationLabelSize(r: RelationLabelText, nodes?: Record<string, C4Node>): LabelSize | null {
+  const lines = relationLabelLines(r, nodes)
   return lines.length > 0 ? estimateLabelSize(lines, RELATION_LABEL_BOX) : null
 }
 

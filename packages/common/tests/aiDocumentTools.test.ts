@@ -298,3 +298,32 @@ describe('smart_layout', () => {
     expect((await call('smart_layout', {})).resultText).toContain('not available')
   })
 })
+
+describe('reference properties through the tools', () => {
+  it('turn tempIds into node ids and refuse nodes of another type', async () => {
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'm', type: 'state-machine', label: 'Order' })
+    await call('add_node', { tempId: 'a', type: 'state', label: 'Pending', parentId: 'm' })
+    await call('add_node', { tempId: 'b', type: 'state', label: 'Paid', parentId: 'm' })
+    await call('add_node', { tempId: 'pay', type: 'event', label: 'PaymentReceived', parentId: 'm' })
+    await call('add_node', { tempId: 'paid', type: 'event', label: 'OrderPaid', parentId: 'm' })
+    const ok = await call('add_relation', { sourceId: 'a', targetId: 'b', relationType: 'transition', properties: { event: 'pay', raises: ['paid'] } })
+    expect(ok.ok).toBe(true)
+    const ids = Object.fromEntries(Object.values(facade.getNodes()).map((n) => [n.label, n.id]))
+    const t = Object.values(facade.getRelations())[0] as unknown as Record<string, unknown>
+    expect(t.event).toBe(ids.PaymentReceived)
+    expect(t.raises).toEqual([ids.OrderPaid])
+
+    const wrong = await call('update_relation', { id: t.id, properties: { event: ids.Pending } })
+    expect(wrong.resultText).toContain('"Pending" is of type state, not event')
+    expect((Object.values(facade.getRelations())[0] as unknown as Record<string, unknown>).event).toBe(ids.PaymentReceived)
+  })
+
+  it('need a node type to point at in the metamodel', async () => {
+    const { call } = setup()
+    const bad = await call('upsert_node_type', { id: 'risk', label: 'Risk', baseType: 'adr', properties: [{ key: 'owner', label: 'Owner', type: 'ref' }] })
+    expect(bad.ok).toBe(false)
+    const good = await call('upsert_node_type', { id: 'risk', label: 'Risk', baseType: 'adr', properties: [{ key: 'owner', label: 'Owner', type: 'ref', refType: 'person', multiple: true }] })
+    expect(good.ok).toBe(true)
+  })
+})

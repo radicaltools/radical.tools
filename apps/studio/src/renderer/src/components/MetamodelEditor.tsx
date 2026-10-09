@@ -36,9 +36,12 @@ const IconTrash = () => (
 
 function PropertyEditor({
   properties,
+  nodeTypes,
   onChange,
 }: {
   properties: PropertyDef[]
+  /** What a 'ref' property may point at. */
+  nodeTypes: NodeTypeDef[]
   onChange: (next: PropertyDef[]) => void
 }): React.ReactElement {
   const update = (idx: number, patch: Partial<PropertyDef>) => {
@@ -72,13 +75,19 @@ function PropertyEditor({
           <select
             className="mm-input mm-prop-type"
             value={p.type}
-            onChange={(e) => update(i, { type: e.target.value as PropertyType })}
+            onChange={(e) => {
+              const type = e.target.value as PropertyType
+              update(i, type === 'ref'
+                ? { type, refType: p.refType ?? nodeTypes[0]?.id, options: undefined }
+                : { type, refType: undefined, multiple: undefined })
+            }}
           >
             <option value="text">text</option>
             <option value="textarea">textarea</option>
             <option value="number">number</option>
             <option value="boolean">boolean</option>
             <option value="enum">enum</option>
+            <option value="ref">reference</option>
           </select>
           <label className="mm-checkbox" title="Required">
             <input
@@ -102,6 +111,26 @@ function PropertyEditor({
                 })
               }
             />
+          )}
+          {p.type === 'ref' && (
+            <>
+              <select
+                className="mm-input mm-prop-options"
+                title="Node type it points at"
+                value={p.refType ?? ''}
+                onChange={(e) => update(i, { refType: e.target.value })}
+              >
+                {nodeTypes.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+              <label className="mm-checkbox" title="Several nodes instead of one">
+                <input
+                  type="checkbox"
+                  checked={!!p.multiple}
+                  onChange={(e) => update(i, { multiple: e.target.checked || undefined })}
+                />
+                many
+              </label>
+            </>
           )}
           <button className="mm-icon-btn danger" title="Remove property" onClick={() => remove(i)}>
             <IconTrash />
@@ -305,6 +334,7 @@ function NodeTypeCard({
           <div className="mm-section-label">Custom properties</div>
           <PropertyEditor
             properties={def.properties ?? []}
+            nodeTypes={allTypes}
             onChange={(properties) => onChange({ properties })}
           />
         </div>
@@ -441,6 +471,7 @@ function RelationTypeCard({
           <div className="mm-section-label">Custom properties</div>
           <PropertyEditor
             properties={def.properties ?? []}
+            nodeTypes={allTypes}
             onChange={(properties) => onChange({ properties })}
           />
         </div>
