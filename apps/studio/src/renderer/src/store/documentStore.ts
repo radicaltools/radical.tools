@@ -163,10 +163,27 @@ function readLSPayload(id: string): DiagramData | null {
   }
 }
 
-function writeLSPayload(id: string, data: DiagramData): void {
-  if (typeof localStorage === 'undefined') return
-  try { localStorage.setItem(lsKeyFor(id), JSON.stringify(data)) } catch (e) {
+/** Browser storage refused a model's content, almost always because its
+ *  quota (a few MB per site) is used up. */
+export class StorageFullError extends Error {
+  constructor() {
+    super(
+      'Browser storage is full, so the model could not be saved. ' +
+      'Delete models you no longer need (Models…), or save this one as a file or folder.',
+    )
+    this.name = 'StorageFullError'
+  }
+}
+
+/** False when storage refused the write (quota exceeded). */
+function writeLSPayload(id: string, data: DiagramData): boolean {
+  if (typeof localStorage === 'undefined') return true
+  try {
+    localStorage.setItem(lsKeyFor(id), JSON.stringify(data))
+    return true
+  } catch (e) {
     console.warn('[documentStore] writeLSPayload failed:', e)
+    return false
   }
 }
 
@@ -442,6 +459,8 @@ export interface DocumentsAPI {
   getActiveId(): string | null
   setActiveId(id: string | null): void
 
+  /** Adds a browser-storage document and makes it active. Throws
+   *  StorageFullError, adding nothing, when `seed` cannot be stored. */
   createLSDocument(name: string, seed?: DiagramData): DocumentMeta
 
   /** Register an FS-backed document without a native dialog.
@@ -476,7 +495,8 @@ export interface DocumentsAPI {
    *  serialization (never cached into the live model) so an unopened
    *  node's saved content is never clobbered with an empty description.
    *  localStorage docs are written synchronously (before this returns), so a
-   *  page-hide flush lands; disk writes run one at a time per document. */
+   *  page-hide flush lands; disk writes run one at a time per document.
+   *  Rejects with StorageFullError when browser storage refuses the write. */
   saveDocument(id: string, data: DiagramData): Promise<void>
 
   /** Update the display name. (Does NOT rename files on disk.) */
@@ -580,7 +600,9 @@ export const documents: DocumentsAPI = {
       source: 'ls',
       lastModified: Date.now(),
     }
-    if (seed) writeLSPayload(meta.id, seed)
+    // A document whose content never landed would open as whatever model
+    // the store still holds: refuse it before it joins the list.
+    if (seed && !writeLSPayload(meta.id, seed)) throw new StorageFullError()
     idx.docs.push(meta)
     idx.activeId = meta.id
     writeIndex(idx)
@@ -684,7 +706,7 @@ export const documents: DocumentsAPI = {
     const meta = idx.docs.find(d => d.id === id)
     if (!meta) return
     if (meta.source !== 'ls') return enqueueSave(id, data)
-    writeLSPayload(id, data)
+    if (!writeLSPayload(id, data)) throw new StorageFullError()
     meta.lastModified = Date.now()
     writeIndex(idx)
     notify()
@@ -1007,7 +1029,12 @@ export const documents: DocumentsAPI = {
     let idx = migrateLegacyIfNeeded(readIndex())
     if (idx.docs.length === 0) {
       const seed = seedIfEmpty()
-      const meta = this.createLSDocument('Untitled', seed)
+      let meta: DocumentMeta
+      try {
+        meta = this.createLSDocument('Untitled', seed)
+      } catch {
+        meta = this.createLSDocument('Untitled')
+      }
       bootSeededId = meta.id
       return { meta, seeded: true }
     }

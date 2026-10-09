@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { documents, useDocumentsStore, type DocumentMeta, type DocumentSource } from '../store/documentStore'
+import { documents, useDocumentsStore, StorageFullError, type DocumentMeta, type DocumentSource } from '../store/documentStore'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { availableMetamodels } from '@radical/common/metamodel'
 import { parseStructurizrDsl } from '@radical/common/formats/structurizrDsl'
@@ -92,7 +92,12 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
     const preset = presets.find((p) => p.id === newPresetId)
     const data: any = { nodes: [], relations: [] }
     if (preset) data.metamodel = preset.build()
-    documents.createLSDocument(name, data)
+    try {
+      documents.createLSDocument(name, data)
+    } catch (e) {
+      window.alert((e as Error).message)
+      return
+    }
     setCreatingNew(false)
     setNewName('')
     setTab('ls')
@@ -105,8 +110,12 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   }
 
   const handleImportFile = async (): Promise<void> => {
-    const meta = await documents.importFromFile()
-    if (meta) setTab('fs')
+    try {
+      const meta = await documents.importFromFile()
+      if (meta) setTab('fs')
+    } catch (e) {
+      window.alert((e as Error).message)
+    }
   }
 
   const handleImportFolder = async (): Promise<void> => {
@@ -158,6 +167,10 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
           documents.createLSDocument(displayName, { nodes: result.nodes, relations: result.relations } as any)
           setTab('ls')
         } catch (err) {
+          if (err instanceof StorageFullError) {
+            window.alert(err.message)
+            return
+          }
           console.warn('[DSL import] failed:', err)
           window.alert('Could not parse the DSL file. See the browser console for details.')
         }
