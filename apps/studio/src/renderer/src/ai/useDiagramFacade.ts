@@ -91,6 +91,11 @@ export function createStoreFacade(): DiagramFacade {
     removeSequence: (id: string) => useDiagramStore.getState().removeSequence(id),
     // ── milestones ──
     getMilestones: () => useDiagramStore.getState().snapshots,
+    openMilestone: () => {
+      // The same test persistence uses: the live model is parked in liveBackup.
+      const { activeSnapshotId, liveBackup, snapshots } = useDiagramStore.getState()
+      return activeSnapshotId && liveBackup ? snapshots.find((s) => s.id === activeSnapshotId) ?? null : null
+    },
     createMilestone: (name: string) => useDiagramStore.getState().createSnapshot(name),
     renameMilestone: (id: string, name: string) => useDiagramStore.getState().renameSnapshot(id, name),
     removeMilestone: (id: string) => useDiagramStore.getState().removeSnapshot(id),

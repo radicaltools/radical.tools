@@ -576,3 +576,51 @@ export function sequenceNodeIds(state: ModelState, id: string): string[] {
   }
   return [...nodes]
 }
+
+// ─── Comparing two copies of a model ─────────────────────────────────────────
+// One definition of "what changed" for compare_milestones, Studio's milestone
+// timeline and the highlight after an outside edit.
+
+/** Layout fields, which a copy also keeps but which are not changes to the system. */
+const LAYOUT_KEYS = new Set(['id', 'x', 'y', 'width', 'height', 'collapsed'])
+
+const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
+/** Fields that differ between two versions of an element or relation, layout left out. */
+function changedFields(before: object, after: object): string[] {
+  const a = before as Record<string, unknown>
+  const b = after as Record<string, unknown>
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
+  return [...keys].filter((key) => !LAYOUT_KEYS.has(key) && !sameValue(a[key], b[key])).sort()
+}
+
+export interface ModelCopy {
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+}
+
+export interface ElementChanges {
+  added: string[]
+  removed: string[]
+  changed: Array<{ id: string; fields: string[] }>
+}
+
+export interface ModelChanges {
+  nodes: ElementChanges
+  relations: ElementChanges
+}
+
+/** Elements and relations added, removed and changed from `before` to
+ *  `after`; a change is any field but the layout (properties included). */
+export function compareModels(before: ModelCopy, after: ModelCopy): ModelChanges {
+  const diff = <T extends object>(from: Record<string, T>, to: Record<string, T>): ElementChanges => ({
+    added: Object.keys(to).filter((id) => !(id in from)),
+    removed: Object.keys(from).filter((id) => !(id in to)),
+    changed: Object.keys(to)
+      // The same object is unchanged: Studio's copies share untouched elements.
+      .filter((id) => id in from && from[id] !== to[id])
+      .map((id) => ({ id, fields: changedFields(from[id], to[id]) }))
+      .filter((change) => change.fields.length > 0),
+  })
+  return { nodes: diff(before.nodes, after.nodes), relations: diff(before.relations, after.relations) }
+}

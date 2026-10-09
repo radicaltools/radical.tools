@@ -101,6 +101,9 @@ export interface DiagramFacade {
   /** Optional milestone access — omitted = milestone tools report a clear
    *  error. Milestones are named copies of the model, oldest first. */
   getMilestones?(): DiagramSnapshot[]
+  /** The milestone Studio's timeline has loaded over the current model, if
+   *  any: getNodes and the editing tools then see it, not the current model. */
+  openMilestone?(): DiagramSnapshot | null
   /** Saves the current nodes, relations and sequences as the latest milestone; its id. */
   createMilestone?(name: string): string
   renameMilestone?(id: string, name: string): void
