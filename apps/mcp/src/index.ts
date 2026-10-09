@@ -31,6 +31,8 @@ const INSTRUCTIONS = [
   'New nodes appear only in Studio\'s All elements view until you list them in a view (create_view, set_view_nodes).',
   'move_node changes a node\'s parent. New and moved nodes get a simple placement; call smart_layout afterwards to arrange the model or one view.',
   'A `need` node keeps raw free-text input (brief, notes, raw requirements) in its description; derive EARS `requirement` nodes from it rather than rewriting it, linking each requirement → need with `derives`.',
+  'State machines (state-machine, state, pseudostate, event; transition, emits, lifecycle-of) model the lifecycle of one entity with SCXML semantics; get_model_summary\'s modelling rules say how to build one, and a transition\'s `event` and `raises` hold the ids (or tempIds) of event nodes.',
+  'Writes report the warnings they bring in; get_issues lists every rule the model breaks now, as Studio\'s Issues panel does. Call it before you report work as done.',
   'Sequences (create_sequence) are ordered relation flows that dynamic views play; presentations are slides over views.',
   'Milestones are named copies of the model at phases of the system (e.g. "As-is", "Target 2027"): create_milestone saves the current model as the latest one, compare_milestones says what changed, and a slide can show a milestone.',
   'Metamodel tools (upsert_node_type, upsert_relation_type, …) change the types; the tool schemas refresh after them.',

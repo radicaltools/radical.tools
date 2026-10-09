@@ -334,3 +334,94 @@ describe('long Smart Layout runs', () => {
     expect(await exited).toBe(0)
   }, 15_000)
 })
+
+describe('state machines over MCP', () => {
+  it('are offered, explained, built with event references, checked and laid out', async () => {
+    const folder = await fixture()
+    const client = new Client({ name: 'radical-test', version: '1.0.0' })
+    await client.connect(new StdioClientTransport({
+      command: process.execPath,
+      args: [join(import.meta.dirname, '../dist/index.js'), '--folder', folder],
+    }))
+    const text = (result: Awaited<ReturnType<typeof client.callTool>>): string =>
+      (result.content as { text: string }[]).map((c) => c.text).join('\n')
+    const call = async (name: string, args: Record<string, unknown>): Promise<string> => {
+      const result = await client.callTool({ name, arguments: args })
+      expect(result.isError, `${name}: ${text(result)}`).not.toBe(true)
+      return text(result)
+    }
+    try {
+      // The schemas offer the types; the instructions and summary say how to use them.
+      const tools = (await client.listTools()).tools
+      const schema = (name: string) => tools.find((t) => t.name === name)!.inputSchema as { properties: Record<string, { enum?: string[] }> }
+      expect(schema('add_node').properties.type.enum).toEqual(expect.arrayContaining(['state-machine', 'state', 'pseudostate', 'event']))
+      expect(schema('add_relation').properties.relationType.enum).toEqual(expect.arrayContaining(['transition', 'emits', 'lifecycle-of']))
+      expect(tools.find((t) => t.name === 'get_issues')?.annotations?.readOnlyHint).toBe(true)
+      expect(client.getInstructions()).toContain('State machines')
+      const summary = await call('get_model_summary', {})
+      expect(summary).toContain('Modelling rules:')
+      expect(summary).toContain('A `state-machine` models the lifecycle of one entity')
+      expect(summary).toContain('"refType":"event"')
+
+      await call('add_node', { tempId: 'm', type: 'state-machine', label: 'Order lifecycle' })
+      for (const [tempId, label] of [['pay', 'PaymentReceived'], ['ship', 'Shipped'], ['paid', 'OrderPaid']]) {
+        await call('add_node', { tempId, type: 'event', label, parentId: 'm' })
+      }
+      // A compound state without its initial pseudostate: written, but warned.
+      await call('add_node', { tempId: 'pending', type: 'state', label: 'Pending', parentId: 'm' })
+      const warned = await call('add_node', { tempId: 'awaiting', type: 'state', label: 'Awaiting card', parentId: 'pending' })
+      expect(warned).toContain('New warnings')
+      expect(warned).toContain('Compound state "Pending" has child states but no initial pseudostate')
+
+      await call('add_node', { tempId: 'pi', type: 'pseudostate', label: 'Start', parentId: 'pending', properties: { kind: 'initial' } })
+      await call('add_node', { tempId: 'i', type: 'pseudostate', label: 'Start', parentId: 'm', properties: { kind: 'initial' } })
+      await call('add_node', { tempId: 'fulfil', type: 'state', label: 'Fulfilment', parentId: 'm', properties: { kind: 'parallel' } })
+      for (const [region, inner] of [['packing', 'Picking'], ['invoicing', 'Drafting']]) {
+        await call('add_node', { tempId: region, type: 'state', label: region, parentId: 'fulfil' })
+        await call('add_node', { tempId: `${region}-start`, type: 'pseudostate', label: 'Start', parentId: region, properties: { kind: 'initial' } })
+        await call('add_node', { tempId: `${region}-inner`, type: 'state', label: inner, parentId: region })
+        await call('add_relation', { sourceId: `${region}-start`, targetId: `${region}-inner`, relationType: 'transition' })
+      }
+      await call('add_node', { tempId: 'done', type: 'state', label: 'Shipped', parentId: 'm', properties: { kind: 'final' } })
+      await call('add_relation', { sourceId: 'i', targetId: 'pending', relationType: 'transition' })
+      await call('add_relation', { sourceId: 'pi', targetId: 'awaiting', relationType: 'transition' })
+      await call('add_relation', { sourceId: 'pending', targetId: 'fulfil', relationType: 'transition', properties: { event: 'pay', guard: 'amount ok', raises: ['paid'] } })
+      // A trigger that is not an event is refused, not stored.
+      const wrong = await call('add_relation', { sourceId: 'fulfil', targetId: 'done', relationType: 'transition', properties: { event: 'pending' } })
+      expect(wrong).toContain('"Pending" is of type state, not event')
+
+      const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      const id = (label: string, type: string) => saved.nodes.find((n) => n.label === label && n.type === type)!.id
+      const pay = saved.relations.find((r) => (r as unknown as Record<string, unknown>).guard === 'amount ok') as unknown as Record<string, unknown>
+      expect(pay.event).toBe(id('PaymentReceived', 'event'))
+      expect(pay.raises).toEqual([id('OrderPaid', 'event')])
+      const toDone = saved.relations.find((r) => r.targetId === id('Shipped', 'state'))!
+      await call('update_relation', { id: toDone.id, properties: { event: 'ship' } })
+      expect(await call('search_model', { query: `LIST RELATIONS WHERE raises = "${id('OrderPaid', 'event')}"` })).toContain('amount ok')
+
+      expect(await call('get_issues', {})).toBe('No issues: the model follows its metamodel.')
+
+      // Smart Layout keeps every state inside its parent, four levels deep.
+      await call('smart_layout', {})
+      const laid = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      const nodes = Object.fromEntries(laid.nodes.map((n) => [n.id, n]))
+      for (const n of laid.nodes) {
+        const parent = n.parentId ? nodes[n.parentId] : undefined
+        if (!parent) continue
+        expect(n.x, n.label).toBeGreaterThanOrEqual(0)
+        expect(n.y, n.label).toBeGreaterThanOrEqual(0)
+        expect(n.x + n.width, n.label).toBeLessThanOrEqual(parent.width + 1e-6)
+        expect(n.y + n.height, n.label).toBeLessThanOrEqual(parent.height + 1e-6)
+      }
+      // Machines and compound states are folders, like systems and containers.
+      const paths = Object.keys(await new MdFolderSession(diskFolderStorage(folder)).readAll())
+      expect(paths).toEqual(expect.arrayContaining([
+        'nodes/order-lifecycle/_index.md',
+        'nodes/order-lifecycle/fulfilment/_index.md',
+        'nodes/order-lifecycle/fulfilment/packing/picking/_index.md',
+      ]))
+    } finally {
+      await client.close()
+    }
+  })
+})
