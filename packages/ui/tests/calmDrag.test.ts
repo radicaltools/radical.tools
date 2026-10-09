@@ -10,6 +10,9 @@
  *   - a container grown by a drag pushes a neighbouring container whole
  *   - a dropped element is pinned: the physics leaves it where it is, on a
  *     small diagram that relaxes as a whole too
+ *   - a drop pushes a pinned element clear like any other (it stays pinned
+ *     where it lands); one that lines hold on both axes stays, and the
+ *     dropped element moves off it
  *   - the store records the pin on the canvas, unpins as one undo step and
  *     drops deleted elements from it
  */
@@ -293,6 +296,59 @@ describe('Pins', () => {
     expect(absOf(nodes, 'b').y).toBeCloseTo(1800, 0)
     // The others did move.
     expect(absOf(nodes, 'a')).not.toEqual({ x: 0, y: 0 })
+  })
+
+  it('let a drop push a pinned element clear, which stays pinned where it lands', async () => {
+    // Every drop pins, so the element dropped on was often dragged before:
+    // the two used to stay on top of each other for good.
+    const nodes: Nodes = {
+      a: node('a', 'system', { x: 0, y: 0 }),
+      b: node('b', 'system', { x: 1000, y: 0 }),
+      c: node('c', 'system', { x: 0, y: 1200 }),
+    }
+    const relations: Record<string, C4Relation> = { r1: { id: 'r1', sourceId: 'b', targetId: 'c' } as C4Relation }
+    const pinned: string[] = []
+    const engine = engineFor(nodes, relations, [], pinned)
+    engine.start(true)
+    calmDrag(engine, nodes, 'b', { x: 1000, y: 40 })
+    engine.release('b')
+    pinned.push('b')
+
+    calmDrag(engine, nodes, 'a', { x: 960, y: 60 })
+    engine.release('a')
+    expect(absOf(nodes, 'a')).toEqual({ x: 960, y: 60 })
+    expect(overlaps(nodes, 'a', 'b')).toBe(false)
+    const landed = absOf(nodes, 'b')
+
+    // The physics of a small diagram keeps b where the push left it.
+    pinned.push('a')
+    engine.invalidate()
+    await wait(400)
+    engine.stop()
+    expect(absOf(nodes, 'b').x).toBeCloseTo(landed.x, 0)
+    expect(absOf(nodes, 'b').y).toBeCloseTo(landed.y, 0)
+    expect(overlaps(nodes, 'a', 'b')).toBe(false)
+  })
+
+  it('move the dropped element off one that lines hold on both axes', () => {
+    const nodes: Nodes = {
+      a: node('a', 'system', { x: 0, y: 0 }),
+      b: node('b', 'system', { x: 1000, y: 0 }),
+      row: node('row', 'system', { x: 2000, y: 0 }),
+      col: node('col', 'system', { x: 1000, y: 1000 }),
+    }
+    const relations: Record<string, C4Relation> = {}
+    withFillers(nodes, relations)
+    const engine = engineFor(nodes, relations, [
+      { axis: 'y', ids: ['b', 'row'], orders: [] },
+      { axis: 'x', ids: ['b', 'col'], orders: [] },
+    ])
+    engine.start(true)
+    calmDrag(engine, nodes, 'a', { x: 960, y: 60 })
+    engine.release('a')
+    engine.stop()
+    expect(absOf(nodes, 'b')).toEqual({ x: 1000, y: 0 })
+    expect(overlaps(nodes, 'a', 'b')).toBe(false)
   })
 
   it('hold after a click on the pinned element', async () => {

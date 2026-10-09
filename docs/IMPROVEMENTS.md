@@ -557,9 +557,11 @@ the drop (`DragMode` and `clearOverlaps` in
 3. **A calm drop pushes rigidly and greedily.** Each covered element moves
    whole along its axis of least overlap; it never chooses a direction with
    more room, and after `CALM_MAX_PUSHES` pushes a dense spot keeps its
-   overlaps. A pinned element, or one held by lines on both axes (a grid
-   cell), is never pushed, so an overlap with it stays. A container holding a
-   pinned element is still pushed whole.
+   overlaps. Pinned elements are pushed too and stay pinned where they land
+   (`fix/drop-on-pinned`, 2026-10-09: an overlap with one used to stay, which
+   read as the physics switching off). One held by lines on both axes (a grid
+   cell) is never pushed: the dropped element moves off it instead, and stays
+   on it when lines hold that one on both axes too.
 4. **The push drag needs a key.** Alt is the default connection modifier, so
    the physics drag is on ⌘/Ctrl; on macOS, Ctrl-click opens the context
    menu, so it is ⌘ there. There is no menu switch for it.
