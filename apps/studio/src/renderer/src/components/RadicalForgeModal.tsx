@@ -97,8 +97,9 @@ const STEP_ORDER: WizardStep[] = ['input', ...FORGE_STAGES.map((s) => s.id), 'ex
 const STEP_LABELS: Record<WizardStep, string> = {
   input: 'Description',
   requirements: 'Requirements',
-  c4: 'C4 model',
-  fitness: 'Fitness fns',
+  domain: 'Domain',
+  c4: 'C4',
+  fitness: 'Fitness',
   scenarios: 'Scenarios',
   states: 'States',
   mockups: 'Mockups',
@@ -718,7 +719,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
           )}
         </div>
         <p className="milestone-modal-text" style={{ marginBottom: 10 }}>
-          Turn a free-text system description into requirements, fitness functions,
+          Turn a free-text system description into requirements, a domain model, fitness functions,
           Gherkin scenarios, state machines, UI mockups and a C4 model — one reviewable stage at a time.
         </p>
 

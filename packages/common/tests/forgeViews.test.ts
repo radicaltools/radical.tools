@@ -8,15 +8,16 @@ import {
   findForgeView,
   forgeArrangeGroups,
   forgeViewOf,
+  forgeViewsOf,
   outermostNodes,
 } from '../src/ai/forge'
 
 const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
   ({ id, type, label: id, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...extra }) as C4Node
 
-function facadeOf(nodes: C4Node[], views: DiagramData['views'] = []) {
+function facadeOf(nodes: C4Node[], views: DiagramData['views'] = [], relations: DiagramData['relations'] = []) {
   let next = 0
-  return createModelFacade({ nodes, relations: [], views, metamodel: builtInGovernanceMetamodel() }, { newId: () => `id${++next}` })
+  return createModelFacade({ nodes, relations, views, metamodel: builtInGovernanceMetamodel() }, { newId: () => `id${++next}` })
 }
 
 describe('landscapeSlot', () => {
@@ -48,6 +49,25 @@ describe('Forge views', () => {
     expect(forgeViewOf('fitness-fn')).toBe('governance')
     expect(forgeViewOf('container', 'c4')).toBe('logical')
     expect(forgeViewOf('blueprint', 'fitness')).toBe('governance')
+  })
+
+  it('files the domain model into the Domain view and Conceptual, and a machine\'s entity into States', () => {
+    expect(forgeViewsOf('entity')).toEqual(['domain', 'conceptual'])
+    expect(forgeViewsOf('domain', 'c4')).toEqual(['domain', 'conceptual'])
+    expect(forgeViewOf('entity')).toBe('domain')
+    const facade = facadeOf(
+      [node('shop', 'domain'), node('order', 'entity', { parentId: 'shop' }), node('m', 'state-machine')],
+      [],
+      [{ id: 'l', sourceId: 'm', targetId: 'order', relationType: 'lifecycle-of' }],
+    )
+    expect(fileIntoForgeViews(facade, ['shop', 'order'], 'domain')).toEqual([
+      { key: 'domain', viewId: 'id1', nodeIds: ['shop', 'order'] },
+      { key: 'conceptual', viewId: 'id2', nodeIds: ['shop', 'order'] },
+    ])
+    expect(fileIntoForgeViews(facade, ['m'], 'states')).toEqual([{ key: 'states', viewId: 'id3', nodeIds: ['m', 'order'] }])
+    expect(forgeArrangeGroups(facade, ['shop', 'order'], 'domain').map((g) => [g.viewName, g.nodeIds])).toEqual([
+      ['Conceptual', ['shop']], ['Domain', ['shop']],
+    ])
   })
 
   it('files nodes into their views, creating a view only when it gets elements and reusing one by name', () => {

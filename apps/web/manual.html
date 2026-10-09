@@ -50,6 +50,7 @@
             <li><a href="#relations">Relations</a></li>
             <li><a href="#properties">Properties &amp; governance</a></li>
             <li><a href="#mockups">Mockups &amp; screen flows</a></li>
+            <li><a href="#domain-model">Domain model</a></li>
             <li><a href="#states">State machines</a></li>
             <li><a href="#selection">Working with selections</a></li>
           </ul>
@@ -268,6 +269,25 @@
         <p>
           Group the mockups of one actor's journey in a <em>Group</em> (“Shopper journey”) and link the steps with <em>Navigates to</em>, including branches and returns (<em>Payment → Payment declined → try again</em>). Record the steps as a <a href="#view-flow">sequence</a> to replay the flow screen by screen in a Flow view or in Presenter.
         </p>
+      </section>
+
+      <section class="doc-section" id="domain-model">
+        <h2>Domain model</h2>
+        <p>
+          The C4 + DDD and C4 + DDD + Governance metamodels can hold the domain model the requirements talk about, in their own words (palette group <em>Domain</em>):
+        </p>
+        <ul>
+          <li><strong>Domain</strong> — a bounded context or subdomain, a part of the business with its own language and rules. <em>Kind</em> says whether it is <em>core</em> (what sets the system apart), <em>supporting</em> or <em>generic</em>. Domains nest for subdomains.</li>
+          <li><strong>Entity</strong> — a thing with an identity inside a domain: a reservation, a customer, a product. An <em>aggregate root</em> is changed as a whole and keeps its own rules (solid border); an <em>entity</em> is a part that only lives inside one (dashed border). Plain values such as an address or an amount are not entities; describe them on the entity that holds them.</li>
+        </ul>
+        <p>Relate them with:</p>
+        <ul>
+          <li><strong>Part of</strong> — entity → its aggregate root (an order line → the order). The <a href="#view-table">Table</a> and <a href="#view-wiki">Wiki</a> views list an aggregate's parts under its root.</li>
+          <li><strong>References</strong> — entity → entity in another aggregate (a reservation is for a customer), with a <em>Cardinality</em> of one or many. Aggregates refer to each other only this way, never as parts.</li>
+          <li><strong>Depends on</strong> and <strong>Partnership</strong> (with its pattern: customer-supplier, anti-corruption layer, …) — domain → domain: the context map.</li>
+          <li><strong>Realises</strong> — the system or container that serves a domain, or the element that owns an entity's data → it. An entity <em>Satisfies</em> the requirements that are about it, and a <a href="#states">state machine</a> is the <em>Lifecycle of</em> an entity.</li>
+        </ul>
+        <p>The <em>Validation</em> list in the <a href="#metamodel">Metamodel editor</a> warns about an entity that is neither a root nor part of an aggregate, a part of two aggregates, a part of something that is not a root, and an aggregate root inside another.</p>
       </section>
 
       <section class="doc-section" id="states">
@@ -543,14 +563,15 @@
       <section class="doc-section" id="forge">
         <h2>Radical Forge</h2>
         <p>
-          <strong>Radical Forge</strong> (<em>Start with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>State machines</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
+          <strong>Radical Forge</strong> (<em>Start with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Domain model</strong> → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>State machines</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
         </p>
         <ul>
           <li><strong>The description is kept as a <a href="#properties">Need</a>.</strong> When you press <em>Start</em>, the text is saved in the model as a need (named after its first line), and the Requirements stage links every requirement it writes to it with <em>Derives from</em>. If the model already has needs, <em>Start from</em> on the Description step loads one instead, and your edits are saved back to it. Going back and starting again updates the same need instead of adding a second one.</li>
           <li><strong>Hub concepts that fit.</strong> For the Requirements, Fitness functions and C4 stages, Forge ranks the <a href="#hub">Hub</a> catalogue against your description (rarer words count more, and so do the concepts linked from a blueprint that fits), and the model picks at most five that fit, whatever language the description is in. They appear under <em>Picked from the Hub</em>, checked; untick the ones you do not want, or <em>Import</em> one as it is. When a blueprint fits the whole system, the C4 stage offers it first, to import as a skeleton. Without AI you see the best keyword matches instead.</li>
-          <li><strong>Four views.</strong> Every element a stage creates goes into a view of its layer: <em>Conceptual</em> (the need, requirements, scenarios and mockups), <em>States</em> (entities, their state machines and events), <em>Logical &amp; physical</em> (the C4 elements) and <em>Governance</em> (fitness functions and ADRs). A view is created when its first element arrives and reused by a later run with the same name. New elements are placed beside what the view already shows, in a block that grows sideways rather than down.</li>
+          <li><strong>Five views.</strong> Every element a stage creates goes into a view of its layer: <em>Conceptual</em> (the need, requirements, scenarios and mockups, and for now the domain model too), <em>Domain</em> (the domains and their entities), <em>States</em> (the state machines, their events and the entities they are the lifecycle of), <em>Logical &amp; physical</em> (the C4 elements) and <em>Governance</em> (fitness functions and ADRs). A view is created when its first element arrives and reused by a later run with the same name. New elements are placed beside what the view already shows, in a block that grows sideways rather than down.</li>
           <li><strong>Arrange after each stage.</strong> When a stage is done, Forge asks whether to keep its new elements in a <em>Row</em>, a <em>Column</em> or a <em>Grid</em> on their view (an <a href="#layout">alignment</a> every later layout keeps), and offers <em>Smart Layout</em> on that view. Nothing is rearranged unless you choose it.</li>
-          <li><strong>State machines</strong> follow the scenarios: the stage finds the things with a real lifecycle (often none, and rarely more than three), adds each as an entity with its <a href="#states">state machine</a>, and derives its transitions from the scenarios — <em>Given</em> the source state, <em>When</em> the event, <em>Then</em> the target state and its effect — including declines, timeouts and cancellations. The scenarios <em>verify</em> the machine, and the C4 stage later links the elements that run it (<em>Implements</em>) and own the entity's data (<em>Realises</em>).</li>
+          <li><strong>The domain model</strong> comes right after the requirements, which are its source: the stage adds the <a href="#domain-model">domains and entities</a> the requirements talk about, groups entities into aggregates, links the references between them and maps how the domains relate, and links each entity to its requirements. The later stages speak its language: scenarios name its entities, state machines model the lifecycle of its entities, and C4 links the systems and containers to the domains and entities they realise.</li>
+          <li><strong>State machines</strong> follow the scenarios: the stage finds the entities of the domain model with a real lifecycle (often none, and rarely more than three), models each with a <a href="#states">state machine</a>, and derives its transitions from the scenarios — <em>Given</em> the source state, <em>When</em> the event, <em>Then</em> the target state and its effect — including declines, timeouts and cancellations. The scenarios <em>verify</em> the machine, and the C4 stage later links the elements that run it (<em>Implements</em>) and own the entity's data (<em>Realises</em>).</li>
           <li><strong>Mockups</strong> come before C4: the stage creates the user-facing screens with <em>Illustrates</em> and <em>Navigates to</em> links, then <em>Generate wireframes</em> draws a wireframe for every mockup that has none. The C4 stage then designs the front-ends the screens need and links each mockup to its container with <em>Presented by</em>.</li>
           <li><strong>Finish here</strong> ends the run at any stage and keeps what has been generated. The final step summarises every stage (what was added, what was skipped) and exports the scenarios as <code>.feature</code> files; <em>← Back</em> resumes where you stopped.</li>
           <li><strong>From your own agent.</strong> The same run, with the same stages, prompts, clarifying questions and Hub suggestions, works in Claude Code, Claude Desktop or any other <a href="#mcp">MCP</a> client, with the agent's model instead of a key in Studio.</li>

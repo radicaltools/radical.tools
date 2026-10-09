@@ -643,7 +643,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   }
 
   implements_.allowedPairs.push(...(['system', 'container', 'component', 'webapp'] as const).map(from => ({ from, to: 'state-machine' })))
-  satisfies.allowedPairs.push({ from: 'state-machine', to: 'requirement' })
+  satisfies.allowedPairs.push({ from: 'state-machine', to: 'requirement' }, { from: 'entity', to: 'requirement' })
   verifies.allowedPairs.push({ from: 'scenario', to: 'state-machine' })
   illustrates.allowedPairs.push({ from: 'mockup', to: 'state' })
 

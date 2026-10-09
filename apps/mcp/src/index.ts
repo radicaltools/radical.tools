@@ -36,7 +36,7 @@ const INSTRUCTIONS = [
   'Sequences (create_sequence) are ordered relation flows that dynamic views play; presentations are slides over views.',
   'Milestones are named copies of the model at phases of the system (e.g. "As-is", "Target 2027"): create_milestone saves the current model as the latest one, compare_milestones says what changed, and a slide can show a milestone.',
   'Metamodel tools (upsert_node_type, upsert_relation_type, …) change the types; the tool schemas refresh after them.',
-  'To turn a free-text description into requirements, fitness functions, scenarios, state machines, mockups and a C4 model the way Studio\'s Radical Forge does, start with forge_start and follow the steps it returns.',
+  'To turn a free-text description into requirements, a domain model, fitness functions, scenarios, state machines, mockups and a C4 model the way Studio\'s Radical Forge does, start with forge_start and follow the steps it returns.',
 ].join(' ')
 
 const FORGE_ARGS = fromJsonSchema({
@@ -88,7 +88,7 @@ async function main(): Promise<void> {
   advertise()
   server.registerPrompt('forge', {
     title: 'Radical Forge',
-    description: 'Turn a system description into requirements, fitness functions, Gherkin scenarios, state machines, mockups and a C4 model, one reviewed stage at a time.',
+    description: 'Turn a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, mockups and a C4 model, one reviewed stage at a time.',
     argsSchema: FORGE_ARGS,
   }, (args) => {
     const { description } = (args ?? {}) as { description?: unknown }

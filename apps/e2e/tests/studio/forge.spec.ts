@@ -113,6 +113,10 @@ test('Forge files each stage into its view and offers to arrange it', async ({ p
   await arrange.getByRole('button', { name: 'Smart Layout' }).click()
   await expect(arrange.getByRole('button', { name: '✓ Smart Layout' })).toBeVisible({ timeout: 30_000 })
 
+  // The domain model comes next; nothing to add here.
+  await page.getByRole('button', { name: 'Continue →' }).click()
+  await page.getByRole('button', { name: 'Generate domain model' }).click()
+
   // Fitness functions: a Governance view of their own, made when they arrive.
   await page.getByRole('button', { name: 'Continue →' }).click()
   await page.getByRole('button', { name: 'Generate fitness functions' }).click()
@@ -126,7 +130,7 @@ test('Forge files each stage into its view and offers to arrange it', async ({ p
   await page.screenshot({ path: test.info().outputPath('governance.png') })
 })
 
-test('Forge builds the state machines after the scenarios, into a States view', async ({ page, studio }) => {
+test('Forge builds the domain model after the requirements and the state machines after the scenarios', async ({ page, studio }) => {
   const doc = JSON.parse(fixture('bookstore'))
   doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'C4 + DDD + Governance', nodeTypes: {}, relationTypes: {} }
   await studio.seedDocument(JSON.stringify(doc))
@@ -136,6 +140,10 @@ test('Forge builds the state machines after the scenarios, into a States view', 
     ({ name: 'add_relation', input: { sourceId, targetId, relationType: 'transition', properties } })
   const stagePrompts = await scriptAnthropic(page, [
     { task: /extract its functional requirements/, calls: [requirement(1)] },
+    { task: /ubiquitous language/, calls: [
+      node('lib', 'domain', 'Lending', undefined, { kind: 'core' }),
+      node('loan', 'entity', 'Loan', 'lib', { kind: 'aggregate-root' }),
+    ] },
     { task: /real lifecycle/, calls: [
       node('m', 'state-machine', 'Loan lifecycle', undefined, { subject: 'Loan' }),
       node('collected', 'event', 'BookCollected', 'm'),
@@ -152,14 +160,16 @@ test('Forge builds the state machines after the scenarios, into a States view', 
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
   await page.getByRole('button', { name: 'Start →' }).click()
 
-  // Eight steps on one line: description, the six stages, finish.
+  // Nine steps on one line: description, the seven stages, finish.
   const steps = page.locator('.forge-step')
-  await expect(steps).toHaveText(['✓Description', 'Requirements', 'Fitness fns', 'Scenarios', 'States', 'Mockups', 'C4 model', 'Finish'])
+  await expect(steps).toHaveText(['✓Description', 'Requirements', 'Domain', 'Fitness', 'Scenarios', 'States', 'Mockups', 'C4', 'Finish'])
   const tops = await steps.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)))
   expect(new Set(tops).size).toBe(1)
+  // …without scrolling.
+  expect(await page.locator('.forge-steps').evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0)
 
   await page.getByRole('button', { name: 'Skip questions' }).click()
-  for (const stage of ['requirements', 'fitness functions', 'Gherkin scenarios']) {
+  for (const stage of ['requirements', 'domain model', 'fitness functions', 'Gherkin scenarios']) {
     await page.getByRole('button', { name: `Generate ${stage}` }).click()
     await page.getByRole('button', { name: 'Continue →' }).click()
   }
@@ -168,6 +178,10 @@ test('Forge builds the state machines after the scenarios, into a States view', 
 
   const stored = async () => await studio.storedDoc() as unknown as Doc & { relations: Array<Record<string, unknown>> }
   await expect.poll(async () => (await stored()).views.find((v) => v.name === 'States')?.nodeIds.length).toBe(5)
+  // The domain model is in a Domain view of its own, and in Conceptual.
+  const domainView = (await stored()).views.find((v) => v.name === 'Domain')!
+  expect(domainView.nodeIds).toHaveLength(2)
+  expect((await stored()).views.find((v) => v.name === 'Conceptual')!.nodeIds).toEqual(expect.arrayContaining(domainView.nodeIds))
   const data = await stored()
   const id = (label: string) => data.nodes.find((n) => n.label === label)!.id
   expect(data.relations.find((r) => r.targetId === id('Lent'))!.event).toBe(id('BookCollected'))

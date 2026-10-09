@@ -4,8 +4,10 @@
 //   • Domain — problem space; may live at root and may be nested inside
 //     another domain to express subdomains / sub-subdomains arbitrarily deep.
 //   • Entity — a domain object (Reservation, Order, Payment); `kind` says
-//     whether it is an aggregate root. The C4 element that owns its data
-//     realises it, and a state machine models its lifecycle (governance).
+//     whether it is an aggregate root. A part belongs to its aggregate root
+//     (`part-of`), aggregates refer to each other (`references`), the C4
+//     element that owns its data realises it, and a state machine models its
+//     lifecycle (governance).
 // The C4 `system` node may now also live inside a domain so it can model
 // the technical realisation of that (sub)domain (≈ a Bounded Context).
 
@@ -64,6 +66,8 @@ export function builtInDddC4Metamodel(): Metamodel {
     allowedAtRoot: true,
     builtin: true,
     tableTab: true,
+    // The parts of an aggregate list under its root in Table and Wiki views.
+    hierarchyRelation: 'part-of',
     properties: [
       {
         key: 'kind',
@@ -87,6 +91,37 @@ export function builtInDddC4Metamodel(): Metamodel {
       ...(['system', 'container', 'component', 'webapp'] as const).map((from) => ({ from, to: 'entity' })),
     ],
     properties: [],
+    builtin: true,
+  }
+
+  // An entity that lives inside an aggregate → its root (an order line →
+  // the order). Aggregates never contain each other: they refer by id.
+  const partOf: RelationTypeDef = {
+    id: 'part-of',
+    label: 'Part of',
+    allowedPairs: [{ from: 'entity', to: 'entity' }],
+    properties: [],
+    color: '#7e22ce',
+    builtin: true,
+  }
+
+  // One entity referring to another, across aggregates (a reservation is for
+  // a customer).
+  const references: RelationTypeDef = {
+    id: 'references',
+    label: 'References',
+    allowedPairs: [{ from: 'entity', to: 'entity' }],
+    properties: [
+      {
+        key: 'cardinality',
+        label: 'Cardinality',
+        type: 'enum',
+        options: ['one', 'many'],
+        default: 'one',
+      },
+      { key: 'description', label: 'Description', type: 'text' },
+    ],
+    color: '#a855f7',
     builtin: true,
   }
 
@@ -145,6 +180,8 @@ export function builtInDddC4Metamodel(): Metamodel {
     relationTypes: {
       ...base.relationTypes,
       realises,
+      'part-of': partOf,
+      references,
       'depends-on': dependsOn,
       partnership,
     },

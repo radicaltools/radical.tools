@@ -69,7 +69,7 @@ describe('Radical Forge over MCP', () => {
       expect(clarify).not.toContain('JSON')
 
       const brief = await call(client, 'forge_generate', { stage: 'requirements', answers: [{ question: 'Which stores?', answer: 'All of them' }] })
-      expect(brief).toContain('stage 1 of 6: Requirements')
+      expect(brief).toContain('stage 1 of 7: Requirements')
       expect(brief).toContain('Keep labels short')
       expect(brief).toContain('Q: Which stores?\nA: All of them')
       expect(brief).toContain(`(id ${need.id})`)
@@ -80,7 +80,7 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'add_relation', { sourceId: 'r1', targetId: need.id, relationType: 'derives' })
       const done = await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement for reserving.' })
       expect(done).toContain('+1 nodes (requirement 1), +1 relations')
-      expect(done).toContain('forge_clarify with stage "fitness"')
+      expect(done).toContain('forge_clarify with stage "domain"')
 
       expect(await refused(client, 'forge_generate', { stage: 'requirements' })).toContain('regenerate: true')
       const again = await call(client, 'forge_generate', { stage: 'requirements', regenerate: true })
@@ -93,6 +93,12 @@ describe('Radical Forge over MCP', () => {
 
       await call(client, 'add_node', { tempId: 'r2', type: 'requirement', label: 'Pick up in store', properties: { ears_type: 'ubiquitous', action: 'hand over reserved products' } })
       await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'Pick-up requirement.' })
+
+      // The domain model comes next, before the fitness functions.
+      expect(await refused(client, 'forge_clarify', { stage: 'fitness' })).toContain('Domain model')
+      await call(client, 'forge_clarify', { stage: 'domain' })
+      expect(await call(client, 'forge_generate', { stage: 'domain' })).toContain('stage 2 of 7: Domain model')
+      await call(client, 'forge_complete_stage', { stage: 'domain', summary: 'No domain model needed.' })
 
       await call(client, 'forge_clarify', { stage: 'fitness' })
       expect(await refused(client, 'forge_generate', { stage: 'fitness', hubConcepts: ['req-idempotency'] })).toContain('not a Hub candidate of this stage')
@@ -141,6 +147,21 @@ describe('Radical Forge over MCP', () => {
         .toEqual([{ id: expect.any(String), type: 'grid', columns: 2, nodeIds: reqs }])
       expect(await call(client, 'forge_arrange', { stage: 'requirements', smartLayout: true })).toContain('Smart Layout (Conceptual)')
 
+      // The domain model goes into a Domain view of its own, and Conceptual too.
+      await call(client, 'forge_clarify', { stage: 'domain' })
+      await call(client, 'forge_generate', { stage: 'domain' })
+      await call(client, 'add_node', { tempId: 'shop', type: 'domain', label: 'Click & collect', properties: { kind: 'core' } })
+      await call(client, 'add_node', { tempId: 'res', type: 'entity', label: 'Reservation', parentId: 'shop', properties: { kind: 'aggregate-root' } })
+      await call(client, 'add_node', { tempId: 'line', type: 'entity', label: 'Reservation line', parentId: 'shop', properties: { kind: 'entity' } })
+      await call(client, 'add_relation', { sourceId: 'line', targetId: 'res', relationType: 'part-of' })
+      expect(await call(client, 'get_issues', {})).toContain('No issues')
+      const domainDone = await call(client, 'forge_complete_stage', { stage: 'domain', summary: 'One context, one aggregate.' })
+      expect(domainDone).toContain('Domain (view')
+      data = await read()
+      const modelIds = data.nodes.filter((n) => n.type === 'domain' || n.type === 'entity').map((n) => n.id)
+      expect(data.views!.find((v) => v.name === 'Domain')!.nodeIds.sort()).toEqual([...modelIds].sort())
+      expect(data.views!.find((v) => v.name === 'Conceptual')!.nodeIds).toEqual(expect.arrayContaining(modelIds))
+
       await call(client, 'forge_clarify', { stage: 'fitness' })
       await call(client, 'forge_generate', { stage: 'fitness', hubConcepts: [] })
       await call(client, 'add_node', { tempId: 'f1', type: 'fitness-fn', label: 'Ready within 2 h', properties: { category: 'performance', threshold: '2 h' } })
@@ -163,6 +184,11 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'forge_generate', { stage: 'requirements' })
       await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
       await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement.' })
+      await call(client, 'forge_clarify', { stage: 'domain' })
+      await call(client, 'forge_generate', { stage: 'domain' })
+      await call(client, 'add_node', { tempId: 'shop', type: 'domain', label: 'Click & collect' })
+      await call(client, 'add_node', { tempId: 'order', type: 'entity', label: 'Order', parentId: 'shop' })
+      await call(client, 'forge_complete_stage', { stage: 'domain', summary: 'The order.' })
       await call(client, 'forge_clarify', { stage: 'fitness' })
       await call(client, 'forge_generate', { stage: 'fitness', hubConcepts: [] })
       await call(client, 'forge_complete_stage', { stage: 'fitness', summary: 'None needed.' })
@@ -176,12 +202,12 @@ describe('Radical Forge over MCP', () => {
 
       await call(client, 'forge_clarify', { stage: 'states' })
       const brief = await call(client, 'forge_generate', { stage: 'states' })
-      expect(brief).toContain('stage 4 of 6: State machines')
+      expect(brief).toContain('stage 5 of 7: State machines')
       expect(brief).toContain('real lifecycle')
       expect(brief).toContain('Given is the source state, When')
       expect(brief).toContain('"type":"ref","refType":"event"')
 
-      await call(client, 'add_node', { tempId: 'order', type: 'entity', label: 'Order' })
+      // The entity comes from the domain model.
       await call(client, 'add_node', { tempId: 'm', type: 'state-machine', label: 'Order lifecycle' })
       await call(client, 'add_relation', { sourceId: 'm', targetId: 'order', relationType: 'lifecycle-of' })
       await call(client, 'add_node', { tempId: 'ready', type: 'event', label: 'OrderReady', parentId: 'm' })

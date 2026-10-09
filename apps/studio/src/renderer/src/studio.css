@@ -585,8 +585,11 @@ label.app-menu-row { cursor: pointer; }
 }
 .forge-steps {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  /* One line; scrolls sideways rather than wrapping on a narrow window. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 4px;
   margin: 4px 0 10px;
 }
 .forge-step {
@@ -595,8 +598,9 @@ label.app-menu-row { cursor: pointer; }
   gap: 4px;
   font-size: 10.5px;
   font-weight: 600;
-  /* Eight steps (description, six stages, finish) fit on one line. */
-  padding: 5px 8px;
+  /* Nine steps (description, seven stages, finish) fit on one line. */
+  padding: 5px 6px;
+  flex-shrink: 0;
   border-radius: 999px;
   border: 1px solid var(--border-color);
   background: transparent;

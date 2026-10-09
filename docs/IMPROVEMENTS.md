@@ -692,3 +692,26 @@ canvas (ADR "State machines as nested states"). Still open:
 7. **Studio builds with terser** because Vite 5's bundled es-module-lexer
    misreads a minified variable named `of` (ADR "Terser minifies Studio").
    Drop `apps/studio/rendererMinify.ts` when Vite bundles es-module-lexer 3.
+
+### Domain model (2026-10-09)
+
+Radical Forge has a Domain model stage right after the requirements: `domain`
+(bounded contexts) and `entity` nodes, aggregates (`part-of`), references
+between aggregates (`references`, with a cardinality) and the context map
+(`depends-on`, `partnership`), filed into a Domain view and, for now,
+Conceptual too. Aggregate rules are in
+`packages/common/src/metamodel/domainModel.ts`. Still open:
+
+1. **Conceptual still gets the domain model.** The owner asked for it for
+   now; drop `conceptual` from `domain` / `entity` in `VIEW_OF_TYPE`
+   (`packages/common/src/ai/forge/views.ts`) once the Domain view is enough.
+2. **No attributes or value objects.** An entity's fields and the values it
+   holds live only in its description; a typed attribute list (and value
+   objects as their own type) would let mockups and C4 use them.
+3. **No Hub concepts for the stage.** The catalogue has no domain models to
+   offer as prior art (e-commerce order, booking, …).
+4. **No layout of its own.** Smart Layout treats domains as containers and
+   entities as cards; an aggregate could be kept together, its root first.
+5. **The Forge step bar is full.** Nine steps fit on one line at the modal's
+   width only with short labels (Fitness, C4) and tight pills; an eighth
+   stage needs a different layout (two rows of stages, or numbers).
