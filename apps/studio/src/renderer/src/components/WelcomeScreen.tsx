@@ -5,6 +5,12 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { formatRoute } from '../route'
 import { availableMetamodels } from '@radical/common/metamodel'
 import type { DiagramData } from '@radical/common/c4'
+import { host } from '../platform/host'
+import { webFolderSupported } from '../persist/webFolder'
+
+/** Markdown folders open in Electron and in Chromium browsers (File System
+ *  Access API), as in the Document Manager. */
+const folderSupported = !!host().openFolder || webFolderSupported()
 
 /** The sample's System Context view (fintechSampleData.json). */
 const SAMPLE_START_VIEW = 'view-ctx'
@@ -133,6 +139,14 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
 
   function handleImport(): void {
     documents.importFromFile().then((meta) => {
+      if (meta) onDismiss()
+    }, (e: Error) => window.alert(e.message))
+  }
+
+  // An empty folder opens as an empty model, so this is also how to start a
+  // model that the MCP server or Claude Code will work on.
+  function handleOpenFolder(): void {
+    documents.importFromFolder().then((meta) => {
       if (meta) onDismiss()
     }, (e: Error) => window.alert(e.message))
   }
@@ -268,6 +282,18 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
               </svg>
               Open file…
             </button>
+            {folderSupported && (
+              <button
+                className="welcome-btn welcome-btn-ghost"
+                onClick={handleOpenFolder}
+                title="Open a Radical Markdown model folder, or an empty folder to start one"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M1.5 3.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                </svg>
+                Open folder…
+              </button>
+            )}
           </div>
 
           {hasExisting && (

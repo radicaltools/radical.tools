@@ -1,4 +1,4 @@
-import { expect } from '../../support/fixtures'
+import { expect, fixture } from '../../support/fixtures'
 import { ModelFolder, test } from '../../support/folder'
 import type { Page } from '@playwright/test'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
+import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 
@@ -213,4 +214,16 @@ test('declining the prompt leaves a non-model folder untouched', async ({ page }
   await expect(models.locator('.docmgr-badge.ls')).toBeVisible()
   await expect(models.locator('.docmgr-badge.md')).toHaveCount(0)
   expect(await folder.paths()).toEqual(['nodes/README.md'])
+})
+
+test('Open folder… on the welcome screen opens a model folder', async ({ page, studio }) => {
+  const files = serializeToMdFolder(JSON.parse(fixture('bookstore')), 'Bookstore')
+  for (const [path, content] of Object.entries(files)) await folder.write(path, content)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Open folder…' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await expect(studio.node('customer')).toBeVisible()
+  await openModels(page)
+  await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
 })
