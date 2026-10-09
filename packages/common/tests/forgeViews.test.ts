@@ -39,8 +39,11 @@ describe('landscapeSlot', () => {
 })
 
 describe('Forge views', () => {
-  it('maps node types to the three views, falling back to the stage', () => {
+  it('maps node types to the four views, falling back to the stage', () => {
     expect(forgeViewOf('requirement')).toBe('conceptual')
+    expect(forgeViewOf('state-machine')).toBe('states')
+    expect(forgeViewOf('event', 'c4')).toBe('states')
+    expect(forgeViewOf('group', 'states')).toBe('states')
     expect(forgeViewOf('mockup', 'c4')).toBe('conceptual')
     expect(forgeViewOf('fitness-fn')).toBe('governance')
     expect(forgeViewOf('container', 'c4')).toBe('logical')

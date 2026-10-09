@@ -509,7 +509,7 @@ function scoreParts(
   // nowhere but over a node. 0 when there is room, 1 when the ends touch.
   let labelCrowding = 0
   for (const r of edges) {
-    const size = labelSizeOf(r)
+    const size = labelSizeOf(r, nodes)
     if (!size) continue
     if (ancestors[r.sourceId]?.has(r.targetId) || ancestors[r.targetId]?.has(r.sourceId)) continue
     const a = abs[r.sourceId], b = abs[r.targetId]

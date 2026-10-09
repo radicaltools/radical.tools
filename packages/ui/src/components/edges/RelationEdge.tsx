@@ -172,6 +172,9 @@ export const RelationEdge = memo(
     // @radical/layout's sides carry the same string values as reactflow's enum
     const tgtSide = geometry.targetSide as Position
     const { x: labelX, y: labelY } = geometry.label
+    // A label-less relation shows its type, except a transition: one without
+    // an event is a completion transition and is drawn bare.
+    const typeName = data?.relationType === 'transition' ? undefined : data?.relationType
 
     const strokeColor = selected ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'
     const strokeDash  = data?.isVirtual ? '6 3' : undefined
@@ -214,7 +217,7 @@ export const RelationEdge = memo(
           </>
         )}
 
-        {(data?.label || data?.technology || data?.relationType) && (
+        {data && (data.label || data.technology || typeName) && (
           <EdgeLabelRenderer>
             <div
               style={{
@@ -239,12 +242,12 @@ export const RelationEdge = memo(
               className={[
                 'nodrag nopan relation-label',
                 selected || hovered || endSelected ? 'relation-label-active' : '',
-                data.label || data.relationType ? '' : 'relation-label-tech-only',
+                data.label || typeName ? '' : 'relation-label-tech-only',
               ].join(' ')}
             >
               {data.label
                 ? <div>{data.label}</div>
-                : data.relationType && <div style={{ opacity: 0.85, fontStyle: 'italic' }}>{data.relationType}</div>
+                : typeName && <div style={{ opacity: 0.85, fontStyle: 'italic' }}>{typeName}</div>
               }
               {data.technology && (
                 <div className="relation-label-tech" style={{ fontStyle: 'italic', opacity: 0.85, fontSize: LABEL_BOX.techFontSize }}>

@@ -10,6 +10,8 @@
 //                   EARS requirements are derived from (requirement → need)
 //   • mockup      — a UI screen (design link or AI-generated wireframe),
 //                   linked via illustrates / presented-by / navigates-to
+//   • state-machine, state, pseudostate, event — event-driven hierarchical
+//                   state machines, linked via transition / lifecycle-of / emits
 
 import { Metamodel, NodeTypeDef, PropertyDef, RelationPair, RelationTypeDef } from '../types'
 import { builtInDddC4Metamodel } from './ddd'
@@ -472,6 +474,174 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
+  // ── States: event-driven hierarchical state machines ─────────────────
+  //
+  // Statecharts with SCXML / XState semantics. A state machine holds states;
+  // a state with child states is compound, and one of kind `parallel` has
+  // its child states active at once (each child is a region). Nesting is
+  // canvas containment, as for systems and containers. Every compound state
+  // and the machine itself enter through an `initial` pseudostate, whose one
+  // transition points at the default child. A transition points at its
+  // trigger (`event`) and at the events it raises (`raises`) with reference
+  // properties: a relation cannot point at a node, a property can.
+
+  const stateMachine: NodeTypeDef = {
+    id: 'state-machine',
+    label: 'State Machine',
+    color: '#3730a3',
+    fg: '#fff',
+    // Two states joined by a transition
+    iconPath: 'M1 3.5A1.5 1.5 0 0 1 2.5 2h3A1.5 1.5 0 0 1 7 3.5v2A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-2Zm8 7A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v2a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 12.5v-2ZM3.5 8h1v3h2.8v-1l2 1.5-2 1.5v-1H3.5V8Z',
+    width: 560,
+    height: 380,
+    collapsedWidth: 200,
+    collapsedHeight: 64,
+    allowedParents: ['system', 'domain', 'group'],
+    allowedAtRoot: true,
+    builtin: true,
+    tableTab: true,
+    properties: [
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'subject', label: 'Lifecycle of (entity, e.g. Order)', type: 'text' },
+    ],
+  }
+
+  const state: NodeTypeDef = {
+    id: 'state',
+    label: 'State',
+    color: '#4f46e5',
+    fg: '#fff',
+    // Rounded rectangle
+    iconPath: 'M3.5 3h9A2.5 2.5 0 0 1 15 5.5v5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 1 10.5v-5A2.5 2.5 0 0 1 3.5 3Zm0 1.5a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1h-9Z',
+    width: 320,
+    height: 220,
+    collapsedWidth: 170,
+    collapsedHeight: 72,
+    allowedParents: ['state-machine', 'state'],
+    allowedAtRoot: false,
+    builtin: true,
+    tableTab: true,
+    properties: [
+      {
+        key: 'kind',
+        label: 'Kind',
+        type: 'enum',
+        options: ['normal', 'parallel', 'final'],
+        default: 'normal',
+      },
+      { key: 'entry', label: 'Entry actions', type: 'text', visibleWhen: { key: 'kind', values: ['normal', 'parallel'] } },
+      { key: 'exit',  label: 'Exit actions',  type: 'text', visibleWhen: { key: 'kind', values: ['normal', 'parallel'] } },
+      { key: 'do',    label: 'Do (ongoing activity)', type: 'text', visibleWhen: { key: 'kind', values: ['normal'] } },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  }
+
+  const pseudostate: NodeTypeDef = {
+    id: 'pseudostate',
+    label: 'Pseudostate',
+    color: '#1e1b4b',
+    fg: '#fff',
+    // Filled dot (initial)
+    iconPath: 'M8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z',
+    width: 36,
+    height: 36,
+    allowedParents: ['state-machine', 'state'],
+    allowedAtRoot: false,
+    builtin: true,
+    properties: [
+      {
+        key: 'kind',
+        label: 'Kind',
+        type: 'enum',
+        options: ['initial', 'shallow-history', 'deep-history', 'choice'],
+        default: 'initial',
+      },
+    ],
+  }
+
+  const event: NodeTypeDef = {
+    id: 'event',
+    label: 'Event',
+    color: '#c2410c',
+    fg: '#fff',
+    // Lightning bolt
+    iconPath: 'M9.5 1 3 9h4l-1 6 6.5-8h-4l1-6Z',
+    width: 170,
+    height: 52,
+    allowedParents: ['state-machine', 'system', 'domain', 'group'],
+    allowedAtRoot: true,
+    builtin: true,
+    tableTab: true,
+    properties: [
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'enum',
+        options: ['external', 'internal', 'timer'],
+        default: 'external',
+      },
+      { key: 'payload', label: 'Payload', type: 'text' },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  }
+
+  const stateNodeTypes = ['state', 'pseudostate'] as const
+  const transition: RelationTypeDef = {
+    id: 'transition',
+    label: 'Transition',
+    allowedPairs: stateNodeTypes.flatMap(from => stateNodeTypes.map(to => ({ from, to }))),
+    properties: [
+      { key: 'event',   label: 'Event (trigger; none = completion)', type: 'ref', refType: 'event' },
+      { key: 'guard',   label: 'Guard [condition]', type: 'text' },
+      { key: 'actions', label: 'Actions (/ effect)', type: 'text' },
+      { key: 'raises',  label: 'Raises (events it publishes)', type: 'ref', refType: 'event', multiple: true },
+      {
+        key: 'kind',
+        label: 'Kind',
+        type: 'enum',
+        options: ['external', 'internal'],
+        default: 'external',
+      },
+    ],
+    color: '#6366f1',
+    builtin: true,
+  }
+
+  // state machine → the element whose lifecycle it models
+  const lifecycleOf: RelationTypeDef = {
+    id: 'lifecycle-of',
+    label: 'Lifecycle of',
+    allowedPairs: (['system', 'container', 'component', 'webapp', 'domain'] as const).map(to => ({ from: 'state-machine', to })),
+    properties: [],
+    color: '#3730a3',
+    builtin: true,
+  }
+
+  // element → event it publishes. A state raises it from its entry, exit or
+  // do activity (SCXML <raise>/<send> in onentry/onexit); a machine when it
+  // is not yet known which state does. A transition cannot be a source (a
+  // relation cannot start at a relation): it lists them in `raises`.
+  const emits: RelationTypeDef = {
+    id: 'emits',
+    label: 'Emits',
+    allowedPairs: (['person', 'system', 'container', 'component', 'webapp', 'queue', 'state-machine', 'state'] as const).map(from => ({ from, to: 'event' })),
+    properties: [
+      {
+        key: 'on',
+        label: 'On (for a state: entry, exit or do)',
+        type: 'enum',
+        options: ['entry', 'exit', 'do'],
+        default: 'entry',
+      },
+    ],
+    color: '#ea580c',
+    builtin: true,
+  }
+
+  satisfies.allowedPairs.push({ from: 'state-machine', to: 'requirement' })
+  verifies.allowedPairs.push({ from: 'scenario', to: 'state-machine' })
+  illustrates.allowedPairs.push({ from: 'mockup', to: 'state' })
+
   return {
     id: 'c4-ddd-governance-builtin',
     name: 'C4 + DDD + Governance',
@@ -484,6 +654,10 @@ export function builtInGovernanceMetamodel(): Metamodel {
       scenario,
       blueprint,
       mockup,
+      'state-machine': stateMachine,
+      state,
+      pseudostate,
+      event,
     },
     relationTypes: {
       ...base.relationTypes,
@@ -497,6 +671,9 @@ export function builtInGovernanceMetamodel(): Metamodel {
       illustrates,
       'presented-by': presentedBy,
       'navigates-to': navigatesTo,
+      transition,
+      'lifecycle-of': lifecycleOf,
+      emits,
     },
   }
 }

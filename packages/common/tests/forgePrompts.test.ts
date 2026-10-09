@@ -39,7 +39,7 @@ describe('buildForgeStagePrompt — prior-stage summaries replace full transcrip
 
 describe('buildForgeStagePrompt — mockups stage', () => {
   it('runs before C4, as part of the spec the architecture follows from', () => {
-    expect(FORGE_STAGES.map((s) => s.id)).toEqual(['requirements', 'fitness', 'scenarios', 'mockups', 'c4'])
+    expect(FORGE_STAGES.map((s) => s.id)).toEqual(['requirements', 'fitness', 'scenarios', 'states', 'mockups', 'c4'])
     expect(PRIMARY_TYPE_IDS_FOR_STAGE.mockups).toEqual(['mockup'])
   })
 
@@ -54,10 +54,40 @@ describe('buildForgeStagePrompt — mockups stage', () => {
     expect(prompt).toContain('no user')
   })
 
+  it('has the C4 stage link each state machine to its owner and each publisher to its events', () => {
+    const prompt = buildForgeStagePrompt('c4', 'A web shop.')
+    expect(prompt).toContain('`lifecycle-of` relation FROM the machine')
+    expect(prompt).toContain('`emits`')
+  })
+
+  it('has mockups illustrate the states they show', () => {
+    expect(buildForgeStagePrompt('mockups', 'A web shop.')).toContain('link the\nmockup to that `state` with `illustrates`')
+  })
+
   it('has the C4 stage use the mockups and link them with presented-by', () => {
     const prompt = buildForgeStagePrompt('c4', 'A web shop.')
     expect(prompt).toContain('mockups already in the model')
     expect(prompt).toContain('`presented-by` relation FROM the mockup TO that element')
+  })
+})
+
+describe('buildForgeStagePrompt — state machines stage', () => {
+  it('runs between the scenarios and the mockups, creating the statechart types', () => {
+    const ids = FORGE_STAGES.map((s) => s.id)
+    expect(ids.indexOf('states')).toBe(ids.indexOf('scenarios') + 1)
+    expect(ids.indexOf('mockups')).toBe(ids.indexOf('states') + 1)
+    expect(PRIMARY_TYPE_IDS_FOR_STAGE.states).toEqual(['state-machine', 'state', 'pseudostate', 'event'])
+  })
+
+  it('models only entities with a lifecycle, from the scenarios, by event reference, without C4 elements', () => {
+    const prompt = buildForgeStagePrompt('states', 'A web shop.')
+    expect(prompt).toContain('real lifecycle')
+    expect(prompt).toContain('If none has, create nothing')
+    expect(prompt).toContain('Given is the source state, When\n   is the event, Then is the target state')
+    expect(prompt).toContain('`event` (the id or\n   tempId of the event node)')
+    expect(prompt).toContain('`pseudostate` of kind "initial"')
+    expect(prompt).toContain('(scenario → state-machine)')
+    expect(prompt).toContain('do not create any here')
   })
 })
 

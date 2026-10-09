@@ -221,7 +221,7 @@ export function matchBlueprint(
 
 /** Hub categories worth surfacing as prior art for each stage — the C4 stage
  *  is where decomposition/coupling guidance (patterns, ADRs) matters most.
- *  `scenarios` and `mockups` have no matching Hub category. */
+ *  `scenarios`, `states` and `mockups` have no matching Hub category. */
 const HUB_CATEGORIES_FOR_STAGE: Partial<Record<ForgeStageId, HubCategory[]>> = {
   requirements: ['requirement'],
   c4: ['pattern', 'adr'],

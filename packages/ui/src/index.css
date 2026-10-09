@@ -1110,6 +1110,27 @@ body {
   cursor: default;
 }
 
+/* Reference property (RefPicker): chips for the picked nodes, a select to add. */
+.ref-picker { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.ref-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--bg-hover); border: 1px solid var(--border-color);
+  border-radius: 10px; padding: 1px 4px 1px 8px; font-size: 11px; color: var(--text-primary);
+}
+.ref-chip-missing { border-color: var(--danger); color: var(--danger); }
+.ref-chip-remove {
+  background: none; border: none; color: inherit; cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 0 2px; opacity: 0.7;
+}
+.ref-chip-remove:hover { opacity: 1; }
+.ref-picker-add { width: auto; flex: 1 1 90px; min-width: 90px; }
+.ref-picker-empty { font-size: 12px; opacity: 0.6; }
+.wiki-ref-input {
+  font: inherit; font-size: 13px; color: var(--text-primary);
+  background: var(--input-bg); border: 1px solid var(--border-color);
+  border-radius: 4px; padding: 2px 4px;
+}
+
 .props-textarea { resize: vertical; min-height: 60px; max-height: 80vh; overflow-y: auto; }
 
 .props-type-badge {

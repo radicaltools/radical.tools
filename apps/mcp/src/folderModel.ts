@@ -4,9 +4,10 @@ import { createHash } from 'node:crypto'
 import { buildToolDefs, runTool, type ToolDef, type ToolRunContext } from '@radical/common/ai/tools'
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
+import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
 import { deserializeFromMdFolder, isMdFolder, isOwnedMdFolderFile, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
-import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, validateModel, type Metamodel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { readSelectionFile } from '@radical/node-files/selectionFile'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
@@ -21,13 +22,18 @@ import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult 
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
  *  external client. */
 const EXCLUDED_TOOLS = new Set(['set_active_view', 'focus_node', 'reset_diagram'])
-const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'search_model', 'list_milestones', 'compare_milestones'])
+const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'search_model', 'list_milestones', 'compare_milestones'])
 const JSON_FILES = ['_layout.json', 'relations.json', 'views.json', 'sequences.json', 'snapshots.json', 'presentations.json', 'metamodel.json', 'hubTemplates.json']
 
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
     name: 'get_model_summary',
-    description: "Call this first. Shows counts, the views, sequences, milestones and presentations in the bound Radical model folder, plus the metamodel context message: each type's valid properties keys and enum options, allowed parents, cardinality and relation allowedPairs.",
+    description: "Call this first. Shows counts, the views, sequences, milestones and presentations in the bound Radical model folder, the modelling rules (how to build requirements, needs, state machines, …), plus the metamodel context message: each type's valid properties keys and enum options, allowed parents, cardinality and relation allowedPairs.",
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'get_issues',
+    description: 'What breaks the rules in the model now, as the Validation list in Studio\'s metamodel editor shows it: errors (wrong parent, relation the metamodel does not allow, unknown type) and warnings (missing required properties, references to no node, and state machine rules: a machine or compound state without one initial pseudostate, a parallel state with fewer than two regions, a final state with outgoing transitions, unreachable states, unguarded transitions competing for one event). Call it after building or changing a state machine, and before you report work as done.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -120,6 +126,15 @@ async function startIfEmpty(path: string, preset: PresetName): Promise<void> {
 
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
   Object.fromEntries(items.map((item) => [item.id, item]))
+
+/** At most this many new warnings go into a write's result. */
+const MAX_WARNINGS = 8
+
+const issuesOf = (data: DiagramData, metamodel: Metamodel): Issue[] =>
+  validateModel(byId(data.nodes), byId(data.relations), metamodel)
+
+const formatIssue = (issue: Issue): string =>
+  `${issue.severity}: ${issue.message}${issue.nodeId ? ` (node ${issue.nodeId})` : issue.relationId ? ` (relation ${issue.relationId})` : ''}`
 
 const depth = (node: C4Node, nodes: Record<string, C4Node>): number => {
   let d = 0
@@ -299,8 +314,15 @@ export class FolderModel {
           relationTypes: Object.keys(metamodel?.relationTypes ?? {}),
         })
         // The other tools' descriptions point at "the metamodel context
-        // message" for property keys and pairing rules; MCP clients get it here.
-        return { ok: true, text: `${summary}\n\n${buildMetamodelMessage(metamodel)}` }
+        // message" for property keys and pairing rules; MCP clients get it here,
+        // with the modelling rules Studio's chat and Forge follow.
+        const rules = `Modelling rules:\n${AI_MODELLING_RULES.map((rule) => `- ${rule}`).join('\n')}`
+        return { ok: true, text: `${summary}\n\n${rules}\n\n${buildMetamodelMessage(metamodel)}` }
+      }
+      if (name === 'get_issues') {
+        const mm = facade.getMetamodel?.()
+        const issues = mm ? issuesOf(data, mm) : []
+        return { ok: true, text: issues.length ? issues.map(formatIssue).join('\n') : 'No issues: the model follows its metamodel.' }
       }
       if (name === 'get_selection') return { ok: true, text: await this.selection(facade) }
       priorTempIds = new Map(this.tempIds)
@@ -406,17 +428,16 @@ export class FolderModel {
   ): Promise<CallOutcome> {
     checkData(changed)
     if (!metamodel) throw new Error('Model has no metamodel')
-    const previousErrors = new Set(validateModel(
-      Object.fromEntries(data.nodes.map((node) => [node.id, node])),
-      Object.fromEntries(data.relations.map((relation) => [relation.id, relation])),
-      metamodel,
-    ).filter((issue) => issue.severity === 'error').map((issue) => issue.id))
-    const newError = validateModel(
-      Object.fromEntries(changed.nodes.map((node) => [node.id, node])),
-      Object.fromEntries(changed.relations.map((relation) => [relation.id, relation])),
-      metamodel,
-    ).find((issue) => issue.severity === 'error' && !previousErrors.has(issue.id))
+    const previous = new Set(issuesOf(data, metamodel).map((issue) => issue.id))
+    const fresh = issuesOf(changed, metamodel).filter((issue) => !previous.has(issue.id))
+    const newError = fresh.find((issue) => issue.severity === 'error')
     if (newError) return { ok: false, text: newError.message }
+    // Warnings do not stop a write (a machine is incomplete while it is being
+    // built), but the agent hears about the ones its change brought in.
+    const warnings = fresh.filter((issue) => issue.severity === 'warning')
+    const warned = warnings.length
+      ? ` New warnings (fine while you are still building; fix them before you finish, see get_issues):${warnings.slice(0, MAX_WARNINGS).map((issue) => `\n- ${issue.message}`).join('')}${warnings.length > MAX_WARNINGS ? `\n- …and ${warnings.length - MAX_WARNINGS} more` : ''}`
+      : ''
     const next = serializeToMdFolderWithPaths(changed).files
     // Preserve the user's manifest prose/name. The format codec only needs
     // to rewrite model-owned sidecars and node Markdown.
@@ -425,12 +446,12 @@ export class FolderModel {
       .filter((path) => before[path] !== next[path]
         && (path in next || isOwnedMdFolderFile(path, before[path])))
       .sort()
-    if (!paths.length) return { ok: true, text: `${resultText} No files changed.` }
+    if (!paths.length) return { ok: true, text: `${resultText} No files changed.${warned}` }
     const write = await session.write(next)
     if (!write.ok) return { ok: false, text: `Folder changed before write; no files written. Conflicts: ${write.conflict.join(', ')}` }
     const revision = createHash('sha256').update(paths.map((path) => `${path}\0${next[path] ?? ''}`).join('\0')).digest('hex').slice(0, 12)
     const createdRelation = changed.relations.find((relation) => !data.relations.some((old) => old.id === relation.id))?.id
-    return { ok: true, text: `${resultText}${createdRelation ? ` Relation ID: ${createdRelation}.` : ''} Changed: ${paths.join(', ')}. Revision: ${revision}.` }
+    return { ok: true, text: `${resultText}${createdRelation ? ` Relation ID: ${createdRelation}.` : ''} Changed: ${paths.join(', ')}. Revision: ${revision}.${warned}` }
   }
 
   private restoreTempIds(previous: Map<string, string>): void {

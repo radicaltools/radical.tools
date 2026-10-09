@@ -109,6 +109,13 @@ const parseValue = (raw: string): string | boolean | null => {
 }
 
 function cmp(actual: unknown, cond: Condition): boolean {
+  // A list (a multiple reference: ids) matches when one of its items does;
+  // `!=` when none does.
+  if (Array.isArray(actual) && actual.length === 0) return cmp(undefined, cond)
+  if (Array.isArray(actual)) {
+    if (cond.op === '!=') return !actual.some((item) => cmp(item, { ...cond, op: '=' }))
+    return actual.some((item) => cmp(item, cond))
+  }
   if (cond.op === '~') {
     if (actual === undefined || actual === null) return false
     return String(actual).toLowerCase().includes(String(cond.value).toLowerCase())

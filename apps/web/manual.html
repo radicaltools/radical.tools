@@ -50,6 +50,7 @@
             <li><a href="#relations">Relations</a></li>
             <li><a href="#properties">Properties &amp; governance</a></li>
             <li><a href="#mockups">Mockups &amp; screen flows</a></li>
+            <li><a href="#states">State machines</a></li>
             <li><a href="#selection">Working with selections</a></li>
           </ul>
         </div>
@@ -218,7 +219,7 @@
           <figcaption>Properties of a Container. Fields come from the metamodel, so custom types get their own forms.</figcaption>
         </figure>
         <p>
-          Every element has a label, description and parent; C4 runtime elements add <em>technology</em> and an <em>external</em> flag. Everything else is defined by the metamodel: text, long text, number, boolean and enum fields, optionally shown only when another field has a given value.
+          Every element has a label, description and parent; C4 runtime elements add <em>technology</em> and an <em>external</em> flag. Everything else is defined by the metamodel: text, long text, number, boolean and enum fields, and <strong>references</strong> to other elements, optionally shown only when another field has a given value. A reference points at one element of a given type, or several (a transition's <em>Event</em>, the events it <em>Raises</em>): you pick them from a list, the model keeps their ids, and renaming the element never breaks the link. A reference to an element that was deleted is marked ⚠ and listed under <em>Validation</em> in the <a href="#metamodel">Metamodel editor</a>.
         </p>
         <h3>Needs</h3>
         <p>
@@ -266,6 +267,28 @@
         <h3>Screen flows</h3>
         <p>
           Group the mockups of one actor's journey in a <em>Group</em> (“Shopper journey”) and link the steps with <em>Navigates to</em>, including branches and returns (<em>Payment → Payment declined → try again</em>). Record the steps as a <a href="#view-flow">sequence</a> to replay the flow screen by screen in a Flow view or in Presenter.
+        </p>
+      </section>
+
+      <section class="doc-section" id="states">
+        <h2>State machines</h2>
+        <p>
+          A <strong>State machine</strong> (palette group <em>States</em>, in the C4 + DDD + Governance metamodel) models the lifecycle of one thing in the system — an order, a payment, a booking — as an event-driven, hierarchical statechart with the semantics of SCXML and XState. It is a frame on the canvas; drop its parts into it.
+        </p>
+        <ul>
+          <li><strong>State</strong> — a rounded box with optional <em>entry</em>, <em>exit</em> and <em>do</em> actions, drawn under its name (<code>entry / start payment timer</code>). Drop states into a state to make it <em>compound</em>: being in a child state means being in its parent too, and a transition that leaves the parent leaves any child (one <em>Cancel</em> for all of them). Set <em>Kind</em> to <em>parallel</em> to make its child states <em>regions</em> that are active at the same time, drawn with dashed borders (packing and invoicing an order), or to <em>final</em> to end the machine or its parent, drawn as a bullseye.</li>
+          <li><strong>Pseudostate</strong> — the dot that marks the <em>initial</em> state: the machine and every compound state that is not parallel have one, with a single transition to the state they start in. <em>Shallow</em> and <em>deep history</em> (H, H*) re-enter the state a compound state was last in; <em>choice</em> (a diamond) branches on guards.</li>
+          <li><strong>Event</strong> — something that happens to the thing: a user action, a message from another system or a timer (<em>Source</em>), with an optional <em>Payload</em>. Events live in the machine or in a system, domain or group, so several machines can share them.</li>
+        </ul>
+        <p>Connect the parts with relations:</p>
+        <ul>
+          <li><strong>Transition</strong> — state → state (or pseudostate). Pick its <em>Event</em> (the trigger; none for a transition that fires when its state completes), and fill in a <em>Guard</em>, <em>Actions</em> and the events it <em>Raises</em>. The arrow is labelled the usual way: <code>PaymentReceived [amount ≥ total] / reserve stock ^OrderPaid</code>, with the events' current names.</li>
+          <li><strong>Emits</strong> — a state (on <em>entry</em>, <em>exit</em> or <em>do</em>), a machine, or a C4 element → the event it publishes.</li>
+          <li><strong>Lifecycle of</strong> — machine → the system, container, component, web app or domain whose thing it models.</li>
+          <li>A scenario <em>Verifies</em> a machine, a machine <em>Satisfies</em> requirements, and a mockup <em>Illustrates</em> the state it shows.</li>
+        </ul>
+        <p>
+          Beyond what may sit where, the <em>Validation</em> list in the <a href="#metamodel">Metamodel editor</a> checks that a statechart can run: one initial state per machine and compound state, at least two regions in a parallel state, nothing leaving a final state, no transition leaving its machine, no two unguarded transitions from one state on the same event, and no state the initial state cannot reach. These are warnings: a machine is often incomplete while you build it. <a href="#forge">Radical Forge</a> can derive machines from your scenarios, and the <a href="#mcp">MCP server</a> tells an agent about the warnings its changes bring in.
         </p>
       </section>
 
@@ -466,11 +489,11 @@
           <em>Radical menu → Metamodel editor…</em>. Start from a preset — <strong>C4</strong>, <strong>C4 + DDD</strong> or <strong>C4 + DDD + Governance</strong> — then shape it:
         </p>
         <ul>
-          <li><strong>Node types</strong> — label, icon, colour, default and collapsed size, <em>allowed parents</em>, whether it may sit at the root, min/max <em>cardinality</em>, and <em>properties</em> (text, long text, number, boolean, enum with options and a default; a property can be <em>visible only when</em> another one has certain values).</li>
-          <li><strong>Relation types</strong> — label, colour, the <em>allowed pairs</em> of source and target types, and their own properties.</li>
+          <li><strong>Node types</strong> — label, icon, colour, default and collapsed size, <em>allowed parents</em>, whether it may sit at the root, min/max <em>cardinality</em>, and <em>properties</em> (text, long text, number, boolean, enum with options and a default, or a <em>reference</em> to one or many elements of a type; a property can be <em>visible only when</em> another one has certain values).</li>
+          <li><strong>Relation types</strong> — label, colour, the <em>allowed pairs</em> of source and target types, and their own properties (references included: that is how a transition points at its event).</li>
           <li>Built-in types can be extended but not deleted; add as many of your own as you need.</li>
         </ul>
-        <p>Validation is live: the palette, the parent drop-down, drag-and-drop and connection previews all consult the metamodel, and the AI assistant's patches are checked against it too.</p>
+        <p>Validation is live: the palette, the parent drop-down, drag-and-drop and connection previews all consult the metamodel, and the AI assistant's patches are checked against it too. The <em>Validation</em> list beside the types shows everything the model breaks now — errors, and warnings such as a missing required field, a reference to nothing or a <a href="#states">state machine</a> rule — and takes you to the element.</p>
       </section>
 
       <section class="doc-section" id="hub">
@@ -519,13 +542,14 @@
       <section class="doc-section" id="forge">
         <h2>Radical Forge</h2>
         <p>
-          <strong>Radical Forge</strong> (<em>Start with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
+          <strong>Radical Forge</strong> (<em>Start with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>State machines</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
         </p>
         <ul>
           <li><strong>The description is kept as a <a href="#properties">Need</a>.</strong> When you press <em>Start</em>, the text is saved in the model as a need (named after its first line), and the Requirements stage links every requirement it writes to it with <em>Derives from</em>. If the model already has needs, <em>Start from</em> on the Description step loads one instead, and your edits are saved back to it. Going back and starting again updates the same need instead of adding a second one.</li>
           <li><strong>Hub concepts that fit.</strong> For the Requirements, Fitness functions and C4 stages, Forge ranks the <a href="#hub">Hub</a> catalogue against your description (rarer words count more, and so do the concepts linked from a blueprint that fits), and the model picks at most five that fit, whatever language the description is in. They appear under <em>Picked from the Hub</em>, checked; untick the ones you do not want, or <em>Import</em> one as it is. When a blueprint fits the whole system, the C4 stage offers it first, to import as a skeleton. Without AI you see the best keyword matches instead.</li>
-          <li><strong>Three views.</strong> Every element a stage creates goes into a view of its layer: <em>Conceptual</em> (the need, requirements, scenarios and mockups), <em>Logical &amp; physical</em> (the C4 elements) and <em>Governance</em> (fitness functions and ADRs). A view is created when its first element arrives and reused by a later run with the same name. New elements are placed beside what the view already shows, in a block that grows sideways rather than down.</li>
+          <li><strong>Four views.</strong> Every element a stage creates goes into a view of its layer: <em>Conceptual</em> (the need, requirements, scenarios and mockups), <em>States</em> (state machines and their events), <em>Logical &amp; physical</em> (the C4 elements) and <em>Governance</em> (fitness functions and ADRs). A view is created when its first element arrives and reused by a later run with the same name. New elements are placed beside what the view already shows, in a block that grows sideways rather than down.</li>
           <li><strong>Arrange after each stage.</strong> When a stage is done, Forge asks whether to keep its new elements in a <em>Row</em>, a <em>Column</em> or a <em>Grid</em> on their view (an <a href="#layout">alignment</a> every later layout keeps), and offers <em>Smart Layout</em> on that view. Nothing is rearranged unless you choose it.</li>
+          <li><strong>State machines</strong> follow the scenarios: the stage finds the things with a real lifecycle (often none, and rarely more than three), models each as a <a href="#states">state machine</a>, and derives its transitions from the scenarios — <em>Given</em> the source state, <em>When</em> the event, <em>Then</em> the target state and its effect — including declines, timeouts and cancellations. The scenarios <em>verify</em> the machine, and the C4 stage later links it to the element that owns it with <em>Lifecycle of</em>.</li>
           <li><strong>Mockups</strong> come before C4: the stage creates the user-facing screens with <em>Illustrates</em> and <em>Navigates to</em> links, then <em>Generate wireframes</em> draws a wireframe for every mockup that has none. The C4 stage then designs the front-ends the screens need and links each mockup to its container with <em>Presented by</em>.</li>
           <li><strong>Finish here</strong> ends the run at any stage and keeps what has been generated. The final step summarises every stage (what was added, what was skipped) and exports the scenarios as <code>.feature</code> files; <em>← Back</em> resumes where you stopped.</li>
           <li><strong>From your own agent.</strong> The same run, with the same stages, prompts, clarifying questions and Hub suggestions, works in Claude Code, Claude Desktop or any other <a href="#mcp">MCP</a> client, with the agent's model instead of a key in Studio.</li>
@@ -570,7 +594,7 @@ codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.
           <table class="doc-table">
             <thead><tr><th>Group</th><th>Tools</th></tr></thead>
             <tbody>
-              <tr><td><strong>Read</strong></td><td><code>get_model_summary</code> — counts, views, sequences, presentations and the metamodel rules (property keys and enum options, allowed parents, cardinality, allowed relation pairs) · <code>search_model</code> — the assistant's query language (<code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>LIST SEQUENCES</code>…)</td></tr>
+              <tr><td><strong>Read</strong></td><td><code>get_model_summary</code> — counts, views, sequences, presentations, the modelling rules the assistant follows (how to write requirements, build a state machine…) and the metamodel rules (property keys and enum options, reference targets, allowed parents, cardinality, allowed relation pairs) · <code>get_issues</code> — everything the model breaks now, as the <em>Validation</em> list shows it · <code>search_model</code> — the assistant's query language (<code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>LIST SEQUENCES</code>…)</td></tr>
               <tr><td><strong>Elements &amp; relations</strong></td><td><code>add_node</code>, <code>update_node</code>, <code>delete_node</code>, <code>move_node</code> (change the parent) · <code>add_relation</code>, <code>update_relation</code>, <code>delete_relation</code></td></tr>
               <tr><td><strong>Views</strong></td><td><code>create_view</code>, <code>update_view</code>, <code>set_view_nodes</code>, <code>delete_view</code> · <code>smart_layout</code> for All elements or one view · <code>align_nodes</code> / <code>grid_nodes</code> / <code>remove_alignment</code> to keep elements in a row, a column or a grid</td></tr>
               <tr><td><strong>Sequences &amp; slides</strong></td><td><code>create_sequence</code>, <code>update_sequence</code>, <code>delete_sequence</code> · <code>create_presentation</code>, <code>update_presentation</code>, <code>delete_presentation</code></td></tr>
@@ -580,7 +604,7 @@ codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.
           </table>
         </div>
         <ul>
-          <li><strong>Validated like Studio.</strong> Writes go through the same schemas and metamodel rules as the editor; an invalid parent, type or relation pair is refused with a message the agent can act on. A tool reports success only after the files are written.</li>
+          <li><strong>Validated like Studio.</strong> Writes go through the same schemas and metamodel rules as the editor; an invalid parent, type or relation pair is refused with a message the agent can act on. Warnings do not stop a write, but the ones it brings in (a compound state with no initial state, a reference to nothing) come back with its result, and <code>get_issues</code> lists them all. A reference such as a transition's event takes an element's id, or a <code>tempId</code> from the same session. A tool reports success only after the files are written.</li>
           <li><strong>Placement.</strong> New elements land inside their parent and parents grow to fit; call <code>smart_layout</code> to tidy up. New elements show in <em>All elements</em> until a view lists them (<code>create_view</code>, <code>set_view_nodes</code>).</li>
           <li><strong>Metamodel edits.</strong> Changing a built-in metamodel saves it as a <code>…-custom</code> copy, like the <a href="#metamodel">Metamodel editor</a>. The server then re-announces the element and relation tools with the new types.</li>
           <li><strong>Radical Forge.</strong> The agent runs <a href="#forge">Radical Forge</a> the way the wizard does: the server keeps the run (the need, your answers, each stage's summary and what it added) and hands the agent each stage's questions and task, with the Hub concepts that match; the agent asks you, builds the stage with the tools above, and stops after each stage to ask how to arrange it (row, column or grid, and Smart Layout, on the stage's view) and whether to continue, regenerate or finish. In Claude Code, start it with the <code>/mcp__radical-folder__forge</code> prompt (named after the server), or just ask for Radical Forge. Wireframes are drawn by the agent too, and <code>forge_finish</code> writes the <code>.feature</code> files to a folder you name.</li>

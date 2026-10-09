@@ -30,14 +30,20 @@ export function pairKey(a: string, b: string): string {
   return a < b ? `${a}\n${b}` : `${b}\n${a}`
 }
 
-const sizes = new WeakMap<C4Relation, LabelSize | null>()
+const sizes = new WeakMap<Record<string, C4Node>, WeakMap<C4Relation, LabelSize | null>>()
 
-/** A relation's label size, cached per relation object (scoring asks often). */
-export function labelSizeOf(r: C4Relation): LabelSize | null {
-  let size = sizes.get(r)
+/** A relation's label size, cached per relation and node set (scoring asks
+ *  often; a transition's label names its events, which live on nodes). */
+export function labelSizeOf(r: C4Relation, nodes: Record<string, C4Node>): LabelSize | null {
+  let byRelation = sizes.get(nodes)
+  if (!byRelation) {
+    byRelation = new WeakMap()
+    sizes.set(nodes, byRelation)
+  }
+  let size = byRelation.get(r)
   if (size === undefined) {
-    size = relationLabelSize(r)
-    sizes.set(r, size)
+    size = relationLabelSize(r, nodes)
+    byRelation.set(r, size)
   }
   return size
 }
@@ -64,7 +70,7 @@ export function labelGaps(nodes: Record<string, C4Node>, relations: Record<strin
   const gaps: LabelGaps = new Map()
   for (const r of Object.values(relations)) {
     if (!nodes[r.sourceId] || !nodes[r.targetId] || r.sourceId === r.targetId) continue
-    const size = labelSizeOf(r)
+    const size = labelSizeOf(r, nodes)
     if (!size) continue
     const s = chain(r.sourceId)
     const t = chain(r.targetId)

@@ -47,6 +47,7 @@
     "electron-builder": "^26.15.3",
     "electron-vite": "^2.0.0",
     "elkjs": "^0.9.3",
+    "terser": "^5.51.2",
     "tsx": "^4.21.0",
     "typescript": "^5.3.3",
     "vite": "^5.0.10",

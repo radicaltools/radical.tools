@@ -1,8 +1,8 @@
 // ─── Where a Radical Forge run puts what it generates ───────────────────────
-// A run splits its output into three views from the start, the layers of a
+// A run splits its output into four views from the start, the layers of a
 // Radical architecture model: Conceptual (the need, requirements, scenarios,
-// mockups), Logical & physical (the C4 elements) and Governance (fitness
-// functions and decisions). A view is created when its first element arrives,
+// mockups), States (the state machines and their events), Logical & physical
+// (the C4 elements) and Governance (fitness functions and decisions). A view is created when its first element arrives,
 // since an empty view shows the whole model; a later run reuses the views by
 // name.
 //
@@ -15,10 +15,11 @@ import { landscapeGridColumns, type C4Node, type DiagramView } from '../../c4'
 import type { DiagramFacade } from '../diagramFacade'
 import type { ForgeStageId } from './prompts'
 
-export type ForgeViewKey = 'conceptual' | 'logical' | 'governance'
+export type ForgeViewKey = 'conceptual' | 'states' | 'logical' | 'governance'
 
 export const FORGE_VIEW_NAMES: Record<ForgeViewKey, string> = {
   conceptual: 'Conceptual',
+  states: 'States',
   logical: 'Logical & physical',
   governance: 'Governance',
 }
@@ -29,6 +30,10 @@ const VIEW_OF_TYPE: Record<string, ForgeViewKey> = {
   requirement: 'conceptual',
   scenario: 'conceptual',
   mockup: 'conceptual',
+  'state-machine': 'states',
+  state: 'states',
+  pseudostate: 'states',
+  event: 'states',
   'fitness-fn': 'governance',
   adr: 'governance',
 }
@@ -37,6 +42,7 @@ export const FORGE_STAGE_VIEW: Record<ForgeStageId, ForgeViewKey> = {
   requirements: 'conceptual',
   fitness: 'governance',
   scenarios: 'conceptual',
+  states: 'states',
   mockups: 'conceptual',
   c4: 'logical',
 }

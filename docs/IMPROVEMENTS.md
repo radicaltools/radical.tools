@@ -375,7 +375,10 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     tool over node fields would do it in one call.
 18. **`set_view_nodes` replaces the whole list.** Adding two elements to a
     view of 78 meant reading `views.json` (or `GET VIEW`) and sending all
-    80 ids back. An `add`/`remove` form would avoid it.
+    80 ids back. An `add`/`remove` form would avoid it. Again on 2026-10-09
+    (state machines ADR): `GET VIEW` of a 67-element table view returned
+    73 KB, more than Claude Code accepts as one tool result, so the ids had
+    to be dug out of the saved output.
 19. **The project's MCP server cannot serve a worktree.** `.mcp.json` points
     the server at `architecture/` in the main checkout; recording an ADR for
     a branch checked out in a git worktree (2026-10-08, calm drags) meant a
@@ -651,3 +654,41 @@ five of up to 60 candidates per stage in the clarify call. Benchmark:
    serves `searchText` only after the Hub is redeployed.
 7. **Scenarios and Mockups get no Hub concepts**; the catalogue has no
    Gherkin or screen content.
+
+### State machines (2026-10-09)
+
+The governance preset has event-driven hierarchical state machines
+(`state-machine`, `state`, `pseudostate`, `event`; `transition`,
+`lifecycle-of`, `emits`) with SCXML semantics, reference properties for a
+transition's events (`packages/common/src/metamodel/refs.ts`), statechart
+rules in
+`packages/common/src/metamodel/statechart.ts` and statechart notation on the
+canvas (ADR "State machines as nested states"). Still open:
+
+1. **No statechart layout.** Smart Layout treats a machine like any C4
+   container: cycles and long `event [guard] / actions` labels are not
+   ranked for, and events float among the states. A layered left-to-right
+   layout with back edges, and events kept apart (a column, or out of the
+   machine), would read better. Measure with ≥5 seeds as usual.
+2. **Leaf states are stored at their expanded size.** A new state gets the
+   type's 320×220 and is drawn at the collapsed 170×72 while it has no
+   children; Smart Layout over MCP leaves gaps sized for the stored box.
+3. **Arrows stop at the final state's box,** not at its bullseye.
+4. **Deleting a node leaves references to it dangling.** Transitions point
+   at events by id (reference properties, ADR "Properties can reference
+   nodes"), so a rename is safe, but deleting an event leaves its id in
+   `event` / `raises`: a warning in the metamodel editor's Validation list and a marked entry in the picker
+   until someone removes it. The store and the model facade could drop
+   such ids in the same undo step as the delete.
+5. **Next steps of the plan:** playing a scenario as a sequence of
+   transitions, and SCXML / XState export. The Radical Forge stage is done
+   (State machines, between scenarios and mockups, into one shared States
+   view rather than one view per machine); it is measured only by its
+   prompt tests, not yet on real briefs with a model.
+6. **Studio has no Issues panel outside the metamodel editor.** Statechart
+   warnings show only under *Validation* there (and from the MCP server); a
+   badge in the toolbar or on the machine itself would make them visible
+   while you build.
+7. **Studio builds with terser** because Vite 5's bundled es-module-lexer
+   misreads a minified variable named `of` (ADR "Terser minifies Studio").
+   Drop `apps/studio/rendererMinify.ts` when Vite bundles es-module-lexer 3.

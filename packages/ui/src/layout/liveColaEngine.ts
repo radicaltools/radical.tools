@@ -69,8 +69,9 @@ interface GroupOrder {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Walk parent chain to compute absolute top-left from relative positions. */
-/** Parent types that can hold other parents; every other parent is a flat group. */
-const NESTING_TYPES: ReadonlySet<string> = new Set(['system', 'domain', 'group'])
+/** Parent types that can hold other parents; every other parent is a flat group.
+ *  A state machine holds compound states, and a compound state holds states. */
+const NESTING_TYPES: ReadonlySet<string> = new Set(['system', 'domain', 'group', 'state-machine', 'state'])
 
 function toAbsoluteTopLeft(n: C4Node, all: Record<string, C4Node>): { x: number; y: number } {
   let x = n.x
@@ -1016,7 +1017,7 @@ export class LiveColaEngine {
     const groupIndex = new Map<string, number>()
     this.colaGroups.forEach((g, i) => groupIndex.set(g.c4id, i))
 
-    // ── Outer containers (system / domain / group) bottom-up by depth ───
+    // ── Outer containers (system / domain / group / state) bottom-up by depth ───
     // Systems, domains, and groups can nest. Each parent's group references
     // its children's group indices, so children must be added to colaGroups
     // BEFORE their parent. Sort by ancestor depth descending — deepest first.

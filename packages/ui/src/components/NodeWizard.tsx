@@ -20,6 +20,7 @@ import {
 import { NODE_COLORS, NODE_FG, TYPE_ICON_PATHS, TYPE_LABELS, type C4Node } from '@radical/common/c4'
 import { useDiagramStore, type NodeWizardSession } from '../store/diagramStore'
 import { EarsQuickEntry } from './EarsQuickEntry'
+import { RefPicker } from './RefPicker'
 
 /**
  * Step-by-step form for a node type with a `wizard` in the metamodel. Opens
@@ -307,6 +308,14 @@ function FieldsStep({ fields, values, setValue, roomy, onEnter }: {
               <span className="nw-switch-track" aria-hidden="true" />
               {label}
             </label>
+          )
+        }
+        if (p.type === 'ref') {
+          return (
+            <div className="nw-field" key={p.key}>
+              <div className="nw-label">{label}</div>
+              <RefPicker def={p} value={value} className="nw-input" onChange={(v) => setValue(p.key, v)} />
+            </div>
           )
         }
         if (p.type === 'enum' && (p.options?.length ?? 0) <= MAX_CHOICE_CHIPS) {

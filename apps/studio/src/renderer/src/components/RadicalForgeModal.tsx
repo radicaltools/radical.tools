@@ -100,6 +100,7 @@ const STEP_LABELS: Record<WizardStep, string> = {
   c4: 'C4 model',
   fitness: 'Fitness fns',
   scenarios: 'Scenarios',
+  states: 'States',
   mockups: 'Mockups',
   export: 'Finish',
 }
@@ -718,7 +719,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         </div>
         <p className="milestone-modal-text" style={{ marginBottom: 10 }}>
           Turn a free-text system description into requirements, fitness functions,
-          Gherkin scenarios, UI mockups and a C4 model — one reviewable stage at a time.
+          Gherkin scenarios, state machines, UI mockups and a C4 model — one reviewable stage at a time.
         </p>
 
         <div className="forge-steps" role="tablist">

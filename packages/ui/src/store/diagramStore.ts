@@ -48,6 +48,7 @@ import {
   sameWizardLink,
   wizardLinksOf,
   type WizardLink,
+  relationDisplayLabel,
 } from '@radical/common/metamodel'
 import * as model from '@radical/common/model'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
@@ -55,7 +56,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { fittedParentSize, projectToVisibleGraph } from '@radical/layout/geometry'
+import { fittedParentSize, isFixedSizeType, projectToVisibleGraph } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
@@ -672,7 +673,7 @@ function deriveRFNodes(
 
     // Fixed-size node types always render at canonical NODE_SIZES regardless of
     // what is stored in the document (handles legacy nodes created with old sizes).
-    const isFixedSize = n.type === 'adr' || n.type === 'fitness-fn' || n.type === 'need' || n.type === 'requirement' || n.type === 'scenario' || n.type === 'mockup'
+    const isFixedSize = isFixedSizeType(n.type)
 
     const effHeight = isFixedSize
       ? NODE_SIZES[n.type].height
@@ -804,8 +805,9 @@ function deriveRFEdges(
       const existing = rfEdges.find(
         (e) => e.source === visSource && e.target === visTarget
       )
-      if (existing && rel.label) {
-        existing.label = existing.label ? `${existing.label}\n${rel.label}` : rel.label
+      const label = relationDisplayLabel(rel, nodes)
+      if (existing && label) {
+        existing.label = existing.label ? `${existing.label}\n${label}` : label
       }
       continue
     }
@@ -827,11 +829,11 @@ function deriveRFEdges(
       zIndex: edgeZIndex,
       markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
       style: { stroke: '#94a3b8', strokeWidth: 1.5 },
-      label: rel.label,
+      label: relationDisplayLabel(rel, nodes),
       data: {
         originalSourceId: rel.sourceId,
         originalTargetId: rel.targetId,
-        label: rel.label,
+        label: relationDisplayLabel(rel, nodes),
         technology: rel.technology,
         relationType: rel.relationType,
         isVirtual,

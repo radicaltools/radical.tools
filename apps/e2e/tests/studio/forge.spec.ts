@@ -125,3 +125,53 @@ test('Forge files each stage into its view and offers to arrange it', async ({ p
   await page.locator('.forge-panel').screenshot({ path: test.info().outputPath('forge-panel.png') })
   await page.screenshot({ path: test.info().outputPath('governance.png') })
 })
+
+test('Forge builds the state machines after the scenarios, into a States view', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'C4 + DDD + Governance', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  const node = (tempId: string, type: string, label: string, parentId?: string, properties?: Record<string, unknown>): ToolUse =>
+    ({ name: 'add_node', input: { tempId, type, label, ...(parentId ? { parentId } : {}), ...(properties ? { properties } : {}) } })
+  const transition = (sourceId: string, targetId: string, properties: Record<string, unknown> = {}): ToolUse =>
+    ({ name: 'add_relation', input: { sourceId, targetId, relationType: 'transition', properties } })
+  const stagePrompts = await scriptAnthropic(page, [
+    { task: /extract its functional requirements/, calls: [requirement(1)] },
+    { task: /real lifecycle/, calls: [
+      node('m', 'state-machine', 'Loan lifecycle', undefined, { subject: 'Loan' }),
+      node('collected', 'event', 'BookCollected', 'm'),
+      node('i', 'pseudostate', 'Start', 'm', { kind: 'initial' }),
+      node('reserved', 'state', 'Reserved', 'm'),
+      node('lent', 'state', 'Lent', 'm', { kind: 'final' }),
+      transition('i', 'reserved'),
+      transition('reserved', 'lent', { event: 'collected' }),
+    ] },
+  ])
+  await studio.open('v-context')
+  await page.getByTitle('Menu').click()
+  await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
+  await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
+  await page.getByRole('button', { name: 'Start →' }).click()
+
+  // Eight steps on one line: description, the six stages, finish.
+  const steps = page.locator('.forge-step')
+  await expect(steps).toHaveText(['✓Description', 'Requirements', 'Fitness fns', 'Scenarios', 'States', 'Mockups', 'C4 model', 'Finish'])
+  const tops = await steps.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)))
+  expect(new Set(tops).size).toBe(1)
+
+  await page.getByRole('button', { name: 'Skip questions' }).click()
+  for (const stage of ['requirements', 'fitness functions', 'Gherkin scenarios']) {
+    await page.getByRole('button', { name: `Generate ${stage}` }).click()
+    await page.getByRole('button', { name: 'Continue →' }).click()
+  }
+  await page.getByRole('button', { name: 'Generate state machines' }).click()
+  await expect(page.locator('.forge-arrange')).toContainText('on States')
+
+  const stored = async () => await studio.storedDoc() as unknown as Doc & { relations: Array<Record<string, unknown>> }
+  await expect.poll(async () => (await stored()).views.find((v) => v.name === 'States')?.nodeIds.length).toBe(5)
+  const data = await stored()
+  const id = (label: string) => data.nodes.find((n) => n.label === label)!.id
+  expect(data.relations.find((r) => r.targetId === id('Lent'))!.event).toBe(id('BookCollected'))
+  expect(stagePrompts.find((p) => p.includes('real lifecycle'))).toContain('Given is the source state')
+  await expect(page).toHaveURL(new RegExp(`/v/${data.views.find((v) => v.name === 'States')!.id}$`))
+  await expect(page.locator('.relation-label', { hasText: 'BookCollected' })).toBeVisible()
+})

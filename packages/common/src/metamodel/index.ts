@@ -5,6 +5,8 @@
 //   • types.ts    — the generic Metamodel/NodeTypeDef/RelationTypeDef shapes
 //   • lookup.ts   — allowed-parent / allowed-relation / cardinality helpers
 //   • validate.ts — validateModel + Issue
+//   • refs.ts     — reference properties (a value that points at nodes by id)
+//   • statechart.ts — state machine rules and transition labels
 //   • ears.ts     — EARS sentence compose/parse for the Requirement node type
 //   • wizard.ts   — step / field / relation helpers behind the node wizard
 //   • categories.ts — palette / diagram grouping of node types (C4, Governance, …)
@@ -13,6 +15,8 @@
 export * from './types'
 export * from './lookup'
 export * from './validate'
+export * from './refs'
+export * from './statechart'
 export * from './ears'
 export * from './wizard'
 export * from './categories'
