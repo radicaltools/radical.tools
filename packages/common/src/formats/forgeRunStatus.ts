@@ -94,10 +94,14 @@ export function forgeRunPhase(status: ForgeRunStatus, now = Date.now()): ForgeRu
   return status.stages.some((s) => s.status === 'generating') ? 'working' : 'waiting'
 }
 
-/** The stage the run is at: the one in progress, else the next to run. */
+/** The stage the run is at: the one in progress (questions or generating);
+ *  else the last one done, while the agent asks the user how to arrange it
+ *  and whether to go on (the next stage begins only when the agent asks its
+ *  questions); else, before any, the first. */
 export function forgeRunCurrentStage(status: ForgeRunStatus): ForgeRunStageInfo | undefined {
   return status.stages.find((s) => s.status === 'generating' || s.status === 'clarifying')
-    ?? status.stages.find((s) => s.status === 'pending')
+    ?? [...status.stages].reverse().find((s) => s.status === 'done')
+    ?? status.stages[0]
 }
 
 /** A person-readable name for the MCP client that drives a run. */

@@ -243,6 +243,12 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
   const button = page.locator('.qs-forge-toggle')
   await expect(button).not.toHaveAttribute('data-agent-phase')
 
+  // Requirements done: the agent asks how to arrange them and whether to go
+  // on, so the run is still at stage 1 of 7.
+  await write('active', { requirements: 'done' })
+  await expect(button).toHaveAttribute('data-agent-phase', 'waiting', { timeout: 10_000 })
+  await expect(button.locator('.qs-forge-badge')).toHaveText('1/7')
+
   // Working on the domain model: blue pulse, stage 2 of 7.
   await write('active', { requirements: 'done', domain: 'generating' })
   await expect(button).toHaveAttribute('data-agent-phase', 'working', { timeout: 10_000 })
@@ -252,12 +258,18 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
   const panel = page.getByRole('dialog', { name: 'Radical Forge — agent run' })
   await expect(panel).toContainText('Radical Forge — run by Claude Code')
   await expect(panel).toContainText('Click & collect')
-  await expect(panel.locator('.forge-step[data-status]')).toHaveCount(7)
+  // The seven stages and nothing else, as the badge counts them.
+  await expect(panel.locator('.forge-step')).toHaveCount(7)
   await expect(panel.locator('.forge-step[data-status="done"]')).toHaveAttribute('title', /requirements summary/)
   await expect(panel.locator('.forge-step.active')).toHaveText('Domain')
   await expect(panel.locator('.forge-agent-line')).toHaveText('Claude Code is generating the Domain model stage…')
   // Read only: nothing to press but Close.
   await expect(panel.getByRole('button')).toHaveCount(1)
+
+  // Done and waiting for the user's choice: still at the Domain model.
+  await write('active', { requirements: 'done', domain: 'done' })
+  await expect(panel.locator('.forge-agent-line')).toHaveText('Waiting for you in Claude Code: how to arrange the Domain model stage, and whether to go on.', { timeout: 10_000 })
+  await expect(button.locator('.qs-forge-badge')).toHaveText('2/7')
 
   // Asking the user: amber, and the view follows the file.
   await write('active', { requirements: 'done', domain: 'done', fitness: 'clarifying' })
