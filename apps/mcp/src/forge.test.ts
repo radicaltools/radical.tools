@@ -8,6 +8,7 @@ import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeToMdFolder, deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { parseForgeRun } from '@radical/common/formats/forgeRunStatus'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
@@ -230,6 +231,39 @@ describe('Radical Forge over MCP', () => {
     } finally {
       await client.close()
     }
+  }, 60_000)
+
+  it('tells Studio where the run stands through .radical/forge-run.json', async () => {
+    const { client, folder } = await connect()
+    const status = async () => parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
+    try {
+      await call(client, 'forge_start', { description: BRIEF })
+      expect(await status()).toMatchObject({ client: 'radical-test', state: 'active', need: { label: 'Click & collect' } })
+      expect((await status()).stages.map((s) => s.status)).toEqual(Array(7).fill('pending'))
+      expect(await readFile(join(folder, '.radical/.gitignore'), 'utf8')).toBe('*\n')
+
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      expect((await status()).stages[0]).toEqual({ id: 'requirements', status: 'clarifying' })
+      await call(client, 'forge_generate', { stage: 'requirements' })
+      expect((await status()).stages[0].status).toBe('generating')
+      await call(client, 'add_node', { tempId: 'r', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
+      await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement.' })
+      expect((await status()).stages[0]).toEqual({ id: 'requirements', status: 'done', summary: 'One requirement.', added: { nodes: 1, relations: 0 } })
+
+      await call(client, 'forge_finish', {})
+      expect((await status()).state).toBe('finished')
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
+  it('marks an unfinished run closed when the client goes away', async () => {
+    const { client, folder } = await connect()
+    await call(client, 'forge_start', { description: BRIEF })
+    await call(client, 'forge_clarify', { stage: 'requirements' })
+    await client.close()
+    const file = join(folder, '.radical/forge-run.json')
+    await expect.poll(async () => parseForgeRun(await readFile(file, 'utf8'))?.state, { timeout: 5000 }).toBe('closed')
   }, 60_000)
 
   it('draws wireframes, imports Hub concepts and exports the Gherkin files', async () => {

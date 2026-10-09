@@ -227,3 +227,47 @@ test('Open folder… on the welcome screen opens a model folder', async ({ page,
   await openModels(page)
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
 })
+
+test('an agent\'s Forge run on the folder makes the Forge button pulse and opens read only', async ({ page }) => {
+  await saveAsFolder(page)
+  const stages = ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'mockups', 'c4']
+  const write = (state: string, statuses: Record<string, string>): Promise<void> => folder.write('.radical/forge-run.json', JSON.stringify({
+    version: 1,
+    client: 'claude-code',
+    need: { id: 'n1', label: 'Click & collect' },
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    state,
+    stages: stages.map((id) => ({ id, status: statuses[id] ?? 'pending', ...(statuses[id] === 'done' ? { summary: `${id} summary`, added: { nodes: 2, relations: 1 } } : {}) })),
+  }))
+  const button = page.locator('.qs-forge-toggle')
+  await expect(button).not.toHaveAttribute('data-agent-phase')
+
+  // Working on the domain model: blue pulse, stage 2 of 7.
+  await write('active', { requirements: 'done', domain: 'generating' })
+  await expect(button).toHaveAttribute('data-agent-phase', 'working', { timeout: 10_000 })
+  await expect(button.locator('.qs-forge-badge')).toHaveText('2/7')
+
+  await button.click()
+  const panel = page.getByRole('dialog', { name: 'Radical Forge — agent run' })
+  await expect(panel).toContainText('Radical Forge — run by Claude Code')
+  await expect(panel).toContainText('Click & collect')
+  await expect(panel.locator('.forge-step[data-status]')).toHaveCount(7)
+  await expect(panel.locator('.forge-step[data-status="done"]')).toHaveAttribute('title', /requirements summary/)
+  await expect(panel.locator('.forge-step.active')).toHaveText('Domain')
+  await expect(panel.locator('.forge-agent-line')).toHaveText('Claude Code is generating the Domain model stage…')
+  // Read only: nothing to press but Close.
+  await expect(panel.getByRole('button')).toHaveCount(1)
+
+  // Asking the user: amber, and the view follows the file.
+  await write('active', { requirements: 'done', domain: 'done', fitness: 'clarifying' })
+  await expect(button).toHaveAttribute('data-agent-phase', 'waiting', { timeout: 10_000 })
+  await expect(panel.locator('.forge-agent-line')).toHaveText('Claude Code is asking you about the Fitness functions stage; answer there.')
+
+  // The client closed early: no pulse, shown as stopped.
+  await write('closed', { requirements: 'done', domain: 'done' })
+  await expect(button).toHaveAttribute('data-agent-phase', 'paused', { timeout: 10_000 })
+  await expect(panel.locator('.forge-agent-line')).toHaveText('Stopped: Claude Code closed before the run finished.')
+  await page.keyboard.press('Escape')
+  await expect(panel).toHaveCount(0)
+})

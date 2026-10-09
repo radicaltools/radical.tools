@@ -53,6 +53,7 @@ import { buildGherkinFiles } from '@radical/common/formats/exportGherkin'
 import { docToConcept, type HubConceptSummary, type HubRadicalDoc } from '@radical/common/hubFormat'
 import { buildConceptInsert } from '@radical/common/hubImport'
 import { sanitizeWireframeSvg } from '@radical/common/wireframe'
+import type { ForgeRunStatus } from '@radical/common/formats/forgeRunStatus'
 import { CATALOGUE_DIR, buildIndex, readCatalogue } from '@radical/hub-catalogue'
 import { createBatchPlacer } from '@radical/layout/geometry'
 
@@ -225,6 +226,10 @@ interface StageState {
 interface ForgeRun {
   description: string
   needId?: string
+  needLabel?: string
+  startedAt: string
+  /** forge_finish was called. */
+  finished?: boolean
   hub: ForgeHubCandidates
   clarified: Set<ForgeStageId>
   stages: Partial<Record<ForgeStageId, StageState>>
@@ -386,6 +391,8 @@ export class Forge {
     const run: ForgeRun = {
       description,
       needId: need,
+      needLabel: need ? facade.getNodes()[need]?.label : undefined,
+      startedAt: new Date().toISOString(),
       hub: forgeHubCandidates(this.hub().summaries, description, metamodel?.id),
       clarified: new Set(),
       stages: {},
@@ -661,7 +668,32 @@ export class Forge {
       for (const file of files) lines.push('', `--- ${file.filename}`, file.content)
     }
     lines.push('', `The elements are in the views ${Object.values(FORGE_VIEW_NAMES).join(', ')}; smart_layout with a viewId arranges one.`)
-    return ok(lines.join('\n'), { readOnly: true })
+    return ok(lines.join('\n'), { readOnly: true, commit: () => { run.finished = true } })
+  }
+
+  /** Where the run stands, for Studio (see forgeRunStatus); null without a
+   *  run. `closing` marks a run the server is leaving unfinished. */
+  status(closing = false): Omit<ForgeRunStatus, 'version' | 'updatedAt'> | null {
+    const run = this.run
+    if (!run) return null
+    return {
+      ...(run.needId && run.needLabel ? { need: { id: run.needId, label: run.needLabel } } : {}),
+      startedAt: run.startedAt,
+      state: run.finished ? 'finished' : closing ? 'closed' : 'active',
+      stages: FORGE_STAGES.map((stage) => {
+        const state = run.stages[stage.id]
+        if (state?.status === 'done') {
+          return {
+            id: stage.id,
+            status: 'done' as const,
+            ...(state.summary ? { summary: state.summary } : {}),
+            added: { nodes: state.added?.nodes.length ?? 0, relations: state.added?.relations.length ?? 0 },
+          }
+        }
+        if (state?.status === 'generating') return { id: stage.id, status: 'generating' as const }
+        return { id: stage.id, status: run.clarified.has(stage.id) ? 'clarifying' as const : 'pending' as const }
+      }),
+    }
   }
 
   private ids(facade: ModelFacade): ModelIds {
