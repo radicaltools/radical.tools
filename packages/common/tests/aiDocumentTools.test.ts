@@ -3,8 +3,8 @@ import { buildToolDefs, hasTool, runTool } from '../src/ai/tools/index'
 import type { ToolRunContext } from '../src/ai/tools/types'
 import { createModelFacade, type ModelFacadeOptions } from '../src/ai/modelFacade'
 import { builtInGovernanceMetamodel } from '../src/metamodel/index'
-import { documentMetamodel } from '../src/model'
-import type { DiagramData } from '../src/c4'
+import { compareModels, documentMetamodel } from '../src/model'
+import type { C4Node, DiagramData } from '../src/c4'
 
 function setup(options: ModelFacadeOptions = {}) {
   const facade = createModelFacade({ nodes: [], relations: [], metamodel: builtInGovernanceMetamodel() }, options)
@@ -210,6 +210,67 @@ describe('milestone tools', () => {
     expect(facade.getPresentations!()[0].slides[0].snapshotId).toBeNull()
     expect((await call('update_presentation', { id: roadmap.id, slides: [{ name: 'X', milestone: 'nope' }] })).resultText).toContain('unknown milestone')
     expect((await call('update_presentation', { id: roadmap.id, slides: [{ name: 'X', focus: ['old'] }] })).resultText).toContain('unknown node')
+  })
+
+  it('re-frame a Studio slide moved to another milestone and unlink slides from a deleted one', async () => {
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'old', type: 'system', label: 'Mainframe' })
+    await call('create_milestone', { name: 'As-is' })
+    await call('create_milestone', { name: 'Target' })
+    const [asIs, target] = facade.getMilestones!().map((m) => m.id)
+    // A slide added in Studio: captured camera, canvas and model copy.
+    const captured = {
+      id: 's1', name: 'Today', snapshotId: asIs, viewId: null, viewport: { x: 10, y: 20, zoom: 1.5 },
+      canvasState: { nodes: {} }, modelSnapshot: { nodes: {}, relations: {} }, focusNodeIds: ['gone'],
+    }
+    facade.setPresentations!([{ id: 'p1', name: 'Roadmap', slides: [captured] }])
+
+    // Renaming keeps what Studio captured.
+    await call('update_presentation', { id: 'p1', slides: [{ id: 's1', name: 'Now' }] })
+    expect(facade.getPresentations!()[0].slides[0]).toEqual({ ...captured, name: 'Now' })
+    // Another milestone: the captured framing belonged to the old model.
+    const moved = await call('update_presentation', { id: 'p1', slides: [{ id: 's1', name: 'Later', milestone: target }] })
+    expect(moved.ok, moved.resultText).toBe(true)
+    expect(facade.getPresentations!()[0].slides[0]).toEqual({ id: 's1', name: 'Later', snapshotId: target, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } })
+
+    expect((await call('delete_milestone', { id: target })).ok).toBe(true)
+    expect(facade.getPresentations!()[0].slides[0].snapshotId).toBeNull()
+    expect(facade.getMilestones!().map((m) => m.id)).toEqual([asIs])
+  })
+
+  it('refuse to read the current model while Studio has a milestone loaded over it', async () => {
+    const { facade, call, ctx } = setup()
+    await call('add_node', { tempId: 'a', type: 'system', label: 'A' })
+    await call('create_milestone', { name: 'As-is' })
+    await call('create_milestone', { name: 'Target' })
+    const [asIs, target] = facade.getMilestones!()
+    ctx.diagram = { ...facade, openMilestone: () => asIs }
+    const created = await call('create_milestone', { name: 'Next' })
+    expect(created.ok).toBe(false)
+    expect(created.resultText).toContain('milestone "As-is" is open in Studio\'s timeline')
+    expect((await call('compare_milestones', { from: asIs.id })).resultText).toContain('is open in Studio\'s timeline')
+    // Between two milestones the open one does not matter.
+    expect((await call('compare_milestones', { from: asIs.id, to: target.id })).ok).toBe(true)
+    expect(facade.getMilestones!()).toHaveLength(2)
+  })
+})
+
+describe('compareModels', () => {
+  const node = (id: string, extra: Record<string, unknown> = {}) =>
+    ({ id, type: 'adr', label: id, collapsed: false, x: 0, y: 0, width: 100, height: 50, ...extra }) as C4Node
+  it('counts any field but the layout as a change, properties and relation types included', () => {
+    const shared = node('same')
+    const before = { nodes: { a: node('a', { status: 'proposed' }), b: node('b'), same: shared }, relations: { r: { id: 'r', sourceId: 'a', targetId: 'b' } } }
+    const after = {
+      nodes: { a: node('a', { status: 'accepted', x: 300, collapsed: true }), c: node('c'), same: shared },
+      relations: { r: { id: 'r', sourceId: 'a', targetId: 'b', relationType: 'constrains' } },
+    }
+    expect(compareModels(before, after)).toEqual({
+      nodes: { added: ['c'], removed: ['b'], changed: [{ id: 'a', fields: ['status'] }] },
+      relations: { added: [], removed: [], changed: [{ id: 'r', fields: ['relationType'] }] },
+    })
+    // Moving or collapsing is not a change; a missing field equals an undefined one.
+    expect(compareModels({ nodes: { a: node('a') }, relations: {} }, { nodes: { a: node('a', { x: 9, description: undefined }) }, relations: {} }).nodes.changed).toEqual([])
   })
 })
 
