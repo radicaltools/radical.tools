@@ -15,7 +15,7 @@ test('the Diagram tab draws every node type and its relations', async ({ page, s
 
   const diagram = editor.locator('.mmd-canvas')
   const legend = editor.locator('.mmd-legend')
-  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(20)
+  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(21)
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 30_000 })
   await expect(diagram.locator('.react-flow__edge').first()).toBeVisible()
   // Smart Layout, then the physics settles it: no two type boxes overlap.
@@ -41,7 +41,7 @@ test('the Diagram tab draws every node type and its relations', async ({ page, s
   // By default every containment edge and every type's properties are shown.
   await expect(legend.getByRole('checkbox', { name: 'Show Contains' })).toBeChecked()
   await expect(legend.getByRole('checkbox', { name: 'Show properties on boxes' })).toBeChecked()
-  await expect(diagram.locator('.react-flow__edge[data-testid^="rf__edge-contains:"]')).toHaveCount(46)
+  await expect(diagram.locator('.react-flow__edge[data-testid^="rf__edge-contains:"]')).toHaveCount(48)
   await expect(diagram.getByTestId('rf__node-requirement').getByText('ears_type')).toBeVisible()
 
   // With Contains off, Blueprint and Group (no relation type reaches them)
@@ -100,7 +100,7 @@ test('selecting a type shows its rules; Edit opens it in the list', async ({ pag
   await expect(diagram.locator('.mmd-category-label')).toHaveText(['C4', 'Domain', 'Governance', 'Requirements'])
   if (process.env.E2E_SHOTS) await page.screenshot({ path: `${process.env.E2E_SHOTS}/relation.png` })
   await page.keyboard.press('Escape')
-  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(20)
+  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(21)
 
   await editor.locator('.mmd-canvas').getByTestId('rf__node-requirement').click()
   const inspector = editor.locator('.mm-editor-side')
@@ -129,7 +129,7 @@ test('the diagram stays drawn on a slow machine', async ({ page, studio }) => {
   await editor.getByRole('tab', { name: 'Diagram' }).click()
   const diagram = editor.locator('.mmd-canvas')
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 60_000 })
-  await expect(diagram.locator('.react-flow__edge')).toHaveCount(126)
+  await expect(diagram.locator('.react-flow__edge')).toHaveCount(132)
   await expect(diagram.getByTestId('rf__node-requirement')).toBeVisible()
 })
 

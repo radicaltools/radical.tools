@@ -3,7 +3,7 @@ import { NodeProps, Handle, Position } from 'reactflow'
 import { C4NodeRFData, NODE_COLORS, TYPE_ICON_PATHS } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
 import { useNodeContent } from '../../store/nodeSelectors'
-import { composeEarsSentence } from '@radical/common/metamodel'
+import { composeEarsSentence, machineEntity, requirementStatePhrase } from '@radical/common/metamodel'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { wireframeDataUri } from '@radical/common/wireframe'
 
@@ -980,7 +980,9 @@ export const RequirementNode = memo(({ data, selected }: NodeProps<C4NodeRFData>
     const by = satisfierOf(s.c4Relations, data.c4id)
     return by ? s.c4Nodes[by]?.label : undefined
   })
-  const { sentence, complete } = composeEarsSentence((node ?? {}) as unknown as Record<string, unknown>, subject)
+  // A string, so the card re-renders only when the phrase changes.
+  const statePhrase = useDiagramStore((s) => node ? requirementStatePhrase(node, s.c4Nodes, s.c4Relations) : '')
+  const { sentence, complete } = composeEarsSentence((node ?? {}) as unknown as Record<string, unknown>, subject, statePhrase)
 
   return (
     <div
@@ -1113,7 +1115,6 @@ const prop = (node: C4Node | undefined, key: string): string => {
 }
 
 export const StateMachineNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useNodeContent(data.c4id)
   const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
   const canEdit = useDiagramStore((s) => s.appMode !== 'metamodel' && !s.presentationActive)
   const onToggle = useCallback(
@@ -1126,7 +1127,8 @@ export const StateMachineNode = memo(({ data, selected }: NodeProps<C4NodeRFData
 
   const accent = NODE_COLORS['state-machine']
   const isExpanded = data.hasChildren && !data.collapsed
-  const subject = prop(node, 'subject')
+  // The entity it is the lifecycle of names the header.
+  const subject = useDiagramStore((s) => machineEntity(data.c4id, s.c4Nodes, s.c4Relations)?.label ?? '')
 
   return (
     <div
@@ -1332,3 +1334,48 @@ export const EventNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
 }, sameCard)
 
 EventNode.displayName = 'EventNode'
+
+// ─── Entity Node (DDD) ───────────────────────────────────────────────────────
+//
+// A domain object card: kind (aggregate root or entity) over the name.
+
+export const EntityNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useNodeContent(data.c4id)
+  const kind = prop(node, 'kind') || 'aggregate-root'
+  const color = NODE_COLORS.entity
+
+  return (
+    <div
+      className="c4-node"
+      style={{
+        position: 'relative',
+        width: data.width,
+        height: data.height,
+        background: color,
+        border: `2px ${kind === 'aggregate-root' ? 'solid' : 'dashed'} ${selected ? 'var(--accent)' : 'rgba(0,0,0,0.25)'}`,
+        borderRadius: 6,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
+        <svg viewBox="0 0 16 16" width="10" height="10" fill="rgba(255,255,255,0.8)" style={{ flexShrink: 0 }}>
+          <path d={TYPE_ICON_PATHS.entity} />
+        </svg>
+        <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)' }}>
+          {kind === 'aggregate-root' ? 'Aggregate root' : 'Entity'}
+        </span>
+      </div>
+      <div style={{ padding: '4px 7px', overflow: 'hidden' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+          {data.label}
+        </span>
+      </div>
+    </div>
+  )
+}, sameCard)
+
+EntityNode.displayName = 'EntityNode'

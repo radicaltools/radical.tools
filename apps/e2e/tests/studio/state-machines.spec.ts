@@ -8,6 +8,11 @@ test.beforeEach(async ({ studio }) => {
   await studio.open('v-order')
 })
 
+test('a machine is named after the entity it is the lifecycle of', async ({ studio }) => {
+  await expect(studio.node('order')).toContainText('State machine · Order')
+  await expect(studio.node('order-entity')).toContainText('Aggregate root')
+})
+
 test('a transition shows its events by name and picks them by reference', async ({ page, studio }) => {
   const label = page.locator('.relation-label', { hasText: '[ok]' })
   await expect(label).toHaveText('PaymentReceived [ok] / reserve ^OrderPaid')

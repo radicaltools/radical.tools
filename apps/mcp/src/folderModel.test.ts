@@ -363,7 +363,9 @@ describe('state machines over MCP', () => {
       expect(summary).toContain('A `state-machine` models the lifecycle of one entity')
       expect(summary).toContain('"refType":"event"')
 
+      await call('add_node', { tempId: 'order', type: 'entity', label: 'Order', properties: { kind: 'aggregate-root' } })
       await call('add_node', { tempId: 'm', type: 'state-machine', label: 'Order lifecycle' })
+      expect(await call('add_relation', { sourceId: 'm', targetId: 'order', relationType: 'lifecycle-of' })).not.toContain('New warnings')
       for (const [tempId, label] of [['pay', 'PaymentReceived'], ['ship', 'Shipped'], ['paid', 'OrderPaid']]) {
         await call('add_node', { tempId, type: 'event', label, parentId: 'm' })
       }
@@ -398,6 +400,15 @@ describe('state machines over MCP', () => {
       const toDone = saved.relations.find((r) => r.targetId === id('Shipped', 'state'))!
       await call('update_relation', { id: toDone.id, properties: { event: 'ship' } })
       expect(await call('search_model', { query: `LIST RELATIONS WHERE raises = "${id('OrderPaid', 'event')}"` })).toContain('amount ok')
+
+      // A component implements the machine; a requirement holds while in a state.
+      await call('add_node', { tempId: 'sys', type: 'system', label: 'Shop' })
+      await call('add_node', { tempId: 'ctr', type: 'container', label: 'Orders', parentId: 'sys' })
+      await call('add_relation', { sourceId: 'ctr', targetId: 'm', relationType: 'implements' })
+      await call('add_relation', { sourceId: 'ctr', targetId: 'order', relationType: 'realises' })
+      await call('add_node', { tempId: 'hold', type: 'requirement', label: 'Hold stock', properties: { ears_type: 'state-driven', action: 'hold the stock', precondition_state: 'pending' } })
+      const req = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data.nodes.find((n) => n.label === 'Hold stock') as unknown as Record<string, unknown>
+      expect(req.precondition_state).toBe(id('Pending', 'state'))
 
       expect(await call('get_issues', {})).toBe('No issues: the model follows its metamodel.')
 

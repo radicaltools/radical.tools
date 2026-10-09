@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   composeEarsSentence,
+  requirementStatePhrase,
   resolveEarsSubject,
   isWizardStepApplicable,
   sameWizardLink,
@@ -17,7 +18,7 @@ import {
   type WizardRelationsStep,
   type WizardStep,
 } from '@radical/common/metamodel'
-import { NODE_COLORS, NODE_FG, TYPE_ICON_PATHS, TYPE_LABELS, type C4Node } from '@radical/common/c4'
+import { NODE_COLORS, NODE_FG, TYPE_ICON_PATHS, TYPE_LABELS, type C4Node, type C4Relation } from '@radical/common/c4'
 import { useDiagramStore, type NodeWizardSession } from '../store/diagramStore'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { RefPicker } from './RefPicker'
@@ -450,7 +451,8 @@ function CustomStep({ step, values, setValues, sessionKey, nodes, relations, lin
   // edit mode, or from a link already picked in this wizard.
   const satisfier = links.find((l) => l.relationType === 'satisfies' && l.direction === 'in')
   const subject = satisfier ? nodes[satisfier.otherId]?.label : resolveEarsSubject(sessionKey, relations, nodes)
-  const { sentence, complete } = composeEarsSentence(values, subject)
+  const statePhrase = requirementStatePhrase({ ...(values as object), id: sessionKey } as unknown as C4Node, nodes, relations as Record<string, C4Relation>)
+  const { sentence, complete } = composeEarsSentence(values, subject, statePhrase)
   return (
     <div className="nw-ears">
       <EarsQuickEntry nodeId={sessionKey} updateNode={(_id, patch) => setValues((v) => ({ ...v, ...patch }))} />
