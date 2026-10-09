@@ -114,13 +114,15 @@ export function checkAddNode(state: ModelState, node: Omit<C4Node, 'id'>): strin
   return null
 }
 
-/** Adds the node, and lists it in the active view when there is one. */
+/** Adds the node, and lists it in the active view when there is one. A view
+ *  with no nodeIds shows every node, so it already shows the new one —
+ *  listing it there would hide all the others. */
 export function insertNode(state: ModelState, id: string, node: Omit<C4Node, 'id'>): void {
   const created = { id, ...node } as NodeRecord
   materializeDefaults(created, state.metamodel)
   state.c4Nodes[id] = created
   const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-  if (view) view.nodeIds.push(id)
+  if (view && view.nodeIds.length > 0) view.nodeIds.push(id)
 }
 
 export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<Omit<C4Node, 'id'>>): string | null {

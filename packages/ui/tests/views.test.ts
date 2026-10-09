@@ -53,6 +53,30 @@ describe('addView / addNodeToView / removeNodeFromView', () => {
     expect(Object.keys(useDiagramStore.getState().views).length).toBe(before + 1)
   })
 
+  it('a node created while a "show all" view is active keeps every node visible', () => {
+    const vid = useDiagramStore.getState().addView('X')
+    useDiagramStore.getState().setActiveView(vid)
+    const parentId = Object.values(useDiagramStore.getState().c4Nodes).find((n) => n.type === 'container')!.id
+    const childId = useDiagramStore.getState().addNode({
+      type: 'component', label: 'New', description: '', technology: '',
+      collapsed: false, external: false, parentId, x: 0, y: 0, width: 160, height: 80,
+    } as any)
+    expect(childId).toBeTruthy()
+    expect(useDiagramStore.getState().views[vid].nodeIds).toEqual([])
+  })
+
+  it('a node created while a curated view is active is listed in it', () => {
+    const vid = useDiagramStore.getState().addView('X')
+    const parentId = Object.values(useDiagramStore.getState().c4Nodes).find((n) => n.type === 'container')!.id
+    useDiagramStore.setState((s) => { s.views[vid].nodeIds = [parentId] })
+    useDiagramStore.getState().setActiveView(vid)
+    const childId = useDiagramStore.getState().addNode({
+      type: 'component', label: 'New', description: '', technology: '',
+      collapsed: false, external: false, parentId, x: 0, y: 0, width: 160, height: 80,
+    } as any)
+    expect(useDiagramStore.getState().views[vid].nodeIds).toEqual([parentId, childId])
+  })
+
   it('addNodeToView appends a node id; removeNodeFromView removes it', () => {
     const vid = useDiagramStore.getState().addView('X')
     const nid = Object.keys(useDiagramStore.getState().c4Nodes)[0]
