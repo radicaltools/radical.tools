@@ -18,6 +18,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { hubCataloguePlugin } from '@radical/hub-catalogue/vite'
+import { RENDERER_MINIFY } from './rendererMinify'
 
 const root = resolve(__dirname, 'src/renderer')
 
@@ -28,6 +29,7 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, 'out/renderer'),
     emptyOutDir: true,
+    ...RENDERER_MINIFY,
   },
   resolve: {
     alias: {
