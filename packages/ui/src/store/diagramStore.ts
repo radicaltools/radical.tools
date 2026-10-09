@@ -4529,6 +4529,16 @@ export const useDiagramStore = create<DiagramStore>()(
           state.canRedo = false
           state.snapshots = snapshots as any
           state.activeSnapshotId = null
+          // A milestone viewed before the load belongs to the model it left:
+          // drop its parked live model and diff, or they would show (ghosts)
+          // or come back (discard) in the loaded one.
+          state.liveBackup = null
+          state.milestoneDirty = false
+          state.milestonePromptOpen = false
+          state.diffHighlight = {} as any
+          state.diffBaseSnapshotId = null
+          state.diffGhostNodes = {} as any
+          state.diffGhostRelations = {} as any
           state.presentations = presInit.presentations as any
           state.activePresentationId = presInit.activeId
           state.presentationSlides = presInit.presentations[0].slides as any
