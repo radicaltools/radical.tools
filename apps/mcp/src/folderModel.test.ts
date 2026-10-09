@@ -259,6 +259,18 @@ describe('starting a model', () => {
     expect(await readdir(dir)).toEqual(['README.md'])
   })
 
+  it('starts over when the folder is emptied or deleted while the server runs', async () => {
+    const dir = await tempDir()
+    const model = await FolderModel.open(dir, { metamodel: 'c4' })
+    expect((await model.call('add_node', { tempId: 'a', type: 'system', label: 'A' })).ok).toBe(true)
+    for (const name of await readdir(dir)) await rm(join(dir, name), { recursive: true })
+    await mkdir(join(dir, '.radical'))
+    expect(await summaryOf(model)).toMatchObject({ metamodel: { id: 'c4-builtin' }, nodes: 0 })
+    await rm(dir, { recursive: true })
+    expect((await model.call('add_node', { tempId: 'b', type: 'system', label: 'B' })).ok).toBe(true)
+    expect(await readFile(join(dir, 'radical.md'), 'utf8')).toMatch(/radicalFormat: "md-folder"/)
+  })
+
   it('keeps an existing model and its metamodel', async () => {
     const folder = await fixture()
     const model = await FolderModel.open(folder, { metamodel: 'c4' })
