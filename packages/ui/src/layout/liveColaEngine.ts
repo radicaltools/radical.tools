@@ -663,9 +663,11 @@ export class LiveColaEngine {
    * After a calm drop: pushes the elements the moved ones now cover (drawn
    * boxes closer than CALM_GAP) out of the way, whole and in one step, and
    * whatever those cover in turn; a group that grew pushes its own
-   * neighbours the same way. Nothing else moves. Pinned elements, and
-   * elements a line holds on both axes, stay; an aligned one moves only
-   * along its line.
+   * neighbours the same way. Nothing else moves. A pinned element is pushed
+   * too and stays pinned where it lands: the pin keeps the physics off it,
+   * not the user's drop. An aligned one moves only along its line; one a
+   * line holds on both axes stays, and the element that covers it moves off
+   * it instead.
    */
   private clearOverlaps(seeds: string[]): void {
     this.refreshBounds()
@@ -699,11 +701,22 @@ export class LiveColaEngine {
           const ox = Math.min(A.X, B.X) - Math.max(A.x, B.x) + CALM_GAP
           const oy = Math.min(A.Y, B.Y) - Math.max(A.y, B.y) + CALM_GAP
           if (ox <= 0 || oy <= 0) continue
-          const axis = this.pushAxis(b, ox <= oy ? 'x' : 'y')
-          if (!axis) continue
-          const away = axis === 'x' ? (B.x + B.X) - (A.x + A.X) : (B.y + B.Y) - (A.y + A.Y)
-          this.translate(b, axis, (away >= 0 ? 1 : -1) * (axis === 'x' ? ox : oy))
-          queue.push(b)
+          const preferred = ox <= oy ? 'x' : 'y'
+          const axis = this.pushAxis(b, preferred)
+          if (axis) {
+            const away = axis === 'x' ? (B.x + B.X) - (A.x + A.X) : (B.y + B.Y) - (A.y + A.Y)
+            this.translate(b, axis, (away >= 0 ? 1 : -1) * (axis === 'x' ? ox : oy))
+            queue.push(b)
+          } else {
+            // Lines hold b on both axes: a moves off it, then looks again.
+            const back = this.pushAxis(a, preferred)
+            if (!back) continue
+            const away = back === 'x' ? (A.x + A.X) - (B.x + B.X) : (A.y + A.Y) - (B.y + B.Y)
+            this.translate(a, back, (away >= 0 ? 1 : -1) * (back === 'x' ? ox : oy))
+            queue.push(a)
+            budget--
+            break
+          }
           if (--budget <= 0) break
         }
       }
@@ -718,8 +731,6 @@ export class LiveColaEngine {
 
   /** The axis `id` may be pushed along, `preferred` if it can, or none. */
   private pushAxis(id: string, preferred: 'x' | 'y'): 'x' | 'y' | null {
-    const cn = this.idToNode.get(id)
-    if (cn && (cn.fixed ?? 0) & PINNED) return null
     // A line through it, or through an element inside it to one outside,
     // holds it on the line's axis.
     const inside = (x: string): boolean => x === id || this.isInside(x, id)
