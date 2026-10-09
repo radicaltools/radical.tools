@@ -129,7 +129,7 @@ test('the diagram stays drawn on a slow machine', async ({ page, studio }) => {
   await editor.getByRole('tab', { name: 'Diagram' }).click()
   const diagram = editor.locator('.mmd-canvas')
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 60_000 })
-  await expect(diagram.locator('.react-flow__edge')).toHaveCount(125)
+  await expect(diagram.locator('.react-flow__edge')).toHaveCount(126)
   await expect(diagram.getByTestId('rf__node-requirement')).toBeVisible()
 })
 

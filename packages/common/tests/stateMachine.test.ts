@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation } from '../src/c4'
 import { isContainerType } from '../src/c4'
-import { builtInC4Metamodel, builtInGovernanceMetamodel, relationDisplayLabel, validateModel } from '../src/metamodel'
+import { builtInC4Metamodel, builtInGovernanceMetamodel, raisedEvents, relationDisplayLabel, validateModel } from '../src/metamodel'
 
 const mm = builtInGovernanceMetamodel()
 const pairsOf = (rel: string) => mm.relationTypes[rel].allowedPairs.map((p) => `${p.from}->${p.to}`)
@@ -58,6 +58,9 @@ describe('state machine types (governance preset)', () => {
     expect(mm.relationTypes.transition.properties?.map((p) => p.key)).toEqual(['event', 'guard', 'actions', 'kind'])
     expect(pairsOf('lifecycle-of')).toContain('state-machine->component')
     expect(pairsOf('emits')).toContain('component->event')
+    // A state raises an event on entry, on exit or from its do activity.
+    expect(pairsOf('emits')).toContain('state->event')
+    expect(mm.relationTypes.emits.properties?.find((p) => p.key === 'on')?.options).toEqual(['entry', 'exit', 'do'])
     expect(pairsOf('satisfies')).toContain('state-machine->requirement')
     expect(pairsOf('verifies')).toContain('scenario->state-machine')
     expect(pairsOf('illustrates')).toContain('mockup->state')
@@ -72,6 +75,13 @@ describe('state machine types (governance preset)', () => {
     expect(relationDisplayLabel(relations[1])).toBe('PaymentReceived [amount covers total] / reserve stock')
     expect(relationDisplayLabel(relations[0])).toBeUndefined()
     expect(relationDisplayLabel({ ...relations[1], label: 'pay' })).toBe('pay')
+  })
+})
+
+describe('raisedEvents', () => {
+  it('reads the events an action raises, sends or emits, but not plain prose', () => {
+    expect(raisedEvents('raise OrderPaid; send "Order shipped", emit \'Stock low\'')).toEqual(['OrderPaid', 'Order shipped', 'Stock low'])
+    expect(raisedEvents('send a confirmation email, raise invoice')).toEqual([])
   })
 })
 
@@ -114,6 +124,16 @@ describe('state machine rules', () => {
     ]
     expect(kinds(issuesOf([...m.nodes, other, otherInit, elsewhere], relations))).toEqual([
       'sm-cross-machine', 'sm-nondeterministic', 'sm-unknown-event',
+    ])
+  })
+
+  it('flags events raised in actions that no event node declares', () => {
+    const m = orderMachine()
+    const nodes = m.nodes.map((n) => n.id === m.pending.id ? { ...n, entry: 'start timer, emit "Payment requested"' } as C4Node : n)
+    const relations = m.relations.map((r) => r.targetId === m.shipped.id ? { ...r, actions: 'raise Shipped, send OrderClosed' } as C4Relation : r)
+    const issues = issuesOf(nodes, relations)
+    expect(issues.map((i) => i.id.split(':').slice(0, 1).concat(i.id.split(':').slice(2)).join(':')).sort()).toEqual([
+      'sm-unknown-raised:OrderClosed', 'sm-unknown-raised:Payment requested',
     ])
   })
 

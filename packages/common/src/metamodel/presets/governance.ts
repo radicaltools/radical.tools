@@ -616,12 +616,23 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
-  // element → event it publishes
+  // element → event it publishes. A state raises it from its entry, exit or
+  // do activity (SCXML <raise>/<send> in onentry/onexit); a machine when it
+  // is not yet known which state does. A transition cannot be a source (a
+  // relation cannot start at a relation): its `actions` say `raise <Event>`.
   const emits: RelationTypeDef = {
     id: 'emits',
     label: 'Emits',
-    allowedPairs: (['person', 'system', 'container', 'component', 'webapp', 'queue', 'state-machine'] as const).map(from => ({ from, to: 'event' })),
-    properties: [],
+    allowedPairs: (['person', 'system', 'container', 'component', 'webapp', 'queue', 'state-machine', 'state'] as const).map(from => ({ from, to: 'event' })),
+    properties: [
+      {
+        key: 'on',
+        label: 'On (for a state: entry, exit or do)',
+        type: 'enum',
+        options: ['entry', 'exit', 'do'],
+        default: 'entry',
+      },
+    ],
     color: '#ea580c',
     builtin: true,
   }

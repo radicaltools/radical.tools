@@ -8,6 +8,8 @@
 // entering a compound state enters its initial child, entering a parallel
 // state enters every child (region), and being in a state means being in all
 // its ancestors. Issues are warnings, like the rest of the soft validation.
+// Actions raise events by name as well (`raise OrderPaid`, `send "Order
+// paid"`), and those names are checked like a transition's trigger.
 
 import type { C4Node, C4Relation } from '../c4'
 import type { Issue } from './validate'
@@ -38,6 +40,17 @@ export function relationDisplayLabel(r: C4Relation): string | undefined {
   if (r.label) return r.label
   if (r.relationType === 'transition') return transitionLabel(r) || undefined
   return undefined
+}
+
+/** Event names an action text raises: `raise X`, `send X` or `emit X`, where
+ *  X is quoted or starts with a capital letter, as event names do. Plain
+ *  prose ("send a confirmation email") names no event. */
+export function raisedEvents(actions: string): string[] {
+  const names: string[] = []
+  for (const m of actions.matchAll(/\b(?:raise|send|emit)\s+(?:"([^"]+)"|'([^']+)'|([A-Z][\w.-]*))/g)) {
+    names.push((m[1] ?? m[2] ?? m[3]).trim())
+  }
+  return names
 }
 
 export function validateStateMachines(
@@ -138,6 +151,23 @@ export function validateStateMachines(
     const event = prop(t, 'event')
     if (event && !eventNames.has(event)) {
       warn(`sm-unknown-event:${t.id}`, `Transition "${src.label}" → "${dst.label}" is triggered by "${event}", which no event node declares.`, { relationId: t.id })
+    }
+  }
+
+  // Events raised by actions, on transitions and in states.
+  for (const t of transitions) {
+    for (const name of raisedEvents(prop(t, 'actions'))) {
+      if (eventNames.has(name)) continue
+      warn(`sm-unknown-raised:${t.id}:${name}`, `Transition "${nodes[t.sourceId].label}" → "${nodes[t.targetId].label}" raises "${name}", which no event node declares.`, { relationId: t.id })
+    }
+  }
+  for (const n of nodeList) {
+    if (!isState(n)) continue
+    for (const key of ['entry', 'exit', 'do']) {
+      for (const name of raisedEvents(prop(n, key))) {
+        if (eventNames.has(name)) continue
+        warn(`sm-unknown-raised:${n.id}:${name}`, `State "${n.label}" raises "${name}" in its ${key} actions, which no event node declares.`, { nodeId: n.id })
+      }
     }
   }
 
