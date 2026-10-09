@@ -71,7 +71,7 @@ describe('buildMetamodelGraph', () => {
     const mm = builtInGovernanceMetamodel()
     mm.nodeTypes.custom1 = { ...mm.nodeTypes.system, id: 'custom1', label: 'Custom 1', builtin: false }
     const g = buildMetamodelGraph(mm)
-    expect(g.categories.map((c) => c.label)).toEqual(['C4', 'Domain', 'Governance', 'Requirements', 'UX', 'Other', 'Custom'])
+    expect(g.categories.map((c) => c.label)).toEqual(['C4', 'Domain', 'Governance', 'Requirements', 'Behaviour', 'UX', 'Other', 'Custom'])
     expect(g.categories.find((c) => c.label === 'Requirements')!.members).toEqual(['need', 'requirement', 'scenario'])
     expect(g.nodes.find((n) => n.id === 'adr')!.category).toBe('category:governance')
   })
@@ -94,25 +94,25 @@ describe('buildMetamodelGraph', () => {
       showProperties: false,
       hiddenRelations: new Set(Object.keys(mm.relationTypes).filter((r) => r !== id)),
     })
-    // Satisfies: the eight C4 element types → Requirement. No containment rescue.
+    // Satisfies: the eight C4 element types and State Machine → Requirement. No containment rescue.
     const satisfies = buildMetamodelGraph(mm, only('satisfies'))
     expect(satisfies.nodes.map((n) => n.id).sort()).toEqual(
-      ['component', 'container', 'database', 'domain', 'person', 'queue', 'requirement', 'system', 'webapp'],
+      ['component', 'container', 'database', 'domain', 'person', 'queue', 'requirement', 'state-machine', 'system', 'webapp'],
     )
     expect(satisfies.edges.every((e) => e.type === 'satisfies')).toBe(true)
-    expect(satisfies.categories.map((c) => c.label)).toEqual(['C4', 'Domain', 'Requirements'])
+    expect(satisfies.categories.map((c) => c.label)).toEqual(['C4', 'Domain', 'Requirements', 'Behaviour'])
     // A relation drawn only as a chip (ADR supersedes ADR) still keeps its type.
     expect(buildMetamodelGraph(mm, only('supersedes')).nodes.map((n) => n.id)).toEqual(['adr'])
     // Nothing shown at all: every type stays, without edges.
     const none = buildMetamodelGraph(mm, { showContainment: false, showProperties: false, hiddenRelations: new Set(Object.keys(mm.relationTypes)) })
     expect(none.edges).toEqual([])
-    expect(none.nodes).toHaveLength(16)
+    expect(none.nodes).toHaveLength(20)
   })
 
   it('draws containment to every allowed child, Group included', () => {
     const g = buildMetamodelGraph(builtInGovernanceMetamodel())
     const fromGroup = g.edges.filter((e) => e.type === CONTAINS_EDGE && e.source === 'group')
-    expect(fromGroup).toHaveLength(15)
+    expect(fromGroup).toHaveLength(17)
   })
 
   it('grows a box for self-relation chips', () => {

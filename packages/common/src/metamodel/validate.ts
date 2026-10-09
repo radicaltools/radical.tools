@@ -2,6 +2,7 @@
 
 import { C4Node, C4Relation } from '../c4'
 import { Metamodel } from './types'
+import { validateStateMachines } from './statechart'
 
 export type IssueSeverity = 'error' | 'warning'
 
@@ -125,6 +126,11 @@ export function validateModel(
         })
       }
     }
+  }
+
+  // Statechart rules, for metamodels that carry the built-in behaviour types.
+  if (metamodel.nodeTypes.state && metamodel.relationTypes.transition) {
+    issues.push(...validateStateMachines(nodes, relations))
   }
 
   return issues

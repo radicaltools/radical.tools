@@ -14,7 +14,7 @@ import ReactFlow, {
 } from 'reactflow'
 import { zoomIdentity } from 'd3-zoom'
 import { useDiagramStore } from '../store/diagramStore'
-import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode } from './nodes/C4Nodes'
+import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
 import { edgeLabelDetail } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
@@ -40,6 +40,10 @@ const nodeTypes: NodeTypes = {
   scenario: ScenarioNode as any,
   blueprint: BlueprintNode as any,
   mockup: MockupNode as any,
+  'state-machine': StateMachineNode as any,
+  state: StateNode as any,
+  pseudostate: PseudostateNode as any,
+  event: EventNode as any,
 }
 
 const edgeTypes: EdgeTypes = {

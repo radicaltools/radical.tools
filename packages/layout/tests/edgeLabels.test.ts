@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { estimateLabelSize, labelOverlaps, placeEdgeLabels, type LabelEdge } from '../src/edgeLabels'
+import { estimateLabelSize, labelOverlaps, placeEdgeLabels, relationLabelLines, type LabelEdge } from '../src/edgeLabels'
 import { computeRoutedEdge, type RoutingObstacle } from '../src/edgeRouting'
 import { Position } from '../src/side'
 
@@ -18,6 +18,15 @@ describe('estimateLabelSize', () => {
     expect(long.w).toBeLessThanOrEqual(200)
     expect(long.h).toBeGreaterThan(2 * short.h)
     expect(withTech.h).toBeCloseTo(short.h + 14 * 1.4)
+  })
+})
+
+describe('relationLabelLines', () => {
+  it('gives a transition without a label room for `event [guard] / actions`', () => {
+    const lines = relationLabelLines({ relationType: 'transition', event: 'Pay', guard: 'ok', actions: 'reserve' })
+    expect(lines.map((l) => l.text)).toEqual(['Pay [ok] / reserve'])
+    expect(relationLabelLines({ relationType: 'transition', label: 'pay' }).map((l) => l.text)).toEqual(['pay'])
+    expect(relationLabelLines({ relationType: 'transition' })).toEqual([])
   })
 })
 

@@ -13,6 +13,8 @@
  * metrics and tests call it on plain rects and polylines.
  */
 import type { Pt, RoutingObstacle } from './edgeRouting'
+import { transitionLabel } from '@radical/common/metamodel'
+import type { C4Relation } from '@radical/common/c4'
 
 // ── Label size ────────────────────────────────────────────────────────
 
@@ -85,12 +87,19 @@ export interface RelationLabelText {
   label?: string
   relationType?: string
   technology?: string
+  /** A transition's trigger, guard and effect, shown when it has no label. */
+  event?: string
+  guard?: string
+  actions?: string
 }
 
 /** The lines of a relation's label; none when it has no label. */
 export function relationLabelLines(r: RelationLabelText): LabelTextLine[] {
   const lines: LabelTextLine[] = []
-  const name = r.label || r.relationType
+  // A transition without a label shows `event [guard] / actions`, and
+  // nothing at all when it is a completion transition.
+  const name = r.label
+    || (r.relationType === 'transition' ? transitionLabel(r as C4Relation) : r.relationType)
   if (name) lines.push({ text: name, fontSize: RELATION_LABEL_BOX.fontSize })
   if (r.technology) lines.push({ text: `[${r.technology}]`, fontSize: RELATION_LABEL_BOX.techFontSize })
   return lines

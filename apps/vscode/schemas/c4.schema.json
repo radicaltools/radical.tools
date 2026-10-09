@@ -91,8 +91,8 @@
   "definitions": {
     "C4ElementType": {
       "type": "string",
-      "enum": ["person", "system", "container", "component", "database", "webapp", "queue", "domain", "group", "adr", "fitness-fn", "need", "requirement", "scenario", "blueprint", "mockup"],
-      "description": "The element type: C4 core types, DDD domain, organisational group, or governance types (ADR, fitness function, need, EARS requirement, scenario, blueprint, mockup)."
+      "enum": ["person", "system", "container", "component", "database", "webapp", "queue", "domain", "group", "adr", "fitness-fn", "need", "requirement", "scenario", "blueprint", "mockup", "state-machine", "state", "pseudostate", "event"],
+      "description": "The element type: C4 core types, DDD domain, organisational group, or governance types (ADR, fitness function, need, EARS requirement, scenario, blueprint, mockup), or state machine types (state machine, state, pseudostate, event)."
     },
     "C4Node": {
       "type": "object",
