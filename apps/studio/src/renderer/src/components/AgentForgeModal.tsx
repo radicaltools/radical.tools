@@ -7,8 +7,9 @@ import { STEP_LABELS } from './RadicalForgeModal'
 
 // ─── An agent's Forge run, read only ─────────────────────────────────────────
 // What an agent running Radical Forge over MCP on this folder is doing: the
-// wizard's step bar with each stage's state, and one line on where the run
-// stands. Nothing here acts on the run; the agent's chat is where to answer.
+// wizard's step bar, its seven stages only (the badge on the Forge button
+// counts the same seven), with each stage's state, and one line on where the
+// run stands. Nothing here acts on the run; the agent's chat is where to answer.
 
 interface Props {
   open: boolean
@@ -53,8 +54,8 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
     : phase === 'paused' ? (status.state === 'closed' ? `Stopped: ${client} closed before the run finished.` : 'Paused: nothing has changed for 30 minutes.')
     : current?.status === 'generating' ? `${client} is generating the ${stageTitle(current.id)} stage…`
     : current?.status === 'clarifying' ? `${client} is asking you about the ${stageTitle(current.id)} stage; answer there.`
-    : current && status.stages.some((s) => s.status === 'done') ? `Waiting for you in ${client}: how to arrange the last stage, and whether to go on to ${stageTitle(current.id)}.`
-    : current ? `${client} has started the run; next is the ${stageTitle(current.id)} stage.`
+    : current?.status === 'done' ? `Waiting for you in ${client}: how to arrange the ${stageTitle(current.id)} stage, and whether to go on.`
+    : current ? `${client} has started the run; the ${stageTitle(current.id)} stage is next.`
     : `Waiting for you in ${client}.`
 
   return createPortal(
@@ -74,7 +75,6 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
       {status.need && <p className="milestone-modal-text" style={{ marginBottom: 10 }}>{status.need.label}</p>}
 
       <div className="forge-steps" role="list">
-        <span className="forge-step done" role="listitem" title="Description: kept as a need"><span className="forge-step-check" aria-hidden>✓</span>{STEP_LABELS.input}</span>
         {status.stages.map((stage) => {
           const active = stage === current && phase !== 'done' && phase !== 'paused'
           return (
@@ -90,10 +90,6 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
             </span>
           )
         })}
-        <span className={`forge-step${status.state === 'finished' ? ' done' : ''}`} role="listitem" title="Finish">
-          {status.state === 'finished' && <span className="forge-step-check" aria-hidden>✓</span>}
-          {STEP_LABELS.export}
-        </span>
       </div>
       <p className="milestone-modal-text forge-agent-line" data-phase={phase}>{line}</p>
     </div>,

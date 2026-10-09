@@ -36,11 +36,12 @@ describe('agent Forge run status file', () => {
     expect(forgeRunPhase(run('active', { domain: 'generating' }), at.getTime() + FORGE_RUN_STALE_MS + 1)).toBe('paused')
   })
 
-  it('is at the stage in progress, else the next one', () => {
+  it('is at the stage in progress, else the last one done until the next begins', () => {
     expect(forgeRunCurrentStage(run('active', { requirements: 'done', domain: 'clarifying' }))?.id).toBe('domain')
-    expect(forgeRunCurrentStage(run('active', { requirements: 'done' }))?.id).toBe('domain')
-    expect(forgeRunCurrentStage(run('active', Object.fromEntries(FORGE_STAGES.map((s) => [s.id, 'done'])))))
-      .toBeUndefined()
+    // Done, and the agent asks the user how to arrange it and whether to go on.
+    expect(forgeRunCurrentStage(run('active', { requirements: 'done' }))?.id).toBe('requirements')
+    expect(forgeRunCurrentStage(run('active'))?.id).toBe('requirements')
+    expect(forgeRunCurrentStage(run('finished', Object.fromEntries(FORGE_STAGES.map((s) => [s.id, 'done']))))?.id).toBe('c4')
   })
 
   it('names the client for people', () => {
