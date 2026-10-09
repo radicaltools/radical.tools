@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation } from '../src/c4'
 import { isContainerType } from '../src/c4'
-import { builtInC4Metamodel, builtInGovernanceMetamodel, relationDisplayLabel, validateModel } from '../src/metamodel'
+import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, composeEarsSentence, relationDisplayLabel, requirementStatePhrase, validateModel } from '../src/metamodel'
 
 const mm = builtInGovernanceMetamodel()
 const pairsOf = (rel: string) => mm.relationTypes[rel].allowedPairs.map((p) => `${p.from}->${p.to}`)
@@ -20,6 +20,7 @@ const kinds = (issues: { id: string }[]) => issues.map((i) => i.id.split(':')[0]
 
 /** Order: Pending → (pay) → Paid ⟨Packing ‖ Invoicing⟩ → (ship) → Shipped (final). */
 function orderMachine() {
+  const order = node('entity', 'Order', undefined, { kind: 'aggregate-root' })
   const machine = node('state-machine', 'Order lifecycle')
   const init = node('pseudostate', 'Start', machine.id, { kind: 'initial' })
   const pending = node('state', 'Pending', machine.id)
@@ -32,14 +33,15 @@ function orderMachine() {
   const pay = node('event', 'PaymentReceived', machine.id)
   const ship = node('event', 'Shipped', machine.id)
   const orderPaid = node('event', 'OrderPaid', machine.id)
-  const nodes = [machine, init, pending, paid, packing, packInit, picking, invoicing, shipped, pay, ship, orderPaid]
+  const nodes = [order, machine, init, pending, paid, packing, packInit, picking, invoicing, shipped, pay, ship, orderPaid]
   const relations = [
+    { id: `l-${++seq}`, sourceId: machine.id, targetId: order.id, relationType: 'lifecycle-of' } as C4Relation,
     transition(init, pending),
     transition(pending, paid, { event: pay.id, guard: 'amount covers total', actions: 'reserve stock', raises: [orderPaid.id] }),
     transition(packInit, picking),
     transition(paid, shipped, { event: ship.id }),
   ]
-  return { nodes, relations, machine, init, pending, paid, packing, picking, invoicing, shipped, pay, ship, orderPaid }
+  return { nodes, relations, order, machine, init, pending, paid, packing, picking, invoicing, shipped, pay, ship, orderPaid }
 }
 
 describe('state machine types (governance preset)', () => {
@@ -56,7 +58,12 @@ describe('state machine types (governance preset)', () => {
     expect(pairsOf('transition').sort()).toEqual([
       'pseudostate->pseudostate', 'pseudostate->state', 'state->pseudostate', 'state->state',
     ])
-    expect(pairsOf('lifecycle-of')).toContain('state-machine->component')
+    // A machine is the lifecycle of a domain entity; C4 elements implement it
+    // and own the entity's data.
+    expect(pairsOf('lifecycle-of')).toEqual(['state-machine->entity'])
+    expect(pairsOf('implements')).toEqual(expect.arrayContaining(['fitness-fn->adr', 'component->state-machine', 'container->state-machine', 'system->state-machine', 'webapp->state-machine']))
+    expect(pairsOf('realises')).toEqual(expect.arrayContaining(['component->entity', 'container->domain']))
+    expect(mm.nodeTypes['state-machine'].properties?.some((p) => p.key === 'subject')).toBe(false)
     expect(pairsOf('emits')).toContain('component->event')
     // A state raises an event on entry, on exit or from its do activity.
     expect(pairsOf('emits')).toContain('state->event')
@@ -74,18 +81,21 @@ describe('state machine types (governance preset)', () => {
     expect(props.raises).toMatchObject({ type: 'ref', refType: 'event', multiple: true })
   })
 
-  it('stays out of the C4 preset', () => {
+  it('stays out of the C4 preset; the entity belongs to DDD', () => {
     expect(builtInC4Metamodel().nodeTypes.state).toBeUndefined()
+    expect(builtInDddC4Metamodel().nodeTypes.entity).toMatchObject({ allowedParents: ['domain', 'group'], allowedAtRoot: true })
+    expect(builtInDddC4Metamodel().nodeTypes.entity.properties?.find((p) => p.key === 'kind')?.options).toEqual(['aggregate-root', 'entity'])
+    expect(mm.nodeTypes.requirement.properties?.find((p) => p.key === 'precondition_state')).toMatchObject({ type: 'ref', refType: 'state' })
   })
 
   it('labels a transition `event [guard] / actions ^raised` by the events\' names', () => {
     const { nodes, relations, pay } = orderMachine()
     const all = byId(nodes)
-    expect(relationDisplayLabel(relations[1], all)).toBe('PaymentReceived [amount covers total] / reserve stock ^OrderPaid')
-    expect(relationDisplayLabel(relations[0], all)).toBeUndefined()
-    expect(relationDisplayLabel({ ...relations[1], label: 'pay' }, all)).toBe('pay')
+    expect(relationDisplayLabel(relations[2], all)).toBe('PaymentReceived [amount covers total] / reserve stock ^OrderPaid')
+    expect(relationDisplayLabel(relations[1], all)).toBeUndefined()
+    expect(relationDisplayLabel({ ...relations[2], label: 'pay' }, all)).toBe('pay')
     // Renaming the event renames the label: the transition holds its id.
-    expect(relationDisplayLabel(relations[1], { ...all, [pay.id]: { ...pay, label: 'Paid' } })).toMatch(/^Paid \[/)
+    expect(relationDisplayLabel(relations[2], { ...all, [pay.id]: { ...pay, label: 'Paid' } })).toMatch(/^Paid \[/)
   })
 })
 
@@ -138,18 +148,20 @@ describe('state machine rules', () => {
 
   it('flags unguarded conflicts and transitions that leave the machine', () => {
     const m = orderMachine()
+    const payment = node('entity', 'Payment')
     const other = node('state-machine', 'Payment')
     const otherInit = node('pseudostate', 'Start', other.id, { kind: 'initial' })
     const elsewhere = node('state', 'Authorised', other.id)
     const relations = [
       ...m.relations,
+      { id: 'l-pay', sourceId: other.id, targetId: payment.id, relationType: 'lifecycle-of' } as C4Relation,
       transition(otherInit, elsewhere),
       transition(m.pending, m.shipped, { event: m.ship.id }),
       transition(m.pending, m.pending, { event: m.ship.id }),
       transition(m.pending, m.pending, { event: m.pay.id, guard: 'within 14 days' }),
       transition(m.picking, elsewhere),
     ]
-    const issues = issuesOf([...m.nodes, other, otherInit, elsewhere], relations)
+    const issues = issuesOf([...m.nodes, payment, other, otherInit, elsewhere], relations)
     expect(kinds(issues)).toEqual(['sm-cross-machine', 'sm-nondeterministic'])
     expect(issues.find((i) => i.id.startsWith('sm-nondeterministic'))?.message).toBe('"Pending" has 2 unguarded transitions on "Shipped"; only one can fire.')
   })
@@ -164,11 +176,42 @@ describe('state machine rules', () => {
     expect(issues.map((i) => i.id)).toEqual([`sm-unreachable:${orphan.id}`])
   })
 
+  it('wants each machine to be the lifecycle of one entity, and one machine per entity', () => {
+    const m = orderMachine()
+    const noEntity = m.relations.filter((r) => r.relationType !== 'lifecycle-of')
+    expect(issuesOf(m.nodes, noEntity).map((i) => i.id)).toEqual([`sm-no-entity:${m.machine.id}`])
+    const second = node('state-machine', 'Order payment')
+    const twice = [...m.relations, { id: 'l-2', sourceId: second.id, targetId: m.order.id, relationType: 'lifecycle-of' } as C4Relation]
+    const issue = issuesOf([...m.nodes, second], twice).find((i) => i.id.startsWith('sm-many-machines'))!
+    expect(issue.message).toContain('Entity "Order" has 2 state machines (Order lifecycle, Order payment)')
+  })
+
   it('reaches a state through a transition from an ancestor', () => {
     const m = orderMachine()
     const cancelled = node('state', 'Cancelled', m.machine.id, { kind: 'final' })
     const cancel = node('event', 'Cancel', m.machine.id)
     const relations = [...m.relations, transition(m.paid, cancelled, { event: cancel.id })]
     expect(issuesOf([...m.nodes, cancelled, cancel], relations)).toEqual([])
+  })
+})
+
+describe('requirements while in a state', () => {
+  it('read "While the <entity> is <state>" from the state they point at, unless the precondition says otherwise', () => {
+    const m = orderMachine()
+    const req = node('requirement', 'Hold stock', undefined, { ears_type: 'state-driven', action: 'hold the stock', precondition_state: m.pending.id })
+    const all = byId([...m.nodes, req])
+    const rels = byId(m.relations)
+    expect(requirementStatePhrase(req, all, rels)).toBe('the Order is Pending')
+    expect(composeEarsSentence(req as unknown as Record<string, unknown>, 'the shop', requirementStatePhrase(req, all, rels)).sentence)
+      .toBe('While the Order is Pending, the shop shall hold the stock.')
+    // Without the machine's entity it names the state alone.
+    expect(requirementStatePhrase(req, all, byId(m.relations.filter((r) => r.relationType !== 'lifecycle-of')))).toBe('in Pending')
+    // Text wins over the reference; no reference, no phrase.
+    expect(composeEarsSentence({ ...req, precondition: 'the shop is open' } as unknown as Record<string, unknown>, 'the shop', 'the Order is Pending').sentence)
+      .toBe('While the shop is open, the shop shall hold the stock.')
+    expect(requirementStatePhrase({ ...req, precondition_state: undefined } as unknown as C4Node, all, rels)).toBe('')
+    // The reference must point at a state.
+    const wrong = { ...req, precondition_state: m.order.id } as unknown as C4Node
+    expect(validateModel(byId([...m.nodes, wrong]), rels, mm).map((i) => i.id)).toEqual([`bad-ref:${req.id}:precondition_state:${m.order.id}`])
   })
 })

@@ -2,7 +2,7 @@
 
 import { builtInGovernanceMetamodel, type Metamodel, type NodeTypeDef } from './metamodel'
 
-export type C4ElementType = 'person' | 'system' | 'container' | 'component' | 'database' | 'webapp' | 'queue' | 'domain' | 'group' | 'adr' | 'fitness-fn' | 'need' | 'requirement' | 'scenario' | 'blueprint' | 'mockup' | 'state-machine' | 'state' | 'pseudostate' | 'event'
+export type C4ElementType = 'person' | 'system' | 'container' | 'component' | 'database' | 'webapp' | 'queue' | 'domain' | 'group' | 'adr' | 'fitness-fn' | 'need' | 'requirement' | 'scenario' | 'blueprint' | 'mockup' | 'state-machine' | 'state' | 'pseudostate' | 'event' | 'entity'
 
 /** Types that act as containers (can hold children, collapse, auto-resize). */
 export const CONTAINER_TYPES: ReadonlySet<string> = new Set([

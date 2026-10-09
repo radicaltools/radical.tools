@@ -186,6 +186,9 @@ export function builtInGovernanceMetamodel(): Metamodel {
     },
     { key: 'trigger',             label: 'When (trigger)',            type: 'text',     visibleWhen: { key: 'ears_type', values: ['event-driven', 'complex'] } },
     { key: 'precondition',        label: 'While (precondition)',      type: 'text',     visibleWhen: { key: 'ears_type', values: ['state-driven', 'complex'] } },
+    // The state the precondition is, when it is one of a state machine's:
+    // "While the Reservation is Confirmed". Takes the place of the text.
+    { key: 'precondition_state',  label: 'While in state',            type: 'ref',      refType: 'state', visibleWhen: { key: 'ears_type', values: ['state-driven', 'complex'] } },
     { key: 'unwanted_condition',  label: 'If (unwanted condition)',   type: 'text',     visibleWhen: { key: 'ears_type', values: ['unwanted-behaviour', 'complex'] } },
     { key: 'feature',             label: 'Where (feature)',           type: 'text',     visibleWhen: { key: 'ears_type', values: ['optional', 'complex'] } },
     { key: 'action',              label: 'The system shall (action)', type: 'textarea' },
@@ -216,7 +219,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
           help: 'A short name for the requirement, e.g. "Lock account after failed logins".' },
         { kind: 'custom', title: 'Sentence', component: 'ears-quick-entry',
           help: 'Type the requirement as one sentence and press Enter — the EARS fields are filled for you. Or skip and fill them in the next step.' },
-        { kind: 'fields', title: 'EARS fields', fields: ['ears_type', 'trigger', 'precondition', 'unwanted_condition', 'feature', 'action'],
+        { kind: 'fields', title: 'EARS fields', fields: ['ears_type', 'trigger', 'precondition', 'precondition_state', 'unwanted_condition', 'feature', 'action'],
           help: 'Pick the EARS pattern; only the clauses it uses are shown.' },
         { kind: 'fields', title: 'Rationale', fields: ['rationale'],
           help: 'Why is this requirement needed? Who asked for it?' },
@@ -502,7 +505,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     tableTab: true,
     properties: [
       { key: 'description', label: 'Description', type: 'textarea' },
-      { key: 'subject', label: 'Lifecycle of (entity, e.g. Order)', type: 'text' },
     ],
   }
 
@@ -607,11 +609,13 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
-  // state machine → the element whose lifecycle it models
+  // state machine → the domain entity whose lifecycle it models (one machine
+  // per entity: two lifecycles of one thing are regions of a parallel state).
+  // The C4 elements that run it `implements` the machine.
   const lifecycleOf: RelationTypeDef = {
     id: 'lifecycle-of',
     label: 'Lifecycle of',
-    allowedPairs: (['system', 'container', 'component', 'webapp', 'domain'] as const).map(to => ({ from: 'state-machine', to })),
+    allowedPairs: [{ from: 'state-machine', to: 'entity' }],
     properties: [],
     color: '#3730a3',
     builtin: true,
@@ -638,6 +642,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
+  implements_.allowedPairs.push(...(['system', 'container', 'component', 'webapp'] as const).map(from => ({ from, to: 'state-machine' })))
   satisfies.allowedPairs.push({ from: 'state-machine', to: 'requirement' })
   verifies.allowedPairs.push({ from: 'scenario', to: 'state-machine' })
   illustrates.allowedPairs.push({ from: 'mockup', to: 'state' })

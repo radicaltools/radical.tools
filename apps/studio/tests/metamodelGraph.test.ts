@@ -106,13 +106,13 @@ describe('buildMetamodelGraph', () => {
     // Nothing shown at all: every type stays, without edges.
     const none = buildMetamodelGraph(mm, { showContainment: false, showProperties: false, hiddenRelations: new Set(Object.keys(mm.relationTypes)) })
     expect(none.edges).toEqual([])
-    expect(none.nodes).toHaveLength(20)
+    expect(none.nodes).toHaveLength(21)
   })
 
   it('draws containment to every allowed child, Group included', () => {
     const g = buildMetamodelGraph(builtInGovernanceMetamodel())
     const fromGroup = g.edges.filter((e) => e.type === CONTAINS_EDGE && e.source === 'group')
-    expect(fromGroup).toHaveLength(17)
+    expect(fromGroup).toHaveLength(18)
   })
 
   it('grows a box for self-relation chips', () => {

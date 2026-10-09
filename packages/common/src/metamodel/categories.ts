@@ -13,7 +13,7 @@ export interface NodeTypeCategory {
 
 export const NODE_TYPE_CATEGORIES: readonly NodeTypeCategory[] = [
   { id: 'c4', label: 'C4', types: ['person', 'system', 'container', 'component', 'database', 'webapp', 'queue'] },
-  { id: 'domain', label: 'Domain', types: ['domain'] },
+  { id: 'domain', label: 'Domain', types: ['domain', 'entity'] },
   { id: 'governance', label: 'Governance', types: ['adr', 'fitness-fn', 'blueprint'] },
   { id: 'requirements', label: 'Requirements', types: ['need', 'requirement', 'scenario'] },
   { id: 'states', label: 'States', types: ['state-machine', 'state', 'pseudostate', 'event'] },

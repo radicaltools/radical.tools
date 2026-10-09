@@ -1,7 +1,8 @@
 // ─── Where a Radical Forge run puts what it generates ───────────────────────
 // A run splits its output into four views from the start, the layers of a
 // Radical architecture model: Conceptual (the need, requirements, scenarios,
-// mockups), States (the state machines and their events), Logical & physical
+// mockups), States (the entities with a lifecycle, their state machines and
+// events), Logical & physical
 // (the C4 elements) and Governance (fitness functions and decisions). A view is created when its first element arrives,
 // since an empty view shows the whole model; a later run reuses the views by
 // name.
@@ -30,6 +31,7 @@ const VIEW_OF_TYPE: Record<string, ForgeViewKey> = {
   requirement: 'conceptual',
   scenario: 'conceptual',
   mockup: 'conceptual',
+  entity: 'states',
   'state-machine': 'states',
   state: 'states',
   pseudostate: 'states',

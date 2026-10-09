@@ -54,9 +54,11 @@ describe('buildForgeStagePrompt — mockups stage', () => {
     expect(prompt).toContain('no user')
   })
 
-  it('has the C4 stage link each state machine to its owner and each publisher to its events', () => {
+  it('has the C4 stage link what implements each machine, owns each entity and publishes each event', () => {
     const prompt = buildForgeStagePrompt('c4', 'A web shop.')
-    expect(prompt).toContain('`lifecycle-of` relation FROM the machine')
+    expect(prompt).toContain('to it with `implements`')
+    expect(prompt).toContain('(element → machine)')
+    expect(prompt).toContain('`realises` (element → entity)')
     expect(prompt).toContain('`emits`')
   })
 
@@ -76,7 +78,7 @@ describe('buildForgeStagePrompt — state machines stage', () => {
     const ids = FORGE_STAGES.map((s) => s.id)
     expect(ids.indexOf('states')).toBe(ids.indexOf('scenarios') + 1)
     expect(ids.indexOf('mockups')).toBe(ids.indexOf('states') + 1)
-    expect(PRIMARY_TYPE_IDS_FOR_STAGE.states).toEqual(['state-machine', 'state', 'pseudostate', 'event'])
+    expect(PRIMARY_TYPE_IDS_FOR_STAGE.states).toEqual(['entity', 'state-machine', 'state', 'pseudostate', 'event'])
   })
 
   it('models only entities with a lifecycle, from the scenarios, by event reference, without C4 elements', () => {
@@ -87,6 +89,7 @@ describe('buildForgeStagePrompt — state machines stage', () => {
     expect(prompt).toContain('`event` (the id or\n   tempId of the event node)')
     expect(prompt).toContain('`pseudostate` of kind "initial"')
     expect(prompt).toContain('(scenario → state-machine)')
+    expect(prompt).toContain('linked to it with `lifecycle-of` (machine →\n   entity; one machine per entity)')
     expect(prompt).toContain('do not create any here')
   })
 })

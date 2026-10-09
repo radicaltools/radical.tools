@@ -29,8 +29,10 @@
 // close to a transition already (Given the source state, When the event,
 // Then the target state and its effect), and the states of an entity the
 // user sees are what its screens show. Only entities with a real lifecycle
-// get one, often none at all. The machine's owner does not exist yet, so the
-// C4 stage adds `lifecycle-of` (and `emits` for the events elements publish).
+// get one, often none at all: the stage adds the domain `entity` and its
+// machine (`lifecycle-of`). Nothing runs it yet, so the C4 stage adds the
+// elements that implement the machine and own the entity (`implements`,
+// `realises`, and `emits` for the events elements publish).
 
 import type { HubConceptSummary } from '../../hubFormat'
 
@@ -51,7 +53,7 @@ export const PRIMARY_TYPE_IDS_FOR_STAGE: Record<ForgeStageId, string[]> = {
   requirements: ['requirement'],
   fitness: ['fitness-fn'],
   scenarios: ['scenario'],
-  states: ['state-machine', 'state', 'pseudostate', 'event'],
+  states: ['entity', 'state-machine', 'state', 'pseudostate', 'event'],
   mockups: ['mockup'],
   c4: ['person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group'],
 }
@@ -237,11 +239,12 @@ export function buildForgeStagePrompt(
         'relation, AND link each existing `fitness-fn` node to whichever new element(s)',
         'it actually constrains with a `constrains` relation, AND link each existing',
         '`mockup` node to the webapp or container that renders it with a',
-        '`presented-by` relation FROM the mockup TO that element, AND link each',
-        'existing `state-machine` to the element whose lifecycle it models with a',
-        '`lifecycle-of` relation FROM the machine, and each element that publishes',
-        'one of the `event` nodes to it with `emits` (all only become possible now',
-        'that real elements exist to point at). Do not invent',
+        '`presented-by` relation FROM the mockup TO that element, AND link the',
+        'element that runs each existing `state-machine` to it with `implements`',
+        '(element → machine), the element that owns the data of each `entity` to it',
+        'with `realises` (element → entity), and each element that publishes one of',
+        'the `event` nodes to it with `emits` (all only become possible now that',
+        'real elements exist to point at). Do not invent',
         'requirements at this stage; if the description implies something not yet',
         'covered by a requirement, model the C4 element anyway but leave it unlinked',
         'rather than fabricating a requirement here.',
@@ -284,8 +287,11 @@ export function buildForgeStagePrompt(
         'your summary.',
         '',
         'For each machine, in this order:',
-        '1. Add it at the root with `subject` set to the entity, then add an `event`',
-        '   node inside it for each thing that happens to the entity (a user action,',
+        '1. Add the entity itself as an `entity` node at the root (kind',
+        '   "aggregate-root" unless it lives inside another aggregate), then the',
+        '   `state-machine` at the root linked to it with `lifecycle-of` (machine →',
+        '   entity; one machine per entity), then an `event`',
+        '   node inside the machine for each thing that happens to the entity (a user action,',
         '   a message from another system, a timeout: set `source` external, internal',
         '   or timer). Name events in PascalCase, e.g. PaymentReceived.',
         '2. Add its `state` nodes inside it. Nest states only where a group of states',

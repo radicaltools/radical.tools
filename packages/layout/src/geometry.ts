@@ -21,7 +21,7 @@ export function effectiveHeight(n: C4Node): number {
 }
 
 /** Record types the canvas always draws at their type's size. */
-const FIXED_SIZE_TYPES: ReadonlySet<string> = new Set(['adr', 'fitness-fn', 'need', 'requirement', 'scenario', 'mockup', 'pseudostate', 'event'])
+const FIXED_SIZE_TYPES: ReadonlySet<string> = new Set(['adr', 'fitness-fn', 'need', 'requirement', 'scenario', 'mockup', 'pseudostate', 'event', 'entity'])
 
 /** True for a record type the canvas always draws at its type's size. */
 export function isFixedSizeType(type: string): boolean {
