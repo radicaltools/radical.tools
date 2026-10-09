@@ -4538,6 +4538,21 @@ export const useDiagramStore = create<DiagramStore>()(
           state.hubTemplates = (data.hubTemplates ?? {}) as any
           state.hubMeta = data.hub ?? null
         })
+        // Outside designer, setAppMode parked the model to put back on return.
+        // A load (an outside edit reloaded from disk, a document switch) is the
+        // new baseline: park it instead, or returning to designer would bring
+        // back — and the next autosave write — the model from before the load.
+        const W = window as any
+        if (W.__preModeLayout) {
+          const parkedViewId = W.__preModeLayout.activeViewId as string | null
+          W.__preModeLayout = {
+            c4Nodes: get().c4Nodes,
+            c4Relations: get().c4Relations,
+            views: get().views,
+            defaultPositions: get().defaultPositions,
+            activeViewId: parkedViewId && views[parkedViewId] ? parkedViewId : null,
+          }
+        }
         get()._sync()
         get()._enforceLayoutConstraints()
         // skipBulk=true: loaded positions are already correct; the 110-iteration
