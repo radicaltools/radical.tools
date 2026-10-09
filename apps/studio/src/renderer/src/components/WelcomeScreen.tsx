@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
-import { documents } from '../store/documentStore'
+import { documents, type DocumentMeta } from '../store/documentStore'
 import { buildFintechSampleRaw } from '../store/fintechSample'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { formatRoute } from '../route'
 import { availableMetamodels } from '@radical/common/metamodel'
+import type { DiagramData } from '@radical/common/c4'
 import { host } from '../platform/host'
 import { webFolderSupported } from '../persist/webFolder'
 
@@ -94,13 +95,27 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [selectedPresetId, setSelectedPresetId] = useState('c4-ddd-governance-builtin')
 
-  function handleNew(): void {
+  /** Adds the model and opens it; says why when browser storage refused it. */
+  function create(name: string, data: DiagramData): DocumentMeta | null {
+    try {
+      return documents.createLSDocument(name, data)
+    } catch (e) {
+      window.alert((e as Error).message)
+      return null
+    }
+  }
+
+  function createBlank(): boolean {
     const preset = presets.find(p => p.id === selectedPresetId) ?? presets[0]
-    documents.createLSDocument('Untitled model', {
+    return !!create('Untitled model', {
       nodes: [],
       relations: [],
       metamodel: preset.build(),
     })
+  }
+
+  function handleNew(): void {
+    if (!createBlank()) return
     setPickerOpen(false)
     onDismiss()
   }
@@ -111,12 +126,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
   // menu. Toolbar.tsx (already mounted underneath this overlay) listens for
   // the event — same pattern as radical:open-ai-settings.
   function handleForge(): void {
-    const preset = presets.find(p => p.id === selectedPresetId) ?? presets[0]
-    documents.createLSDocument('Untitled model', {
-      nodes: [],
-      relations: [],
-      metamodel: preset.build(),
-    })
+    if (!createBlank()) return
     setPickerOpen(false)
     onDismiss()
     window.dispatchEvent(new CustomEvent('radical:open-forge'))
@@ -130,7 +140,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
   function handleImport(): void {
     documents.importFromFile().then((meta) => {
       if (meta) onDismiss()
-    })
+    }, (e: Error) => window.alert(e.message))
   }
 
   // An empty folder opens as an empty model, so this is also how to start a
@@ -138,7 +148,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
   function handleOpenFolder(): void {
     documents.importFromFolder().then((meta) => {
       if (meta) onDismiss()
-    })
+    }, (e: Error) => window.alert(e.message))
   }
 
   // Land on System Context rather than the default canvas, which holds all
@@ -150,7 +160,8 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
     // (The open doc may be an earlier sample copy with the same view ids.)
     const viewsBefore = useDiagramStore.getState().views
     const data = buildFintechSampleRaw()
-    const meta = documents.createLSDocument('Fintech Banking Platform', data)
+    const meta = create('Fintech Banking Platform', data)
+    if (!meta) return
     documents.setActiveId(meta.id)
     const loaded = (views: typeof viewsBefore): boolean =>
       views !== viewsBefore && !!views[SAMPLE_START_VIEW]
