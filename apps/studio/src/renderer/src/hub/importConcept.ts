@@ -43,7 +43,8 @@ export function importHubConceptIntoDiagram(
     Object.assign(state.c4Relations, insert.relations)
     Object.assign(state.sequences, insert.sequences)
     for (const v of insert.views) state.views[v.id] = v
-    if (state.activeViewId && state.views[state.activeViewId]) {
+    // Empty nodeIds means "show all" — the imported nodes are already in it.
+    if (state.activeViewId && state.views[state.activeViewId]?.nodeIds.length) {
       state.views[state.activeViewId].nodeIds.push(...Object.keys(insert.nodes))
     }
   })

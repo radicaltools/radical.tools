@@ -394,7 +394,7 @@ export function TableView(): React.ReactElement {
     const node = nodes[nodeId]
     if (!node) { pushNotification('Node not found.', 'error'); return }
 
-    if (activeView.nodeIds.includes(nodeId)) {
+    if (activeView.nodeIds.length === 0 || activeView.nodeIds.includes(nodeId)) {
       pushNotification(`"${node.label}" is already in this view.`, 'warning')
       return
     }

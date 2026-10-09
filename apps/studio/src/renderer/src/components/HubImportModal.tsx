@@ -602,7 +602,8 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         Object.assign(state.c4Relations, newRelations)
         Object.assign(state.sequences, newSequences)
         for (const v of newViews) state.views[v.id] = v
-        if (state.activeViewId && state.views[state.activeViewId]) {
+        // Empty nodeIds means "show all" — the imported nodes are already in it.
+        if (state.activeViewId && state.views[state.activeViewId]?.nodeIds.length) {
           state.views[state.activeViewId].nodeIds.push(...Object.keys(newNodes))
         }
       })
