@@ -5,7 +5,7 @@
 // single "Ungrouped scenarios" file rather than being dropped silently.
 
 import type { C4Node, C4Relation } from '../c4'
-import { composeEarsSentence } from '../metamodel'
+import { composeEarsSentence, requirementStatePhrase } from '../metamodel'
 
 export interface GherkinFile {
   filename: string
@@ -78,7 +78,7 @@ export function buildGherkinFiles(
 
   for (const [reqId, list] of byRequirement) {
     const req = nodes[reqId]
-    const { sentence } = composeEarsSentence(req as unknown as Record<string, unknown>)
+    const { sentence } = composeEarsSentence(req as unknown as Record<string, unknown>, undefined, requirementStatePhrase(req, nodes, relations))
     const lines = [`Feature: ${req.label}`]
     if (sentence) lines.push(indentBlock(sentence, 2))
     lines.push('')

@@ -1,31 +1,162 @@
 {
-  "metamodel": { "id": "c4-ddd-governance-builtin", "name": "C4 + DDD + Governance", "nodeTypes": {}, "relationTypes": {} },
+  "metamodel": {
+    "id": "c4-ddd-governance-builtin",
+    "name": "C4 + DDD + Governance",
+    "nodeTypes": {},
+    "relationTypes": {}
+  },
   "nodes": [
-    { "id": "order", "type": "state-machine", "label": "Order lifecycle", "subject": "Order",
-      "x": 0, "y": 0, "width": 1000, "height": 520, "collapsed": false },
-    { "id": "pay", "type": "event", "label": "PaymentReceived", "parentId": "order",
-      "x": 40, "y": 120, "width": 170, "height": 52, "collapsed": false },
-    { "id": "cancel", "type": "event", "label": "Cancel", "parentId": "order",
-      "x": 240, "y": 120, "width": 170, "height": 52, "collapsed": false },
-    { "id": "order-paid", "type": "event", "label": "OrderPaid", "parentId": "order",
-      "x": 440, "y": 120, "width": 170, "height": 52, "collapsed": false },
-    { "id": "start", "type": "pseudostate", "label": "Start", "kind": "initial", "parentId": "order",
-      "x": 40, "y": 330, "width": 36, "height": 36, "collapsed": false },
-    { "id": "pending", "type": "state", "label": "Pending payment", "parentId": "order",
-      "x": 160, "y": 310, "width": 170, "height": 72, "collapsed": false },
-    { "id": "confirmed", "type": "state", "label": "Confirmed", "parentId": "order",
-      "x": 700, "y": 310, "width": 170, "height": 72, "collapsed": false },
-    { "id": "cancelled", "type": "state", "label": "Cancelled", "kind": "final", "parentId": "order",
-      "x": 700, "y": 420, "width": 170, "height": 72, "collapsed": false }
+    {
+      "id": "order-entity",
+      "type": "entity",
+      "label": "Order",
+      "kind": "aggregate-root",
+      "x": 0,
+      "y": 560,
+      "width": 170,
+      "height": 56,
+      "collapsed": false
+    },
+    {
+      "id": "order",
+      "type": "state-machine",
+      "label": "Order lifecycle",
+      "x": 0,
+      "y": 0,
+      "width": 1000,
+      "height": 520,
+      "collapsed": false
+    },
+    {
+      "id": "pay",
+      "type": "event",
+      "label": "PaymentReceived",
+      "parentId": "order",
+      "x": 40,
+      "y": 120,
+      "width": 170,
+      "height": 52,
+      "collapsed": false
+    },
+    {
+      "id": "cancel",
+      "type": "event",
+      "label": "Cancel",
+      "parentId": "order",
+      "x": 240,
+      "y": 120,
+      "width": 170,
+      "height": 52,
+      "collapsed": false
+    },
+    {
+      "id": "order-paid",
+      "type": "event",
+      "label": "OrderPaid",
+      "parentId": "order",
+      "x": 440,
+      "y": 120,
+      "width": 170,
+      "height": 52,
+      "collapsed": false
+    },
+    {
+      "id": "start",
+      "type": "pseudostate",
+      "label": "Start",
+      "kind": "initial",
+      "parentId": "order",
+      "x": 40,
+      "y": 330,
+      "width": 36,
+      "height": 36,
+      "collapsed": false
+    },
+    {
+      "id": "pending",
+      "type": "state",
+      "label": "Pending payment",
+      "parentId": "order",
+      "x": 160,
+      "y": 310,
+      "width": 170,
+      "height": 72,
+      "collapsed": false
+    },
+    {
+      "id": "confirmed",
+      "type": "state",
+      "label": "Confirmed",
+      "parentId": "order",
+      "x": 700,
+      "y": 310,
+      "width": 170,
+      "height": 72,
+      "collapsed": false
+    },
+    {
+      "id": "cancelled",
+      "type": "state",
+      "label": "Cancelled",
+      "kind": "final",
+      "parentId": "order",
+      "x": 700,
+      "y": 420,
+      "width": 170,
+      "height": 72,
+      "collapsed": false
+    }
   ],
   "relations": [
-    { "id": "t-start", "sourceId": "start", "targetId": "pending", "relationType": "transition" },
-    { "id": "t-pay", "sourceId": "pending", "targetId": "confirmed", "relationType": "transition",
-      "event": "pay", "guard": "ok", "actions": "reserve", "raises": ["order-paid"] },
-    { "id": "t-cancel", "sourceId": "confirmed", "targetId": "cancelled", "relationType": "transition", "event": "cancel" }
+    {
+      "id": "l-order",
+      "sourceId": "order",
+      "targetId": "order-entity",
+      "relationType": "lifecycle-of"
+    },
+    {
+      "id": "t-start",
+      "sourceId": "start",
+      "targetId": "pending",
+      "relationType": "transition"
+    },
+    {
+      "id": "t-pay",
+      "sourceId": "pending",
+      "targetId": "confirmed",
+      "relationType": "transition",
+      "event": "pay",
+      "guard": "ok",
+      "actions": "reserve",
+      "raises": [
+        "order-paid"
+      ]
+    },
+    {
+      "id": "t-cancel",
+      "sourceId": "confirmed",
+      "targetId": "cancelled",
+      "relationType": "transition",
+      "event": "cancel"
+    }
   ],
   "views": [
-    { "id": "v-order", "name": "Order", "kind": "static",
-      "nodeIds": ["order", "pay", "cancel", "order-paid", "start", "pending", "confirmed", "cancelled"], "positions": {} }
+    {
+      "id": "v-order",
+      "name": "Order",
+      "kind": "static",
+      "nodeIds": [
+        "order",
+        "pay",
+        "cancel",
+        "order-paid",
+        "start",
+        "pending",
+        "confirmed",
+        "cancelled",
+        "order-entity"
+      ],
+      "positions": {}
+    }
   ]
 }

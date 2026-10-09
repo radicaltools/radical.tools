@@ -181,7 +181,9 @@ describe('Radical Forge over MCP', () => {
       expect(brief).toContain('Given is the source state, When')
       expect(brief).toContain('"type":"ref","refType":"event"')
 
-      await call(client, 'add_node', { tempId: 'm', type: 'state-machine', label: 'Order lifecycle', properties: { subject: 'Order' } })
+      await call(client, 'add_node', { tempId: 'order', type: 'entity', label: 'Order' })
+      await call(client, 'add_node', { tempId: 'm', type: 'state-machine', label: 'Order lifecycle' })
+      await call(client, 'add_relation', { sourceId: 'm', targetId: 'order', relationType: 'lifecycle-of' })
       await call(client, 'add_node', { tempId: 'ready', type: 'event', label: 'OrderReady', parentId: 'm' })
       await call(client, 'add_node', { tempId: 'i', type: 'pseudostate', label: 'Start', parentId: 'm', properties: { kind: 'initial' } })
       await call(client, 'add_node', { tempId: 'reserved', type: 'state', label: 'Reserved', parentId: 'm' })
@@ -195,7 +197,7 @@ describe('Radical Forge over MCP', () => {
 
       const data = await read()
       const states = data.views!.find((v) => v.name === 'States')!
-      const machineIds = data.nodes.filter((n) => ['state-machine', 'state', 'pseudostate', 'event'].includes(n.type)).map((n) => n.id)
+      const machineIds = data.nodes.filter((n) => ['entity', 'state-machine', 'state', 'pseudostate', 'event'].includes(n.type)).map((n) => n.id)
       expect(states.nodeIds.sort()).toEqual(machineIds.sort())
       expect(data.views!.find((v) => v.name === 'Conceptual')!.nodeIds).not.toContain(machineIds[0])
       await call(client, 'forge_clarify', { stage: 'mockups' })

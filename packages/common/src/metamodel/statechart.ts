@@ -47,12 +47,50 @@ export function relationDisplayLabel(r: C4Relation, nodes: Record<string, C4Node
   return undefined
 }
 
+/** machine id → the entity it is the lifecycle of, per relations object. */
+const entityCache = new WeakMap<Record<string, C4Relation>, Map<string, string>>()
+
+/** The entity a state machine is the lifecycle of (`lifecycle-of`). */
+export function machineEntity(machineId: string, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): C4Node | undefined {
+  let map = entityCache.get(relations)
+  if (!map) {
+    map = new Map()
+    for (const r of Object.values(relations)) {
+      if (r.relationType === 'lifecycle-of' && !map.has(r.sourceId)) map.set(r.sourceId, r.targetId)
+    }
+    entityCache.set(relations, map)
+  }
+  const id = map.get(machineId)
+  return id ? nodes[id] : undefined
+}
+
+/** The state machine a node sits in. */
+export function machineOf(node: C4Node, nodes: Record<string, C4Node>): C4Node | undefined {
+  let cur: C4Node | undefined = node
+  for (let depth = 0; cur && depth < 64; depth++) {
+    if (cur.type === 'state-machine') return cur
+    cur = cur.parentId ? nodes[cur.parentId] : undefined
+  }
+  return undefined
+}
+
+/** How a requirement's precondition reads when it points at a state:
+ *  "the Reservation is Confirmed", or "in Confirmed" when the machine is
+ *  the lifecycle of no entity. Empty when it points at no state. */
+export function requirementStatePhrase(requirement: C4Node, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): string {
+  const state = nodes[refIds((requirement as unknown as Props).precondition_state)[0] ?? '']
+  if (!state) return ''
+  const machine = machineOf(state, nodes)
+  const entity = machine ? machineEntity(machine.id, nodes, relations) : undefined
+  return entity ? `the ${entity.label} is ${state.label}` : `in ${state.label}`
+}
+
 export function validateStateMachines(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
 ): Issue[] {
   const nodeList = Object.values(nodes)
-  if (!nodeList.some((n) => n.type === 'state' || n.type === 'pseudostate')) return []
+  if (!nodeList.some((n) => n.type === 'state-machine' || n.type === 'state' || n.type === 'pseudostate')) return []
 
   const issues: Issue[] = []
   const warn = (id: string, message: string, at: { nodeId?: string; relationId?: string }): void => {
@@ -70,15 +108,6 @@ export function validateStateMachines(
   const initialsOf = (id: string): C4Node[] =>
     (children.get(id) ?? []).filter((c) => isPseudo(c) && pseudoKind(c) === 'initial')
 
-  /** The state machine a state or pseudostate belongs to. */
-  const machineOf = (n: C4Node): string | undefined => {
-    let cur: C4Node | undefined = n
-    for (let depth = 0; cur && depth < 64; depth++) {
-      if (cur.type === 'state-machine') return cur.id
-      cur = cur.parentId ? nodes[cur.parentId] : undefined
-    }
-    return undefined
-  }
 
   const transitions = Object.values(relations).filter((r) =>
     r.relationType === 'transition' && nodes[r.sourceId] && nodes[r.targetId])
@@ -138,7 +167,7 @@ export function validateStateMachines(
   for (const t of transitions) {
     const src = nodes[t.sourceId]
     const dst = nodes[t.targetId]
-    if (machineOf(src) !== machineOf(dst)) {
+    if (machineOf(src, nodes)?.id !== machineOf(dst, nodes)?.id) {
       warn(`sm-cross-machine:${t.id}`, `Transition "${src.label}" → "${dst.label}" leaves its state machine.`, { relationId: t.id })
     }
   }
@@ -157,6 +186,21 @@ export function validateStateMachines(
       const on = event ? `on "${nodes[event]?.label ?? event}"` : 'without an event'
       warn(`sm-nondeterministic:${sourceId}:${event}`, `"${nodes[sourceId].label}" has ${list.length} unguarded transitions ${on}; only one can fire.`, { nodeId: sourceId })
     }
+  }
+
+  // ── What each machine is the lifecycle of ───────────────────────────────
+  const machinesOfEntity = new Map<string, C4Node[]>()
+  for (const machine of nodeList.filter((n) => n.type === 'state-machine')) {
+    const entity = machineEntity(machine.id, nodes, relations)
+    if (!entity) {
+      warn(`sm-no-entity:${machine.id}`, `State machine "${machine.label}" is the lifecycle of no entity; link it to one with "lifecycle-of".`, { nodeId: machine.id })
+      continue
+    }
+    machinesOfEntity.set(entity.id, [...(machinesOfEntity.get(entity.id) ?? []), machine])
+  }
+  for (const [entityId, machines] of machinesOfEntity) {
+    if (machines.length < 2) continue
+    warn(`sm-many-machines:${entityId}`, `Entity "${nodes[entityId].label}" has ${machines.length} state machines (${machines.map((m) => m.label).join(', ')}); model one lifecycle, with parallel regions if parts of it progress at once.`, { nodeId: entityId })
   }
 
   // ── Reachability from each machine's initial state ──────────────────────

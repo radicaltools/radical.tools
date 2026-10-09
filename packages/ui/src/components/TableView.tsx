@@ -3,7 +3,7 @@ import { useDiagramStore } from '../store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType } from '@radical/common/c4'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
 import type { Metamodel, PropertyDef } from '@radical/common/metamodel'
-import { isParentAllowed, composeEarsSentence, resolveEarsSubject } from '@radical/common/metamodel'
+import { isParentAllowed, composeEarsSentence, requirementStatePhrase, resolveEarsSubject } from '@radical/common/metamodel'
 import { RefPicker } from './RefPicker'
 
 // ─── Column definitions ──────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ type Tab = string
 
 function getNodeProp(node: C4Node, key: string, nodes: Record<string, C4Node>, relations?: Record<string, C4Relation>): string {
   if (key === '_type')   return TYPE_LABELS[node.type] ?? node.type
-  if (key === '_ears_sentence') return composeEarsSentence(node as unknown as Record<string, unknown>, relations ? resolveEarsSubject(node.id, relations, nodes) : undefined).sentence
+  if (key === '_ears_sentence') return composeEarsSentence(node as unknown as Record<string, unknown>, relations ? resolveEarsSubject(node.id, relations, nodes) : undefined, relations ? requirementStatePhrase(node, nodes, relations) : undefined).sentence
   const raw = (node as unknown as Record<string, unknown>)[key]
   if (raw === undefined || raw === null) return ''
   if (typeof raw === 'boolean') return raw ? 'true' : 'false'

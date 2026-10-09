@@ -374,7 +374,7 @@ export function WikiView(): React.ReactElement {
 // the C4/DDD structural model, then the governance layer (ADRs, fitness
 // functions, requirements, blueprints) that references it.
 const ARCHITECTURE_ROOT_TYPES: ReadonlySet<string> = new Set([
-  'person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group',
+  'person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'entity', 'group',
 ])
 // Governance items are further split by type — a flat "Governance" bucket
 // mixing ADRs, fitness functions and requirements is just a smaller version
