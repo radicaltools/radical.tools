@@ -8,6 +8,7 @@
  *   - a row moves up and down with a dragged member, the others stay put
  *     along it
  *   - a container grown by a drag pushes a neighbouring container whole
+ *   - a row through a container follows it while a child's drag grows it
  *   - a dropped element is pinned: the physics leaves it where it is, on a
  *     small diagram that relaxes as a whole too
  *   - a drop pushes a pinned element clear like any other (it stays pinned
@@ -228,6 +229,46 @@ describe('Calm drag', () => {
     expect(absOf(nodes, 'a')).toEqual({ x: 100, y: 1500 })
     expect(absOf(nodes, 'b')).toEqual({ x: 600, y: 1500 })
     expect(absOf(nodes, 'c')).toEqual({ x: 0, y: 600 })
+  })
+
+  it('keeps a row through a container while a child\'s drag grows it', () => {
+    const nodes: Nodes = {
+      box: node('box', 'system', { x: 0, y: 0, width: 600, height: 400 }),
+      kid: node('kid', 'container', { parentId: 'box', x: 80, y: 120 }),
+      b: node('b', 'system', { x: 900, y: 0 }),
+    }
+    const relations: Record<string, C4Relation> = {}
+    withFillers(nodes, relations)
+    const engine = engineFor(nodes, relations, [{ axis: 'y', ids: ['box', 'b'], orders: [] }])
+    engine.start(true)
+    /** Distance between the two centres on the row's axis, as drawn. */
+    const offLine = (): number => {
+      const boxY = absOf(nodes, 'box').y + nodes.box.height / 2
+      const bY = absOf(nodes, 'b').y + drawnSize(nodes.b, false).height / 2
+      return Math.abs(boxY - bY)
+    }
+    // A nudge reports the group box the physics made.
+    const k0 = absOf(nodes, 'kid')
+    calmDrag(engine, nodes, 'kid', { x: k0.x + 1, y: k0.y }, [], 1)
+    engine.release('kid')
+    expect(offLine()).toBeLessThan(1.5)
+
+    // Down past the bottom edge: the box grows down, its centre moves.
+    const k1 = absOf(nodes, 'kid')
+    const bX = absOf(nodes, 'b').x
+    calmDrag(engine, nodes, 'kid', { x: k1.x, y: k1.y + 500 })
+    expect(offLine()).toBeLessThan(1.5)
+    engine.release('kid')
+    expect(offLine()).toBeLessThan(1.5)
+    // Along the row it stays.
+    expect(absOf(nodes, 'b').x).toBe(bX)
+
+    // Up past the top edge.
+    const k2 = absOf(nodes, 'kid')
+    calmDrag(engine, nodes, 'kid', { x: k2.x, y: k2.y - 900 })
+    engine.release('kid')
+    engine.stop()
+    expect(offLine()).toBeLessThan(1.5)
   })
 
   it('lets a container grown by a drag push its neighbour, whole', () => {
