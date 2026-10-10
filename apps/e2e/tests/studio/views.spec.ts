@@ -154,3 +154,49 @@ test.describe('hidden relations', () => {
     await expect(page.locator('.mx-cell[title*="charges card"]')).toHaveCount(0)
   })
 })
+
+test.describe('Viewer', () => {
+  test('Viewer opens on what Designer showed, then shows each view with its own layout', async ({ page, studio }) => {
+    // System Context places the nodes it shares with Containers far away
+    // from where Containers has them.
+    const model = JSON.parse(fixture('bookstore'))
+    const context = model.views.find((v: { id: string }) => v.id === 'v-context')
+    for (const p of Object.values(context.positions) as Array<{ x: number; y: number }>) { p.x += 900; p.y += 700 }
+    await studio.seedDocument(JSON.stringify(model))
+    const layout = (): Promise<Record<string, number[]>> => page.$$eval('.react-flow__node', (els) =>
+      Object.fromEntries(els.map((el) => [
+        el.getAttribute('data-id') ?? '',
+        ((el as HTMLElement).style.transform.match(/-?[\d.]+/g) ?? []).map(Number),
+      ])))
+    /** The nodes more than 2 px from where `expected` has them (a fresh load
+     *  settles nodes by a fraction of a pixel). */
+    const moved = (actual: Record<string, number[]>, expected: Record<string, number[]>): string[] =>
+      Object.keys(expected).filter((id) => !actual[id] ||
+        Math.hypot(actual[id][0] - expected[id][0], actual[id][1] - expected[id][1]) > 2)
+
+    // Containers as Viewer shows it when it is the first view loaded.
+    await studio.open('v-containers', 'viewer')
+    await page.reload()
+    await studio.ready()
+    const containers = await layout()
+
+    // Designer, then Viewer, then another view.
+    await studio.open('v-context')
+    await page.reload()
+    await studio.ready()
+    const designer = await layout()
+    await page.getByRole('button', { name: 'Viewer', exact: true }).click()
+    await studio.settle()
+    // Viewer opens on what Designer showed: the same view, every node in
+    // the same place. (Its left panel is a little wider, so the camera
+    // refits the narrower canvas.)
+    await expect(page.getByText('Structure: System Context')).toBeVisible()
+    expect(moved(await layout(), designer)).toEqual([])
+
+    await page.locator('.lp-view-card').filter({ hasText: 'Containers' }).click()
+    await studio.settle()
+    const shown = await layout()
+    expect(Object.keys(shown).sort()).toEqual(Object.keys(containers).sort())
+    expect(moved(shown, containers)).toEqual([])
+  })
+})
