@@ -2522,6 +2522,10 @@ label.app-menu-row { cursor: pointer; }
   font-style: normal;
   color: #3b6fe6;
 }
+.welcome-wordmark-by {
+  font-weight: 400;
+  color: #6b7280;
+}
 .welcome-lead {
   font-size: 15px;
   line-height: 1.55;

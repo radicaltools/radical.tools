@@ -199,7 +199,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
                 <circle cx="2"  cy="14" r="2" fill="#3b6fe6" opacity="0.45"/>
                 <circle cx="26" cy="14" r="2" fill="#3b6fe6" opacity="0.45"/>
             </svg>
-            <span className="welcome-wordmark-text">radical<em>.tools</em></span>
+            <span className="welcome-wordmark-text">studio <span className="welcome-wordmark-by">by radical<em>.tools</em></span></span>
           </div>
           {/* Newcomers get one line on what this is; returning users know. */}
           {!hasExisting && (
