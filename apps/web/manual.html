@@ -125,7 +125,7 @@
           On first launch you land on the <strong>Welcome screen</strong>. It asks one thing first — a new model or an existing one — and the details come in the next step:
         </p>
         <ul>
-          <li><strong>New model</strong> — pick the metamodel (<em>C4 + DDD + Governance</em> is preselected; <em>C4</em> and <em>C4 + DDD</em> are in the list, and the metamodel editor changes it later) and where to keep the model: <em>in this browser</em>, <em>in a file</em> (one <code>.radical</code> file, every change saved to it) or <em>in a folder</em> (Markdown files, see <a href="#documents">Models &amp; files</a>). The choice of storage is remembered. Once an AI provider is set up, <em>Create with Radical Forge</em> starts the model from a description instead.</li>
+          <li><strong>New model</strong> — pick the metamodel (<em>Radical</em> is preselected, plain <em>C4</em> is the other choice, and the <a href="#metamodel">metamodel editor</a> changes it later) and where to keep the model: <em>in this browser</em>, <em>in a file</em> (one <code>.radical</code> file, every change saved to it) or <em>in a folder</em> (Markdown files, see <a href="#documents">Models &amp; files</a>). The choice of storage is remembered. Once an AI provider is set up, <em>Create with Radical Forge</em> starts the model from a description instead.</li>
           <li><strong>Open</strong> — a recent model, the ones kept in this browser, a file, a folder, a Structurizr DSL workspace or the sample.</li>
           <li><strong>Try the sample</strong> — the <em>Fintech Banking Platform</em> used throughout this guide: 65 elements — architecture, ADRs and fitness functions, the needs behind it (a regulation, a product brief and a client's feedback), the EARS requirements derived from them, Gherkin scenarios and 13 UI mockups with wireframes in three screen flows — 15 views of every kind, four sequences, four milestones and a ready-made presentation. A first visit offers it right under the two choices.</li>
           <li><strong>Recent</strong> — your last three models, one click away; <em>Open</em> lists more.</li>
@@ -277,7 +277,7 @@
       <section class="doc-section" id="domain-model">
         <h2>Domain model</h2>
         <p>
-          The C4 + DDD and C4 + DDD + Governance metamodels can hold the domain model the requirements talk about, in their own words (palette group <em>Domain</em>):
+          The Radical metamodel can hold the domain model the requirements talk about, in their own words (palette group <em>Domain</em>):
         </p>
         <ul>
           <li><strong>Domain</strong> — a bounded context or subdomain, a part of the business with its own language and rules. <em>Kind</em> says whether it is <em>core</em> (what sets the system apart), <em>supporting</em> or <em>generic</em>. Domains nest for subdomains.</li>
@@ -296,7 +296,7 @@
       <section class="doc-section" id="states">
         <h2>State machines</h2>
         <p>
-          A <strong>State machine</strong> (palette group <em>States</em>, in the C4 + DDD + Governance metamodel) models the lifecycle of one <strong>Entity</strong> — a domain object such as a reservation, an order or a payment (palette group <em>Domain</em>; its <em>Kind</em> says whether it is an aggregate root) — as an event-driven, hierarchical statechart with the semantics of SCXML and XState. It is a frame on the canvas, named after its entity; drop its parts into it.
+          A <strong>State machine</strong> (palette group <em>States</em>, in the Radical metamodel) models the lifecycle of one <strong>Entity</strong> — a domain object such as a reservation, an order or a payment (palette group <em>Domain</em>; its <em>Kind</em> says whether it is an aggregate root) — as an event-driven, hierarchical statechart with the semantics of SCXML and XState. It is a frame on the canvas, named after its entity; drop its parts into it.
         </p>
         <ul>
           <li><strong>State</strong> — a rounded box with optional <em>entry</em>, <em>exit</em> and <em>do</em> actions, drawn under its name (<code>entry / start payment timer</code>). Drop states into a state to make it <em>compound</em>: being in a child state means being in its parent too, and a transition that leaves the parent leaves any child (one <em>Cancel</em> for all of them). Set <em>Kind</em> to <em>parallel</em> to make its child states <em>regions</em> that are active at the same time, drawn with dashed borders (packing and invoicing an order), or to <em>final</em> to end the machine or its parent, drawn as a bullseye.</li>
@@ -510,7 +510,7 @@
           <figcaption>The metamodel travels with the model. Change it here and every form, palette entry and validation rule follows.</figcaption>
         </figure>
         <p>
-          <em>Radical menu → Metamodel editor…</em>. Start from a preset — <strong>C4</strong>, <strong>C4 + DDD</strong> or <strong>C4 + DDD + Governance</strong> — then shape it:
+          <em>Radical menu → Metamodel editor…</em>. Start from a preset — <strong>Radical</strong> (C4 with DDD domains and entities, and what shapes the architecture: needs, requirements, ADRs, fitness functions, scenarios, mockups and state machines) or plain <strong>C4</strong> — then shape it (a model made with the former <em>C4 + DDD</em> preset opens under the Radical metamodel, which holds all of its types):
         </p>
         <ul>
           <li><strong>Node types</strong> — label, icon, colour, default and collapsed size, <em>allowed parents</em>, whether it may sit at the root, min/max <em>cardinality</em>, and <em>properties</em> (text, long text, number, boolean, enum with options and a default, or a <em>reference</em> to one or many elements of a type; a property can be <em>visible only when</em> another one has certain values).</li>
@@ -606,7 +606,7 @@ codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.
     }
   }
 }</code></pre>
-        <p>The folder may also be relative to the directory the client starts the server in. A missing or empty folder becomes a new, empty model; <code>--metamodel c4</code>, <code>c4-ddd</code> or <code>governance</code> picks its metamodel (default <code>governance</code>, C4 + DDD + Governance). A folder with other files and no <code>radical.md</code> is refused, so the server never writes into a folder that isn't a model.</p>
+        <p>The folder may also be relative to the directory the client starts the server in. A missing or empty folder becomes a new, empty model; <code>--metamodel radical</code> or <code>c4</code> picks its metamodel (default <code>radical</code>, the Radical metamodel). A folder with other files and no <code>radical.md</code> is refused, so the server never writes into a folder that isn't a model.</p>
         <h3>Working alongside Studio</h3>
         <p>
           Open the <em>same</em> folder in Studio: in the desktop app, or in a Chromium browser through <em>Open → Folder…</em> (the browser asks for folder access; a model kept only in browser storage cannot be reached by the server). Studio reloads the folder when the agent changes it, so new elements appear on the open canvas. Then ask the agent to call <code>get_model_summary</code> first; the server's instructions tell it to as well.

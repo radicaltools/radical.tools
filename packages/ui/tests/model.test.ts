@@ -10,7 +10,8 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useDiagramStore } from '../src/store/diagramStore'
-import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import { availableMetamodels, builtInDddC4Metamodel, builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import { documentMetamodel, forkPresetMetamodel } from '@radical/common/model'
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 
 // Snapshot the pristine sample on import so each test starts from the same
@@ -262,11 +263,32 @@ describe('metamodel edits on a built-in preset', () => {
     s.upsertNodeType({ ...s.metamodel.nodeTypes.adr, id: 'risk', label: 'Risk', builtin: false })
     const mm = useDiagramStore.getState().metamodel
     expect(mm.id).toBe('c4-ddd-governance-custom')
-    expect(mm.name).toBe('C4 + DDD + Governance (custom)')
+    expect(mm.name).toBe('Radical (custom)')
     expect(mm.nodeTypes.risk.label).toBe('Risk')
     const saved = useDiagramStore.getState().saveDiagram()
     useDiagramStore.getState().loadDiagram(saved)
     expect(useDiagramStore.getState().metamodel.nodeTypes.risk?.label).toBe('Risk')
+  })
+})
+
+describe('built-in metamodels', () => {
+  it('offers Radical, the default, and C4', () => {
+    expect(availableMetamodels().map((p) => [p.id, p.name])).toEqual([
+      ['c4-ddd-governance-builtin', 'Radical'],
+      ['c4-builtin', 'C4'],
+    ])
+  })
+
+  it('loads a model saved under the retired C4 + DDD preset as Radical, every element still valid', () => {
+    const ddd = builtInDddC4Metamodel()
+    const mm = documentMetamodel({ ...ddd, nodeTypes: {}, relationTypes: {} })
+    expect(mm.id).toBe('c4-ddd-governance-builtin')
+    expect(mm.name).toBe('Radical')
+    // Radical holds every C4 + DDD type, unchanged.
+    for (const [id, type] of Object.entries(ddd.nodeTypes)) expect(mm.nodeTypes[id]).toEqual(type)
+    for (const id of Object.keys(ddd.relationTypes)) expect(mm.relationTypes[id]).toBeDefined()
+    // The retired id is no longer a preset to fork.
+    expect(forkPresetMetamodel(mm)?.id).toBe('c4-ddd-governance-custom')
   })
 })
 

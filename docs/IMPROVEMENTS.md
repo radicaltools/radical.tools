@@ -282,7 +282,8 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
 1. ~~**The MCP server cannot start a model.**~~ Fixed in #119: an empty or
    missing folder becomes a new model.
 2. ~~**No way to pick a metamodel for a new folder.**~~ Fixed in #119:
-   `--metamodel c4|c4-ddd|governance` (default `governance`).
+   `--metamodel c4|c4-ddd|governance` (default `governance`); since the two
+   built-in metamodels, `radical|c4` (default `radical`).
 3. ~~**`--folder` must be absolute.**~~ Fixed in #119: a relative path resolves
    against the working directory, so `.mcp.json` calls `node` directly.
 4. ~~**Webapps and containers are stored differently.**~~ Fixed with 8: a web
@@ -451,7 +452,7 @@ a unit or e2e test:
   is undoable" did not hold (bug 8, fixed in #118).
 - *Getting started:* the Welcome screen shows on every browser load without a
   route, never in desktop or VS Code. It offers New model and Open; New model
-  then asks for the metamodel (C4 + DDD + Governance by default) and where to
+  then asks for the metamodel (Radical metamodel by default, or C4) and where to
   keep the model (this browser, a file or a Markdown folder; file and folder
   only where the browser can write them back, the choice remembered per
   browser), with Create with Radical Forge only once an AI provider is set
@@ -467,8 +468,7 @@ a unit or e2e test:
   flag or status.
 - *Metamodel editor:* no controls for icon, collapsed size, root placement,
   enum default, "visible only when" or relation colour; presets are picked when
-  a model is created, not in the editor; the Diagram tab is undocumented; the
-  second preset is called "C4 + DDD Domains".
+  a model is created, not in the editor; the Diagram tab is undocumented.
 - *Views:* a new view starts with the whole model, not what is on screen;
   every card has a settings button and the treemap's Size/Levels live in its
   toolbar; the treemap drills in on double-click and has no inline expand; the

@@ -3,7 +3,7 @@
 ## Architecture model
 
 `architecture/` is the architecture of radical.tools itself, kept as a Radical
-Markdown-folder model (C4 + DDD + Governance): containers, shared packages,
+Markdown-folder model (Radical metamodel): containers, shared packages,
 ADRs, fitness functions, needs and requirements. Claude Code reaches it through
 the project MCP server `radical-architecture` (`.mcp.json`), which needs
 `npm run build -w @radical/mcp` once after cloning and after MCP changes.

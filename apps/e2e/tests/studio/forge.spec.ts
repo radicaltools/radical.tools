@@ -60,7 +60,7 @@ interface Doc {
 
 test('Forge files each stage into its view and offers to arrange it', async ({ page, studio }) => {
   const doc = JSON.parse(fixture('bookstore'))
-  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'C4 + DDD + Governance', nodeTypes: {}, relationTypes: {} }
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
   await studio.seedDocument(JSON.stringify(doc))
   const stagePrompts = await scriptAnthropic(page, [
     { task: /extract its functional requirements/, calls: [1, 2, 3, 4, 5].map(requirement) },
@@ -132,7 +132,7 @@ test('Forge files each stage into its view and offers to arrange it', async ({ p
 
 test('Forge builds the domain model after the requirements and the state machines after the scenarios', async ({ page, studio }) => {
   const doc = JSON.parse(fixture('bookstore'))
-  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'C4 + DDD + Governance', nodeTypes: {}, relationTypes: {} }
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
   await studio.seedDocument(JSON.stringify(doc))
   const node = (tempId: string, type: string, label: string, parentId?: string, properties?: Record<string, unknown>): ToolUse =>
     ({ name: 'add_node', input: { tempId, type, label, ...(parentId ? { parentId } : {}), ...(properties ? { properties } : {}) } })

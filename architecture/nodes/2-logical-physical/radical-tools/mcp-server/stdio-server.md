@@ -5,4 +5,4 @@ label: "Stdio server"
 technology: "@modelcontextprotocol/server"
 ---
 
-apps/mcp/src/index.ts. Parses --folder and --metamodel, registers every catalogue tool with a readOnlyHint, forwards progress and cancellation, and re-advertises the tool schemas after a metamodel change. Exits with its client.
+apps/mcp/src/index.ts. Parses --folder and --metamodel (radical or c4, default radical), registers every catalogue tool with a readOnlyHint, forwards progress and cancellation, and re-advertises the tool schemas after a metamodel change. Exits with its client.

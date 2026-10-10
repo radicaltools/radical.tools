@@ -38,7 +38,6 @@ import {
   NodeTypeDef,
   RelationTypeDef,
   builtInC4Metamodel,
-  builtInDddC4Metamodel,
   builtInGovernanceMetamodel,
   isRelationAllowed,
   isParentAllowed,
@@ -1401,14 +1400,7 @@ export const useDiagramStore = create<DiagramStore>()(
       initPres = buildPresentationsFromData(persisted.presentations, persisted.presentationSlides)
       // Auto-refresh built-in presets so persisted documents pick up
       // metamodel updates shipped with new app versions.
-      initMetamodel = (() => {
-        const persistedMm = persisted.metamodel
-        if (!persistedMm) return builtInC4Metamodel()
-        if (persistedMm.id === 'c4-builtin') return builtInC4Metamodel()
-        if (persistedMm.id === 'c4-ddd-builtin') return builtInDddC4Metamodel()
-        if (persistedMm.id === 'c4-ddd-governance-builtin') return builtInGovernanceMetamodel()
-        return persistedMm
-      })()
+      initMetamodel = model.documentMetamodel(persisted.metamodel)
       // Signal the boot startLiveLayout() call to skip cola's bulk phase
       // so the persisted positions aren't immediately overwritten.
       _initLoadedFromDisk = true

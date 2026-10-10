@@ -8,7 +8,7 @@ Model your software architecture with nodes, relations, and multiple synchronize
 ## Features
 
 - **Visual drag-and-drop editor** for `.radical` files — opens automatically on double-click
-- **Multiple metamodels** — start from C4, C4 + DDD Domains, or C4 + DDD + Governance (ADRs, Fitness Functions, Needs, Requirements)
+- **Two metamodels** — the Radical metamodel (C4 with DDD domains, ADRs, Fitness Functions, Needs, Requirements, Scenarios, Mockups and State Machines) or plain C4
 - **Multiple views per model** — Canvas, Treemap, Matrix, Sequence, Table, Wiki — all driven from one source of truth
 - **JSON Schema validation** — IntelliSense, autocomplete and error highlighting for `.c4.json` files
 - **Live VS Code theme sync** — diagram UI automatically follows your editor's light / dark theme
@@ -24,7 +24,7 @@ Model your software architecture with nodes, relations, and multiple synchronize
 
 1. Create a file ending in `.radical` (e.g. `architecture.radical`)
 2. VS Code opens it automatically in Radical.Tools
-3. The editor initialises with the **C4 + DDD + Governance** metamodel — the fullest preset
+3. The editor initialises with the **Radical** metamodel — the fuller of the two
 4. Add nodes from the left-panel palette and connect them on the canvas
 
 ### Existing `.c4.json` file
@@ -74,11 +74,10 @@ Three built-in presets ship with the extension:
 
 | Preset | Node types included |
 |--------|---------------------|
+| **Radical** | All C4 types + recursive **Domain** container, **Entity**, **ADR**, **Fitness Function**, **Need**, **Requirement**, **Scenario**, **Blueprint**, **Mockup**, **State Machine** |
 | **C4** | Person, System, Container, Component, Database, Web App, Queue, Group |
-| **C4 + DDD** | All C4 types + recursive **Domain** container |
-| **C4 + DDD + Governance** | All above + **ADR**, **Fitness Function**, **Need**, **Requirement**, **Scenario**, **Blueprint**, **Mockup** |
 
-New files are initialised with the **C4 + DDD + Governance** preset.  
+New files are initialised with the **Radical** metamodel. Files made with the former *C4 + DDD* preset open under it, since it holds all of their types.  
 The metamodel can be customised per-document via the Radical menu → Schema → Metamodel editor.
 
 ---

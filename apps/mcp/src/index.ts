@@ -7,7 +7,7 @@ import { FORGE_PROCEDURE } from './forge'
 const USAGE = `Usage: radical-mcp --folder <model-folder> [--metamodel ${Object.keys(PRESETS).join('|')}]
   --folder     the Markdown model folder, absolute or relative to the working directory;
                a missing or empty folder becomes a new model
-  --metamodel  the metamodel of a new model (default: governance)`
+  --metamodel  the metamodel of a new model (default: radical)`
 
 function parseArgs(args: string[]): { folder: string } & OpenOptions {
   const values = new Map<string, string>()

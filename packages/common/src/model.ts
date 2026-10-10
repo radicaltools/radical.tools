@@ -13,7 +13,6 @@
 import { constraintLines, pinnedNodeIds, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
 import {
   builtInC4Metamodel,
-  builtInDddC4Metamodel,
   builtInGovernanceMetamodel,
   canAddMoreOfType,
   inferRelationType,
@@ -38,16 +37,16 @@ type NodeRecord = C4Node & Record<string, unknown>
 
 /** The metamodel a loaded document runs under. Built-in metamodels are
  *  stored by id and replaced with the current preset; a document without
- *  one uses C4. */
+ *  one uses C4. The retired C4 + DDD preset loads as the Radical metamodel,
+ *  which holds all of its types unchanged. */
 export function documentMetamodel(stored: Metamodel | undefined): Metamodel {
   if (!stored) return builtInC4Metamodel()
   if (stored.id === 'c4-builtin') return builtInC4Metamodel()
-  if (stored.id === 'c4-ddd-builtin') return builtInDddC4Metamodel()
-  if (stored.id === 'c4-ddd-governance-builtin') return builtInGovernanceMetamodel()
+  if (stored.id === 'c4-ddd-builtin' || stored.id === 'c4-ddd-governance-builtin') return builtInGovernanceMetamodel()
   return stored
 }
 
-const PRESET_IDS = new Set(['c4-builtin', 'c4-ddd-builtin', 'c4-ddd-governance-builtin'])
+const PRESET_IDS = new Set(['c4-builtin', 'c4-ddd-governance-builtin'])
 
 /** A copy of a built-in preset under a custom id, or null when `mm` is
  *  already custom. Edit the copy: documentMetamodel swaps a preset id back

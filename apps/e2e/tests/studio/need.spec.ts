@@ -4,7 +4,7 @@ import { test, expect, fixture } from '../../support/fixtures'
 // derive from — and Radical Forge storing / reusing its description as one.
 function governanceBookstore(): Record<string, unknown> & { nodes: unknown[]; relations: unknown[]; views: unknown[] } {
   const doc = JSON.parse(fixture('bookstore'))
-  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'C4 + DDD + Governance', nodeTypes: {}, relationTypes: {} }
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
   return doc
 }
 
