@@ -22,7 +22,13 @@ import {
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import {
   webFolderSupported,
+  webFileSupported,
   pickWebDirectory,
+  pickWebFileToOpen,
+  pickWebFileToSave,
+  readFileHandle,
+  writeFileHandle,
+  type FsFileHandle,
   readOneFileFromHandle,
   handleFolderStorage,
   type FsDirHandle,
@@ -39,11 +45,12 @@ const LS_DOC_PREFIX = 'radical-doc:'
 /** Legacy single-slot key from the previous persistence iteration. */
 const LS_LEGACY_KEY = 'radical-diagram-v1'
 
-/** Web md-folder docs (source==='md', no native host folder access) whose directory handle
- *  has verified read/write permission this session. Writes are skipped until a
- *  folder is "connected" so a permission-pending handle can never clobber the
- *  user's files with an empty/stale model after a reload. */
-const connectedWebFolders = new Set<string>()
+/** Web documents kept on disk through the File System Access API (md folders
+ *  and single files, see `isWebDiskDoc`) whose handle has verified read/write
+ *  permission this session. Writes are skipped until a handle is "connected"
+ *  so a permission-pending handle can never clobber the user's files with an
+ *  empty/stale model after a reload. */
+const connectedWebHandles = new Set<string>()
 
 /** Id of the document ensureActive() seeded on this boot because the index was
  *  empty, i.e. a first visit. The welcome screen hides it from "recent" so a
@@ -207,6 +214,38 @@ function defaultNameFromFolder(folderPath: string): string {
   return base || folderPath
 }
 
+/** A web document kept in a single file through a stored file handle (an
+ *  Electron file document has a `filePath` instead). */
+function isWebFileDoc(meta: DocumentMeta | undefined): boolean {
+  return meta?.source === 'fs' && !meta.filePath && !host().readFile && webFileSupported()
+}
+
+/** A web document whose storage is a handle needing permission each session:
+ *  a Markdown folder or a single file. */
+function isWebDiskDoc(meta: DocumentMeta | undefined): boolean {
+  return (meta?.source === 'md' && !host().readFolder && webFolderSupported()) || isWebFileDoc(meta)
+}
+
+/** Pretty JSON, as every model file is written. */
+function modelJson(data: DiagramData): string {
+  return JSON.stringify(data, null, 2)
+}
+
+/** A suggested file name for a model. */
+function modelFileName(name: string): string {
+  return (name || 'model').replace(/[\\/]/g, '_') + '.radical'
+}
+
+/** Only an object with node and relation arrays is a model. */
+function parseModel(content: string): DiagramData | null {
+  try {
+    const parsed = JSON.parse(content) as DiagramData
+    return parsed && Array.isArray(parsed.nodes) && Array.isArray(parsed.relations) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 /** Fetch one md-folder node's body from disk (Electron file or web handle),
  *  without caching it anywhere — the caller decides what to do with it. */
 async function fetchNodeBody(id: string, nodeId: string): Promise<string | undefined> {
@@ -356,7 +395,7 @@ async function bindFolder(meta: DocumentMeta, written: WrittenFolder): Promise<v
     meta.folderPath = written.folderPath
   } else {
     await saveHandle(meta.id, written.handle)
-    connectedWebFolders.add(meta.id)
+    connectedWebHandles.add(meta.id)
     written.session.onExternalChange = () => notifyExternalChange(meta.id)
     webSessions.set(meta.id, written.session)
     meta.folderPath = undefined
@@ -364,6 +403,18 @@ async function bindFolder(meta: DocumentMeta, written: WrittenFolder): Promise<v
   meta.source = 'md'
   meta.filePath = undefined
   meta.name = written.name
+  meta.lastModified = Date.now()
+}
+
+/** Turn `meta` into the file-backed document of a file handle just written. */
+async function bindWebFile(meta: DocumentMeta, handle: FsFileHandle): Promise<void> {
+  await saveHandle(meta.id, handle)
+  connectedWebHandles.add(meta.id)
+  if (meta.source === 'ls') deleteLSPayload(meta.id)
+  meta.source = 'fs'
+  meta.filePath = undefined
+  meta.folderPath = undefined
+  meta.name = stripModelExtension(handle.name) || meta.name
   meta.lastModified = Date.now()
 }
 
@@ -378,6 +429,20 @@ async function writeDocument(id: string, data: DiagramData): Promise<void> {
     const res = await h.writeFile(meta.filePath, json)
     if (!res.success) {
       console.warn('[documentStore] FS write failed for', meta.filePath, res.error)
+      return
+    }
+  } else if (isWebFileDoc(meta)) {
+    // As for folders: never write before access is verified this session.
+    const handle = await loadHandle<FsFileHandle>(id)
+    if (!handle) return
+    if (!connectedWebHandles.has(id)) {
+      if (!(await verifyPermission(handle, 'readwrite', false))) return
+      connectedWebHandles.add(id)
+    }
+    try {
+      await writeFileHandle(handle, modelJson(data))
+    } catch (e) {
+      console.warn('[documentStore] web file write failed:', e)
       return
     }
   } else if (meta.source === 'md' && meta.folderPath && h.writeFolder) {
@@ -398,10 +463,10 @@ async function writeDocument(id: string, data: DiagramData): Promise<void> {
   } else if (meta.source === 'md' && !h.writeFolder && webFolderSupported()) {
     // Never write until the handle's permission is verified this session,
     // so a reload with a permission-pending handle can't overwrite files.
-    if (!connectedWebFolders.has(id)) {
+    if (!connectedWebHandles.has(id)) {
       const handle = await loadHandle(id)
       if (!handle || !(await verifyPermission(handle, 'readwrite', false))) return
-      connectedWebFolders.add(id)
+      connectedWebHandles.add(id)
     }
     const handle = await loadHandle(id)
     if (!handle) return
@@ -576,9 +641,10 @@ export interface DocumentsAPI {
   /** Remove the doc from the index. Optionally delete its LS payload. */
   deleteDocument(id: string, opts?: { wipePayload?: boolean }): void
 
-  /** Open dialog (Electron) or HTML file picker (web) -> register as a doc.
-   *  Electron path adds an FS-backed doc bound to the chosen path.
-   *  Web path adds an LS-backed doc seeded with the parsed JSON content.
+  /** Open dialog (Electron) or file picker (web) -> register as a doc.
+   *  Electron path adds an FS-backed doc bound to the chosen path; so does a
+   *  browser that can write files back (Chromium), through the file handle.
+   *  Other browsers add an LS-backed doc seeded with the parsed JSON content.
    *  Returns the new (or re-activated) meta, or null if the user cancelled
    *  / the file was unparsable. The optional `pickerOverride` is an injection
    *  seam for tests — production callers pass nothing. */
@@ -589,8 +655,9 @@ export interface DocumentsAPI {
   /** Save the doc's payload to disk.
    *  Electron path: native Save dialog -> writes via preload IPC and turns
    *  the doc into FS-backed, bound to the chosen path.
-   *  Web path: triggers a browser download of the JSON; the doc stays
-   *  LS-backed (the browser has no writable absolute path) but its display
+   *  Web path: a browser that can write files back (Chromium) saves through
+   *  the file picker and turns the doc FS-backed on the file handle. Other
+   *  browsers download the JSON; the doc stays LS-backed but its display
    *  name is updated to match the chosen filename. The optional
    *  `downloadOverride` is an injection seam for tests.
    *  Returns the (possibly mutated) meta, or null on cancel / failure. */
@@ -616,6 +683,12 @@ export interface DocumentsAPI {
     confirmForeignFolder?: (folderName: string) => boolean | Promise<boolean>,
   ): Promise<DocumentMeta | null>
 
+  /** Pick a file to save into (Electron Save dialog, or the browser's file
+   *  picker), write `data` there as a new model named after the file, and make
+   *  it the active document. Returns null on cancel / failure or when this
+   *  browser cannot keep a model in a file. */
+  createFileDocument(data: DiagramData, name: string): Promise<DocumentMeta | null>
+
   /** Pick a folder (Electron or web), write `data` into it as a new Markdown
    *  model named after the folder, and make it the active document. Same
    *  foreign-folder rule as `saveAsFolder`. Returns null on cancel / failure. */
@@ -624,15 +697,16 @@ export interface DocumentsAPI {
     confirmForeignFolder?: (folderName: string) => boolean | Promise<boolean>,
   ): Promise<DocumentMeta | null>
 
-  /** Re-request read/write permission for a web md-folder document's handle
-   *  (must be called from a user gesture). Returns true on success. */
-  reconnectFolder(id: string): Promise<boolean>
+  /** Re-request read/write permission for a web folder or file document's
+   *  handle (must be called from a user gesture). Returns true on success. */
+  reconnect(id: string): Promise<boolean>
 
-  /** True when a web md-folder document has verified permission this session. */
-  isFolderConnected(id: string): boolean
+  /** True when a web folder or file document has verified permission this
+   *  session. */
+  isConnected(id: string): boolean
 
-  /** True for a browser folder document still waiting for Reconnect: until
-   *  the user grants access again, it loads as an empty model. */
+  /** True for a browser folder or file document still waiting for Reconnect:
+   *  until the user grants access again, it loads as an empty model. */
   awaitsReconnect(id: string): boolean
 
   /** Call `onExternalChange` when a document's storage is edited outside
@@ -742,6 +816,13 @@ export const documents: DocumentsAPI = {
       if (!res.success || !res.content) return null
       try { return JSON.parse(res.content) as DiagramData } catch { return null }
     }
+    if (isWebFileDoc(meta)) {
+      const handle = await loadHandle<FsFileHandle>(id)
+      if (!handle) return null
+      if (!(await verifyPermission(handle, 'readwrite', false))) return null // needs reconnect
+      connectedWebHandles.add(id)
+      try { return parseModel(await readFileHandle(handle)) } catch { return null }
+    }
     if (meta.source === 'md' && meta.folderPath && h.readFolder) {
       const res = await h.readFolder(meta.folderPath)
       if (!res.success || !res.files) return null
@@ -757,7 +838,7 @@ export const documents: DocumentsAPI = {
       const handle = await loadHandle(id)
       if (!handle) return null
       if (!(await verifyPermission(handle, 'readwrite', false))) return null // needs reconnect
-      connectedWebFolders.add(id)
+      connectedWebHandles.add(id)
       try {
         const files = await webSession(id, handle).readAll()
         if (Object.keys(files).length === 0) return null // empty/new folder
@@ -812,9 +893,12 @@ export const documents: DocumentsAPI = {
     if (idx.docs.length === before) return
     if (opts?.wipePayload !== false) deleteLSPayload(id)
     if (removed?.source === 'md') {
-      connectedWebFolders.delete(id)
+      connectedWebHandles.delete(id)
       mdBodyPaths.delete(id)
       webSessions.delete(id)
+      void removeHandle(id)
+    } else if (removed?.source === 'fs' && !removed.filePath) {
+      connectedWebHandles.delete(id)
       void removeHandle(id)
     }
     if (idx.activeId === id) idx.activeId = idx.docs[0]?.id ?? null
@@ -846,6 +930,34 @@ export const documents: DocumentsAPI = {
         filePath: res.filePath,
         lastModified: Date.now(),
       }
+      idx.docs.push(meta)
+      idx.activeId = meta.id
+      writeIndex(idx)
+      notify()
+      return meta
+    }
+
+    // ── Web, File System Access: keep the model in the picked file.
+    if (!pickerOverride && webFileSupported()) {
+      const handle = await pickWebFileToOpen()
+      if (!handle) return null
+      const parsed = parseModel(await readFileHandle(handle))
+      if (!parsed) {
+        console.warn('[documentStore] importFromFile: not a DiagramData payload')
+        return null
+      }
+      // Writing back needs its own grant; ask while the pick still counts as
+      // the user's gesture. Refused, the model waits for Reconnect.
+      const writable = await verifyPermission(handle, 'readwrite', true)
+      const idx = readIndex()
+      const meta: DocumentMeta = {
+        id: uid(),
+        name: stripModelExtension(handle.name),
+        source: 'fs',
+        lastModified: Date.now(),
+      }
+      await saveHandle(meta.id, handle)
+      if (writable) connectedWebHandles.add(meta.id)
       idx.docs.push(meta)
       idx.activeId = meta.id
       writeIndex(idx)
@@ -891,6 +1003,27 @@ export const documents: DocumentsAPI = {
       meta.filePath = res.filePath
       meta.name = defaultNameFromPath(res.filePath)
       meta.lastModified = Date.now()
+      writeIndex(idx)
+      notify()
+      return meta
+    }
+
+    // ── Web, File System Access: bind the doc to the picked file.
+    if (!downloadOverride && webFileSupported()) {
+      const current = readIndex().docs.find(d => d.id === id)
+      if (!current) return null
+      const handle = await pickWebFileToSave(modelFileName(current.name))
+      if (!handle) return null
+      try {
+        await writeFileHandle(handle, json)
+      } catch (e) {
+        console.warn('[documentStore] saveAsFile write failed:', e)
+        return null
+      }
+      const idx = readIndex()
+      const meta = idx.docs.find(d => d.id === id)
+      if (!meta) return null
+      await bindWebFile(meta, handle)
       writeIndex(idx)
       notify()
       return meta
@@ -958,7 +1091,7 @@ export const documents: DocumentsAPI = {
         lastModified: Date.now(),
       }
       await saveHandle(meta.id, handle)
-      connectedWebFolders.add(meta.id)
+      connectedWebHandles.add(meta.id)
       webSessions.delete(meta.id)
       idx.docs.push(meta)
       idx.activeId = meta.id
@@ -984,6 +1117,37 @@ export const documents: DocumentsAPI = {
     return meta
   },
 
+  async createFileDocument(data, name) {
+    const h = host()
+    const json = modelJson(data)
+    // ── Electron: native Save dialog → FS-backed doc on that path. ──
+    if (h.saveDiagram) {
+      const res = await h.saveDiagram(json)
+      if (!res.success || !res.filePath) return null
+      const meta = this.createFSDocument(res.filePath)
+      this.setActiveId(meta.id) // an entry already tracking this path
+      return meta
+    }
+    // ── Web: file picker → FS-backed doc on the file handle. ──
+    if (!webFileSupported()) return null
+    const handle = await pickWebFileToSave(modelFileName(name))
+    if (!handle) return null
+    try {
+      await writeFileHandle(handle, json)
+    } catch (e) {
+      console.warn('[documentStore] new file write failed:', e)
+      return null
+    }
+    const idx = readIndex()
+    const meta: DocumentMeta = { id: uid(), name, source: 'fs', lastModified: Date.now() }
+    await bindWebFile(meta, handle)
+    idx.docs.push(meta)
+    idx.activeId = meta.id
+    writeIndex(idx)
+    notify()
+    return meta
+  },
+
   async createFolderDocument(data, confirmForeignFolder) {
     const written = await pickAndWriteFolder(data, 'model', confirmForeignFolder)
     if (!written) return null
@@ -999,23 +1163,22 @@ export const documents: DocumentsAPI = {
     return meta
   },
 
-  async reconnectFolder(id) {
-    if (!webFolderSupported()) return false
-    const handle = await loadHandle(id)
+  async reconnect(id) {
+    if (!isWebDiskDoc(readIndex().docs.find((d) => d.id === id))) return false
+    const handle = await loadHandle<FsDirHandle | FsFileHandle>(id)
     if (!handle) return false
     const ok = await verifyPermission(handle, 'readwrite', true)
     if (!ok) return false
-    connectedWebFolders.add(id)
+    connectedWebHandles.add(id)
     return true
   },
 
-  isFolderConnected(id) {
-    return connectedWebFolders.has(id)
+  isConnected(id) {
+    return connectedWebHandles.has(id)
   },
 
   awaitsReconnect(id) {
-    const meta = readIndex().docs.find((d) => d.id === id)
-    return meta?.source === 'md' && !host().readFolder && !connectedWebFolders.has(id)
+    return isWebDiskDoc(readIndex().docs.find((d) => d.id === id)) && !connectedWebHandles.has(id)
   },
 
   async publishSelection(id, content) {
@@ -1027,7 +1190,7 @@ export const documents: DocumentsAPI = {
       if (!res.success) console.warn('[documentStore] selection write failed:', res.error)
       return
     }
-    if (h.readFolder || !connectedWebFolders.has(id)) return
+    if (h.readFolder || !connectedWebHandles.has(id)) return
     const handle = await loadHandle(id)
     if (!handle) return
     try { await writeSelectionToHandle(handle, content) }
@@ -1042,7 +1205,7 @@ export const documents: DocumentsAPI = {
       const res = await h.readForgeRun(meta.folderPath)
       return res.success ? res.content ?? null : null
     }
-    if (h.readFolder || !connectedWebFolders.has(id)) return null
+    if (h.readFolder || !connectedWebHandles.has(id)) return null
     const handle = await loadHandle(id)
     return handle ? readForgeRunFromHandle(handle) : null
   },
@@ -1075,7 +1238,7 @@ export const documents: DocumentsAPI = {
 
     if (!h.writeFolder && webFolderSupported()) {
       const timer = setInterval(() => {
-        if (!connectedWebFolders.has(id)) return
+        if (!connectedWebHandles.has(id)) return
         webSessions.get(id)?.poll().catch((e) => console.warn('[documentStore] folder poll failed:', e))
       }, WEB_FOLDER_POLL_MS)
       return () => {

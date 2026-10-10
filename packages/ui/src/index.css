@@ -2864,17 +2864,10 @@ body {
 /* ─── Radical Forge — live progress feed ─────────────────────────────────── */
 
 /* ─── Document manager modal ─────────────────────────────────────────────── */
-.docmgr-tab.active {
+.docmgr-filter.active {
   color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-.docmgr-tab.active .docmgr-tab-count {
   background: var(--accent-soft);
-  color: var(--accent);
-}
-.docmgr-mm-option.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .docmgr-btn.primary {
   background: var(--accent); border-color: var(--accent);
@@ -2882,13 +2875,7 @@ body {
 }
 .docmgr-btn.primary:hover { filter: brightness(1.08); }
 .docmgr-btn.small { padding: 3px 8px; font-size: 12px; }
-.docmgr-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
-.docmgr-btn.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .docmgr-item.active { background: var(--accent-soft); }
-.docmgr-badge.ls {
-  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
-  color: var(--text-secondary);
-}
 
 /* ─── Toolbar: active document chip ──────────────────────────────────────── */
 .toolbar-doc-badge.ls { background: rgba(120,120,120,0.25); color: #ccc; }
@@ -3113,11 +3100,6 @@ body {
 /* ─── Welcome / Splash screen ─────────────────────────────────────────────── */
 
 /* ── Left column ── */
-.welcome-mm-option.selected {
-  background: rgba(59, 111, 230, 0.07);
-  border-color: rgba(59, 111, 230, 0.35);
-}
-
 /* ─── Treemap view ───────────────────────────────────────────────────── */
 .tm-bc-item.active {
   color: var(--text-primary);

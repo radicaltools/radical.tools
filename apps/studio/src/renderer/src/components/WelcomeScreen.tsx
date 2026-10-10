@@ -1,56 +1,7 @@
-import React, { useState } from 'react'
-import { documents, type DocumentMeta } from '../store/documentStore'
-import { buildFintechSampleRaw } from '../store/fintechSample'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { formatRoute } from '../route'
-import { availableMetamodels } from '@radical/common/metamodel'
-import type { DiagramData } from '@radical/common/c4'
-import { host } from '../platform/host'
-import { webFolderSupported } from '../persist/webFolder'
+import React, { useEffect, useState } from 'react'
+import { documents } from '../store/documentStore'
 import { aiReady, loadAISettings } from '../ai/settings'
-import { confirmForeignFolder } from './confirmForeignFolder'
-
-/** Markdown folders open in Electron and in Chromium browsers (File System
- *  Access API), as in the Document Manager. */
-const folderSupported = !!host().openFolder || webFolderSupported()
-
-/** Where "New model" keeps the model: browser storage, or a Markdown folder
- *  the user picks. The last choice is remembered per browser. */
-type Storage = 'browser' | 'folder'
-const STORAGE_KEY = 'radical-new-model-storage'
-
-const STORAGE_OPTIONS: { id: Storage; name: string; description: string }[] = [
-  {
-    id: 'browser',
-    name: 'In this browser',
-    description: 'Kept in this browser\'s storage. Nothing to pick; export a file to share it.',
-  },
-  {
-    id: 'folder',
-    name: 'In a folder',
-    description: 'Markdown files in a folder you pick, ready for git, Claude Code and the MCP server.',
-  },
-]
-
-function loadStorageChoice(): Storage {
-  if (!folderSupported) return 'browser'
-  try {
-    return localStorage.getItem(STORAGE_KEY) === 'folder' ? 'folder' : 'browser'
-  } catch {
-    return 'browser'
-  }
-}
-
-function saveStorageChoice(storage: Storage): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, storage)
-  } catch {
-    // Not remembered; the choice still applies now.
-  }
-}
-
-/** The sample's System Context view (fintechSampleData.json). */
-const SAMPLE_START_VIEW = 'view-ctx'
+import { BrowserIcon, ModelRow, NewModelStep, OpenSources, StepRow, openSample } from './ModelSteps'
 
 interface Props {
   onDismiss: () => void
@@ -124,115 +75,41 @@ function SamplePreview(): React.ReactElement {
 
 export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
   // The doc auto-seeded on a first visit is not the user's work: leave it out
-  // so newcomers get the first-visit layout with the sample front and centre.
+  // so newcomers are not greeted by a model they never made.
   const existingDocs = documents.listDocuments().filter(d => !documents.isBootSeeded(d.id))
   const hasExisting  = existingDocs.length > 0
+  const browserDocs  = existingDocs.filter(d => d.source === 'ls')
   // AI settings live behind the logo menu, which this overlay covers, so
   // reading them once is enough.
   const [forgeAvailable] = useState(() => aiReady(loadAISettings()))
-  const presets = availableMetamodels()
-  const [openPicker, setOpenPicker] = useState<'metamodel' | 'storage' | null>(null)
-  const [selectedPresetId, setSelectedPresetId] = useState('c4-ddd-governance-builtin')
-  const selectedPreset = presets.find(p => p.id === selectedPresetId) ?? presets[0]
-  const [storage, setStorage] = useState<Storage>(loadStorageChoice)
-  const selectedStorage = STORAGE_OPTIONS.find(o => o.id === storage) ?? STORAGE_OPTIONS[0]
+  /** The right column: the two choices, then what "New model" or "Open"
+   *  needs to know. */
+  const [step, setStep] = useState<'start' | 'new' | 'open' | 'open-browser'>('start')
 
-  function chooseStorage(next: Storage): void {
-    setStorage(next)
-    saveStorageChoice(next)
-    setOpenPicker(null)
-  }
-
-  /** Adds the model and opens it; says why when browser storage refused it. */
-  function create(name: string, data: DiagramData): DocumentMeta | null {
-    try {
-      return documents.createLSDocument(name, data)
-    } catch (e) {
-      window.alert((e as Error).message)
-      return null
+  // Escape steps back.
+  useEffect(() => {
+    if (step === 'start') return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setStep(step === 'open-browser' ? 'open' : 'start')
     }
-  }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [step])
 
-  /** An empty model where the user chose to keep it. False when the folder
-   *  pick was cancelled or the model could not be stored. */
-  async function createBlank(): Promise<boolean> {
-    const data: DiagramData = { nodes: [], relations: [], metamodel: selectedPreset.build() }
-    if (storage === 'folder') return !!(await documents.createFolderDocument(data, confirmForeignFolder))
-    return !!create('Untitled model', data)
-  }
-
-  async function handleNew(): Promise<void> {
-    if (!(await createBlank())) return
-    setOpenPicker(null)
-    onDismiss()
-  }
-
-  // "Start with Radical Forge" — opens straight into a blank model with the
-  // wizard already up, so a user can go from nothing to a described system
-  // without first clicking "New model" then hunting for Forge in the app
-  // menu. Toolbar.tsx (already mounted underneath this overlay) listens for
-  // the event — same pattern as radical:open-ai-settings.
-  async function handleForge(): Promise<void> {
-    if (!(await createBlank())) return
-    setOpenPicker(null)
-    onDismiss()
-    window.dispatchEvent(new CustomEvent('radical:open-forge'))
-  }
-
-  function handleOpen(id: string): void {
-    documents.setActiveId(id)
-    onDismiss()
-  }
-
-  function handleImport(): void {
-    documents.importFromFile().then((meta) => {
-      if (meta) onDismiss()
-    }, (e: Error) => window.alert(e.message))
-  }
-
-  // An empty folder opens as an empty model, so this is also how to start a
-  // model that the MCP server or Claude Code will work on.
-  function handleOpenFolder(): void {
-    documents.importFromFolder().then((meta) => {
-      if (meta) onDismiss()
-    }, (e: Error) => window.alert(e.message))
-  }
-
-  // Land on System Context rather than the default canvas, which holds all
-  // 65 elements at once and reads as noise on a first look. The doc loads
-  // asynchronously, so wait for the view to exist, then hand it to route
-  // sync (App starts it once the splash is dismissed) through the hash.
-  function handleSample(): void {
-    // Views of the doc open right now; the sample's arrive as a new object.
-    // (The open doc may be an earlier sample copy with the same view ids.)
-    const viewsBefore = useDiagramStore.getState().views
-    const data = buildFintechSampleRaw()
-    const meta = create('Fintech Banking Platform', data)
-    if (!meta) return
-    documents.setActiveId(meta.id)
-    const loaded = (views: typeof viewsBefore): boolean =>
-      views !== viewsBefore && !!views[SAMPLE_START_VIEW]
-
-    let done = false
-    const finish = (): void => {
-      if (done) return
-      done = true
-      unsub()
-      clearTimeout(timer)
-      if (loaded(useDiagramStore.getState().views)) {
-        history.replaceState(null, '', formatRoute({ mode: 'designer', view: SAMPLE_START_VIEW }))
-      }
-      onDismiss()
-    }
-    const unsub = useDiagramStore.subscribe((s) => { if (loaded(s.views)) finish() })
-    const timer = setTimeout(finish, 1500)
-  }
+  const back = (
+    <button type="button" className="msteps-back" onClick={() => setStep(step === 'open-browser' ? 'open' : 'start')}>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="M10 6H2M5.5 2.5L2 6l3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+      Back
+    </button>
+  )
 
   return (
     <div className="welcome-overlay">
       <div className="welcome-card">
 
-        {/* ── Left column: start something ── */}
+        {/* ── Left column: what this is ── */}
         <div className="welcome-left">
           <div className="welcome-wordmark">
             <svg className="welcome-wordmark-icon" width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -245,175 +122,135 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
             </svg>
             <span className="welcome-wordmark-text">studio <span className="welcome-wordmark-by">by radical<em>.tools</em></span></span>
           </div>
-          {/* Newcomers get one line on what this is; returning users know. */}
-          {!hasExisting && (
-            <p className="welcome-lead">
-              Model software architecture with C4 views, and keep the
-              decisions, requirements and screens behind it in one place.
-            </p>
-          )}
-
-          <div className="welcome-cta-group">
-            {/* Forge needs a model to talk to, so it shows only once AI is
-                set up (logo menu → AI providers…). */}
-            {forgeAvailable && (
-              <button
-                className="welcome-btn welcome-btn-forge"
-                onClick={() => void handleForge()}
-                title="Describe a system in plain language and let AI generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model for it"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                  <path d="M4.5 1.5l.9 2.1L7.5 4.5l-2.1.9-.9 2.1-.9-2.1L1.5 4.5l2.1-.9z"/>
-                  <path d="M10.5 6.5l.65 1.35L12.5 8.5l-1.35.65-.65 1.35-.65-1.35L8.5 8.5l1.35-.65z"/>
-                </svg>
-                Start with Radical Forge
-              </button>
-            )}
-            <button className="welcome-btn welcome-btn-primary" onClick={() => void handleNew()}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                <line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-              </svg>
-              New model
-            </button>
-            {/* What the new model is built on and where it is kept: the
-                defaults suit most people, so they read as captions. */}
-            <div className="welcome-new-options">
-              <button
-                type="button"
-                className="welcome-mm-toggle"
-                onClick={() => setOpenPicker(o => o === 'metamodel' ? null : 'metamodel')}
-                aria-expanded={openPicker === 'metamodel'}
-                title="Metamodel for new models"
-              >
-                {selectedPreset.name}
-                <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 7L1 3h8z"/></svg>
-              </button>
-              {folderSupported && (
-                <>
-                  <span className="welcome-new-options-sep" aria-hidden="true">·</span>
-                  <button
-                    type="button"
-                    className="welcome-mm-toggle"
-                    onClick={() => setOpenPicker(o => o === 'storage' ? null : 'storage')}
-                    aria-expanded={openPicker === 'storage'}
-                    title="Where new models are kept"
-                  >
-                    {selectedStorage.name}
-                    <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 7L1 3h8z"/></svg>
-                  </button>
-                </>
-              )}
-            </div>
-            {openPicker === 'metamodel' && (
-              <div className="welcome-mm-picker">
-                {presets.map(p => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`welcome-mm-option${selectedPreset.id === p.id ? ' selected' : ''}`}
-                    onClick={() => { setSelectedPresetId(p.id); setOpenPicker(null) }}
-                  >
-                    <div className="welcome-mm-option-name">
-                      {p.name}
-                      {selectedPreset.id === p.id && <span className="welcome-mm-option-check">✓</span>}
-                    </div>
-                    <div className="welcome-mm-option-desc">{p.description}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-            {openPicker === 'storage' && (
-              <div className="welcome-mm-picker">
-                {STORAGE_OPTIONS.map(o => (
-                  <button
-                    key={o.id}
-                    type="button"
-                    className={`welcome-mm-option${storage === o.id ? ' selected' : ''}`}
-                    onClick={() => chooseStorage(o.id)}
-                  >
-                    <div className="welcome-mm-option-name">
-                      {o.name}
-                      {storage === o.id && <span className="welcome-mm-option-check">✓</span>}
-                    </div>
-                    <div className="welcome-mm-option-desc">{o.description}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Opening what already exists is the quiet path. */}
-          <div className="welcome-links">
-            <button type="button" className="welcome-link" onClick={handleImport}>Open file…</button>
-            {folderSupported && (
-              <button
-                type="button"
-                className="welcome-link"
-                onClick={handleOpenFolder}
-                title="Open a Radical Markdown model folder, or an empty folder to start one"
-              >
-                Open folder…
-              </button>
-            )}
-            {hasExisting && (
-              <button type="button" className="welcome-link" onClick={handleSample}>Sample model</button>
-            )}
-          </div>
+          {/* The website's words (apps/web/index.html), so both say the same. */}
+          <h1 className="welcome-heading">
+            Architecture that lives here, <span>and holds whatever builds from it.</span>
+          </h1>
+          <p className="welcome-lead">
+            One model, built by you or by AI, that becomes the harness for
+            whatever builds from it.
+          </p>
+          <SamplePreview />
         </div>
 
-        {/* ── Right column: carry on, or look around ── */}
+        {/* ── Right column: New model or Open, then the details ── */}
         <div className="welcome-right">
-          {hasExisting ? (
-            <>
-              <p className="welcome-right-label">Recent</p>
-              <div className="welcome-recent">
-                {existingDocs.slice(0, 6).map((doc, i) => (
-                  <button
-                    key={doc.id}
-                    className={`welcome-recent-item${i === 0 ? ' welcome-recent-item-last' : ''}`}
-                    onClick={() => handleOpen(doc.id)}
-                    // The last model is one Enter away.
-                    autoFocus={i === 0}
-                    title={`Last edited ${new Date(doc.lastModified).toLocaleString()}`}
-                  >
-                    <span className="welcome-recent-icon">
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <rect x="1.5" y="0.5" width="9" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-                        <line x1="4" y1="4.5" x2="8" y2="4.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                        <line x1="4" y1="7"   x2="8" y2="7"   stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                        <line x1="4" y1="9.5" x2="6" y2="9.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                      </svg>
-                    </span>
-                    <span className="welcome-recent-name">{doc.name}</span>
-                    <span className="welcome-recent-date">
-                      {new Date(doc.lastModified).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            // First visit: the sample is the fastest way to see what the
-            // tool does (no AI key, no blank canvas), so it gets the whole
-            // column.
-            <>
-              <p className="welcome-right-label">Explore a sample</p>
-              <button type="button" className="welcome-sample-card" onClick={handleSample}>
-                <SamplePreview />
-                <span className="welcome-sample-title">Fintech Banking Platform</span>
-                <span className="welcome-sample-desc">
-                  A complete model to click through, from C4 views down to
-                  the decisions, requirements and screens behind them.
+          {step === 'start' && (
+            <div className="welcome-start">
+              <button
+                type="button"
+                className="welcome-choice welcome-choice-primary"
+                onClick={() => setStep('new')}
+                aria-label="New model"
+                aria-describedby="welcome-new-desc"
+              >
+                <svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <line x1="7" y1="1.5" x2="7" y2="12.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  <line x1="1.5" y1="7" x2="12.5" y2="7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                </svg>
+                <span className="welcome-choice-text">
+                  <span className="welcome-choice-title">New model</span>
+                  <span className="welcome-choice-desc" id="welcome-new-desc">
+                    {forgeAvailable
+                      ? 'Empty or with Radical Forge, kept in this browser, a file or a folder'
+                      : 'Pick a metamodel, keep it in this browser, a file or a folder'}
+                  </span>
                 </span>
-                <span className="welcome-sample-cta">
-                  Explore the sample
+              </button>
+              <button
+                type="button"
+                className="welcome-choice"
+                onClick={() => setStep('open')}
+                aria-label="Open"
+                aria-describedby="welcome-open-desc"
+              >
+                <svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path d="M1.5 3.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                </svg>
+                <span className="welcome-choice-text">
+                  <span className="welcome-choice-title">Open</span>
+                  <span className="welcome-choice-desc" id="welcome-open-desc">
+                    From this browser, a file, a folder, or the sample
+                  </span>
+                </span>
+              </button>
+
+              {/* A newcomer has no models yet: the sample shows what the tool
+                  does, with no AI key and no blank canvas. */}
+              {!hasExisting && (
+                <button type="button" className="welcome-sample-link" onClick={() => openSample(onDismiss, true)}>
+                  Try the sample model
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                     <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                </span>
-              </button>
-            </>
+                </button>
+              )}
+
+              {/* The last few models, one click away; the full list is under Open. */}
+              {hasExisting && (
+                <div className="welcome-start-recent">
+                  <p className="msteps-label">Recent</p>
+                  <div className="msteps-rows">
+                    {existingDocs.slice(0, 3).map(doc => <ModelRow key={doc.id} doc={doc} onOpen={onDismiss} />)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 'new' && (
+            <div className="msteps">
+              {back}
+              <h2 className="msteps-title">New model</h2>
+              <NewModelStep onDone={onDismiss} />
+            </div>
+          )}
+
+          {step === 'open' && (
+            <div className="msteps">
+              {back}
+              <h2 className="msteps-title">Open</h2>
+              {hasExisting && (
+                <>
+                  <p className="msteps-label">Recent</p>
+                  <div className="msteps-rows">
+                    {/* The last model is one Enter away. */}
+                    {existingDocs.slice(0, 5).map((doc, i) => (
+                      <ModelRow key={doc.id} doc={doc} onOpen={onDismiss} autoFocus={i === 0} />
+                    ))}
+                  </div>
+                  <div className="msteps-divider" />
+                </>
+              )}
+              <OpenSources
+                onDone={onDismiss}
+                setRoute
+                autoFocus={false}
+                before={
+                  <StepRow
+                    icon={<BrowserIcon />}
+                    name="In this browser…"
+                    meta={browserDocs.length === 1 ? '1 model' : `${browserDocs.length} models`}
+                    onClick={() => setStep('open-browser')}
+                    autoFocus={!hasExisting}
+                  />
+                }
+              />
+            </div>
+          )}
+
+          {step === 'open-browser' && (
+            <div className="msteps">
+              {back}
+              <h2 className="msteps-title">In this browser</h2>
+              {browserDocs.length > 0 ? (
+                <div className="msteps-rows msteps-rows-scroll">
+                  {browserDocs.map((doc, i) => <ModelRow key={doc.id} doc={doc} onOpen={onDismiss} autoFocus={i === 0} />)}
+                </div>
+              ) : (
+                <p className="msteps-empty">No models are kept in this browser yet.</p>
+              )}
+            </div>
           )}
         </div>
 
