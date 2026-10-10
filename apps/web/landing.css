@@ -228,6 +228,47 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .tile-text a:hover { text-decoration: underline; }
 
 /* ── Feature list ────────────────────────────────────────────────── */
+/* ── Two metamodels ── */
+.metamodels { padding: 0 0 64px; }
+.mm-head { max-width: 720px; margin-bottom: 18px; }
+.mm-head p { margin-top: 8px; font-size: 13.5px; line-height: 1.6; color: var(--muted); }
+.mm-cards { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; }
+.mm-card {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 20px 22px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.mm-card:hover { border-color: var(--accent-border); transform: translateY(-2px); }
+.mm-card-head { display: flex; align-items: center; gap: 10px; }
+.mm-name { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.mm-tag {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px;
+  color: var(--accent); background: var(--accent-light);
+}
+.mm-text { font-size: 13px; line-height: 1.6; color: var(--muted); }
+.mm-text em { color: var(--text-2); font-style: normal; font-weight: 500; }
+.mm-groups { display: flex; flex-direction: column; gap: 6px; }
+.mm-group {
+  font-size: 12px; line-height: 1.5; color: var(--muted);
+  padding-left: 10px;
+  border-left: 3px solid var(--g);
+}
+.mm-group b { color: var(--text); font-weight: 600; margin-right: 6px; }
+.mm-chain {
+  font-family: var(--mono); font-size: 11px; line-height: 1.7; color: var(--text-2);
+  padding: 8px 10px; border-radius: var(--radius-md); background: var(--hover-faint);
+}
+.mm-chain i { font-style: normal; color: var(--accent); }
+.mm-more { margin-top: auto; font-size: 13px; font-weight: 600; color: var(--accent); }
+@media (max-width: 760px) {
+  .mm-cards { grid-template-columns: 1fr; }
+}
+
 .features { padding: 0 0 64px; }
 .features h2 { margin-bottom: 18px; }
 .feature-list {
