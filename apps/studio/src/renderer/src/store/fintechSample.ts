@@ -7,7 +7,7 @@
  *    container, component, database, webapp, queue, adr, fitness-fn,
  *    need (raw input: regulation, brief, stakeholder note), requirement
  *    (EARS), scenario (Gherkin), mockup (with wireframe), group
- *  - C4 + DDD + Governance metamodel, with satisfies / verifies / derives /
+ *  - Radical metamodel, with satisfies / verifies / derives /
  *    traces-to / illustrates / presented-by / navigates-to relations
  *  - 15 named views: static, dynamic (payment flow + one per screen flow),
  *    treemap, matrix, table (Governance, Requirements Register) and wiki

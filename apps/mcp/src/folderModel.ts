@@ -7,7 +7,7 @@ import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
 import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
 import { deserializeFromMdFolder, isMdFolder, isOwnedMdFolderFile, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
-import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { readSelectionFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
 import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
@@ -70,14 +70,13 @@ export interface CallOutcome {
 
 /** Metamodels a new folder can start with (`--metamodel`). */
 export const PRESETS = {
+  radical: builtInGovernanceMetamodel,
   c4: builtInC4Metamodel,
-  'c4-ddd': builtInDddC4Metamodel,
-  governance: builtInGovernanceMetamodel,
 } as const
 export type PresetName = keyof typeof PRESETS
 
 export interface OpenOptions {
-  /** Metamodel for a folder that holds no model yet; Governance by default, as in Studio. */
+  /** Metamodel for a folder that holds no model yet; Radical by default, as in Studio. */
   metamodel?: PresetName
 }
 
@@ -199,7 +198,7 @@ export class FolderModel {
   static async open(folder: string, options: OpenOptions = {}): Promise<FolderModel> {
     if (!folder) throw new Error('--folder is required')
     const path = resolve(folder)
-    const preset = options.metamodel ?? 'governance'
+    const preset = options.metamodel ?? 'radical'
     await startIfEmpty(path, preset)
     const canonical = await realpath(path)
     if (!(await stat(canonical)).isDirectory()) throw new Error(`Not a directory: ${folder}`)

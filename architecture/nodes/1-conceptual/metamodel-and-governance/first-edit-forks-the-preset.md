@@ -5,7 +5,7 @@ label: "First edit forks the preset"
 gherkin: |
   And reloading the model keeps the Risk type
   # Covered by: packages/common/tests/aiDocumentTools.test.ts › copy a preset on the first edit, and the copy survives reloading
-given: "a model running under the built-in C4 + DDD + Governance preset"
+given: "a model running under the built-in Radical metamodel"
 then: "the metamodel becomes \"c4-ddd-governance-custom\" with Risk as a custom type, and a second edit changes that copy without copying again"
 when: "a node type \"Risk\" is added to the metamodel"
 ---

@@ -5,4 +5,4 @@ label: "@radical/common"
 technology: "TypeScript"
 ---
 
-The model shared by every app: C4 types, metamodels, file formats including Markdown-folder sync, query language, the headless model facade, the AI tool catalogue and system prompt, Radical Forge's stages and prompts, and the Hub concept import. No UI or browser dependencies.
+The model shared by every app: C4 types, the two built-in metamodels (Radical and C4), file formats including Markdown-folder sync, query language, the headless model facade, the AI tool catalogue and system prompt, Radical Forge's stages and prompts, and the Hub concept import. No UI or browser dependencies.

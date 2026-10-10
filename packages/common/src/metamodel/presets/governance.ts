@@ -1,6 +1,7 @@
-// ─── Built-in C4 + DDD + Governance preset ──────────────────────────────────
+// ─── Built-in Radical metamodel ─────────────────────────────────────────────
 //
-// Extends C4 + DDD with two governance node types and three relation types:
+// The default metamodel (id c4-ddd-governance-builtin, kept for the files and
+// Hub concepts that store it). Extends C4 + DDD (ddd.ts) with two governance node types and three relation types:
 //   • adr         — Architecture Decision Record (Nygard / MADR format)
 //   • fitness-fn  — Fitness Function (Building Evolutionary Architectures)
 //   • constrains  — adr / fitness-fn → any C4 element
@@ -15,6 +16,9 @@
 
 import { Metamodel, NodeTypeDef, PropertyDef, RelationPair, RelationTypeDef } from '../types'
 import { builtInDddC4Metamodel } from './ddd'
+
+/** What the default metamodel is called in the app. */
+export const RADICAL_METAMODEL_NAME = 'Radical'
 
 export function builtInGovernanceMetamodel(): Metamodel {
   const base = builtInDddC4Metamodel()
@@ -649,7 +653,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   return {
     id: 'c4-ddd-governance-builtin',
-    name: 'C4 + DDD + Governance',
+    name: RADICAL_METAMODEL_NAME,
     nodeTypes: {
       ...base.nodeTypes,
       adr,

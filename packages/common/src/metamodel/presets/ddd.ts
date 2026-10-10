@@ -1,6 +1,8 @@
-// ─── Built-in DDD-extended C4 preset ───────────────────────────────────────
+// ─── DDD layer of the Radical metamodel ─────────────────────────────────────
 //
-// Extends the C4 metamodel with a DDD layer:
+// The base the Radical metamodel (governance.ts) builds on; no longer offered
+// on its own, and documents saved with its id load as Radical. Extends the C4
+// metamodel with a DDD layer:
 //   • Domain — problem space; may live at root and may be nested inside
 //     another domain to express subdomains / sub-subdomains arbitrarily deep.
 //   • Entity — a domain object (Reservation, Order, Payment); `kind` says

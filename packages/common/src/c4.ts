@@ -399,7 +399,7 @@ export type PositionMap = Record<string, { x: number; y: number; width?: number;
 // The actual label/color/icon/size data for each built-in type lives with
 // the metamodel preset that introduces it (`types/metamodel/presets/*`),
 // not here. `builtInGovernanceMetamodel()` is the superset of every
-// built-in type (C4 + DDD + Governance), so the flat lookup tables below —
+// built-in type (Radical metamodel), so the flat lookup tables below —
 // kept for the many call sites that index by type without carrying a
 // `Metamodel` around — are generated from it rather than hand-duplicated.
 

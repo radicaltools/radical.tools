@@ -82,7 +82,7 @@ Snapshot shape (only when the user explicitly wants versioned milestones): `{ "i
 
 ## DDD / governance element types
 
-Available when using an extended built-in metamodel. Set `"metamodel": { "id": "c4-ddd-builtin" }` for DDD or `"metamodel": { "id": "c4-ddd-governance-builtin" }` for DDD plus governance; the app expands these preset ids when it opens the file. Omit `metamodel` only for core C4 types.
+Available in the Radical metamodel, the app's default: set `"metamodel": { "id": "c4-ddd-governance-builtin" }` (the id predates the name) and the app expands it when it opens the file. Omit `metamodel` only for core C4 types. The older `"c4-ddd-builtin"` id still opens, as the Radical metamodel.
 
 | type        | default w×h | allowed parents         | at root |
 |-------------|-------------|-------------------------|---------|
