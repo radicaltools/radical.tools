@@ -468,7 +468,8 @@ a unit or e2e test:
   flag or status.
 - *Metamodel editor:* no controls for icon, collapsed size, root placement,
   enum default, "visible only when" or relation colour; presets are picked when
-  a model is created, not in the editor; the Diagram tab is undocumented.
+  a model is created, not in the editor. (The Diagram tab and every built-in
+  type and relation are now described in the manual's Metamodels chapter.)
 - *Views:* a new view starts with the whole model, not what is on screen;
   every card has a settings button and the treemap's Size/Levels live in its
   toolbar; the treemap drills in on double-click and has no inline expand; the

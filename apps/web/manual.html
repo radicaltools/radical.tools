@@ -56,6 +56,17 @@
           </ul>
         </div>
         <div class="toc-group">
+          <div class="toc-label">Metamodels</div>
+          <ul>
+            <li><a href="#metamodels">Overview</a></li>
+            <li><a href="#metamodel-c4">C4</a></li>
+            <li><a href="#metamodel-radical">Radical</a></li>
+            <li><a href="#metamodel-relations">Relations</a></li>
+            <li><a href="#metamodel-rules">Rules &amp; checks</a></li>
+            <li><a href="#metamodel">Metamodel editor</a></li>
+          </ul>
+        </div>
+        <div class="toc-group">
           <div class="toc-label">Views</div>
           <ul>
             <li><a href="#views">Views</a></li>
@@ -78,7 +89,6 @@
         <div class="toc-group">
           <div class="toc-label">Extend</div>
           <ul>
-            <li><a href="#metamodel">Metamodel editor</a></li>
             <li><a href="#hub">Concept Hub</a></li>
             <li><a href="#ai">AI assistant</a></li>
             <li><a href="#forge">Radical Forge</a></li>
@@ -501,6 +511,249 @@
       </section>
 
       <!-- ═══════════════ EXTEND ═══════════════ -->
+
+      <!-- ═══════════════ METAMODELS ═══════════════ -->
+
+      <section class="doc-section" id="metamodels">
+        <h2>Metamodels</h2>
+        <p>
+          A model in Radical is a graph of typed elements and typed relations. The <strong>metamodel</strong> is the rulebook for that graph: which element types exist, what each one may sit inside, which relations may join which types, and which fields each type and relation has. It travels with the model — in a <code>.radical</code> file it is the <code>metamodel</code> key, in a model folder <code>metamodel.json</code> — so whoever opens the model gets the same rules.
+        </p>
+        <p>Everything that edits the model consults it:</p>
+        <ul>
+          <li><strong>The palette</strong> lists its types, grouped into C4, Domain, Requirements, States, UX, Governance and Other.</li>
+          <li><strong>Placement</strong> — dropping an element where its type may not sit (a Component straight on the canvas, a Person inside a System) is refused with a message, and so is reparenting.</li>
+          <li><strong>Connections</strong> — the relation type is inferred from the pair of element types, and a pair no relation type allows is refused.</li>
+          <li><strong>The properties panel</strong>, table columns and wizards are built from the type's fields, including enum options and fields that show only when another one has a given value.</li>
+          <li><strong>The AI assistant, Radical Forge and the MCP server</strong> receive the rules with every request, and their edits are checked against them like yours.</li>
+        </ul>
+        <p>
+          Studio ships two metamodels, chosen when you create a model (<a href="#getting-started">New model</a>; <code>--metamodel radical</code> or <code>c4</code> for the <a href="#mcp">MCP server</a>):
+        </p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Metamodel</th><th>What it holds</th><th>Pick it when</th></tr></thead>
+            <tbody>
+              <tr><td><strong><a href="#metamodel-radical">Radical</a></strong> (default)</td><td>Everything in C4, plus the domain (domains, entities), what the architecture must do (needs, EARS requirements, Gherkin scenarios), how things behave (state machines), what users see (mockups) and what was decided (ADRs, fitness functions) — 21 element types and 19 relation types, linked to each other.</td><td>The model should explain <em>why</em> the architecture is the way it is, be traceable from a stakeholder's words to a container, or act as the harness that AI-written code is checked against.</td></tr>
+              <tr><td><strong><a href="#metamodel-c4">C4</a></strong></td><td>The C4 model only: people, software systems, containers (plus databases, web apps and queues), components and groups, joined by one relation, <em>Interacts</em>.</td><td>The diagram is the whole job: context and container maps, with nothing else in the palette.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Both can be extended with your own types and fields in the <a href="#metamodel">metamodel editor</a>; the first change makes a copy, <em>Radical (custom)</em> or <em>C4 (custom)</em>, so the built-in rules are never edited in place. An unedited built-in metamodel is replaced with the current version each time the model opens, so models get new types as Studio ships them. A model made with the former <em>C4 + DDD</em> metamodel opens under Radical, which holds all of its types unchanged.
+        </p>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/metamodel-diagram-light.png" alt="The Diagram tab of the metamodel editor on the Radical metamodel with Requirement selected: its lines to the types it links to, and beside it where a requirement may sit and every relation going out and coming in" loading="lazy" />
+          <img class="shot-dark" src="screenshots/metamodel-diagram-dark.png" alt="The Diagram tab of the metamodel editor on the Radical metamodel with Requirement selected: its lines to the types it links to, and beside it where a requirement may sit and every relation going out and coming in" loading="lazy" />
+          <figcaption>The <em>Diagram</em> tab of the <a href="#metamodel">metamodel editor</a> draws every type of the metamodel in a frame per palette group. Click one — here <em>Requirement</em> — to see where it may sit and every relation that may go out of it or come in.</figcaption>
+        </figure>
+        <h3>How the layers of Radical connect</h3>
+        <p>Read one requirement through the model, from the words someone wrote to the code that keeps it:</p>
+        <ol>
+          <li>A <strong>Need</strong> keeps the stakeholder's text as written — a brief, a user story, a regulation.</li>
+          <li>Each <strong>Requirement</strong> <em>derives from</em> that need: one EARS sentence the system must make true.</li>
+          <li>A <strong>Scenario</strong> <em>verifies</em> the requirement: Given / When / Then, ready for a test.</li>
+          <li>A <strong>State machine</strong> — the lifecycle of a domain <strong>Entity</strong> — shows the states the scenario walks through, and the scenario verifies the machine too.</li>
+          <li>A <strong>Mockup</strong> <em>illustrates</em> the requirement, the scenario or a state, and is <em>presented by</em> the web app that renders it.</li>
+          <li>A <strong>Container</strong> (or system, component…) <em>satisfies</em> the requirement — it becomes the subject of the EARS sentence — <em>implements</em> the state machine and <em>realises</em> the entity whose data it owns.</li>
+          <li>An <strong>ADR</strong> records the decision the requirement led to (<em>traces to</em>) and <em>constrains</em> the containers it governs; a <strong>Fitness function</strong> <em>implements</em> the ADR as an automated check.</li>
+        </ol>
+        <p>Every arrow in that story is a relation type with a fixed direction; the sections below describe each type and each relation, and which pairs they join.</p>
+      </section>
+
+      <section class="doc-section" id="metamodel-c4">
+        <h2>The C4 metamodel</h2>
+        <p>
+          The <a href="https://c4model.com" target="_blank" rel="noopener">C4 model</a> describes software at four levels of zoom: the people and systems around yours (context), the deployable parts of a system (containers), the parts of a container (components), and code, which Radical leaves to your editor. Radical's C4 adds three specialised containers — database, web app, queue — so the diagram says what each part is without a note. Every C4 type has a <em>Description</em> and an <em>External</em> flag (except Group); containers and components have a <em>Technology</em> as well. Both metamodels contain all of this.
+        </p>
+
+        <h3>Element types</h3>
+        <dl class="mm-types">
+          <dt>Person</dt>
+          <dd>Someone who uses or runs the system: a customer, an operator, another team. A person stands at the root of the canvas or inside a group, never inside a system — they are outside of it by definition. Mark a person <em>External</em> when they belong to another organisation. <span class="mm-eg">Retail Customer, Bank Operator.</span></dd>
+
+          <dt>Software System</dt>
+          <dd>Something that delivers value to its users and is owned by one team: yours, or one you depend on (mark it <em>External</em>). On a context diagram it is a box; expanded, it holds its containers. Systems may nest inside other systems and groups, and in Radical inside a domain, where the system is the bounded context that realises that (sub)domain. <span class="mm-eg">Core Banking Platform; SWIFT Network (external).</span></dd>
+
+          <dt>Container</dt>
+          <dd>Something that runs or stores data and is deployed on its own: a service, a worker, a mobile app, a serverless function. It lives inside a system (or a group within one). <em>Technology</em> says what it is built with. <span class="mm-eg">Payments Service — Kotlin, Spring Boot.</span></dd>
+
+          <dt>Database, Web App, Queue</dt>
+          <dd>Containers with a known role, drawn with their own shapes: a <strong>Database</strong> stores data and never starts an interaction; a <strong>Web App</strong> is a browser front end and may hold components; a <strong>Queue</strong> carries messages between containers. All three live in a system or a group and have a <em>Technology</em>. <span class="mm-eg">Accounts DB — PostgreSQL; Web Banking — React; Event Bus — Kafka.</span></dd>
+
+          <dt>Component</dt>
+          <dd>A part of a container behind a clear interface: a controller, a domain service, an adapter. Components live inside a container, a web app or a group — never straight in a system or on the canvas. <span class="mm-eg">Payment Validator inside Payments Service.</span></dd>
+
+          <dt>Group</dt>
+          <dd>A labelled boundary with no meaning of its own: a team, a layer, a deployment zone. Groups nest in groups, sit at the root, or inside a system to gather some of its parts (as Structurizr groups do). No relation starts or ends at a group: connect what is inside it.</dd>
+        </dl>
+
+        <h3>The Interacts relation</h3>
+        <p>
+          <strong>Interacts</strong> is the only relation in C4 and covers any meaningful interaction: the source calls, uses, sends to or delivers to the target. Its label says what happens (<em>“Makes payments using”</em>), its <em>Technology</em> how (<em>“JSON/HTTPS”</em>). The direction is the direction of the request, not of the data: draw it from the initiator.
+        </p>
+        <ul>
+          <li><strong>Person →</strong> system, container, web app, component.</li>
+          <li><strong>Software System →</strong> person, system, container, database, web app, queue, component.</li>
+          <li><strong>Container and Web App →</strong> person, system, container, database, web app, queue.</li>
+          <li><strong>Component →</strong> component, container, web app, database, queue, system.</li>
+          <li><strong>Queue →</strong> container, web app, component (a consumer it delivers to).</li>
+        </ul>
+        <p>
+          What the rules leave out is deliberate: a <strong>Database</strong> never initiates, so nothing starts at one; a container does not call a component of another container directly — draw the call to the container, or from component to component; and no relation touches a <strong>Group</strong>.
+        </p>
+      </section>
+
+      <section class="doc-section" id="metamodel-radical">
+        <h2>The Radical metamodel</h2>
+        <p>
+          Radical is the default. It contains the whole <a href="#metamodel-c4">C4 metamodel</a> unchanged, except that a Software System may also sit inside a <strong>Domain</strong>, and adds thirteen element types in five layers. The types of the new layers can sit at the root, in a system, in a domain or in a group, unless noted. Needs, requirements, scenarios, mockups, ADRs and fitness functions open a <a href="#properties">wizard</a> when you create them, and most of the new types have their own tab in the <a href="#view-table">Table view</a>.
+        </p>
+
+        <h3>Domain layer</h3>
+        <dl class="mm-types">
+          <dt>Domain</dt>
+          <dd>A part of the problem space, in the language of the business rather than of the software: <em>Payments</em>, <em>Customer onboarding</em>. Domains nest in domains to any depth (subdomains) and in groups. <em>Kind</em> says how much it matters — <em>core</em> (where you compete), <em>supporting</em> or <em>generic</em> (buy it) — and <em>Vision</em> what it is for. A Software System placed inside a domain is the bounded context that realises it. Between domains, <strong>Depends on</strong> and <strong>Partnership</strong> draw the context map (see <a href="#metamodel-relations">relations</a>).</dd>
+
+          <dt>Entity</dt>
+          <dd>A thing the domain keeps track of and that has an identity over time: a reservation, an order, a payment. Entities live in a domain or a group. <em>Kind</em> is <em>aggregate root</em> (the default, drawn with a solid border) — a consistency boundary other aggregates refer to by id — or <em>entity</em> (dashed), a part that belongs to exactly one aggregate through <strong>Part of</strong>. The C4 element that owns the entity's data <strong>realises</strong> it, a <a href="#states">state machine</a> is its lifecycle, and it can <strong>satisfy</strong> requirements. In the Table and Wiki views the parts of an aggregate list under its root. <span class="mm-eg">Order (root) with Order Line (part of Order).</span></dd>
+        </dl>
+
+        <h3>Requirements layer</h3>
+        <dl class="mm-types">
+          <dt>Need</dt>
+          <dd>Raw input in the stakeholder's own words, kept verbatim: a product brief, a user story, a stakeholder note, meeting notes, a regulation (<em>Kind</em>), with its <em>Source</em> — who said it, or where it came from. A need is not a requirement: nothing satisfies or verifies it, and it has no status — being in the model means it was heard. Requirements <strong>derive from</strong> it, and a need can sit under a broader need. Radical Forge stores the brief it starts from as a need. <span class="mm-eg">“Customers must confirm high-value transfers on their phone.” — PSD2, regulation.</span></dd>
+
+          <dt>Requirement</dt>
+          <dd>
+            One thing the system shall do, written as an <a href="https://alistairmavin.com/ears/" target="_blank" rel="noopener">EARS</a> sentence. <em>EARS type</em> picks the pattern and shows only the clauses it needs: <em>ubiquitous</em> (“The system shall…”), <em>event-driven</em> (“When <em>trigger</em>, …”), <em>state-driven</em> (“While <em>precondition</em>, …” — or <em>While in state</em>, pointing at a <strong>State</strong>: “While the Order is Ready, …”), <em>unwanted behaviour</em> (“If <em>condition</em>, then …”), <em>optional</em> (“Where <em>feature</em>, …”) and <em>complex</em> (any combination). <em>Action</em> is what the system shall do, <em>Rationale</em> why. Type the whole sentence in the wizard and it is split into the fields for you.
+            <br />The card on the canvas shows the composed sentence; its subject is the first element that <strong>satisfies</strong> the requirement, so linking a container makes the sentence name it. A requirement <strong>derives from</strong> a need or a broader requirement (decomposition), <strong>traces to</strong> the ADRs and fitness functions it led to, and can <strong>constrain</strong> C4 elements directly. <span class="mm-eg">“When a transfer exceeds €1,000, the Payments Service shall require strong customer authentication.”</span>
+          </dd>
+
+          <dt>Scenario</dt>
+          <dd>An acceptance example in Gherkin: <em>Given</em> the starting situation, <em>When</em> something happens, <em>Then</em> the outcome, with <em>Extra steps</em> for And / But lines. A scenario <strong>verifies</strong> a requirement, and a state machine when it walks through its states; Given is then the source state and Then the target. Scenarios become tests — which is how a coding agent turns the model into checks. <span class="mm-eg">Given a confirmed reservation, When staff mark it ready, Then the customer is notified.</span></dd>
+        </dl>
+
+        <h3>States layer</h3>
+        <p>Event-driven, hierarchical statecharts with the semantics of SCXML and XState; the <a href="#states">State machines</a> chapter shows how to build one on the canvas.</p>
+        <dl class="mm-types">
+          <dt>State Machine</dt>
+          <dd>The lifecycle of one entity, drawn as a frame that holds its states. It is the <strong>Lifecycle of</strong> exactly one entity and is named after it on the canvas; the C4 elements that run it <strong>implement</strong> it; scenarios <strong>verify</strong> it; it can <strong>satisfy</strong> requirements and <strong>emit</strong> events when it is not yet known which state does.</dd>
+
+          <dt>State</dt>
+          <dd>A situation the entity can be in. States live only inside a machine or another state: a state with child states is <em>compound</em>. <em>Kind</em> <em>normal</em> is the usual; <em>parallel</em> makes its child states regions that are active at the same time; <em>final</em> ends its parent (drawn as a bullseye). A state can run <em>Entry</em> and <em>Exit</em> actions and an ongoing <em>Do</em> activity, and <strong>emit</strong> events from them.</dd>
+
+          <dt>Pseudostate</dt>
+          <dd>A point the machine passes through but never rests in. <em>Initial</em> (a filled dot) is where the machine, and every compound state that is not parallel, starts — with exactly one outgoing transition. <em>Choice</em> (a diamond) branches on guards; <em>shallow</em> and <em>deep history</em> (H, H*) return to the state that was last active. Pseudostates live inside a machine or a state.</dd>
+
+          <dt>Event</dt>
+          <dd>Something that happens and can trigger a transition: <em>Source</em> is <em>external</em> (from outside the system), <em>internal</em> or a <em>timer</em>, with an optional <em>Payload</em>. Events live in a machine, a system, a domain or a group, so one event can be shared. A transition points at the event that triggers it and the events it raises; people, C4 elements, machines and states <strong>emit</strong> events.</dd>
+        </dl>
+
+        <h3>UX layer</h3>
+        <dl class="mm-types">
+          <dt>Mockup</dt>
+          <dd>One screen of the product: its <em>Screen / route</em>, a <em>Design link</em> to Figma or Penpot, and optionally a low-fi wireframe drawn by AI on the card. A mockup <strong>illustrates</strong> the requirements, scenarios and states it shows, is <strong>presented by</strong> the web app, container, component or system that renders it, and <strong>navigates to</strong> other mockups, with the trigger — together, the screen flow. See <a href="#mockups">Mockups &amp; screen flows</a>.</dd>
+        </dl>
+
+        <h3>Governance layer</h3>
+        <dl class="mm-types">
+          <dt>ADR</dt>
+          <dd>An Architecture Decision Record in the Nygard / MADR shape: <em>Status</em> (proposed, accepted, deprecated, superseded), <em>Date</em>, <em>Context</em>, <em>Decision</em>, <em>Consequences</em> and <em>Alternatives considered</em>. An ADR <strong>constrains</strong> the elements the decision governs, <strong>supersedes</strong> the ADR it replaces, is what requirements <strong>trace to</strong>, and what fitness functions <strong>implement</strong>. A new ADR starts <em>proposed</em> with today's date. <span class="mm-eg">ADR-001 Event-driven core — constrains Payments Service and Event Bus.</span></dd>
+
+          <dt>Fitness Function</dt>
+          <dd>An objective, preferably automated check that the architecture still has a property it was designed for (from <em>Building Evolutionary Architectures</em>): what it measures (<em>Description</em>), its <em>Category</em> — structural (dependencies, layering), operational (latency, availability), process (review, deployment) or holistic — and the <em>Threshold / success criteria</em>. It <strong>implements</strong> the ADR it verifies and <strong>constrains</strong> the elements it guards; requirements can trace to it. <span class="mm-eg">“Payment p99 &lt; 250 ms” — operational, implements ADR-001.</span></dd>
+
+          <dt>Blueprint</dt>
+          <dd>A curated reference architecture imported from the <a href="#hub">Concept Hub</a> — not drawn by hand, so it is not in the palette. It has a <em>Status</em> (draft, reviewed, approved, deprecated), the <em>Domain / context</em> it fits and a <em>Rationale</em>, and arrives with its systems, requirements, mockups and views. It sits at the root or in a domain or group and has no relations of its own.</dd>
+        </dl>
+      </section>
+
+      <section class="doc-section" id="metamodel-relations">
+        <h2>Relations in Radical</h2>
+        <p>
+          Radical keeps <a href="#metamodel-c4">Interacts</a> between C4 elements and adds eighteen relation types. Each has a direction — read it as a sentence from source to target — and joins only the pairs listed. When you connect two elements Studio picks the relation type the pair allows; two pairs allow two types (entity → entity, domain → domain), so there you choose it in the properties panel.
+        </p>
+
+        <h3>Domain</h3>
+        <dl class="mm-types">
+          <dt>Realises</dt>
+          <dd>The software behind the domain. <em>System or container → domain</em>: the bounded context that implements the domain. <em>System, container, component or web app → entity</em>: the element that owns the entity's data. <span class="mm-eg">Orders Service realises Order.</span></dd>
+          <dt>Part of</dt>
+          <dd><em>Entity → entity</em>: a part of an aggregate points to its root. Aggregates never contain each other; they refer to each other with References.</dd>
+          <dt>References</dt>
+          <dd><em>Entity → entity</em>: one aggregate refers to another by id, with a <em>Cardinality</em> (one or many) and a description. <span class="mm-eg">Order references Customer (one).</span></dd>
+          <dt>Depends on</dt>
+          <dd><em>Domain → domain</em>: the source domain needs the target to do its work — the plain arrow of a context map.</dd>
+          <dt>Partnership</dt>
+          <dd><em>Domain → domain</em> with a context-mapping <em>Pattern</em>: partnership, shared kernel, customer–supplier, conformist, anti-corruption layer, open host service, published language or separate ways — how the two teams' models meet.</dd>
+        </dl>
+
+        <h3>Traceability</h3>
+        <dl class="mm-types">
+          <dt>Derives from</dt>
+          <dd><em>Requirement → need</em>: the requirement turns that stakeholder input into a shall-statement. <em>Requirement → requirement</em>: decomposition into finer requirements. <em>Need → need</em>: a need inside a broader one. The Table and Wiki views show these as a tree, and <em>Add child</em> there creates the link. Nothing else may point at a need.</dd>
+          <dt>Satisfies</dt>
+          <dd><em>Any C4 element, a domain, an entity or a state machine → requirement</em>: this element is what makes the requirement true. The first one becomes the subject of the requirement's EARS sentence. An optional <em>Note</em> says how.</dd>
+          <dt>Verifies</dt>
+          <dd><em>Scenario → requirement or state machine</em>: the scenario is the acceptance test for it.</dd>
+          <dt>Traces to</dt>
+          <dd><em>Requirement → ADR or fitness function</em>: the decision the requirement led to, or the check that keeps it.</dd>
+        </dl>
+
+        <h3>Behaviour</h3>
+        <dl class="mm-types">
+          <dt>Lifecycle of</dt>
+          <dd><em>State machine → entity</em>: the machine is the lifecycle of that entity — one machine per entity (two lifecycles of one thing are regions of a parallel state).</dd>
+          <dt>Implements (C4 → machine)</dt>
+          <dd><em>System, container, component or web app → state machine</em>: this element runs the machine.</dd>
+          <dt>Transition</dt>
+          <dd><em>State or pseudostate → state or pseudostate</em>, within one machine. It points at its trigger <em>Event</em> (none means a completion transition, taken when the source finishes), has a <em>Guard</em> and <em>Actions</em>, lists the events it <em>Raises</em>, and is <em>external</em> or <em>internal</em> (stays in the state without exiting it). The canvas labels it <code>event [guard] / actions ^raised</code>.</dd>
+          <dt>Emits</dt>
+          <dd><em>Person, system, container, component, web app, queue, state machine or state → event</em>: this element raises the event; for a state, <em>On</em> says whether from its entry, exit or do activity. A transition raises events through its <em>Raises</em> field instead.</dd>
+        </dl>
+
+        <h3>UX</h3>
+        <dl class="mm-types">
+          <dt>Illustrates</dt>
+          <dd><em>Mockup → requirement, scenario or state</em>: the screen shows this requirement being met, this scenario's step, or what the user sees while the entity is in this state.</dd>
+          <dt>Presented by</dt>
+          <dd><em>Mockup → web app, container, component or system</em>: the part of the architecture that renders the screen.</dd>
+          <dt>Navigates to</dt>
+          <dd><em>Mockup → mockup</em>, with the <em>Trigger</em> (“Tap Confirm”): one step of a screen flow.</dd>
+        </dl>
+
+        <h3>Governance</h3>
+        <dl class="mm-types">
+          <dt>Constrains</dt>
+          <dd><em>ADR, fitness function or requirement → person, system, domain, container, component, database, web app or queue</em>: the decision, check or requirement applies to that element; an optional <em>Note</em> says how. This is what an agent reads before it changes the element.</dd>
+          <dt>Supersedes</dt>
+          <dd><em>ADR → ADR</em>: the newer decision replaces the older one (set the older one's status to <em>superseded</em>).</dd>
+          <dt>Implements (fitness function → ADR)</dt>
+          <dd><em>Fitness function → ADR</em>: the check verifies that the decision still holds.</dd>
+        </dl>
+      </section>
+
+      <section class="doc-section" id="metamodel-rules">
+        <h2>Rules and checks</h2>
+        <p>The metamodel is enforced in two ways.</p>
+        <h3>Refused at once</h3>
+        <ul>
+          <li>Placing or moving an element where its type may not sit, or at the root when its type needs a parent (a component, a state, a pseudostate).</li>
+          <li>Connecting a pair of types that no relation type allows: “Relation not allowed: Database → Person”.</li>
+          <li>Moving an element into itself or one of its descendants.</li>
+        </ul>
+        <p>The same refusals reach the AI assistant, Radical Forge and the MCP server as messages they can act on.</p>
+        <h3>Listed as issues</h3>
+        <p>
+          Some rules are about the model as a whole, and a model is often incomplete while you build it, so they are warnings rather than refusals. The <em>Validation</em> list in the <a href="#metamodel">metamodel editor</a> shows them (and the MCP server's <code>get_issues</code>), each taking you to the element:
+        </p>
+        <ul>
+          <li><strong>Any metamodel:</strong> a type the metamodel does not know or a misplaced element (errors, e.g. from a hand-edited file), a relation between types no relation type joins, a reference field that points at nothing or at the wrong type, an empty required field, too few or too many elements of a type (in custom metamodels that set those).</li>
+          <li><strong>Domain model (Radical):</strong> an aggregate root that is <em>part of</em> something (it should <em>reference</em> it); a part of something that is not an aggregate root; an entity that belongs to no aggregate or to two.</li>
+          <li><strong>State machines (Radical):</strong> a machine with no entity, or an entity with two machines; a machine or compound state with no initial pseudostate, or more than one; an initial pseudostate without exactly one outgoing transition, or with one coming in; a parallel state with fewer than two regions or with an initial pseudostate; a final state with children or outgoing transitions; a transition that leaves its machine; two unguarded transitions from one state on the same event; a state the initial state cannot reach.</li>
+        </ul>
+      </section>
 
       <section class="doc-section" id="metamodel">
         <h2>Metamodel editor</h2>

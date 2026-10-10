@@ -243,14 +243,14 @@ function makeBaseData() {
     nd('p-corp',     'person', 'Corporate Client', 'Business client using treasury and bulk-payment APIs',     '', -250, 440,  150, 170),
     nd('p-ops',      'person', 'Bank Operator',    'Internal staff managing operations and support',           '', -250, 670,  150, 170),
 
-    // Core Banking Platform (system → 3 domains)
+    // Core Banking Platform (system, its containers in 3 groups)
     nd('sys-core', 'system', 'Core Banking Platform',
       'Central microservices platform — all banking domain logic', 'Kubernetes / Istio',
       50, 0, 2200, 980),
 
-    // Domain: Access & Security
-    nd('dom-access', 'domain', 'Access & Security',
-      'API gateway, authentication and authorisation for all inbound traffic', 'Kong / Keycloak',
+    // Group: Access & Security
+    nd('dom-access', 'group', 'Access & Security',
+      'API gateway, authentication and authorisation for all inbound traffic', '',
       60, 100, 700, 360, { parentId: 'sys-core' }),
     nd('ctn-apigw', 'container', 'API Gateway',
       'Routes all external traffic, enforces rate limits and TLS termination', 'Kong / Nginx',
@@ -259,9 +259,9 @@ function makeBaseData() {
       'Issues JWT tokens and validates OIDC sessions', 'Keycloak / OAuth 2.0',
       370, 110, 300, 200, { parentId: 'dom-access' }),
 
-    // Domain: Banking Services
-    nd('dom-banking', 'domain', 'Banking Services',
-      'Core financial domain — payments, accounts and event streaming', 'Java / Go',
+    // Group: Banking Services
+    nd('dom-banking', 'group', 'Banking Services',
+      'Core financial domain — payments, accounts and event streaming', '',
       820, 100, 1260, 400, { parentId: 'sys-core' }),
     nd('ctn-payments', 'container', 'Payments Service',
       'Processes domestic and cross-border payment instructions', 'Go 1.22 / gRPC',
@@ -279,9 +279,9 @@ function makeBaseData() {
       'Async domain-event streaming between all microservices', 'Apache Kafka 3.6',
       930, 165, 220, 95, { parentId: 'dom-banking' }),
 
-    // Domain: Risk & Data
-    nd('dom-risk', 'domain', 'Risk & Data',
-      'Real-time fraud detection and persistent data stores', 'Python / PostgreSQL',
+    // Group: Risk & Data
+    nd('dom-risk', 'group', 'Risk & Data',
+      'Real-time fraud detection and persistent data stores', '',
       60, 560, 880, 360, { parentId: 'sys-core' }),
     nd('ctn-fraud', 'container', 'Fraud Detection',
       'Real-time ML-based transaction risk scoring', 'Python 3.12 / XGBoost',
