@@ -417,6 +417,7 @@ export class LiveColaEngine {
       }
       this.applyCalm(this.calm)
       this.refreshBounds()
+      this.followCarriers([this.calm.id, ...this.calm.with])
       this.keepOrders([this.calm.id, ...this.calm.with])
       this.emitPositions()
       return
@@ -573,6 +574,43 @@ export class LiveColaEngine {
       if (f.my) f.y -= delta.y
     }
     return { id, with: moved.slice(1), from, delta, follow, partners, moving: delta.x !== 0 || delta.y !== 0 }
+  }
+
+  /**
+   * Lines through a group that holds a dragged element: the group's box
+   * grows and shrinks with it, so its centre moves, and the rest of the line
+   * keeps to it as it would if the group itself were dragged. Without this a
+   * child's drag pulled its container off the line.
+   */
+  private followCarriers(moved: string[]): void {
+    const inside = (id: string, ancestor: string): boolean => {
+      for (let p = this.allNodes[id]?.parentId; p; p = this.allNodes[p]?.parentId) {
+        if (p === ancestor) return true
+      }
+      return false
+    }
+    const centre = (id: string, axis: 'x' | 'y'): number | undefined => {
+      const b = this.boxOf(id)
+      if (!b) return undefined
+      return axis === 'x' ? (b.x + b.X) / 2 : (b.y + b.Y) / 2
+    }
+    let shifted = false
+    for (const a of this.alignments) {
+      // A line through a dragged element moves with it (calmDrag partners).
+      if (a.ids.some((m) => moved.includes(m))) continue
+      const carrier = a.ids.find((m) => moved.some((id) => inside(id, m)))
+      if (!carrier) continue
+      const line = centre(carrier, a.axis)
+      if (line === undefined) continue
+      for (const other of a.ids) {
+        if (other === carrier || moved.some((id) => inside(id, other))) continue
+        const c = centre(other, a.axis)
+        if (c === undefined || Math.abs(line - c) < 0.01) continue
+        this.translate(other, a.axis, line - c)
+        shifted = true
+      }
+    }
+    if (shifted) this.refreshBounds()
   }
 
   private applyCalm(c: CalmDrag): void {

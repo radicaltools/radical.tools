@@ -52,6 +52,39 @@ test('a row on All elements holds through a drag, Smart Layout and a reload', as
   await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
 })
 
+test('dragging a child of an aligned container keeps the alignment', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  // Bookstore holds Web App; Payment Provider stands beside it.
+  const row = ['bookstore', 'payments']
+  // A container is picked by its header: its middle is its children.
+  await studio.node('bookstore').click({ position: { x: 24, y: 12 } })
+  await studio.node('payments').click({ modifiers: ['Shift'] })
+  await expect(page.locator('.sel-bar-badge')).toHaveText('2')
+  await page.getByRole('button', { name: /^Align/ }).click()
+  await page.getByRole('menuitem', { name: /Keep in a row/ }).click()
+  await expect.poll(() => spread(studio, row, 'y')).toBeLessThanOrEqual(1.5)
+
+  // Drag Web App well below Bookstore's bottom edge: Bookstore grows down,
+  // so its centre moves, and Payment Provider must follow it.
+  await studio.pane.click({ position: { x: 5, y: 5 } })
+  const box = (await studio.node('web').boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + 12)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2, box.y + 260, { steps: 15 })
+  await expect.poll(() => spread(studio, row, 'y')).toBeLessThanOrEqual(1.5)
+  await page.mouse.up()
+  await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
+
+  // And up again past the top edge.
+  const back = (await studio.node('web').boundingBox())!
+  await page.mouse.move(back.x + back.width / 2, back.y + 12)
+  await page.mouse.down()
+  await page.mouse.move(back.x + back.width / 2, back.y - 420, { steps: 15 })
+  await page.mouse.up()
+  await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
+})
+
 test('a column in a view stays in that view and can be removed from the canvas', async ({ page, studio }) => {
   await studio.seed()
   await studio.open('v-containers')
