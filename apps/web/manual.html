@@ -988,6 +988,26 @@ npm run build -w @radical/mcp   <span class="cm"># MCP server for coding agents<
   </footer>
 
   <script>
+    // Arriving with #section in the URL (a link from the landing page or
+    // elsewhere): the browser jumps before the web fonts arrive, and the text
+    // they reflow moves the section down. Jump again once they are in, unless
+    // the reader has scrolled meanwhile.
+    (function () {
+      if (!location.hash) return;
+      var target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (!target) return;
+      var moved = false;
+      window.addEventListener('wheel', function () { moved = true; }, { once: true, passive: true });
+      window.addEventListener('touchmove', function () { moved = true; }, { once: true, passive: true });
+      window.addEventListener('keydown', function () { moved = true; }, { once: true });
+      function land() {
+        if (moved) return;
+        target.scrollIntoView({ block: 'start', behavior: 'instant' });
+      }
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(land);
+      window.addEventListener('load', land);
+    })();
+
     // Highlight the TOC entry for the section in view.
     (function () {
       var links = Array.prototype.slice.call(document.querySelectorAll('.doc-toc a[href^="#"]'));

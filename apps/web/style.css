@@ -137,6 +137,11 @@
   padding-bottom: 56px;
   border-bottom: 1px solid var(--border);
 }
+/* A link to a section or heading lands below the sticky site nav (56px). */
+.doc-section,
+.doc-section [id] {
+  scroll-margin-top: 72px;
+}
 .doc-section:last-child {
   border-bottom: none;
 }
@@ -322,6 +327,11 @@
 }
 .doc-shot img {
   width: 100%;
+  height: auto;
+  /* Every screenshot is 1440×900. Reserving the box before a lazy image
+     loads keeps the page from growing under a jump to a section, which
+     left the jump short of its target. */
+  aspect-ratio: 1440 / 900;
   display: block;
   border-bottom: 1px solid var(--border);
 }
