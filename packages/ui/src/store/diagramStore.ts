@@ -2426,18 +2426,28 @@ export const useDiagramStore = create<DiagramStore>()(
         const { activeViewId, c4Nodes, appMode } = get()
         if (newId === activeViewId) return
 
-        // In viewer (explore mode) we deliberately keep the user's current
-        // node positions when the active view changes — they may have
-        // dragged things around to inspect a relationship and shouldn't
-        // lose that arrangement just because they flipped to another view.
-        // Only the *visibility* (view filter) changes; positions are NOT
-        // saved into the outgoing view (would dirty the in-memory map for
-        // the explore session) and NOT loaded from the incoming view.
-        // The pre-mode snapshot in setAppMode restores everything cleanly
-        // when the user returns to designer.
+        // Viewer and Presenter show each view as it was laid out: the
+        // incoming view's positions and camera are loaded, as in designer.
+        // (Keeping the outgoing view's positions scattered every view whose
+        // nodes differ.) Nothing is saved into the outgoing view: drags here
+        // are for exploring only, and the pre-mode snapshot in setAppMode
+        // restores the designer layout on the way back.
         if (appMode !== 'designer') {
-          set((state) => { state.activeViewId = newId })
+          let incomingViewport: { x: number; y: number; zoom: number } | null = null
+          set((state) => {
+            const incoming = newId === null
+              ? state.defaultPositions as Record<string, NodePosition>
+              : state.views[newId]?.positions as Record<string, NodePosition> | undefined
+            if (incoming && Object.keys(incoming).length > 0) {
+              applyPositions(state.c4Nodes as Record<string, C4Node>, incoming)
+            }
+            incomingViewport = (newId === null ? state.defaultViewport : state.views[newId]?.viewport) as typeof incomingViewport ?? null
+            state.activeViewId = newId
+          })
           get()._sync()
+          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+          ;(window as any).__rfPlaceCamera?.(incomingViewport, shown)
+          _liveLayout?.reset()
           return
         }
 

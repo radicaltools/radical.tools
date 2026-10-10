@@ -169,7 +169,7 @@ describe('setActiveView in designer mode', () => {
 })
 
 describe('setActiveView in viewer (explore) mode', () => {
-  it('only flips activeViewId — no position copy in either direction', () => {
+  it('shows the incoming view\'s layout without saving the outgoing one', () => {
     const vid = useDiagramStore.getState().addView('Curated')
     // seed positions on the target view that DIFFER from current c4Nodes
     useDiagramStore.setState((s: any) => {
@@ -178,7 +178,7 @@ describe('setActiveView in viewer (explore) mode', () => {
       }
       return s
     })
-    // mutate ctn1 to a sentinel current value
+    // mutate ctn1 to a sentinel current value, e.g. dragged while exploring
     useDiagramStore.setState((s: any) => {
       s.c4Nodes['ctn1'].x = 555
       s.c4Nodes['ctn1'].y = 777
@@ -192,12 +192,20 @@ describe('setActiveView in viewer (explore) mode', () => {
 
     // 1. activeViewId did flip
     expect(useDiagramStore.getState().activeViewId).toBe(vid)
-    // 2. ctn1 position is UNCHANGED — view's positions were NOT applied
+    // 2. ctn1 is where the incoming view has it
     const n = useDiagramStore.getState().c4Nodes['ctn1']
-    expect(n.x).toBe(555)
-    expect(n.y).toBe(777)
+    expect(n.x).toBe(11)
+    expect(n.y).toBe(22)
     // 3. defaultPositions were NOT overwritten with mid-explore coords
     expect(JSON.stringify(useDiagramStore.getState().defaultPositions)).toBe(dpBefore)
+
+    // 4. Leaving the view does not save the explore session into it either
+    useDiagramStore.setState((s: any) => {
+      s.c4Nodes['ctn1'].x = 999
+      return s
+    })
+    useDiagramStore.getState().setActiveView(null)
+    expect(useDiagramStore.getState().views[vid].positions.ctn1.x).toBe(11)
   })
 })
 
