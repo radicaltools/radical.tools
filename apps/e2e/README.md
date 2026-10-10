@@ -22,13 +22,14 @@ The first time, install Chromium: `npx playwright install chromium`.
 
 | Spec | |
 |---|---|
-| `studio/boot` | Welcome screen, the Fintech sample, a new empty model |
+| `studio/boot` | Welcome screen (New model / Open steps, recent models, the sample), a new empty model, the Models dialog |
 | `studio/editing` | Palette drop, rename, Alt-drag connect, forbidden relation, undo/redo, delete, reload |
 | `studio/views` | Static, nested, dynamic and table views; sample treemap, matrix, wiki; Viewer and Presenter perspectives |
 | `studio/layout` | Smart Layout: no overlapping siblings, children inside their parent, same result on every run |
 | `studio/presentation` | Playing slides, keyboard navigation, slide deep links |
 | `studio/export` | PNG and SVG export produce real files |
-| `studio/folders` | Models stored as a folder of Markdown files: save as folder, reload, renames that move files, outside edits (including MCP), files Studio must not touch |
+| `studio/folders` | Models stored as a folder of Markdown files: move to a folder, new model in a folder, reload, renames that move files, outside edits (including MCP), files Studio must not touch |
+| `studio/files` | Models kept in a single `.radical` file: open, edits saved back, reopen after a reload, new model in a file |
 | `studio/known-issues` | Open bugs, marked `test.fail` (see below) |
 | `hub/hub` | Landing page, categories, search, concept canvas / wiki / table, `.radical` download |
 
@@ -42,7 +43,8 @@ Tests start from a known document instead of clicking one together: see
 
 Folder tests (`support/folder.ts`) run the web build's File System Access
 code against a directory in the browser's origin-private file system: the
-directory picker is replaced with one that returns it, and the test edits it
+directory picker is replaced with one that returns it (`ModelFile` does the
+same with the file pickers and one file), and the test edits it
 directly to play another editor. They run in a persistent browser profile,
 because Chromium crashes when an off-the-record page (Playwright's default)
 reads a stored directory handle back from IndexedDB.

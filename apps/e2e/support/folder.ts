@@ -97,3 +97,42 @@ export class ModelFolder {
     }, [this.name, path] as const)
   }
 }
+
+/**
+ * A model file for Studio's web build, which keeps a model in a single file
+ * through the File System Access API. As with `ModelFolder`, the native file
+ * pickers are replaced: both hand out a file in the page's origin-private
+ * file system (OPFS), a real file handle the app reads, writes and stores.
+ */
+export class ModelFile {
+  constructor(readonly page: Page, readonly name = 'model.radical') {}
+
+  /** Make the open and save file pickers return this file. Call before navigating. */
+  async install(): Promise<void> {
+    await this.page.addInitScript((name) => {
+      const file = async (): Promise<FileSystemFileHandle> =>
+        (await navigator.storage.getDirectory()).getFileHandle(name, { create: true })
+      const w = window as unknown as Record<string, unknown>
+      w.showOpenFilePicker = async () => [await file()]
+      w.showSaveFilePicker = async () => file()
+    }, this.name)
+  }
+
+  /** The file's content ('' when it is empty or missing). */
+  async read(): Promise<string> {
+    return this.page.evaluate(async (name) => {
+      const handle = await (await navigator.storage.getDirectory()).getFileHandle(name, { create: true })
+      return (await handle.getFile()).text()
+    }, this.name)
+  }
+
+  /** Write the file as another program would. */
+  async write(content: string): Promise<void> {
+    await this.page.evaluate(async ([name, text]) => {
+      const handle = await (await navigator.storage.getDirectory()).getFileHandle(name, { create: true })
+      const writable = await handle.createWritable()
+      await writable.write(text)
+      await writable.close()
+    }, [this.name, content] as const)
+  }
+}

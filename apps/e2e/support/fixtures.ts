@@ -104,7 +104,8 @@ export class Studio {
   /** Open the bundled Fintech sample from the welcome screen, then `view`. */
   async openSample(view = 'view-ctx'): Promise<void> {
     await this.page.goto('/')
-    await this.page.getByRole('button', { name: /Explore the sample/ }).click()
+    await this.page.getByRole('button', { name: 'Open', exact: true }).click()
+    await this.page.getByRole('button', { name: /Sample model/ }).click()
     await this.advance(1000)
     await expect(this.page).toHaveURL(/\/v\/view-ctx$/)
     await this.ready()

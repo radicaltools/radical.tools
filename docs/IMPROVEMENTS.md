@@ -450,8 +450,17 @@ a unit or e2e test:
   into a container does not re-parent it and nothing highlights; "everything
   is undoable" did not hold (bug 8, fixed in #118).
 - *Getting started:* the Welcome screen shows on every browser load without a
-  route, never in desktop or VS Code; New model uses C4 + DDD + Governance
-  unless the dropdown was opened first.
+  route, never in desktop or VS Code. It offers New model and Open; New model
+  then asks for the metamodel (C4 + DDD + Governance by default) and where to
+  keep the model (this browser, a file or a Markdown folder; file and folder
+  only where the browser can write them back, the choice remembered per
+  browser), with Create with Radical Forge only once an AI provider is set
+  up. Open lists recent models, then this browser's models, a file, a folder,
+  a Structurizr DSL workspace and the sample; a first visit also offers the
+  sample under the two choices. In Chromium a file is kept, not imported:
+  changes are saved back to it, and after a reload it needs access granted
+  again. Manage models shows every model on one list (search, filter by
+  place, a ⋯ menu per row) and reuses the same New model / Open steps.
 - *Properties & governance:* the EARS subject comes from the element that
   *satisfies* the requirement, not the one it *constrains*; requirements have
   no status or MoSCoW priority; fitness functions have no trigger, automated

@@ -122,18 +122,18 @@
         <p>
           Radical.Tools runs in the browser at <a href="https://studio.radical.tools" target="_blank" rel="noopener">studio.radical.tools</a>
           — no account, nothing uploaded — or as a desktop app (see <a href="#vscode">local install</a>).
-          On first launch you land on the <strong>Welcome screen</strong>:
+          On first launch you land on the <strong>Welcome screen</strong>. It asks one thing first — a new model or an existing one — and the details come in the next step:
         </p>
         <ul>
-          <li><strong>New model</strong> — pick the metamodel first: <em>C4</em>, <em>C4 + DDD</em> (adds Domains) or <em>C4 + DDD + Governance</em> (adds ADRs, fitness functions, needs, requirements and blueprints). You can change it later in the metamodel editor.</li>
-          <li><strong>Open file</strong> — a <code>.radical</code> / <code>.json</code> model from disk.</li>
-          <li><strong>Load the sample</strong> — the <em>Fintech Banking Platform</em> used throughout this guide: 65 elements — architecture, ADRs and fitness functions, the needs behind it (a regulation, a product brief and a client's feedback), the EARS requirements derived from them, Gherkin scenarios and 13 UI mockups with wireframes in three screen flows — 15 views of every kind, four sequences, four milestones and a ready-made presentation.</li>
-          <li><strong>Recent</strong> — models you already have in this browser.</li>
+          <li><strong>New model</strong> — pick the metamodel (<em>C4 + DDD + Governance</em> is preselected; <em>C4</em> and <em>C4 + DDD</em> are in the list, and the metamodel editor changes it later) and where to keep the model: <em>in this browser</em>, <em>in a file</em> (one <code>.radical</code> file, every change saved to it) or <em>in a folder</em> (Markdown files, see <a href="#documents">Models &amp; files</a>). The choice of storage is remembered. Once an AI provider is set up, <em>Create with Radical Forge</em> starts the model from a description instead.</li>
+          <li><strong>Open</strong> — a recent model, the ones kept in this browser, a file, a folder, a Structurizr DSL workspace or the sample.</li>
+          <li><strong>Try the sample</strong> — the <em>Fintech Banking Platform</em> used throughout this guide: 65 elements — architecture, ADRs and fitness functions, the needs behind it (a regulation, a product brief and a client's feedback), the EARS requirements derived from them, Gherkin scenarios and 13 UI mockups with wireframes in three screen flows — 15 views of every kind, four sequences, four milestones and a ready-made presentation. A first visit offers it right under the two choices.</li>
+          <li><strong>Recent</strong> — your last three models, one click away; <em>Open</em> lists more.</li>
         </ul>
         <figure class="doc-shot">
-          <img class="shot-light" src="screenshots/welcome-light.png" alt="Welcome screen: New model with metamodel picker, Open file, Load sample, recent models" loading="lazy" />
-          <img class="shot-dark" src="screenshots/welcome-dark.png" alt="Welcome screen: New model with metamodel picker, Open file, Load sample, recent models" loading="lazy" />
-          <figcaption>The Welcome screen. Loading the sample is the fastest way to see every feature in this guide.</figcaption>
+          <img class="shot-light" src="screenshots/welcome-light.png" alt="Welcome screen: New model and Open, with the three most recent models below" loading="lazy" />
+          <img class="shot-dark" src="screenshots/welcome-dark.png" alt="Welcome screen: New model and Open, with the three most recent models below" loading="lazy" />
+          <figcaption>The Welcome screen. The sample is the fastest way to see every feature in this guide.</figcaption>
         </figure>
         <div class="doc-tip">
           <strong>Tip:</strong> a deep link such as <code>studio.radical.tools/#/m/designer/v/canvas</code> skips the Welcome screen and opens the last active model directly. See <a href="#links">Deep links</a>.
@@ -165,18 +165,21 @@
       <section class="doc-section" id="documents">
         <h2>Models &amp; files</h2>
         <p>
-          A model is a <em>document</em>. Open <em>Radical menu → Manage models…</em> to see them grouped by where they live:
+          A model is a <em>document</em>, kept in one of three places:
         </p>
         <ul>
-          <li><strong>Local storage</strong> — kept in this browser. Create with <em>+ New local model</em> (choose the metamodel), rename, delete, or convert with <em>Save as file…</em> / <em>Save as folder…</em>.</li>
-          <li><strong>Files</strong> — a single <code>.radical</code> JSON file on disk (desktop app).</li>
-          <li><strong>Folders</strong> — a <strong>Markdown folder</strong>: one <code>.md</code> per element with YAML front-matter, nested directories for containment, JSON sidecars for layout, views and relations. Diff-friendly and readable without the app. Works in the desktop app and, in Chromium browsers, via the File System Access API (you may be asked to <em>Reconnect</em> a folder after a reload).</li>
+          <li><strong>This browser</strong> — browser storage. Nothing to pick; export a file to share it.</li>
+          <li><strong>A file</strong> — a single <code>.radical</code> JSON file on disk. In the desktop app and in Chromium browsers (File System Access API) every change is saved back to the file; other browsers can only import and download one.</li>
+          <li><strong>A folder</strong> — a <strong>Markdown folder</strong>: one <code>.md</code> per element with YAML front-matter, nested directories for containment, JSON sidecars for layout, views and relations. Diff-friendly and readable without the app. Works in the desktop app and in Chromium browsers.</li>
         </ul>
-        <p>Every change is <strong>autosaved</strong> (a few hundred milliseconds after you stop editing) to wherever the document lives. <em>Import Structurizr DSL…</em> converts a <code>.dsl</code> workspace into a new local model.</p>
+        <p>
+          <em>Radical menu → Manage models…</em> lists every model on one list, the last used first, with a search box and a filter by place (<em>All</em>, <em>Browser</em>, <em>Files</em>, <em>Folders</em>). Click a row to switch to it. Its <em>⋯</em> menu renames it, moves the open model to a file or a folder, and deletes it (a file or folder is only removed from the list; it stays on disk). <em>+ New model</em> and <em>Open…</em> are the same steps as on the Welcome screen; <em>Open… → Structurizr DSL…</em> converts a <code>.dsl</code> workspace into a new model.
+        </p>
+        <p>Every change is <strong>autosaved</strong> (a few hundred milliseconds after you stop editing) to wherever the document lives. In the browser, a file or folder needs access granted again after a reload: click it on the Welcome screen, or <em>Reconnect…</em> on its row.</p>
         <figure class="doc-shot">
-          <img class="shot-light" src="screenshots/documents-light.png" alt="Models dialog listing local, file and folder backed models with Rename, Save as file, Save as folder and Delete actions" loading="lazy" />
-          <img class="shot-dark" src="screenshots/documents-dark.png" alt="Models dialog listing local, file and folder backed models with Rename, Save as file, Save as folder and Delete actions" loading="lazy" />
-          <figcaption>The Models dialog. The badge on each row tells you where the model is stored.</figcaption>
+          <img class="shot-light" src="screenshots/documents-light.png" alt="Models dialog: one list of browser, file and folder models with search, a filter by place and a menu per row" loading="lazy" />
+          <img class="shot-dark" src="screenshots/documents-dark.png" alt="Models dialog: one list of browser, file and folder models with search, a filter by place and a menu per row" loading="lazy" />
+          <figcaption>The Models dialog. The icon and the line under each name tell you where the model is kept.</figcaption>
         </figure>
         <div class="doc-tip">
           <strong>Desktop:</strong> launch with <code>radical --file path/to/model.radical</code> (or the <code>RADICAL_FILE</code> environment variable) and the app reloads whenever that file changes on disk — handy next to a text editor or a Git checkout.
@@ -563,7 +566,7 @@
       <section class="doc-section" id="forge">
         <h2>Radical Forge</h2>
         <p>
-          <strong>Radical Forge</strong> (<em>Start with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Domain model</strong> → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>State machines</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
+          <strong>Radical Forge</strong> (<em>New model → Create with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Domain model</strong> → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>State machines</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
         </p>
         <ul>
           <li><strong>The description is kept as a <a href="#properties">Need</a>.</strong> When you press <em>Start</em>, the text is saved in the model as a need (named after its first line), and the Requirements stage links every requirement it writes to it with <em>Derives from</em>. If the model already has needs, <em>Start from</em> on the Description step loads one instead, and your edits are saved back to it. Going back and starting again updates the same need instead of adding a second one.</li>
@@ -606,7 +609,7 @@ codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.
         <p>The folder may also be relative to the directory the client starts the server in. A missing or empty folder becomes a new, empty model; <code>--metamodel c4</code>, <code>c4-ddd</code> or <code>governance</code> picks its metamodel (default <code>governance</code>, C4 + DDD + Governance). A folder with other files and no <code>radical.md</code> is refused, so the server never writes into a folder that isn't a model.</p>
         <h3>Working alongside Studio</h3>
         <p>
-          Open the <em>same</em> folder in Studio: in the desktop app, or in a Chromium browser through <em>Manage models…</em> (the browser asks for folder access; a model kept only in browser storage cannot be reached by the server). Studio reloads the folder when the agent changes it, so new elements appear on the open canvas. Then ask the agent to call <code>get_model_summary</code> first; the server's instructions tell it to as well.
+          Open the <em>same</em> folder in Studio: in the desktop app, or in a Chromium browser through <em>Open → Folder…</em> (the browser asks for folder access; a model kept only in browser storage cannot be reached by the server). Studio reloads the folder when the agent changes it, so new elements appear on the open canvas. Then ask the agent to call <code>get_model_summary</code> first; the server's instructions tell it to as well.
         </p>
         <div class="doc-tip">
           <strong>Tip:</strong> while the agent writes, keep Studio in <a href="#presenting">Viewer</a>. A change spans several files and the two processes share no lock: the server refuses to write over a file that changed since it read it, but editing the same folder from both sides at once can still race.

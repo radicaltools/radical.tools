@@ -37,9 +37,9 @@ async function openModels(page: Page): Promise<void> {
 /** Convert the seeded document to a folder through the Models dialog. */
 async function saveAsFolder(page: Page): Promise<void> {
   await openModels(page)
-  await page.getByRole('button', { name: 'Save as folder…' }).click()
+  await page.getByRole('button', { name: 'Actions for E2E' }).click()
+  await page.getByRole('menuitem', { name: 'Move to a folder…' }).click()
   const models = page.getByRole('dialog', { name: 'Models' })
-  await expect(models.getByRole('tab', { name: /Folders/ })).toHaveAttribute('aria-selected', 'true')
   await expect(models.locator('.docmgr-badge.md')).toBeVisible()
   await models.getByRole('button', { name: 'Close' }).click()
 }
@@ -209,23 +209,42 @@ test('declining the prompt leaves a non-model folder untouched', async ({ page }
   await folder.write('nodes/README.md', '# Notes\n')
   page.once('dialog', (d) => d.dismiss())
   await openModels(page)
-  await page.getByRole('button', { name: 'Save as folder…' }).click()
+  await page.getByRole('button', { name: 'Actions for E2E' }).click()
+  await page.getByRole('menuitem', { name: 'Move to a folder…' }).click()
   const models = page.getByRole('dialog', { name: 'Models' })
   await expect(models.locator('.docmgr-badge.ls')).toBeVisible()
   await expect(models.locator('.docmgr-badge.md')).toHaveCount(0)
   expect(await folder.paths()).toEqual(['nodes/README.md'])
 })
 
-test('Open folder… on the welcome screen opens a model folder', async ({ page, studio }) => {
+test('Open → Folder… on the welcome screen opens a model folder', async ({ page, studio }) => {
   const files = serializeToMdFolder(JSON.parse(fixture('bookstore')), 'Bookstore')
   for (const [path, content] of Object.entries(files)) await folder.write(path, content)
   await page.goto('/')
-  await page.getByRole('button', { name: 'Open folder…' }).click()
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
   await expect(studio.node('customer')).toBeVisible()
   await openModels(page)
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
+})
+
+test('New model on the welcome screen can keep the model in a folder', async ({ page, studio }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'New model' }).click()
+  await page.getByRole('radio', { name: /In a folder/ }).check()
+  await page.getByRole('button', { name: 'Choose folder and create' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await expect(studio.nodes).toHaveCount(0)
+  await expect.poll(() => folder.paths()).toContain('metamodel.json')
+  await openModels(page)
+  await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
+  // The choice is remembered for the next new model.
+  await page.goto('/')
+  await page.getByRole('button', { name: 'New model' }).click()
+  await expect(page.getByRole('radio', { name: /In a folder/ })).toBeChecked()
 })
 
 test('an agent\'s Forge run on the folder makes the Forge button pulse and opens read only', async ({ page }) => {

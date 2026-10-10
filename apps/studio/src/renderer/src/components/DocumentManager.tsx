@@ -1,144 +1,170 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { documents, useDocumentsStore, StorageFullError, type DocumentMeta, type DocumentSource } from '../store/documentStore'
+import { documents, useDocumentsStore, type DocumentMeta, type DocumentSource } from '../store/documentStore'
+import { confirmForeignFolder } from './confirmForeignFolder'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { availableMetamodels } from '@radical/common/metamodel'
-import { parseStructurizrDsl } from '@radical/common/formats/structurizrDsl'
-import { webFolderSupported } from '../persist/webFolder'
+import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { host } from '../platform/host'
 import { reloadActiveDocument } from '../persistence/autosave'
+import { NewModelStep, OpenSources, SourceIcon, fileSupported, folderSupported, shortDate } from './ModelSteps'
 
 interface Props {
   open: boolean
   onClose: () => void
 }
 
-type TabKey = DocumentSource
+const isElectron = !!host().openFolder
 
-function fmtTime(ts: number): string {
-  const d = new Date(ts)
-  return d.toLocaleString()
+type Filter = 'all' | DocumentSource
+
+const FILTERS: ReadonlyArray<{ key: Filter; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'ls', label: 'Browser' },
+  { key: 'fs', label: 'Files' },
+  { key: 'md', label: 'Folders' },
+]
+
+/** Where a model is kept, in words. */
+function locationOf(d: DocumentMeta): string {
+  if (d.source === 'md') return d.folderPath ?? 'Folder'
+  if (d.source === 'fs') return d.filePath ?? 'File'
+  return 'This browser'
 }
 
-const isElectron = !!host().openFolder
-/** Folder-of-Markdown mode works in Electron and in Chromium browsers (File
- *  System Access API). */
-const folderSupported = isElectron || webFolderSupported()
+/** A web file or folder whose access must be granted again this session. */
+function needsReconnect(d: DocumentMeta): boolean {
+  return !isElectron && d.source !== 'ls' && !d.filePath && !d.folderPath && !documents.isConnected(d.id)
+}
 
-const ALL_TABS: ReadonlyArray<{ key: TabKey; label: string; hint: string; folderMode?: boolean }> = [
-  { key: 'ls', label: 'Local storage', hint: 'Models saved inside the app (browser localStorage).' },
-  { key: 'fs', label: 'Files',         hint: 'Models backed by a single JSON file on disk.' },
-  { key: 'md', label: 'Folders',       hint: 'Models stored as a folder of Markdown files (one per element).', folderMode: true },
-]
-const TABS = ALL_TABS.filter((t) => !t.folderMode || folderSupported)
+/** The ⋯ menu of one model. */
+function ModelMenu({ doc, onRename }: { doc: DocumentMeta; onRename: () => void }): React.ReactElement {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const saveDiagram = useDiagramStore((s) => s.saveDiagram)
+  useOutsideClick([wrapRef], open, () => setOpen(false))
+
+  // Moving stores the model on screen, so it is offered for the open one only.
+  const isActive = doc.id === documents.getActiveId()
+  const run = (action: () => void | Promise<void>) => (): void => {
+    setOpen(false)
+    void action()
+  }
+
+  const moveToFile = async (): Promise<void> => {
+    await documents.saveAsFile(doc.id, saveDiagram())
+  }
+  const moveToFolder = async (): Promise<void> => {
+    await documents.saveAsFolder(doc.id, saveDiagram(), confirmForeignFolder)
+  }
+  const remove = (): void => {
+    const question = doc.source === 'fs'
+      ? `Remove "${doc.name}" from the list?\n\n(The file on disk is kept.)`
+      : doc.source === 'md'
+        ? `Remove "${doc.name}" from the list?\n\n(The folder on disk is kept.)`
+        : `Permanently delete "${doc.name}" from this browser?`
+    if (window.confirm(question)) documents.deleteDocument(doc.id)
+  }
+
+  return (
+    <div className="docmgr-menu-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className="docmgr-more"
+        aria-label={`Actions for ${doc.name}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+          <circle cx="3" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="11" cy="7" r="1.3"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="docmgr-menu" role="menu">
+          <button type="button" role="menuitem" onClick={run(onRename)}>Rename</button>
+          {isActive && doc.source === 'ls' && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={run(moveToFile)}
+              title={fileSupported ? 'Keep this model in a file; every change is saved to it' : 'Download this model as a file'}
+            >
+              {fileSupported ? 'Move to a file…' : 'Download as file…'}
+            </button>
+          )}
+          {isActive && folderSupported && doc.source !== 'md' && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={run(moveToFolder)}
+              title="Keep this model as a folder of Markdown files, one per element"
+            >
+              Move to a folder…
+            </button>
+          )}
+          <div className="docmgr-menu-sep" />
+          <button type="button" role="menuitem" className="danger" onClick={run(remove)}>
+            {doc.source === 'ls' ? 'Delete…' : 'Remove from list…'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function DocumentManagerModal({ open, onClose }: Props): React.ReactElement | null {
   const docs = useDocumentsStore((s) => s.docs)
   const activeId = useDocumentsStore((s) => s.activeId)
+  const [view, setView] = useState<'list' | 'new' | 'open'>('list')
+  const [filter, setFilter] = useState<Filter>('all')
+  const [query, setQuery] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
-  // Inline "create new local diagram" form. Electron's BrowserWindow has
-  // window.prompt disabled (returns null silently), so we render an in-modal
-  // input row instead of relying on the browser dialog.
-  const [creatingNew, setCreatingNew] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [mmPickerOpen, setMmPickerOpen] = useState(false)
-  const presets = useMemo(() => availableMetamodels(), [])
-  const [newPresetId, setNewPresetId] = useState<string>('c4-ddd-governance-builtin')
-  const saveDiagram = useDiagramStore((s) => s.saveDiagram)
 
-  // Default the visible tab to the source of the active document so users
-  // land on the section they're most likely editing.
-  const activeDoc = docs.find((d) => d.id === activeId)
-  const [tab, setTab] = useState<TabKey>(activeDoc?.source ?? 'ls')
-
-  // When the modal re-opens, re-sync the tab to the active document so the
-  // user sees the relevant section without having to click.
+  // Each opening starts on the list.
   useEffect(() => {
-    if (open && activeDoc) setTab(activeDoc.source)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (open) setView('list')
   }, [open])
 
+  // Escape steps back to the list, then closes.
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || renamingId) return
+      if (view === 'list') onClose()
+      else setView('list')
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  }, [open, onClose, view, renamingId])
 
   const counts = useMemo(() => {
-    const c: Record<TabKey, number> = { ls: 0, fs: 0, md: 0 }
+    const c: Record<Filter, number> = { all: docs.length, ls: 0, fs: 0, md: 0 }
     for (const d of docs) c[d.source]++
     return c
   }, [docs])
 
-  const visible = useMemo(
-    () => docs.filter((d) => d.source === tab).sort((a, b) => b.lastModified - a.lastModified),
-    [docs, tab],
-  )
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return docs
+      .filter((d) => filter === 'all' || d.source === filter)
+      .filter((d) => !q || d.name.toLowerCase().includes(q) || locationOf(d).toLowerCase().includes(q))
+      .sort((a, b) => b.lastModified - a.lastModified)
+  }, [docs, filter, query])
 
   if (!open) return null
 
-  const handleNewLSStart = (): void => {
-    setCreatingNew(true)
-    setNewName('Untitled')
-    setNewPresetId('c4-ddd-governance-builtin')
-    setMmPickerOpen(false)
-    setTab('ls')
-  }
-
-  const handleNewLSCommit = (): void => {
-    const name = newName.trim() || 'Untitled'
-    const preset = presets.find((p) => p.id === newPresetId)
-    const data: any = { nodes: [], relations: [] }
-    if (preset) data.metamodel = preset.build()
-    try {
-      documents.createLSDocument(name, data)
-    } catch (e) {
-      window.alert((e as Error).message)
-      return
-    }
-    setCreatingNew(false)
-    setNewName('')
-    setTab('ls')
-  }
-
-  const handleNewLSCancel = (): void => {
-    setCreatingNew(false)
-    setNewName('')
-    setMmPickerOpen(false)
-  }
-
-  const handleImportFile = async (): Promise<void> => {
-    try {
-      const meta = await documents.importFromFile()
-      if (meta) setTab('fs')
-    } catch (e) {
-      window.alert((e as Error).message)
-    }
-  }
-
-  const handleImportFolder = async (): Promise<void> => {
-    const meta = await documents.importFromFolder()
-    if (meta) setTab('md')
-  }
-
-  const handleSaveAsFolder = async (d: DocumentMeta): Promise<void> => {
-    const data = saveDiagram()
-    const meta = await documents.saveAsFolder(d.id, data, (folderName) => window.confirm(
-      `"${folderName}" already contains files and is not a Radical model folder.\n\n` +
-      'Save the model into it anyway? Existing files are kept, except ones with the ' +
-      "same names as the model's own files (nodes/…, views.json, metamodel.json, …).",
-    ))
-    if (meta) setTab('md')
+  const handleSwitch = (id: string): void => {
+    if (id === activeId || renamingId) return
+    documents.setActiveId(id)
   }
 
   // Web File System Access API handles lose permission across reloads; a user
-  // gesture re-grants it, after which we reload the folder's content.
+  // gesture re-grants it, after which we reload the folder's or file's content.
   const handleReconnect = async (d: DocumentMeta): Promise<void> => {
-    const ok = await documents.reconnectFolder(d.id)
+    const ok = await documents.reconnect(d.id)
     if (!ok) {
-      window.alert('Could not get permission to access the folder.')
+      window.alert(`Could not get permission to access the ${d.source === 'md' ? 'folder' : 'file'}.`)
       return
     }
     // Switching loads the document; if it already is the active one, reload it.
@@ -147,175 +173,121 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
     onClose()
   }
 
-  const handleImportDsl = (): void => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.dsl,.txt'
-    input.style.display = 'none'
-    document.body.appendChild(input)
-    input.onchange = (): void => {
-      const file = input.files?.[0]
-      document.body.removeChild(input)
-      if (!file) return
-      const reader = new FileReader()
-      reader.onload = (e): void => {
-        const content = e.target?.result as string
-        if (!content) return
-        try {
-          const result = parseStructurizrDsl(content)
-          const displayName = result.name || file.name.replace(/\.(dsl|txt)$/i, '') || 'Imported DSL'
-          documents.createLSDocument(displayName, { nodes: result.nodes, relations: result.relations } as any)
-          setTab('ls')
-        } catch (err) {
-          if (err instanceof StorageFullError) {
-            window.alert(err.message)
-            return
-          }
-          console.warn('[DSL import] failed:', err)
-          window.alert('Could not parse the DSL file. See the browser console for details.')
-        }
-      }
-      reader.readAsText(file)
-    }
-    input.click()
-  }
-
-  const handleSwitch = (id: string): void => {
-    if (id === activeId) return
-    documents.setActiveId(id)
-  }
-
-  const handleRenameStart = (d: DocumentMeta): void => {
-    setRenamingId(d.id)
-    setRenameValue(d.name)
-  }
-
   const handleRenameCommit = (): void => {
     if (renamingId) documents.renameDocument(renamingId, renameValue)
     setRenamingId(null)
     setRenameValue('')
   }
 
-  const handleDelete = (d: DocumentMeta): void => {
-    const which = d.source === 'fs'
-      ? `Remove "${d.name}" from the library?\n\n(The file on disk will NOT be deleted.)`
-      : d.source === 'md'
-        ? `Remove "${d.name}" from the library?\n\n(The folder on disk will NOT be deleted.)`
-        : `Permanently delete "${d.name}" from local storage?`
-    if (!window.confirm(which)) return
-    documents.deleteDocument(d.id)
-  }
+  const back = (
+    <button type="button" className="msteps-back" onClick={() => setView('list')}>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="M10 6H2M5.5 2.5L2 6l3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+      Back
+    </button>
+  )
 
-  const handleSaveAs = async (d: DocumentMeta): Promise<void> => {
-    // Save the *current* in-memory diagram into the chosen target as a file.
-    const data = saveDiagram()
-    const meta = await documents.saveAsFile(d.id, data)
-    if (meta) setTab('fs')
-  }
-
-  const renderToolbar = (): React.ReactElement => {
-    if (tab === 'ls') {
-      if (creatingNew) {
-        const selectedPreset = presets.find(p => p.id === newPresetId)
-        return (
-          <div className="docmgr-toolbar docmgr-toolbar-create">
-            <div className="docmgr-create-row">
-              <input
-                className="docmgr-rename-input"
-                autoFocus
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Model name"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleNewLSCommit()
-                  else if (e.key === 'Escape') handleNewLSCancel()
-                }}
-              />
-              <button className="docmgr-btn primary" onClick={handleNewLSCommit}>Create</button>
-              <button
-                type="button"
-                className="docmgr-btn docmgr-btn-mm"
-                onClick={() => setMmPickerOpen(o => !o)}
-                title={`Metamodel: ${selectedPreset?.name ?? newPresetId}`}
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 7L1 3h8z"/></svg>
-              </button>
-              <button className="docmgr-btn" onClick={handleNewLSCancel}>Cancel</button>
-            </div>
-            {mmPickerOpen && (
-              <div className="docmgr-mm-picker">
-                <div className="docmgr-mm-picker-title">Metamodel</div>
-                {presets.map((p) => {
-                  const active = p.id === newPresetId
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className={`docmgr-mm-option${active ? ' active' : ''}`}
-                      onClick={() => { setNewPresetId(p.id); setMmPickerOpen(false) }}
-                      aria-pressed={active}
-                    >
-                      <div className="docmgr-mm-option-name">
-                        {p.name}
-                        {active && <span style={{ marginLeft: 6, color: 'var(--accent)' }}>✓</span>}
-                      </div>
-                      <div className="docmgr-mm-option-desc">{p.description}</div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )
-      }
-      return (
-        <div className="docmgr-toolbar">
-          <button className="docmgr-btn primary" onClick={handleNewLSStart}>+ New local model</button>
-          <button className="docmgr-btn" onClick={handleImportDsl}>Import Structurizr DSL…</button>
-          <span className="docmgr-toolbar-hint">Stored in your browser only — no file on disk.</span>
-        </div>
-      )
-    }
-    if (tab === 'md') {
-      return (
-        <div className="docmgr-toolbar">
-          <button className="docmgr-btn primary" onClick={handleImportFolder}>Open folder…</button>
-          <span className="docmgr-toolbar-hint">Pick a folder of Markdown files (one <code>.md</code> per element) to add to the library.</span>
-        </div>
-      )
-    }
-    return (
+  const renderList = (): React.ReactElement => (
+    <>
       <div className="docmgr-toolbar">
-        <button className="docmgr-btn primary" onClick={handleImportFile}>Open file…</button>
-        <span className="docmgr-toolbar-hint">Pick a <code>.json</code> model on disk to add to the library.</span>
+        <button className="docmgr-btn primary" onClick={() => setView('new')}>+ New model</button>
+        <button className="docmgr-btn" onClick={() => setView('open')}>Open…</button>
+        <input
+          className="docmgr-search"
+          type="search"
+          placeholder="Search models"
+          aria-label="Search models"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
-    )
-  }
 
-  const renderEmpty = (): React.ReactElement => {
-    if (tab === 'ls') {
-      return (
-        <div className="docmgr-empty">
-          <p style={{ margin: '0 0 12px' }}>No local models yet.</p>
-          <button className="docmgr-btn primary" onClick={handleNewLSStart}>Create one</button>
-        </div>
-      )
-    }
-    if (tab === 'md') {
-      return (
-        <div className="docmgr-empty">
-          <p style={{ margin: '0 0 12px' }}>No folder-backed models yet.</p>
-          <button className="docmgr-btn primary" onClick={handleImportFolder}>Open a folder…</button>
-        </div>
-      )
-    }
-    return (
-      <div className="docmgr-empty">
-        <p style={{ margin: '0 0 12px' }}>No file-backed models yet.</p>
-        <button className="docmgr-btn primary" onClick={handleImportFile}>Open a file…</button>
+      <div className="docmgr-filters" role="radiogroup" aria-label="Show">
+        {FILTERS.filter((f) => f.key === 'all' || counts[f.key] > 0).map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            role="radio"
+            aria-checked={filter === f.key}
+            className={`docmgr-filter${filter === f.key ? ' active' : ''}`}
+            onClick={() => setFilter(f.key)}
+          >
+            {f.label}
+            <span className="docmgr-filter-count">{counts[f.key]}</span>
+          </button>
+        ))}
       </div>
-    )
-  }
+
+      {visible.length === 0 ? (
+        <div className="docmgr-empty">
+          {docs.length === 0 ? 'No models yet.' : 'No model matches.'}
+        </div>
+      ) : (
+        <ul className="docmgr-list">
+          {visible.map((d) => {
+            const isActive = d.id === activeId
+            const isRenaming = renamingId === d.id
+            return (
+              <li key={d.id} className={`docmgr-item${isActive ? ' active' : ''}`}>
+                <div
+                  className="docmgr-item-main"
+                  role={isRenaming ? undefined : 'button'}
+                  tabIndex={isRenaming ? undefined : 0}
+                  onClick={() => handleSwitch(d.id)}
+                  onKeyDown={(e) => { if (!isRenaming && e.key === 'Enter') handleSwitch(d.id) }}
+                >
+                  <span
+                    className={`docmgr-badge ${d.source}`}
+                    title={d.source === 'md' ? 'Folder' : d.source === 'fs' ? 'File' : 'This browser'}
+                  >
+                    <SourceIcon source={d.source} />
+                  </span>
+                  {isRenaming ? (
+                    <input
+                      className="docmgr-rename-input"
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={handleRenameCommit}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleRenameCommit()
+                        else if (e.key === 'Escape') { setRenamingId(null); setRenameValue('') }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <div className="docmgr-item-info">
+                      <div className="docmgr-name">
+                        {d.name}
+                        {isActive && <span className="docmgr-active-tag">open</span>}
+                      </div>
+                      <div className="docmgr-sub">
+                        <span className="docmgr-path" title={locationOf(d)}>{locationOf(d)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {needsReconnect(d) && (
+                  <button
+                    className="docmgr-btn small"
+                    onClick={() => void handleReconnect(d)}
+                    title={`Grant access to this ${d.source === 'md' ? 'folder' : 'file'} again and reload it`}
+                  >
+                    Reconnect…
+                  </button>
+                )}
+                <span className="docmgr-time" title={`Last edited ${new Date(d.lastModified).toLocaleString()}`}>
+                  {shortDate(d.lastModified)}
+                </span>
+                <ModelMenu doc={d} onRename={() => { setRenamingId(d.id); setRenameValue(d.name) }} />
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </>
+  )
 
   // Render through a portal attached to <body> so the modal escapes any
   // ancestor that creates a containing block for position:fixed (the
@@ -350,83 +322,20 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
           <button className="docmgr-close" onClick={onClose} aria-label="Close" title="Close (Esc)">✕</button>
         </div>
 
-        <div className="docmgr-tabs" role="tablist">
-          {TABS.map((t) => {
-            const isActive = t.key === tab
-            return (
-              <button
-                key={t.key}
-                role="tab"
-                aria-selected={isActive}
-                className={`docmgr-tab${isActive ? ' active' : ''}`}
-                onClick={() => setTab(t.key)}
-                title={t.hint}
-              >
-                <span>{t.label}</span>
-                <span className="docmgr-tab-count">{counts[t.key]}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        {renderToolbar()}
-
-        {visible.length === 0 ? renderEmpty() : (
-          <ul className="docmgr-list">
-            {visible.map((d) => {
-              const isActive = d.id === activeId
-              const isRenaming = renamingId === d.id
-              return (
-                <li key={d.id} className={`docmgr-item${isActive ? ' active' : ''}`}>
-                  <div className="docmgr-item-main" onClick={() => handleSwitch(d.id)}>
-                    <span className={`docmgr-badge ${d.source}`}>
-                      {d.source === 'fs' ? 'FILE' : d.source === 'md' ? 'FOLDER' : 'LOCAL'}
-                    </span>
-                    {isRenaming ? (
-                      <input
-                        className="docmgr-rename-input"
-                        autoFocus
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onBlur={handleRenameCommit}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleRenameCommit()
-                          else if (e.key === 'Escape') { setRenamingId(null); setRenameValue('') }
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <div className="docmgr-item-info">
-                        <div className="docmgr-name">{d.name}{isActive && <span className="docmgr-active-tag"> · active</span>}</div>
-                        <div className="docmgr-sub">
-                          {d.source === 'fs' && d.filePath && <span className="docmgr-path" title={d.filePath}>{d.filePath}</span>}
-                          {d.source === 'md' && d.folderPath && <span className="docmgr-path" title={d.folderPath}>{d.folderPath}</span>}
-                          <span className="docmgr-time">modified {fmtTime(d.lastModified)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="docmgr-item-actions">
-                    {!isRenaming && (
-                      <>
-                        <button className="docmgr-btn small" onClick={() => handleRenameStart(d)} title="Rename">Rename</button>
-                        {d.source === 'ls' && (
-                          <button className="docmgr-btn small" onClick={() => handleSaveAs(d)} title="Save current model as a file (converts this entry to file-backed)">Save as file…</button>
-                        )}
-                        {folderSupported && d.source !== 'md' && (
-                          <button className="docmgr-btn small" onClick={() => handleSaveAsFolder(d)} title="Save current model as a folder of Markdown files (converts this entry to folder-backed)">Save as folder…</button>
-                        )}
-                        {!isElectron && d.source === 'md' && !documents.isFolderConnected(d.id) && (
-                          <button className="docmgr-btn small" onClick={() => handleReconnect(d)} title="Re-grant access to this folder and reload it">Reconnect…</button>
-                        )}
-                        <button className="docmgr-btn small danger" onClick={() => handleDelete(d)} title={d.source === 'ls' ? 'Delete from local storage' : 'Remove from library (files kept)'}>Delete</button>
-                      </>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+        {view === 'list' && renderList()}
+        {view === 'new' && (
+          <div className="docmgr-step msteps">
+            {back}
+            <h2 className="msteps-title">New model</h2>
+            <NewModelStep onDone={onClose} />
+          </div>
+        )}
+        {view === 'open' && (
+          <div className="docmgr-step msteps">
+            {back}
+            <h2 className="msteps-title">Open</h2>
+            <OpenSources onDone={onClose} autoFocus />
+          </div>
         )}
       </div>
     </div>,
