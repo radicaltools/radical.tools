@@ -297,6 +297,76 @@ async function mayWriteInto(
   return confirmForeign ? await confirmForeign(folderName) : false
 }
 
+/** A folder `pickAndWriteFolder` wrote: a path on disk (Electron), or a
+ *  browser directory handle with its live session (web). */
+type WrittenFolder =
+  | { name: string; folderPath: string }
+  | { name: string; handle: FsDirHandle; session: MdFolderSession }
+
+/** Pick a folder (Electron or web) and write `data` into it as a Markdown
+ *  model named after the folder (`fallbackName` when the browser gives no
+ *  name). A folder that already holds `.md` / `.json` files but is not a
+ *  Radical model is written into only if `confirmForeign` returns true.
+ *  Returns null on cancel, refusal or a failed write. */
+async function pickAndWriteFolder(
+  data: DiagramData,
+  fallbackName: string,
+  confirmForeign?: (folderName: string) => boolean | Promise<boolean>,
+): Promise<WrittenFolder | null> {
+  const h = host()
+  // ── Electron: pick a destination folder, write via IPC. ──
+  if (h.pickFolder && h.writeFolder) {
+    const picked = await h.pickFolder()
+    if (!picked.success || !picked.folderPath) return null
+    const name = defaultNameFromFolder(picked.folderPath)
+    const present = h.readFolder ? await h.readFolder(picked.folderPath) : null
+    if (present?.success && present.files && !(await mayWriteInto(present.files, name, confirmForeign))) {
+      return null
+    }
+    const res = await h.writeFolder(picked.folderPath, serializeToMdFolder(data, name))
+    if (!res.success) {
+      console.warn('[documentStore] folder write failed:', res.error)
+      return null
+    }
+    return { name, folderPath: picked.folderPath }
+  }
+
+  // ── Web: pick a directory handle and write through a session. ──
+  if (webFolderSupported()) {
+    const handle = await pickWebDirectory()
+    if (!handle) return null
+    const name = handle.name || fallbackName
+    const session = new MdFolderSession(handleFolderStorage(handle))
+    try {
+      if (!(await mayWriteInto(await session.readAll(), name, confirmForeign))) return null
+      const res = await session.write(serializeToMdFolder(data, name))
+      if (!res.ok) return null // changed while we were writing; nothing written
+    } catch (e) {
+      console.warn('[documentStore] web folder write failed:', e)
+      return null
+    }
+    return { name, handle, session }
+  }
+  return null
+}
+
+/** Turn `meta` into the md-backed document of a folder just written. */
+async function bindFolder(meta: DocumentMeta, written: WrittenFolder): Promise<void> {
+  if ('folderPath' in written) {
+    meta.folderPath = written.folderPath
+  } else {
+    await saveHandle(meta.id, written.handle)
+    connectedWebFolders.add(meta.id)
+    written.session.onExternalChange = () => notifyExternalChange(meta.id)
+    webSessions.set(meta.id, written.session)
+    meta.folderPath = undefined
+  }
+  meta.source = 'md'
+  meta.filePath = undefined
+  meta.name = written.name
+  meta.lastModified = Date.now()
+}
+
 /** Write a disk-backed (fs / md) document. Called only through `enqueueSave`. */
 async function writeDocument(id: string, data: DiagramData): Promise<void> {
   const h = host()
@@ -542,6 +612,14 @@ export interface DocumentsAPI {
    *  null on cancel / failure. */
   saveAsFolder(
     id: string,
+    data: DiagramData,
+    confirmForeignFolder?: (folderName: string) => boolean | Promise<boolean>,
+  ): Promise<DocumentMeta | null>
+
+  /** Pick a folder (Electron or web), write `data` into it as a new Markdown
+   *  model named after the folder, and make it the active document. Same
+   *  foreign-folder rule as `saveAsFolder`. Returns null on cancel / failure. */
+  createFolderDocument(
     data: DiagramData,
     confirmForeignFolder?: (folderName: string) => boolean | Promise<boolean>,
   ): Promise<DocumentMeta | null>
@@ -892,68 +970,33 @@ export const documents: DocumentsAPI = {
   },
 
   async saveAsFolder(id, data, confirmForeignFolder) {
-    const h = host()
-    // ── Electron: pick a destination folder, write via IPC. ──
-    if (h.pickFolder && h.writeFolder) {
-      const idx = readIndex()
-      const meta = idx.docs.find((d) => d.id === id)
-      if (!meta) return null
-      const picked = await h.pickFolder()
-      if (!picked.success || !picked.folderPath) return null
-      const name = defaultNameFromFolder(picked.folderPath)
-      const present = h.readFolder ? await h.readFolder(picked.folderPath) : null
-      if (present?.success && present.files && !(await mayWriteInto(present.files, name, confirmForeignFolder))) {
-        return null
-      }
-      const files = serializeToMdFolder(data, name)
-      const res = await h.writeFolder(picked.folderPath, files)
-      if (!res.success) {
-        console.warn('[documentStore] saveAsFolder write failed:', res.error)
-        return null
-      }
-      if (meta.source === 'ls') deleteLSPayload(id)
-      meta.source = 'md'
-      meta.folderPath = picked.folderPath
-      meta.filePath = undefined
-      meta.name = name
-      meta.lastModified = Date.now()
-      writeIndex(idx)
-      notify()
-      return meta
-    }
+    const current = readIndex().docs.find((d) => d.id === id)
+    if (!current) return null
+    const written = await pickAndWriteFolder(data, current.name, confirmForeignFolder)
+    if (!written) return null
+    const idx = readIndex()
+    const meta = idx.docs.find((d) => d.id === id)
+    if (!meta) return null
+    if (meta.source === 'ls') deleteLSPayload(id)
+    await bindFolder(meta, written)
+    writeIndex(idx)
+    notify()
+    return meta
+  },
 
-    // ── Web: pick a directory handle, write, convert doc to md-backed. ──
-    if (webFolderSupported()) {
-      const idx = readIndex()
-      const meta = idx.docs.find((d) => d.id === id)
-      if (!meta) return null
-      const handle = await pickWebDirectory()
-      if (!handle) return null
-      const name = handle.name || meta.name
-      const session = new MdFolderSession(handleFolderStorage(handle))
-      try {
-        if (!(await mayWriteInto(await session.readAll(), name, confirmForeignFolder))) return null
-        const res = await session.write(serializeToMdFolder(data, name))
-        if (!res.ok) return null // changed while we were writing; nothing written
-      } catch (e) {
-        console.warn('[documentStore] web saveAsFolder write failed:', e)
-        return null
-      }
-      await saveHandle(meta.id, handle)
-      connectedWebFolders.add(meta.id)
-      session.onExternalChange = () => notifyExternalChange(meta.id)
-      webSessions.set(meta.id, session)
-      if (meta.source === 'ls') deleteLSPayload(id)
-      meta.source = 'md'
-      meta.folderPath = undefined
-      meta.filePath = undefined
-      meta.name = name
-      meta.lastModified = Date.now()
-      writeIndex(idx)
-      notify()
-      return meta
-    }
-    return null
+  async createFolderDocument(data, confirmForeignFolder) {
+    const written = await pickAndWriteFolder(data, 'model', confirmForeignFolder)
+    if (!written) return null
+    const idx = readIndex()
+    const meta: DocumentMeta = { id: uid(), name: written.name, source: 'md', lastModified: Date.now() }
+    await bindFolder(meta, written)
+    // Electron opened this folder before: keep one entry for it.
+    idx.docs = idx.docs.filter((d) => !(meta.folderPath && d.source === 'md' && d.folderPath === meta.folderPath))
+    idx.docs.push(meta)
+    idx.activeId = meta.id
+    writeIndex(idx)
+    notify()
+    return meta
   },
 
   async reconnectFolder(id) {

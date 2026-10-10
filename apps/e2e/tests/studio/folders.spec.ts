@@ -228,6 +228,22 @@ test('Open folder… on the welcome screen opens a model folder', async ({ page,
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
 })
 
+test('New model on the welcome screen can keep the model in a folder', async ({ page, studio }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'In this browser' }).click()
+  await page.getByRole('button', { name: /^In a folder/ }).click()
+  await page.getByRole('button', { name: 'New model' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await expect(studio.nodes).toHaveCount(0)
+  await expect.poll(() => folder.paths()).toContain('metamodel.json')
+  await openModels(page)
+  await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
+  // The choice is remembered for the next new model.
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: 'In a folder' })).toBeVisible()
+})
+
 test('an agent\'s Forge run on the folder makes the Forge button pulse and opens read only', async ({ page }) => {
   await saveAsFolder(page)
   const stages = ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'mockups', 'c4']

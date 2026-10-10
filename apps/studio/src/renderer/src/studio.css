@@ -2538,10 +2538,20 @@ label.app-menu-row { cursor: pointer; }
   gap: 8px;
   margin-top: auto;
 }
-/* The metamodel for "New model": the default suits almost everyone, so it
-   reads as a caption that opens the picker. */
+/* The metamodel and storage of "New model": the defaults suit almost
+   everyone, so they read as captions that open a picker. */
+.welcome-new-options {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.welcome-new-options-sep {
+  font-size: 11.5px;
+  color: #c4c8d2;
+}
 .welcome-mm-toggle {
-  align-self: center;
   display: inline-flex;
   align-items: center;
   gap: 5px;

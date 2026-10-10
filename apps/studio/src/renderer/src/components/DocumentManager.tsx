@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { documents, useDocumentsStore, StorageFullError, type DocumentMeta, type DocumentSource } from '../store/documentStore'
+import { confirmForeignFolder } from './confirmForeignFolder'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { availableMetamodels } from '@radical/common/metamodel'
 import { parseStructurizrDsl } from '@radical/common/formats/structurizrDsl'
@@ -125,11 +126,7 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
 
   const handleSaveAsFolder = async (d: DocumentMeta): Promise<void> => {
     const data = saveDiagram()
-    const meta = await documents.saveAsFolder(d.id, data, (folderName) => window.confirm(
-      `"${folderName}" already contains files and is not a Radical model folder.\n\n` +
-      'Save the model into it anyway? Existing files are kept, except ones with the ' +
-      "same names as the model's own files (nodes/…, views.json, metamodel.json, …).",
-    ))
+    const meta = await documents.saveAsFolder(d.id, data, confirmForeignFolder)
     if (meta) setTab('md')
   }
 

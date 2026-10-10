@@ -8,10 +8,46 @@ import type { DiagramData } from '@radical/common/c4'
 import { host } from '../platform/host'
 import { webFolderSupported } from '../persist/webFolder'
 import { aiReady, loadAISettings } from '../ai/settings'
+import { confirmForeignFolder } from './confirmForeignFolder'
 
 /** Markdown folders open in Electron and in Chromium browsers (File System
  *  Access API), as in the Document Manager. */
 const folderSupported = !!host().openFolder || webFolderSupported()
+
+/** Where "New model" keeps the model: browser storage, or a Markdown folder
+ *  the user picks. The last choice is remembered per browser. */
+type Storage = 'browser' | 'folder'
+const STORAGE_KEY = 'radical-new-model-storage'
+
+const STORAGE_OPTIONS: { id: Storage; name: string; description: string }[] = [
+  {
+    id: 'browser',
+    name: 'In this browser',
+    description: 'Kept in this browser\'s storage. Nothing to pick; export a file to share it.',
+  },
+  {
+    id: 'folder',
+    name: 'In a folder',
+    description: 'Markdown files in a folder you pick, ready for git, Claude Code and the MCP server.',
+  },
+]
+
+function loadStorageChoice(): Storage {
+  if (!folderSupported) return 'browser'
+  try {
+    return localStorage.getItem(STORAGE_KEY) === 'folder' ? 'folder' : 'browser'
+  } catch {
+    return 'browser'
+  }
+}
+
+function saveStorageChoice(storage: Storage): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, storage)
+  } catch {
+    // Not remembered; the choice still applies now.
+  }
+}
 
 /** The sample's System Context view (fintechSampleData.json). */
 const SAMPLE_START_VIEW = 'view-ctx'
@@ -95,9 +131,17 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
   // reading them once is enough.
   const [forgeAvailable] = useState(() => aiReady(loadAISettings()))
   const presets = availableMetamodels()
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [openPicker, setOpenPicker] = useState<'metamodel' | 'storage' | null>(null)
   const [selectedPresetId, setSelectedPresetId] = useState('c4-ddd-governance-builtin')
   const selectedPreset = presets.find(p => p.id === selectedPresetId) ?? presets[0]
+  const [storage, setStorage] = useState<Storage>(loadStorageChoice)
+  const selectedStorage = STORAGE_OPTIONS.find(o => o.id === storage) ?? STORAGE_OPTIONS[0]
+
+  function chooseStorage(next: Storage): void {
+    setStorage(next)
+    saveStorageChoice(next)
+    setOpenPicker(null)
+  }
 
   /** Adds the model and opens it; says why when browser storage refused it. */
   function create(name: string, data: DiagramData): DocumentMeta | null {
@@ -109,17 +153,17 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
     }
   }
 
-  function createBlank(): boolean {
-    return !!create('Untitled model', {
-      nodes: [],
-      relations: [],
-      metamodel: selectedPreset.build(),
-    })
+  /** An empty model where the user chose to keep it. False when the folder
+   *  pick was cancelled or the model could not be stored. */
+  async function createBlank(): Promise<boolean> {
+    const data: DiagramData = { nodes: [], relations: [], metamodel: selectedPreset.build() }
+    if (storage === 'folder') return !!(await documents.createFolderDocument(data, confirmForeignFolder))
+    return !!create('Untitled model', data)
   }
 
-  function handleNew(): void {
-    if (!createBlank()) return
-    setPickerOpen(false)
+  async function handleNew(): Promise<void> {
+    if (!(await createBlank())) return
+    setOpenPicker(null)
     onDismiss()
   }
 
@@ -128,9 +172,9 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
   // without first clicking "New model" then hunting for Forge in the app
   // menu. Toolbar.tsx (already mounted underneath this overlay) listens for
   // the event — same pattern as radical:open-ai-settings.
-  function handleForge(): void {
-    if (!createBlank()) return
-    setPickerOpen(false)
+  async function handleForge(): Promise<void> {
+    if (!(await createBlank())) return
+    setOpenPicker(null)
     onDismiss()
     window.dispatchEvent(new CustomEvent('radical:open-forge'))
   }
@@ -215,7 +259,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
             {forgeAvailable && (
               <button
                 className="welcome-btn welcome-btn-forge"
-                onClick={handleForge}
+                onClick={() => void handleForge()}
                 title="Describe a system in plain language and let AI generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model for it"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -225,37 +269,74 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
                 Start with Radical Forge
               </button>
             )}
-            <button className="welcome-btn welcome-btn-primary" onClick={handleNew}>
+            <button className="welcome-btn welcome-btn-primary" onClick={() => void handleNew()}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                 <line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
               </svg>
               New model
             </button>
-            <button
-              type="button"
-              className="welcome-mm-toggle"
-              onClick={() => setPickerOpen(o => !o)}
-              aria-expanded={pickerOpen}
-              title="Metamodel for new models"
-            >
-              {selectedPreset.name}
-              <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 7L1 3h8z"/></svg>
-            </button>
-            {pickerOpen && (
+            {/* What the new model is built on and where it is kept: the
+                defaults suit most people, so they read as captions. */}
+            <div className="welcome-new-options">
+              <button
+                type="button"
+                className="welcome-mm-toggle"
+                onClick={() => setOpenPicker(o => o === 'metamodel' ? null : 'metamodel')}
+                aria-expanded={openPicker === 'metamodel'}
+                title="Metamodel for new models"
+              >
+                {selectedPreset.name}
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 7L1 3h8z"/></svg>
+              </button>
+              {folderSupported && (
+                <>
+                  <span className="welcome-new-options-sep" aria-hidden="true">·</span>
+                  <button
+                    type="button"
+                    className="welcome-mm-toggle"
+                    onClick={() => setOpenPicker(o => o === 'storage' ? null : 'storage')}
+                    aria-expanded={openPicker === 'storage'}
+                    title="Where new models are kept"
+                  >
+                    {selectedStorage.name}
+                    <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 7L1 3h8z"/></svg>
+                  </button>
+                </>
+              )}
+            </div>
+            {openPicker === 'metamodel' && (
               <div className="welcome-mm-picker">
                 {presets.map(p => (
                   <button
                     key={p.id}
                     type="button"
                     className={`welcome-mm-option${selectedPreset.id === p.id ? ' selected' : ''}`}
-                    onClick={() => { setSelectedPresetId(p.id); setPickerOpen(false) }}
+                    onClick={() => { setSelectedPresetId(p.id); setOpenPicker(null) }}
                   >
                     <div className="welcome-mm-option-name">
                       {p.name}
                       {selectedPreset.id === p.id && <span className="welcome-mm-option-check">✓</span>}
                     </div>
                     <div className="welcome-mm-option-desc">{p.description}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {openPicker === 'storage' && (
+              <div className="welcome-mm-picker">
+                {STORAGE_OPTIONS.map(o => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    className={`welcome-mm-option${storage === o.id ? ' selected' : ''}`}
+                    onClick={() => chooseStorage(o.id)}
+                  >
+                    <div className="welcome-mm-option-name">
+                      {o.name}
+                      {storage === o.id && <span className="welcome-mm-option-check">✓</span>}
+                    </div>
+                    <div className="welcome-mm-option-desc">{o.description}</div>
                   </button>
                 ))}
               </div>
