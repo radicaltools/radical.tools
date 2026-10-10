@@ -2522,25 +2522,45 @@ label.app-menu-row { cursor: pointer; }
   font-style: normal;
   color: #3b6fe6;
 }
-.welcome-heading {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: #111827;
-  letter-spacing: -0.8px;
-  margin: 0 0 12px;
-}
 .welcome-lead {
-  font-size: 13px;
-  line-height: 1.6;
-  color: #6b7280;
-  margin: 0 0 32px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #4b5563;
+  margin: -12px 0 32px;
 }
 .welcome-cta-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: auto;
+}
+/* The metamodel for "New model": the default suits almost everyone, so it
+   reads as a caption that opens the picker. */
+.welcome-mm-toggle {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 11.5px;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.14s;
+}
+.welcome-mm-toggle:hover,
+.welcome-mm-toggle[aria-expanded="true"] {
+  color: #374151;
+}
+.welcome-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  margin-top: 28px;
 }
 .welcome-mm-picker {
   display: flex;
@@ -2551,14 +2571,6 @@ label.app-menu-row { cursor: pointer; }
   border: 1px solid rgba(127, 127, 127, 0.18);
   border-radius: 10px;
   margin-top: 4px;
-}
-.welcome-mm-picker-title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 2px 4px 6px;
 }
 .welcome-mm-option {
   text-align: left;
@@ -2590,30 +2602,6 @@ label.app-menu-row { cursor: pointer; }
   font-size: 11px;
   color: var(--text-muted);
   line-height: 1.4;
-}
-/* "New model" + dropdown arrow split */
-.welcome-btn-group {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-}
-.welcome-btn-group .welcome-btn {
-  flex: 1;
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-.welcome-btn-mm {
-  padding: 0 12px !important;
-  min-width: unset !important;
-  flex-shrink: 0;
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  border-left: 1px solid rgba(127,127,127,.2) !important;
-  margin-left: -1px;
-}
-.welcome-sample-link {
-  margin-top: 14px;
-  text-align: center;
 }
 .welcome-link {
   background: none;
@@ -2653,14 +2641,6 @@ label.app-menu-row { cursor: pointer; }
 .welcome-btn-primary:hover {
   background: #2d5fd4;
   border-color: #2d5fd4;
-}
-.welcome-btn-ghost {
-  background: #f3f4f6;
-  color: #374151;
-  border-color: #e5e7eb;
-}
-.welcome-btn-ghost:hover {
-  background: #e9eaf0;
 }
 .welcome-btn-forge {
   background: linear-gradient(135deg, #f0f4ff, #faf0ff);
@@ -2711,6 +2691,23 @@ label.app-menu-row { cursor: pointer; }
 }
 .welcome-recent-item:hover {
   background: rgba(59, 111, 230, 0.07);
+}
+/* The last model: what most visits come back for. */
+.welcome-recent-item-last {
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #e3e6ef;
+}
+.welcome-recent-item-last .welcome-recent-name {
+  font-weight: 600;
+}
+.welcome-recent-item:focus-visible {
+  outline: 2px solid #3b6fe6;
+  outline-offset: 1px;
+}
+/* Focused on open: the highlight already says so. */
+.welcome-recent-item-last:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px #b9c9f5, 0 1px 3px rgba(59, 111, 230, 0.12);
 }
 .welcome-recent-icon {
   flex-shrink: 0;
@@ -2773,28 +2770,21 @@ label.app-menu-row { cursor: pointer; }
   line-height: 1.5;
   color: #6b7280;
 }
-.welcome-sample-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.welcome-sample-tag {
-  font-size: 10.5px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: #eef2fd;
-  color: #3b4eab;
-}
-.welcome-sample-stats {
-  font-size: 11px;
-  color: #9ca3af;
-}
 .welcome-sample-cta {
   margin-top: auto;
+  padding-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3b6fe6;
 }
-.welcome-sample-card:hover .welcome-sample-cta {
-  background: #2d5fd4;
-  border-color: #2d5fd4;
+.welcome-sample-card:hover .welcome-sample-cta svg {
+  transform: translateX(2px);
+}
+.welcome-sample-cta svg {
+  transition: transform 0.14s;
 }
 /* ─── Treemap view ───────────────────────────────────────────────────── */
 .treemap-wrap-outer {

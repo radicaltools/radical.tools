@@ -7,6 +7,7 @@ import { availableMetamodels } from '@radical/common/metamodel'
 import type { DiagramData } from '@radical/common/c4'
 import { host } from '../platform/host'
 import { webFolderSupported } from '../persist/webFolder'
+import { aiReady, loadAISettings } from '../ai/settings'
 
 /** Markdown folders open in Electron and in Chromium browsers (File System
  *  Access API), as in the Document Manager. */
@@ -90,10 +91,13 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
   // so newcomers get the first-visit layout with the sample front and centre.
   const existingDocs = documents.listDocuments().filter(d => !documents.isBootSeeded(d.id))
   const hasExisting  = existingDocs.length > 0
-  const lastDoc      = hasExisting ? existingDocs[0] : null
+  // AI settings live behind the logo menu, which this overlay covers, so
+  // reading them once is enough.
+  const [forgeAvailable] = useState(() => aiReady(loadAISettings()))
   const presets = availableMetamodels()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [selectedPresetId, setSelectedPresetId] = useState('c4-ddd-governance-builtin')
+  const selectedPreset = presets.find(p => p.id === selectedPresetId) ?? presets[0]
 
   /** Adds the model and opens it; says why when browser storage refused it. */
   function create(name: string, data: DiagramData): DocumentMeta | null {
@@ -106,11 +110,10 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
   }
 
   function createBlank(): boolean {
-    const preset = presets.find(p => p.id === selectedPresetId) ?? presets[0]
     return !!create('Untitled model', {
       nodes: [],
       relations: [],
-      metamodel: preset.build(),
+      metamodel: selectedPreset.build(),
     })
   }
 
@@ -185,7 +188,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
     <div className="welcome-overlay">
       <div className="welcome-card">
 
-        {/* ── Left column ── */}
+        {/* ── Left column: start something ── */}
         <div className="welcome-left">
           <div className="welcome-wordmark">
             <svg className="welcome-wordmark-icon" width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -198,48 +201,31 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
             </svg>
             <span className="welcome-wordmark-text">radical<em>.tools</em></span>
           </div>
-
-          <h1 className="welcome-heading">
-            {hasExisting ? <>Your recent<br/>models</> : <>Architecture<br/>modelling</>}
-          </h1>
-          <p className="welcome-lead">
-            {hasExisting
-              ? 'Continue where you stopped, or start something new.'
-              : 'C4-based visual modelling for software architecture teams.'}
-          </p>
+          {/* Newcomers get one line on what this is; returning users know. */}
+          {!hasExisting && (
+            <p className="welcome-lead">
+              Model software architecture with C4 views, and keep the
+              decisions, requirements and screens behind it in one place.
+            </p>
+          )}
 
           <div className="welcome-cta-group">
-            {lastDoc && (
+            {/* Forge needs a model to talk to, so it shows only once AI is
+                set up (logo menu → AI providers…). */}
+            {forgeAvailable && (
               <button
-                className="welcome-btn welcome-btn-primary"
-                onClick={() => handleOpen(lastDoc.id)}
-                title={`Last edited ${new Date(lastDoc.lastModified).toLocaleString()}`}
+                className="welcome-btn welcome-btn-forge"
+                onClick={handleForge}
+                title="Describe a system in plain language and let AI generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model for it"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M7 1.5a5.5 5.5 0 1 1-3.89 9.39" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none"/>
-                  <polyline points="3.5,7.5 1.5,11 5,11.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                  <line x1="7" y1="4" x2="7" y2="7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                  <line x1="7" y1="7.5" x2="9.5" y2="9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <path d="M4.5 1.5l.9 2.1L7.5 4.5l-2.1.9-.9 2.1-.9-2.1L1.5 4.5l2.1-.9z"/>
+                  <path d="M10.5 6.5l.65 1.35L12.5 8.5l-1.35.65-.65 1.35-.65-1.35L8.5 8.5l1.35-.65z"/>
                 </svg>
-                Open last — {lastDoc.name}
+                Start with Radical Forge
               </button>
             )}
-            <button
-              className="welcome-btn welcome-btn-forge"
-              onClick={handleForge}
-              title="Describe a system in plain language and let AI generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model for it"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                <path d="M4.5 1.5l.9 2.1L7.5 4.5l-2.1.9-.9 2.1-.9-2.1L1.5 4.5l2.1-.9z"/>
-                <path d="M10.5 6.5l.65 1.35L12.5 8.5l-1.35.65-.65 1.35-.65-1.35L8.5 8.5l1.35-.65z"/>
-              </svg>
-              Start with Radical Forge
-            </button>
-            <div className="welcome-btn-group">
-            <button
-              className="welcome-btn welcome-btn-ghost"
-              onClick={handleNew}
-            >
+            <button className="welcome-btn welcome-btn-primary" onClick={handleNew}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                 <line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
@@ -248,74 +234,67 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
             </button>
             <button
               type="button"
-              className="welcome-btn welcome-btn-ghost welcome-btn-mm"
+              className="welcome-mm-toggle"
               onClick={() => setPickerOpen(o => !o)}
-              title="Change metamodel"
+              aria-expanded={pickerOpen}
+              title="Metamodel for new models"
             >
-              <svg width="11" height="11" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 7L1 3h8z"/></svg>
+              {selectedPreset.name}
+              <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 7L1 3h8z"/></svg>
             </button>
-            </div>
             {pickerOpen && (
               <div className="welcome-mm-picker">
-                <div className="welcome-mm-picker-title">Metamodel for new model</div>
                 {presets.map(p => (
                   <button
                     key={p.id}
                     type="button"
-                    className={`welcome-mm-option${selectedPresetId === p.id ? ' selected' : ''}`}
+                    className={`welcome-mm-option${selectedPreset.id === p.id ? ' selected' : ''}`}
                     onClick={() => { setSelectedPresetId(p.id); setPickerOpen(false) }}
                   >
                     <div className="welcome-mm-option-name">
                       {p.name}
-                      {selectedPresetId === p.id && <span className="welcome-mm-option-check">✓</span>}
+                      {selectedPreset.id === p.id && <span className="welcome-mm-option-check">✓</span>}
                     </div>
                     <div className="welcome-mm-option-desc">{p.description}</div>
                   </button>
                 ))}
               </div>
             )}
-            <button className="welcome-btn welcome-btn-ghost" onClick={handleImport}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1.5" y="1.5" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                <line x1="4" y1="7" x2="10" y2="7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <polyline points="7,4 10,7 7,10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Open file…
-            </button>
+          </div>
+
+          {/* Opening what already exists is the quiet path. */}
+          <div className="welcome-links">
+            <button type="button" className="welcome-link" onClick={handleImport}>Open file…</button>
             {folderSupported && (
               <button
-                className="welcome-btn welcome-btn-ghost"
+                type="button"
+                className="welcome-link"
                 onClick={handleOpenFolder}
                 title="Open a Radical Markdown model folder, or an empty folder to start one"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M1.5 3.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                </svg>
                 Open folder…
               </button>
             )}
+            {hasExisting && (
+              <button type="button" className="welcome-link" onClick={handleSample}>Sample model</button>
+            )}
           </div>
-
-          {hasExisting && (
-            <div className="welcome-sample-link">
-              <button type="button" className="welcome-link" onClick={handleSample}>
-                or open a sample model
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* ── Right column ── */}
+        {/* ── Right column: carry on, or look around ── */}
         <div className="welcome-right">
           {hasExisting ? (
             <>
               <p className="welcome-right-label">Recent</p>
               <div className="welcome-recent">
-                {existingDocs.slice(0, 6).map((doc) => (
+                {existingDocs.slice(0, 6).map((doc, i) => (
                   <button
                     key={doc.id}
-                    className="welcome-recent-item"
+                    className={`welcome-recent-item${i === 0 ? ' welcome-recent-item-last' : ''}`}
                     onClick={() => handleOpen(doc.id)}
+                    // The last model is one Enter away.
+                    autoFocus={i === 0}
+                    title={`Last edited ${new Date(doc.lastModified).toLocaleString()}`}
                   >
                     <span className="welcome-recent-icon">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -336,7 +315,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
           ) : (
             // First visit: the sample is the fastest way to see what the
             // tool does (no AI key, no blank canvas), so it gets the whole
-            // column. Counts mirror fintechSampleData.json.
+            // column.
             <>
               <p className="welcome-right-label">Explore a sample</p>
               <button type="button" className="welcome-sample-card" onClick={handleSample}>
@@ -346,13 +325,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
                   A complete model to click through, from C4 views down to
                   the decisions, requirements and screens behind them.
                 </span>
-                <span className="welcome-sample-tags">
-                  {['C4 views', 'ADRs', 'Requirements', 'UI mockups', 'Wiki', 'Slides'].map(t => (
-                    <span key={t} className="welcome-sample-tag">{t}</span>
-                  ))}
-                </span>
-                <span className="welcome-sample-stats">65 elements · 15 views · 12 slides</span>
-                <span className="welcome-btn welcome-btn-primary welcome-sample-cta">
+                <span className="welcome-sample-cta">
                   Explore the sample
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                     <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>

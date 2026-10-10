@@ -450,8 +450,9 @@ a unit or e2e test:
   into a container does not re-parent it and nothing highlights; "everything
   is undoable" did not hold (bug 8, fixed in #118).
 - *Getting started:* the Welcome screen shows on every browser load without a
-  route, never in desktop or VS Code; New model uses C4 + DDD + Governance
-  unless the dropdown was opened first.
+  route, never in desktop or VS Code; New model uses the metamodel named under
+  it (C4 + DDD + Governance by default); Start with Radical Forge shows only
+  once an AI provider is set up.
 - *Properties & governance:* the EARS subject comes from the element that
   *satisfies* the requirement, not the one it *constrains*; requirements have
   no status or MoSCoW priority; fitness functions have no trigger, automated
