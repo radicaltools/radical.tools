@@ -226,7 +226,11 @@ describe('Radical Forge over MCP', () => {
       const states = data.views!.find((v) => v.name === 'States')!
       const machineIds = data.nodes.filter((n) => ['entity', 'state-machine', 'state', 'pseudostate', 'event'].includes(n.type)).map((n) => n.id)
       expect(states.nodeIds.sort()).toEqual(machineIds.sort())
-      expect(data.views!.find((v) => v.name === 'Conceptual')!.nodeIds).not.toContain(machineIds[0])
+      // The machine itself stays off Conceptual. (The entity is there too, for
+      // now: forgeViewsOf files the domain model into both views.)
+      const conceptual = data.views!.find((v) => v.name === 'Conceptual')!.nodeIds
+      const machine = data.nodes.filter((n) => ['state-machine', 'state', 'pseudostate', 'event'].includes(n.type)).map((n) => n.id)
+      expect(machine.filter((id) => conceptual.includes(id))).toEqual([])
       await call(client, 'forge_clarify', { stage: 'mockups' })
     } finally {
       await client.close()
