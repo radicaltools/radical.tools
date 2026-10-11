@@ -123,6 +123,11 @@ publish job `id-token: write`. A new trusted publisher must complete its first
 successful publish within two days, so configure it when the next version is
 ready. See [npm's Trusted Publishing instructions](https://docs.npmjs.com/trusted-publishers/).
 
+If npm shows **Pending validation**, publish a new version through this workflow
+before the deadline shown in npm. A dry run or a local `npm publish` does not
+validate the OIDC connection. The workflow needs direct `npm publish` permission;
+`npm stage publish` alone is insufficient, and managing dist-tags is not needed.
+
 In GitHub **Actions → Publish MCP to npm → Run workflow**, select `main` and leave
 **dry-run** enabled to verify and upload the package without publishing. For a
 reviewed version bump, run it with **dry-run** disabled. Actual publishing is
