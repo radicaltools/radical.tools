@@ -1,0 +1,33 @@
+{
+  "types": {
+    "x": {
+      "markdownlint": {
+        "MD043": {
+          "headings": [
+            "# Example document",
+            "## Overview",
+            "## Details",
+            "### Inputs",
+            "### Outputs",
+            "## Acceptance"
+          ],
+          "match_case": true
+        }
+      }
+    },
+    "flexible": {
+      "markdownlint": {
+        "MD043": {
+          "headings": [
+            "?",
+            "## Overview",
+            "*",
+            "## Acceptance",
+            "*"
+          ],
+          "match_case": true
+        }
+      }
+    }
+  }
+}
