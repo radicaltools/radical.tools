@@ -1,16 +1,24 @@
-// ─── Built-in C4 + DDD + Governance preset ──────────────────────────────────
+// ─── Built-in Radical metamodel ─────────────────────────────────────────────
 //
-// Extends C4 + DDD with two governance node types and three relation types:
+// The default metamodel (id c4-ddd-governance-builtin, kept for the files and
+// Hub concepts that store it). Extends C4 + DDD (ddd.ts) with two governance node types and three relation types:
 //   • adr         — Architecture Decision Record (Nygard / MADR format)
 //   • fitness-fn  — Fitness Function (Building Evolutionary Architectures)
 //   • constrains  — adr / fitness-fn → any C4 element
 //   • supersedes  — adr → adr (replaces an older decision)
 //   • implements  — fitness-fn → adr ("this FF verifies ADR-003")
+//   • need        — raw free-text input (brief, notes, raw requirements) that
+//                   EARS requirements are derived from (requirement → need)
 //   • mockup      — a UI screen (design link or AI-generated wireframe),
 //                   linked via illustrates / presented-by / navigates-to
+//   • state-machine, state, pseudostate, event — event-driven hierarchical
+//                   state machines, linked via transition / lifecycle-of / emits
 
 import { Metamodel, NodeTypeDef, PropertyDef, RelationPair, RelationTypeDef } from '../types'
 import { builtInDddC4Metamodel } from './ddd'
+
+/** What the default metamodel is called in the app. */
+export const RADICAL_METAMODEL_NAME = 'Radical'
 
 export function builtInGovernanceMetamodel(): Metamodel {
   const base = builtInDddC4Metamodel()
@@ -113,6 +121,63 @@ export function builtInGovernanceMetamodel(): Metamodel {
     },
   }
 
+  // ── Need (ISO/IEC/IEEE 29148 "stakeholder need") ─────────────────────────
+  //
+  // Raw, unstructured input — a brief, user story, meeting notes, a quoted
+  // regulation, raw requirements — kept verbatim as the node's `description`
+  // (so it is the Markdown body of its file in an md-folder model). EARS
+  // requirements are derived from it (requirement --derives--> need), and a
+  // need nests under a broader one the same way (need --derives--> need); it is
+  // deliberately not a requirement itself, so nothing `satisfies` or
+  // `verifies` it. It has no status: being in the model means it is
+  // accepted. Radical Forge stores its input description as one.
+
+  const needProps: PropertyDef[] = [
+    { key: 'description', label: 'Text', type: 'textarea' },
+    {
+      key: 'kind',
+      label: 'Kind',
+      type: 'enum',
+      options: ['brief', 'user-story', 'stakeholder-note', 'meeting-notes', 'regulation', 'other'],
+      default: 'brief',
+    },
+    { key: 'source', label: 'Source (who / where from)', type: 'text' },
+  ]
+
+  const need: NodeTypeDef = {
+    id: 'need',
+    label: 'Need',
+    color: '#475569',
+    fg: '#fff',
+    // Speech bubble with text lines
+    iconPath: 'M3 2a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 3 12h1.5v2.5L8 12h5a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 13 2H3Zm1.5 3h7v1h-7V5Zm0 2.5h5v1h-5v-1Z',
+    width: 200,
+    height: 80,
+    collapsedWidth: 180,
+    collapsedHeight: 80,
+    allowedParents: ['system', 'domain', 'group'],
+    allowedAtRoot: true,
+    builtin: true,
+    tableTab: true,
+    // A need's wiki page and table tab list what derives from it — sub-needs
+    // and requirements — as its children; "add child" creates either.
+    hierarchyRelation: 'derives',
+    properties: needProps,
+    wizard: {
+      trigger: 'create',
+      steps: [
+        { kind: 'fields', title: 'Name & kind', fields: ['label', 'kind'],
+          help: 'A short name, e.g. "Checkout brief from Sales". Pick what kind of input it is.' },
+        { kind: 'fields', title: 'Text', fields: ['description'],
+          help: 'Paste the input as-is — a brief, user story, notes or raw requirements. No format needed; Radical Forge or you can turn it into EARS requirements later.' },
+        { kind: 'fields', title: 'Source', fields: ['source'],
+          help: 'Who it came from or where it lives (a person, meeting, ticket or link).' },
+        { kind: 'relations', title: 'Part of', relationType: 'derives', direction: 'out',
+          help: 'Is this part of a broader need, e.g. one stakeholder\'s notes within a discovery? Leave empty if not.' },
+      ],
+    },
+  }
+
   // ── EARS Requirement ──────────────────────────────────────────────────────
 
   const requirementProps: PropertyDef[] = [
@@ -125,6 +190,9 @@ export function builtInGovernanceMetamodel(): Metamodel {
     },
     { key: 'trigger',             label: 'When (trigger)',            type: 'text',     visibleWhen: { key: 'ears_type', values: ['event-driven', 'complex'] } },
     { key: 'precondition',        label: 'While (precondition)',      type: 'text',     visibleWhen: { key: 'ears_type', values: ['state-driven', 'complex'] } },
+    // The state the precondition is, when it is one of a state machine's:
+    // "While the Reservation is Confirmed". Takes the place of the text.
+    { key: 'precondition_state',  label: 'While in state',            type: 'ref',      refType: 'state', visibleWhen: { key: 'ears_type', values: ['state-driven', 'complex'] } },
     { key: 'unwanted_condition',  label: 'If (unwanted condition)',   type: 'text',     visibleWhen: { key: 'ears_type', values: ['unwanted-behaviour', 'complex'] } },
     { key: 'feature',             label: 'Where (feature)',           type: 'text',     visibleWhen: { key: 'ears_type', values: ['optional', 'complex'] } },
     { key: 'action',              label: 'The system shall (action)', type: 'textarea' },
@@ -155,14 +223,14 @@ export function builtInGovernanceMetamodel(): Metamodel {
           help: 'A short name for the requirement, e.g. "Lock account after failed logins".' },
         { kind: 'custom', title: 'Sentence', component: 'ears-quick-entry',
           help: 'Type the requirement as one sentence and press Enter — the EARS fields are filled for you. Or skip and fill them in the next step.' },
-        { kind: 'fields', title: 'EARS fields', fields: ['ears_type', 'trigger', 'precondition', 'unwanted_condition', 'feature', 'action'],
+        { kind: 'fields', title: 'EARS fields', fields: ['ears_type', 'trigger', 'precondition', 'precondition_state', 'unwanted_condition', 'feature', 'action'],
           help: 'Pick the EARS pattern; only the clauses it uses are shown.' },
         { kind: 'fields', title: 'Rationale', fields: ['rationale'],
           help: 'Why is this requirement needed? Who asked for it?' },
         { kind: 'relations', title: 'Satisfied by', relationType: 'satisfies', direction: 'in',
           help: 'Which elements must satisfy this requirement?' },
         { kind: 'relations', title: 'Derives from', relationType: 'derives', direction: 'out',
-          help: 'Is this a refinement of a broader requirement?' },
+          help: 'Is this a refinement of a broader requirement, or derived from a need?' },
         { kind: 'relations', title: 'Traces to', relationType: 'traces-to', direction: 'out',
           help: 'Which decisions or fitness functions follow from it?' },
       ],
@@ -217,11 +285,16 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
-  // requirement → requirement decomposition
+  // requirement → requirement decomposition, requirement → need (the raw
+  // input it was derived from) and need → need (a need within a broader one)
   const derives: RelationTypeDef = {
     id: 'derives',
     label: 'Derives from',
-    allowedPairs: [{ from: 'requirement', to: 'requirement' }],
+    allowedPairs: [
+      { from: 'requirement', to: 'requirement' },
+      { from: 'requirement', to: 'need' },
+      { from: 'need', to: 'need' },
+    ],
     properties: [],
     color: '#0d9488',
     builtin: true,
@@ -408,17 +481,192 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
+  // ── States: event-driven hierarchical state machines ─────────────────
+  //
+  // Statecharts with SCXML / XState semantics. A state machine holds states;
+  // a state with child states is compound, and one of kind `parallel` has
+  // its child states active at once (each child is a region). Nesting is
+  // canvas containment, as for systems and containers. Every compound state
+  // and the machine itself enter through an `initial` pseudostate, whose one
+  // transition points at the default child. A transition points at its
+  // trigger (`event`) and at the events it raises (`raises`) with reference
+  // properties: a relation cannot point at a node, a property can.
+
+  const stateMachine: NodeTypeDef = {
+    id: 'state-machine',
+    label: 'State Machine',
+    color: '#3730a3',
+    fg: '#fff',
+    // Two states joined by a transition
+    iconPath: 'M1 3.5A1.5 1.5 0 0 1 2.5 2h3A1.5 1.5 0 0 1 7 3.5v2A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-2Zm8 7A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v2a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 12.5v-2ZM3.5 8h1v3h2.8v-1l2 1.5-2 1.5v-1H3.5V8Z',
+    width: 560,
+    height: 380,
+    collapsedWidth: 200,
+    collapsedHeight: 64,
+    allowedParents: ['system', 'domain', 'group'],
+    allowedAtRoot: true,
+    builtin: true,
+    tableTab: true,
+    properties: [
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  }
+
+  const state: NodeTypeDef = {
+    id: 'state',
+    label: 'State',
+    color: '#4f46e5',
+    fg: '#fff',
+    // Rounded rectangle
+    iconPath: 'M3.5 3h9A2.5 2.5 0 0 1 15 5.5v5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 1 10.5v-5A2.5 2.5 0 0 1 3.5 3Zm0 1.5a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1h-9Z',
+    width: 320,
+    height: 220,
+    collapsedWidth: 170,
+    collapsedHeight: 72,
+    allowedParents: ['state-machine', 'state'],
+    allowedAtRoot: false,
+    builtin: true,
+    tableTab: true,
+    properties: [
+      {
+        key: 'kind',
+        label: 'Kind',
+        type: 'enum',
+        options: ['normal', 'parallel', 'final'],
+        default: 'normal',
+      },
+      { key: 'entry', label: 'Entry actions', type: 'text', visibleWhen: { key: 'kind', values: ['normal', 'parallel'] } },
+      { key: 'exit',  label: 'Exit actions',  type: 'text', visibleWhen: { key: 'kind', values: ['normal', 'parallel'] } },
+      { key: 'do',    label: 'Do (ongoing activity)', type: 'text', visibleWhen: { key: 'kind', values: ['normal'] } },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  }
+
+  const pseudostate: NodeTypeDef = {
+    id: 'pseudostate',
+    label: 'Pseudostate',
+    color: '#1e1b4b',
+    fg: '#fff',
+    // Filled dot (initial)
+    iconPath: 'M8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z',
+    width: 36,
+    height: 36,
+    allowedParents: ['state-machine', 'state'],
+    allowedAtRoot: false,
+    builtin: true,
+    properties: [
+      {
+        key: 'kind',
+        label: 'Kind',
+        type: 'enum',
+        options: ['initial', 'shallow-history', 'deep-history', 'choice'],
+        default: 'initial',
+      },
+    ],
+  }
+
+  const event: NodeTypeDef = {
+    id: 'event',
+    label: 'Event',
+    color: '#c2410c',
+    fg: '#fff',
+    // Lightning bolt
+    iconPath: 'M9.5 1 3 9h4l-1 6 6.5-8h-4l1-6Z',
+    width: 170,
+    height: 52,
+    allowedParents: ['state-machine', 'system', 'domain', 'group'],
+    allowedAtRoot: true,
+    builtin: true,
+    tableTab: true,
+    properties: [
+      {
+        key: 'source',
+        label: 'Source',
+        type: 'enum',
+        options: ['external', 'internal', 'timer'],
+        default: 'external',
+      },
+      { key: 'payload', label: 'Payload', type: 'text' },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  }
+
+  const stateNodeTypes = ['state', 'pseudostate'] as const
+  const transition: RelationTypeDef = {
+    id: 'transition',
+    label: 'Transition',
+    allowedPairs: stateNodeTypes.flatMap(from => stateNodeTypes.map(to => ({ from, to }))),
+    properties: [
+      { key: 'event',   label: 'Event (trigger; none = completion)', type: 'ref', refType: 'event' },
+      { key: 'guard',   label: 'Guard [condition]', type: 'text' },
+      { key: 'actions', label: 'Actions (/ effect)', type: 'text' },
+      { key: 'raises',  label: 'Raises (events it publishes)', type: 'ref', refType: 'event', multiple: true },
+      {
+        key: 'kind',
+        label: 'Kind',
+        type: 'enum',
+        options: ['external', 'internal'],
+        default: 'external',
+      },
+    ],
+    color: '#6366f1',
+    builtin: true,
+  }
+
+  // state machine → the domain entity whose lifecycle it models (one machine
+  // per entity: two lifecycles of one thing are regions of a parallel state).
+  // The C4 elements that run it `implements` the machine.
+  const lifecycleOf: RelationTypeDef = {
+    id: 'lifecycle-of',
+    label: 'Lifecycle of',
+    allowedPairs: [{ from: 'state-machine', to: 'entity' }],
+    properties: [],
+    color: '#3730a3',
+    builtin: true,
+  }
+
+  // element → event it publishes. A state raises it from its entry, exit or
+  // do activity (SCXML <raise>/<send> in onentry/onexit); a machine when it
+  // is not yet known which state does. A transition cannot be a source (a
+  // relation cannot start at a relation): it lists them in `raises`.
+  const emits: RelationTypeDef = {
+    id: 'emits',
+    label: 'Emits',
+    allowedPairs: (['person', 'system', 'container', 'component', 'webapp', 'queue', 'state-machine', 'state'] as const).map(from => ({ from, to: 'event' })),
+    properties: [
+      {
+        key: 'on',
+        label: 'On (for a state: entry, exit or do)',
+        type: 'enum',
+        options: ['entry', 'exit', 'do'],
+        default: 'entry',
+      },
+    ],
+    color: '#ea580c',
+    builtin: true,
+  }
+
+  implements_.allowedPairs.push(...(['system', 'container', 'component', 'webapp'] as const).map(from => ({ from, to: 'state-machine' })))
+  satisfies.allowedPairs.push({ from: 'state-machine', to: 'requirement' }, { from: 'entity', to: 'requirement' })
+  verifies.allowedPairs.push({ from: 'scenario', to: 'state-machine' })
+  illustrates.allowedPairs.push({ from: 'mockup', to: 'state' })
+
   return {
     id: 'c4-ddd-governance-builtin',
-    name: 'C4 + DDD + Governance',
+    name: RADICAL_METAMODEL_NAME,
     nodeTypes: {
       ...base.nodeTypes,
       adr,
       'fitness-fn': fitnessFn,
+      need,
       requirement,
       scenario,
       blueprint,
       mockup,
+      'state-machine': stateMachine,
+      state,
+      pseudostate,
+      event,
     },
     relationTypes: {
       ...base.relationTypes,
@@ -432,6 +680,9 @@ export function builtInGovernanceMetamodel(): Metamodel {
       illustrates,
       'presented-by': presentedBy,
       'navigates-to': navigatesTo,
+      transition,
+      'lifecycle-of': lifecycleOf,
+      emits,
     },
   }
 }

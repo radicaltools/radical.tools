@@ -22,8 +22,11 @@ export interface ToolRunContext {
   /** Clears the tempId map — call after reset_diagram, since prior tempIds
    *  point at nodes that no longer exist. */
   resetTempIds(): void
-  /** Simple grid placement for a newly created node; live layout reshuffles. */
-  placeNext(): { x: number; y: number }
+  /** Placement for a newly created node under `parentId` (undefined = the
+   *  root), relative to that parent. Studio places a run's nodes in a
+   *  landscape block beside what the canvas shows; the MCP server right of
+   *  the last sibling. */
+  placeNext(parentId?: string): { x: number; y: number }
 }
 
 export interface ToolResult {
@@ -37,6 +40,9 @@ export interface ToolResult {
 }
 
 export type ToolHandler = (input: unknown, ctx: ToolRunContext) => ToolResult
+
+/** A tool that has to wait, e.g. for a layout run. */
+export type AsyncToolHandler = (input: unknown, ctx: ToolRunContext) => Promise<ToolResult>
 
 export function fail(resultText: string): ToolResult {
   return { ok: false, resultText }

@@ -36,6 +36,9 @@ export const W_LEAF     = 20
 export const W_ASPECT   = 30
 export const W_COMPACT  = 8
 export const W_SYMMETRY = 4
+/** Per labelled relation whose ends leave no room for its label (≈ an
+ *  overdraw: the label has to cover a node). */
+export const W_LABEL    = 15
 
 /** Mean edge length (in node sizes) above which the length term kicks in. */
 export const LEN_MEAN_KNEE = 3

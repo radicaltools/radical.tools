@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Docs — Radical.Tools</title>
-  <meta name="description" content="Radical.Tools documentation: modelling with C4, DDD and governance, UI mockups and screen flows, six view kinds, milestones, presentations, Markdown-folder persistence, the metamodel editor, the Concept Hub and the AI assistant." />
+  <meta name="description" content="Radical.Tools documentation: modelling with C4, DDD and governance, UI mockups and screen flows, six view kinds, milestones, presentations, Markdown-folder persistence, the metamodel editor, the Concept Hub, the AI assistant and the MCP server for coding agents." />
   <!-- Before any stylesheet: sets data-theme for the first paint and is not blocked by a slow font CDN. -->
   <script src="theme.js?v=__BUILD__"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -50,7 +50,20 @@
             <li><a href="#relations">Relations</a></li>
             <li><a href="#properties">Properties &amp; governance</a></li>
             <li><a href="#mockups">Mockups &amp; screen flows</a></li>
+            <li><a href="#domain-model">Domain model</a></li>
+            <li><a href="#states">State machines</a></li>
             <li><a href="#selection">Working with selections</a></li>
+          </ul>
+        </div>
+        <div class="toc-group">
+          <div class="toc-label">Metamodels</div>
+          <ul>
+            <li><a href="#metamodels">Overview</a></li>
+            <li><a href="#metamodel-c4">C4</a></li>
+            <li><a href="#metamodel-radical">Radical</a></li>
+            <li><a href="#metamodel-relations">Relations</a></li>
+            <li><a href="#metamodel-rules">Rules &amp; checks</a></li>
+            <li><a href="#metamodel">Metamodel editor</a></li>
           </ul>
         </div>
         <div class="toc-group">
@@ -76,10 +89,10 @@
         <div class="toc-group">
           <div class="toc-label">Extend</div>
           <ul>
-            <li><a href="#metamodel">Metamodel editor</a></li>
             <li><a href="#hub">Concept Hub</a></li>
             <li><a href="#ai">AI assistant</a></li>
             <li><a href="#forge">Radical Forge</a></li>
+            <li><a href="#mcp">MCP server</a></li>
           </ul>
         </div>
         <div class="toc-group">
@@ -103,7 +116,7 @@
         <p class="doc-hero-sub">
           One model of your architecture; every diagram, table and wiki page derived from it.
           This guide walks through modelling, the six view kinds, milestones, presentations,
-          files, the metamodel editor, the Concept Hub and the AI assistant.
+          files, the metamodel editor, the Concept Hub, the AI assistant and the MCP server that lets coding agents edit the model.
         </p>
         <div class="doc-hero-actions">
           <a class="cta" href="https://studio.radical.tools" target="_blank" rel="noopener">Open Studio</a>
@@ -119,18 +132,18 @@
         <p>
           Radical.Tools runs in the browser at <a href="https://studio.radical.tools" target="_blank" rel="noopener">studio.radical.tools</a>
           — no account, nothing uploaded — or as a desktop app (see <a href="#vscode">local install</a>).
-          On first launch you land on the <strong>Welcome screen</strong>:
+          On first launch you land on the <strong>Welcome screen</strong>. It asks one thing first — a new model or an existing one — and the details come in the next step:
         </p>
         <ul>
-          <li><strong>New model</strong> — pick the metamodel first: <em>C4</em>, <em>C4 + DDD</em> (adds Domains) or <em>C4 + DDD + Governance</em> (adds ADRs, fitness functions, requirements and blueprints). You can change it later in the metamodel editor.</li>
-          <li><strong>Open file</strong> — a <code>.radical</code> / <code>.json</code> model from disk.</li>
-          <li><strong>Load the sample</strong> — the <em>Fintech Banking Platform</em> used throughout this guide: 62 elements — architecture, ADRs and fitness functions, EARS requirements, Gherkin scenarios and 13 UI mockups with wireframes in three screen flows — 15 views of every kind, four sequences, four milestones and a ready-made presentation.</li>
-          <li><strong>Recent</strong> — models you already have in this browser.</li>
+          <li><strong>New model</strong> — pick the metamodel (<em>Radical</em> is preselected, plain <em>C4</em> is the other choice, and the <a href="#metamodel">metamodel editor</a> changes it later) and where to keep the model: <em>in this browser</em>, <em>in a file</em> (one <code>.radical</code> file, every change saved to it) or <em>in a folder</em> (Markdown files, see <a href="#documents">Models &amp; files</a>). The choice of storage is remembered. Once an AI provider is set up, <em>Create with Radical Forge</em> starts the model from a description instead.</li>
+          <li><strong>Open</strong> — a recent model, the ones kept in this browser, a file, a folder, a Structurizr DSL workspace or the sample.</li>
+          <li><strong>Try the sample</strong> — the <em>Fintech Banking Platform</em> used throughout this guide: 65 elements — architecture, ADRs and fitness functions, the needs behind it (a regulation, a product brief and a client's feedback), the EARS requirements derived from them, Gherkin scenarios and 13 UI mockups with wireframes in three screen flows — 15 views of every kind, four sequences, four milestones and a ready-made presentation. A first visit offers it right under the two choices.</li>
+          <li><strong>Recent</strong> — your last three models, one click away; <em>Open</em> lists more.</li>
         </ul>
         <figure class="doc-shot">
-          <img class="shot-light" src="screenshots/welcome-light.png" alt="Welcome screen: New model with metamodel picker, Open file, Load sample, recent models" loading="lazy" />
-          <img class="shot-dark" src="screenshots/welcome-dark.png" alt="Welcome screen: New model with metamodel picker, Open file, Load sample, recent models" loading="lazy" />
-          <figcaption>The Welcome screen. Loading the sample is the fastest way to see every feature in this guide.</figcaption>
+          <img class="shot-light" src="screenshots/welcome-light.png" alt="Welcome screen: New model and Open, with the three most recent models below" loading="lazy" />
+          <img class="shot-dark" src="screenshots/welcome-dark.png" alt="Welcome screen: New model and Open, with the three most recent models below" loading="lazy" />
+          <figcaption>The Welcome screen. The sample is the fastest way to see every feature in this guide.</figcaption>
         </figure>
         <div class="doc-tip">
           <strong>Tip:</strong> a deep link such as <code>studio.radical.tools/#/m/designer/v/canvas</code> skips the Welcome screen and opens the last active model directly. See <a href="#links">Deep links</a>.
@@ -162,18 +175,21 @@
       <section class="doc-section" id="documents">
         <h2>Models &amp; files</h2>
         <p>
-          A model is a <em>document</em>. Open <em>Radical menu → Manage models…</em> to see them grouped by where they live:
+          A model is a <em>document</em>, kept in one of three places:
         </p>
         <ul>
-          <li><strong>Local storage</strong> — kept in this browser. Create with <em>+ New local model</em> (choose the metamodel), rename, delete, or convert with <em>Save as file…</em> / <em>Save as folder…</em>.</li>
-          <li><strong>Files</strong> — a single <code>.radical</code> JSON file on disk (desktop app).</li>
-          <li><strong>Folders</strong> — a <strong>Markdown folder</strong>: one <code>.md</code> per element with YAML front-matter, nested directories for containment, JSON sidecars for layout, views and relations. Diff-friendly and readable without the app. Works in the desktop app and, in Chromium browsers, via the File System Access API (you may be asked to <em>Reconnect</em> a folder after a reload).</li>
+          <li><strong>This browser</strong> — browser storage. Nothing to pick; export a file to share it.</li>
+          <li><strong>A file</strong> — a single <code>.radical</code> JSON file on disk. In the desktop app and in Chromium browsers (File System Access API) every change is saved back to the file; other browsers can only import and download one.</li>
+          <li><strong>A folder</strong> — a <strong>Markdown folder</strong>: one <code>.md</code> per element with YAML front-matter, nested directories for containment, JSON sidecars for layout, views and relations. Diff-friendly and readable without the app. Works in the desktop app and in Chromium browsers.</li>
         </ul>
-        <p>Every change is <strong>autosaved</strong> (a few hundred milliseconds after you stop editing) to wherever the document lives. <em>Import Structurizr DSL…</em> converts a <code>.dsl</code> workspace into a new local model.</p>
+        <p>
+          <em>Radical menu → Manage models…</em> lists every model on one list, the last used first, with a search box and a filter by place (<em>All</em>, <em>Browser</em>, <em>Files</em>, <em>Folders</em>). Click a row to switch to it. Its <em>⋯</em> menu renames it, moves the open model to a file or a folder, and deletes it (a file or folder is only removed from the list; it stays on disk). <em>+ New model</em> and <em>Open…</em> are the same steps as on the Welcome screen; <em>Open… → Structurizr DSL…</em> converts a <code>.dsl</code> workspace into a new model.
+        </p>
+        <p>Every change is <strong>autosaved</strong> (a few hundred milliseconds after you stop editing) to wherever the document lives. In the browser, a file or folder needs access granted again after a reload: click it on the Welcome screen, or <em>Reconnect…</em> on its row.</p>
         <figure class="doc-shot">
-          <img class="shot-light" src="screenshots/documents-light.png" alt="Models dialog listing local, file and folder backed models with Rename, Save as file, Save as folder and Delete actions" loading="lazy" />
-          <img class="shot-dark" src="screenshots/documents-dark.png" alt="Models dialog listing local, file and folder backed models with Rename, Save as file, Save as folder and Delete actions" loading="lazy" />
-          <figcaption>The Models dialog. The badge on each row tells you where the model is stored.</figcaption>
+          <img class="shot-light" src="screenshots/documents-light.png" alt="Models dialog: one list of browser, file and folder models with search, a filter by place and a menu per row" loading="lazy" />
+          <img class="shot-dark" src="screenshots/documents-dark.png" alt="Models dialog: one list of browser, file and folder models with search, a filter by place and a menu per row" loading="lazy" />
+          <figcaption>The Models dialog. The icon and the line under each name tell you where the model is kept.</figcaption>
         </figure>
         <div class="doc-tip">
           <strong>Desktop:</strong> launch with <code>radical --file path/to/model.radical</code> (or the <code>RADICAL_FILE</code> environment variable) and the app reloads whenever that file changes on disk — handy next to a text editor or a Git checkout.
@@ -193,7 +209,7 @@
           The metamodel decides what is allowed. Dropping a Component directly on the canvas, a Person inside a System, or a fourth element of a type limited to three is <em>refused</em> with a message rather than silently drawn — so the model stays valid.
         </p>
         <h3>Containment</h3>
-        <p>Change a parent any time with the <em>Parent</em> field in properties, or by dragging the node into another container. Collapse a container with the toggle in its header or in the model tree; children fold away and relations re-attach to the parent. In a named view, collapsing is <em>per view</em> — the same system can be open in one view and folded in another.</p>
+        <p>Change a parent any time with the <em>Parent</em> field in properties, or by dragging the node into another container. Collapse a container with the toggle in its header or in the model tree; children fold away and relations re-attach to the parent. In a named view, collapsing is <em>per view</em> — the same system can be open in one view and folded in another. A <em>Group</em> has no meaning of its own: it can sit at the root, in another group or inside a system, where it gathers some of the system's parts (shared libraries, say) the way groups do in Structurizr.</p>
         <h3>Visibility per view</h3>
         <p>Elements exist once in the model and appear in as many views as you like. Use the eye icon in the model tree (or <em>Hide from view</em> in the selection bar) to add or remove an element from the active view. Ancestors of a visible element are included automatically.</p>
       </section>
@@ -217,7 +233,14 @@
           <figcaption>Properties of a Container. Fields come from the metamodel, so custom types get their own forms.</figcaption>
         </figure>
         <p>
-          Every element has a label, description and parent; C4 runtime elements add <em>technology</em> and an <em>external</em> flag. Everything else is defined by the metamodel: text, long text, number, boolean and enum fields, optionally shown only when another field has a given value.
+          Every element has a label, description and parent; C4 runtime elements add <em>technology</em> and an <em>external</em> flag. Everything else is defined by the metamodel: text, long text, number, boolean and enum fields, and <strong>references</strong> to other elements, optionally shown only when another field has a given value. A reference points at one element of a given type, or several (a transition's <em>Event</em>, the events it <em>Raises</em>): you pick them from a list, the model keeps their ids, and renaming the element never breaks the link. A reference to an element that was deleted is marked ⚠ and listed under <em>Validation</em> in the <a href="#metamodel">Metamodel editor</a>.
+        </p>
+        <h3>Needs</h3>
+        <p>
+          A <strong>Need</strong> (palette group <em>Requirements</em>) keeps raw input exactly as it arrived: a brief, a user story, meeting notes, a quoted regulation or a list of raw requirements. The text is free-form and is the element's description, so in a <a href="#formats">Markdown folder</a> it is simply the body of its file. <em>Kind</em> says what it is and <em>Source</em> who or where it came from. There is no status: a need in the model is an accepted one.
+        </p>
+        <p>
+          Needs are where EARS requirements come from. A requirement links to the need it was written from with <em>Derives from</em> (the same relation that links a sub-requirement to its parent), so every requirement traces back to the words someone actually wrote. Needs nest the same way: a need that is part of a broader one (one stakeholder's notes within a discovery, one chapter of a regulation) links to it with <em>Derives from</em>, which its wizard asks as <em>Part of</em>. A need's <a href="#view-wiki">Wiki</a> page lists its sub-needs and the requirements derived from it under <em>Derives from this</em>, and adding a child there creates either, already linked; the <em>Need</em> tab of a <a href="#view-table">Table</a> shows them as a tree. Nothing <em>satisfies</em> or <em>verifies</em> a need directly; that is what its requirements are for.
         </p>
         <h3>Requirements (EARS)</h3>
         <p>
@@ -231,7 +254,7 @@
         </p>
         <h3>Wizards</h3>
         <p>
-          Creating an ADR, fitness function, requirement, scenario or mockup — dropped on the canvas or a table, or added from a wiki page — opens a <strong>wizard</strong> that walks through its fields one step at a time, with a prompt for each, and ends with the relations that give it meaning (which elements an ADR <em>constrains</em>, which earlier ADR it <em>supersedes</em>…). The element is only created when you press <strong>Create</strong> (<kbd>⌘/Ctrl</kbd>+<kbd>Enter</kbd> from any step); <kbd>Esc</kbd> discards it. <strong>Fill in with wizard…</strong> in the properties panel reopens it for an existing element, and <em>Wizard on create</em> in the app menu turns the automatic wizard off. Wizards are part of the metamodel (<code>wizard</code> on a node type), so custom metamodels can define their own.
+          Creating an ADR, fitness function, need, requirement, scenario or mockup — dropped on the canvas or a table, or added from a wiki page — opens a <strong>wizard</strong> that walks through its fields one step at a time, with a prompt for each, and ends with the relations that give it meaning (which elements an ADR <em>constrains</em>, which earlier ADR it <em>supersedes</em>…). The element is only created when you press <strong>Create</strong> (<kbd>⌘/Ctrl</kbd>+<kbd>Enter</kbd> from any step); <kbd>Esc</kbd> discards it. <strong>Fill in with wizard…</strong> in the properties panel reopens it for an existing element, and <em>Wizard on create</em> in the app menu turns the automatic wizard off. Wizards are part of the metamodel (<code>wizard</code> on a node type), so custom metamodels can define their own.
         </p>
       </section>
 
@@ -261,6 +284,48 @@
         </p>
       </section>
 
+      <section class="doc-section" id="domain-model">
+        <h2>Domain model</h2>
+        <p>
+          The Radical metamodel can hold the domain model the requirements talk about, in their own words (palette group <em>Domain</em>):
+        </p>
+        <ul>
+          <li><strong>Domain</strong> — a bounded context or subdomain, a part of the business with its own language and rules. <em>Kind</em> says whether it is <em>core</em> (what sets the system apart), <em>supporting</em> or <em>generic</em>. Domains nest for subdomains.</li>
+          <li><strong>Entity</strong> — a thing with an identity inside a domain: a reservation, a customer, a product. An <em>aggregate root</em> is changed as a whole and keeps its own rules (solid border); an <em>entity</em> is a part that only lives inside one (dashed border). Plain values such as an address or an amount are not entities; describe them on the entity that holds them.</li>
+        </ul>
+        <p>Relate them with:</p>
+        <ul>
+          <li><strong>Part of</strong> — entity → its aggregate root (an order line → the order). The <a href="#view-table">Table</a> and <a href="#view-wiki">Wiki</a> views list an aggregate's parts under its root.</li>
+          <li><strong>References</strong> — entity → entity in another aggregate (a reservation is for a customer), with a <em>Cardinality</em> of one or many. Aggregates refer to each other only this way, never as parts.</li>
+          <li><strong>Depends on</strong> and <strong>Partnership</strong> (with its pattern: customer-supplier, anti-corruption layer, …) — domain → domain: the context map.</li>
+          <li><strong>Realises</strong> — the system or container that serves a domain, or the element that owns an entity's data → it. An entity <em>Satisfies</em> the requirements that are about it, and a <a href="#states">state machine</a> is the <em>Lifecycle of</em> an entity.</li>
+        </ul>
+        <p>The <em>Validation</em> list in the <a href="#metamodel">Metamodel editor</a> warns about an entity that is neither a root nor part of an aggregate, a part of two aggregates, a part of something that is not a root, and an aggregate root inside another.</p>
+      </section>
+
+      <section class="doc-section" id="states">
+        <h2>State machines</h2>
+        <p>
+          A <strong>State machine</strong> (palette group <em>States</em>, in the Radical metamodel) models the lifecycle of one <strong>Entity</strong> — a domain object such as a reservation, an order or a payment (palette group <em>Domain</em>; its <em>Kind</em> says whether it is an aggregate root) — as an event-driven, hierarchical statechart with the semantics of SCXML and XState. It is a frame on the canvas, named after its entity; drop its parts into it.
+        </p>
+        <ul>
+          <li><strong>State</strong> — a rounded box with optional <em>entry</em>, <em>exit</em> and <em>do</em> actions, drawn under its name (<code>entry / start payment timer</code>). Drop states into a state to make it <em>compound</em>: being in a child state means being in its parent too, and a transition that leaves the parent leaves any child (one <em>Cancel</em> for all of them). Set <em>Kind</em> to <em>parallel</em> to make its child states <em>regions</em> that are active at the same time, drawn with dashed borders (packing and invoicing an order), or to <em>final</em> to end the machine or its parent, drawn as a bullseye.</li>
+          <li><strong>Pseudostate</strong> — the dot that marks the <em>initial</em> state: the machine and every compound state that is not parallel have one, with a single transition to the state they start in. <em>Shallow</em> and <em>deep history</em> (H, H*) re-enter the state a compound state was last in; <em>choice</em> (a diamond) branches on guards.</li>
+          <li><strong>Event</strong> — something that happens to the thing: a user action, a message from another system or a timer (<em>Source</em>), with an optional <em>Payload</em>. Events live in the machine or in a system, domain or group, so several machines can share them.</li>
+        </ul>
+        <p>Connect the parts with relations:</p>
+        <ul>
+          <li><strong>Transition</strong> — state → state (or pseudostate). Pick its <em>Event</em> (the trigger; none for a transition that fires when its state completes), and fill in a <em>Guard</em>, <em>Actions</em> and the events it <em>Raises</em>. The arrow is labelled the usual way: <code>PaymentReceived [amount ≥ total] / reserve stock ^OrderPaid</code>, with the events' current names.</li>
+          <li><strong>Emits</strong> — a state (on <em>entry</em>, <em>exit</em> or <em>do</em>), a machine, or a C4 element → the event it publishes.</li>
+          <li><strong>Lifecycle of</strong> — machine → the entity it models; one machine per entity (two lifecycles of one thing are regions of a parallel state).</li>
+          <li><strong>Implements</strong> — the system, container, component or web app that runs the machine → machine. <strong>Realises</strong> — the element that owns the entity's data → entity.</li>
+          <li>A scenario <em>Verifies</em> a machine, a machine <em>Satisfies</em> requirements, and a mockup <em>Illustrates</em> the state it shows. A state-driven requirement (<em>While …</em>) can point at the state it holds in with <em>While in state</em>: its sentence then reads <em>While the Reservation is Confirmed, …</em>, and follows a rename.</li>
+        </ul>
+        <p>
+          Beyond what may sit where, the <em>Validation</em> list in the <a href="#metamodel">Metamodel editor</a> checks that a statechart can run: each machine the lifecycle of one entity and no entity with two machines, one initial state per machine and compound state, at least two regions in a parallel state, nothing leaving a final state, no transition leaving its machine, no two unguarded transitions from one state on the same event, and no state the initial state cannot reach. These are warnings: a machine is often incomplete while you build it. <a href="#forge">Radical Forge</a> can derive machines from your scenarios, and the <a href="#mcp">MCP server</a> tells an agent about the warnings its changes bring in.
+        </p>
+      </section>
+
       <section class="doc-section" id="selection">
         <h2>Working with selections</h2>
         <p>
@@ -270,6 +335,7 @@
           <li><strong>Wrap into…</strong> — create a new container of an allowed type around the selection.</li>
           <li><strong>Move to…</strong> — re-parent the selection into another container.</li>
           <li><strong>Unwrap</strong> — remove a container but keep its children and their relations.</li>
+          <li><strong>Align…</strong> — keep the elements in a row, a column or a grid on this canvas, optionally in the order you selected them (see <a href="#alignments">Alignments</a>). With a single container selected it reads <strong>Align children…</strong>.</li>
           <li><strong>Hide from view</strong> — take the elements out of the active view without touching the model.</li>
           <li><strong>Delete</strong> — remove from the model (with children); <kbd>Delete</kbd> does the same. Everything is undoable with <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd>.</li>
         </ul>
@@ -350,7 +416,7 @@
           <figcaption>The <em>Governance</em> table. Each tab has the columns that matter for that kind of element.</figcaption>
         </figure>
         <p>
-          <strong>All nodes</strong> shows the containment tree as indented rows; <strong>ADRs</strong>, <strong>Fitness Functions</strong> and <strong>Requirements</strong> expose their governance fields (status, priority, EARS pattern and slots…) as columns; <strong>Relations</strong> lists every edge with source, target, label, technology and type. Click a cell to edit it in place — enums become dropdowns, and columns that depend on another value (an EARS trigger only exists for event-driven requirements) grey out when they do not apply. Drop a palette item onto a row to add a child of that element.
+          <strong>All nodes</strong> shows the containment tree as indented rows; <strong>ADRs</strong>, <strong>Fitness Functions</strong>, <strong>Needs</strong> and <strong>Requirements</strong> expose their governance fields (status, kind, EARS pattern and slots…) as columns; <strong>Relations</strong> lists every edge with source, target, label, technology and type. Click a cell to edit it in place — enums become dropdowns, and columns that depend on another value (an EARS trigger only exists for event-driven requirements) grey out when they do not apply. Drop a palette item onto a row to add a child of that element.
         </p>
       </section>
 
@@ -374,7 +440,7 @@
           <figcaption>The <em>Architecture Wiki</em> view. Every element is a page; every field on it is editable inline.</figcaption>
         </figure>
         <p>
-          The overview page lists the view's elements as a table of contents; each element page shows its description as prose, short facts (status, technology, priority…) in an infobox, long fields as sections, children, and incoming and outgoing relations as links. Requirements show their EARS sentence with editable slots. You can add child elements and relations directly from a page. The page you are on is saved with the view, so a deep link lands on it.
+          The overview page lists the view's elements as a table of contents; each element page shows its description as prose, short facts (status, technology, priority…) in an infobox, long fields as sections, children, and incoming and outgoing relations as links. Requirements show their EARS sentence with editable slots; a need's page lists the requirements derived from it. You can add child elements and relations directly from a page. The page you are on is saved with the view, so a deep link lands on it.
         </p>
       </section>
 
@@ -386,8 +452,16 @@
         <p>
           One button, several algorithms: a layered layout (ELK), a force-directed layout and a simulated-annealing pass are run as candidates, scored for edge crossings, overlaps and compactness, and the best one is applied — with edge routing cleaned up afterwards. It respects containment, so children are arranged inside their parents. A view with <em>Tree</em> layout mode gets a hierarchical tree layout instead.
         </p>
+        <h3 id="dragging">Dragging and pins</h3>
+        <p>A drag moves only what you drag: the element (with the other selected elements, if you drag a selection), and the elements it is kept in a row or column with, which follow it across the line. Nothing else moves while you drag. When you drop it, elements it now covers are pushed just clear, each in one piece and in one direction, and a container that grew pushes its neighbours the same way; the rest of the diagram stays where it was.</p>
+        <p>A dropped element is <strong>pinned</strong>: the live physics (below) leaves it where you put it from then on. Select it to see the pin at its corner; click the pin to unpin it. A view's pinned elements are listed in its properties, with a button that unpins them all. Running Smart Layout rearranges the whole canvas and unpins everything on it (<em>Undo</em> brings the pins back with the old positions); if it keeps the current layout, the pins stay.</p>
         <h3>Live physics</h3>
-        <p>While you drag, a light force simulation nudges neighbours out of the way and keeps containers hugging their children. It never fights you: the node you hold stays where you put it.</p>
+        <p>A light force simulation keeps containers hugging their children and makes room when an element is added or a container expanded. Hold <kbd>⌘</kbd>/<kbd>Ctrl</kbd> as you start a drag to let it nudge neighbours out of the way while you drag; the node you hold stays where you put it, and pinned elements do not move.</p>
+        <h3 id="alignments">Alignments</h3>
+        <p>Select two or more elements and choose <strong>Align… → Keep in a row</strong> (centres on one horizontal line) or <strong>Keep in a column</strong> (one vertical line). The rule belongs to the canvas you made it on — <em>All elements</em> or one view — and every layout keeps it: drag one member — or an element inside a member container, which grows or shrinks it — and the others follow, the live physics holds the line, Smart Layout picks its best arrangement with the alignment applied. Members may sit in different containers, and expanded containers can be aligned by their boxes.</p>
+        <p>With <strong>Keep their order</strong> ticked in the same menu (the default; Studio remembers your choice) the elements also keep the order you selected them in, left to right or top to bottom — select them right to left and the row swaps them round. Drag one past its neighbour and the neighbour is pushed ahead, and Smart Layout never swaps them. Dashed guides show each alignment, with arrowheads when the order is kept; select a member to get buttons that switch order-keeping and remove the alignment, or use <em>Align… → Stop keeping aligned</em>. A view's alignments are also listed in its properties, each with an <em>in order</em> switch (the order they are listed in, which is the order they were selected in).</p>
+        <p><strong>Align… → Keep in a grid</strong> (three or more elements) puts them in a grid filled row by row in the order you selected them, and lays it out in even cells. Pick the number of columns with − / + in the menu (about square by default); later, select a member and use − / + on the guide, or the <em>columns</em> field in the view's properties. Every row stays a row and every column a column, in order, whatever moves.</p>
+        <p>To arrange what is inside a container, select just the container: the button reads <strong>Align children…</strong> and offers the same row, column and grid for its children, in the order they stand now — left to right, top to bottom, or row by row for a grid. This works on a collapsed container too: the rule is saved straight away and the children line up when you expand it. With the container selected, its children's guides show their buttons too.</p>
         <h3>Fit &amp; Smart Fit</h3>
         <p><strong>Fit All</strong> frames the visible elements. <strong>Smart Fit</strong> (Radical menu) keeps the camera fitted as the diagram changes — useful while importing or laying out, less so while hand-arranging. Scroll to zoom, drag the background to pan.</p>
         <h3>Quick Search</h3>
@@ -424,7 +498,7 @@
           <figcaption>Viewer: everything you can do in Designer to <em>look</em>, nothing that changes the saved model.</figcaption>
         </figure>
         <p>
-          <strong>Viewer</strong> is a sandbox. Drag, collapse, re-layout, switch views and milestones — all of it is thrown away when you return to Designer, so you can explore freely in front of others. It is also the perspective the <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a> uses to show concepts.
+          <strong>Viewer</strong> is a sandbox. Every view opens with the layout it has in Designer; drag, collapse, re-layout, switch views and milestones — all of it is thrown away when you return to Designer, so you can explore freely in front of others. It is also the perspective the <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a> uses to show concepts.
         </p>
         <figure class="doc-shot">
           <img class="shot-light" src="screenshots/presenter-light.png" alt="Presenter perspective: the slide dock along the bottom lists the Architecture Walkthrough slides with Present and Add slide buttons" loading="lazy" />
@@ -438,6 +512,249 @@
 
       <!-- ═══════════════ EXTEND ═══════════════ -->
 
+      <!-- ═══════════════ METAMODELS ═══════════════ -->
+
+      <section class="doc-section" id="metamodels">
+        <h2>Metamodels</h2>
+        <p>
+          A model in Radical is a graph of typed elements and typed relations. The <strong>metamodel</strong> is the rulebook for that graph: which element types exist, what each one may sit inside, which relations may join which types, and which fields each type and relation has. It travels with the model — in a <code>.radical</code> file it is the <code>metamodel</code> key, in a model folder <code>metamodel.json</code> — so whoever opens the model gets the same rules.
+        </p>
+        <p>Everything that edits the model consults it:</p>
+        <ul>
+          <li><strong>The palette</strong> lists its types, grouped into C4, Domain, Requirements, States, UX, Governance and Other.</li>
+          <li><strong>Placement</strong> — dropping an element where its type may not sit (a Component straight on the canvas, a Person inside a System) is refused with a message, and so is reparenting.</li>
+          <li><strong>Connections</strong> — the relation type is inferred from the pair of element types, and a pair no relation type allows is refused.</li>
+          <li><strong>The properties panel</strong>, table columns and wizards are built from the type's fields, including enum options and fields that show only when another one has a given value.</li>
+          <li><strong>The AI assistant, Radical Forge and the MCP server</strong> receive the rules with every request, and their edits are checked against them like yours.</li>
+        </ul>
+        <p>
+          Studio ships two metamodels, chosen when you create a model (<a href="#getting-started">New model</a>; <code>--metamodel radical</code> or <code>c4</code> for the <a href="#mcp">MCP server</a>):
+        </p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Metamodel</th><th>What it holds</th><th>Pick it when</th></tr></thead>
+            <tbody>
+              <tr><td><strong><a href="#metamodel-radical">Radical</a></strong> (default)</td><td>Everything in C4, plus the domain (domains, entities), what the architecture must do (needs, EARS requirements, Gherkin scenarios), how things behave (state machines), what users see (mockups) and what was decided (ADRs, fitness functions) — 21 element types and 19 relation types, linked to each other.</td><td>The model should explain <em>why</em> the architecture is the way it is, be traceable from a stakeholder's words to a container, or act as the harness that AI-written code is checked against.</td></tr>
+              <tr><td><strong><a href="#metamodel-c4">C4</a></strong></td><td>The C4 model only: people, software systems, containers (plus databases, web apps and queues), components and groups, joined by one relation, <em>Interacts</em>.</td><td>The diagram is the whole job: context and container maps, with nothing else in the palette.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Both can be extended with your own types and fields in the <a href="#metamodel">metamodel editor</a>; the first change makes a copy, <em>Radical (custom)</em> or <em>C4 (custom)</em>, so the built-in rules are never edited in place. An unedited built-in metamodel is replaced with the current version each time the model opens, so models get new types as Studio ships them. A model made with the former <em>C4 + DDD</em> metamodel opens under Radical, which holds all of its types unchanged.
+        </p>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/metamodel-diagram-light.png" alt="The Diagram tab of the metamodel editor on the Radical metamodel with Requirement selected: its lines to the types it links to, and beside it where a requirement may sit and every relation going out and coming in" loading="lazy" />
+          <img class="shot-dark" src="screenshots/metamodel-diagram-dark.png" alt="The Diagram tab of the metamodel editor on the Radical metamodel with Requirement selected: its lines to the types it links to, and beside it where a requirement may sit and every relation going out and coming in" loading="lazy" />
+          <figcaption>The <em>Diagram</em> tab of the <a href="#metamodel">metamodel editor</a> draws every type of the metamodel in a frame per palette group. Click one — here <em>Requirement</em> — to see where it may sit and every relation that may go out of it or come in.</figcaption>
+        </figure>
+        <h3>How the layers of Radical connect</h3>
+        <p>Read one requirement through the model, from the words someone wrote to the code that keeps it:</p>
+        <ol>
+          <li>A <strong>Need</strong> keeps the stakeholder's text as written — a brief, a user story, a regulation.</li>
+          <li>Each <strong>Requirement</strong> <em>derives from</em> that need: one EARS sentence the system must make true.</li>
+          <li>A <strong>Scenario</strong> <em>verifies</em> the requirement: Given / When / Then, ready for a test.</li>
+          <li>A <strong>State machine</strong> — the lifecycle of a domain <strong>Entity</strong> — shows the states the scenario walks through, and the scenario verifies the machine too.</li>
+          <li>A <strong>Mockup</strong> <em>illustrates</em> the requirement, the scenario or a state, and is <em>presented by</em> the web app that renders it.</li>
+          <li>A <strong>Container</strong> (or system, component…) <em>satisfies</em> the requirement — it becomes the subject of the EARS sentence — <em>implements</em> the state machine and <em>realises</em> the entity whose data it owns.</li>
+          <li>An <strong>ADR</strong> records the decision the requirement led to (<em>traces to</em>) and <em>constrains</em> the containers it governs; a <strong>Fitness function</strong> <em>implements</em> the ADR as an automated check.</li>
+        </ol>
+        <p>Every arrow in that story is a relation type with a fixed direction; the sections below describe each type and each relation, and which pairs they join.</p>
+      </section>
+
+      <section class="doc-section" id="metamodel-c4">
+        <h2>The C4 metamodel</h2>
+        <p>
+          The <a href="https://c4model.com" target="_blank" rel="noopener">C4 model</a> describes software at four levels of zoom: the people and systems around yours (context), the deployable parts of a system (containers), the parts of a container (components), and code, which Radical leaves to your editor. Radical's C4 adds three specialised containers — database, web app, queue — so the diagram says what each part is without a note. Every C4 type has a <em>Description</em> and an <em>External</em> flag (except Group); containers and components have a <em>Technology</em> as well. Both metamodels contain all of this.
+        </p>
+
+        <h3>Element types</h3>
+        <dl class="mm-types">
+          <dt>Person</dt>
+          <dd>Someone who uses or runs the system: a customer, an operator, another team. A person stands at the root of the canvas or inside a group, never inside a system — they are outside of it by definition. Mark a person <em>External</em> when they belong to another organisation. <span class="mm-eg">Retail Customer, Bank Operator.</span></dd>
+
+          <dt>Software System</dt>
+          <dd>Something that delivers value to its users and is owned by one team: yours, or one you depend on (mark it <em>External</em>). On a context diagram it is a box; expanded, it holds its containers. Systems may nest inside other systems and groups, and in Radical inside a domain, where the system is the bounded context that realises that (sub)domain. <span class="mm-eg">Core Banking Platform; SWIFT Network (external).</span></dd>
+
+          <dt>Container</dt>
+          <dd>Something that runs or stores data and is deployed on its own: a service, a worker, a mobile app, a serverless function. It lives inside a system (or a group within one). <em>Technology</em> says what it is built with. <span class="mm-eg">Payments Service — Kotlin, Spring Boot.</span></dd>
+
+          <dt>Database, Web App, Queue</dt>
+          <dd>Containers with a known role, drawn with their own shapes: a <strong>Database</strong> stores data and never starts an interaction; a <strong>Web App</strong> is a browser front end and may hold components; a <strong>Queue</strong> carries messages between containers. All three live in a system or a group and have a <em>Technology</em>. <span class="mm-eg">Accounts DB — PostgreSQL; Web Banking — React; Event Bus — Kafka.</span></dd>
+
+          <dt>Component</dt>
+          <dd>A part of a container behind a clear interface: a controller, a domain service, an adapter. Components live inside a container, a web app or a group — never straight in a system or on the canvas. <span class="mm-eg">Payment Validator inside Payments Service.</span></dd>
+
+          <dt>Group</dt>
+          <dd>A labelled boundary with no meaning of its own: a team, a layer, a deployment zone. Groups nest in groups, sit at the root, or inside a system to gather some of its parts (as Structurizr groups do). No relation starts or ends at a group: connect what is inside it.</dd>
+        </dl>
+
+        <h3>The Interacts relation</h3>
+        <p>
+          <strong>Interacts</strong> is the only relation in C4 and covers any meaningful interaction: the source calls, uses, sends to or delivers to the target. Its label says what happens (<em>“Makes payments using”</em>), its <em>Technology</em> how (<em>“JSON/HTTPS”</em>). The direction is the direction of the request, not of the data: draw it from the initiator.
+        </p>
+        <ul>
+          <li><strong>Person →</strong> system, container, web app, component.</li>
+          <li><strong>Software System →</strong> person, system, container, database, web app, queue, component.</li>
+          <li><strong>Container and Web App →</strong> person, system, container, database, web app, queue.</li>
+          <li><strong>Component →</strong> component, container, web app, database, queue, system.</li>
+          <li><strong>Queue →</strong> container, web app, component (a consumer it delivers to).</li>
+        </ul>
+        <p>
+          What the rules leave out is deliberate: a <strong>Database</strong> never initiates, so nothing starts at one; a container does not call a component of another container directly — draw the call to the container, or from component to component; and no relation touches a <strong>Group</strong>.
+        </p>
+      </section>
+
+      <section class="doc-section" id="metamodel-radical">
+        <h2>The Radical metamodel</h2>
+        <p>
+          Radical is the default. It contains the whole <a href="#metamodel-c4">C4 metamodel</a> unchanged, except that a Software System may also sit inside a <strong>Domain</strong>, and adds thirteen element types in five layers. The types of the new layers can sit at the root, in a system, in a domain or in a group, unless noted. Needs, requirements, scenarios, mockups, ADRs and fitness functions open a <a href="#properties">wizard</a> when you create them, and most of the new types have their own tab in the <a href="#view-table">Table view</a>.
+        </p>
+
+        <h3>Domain layer</h3>
+        <dl class="mm-types">
+          <dt>Domain</dt>
+          <dd>A part of the problem space, in the language of the business rather than of the software: <em>Payments</em>, <em>Customer onboarding</em>. Domains nest in domains to any depth (subdomains) and in groups. <em>Kind</em> says how much it matters — <em>core</em> (where you compete), <em>supporting</em> or <em>generic</em> (buy it) — and <em>Vision</em> what it is for. A Software System placed inside a domain is the bounded context that realises it. Between domains, <strong>Depends on</strong> and <strong>Partnership</strong> draw the context map (see <a href="#metamodel-relations">relations</a>).</dd>
+
+          <dt>Entity</dt>
+          <dd>A thing the domain keeps track of and that has an identity over time: a reservation, an order, a payment. Entities live in a domain or a group. <em>Kind</em> is <em>aggregate root</em> (the default, drawn with a solid border) — a consistency boundary other aggregates refer to by id — or <em>entity</em> (dashed), a part that belongs to exactly one aggregate through <strong>Part of</strong>. The C4 element that owns the entity's data <strong>realises</strong> it, a <a href="#states">state machine</a> is its lifecycle, and it can <strong>satisfy</strong> requirements. In the Table and Wiki views the parts of an aggregate list under its root. <span class="mm-eg">Order (root) with Order Line (part of Order).</span></dd>
+        </dl>
+
+        <h3>Requirements layer</h3>
+        <dl class="mm-types">
+          <dt>Need</dt>
+          <dd>Raw input in the stakeholder's own words, kept verbatim: a product brief, a user story, a stakeholder note, meeting notes, a regulation (<em>Kind</em>), with its <em>Source</em> — who said it, or where it came from. A need is not a requirement: nothing satisfies or verifies it, and it has no status — being in the model means it was heard. Requirements <strong>derive from</strong> it, and a need can sit under a broader need. Radical Forge stores the brief it starts from as a need. <span class="mm-eg">“Customers must confirm high-value transfers on their phone.” — PSD2, regulation.</span></dd>
+
+          <dt>Requirement</dt>
+          <dd>
+            One thing the system shall do, written as an <a href="https://alistairmavin.com/ears/" target="_blank" rel="noopener">EARS</a> sentence. <em>EARS type</em> picks the pattern and shows only the clauses it needs: <em>ubiquitous</em> (“The system shall…”), <em>event-driven</em> (“When <em>trigger</em>, …”), <em>state-driven</em> (“While <em>precondition</em>, …” — or <em>While in state</em>, pointing at a <strong>State</strong>: “While the Order is Ready, …”), <em>unwanted behaviour</em> (“If <em>condition</em>, then …”), <em>optional</em> (“Where <em>feature</em>, …”) and <em>complex</em> (any combination). <em>Action</em> is what the system shall do, <em>Rationale</em> why. Type the whole sentence in the wizard and it is split into the fields for you.
+            <br />The card on the canvas shows the composed sentence; its subject is the first element that <strong>satisfies</strong> the requirement, so linking a container makes the sentence name it. A requirement <strong>derives from</strong> a need or a broader requirement (decomposition), <strong>traces to</strong> the ADRs and fitness functions it led to, and can <strong>constrain</strong> C4 elements directly. <span class="mm-eg">“When a transfer exceeds €1,000, the Payments Service shall require strong customer authentication.”</span>
+          </dd>
+
+          <dt>Scenario</dt>
+          <dd>An acceptance example in Gherkin: <em>Given</em> the starting situation, <em>When</em> something happens, <em>Then</em> the outcome, with <em>Extra steps</em> for And / But lines. A scenario <strong>verifies</strong> a requirement, and a state machine when it walks through its states; Given is then the source state and Then the target. Scenarios become tests — which is how a coding agent turns the model into checks. <span class="mm-eg">Given a confirmed reservation, When staff mark it ready, Then the customer is notified.</span></dd>
+        </dl>
+
+        <h3>States layer</h3>
+        <p>Event-driven, hierarchical statecharts with the semantics of SCXML and XState; the <a href="#states">State machines</a> chapter shows how to build one on the canvas.</p>
+        <dl class="mm-types">
+          <dt>State Machine</dt>
+          <dd>The lifecycle of one entity, drawn as a frame that holds its states. It is the <strong>Lifecycle of</strong> exactly one entity and is named after it on the canvas; the C4 elements that run it <strong>implement</strong> it; scenarios <strong>verify</strong> it; it can <strong>satisfy</strong> requirements and <strong>emit</strong> events when it is not yet known which state does.</dd>
+
+          <dt>State</dt>
+          <dd>A situation the entity can be in. States live only inside a machine or another state: a state with child states is <em>compound</em>. <em>Kind</em> <em>normal</em> is the usual; <em>parallel</em> makes its child states regions that are active at the same time; <em>final</em> ends its parent (drawn as a bullseye). A state can run <em>Entry</em> and <em>Exit</em> actions and an ongoing <em>Do</em> activity, and <strong>emit</strong> events from them.</dd>
+
+          <dt>Pseudostate</dt>
+          <dd>A point the machine passes through but never rests in. <em>Initial</em> (a filled dot) is where the machine, and every compound state that is not parallel, starts — with exactly one outgoing transition. <em>Choice</em> (a diamond) branches on guards; <em>shallow</em> and <em>deep history</em> (H, H*) return to the state that was last active. Pseudostates live inside a machine or a state.</dd>
+
+          <dt>Event</dt>
+          <dd>Something that happens and can trigger a transition: <em>Source</em> is <em>external</em> (from outside the system), <em>internal</em> or a <em>timer</em>, with an optional <em>Payload</em>. Events live in a machine, a system, a domain or a group, so one event can be shared. A transition points at the event that triggers it and the events it raises; people, C4 elements, machines and states <strong>emit</strong> events.</dd>
+        </dl>
+
+        <h3>UX layer</h3>
+        <dl class="mm-types">
+          <dt>Mockup</dt>
+          <dd>One screen of the product: its <em>Screen / route</em>, a <em>Design link</em> to Figma or Penpot, and optionally a low-fi wireframe drawn by AI on the card. A mockup <strong>illustrates</strong> the requirements, scenarios and states it shows, is <strong>presented by</strong> the web app, container, component or system that renders it, and <strong>navigates to</strong> other mockups, with the trigger — together, the screen flow. See <a href="#mockups">Mockups &amp; screen flows</a>.</dd>
+        </dl>
+
+        <h3>Governance layer</h3>
+        <dl class="mm-types">
+          <dt>ADR</dt>
+          <dd>An Architecture Decision Record in the Nygard / MADR shape: <em>Status</em> (proposed, accepted, deprecated, superseded), <em>Date</em>, <em>Context</em>, <em>Decision</em>, <em>Consequences</em> and <em>Alternatives considered</em>. An ADR <strong>constrains</strong> the elements the decision governs, <strong>supersedes</strong> the ADR it replaces, is what requirements <strong>trace to</strong>, and what fitness functions <strong>implement</strong>. A new ADR starts <em>proposed</em> with today's date. <span class="mm-eg">ADR-001 Event-driven core — constrains Payments Service and Event Bus.</span></dd>
+
+          <dt>Fitness Function</dt>
+          <dd>An objective, preferably automated check that the architecture still has a property it was designed for (from <em>Building Evolutionary Architectures</em>): what it measures (<em>Description</em>), its <em>Category</em> — structural (dependencies, layering), operational (latency, availability), process (review, deployment) or holistic — and the <em>Threshold / success criteria</em>. It <strong>implements</strong> the ADR it verifies and <strong>constrains</strong> the elements it guards; requirements can trace to it. <span class="mm-eg">“Payment p99 &lt; 250 ms” — operational, implements ADR-001.</span></dd>
+
+          <dt>Blueprint</dt>
+          <dd>A curated reference architecture imported from the <a href="#hub">Concept Hub</a> — not drawn by hand, so it is not in the palette. It has a <em>Status</em> (draft, reviewed, approved, deprecated), the <em>Domain / context</em> it fits and a <em>Rationale</em>, and arrives with its systems, requirements, mockups and views. It sits at the root or in a domain or group and has no relations of its own.</dd>
+        </dl>
+      </section>
+
+      <section class="doc-section" id="metamodel-relations">
+        <h2>Relations in Radical</h2>
+        <p>
+          Radical keeps <a href="#metamodel-c4">Interacts</a> between C4 elements and adds eighteen relation types. Each has a direction — read it as a sentence from source to target — and joins only the pairs listed. When you connect two elements Studio picks the relation type the pair allows; two pairs allow two types (entity → entity, domain → domain), so there you choose it in the properties panel.
+        </p>
+
+        <h3>Domain</h3>
+        <dl class="mm-types">
+          <dt>Realises</dt>
+          <dd>The software behind the domain. <em>System or container → domain</em>: the bounded context that implements the domain. <em>System, container, component or web app → entity</em>: the element that owns the entity's data. <span class="mm-eg">Orders Service realises Order.</span></dd>
+          <dt>Part of</dt>
+          <dd><em>Entity → entity</em>: a part of an aggregate points to its root. Aggregates never contain each other; they refer to each other with References.</dd>
+          <dt>References</dt>
+          <dd><em>Entity → entity</em>: one aggregate refers to another by id, with a <em>Cardinality</em> (one or many) and a description. <span class="mm-eg">Order references Customer (one).</span></dd>
+          <dt>Depends on</dt>
+          <dd><em>Domain → domain</em>: the source domain needs the target to do its work — the plain arrow of a context map.</dd>
+          <dt>Partnership</dt>
+          <dd><em>Domain → domain</em> with a context-mapping <em>Pattern</em>: partnership, shared kernel, customer–supplier, conformist, anti-corruption layer, open host service, published language or separate ways — how the two teams' models meet.</dd>
+        </dl>
+
+        <h3>Traceability</h3>
+        <dl class="mm-types">
+          <dt>Derives from</dt>
+          <dd><em>Requirement → need</em>: the requirement turns that stakeholder input into a shall-statement. <em>Requirement → requirement</em>: decomposition into finer requirements. <em>Need → need</em>: a need inside a broader one. The Table and Wiki views show these as a tree, and <em>Add child</em> there creates the link. Nothing else may point at a need.</dd>
+          <dt>Satisfies</dt>
+          <dd><em>Any C4 element, a domain, an entity or a state machine → requirement</em>: this element is what makes the requirement true. The first one becomes the subject of the requirement's EARS sentence. An optional <em>Note</em> says how.</dd>
+          <dt>Verifies</dt>
+          <dd><em>Scenario → requirement or state machine</em>: the scenario is the acceptance test for it.</dd>
+          <dt>Traces to</dt>
+          <dd><em>Requirement → ADR or fitness function</em>: the decision the requirement led to, or the check that keeps it.</dd>
+        </dl>
+
+        <h3>Behaviour</h3>
+        <dl class="mm-types">
+          <dt>Lifecycle of</dt>
+          <dd><em>State machine → entity</em>: the machine is the lifecycle of that entity — one machine per entity (two lifecycles of one thing are regions of a parallel state).</dd>
+          <dt>Implements (C4 → machine)</dt>
+          <dd><em>System, container, component or web app → state machine</em>: this element runs the machine.</dd>
+          <dt>Transition</dt>
+          <dd><em>State or pseudostate → state or pseudostate</em>, within one machine. It points at its trigger <em>Event</em> (none means a completion transition, taken when the source finishes), has a <em>Guard</em> and <em>Actions</em>, lists the events it <em>Raises</em>, and is <em>external</em> or <em>internal</em> (stays in the state without exiting it). The canvas labels it <code>event [guard] / actions ^raised</code>.</dd>
+          <dt>Emits</dt>
+          <dd><em>Person, system, container, component, web app, queue, state machine or state → event</em>: this element raises the event; for a state, <em>On</em> says whether from its entry, exit or do activity. A transition raises events through its <em>Raises</em> field instead.</dd>
+        </dl>
+
+        <h3>UX</h3>
+        <dl class="mm-types">
+          <dt>Illustrates</dt>
+          <dd><em>Mockup → requirement, scenario or state</em>: the screen shows this requirement being met, this scenario's step, or what the user sees while the entity is in this state.</dd>
+          <dt>Presented by</dt>
+          <dd><em>Mockup → web app, container, component or system</em>: the part of the architecture that renders the screen.</dd>
+          <dt>Navigates to</dt>
+          <dd><em>Mockup → mockup</em>, with the <em>Trigger</em> (“Tap Confirm”): one step of a screen flow.</dd>
+        </dl>
+
+        <h3>Governance</h3>
+        <dl class="mm-types">
+          <dt>Constrains</dt>
+          <dd><em>ADR, fitness function or requirement → person, system, domain, container, component, database, web app or queue</em>: the decision, check or requirement applies to that element; an optional <em>Note</em> says how. This is what an agent reads before it changes the element.</dd>
+          <dt>Supersedes</dt>
+          <dd><em>ADR → ADR</em>: the newer decision replaces the older one (set the older one's status to <em>superseded</em>).</dd>
+          <dt>Implements (fitness function → ADR)</dt>
+          <dd><em>Fitness function → ADR</em>: the check verifies that the decision still holds.</dd>
+        </dl>
+      </section>
+
+      <section class="doc-section" id="metamodel-rules">
+        <h2>Rules and checks</h2>
+        <p>The metamodel is enforced in two ways.</p>
+        <h3>Refused at once</h3>
+        <ul>
+          <li>Placing or moving an element where its type may not sit, or at the root when its type needs a parent (a component, a state, a pseudostate).</li>
+          <li>Connecting a pair of types that no relation type allows: “Relation not allowed: Database → Person”.</li>
+          <li>Moving an element into itself or one of its descendants.</li>
+        </ul>
+        <p>The same refusals reach the AI assistant, Radical Forge and the MCP server as messages they can act on.</p>
+        <h3>Listed as issues</h3>
+        <p>
+          Some rules are about the model as a whole, and a model is often incomplete while you build it, so they are warnings rather than refusals. The <em>Validation</em> list in the <a href="#metamodel">metamodel editor</a> shows them (and the MCP server's <code>get_issues</code>), each taking you to the element:
+        </p>
+        <ul>
+          <li><strong>Any metamodel:</strong> a type the metamodel does not know or a misplaced element (errors, e.g. from a hand-edited file), a relation between types no relation type joins, a reference field that points at nothing or at the wrong type, an empty required field, too few or too many elements of a type (in custom metamodels that set those).</li>
+          <li><strong>Domain model (Radical):</strong> an aggregate root that is <em>part of</em> something (it should <em>reference</em> it); a part of something that is not an aggregate root; an entity that belongs to no aggregate or to two.</li>
+          <li><strong>State machines (Radical):</strong> a machine with no entity, or an entity with two machines; a machine or compound state with no initial pseudostate, or more than one; an initial pseudostate without exactly one outgoing transition, or with one coming in; a parallel state with fewer than two regions or with an initial pseudostate; a final state with children or outgoing transitions; a transition that leaves its machine; two unguarded transitions from one state on the same event; a state the initial state cannot reach.</li>
+        </ul>
+      </section>
+
       <section class="doc-section" id="metamodel">
         <h2>Metamodel editor</h2>
         <figure class="doc-shot">
@@ -446,14 +763,14 @@
           <figcaption>The metamodel travels with the model. Change it here and every form, palette entry and validation rule follows.</figcaption>
         </figure>
         <p>
-          <em>Radical menu → Metamodel editor…</em>. Start from a preset — <strong>C4</strong>, <strong>C4 + DDD</strong> or <strong>C4 + DDD + Governance</strong> — then shape it:
+          <em>Radical menu → Metamodel editor…</em>. Start from a preset — <strong>Radical</strong> (C4 with DDD domains and entities, and what shapes the architecture: needs, requirements, ADRs, fitness functions, scenarios, mockups and state machines) or plain <strong>C4</strong> — then shape it (a model made with the former <em>C4 + DDD</em> preset opens under the Radical metamodel, which holds all of its types):
         </p>
         <ul>
-          <li><strong>Node types</strong> — label, icon, colour, default and collapsed size, <em>allowed parents</em>, whether it may sit at the root, min/max <em>cardinality</em>, and <em>properties</em> (text, long text, number, boolean, enum with options and a default; a property can be <em>visible only when</em> another one has certain values).</li>
-          <li><strong>Relation types</strong> — label, colour, the <em>allowed pairs</em> of source and target types, and their own properties.</li>
+          <li><strong>Node types</strong> — label, icon, colour, default and collapsed size, <em>allowed parents</em>, whether it may sit at the root, min/max <em>cardinality</em>, and <em>properties</em> (text, long text, number, boolean, enum with options and a default, or a <em>reference</em> to one or many elements of a type; a property can be <em>visible only when</em> another one has certain values).</li>
+          <li><strong>Relation types</strong> — label, colour, the <em>allowed pairs</em> of source and target types, and their own properties (references included: that is how a transition points at its event).</li>
           <li>Built-in types can be extended but not deleted; add as many of your own as you need.</li>
         </ul>
-        <p>Validation is live: the palette, the parent drop-down, drag-and-drop and connection previews all consult the metamodel, and the AI assistant's patches are checked against it too.</p>
+        <p>Validation is live: the palette, the parent drop-down, drag-and-drop and connection previews all consult the metamodel, and the AI assistant's patches are checked against it too. The <em>Validation</em> list beside the types shows everything the model breaks now — errors, and warnings such as a missing required field, a reference to nothing or a <a href="#states">state machine</a> rule — and takes you to the element.</p>
       </section>
 
       <section class="doc-section" id="hub">
@@ -494,19 +811,84 @@
         <ul>
           <li><strong>Answer questions</strong> — “what depends on the Event Bus?”, “which containers have no owner?”. It queries the model with a small query language (<code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>STATS MODEL</code>) rather than guessing.</li>
           <li><strong>Change the model</strong> — “add a Redis cache between the API gateway and the accounts service”. The answer is a <em>patch</em> (add / update / delete nodes and relations, add views) that is validated against the metamodel, applied atomically and undoable like any other edit.</li>
-          <li><strong>Draft governance</strong> — turn a paragraph into EARS requirements or an ADR with the right fields filled.</li>
+          <li><strong>Draft governance</strong> — turn a paragraph or a <a href="#properties">need</a> into EARS requirements (linked back to the need) or an ADR with the right fields filled.</li>
         </ul>
+        <p>The same tools are available outside Studio: the <a href="#mcp">MCP server</a> hands them to Claude Code, Claude Desktop, Codex or any other MCP client.</p>
       </section>
 
       <section class="doc-section" id="forge">
         <h2>Radical Forge</h2>
         <p>
-          <strong>Radical Forge</strong> (<em>Start with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
+          <strong>Radical Forge</strong> (<em>New model → Create with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Domain model</strong> → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>State machines</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
         </p>
         <ul>
+          <li><strong>The description is kept as a <a href="#properties">Need</a>.</strong> When you press <em>Start</em>, the text is saved in the model as a need (named after its first line), and the Requirements stage links every requirement it writes to it with <em>Derives from</em>. If the model already has needs, <em>Start from</em> on the Description step loads one instead, and your edits are saved back to it. Going back and starting again updates the same need instead of adding a second one.</li>
+          <li><strong>Hub concepts that fit.</strong> For the Requirements, Fitness functions and C4 stages, Forge ranks the <a href="#hub">Hub</a> catalogue against your description (rarer words count more, and so do the concepts linked from a blueprint that fits), and the model picks at most five that fit, whatever language the description is in. They appear under <em>Picked from the Hub</em>, checked; untick the ones you do not want, or <em>Import</em> one as it is. When a blueprint fits the whole system, the C4 stage offers it first, to import as a skeleton. Without AI you see the best keyword matches instead.</li>
+          <li><strong>Five views.</strong> Every element a stage creates goes into a view of its layer: <em>Conceptual</em> (the need, requirements, scenarios and mockups, and for now the domain model too), <em>Domain</em> (the domains and their entities), <em>States</em> (the state machines, their events and the entities they are the lifecycle of), <em>Logical &amp; physical</em> (the C4 elements) and <em>Governance</em> (fitness functions and ADRs). A view is created when its first element arrives and reused by a later run with the same name. New elements are placed beside what the view already shows, in a block that grows sideways rather than down.</li>
+          <li><strong>Arrange after each stage.</strong> When a stage is done, Forge asks whether to keep its new elements in a <em>Row</em>, a <em>Column</em> or a <em>Grid</em> on their view (an <a href="#layout">alignment</a> every later layout keeps), and offers <em>Smart Layout</em> on that view. Nothing is rearranged unless you choose it.</li>
+          <li><strong>The domain model</strong> comes right after the requirements, which are its source: the stage adds the <a href="#domain-model">domains and entities</a> the requirements talk about, groups entities into aggregates, links the references between them and maps how the domains relate, and links each entity to its requirements. The later stages speak its language: scenarios name its entities, state machines model the lifecycle of its entities, and C4 links the systems and containers to the domains and entities they realise.</li>
+          <li><strong>State machines</strong> follow the scenarios: the stage finds the entities of the domain model with a real lifecycle (often none, and rarely more than three), models each with a <a href="#states">state machine</a>, and derives its transitions from the scenarios — <em>Given</em> the source state, <em>When</em> the event, <em>Then</em> the target state and its effect — including declines, timeouts and cancellations. The scenarios <em>verify</em> the machine, and the C4 stage later links the elements that run it (<em>Implements</em>) and own the entity's data (<em>Realises</em>).</li>
           <li><strong>Mockups</strong> come before C4: the stage creates the user-facing screens with <em>Illustrates</em> and <em>Navigates to</em> links, then <em>Generate wireframes</em> draws a wireframe for every mockup that has none. The C4 stage then designs the front-ends the screens need and links each mockup to its container with <em>Presented by</em>.</li>
           <li><strong>Finish here</strong> ends the run at any stage and keeps what has been generated. The final step summarises every stage (what was added, what was skipped) and exports the scenarios as <code>.feature</code> files; <em>← Back</em> resumes where you stopped.</li>
+          <li><strong>From your own agent.</strong> The same run, with the same stages, prompts, clarifying questions and Hub suggestions, works in Claude Code, Claude Desktop or any other <a href="#mcp">MCP</a> client, with the agent's model instead of a key in Studio. While an agent runs Forge on the folder Studio has open, the Forge button in the search bar pulses — blue while the agent generates a stage, amber while it waits for you (its questions, how to arrange a stage, whether to go on) — with the stage it is at; click it to see the run's steps, read only. Answer the agent in its own chat. The button stops pulsing when the run finishes, when the agent's client closes, or after 30 minutes without a change.</li>
         </ul>
+      </section>
+
+      <section class="doc-section" id="mcp">
+        <h2>MCP server</h2>
+        <p>
+          The <strong>MCP server</strong> lets a coding agent work on your model directly: <strong>Claude Code</strong>, <strong>Claude Desktop</strong>, <strong>Codex</strong> or any other client that speaks the <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">Model Context Protocol</a>. It runs locally over stdio, is bound to one <a href="#formats">Markdown folder</a>, and offers the same tools as the <a href="#ai">AI assistant</a> in Studio, so the agent can read the architecture, ADRs and requirements before it writes code and update the model when the design changes. Nothing leaves your machine except what your agent sends to its own provider.
+        </p>
+        <h3>Set it up</h3>
+        <p>Build it once with Node.js 20 or newer, from a clone of the repository (see <a href="#vscode">local install</a>):</p>
+<pre class="code"><code>npm install
+npm run build -w @radical/mcp
+node apps/mcp/dist/index.js --folder /absolute/path/to/my-model   <span class="cm"># waits for MCP messages on stdin</span></code></pre>
+        <p>Then register that command with your client, using absolute paths:</p>
+<pre class="code"><code><span class="cm"># Claude Code</span>
+claude mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.js --folder /path/to/my-model
+
+<span class="cm"># Codex</span>
+codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.js --folder /path/to/my-model</code></pre>
+        <p>For <strong>Claude Desktop</strong>, add it under <code>mcpServers</code> in <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (on Windows <code>%APPDATA%\Claude\claude_desktop_config.json</code>) and restart the app. Give the full path to <code>node</code>, because the app does not see your shell's <code>PATH</code>:</p>
+<pre class="code"><code>{
+  "mcpServers": {
+    "radical-folder": {
+      "command": "/usr/local/bin/node",
+      "args": ["/path/to/radical.tools/apps/mcp/dist/index.js", "--folder", "/path/to/my-model"]
+    }
+  }
+}</code></pre>
+        <p>The folder may also be relative to the directory the client starts the server in. A missing or empty folder becomes a new, empty model; <code>--metamodel radical</code> or <code>c4</code> picks its metamodel (default <code>radical</code>, the Radical metamodel). A folder with other files and no <code>radical.md</code> is refused, so the server never writes into a folder that isn't a model.</p>
+        <h3>Working alongside Studio</h3>
+        <p>
+          Open the <em>same</em> folder in Studio: in the desktop app, or in a Chromium browser through <em>Open → Folder…</em> (the browser asks for folder access; a model kept only in browser storage cannot be reached by the server). Studio reloads the folder when the agent changes it, so new elements appear on the open canvas. Then ask the agent to call <code>get_model_summary</code> first; the server's instructions tell it to as well.
+        </p>
+        <div class="doc-tip">
+          <strong>Tip:</strong> while the agent writes, keep Studio in <a href="#presenting">Viewer</a>. A change spans several files and the two processes share no lock: the server refuses to write over a file that changed since it read it, but editing the same folder from both sides at once can still race.
+        </div>
+        <h3>Tools</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Group</th><th>Tools</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Read</strong></td><td><code>get_model_summary</code> — counts, views, sequences, presentations, the modelling rules the assistant follows (how to write requirements, build a state machine…) and the metamodel rules (property keys and enum options, reference targets, allowed parents, cardinality, allowed relation pairs) · <code>get_issues</code> — everything the model breaks now, as the <em>Validation</em> list shows it · <code>search_model</code> — the assistant's query language (<code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>LIST SEQUENCES</code>…)</td></tr>
+              <tr><td><strong>Elements &amp; relations</strong></td><td><code>add_node</code>, <code>update_node</code>, <code>delete_node</code>, <code>move_node</code> (change the parent) · <code>add_relation</code>, <code>update_relation</code>, <code>delete_relation</code></td></tr>
+              <tr><td><strong>Views</strong></td><td><code>create_view</code>, <code>update_view</code>, <code>set_view_nodes</code>, <code>delete_view</code> · <code>smart_layout</code> for All elements or one view · <code>align_nodes</code> / <code>grid_nodes</code> / <code>remove_alignment</code> to keep elements in a row, a column or a grid</td></tr>
+              <tr><td><strong>Sequences &amp; slides</strong></td><td><code>create_sequence</code>, <code>update_sequence</code>, <code>delete_sequence</code> · <code>create_presentation</code>, <code>update_presentation</code>, <code>delete_presentation</code></td></tr>
+              <tr><td><strong>Metamodel</strong></td><td><code>upsert_node_type</code>, <code>delete_node_type</code>, <code>upsert_relation_type</code>, <code>delete_relation_type</code></td></tr>
+              <tr><td><strong>Radical Forge</strong></td><td><code>forge_start</code> · <code>forge_clarify</code> → <code>forge_generate</code> → <code>forge_complete_stage</code> → <code>forge_arrange</code> for each stage · <code>forge_wireframe</code> · <code>forge_import_hub_concept</code> · <code>forge_finish</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li><strong>Validated like Studio.</strong> Writes go through the same schemas and metamodel rules as the editor; an invalid parent, type or relation pair is refused with a message the agent can act on. Warnings do not stop a write, but the ones it brings in (a compound state with no initial state, a reference to nothing) come back with its result, and <code>get_issues</code> lists them all. A reference such as a transition's event takes an element's id, or a <code>tempId</code> from the same session. A tool reports success only after the files are written.</li>
+          <li><strong>Placement.</strong> New elements land inside their parent and parents grow to fit; call <code>smart_layout</code> to tidy up. New elements show in <em>All elements</em> until a view lists them (<code>create_view</code>, <code>set_view_nodes</code>).</li>
+          <li><strong>Metamodel edits.</strong> Changing a built-in metamodel saves it as a <code>…-custom</code> copy, like the <a href="#metamodel">Metamodel editor</a>. The server then re-announces the element and relation tools with the new types.</li>
+          <li><strong>Radical Forge.</strong> The agent runs <a href="#forge">Radical Forge</a> the way the wizard does (and Studio, open on the same folder, shows where the run stands on its Forge button): the server keeps the run (the need, your answers, each stage's summary and what it added) and hands the agent each stage's questions and task, with the Hub concepts that match; the agent asks you, builds the stage with the tools above, and stops after each stage to ask how to arrange it (row, column or grid, and Smart Layout, on the stage's view) and whether to continue, regenerate or finish. In Claude Code, start it with the <code>/mcp__radical-folder__forge</code> prompt (named after the server), or just ask for Radical Forge. Wireframes are drawn by the agent too, and <code>forge_finish</code> writes the <code>.feature</code> files to a folder you name.</li>
+          <li><strong>Plain files.</strong> Unrelated files and the text of <code>radical.md</code> are left as they were, so the agent's changes show up as small Git diffs.</li>
+        </ul>
+        <p>Single <code>.radical</code> files, milestones, canvas-only actions (switching or focusing the view in Studio) and remote HTTP connections are not supported.</p>
       </section>
 
       <!-- ═══════════════ REFERENCE ═══════════════ -->
@@ -514,7 +896,7 @@
       <section class="doc-section" id="formats">
         <h2>File formats</h2>
         <h3><code>.radical</code> (JSON)</h3>
-        <p>One file: <code>nodes</code>, <code>relations</code>, <code>sequences</code>, <code>views</code> (with per-view positions and camera), <code>snapshots</code> (milestones), <code>presentations</code>, the <code>metamodel</code> and Hub template records. Older <code>.c4.json</code> files open unchanged.</p>
+        <p>One file: <code>nodes</code>, <code>relations</code>, <code>sequences</code>, <code>views</code> (with per-view positions, camera and <code>layoutConstraints</code> — the alignments and grids), <code>defaultLayoutConstraints</code> (alignments on <em>All elements</em>), <code>snapshots</code> (milestones), <code>presentations</code>, the <code>metamodel</code> and Hub template records. Older <code>.c4.json</code> files open unchanged.</p>
         <h3>Markdown folder</h3>
 <pre class="code"><code>my-model/
 ├─ radical.md                 <span class="cm"># manifest</span>
@@ -528,9 +910,9 @@
 ├─ relations.json
 ├─ views.json · sequences.json · snapshots.json · presentations.json
 ├─ metamodel.json · hubTemplates.json
-└─ _layout.json               <span class="cm"># positions &amp; camera — the only noisy file</span></code></pre>
+└─ _layout.json               <span class="cm"># positions, camera &amp; All-elements alignments — the only noisy file</span></code></pre>
         <p>
-          Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the element's properties, sorted) and the description as body. Hierarchy is the directory tree. Output is deterministic — sorted keys, stable file names — so Git diffs show what changed and nothing else. Edit the files by hand; the app picks them up.
+          Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the element's properties, sorted) and the description as body. Hierarchy is the directory tree. Output is deterministic — sorted keys, stable file names — so Git diffs show what changed and nothing else. Edit the files by hand, or let an agent edit them through the <a href="#mcp">MCP server</a>; the app picks them up.
         </p>
       </section>
 
@@ -544,7 +926,8 @@ mode   designer | viewer | presenter | metamodel
 view   a view id, or <span class="cm">canvas</span> for the default Structure view
 f      element page (Wiki views)      s   active milestone
 p / sl presentation and 0-based slide while presenting
-d      <span class="cm">ls:&lt;uuid&gt;</span> or <span class="cm">fs:&lt;path&gt;</span> — which model (local to this machine)</code></pre>
+d      <span class="cm">ls:&lt;id&gt;</span>, <span class="cm">fs:&lt;path&gt;</span> or <span class="cm">md:&lt;folder&gt;</span> — which model (local to this machine)</code></pre>
+        <p>A model kept in a file or a <a href="#formats">Markdown folder</a> loads a moment after Studio opens; the link is applied once it has. A browser folder that needs <em>Reconnect…</em> keeps the link until you reconnect it. File and folder paths only open in the desktop app; in the browser a folder is identified by its id, so its links work in the browser that opened it.</p>
         <p>The Hub uses <code>#/c/&lt;conceptId&gt;/v/canvas|wiki|table</code> (plus <code>/cv/&lt;viewId&gt;</code> for one of a concept's named views) and <code>studio.radical.tools/?hub=id1,id2</code> opens Studio with those concepts queued for import.</p>
       </section>
 
@@ -558,6 +941,7 @@ d      <span class="cm">ls:&lt;uuid&gt;</span> or <span class="cm">fs:&lt;path&g
               <tr><td><kbd>Tab</kbd> / <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>In Quick Search: switch to AI mode / send to AI</td></tr>
               <tr><td><kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>⇧</kbd>+<kbd>Z</kbd> or <kbd>Y</kbd></td><td>Undo · Redo</td></tr>
               <tr><td><kbd>Alt</kbd> + drag (configurable)</td><td>Connect two elements</td></tr>
+              <tr><td><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + drag</td><td>Drag with the live physics making room around the element</td></tr>
               <tr><td><kbd>Shift</kbd> / <kbd>⌘</kbd>/<kbd>Ctrl</kbd> / <kbd>Alt</kbd> + click</td><td>Add to selection</td></tr>
               <tr><td><kbd>Delete</kbd></td><td>Delete selected elements or relation</td></tr>
               <tr><td>Double-click canvas</td><td>New Software System at the pointer</td></tr>
@@ -585,7 +969,8 @@ npm install
 npm run dev              <span class="cm"># Electron, hot reload</span>
 npm run build &amp;&amp; npm start
 npm run dev:web          <span class="cm"># browser build of Studio</span>
-npm run dev:hub          <span class="cm"># Architecture Hub</span></code></pre>
+npm run dev:hub          <span class="cm"># Architecture Hub</span>
+npm run build -w @radical/mcp   <span class="cm"># MCP server for coding agents</span></code></pre>
         <p>The desktop app adds native file dialogs, Markdown folders without browser permissions and <code>--file</code> watching. Everything else is identical to the browser build.</p>
       </section>
 
@@ -603,6 +988,26 @@ npm run dev:hub          <span class="cm"># Architecture Hub</span></code></pre>
   </footer>
 
   <script>
+    // Arriving with #section in the URL (a link from the landing page or
+    // elsewhere): the browser jumps before the web fonts arrive, and the text
+    // they reflow moves the section down. Jump again once they are in, unless
+    // the reader has scrolled meanwhile.
+    (function () {
+      if (!location.hash) return;
+      var target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (!target) return;
+      var moved = false;
+      window.addEventListener('wheel', function () { moved = true; }, { once: true, passive: true });
+      window.addEventListener('touchmove', function () { moved = true; }, { once: true, passive: true });
+      window.addEventListener('keydown', function () { moved = true; }, { once: true });
+      function land() {
+        if (moved) return;
+        target.scrollIntoView({ block: 'start', behavior: 'instant' });
+      }
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(land);
+      window.addEventListener('load', land);
+    })();
+
     // Highlight the TOC entry for the section in view.
     (function () {
       var links = Array.prototype.slice.call(document.querySelectorAll('.doc-toc a[href^="#"]'));

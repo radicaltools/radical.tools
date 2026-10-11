@@ -14,10 +14,53 @@ import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData, DiagramView, NodePosition } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { documents, useDocumentsStore, type DocumentSource } from '../store/documentStore'
+import { documents, useDocumentsStore, StorageFullError, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
 
 let reloadActive: () => void = () => {}
+
+// ─── Load notifications ──────────────────────────────────────────────────────
+// A file or folder document reaches the store asynchronously, after the sample
+// has rendered (boot) or after the switch (Models dialog, a deep link). The
+// router waits for it before it applies a view, milestone or slide from the
+// URL; loadDiagram would reset them otherwise.
+
+let _loadingId: string | null = null
+const _loadListeners = new Set<(id: string) => void>()
+
+/** The document whose load into the store is in flight, or null. */
+export function loadingDocumentId(): string | null {
+  return _loadingId
+}
+
+/** Calls `listener` with the document id each time a load of the active
+ *  document into the store has finished (including a load that found
+ *  nothing). Returns the unsubscribe function. */
+export function onDocumentLoaded(listener: (id: string) => void): () => void {
+  _loadListeners.add(listener)
+  return () => { _loadListeners.delete(listener) }
+}
+
+/** The model as it was before a reload brought in an edit made outside
+ *  Studio: its nodes and relations, and what `documents` had for the
+ *  descriptions it had not read into memory yet. */
+export interface BeforeOutsideEdit {
+  id: string
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  pendingBodies: string[]
+  files: Record<string, string> | undefined
+}
+
+const _outsideEditListeners = new Set<(before: BeforeOutsideEdit) => void>()
+
+/** Calls `listener` each time the active document was reloaded because its
+ *  folder changed outside Studio (an MCP client, an editor, git), once the
+ *  new model is in the store. Returns the unsubscribe function. */
+export function onOutsideEditLoaded(listener: (before: BeforeOutsideEdit) => void): () => void {
+  _outsideEditListeners.add(listener)
+  return () => { _outsideEditListeners.delete(listener) }
+}
 
 /** Re-read the active document from its storage into the diagram store, e.g.
  *  after a web folder regained permission. */
@@ -52,6 +95,15 @@ if (typeof window !== 'undefined') {
     }
     return data
   }
+  // Browser storage that is full refuses every save of a local model. Say so
+  // once (not on each edit) until a save gets through again.
+  let _storageFullShown = false
+  const reportSaveError = (e: unknown, interactive = true): void => {
+    console.warn('[diagramStore] persist failed:', e)
+    if (!(e instanceof StorageFullError) || _storageFullShown || !interactive) return
+    _storageFullShown = true
+    if (typeof window.alert === 'function') window.alert(e.message)
+  }
   const flushPersist = async (): Promise<void> => {
     if (_suspended) return
     const activeId = documents.getActiveId()
@@ -60,8 +112,9 @@ if (typeof window !== 'undefined') {
       const data = buildPersistData()
       _layoutSafePending = false
       await documents.saveDocument(activeId, data)
+      _storageFullShown = false
     } catch (e) {
-      console.warn('[diagramStore] persist failed:', e)
+      reportSaveError(e)
     }
   }
   const schedulePersist = (): void => {
@@ -90,6 +143,7 @@ if (typeof window !== 'undefined') {
       s.views !== prev.views ||
       s.defaultPositions !== prev.defaultPositions ||
       s.defaultViewport !== prev.defaultViewport ||
+      s.defaultLayoutConstraints !== prev.defaultLayoutConstraints ||
       s.snapshots !== prev.snapshots ||
       s.presentations !== prev.presentations ||
       s.metamodel !== prev.metamodel
@@ -125,11 +179,17 @@ if (typeof window !== 'undefined') {
   ): void => {
     const seq = ++_loadSeq
     _suspended = true
+    _loadingId = id
     if (_persistTimer !== null) {
       clearTimeout(_persistTimer)
       _persistTimer = null
     }
     if (_watchingId !== id) stopWatching()
+    const live = useDiagramStore.getState()
+    const camera = opts?.keepUi ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
+    const before: BeforeOutsideEdit | null = opts?.keepUi
+      ? { id, nodes: live.c4Nodes, relations: live.c4Relations, pendingBodies: documents.getPendingBodyNodeIds(id), files: documents.loadedFolderFiles(id) }
+      : null
     documents.loadDocument(id).then((data) => {
       if (seq !== _loadSeq || documents.getActiveId() !== id) return
       if (data) {
@@ -141,10 +201,18 @@ if (typeof window !== 'undefined') {
           const next = useDiagramStore.getState()
           if (activeViewId && next.views[activeViewId]) next.setActiveView(activeViewId)
           if (selectedNodeId && next.c4Nodes[selectedNodeId]) next.selectNode(selectedNodeId)
+          // Loading put back the camera saved on disk; keep the one in use.
+          if (camera) {
+            const shown = useDiagramStore.getState().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+            ;(window as any).__rfPlaceCamera?.({ ...camera }, shown, { keep: true })
+          }
         }
+        if (before) for (const listener of [..._outsideEditListeners]) listener(before)
         if (source === 'md') watchActive(id)
-      } else if (source === 'fs' || source === 'md') {
-        // New/empty file: initialize with the maximum built-in metamodel
+      } else {
+        // New/empty file, or content that is missing: initialize with the
+        // maximum built-in metamodel. Never keep the model on screen, which
+        // belongs to the document just left.
         useDiagramStore.getState().loadDiagram({
           nodes: [],
           relations: [],
@@ -152,7 +220,12 @@ if (typeof window !== 'undefined') {
         })
       }
     }).catch((e) => console.warn('[diagramStore] document load failed:', e))
-      .finally(() => { if (seq === _loadSeq) _suspended = false })
+      .finally(() => {
+        if (seq !== _loadSeq) return
+        _suspended = false
+        _loadingId = null
+        if (documents.getActiveId() === id) for (const listener of [..._loadListeners]) listener(id)
+      })
   }
 
   // ── Follow outside edits to the active md-folder document ────────────────
@@ -212,8 +285,7 @@ if (typeof window !== 'undefined') {
       _persistTimer = null
       const data = buildPersistData()
       _layoutSafePending = false
-      documents.saveDocument(leaving, data)
-        .catch((e) => console.warn('[diagramStore] persist on switch failed:', e))
+      documents.saveDocument(leaving, data).catch((e) => reportSaveError(e))
     }
     if (!s.activeId) return
     loadActive(s.activeId, documents.listDocuments().find(d => d.id === s.activeId)?.source)
@@ -247,7 +319,8 @@ if (typeof window !== 'undefined') {
     try {
       const data = buildPersistData()
       _layoutSafePending = false
-      void documents.saveDocument(activeId, data)
+      // The page is going away: no dialog, just the console.
+      documents.saveDocument(activeId, data).catch((e) => reportSaveError(e, false))
     } catch (e) {
       console.warn('[diagramStore] sync flush failed:', e)
     }

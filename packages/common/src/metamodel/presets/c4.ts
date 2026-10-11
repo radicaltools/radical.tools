@@ -72,7 +72,9 @@ export function builtInC4Metamodel(): Metamodel {
   //  • component                 → inside a container or group
   //  • database / webapp / queue → inside a system or group
   //  • group                     → root OR inside another group (recursive,
-  //                                purely organisational — no semantics)
+  //                                purely organisational — no semantics) OR
+  //                                inside a system, to group its parts as
+  //                                Structurizr groups do
   const allowedParentsMap: Record<string, string[] | undefined> = {
     person:    ['group'],
     system:    ['system', 'group'],
@@ -81,7 +83,7 @@ export function builtInC4Metamodel(): Metamodel {
     database:  ['system', 'group'],
     webapp:    ['system', 'group'],
     queue:     ['system', 'group'],
-    group:     ['group'],
+    group:     ['group', 'system'],
   }
 
   const techTypes = new Set(['container', 'component', 'database', 'webapp', 'queue'])
@@ -125,6 +127,7 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'person', to: 'system' },
     { from: 'person', to: 'container' },
     { from: 'person', to: 'webapp' },
+    { from: 'person', to: 'component' },
 
     // System-level dependencies
     { from: 'system', to: 'person' },
@@ -133,6 +136,7 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'system', to: 'database' },
     { from: 'system', to: 'webapp' },
     { from: 'system', to: 'queue' },
+    { from: 'system', to: 'component' },
 
     // Container-level calls
     { from: 'container', to: 'person' },
@@ -161,6 +165,7 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'component', to: 'webapp' },
     { from: 'component', to: 'database' },
     { from: 'component', to: 'queue' },
+    { from: 'component', to: 'system' },
   ]
 
   const relationTypes: Record<string, RelationTypeDef> = {

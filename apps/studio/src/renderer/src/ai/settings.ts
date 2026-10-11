@@ -89,3 +89,13 @@ export function saveAISettings(settings: AISettings, storage?: MinimalStorage | 
     /* quota or similar — silently ignore */
   }
 }
+
+/** The active provider is a cloud one with no API key yet (Ollama needs none). */
+export function activeProviderNeedsKey(settings: AISettings): boolean {
+  return settings.active !== 'ollama' && !settings.providers[settings.active]?.apiKey
+}
+
+/** AI is switched on and the active provider can be called. */
+export function aiReady(settings: AISettings): boolean {
+  return settings.enabled && !activeProviderNeedsKey(settings)
+}

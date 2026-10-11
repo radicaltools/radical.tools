@@ -1110,6 +1110,27 @@ body {
   cursor: default;
 }
 
+/* Reference property (RefPicker): chips for the picked nodes, a select to add. */
+.ref-picker { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.ref-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--bg-hover); border: 1px solid var(--border-color);
+  border-radius: 10px; padding: 1px 4px 1px 8px; font-size: 11px; color: var(--text-primary);
+}
+.ref-chip-missing { border-color: var(--danger); color: var(--danger); }
+.ref-chip-remove {
+  background: none; border: none; color: inherit; cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 0 2px; opacity: 0.7;
+}
+.ref-chip-remove:hover { opacity: 1; }
+.ref-picker-add { width: auto; flex: 1 1 90px; min-width: 90px; }
+.ref-picker-empty { font-size: 12px; opacity: 0.6; }
+.wiki-ref-input {
+  font: inherit; font-size: 13px; color: var(--text-primary);
+  background: var(--input-bg); border: 1px solid var(--border-color);
+  border-radius: 4px; padding: 2px 4px;
+}
+
 .props-textarea { resize: vertical; min-height: 60px; max-height: 80vh; overflow-y: auto; }
 
 .props-type-badge {
@@ -1473,6 +1494,9 @@ body {
   font-size: 16px;
   line-height: 1.6;
   color: var(--text-secondary);
+  /* Keep paragraphs and line breaks, as .wiki-prose does — a Need's text is
+     often several paragraphs or a list. */
+  white-space: pre-wrap;
 }
 
 /* EARS sentence blockquote */
@@ -2007,6 +2031,16 @@ body {
   font-family: inherit;
 }
 
+/* Relation labels by zoom (Canvas sets data-edge-labels, see
+   edgeLabelDetail): zoomed out the technology goes first, then the whole
+   label. A selected or hovered relation, or one of a selected node, keeps
+   its full label. */
+.canvas-area[data-edge-labels='name'] .relation-label:not(.relation-label-active) .relation-label-tech,
+.canvas-area[data-edge-labels='name'] .relation-label-tech-only:not(.relation-label-active),
+.canvas-area[data-edge-labels='none'] .relation-label:not(.relation-label-active) {
+  display: none;
+}
+
 .c4-node-header {
   display: flex;
   align-items: center;
@@ -2153,20 +2187,29 @@ body {
 }
 
 .c4-node-collapse-btn {
-  width: 20px; height: 20px;
-  border: 1px solid rgba(255,255,255,0.35);
-  border-radius: 4px;
-  background: rgba(0,0,0,0.2);
-  color: rgba(255,255,255,0.8);
+  position: relative;
+  width: 28px; height: 28px;
+  border: 1px solid rgba(255,255,255,0.45);
+  border-radius: 5px;
+  background: rgba(0,0,0,0.25);
+  color: rgba(255,255,255,0.95);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
   flex-shrink: 0;
   transition: background 0.1s;
 }
-.c4-node-collapse-btn:hover { background: rgba(0,0,0,0.4); }
+/* A larger, invisible hit area: easy to click on a zoomed-out canvas. */
+.c4-node-collapse-btn::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+}
+.c4-node-collapse-btn:hover { background: rgba(0,0,0,0.45); }
 
 /* Person node: silhouette above the box, selection outline on body only */
 .c4-person-node {
@@ -2821,17 +2864,10 @@ body {
 /* ─── Radical Forge — live progress feed ─────────────────────────────────── */
 
 /* ─── Document manager modal ─────────────────────────────────────────────── */
-.docmgr-tab.active {
+.docmgr-filter.active {
   color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-.docmgr-tab.active .docmgr-tab-count {
   background: var(--accent-soft);
-  color: var(--accent);
-}
-.docmgr-mm-option.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .docmgr-btn.primary {
   background: var(--accent); border-color: var(--accent);
@@ -2839,13 +2875,7 @@ body {
 }
 .docmgr-btn.primary:hover { filter: brightness(1.08); }
 .docmgr-btn.small { padding: 3px 8px; font-size: 12px; }
-.docmgr-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
-.docmgr-btn.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .docmgr-item.active { background: var(--accent-soft); }
-.docmgr-badge.ls {
-  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
-  color: var(--text-secondary);
-}
 
 /* ─── Toolbar: active document chip ──────────────────────────────────────── */
 .toolbar-doc-badge.ls { background: rgba(120,120,120,0.25); color: #ccc; }
@@ -3070,11 +3100,6 @@ body {
 /* ─── Welcome / Splash screen ─────────────────────────────────────────────── */
 
 /* ── Left column ── */
-.welcome-mm-option.selected {
-  background: rgba(59, 111, 230, 0.07);
-  border-color: rgba(59, 111, 230, 0.35);
-}
-
 /* ─── Treemap view ───────────────────────────────────────────────────── */
 .tm-bc-item.active {
   color: var(--text-primary);
@@ -3384,6 +3409,8 @@ body {
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .tv-bool:hover { border-color: var(--accent, #3b82f6); }
+.tv-bool-readonly { cursor: default; }
+.tv-bool-readonly:not(.tv-bool-on):hover { border-color: var(--border-color); }
 .tv-bool-on {
   background: var(--accent, #3b82f6);
   border-color: var(--accent, #3b82f6);
@@ -3400,3 +3427,46 @@ body {
   font-size: 13px;
 }
 
+
+/* ── Alignment guides (AlignmentGuides.tsx) ─────────────────────────────── */
+.alignment-guide-actions {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 4px;
+  pointer-events: auto;
+}
+.alignment-guide-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background: var(--bg-panel);
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 15px;
+  cursor: pointer;
+}
+.alignment-guide-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.alignment-guide-count {
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 9px;
+  background: var(--bg-panel);
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.alignment-guide-btn:hover:not(:disabled),
+.alignment-guide-btn.on {
+  background: var(--accent);
+  color: var(--bg-panel);
+}

@@ -5,63 +5,11 @@ import {
   BaseEdge,
   Position,
   useStore,
-  useStoreApi,
+  type ReactFlowState,
 } from 'reactflow'
 import { C4EdgeRFData } from '@radical/common/c4'
-import { computeRoutedEdge, RoutingObstacle } from '@radical/layout/edgeRouting'
-import { allocatePorts } from '@radical/layout/portAllocator'
 import { useDiagramStore } from '../../store/diagramStore'
-
-// ─── Floating-edge helpers ────────────────────────────────────────────────────
-
-function nodeCenter(node: { positionAbsolute?: { x: number; y: number }; width?: number | null; height?: number | null }) {
-  return {
-    x: (node.positionAbsolute?.x ?? 0) + (node.width ?? 0) / 2,
-    y: (node.positionAbsolute?.y ?? 0) + (node.height ?? 0) / 2,
-  }
-}
-
-/**
- * Pick the best exit/entry side based on direction vector.
- * Slightly biased toward vertical sides (Top/Bottom) because
- * C4 diagrams flow top→bottom, so near-diagonal edges look better
- * exiting vertically.
- */
-function bestSide(dx: number, dy: number, isTarget: boolean): Position {
-  // Vertical bias: treat vertical as dominant unless horizontal is clearly larger
-  const VERTICAL_BIAS = 1.15
-  if (Math.abs(dx) >= Math.abs(dy) * VERTICAL_BIAS) {
-    // horizontal dominant
-    const goingRight = dx > 0
-    return (goingRight !== isTarget) ? Position.Right : Position.Left
-  } else {
-    // vertical dominant (or near-diagonal → prefer vertical)
-    const goingDown = dy > 0
-    return (goingDown !== isTarget) ? Position.Bottom : Position.Top
-  }
-}
-
-/**
- * Compute the border point on a node given the chosen side.
- * Always returns the centre of the side for clean, consistent connections.
- */
-function borderPoint(
-  node: { positionAbsolute?: { x: number; y: number }; width?: number | null; height?: number | null },
-  side: Position,
-  _otherCenter?: { x: number; y: number }
-) {
-  const ax = node.positionAbsolute?.x ?? 0
-  const ay = node.positionAbsolute?.y ?? 0
-  const w  = node.width  ?? 0
-  const h  = node.height ?? 0
-
-  switch (side) {
-    case Position.Left:   return { x: ax,         y: ay + h / 2 }
-    case Position.Right:  return { x: ax + w,     y: ay + h / 2 }
-    case Position.Top:    return { x: ax + w / 2, y: ay         }
-    case Position.Bottom: return { x: ax + w / 2, y: ay + h     }
-  }
-}
+import { edgeGeometry, LABEL_BOX } from './edgeGeometry'
 
 // ─── Custom arrowhead ─────────────────────────────────────────────────────────
 
@@ -195,104 +143,38 @@ export const RelationEdge = memo(
     source,
     target,
     data,
-    markerEnd,
     style,
     selected,
   }: EdgeProps<C4EdgeRFData>) => {
-    // Targeted selectors: only re-render when THIS edge's source or target changes
-    const sourceSelector = useCallback((s: any) => s.nodeInternals.get(source), [source])
-    const targetSelector = useCallback((s: any) => s.nodeInternals.get(target), [target])
-    const sourceNode = useStore(sourceSelector)
-    const targetNode = useStore(targetSelector)
+    // Sides, ports, path and label spot come from one pass over the whole
+    // canvas (edgeGeometry.ts); the geometry object stays the same while
+    // nothing this edge draws changed, so only the edges that moved re-render.
+    const moving = useDiagramStore((s) => s.liveLayoutMoving)
+    const geometrySelector = useCallback(
+      (s: ReactFlowState) => edgeGeometry(s.nodeInternals, s.edges, moving).get(id),
+      [id, moving],
+    )
+    const geometry = useStore(geometrySelector)
     const diffKind = useDiagramStore(s => s.showDiff ? s.diffHighlight[id] : undefined)
-    const storeApi = useStoreApi()
-
-    // Fall back to a straight stub if node data is not ready yet
-    if (!sourceNode || !targetNode) return null
-
-    const sc = nodeCenter(sourceNode)
-    const tc = nodeCenter(targetNode)
-
-    // Resolve sides + ports from the central allocator (groups parallel
-    // edges so they don't all collide at the centre of a side).
-    const stateSnapshot = storeApi.getState()
-    const allocations = allocatePorts(
-      stateSnapshot.nodeInternals as any,
-      stateSnapshot.edges as any
+    // Zoomed out, labels are hidden (see edgeLabelDetail); the relation the
+    // user points at, or one of a selected node, keeps its label.
+    const [hovered, setHovered] = useState(false)
+    const endSelectedSelector = useCallback(
+      (s: ReactFlowState) => !!(s.nodeInternals.get(source)?.selected || s.nodeInternals.get(target)?.selected),
+      [source, target],
     )
-    const alloc = allocations.get(id)
+    const endSelected = useStore(endSelectedSelector)
 
-    let srcSide: Position, tgtSide: Position
-    let sp: { x: number; y: number }, tp: { x: number; y: number }
-    if (alloc) {
-      // @radical/layout's sides carry the same string values as reactflow's enum
-      srcSide = alloc.sourceSide as Position
-      tgtSide = alloc.targetSide as Position
-      sp = alloc.sourcePoint
-      tp = alloc.targetPoint
-    } else {
-      // Fallback (e.g. virtual edges not in store)
-      const dx = tc.x - sc.x
-      const dy = tc.y - sc.y
-      const sax = sourceNode.positionAbsolute?.x ?? 0
-      const say = sourceNode.positionAbsolute?.y ?? 0
-      const sw  = sourceNode.width  ?? 0
-      const sh  = sourceNode.height ?? 0
-      const tax = targetNode.positionAbsolute?.x ?? 0
-      const tay = targetNode.positionAbsolute?.y ?? 0
-      const tw  = targetNode.width  ?? 0
-      const th  = targetNode.height ?? 0
-      const ntx = Math.max(tax, Math.min(tax + tw, sc.x))
-      const nty = Math.max(tay, Math.min(tay + th, sc.y))
-      let srcDx = ntx - sc.x
-      let srcDy = nty - sc.y
-      if (srcDx === 0 && srcDy === 0) { srcDx = dx; srcDy = dy }
-      const nsx = Math.max(sax, Math.min(sax + sw, tc.x))
-      const nsy = Math.max(say, Math.min(say + sh, tc.y))
-      let tgtDx = tc.x - nsx
-      let tgtDy = tc.y - nsy
-      if (tgtDx === 0 && tgtDy === 0) { tgtDx = dx; tgtDy = dy }
-      srcSide = bestSide(srcDx, srcDy, false)
-      tgtSide = bestSide(tgtDx, tgtDy, true)
-      sp = borderPoint(sourceNode, srcSide, tc)
-      tp = borderPoint(targetNode, tgtSide, sc)
-    }
+    // Not drawable yet (an end is hidden or not measured).
+    if (!geometry) return null
 
-    // Collect obstacles imperatively (no reactive subscription to all nodes)
-    const nodeInternals = stateSnapshot.nodeInternals
-    const allNodes = Array.from(nodeInternals.values())
-    const excludeIds = new Set<string>([source, target])
-
-    // Exclude ancestors of source and target (edge crosses their borders)
-    let walker: (typeof sourceNode) | undefined = sourceNode
-    while (walker?.parentNode) { excludeIds.add(walker.parentNode); walker = nodeInternals.get(walker.parentNode) }
-    walker = targetNode
-    while (walker?.parentNode) { excludeIds.add(walker.parentNode); walker = nodeInternals.get(walker.parentNode) }
-
-    const obstacles: RoutingObstacle[] = []
-    for (const n of allNodes) {
-      if (excludeIds.has(n.id) || n.hidden || !n.width || !n.height) continue
-      // Exclude descendants of source or target (they're inside those nodes)
-      let isDescendant = false
-      let cur: (typeof n) | undefined = n
-      while (cur?.parentNode) {
-        if (cur.parentNode === source || cur.parentNode === target) { isDescendant = true; break }
-        cur = nodeInternals.get(cur.parentNode)
-      }
-      if (isDescendant) continue
-      obstacles.push({
-        x: n.positionAbsolute?.x ?? 0,
-        y: n.positionAbsolute?.y ?? 0,
-        w: n.width,
-        h: n.height,
-      })
-    }
-
-    const { path: edgePath, labelX, labelY } = computeRoutedEdge(
-      sp.x, sp.y, srcSide,
-      tp.x, tp.y, tgtSide,
-      obstacles,
-    )
+    const { sourcePoint: sp, targetPoint: tp, path: edgePath } = geometry
+    // @radical/layout's sides carry the same string values as reactflow's enum
+    const tgtSide = geometry.targetSide as Position
+    const { x: labelX, y: labelY } = geometry.label
+    // A label-less relation shows its type, except a transition: one without
+    // an event is a completion transition and is drawn bare.
+    const typeName = data?.relationType === 'transition' ? undefined : data?.relationType
 
     const strokeColor = selected ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'
     const strokeDash  = data?.isVirtual ? '6 3' : undefined
@@ -308,20 +190,22 @@ export const RelationEdge = memo(
 
     return (
       <>
-        <BaseEdge
-          id={id}
-          path={edgePath}
-          style={{
-            ...style,
-            stroke:          diffStroke ?? strokeColor,
-            strokeWidth:     diffStroke ? 3 : selected ? 2 : 1.5,
-            strokeDasharray: diffDash ?? strokeDash,
-            strokeLinejoin:  'round',
-            strokeLinecap:   'round',
-            opacity:         diffOpacity,
-            filter:          diffStroke ? `drop-shadow(0 0 4px ${diffStroke})` : undefined,
-          }}
-        />
+        <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+          <BaseEdge
+            id={id}
+            path={edgePath}
+            style={{
+              ...style,
+              stroke:          diffStroke ?? strokeColor,
+              strokeWidth:     diffStroke ? 3 : selected ? 2 : 1.5,
+              strokeDasharray: diffDash ?? strokeDash,
+              strokeLinejoin:  'round',
+              strokeLinecap:   'round',
+              opacity:         diffOpacity,
+              filter:          diffStroke ? `drop-shadow(0 0 4px ${diffStroke})` : undefined,
+            }}
+          />
+        </g>
         {/* Custom arrowhead drawn at the target point */}
         <Arrow x={tp.x} y={tp.y} side={tgtSide} color={diffStroke ?? strokeColor} size={selected ? 10 : 8} />
 
@@ -333,33 +217,40 @@ export const RelationEdge = memo(
           </>
         )}
 
-        {(data?.label || data?.technology || data?.relationType) && (
+        {data && (data.label || data.technology || typeName) && (
           <EdgeLabelRenderer>
             <div
               style={{
                 position:        'absolute',
                 transform:       `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
                 background:      'var(--edge-label-bg)',
-                border:          '1px solid var(--edge-label-border)',
+                border:          `${LABEL_BOX.border}px solid var(--edge-label-border)`,
                 borderRadius:    4,
-                padding:         '3px 8px',
-                fontSize:        17,
+                padding:         `${LABEL_BOX.padY}px ${LABEL_BOX.padX}px`,
+                fontSize:        LABEL_BOX.fontSize,
                 color:           'var(--text-primary)',
                 pointerEvents:   'none',
-                maxWidth:        200,
+                maxWidth:        LABEL_BOX.maxWidth,
                 textAlign:       'center',
-                lineHeight:      1.4,
-                backdropFilter:  'blur(4px)',
+                lineHeight:      LABEL_BOX.lineHeight,
+                // No backdrop-filter: every label would become its own
+                // compositor layer re-blurred on each pan/zoom frame, which
+                // drops large diagrams to ~8 fps on Retina GPUs. The
+                // background is ~90% opaque, so the blur was barely visible.
                 zIndex:          1000,
               }}
-              className="nodrag nopan"
+              className={[
+                'nodrag nopan relation-label',
+                selected || hovered || endSelected ? 'relation-label-active' : '',
+                data.label || typeName ? '' : 'relation-label-tech-only',
+              ].join(' ')}
             >
               {data.label
                 ? <div>{data.label}</div>
-                : data.relationType && <div style={{ opacity: 0.85, fontStyle: 'italic' }}>{data.relationType}</div>
+                : typeName && <div style={{ opacity: 0.85, fontStyle: 'italic' }}>{typeName}</div>
               }
               {data.technology && (
-                <div style={{ fontStyle: 'italic', opacity: 0.85, fontSize: 14 }}>
+                <div className="relation-label-tech" style={{ fontStyle: 'italic', opacity: 0.85, fontSize: LABEL_BOX.techFontSize }}>
                   [{data.technology}]
                 </div>
               )}

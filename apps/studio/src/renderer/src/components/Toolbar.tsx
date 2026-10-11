@@ -7,6 +7,7 @@ import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
 import { HubImportModal } from './HubImportModal'
 import { RadicalForgeModal } from './RadicalForgeModal'
+import { AgentForgeModal } from './AgentForgeModal'
 import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { useExport } from '../hooks/useExport'
 import {
@@ -459,7 +460,7 @@ function AppMenu({
               className="app-menu-item"
               role="menuitem"
               onClick={run(onOpenForge)}
-              title="Generate requirements, fitness functions, Gherkin scenarios, UI mockups and a C4 model from a description"
+              title="Generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model from a description"
             >
               <span className="app-menu-icon"><IconAI /></span>
               <span className="app-menu-text">Radical Forge…</span>
@@ -579,6 +580,11 @@ export function Toolbar(): React.ReactElement {
       } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
         e.preventDefault()
         useDiagramStore.getState().redo()
+      } else if ((e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') && (window as any).__radicalZoomIn) {
+        // The canvas and the Flow view register zoom; elsewhere the browser zooms the page.
+        e.preventDefault()
+        if (e.key === '+' || e.key === '=') useDiagramStore.getState().zoomIn()
+        else useDiagramStore.getState().zoomOut()
       }
     }
     window.addEventListener('keydown', handler)
@@ -642,11 +648,22 @@ export function Toolbar(): React.ReactElement {
     return () => window.removeEventListener('radical:open-forge', onOpen as EventListener)
   }, [])
 
+  // The Forge button opens a read-only view instead while an agent runs
+  // Forge on this folder over MCP (see persistence/agentForge).
+  const [agentForgeOpen, setAgentForgeOpen] = useState(false)
+  const closeAgentForge = useCallback(() => setAgentForgeOpen(false), [])
+  useEffect(() => {
+    const onOpen = () => setAgentForgeOpen(true)
+    window.addEventListener('radical:open-agent-forge', onOpen as EventListener)
+    return () => window.removeEventListener('radical:open-agent-forge', onOpen as EventListener)
+  }, [])
+
   return (
     <div className="toolbar">
       <AISettingsModal open={aiSettingsOpen} onClose={handleCloseAISettings} />
       <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} />
       <RadicalForgeModal open={forgeOpen} onClose={handleCloseForge} />
+      <AgentForgeModal open={agentForgeOpen && !forgeOpen} onClose={closeAgentForge} />
       <AppMenu
         onManage={handleManage}
         activeDocLabel={activeDoc?.name ?? null}

@@ -10,16 +10,24 @@
 // Reads and writes go through an `MdFolderSession` over `handleFolderStorage`,
 // which is handle-driven and side-effect-isolated so it can be unit-tested
 // against an in-memory fake directory handle.
+//
+// A model can also live in a single `.radical` file: the file handle from
+// `showOpenFilePicker()` / `showSaveFilePicker()` is stored the same way and
+// needs the same re-grant after a reload.
 
 import { isMdFolderModelPath } from '@radical/common/formats/mdFolder'
+import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import type { MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 
 // Minimal structural typings for the File System Access API (avoids depending
 // on lib.dom variants that may not ship these definitions).
 export interface FsFileHandle {
   kind: 'file'
+  name: string
   getFile(): Promise<{ text(): Promise<string>; lastModified: number; size: number }>
   createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>
+  queryPermission?(opts: { mode: 'read' | 'readwrite' }): Promise<'granted' | 'denied' | 'prompt'>
+  requestPermission?(opts: { mode: 'read' | 'readwrite' }): Promise<'granted' | 'denied' | 'prompt'>
 }
 export interface FsDirHandle {
   kind: 'directory'
@@ -52,9 +60,60 @@ export async function pickWebDirectory(): Promise<FsDirHandle | null> {
   }
 }
 
+/** True when this environment can keep a model in a single file it reads and
+ *  writes back (Chromium browsers). */
+export function webFileSupported(): boolean {
+  const w = typeof window !== 'undefined'
+    ? window as unknown as { showOpenFilePicker?: unknown; showSaveFilePicker?: unknown }
+    : null
+  return (
+    !!w &&
+    typeof w.showOpenFilePicker === 'function' &&
+    typeof w.showSaveFilePicker === 'function' &&
+    typeof indexedDB !== 'undefined'
+  )
+}
+
+const MODEL_FILE_TYPES = [
+  { description: 'Radical model', accept: { 'application/json': ['.radical', '.json'] } },
+]
+
+/** Prompt the user to choose a model file to open. Null if cancelled. */
+export async function pickWebFileToOpen(): Promise<FsFileHandle | null> {
+  const w = window as unknown as { showOpenFilePicker?: (o?: unknown) => Promise<FsFileHandle[]> }
+  if (typeof w.showOpenFilePicker !== 'function') return null
+  try {
+    const [handle] = await w.showOpenFilePicker({ types: MODEL_FILE_TYPES, multiple: false })
+    return handle ?? null
+  } catch {
+    return null // user dismissed the picker
+  }
+}
+
+/** Prompt the user for a file to save a model into. Null if cancelled. */
+export async function pickWebFileToSave(suggestedName: string): Promise<FsFileHandle | null> {
+  const w = window as unknown as { showSaveFilePicker?: (o?: unknown) => Promise<FsFileHandle> }
+  if (typeof w.showSaveFilePicker !== 'function') return null
+  try {
+    return await w.showSaveFilePicker({ suggestedName, types: MODEL_FILE_TYPES })
+  } catch {
+    return null // user dismissed the picker
+  }
+}
+
+export async function readFileHandle(handle: FsFileHandle): Promise<string> {
+  return (await handle.getFile()).text()
+}
+
+export async function writeFileHandle(handle: FsFileHandle, content: string): Promise<void> {
+  const writable = await handle.createWritable()
+  await writable.write(content)
+  await writable.close()
+}
+
 /** Confirm (and optionally request) read/write access to a stored handle. */
 export async function verifyPermission(
-  handle: FsDirHandle,
+  handle: FsDirHandle | FsFileHandle,
   mode: 'read' | 'readwrite',
   request: boolean,
 ): Promise<boolean> {
@@ -134,6 +193,32 @@ export function handleFolderStorage(root: FsDirHandle): MdFolderStorage {
   }
 }
 
+async function writeText(dir: FsDirHandle, name: string, content: string): Promise<void> {
+  const writable = await (await dir.getFileHandle(name, { create: true })).createWritable()
+  await writable.write(content)
+  await writable.close()
+}
+
+/** Writes the canvas selection file (see canvasSelection) under the model
+ *  folder's `.radical/`, with the `.gitignore` that keeps it out of git. */
+export async function writeSelectionToHandle(root: FsDirHandle, content: string): Promise<void> {
+  const dir = await root.getDirectoryHandle(SELECTION_DIR, { create: true })
+  try { await dir.getFileHandle('.gitignore') }
+  catch { await writeText(dir, '.gitignore', SELECTION_GITIGNORE_CONTENT) }
+  await writeText(dir, 'selection.json', content)
+}
+
+/** The Forge run status file (see forgeRunStatus) under the model folder's
+ *  `.radical/`, or null when there is none. */
+export async function readForgeRunFromHandle(root: FsDirHandle): Promise<string | null> {
+  try {
+    const dir = await root.getDirectoryHandle(SELECTION_DIR)
+    return await (await (await dir.getFileHandle('forge-run.json')).getFile()).text()
+  } catch {
+    return null
+  }
+}
+
 // ─── IndexedDB handle persistence ────────────────────────────────────────────
 
 const DB_NAME = 'radical-fs'
@@ -151,7 +236,7 @@ function openDb(): Promise<IDBDatabase> {
   })
 }
 
-export async function saveHandle(key: string, handle: FsDirHandle): Promise<void> {
+export async function saveHandle(key: string, handle: FsDirHandle | FsFileHandle): Promise<void> {
   if (typeof indexedDB === 'undefined') return
   const db = await openDb()
   try {
@@ -166,14 +251,16 @@ export async function saveHandle(key: string, handle: FsDirHandle): Promise<void
   }
 }
 
-export async function loadHandle(key: string): Promise<FsDirHandle | null> {
+/** The handle stored under `key`: a directory for a folder document, a file
+ *  for a file document. */
+export async function loadHandle<H extends FsDirHandle | FsFileHandle = FsDirHandle>(key: string): Promise<H | null> {
   if (typeof indexedDB === 'undefined') return null
   const db = await openDb()
   try {
-    return await new Promise<FsDirHandle | null>((resolve, reject) => {
+    return await new Promise<H | null>((resolve, reject) => {
       const tx = db.transaction(STORE, 'readonly')
       const req = tx.objectStore(STORE).get(key)
-      req.onsuccess = () => resolve((req.result as FsDirHandle) ?? null)
+      req.onsuccess = () => resolve((req.result as H) ?? null)
       req.onerror = () => reject(req.error)
     })
   } finally {

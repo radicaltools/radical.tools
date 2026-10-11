@@ -24,6 +24,10 @@ import {
   SlideCanvasState,
   NodePosition,
   PositionMap,
+  LayoutConstraint,
+  AlignConstraint,
+  defaultGridColumns,
+  pinnedNodeIds,
   NODE_SIZES,
   COLLAPSED_HEIGHT,
   COLLAPSED_WIDTH,
@@ -34,7 +38,6 @@ import {
   NodeTypeDef,
   RelationTypeDef,
   builtInC4Metamodel,
-  builtInDddC4Metamodel,
   builtInGovernanceMetamodel,
   isRelationAllowed,
   isParentAllowed,
@@ -44,6 +47,7 @@ import {
   sameWizardLink,
   wizardLinksOf,
   type WizardLink,
+  relationDisplayLabel,
 } from '@radical/common/metamodel'
 import * as model from '@radical/common/model'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
@@ -51,11 +55,24 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { compoundPadding } from '@radical/layout/geometry'
-import { LiveColaLayout } from '../layout/liveColaLayout'
+import { fittedParentSize, isFixedSizeType, projectToVisibleGraph } from '@radical/layout/geometry'
+import { arrangeGrid } from '@radical/layout/constraints'
+import {
+  applyAlignments,
+  applyLayoutPositions,
+  computeViewCollapsedSet,
+  computeViewNodeSet,
+  isEffectivelyCollapsed,
+  viewLayoutInput,
+  type LayoutInput,
+} from '@radical/layout/viewInput'
+// Re-exported for components that read view collapse state from the store module.
+export { computeViewCollapsedSet, isEffectivelyCollapsed }
+import { LiveColaLayout, type DragMode } from '../layout/liveColaLayout'
+import { LOCAL_PHYSICS_MIN_NODES } from '../layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
-import { loadStudioSettings } from '../studioSettings'
+import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -99,6 +116,9 @@ interface HistoryEntry {
   c4Nodes: Record<string, C4Node>
   c4Relations: Record<string, C4Relation>
   views: Record<string, DiagramView>
+  defaultLayoutConstraints: LayoutConstraint[]
+  /** Only on entries that also change sequences (clearModel). */
+  sequences?: Record<string, DiagramSequence>
 }
 
 const MAX_HISTORY = 100
@@ -114,6 +134,7 @@ function _captureState(state: DiagramStore): HistoryEntry {
     c4Nodes: state.c4Nodes,
     c4Relations: state.c4Relations,
     views: state.views,
+    defaultLayoutConstraints: state.defaultLayoutConstraints,
   }
 }
 
@@ -121,6 +142,42 @@ function _pushUndo(state: DiagramStore): void {
   _undoStack.push(_captureState(state))
   if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
   _redoStack.length = 0 // clear redo on new change
+}
+
+/** A large diagram where many elements overlap their siblings has not been
+ *  laid out yet; its live layout is local only (LOCAL_PHYSICS_MIN_NODES), so
+ *  only Smart Layout will arrange it. */
+function looksUnarranged(nodes: Record<string, C4Node>): boolean {
+  const list = Object.values(nodes)
+  if (list.length < LOCAL_PHYSICS_MIN_NODES) return false
+  const byParent = new Map<string, C4Node[]>()
+  for (const n of list) {
+    const key = n.parentId ?? ''
+    const siblings = byParent.get(key)
+    if (siblings) siblings.push(n)
+    else byParent.set(key, [n])
+  }
+  const overlapping = new Set<string>()
+  for (const siblings of byParent.values()) {
+    for (let i = 0; i < siblings.length; i++) {
+      const a = siblings[i]
+      for (let j = i + 1; j < siblings.length; j++) {
+        const b = siblings[j]
+        if (a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height) {
+          overlapping.add(a.id)
+          overlapping.add(b.id)
+        }
+      }
+    }
+  }
+  return overlapping.size > list.length * 0.1
+}
+
+/** Called after a document loads (at boot or on switching documents). */
+function suggestSmartLayoutIfUnarranged(): void {
+  const s = useDiagramStore.getState()
+  if (!looksUnarranged(s.c4Nodes)) return
+  s.pushNotification('This large diagram is not laid out yet. The live layout only moves what you drag or add here: use Smart Layout to arrange it.', 'info')
 }
 
 /** Snapshot all node positions from c4Nodes into a positions map */
@@ -138,6 +195,18 @@ function applyPositions(nodes: Record<string, C4Node>, positions: Record<string,
     const n = nodes[id]
     if (n) { n.x = pos.x; n.y = pos.y; n.width = pos.width; n.height = pos.height }
   }
+}
+
+/** The model a slide shows: its linked milestone when it has one (linked by
+ *  hand, so it wins), else the copy captured when the slide was added. A slide
+ *  with neither shows the live model. */
+function slideModel(
+  slide: PresentationSlide,
+  snapshots: DiagramSnapshot[],
+): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } | undefined {
+  const milestone = slide.snapshotId ? snapshots.find((s) => s.id === slide.snapshotId) : undefined
+  if (milestone) return { nodes: milestone.nodes as Record<string, C4Node>, relations: milestone.relations as Record<string, C4Relation> }
+  return (slide as { modelSnapshot?: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } }).modelSnapshot
 }
 
 /** Capture all node positions + collapsed state for a presentation slide */
@@ -162,42 +231,21 @@ function buildPresentationsFromData(
   return { presentations: list, activeId: list[0].id }
 }
 
-function computeSnapDiff(
+/** What changed per element and relation id, for the diff highlight. The
+ *  same comparison as compare_milestones (model.compareModels): any field but
+ *  the layout. */
+export function computeSnapDiff(
   prevNodes: Record<string, C4Node>,
   currNodes: Record<string, C4Node>,
   prevRels: Record<string, C4Relation>,
   currRels: Record<string, C4Relation>,
 ): Record<string, 'new' | 'changed' | 'removed'> {
   const result: Record<string, 'new' | 'changed' | 'removed'> = {}
-  for (const id of Object.keys(currNodes)) {
-    if (!prevNodes[id]) {
-      result[id] = 'new'
-    } else {
-      const p = prevNodes[id], c = currNodes[id]
-      if (p.label !== c.label || p.description !== c.description || p.technology !== c.technology ||
-          p.type !== c.type || p.parentId !== c.parentId || p.external !== c.external) {
-        result[id] = 'changed'
-      }
-    }
-  }
-  // Removed nodes: in base but not in current.
-  for (const id of Object.keys(prevNodes)) {
-    if (!currNodes[id]) result[id] = 'removed'
-  }
-  for (const id of Object.keys(currRels)) {
-    if (!prevRels[id]) {
-      result[id] = 'new'
-    } else {
-      const p = prevRels[id], c = currRels[id]
-      if (p.sourceId !== c.sourceId || p.targetId !== c.targetId ||
-          p.label !== c.label || p.technology !== c.technology) {
-        result[id] = 'changed'
-      }
-    }
-  }
-  // Removed relations: in base but not in current.
-  for (const id of Object.keys(prevRels)) {
-    if (!currRels[id]) result[id] = 'removed'
+  const changes = model.compareModels({ nodes: prevNodes, relations: prevRels }, { nodes: currNodes, relations: currRels })
+  for (const group of [changes.nodes, changes.relations]) {
+    for (const id of group.added) result[id] = 'new'
+    for (const { id } of group.changed) result[id] = 'changed'
+    for (const id of group.removed) result[id] = 'removed'
   }
   return result
 }
@@ -245,7 +293,7 @@ function computeSeqDiff(
  * so they can be merged into the canvas at render time without polluting
  * the actual model.
  */
-function computeDiffGhosts(
+export function computeDiffGhosts(
   baseNodes: Record<string, C4Node>,
   currNodes: Record<string, C4Node>,
   baseRels: Record<string, C4Relation>,
@@ -260,67 +308,6 @@ function computeDiffGhosts(
     if (!currRels[id]) relations[id] = JSON.parse(JSON.stringify(baseRels[id]))
   }
   return { nodes, relations }
-}
-
-/** Compute the effective set of node IDs for a view: explicit nodeIds + all their ancestors */
-function computeViewNodeSet(view: DiagramView | undefined, nodes: Record<string, C4Node>): Set<string> | undefined {
-  if (!view) return undefined
-  if (view.nodeIds.length === 0) return undefined
-  const result = new Set<string>()
-  for (const id of view.nodeIds) {
-    let cur = id
-    while (cur && nodes[cur]) {
-      result.add(cur)
-      cur = nodes[cur].parentId ?? ''
-    }
-  }
-  return result
-}
-
-/**
- * Compute which nodes should be treated as collapsed in a view.
- * A parent (system/container) is view-collapsed if:
- * - it has children in the full model, AND
- * - none of those children are in the view filter, AND
- * - it is not already collapsed on the model.
- * Returns empty set when no view filter is active.
- */
-export function computeViewCollapsedSet(
-  viewFilter: Set<string> | undefined,
-  allNodes: Record<string, C4Node>
-): Set<string> {
-  const result = new Set<string>()
-  if (!viewFilter) return result
-
-  // Which parents have at least one child in the view?
-  const parentHasViewChild = new Set<string>()
-  for (const n of Object.values(allNodes)) {
-    if (n.parentId && viewFilter.has(n.id)) parentHasViewChild.add(n.parentId)
-  }
-
-  for (const [id, n] of Object.entries(allNodes)) {
-    if (!viewFilter.has(id)) continue
-    if (!isContainerType(n.type)) continue
-    if (n.collapsed) continue // already collapsed on the model
-    if (parentHasViewChild.has(id)) continue // has visible children
-
-    // Check it actually has children in the full model
-    const hasChildInModel = Object.values(allNodes).some(c => c.parentId === id)
-    if (hasChildInModel) result.add(id)
-  }
-  return result
-}
-
-/** Is the node effectively collapsed (model-collapsed OR view-collapsed)?
- *  Pass `expandedSet` (from `view.expandedNodeIds`) to allow a named view to
- *  override a model-level collapse. */
-export function isEffectivelyCollapsed(
-  node: C4Node,
-  viewCollapsedSet?: Set<string>,
-  expandedSet?: Set<string>
-): boolean {
-  if (expandedSet?.has(node.id)) return false  // view-level explicit expansion
-  return node.collapsed || (viewCollapsedSet?.has(node.id) ?? false)
 }
 
 /**
@@ -344,82 +331,33 @@ export function nodeEffectivelyCollapsedInView(
   )
 }
 
-/** Return the subset of nodes/relations visible in the active view (or all if no view). */
-function filterForView(
-  allNodes: Record<string, C4Node>,
-  allRelations: Record<string, C4Relation>,
-  viewFilter: Set<string> | undefined,
-  viewCollapsedSet?: Set<string>
-): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } {
-  if (!viewFilter) return { nodes: allNodes, relations: allRelations }
-  const nodes: Record<string, C4Node> = {}
-  for (const [id, n] of Object.entries(allNodes)) {
-    if (viewFilter.has(id)) {
-      nodes[id] = viewCollapsedSet?.has(id) ? { ...n, collapsed: true } : n
-    }
-  }
+const NO_CONSTRAINTS: LayoutConstraint[] = []
 
-  const relations: Record<string, C4Relation> = {}
-  for (const [id, r] of Object.entries(allRelations)) {
-    if (viewFilter.has(r.sourceId) && viewFilter.has(r.targetId)) relations[id] = r
-  }
-  return { nodes, relations }
+/** The layout constraints of the active canvas: the view's own, or All
+ *  elements' when no view is active. */
+export function activeLayoutConstraints(
+  state: Pick<DiagramStore, 'activeViewId' | 'views' | 'defaultLayoutConstraints'>,
+): LayoutConstraint[] {
+  return (state.activeViewId ? state.views[state.activeViewId]?.layoutConstraints : state.defaultLayoutConstraints) ?? NO_CONSTRAINTS
 }
 
-interface LayoutInput {
-  nodes: Record<string, C4Node>
-  relations: Record<string, C4Relation>
-  viewFilter: Set<string> | undefined
-  viewCollapsedSet: Set<string>
-  expandedSet: Set<string> | undefined
+/** Direct children of `parentId` in the active view, with their boxes in
+ *  the parent's frame. `drawn` is false while the parent is collapsed: the
+ *  boxes are then where the children were last drawn. */
+export function childrenInView(
+  state: Pick<DiagramStore, 'rfNodes'>, parentId: string,
+): { drawn: boolean; boxes: Array<{ id: string; x: number; y: number; width: number; height: number }> } {
+  const children = state.rfNodes.filter((n) => n.parentNode === parentId)
+  return {
+    drawn: children.some((n) => !n.hidden),
+    boxes: children.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y, width: n.data.width, height: n.data.height })),
+  }
 }
 
-/**
- * The graph a layout algorithm should see for the active view: the same
- * node filter, collapse rules (view-collapsed, per-view collapsed and
- * expanded overrides) and hidden relations the canvas applies when it
- * renders. `collapsed` on the returned nodes is the effective state.
- */
+/** The layout input for the store's active view. */
 function layoutInputForView(state: DiagramStore): LayoutInput {
   const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-  const viewFilter = computeViewNodeSet(view, state.c4Nodes)
-  const viewCollapsedSet = computeViewCollapsedSet(viewFilter, state.c4Nodes)
-  for (const id of view?.collapsedNodeIds ?? []) viewCollapsedSet.add(id)
-  const expandedSet = view?.expandedNodeIds?.length ? new Set(view.expandedNodeIds) : undefined
-
-  const filtered = filterForView(state.c4Nodes, state.c4Relations, viewFilter)
-  const nodes: Record<string, C4Node> = {}
-  for (const [id, n] of Object.entries(filtered.nodes)) {
-    const collapsed = isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet)
-    nodes[id] = collapsed === n.collapsed ? n : { ...n, collapsed }
-  }
-  const hidden = new Set(view?.hiddenRelationIds ?? [])
-  const relations: Record<string, C4Relation> = {}
-  for (const [id, r] of Object.entries(filtered.relations)) {
-    if (!hidden.has(id)) relations[id] = r
-  }
-  return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet }
-}
-
-/**
- * Write a layout result into the model. Collapsed nodes keep their stored
- * size: the canvas draws them at the collapsed size anyway, and the stored
- * one is what they expand back to.
- */
-function applyLayoutPositions(
-  c4Nodes: Record<string, C4Node>,
-  positions: PositionMap,
-  input: LayoutInput,
-): void {
-  for (const [id, pos] of Object.entries(positions)) {
-    const node = c4Nodes[id]
-    if (!node) continue
-    node.x = pos.x
-    node.y = pos.y
-    if (input.nodes[id]?.collapsed) continue
-    if (pos.width)  node.width  = pos.width
-    if (pos.height) node.height = pos.height
-  }
+  return viewLayoutInput(view, state.c4Nodes, state.c4Relations, activeLayoutConstraints(state))
 }
 
 /**
@@ -734,7 +672,7 @@ function deriveRFNodes(
 
     // Fixed-size node types always render at canonical NODE_SIZES regardless of
     // what is stored in the document (handles legacy nodes created with old sizes).
-    const isFixedSize = n.type === 'adr' || n.type === 'fitness-fn' || n.type === 'requirement' || n.type === 'scenario' || n.type === 'mockup'
+    const isFixedSize = isFixedSizeType(n.type)
 
     const effHeight = isFixedSize
       ? NODE_SIZES[n.type].height
@@ -866,8 +804,9 @@ function deriveRFEdges(
       const existing = rfEdges.find(
         (e) => e.source === visSource && e.target === visTarget
       )
-      if (existing && rel.label) {
-        existing.label = existing.label ? `${existing.label}\n${rel.label}` : rel.label
+      const label = relationDisplayLabel(rel, nodes)
+      if (existing && label) {
+        existing.label = existing.label ? `${existing.label}\n${label}` : label
       }
       continue
     }
@@ -889,11 +828,11 @@ function deriveRFEdges(
       zIndex: edgeZIndex,
       markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
       style: { stroke: '#94a3b8', strokeWidth: 1.5 },
-      label: rel.label,
+      label: relationDisplayLabel(rel, nodes),
       data: {
         originalSourceId: rel.sourceId,
         originalTargetId: rel.targetId,
-        label: rel.label,
+        label: relationDisplayLabel(rel, nodes),
         technology: rel.technology,
         relationType: rel.relationType,
         isVirtual,
@@ -987,6 +926,10 @@ interface DiagramStore {
   defaultPositions: Record<string, NodePosition>
   /** Camera state (pan + zoom) for the "All" (default) view */
   defaultViewport: { x: number; y: number; zoom: number } | null
+  /** Layout constraints of the "All" (default) view; a named view keeps its
+   *  own in `layoutConstraints`. Read the active canvas's with
+   *  activeLayoutConstraints(). */
+  defaultLayoutConstraints: LayoutConstraint[]
   /** Node ids on a lazily-loaded md-folder doc whose `description` hasn't
    *  been fetched from disk yet — see `hydrateNode`. Empty for other
    *  document sources. */
@@ -1000,7 +943,8 @@ interface DiagramStore {
   selectedNodeId: string | null
   selectedEdgeId: string | null
   /**
-   * All currently selected node ids on the canvas. The first entry mirrors
+   * All currently selected node ids on the canvas, in the order they were
+   * selected (Align… keeps that order). The first entry mirrors
    * `selectedNodeId` (“primary” selection) when non-empty. Maintained from
    * ReactFlow selection changes; multi-select uses Shift/Cmd by default.
    */
@@ -1012,6 +956,9 @@ interface DiagramStore {
   /** Full candidate ranking + SA stats from the last Smart Layout run — powers the "why this layout" panel. */
   lastSmartLayoutReport: SmartLayoutReport | null
   liveLayoutActive: boolean
+  /** The live layout is moving nodes; false once it reports rest. Edges skip
+   *  costly routing while it moves and route fully when it stops. */
+  liveLayoutMoving: boolean
 
   // ── connect mode ──
   connectSource: string | null
@@ -1087,13 +1034,16 @@ interface DiagramStore {
   renameView: (id: string, name: string) => void
   setActiveView: (id: string | null) => void
   addNodeToView: (viewId: string, nodeId: string) => void
-  removeNodeFromView: (viewId: string, nodeId: string) => void
+  /** Hide one node or several (one undo step) and their descendants from a view. */
+  removeNodeFromView: (viewId: string, nodeIds: string | string[]) => void
   /** Replace the entire visible-nodes set of a view. Unknown ids are ignored. */
   setViewNodes: (viewId: string, nodeIds: string[]) => void
   /** Hide a specific relation from the view, even if both endpoints are visible. */
   hideRelationFromView: (viewId: string, relationId: string) => void
   /** Reverse `hideRelationFromView`. */
   unhideRelationInView: (viewId: string, relationId: string) => void
+  /** Replace the view's hidden relations (one undo step). Unknown ids are ignored. */
+  setViewHiddenRelations: (viewId: string, relationIds: string[]) => void
   /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', and 'wiki'. */
   setViewKind: (viewId: string, kind: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki') => void
   /** Persist treemap drill-down focus (null = top "All"). */
@@ -1110,6 +1060,35 @@ interface DiagramStore {
   setTreemapMaxDepth: (viewId: string, depth: number | null) => void
   /** Choose the auto-layout strategy used for this view. */
   setViewLayoutMode: (viewId: string, mode: 'auto' | 'tree') => void
+  /**
+   * Keeps `nodeIds` on one line on the active canvas — a row ('horizontal')
+   * or a column ('vertical') — through drags, the live layout and Smart
+   * Layout, and lines them up now. With `ordered` they also keep the order
+   * of `nodeIds` along the line (left to right, top to bottom) — the order
+   * the user selected them in. Returns the constraint's id, or null when
+   * refused (the reason is notified).
+   */
+  addAlignment: (axis: AlignConstraint['axis'], nodeIds: string[], options?: { ordered?: boolean }) => string | null
+  /**
+   * Keeps `nodeIds` in a grid of `columns` columns (default: about square)
+   * on the active canvas, filled row by row in the order given — the order
+   * the user selected them in — and lays them out in even cells now.
+   * Returns the constraint's id, or null when refused (notified).
+   */
+  addGrid: (nodeIds: string[], columns?: number) => string | null
+  /** Gives a grid another number of columns and lays it out again, on its
+   *  canvas (null = All elements; undefined = the active canvas). */
+  setGridColumns: (id: string, columns: number, viewId?: string | null) => void
+  /** Makes an alignment keep the order of its members as listed (the order
+   *  they were selected in) on its canvas (null = All elements; undefined =
+   *  the active canvas), or stop keeping it. */
+  setAlignmentOrdered: (id: string, ordered: boolean, viewId?: string | null) => void
+  /** Removes layout constraints, as one undo step, from a view (null = All
+   *  elements; undefined = the active canvas). */
+  removeLayoutConstraint: (ids: string | string[], viewId?: string | null) => void
+  /** Lets the live physics move these elements of the active canvas again
+   *  (see PinConstraint), as one undo step. */
+  unpinNodes: (ids: string[]) => void
   /** Link/unlink a sequence to a dynamic view. */
   setViewSequence: (viewId: string, sequenceId: string | null) => void
   /**
@@ -1150,9 +1129,15 @@ interface DiagramStore {
   setLayoutMode: (mode: 'elk' | 'cola' | 'radical') => void
   startLiveLayout: (opts?: { skipBulk?: boolean }) => void
   stopLiveLayout: () => void
-  liveGrab: (nodeId: string, x: number, y: number) => void
-  liveDrag: (nodeId: string, x: number, y: number) => void
-  liveRelease: (nodeId: string) => void
+  /** A drag starts. 'calm' (the default) moves only the element (and the
+   *  rows and columns it keeps); 'push' lets the physics move the rest. */
+  liveGrab: (nodeId: string, x: number, y: number, mode?: DragMode, abs?: { x: number; y: number }, withIds?: string[]) => void
+  /** `abs`: the absolute top-left (React Flow's positionAbsolute). */
+  liveDrag: (nodeId: string, x: number, y: number, abs?: { x: number; y: number }) => void
+  /** A drag ends: when it `moved` (React Flow reports a click as a drag
+   *  too), the element and `withIds`, the other selected elements dragged
+   *  along, are pinned where they were dropped. */
+  liveRelease: (nodeId: string, withIds?: string[], moved?: boolean) => void
   setConnectionModifier: (mod: 'shift' | 'ctrl' | 'alt' | 'meta') => void
   startConnection: (sourceId: string) => void
   cancelConnection: () => void
@@ -1162,6 +1147,9 @@ interface DiagramStore {
   loadDiagram: (data: DiagramData) => void
   saveDiagram: () => DiagramData
   resetDiagram: () => void
+  /** Erase nodes, relations, views and sequences as one undo step; milestones,
+   *  presentations and the metamodel stay (the AI's reset_diagram). */
+  clearModel: () => void
 
   // ── actions: undo / redo ──
   undo: () => void
@@ -1255,6 +1243,9 @@ interface DiagramStore {
   presentationActive: boolean
   presentationSlideIndex: number
   addPresentation: (name?: string) => string
+  /** Replace every presentation (AI tools). Keeps the active one when it
+   *  still exists; an empty list leaves one empty presentation. */
+  setPresentations: (presentations: Presentation[]) => void
   removePresentation: (id: string) => void
   renamePresentation: (id: string, name: string) => void
   setActivePresentation: (id: string) => void
@@ -1278,6 +1269,7 @@ interface DiagramStore {
   autoFitActive: boolean
   setFitViewFn: (fn: (() => void) | null, instantFn?: (() => void) | null) => void
   fitAll: () => void
+  /** Flips the Smart fit setting and saves it to the studio settings. */
   toggleAutoFit: () => void
   zoomIn: () => void
   zoomOut: () => void
@@ -1287,6 +1279,21 @@ interface DiagramStore {
   _pushUndo: () => void
   _markMilestoneEdit: () => void
   _resizeParentsBottomUp: (viewFilter?: Set<string>, viewCollapsedSet?: Set<string>, expandedSet?: Set<string>) => void
+  /** Moves the active canvas's elements so its layout constraints hold
+   *  (no undo step of its own). */
+  _enforceLayoutConstraints: () => void
+  /** Lays grid `id` of the active canvas out in even cells, then keeps the
+   *  constraints (no undo step of its own). */
+  _arrangeGrid: (id: string) => void
+}
+
+/** A layout of the whole canvas places every element anew: the active
+ *  canvas's pins (elements dropped after a drag) go with the old places.
+ *  Designer only: Viewer puts the old positions back when it is left. */
+function unpinLaidOut(state: DiagramStore, appMode: DiagramStore['appMode']): void {
+  if (appMode !== 'designer') return
+  const pinned = pinnedNodeIds(model.layoutConstraintsOf(state, state.activeViewId))
+  if (pinned.length) model.setPinned(state, state.activeViewId, pinned, false, uid)
 }
 
 // ─── Live layout singleton (not serialisable → kept outside store) ───────────
@@ -1393,14 +1400,7 @@ export const useDiagramStore = create<DiagramStore>()(
       initPres = buildPresentationsFromData(persisted.presentations, persisted.presentationSlides)
       // Auto-refresh built-in presets so persisted documents pick up
       // metamodel updates shipped with new app versions.
-      initMetamodel = (() => {
-        const persistedMm = persisted.metamodel
-        if (!persistedMm) return builtInC4Metamodel()
-        if (persistedMm.id === 'c4-builtin') return builtInC4Metamodel()
-        if (persistedMm.id === 'c4-ddd-builtin') return builtInDddC4Metamodel()
-        if (persistedMm.id === 'c4-ddd-governance-builtin') return builtInGovernanceMetamodel()
-        return persistedMm
-      })()
+      initMetamodel = model.documentMetamodel(persisted.metamodel)
       // Signal the boot startLiveLayout() call to skip cola's bulk phase
       // so the persisted positions aren't immediately overwritten.
       _initLoadedFromDisk = true
@@ -1454,6 +1454,7 @@ export const useDiagramStore = create<DiagramStore>()(
       activeViewId: null,
       defaultPositions: initDefaultPositions,
       defaultViewport: persisted?.defaultViewport ?? null,
+      defaultLayoutConstraints: persisted?.defaultLayoutConstraints ?? [],
       pendingBodyNodeIds: {},
       rfNodes: deriveRFNodes(initNodes),
       rfEdges: deriveRFEdges(initNodes, initRelations),
@@ -1465,9 +1466,10 @@ export const useDiagramStore = create<DiagramStore>()(
       smartLayoutProgress: null,
       lastSmartLayoutReport: null,
       liveLayoutActive: true,
+      liveLayoutMoving: false,
       connectSource: null,
       connectionModifier: 'alt' as const,
-      autoFitActive: true,
+      autoFitActive: loadStudioSettings().smartFit,
       canUndo: false,
       canRedo: false,
       snapshots: initSnapshots,
@@ -1815,6 +1817,29 @@ export const useDiagramStore = create<DiagramStore>()(
                 cur = p
               }
 
+              // Grow around the collapsed box's centre: the children's
+              // bounds (which the group's box is drawn around) are centred
+              // on it. From the box's top-left corner the group ran right
+              // and down, and pushed the diagram below and beside it away.
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+              for (const c of children) {
+                if (Math.abs(c.x) < 1 && Math.abs(c.y) < 1) continue // placed below
+                const w = c.collapsed ? COLLAPSED_WIDTH[c.type] : (c.width ?? 0)
+                const h = c.collapsed ? COLLAPSED_HEIGHT[c.type] : (c.height ?? 0)
+                minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x + w)
+                minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y + h)
+              }
+              if (minX <= maxX) {
+                const dx = COLLAPSED_WIDTH[parent.type] / 2 - (minX + maxX) / 2
+                const dy = COLLAPSED_HEIGHT[parent.type] / 2 - (minY + maxY) / 2
+                set((state) => {
+                  const p = state.c4Nodes[id]
+                  if (p) { p.x += dx; p.y += dy }
+                })
+                absX += dx
+                absY += dy
+              }
+
               // For children that have never been positioned (x≈0 and y≈0),
               // assign a default cluster so cola has somewhere to start.
               const unpositioned = children.filter((c) => Math.abs(c.x) < 1 && Math.abs(c.y) < 1)
@@ -1843,6 +1868,30 @@ export const useDiagramStore = create<DiagramStore>()(
                 })
               }
             }
+          }
+        } else {
+          // Collapsing: shrink to the centre of the expanded box, the
+          // reverse of an expand. The node turns from a cola group into a
+          // leaf the layout has no position for, and a new leaf spawns among
+          // its neighbours: seed it there.
+          const allNodes = get().c4Nodes
+          const node = allNodes[id]
+          if (node && isContainerType(node.type)) {
+            const dx = Math.max(0, ((node.width ?? 0) - COLLAPSED_WIDTH[node.type]) / 2)
+            const dy = Math.max(0, ((node.height ?? 0) - COLLAPSED_HEIGHT[node.type]) / 2)
+            if (dx > 0 || dy > 0) {
+              set((state) => {
+                const n = state.c4Nodes[id]
+                if (n) { n.x += dx; n.y += dy }
+              })
+            }
+            let absX = node.x + dx
+            let absY = node.y + dy
+            for (let p = node.parentId ? allNodes[node.parentId] : undefined; p; p = p.parentId ? allNodes[p.parentId] : undefined) {
+              absX += p.x
+              absY += p.y
+            }
+            _liveLayout?.seedPosition(id, absX + COLLAPSED_WIDTH[node.type] / 2, absY + COLLAPSED_HEIGHT[node.type] / 2)
           }
         }
 
@@ -1885,9 +1934,14 @@ export const useDiagramStore = create<DiagramStore>()(
         // Walk up the ancestor chain:
         // At each level: separate siblings of current node, then refit the parent.
         // This propagates size changes upward so grandparent containers also shrink/grow.
+        // Under live physics no separation: the physics makes room itself, so
+        // this arrangement would only be drawn until its first reply — the
+        // toggled group pushed off its centre, siblings pushed aside, all
+        // snapping back a few frames later.
+        const separate = !_liveLayout?.running
         let currentId: string | undefined = id
         while (currentId) {
-          const overlapUpdates = separateSiblings(currentId, get().c4Nodes)
+          const overlapUpdates = separate ? separateSiblings(currentId, get().c4Nodes) : {}
           if (Object.keys(overlapUpdates).length > 0) {
             set((state) => {
               for (const [sid, pos] of Object.entries(overlapUpdates)) {
@@ -1939,6 +1993,18 @@ export const useDiagramStore = create<DiagramStore>()(
 
         get()._sync()
         _liveLayout?.invalidate()
+        // Smart fit frames the result as soon as the canvas shows it, not on
+        // its next 300 ms tick. React Flow takes the new nodes in an effect,
+        // a frame or two after this: ask again each frame meanwhile (a call
+        // before the change shows does nothing).
+        if (get().autoFitActive && typeof requestAnimationFrame !== 'undefined') {
+          let frames = 0
+          const kick = () => {
+            _getFitViewInstantFn()?.()
+            if (++frames < 5) requestAnimationFrame(kick)
+          }
+          requestAnimationFrame(kick)
+        }
       },
 
       // ── relations ────────────────────────────────────────────────────────
@@ -1962,6 +2028,12 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       updateRelation(id, updates) {
+        // Moving an end obeys the same metamodel rules as adding a relation.
+        const refused = model.checkPatchRelation(get(), id, updates)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
         get()._pushUndo()
         get()._markMilestoneEdit()
         set((state) => { model.patchRelation(state, id, updates) })
@@ -2273,96 +2345,27 @@ export const useDiagramStore = create<DiagramStore>()(
 
       reparentNodes(ids, newParentId) {
         const state0 = get()
-        const mm = state0.metamodel
         const nodes = ids
           .map((id) => state0.c4Nodes[id])
           .filter((n): n is C4Node => !!n)
         if (nodes.length === 0) return
-
-        // All selected nodes must currently share the same parent so we don't
-        // silently merge two different sub-trees.
         const oldParentId = nodes[0].parentId ?? null
-        if (!nodes.every((n) => (n.parentId ?? null) === oldParentId)) {
-          state0.pushNotification(
-            'Cannot move: selected nodes have different parents. Select siblings only.',
-            'error',
-          )
-          return
-        }
-        if ((newParentId ?? null) === oldParentId) {
-          // Nothing to do — new parent is the current parent.
-          return
-        }
+        // Same parent for every selected node: nothing to do.
+        if ((newParentId ?? null) === oldParentId && nodes.every((n) => (n.parentId ?? null) === oldParentId)) return
 
+        const refused = model.checkReparent(state0, ids, newParentId)
+        if (refused) {
+          state0.pushNotification(refused, 'error')
+          return
+        }
         const newParent = newParentId ? state0.c4Nodes[newParentId] : undefined
-        if (newParentId && !newParent) {
-          state0.pushNotification('Target parent no longer exists.', 'error')
-          return
-        }
         const newParentLabel = newParent
-          ? (mm?.nodeTypes[newParent.type]?.label ?? newParent.type)
+          ? (state0.metamodel?.nodeTypes[newParent.type]?.label ?? newParent.type)
           : 'the canvas root'
-
-        // Cycle guard: new parent must not be one of the moved nodes nor any
-        // of their descendants.
-        const movedSet = new Set(ids)
-        for (const id of ids) {
-          for (const d of getDescendants(id, state0.c4Nodes)) movedSet.add(d)
-        }
-        if (newParentId && movedSet.has(newParentId)) {
-          state0.pushNotification(
-            'Cannot move a node into itself or one of its descendants.',
-            'error',
-          )
-          return
-        }
-
-        // Metamodel: each moved node's type must be allowed inside the target.
-        for (const n of nodes) {
-          if (!isParentAllowed(mm, n.type, newParent?.type)) {
-            const childDef = mm?.nodeTypes[n.type]
-            const childLabel = childDef?.label ?? n.type
-            const allowed = childDef?.allowedParents
-            const allowedStr = allowed && allowed.length
-              ? allowed.map((t) => mm?.nodeTypes[t]?.label ?? t).join(', ')
-              : 'the canvas root'
-            state0.pushNotification(
-              `Cannot place ${childLabel} "${n.label}" inside ${newParentLabel}. Allowed: ${allowedStr}.`,
-              'error',
-            )
-            return
-          }
-        }
-
-        // Compute absolute (root-space) coords by walking up the parent chain.
-        const absOf = (id: string): { x: number; y: number } => {
-          let x = 0, y = 0
-          let cur: C4Node | undefined = state0.c4Nodes[id]
-          const seen = new Set<string>()
-          while (cur && !seen.has(cur.id)) {
-            seen.add(cur.id)
-            x += cur.x
-            y += cur.y
-            cur = cur.parentId ? state0.c4Nodes[cur.parentId] : undefined
-          }
-          return { x, y }
-        }
-        const newParentAbs = newParentId
-          ? absOf(newParentId)
-          : { x: 0, y: 0 }
 
         get()._pushUndo()
         get()._markMilestoneEdit()
-        set((state) => {
-          for (const n of nodes) {
-            const sn = state.c4Nodes[n.id]
-            if (!sn) continue
-            const a = absOf(n.id) // computed against the original tree (state0)
-            sn.parentId = newParentId ?? undefined
-            sn.x = a.x - newParentAbs.x
-            sn.y = a.y - newParentAbs.y
-          }
-        })
+        set((state) => { model.reparentNodes(state, ids, newParentId) })
 
         // Refit both sides of the move bottom-up so containers grow/shrink.
         const refitChain = (startId: string | null | undefined): void => {
@@ -2415,18 +2418,28 @@ export const useDiagramStore = create<DiagramStore>()(
         const { activeViewId, c4Nodes, appMode } = get()
         if (newId === activeViewId) return
 
-        // In viewer (explore mode) we deliberately keep the user's current
-        // node positions when the active view changes — they may have
-        // dragged things around to inspect a relationship and shouldn't
-        // lose that arrangement just because they flipped to another view.
-        // Only the *visibility* (view filter) changes; positions are NOT
-        // saved into the outgoing view (would dirty the in-memory map for
-        // the explore session) and NOT loaded from the incoming view.
-        // The pre-mode snapshot in setAppMode restores everything cleanly
-        // when the user returns to designer.
+        // Viewer and Presenter show each view as it was laid out: the
+        // incoming view's positions and camera are loaded, as in designer.
+        // (Keeping the outgoing view's positions scattered every view whose
+        // nodes differ.) Nothing is saved into the outgoing view: drags here
+        // are for exploring only, and the pre-mode snapshot in setAppMode
+        // restores the designer layout on the way back.
         if (appMode !== 'designer') {
-          set((state) => { state.activeViewId = newId })
+          let incomingViewport: { x: number; y: number; zoom: number } | null = null
+          set((state) => {
+            const incoming = newId === null
+              ? state.defaultPositions as Record<string, NodePosition>
+              : state.views[newId]?.positions as Record<string, NodePosition> | undefined
+            if (incoming && Object.keys(incoming).length > 0) {
+              applyPositions(state.c4Nodes as Record<string, C4Node>, incoming)
+            }
+            incomingViewport = (newId === null ? state.defaultViewport : state.views[newId]?.viewport) as typeof incomingViewport ?? null
+            state.activeViewId = newId
+          })
           get()._sync()
+          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+          ;(window as any).__rfPlaceCamera?.(incomingViewport, shown)
+          _liveLayout?.reset()
           return
         }
 
@@ -2474,40 +2487,39 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(state as any).__pendingViewport = incomingViewport
         })
         get()._sync()
-        // Apply restored camera. Defer so React Flow finishes rendering the
-        // newly-positioned nodes before we move the viewport.
+        // The camera for the incoming view, in one step: no flight from the
+        // outgoing view's camera (see Canvas placeCamera).
         const pending = (get() as any).__pendingViewport as
           | { x: number; y: number; zoom: number }
           | null
-        if (pending) {
-          requestAnimationFrame(() => {
-            const setVP = (window as any).__rfSetViewport as
-              | ((vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => void)
-              | null
-            setVP?.(pending, { duration: 250 })
-          })
-        }
+        const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+        ;(window as any).__rfPlaceCamera?.(pending ?? null, shown)
         set((state) => { delete (state as any).__pendingViewport })
+        // Alignments added elsewhere (the MCP server, another window) hold
+        // from the moment the canvas shows.
+        get()._enforceLayoutConstraints()
         // Drop cola's cached positions so the live layout doesn't immediately
         // overwrite the just-restored coordinates with stale ones.
         _liveLayout?.reset()
       },
       addNodeToView(viewId, nodeId) {
-        set((state) => {
-          const view = state.views[viewId]
-          if (view && !view.nodeIds.includes(nodeId)) view.nodeIds.push(nodeId)
-        })
+        const view = get().views[viewId]
+        if (!view || view.nodeIds.includes(nodeId)) return
+        get()._pushUndo()
+        set((state) => { state.views[viewId].nodeIds.push(nodeId) })
         get()._sync()
       },
-      removeNodeFromView(viewId, nodeId) {
+      removeNodeFromView(viewId, nodeIds) {
+        const ids = typeof nodeIds === 'string' ? [nodeIds] : nodeIds
+        if (!get().views[viewId] || ids.length === 0) return
+        get()._pushUndo()
         set((state) => {
           const view = state.views[viewId]
-          if (!view) return
-          // Remove the node AND all its descendants as one unit.
+          // Remove the nodes AND all their descendants as one unit.
           // Without cascading, children remaining in nodeIds cause
           // computeViewNodeSet to re-include the parent (ancestor walk),
           // so the parent would keep appearing even after its eye was toggled off.
-          const toRemove = new Set([nodeId, ...getDescendants(nodeId, state.c4Nodes)])
+          const toRemove = new Set(ids.flatMap((id) => [id, ...getDescendants(id, state.c4Nodes)]))
           if (view.nodeIds.length === 0) {
             // Empty nodeIds means "show all". First removal transitions to
             // "show all except this subtree" by explicitly listing every other node.
@@ -2532,22 +2544,29 @@ export const useDiagramStore = create<DiagramStore>()(
         _liveLayout?.invalidate()
       },
       hideRelationFromView(viewId, relationId) {
+        const view = get().views[viewId]
+        if (!view || view.hiddenRelationIds?.includes(relationId)) return
+        get()._pushUndo()
         set((state) => {
-          const view = state.views[viewId]
-          if (!view) return
-          if (!view.hiddenRelationIds) view.hiddenRelationIds = []
-          if (!view.hiddenRelationIds.includes(relationId)) {
-            view.hiddenRelationIds.push(relationId)
-          }
+          const v = state.views[viewId]
+          v.hiddenRelationIds = [...(v.hiddenRelationIds ?? []), relationId]
         })
         get()._sync()
       },
       unhideRelationInView(viewId, relationId) {
+        const view = get().views[viewId]
+        if (!view?.hiddenRelationIds?.includes(relationId)) return
+        get()._pushUndo()
         set((state) => {
-          const view = state.views[viewId]
-          if (!view || !view.hiddenRelationIds) return
-          view.hiddenRelationIds = view.hiddenRelationIds.filter((id) => id !== relationId)
+          const v = state.views[viewId]
+          v.hiddenRelationIds = (v.hiddenRelationIds ?? []).filter((id) => id !== relationId)
         })
+        get()._sync()
+      },
+      setViewHiddenRelations(viewId, relationIds) {
+        if (!get().views[viewId]) return
+        get()._pushUndo()
+        set((state) => { model.setViewHiddenRelations(state, viewId, relationIds) })
         get()._sync()
       },
 
@@ -2617,6 +2636,134 @@ export const useDiagramStore = create<DiagramStore>()(
           view.layoutMode = mode
         })
         get()._sync()
+      },
+
+      addAlignment(axis, nodeIds, options = {}) {
+        const viewId = get().activeViewId
+        const ordered = !!options.ordered
+        const ids = [...new Set(nodeIds)]
+        const refused = model.checkAddAlignment(get(), viewId, axis, ids, ordered)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return null
+        }
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        const id = uid()
+        set((state) => { model.insertAlignment(state, viewId, id, axis, ids, ordered) })
+        get()._enforceLayoutConstraints()
+        _liveLayout?.reset()
+        return id
+      },
+
+      addGrid(nodeIds, columns) {
+        const viewId = get().activeViewId
+        const ids = [...new Set(nodeIds)]
+        const cols = columns ?? defaultGridColumns(ids.length)
+        const refused = model.checkAddGrid(get(), viewId, ids, cols)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return null
+        }
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        const id = uid()
+        set((state) => { model.insertGrid(state, viewId, id, ids, cols) })
+        get()._arrangeGrid(id)
+        _liveLayout?.reset()
+        return id
+      },
+
+      setGridColumns(id, columns, viewIdArg) {
+        const viewId = viewIdArg === undefined ? get().activeViewId : viewIdArg
+        const c = model.layoutConstraintsOf(get(), viewId).find((x) => x.id === id)
+        if (!c || c.type !== 'grid' || c.columns === columns) return
+        const refused = model.checkGridColumns(get(), viewId, id, columns)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        set((state) => { model.setGridColumns(state, viewId, id, columns) })
+        if (viewId === get().activeViewId) {
+          get()._arrangeGrid(id)
+          _liveLayout?.reset()
+        }
+      },
+
+      _arrangeGrid(id) {
+        const c = activeLayoutConstraints(get()).find((x) => x.id === id)
+        if (!c || c.type !== 'grid') return
+        const input = layoutInputForView(get())
+        // Members inside a collapsed container are laid out as if it were
+        // open, so the grid is in place when it is expanded.
+        const open = { ...input.nodes }
+        for (const member of c.nodeIds) {
+          for (let p = open[member]?.parentId; p && open[p]; p = open[p].parentId) {
+            if (open[p].collapsed) open[p] = { ...open[p], collapsed: false }
+          }
+        }
+        const { nodes } = projectToVisibleGraph(open, input.relations)
+        const positions = arrangeGrid(nodes, {}, c)
+        set((state) => {
+          for (const member of c.nodeIds) {
+            const n = state.c4Nodes[member]
+            const p = positions[member]
+            if (n && p) { n.x = p.x; n.y = p.y }
+          }
+        })
+        get()._sync()
+        get()._enforceLayoutConstraints()
+      },
+
+      setAlignmentOrdered(id, ordered, viewIdArg) {
+        const viewId = viewIdArg === undefined ? get().activeViewId : viewIdArg
+        const c = model.layoutConstraintsOf(get(), viewId).find((x) => x.id === id)
+        if (!c || c.type !== 'align' || !!c.ordered === ordered) return
+        const ids = ordered ? c.nodeIds : null
+        if (ids) {
+          const refused = model.checkAlignmentOrder(get(), viewId, id, ids)
+          if (refused) {
+            get().pushNotification(refused, 'error')
+            return
+          }
+        }
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        set((state) => { model.setAlignmentOrder(state, viewId, id, ids) })
+        if (viewId === get().activeViewId) {
+          get()._enforceLayoutConstraints()
+          _liveLayout?.reset()
+        }
+      },
+
+      unpinNodes(ids) {
+        const viewId = get().activeViewId
+        const pinned = pinnedNodeIds(model.layoutConstraintsOf(get(), viewId))
+        if (!ids.some((id) => pinned.includes(id))) return
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        set((state) => { model.setPinned(state, viewId, ids, false, uid) })
+        _liveLayout?.invalidate()
+      },
+
+      removeLayoutConstraint(ids, viewIdArg) {
+        const viewId = viewIdArg === undefined ? get().activeViewId : viewIdArg
+        const remove = new Set(typeof ids === 'string' ? [ids] : ids)
+        if (!model.layoutConstraintsOf(get(), viewId).some((c) => remove.has(c.id))) return
+        get()._pushUndo()
+        get()._markMilestoneEdit()
+        set((state) => { for (const id of remove) model.deleteLayoutConstraint(state, viewId, id) })
+        if (viewId === get().activeViewId) _liveLayout?.invalidate()
+      },
+
+      _enforceLayoutConstraints() {
+        const input = layoutInputForView(get())
+        if (!input.alignments.length) return
+        let moved = false
+        set((state) => { moved = applyAlignments(state.c4Nodes, input) })
+        if (moved) get()._sync()
       },
 
       setViewSequence(viewId, sequenceId) {
@@ -2785,13 +2932,20 @@ export const useDiagramStore = create<DiagramStore>()(
 
           // Track multi-selection driven by ReactFlow (shift/cmd-click,
           // selection box). We rebuild selectedNodeIds from the current
-          // rfNodes' selected flag so it reflects the true UI state.
+          // rfNodes' selected flag so it reflects the true UI state, in
+          // selection order: nodes still selected keep their place, newly
+          // selected ones follow in the order of the changes.
           const hasSelectChange = passthrough.some(c => c.type === 'select')
           if (hasSelectChange) {
-            const ids: string[] = []
+            const selectedNow = new Set<string>()
             for (const rn of state.rfNodes) {
-              if ((rn as any).selected) ids.push(rn.id)
+              if ((rn as any).selected) selectedNow.add(rn.id)
             }
+            const ids = state.selectedNodeIds.filter((id) => selectedNow.has(id))
+            for (const c of passthrough) {
+              if (c.type === 'select' && c.selected && selectedNow.has(c.id) && !ids.includes(c.id)) ids.push(c.id)
+            }
+            for (const id of selectedNow) if (!ids.includes(id)) ids.push(id)
             state.selectedNodeIds = ids
             state.selectedNodeId = ids[0] ?? state.selectedNodeId
             // Compatibility with single-select consumers: when nothing is
@@ -2901,21 +3055,12 @@ export const useDiagramStore = create<DiagramStore>()(
         if (viewFilter) children = children.filter((c) => viewFilter.has(c.id))
         if (children.length === 0) return
 
-        const pad = compoundPadding(parent.type)
-        const padRight  = pad.side
-        const padBottom = pad.bottom
-
-        let maxRight = 0
-        let maxBottom = 0
-        for (const child of children) {
-          const h = effectiveNodeHeight(child, viewCollapsedSet, expandedSet)
-          const w = effectiveNodeWidth(child, viewCollapsedSet, expandedSet)
-          maxRight  = Math.max(maxRight,  child.x + w)
-          maxBottom = Math.max(maxBottom, child.y + h)
-        }
-
-        const newW = Math.max(maxRight + padRight, NODE_SIZES[parent.type].width)
-        const newH = Math.max(maxBottom + padBottom, NODE_SIZES[parent.type].height)
+        const { width: newW, height: newH } = fittedParentSize(parent, children.map((child) => ({
+          x: child.x,
+          y: child.y,
+          width: effectiveNodeWidth(child, viewCollapsedSet, expandedSet),
+          height: effectiveNodeHeight(child, viewCollapsedSet, expandedSet),
+        })))
 
         set((state) => {
           const n = state.c4Nodes[parentId]
@@ -2964,7 +3109,10 @@ export const useDiagramStore = create<DiagramStore>()(
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const positions = applyRadicalLayout(input.nodes, input.relations)
-          set((state) => { applyLayoutPositions(state.c4Nodes, positions, input) })
+          set((state) => {
+            applyLayoutPositions(state.c4Nodes, positions, input)
+            unpinLaidOut(state, get().appMode)
+          })
 
           // Resize parents bottom-up for any compound nodes not sized by radical
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
@@ -3001,6 +3149,7 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           }
           if (rootIds.length > 0) get()._sync()
+          get()._enforceLayoutConstraints()
         } finally {
           set((state) => { state.isLayoutRunning = false })
         }
@@ -3013,8 +3162,13 @@ export const useDiagramStore = create<DiagramStore>()(
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const positions = await applyTreeLayout(input.nodes, input.relations)
+          // One undo step for the whole layout. Viewer reverts positions on exit anyway.
+          if (get().appMode === 'designer') get()._pushUndo()
           get()._markMilestoneEdit()
-          set((state) => { applyLayoutPositions(state.c4Nodes, positions, input) })
+          set((state) => {
+            applyLayoutPositions(state.c4Nodes, positions, input)
+            unpinLaidOut(state, get().appMode)
+          })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level.
@@ -3034,6 +3188,7 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           }
           get()._sync()
+          get()._enforceLayoutConstraints()
 
           // Drop cola caches so the live layout doesn't snap nodes back to
           // their pre-layout positions on the next rebuild.
@@ -3075,7 +3230,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const result = await runSmartLayout(input.nodes, input.relations, get().metamodel as Metamodel | undefined, (progress) => {
             set((s) => { s.smartLayoutProgress = progress })
-          })
+          }, { alignments: input.alignments })
           if (result.candidates.length === 0) {
             get().pushNotification('Smart layout: no candidate produced a result.', 'warning')
             return
@@ -3084,8 +3239,13 @@ export const useDiagramStore = create<DiagramStore>()(
             get().pushNotification('Smart layout: the current layout already scores best — nothing changed.', 'info')
             return
           }
+          // One undo step for the whole layout. Viewer reverts positions on exit anyway.
+          if (get().appMode === 'designer') get()._pushUndo()
           get()._markMilestoneEdit()
-          set((state) => { applyLayoutPositions(state.c4Nodes, result.winner.positions, input) })
+          set((state) => {
+            applyLayoutPositions(state.c4Nodes, result.winner.positions, input)
+            unpinLaidOut(state, get().appMode)
+          })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level (same as ELK/Radical paths).
@@ -3105,6 +3265,9 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           }
           get()._sync()
+          // The parent refit and root separation above know nothing of the
+          // user's alignments; put them back.
+          get()._enforceLayoutConstraints()
 
           // Drop cola caches so the live layout doesn't snap nodes back to
           // their pre-smart positions on the next rebuild.
@@ -3154,7 +3317,7 @@ export const useDiagramStore = create<DiagramStore>()(
             '· planarity', result.planarity.verdict, `(${result.planarity.crossingEdges}/${result.planarity.totalEdges})`,
             '· winner score', result.winner.score,
             '· ranking:', result.candidates.map((c) =>
-              `${c.name} [composite=${c.score.composite.toFixed(0)} cross=${c.metrics.crossings}(rend${c.score.renderedCrossings}) over=${c.metrics.overdraws}(rend${c.score.renderedOverdraws}) loop=${c.score.stubLoopPenalty.toFixed(2)} olap=${c.score.nodeOverlap.toFixed(1)} long=${c.score.edgeLengthExcess.toFixed(1)} lmean=${c.score.edgeLengthMean.toFixed(2)} leaf=${c.score.leafCentrality.toFixed(2)} ar=${c.score.aspectPenalty.toFixed(2)} sym=${c.score.symmetryDeficit.toFixed(2)}]`,
+              `${c.name} [composite=${c.score.composite.toFixed(0)} cross=${c.metrics.crossings}(rend${c.score.renderedCrossings}) over=${c.metrics.overdraws}(rend${c.score.renderedOverdraws}) loop=${c.score.stubLoopPenalty.toFixed(2)} olap=${c.score.nodeOverlap.toFixed(1)} long=${c.score.edgeLengthExcess.toFixed(1)} lmean=${c.score.edgeLengthMean.toFixed(2)} leaf=${c.score.leafCentrality.toFixed(2)} ar=${c.score.aspectPenalty.toFixed(2)} sym=${c.score.symmetryDeficit.toFixed(2)} lbl=${c.score.labelCrowding.toFixed(2)}]`,
             ).join(' | '),
           )
           // Same ranking, surfaced to the UI (previously console-only) so a
@@ -3209,20 +3372,19 @@ export const useDiagramStore = create<DiagramStore>()(
           return
         }
         _liveLayout = new LiveColaLayout({
+          // The same graph Smart Layout and the canvas see: the view's own
+          // collapsed/expanded overrides included, so a node collapsed on All
+          // elements but expanded in this view is a group here, not a leaf.
           getModel: () => {
-            const state = get()
-            const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-            const vf = computeViewNodeSet(view as DiagramView | undefined, state.c4Nodes as Record<string, C4Node>)
-            const vcs = computeViewCollapsedSet(vf, state.c4Nodes as Record<string, C4Node>)
-            return filterForView(
-              state.c4Nodes as Record<string, C4Node>,
-              state.c4Relations as Record<string, C4Relation>,
-              vf,
-              vcs
-            )
+            const { nodes, relations, alignments } = layoutInputForView(get())
+            return { nodes, relations, alignments, pinned: pinnedNodeIds(activeLayoutConstraints(get())) }
+          },
+          onSettled: () => {
+            set((state) => { state.liveLayoutMoving = false })
           },
           applyPositions: (positions) => {
             set((state) => {
+              state.liveLayoutMoving = true
               // Update c4Nodes (source of truth) and patch rfNodes positions
               // in-place. Avoids full _sync() re-derive which would rebuild
               // all rfNodes/rfEdges arrays every animation frame.
@@ -3239,8 +3401,12 @@ export const useDiagramStore = create<DiagramStore>()(
                 const pos = positions[rfNode.id]
                 if (!pos) continue
                 rfNode.position = { x: pos.x, y: pos.y }
+                const data = rfNode.data as C4NodeRFData
+                // The layout sizes only groups that show children. A size for
+                // a node drawn collapsed is a stale group box (a tick from
+                // before the collapse) and would leave a big empty rectangle.
+                if (data.collapsed || !data.hasChildren) continue
                 if (pos.width != null || pos.height != null) {
-                  const data = rfNode.data as C4NodeRFData
                   if (pos.width != null) {
                     data.width = pos.width
                     rfNode.width = pos.width
@@ -3271,16 +3437,22 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { state.liveLayoutActive = false })
       },
 
-      liveGrab(nodeId, x, y) {
-        _liveLayout?.grab(nodeId, x, y)
+      liveGrab(nodeId, x, y, mode = 'calm', abs, withIds) {
+        _liveLayout?.grab(nodeId, x, y, mode, abs, withIds)
       },
 
-      liveDrag(nodeId, x, y) {
-        _liveLayout?.drag(nodeId, x, y)
+      liveDrag(nodeId, x, y, abs) {
+        _liveLayout?.drag(nodeId, x, y, abs)
       },
 
-      liveRelease(nodeId) {
+      liveRelease(nodeId, withIds = [], moved = true) {
         _liveLayout?.release(nodeId)
+        // The physics already holds it (release); the rule keeps it held
+        // after a rebuild and in the saved file. No undo step: the drag
+        // itself has none.
+        if (moved && get().appMode === 'designer') {
+          set((state) => { model.setPinned(state, state.activeViewId, [nodeId, ...withIds], true, uid) })
+        }
         // A drag while editing a milestone is a real edit too — mark dirty
         // so the user is asked how to persist it (propagate / save as new).
         // Without this, positions never make it into the snapshot and switching
@@ -3305,13 +3477,37 @@ export const useDiagramStore = create<DiagramStore>()(
         if (_undoStack.length === 0) return
         const entry = _undoStack.pop()!
         // push current state to redo
-        _redoStack.push(_captureState(get()))
+        _redoStack.push({ ..._captureState(get()), ...(entry.sequences ? { sequences: get().sequences } : {}) })
         set((state) => {
           state.c4Nodes = entry.c4Nodes as any
           state.c4Relations = entry.c4Relations as any
           state.views = entry.views as any
+          state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
+          if (entry.sequences) state.sequences = entry.sequences as any
           state.canUndo = _undoStack.length > 0
           state.canRedo = true
+        })
+        get()._sync()
+        _liveLayout?.reset()
+      },
+
+      clearModel() {
+        _undoStack.push({ ..._captureState(get()), sequences: get().sequences })
+        if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
+        _redoStack.length = 0
+        get()._markMilestoneEdit()
+        set((state) => {
+          state.c4Nodes = {} as any
+          state.c4Relations = {} as any
+          state.views = {} as any
+          state.defaultLayoutConstraints = []
+          state.sequences = {} as any
+          state.activeViewId = null
+          state.selectedNodeId = null
+          state.selectedNodeIds = []
+          state.selectedEdgeId = null
+          state.canUndo = true
+          state.canRedo = false
         })
         get()._sync()
         _liveLayout?.reset()
@@ -3321,11 +3517,13 @@ export const useDiagramStore = create<DiagramStore>()(
         if (_redoStack.length === 0) return
         const entry = _redoStack.pop()!
         // push current state to undo
-        _undoStack.push(_captureState(get()))
+        _undoStack.push({ ..._captureState(get()), ...(entry.sequences ? { sequences: get().sequences } : {}) })
         set((state) => {
           state.c4Nodes = entry.c4Nodes as any
           state.c4Relations = entry.c4Relations as any
           state.views = entry.views as any
+          state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
+          if (entry.sequences) state.sequences = entry.sequences as any
           state.canUndo = true
           state.canRedo = _redoStack.length > 0
         })
@@ -3855,28 +4053,33 @@ export const useDiagramStore = create<DiagramStore>()(
       resetMetamodelToC4() {
         set((state) => { state.metamodel = builtInC4Metamodel() as any })
       },
+      // Editing a built-in preset works on a custom copy: on load,
+      // documentMetamodel swaps a preset id back to the preset, which would
+      // silently drop the edit.
       upsertNodeType(def) {
         set((state) => {
-          (state.metamodel as Metamodel).nodeTypes[def.id] = def
+          state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
+          ;(state.metamodel as Metamodel).nodeTypes[def.id] = def
         })
       },
       removeNodeType(id) {
         set((state) => {
-          const mm = state.metamodel as Metamodel
-          if (mm.nodeTypes[id]?.builtin) return
-          delete mm.nodeTypes[id]
+          if ((state.metamodel as Metamodel).nodeTypes[id]?.builtin) return
+          state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
+          delete (state.metamodel as Metamodel).nodeTypes[id]
         })
       },
       upsertRelationType(def) {
         set((state) => {
-          (state.metamodel as Metamodel).relationTypes[def.id] = def
+          state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
+          ;(state.metamodel as Metamodel).relationTypes[def.id] = def
         })
       },
       removeRelationType(id) {
         set((state) => {
-          const mm = state.metamodel as Metamodel
-          if (mm.relationTypes[id]?.builtin) return
-          delete mm.relationTypes[id]
+          if ((state.metamodel as Metamodel).relationTypes[id]?.builtin) return
+          state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
+          delete (state.metamodel as Metamodel).relationTypes[id]
         })
       },
 
@@ -3899,6 +4102,19 @@ export const useDiagramStore = create<DiagramStore>()(
           state.presentationSlideIndex = 0
         })
         return id
+      },
+
+      setPresentations(presentations) {
+        set((state) => {
+          state.presentations = (presentations.length ? presentations : [{ id: uid(), name: 'Presentation 1', slides: [] }]) as any
+          if (!state.presentations.some((p) => p.id === state.activePresentationId)) {
+            state.activePresentationId = state.presentations[0].id
+            state.presentationSlideIndex = 0
+          }
+          const active = state.presentations.find((p) => p.id === state.activePresentationId)!
+          state.presentationSlides = active.slides
+          state.presentationSlideIndex = Math.min(state.presentationSlideIndex, Math.max(0, active.slides.length - 1))
+        })
       },
 
       removePresentation(id) {
@@ -4047,25 +4263,12 @@ export const useDiagramStore = create<DiagramStore>()(
         // Disable physics while presenting
         get().stopLiveLayout()
 
-        // Restore inline model snapshot first (preferred — captured at
-        // slide-creation time so it always reflects what was on screen).
-        // Fall back to the linked milestone snapshot for legacy slides.
-        const inline = (slide as any).modelSnapshot as
-          | { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
-          | undefined
-        if (inline) {
+        const shown = slideModel(slide, get().snapshots)
+        if (shown) {
           set((state) => {
-            state.c4Nodes = inline.nodes as any
-            state.c4Relations = inline.relations as any
+            state.c4Nodes = shown.nodes as any
+            state.c4Relations = shown.relations as any
           })
-        } else if (slide.snapshotId) {
-          const snap = get().snapshots.find(s => s.id === slide.snapshotId)
-          if (snap) {
-            set((state) => {
-              state.c4Nodes = snap.nodes as any
-              state.c4Relations = snap.relations as any
-            })
-          }
         } else {
           // A slide without its own model shows the live one — undo whatever
           // a previous milestone slide swapped in.
@@ -4153,6 +4356,10 @@ export const useDiagramStore = create<DiagramStore>()(
             { x: vp.x, y: vp.y, zoom: vp.zoom },
             { duration: 600 },
           ))
+        } else if (slide.focusNodeIds?.length) {
+          // No captured camera: zoom onto the slide's focus elements.
+          const focus = slide.focusNodeIds
+          requestAnimationFrame(() => (window as any).__rfFocusNodes?.(focus, { duration: 600 }))
         } else {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => _getFitViewFn()?.())
@@ -4167,23 +4374,12 @@ export const useDiagramStore = create<DiagramStore>()(
         const slide = presentationSlides[i]
         set((state) => { state.presentationSlideIndex = i })
 
-        // Restore inline model snapshot (preferred) or linked milestone snapshot.
-        const inline = (slide as any).modelSnapshot as
-          | { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
-          | undefined
-        if (inline) {
+        const shown = slideModel(slide, get().snapshots)
+        if (shown) {
           set((state) => {
-            state.c4Nodes = inline.nodes as any
-            state.c4Relations = inline.relations as any
+            state.c4Nodes = shown.nodes as any
+            state.c4Relations = shown.relations as any
           })
-        } else if (slide.snapshotId) {
-          const snap = get().snapshots.find(s => s.id === slide.snapshotId)
-          if (snap) {
-            set((state) => {
-              state.c4Nodes = snap.nodes as any
-              state.c4Relations = snap.relations as any
-            })
-          }
         }
 
         // Apply saved canvas state (positions + collapsed).
@@ -4224,6 +4420,10 @@ export const useDiagramStore = create<DiagramStore>()(
             { x: vp.x, y: vp.y, zoom: vp.zoom },
             { duration: 400 },
           ))
+        } else if (slide.focusNodeIds?.length) {
+          // No captured camera: zoom onto the slide's focus elements.
+          const focus = slide.focusNodeIds
+          requestAnimationFrame(() => (window as any).__rfFocusNodes?.(focus, { duration: 400 }))
         } else {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => _getFitViewFn()?.())
@@ -4324,6 +4524,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.views = views as any
           state.defaultPositions = defaultPos as any
           state.defaultViewport = defaultVP
+          state.defaultLayoutConstraints = (data.defaultLayoutConstraints ?? []) as any
           state.activeViewId = null
           state.selectedNodeId = null
           state.selectedEdgeId = null
@@ -4332,6 +4533,16 @@ export const useDiagramStore = create<DiagramStore>()(
           state.canRedo = false
           state.snapshots = snapshots as any
           state.activeSnapshotId = null
+          // A milestone viewed before the load belongs to the model it left:
+          // drop its parked live model and diff, or they would show (ghosts)
+          // or come back (discard) in the loaded one.
+          state.liveBackup = null
+          state.milestoneDirty = false
+          state.milestonePromptOpen = false
+          state.diffHighlight = {} as any
+          state.diffBaseSnapshotId = null
+          state.diffGhostNodes = {} as any
+          state.diffGhostRelations = {} as any
           state.presentations = presInit.presentations as any
           state.activePresentationId = presInit.activeId
           state.presentationSlides = presInit.presentations[0].slides as any
@@ -4341,19 +4552,30 @@ export const useDiagramStore = create<DiagramStore>()(
           state.hubTemplates = (data.hubTemplates ?? {}) as any
           state.hubMeta = data.hub ?? null
         })
+        // Outside designer, setAppMode parked the model to put back on return.
+        // A load (an outside edit reloaded from disk, a document switch) is the
+        // new baseline: park it instead, or returning to designer would bring
+        // back — and the next autosave write — the model from before the load.
+        const W = window as any
+        if (W.__preModeLayout) {
+          const parkedViewId = W.__preModeLayout.activeViewId as string | null
+          W.__preModeLayout = {
+            c4Nodes: get().c4Nodes,
+            c4Relations: get().c4Relations,
+            views: get().views,
+            defaultPositions: get().defaultPositions,
+            activeViewId: parkedViewId && views[parkedViewId] ? parkedViewId : null,
+          }
+        }
         get()._sync()
+        get()._enforceLayoutConstraints()
         // skipBulk=true: loaded positions are already correct; the 110-iteration
         // cola bulk phase would immediately rearrange and overwrite them.
         get().startLiveLayout({ skipBulk: true })
+        suggestSmartLayoutIfUnarranged()
         // Apply restored camera (loaded as activeViewId=null → default view).
-        if (defaultVP) {
-          requestAnimationFrame(() => {
-            const setVP = (window as any).__rfSetViewport as
-              | ((vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => void)
-              | null
-            setVP?.(defaultVP, { duration: 0 })
-          })
-        }
+        const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+        ;(window as any).__rfPlaceCamera?.(defaultVP ?? null, shown)
       },
 
       saveDiagram() {
@@ -4392,6 +4614,7 @@ export const useDiagramStore = create<DiagramStore>()(
           views: savedViews,
           defaultPositions: savedDefaultPos,
           defaultViewport: savedDefaultVP,
+          ...(get().defaultLayoutConstraints.length ? { defaultLayoutConstraints: get().defaultLayoutConstraints as LayoutConstraint[] } : {}),
           snapshots: snapshots as DiagramSnapshot[],
           presentations: presentations as Presentation[],
           metamodel: metamodel as Metamodel,
@@ -4414,6 +4637,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.views = {} as any
           state.activeViewId = null
           state.defaultPositions = snapshotPositions(sample.nodes) as any
+          state.defaultLayoutConstraints = []
           state.selectedNodeId = null
           state.selectedEdgeId = null
           state.nodeWizard = null
@@ -4451,6 +4675,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.views = {} as any
           state.activeViewId = null
           state.defaultPositions = {} as any
+          state.defaultLayoutConstraints = []
           state.selectedNodeId = null
           state.selectedEdgeId = null
           state.nodeWizard = null
@@ -4530,6 +4755,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         const next = !get().autoFitActive
         set((state) => { state.autoFitActive = next })
+        saveStudioSettings({ ...loadStudioSettings(), smartFit: next })
         if (next) {
           _getFitViewFn()?.()  // start immediately (animated)
           const t = setInterval(() => {
@@ -4551,4 +4777,5 @@ if (typeof requestAnimationFrame !== 'undefined') {
   // cola's 110-iteration synchronous bulk phase doesn't immediately
   // overwrite the persisted positions.
   useDiagramStore.getState().startLiveLayout({ skipBulk: _initLoadedFromDisk })
+  if (_initLoadedFromDisk) suggestSmartLayoutIfUnarranged()
 }

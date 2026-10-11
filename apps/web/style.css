@@ -137,6 +137,11 @@
   padding-bottom: 56px;
   border-bottom: 1px solid var(--border);
 }
+/* A link to a section or heading lands below the sticky site nav (56px). */
+.doc-section,
+.doc-section [id] {
+  scroll-margin-top: 72px;
+}
 .doc-section:last-child {
   border-bottom: none;
 }
@@ -211,6 +216,28 @@
 }
 
 /* Tip callout */
+/* Metamodel reference: a term, then its explanation. */
+.mm-types { margin: 4px 0 18px; }
+.mm-types dt {
+  margin-top: 16px;
+  font-weight: 650;
+  color: var(--text);
+}
+.mm-types dd {
+  margin: 4px 0 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--border);
+  line-height: 1.65;
+}
+.mm-eg {
+  display: block;
+  margin-top: 4px;
+  font-size: .9em;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.mm-eg::before { content: "Example: "; font-style: normal; font-weight: 600; }
+
 .doc-tip {
   background: var(--accent-light);
   border: 1px solid var(--accent-border);
@@ -300,6 +327,11 @@
 }
 .doc-shot img {
   width: 100%;
+  height: auto;
+  /* Every screenshot is 1440×900. Reserving the box before a lazy image
+     loads keeps the page from growing under a jump to a section, which
+     left the jump short of its target. */
+  aspect-ratio: 1440 / 900;
   display: block;
   border-bottom: 1px solid var(--border);
 }

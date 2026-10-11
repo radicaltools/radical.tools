@@ -1,8 +1,15 @@
-// ─── Built-in DDD-extended C4 preset ───────────────────────────────────────
+// ─── DDD layer of the Radical metamodel ─────────────────────────────────────
 //
-// Extends the C4 metamodel with a single DDD-style strategic layer:
+// The base the Radical metamodel (governance.ts) builds on; no longer offered
+// on its own, and documents saved with its id load as Radical. Extends the C4
+// metamodel with a DDD layer:
 //   • Domain — problem space; may live at root and may be nested inside
 //     another domain to express subdomains / sub-subdomains arbitrarily deep.
+//   • Entity — a domain object (Reservation, Order, Payment); `kind` says
+//     whether it is an aggregate root. A part belongs to its aggregate root
+//     (`part-of`), aggregates refer to each other (`references`), the C4
+//     element that owns its data realises it, and a state machine models its
+//     lifecycle (governance).
 // The C4 `system` node may now also live inside a domain so it can model
 // the technical realisation of that (sub)domain (≈ a Bounded Context).
 
@@ -48,15 +55,75 @@ export function builtInDddC4Metamodel(): Metamodel {
     properties: domainProps,
   }
 
-  // "Realises" — a system implements a domain (Bounded Context mapping).
+  const entity: NodeTypeDef = {
+    id: 'entity',
+    label: 'Entity',
+    color: '#7e22ce',
+    fg: '#fff',
+    // A record card with a key
+    iconPath: 'M3 2.5A1.5 1.5 0 0 1 4.5 1h7A1.5 1.5 0 0 1 13 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 13.5v-11ZM4.5 2a.5.5 0 0 0-.5.5V5h8V2.5a.5.5 0 0 0-.5-.5h-7ZM12 6H4v1.5h8V6Zm0 2.5H4V10h8V8.5Zm0 2.5H4v2.5c0 .28.22.5.5.5h7a.5.5 0 0 0 .5-.5V11Z',
+    width: 170,
+    height: 56,
+    allowedParents: ['domain', 'group'],
+    allowedAtRoot: true,
+    builtin: true,
+    tableTab: true,
+    // The parts of an aggregate list under its root in Table and Wiki views.
+    hierarchyRelation: 'part-of',
+    properties: [
+      {
+        key: 'kind',
+        label: 'Kind',
+        type: 'enum',
+        options: ['aggregate-root', 'entity'],
+        default: 'aggregate-root',
+      },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  }
+
+  // "Realises" — a system implements a domain (Bounded Context mapping), and
+  // a C4 element owns (holds the data of) an entity.
   const realises: RelationTypeDef = {
     id: 'realises',
     label: 'Realises',
     allowedPairs: [
       { from: 'system',    to: 'domain' },
       { from: 'container', to: 'domain' },
+      ...(['system', 'container', 'component', 'webapp'] as const).map((from) => ({ from, to: 'entity' })),
     ],
     properties: [],
+    builtin: true,
+  }
+
+  // An entity that lives inside an aggregate → its root (an order line →
+  // the order). Aggregates never contain each other: they refer by id.
+  const partOf: RelationTypeDef = {
+    id: 'part-of',
+    label: 'Part of',
+    allowedPairs: [{ from: 'entity', to: 'entity' }],
+    properties: [],
+    color: '#7e22ce',
+    builtin: true,
+  }
+
+  // One entity referring to another, across aggregates (a reservation is for
+  // a customer).
+  const references: RelationTypeDef = {
+    id: 'references',
+    label: 'References',
+    allowedPairs: [{ from: 'entity', to: 'entity' }],
+    properties: [
+      {
+        key: 'cardinality',
+        label: 'Cardinality',
+        type: 'enum',
+        options: ['one', 'many'],
+        default: 'one',
+      },
+      { key: 'description', label: 'Description', type: 'text' },
+    ],
+    color: '#a855f7',
     builtin: true,
   }
 
@@ -110,10 +177,13 @@ export function builtInDddC4Metamodel(): Metamodel {
       ...base.nodeTypes,
       system: patchedSystem,
       domain,
+      entity,
     },
     relationTypes: {
       ...base.relationTypes,
       realises,
+      'part-of': partOf,
+      references,
       'depends-on': dependsOn,
       partnership,
     },

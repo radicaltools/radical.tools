@@ -5,13 +5,21 @@
 //   • types.ts    — the generic Metamodel/NodeTypeDef/RelationTypeDef shapes
 //   • lookup.ts   — allowed-parent / allowed-relation / cardinality helpers
 //   • validate.ts — validateModel + Issue
+//   • refs.ts     — reference properties (a value that points at nodes by id)
+//   • domainModel.ts — aggregate rules of the DDD domain model
+//   • statechart.ts — state machine rules and transition labels
 //   • ears.ts     — EARS sentence compose/parse for the Requirement node type
 //   • wizard.ts   — step / field / relation helpers behind the node wizard
+//   • categories.ts — palette / diagram grouping of node types (C4, Governance, …)
 //   • presets/    — the built-in C4, C4+DDD, and C4+DDD+Governance presets
 
 export * from './types'
 export * from './lookup'
 export * from './validate'
+export * from './refs'
+export * from './domainModel'
+export * from './statechart'
 export * from './ears'
 export * from './wizard'
+export * from './categories'
 export * from './presets'

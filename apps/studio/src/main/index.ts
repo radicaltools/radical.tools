@@ -5,6 +5,8 @@ import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'f
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { readEditorStateFile, writeSelectionFile } from '@radical/node-files/selectionFile'
+import { FORGE_RUN_FILE } from '@radical/common/formats/forgeRunStatus'
 
 /** One session per model folder, kept for the app's lifetime: it remembers
  *  what the renderer last read, so writes never clobber outside edits. */
@@ -106,6 +108,7 @@ app.whenReady().then(() => {
       defaultPath: 'diagram.c4.json',
       filters: [
         { name: 'C4 Diagram', extensions: ['c4.json'] },
+        { name: 'Radical model', extensions: ['radical'] },
         { name: 'JSON', extensions: ['json'] },
       ],
     })
@@ -120,7 +123,7 @@ app.whenReady().then(() => {
     const result = await dialog.showOpenDialog(win!, {
       title: 'Open Diagram',
       filters: [
-        { name: 'C4 Diagram', extensions: ['c4.json', 'json'] },
+        { name: 'Radical model', extensions: ['radical', 'c4.json', 'json'] },
       ],
       properties: ['openFile'],
     })
@@ -207,6 +210,27 @@ app.whenReady().then(() => {
       }
     },
   )
+
+  // The canvas selection, for AI clients (the MCP server) on the same folder.
+  // Outside the model files, so it never trips the folder session's checks.
+  ipcMain.handle('folder:write-selection', async (_event, folderPath: string, content: string) => {
+    try {
+      await writeSelectionFile(folderPath, content)
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
+
+  // Where an agent's Forge run on the same folder stands (the MCP server
+  // writes it), for Studio to show.
+  ipcMain.handle('folder:read-forge-run', async (_event, folderPath: string) => {
+    try {
+      return { success: true, content: await readEditorStateFile(folderPath, FORGE_RUN_FILE) }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
 
   // ── Folder watcher: poll the active md document's folder ─────────────────
   // Polling, like the --file watcher below: native change events are

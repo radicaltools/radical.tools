@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join, dirname } from 'node:path'
+import { basename, join, dirname, relative } from 'node:path'
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeToMdFolder, deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { writeSelectionFile } from '@radical/node-files/selectionFile'
+import { serializeSelection } from '@radical/common/formats/canvasSelection'
 import { FolderModel } from './folderModel'
 
 const folders: string[] = []
@@ -40,6 +43,10 @@ describe('folder-backed MCP model', () => {
       const tools = await client.listTools()
       expect(tools.tools.map((tool) => tool.name)).toContain('add_node')
       expect(tools.tools.map((tool) => tool.name)).not.toContain('reset_diagram')
+      expect(client.getInstructions()).toContain('get_model_summary')
+      const summary = JSON.stringify((await client.callTool({ name: 'get_model_summary', arguments: {} })).content)
+      expect(summary).toContain('ears_type')
+      expect(summary).toContain('allowedPairs')
       const result = await client.callTool({ name: 'add_node', arguments: { tempId: 'new-system', type: 'system', label: 'New System' } })
       expect(result.isError).not.toBe(true)
       const message = JSON.stringify(result.content)
@@ -67,10 +74,76 @@ describe('folder-backed MCP model', () => {
       expect(update.isError, JSON.stringify(update.content)).not.toBe(true)
       const updated = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
       expect(updated.nodes.find((node) => node.id === id)?.label).toBe('Renamed System')
+
+      const domain = await client.callTool({ name: 'add_node', arguments: { tempId: 'shop', type: 'domain', label: 'Shop' } })
+      expect(domain.isError, JSON.stringify(domain.content)).not.toBe(true)
+      const moved = await client.callTool({ name: 'move_node', arguments: { id: 'new-system', parentId: 'shop' } })
+      expect(moved.isError, JSON.stringify(moved.content)).not.toBe(true)
+      const view = await client.callTool({ name: 'create_view', arguments: { tempId: 'ctx', name: 'Context', nodeIds: ['actor', 'new-system'] } })
+      expect(view.isError, JSON.stringify(view.content)).not.toBe(true)
+      expect(JSON.stringify(view.content)).toContain('views.json')
+      const final = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      const domainId = final.nodes.find((node) => node.label === 'Shop')?.id
+      expect(final.nodes.find((node) => node.id === id)?.parentId).toBe(domainId)
+      expect(final.views).toEqual([expect.objectContaining({ name: 'Context', nodeIds: expect.arrayContaining([id]) })])
     } finally {
       await client.close()
     }
   })
+
+  it('places children inside their parent, keeps defaultPositions in step and runs Smart Layout', async () => {
+    const folder = await fixture()
+    const files = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+    // Studio writes defaultPositions; give the fixture an (empty) map like a saved model.
+    const layout = JSON.parse(files['_layout.json'] ?? '{}')
+    await writeFile(join(folder, '_layout.json'), JSON.stringify({ ...layout, defaultPositions: {} }))
+    const client = new Client({ name: 'radical-test', version: '1.0.0' })
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [join(import.meta.dirname, '../dist/index.js'), '--folder', folder],
+    })
+    const read = async () => deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    try {
+      await client.connect(transport)
+      for (const args of [
+        { tempId: 'shop', type: 'domain', label: 'Shop' },
+        { tempId: 'orders', type: 'system', label: 'Orders', parentId: 'shop' },
+        { tempId: 'billing', type: 'system', label: 'Billing', parentId: 'shop' },
+        { tempId: 'crm', type: 'system', label: 'CRM' },
+      ]) {
+        const added = await client.callTool({ name: 'add_node', arguments: args })
+        expect(added.isError, JSON.stringify(added.content)).not.toBe(true)
+      }
+      let data = await read()
+      const byLabel = (label: string) => data.nodes.find((node) => node.label === label)!
+      const [shop, orders, billing] = [byLabel('Shop'), byLabel('Orders'), byLabel('Billing')]
+      expect(orders).toMatchObject({ x: 30, y: 120 })
+      expect(billing.x).toBeGreaterThan(orders.x + orders.width)
+      // The parent grew to wrap both children.
+      expect(shop.width).toBeGreaterThanOrEqual(billing.x + billing.width + 30)
+      expect(shop.height).toBeGreaterThanOrEqual(orders.y + orders.height + 30)
+
+      const moved = await client.callTool({ name: 'move_node', arguments: { id: 'crm', parentId: 'shop' } })
+      expect(moved.isError, JSON.stringify(moved.content)).not.toBe(true)
+      data = await read()
+      const crm = byLabel('CRM')
+      expect(crm.parentId).toBe(shop.id)
+      expect(data.defaultPositions?.[crm.id]).toEqual({ x: crm.x, y: crm.y, width: crm.width, height: crm.height })
+
+      const user = await client.callTool({ name: 'add_node', arguments: { tempId: 'user', type: 'person', label: 'Buyer' } })
+      expect(user.isError).not.toBe(true)
+      await client.callTool({ name: 'add_relation', arguments: { sourceId: 'user', targetId: 'orders', relationType: 'interacts' } })
+      const laidOut = await client.callTool({ name: 'smart_layout', arguments: {} })
+      expect(laidOut.isError, JSON.stringify(laidOut.content)).not.toBe(true)
+      expect(JSON.stringify(laidOut.content)).toMatch(/Smart Layout/)
+      data = await read()
+      for (const node of data.nodes) {
+        expect(data.defaultPositions?.[node.id]).toEqual({ x: node.x, y: node.y, width: node.width, height: node.height })
+      }
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
 
   it('rejects a changed folder before writing', async () => {
     const folder = await fixture()
@@ -93,5 +166,273 @@ describe('folder-backed MCP model', () => {
     await rm(join(folder, 'nodes'), { recursive: true })
     await symlink(outside, join(folder, 'nodes'))
     await expect(FolderModel.open(folder)).rejects.toThrow('symlink in model path')
+  })
+})
+
+describe('canvas selection', () => {
+  it('returns what Studio selected, resolved against the model, and is not a model change', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    expect((await model.call('get_selection', {})).text).toMatch(/^No selection/)
+
+    const screen = await model.call('add_node', { tempId: 'screen', type: 'mockup', label: 'Checkout screen' })
+    const page = await model.call('add_node', { tempId: 'pay', type: 'requirement', label: 'Pay by card' })
+    expect([screen.text, page.text]).toEqual([expect.stringMatching(/^Created node/), expect.stringMatching(/^Created node/)])
+    const [mockupId, requirementId] = [screen, page].map((outcome) => /Created node ([^ .]+)\./.exec(outcome.text)![1])
+    for (const [tool, args] of [
+      ['add_relation', { sourceId: mockupId, targetId: requirementId, relationType: 'illustrates' }],
+      ['create_view', { tempId: 'screens', name: 'Screens', nodeIds: [mockupId] }],
+    ] as const) expect((await model.call(tool, args)).text).not.toMatch(/required|unknown|invalid|not allowed/i)
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const view = data.views!.find((v) => v.name === 'Screens')!
+    const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+
+    await writeSelectionFile(folder, serializeSelection({ viewId: view.id, nodeIds: [mockupId, 'gone'], relationIds: [] }))
+    expect(await readFile(join(folder, '.radical/.gitignore'), 'utf8')).toBe('*\n')
+    const outcome = await model.call('get_selection', {})
+    expect(outcome.ok).toBe(true)
+    const result = JSON.parse(outcome.text)
+    expect(result.view).toEqual({ id: view.id, name: 'Screens', kind: 'static' })
+    expect(result.nodes).toHaveLength(1)
+    expect(result.nodes[0].node).toMatchObject({ id: mockupId, type: 'mockup', label: 'Checkout screen' })
+    expect(result.nodes[0].outgoing[0]).toMatchObject({ targetId: requirementId })
+    expect(result.missing).toEqual(['gone'])
+
+    await writeSelectionFile(folder, serializeSelection({ viewId: null, nodeIds: [], relationIds: [] }))
+    expect((await model.call('get_selection', {})).text).toMatch(/^Nothing is selected in Studio/)
+    // The selection file sits outside the model: the folder's model files are untouched.
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
+  })
+})
+
+describe('milestones', () => {
+  it('saves a milestone into the folder, lists it in the summary and compares without writing', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    expect(model.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(['list_milestones', 'create_milestone', 'compare_milestones']))
+    await model.call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    const saved = await model.call('create_milestone', { name: 'As-is' })
+    expect(saved.text).toMatch(/^Saved milestone "As-is"/)
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(data.snapshots).toEqual([expect.objectContaining({ name: 'As-is', nodes: { [data.nodes[0].id]: expect.objectContaining({ label: 'Shop' }) } })])
+    expect(JSON.parse((await model.call('get_model_summary', {})).text.split('\n\n')[0]).milestones).toEqual([{ id: data.snapshots![0].id, name: 'As-is' }])
+
+    await model.call('add_node', { tempId: 'pay', type: 'system', label: 'Payments' })
+    const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+    const compared = await model.call('compare_milestones', { from: data.snapshots![0].id })
+    expect(compared.text).toContain('Elements added:\n- Payments (system, ')
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
+  })
+})
+
+describe('starting a model', () => {
+  async function tempDir(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'radical-new-'))
+    folders.push(dir)
+    return dir
+  }
+  const summaryOf = async (model: FolderModel) => JSON.parse((await model.call('get_model_summary', {})).text.split('\n')[0])
+
+  it('turns an empty folder into a Governance model, as Studio would write it', async () => {
+    const dir = await tempDir()
+    await mkdir(join(dir, '.git'))
+    const model = await FolderModel.open(dir)
+    const manifest = await readFile(join(dir, 'radical.md'), 'utf8')
+    expect(manifest).toMatch(/radicalFormat: "md-folder"/)
+    expect(manifest).toContain(`name: "${basename(dir)}"`)
+    const summary = await summaryOf(model)
+    expect(summary.metamodel.id).toBe('c4-ddd-governance-builtin')
+    expect(summary.nodeTypes).toContain('need')
+  })
+
+  it('creates a missing folder, relative to the working directory, with the chosen metamodel', async () => {
+    const dir = join(await tempDir(), 'docs', 'architecture')
+    const model = await FolderModel.open(relative(process.cwd(), dir), { metamodel: 'c4' })
+    expect((await summaryOf(model)).metamodel.id).toBe('c4-builtin')
+    expect(await readFile(join(dir, 'radical.md'), 'utf8')).toContain('name: "architecture"')
+  })
+
+  it('leaves a folder with other files alone and says how to start one', async () => {
+    const dir = await tempDir()
+    await writeFile(join(dir, 'README.md'), '# Not a model\n')
+    await expect(FolderModel.open(dir)).rejects.toThrow(/empty or new folder/)
+    expect(await readdir(dir)).toEqual(['README.md'])
+  })
+
+  it('starts over when the folder is emptied or deleted while the server runs', async () => {
+    const dir = await tempDir()
+    const model = await FolderModel.open(dir, { metamodel: 'c4' })
+    expect((await model.call('add_node', { tempId: 'a', type: 'system', label: 'A' })).ok).toBe(true)
+    for (const name of await readdir(dir)) await rm(join(dir, name), { recursive: true })
+    await mkdir(join(dir, '.radical'))
+    expect(await summaryOf(model)).toMatchObject({ metamodel: { id: 'c4-builtin' }, nodes: 0 })
+    await rm(dir, { recursive: true })
+    expect((await model.call('add_node', { tempId: 'b', type: 'system', label: 'B' })).ok).toBe(true)
+    expect(await readFile(join(dir, 'radical.md'), 'utf8')).toMatch(/radicalFormat: "md-folder"/)
+  })
+
+  it('keeps an existing model and its metamodel', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder, { metamodel: 'c4' })
+    expect((await summaryOf(model)).metamodel.id).toBe('c4-ddd-governance-builtin')
+  })
+})
+
+describe('long Smart Layout runs', () => {
+  async function modelWithNodes(): Promise<{ folder: string; model: FolderModel }> {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    for (const args of [
+      { tempId: 'a', type: 'system', label: 'A' },
+      { tempId: 'b', type: 'system', label: 'B' },
+      { tempId: 'u', type: 'person', label: 'User' },
+    ]) expect((await model.call('add_node', args)).ok).toBe(true)
+    expect((await model.call('add_relation', { sourceId: 'u', targetId: 'a', relationType: 'interacts' })).ok).toBe(true)
+    return { folder, model }
+  }
+
+  it('reports each step to a client that asked for progress', async () => {
+    const { model } = await modelWithNodes()
+    const steps: { progress: number; message: string }[] = []
+    const outcome = await model.call('smart_layout', {}, { onProgress: (p) => steps.push(p) })
+    expect(outcome.ok, outcome.text).toBe(true)
+    expect(steps.map((s) => s.message)).toContain('Smart Layout: candidates 1/10')
+    expect(steps.map((s) => s.progress)).toEqual(steps.map((_, i) => i + 1))
+  }, 60_000)
+
+  it('stops at the next step once the client cancels, and writes nothing', async () => {
+    const { folder, model } = await modelWithNodes()
+    const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+    const cancel = new AbortController()
+    const outcome = await model.call('smart_layout', {}, { signal: cancel.signal, onProgress: () => cancel.abort() })
+    expect(outcome).toMatchObject({ ok: false, text: expect.stringMatching(/cancelled/) })
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
+  }, 60_000)
+
+  it('unpins the canvas it arranges', async () => {
+    // Elements on top of each other, two of them pinned in Studio.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = ['a', 'b', 'c'].map((id, i) => ({ id, type: 'system', label: id.toUpperCase(), x: i * 10, y: i * 10, width: 240, height: 160, collapsed: false }))
+    data.defaultLayoutConstraints = [{ id: 'p', type: 'pin', nodeIds: ['a', 'b'] }]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const outcome = await model.call('smart_layout', {})
+    expect(outcome.text).toContain('Unpinned 2 elements.')
+    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(after.defaultLayoutConstraints ?? []).toEqual([])
+  }, 60_000)
+
+  it('exits when the client closes its end', async () => {
+    const folder = await fixture()
+    const server = spawn(process.execPath, [join(import.meta.dirname, '../dist/index.js'), '--folder', folder], { stdio: ['pipe', 'ignore', 'ignore'] })
+    const exited = new Promise<number | null>((done) => server.once('exit', done))
+    server.stdin.end()
+    expect(await exited).toBe(0)
+  }, 15_000)
+})
+
+describe('state machines over MCP', () => {
+  it('are offered, explained, built with event references, checked and laid out', async () => {
+    const folder = await fixture()
+    const client = new Client({ name: 'radical-test', version: '1.0.0' })
+    await client.connect(new StdioClientTransport({
+      command: process.execPath,
+      args: [join(import.meta.dirname, '../dist/index.js'), '--folder', folder],
+    }))
+    const text = (result: Awaited<ReturnType<typeof client.callTool>>): string =>
+      (result.content as { text: string }[]).map((c) => c.text).join('\n')
+    const call = async (name: string, args: Record<string, unknown>): Promise<string> => {
+      const result = await client.callTool({ name, arguments: args })
+      expect(result.isError, `${name}: ${text(result)}`).not.toBe(true)
+      return text(result)
+    }
+    try {
+      // The schemas offer the types; the instructions and summary say how to use them.
+      const tools = (await client.listTools()).tools
+      const schema = (name: string) => tools.find((t) => t.name === name)!.inputSchema as { properties: Record<string, { enum?: string[] }> }
+      expect(schema('add_node').properties.type.enum).toEqual(expect.arrayContaining(['state-machine', 'state', 'pseudostate', 'event']))
+      expect(schema('add_relation').properties.relationType.enum).toEqual(expect.arrayContaining(['transition', 'emits', 'lifecycle-of']))
+      expect(tools.find((t) => t.name === 'get_issues')?.annotations?.readOnlyHint).toBe(true)
+      expect(client.getInstructions()).toContain('State machines')
+      const summary = await call('get_model_summary', {})
+      expect(summary).toContain('Modelling rules:')
+      expect(summary).toContain('A `state-machine` models the lifecycle of one entity')
+      expect(summary).toContain('"refType":"event"')
+
+      await call('add_node', { tempId: 'order', type: 'entity', label: 'Order', properties: { kind: 'aggregate-root' } })
+      await call('add_node', { tempId: 'm', type: 'state-machine', label: 'Order lifecycle' })
+      expect(await call('add_relation', { sourceId: 'm', targetId: 'order', relationType: 'lifecycle-of' })).not.toContain('New warnings')
+      for (const [tempId, label] of [['pay', 'PaymentReceived'], ['ship', 'Shipped'], ['paid', 'OrderPaid']]) {
+        await call('add_node', { tempId, type: 'event', label, parentId: 'm' })
+      }
+      // A compound state without its initial pseudostate: written, but warned.
+      await call('add_node', { tempId: 'pending', type: 'state', label: 'Pending', parentId: 'm' })
+      const warned = await call('add_node', { tempId: 'awaiting', type: 'state', label: 'Awaiting card', parentId: 'pending' })
+      expect(warned).toContain('New warnings')
+      expect(warned).toContain('Compound state "Pending" has child states but no initial pseudostate')
+
+      await call('add_node', { tempId: 'pi', type: 'pseudostate', label: 'Start', parentId: 'pending', properties: { kind: 'initial' } })
+      await call('add_node', { tempId: 'i', type: 'pseudostate', label: 'Start', parentId: 'm', properties: { kind: 'initial' } })
+      await call('add_node', { tempId: 'fulfil', type: 'state', label: 'Fulfilment', parentId: 'm', properties: { kind: 'parallel' } })
+      for (const [region, inner] of [['packing', 'Picking'], ['invoicing', 'Drafting']]) {
+        await call('add_node', { tempId: region, type: 'state', label: region, parentId: 'fulfil' })
+        await call('add_node', { tempId: `${region}-start`, type: 'pseudostate', label: 'Start', parentId: region, properties: { kind: 'initial' } })
+        await call('add_node', { tempId: `${region}-inner`, type: 'state', label: inner, parentId: region })
+        await call('add_relation', { sourceId: `${region}-start`, targetId: `${region}-inner`, relationType: 'transition' })
+      }
+      await call('add_node', { tempId: 'done', type: 'state', label: 'Shipped', parentId: 'm', properties: { kind: 'final' } })
+      await call('add_relation', { sourceId: 'i', targetId: 'pending', relationType: 'transition' })
+      await call('add_relation', { sourceId: 'pi', targetId: 'awaiting', relationType: 'transition' })
+      await call('add_relation', { sourceId: 'pending', targetId: 'fulfil', relationType: 'transition', properties: { event: 'pay', guard: 'amount ok', raises: ['paid'] } })
+      // A trigger that is not an event is refused, not stored.
+      const wrong = await call('add_relation', { sourceId: 'fulfil', targetId: 'done', relationType: 'transition', properties: { event: 'pending' } })
+      expect(wrong).toContain('"Pending" is of type state, not event')
+
+      const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      const id = (label: string, type: string) => saved.nodes.find((n) => n.label === label && n.type === type)!.id
+      const pay = saved.relations.find((r) => (r as unknown as Record<string, unknown>).guard === 'amount ok') as unknown as Record<string, unknown>
+      expect(pay.event).toBe(id('PaymentReceived', 'event'))
+      expect(pay.raises).toEqual([id('OrderPaid', 'event')])
+      const toDone = saved.relations.find((r) => r.targetId === id('Shipped', 'state'))!
+      await call('update_relation', { id: toDone.id, properties: { event: 'ship' } })
+      expect(await call('search_model', { query: `LIST RELATIONS WHERE raises = "${id('OrderPaid', 'event')}"` })).toContain('amount ok')
+
+      // A component implements the machine; a requirement holds while in a state.
+      await call('add_node', { tempId: 'sys', type: 'system', label: 'Shop' })
+      await call('add_node', { tempId: 'ctr', type: 'container', label: 'Orders', parentId: 'sys' })
+      await call('add_relation', { sourceId: 'ctr', targetId: 'm', relationType: 'implements' })
+      await call('add_relation', { sourceId: 'ctr', targetId: 'order', relationType: 'realises' })
+      await call('add_node', { tempId: 'hold', type: 'requirement', label: 'Hold stock', properties: { ears_type: 'state-driven', action: 'hold the stock', precondition_state: 'pending' } })
+      const req = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data.nodes.find((n) => n.label === 'Hold stock') as unknown as Record<string, unknown>
+      expect(req.precondition_state).toBe(id('Pending', 'state'))
+
+      expect(await call('get_issues', {})).toBe('No issues: the model follows its metamodel.')
+
+      // Smart Layout keeps every state inside its parent, four levels deep.
+      await call('smart_layout', {})
+      const laid = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      const nodes = Object.fromEntries(laid.nodes.map((n) => [n.id, n]))
+      for (const n of laid.nodes) {
+        const parent = n.parentId ? nodes[n.parentId] : undefined
+        if (!parent) continue
+        expect(n.x, n.label).toBeGreaterThanOrEqual(0)
+        expect(n.y, n.label).toBeGreaterThanOrEqual(0)
+        expect(n.x + n.width, n.label).toBeLessThanOrEqual(parent.width + 1e-6)
+        expect(n.y + n.height, n.label).toBeLessThanOrEqual(parent.height + 1e-6)
+      }
+      // Machines and compound states are folders, like systems and containers.
+      const paths = Object.keys(await new MdFolderSession(diskFolderStorage(folder)).readAll())
+      expect(paths).toEqual(expect.arrayContaining([
+        'nodes/order-lifecycle/_index.md',
+        'nodes/order-lifecycle/fulfilment/_index.md',
+        'nodes/order-lifecycle/fulfilment/packing/picking/_index.md',
+      ]))
+    } finally {
+      await client.close()
+    }
   })
 })

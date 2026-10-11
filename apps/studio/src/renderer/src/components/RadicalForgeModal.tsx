@@ -2,25 +2,41 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { runAIPrompt, type ForgeProgressEvent } from '../ai/runner'
-import { loadAISettings } from '../ai/settings'
+import { activeProviderNeedsKey, loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
-import { FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, buildForgeStagePrompt, buildPriorStagesBlock, type ForgeStageId } from '../ai/forgePrompts'
+import {
+  FORGE_ARRANGEMENTS,
+  FORGE_STAGES,
+  FORGE_STAGE_VIEW,
+  HUB_MATCHES_QUESTION_ID,
+  PRIMARY_TYPE_IDS_FOR_STAGE,
+  arrangeForgeGroup,
+  buildForgeStagePrompt,
+  buildPriorStagesBlock,
+  fileIntoForgeViews,
+  findForgeView,
+  forgeArrangeGroups,
+  forgeHubCandidates,
+  formatClarificationAnswers,
+  needLabelFromDescription,
+  type ClarifyStageQuestion,
+  type ForgeArrangeGroup,
+  type ForgeArrangement,
+  type ForgeNeedRef,
+  type ForgeStageId,
+} from '@radical/common/ai/forge'
 import { buildGherkinFiles } from '@radical/common/formats/exportGherkin'
 import { downloadGherkinFiles } from '../export/downloadGherkinFiles'
 import { AIReportLine } from './AIReportLine'
-import { useHubStore, type HubCategory, type HubConceptSummary } from '@radical/ui/store/hubStore'
-import { findRelevantConcepts } from '../hub/matchConcepts'
+import { useHubStore, type HubConceptSummary } from '@radical/ui/store/hubStore'
 import { importHubConceptIntoDiagram } from '../hub/importConcept'
-import {
-  askClarifyingQuestions,
-  formatClarificationAnswers,
-  HUB_MATCHES_QUESTION_ID,
-  type ClarifyStageQuestion,
-} from '../ai/forgeClarify'
+import { askClarifyingQuestions } from '../ai/forgeClarify'
 import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 import { generateWireframe } from '../ai/mockupWireframe'
+import { addedSince, currentModelIds, removeAdded, type ModelIds } from '../ai/forgeStageOutput'
 
 type ClarifyStatus = 'asking' | 'form' | 'done'
 
@@ -36,6 +52,18 @@ interface WireframeRun {
   running: boolean
 }
 type ClarifyAnswers = Record<string, string | string[]>
+
+/** After a stage: its new elements per view, and what the user did with
+ *  them — kept in a row, column or grid, and/or laid out. */
+interface StageArrange {
+  groups: ForgeArrangeGroup[]
+  arranged?: ForgeArrangement
+  laidOut?: boolean
+  message?: string
+  failed?: boolean
+}
+
+const ARRANGEMENT_LABELS: Record<ForgeArrangement, string> = { row: 'Row', column: 'Column', grid: 'Grid' }
 
 interface ProgressEntry {
   id: number
@@ -58,23 +86,6 @@ function formatTokenCount(n: number): string {
 const PROGRESS_ENTRY_LIMIT = 40
 const PROGRESS_VISIBLE_COUNT = 7
 
-/** Hub categories worth surfacing as prior art for each stage — the C4 stage
- *  is where decomposition/coupling guidance (patterns, ADRs) matters most.
- *  `scenarios` has no matching Hub category (no Gherkin content there). */
-const HUB_CATEGORIES_FOR_STAGE: Partial<Record<ForgeStageId, HubCategory[]>> = {
-  requirements: ['requirement'],
-  c4: ['pattern', 'adr'],
-  fitness: ['fitness-function'],
-}
-
-/** Requirements tagged this way are generic, domain-agnostic engineering
- *  tenets (idempotency, least privilege, resource isolation, ...) rather
- *  than product-specific behaviour — a "principle" is modeled as a kind of
- *  requirement (a tag), not a new concept type. The C4 stage treats them as
- *  decomposition guidance alongside patterns/ADRs. */
-const PRINCIPLE_TAG = 'principle'
-const PRINCIPLE_MATCH_LIMIT = 2
-
 interface Props {
   open: boolean
   onClose: () => void
@@ -83,12 +94,14 @@ interface Props {
 type WizardStep = 'input' | ForgeStageId | 'export'
 
 const STEP_ORDER: WizardStep[] = ['input', ...FORGE_STAGES.map((s) => s.id), 'export']
-const STEP_LABELS: Record<WizardStep, string> = {
+export const STEP_LABELS: Record<WizardStep, string> = {
   input: 'Description',
   requirements: 'Requirements',
-  c4: 'C4 model',
-  fitness: 'Fitness fns',
+  domain: 'Domain',
+  c4: 'C4',
+  fitness: 'Fitness',
   scenarios: 'Scenarios',
+  states: 'States',
   mockups: 'Mockups',
   export: 'Finish',
 }
@@ -127,9 +140,16 @@ function pickTextFile(): Promise<string | null> {
   })
 }
 
+const NO_NODES: Record<string, C4Node> = {}
+const NO_RELATIONS: Record<string, C4Relation> = {}
+
 export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement | null {
   const [step, setStep] = useState<WizardStep>('input')
   const [description, setDescription] = useState('')
+  /** The `need` node the description lives in — picked on the Description
+   *  step, or created from the typed text when the run starts (ensureNeed).
+   *  null = a new need will be created. */
+  const [needId, setNeedId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stageReports, setStageReports] = useState<Partial<Record<ForgeStageId, ApplyReport>>>({})
@@ -145,6 +165,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
    *  undefined until the first stage with usage data completes. */
   const [sessionUsage, setSessionUsage] = useState<TokenUsage | undefined>(undefined)
   const [wireframeRun, setWireframeRun] = useState<WireframeRun | null>(null)
+  const [arrangeByStage, setArrangeByStage] = useState<Partial<Record<ForgeStageId, StageArrange>>>({})
+  /** The Hub concepts the model picked from each stage's candidates. */
+  const [hubPicksByStage, setHubPicksByStage] = useState<Partial<Record<ForgeStageId, HubConceptSummary[]>>>({})
+  const [layingOut, setLayingOut] = useState(false)
   /** Furthest step reached by normal forward navigation — stepper tabs past
    *  it stay disabled. An early finish jumps to the last step without
    *  raising this, so stages the user never reached can't be opened from
@@ -160,6 +184,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   // — a ref, not state, so starting a fetch doesn't itself change an effect
   // dependency (see the effect for why that would matter).
   const clarifyStartedRef = useRef<Set<ForgeStageId>>(new Set())
+  // What each stage's last run added, so Regenerate can take it out first.
+  const stageAddedRef = useRef<Partial<Record<ForgeStageId, ModelIds>>>({})
   const diagram = useDiagramFacade()
 
   const currentStageId: ForgeStageId | null = FORGE_STAGES.some((s) => s.id === step) ? (step as ForgeStageId) : null
@@ -168,12 +194,16 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const fetchHubConcepts = useHubStore((s) => s.fetchConcepts)
   const loadHubConcept = useHubStore((s) => s.loadConcept)
   const activeMetamodelId = useDiagramStore((s) => s.metamodel?.id)
+  // Metamodels without the governance `need` type (plain C4, custom ones)
+  // run Forge as before, without storing the description in the model.
+  const hasNeedType = useDiagramStore((s) => !!s.metamodel?.nodeTypes.need)
 
   // Reset to a clean run every time the wizard is (re)opened.
   useEffect(() => {
     if (!open) return
     setStep('input')
     setDescription('')
+    setNeedId(null)
     setBusy(false)
     setError(null)
     setStageReports({})
@@ -186,9 +216,12 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setProgressByStage({})
     setSessionUsage(undefined)
     setWireframeRun(null)
+    setArrangeByStage({})
+    setHubPicksByStage({})
     setReachedIndex(0)
     setFinishedAt(null)
     clarifyStartedRef.current = new Set()
+    stageAddedRef.current = {}
   }, [open])
 
   useEffect(() => {
@@ -214,9 +247,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     return () => window.removeEventListener('keydown', onKey)
   }, [open, busy, onClose])
 
-  const providerCfg = aiSettings.providers[aiSettings.active]
   const providerLabel = getAdapter(aiSettings.active).label
-  const needsKey = aiSettings.active !== 'ollama' && !providerCfg.apiKey
+  const needsKey = activeProviderNeedsKey(aiSettings)
   const unavailableReason = !aiSettings.enabled
     ? 'AI features are disabled.'
     : needsKey
@@ -232,21 +264,16 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (text) setDescription(text)
   }, [])
 
-  const hubMatchesByStage = useMemo(() => {
-    const out: Partial<Record<ForgeStageId, HubConceptSummary[]>> = {}
-    if (!description.trim()) return out
-    for (const stage of FORGE_STAGES) {
-      const categories = HUB_CATEGORIES_FOR_STAGE[stage.id]
-      if (categories) out[stage.id] = findRelevantConcepts(hubConcepts, categories, description, activeMetamodelId)
-    }
-    // Decomposition guidance for the C4 stage also draws on "principle"-tagged
-    // requirements (see PRINCIPLE_TAG above) — searched separately so they
-    // don't get crowded out by the (much larger) pattern/adr pool.
-    const principleReqs = hubConcepts.filter((c) => c.category === 'requirement' && c.tags.includes(PRINCIPLE_TAG))
-    const principleMatches = findRelevantConcepts(principleReqs, 'requirement', description, activeMetamodelId, PRINCIPLE_MATCH_LIMIT)
-    if (principleMatches.length) out.c4 = [...(out.c4 ?? []), ...principleMatches]
-    return out
-  }, [hubConcepts, description, activeMetamodelId])
+  // Per stage: the keyword-ranked candidates the clarify call lets the model
+  // pick from, and the few suggested until it has (or when there is no AI).
+  const hubByStage = useMemo(
+    () => forgeHubCandidates(hubConcepts, description, activeMetamodelId).stages,
+    [hubConcepts, description, activeMetamodelId],
+  )
+  const hubMatchesByStage = useMemo(
+    () => Object.fromEntries(FORGE_STAGES.map((s) => [s.id, hubPicksByStage[s.id] ?? hubByStage[s.id]?.suggested])) as Partial<Record<ForgeStageId, HubConceptSummary[]>>,
+    [hubByStage, hubPicksByStage],
+  )
 
   // Fires once per stage, the moment it becomes current: asks the model
   // whether it needs clarifying questions before generating. Skips the call
@@ -260,7 +287,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   // re-run's own guard bailed out (status was already non-empty) — the
   // response would arrive, see `cancelled`, and silently no-op, leaving the
   // stage stuck on "Checking for clarifying questions…" forever. Reading
-  // stageReports/unavailableReason/description/hubMatchesByStage/aiSettings
+  // stageReports/unavailableReason/description/hubByStage/aiSettings
   // without listing them is deliberate for the same reason — this is a
   // fire-once-per-stage-entry effect, not a sync-on-every-change one.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -283,8 +310,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       .map((s) => formatClarificationAnswers(clarifyQuestionsByStage[s.id], clarifyAnswersByStage[s.id]))
       .filter(Boolean)
       .join('\n\n')
-    askClarifyingQuestions(stage.title, description, hubMatchesByStage[currentStageId], aiSettings, undefined, priorQA)
-      .then(({ questions, usage }) => {
+    askClarifyingQuestions(stage.title, description, hubByStage[currentStageId]?.candidates, aiSettings, undefined, priorQA)
+      .then(({ questions, picked, usage }) => {
+        // An unreadable reply keeps the keyword suggestions.
+        if (picked) setHubPicksByStage((p) => ({ ...p, [currentStageId]: picked }))
         setClarifyQuestionsByStage((q) => ({ ...q, [currentStageId]: questions }))
         // multiSelect questions (in practice, just hub_matches) default to
         // "everything selected" — unless the user deselects something,
@@ -343,6 +372,16 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (busy || unavailableReason) return
     setBusy(true)
     setError(null)
+    // Regenerate replaces the previous attempt instead of adding a second copy.
+    const previous = stageAddedRef.current[stageId]
+    if (previous) removeAdded(previous)
+    setArrangeByStage((a) => ({ ...a, [stageId]: undefined }))
+    // The stage builds on its view, so its elements land there as they come.
+    // A view it is the first to fill does not exist yet (an empty view shows
+    // the whole model): it is made from them afterwards, on All elements.
+    const stageView = findForgeView(useDiagramStore.getState().views, FORGE_STAGE_VIEW[stageId])
+    useDiagramStore.getState().setActiveView(stageView?.id ?? null)
+    const before = currentModelIds()
     setProgressByStage((p) => ({ ...p, [stageId]: { round: 0, entries: [] } }))
     const ctl = new AbortController()
     abortRef.current = ctl
@@ -375,9 +414,15 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       const priorStageSummaries = buildPriorStagesBlock(
         FORGE_STAGES.slice(0, stageIdx).map((s) => ({ title: s.title, summary: stageSummaries[s.id] ?? '' })),
       )
-      const prompt = buildForgeStagePrompt(stageId, description, effectiveMatches, clarifications, priorStageSummaries)
+      const needNode = needId ? useDiagramStore.getState().c4Nodes[needId] : undefined
+      const needRef: ForgeNeedRef | undefined = needNode ? { id: needNode.id, label: needNode.label } : undefined
+      const prompt = buildForgeStagePrompt(stageId, description, effectiveMatches, clarifications, priorStageSummaries, needRef)
       const relevantTypeIds = new Set(PRIMARY_TYPE_IDS_FOR_STAGE[stageId])
-      const result = await runAIPrompt({ prompt, settings: aiSettings, diagram, signal: ctl.signal, onProgress, relevantTypeIds })
+      const result = await runAIPrompt({
+        prompt, settings: aiSettings, diagram, signal: ctl.signal, onProgress, relevantTypeIds,
+        // Forge builds the model; editing types or slides is out of scope and costs schema tokens every stage.
+        excludeToolGroups: ['metamodel', 'presentation', 'milestone'],
+      })
       setStageReports((r) => ({ ...r, [stageId]: result.report }))
       setStageSummaries((s) => ({ ...s, [stageId]: result.summary || 'Done.' }))
       if (result.usage) {
@@ -387,10 +432,55 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     } catch (err) {
       setError((err as Error).message || String(err))
     } finally {
+      const added = addedSince(before)
+      stageAddedRef.current[stageId] = added
+      // Each element into its view (Conceptual, Logical & physical, Governance),
+      // and the stage's view on screen.
+      fileIntoForgeViews(diagram, added.nodes, stageId)
+      const target = findForgeView(useDiagramStore.getState().views, FORGE_STAGE_VIEW[stageId])
+      if (target) useDiagramStore.getState().setActiveView(target.id)
+      setArrangeByStage((a) => ({ ...a, [stageId]: { groups: forgeArrangeGroups(diagram, added.nodes, stageId) } }))
       abortRef.current = null
       setBusy(false)
     }
-  }, [busy, unavailableReason, description, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries])
+  }, [busy, unavailableReason, description, needId, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries])
+
+  /** Keeps the stage's new elements in a row, column or grid on their view. */
+  const arrangeStage = useCallback((stageId: ForgeStageId, arrangement: ForgeArrangement) => {
+    const current = arrangeByStage[stageId]
+    if (!current || busy || layingOut) return
+    const results = current.groups
+      .filter((g) => g.nodeIds.length >= 2)
+      .map((g) => arrangeForgeGroup(diagram, g, arrangement))
+    const failed = results.some((r) => !r.ok)
+    setArrangeByStage((a) => ({
+      ...a,
+      [stageId]: { ...current, arranged: failed ? current.arranged : arrangement, message: results.map((r) => r.text).join(' '), failed },
+    }))
+  }, [arrangeByStage, busy, layingOut, diagram])
+
+  /** Smart Layout on every view the stage added to, its own view last so it
+   *  stays on screen. */
+  const layoutStage = useCallback(async (stageId: ForgeStageId) => {
+    const current = arrangeByStage[stageId]
+    if (!current || busy || layingOut || !diagram.runLayout) return
+    const own = findForgeView(useDiagramStore.getState().views, FORGE_STAGE_VIEW[stageId])?.id
+    const viewIds = [...new Set(current.groups.map((g) => g.viewId))].sort((a, b) => Number(a === own) - Number(b === own))
+    setLayingOut(true)
+    try {
+      const texts: string[] = []
+      for (const viewId of viewIds) {
+        const outcome = await diagram.runLayout(viewId)
+        texts.push(outcome.text)
+        if (!outcome.ok) throw new Error(outcome.text)
+      }
+      setArrangeByStage((a) => ({ ...a, [stageId]: { ...current, laidOut: true, message: texts.join(' '), failed: false } }))
+    } catch (err) {
+      setArrangeByStage((a) => ({ ...a, [stageId]: { ...current, message: (err as Error).message || String(err), failed: true } }))
+    } finally {
+      setLayingOut(false)
+    }
+  }, [arrangeByStage, busy, layingOut, diagram])
 
   const cancelStage = useCallback(() => { abortRef.current?.abort() }, [])
 
@@ -463,6 +553,48 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setReachedIndex((r) => Math.max(r, stepIndex + 1))
     setFinishedAt(null)
   }, [stepIndex])
+  /** Stores the description as a `need` node before the first stage runs:
+   *  a picked need gets the (possibly edited) text written back, otherwise a
+   *  new need is created — and remembered, so going Back and starting again
+   *  updates it instead of adding a duplicate. */
+  const ensureNeed = useCallback(() => {
+    if (!hasNeedType) return
+    const { c4Nodes, addNode, updateNode, setActiveView } = useDiagramStore.getState()
+    const text = description.trim()
+    const existing = needId ? c4Nodes[needId] : undefined
+    // The run's views start with the need, on Conceptual.
+    const showNeed = (id: string): void => {
+      const [filed] = fileIntoForgeViews(diagram, [id])
+      if (filed) useDiagramStore.getState().setActiveView(filed.viewId)
+    }
+    if (existing) {
+      if ((existing.description ?? '').trim() !== text) updateNode(existing.id, { description: text })
+      showNeed(existing.id)
+      return
+    }
+    // A new node joins the view on screen: make that Conceptual, or none yet.
+    setActiveView(findForgeView(useDiagramStore.getState().views, 'conceptual')?.id ?? null)
+    const def = useDiagramStore.getState().metamodel?.nodeTypes.need
+    const id = addNode({
+      type: 'need',
+      label: needLabelFromDescription(text),
+      description: text,
+      kind: 'brief',
+      source: 'Radical Forge',
+      collapsed: false,
+      x: 80,
+      y: -200,
+      width: def?.width ?? 200,
+      height: def?.height ?? 80,
+    } as Parameters<typeof addNode>[0])
+    if (!id) return
+    setNeedId(id)
+    showNeed(id)
+  }, [hasNeedType, description, needId, diagram])
+  const startRun = useCallback(() => {
+    ensureNeed()
+    goNext()
+  }, [ensureNeed, goNext])
   const goBack = useCallback(() => {
     // Back from an early finish resumes the run where it was stopped.
     if (step === 'export' && finishedAt) {
@@ -482,9 +614,24 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setStep('export')
   }, [busy, currentStageId])
 
-  const nodes = useDiagramStore((s) => s.c4Nodes)
-  const relations = useDiagramStore((s) => s.c4Relations)
+  // Only while open: the dialog stays mounted, and the live layout replaces
+  // c4Nodes every frame.
+  const nodes = useDiagramStore((s) => (open ? s.c4Nodes : NO_NODES))
+  const relations = useDiagramStore((s) => (open ? s.c4Relations : NO_RELATIONS))
   const gherkinFiles = useMemo(() => buildGherkinFiles(nodes, relations), [nodes, relations])
+  const needs = useMemo(
+    () => Object.values(nodes).filter((n) => n.type === 'need').sort((a, b) => a.label.localeCompare(b.label)),
+    [nodes],
+  )
+  /** Picking a need loads its text; going back to "A new description"
+   *  clears the textarea only if it still holds that need's text. */
+  const pickNeed = useCallback((id: string | null) => {
+    const picked = id ? nodes[id] : undefined
+    const previous = needId ? nodes[needId] : undefined
+    setNeedId(picked ? picked.id : null)
+    if (picked) setDescription(picked.description ?? '')
+    else if (previous && description === (previous.description ?? '')) setDescription('')
+  }, [nodes, needId, description])
   const mockupStats = useMemo(() => {
     const mockups = Object.values(nodes).filter((n) => n.type === 'mockup')
     const missing = mockups.filter((n) => !(n as unknown as Record<string, unknown>).wireframe).length
@@ -514,8 +661,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (stageReports[currentStageId]) {
       return (
         <>
-          <button type="button" className="forge-btn forge-btn-secondary" onClick={() => runStage(currentStageId)} disabled={!!unavailableReason}>Regenerate</button>
-          <button type="button" className="forge-btn forge-btn-primary" onClick={goNext}>{isLastStage ? 'Finish →' : 'Continue →'}</button>
+          <button type="button" className="forge-btn forge-btn-secondary" onClick={() => runStage(currentStageId)} disabled={!!unavailableReason || layingOut}>Regenerate</button>
+          <button type="button" className="forge-btn forge-btn-primary" onClick={goNext} disabled={layingOut}>{isLastStage ? 'Finish →' : 'Continue →'}</button>
         </>
       )
     }
@@ -572,8 +719,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
           )}
         </div>
         <p className="milestone-modal-text" style={{ marginBottom: 10 }}>
-          Turn a free-text system description into requirements, fitness functions,
-          Gherkin scenarios, UI mockups and a C4 model — one reviewable stage at a time.
+          Turn a free-text system description into requirements, a domain model, fitness functions,
+          Gherkin scenarios, state machines, UI mockups and a C4 model — one reviewable stage at a time.
         </p>
 
         <div className="forge-steps" role="tablist">
@@ -611,6 +758,20 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         <div className="forge-body">
           {step === 'input' && (
             <>
+              {hasNeedType && needs.length > 0 && (
+                <label className="forge-need-picker">
+                  <span>Start from</span>
+                  <select
+                    value={needId ?? ''}
+                    onChange={(e) => pickNeed(e.target.value || null)}
+                  >
+                    <option value="">A new description</option>
+                    {needs.map((n) => (
+                      <option key={n.id} value={n.id}>{n.label}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <textarea
                 className="forge-textarea"
                 placeholder="Describe the system in plain language — who uses it, what it does, the main flows and constraints…"
@@ -622,6 +783,13 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
               <button type="button" className="forge-btn forge-btn-secondary forge-btn-sm" onClick={handleUpload} style={{ marginTop: 8 }}>
                 Upload .txt / .md file…
               </button>
+              {hasNeedType && (
+                <p className="forge-need-hint">
+                  {needId
+                    ? 'Edits are saved back to this need, and the generated requirements are linked to it.'
+                    : 'Saved in the model as a Need when you start, so every generated requirement traces back to it.'}
+                </p>
+              )}
             </>
           )}
 
@@ -629,9 +797,10 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
             <div className="forge-stage-card">
               <p className="milestone-modal-text" style={{ margin: '0 0 10px' }}>{currentStage.blurb}</p>
 
-              {!!hubMatchesByStage[currentStage.id]?.length && (
+              {/* Hidden while the model picks, so the list does not change under the cursor. */}
+              {!!hubMatchesByStage[currentStage.id]?.length && clarifyStatusByStage[currentStage.id] && clarifyStatusByStage[currentStage.id] !== 'asking' && (
                 <div className="forge-hub-suggestions">
-                  <div className="forge-hub-suggestions-label">Suggested from the Hub</div>
+                  <div className="forge-hub-suggestions-label">{hubPicksByStage[currentStage.id] ? 'Picked from the Hub' : 'Suggested from the Hub'}</div>
                   {hubMatchesByStage[currentStage.id]!.map((c) => {
                     const imported = importedHubIds.has(c.id)
                     const importing = importingHubId === c.id
@@ -768,6 +937,49 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                   })()}
                 </div>
               )}
+              {stageReports[currentStage.id] && !!arrangeByStage[currentStage.id]?.groups.length && (() => {
+                const arrange = arrangeByStage[currentStage.id]!
+                const alignable = arrange.groups.filter((g) => g.nodeIds.length >= 2)
+                const viewNames = [...new Set(arrange.groups.map((g) => g.viewName))].join(' and ')
+                return (
+                  <div className="forge-arrange">
+                    <div className="forge-arrange-title">Arrange</div>
+                    {alignable.length > 0 && (
+                      <div className="forge-arrange-row">
+                        <span>
+                          Keep the {alignable.map((g) => `${g.nodeIds.length} new elements on ${g.viewName}`).join(' and ')} in a
+                        </span>
+                        {FORGE_ARRANGEMENTS.map((arrangement) => (
+                          <button
+                            key={arrangement}
+                            type="button"
+                            className={`forge-btn forge-btn-sm ${arrange.arranged === arrangement ? 'forge-btn-success' : 'forge-btn-secondary'}`}
+                            disabled={busy || layingOut || !!arrange.arranged}
+                            onClick={() => arrangeStage(currentStage.id, arrangement)}
+                          >
+                            {arrange.arranged === arrangement ? `✓ ${ARRANGEMENT_LABELS[arrangement]}` : ARRANGEMENT_LABELS[arrangement]}
+                          </button>
+                        ))}
+                        <span>?</span>
+                      </div>
+                    )}
+                    <div className="forge-arrange-row">
+                      <span>Run Smart Layout on {viewNames}?</span>
+                      <button
+                        type="button"
+                        className={`forge-btn forge-btn-sm ${arrange.laidOut ? 'forge-btn-success' : 'forge-btn-secondary'}`}
+                        disabled={busy || layingOut}
+                        onClick={() => void layoutStage(currentStage.id)}
+                      >
+                        {layingOut ? 'Laying out…' : arrange.laidOut ? '✓ Smart Layout' : 'Smart Layout'}
+                      </button>
+                    </div>
+                    {arrange.message && (
+                      <div className={`forge-arrange-message${arrange.failed ? ' forge-arrange-message-error' : ''}`}>{arrange.message}</div>
+                    )}
+                  </div>
+                )
+              })()}
               {currentStage.id === 'mockups' && stageReports.mockups && mockupStats.total > 0 && (
                 <div className="forge-wireframes">
                   <div className="forge-wireframes-title">Wireframes</div>
@@ -850,7 +1062,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
             <button
               type="button"
               className="forge-btn forge-btn-primary"
-              onClick={goNext}
+              onClick={startRun}
               disabled={!description.trim()}
             >
               Start →

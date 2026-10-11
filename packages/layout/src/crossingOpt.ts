@@ -340,10 +340,30 @@ function buildAncestors(c4Nodes: Record<string, C4Node>): Record<string, Set<str
  * Call this after a layout engine has written its positions back into
  * `c4Nodes`, but before the store calls `_sync()`.
  */
+/** Bounds the local search in `minimizeCrossings`. Work is counted in the
+ *  segment tests `localCost` makes, so it tracks running time; counting
+ *  instead of timing keeps the result the same on every machine. */
+export interface CrossingSearchBudget {
+  /** Stop searching (keeping every improvement so far) past this much work. */
+  maxWork?: number
+  /** Filled in with the work done, for measurement. */
+  stats?: { work: number; exhausted: boolean }
+}
+
+/** About ten times what the busiest hub blueprint or the fintech sample
+ *  needs (1.9 M), so they lay out exactly as before. A model with hundreds of
+ *  elements in one container needed 650 M per candidate, 40 s each; it now
+ *  stops after about a second and keeps what it improved so far. */
+export const MAX_CROSSING_WORK = 20_000_000
+
 export function minimizeCrossings(
   c4Nodes: Record<string, C4Node>,
-  c4Relations: Record<string, C4Relation>
+  c4Relations: Record<string, C4Relation>,
+  budget: CrossingSearchBudget = {},
 ): Record<string, { x: number; y: number }> {
+  const maxWork = budget.maxWork ?? MAX_CROSSING_WORK
+  let work = 0
+  let exhausted = false
 
   // ── 1. Absolute position map (mutated in-place during swaps) ──────────────
   const abs = buildAbsPos(c4Nodes)
@@ -351,6 +371,18 @@ export function minimizeCrossings(
 
   // ── 2. Ancestor sets (constant throughout optimisation) ───────────────────
   const ancestors = buildAncestors(c4Nodes)
+
+  /** localCost, counting its segment tests against the budget. */
+  const cost = (edges: EdgePair[], touched: boolean[], moved: string[]): number => {
+    let hit = 0
+    for (const t of touched) if (t) hit++
+    work += edges.length + hit * (allIds.length + edges.length) + (edges.length - hit) * moved.length
+    return localCost(abs, edges, touched, moved, ancestors, allIds)
+  }
+  const spent = (): boolean => {
+    if (work > maxWork) exhausted = true
+    return exhausted
+  }
 
   // ── 3. Group nodes by shared parent ───────────────────────────────────────
   const groups = new Map<string, string[]>()
@@ -409,6 +441,7 @@ export function minimizeCrossings(
     .sort(([keyA], [keyB]) => nodeDepth(keyB) - nodeDepth(keyA))
 
   for (const [parentKey, ids] of sortedGroups) {
+    if (spent()) break
     const groupSet = new Set(ids)
 
     // Edges where at least one endpoint is in this group (intra + escape).
@@ -439,8 +472,8 @@ export function minimizeCrossings(
     while (improved && passes-- > 0) {
       improved = false
 
-      for (let i = 0; i < swapIds.length; i++) {
-        for (let j = i + 1; j < swapIds.length; j++) {
+      for (let i = 0; i < swapIds.length && !spent(); i++) {
+        for (let j = i + 1; j < swapIds.length && !spent(); j++) {
           const ia = swapIds[i], ib = swapIds[j]
           const ra = abs[ia], rb = abs[ib]
 
@@ -448,14 +481,14 @@ export function minimizeCrossings(
           // descendants follow once it is accepted).
           const moved = [ia, ib]
           const touched = relevant.map(e => e.src === ia || e.src === ib || e.tgt === ia || e.tgt === ib)
-          const before = localCost(abs, relevant, touched, moved, ancestors, allIds)
+          const before = cost(relevant, touched, moved)
 
           // Swap top-left positions; each node retains its own dimensions
           const sx = ra.x, sy = ra.y
           ra.x = rb.x; ra.y = rb.y
           rb.x = sx;   rb.y = sy
 
-          const after = localCost(abs, relevant, touched, moved, ancestors, allIds)
+          const after = cost(relevant, touched, moved)
 
           if (after < before) {
             // Accept swap — propagate position deltas to descendants
@@ -518,12 +551,13 @@ export function minimizeCrossings(
     while (tImproved && tPasses-- > 0) {
       tImproved = false
       for (const id of swapIds) {
+        if (spent()) break
         const r = abs[id]
         if (!r) continue
         const moved = subtreeOf(id)
         const movedSet = new Set(moved)
         const touched = relevant.map(e => movedSet.has(e.src) || movedSet.has(e.tgt))
-        const baseCost = localCost(abs, relevant, touched, moved, ancestors, allIds)
+        const baseCost = cost(relevant, touched, moved)
         let bestDx = 0, bestDy = 0, bestCost = baseCost
 
         // X axis
@@ -531,7 +565,7 @@ export function minimizeCrossings(
           if (wouldCollide(id, r, dx, 0)) continue
           r.x += dx
           shiftDescendants(id, dx, 0)
-          const c = localCost(abs, relevant, touched, moved, ancestors, allIds)
+          const c = cost(relevant, touched, moved)
           if (c < bestCost) { bestCost = c; bestDx = dx; bestDy = 0 }
           r.x -= dx
           shiftDescendants(id, -dx, 0)
@@ -541,7 +575,7 @@ export function minimizeCrossings(
           if (wouldCollide(id, r, 0, dy)) continue
           r.y += dy
           shiftDescendants(id, 0, dy)
-          const c = localCost(abs, relevant, touched, moved, ancestors, allIds)
+          const c = cost(relevant, touched, moved)
           if (c < bestCost) { bestCost = c; bestDx = 0; bestDy = dy }
           r.y -= dy
           shiftDescendants(id, 0, -dy)
@@ -561,5 +595,6 @@ export function minimizeCrossings(
     } // end swapGroups loop
   }
 
+  if (budget.stats) { budget.stats.work = work; budget.stats.exhausted = exhausted }
   return updates
 }

@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { runAIPrompt } from '../src/renderer/src/ai/runner'
 import { defaultAISettings } from '../src/renderer/src/ai/settings'
 import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
+import { createModelFacade } from '@radical/common/ai/modelFacade'
+import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 function makeFacade(): DiagramFacade & { _nodes: Record<string, C4Node>; _rels: Record<string, C4Relation> } {
@@ -105,6 +107,25 @@ describe('runAIPrompt — end-to-end with mocked Anthropic tool-calling', () => 
     expect(result.report.added.relations).toBe(1)
     expect(result.iterations).toBe(1)
     expect(Object.keys(facade._nodes)).toHaveLength(2)
+  })
+
+  it('places a run\'s new nodes beside the canvas in a block that grows sideways, and the next run beside that', async () => {
+    const facade = makeFacade()
+    facade._nodes.old = { id: 'old', type: 'system', label: 'Old', x: 0, y: 40, width: 200, height: 100, collapsed: false } as C4Node
+    const addFive = (prefix: string): void => {
+      fakeAnthropicFetch([
+        { content: [1, 2, 3, 4, 5].map((i) => toolUse(`c${i}`, 'add_node', { tempId: `${prefix}${i}`, type: 'system', label: `${prefix}${i}` })), stop_reason: 'tool_use' },
+        { content: [text('Done.')], stop_reason: 'end_turn' },
+      ])
+    }
+    addFive('a')
+    await runAIPrompt({ prompt: 'Add five', settings: anthropicSettings(), diagram: facade })
+    const placed = (prefix: string) => Object.values(facade._nodes).filter((n) => n.label.startsWith(prefix)).map((n) => [n.x, n.y])
+    expect(placed('a')).toEqual([[320, 40], [680, 40], [320, 320], [680, 320], [1040, 40]])
+    addFive('b')
+    await runAIPrompt({ prompt: 'Add five more', settings: anthropicSettings(), diagram: facade })
+    const x0 = 1040 + facade._nodes[Object.keys(facade._nodes).find((id) => facade._nodes[id].label === 'a5')!].width + 120
+    expect(placed('b')[0]).toEqual([x0, 40])
   })
 
   it('feeds a rejected tool call back as an error result and lets the model self-correct', async () => {
@@ -507,5 +528,45 @@ describe('runAIPrompt — onProgress (live feed for Radical Forge)', () => {
     fakeAnthropicFetch([{ content: [text('ok')], stop_reason: 'end_turn' }])
     const result = await runAIPrompt({ prompt: 'hello', settings: anthropicSettings(), diagram: makeFacade() })
     expect(result.usage).toBeUndefined()
+  })
+})
+
+describe('runAIPrompt — tool groups and metamodel changes', () => {
+  beforeEach(() => { delete (globalThis as any).fetch })
+
+  const toolNames = (body: any): string[] => body.tools.map((t: { name: string }) => t.name)
+
+  it('leaves excluded groups out of the request and refuses calls to them', async () => {
+    const fake = fakeAnthropicFetch([
+      { content: [toolUse('c1', 'upsert_node_type', { id: 'risk', label: 'Risk' })], stop_reason: 'tool_use' },
+      { content: [text('Could not.')], stop_reason: 'end_turn' },
+    ])
+    const facade = createModelFacade({ nodes: [], relations: [], metamodel: builtInGovernanceMetamodel() })
+    const result = await runAIPrompt({
+      prompt: 'Add a risk type', settings: anthropicSettings(), diagram: facade,
+      excludeToolGroups: ['metamodel', 'presentation'],
+    })
+    const names = toolNames(fake.bodies()[0])
+    expect(names).toContain('add_node')
+    expect(names).not.toContain('upsert_node_type')
+    expect(names).not.toContain('create_presentation')
+    expect(result.report.errors).toEqual(['Unknown tool "upsert_node_type"'])
+    expect(JSON.stringify(fake.bodies()[1].messages)).toContain('Unknown tool')
+    expect(facade.getMetamodel!()!.nodeTypes.risk).toBeUndefined()
+  })
+
+  it('rebuilds the tool schemas after a metamodel tool adds a type', async () => {
+    const fake = fakeAnthropicFetch([
+      { content: [toolUse('c1', 'upsert_node_type', { id: 'risk', label: 'Risk', allowedAtRoot: true })], stop_reason: 'tool_use' },
+      { content: [toolUse('c2', 'add_node', { tempId: 'r', type: 'risk', label: 'Outage' })], stop_reason: 'tool_use' },
+      { content: [text('Done.')], stop_reason: 'end_turn' },
+    ])
+    const facade = createModelFacade({ nodes: [], relations: [], metamodel: builtInGovernanceMetamodel() })
+    const result = await runAIPrompt({ prompt: 'Add a risk type and one risk', settings: anthropicSettings(), diagram: facade })
+    const enumOf = (body: any) => body.tools.find((t: { name: string }) => t.name === 'add_node').input_schema.properties.type.enum
+    expect(enumOf(fake.bodies()[0])).not.toContain('risk')
+    expect(enumOf(fake.bodies()[1])).toContain('risk')
+    expect(result.report.added.nodes).toBe(1)
+    expect(Object.values(facade.getNodes()).map((n) => n.type)).toEqual(['risk'])
   })
 })

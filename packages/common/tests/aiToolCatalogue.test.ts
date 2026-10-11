@@ -4,6 +4,7 @@ import type { ToolRunContext } from '../src/ai/tools/types'
 import type { DiagramFacade } from '../src/ai/diagramFacade'
 import type { C4Node, C4Relation, DiagramView } from '../src/c4'
 import type { Metamodel } from '../src/metamodel/index'
+import { createModelFacade } from '../src/ai/modelFacade'
 
 function makeFacade(mm?: Metamodel): DiagramFacade & {
   _nodes: Record<string, C4Node>
@@ -77,7 +78,7 @@ describe('buildToolDefs', () => {
     const defs = buildToolDefs(REQUIREMENT_MM)
     const names = defs.map((d) => d.name)
     expect(names).toEqual(expect.arrayContaining([
-      'add_node', 'update_node', 'delete_node',
+      'add_node', 'update_node', 'move_node', 'delete_node',
       'add_relation', 'update_relation', 'delete_relation',
       'create_view', 'set_view_nodes', 'delete_view', 'set_active_view',
       'search_model', 'focus_node', 'reset_diagram',
@@ -139,6 +140,39 @@ describe('node tools', () => {
     const result = handlers.get('delete_node')!({ id: 't1' }, ctx)
     expect(result.ok).toBe(true)
     expect(Object.keys(facade._nodes)).toHaveLength(0)
+  })
+
+  it('move_node resolves tempIds, moves to the root with null, and reports refusals', () => {
+    const mm: Metamodel = {
+      id: 'test',
+      name: 'Test',
+      nodeTypes: {
+        system: { id: 'system', label: 'System', color: '', fg: '', iconPath: '', width: 0, height: 0, allowedAtRoot: true, allowedParents: ['group'] },
+        group: { id: 'group', label: 'Group', color: '', fg: '', iconPath: '', width: 0, height: 0, allowedAtRoot: true },
+        container: { id: 'container', label: 'Container', color: '', fg: '', iconPath: '', width: 0, height: 0, allowedParents: ['system'] },
+      },
+      relationTypes: {},
+    }
+    const facade = createModelFacade({ nodes: [], relations: [], metamodel: mm })
+    const ctx = makeCtx(facade)
+    const handlers = buildToolHandlers()
+    handlers.get('add_node')!({ tempId: 'grp', type: 'group', label: 'Group' }, ctx)
+    handlers.get('add_node')!({ tempId: 'sys', type: 'system', label: 'Sys' }, ctx)
+    handlers.get('add_node')!({ tempId: 'api', type: 'container', label: 'API', parentId: 'sys' }, ctx)
+
+    const moved = handlers.get('move_node')!({ id: 'sys', parentId: 'grp' }, ctx)
+    expect(moved.ok, moved.resultText).toBe(true)
+    expect(facade.getNodes()[ctx.resolveId('sys')].parentId).toBe(ctx.resolveId('grp'))
+
+    const toRoot = handlers.get('move_node')!({ id: 'sys', parentId: null }, ctx)
+    expect(toRoot.ok).toBe(true)
+    expect(facade.getNodes()[ctx.resolveId('sys')].parentId).toBeUndefined()
+
+    const forbidden = handlers.get('move_node')!({ id: 'api', parentId: 'grp' }, ctx)
+    expect(forbidden.ok).toBe(false)
+    expect(forbidden.resultText).toContain('Allowed parents: System')
+    expect(handlers.get('move_node')!({ id: 'sys', parentId: 'api' }, ctx).ok).toBe(false)
+    expect(facade.getNodes()[ctx.resolveId('api')].parentId).toBe(ctx.resolveId('sys'))
   })
 
   it('add_node fails cleanly when the store rejects it (empty id)', () => {

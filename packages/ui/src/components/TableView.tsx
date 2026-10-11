@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType } from '@radical/common/c4'
-import { NODE_COLORS, NODE_FG, TYPE_LABELS, NODE_SIZES } from '@radical/common/c4'
+import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
 import type { Metamodel, PropertyDef } from '@radical/common/metamodel'
-import { isParentAllowed, composeEarsSentence, resolveEarsSubject } from '@radical/common/metamodel'
+import { isParentAllowed, composeEarsSentence, requirementStatePhrase, resolveEarsSubject } from '@radical/common/metamodel'
+import { RefPicker } from './RefPicker'
 
 // ─── Column definitions ──────────────────────────────────────────────────────
 //
@@ -14,7 +15,7 @@ import { isParentAllowed, composeEarsSentence, resolveEarsSubject } from '@radic
 // This is what lets a custom type added via the Metamodel Editor show up
 // here automatically, with no code changes.
 
-type CellType = 'text' | 'textarea' | 'enum' | 'boolean' | 'number' | 'readonly'
+type CellType = 'text' | 'textarea' | 'enum' | 'boolean' | 'number' | 'ref' | 'readonly'
 
 interface ColDef {
   key: string
@@ -24,6 +25,8 @@ interface ColDef {
   options?: string[]
   /** Hide cell when another field on the same row doesn't match. */
   visibleWhen?: { key: string; values: string[] }
+  /** The property behind a 'ref' column (what it may point at). */
+  def?: PropertyDef
 }
 
 const ALL_NODES_COLS: ColDef[] = [
@@ -48,11 +51,12 @@ const DEFAULT_COL_WIDTH: Record<CellType, number> = {
   enum: 140,
   boolean: 90,
   number: 110,
+  ref: 180,
   readonly: 160,
 }
 
 function propToCol(p: PropertyDef): ColDef {
-  return { key: p.key, label: p.label, width: DEFAULT_COL_WIDTH[p.type], type: p.type, options: p.options, visibleWhen: p.visibleWhen }
+  return { key: p.key, label: p.label, width: DEFAULT_COL_WIDTH[p.type], type: p.type, options: p.options, visibleWhen: p.visibleWhen, ...(p.type === 'ref' ? { def: p } : {}) }
 }
 
 /** Computed (non-property) columns for specific node types, e.g. the EARS
@@ -80,7 +84,7 @@ type Tab = string
 
 function getNodeProp(node: C4Node, key: string, nodes: Record<string, C4Node>, relations?: Record<string, C4Relation>): string {
   if (key === '_type')   return TYPE_LABELS[node.type] ?? node.type
-  if (key === '_ears_sentence') return composeEarsSentence(node as unknown as Record<string, unknown>, relations ? resolveEarsSubject(node.id, relations, nodes) : undefined).sentence
+  if (key === '_ears_sentence') return composeEarsSentence(node as unknown as Record<string, unknown>, relations ? resolveEarsSubject(node.id, relations, nodes) : undefined, relations ? requirementStatePhrase(node, nodes, relations) : undefined).sentence
   const raw = (node as unknown as Record<string, unknown>)[key]
   if (raw === undefined || raw === null) return ''
   if (typeof raw === 'boolean') return raw ? 'true' : 'false'
@@ -214,13 +218,20 @@ export function TableView(): React.ReactElement {
     [relations, visibleNodeIds],
   )
 
+  // The Relations tab leaves out relations hidden in this view; trees still
+  // follow every relation, since hiding one does not change the model.
+  const shownRelList = useMemo(() => {
+    const hidden = activeView?.hiddenRelationIds
+    return hidden?.length ? relList.filter(r => !hidden.includes(r.id)) : relList
+  }, [relList, activeView])
+
   // Sparse union: base relation columns + every extra property declared by a
-  // relation type that actually appears in `relList`, deduped by key (two
+  // relation type that actually appears in `shownRelList`, deduped by key (two
   // relation types sharing a property key share the same underlying field).
   const relCols = useMemo<ColDef[]>(() => {
     const seen = new Set(REL_BASE_COLS.map(c => c.key))
     const extra: ColDef[] = []
-    for (const r of relList) {
+    for (const r of shownRelList) {
       const def = metamodel.relationTypes[r.relationType ?? 'interacts']
       for (const p of def?.properties ?? []) {
         if (seen.has(p.key)) continue
@@ -229,7 +240,7 @@ export function TableView(): React.ReactElement {
       }
     }
     return [...REL_BASE_COLS, ...extra]
-  }, [relList, metamodel])
+  }, [shownRelList, metamodel])
 
   const treeRows = useMemo<TreeRow[]>(() =>
     tab === 'all' ? buildTreeRows(nodeList, n => n.parentId ?? null) : [],
@@ -247,10 +258,14 @@ export function TableView(): React.ReactElement {
     const m = new Map<string, string>()
     for (const r of relList) {
       if (r.relationType !== treeRelationType) continue
+      // Only same-type edges form this tab's tree — e.g. a Requirement
+      // deriving from a Need stays a root here rather than an orphan whose
+      // parent row isn't in the tab.
+      if (nodes[r.targetId]?.type !== tab) continue
       if (!m.has(r.sourceId)) m.set(r.sourceId, r.targetId)
     }
     return m
-  }, [relList, treeRelationType])
+  }, [relList, treeRelationType, nodes, tab])
 
   const typeTreeRows = useMemo<TreeRow[]>(() => {
     if (!relationParentOf) return []
@@ -266,7 +281,7 @@ export function TableView(): React.ReactElement {
     : ALL_NODES_COLS
 
   const rows: (C4Node | C4Relation)[] =
-    tab === 'relations' ? relList
+    tab === 'relations' ? shownRelList
     : tab === 'all'       ? treeRows.map(r => r.node)
     : treeRelationType    ? typeTreeRows.map(r => r.node)
     : (nodesByType.get(tab) ?? [])
@@ -314,8 +329,8 @@ export function TableView(): React.ReactElement {
     // ── Case 1: new node dragged from the palette/toolbar ──────────────────
     const typeStr = e.dataTransfer.getData('application/c4-type')
     if (typeStr) {
-      const size = NODE_SIZES[typeStr as C4ElementType] ?? { width: 200, height: 100 }
       const mm = useDiagramStore.getState().metamodel
+      const size = nodeTypeSize(typeStr, mm)
       const def = mm?.nodeTypes[typeStr]
       const label = def?.label ?? (typeStr[0].toUpperCase() + typeStr.slice(1))
       const allowedParents = def?.allowedParents ?? []
@@ -383,7 +398,7 @@ export function TableView(): React.ReactElement {
     const node = nodes[nodeId]
     if (!node) { pushNotification('Node not found.', 'error'); return }
 
-    if (activeView.nodeIds.includes(nodeId)) {
+    if (activeView.nodeIds.length === 0 || activeView.nodeIds.includes(nodeId)) {
       pushNotification(`"${node.label}" is already in this view.`, 'warning')
       return
     }
@@ -422,8 +437,9 @@ export function TableView(): React.ReactElement {
   }, [tab, selectNode, selectEdge])
 
   const handleBoolToggle = useCallback((rowId: string, colKey: string, current: string) => {
+    if (readOnly) return
     updateNode(rowId, { [colKey]: current !== 'true' } as Parameters<typeof updateNode>[1])
-  }, [updateNode])
+  }, [readOnly, updateNode])
 
   function renderCell(row: C4Node | C4Relation, col: ColDef, depth = 0): React.ReactNode {
     const isNodeRow = tab !== 'relations'
@@ -435,6 +451,19 @@ export function TableView(): React.ReactElement {
       if (!col.visibleWhen.values.includes(cur)) {
         return <span className="tv-cell-value" style={{ color: 'var(--text-muted)', opacity: 0.4 }}>—</span>
       }
+    }
+
+    // A reference is picked in place: ids are stored, labels shown.
+    if (col.type === 'ref' && col.def) {
+      return (
+        <span className="tv-cell-value" onClick={(e) => e.stopPropagation()}>
+          <RefPicker def={col.def} className="tv-cell-input" readOnly={readOnly}
+            value={(row as unknown as Record<string, unknown>)[col.key]}
+            onChange={(v) => isNodeRow
+              ? updateNode(rowId, { [col.key]: v } as Parameters<typeof updateNode>[1])
+              : updateRelation(rowId, { [col.key]: v } as Partial<C4Relation>)} />
+        </span>
+      )
     }
 
     const rawVal = isNodeRow
@@ -462,6 +491,7 @@ export function TableView(): React.ReactElement {
 
     if (col.type === 'boolean') {
       const checked = rawVal === 'true'
+      if (readOnly) return <span className={`tv-bool tv-bool-readonly ${checked ? 'tv-bool-on' : ''}`}>{checked ? '✓' : '—'}</span>
       return (
         <button
           className={`tv-bool ${checked ? 'tv-bool-on' : ''}`}
@@ -592,7 +622,7 @@ export function TableView(): React.ReactElement {
         {TABS.map(t => {
           const count =
             t.id === 'all'       ? nodeList.length
-            : t.id === 'relations' ? relList.length
+            : t.id === 'relations' ? shownRelList.length
             : nodesByType.get(t.id)?.length ?? 0
           return (
             <button

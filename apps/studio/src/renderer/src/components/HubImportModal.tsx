@@ -6,7 +6,7 @@ import type { C4Node, C4Relation, C4ElementType, DiagramSequence } from '@radica
 import { NODE_SIZES } from '@radical/common/c4'
 import { isParentAllowed } from '@radical/common/metamodel'
 import { nodeTypeTheme } from '@radical/ui/types/hubTheme'
-import { conceptViewsToDiagram } from '@radical/ui/hub/conceptViews'
+import { conceptViewsToDiagram } from '@radical/common/hubViews'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -602,7 +602,8 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         Object.assign(state.c4Relations, newRelations)
         Object.assign(state.sequences, newSequences)
         for (const v of newViews) state.views[v.id] = v
-        if (state.activeViewId && state.views[state.activeViewId]) {
+        // Empty nodeIds means "show all" — the imported nodes are already in it.
+        if (state.activeViewId && state.views[state.activeViewId]?.nodeIds.length) {
           state.views[state.activeViewId].nodeIds.push(...Object.keys(newNodes))
         }
       })

@@ -12,7 +12,10 @@
     "./geometry": "./src/geometry.ts",
     "./portAllocator": "./src/portAllocator.ts",
     "./edgeRouting": "./src/edgeRouting.ts",
-    "./side": "./src/side.ts"
+    "./edgeLabels": "./src/edgeLabels.ts",
+    "./side": "./src/side.ts",
+    "./viewInput": "./src/viewInput.ts",
+    "./constraints": "./src/constraints.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

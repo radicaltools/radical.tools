@@ -1,37 +1,108 @@
 #!/usr/bin/env node
-import { McpServer, fromJsonSchema } from '@modelcontextprotocol/server'
+import { McpServer, fromJsonSchema, type RegisteredTool } from '@modelcontextprotocol/server'
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
-import { FolderModel } from './folderModel'
+import { FolderModel, PRESETS, READ_ONLY_TOOLS, type OpenOptions } from './folderModel'
+import { FORGE_PROCEDURE } from './forge'
 
-function folderArg(args: string[]): string {
-  if (args.length !== 2 || args[0] !== '--folder' || !args[1]) {
-    throw new Error('Usage: radical-mcp --folder /absolute/path/to/model-folder')
+const USAGE = `Usage: radical-mcp --folder <model-folder> [--metamodel ${Object.keys(PRESETS).join('|')}]
+  --folder     the Markdown model folder, absolute or relative to the working directory;
+               a missing or empty folder becomes a new model
+  --metamodel  the metamodel of a new model (default: radical)`
+
+function parseArgs(args: string[]): { folder: string } & OpenOptions {
+  const values = new Map<string, string>()
+  for (let i = 0; i < args.length; i += 2) {
+    const [flag, value] = [args[i], args[i + 1]]
+    if ((flag !== '--folder' && flag !== '--metamodel') || !value || values.has(flag)) throw new Error(USAGE)
+    values.set(flag, value)
   }
-  return args[1]
+  const folder = values.get('--folder')
+  const metamodel = values.get('--metamodel')
+  if (!folder || (metamodel !== undefined && !(metamodel in PRESETS))) throw new Error(USAGE)
+  return { folder, metamodel: metamodel as OpenOptions['metamodel'] }
+}
+
+const INSTRUCTIONS = [
+  'Reads and edits one Radical Markdown model folder (C4 architecture plus governance records such as ADRs and requirements).',
+  'Call get_model_summary first: besides counts it returns the metamodel context message the other tools refer to,',
+  'with each type\'s valid `properties` keys and enum options, allowedParents/allowedAtRoot/cardinality,',
+  'and the node-type pairs each relation type allows. Use search_model for exact model data before changing it.',
+  'When the user refers to "the selected" element, mockup or view (or "this one") without naming it, call get_selection: it returns what is selected on Studio\'s canvas for this folder.',
+  'New nodes appear only in Studio\'s All elements view until you list them in a view (create_view, set_view_nodes).',
+  'move_node changes a node\'s parent. New and moved nodes get a simple placement; call smart_layout afterwards to arrange the model or one view.',
+  'A `need` node keeps raw free-text input (brief, notes, raw requirements) in its description; derive EARS `requirement` nodes from it rather than rewriting it, linking each requirement → need with `derives`.',
+  'State machines (state-machine, state, pseudostate, event; transition, emits, lifecycle-of) model the lifecycle of one entity with SCXML semantics; get_model_summary\'s modelling rules say how to build one, and a transition\'s `event` and `raises` hold the ids (or tempIds) of event nodes.',
+  'Writes report the warnings they bring in; get_issues lists every rule the model breaks now, as the Validation list in Studio\'s metamodel editor does. Call it before you report work as done.',
+  'Sequences (create_sequence) are ordered relation flows that dynamic views play; presentations are slides over views.',
+  'Milestones are named copies of the model at phases of the system (e.g. "As-is", "Target 2027"): create_milestone saves the current model as the latest one, compare_milestones says what changed, and a slide can show a milestone.',
+  'Metamodel tools (upsert_node_type, upsert_relation_type, …) change the types; the tool schemas refresh after them.',
+  'To turn a free-text description into requirements, a domain model, fitness functions, scenarios, state machines, mockups and a C4 model the way Studio\'s Radical Forge does, start with forge_start and follow the steps it returns.',
+].join(' ')
+
+const FORGE_ARGS = fromJsonSchema({
+  type: 'object',
+  properties: { description: { type: 'string', description: 'The system to forge, in plain language. Leave empty to be asked, or to start from an existing need.' } },
+})
+
+/** The `forge` prompt: Radical Forge as one command (a slash command in Claude Code). */
+function forgePrompt(description: string): string {
+  return [
+    'Run Radical Forge on the model of the radical MCP server.',
+    description
+      ? `The system:\n"""\n${description}\n"""`
+      : 'Ask me to describe the system first, or offer the needs already in the model (search_model: LIST NODES WHERE type = "need").',
+    '',
+    FORGE_PROCEDURE,
+  ].join('\n')
 }
 
 async function main(): Promise<void> {
-  const model = await FolderModel.open(folderArg(process.argv.slice(2)))
-  const server = new McpServer({ name: 'radical-folder', version: '0.1.0' })
-  server.registerTool('get_model_summary', {
-    description: 'Show counts and available element types in the currently bound Radical model folder.',
-    inputSchema: fromJsonSchema({ type: 'object', properties: {}, additionalProperties: false }),
-    annotations: { readOnlyHint: true },
-  }, async () => {
-    const outcome = await model.call('get_model_summary', {})
-    return { content: [{ type: 'text', text: outcome.text }], isError: !outcome.ok }
-  })
-  for (const tool of model.tools) {
-    server.registerTool(tool.name, {
-      description: tool.description,
-      inputSchema: fromJsonSchema(tool.inputSchema),
-      annotations: { readOnlyHint: tool.name === 'search_model' },
-    }, async (input) => {
-      const outcome = await model.call(tool.name, input)
-      return { content: [{ type: 'text', text: outcome.text }], isError: !outcome.ok }
-    })
+  const { folder, metamodel } = parseArgs(process.argv.slice(2))
+  const model = await FolderModel.open(folder, { metamodel })
+  const server = new McpServer({ name: 'radical-folder', version: '0.1.0' }, { instructions: INSTRUCTIONS })
+  const registered = new Map<string, RegisteredTool>()
+  const gone = new AbortController()
+  const advertise = (): void => {
+    for (const tool of model.tools) {
+      const existing = registered.get(tool.name)
+      if (existing) {
+        existing.update({ description: tool.description, paramsSchema: fromJsonSchema(tool.inputSchema) })
+        continue
+      }
+      registered.set(tool.name, server.registerTool(tool.name, {
+        description: tool.description,
+        inputSchema: fromJsonSchema(tool.inputSchema),
+        annotations: { readOnlyHint: READ_ONLY_TOOLS.has(tool.name) },
+      }, async (input, ctx) => {
+        // Progress goes out only to a client that asked for it with a token.
+        const token = ctx.mcpReq._meta?.progressToken
+        const onProgress = token === undefined ? undefined : ({ progress, message }: { progress: number; message: string }) => {
+          void ctx.mcpReq.notify({ method: 'notifications/progress', params: { progressToken: token, progress, message } })
+        }
+        const outcome = await model.call(tool.name, input, { onProgress, signal: AbortSignal.any([ctx.mcpReq.signal, gone.signal]) })
+        if (outcome.toolsChanged) advertise()
+        return { content: [{ type: 'text', text: outcome.text }], isError: !outcome.ok }
+      }))
+    }
   }
+  advertise()
+  server.registerPrompt('forge', {
+    title: 'Radical Forge',
+    description: 'Turn a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, mockups and a C4 model, one reviewed stage at a time.',
+    argsSchema: FORGE_ARGS,
+  }, (args) => {
+    const { description } = (args ?? {}) as { description?: unknown }
+    return { messages: [{ role: 'user', content: { type: 'text', text: forgePrompt(typeof description === 'string' ? description.trim() : '') } }] }
+  })
+  // The Forge run status Studio shows names the client driving the run.
+  model.clientName = () => server.server.getClientVersion()?.name
   await server.connect(new StdioServerTransport())
+  // The client is gone: stop instead of computing (and writing) a result nobody
+  // will read. A running Smart Layout notices at its next step.
+  process.stdin.once('end', () => {
+    gone.abort()
+    void model.close().then(() => process.exit(0))
+  })
 }
 
 main().catch((error: unknown) => {

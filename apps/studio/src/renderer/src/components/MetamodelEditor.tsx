@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { builtInC4Metamodel, validateModel } from '@radical/common/metamodel'
+import { forkPresetMetamodel } from '@radical/common/model'
 import type {
   NodeTypeDef,
   RelationTypeDef,
@@ -9,6 +10,14 @@ import type {
   PropertyDef,
   PropertyType,
 } from '@radical/common/metamodel'
+import {
+  MetamodelDiagram,
+  MetamodelLegend,
+  DEFAULT_DIAGRAM_FILTER,
+  type DiagramSelection,
+} from './metamodel/MetamodelDiagram'
+import { MetamodelInspector } from './metamodel/MetamodelInspector'
+import { CONTAINS_EDGE, type MetamodelGraphFilter } from './metamodel/metamodelGraph'
 
 // ── small icon helpers ─────────────────────────────────────────────────────
 
@@ -27,9 +36,12 @@ const IconTrash = () => (
 
 function PropertyEditor({
   properties,
+  nodeTypes,
   onChange,
 }: {
   properties: PropertyDef[]
+  /** What a 'ref' property may point at. */
+  nodeTypes: NodeTypeDef[]
   onChange: (next: PropertyDef[]) => void
 }): React.ReactElement {
   const update = (idx: number, patch: Partial<PropertyDef>) => {
@@ -63,13 +75,19 @@ function PropertyEditor({
           <select
             className="mm-input mm-prop-type"
             value={p.type}
-            onChange={(e) => update(i, { type: e.target.value as PropertyType })}
+            onChange={(e) => {
+              const type = e.target.value as PropertyType
+              update(i, type === 'ref'
+                ? { type, refType: p.refType ?? nodeTypes[0]?.id, options: undefined }
+                : { type, refType: undefined, multiple: undefined })
+            }}
           >
             <option value="text">text</option>
             <option value="textarea">textarea</option>
             <option value="number">number</option>
             <option value="boolean">boolean</option>
             <option value="enum">enum</option>
+            <option value="ref">reference</option>
           </select>
           <label className="mm-checkbox" title="Required">
             <input
@@ -94,6 +112,26 @@ function PropertyEditor({
               }
             />
           )}
+          {p.type === 'ref' && (
+            <>
+              <select
+                className="mm-input mm-prop-options"
+                title="Node type it points at"
+                value={p.refType ?? ''}
+                onChange={(e) => update(i, { refType: e.target.value })}
+              >
+                {nodeTypes.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+              <label className="mm-checkbox" title="Several nodes instead of one">
+                <input
+                  type="checkbox"
+                  checked={!!p.multiple}
+                  onChange={(e) => update(i, { multiple: e.target.checked || undefined })}
+                />
+                many
+              </label>
+            </>
+          )}
           <button className="mm-icon-btn danger" title="Remove property" onClick={() => remove(i)}>
             <IconTrash />
           </button>
@@ -106,23 +144,39 @@ function PropertyEditor({
   )
 }
 
+/** Opens and scrolls to a card when `focusToken` changes — how the diagram's
+ *  "Edit" lands on the right card in the list. */
+function useCardFocus(focusToken: number | undefined, setOpen: (v: boolean) => void) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (focusToken === undefined) return
+    setOpen(true)
+    requestAnimationFrame(() => ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusToken])
+  return ref
+}
+
 // ── Node-type card ─────────────────────────────────────────────────────────
 
 function NodeTypeCard({
   def,
   allTypes,
+  focusToken,
   onChange,
   onDelete,
 }: {
   def: NodeTypeDef
   allTypes: NodeTypeDef[]
+  focusToken?: number
   onChange: (patch: Partial<NodeTypeDef>) => void
   onDelete: () => void
 }): React.ReactElement {
   const [open, setOpen] = useState(false)
+  const ref = useCardFocus(focusToken, setOpen)
 
   return (
-    <div className="mm-card">
+    <div ref={ref} className={`mm-card${focusToken !== undefined ? ' focused' : ''}`}>
       <div className="mm-card-header" onClick={() => setOpen((v) => !v)}>
         <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
           <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -234,13 +288,14 @@ function NodeTypeCard({
 
           <div className="mm-section-label">Allowed parents</div>
           <div className="mm-parent-grid">
-            <label className="mm-checkbox">
+            <label className="mm-checkbox" title="Elements of this type may sit at the top level, outside any parent.">
               <input
                 type="checkbox"
-                checked={!def.allowedParents || def.allowedParents.length === 0}
-                onChange={(e) => onChange({ allowedParents: e.target.checked ? undefined : [] })}
+                // Same rule as isParentAllowed: allowedAtRoot wins, else a type with no parents.
+                checked={def.allowedAtRoot ?? (!def.allowedParents || def.allowedParents.length === 0)}
+                onChange={(e) => onChange({ allowedAtRoot: e.target.checked })}
               />
-              Root only
+              At the root
             </label>
             {allTypes
               .filter((t) => t.id !== def.id)
@@ -279,6 +334,7 @@ function NodeTypeCard({
           <div className="mm-section-label">Custom properties</div>
           <PropertyEditor
             properties={def.properties ?? []}
+            nodeTypes={allTypes}
             onChange={(properties) => onChange({ properties })}
           />
         </div>
@@ -292,15 +348,18 @@ function NodeTypeCard({
 function RelationTypeCard({
   def,
   allTypes,
+  focusToken,
   onChange,
   onDelete,
 }: {
   def: RelationTypeDef
   allTypes: NodeTypeDef[]
+  focusToken?: number
   onChange: (patch: Partial<RelationTypeDef>) => void
   onDelete: () => void
 }): React.ReactElement {
   const [open, setOpen] = useState(false)
+  const ref = useCardFocus(focusToken, setOpen)
 
   const updatePair = (idx: number, patch: Partial<RelationPair>) =>
     onChange({ allowedPairs: def.allowedPairs.map((p, i) => (i === idx ? { ...p, ...patch } : p)) })
@@ -312,7 +371,7 @@ function RelationTypeCard({
   }
 
   return (
-    <div className="mm-card">
+    <div ref={ref} className={`mm-card${focusToken !== undefined ? ' focused' : ''}`}>
       <div className="mm-card-header" onClick={() => setOpen((v) => !v)}>
         <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
           <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -412,6 +471,7 @@ function RelationTypeCard({
           <div className="mm-section-label">Custom properties</div>
           <PropertyEditor
             properties={def.properties ?? []}
+            nodeTypes={allTypes}
             onChange={(properties) => onChange({ properties })}
           />
         </div>
@@ -463,6 +523,17 @@ function IssuesPanel(): React.ReactElement {
 
 // ── Main perspective ───────────────────────────────────────────────────────
 
+type EditorTab = 'list' | 'diagram'
+const LS_TAB = 'radical-metamodel-tab'
+
+function readTab(): EditorTab {
+  try {
+    return localStorage.getItem(LS_TAB) === 'diagram' ? 'diagram' : 'list'
+  } catch {
+    return 'list'
+  }
+}
+
 export function MetamodelEditor(): React.ReactElement {
   const metamodel = useDiagramStore((s) => s.metamodel)
   const upsertNodeType = useDiagramStore((s) => s.upsertNodeType)
@@ -508,9 +579,32 @@ export function MetamodelEditor(): React.ReactElement {
   const setAppMode = useDiagramStore((s) => s.setAppMode)
   const close = (): void => setAppMode('designer')
 
-  // Esc closes the editor.
+  const [tab, setTabState] = useState<EditorTab>(readTab)
+  const setTab = (t: EditorTab): void => {
+    setTabState(t)
+    try { localStorage.setItem(LS_TAB, t) } catch { /* storage unavailable */ }
+  }
+  const [selection, setSelection] = useState<DiagramSelection>(null)
+  const [diagramFilter, setDiagramFilter] = useState<MetamodelGraphFilter>(DEFAULT_DIAGRAM_FILTER)
+  // Card to open + scroll to in the list; the counter re-triggers the same card.
+  const [focusCard, setFocusCard] = useState<{ kind: 'type' | 'relation'; id: string; token: number } | null>(null)
+  const editInList = (s: NonNullable<DiagramSelection>): void => {
+    if (s.kind === 'relation' && s.id === CONTAINS_EDGE) return
+    setFocusCard((cur) => ({ kind: s.kind, id: s.id, token: (cur?.token ?? 0) + 1 }))
+    setTab('list')
+  }
+  const focusTokenFor = (kind: 'type' | 'relation', id: string): number | undefined =>
+    focusCard && focusCard.kind === kind && focusCard.id === id ? focusCard.token : undefined
+
+  // Esc clears the diagram selection first, then closes the editor.
+  const selectionRef = useRef(selection)
+  selectionRef.current = selection
   useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') close() }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      if (selectionRef.current) setSelection(null)
+      else close()
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -530,7 +624,7 @@ export function MetamodelEditor(): React.ReactElement {
       }}
     >
       <div
-        className="milestone-modal mm-editor-modal"
+        className={`milestone-modal mm-editor-modal${tab === 'diagram' ? ' is-diagram' : ''}`}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -546,19 +640,32 @@ export function MetamodelEditor(): React.ReactElement {
           ✕
         </button>
         <div className="mm-editor">
-          <div className="mm-editor-main">
+          <div className={`mm-editor-main${tab === 'diagram' ? ' is-diagram' : ''}`}>
         <div className="mm-editor-header">
           <div>
             <input
               className="mm-input mm-name"
               value={metamodel.name}
-              onChange={(e) => setMetamodel({ ...metamodel, name: e.target.value })}
+              onChange={(e) => setMetamodel({ ...(forkPresetMetamodel(metamodel) ?? metamodel), name: e.target.value })}
             />
             <div className="mm-subhead">
               Per-document metamodel · {nodeTypes.length} node type(s) · {relationTypes.length} relation type(s)
             </div>
           </div>
           <div style={{ flex: 1 }} />
+          <div className="mm-tabs" role="tablist" aria-label="Metamodel view">
+            {(['list', 'diagram'] as const).map((t) => (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={tab === t}
+                className={`mm-tab${tab === t ? ' active' : ''}`}
+                onClick={() => setTab(t)}
+              >
+                {t === 'list' ? 'List' : 'Diagram'}
+              </button>
+            ))}
+          </div>
           <button
             className="mm-btn"
             onClick={() => {
@@ -571,6 +678,16 @@ export function MetamodelEditor(): React.ReactElement {
           </button>
         </div>
 
+        {tab === 'diagram' ? (
+          <MetamodelDiagram
+            metamodel={metamodel}
+            filter={diagramFilter}
+            selection={selection}
+            onSelect={setSelection}
+            onEdit={(id) => editInList({ kind: 'type', id })}
+          />
+        ) : (
+        <>
         <div className="mm-section">
           <div className="mm-section-header">
             <h3>Node types</h3>
@@ -584,6 +701,7 @@ export function MetamodelEditor(): React.ReactElement {
                 key={t.id}
                 def={t}
                 allTypes={nodeTypes}
+                focusToken={focusTokenFor('type', t.id)}
                 onChange={(patch) => upsertNodeType({ ...t, ...patch })}
                 onDelete={() => removeNodeType(t.id)}
               />
@@ -604,6 +722,7 @@ export function MetamodelEditor(): React.ReactElement {
                 key={t.id}
                 def={t}
                 allTypes={nodeTypes}
+                focusToken={focusTokenFor('relation', t.id)}
                 onChange={(patch) => upsertRelationType({ ...t, ...patch })}
                 onDelete={() => removeRelationType(t.id)}
               />
@@ -616,10 +735,32 @@ export function MetamodelEditor(): React.ReactElement {
           stored in the metamodel and surface in the Issues panel; full canvas styling for
           custom types lands in a follow-up.
         </div>
+        </>
+        )}
       </div>
 
       <aside className="mm-editor-side">
-        <IssuesPanel />
+        {tab === 'diagram' && selection ? (
+          <MetamodelInspector
+            metamodel={metamodel}
+            selection={selection}
+            onSelect={setSelection}
+            onEdit={editInList}
+          />
+        ) : tab === 'diagram' ? (
+          <>
+            <MetamodelLegend
+              metamodel={metamodel}
+              filter={diagramFilter}
+              selection={selection}
+              onFilter={setDiagramFilter}
+              onSelect={setSelection}
+            />
+            <IssuesPanel />
+          </>
+        ) : (
+          <IssuesPanel />
+        )}
       </aside>
         </div>
       </div>

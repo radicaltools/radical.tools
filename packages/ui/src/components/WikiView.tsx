@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, PropertyDef, type WizardLink } from '@radical/common/metamodel'
+import { isParentAllowed, isRelationAllowed, isPropertyVisible, resolveEarsSubject, refLabels, PropertyDef, type WizardLink } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { MockupWireframe } from './MockupWireframe'
+import { RefPicker } from './RefPicker'
 import { wireframeDataUri } from '@radical/common/wireframe'
 import { loadStudioSettings, STUDIO_SETTINGS_CHANGED_EVENT } from '../studioSettings'
 import {
@@ -12,7 +13,7 @@ import {
   C4ElementType,
   NODE_COLORS,
   NODE_FG,
-  NODE_SIZES,
+  nodeTypeSize,
   TYPE_LABELS,
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
@@ -240,7 +241,7 @@ export function WikiView(): React.ReactElement {
   const createNode = (type: string, parentId: string | undefined, link?: WizardLink) => {
     const def = metamodel?.nodeTypes[type]
     const label = `New ${def?.label ?? TYPE_LABELS[type as C4ElementType] ?? type}`
-    const size = NODE_SIZES[type as C4ElementType]
+    const size = nodeTypeSize(type, metamodel)
     requestCreateNode({
       type: type as C4ElementType,
       label,
@@ -251,8 +252,7 @@ export function WikiView(): React.ReactElement {
       parentId,
       x: 0,
       y: 0,
-      width: def?.width ?? size?.width ?? 160,
-      height: def?.height ?? size?.height ?? 90,
+      ...size,
     }, {
       links: link ? [link] : [],
       onCreated: (id) => {
@@ -374,12 +374,12 @@ export function WikiView(): React.ReactElement {
 // the C4/DDD structural model, then the governance layer (ADRs, fitness
 // functions, requirements, blueprints) that references it.
 const ARCHITECTURE_ROOT_TYPES: ReadonlySet<string> = new Set([
-  'person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group',
+  'person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'entity', 'group',
 ])
 // Governance items are further split by type — a flat "Governance" bucket
 // mixing ADRs, fitness functions and requirements is just a smaller version
 // of the same illegible wall, so each type gets its own labelled subgroup.
-const GOVERNANCE_TYPE_ORDER: readonly string[] = ['requirement', 'scenario', 'mockup', 'adr', 'fitness-fn', 'blueprint']
+const GOVERNANCE_TYPE_ORDER: readonly string[] = ['need', 'requirement', 'scenario', 'state-machine', 'event', 'mockup', 'adr', 'fitness-fn', 'blueprint']
 const GOVERNANCE_ROOT_TYPES: ReadonlySet<string> = new Set(GOVERNANCE_TYPE_ORDER)
 
 type RootSectionId = 'architecture' | 'governance' | 'other'
@@ -745,7 +745,7 @@ const INFOBOX_TEXT_KEYS: ReadonlySet<string> = new Set([
 // booleans, numbers, and the curated short-text metadata above. Substantive
 // text/textarea content stays in the main body.
 function isInfoboxFact(p: PropertyDef): boolean {
-  if (p.type === 'enum' || p.type === 'boolean' || p.type === 'number') return true
+  if (p.type === 'enum' || p.type === 'boolean' || p.type === 'number' || p.type === 'ref') return true
   if (p.type === 'text') return INFOBOX_TEXT_KEYS.has(p.key)
   return false
 }
@@ -1122,7 +1122,12 @@ function WikiElementPage({
         <section className="wiki-prose-section">
           <div className="wiki-section-head">
             <h2 className="wiki-h2">
-              Contains <span className="wiki-count">{children.length}</span>
+              {/* Relation-derived children aren't contained — name the relation
+                  instead, e.g. requirements that "Derives from this" need. */}
+              {hierarchyRelationType
+                ? `${metamodel?.relationTypes[hierarchyRelationType]?.label ?? hierarchyRelationType} this`
+                : 'Contains'}{' '}
+              <span className="wiki-count">{children.length}</span>
             </h2>
             {!readOnly && (
               <AddMenu
@@ -1377,6 +1382,21 @@ function WikiRelationLine({
 
 // ─── Infobox / inline fact value (display-first, edit on click) ──────────────
 
+/** A reference property: the labels of the nodes it points at, or a picker. */
+function WikiRefValue({ def, value, readOnly, onCommit }: {
+  def: PropertyDef
+  value: unknown
+  readOnly: boolean
+  onCommit: (v: string | string[]) => void
+}): React.ReactElement {
+  const nodes = useDiagramStore((s) => s.c4Nodes)
+  if (readOnly) {
+    const labels = refLabels(value, nodes)
+    return labels.length ? <span>{labels.join(', ')}</span> : <span className="wiki-muted">—</span>
+  }
+  return <RefPicker def={def} value={value} onChange={onCommit} className="wiki-ref-input" />
+}
+
 function WikiFactValue({
   def,
   value,
@@ -1388,8 +1408,10 @@ function WikiFactValue({
   value: unknown
   readOnly?: boolean
   inline?: boolean
-  onCommit: (v: string | number | boolean) => void
+  onCommit: (v: string | number | boolean | string[]) => void
 }): React.ReactElement {
+  if (def.type === 'ref') return <WikiRefValue def={def} value={value} readOnly={readOnly} onCommit={onCommit} />
+
   if (def.type === 'boolean') {
     const on = Boolean(value)
     return (

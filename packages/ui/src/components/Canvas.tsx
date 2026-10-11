@@ -6,16 +6,20 @@ import ReactFlow, {
   NodeTypes,
   EdgeTypes,
   NodeMouseHandler,
+  NodeDragHandler,
   ReactFlowInstance,
-  useViewport,
+  useStoreApi,
   getNodesBounds,
   getViewportForBounds,
 } from 'reactflow'
+import { zoomIdentity } from 'd3-zoom'
 import { useDiagramStore } from '../store/diagramStore'
-import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode } from './nodes/C4Nodes'
+import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
+import { edgeLabelDetail } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
-import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT } from '@radical/common/c4'
+import { AlignmentGuides } from './AlignmentGuides'
+import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize } from '@radical/common/c4'
 import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
 
 // Node and edge type registrations
@@ -31,15 +35,28 @@ const nodeTypes: NodeTypes = {
   group: GroupNode as any,
   adr: AdrNode as any,
   'fitness-fn': FitnessFnNode as any,
+  need: NeedNode as any,
   requirement: RequirementNode as any,
   scenario: ScenarioNode as any,
   blueprint: BlueprintNode as any,
   mockup: MockupNode as any,
+  'state-machine': StateMachineNode as any,
+  state: StateNode as any,
+  pseudostate: PseudostateNode as any,
+  event: EventNode as any,
+  entity: EntityNode as any,
 }
 
 const edgeTypes: EdgeTypes = {
   c4relation: RelationEdge as any,
 }
+
+/** How long Smart fit keeps refitting after an expand or collapse (the live
+ *  layout settles siblings around the change meanwhile). */
+const ACTIVE_FIT_WINDOW_MS = 1500
+/** Longest Smart fit follows the live layout after an expand, a collapse or
+ *  opening a view. */
+const MAX_TRACK_MS = 6000
 
 // ─── Connection preview line (drawn while dragging) ────────────────────────────
 function ConnectionPreviewLine({
@@ -191,11 +208,26 @@ function StructuralCanvas(): React.ReactElement {
   const setFitViewFn = useDiagramStore((s) => s.setFitViewFn)
   const setViewportFns = useDiagramStore((s) => s.setViewportFns)
 
-  // Always keep window.__rfCurrentViewport up-to-date so slide capture is accurate
-  const vp = useViewport()
+  // Always keep window.__rfCurrentViewport up-to-date so slide capture is
+  // accurate. A subscription, not useViewport(): that re-rendered the whole
+  // canvas on every camera frame (Smart fit, pan, zoom).
+  const rfStore = useStoreApi()
   useEffect(() => {
-    ;(window as any).__rfCurrentViewport = { x: vp.x, y: vp.y, zoom: vp.zoom }
-  }, [vp.x, vp.y, vp.zoom])
+    const record = (transform: [number, number, number]): void => {
+      ;(window as any).__rfCurrentViewport = { x: transform[0], y: transform[1], zoom: transform[2] }
+    }
+    record(rfStore.getState().transform)
+    return rfStore.subscribe((s, prev) => { if (s.transform !== prev.transform) record(s.transform) })
+  }, [rfStore])
+
+  /** Moves the camera in this frame. React Flow's setViewport always goes
+   *  through a d3 transition, which applies even a zero duration one frame
+   *  later: the nodes would draw once under the old camera. */
+  const setCameraNow = useCallback((vp: { x: number; y: number; zoom: number }) => {
+    const { d3Zoom, d3Selection } = rfStore.getState()
+    if (d3Zoom && d3Selection) d3Zoom.transform(d3Selection, zoomIdentity.translate(vp.x, vp.y).scale(vp.zoom))
+    else rfInstanceRef.current?.setViewport(vp)
+  }, [rfStore])
 
   // ── Auto-fit animation state ─────────────────────────────────────────
   // We run a single persistent rAF loop that *exponentially* eases the
@@ -225,7 +257,31 @@ function StructuralCanvas(): React.ReactElement {
   // bias zoom-out so the new nodes are guaranteed to be in frame, even
   // if cola is still pushing them around).
   const recentlyAddedIdsRef = useRef<Set<string>>(new Set())
+  // When the user last moved the camera by hand: the "diagram left the
+  // screen" refit waits a moment after that, so it never fights a gesture.
+  const lastUserCameraRef = useRef<number>(0)
+  // After an expand or collapse the camera follows the diagram every frame
+  // (see smoothFitView) until this time, or earlier once the live layout
+  // comes to rest and the active-fit window has closed.
+  const trackUntilRef = useRef<number>(0)
+  const trackingRef = useRef(false)
+  // A view just opened with Smart fit on: the nodes it shows, to fit at once
+  // in the first frame React Flow draws them (see placeCamera).
+  const snapIdsRef = useRef<Set<string> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // How much of the relation labels the zoom shows (see edgeLabelDetail and
+  // index.css). Set on the container from a store subscription, so crossing
+  // a threshold restyles the labels without re-rendering the canvas.
+  useEffect(() => {
+    const apply = (zoom: number): void => {
+      const el = containerRef.current
+      const detail = edgeLabelDetail(zoom)
+      if (el && el.dataset.edgeLabels !== detail) el.dataset.edgeLabels = detail
+    }
+    apply(rfStore.getState().transform[2])
+    return rfStore.subscribe((s, prev) => { if (s.transform !== prev.transform) apply(s.transform[2]) })
+  }, [rfStore])
 
   /**
    * Full fit-all target — everything visible (used for explicit Fit-All
@@ -304,7 +360,6 @@ function StructuralCanvas(): React.ReactElement {
     // Always update memory so a later expand still detects "new".
     prevVisibleIdsRef.current = currentIds
 
-    const ACTIVE_FIT_WINDOW_MS = 1500
     const now = performance.now()
     const hasChange = newlyVisible.length > 0 || removedCount > 0
     if (hasChange) {
@@ -313,12 +368,27 @@ function StructuralCanvas(): React.ReactElement {
       // window so the user always sees the full result, not a stale
       // mid-animation snapshot.
       fitWindowUntilRef.current = now + ACTIVE_FIT_WINDOW_MS
+      trackUntilRef.current = now + MAX_TRACK_MS
       if (newlyVisible.length > 0) {
         recentlyAddedIdsRef.current = new Set(newlyVisible.map((n) => n.id))
       }
     }
-    // Outside the active window with no fresh change → camera stays put.
-    if (now > fitWindowUntilRef.current) return null
+    // Outside the active window with no fresh change → camera stays put,
+    // unless the diagram has left the screen altogether (the physics moved
+    // it after the window closed): Smart fit keeps it in view.
+    if (now > fitWindowUntilRef.current) {
+      const HANDS_OFF_MS = 2000
+      if (now - lastUserCameraRef.current < HANDS_OFF_MS) return null
+      const vp = inst.getViewport()
+      const view = { x: -vp.x / vp.zoom, y: -vp.y / vp.zoom, width: rect.width / vp.zoom, height: rect.height / vp.zoom }
+      const onScreen = visible.some((n) => {
+        const p = n.positionAbsolute ?? n.position
+        const w = n.width ?? 0
+        const h = n.height ?? 0
+        return p.x < view.x + view.width && p.x + w > view.x && p.y < view.y + view.height && p.y + h > view.y
+      })
+      if (onScreen) return null
+    }
 
     // Inside the active window: include all currently-visible nodes
     // PLUS any recently-added nodes (in case cola has temporarily pushed
@@ -342,6 +412,28 @@ function StructuralCanvas(): React.ReactElement {
     return getViewportForBounds(padded, rect.width, rect.height, 0.05, 4, 0.18)
   }, [])
 
+  /** Puts the camera on `target`, then refits it every frame while the live
+   *  layout moves the diagram, until `trackUntilRef` (or the layout comes to
+   *  rest once the active-fit window has closed). */
+  const trackFit = useCallback((target: { x: number; y: number; zoom: number }) => {
+    if (fitAnimRef.current != null) cancelAnimationFrame(fitAnimRef.current)
+    trackingRef.current = true
+    const track = () => {
+      const now = performance.now()
+      const moving = useDiagramStore.getState().liveLayoutMoving
+      if (now > trackUntilRef.current || (!moving && now > fitWindowUntilRef.current)) {
+        trackingRef.current = false
+        fitAnimRef.current = null
+        return
+      }
+      const next = computeFitTarget()
+      if (next) setCameraNow(next)
+      fitAnimRef.current = requestAnimationFrame(track)
+    }
+    setCameraNow(target)
+    fitAnimRef.current = requestAnimationFrame(track)
+  }, [computeFitTarget, setCameraNow])
+
   /**
    * Request a smooth fit. `force=true` snaps deadband off and re-arms the
    * loop even when the diagram looks stationary (used for explicit Fit-All
@@ -357,6 +449,8 @@ function StructuralCanvas(): React.ReactElement {
     // auto-fit interval tick must not run — otherwise the zoom-in onto the
     // searched node is immediately overridden by fit-to-all on the next
     // 300ms tick. Manual / forced calls (Fit-All button) bypass this.
+    // A view just opened: placeCamera fits it as soon as it is drawn.
+    if (!force && snapIdsRef.current) return
     if (!force) {
       const until = (window as unknown as { __radicalAutoFitSuppressUntil?: number }).__radicalAutoFitSuppressUntil ?? 0
       if (performance.now() < until) {
@@ -387,6 +481,15 @@ function StructuralCanvas(): React.ReactElement {
     if (!inst) return
     const container = containerRef.current
     if (!container) return
+
+    // After an expand or collapse: frame the diagram at once, then in every
+    // frame while the live layout moves it. Easing towards a target refreshed
+    // every 300 ms left the camera one to three seconds behind, and the
+    // diagram, pushed aside by the group that grew, slid in from an edge.
+    if (!force && performance.now() < trackUntilRef.current) {
+      if (!trackingRef.current) trackFit(target)
+      return
+    }
 
     fitTargetRef.current = target
     fitForceRef.current = force
@@ -421,7 +524,18 @@ function StructuralCanvas(): React.ReactElement {
       fitAnimRef.current = requestAnimationFrame(tick)
     }
     void duration // duration kept in API for callers; loop is time-constant based
-  }, [computeFitTarget, computeSmartFitTarget])
+  }, [computeFitTarget, computeSmartFitTarget, trackFit])
+
+  /** Stops the camera animation or tracking in flight. */
+  const stopFit = useCallback(() => {
+    if (fitAnimRef.current != null) {
+      cancelAnimationFrame(fitAnimRef.current)
+      fitAnimRef.current = null
+    }
+    trackingRef.current = false
+    trackUntilRef.current = 0
+    snapIdsRef.current = null
+  }, [])
 
   /**
    * Suppress the auto-fit interval for `durationMs` and cancel any in-flight
@@ -433,21 +547,85 @@ function StructuralCanvas(): React.ReactElement {
   const suppressAutoFit = useCallback((durationMs: number) => {
     ;(window as unknown as { __radicalAutoFitSuppressUntil?: number }).__radicalAutoFitSuppressUntil =
       performance.now() + durationMs
-    if (fitAnimRef.current != null) {
-      cancelAnimationFrame(fitAnimRef.current)
-      fitAnimRef.current = null
-    }
-  }, [])
+    stopFit()
+  }, [stopFit])
 
   // Cancel the in-flight fit animation on unmount (HMR / route change).
   useEffect(() => {
-    return () => {
-      if (fitAnimRef.current != null) {
-        cancelAnimationFrame(fitAnimRef.current)
-        fitAnimRef.current = null
+    return stopFit
+  }, [stopFit])
+
+  // React Flow passes an event only for camera moves the user makes (wheel,
+  // pinch, dragging the pane); fits and focus pass none. The user's camera
+  // wins: cancel any fit still animating, which would otherwise pull the
+  // view back on every frame, and close the active-fit window so the next
+  // tick leaves the camera alone. Smart fit itself stays on (it is a
+  // setting); it reacts again to the next expand or collapse.
+  const takeCamera = useCallback(() => {
+    lastUserCameraRef.current = performance.now()
+    stopFit()
+    fitWindowUntilRef.current = 0
+  }, [stopFit])
+  const onUserMoveStart = useCallback((event: unknown) => { if (event) takeCamera() }, [takeCamera])
+
+  /**
+   * The camera for a view just opened (or a document just loaded), in one
+   * step: each view keeps its own coordinates, so a flight from the previous
+   * view's camera crossed empty canvas and the diagram slid in from an edge.
+   * With Smart fit on, the view is fitted in the first frame React Flow draws
+   * its nodes (`ids`, which the store has just shown: React Flow takes them
+   * a frame or two later); the saved camera `vp` bridges those frames. With
+   * Smart fit off, the saved camera stays. Either way the shown nodes become
+   * Smart fit's baseline: it reacts again to the next expand or collapse.
+   * `keep` holds `vp` even with Smart fit on: a reload of the same model
+   * (an outside edit) leaves the camera where the user had it.
+   */
+  const placeCamera = useCallback((
+    vp: { x: number; y: number; zoom: number } | null,
+    ids?: string[],
+    opts?: { keep?: boolean },
+  ) => {
+    const inst = rfInstanceRef.current
+    if (!inst) return
+    stopFit()
+    fitWindowUntilRef.current = 0
+    const shown = new Set(ids ?? inst.getNodes().filter((n) => !n.hidden).map((n) => n.id))
+    prevVisibleIdsRef.current = shown
+    if (vp) setCameraNow(vp)
+    if (opts?.keep || !useDiagramStore.getState().autoFitActive) return
+    snapIdsRef.current = shown
+    let frames = 0
+    const snap = () => {
+      if (snapIdsRef.current !== shown) return // stopped, or a newer view
+      const visible = inst.getNodes().filter((n) => !n.hidden)
+      const drawn = visible.length > 0 && visible.every((n) => n.width && n.height)
+        && (shown.size === 0 || (visible.length === shown.size && visible.every((n) => shown.has(n.id))))
+      if (!drawn && ++frames < 30) {
+        fitAnimRef.current = requestAnimationFrame(snap)
+        return
       }
+      fitAnimRef.current = null
+      snapIdsRef.current = null
+      prevVisibleIdsRef.current = new Set(visible.map((n) => n.id))
+      const target = computeFitTarget()
+      if (!target) return
+      // Then follow the view while it settles (the live layout, group sizes).
+      const now = performance.now()
+      fitWindowUntilRef.current = now + ACTIVE_FIT_WINDOW_MS
+      trackUntilRef.current = now + MAX_TRACK_MS
+      trackFit(target)
     }
-  }, [])
+    fitAnimRef.current = requestAnimationFrame(snap)
+  }, [stopFit, setCameraNow, computeFitTarget, trackFit])
+  // d3-zoom folds wheel events within ~150 ms into one gesture and reports its
+  // start only once, so a wheel that lands while a fit animates would not
+  // reach onMoveStart: every wheel takes the camera.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    el.addEventListener('wheel', takeCamera, { capture: true, passive: true })
+    return () => el.removeEventListener('wheel', takeCamera, { capture: true })
+  }, [takeCamera])
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     rfInstanceRef.current = instance
@@ -482,10 +660,43 @@ function StructuralCanvas(): React.ReactElement {
       suppressAutoFit(dur + 2500)
       instance.setCenter(px, py, { zoom: opts?.zoom ?? 1.1, duration: dur })
     }
+    // A presentation slide with focus elements frames just those, once React
+    // Flow has drawn them (the slide switch may have just swapped the view).
+    // Hidden ones (inside a collapsed group) are left out; with none shown,
+    // the slide falls back to fitting the whole view.
+    ;(window as any).__rfFocusNodes = (ids: string[], opts?: { duration?: number }) => {
+      const dur = opts?.duration ?? 600
+      const wanted = new Set(ids)
+      suppressAutoFit(dur + 1800)
+      let frames = 0
+      const frame = () => {
+        const focus = instance.getNodes().filter((n) => wanted.has(n.id) && !n.hidden)
+        const drawn = focus.length > 0 && focus.every((n) => n.width && n.height)
+        if (!drawn && ++frames < 30) {
+          requestAnimationFrame(frame)
+          return
+        }
+        const rect = containerRef.current?.getBoundingClientRect()
+        if (!drawn || !rect || rect.width === 0 || rect.height === 0) {
+          smoothFitView(dur, true)
+          return
+        }
+        const bounds = getNodesBounds(focus)
+        const MARGIN = 60
+        const target = getViewportForBounds(
+          { x: bounds.x - MARGIN, y: bounds.y - MARGIN, width: bounds.width + MARGIN * 2, height: bounds.height + MARGIN * 2 },
+          rect.width, rect.height, 0.05, 1.5, 0.08,
+        )
+        suppressAutoFit(dur + 1800)
+        instance.setViewport(target, { duration: dur })
+      }
+      requestAnimationFrame(frame)
+    }
     // Presentation slide navigation (diagramStore's goToSlide/previewSlide)
     // uses this to stop the auto-fit interval from fighting the slide's own
     // captured camera right after a slide switch swaps the visible node set.
     ;(window as any).__rfSuppressAutoFit = suppressAutoFit
+    ;(window as any).__rfPlaceCamera = placeCamera
     // Restore the camera saved with the active view (or default context).
     // Falls back to fit-all if no viewport was persisted yet.
     setTimeout(() => {
@@ -493,21 +704,21 @@ function StructuralCanvas(): React.ReactElement {
       const stored = s.activeViewId
         ? s.views[s.activeViewId]?.viewport ?? null
         : s.defaultViewport
-      if (stored) {
-        instance.setViewport(stored, { duration: 0 })
+      if (stored || s.autoFitActive) {
+        placeCamera(stored)
       } else {
         instance.fitView({ padding: 0.12 })
       }
     }, 100)
 
     // Register global zoom helpers used by the Toolbar zoom buttons.
-    ;(window as any).__radicalZoomIn  = () => instance.zoomIn({ duration: 300 })
-    ;(window as any).__radicalZoomOut = () => instance.zoomOut({ duration: 300 })
+    ;(window as any).__radicalZoomIn  = () => { takeCamera(); instance.zoomIn({ duration: 300 }) }
+    ;(window as any).__radicalZoomOut = () => { takeCamera(); instance.zoomOut({ duration: 300 }) }
     return () => {
       delete (window as any).__radicalZoomIn
       delete (window as any).__radicalZoomOut
     }
-  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit])
+  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, placeCamera])
 
   // Double-click on the canvas background → add a new System at that position
   const onCanvasDoubleClick = useCallback(
@@ -738,7 +949,7 @@ function StructuralCanvas(): React.ReactElement {
         return
       }
 
-      const size = NODE_SIZES[typeStr]
+      const size = nodeTypeSize(typeStr, mm)
       // Opens the type's wizard instead, when it has one.
       requestCreateNode({
         type: typeStr,
@@ -773,23 +984,39 @@ function StructuralCanvas(): React.ReactElement {
   // Cola-driven drag handlers
   const dragRafRef = useRef<number | null>(null)
 
-  const onNodeDragStart: NodeMouseHandler = useCallback(
-    (_event, node) => {
-      liveGrab(node.id, node.position.x, node.position.y)
+  // A drag moves only the element (calm); with Cmd/Ctrl held when it
+  // starts, the physics makes room around it (push). The connection
+  // modifier keeps its own key.
+  // React Flow drags the other selected nodes along: a calm drag moves
+  // them too (the physics would put them back).
+  const dragDragsAlong = useRef<string[]>([])
+  // React Flow reports a click as a drag too: only a move pins.
+  const dragFrom = useRef<{ x: number; y: number } | null>(null)
+  const onNodeDragStart: NodeDragHandler = useCallback(
+    (event, node, nodes) => {
+      const mod = useDiagramStore.getState().connectionModifier
+      const push = (mod !== 'meta' && event.metaKey) || (mod !== 'ctrl' && event.ctrlKey)
+      dragDragsAlong.current = push ? [] : nodes.filter((n) => n.id !== node.id).map((n) => n.id)
+      dragFrom.current = { ...node.position }
+      liveGrab(node.id, node.position.x, node.position.y, push ? 'push' : 'calm', node.positionAbsolute, dragDragsAlong.current)
     },
     [liveGrab]
   )
 
   const onNodeDrag: NodeMouseHandler = useCallback(
     (_event, node) => {
-      liveDrag(node.id, node.position.x, node.position.y)
+      liveDrag(node.id, node.position.x, node.position.y, node.positionAbsolute)
     },
     [liveDrag]
   )
 
   const onNodeDragStop: NodeMouseHandler = useCallback(
     (_event, node) => {
-      liveRelease(node.id)
+      const from = dragFrom.current
+      const moved = !from || Math.abs(node.position.x - from.x) > 0.5 || Math.abs(node.position.y - from.y) > 0.5
+      liveRelease(node.id, dragDragsAlong.current, moved)
+      dragDragsAlong.current = []
+      dragFrom.current = null
     },
     [liveRelease]
   )
@@ -809,10 +1036,29 @@ function StructuralCanvas(): React.ReactElement {
       )
     : rfNodes
 
+  // Edges between a container's children are drawn above the container (so
+  // they stay visible and clickable), and one can lie over its expand /
+  // collapse button. A click there is meant for the button: hand it over
+  // before the edge sees it. Same reach as the button's own hit area (CSS).
+  const onClickCapture = useCallback((e: React.MouseEvent) => {
+    if ((e.target as Element).closest('.c4-node-collapse-btn')) return
+    const reach = 10
+    for (const btn of containerRef.current?.querySelectorAll<HTMLElement>('.c4-node-collapse-btn') ?? []) {
+      const r = btn.getBoundingClientRect()
+      if (e.clientX >= r.left - reach && e.clientX <= r.right + reach && e.clientY >= r.top - reach && e.clientY <= r.bottom + reach) {
+        e.stopPropagation()
+        e.preventDefault()
+        btn.click()
+        return
+      }
+    }
+  }, [])
+
   return (
     <div
       ref={containerRef}
       className={canvasClasses.join(' ')}
+      onClickCapture={onClickCapture}
       onDrop={isViewMode ? undefined : onDrop}
       onDragOver={isViewMode ? undefined : onDragOver}
       onDoubleClick={isViewMode ? undefined : onCanvasDoubleClick}
@@ -939,6 +1185,7 @@ function StructuralCanvas(): React.ReactElement {
         onEdgeClick={onEdgeClick as any}
         onPaneClick={onPaneClick}
         onInit={onInit}
+        onMoveStart={onUserMoveStart}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         nodesDraggable={!presentationActive}
@@ -961,6 +1208,7 @@ function StructuralCanvas(): React.ReactElement {
           size={1}
           color="var(--canvas-dots)"
         />
+        <AlignmentGuides />
       </ReactFlow>
 
       {connectSource && connectMouse && (

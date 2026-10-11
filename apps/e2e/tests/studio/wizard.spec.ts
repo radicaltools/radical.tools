@@ -4,7 +4,7 @@ import { test, expect, fixture } from '../../support/fixtures'
 // metamodel (whose ADR type has a create-time wizard).
 test.beforeEach(async ({ studio }) => {
   const doc = JSON.parse(fixture('bookstore'))
-  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'C4 + DDD + Governance', nodeTypes: {}, relationTypes: {} }
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
   await studio.seedDocument(JSON.stringify(doc))
 })
 

@@ -110,6 +110,41 @@ describe('minimizeCrossings', () => {
   })
 })
 
+describe('minimizeCrossings work budget', () => {
+  /** One container with many crossing children: a lot of pairs to swap. */
+  function crowdedContainer(n: number): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } {
+    const nodes: Record<string, C4Node> = { box: node('box', 'system', { width: 3000, height: 3000 }) }
+    const relations: Record<string, C4Relation> = {}
+    for (let i = 0; i < n; i++) {
+      nodes[`c${i}`] = node(`c${i}`, 'container', { parentId: 'box', x: 40 + (i % 8) * 260, y: 120 + Math.floor(i / 8) * 160 })
+      if (i > 0) relations[`r${i}`] = rel(`r${i}`, `c${i}`, `c${(i * 7) % i}`)
+    }
+    return { nodes, relations }
+  }
+
+  it('stops past its budget and keeps what it improved', () => {
+    const { nodes, relations } = crowdedContainer(40)
+    const free = { work: 0, exhausted: false }
+    minimizeCrossings(nodes, relations, { stats: free, maxWork: Infinity })
+    expect(free.exhausted).toBe(false)
+
+    const capped = { work: 0, exhausted: false }
+    const updates = minimizeCrossings(nodes, relations, { stats: capped, maxWork: free.work / 10 })
+    expect(capped.exhausted).toBe(true)
+    expect(capped.work).toBeLessThan(free.work / 5)
+    const after: Record<string, C4Node> = {}
+    for (const [id, n] of Object.entries(nodes)) after[id] = updates[id] ? { ...n, ...updates[id] } : n
+    expect(totalLayoutCost(after, relations)).toBeLessThanOrEqual(totalLayoutCost(nodes, relations))
+  })
+
+  it('leaves a diagram of ordinary size unbounded by the default budget', () => {
+    const { nodes, relations } = crowdedContainer(40)
+    const stats = { work: 0, exhausted: false }
+    minimizeCrossings(nodes, relations, { stats })
+    expect(stats.exhausted).toBe(false)
+  })
+})
+
 describe('runSmartLayoutELKPhase', () => {
   it('only runs the engines, one at a time, reporting each', async () => {
     const { nodes, relations } = crossedRow()

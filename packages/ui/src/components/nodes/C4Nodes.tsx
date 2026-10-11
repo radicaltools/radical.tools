@@ -2,10 +2,37 @@ import React, { memo, useCallback } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { C4NodeRFData, NODE_COLORS, TYPE_ICON_PATHS } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
-import { composeEarsSentence, resolveEarsSubject } from '@radical/common/metamodel'
+import { useNodeContent } from '../../store/nodeSelectors'
+import { composeEarsSentence, machineEntity, requirementStatePhrase } from '@radical/common/metamodel'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 import { wireframeDataUri } from '@radical/common/wireframe'
 
 // ─── Diff highlight overlay ────────────────────────────────────────────────
+// ─── Rendering under live physics ───────────────────────────────────────────
+// The live layout moves nodes every frame. Nothing a card shows depends on
+// where it is, so cards re-render only when their content changes: with
+// hundreds of nodes, re-rendering every card each frame made dragging crawl.
+
+/** Card props equality: React Flow also passes xPos/yPos, which change every frame. */
+function sameCard(a: NodeProps<C4NodeRFData>, b: NodeProps<C4NodeRFData>): boolean {
+  return a.data === b.data && a.selected === b.selected
+}
+
+/** requirement id → the node that satisfies it, per relations object. */
+const satisfierCache = new WeakMap<Record<string, C4Relation>, Map<string, string>>()
+function satisfierOf(relations: Record<string, C4Relation>, reqId: string): string | undefined {
+  let map = satisfierCache.get(relations)
+  if (!map) {
+    map = new Map()
+    // First satisfies relation wins, as in resolveEarsSubject.
+    for (const rel of Object.values(relations)) {
+      if (rel.relationType === 'satisfies' && !map.has(rel.targetId)) map.set(rel.targetId, rel.sourceId)
+    }
+    satisfierCache.set(relations, map)
+  }
+  return map.get(reqId)
+}
+
 function DiffOverlay({ c4id }: { c4id: string }) {
   const diff = useDiagramStore(s => s.showDiff ? s.diffHighlight[c4id] : undefined)
   if (!diff) return null
@@ -129,7 +156,7 @@ export const PersonNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       </div>
     </div>
   )
-})
+}, sameCard)
 
 PersonNode.displayName = 'PersonNode'
 
@@ -189,7 +216,7 @@ export const SystemNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       {/* Children are rendered by React Flow as separate nodes */}
     </div>
   )
-})
+}, sameCard)
 
 SystemNode.displayName = 'SystemNode'
 
@@ -246,7 +273,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
       )}
     </div>
   )
-})
+}, sameCard)
 
 ContainerNode.displayName = 'ContainerNode'
 
@@ -292,7 +319,7 @@ export const ComponentNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
       )}
     </div>
   )
-})
+}, sameCard)
 
 ComponentNode.displayName = 'ComponentNode'
 
@@ -370,28 +397,39 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) =
       </div>
     </div>
   )
-})
+}, sameCard)
 
 DatabaseNode.displayName = 'DatabaseNode'
 
 // ─── Web App Node ─────────────────────────────────────────────────────────────
 
 export const WebAppNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const w = data.width ?? 220
-  const h = data.height ?? 140
+  const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
+  const canEdit = useDiagramStore((s) => s.appMode !== 'metamodel' && !s.presentationActive)
+  const onToggle = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      toggleCollapse(data.c4id)
+    },
+    [data.c4id, toggleCollapse]
+  )
+
+  // A web app holds components like a container does: expanded, it becomes a
+  // dashed frame around them and keeps only its browser bar and label.
+  const isExpanded = data.hasChildren && !data.collapsed
   const bg = NODE_COLORS.webapp
-  const borderColor = selected ? 'var(--accent)' : 'rgba(0,0,0,0.25)'
+  const borderColor = selected ? 'var(--accent)' : (isExpanded ? bg : 'rgba(0,0,0,0.25)')
   const barH = 18
 
   return (
     <div
-      className="c4-node c4-webapp-node"
+      className={`c4-node c4-webapp-node${isExpanded ? ' c4-node-expanded' : ''}`}
       style={{
-        width: w,
-        height: h,
+        width: '100%',
+        height: '100%',
         position: 'relative',
-        background: bg,
-        border: `2px solid ${borderColor}`,
+        background: isExpanded ? 'transparent' : bg,
+        border: `2px ${isExpanded ? 'dashed' : 'solid'} ${borderColor}`,
         borderRadius: 8,
         overflow: 'hidden',
         display: 'flex',
@@ -405,7 +443,7 @@ export const WebAppNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       <div
         style={{
           height: barH,
-          background: 'rgba(0,0,0,0.25)',
+          background: isExpanded ? 'transparent' : 'rgba(0,0,0,0.25)',
           display: 'flex',
           alignItems: 'center',
           gap: 4,
@@ -416,33 +454,47 @@ export const WebAppNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5f57' }} />
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#febc2e' }} />
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#28c840' }} />
+        {data.hasChildren && canEdit && (
+          <button className="c4-node-collapse-btn" style={{ marginLeft: 'auto' }} onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+            {data.collapsed ? '+' : '−'}
+          </button>
+        )}
       </div>
 
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '6px 8px',
-          textAlign: 'center',
-        }}
-      >
-        <div className="c4-node-label">{data.label}</div>
-        <div className="c4-node-tech" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
-          Web App
+      {isExpanded ? (
+        <>
+          <div className="c4-node-tech" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: bg, padding: '4px 8px 0' }}>
+            Web App
+          </div>
+          <div className="c4-node-label" style={{ fontSize: 12, color: bg }}>{data.label}</div>
+        </>
+      ) : (
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '6px 8px',
+            textAlign: 'center',
+          }}
+        >
+          <div className="c4-node-label">{data.label}</div>
+          <div className="c4-node-tech" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+            Web App
+          </div>
+          {data.technology && (
+            <div className="c4-node-tech">[{data.technology}]</div>
+          )}
+          {data.description && (
+            <div className="c4-node-desc">{data.description}</div>
+          )}
         </div>
-        {data.technology && (
-          <div className="c4-node-tech">[{data.technology}]</div>
-        )}
-        {data.description && (
-          <div className="c4-node-desc">{data.description}</div>
-        )}
-      </div>
+      )}
     </div>
   )
-})
+}, sameCard)
 
 WebAppNode.displayName = 'WebAppNode'
 
@@ -517,7 +569,7 @@ export const QueueNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
       </div>
     </div>
   )
-})
+}, sameCard)
 
 QueueNode.displayName = 'QueueNode'
 
@@ -574,7 +626,7 @@ export const DomainNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       )}
     </div>
   )
-})
+}, sameCard)
 
 DomainNode.displayName = 'DomainNode'
 
@@ -628,7 +680,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
       )}
     </div>
   )
-})
+}, sameCard)
 
 GroupNode.displayName = 'GroupNode'
 
@@ -639,7 +691,7 @@ GroupNode.displayName = 'GroupNode'
 const ADR_COLOR = '#92400e'
 
 export const AdrNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useDiagramStore(s => s.c4Nodes[data.c4id])
+  const node = useNodeContent(data.c4id)
   const status = (node as unknown as Record<string, string> | undefined)?.status ?? 'proposed'
   const statusColor: Record<string, string> = {
     proposed:   '#fbbf24',
@@ -685,7 +737,7 @@ export const AdrNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
       </div>
     </div>
   )
-})
+}, sameCard)
 
 AdrNode.displayName = 'AdrNode'
 
@@ -729,7 +781,7 @@ export const FitnessFnNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
       </div>
     </div>
   )
-})
+}, sameCard)
 
 FitnessFnNode.displayName = 'FitnessFnNode'
 
@@ -740,7 +792,7 @@ FitnessFnNode.displayName = 'FitnessFnNode'
 const SCENARIO_COLOR = '#166534'
 
 export const ScenarioNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useDiagramStore(s => s.c4Nodes[data.c4id]) as unknown as Record<string, unknown> | undefined
+  const node = useNodeContent(data.c4id) as unknown as Record<string, unknown> | undefined
   const given = String(node?.given ?? '').trim()
   const when = String(node?.when ?? '').trim()
   const then = String(node?.then ?? '').trim()
@@ -786,7 +838,7 @@ export const ScenarioNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) =
       </div>
     </div>
   )
-})
+}, sameCard)
 
 ScenarioNode.displayName = 'ScenarioNode'
 
@@ -799,7 +851,7 @@ ScenarioNode.displayName = 'ScenarioNode'
 const MOCKUP_COLOR = '#be185d'
 
 export const MockupNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useDiagramStore(s => s.c4Nodes[data.c4id]) as unknown as Record<string, unknown> | undefined
+  const node = useNodeContent(data.c4id) as unknown as Record<string, unknown> | undefined
   const wireframe = typeof node?.wireframe === 'string' ? node.wireframe : ''
   const link = typeof node?.link === 'string' ? node.link.trim() : ''
   const screen = typeof node?.screen === 'string' ? node.screen.trim() : ''
@@ -853,9 +905,68 @@ export const MockupNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       </div>
     </div>
   )
-})
+}, sameCard)
 
 MockupNode.displayName = 'MockupNode'
+
+// ─── Need Node ────────────────────────────────────────────────────────────────
+//
+// Compact pill: slate header strip with the kind, label, then the start of
+// the raw free text (its description) — the input requirements derive from.
+
+const NEED_COLOR = '#475569'
+
+export const NeedNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useNodeContent(data.c4id)
+  const kind = (node as unknown as Record<string, string> | undefined)?.kind ?? 'brief'
+  const text = (node?.description ?? '').trim()
+
+  return (
+    <div
+      className="c4-node"
+      style={{
+        position: 'relative',
+        width: data.width,
+        height: data.height,
+        background: NEED_COLOR,
+        border: `2px solid ${selected ? 'var(--accent)' : 'rgba(0,0,0,0.25)'}`,
+        borderRadius: 6,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+
+      {/* Row 1: type + kind */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
+        <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' }}>
+          NEED
+        </span>
+        <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)' }}>
+          {kind}
+        </span>
+      </div>
+
+      {/* Row 2: label */}
+      <div style={{ padding: '2px 7px 0', overflow: 'hidden' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+          {data.label}
+        </span>
+      </div>
+
+      {/* Row 3: start of the free text */}
+      <div style={{ flex: 1, padding: '2px 7px 4px', overflow: 'hidden' }}>
+        <span style={{ fontSize: 9, color: text ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', fontStyle: text ? 'normal' : 'italic', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {text || 'No text yet'}
+        </span>
+      </div>
+    </div>
+  )
+}, sameCard)
+
+NeedNode.displayName = 'NeedNode'
 
 // ─── Requirement Node (EARS) ──────────────────────────────────────────────────
 //
@@ -864,11 +975,14 @@ MockupNode.displayName = 'MockupNode'
 const REQ_COLOR = '#0e7490'
 
 export const RequirementNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
-  const node = useDiagramStore(s => s.c4Nodes[data.c4id])
-  const c4Relations = useDiagramStore(s => s.c4Relations)
-  const c4Nodes = useDiagramStore(s => s.c4Nodes)
-  const subject = resolveEarsSubject(data.c4id, c4Relations, c4Nodes)
-  const { sentence, complete } = composeEarsSentence((node ?? {}) as unknown as Record<string, unknown>, subject)
+  const node = useNodeContent(data.c4id)
+  const subject = useDiagramStore((s) => {
+    const by = satisfierOf(s.c4Relations, data.c4id)
+    return by ? s.c4Nodes[by]?.label : undefined
+  })
+  // A string, so the card re-renders only when the phrase changes.
+  const statePhrase = useDiagramStore((s) => node ? requirementStatePhrase(node, s.c4Nodes, s.c4Relations) : '')
+  const { sentence, complete } = composeEarsSentence((node ?? {}) as unknown as Record<string, unknown>, subject, statePhrase)
 
   return (
     <div
@@ -910,7 +1024,7 @@ export const RequirementNode = memo(({ data, selected }: NodeProps<C4NodeRFData>
       </div>
     </div>
   )
-})
+}, sameCard)
 
 RequirementNode.displayName = 'RequirementNode'
 
@@ -982,7 +1096,286 @@ export const BlueprintNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
       )}
     </div>
   )
-})
+}, sameCard)
 
 BlueprintNode.displayName = 'BlueprintNode'
 
+
+// ─── State machine nodes ─────────────────────────────────────────────────────
+//
+// Statechart notation: a state machine frames its states; a state is a
+// rounded box, a compound one draws its children inside it and a parallel
+// one marks its child states (regions) with dashed borders; a final state is
+// a bullseye; pseudostates are a dot (initial), an H / H* circle (history)
+// or a diamond (choice). Events are compact cards.
+
+const prop = (node: C4Node | undefined, key: string): string => {
+  const value = (node as unknown as Record<string, unknown> | undefined)?.[key]
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export const StateMachineNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
+  const canEdit = useDiagramStore((s) => s.appMode !== 'metamodel' && !s.presentationActive)
+  const onToggle = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      toggleCollapse(data.c4id)
+    },
+    [data.c4id, toggleCollapse]
+  )
+
+  const accent = NODE_COLORS['state-machine']
+  const isExpanded = data.hasChildren && !data.collapsed
+  // The entity it is the lifecycle of names the header.
+  const subject = useDiagramStore((s) => machineEntity(data.c4id, s.c4Nodes, s.c4Relations)?.label ?? '')
+
+  return (
+    <div
+      className={`c4-node${isExpanded ? ' c4-node-expanded' : ''}`}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        background: isExpanded ? 'rgba(55,48,163,0.04)' : accent,
+        border: `2px solid ${selected ? 'var(--accent)' : accent}`,
+        borderRadius: 10,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+
+      <div className="c4-node-header" style={{ background: isExpanded ? 'transparent' : 'rgba(0,0,0,0.2)' }}>
+        <span style={isExpanded ? { color: accent } : undefined}>
+          State machine{subject ? ` · ${subject}` : ''}
+        </span>
+        {data.hasChildren && canEdit && (
+          <button className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+            {data.collapsed ? '+' : '−'}
+          </button>
+        )}
+      </div>
+
+      <div className="c4-node-label" style={isExpanded ? { color: accent } : undefined}>{data.label}</div>
+      {!isExpanded && data.description && (
+        <div className="c4-node-desc">{data.description}</div>
+      )}
+    </div>
+  )
+}, sameCard)
+
+StateMachineNode.displayName = 'StateMachineNode'
+
+export const StateNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useNodeContent(data.c4id)
+  const parent = useNodeContent(data.parentId ?? '')
+  const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
+  const canEdit = useDiagramStore((s) => s.appMode !== 'metamodel' && !s.presentationActive)
+  const onToggle = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      toggleCollapse(data.c4id)
+    },
+    [data.c4id, toggleCollapse]
+  )
+
+  const accent = NODE_COLORS.state
+  const kind = prop(node, 'kind') || 'normal'
+  const isRegion = parent?.type === 'state' && prop(parent, 'kind') === 'parallel'
+  const isExpanded = data.hasChildren && !data.collapsed
+  const borderColor = selected ? 'var(--accent)' : accent
+
+  if (kind === 'final') {
+    return (
+      <div className="c4-node" style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+        <AllHandles />
+        <DiffOverlay c4id={data.c4id} />
+        <svg width="30" height="30" viewBox="0 0 30 30" aria-label="Final state">
+          <circle cx="15" cy="15" r="13" fill="none" stroke={borderColor} strokeWidth="2.5" />
+          <circle cx="15" cy="15" r="8" fill={accent} />
+        </svg>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {data.label}
+        </span>
+      </div>
+    )
+  }
+
+  const compartments = [
+    prop(node, 'entry') && `entry / ${prop(node, 'entry')}`,
+    kind === 'normal' && prop(node, 'do') && `do / ${prop(node, 'do')}`,
+    prop(node, 'exit') && `exit / ${prop(node, 'exit')}`,
+  ].filter(Boolean) as string[]
+
+  return (
+    <div
+      className={`c4-node${isExpanded ? ' c4-node-expanded' : ''}`}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        background: isExpanded ? 'rgba(79,70,229,0.05)' : accent,
+        border: `2px ${isRegion ? 'dashed' : 'solid'} ${borderColor}`,
+        borderRadius: 16,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+
+      {(isExpanded || kind === 'parallel') && (
+        <div className="c4-node-header" style={{ background: 'transparent' }}>
+          <span style={{ color: isExpanded ? accent : 'rgba(255,255,255,0.8)' }}>
+            {kind === 'parallel' ? 'Parallel state' : isRegion ? 'Region' : 'State'}
+          </span>
+          {data.hasChildren && canEdit && (
+            <button className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+              {data.collapsed ? '+' : '−'}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div style={{ padding: isExpanded ? '0 12px' : '8px 12px 2px', textAlign: isExpanded ? 'left' : 'center' }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: isExpanded ? accent : '#fff', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {data.label}
+        </span>
+      </div>
+      {compartments.length > 0 && (
+        <div style={{ margin: '4px 0 0', padding: '3px 12px 4px', borderTop: `1px solid ${isExpanded ? 'rgba(79,70,229,0.25)' : 'rgba(255,255,255,0.35)'}` }}>
+          {compartments.map((line) => (
+            <div key={line} style={{ fontSize: 10, lineHeight: '1.35', color: isExpanded ? accent : 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {line}
+            </div>
+          ))}
+        </div>
+      )}
+      {!isExpanded && data.hasChildren && canEdit && kind !== 'parallel' && (
+        <button className="c4-node-collapse-btn" onClick={onToggle} title="Expand" style={{ position: 'absolute', top: 4, right: 6 }}>+</button>
+      )}
+    </div>
+  )
+}, sameCard)
+
+StateNode.displayName = 'StateNode'
+
+export const PseudostateNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useNodeContent(data.c4id)
+  const kind = prop(node, 'kind') || 'initial'
+  // The notation's black dot, which has to stay visible on a dark canvas.
+  const color = 'var(--text-primary)'
+  const ring = selected ? 'var(--accent)' : color
+  const size = Math.min(data.width, data.height)
+
+  return (
+    <div className="c4-node" title={`${data.label} (${kind})`} style={{ position: 'relative', width: data.width, height: data.height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+      <svg width={size} height={size} viewBox="0 0 36 36" aria-label={kind}>
+        {kind === 'initial' && <circle cx="18" cy="18" r="11" fill={color} stroke={ring} strokeWidth={selected ? 3 : 0} />}
+        {kind === 'choice' && <path d="M18 3 33 18 18 33 3 18Z" fill="var(--bg-panel)" stroke={ring} strokeWidth="2.5" />}
+        {(kind === 'shallow-history' || kind === 'deep-history') && (
+          <>
+            <circle cx="18" cy="18" r="15" fill="var(--bg-panel)" stroke={ring} strokeWidth="2.5" />
+            <text x="18" y="23" textAnchor="middle" fontSize="14" fontWeight="700" fill={color} fontFamily="system-ui, sans-serif">
+              {kind === 'deep-history' ? 'H*' : 'H'}
+            </text>
+          </>
+        )}
+      </svg>
+    </div>
+  )
+}, sameCard)
+
+PseudostateNode.displayName = 'PseudostateNode'
+
+export const EventNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useNodeContent(data.c4id)
+  const source = prop(node, 'source') || 'external'
+  const color = NODE_COLORS.event
+
+  return (
+    <div
+      className="c4-node"
+      style={{
+        position: 'relative',
+        width: data.width,
+        height: data.height,
+        background: color,
+        border: `2px solid ${selected ? 'var(--accent)' : 'rgba(0,0,0,0.25)'}`,
+        borderRadius: 6,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
+        <svg viewBox="0 0 16 16" width="10" height="10" fill="rgba(255,255,255,0.8)" style={{ flexShrink: 0 }}>
+          <path d={TYPE_ICON_PATHS.event} />
+        </svg>
+        <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)' }}>
+          Event · {source}
+        </span>
+      </div>
+      <div style={{ padding: '3px 7px', overflow: 'hidden' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+          {data.label}
+        </span>
+      </div>
+    </div>
+  )
+}, sameCard)
+
+EventNode.displayName = 'EventNode'
+
+// ─── Entity Node (DDD) ───────────────────────────────────────────────────────
+//
+// A domain object card: kind (aggregate root or entity) over the name.
+
+export const EntityNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useNodeContent(data.c4id)
+  const kind = prop(node, 'kind') || 'aggregate-root'
+  const color = NODE_COLORS.entity
+
+  return (
+    <div
+      className="c4-node"
+      style={{
+        position: 'relative',
+        width: data.width,
+        height: data.height,
+        background: color,
+        border: `2px ${kind === 'aggregate-root' ? 'solid' : 'dashed'} ${selected ? 'var(--accent)' : 'rgba(0,0,0,0.25)'}`,
+        borderRadius: 6,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 7px', background: 'rgba(0,0,0,0.25)' }}>
+        <svg viewBox="0 0 16 16" width="10" height="10" fill="rgba(255,255,255,0.8)" style={{ flexShrink: 0 }}>
+          <path d={TYPE_ICON_PATHS.entity} />
+        </svg>
+        <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)' }}>
+          {kind === 'aggregate-root' ? 'Aggregate root' : 'Entity'}
+        </span>
+      </div>
+      <div style={{ padding: '4px 7px', overflow: 'hidden' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+          {data.label}
+        </span>
+      </div>
+    </div>
+  )
+}, sameCard)
+
+EntityNode.displayName = 'EntityNode'

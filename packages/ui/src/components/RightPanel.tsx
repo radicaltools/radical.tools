@@ -1,12 +1,20 @@
-import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback, memo } from 'react'
 import { useDiagramStore, nodeEffectivelyCollapsedInView } from '../store/diagramStore'
-import { C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '@radical/common/c4'
-import { resolveEarsSubject } from '@radical/common/metamodel'
+import { useChildIds, useNodeContent, useNodeLabels } from '../store/nodeSelectors'
+import { type C4Relation, C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '@radical/common/c4'
+import { resolveEarsSubject, NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
+import { RefPicker } from './RefPicker'
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
+
+/** A view with no node list shows the whole model. */
+function viewNodeCount(view: { nodeIds: string[] }): string {
+  const n = view.nodeIds.length
+  return n === 0 ? 'All nodes' : `${n} ${n === 1 ? 'node' : 'nodes'}`
+}
 
 function AutoResizeTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -62,14 +70,7 @@ const PALETTE_SUBLABELS: Record<string, string> = {
 const PALETTE_ORDER = ['domain', 'group', 'person', 'system', 'container', 'component', 'database', 'webapp', 'queue']
 
 // Groups shown in the palette. Types not listed here fall into "Custom".
-const PALETTE_GROUPS: { label: string; types: string[] }[] = [
-  { label: 'C4',          types: ['person', 'system', 'container', 'component', 'database', 'webapp', 'queue'] },
-  { label: 'Domain',      types: ['domain'] },
-  { label: 'Governance',  types: ['adr', 'fitness-fn', 'blueprint'] },
-  { label: 'Requirements',types: ['requirement', 'scenario'] },
-  { label: 'UX',          types: ['mockup'] },
-  { label: 'Other',       types: ['group'] },
-]
+const PALETTE_GROUPS = NODE_TYPE_CATEGORIES
 
 function PaletteItem({ typeId, label, sublabel, color, iconPath }: {
   typeId: string
@@ -107,11 +108,12 @@ function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
   /** Nodes that directly match the active filter (vs. shown only as an ancestor path) — used to highlight them. */
   matchedSet?: Set<string> | null
 }) {
-  const node = useDiagramStore((s) => s.c4Nodes[nodeId])
+  // Content, not geometry: the live layout moves nodes every frame.
+  const node = useNodeContent(nodeId)
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
   const selectNode = useDiagramStore((s) => s.selectNode)
   const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
-  const allNodes = useDiagramStore((s) => s.c4Nodes)
+  const childIds = useChildIds(nodeId)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const activeView = useDiagramStore((s) => s.activeViewId ? s.views[s.activeViewId] : undefined)
   const addNodeToView = useDiagramStore((s) => s.addNodeToView)
@@ -119,7 +121,7 @@ function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
 
   if (!node) return null
 
-  const children = Object.values(allNodes).filter((n) => n.parentId === nodeId && (!filterSet || filterSet.has(n.id)))
+  const children = childIds.filter((id) => !filterSet || filterSet.has(id))
   const hasChildren = children.length > 0
   const isSelected = selectedNodeId === nodeId
   const canCollapse = isContainerType(node.type) && hasChildren
@@ -173,8 +175,8 @@ function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
           </span>
         )}
       </div>
-      {!isEffectivelyCollapsed && children.map((c) => (
-        <TreeNodeItem key={c.id} nodeId={c.id} depth={depth + 1} filterSet={filterSet} matchedSet={matchedSet} />
+      {!isEffectivelyCollapsed && children.map((childId) => (
+        <TreeNodeItem key={childId} nodeId={childId} depth={depth + 1} filterSet={filterSet} matchedSet={matchedSet} />
       ))}
     </>
   )
@@ -182,39 +184,33 @@ function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
 
 // ── Relation row ──────────────────────────────────────────────────────────────
 
-function RelationListItem({ relationId }: { relationId: string }): React.ReactElement | null {
-  const rel = useDiagramStore((s) => s.c4Relations[relationId])
-  const sourceLabel = useDiagramStore((s) => {
-    const r = s.c4Relations[relationId]; if (!r) return ''
-    const n = s.c4Nodes[r.sourceId]; return n ? (n.label || n.type) : '?'
-  })
-  const targetLabel = useDiagramStore((s) => {
-    const r = s.c4Relations[relationId]; if (!r) return ''
-    const n = s.c4Nodes[r.targetId]; return n ? (n.label || n.type) : '?'
-  })
-  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+interface RelationListItemProps {
+  rel: C4Relation
+  sourceLabel: string
+  targetLabel: string
+  isSelected: boolean
+  /** Active view, when one is; then whether the relation is hidden there and
+   *  both its ends are in it. */
+  activeViewId: string | null
+  hidden: boolean
+  endpointsInView: boolean
+}
+
+/** One row of the Relations list. Props only: with a thousand relations,
+ *  a store subscription per row ran on every live-layout frame. */
+const RelationListItem = memo(function RelationListItem({
+  rel, sourceLabel, targetLabel, isSelected, activeViewId, hidden, endpointsInView,
+}: RelationListItemProps): React.ReactElement {
   const selectEdge = useDiagramStore((s) => s.selectEdge)
-  const activeViewId = useDiagramStore((s) => s.activeViewId)
-  const activeView = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
   const hideRelationFromView = useDiagramStore((s) => s.hideRelationFromView)
   const unhideRelationInView = useDiagramStore((s) => s.unhideRelationInView)
-
-  if (!rel) return null
-
-  // A relation is "in view" when no view is active OR the active view does
-  // not have it on its hidden list AND both endpoints are visible there.
-  const hidden = !!activeView?.hiddenRelationIds?.includes(relationId)
-  const endpointsInView = !activeView
-    || activeView.nodeIds.length === 0
-    || (activeView.nodeIds.includes(rel.sourceId) && activeView.nodeIds.includes(rel.targetId))
-  const inView = !activeView || (!hidden && endpointsInView)
-  const isSelected = selectedEdgeId === relationId
+  const inView = !activeViewId || (!hidden && endpointsInView)
 
   return (
     <div
       className={`tree-node ${isSelected ? 'selected' : ''}`}
       style={{ paddingLeft: 12, opacity: inView ? 1 : 0.35 }}
-      onClick={() => selectEdge(relationId)}
+      onClick={() => selectEdge(rel.id)}
       title={rel.label || `${sourceLabel} → ${targetLabel}`}
     >
       <span className="tree-toggle" style={{ opacity: 0.3 }}>·</span>
@@ -237,8 +233,8 @@ function RelationListItem({ relationId }: { relationId: string }): React.ReactEl
           title={hidden ? 'Show in view' : 'Hide from view'}
           onClick={(e) => {
             e.stopPropagation()
-            if (hidden) unhideRelationInView(activeViewId, relationId)
-            else hideRelationFromView(activeViewId, relationId)
+            if (hidden) unhideRelationInView(activeViewId, rel.id)
+            else hideRelationFromView(activeViewId, rel.id)
           }}
         >
           {hidden ? '👁‍🗨' : '👁'}
@@ -246,28 +242,49 @@ function RelationListItem({ relationId }: { relationId: string }): React.ReactEl
       )}
     </div>
   )
-}
+})
 
 function RelationsSection(): React.ReactElement {
   const relations = useDiagramStore((s) => s.c4Relations)
-  const c4Nodes = useDiagramStore((s) => s.c4Nodes)
-  const ids = useMemo(() => {
+  // Labels only: the live layout replaces c4Nodes every frame.
+  const labels = useNodeLabels()
+  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+  const activeViewId = useDiagramStore((s) => s.activeViewId)
+  const activeView = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
+  const rels = useMemo(() => {
     return Object.values(relations)
-      .filter((r) => c4Nodes[r.sourceId] && c4Nodes[r.targetId])
+      .filter((r) => labels.has(r.sourceId) && labels.has(r.targetId))
       .sort((a, b) => {
-        const sa = (c4Nodes[a.sourceId]?.label || '').localeCompare(c4Nodes[b.sourceId]?.label || '')
+        const sa = (labels.get(a.sourceId) || '').localeCompare(labels.get(b.sourceId) || '')
         if (sa !== 0) return sa
-        return (c4Nodes[a.targetId]?.label || '').localeCompare(c4Nodes[b.targetId]?.label || '')
+        return (labels.get(a.targetId) || '').localeCompare(labels.get(b.targetId) || '')
       })
-      .map((r) => r.id)
-  }, [relations, c4Nodes])
+  }, [relations, labels])
+  // An element without a label is named by its type. Read once per change
+  // of labels: subscribing to c4Nodes would re-render on every frame.
+  const nameOf = (id: string): string => labels.get(id) || useDiagramStore.getState().c4Nodes[id]?.type || '?'
 
-  if (ids.length === 0) {
+  if (rels.length === 0) {
     return <div className="lp-empty-state" style={{ padding: '4px 12px 8px' }}>No relations.</div>
   }
+  // A relation is "in view" when no view is active OR the active view does
+  // not have it on its hidden list AND both endpoints are visible there.
+  const inViewNodes = activeView && activeView.nodeIds.length > 0 ? new Set(activeView.nodeIds) : null
+  const hiddenIds = new Set(activeView?.hiddenRelationIds ?? [])
   return (
     <>
-      {ids.map((id) => <RelationListItem key={id} relationId={id} />)}
+      {rels.map((r) => (
+        <RelationListItem
+          key={r.id}
+          rel={r}
+          sourceLabel={nameOf(r.sourceId)}
+          targetLabel={nameOf(r.targetId)}
+          isSelected={selectedEdgeId === r.id}
+          activeViewId={activeViewId}
+          hidden={hiddenIds.has(r.id)}
+          endpointsInView={!inViewNodes || (inViewNodes.has(r.sourceId) && inViewNodes.has(r.targetId))}
+        />
+      ))}
     </>
   )
 }
@@ -795,7 +812,11 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const setViewKind = useDiagramStore((s) => s.setViewKind)
   const setViewSequence = useDiagramStore((s) => s.setViewSequence)
   const setViewLayoutMode = useDiagramStore((s) => s.setViewLayoutMode)
+  const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
+  const setAlignmentOrdered = useDiagramStore((s) => s.setAlignmentOrdered)
+  const setGridColumns = useDiagramStore((s) => s.setGridColumns)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
+  const labels = useNodeLabels()
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState('')
   const seqList = Object.values(sequences)
@@ -930,6 +951,63 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
           </select>
         </div>
       )}
+      {(isStatic || isDynamic) && (view.layoutConstraints?.length ?? 0) > 0 && (
+        <div>
+          <div className="props-section-title">Layout rules</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {view.layoutConstraints!.map((c) => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{c.type === 'grid' ? 'Grid' : c.type === 'pin' ? 'Pinned' : c.axis === 'horizontal' ? 'Row' : 'Column'}</span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}
+                  title={c.nodeIds.map((id) => labels.get(id) ?? id).join(c.type === 'grid' || (c.type === 'align' && c.ordered) ? ' → ' : ', ')}>
+                  {c.nodeIds.map((id) => labels.get(id) ?? id).join(c.type === 'grid' || (c.type === 'align' && c.ordered) ? ' → ' : ', ')}
+                </span>
+                {c.type === 'pin' ? null : c.type === 'grid' ? (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, color: 'var(--text-muted)' }} title="Columns; the cells fill row by row in the order listed">
+                    <input
+                      type="number"
+                      min={1}
+                      max={c.nodeIds.length}
+                      value={c.columns}
+                      disabled={readOnly}
+                      onChange={(e) => {
+                        const n = Math.round(Number(e.target.value))
+                        if (n >= 1 && n <= c.nodeIds.length) setGridColumns(c.id, n, view.id)
+                      }}
+                      className="props-input"
+                      style={{ width: 40, padding: '1px 4px', fontSize: 11 }}
+                    />
+                    columns
+                  </label>
+                ) : (
+                  <label
+                    style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, color: 'var(--text-muted)', cursor: readOnly ? 'default' : 'pointer' }}
+                    title={c.axis === 'horizontal' ? 'Keep them left to right in the order listed (the order they were selected in)' : 'Keep them top to bottom in the order listed (the order they were selected in)'}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!c.ordered}
+                      disabled={readOnly}
+                      onChange={(e) => setAlignmentOrdered(c.id, e.target.checked, view.id)}
+                      style={{ margin: 0 }}
+                    />
+                    in order
+                  </label>
+                )}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => removeLayoutConstraint(c.id, view.id)}
+                    title={c.type === 'pin' ? 'Unpin them: the live physics may move them again' : 'Stop keeping these elements aligned'}
+                    aria-label={c.type === 'pin' ? 'Unpin all' : 'Remove alignment'}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, padding: '0 2px' }}
+                  >×</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {isDynamic && (
         <div>
           <div className="props-section-title">Sequence</div>
@@ -954,7 +1032,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
       )}
       <div>
         <div className="props-section-title">Nodes</div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{view.nodeIds.length} node{view.nodeIds.length !== 1 ? 's' : ''}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{viewNodeCount(view)}</div>
       </div>
       {!readOnly && (
         <button className="props-delete" onClick={() => { removeView(view.id); setActiveView(null); onClose() }}>
@@ -1090,7 +1168,7 @@ function ViewList({ readOnly = false, onOpenProps }: { readOnly?: boolean; onOpe
               <div className="lp-card-body">
                 <div className="lp-card-title">{v.name}</div>
                 <div className="lp-card-meta">
-                  <span>{v.nodeIds.length} {v.nodeIds.length === 1 ? 'node' : 'nodes'}</span>
+                  <span>{viewNodeCount(v)}</span>
                   {isDynamic && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>flow</span>}
                   {isTreemap && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>hierarchy</span>}
                   {isTable && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>table</span>}
@@ -1189,7 +1267,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
       .filter(g => g.items.length > 0)
 
     if (customTypes.length > 0) {
-      groups.push({ label: 'Custom', items: customTypes.map(makeItem) })
+      groups.push({ label: CUSTOM_CATEGORY.label, items: customTypes.map(makeItem) })
     }
 
     return groups
@@ -1713,8 +1791,17 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
     }
 
     // Renders a metamodel PropertyDef as a form control, including enum selects.
-    const metamodelField = (p: { key: string; label: string; type: string; options?: string[]; default?: string | number | boolean }) => {
+    const metamodelField = (p: PropertyDef) => {
       const value = (node as unknown as Record<string, unknown>)[p.key]
+      if (p.type === 'ref') {
+        return (
+          <div className="props-field" key={p.key}>
+            <label className="props-label">{p.label}</label>
+            <RefPicker def={p} value={value} readOnly={readOnly}
+              onChange={(v) => !readOnly && updateNode(node.id, { [p.key]: v } as Parameters<typeof updateNode>[1])} />
+          </div>
+        )
+      }
       const onChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         if (readOnly) return
         updateNode(node.id, {
@@ -1987,7 +2074,15 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
             {relField('label', 'Label')}
             {/* Metamodel-driven properties; fallback to Technology only for relations with no type def */}
             {relMetaProps.length > 0
-              ? relMetaProps.map(p => relField(p.key, p.label, p.type, p.options))
+              ? relMetaProps.map(p => p.type === 'ref'
+                ? (
+                  <div className="props-field" key={p.key}>
+                    <label className="props-label">{p.label}</label>
+                    <RefPicker def={p} value={(rel as unknown as Record<string, unknown>)[p.key]} readOnly={readOnly}
+                      onChange={(v) => !readOnly && updateRelation(rel.id, { [p.key]: v } as Parameters<typeof updateRelation>[1])} />
+                  </div>
+                )
+                : relField(p.key, p.label, p.type, p.options))
               : !relTypeDef && relField('technology', 'Technology')
             }
           </div>
@@ -2093,7 +2188,7 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
   const handleShowMatches = () => { if (activeViewId && nodesMatchedSet) setViewNodes(activeViewId, Array.from(nodesMatchedSet)) }
   const handleHideMatches = () => {
     if (!activeViewId || !nodesMatchedSet) return
-    for (const id of nodesMatchedSet) removeNodeFromView(activeViewId, id)
+    removeNodeFromView(activeViewId, Array.from(nodesMatchedSet))
   }
 
   // Pane 2 is shown when any item is selected

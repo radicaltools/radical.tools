@@ -47,9 +47,12 @@ function normalize(data: DiagramData, tempToReal: Map<string, string>) {
     .map(({ id: _id, ...r }) => ({ ...r, sourceId: id(r.sourceId), targetId: id(r.targetId) }))
     .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const views = (data.views ?? [])
-    .map(({ positions: _p, viewport: _v, ...v }) => ({ ...v, id: id(v.id), nodeIds: v.nodeIds.map(id) }))
+    .map(({ positions: _p, viewport: _v, ...v }) => ({ ...v, id: id(v.id), nodeIds: v.nodeIds.map(id), sequenceId: id(v.sequenceId) }))
     .sort((a, b) => String(a.id).localeCompare(String(b.id)))
-  return { nodes, relations, views, text }
+  const sequences = (data.sequences ?? [])
+    .map((sequence) => ({ ...sequence, id: id(sequence.id) }))
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)))
+  return { nodes, relations, views, sequences, metamodel: data.metamodel, text }
 }
 
 const blueprint = readCatalogue().find((e) => e.doc.hub.category === 'blueprint')!.doc
@@ -62,6 +65,7 @@ describe('headless facade matches the Studio store', () => {
     const start = useDiagramStore.getState().saveDiagram()
     const someNode = start.nodes.find((n) => !n.parentId)!
     const someRelation = start.relations[0]
+    const otherRelation = start.relations[1]
 
     let seq = 0
     const headless = createModelFacade(start, { newId: () => `id${++seq}` })
@@ -79,6 +83,22 @@ describe('headless facade matches the Studio store', () => {
       ['create_view', { tempId: 'v', name: 'Billing', nodeIds: ['sys', 'api', 'sys', 'ghost'], kind: 'table', active: true }],
       ['add_node', { tempId: 'db', type: 'container', label: 'Ledger', parentId: 'sys' }], // lands in the active view
       ['set_view_nodes', { id: 'v', nodeIds: ['db', 'sys'] }],
+      ['add_node', { tempId: 'sys2', type: 'system', label: 'Payments' }],
+      ['move_node', { id: 'db', parentId: 'sys2' }],
+      ['move_node', { id: 'db', parentId: null }],                                     // refused: containment
+      ['update_view', { id: 'v', name: 'Billing overview', kind: 'matrix' }],
+      ['create_sequence', { tempId: 'seq', name: 'Flow', steps: [{ relationId: otherRelation.id, description: 'First step' }] }],
+      ['update_sequence', { id: 'seq', name: 'Main flow', steps: [{ relationId: otherRelation.id }, { relationId: otherRelation.id }] }],
+      ['create_view', { tempId: 'dyn', name: 'Flow view', kind: 'dynamic', sequenceId: 'seq' }],
+      ['create_view', { tempId: 'bad', name: 'No flow', kind: 'dynamic' }],               // refused: no sequence
+      ['upsert_node_type', {
+        id: 'risk', label: 'Risk', allowedAtRoot: true,
+        properties: [{ key: 'severity', label: 'Severity', type: 'enum', options: ['low', 'high'] }],
+      }],
+      ['add_node', { tempId: 'risk1', type: 'risk', label: 'Outage', properties: { severity: 'high' } }],
+      ['upsert_relation_type', { id: 'mitigates', label: 'Mitigates', allowedPairs: [{ from: 'requirement', to: 'risk' }] }],
+      ['add_relation', { sourceId: 'req', targetId: 'risk1', relationType: 'mitigates' }],
+      ['delete_node_type', { id: 'risk' }],                                             // refused: in use
       ['delete_relation', { id: someRelation.id }],
       ['delete_node', { id: 'sys' }],                                                  // cascades
       ['set_active_view', { id: null }],
@@ -100,6 +120,9 @@ describe('headless facade matches the Studio store', () => {
     expect(nb.nodes).toEqual(na.nodes)
     expect(nb.relations).toEqual(na.relations)
     expect(nb.views).toEqual(na.views)
+    expect(nb.sequences).toEqual(na.sequences)
+    expect(nb.metamodel).toEqual(na.metamodel)
+    expect(na.metamodel?.nodeTypes.risk).toBeDefined()
   })
 
   it('resets like the store does', () => {

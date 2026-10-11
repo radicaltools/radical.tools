@@ -157,6 +157,8 @@ function resolveMetamodel(raw) {
     errors.push('"metamodel" must be an object when present')
     return { nodeTypes: {}, pairs: [], relationTypeIds: new Set(), allowAnyPair: false, name: 'invalid' }
   }
+  // The retired C4 + DDD preset opens as the Radical metamodel, as in the app.
+  if (raw.id === 'c4-ddd-builtin') return { ...builtInPreset('c4-ddd-governance-builtin'), name: raw.id }
   if (PRESET_IDS.has(raw.id)) return { ...builtInPreset(raw.id), name: raw.id }
   if (!raw.id || typeof raw.id !== 'string') errors.push('custom metamodel requires a string "id"')
   if (!raw.name || typeof raw.name !== 'string') errors.push('custom metamodel requires a string "name"')

@@ -7,8 +7,9 @@ name: E2E — update screenshots
 # again when the run ends). Only baselines that changed or are missing are
 # rewritten. Review the new images in the PR diff before merging.
 #
-# A push made with GITHUB_TOKEN does not start other workflows: re-run the
-# CI checks on the PR afterwards (or push any commit).
+# A push made with GITHUB_TOKEN does not start other workflows, and re-running
+# an earlier CI run tests its old commit (the old baselines): push any commit
+# afterwards, an empty one is fine, to check the new baselines.
 
 on:
   pull_request:

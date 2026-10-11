@@ -80,6 +80,6 @@ Relations follow "initiator → target". Databases never initiate (`database` mu
 
 ## Optional sections
 
-For views, sequences (dynamic views), presentations, milestones/snapshots, the DDD/governance types (`domain`, `adr`, `fitness-fn`, `requirement`, `blueprint`), and custom metamodels, read [references/radical-file-format.md](references/radical-file-format.md).
+For views, sequences (dynamic views), presentations, milestones/snapshots, the DDD/governance types (`domain`, `adr`, `fitness-fn`, `need`, `requirement`, `scenario`, `mockup`, `blueprint`), and custom metamodels, read [references/radical-file-format.md](references/radical-file-format.md).
 
 The minimal example above is a complete, valid core-C4 model.

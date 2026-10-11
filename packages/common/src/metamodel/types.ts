@@ -7,7 +7,7 @@
 // The metamodel is stored per-document and validated softly: violations
 // surface in the Issues panel rather than blocking edits.
 
-export type PropertyType = 'text' | 'textarea' | 'boolean' | 'number' | 'enum'
+export type PropertyType = 'text' | 'textarea' | 'boolean' | 'number' | 'enum' | 'ref'
 
 export interface PropertyDef {
   key: string
@@ -16,6 +16,12 @@ export interface PropertyDef {
   required?: boolean
   /** Only for `type === 'enum'`. */
   options?: string[]
+  /** Only for `type === 'ref'`: the node type the property points at. The
+   *  value is that node's id (rename-safe), or with `multiple` an array of
+   *  ids. A relation cannot point at a node; a reference property can. */
+  refType?: string
+  /** Only for `type === 'ref'`: several nodes instead of one. */
+  multiple?: boolean
   default?: string | number | boolean
   /** Show this property only when another property has one of the listed values.
    *  E.g. `{ key: 'ears_type', values: ['event-driven', 'complex'] }` means

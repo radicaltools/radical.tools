@@ -51,6 +51,16 @@ const sample: DiagramData = {
 }
 
 describe('md-folder persistence', () => {
+  it('keeps a list property (a multiple reference) as a list of ids', () => {
+    const risk = node({ id: 'risk1', type: 'adr', label: 'Vendor lock-in', ...({ owners: ['p1', 'p2'], note: '[not a list]' } as Record<string, unknown>) })
+    const files = serializeToMdFolder({ nodes: [risk], relations: [] }, 'Refs')
+    const md = Object.entries(files).find(([path]) => path.endsWith('.md') && path !== MD_MANIFEST_FILE)![1]
+    expect(md).toContain('owners: ["p1","p2"]')
+    const back = deserializeFromMdFolder(files).data.nodes[0] as unknown as Record<string, unknown>
+    expect(back.owners).toEqual(['p1', 'p2'])
+    expect(back.note).toBe('[not a list]')
+  })
+
   it('produces a manifest and one file per node', () => {
     const files = serializeToMdFolder(sample, 'Demo')
     expect(isMdFolder(files)).toBe(true)
@@ -61,6 +71,18 @@ describe('md-folder persistence', () => {
     expect(paths).toContain('nodes/payment-system/api/_index.md')
     expect(paths).toContain('nodes/payment-system/api/ledger-db.md')
     expect(paths.some((p) => p.startsWith('nodes/use-event-sourcing'))).toBe(true)
+  })
+
+  it('stores a web app as a directory, with or without components, and reads its old flat file', () => {
+    const web = node({ id: 'web1', type: 'webapp', label: 'Portal', parentId: 'sys1' })
+    const data = { ...sample, nodes: [...sample.nodes, web] }
+    const files = serializeToMdFolder(data)
+    expect(Object.keys(files)).toContain('nodes/payment-system/portal/_index.md')
+    // A folder written before web apps held components keeps a flat file.
+    const flat: Record<string, string> = { ...files, 'nodes/payment-system/portal.md': files['nodes/payment-system/portal/_index.md'] }
+    delete flat['nodes/payment-system/portal/_index.md']
+    const back = deserializeFromMdFolder(flat).data.nodes.find((n) => n.id === 'web1')
+    expect(back).toMatchObject({ type: 'webapp', parentId: 'sys1' })
   })
 
   it('keeps positions out of the markdown and in the layout sidecar', () => {
@@ -102,6 +124,27 @@ describe('md-folder persistence', () => {
     const req = back.nodes.find((n) => n.id === 'req1') as unknown as Record<string, unknown>
     expect(req.ears_type).toBe('event-driven')
     expect(req.priority).toBe('must')
+  })
+
+  it('stores a need\'s free text as the Markdown body of its file', () => {
+    const text = '# Checkout brief\n\nCustomers want to pay with a saved card.\n\n- Must work on mobile\n- GDPR applies'
+    const data: DiagramData = {
+      ...sample,
+      nodes: [node({ id: 'need1', type: 'need', label: 'Checkout brief', description: text, ...({
+        kind: 'brief',
+      } as Record<string, unknown>) })],
+      relations: [],
+      views: [],
+      sequences: [],
+      defaultPositions: {},
+    }
+    const files = serializeToMdFolder(data)
+    const md = files['nodes/checkout-brief.md']
+    expect(md).toContain('type: "need"')
+    expect(md.split('---').slice(2).join('---').trim()).toBe(text)
+    const back = deserializeFromMdFolder(files).data.nodes[0] as unknown as Record<string, unknown>
+    expect(back.description).toBe(text)
+    expect(back.kind).toBe('brief')
   })
 
   it('does not confuse numeric-looking strings with numbers', () => {

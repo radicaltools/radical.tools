@@ -105,6 +105,39 @@ describe('setAppMode designer ↔ viewer', () => {
     }
   })
 
+  it('a load in viewer (outside edit reloaded) survives the return to designer', () => {
+    useDiagramStore.getState().setAppMode('viewer')
+    // What an MCP client adding a node looks like once the folder is reloaded.
+    const data = useDiagramStore.getState().saveDiagram()
+    data.nodes = [...data.nodes, { id: 'mcp-added', type: 'container', label: 'Added by MCP', x: 0, y: 0 } as C4Node]
+    useDiagramStore.getState().loadDiagram(data)
+    expect(useDiagramStore.getState().c4Nodes['mcp-added']).toBeDefined()
+    useDiagramStore.getState().setAppMode('designer')
+    expect(useDiagramStore.getState().c4Nodes['mcp-added']?.label).toBe('Added by MCP')
+    expect(Object.keys(useDiagramStore.getState().c4Nodes).sort())
+      .toEqual(data.nodes.map((n) => n.id).sort())
+  })
+
+  it('drags in viewer after such a load are still reverted', () => {
+    useDiagramStore.getState().setAppMode('viewer')
+    useDiagramStore.getState().loadDiagram(useDiagramStore.getState().saveDiagram())
+    const x = useDiagramStore.getState().c4Nodes['ctn1'].x
+    useDiagramStore.setState((s: any) => { s.c4Nodes['ctn1'].x = 9999; return s })
+    useDiagramStore.getState().setAppMode('designer')
+    expect(useDiagramStore.getState().c4Nodes['ctn1'].x).toBe(x)
+  })
+
+  it('a load that drops the view designer had open falls back to All elements', () => {
+    const viewId = useDiagramStore.getState().addView('Doomed')
+    useDiagramStore.getState().setActiveView(viewId)
+    useDiagramStore.getState().setAppMode('viewer')
+    const data = useDiagramStore.getState().saveDiagram()
+    data.views = (data.views ?? []).filter((v) => v.id !== viewId)
+    useDiagramStore.getState().loadDiagram(data)
+    useDiagramStore.getState().setAppMode('designer')
+    expect(useDiagramStore.getState().activeViewId).toBeNull()
+  })
+
   it("'presenter' is a first-class mode distinct from 'viewer'", () => {
     useDiagramStore.getState().setAppMode('presenter')
     expect(useDiagramStore.getState().appMode).toBe('presenter')

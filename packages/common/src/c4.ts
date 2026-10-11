@@ -2,11 +2,11 @@
 
 import { builtInGovernanceMetamodel, type Metamodel, type NodeTypeDef } from './metamodel'
 
-export type C4ElementType = 'person' | 'system' | 'container' | 'component' | 'database' | 'webapp' | 'queue' | 'domain' | 'group' | 'adr' | 'fitness-fn' | 'requirement' | 'scenario' | 'blueprint' | 'mockup'
+export type C4ElementType = 'person' | 'system' | 'container' | 'component' | 'database' | 'webapp' | 'queue' | 'domain' | 'group' | 'adr' | 'fitness-fn' | 'need' | 'requirement' | 'scenario' | 'blueprint' | 'mockup' | 'state-machine' | 'state' | 'pseudostate' | 'event' | 'entity'
 
 /** Types that act as containers (can hold children, collapse, auto-resize). */
 export const CONTAINER_TYPES: ReadonlySet<string> = new Set([
-  'system', 'container', 'domain', 'group', 'blueprint',
+  'system', 'container', 'webapp', 'domain', 'group', 'blueprint', 'state-machine', 'state',
 ])
 
 /** True when the given node-type id behaves as a parent container. */
@@ -163,6 +163,126 @@ export interface DiagramView {
    * affecting other views or the default "all nodes" view.
    */
   expandedNodeIds?: string[]
+  /**
+   * Layout rules the user set for this view's canvas; every layout (live
+   * physics, Smart Layout, MCP) keeps them. Optional for backwards compat.
+   */
+  layoutConstraints?: LayoutConstraint[]
+}
+
+/**
+ * A layout rule that holds on one canvas whatever moves: drags, the live
+ * physics, Smart Layout. Members hidden on the canvas (outside the view,
+ * under a collapsed parent) are skipped; a line left with fewer than two
+ * members rests.
+ */
+export type LayoutConstraint = AlignConstraint | GridConstraint | PinConstraint
+
+/**
+ * Keeps the centres of `nodeIds` on one line — a row (`axis: 'horizontal'`,
+ * equal centre y) or a column (`axis: 'vertical'`, equal centre x). With
+ * `ordered`, the members also keep the order of `nodeIds` along that line:
+ * left to right in a row, top to bottom in a column.
+ */
+export interface AlignConstraint {
+  id: string
+  type: 'align'
+  axis: 'horizontal' | 'vertical'
+  nodeIds: string[]
+  ordered?: boolean
+}
+
+/**
+ * Keeps `nodeIds` in a grid of `columns` columns, filled row by row in the
+ * order of `nodeIds`: every row is an ordered row, every column an ordered
+ * column (gridCells).
+ */
+export interface GridConstraint {
+  id: string
+  type: 'grid'
+  columns: number
+  nodeIds: string[]
+}
+
+/**
+ * Keeps `nodeIds` where they stand: the live physics does not move them (a
+ * drag still does). A canvas has at most one; dropping an element after a
+ * drag adds it. A layout of the whole canvas (Smart Layout) places every
+ * element anew and removes it.
+ */
+export interface PinConstraint {
+  id: string
+  type: 'pin'
+  nodeIds: string[]
+}
+
+/** The elements pinned on a canvas with these rules. */
+export function pinnedNodeIds(constraints: readonly LayoutConstraint[] | undefined): string[] {
+  return constraints?.find((c): c is PinConstraint => c.type === 'pin')?.nodeIds ?? []
+}
+
+/** Columns for a grid of `count` elements when none are asked for: about square. */
+export function defaultGridColumns(count: number): number {
+  return Math.max(1, Math.ceil(Math.sqrt(count)))
+}
+
+/** A landscape grid keeps up to this many columns per row. */
+const LANDSCAPE_WIDTH = 2
+
+/**
+ * Cell `index` of a grid that grows wider than tall: it adds a column while
+ * it has fewer than twice as many columns as rows, otherwise a row, and fills
+ * the new column or row before growing again. Cells already handed out never
+ * move, so elements placed one by one end up in a landscape block rather than
+ * a tall column or an endless row.
+ */
+export function landscapeSlot(index: number): { column: number; row: number } {
+  if (index <= 0) return { column: 0, row: 0 }
+  let columns = 1
+  let rows = 1
+  let filled = 1
+  for (;;) {
+    if (columns < LANDSCAPE_WIDTH * rows) {
+      if (index < filled + rows) return { column: columns, row: index - filled }
+      filled += rows
+      columns++
+    } else {
+      if (index < filled + columns) return { column: index - filled, row: rows }
+      filled += columns
+      rows++
+    }
+  }
+}
+
+/** Columns of the landscape grid (landscapeSlot) that holds `count` elements. */
+export function landscapeGridColumns(count: number): number {
+  let columns = 1
+  for (let i = 0; i < count; i++) columns = Math.max(columns, landscapeSlot(i).column + 1)
+  return columns
+}
+
+/** A grid's rows and columns, each listed in order. */
+export function gridCells(c: Pick<GridConstraint, 'columns' | 'nodeIds'>): { rows: string[][]; columns: string[][] } {
+  const cols = Math.max(1, Math.min(Math.floor(c.columns), c.nodeIds.length))
+  const rows: string[][] = []
+  for (let i = 0; i < c.nodeIds.length; i += cols) rows.push(c.nodeIds.slice(i, i + cols))
+  const columns: string[][] = []
+  for (let k = 0; k < cols; k++) columns.push(c.nodeIds.filter((_, i) => i % cols === k))
+  return { rows, columns }
+}
+
+/** Every rule as the lines it keeps: alignments as they are, a grid as its
+ *  ordered rows and columns, a pin none. */
+export function constraintLines(constraints: readonly LayoutConstraint[]): AlignConstraint[] {
+  return constraints.flatMap((c): AlignConstraint[] => {
+    if (c.type === 'align') return [c]
+    if (c.type === 'pin') return []
+    const { rows, columns } = gridCells(c)
+    return [
+      ...rows.map((ids, r): AlignConstraint => ({ id: `${c.id}:row${r}`, type: 'align', axis: 'horizontal', nodeIds: ids, ordered: true })),
+      ...columns.map((ids, k): AlignConstraint => ({ id: `${c.id}:col${k}`, type: 'align', axis: 'vertical', nodeIds: ids, ordered: true })),
+    ]
+  })
 }
 
 /** Named snapshot (version) of the diagram state */
@@ -190,6 +310,11 @@ export interface PresentationSlide {
   /** null = show all nodes; string = activate this view when navigating to slide */
   viewId?: string | null
   viewport: { x: number; y: number; zoom: number }
+  /**
+   * Elements the slide zooms onto when it has no captured viewport: the
+   * camera frames just these, so several slides can show parts of one view.
+   */
+  focusNodeIds?: string[]
   /** Full node positions + collapsed flags at the time the slide was created/captured */
   canvasState?: SlideCanvasState
   /**
@@ -220,6 +345,8 @@ export interface DiagramData {
   defaultPositions?: Record<string, NodePosition>
   /** Camera state (pan + zoom) for the "All" (default) view */
   defaultViewport?: { x: number; y: number; zoom: number } | null
+  /** Layout constraints of the "All" (default) view; a named view keeps its own. */
+  defaultLayoutConstraints?: LayoutConstraint[]
   /** Named snapshots (versions) */
   snapshots?: DiagramSnapshot[]
   /** Multiple named presentations */
@@ -272,7 +399,7 @@ export type PositionMap = Record<string, { x: number; y: number; width?: number;
 // The actual label/color/icon/size data for each built-in type lives with
 // the metamodel preset that introduces it (`types/metamodel/presets/*`),
 // not here. `builtInGovernanceMetamodel()` is the superset of every
-// built-in type (C4 + DDD + Governance), so the flat lookup tables below —
+// built-in type (Radical metamodel), so the flat lookup tables below —
 // kept for the many call sites that index by type without carrying a
 // `Metamodel` around — are generated from it rather than hand-duplicated.
 
@@ -288,6 +415,17 @@ function pluckPerType<T>(fn: (def: NodeTypeDef) => T): Record<C4ElementType, T> 
 
 export const NODE_SIZES: Record<C4ElementType, { width: number; height: number }> =
   pluckPerType(def => ({ width: def.width, height: def.height }))
+
+/** Size of a new node of `type`: the active metamodel's type first (custom
+ *  types are only there), then the built-in size, then a default. */
+export function nodeTypeSize(type: string, metamodel?: Metamodel | null): { width: number; height: number } {
+  const def = metamodel?.nodeTypes[type]
+  const builtIn = NODE_SIZES[type as C4ElementType] as { width: number; height: number } | undefined
+  return {
+    width: def?.width ?? builtIn?.width ?? 160,
+    height: def?.height ?? builtIn?.height ?? 90,
+  }
+}
 
 export const COLLAPSED_HEIGHT: Record<C4ElementType, number> =
   pluckPerType(def => def.collapsedHeight ?? def.height)

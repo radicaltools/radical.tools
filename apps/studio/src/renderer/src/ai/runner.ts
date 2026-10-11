@@ -7,8 +7,10 @@
 
 import { emptyReport, mergeReport, type ApplyReport, type DiagramFacade } from '@radical/common/ai/diagramFacade'
 import { getAdapter } from './registry'
-import { buildContextMessage, buildSystemMessages } from './systemPrompt'
-import { buildToolDefs, buildToolHandlers, type ToolRunContext } from '@radical/common/ai/tools'
+import { buildSystemMessages } from './systemPrompt'
+import { buildContextMessage } from '@radical/common/ai/systemPrompt'
+import { buildToolDefs, runTool, type ToolGroup, type ToolRunContext } from '@radical/common/ai/tools'
+import { createBatchPlacer } from '@radical/layout/geometry'
 import { addTokenUsage, textOf, toolCallsOf, type AISettings, type ChatContentBlock, type ChatMessage, type TokenUsage } from './types'
 
 export interface RunAIResult {
@@ -50,6 +52,10 @@ export interface RunAIOptions {
    *  `buildMetamodelMessage`. Radical Forge passes its active stage's
    *  primary type(s); QuickSearch omits it for full detail always. */
   relevantTypeIds?: Set<string>
+  /** Tool groups to leave out. Radical Forge only builds the model, so it
+   *  leaves out 'metamodel', 'presentation' and 'milestone'; QuickSearch's chat
+   *  has all. */
+  excludeToolGroups?: ToolGroup[]
 }
 
 /** Appends a fresh text block to a turn's content ahead of sending it — used
@@ -87,6 +93,19 @@ function describeToolCall(name: string, input: unknown, ctx: ToolRunContext): st
     case 'set_view_nodes': return '~ updated view'
     case 'set_active_view': return 'switched view'
     case 'delete_view': return '− removed view'
+    case 'move_node': return `↳ moved ${nodeLabel(i.id)}`
+    case 'update_view': return `~ view: ${String(i.name ?? 'updated')}`
+    case 'create_sequence': return `+ sequence: ${String(i.name ?? '')}`
+    case 'update_sequence': return '~ updated sequence'
+    case 'delete_sequence': return '− removed sequence'
+    case 'create_presentation': return `+ presentation: ${String(i.name ?? '')}`
+    case 'update_presentation': return '~ updated presentation'
+    case 'delete_presentation': return '− removed presentation'
+    case 'upsert_node_type': return `~ element type: ${String(i.label ?? i.id ?? '')}`
+    case 'delete_node_type': return `− element type: ${String(i.id ?? '')}`
+    case 'upsert_relation_type': return `~ relation type: ${String(i.label ?? i.id ?? '')}`
+    case 'delete_relation_type': return `− relation type: ${String(i.id ?? '')}`
+    case 'smart_layout': return 'ran Smart Layout'
     case 'search_model': return 'searched the model'
     case 'focus_node': return 'focused a node'
     case 'reset_diagram': return 'reset the diagram'
@@ -95,36 +114,39 @@ function describeToolCall(name: string, input: unknown, ctx: ToolRunContext): st
 }
 
 export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
-  const { settings, prompt, diagram, history = [], signal, onProgress, relevantTypeIds } = opts
+  const { settings, prompt, diagram, history = [], signal, onProgress, relevantTypeIds, excludeToolGroups } = opts
   const maxIterations = opts.maxIterations ?? 12
   const cfg = settings.providers[settings.active]
   const adapter = getAdapter(settings.active)
   const model = cfg.model || adapter.defaultModel
 
-  const metamodel = diagram.getMetamodel?.()
-  const tools = buildToolDefs(metamodel)
-  const handlers = buildToolHandlers()
+  // Rebuilt when a metamodel tool changes the types mid-run, so the next
+  // round's schemas (node-type enums) and metamodel message match.
+  let metamodel = diagram.getMetamodel?.()
+  let tools = buildToolDefs(metamodel, { exclude: excludeToolGroups })
 
   // Shared across the WHOLE run — a node created in round 1 must still be
   // resolvable by a relation created in round 3, and reset_diagram (any
   // round) must invalidate every tempId registered before it.
   const tempToReal = new Map<string, string>()
-  let placedThisRun = 0
-  const PLACE_X0 = 80
-  const PLACE_Y0 = 80
-  const STEP_X = 360
-  const PER_ROW = 4
+  // New nodes go beside what the canvas on screen already shows, in a block
+  // that grows sideways (see createBatchPlacer).
+  const placeNext = createBatchPlacer(() => diagram.getNodes(), () => {
+    const view = diagram.getActiveView?.()
+    if (!view?.nodeIds.length) return undefined
+    const nodes = diagram.getNodes()
+    const shown = new Set<string>()
+    for (const id of view.nodeIds) {
+      for (let cur: string | undefined = id; cur && nodes[cur] && !shown.has(cur); cur = nodes[cur].parentId) shown.add(cur)
+    }
+    return shown
+  })
   const ctx: ToolRunContext = {
     diagram,
     resolveId: (id) => tempToReal.get(id) ?? id,
     registerTempId: (tempId, realId) => { tempToReal.set(tempId, realId) },
     resetTempIds: () => { tempToReal.clear() },
-    placeNext: () => {
-      const col = placedThisRun % PER_ROW
-      const row = Math.floor(placedThisRun / PER_ROW)
-      placedThisRun++
-      return { x: PLACE_X0 + col * STEP_X, y: PLACE_Y0 + row * 280 }
-    },
+    placeNext,
   }
 
   // Working transcript for THIS run — kept separate from the caller's
@@ -151,6 +173,12 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
 
     round++
     onProgress?.({ type: 'round', round })
+
+    const liveMetamodel = diagram.getMetamodel?.()
+    if (liveMetamodel !== metamodel) {
+      metamodel = liveMetamodel
+      tools = buildToolDefs(metamodel, { exclude: excludeToolGroups })
+    }
 
     // The prompt + metamodel prefix is byte-identical every round (see
     // systemPrompt.ts) so it stays cacheable across rounds AND stages.
@@ -208,20 +236,15 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
     const resultBlocks: ChatContentBlock[] = []
     const roundErrors: string[] = []
     for (const call of calls) {
-      const handler = handlers.get(call.name)
-      if (!handler) {
+      // Only tools offered this run: a left-out group stays out even if named.
+      if (!tools.some((tool) => tool.name === call.name)) {
         const msg = `Unknown tool "${call.name}"`
         resultBlocks.push({ type: 'tool_result', toolCallId: call.id, content: msg, isError: true })
         roundErrors.push(msg)
         onProgress?.({ type: 'action', ok: false, label: msg })
         continue
       }
-      let result
-      try {
-        result = handler(call.input, ctx)
-      } catch (err) {
-        result = { ok: false, resultText: (err as Error).message }
-      }
+      const result = await runTool(call.name, call.input, ctx)
       resultBlocks.push({ type: 'tool_result', toolCallId: call.id, content: result.resultText, isError: !result.ok })
       if (result.ok) mergeReport(report, result)
       else roundErrors.push(`${call.name}: ${result.resultText}`)

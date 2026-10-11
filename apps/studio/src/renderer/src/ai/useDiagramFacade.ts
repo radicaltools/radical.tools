@@ -9,6 +9,9 @@
 import { useMemo } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
+import type { AlignConstraint, Presentation } from '@radical/common/c4'
+import * as model from '@radical/common/model'
+import type { Metamodel } from '@radical/common/metamodel'
 
 export function useDiagramFacade(): DiagramFacade {
   return useMemo(createStoreFacade, [])
@@ -32,6 +35,8 @@ export function createStoreFacade(): DiagramFacade {
     updateNode: (id: string, u: Parameters<ReturnType<typeof useDiagramStore.getState>['updateNode']>[1]) =>
       useDiagramStore.getState().updateNode(id, u),
     removeNode: (id: string) => useDiagramStore.getState().removeNode(id),
+    moveNodes: (ids: string[], parentId: string | null) =>
+      useDiagramStore.getState().reparentNodes(ids, parentId),
     addRelation: (r: Parameters<ReturnType<typeof useDiagramStore.getState>['addRelation']>[0]) =>
       useDiagramStore.getState().addRelation(r),
     updateRelation: (id: string, u: Parameters<ReturnType<typeof useDiagramStore.getState>['updateRelation']>[1]) =>
@@ -46,19 +51,69 @@ export function createStoreFacade(): DiagramFacade {
     setActiveView: (id: string | null) => useDiagramStore.getState().setActiveView(id),
     setViewKind: (id: string, kind: Parameters<ReturnType<typeof useDiagramStore.getState>['setViewKind']>[1]) =>
       useDiagramStore.getState().setViewKind(id, kind),
-    // ── diagram-level ──
-    clearDiagram: () => {
+    renameView: (id: string, name: string) => useDiagramStore.getState().renameView(id, name),
+    setViewSequence: (id: string, sequenceId: string | null) =>
+      useDiagramStore.getState().setViewSequence(id, sequenceId),
+    setViewHiddenRelations: (id: string, relationIds: string[]) =>
+      useDiagramStore.getState().setViewHiddenRelations(id, relationIds),
+    getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(useDiagramStore.getState(), viewId),
+    addAlignment: (viewId: string | null, axis: AlignConstraint['axis'], nodeIds: string[], ordered = false) => {
+      // The store aligns on the canvas on screen, so switch to the requested one first.
       const s = useDiagramStore.getState()
-      s.loadDiagram({
-        nodes: [],
-        relations: [],
-        views: [],
-        defaultPositions: {},
-        defaultViewport: null,
-        snapshots: [],
-        presentations: [],
-        metamodel: s.metamodel,
+      const refused = model.checkAddAlignment(s, viewId, axis, nodeIds, ordered)
+      if (refused) return { error: refused }
+      if (viewId !== s.activeViewId) s.setActiveView(viewId)
+      const id = useDiagramStore.getState().addAlignment(axis, nodeIds, { ordered })
+      return id ? { id } : { error: 'The alignment was refused.' }
+    },
+    addGrid: (viewId: string | null, nodeIds: string[], columns: number) => {
+      const s = useDiagramStore.getState()
+      const refused = model.checkAddGrid(s, viewId, nodeIds, columns)
+      if (refused) return { error: refused }
+      if (viewId !== s.activeViewId) s.setActiveView(viewId)
+      const id = useDiagramStore.getState().addGrid(nodeIds, columns)
+      return id ? { id } : { error: 'The grid was refused.' }
+    },
+    removeLayoutConstraints: (viewId: string | null, ids: string[]) =>
+      useDiagramStore.getState().removeLayoutConstraint(ids, viewId),
+    // ── sequences ──
+    getSequences: () => useDiagramStore.getState().sequences,
+    addSequence: (name: string) => useDiagramStore.getState().addSequence(name),
+    renameSequence: (id: string, name: string) => useDiagramStore.getState().renameSequence(id, name),
+    setSequenceSteps: (id: string, steps: Array<{ relationId: string; description?: string }>) => {
+      const s = useDiagramStore.getState()
+      s.clearSequence(id)
+      steps.forEach((step, i) => {
+        s.toggleRelationInSequence(id, step.relationId)
+        if (step.description) s.updateStepDescription(id, i, step.description)
       })
     },
+    removeSequence: (id: string) => useDiagramStore.getState().removeSequence(id),
+    // ── milestones ──
+    getMilestones: () => useDiagramStore.getState().snapshots,
+    openMilestone: () => {
+      // The same test persistence uses: the live model is parked in liveBackup.
+      const { activeSnapshotId, liveBackup, snapshots } = useDiagramStore.getState()
+      return activeSnapshotId && liveBackup ? snapshots.find((s) => s.id === activeSnapshotId) ?? null : null
+    },
+    createMilestone: (name: string) => useDiagramStore.getState().createSnapshot(name),
+    renameMilestone: (id: string, name: string) => useDiagramStore.getState().renameSnapshot(id, name),
+    removeMilestone: (id: string) => useDiagramStore.getState().removeSnapshot(id),
+    // ── metamodel, presentations, layout ──
+    setMetamodel: (metamodel: Metamodel) => useDiagramStore.getState().setMetamodel(metamodel),
+    getPresentations: () => useDiagramStore.getState().presentations,
+    setPresentations: (presentations: Presentation[]) => useDiagramStore.getState().setPresentations(presentations),
+    runLayout: async (viewId?: string) => {
+      const s = useDiagramStore.getState()
+      if (s.appMode !== 'designer') return { ok: false, text: 'Smart Layout runs only in the designer.' }
+      // Studio lays out what is on screen, so switch to the requested canvas first.
+      const target = viewId ?? null
+      if (target !== s.activeViewId) s.setActiveView(target)
+      await useDiagramStore.getState().runSmartLayout()
+      const name = target ? useDiagramStore.getState().views[target]?.name ?? target : 'All elements'
+      return { ok: true, text: `Ran Smart Layout on ${name}.` }
+    },
+    // ── diagram-level ──
+    clearDiagram: () => useDiagramStore.getState().clearModel(),
   }
 }
