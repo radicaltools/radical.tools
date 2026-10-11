@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, dirname } from 'node:path'
+import { join, dirname, basename } from 'node:path'
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
@@ -303,7 +303,7 @@ describe('Radical Forge over MCP', () => {
       const finish = await call(client, 'forge_finish', {})
       expect(finish).toContain('- Requirements: skipped')
       expect(finish).toContain('Feature:')
-      const dir = join(folder, '..', `${folder.split('/').pop()}-features`)
+      const dir = join(folder, '..', `${basename(folder)}-features`)
       folders.push(dir)
       expect(await call(client, 'forge_finish', { gherkinDir: dir })).toContain('Wrote 1 .feature files')
       const [file] = await readdir(dir)
