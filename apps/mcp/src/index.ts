@@ -3,6 +3,7 @@ import { McpServer, fromJsonSchema, type RegisteredTool } from '@modelcontextpro
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import { FolderModel, PRESETS, READ_ONLY_TOOLS, type OpenOptions } from './folderModel'
 import { FORGE_PROCEDURE } from './forge'
+import { version } from '../package.json'
 
 const USAGE = `Usage: radical-mcp --folder <model-folder> [--metamodel ${Object.keys(PRESETS).join('|')}]
   --folder     the Markdown model folder, absolute or relative to the working directory;
@@ -59,7 +60,7 @@ function forgePrompt(description: string): string {
 async function main(): Promise<void> {
   const { folder, metamodel } = parseArgs(process.argv.slice(2))
   const model = await FolderModel.open(folder, { metamodel })
-  const server = new McpServer({ name: 'radical-folder', version: '0.1.0' }, { instructions: INSTRUCTIONS })
+  const server = new McpServer({ name: 'radical-folder', version }, { instructions: INSTRUCTIONS })
   const registered = new Map<string, RegisteredTool>()
   const gone = new AbortController()
   const advertise = (): void => {

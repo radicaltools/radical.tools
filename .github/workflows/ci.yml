@@ -43,3 +43,19 @@ jobs:
     name: E2E
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
     uses: ./.github/workflows/e2e.yml
+
+  mcp-package:
+    name: MCP package (${{ matrix.os }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [20, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci --ignore-scripts
+      - run: npm run test:package -w ./apps/mcp

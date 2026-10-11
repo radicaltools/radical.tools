@@ -146,7 +146,7 @@ apps/
   vscode/         VS Code extension; bundles the Studio web build as its webview
   e2e/            End-to-end regression suite (Playwright) for the web builds
                   of Studio and Hub, with screenshot baselines
-  mcp/            MCP server for radical models (empty for now)
+  mcp/            @radical.tools/mcp: local stdio MCP server for model folders
   web/            Marketing site and manual (radical.tools)
 packages/
   common/         @radical/common: C4 + metamodel types, file formats, query
