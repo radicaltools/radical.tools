@@ -2,13 +2,27 @@
 
 This local stdio MCP server lets Codex read and edit one Radical **Markdown model folder**. Point it at a folder containing `radical.md`, `nodes/**/*.md` and the JSON sidecars, or at an empty or missing folder, which becomes a new model. Studio's browser folder watcher reloads outside edits on its normal poll, so changes appear on the open canvas without a separate browser connection.
 
-## Build and connect
+## Install and connect
 
-Use Node.js 20 or newer. From the repository root:
+Use Node.js 20.11 or newer. Run the published server without cloning this repository:
+
+```sh
+npx -y @radical.tools/mcp --folder /absolute/path/to/my-model
+```
+
+For reproducible setups, pin a version, for example `@radical.tools/mcp@0.1.0`.
+To connect a coding agent, use `npx` as the command, with
+`["-y", "@radical.tools/mcp@0.1.0", "--folder", "/absolute/path/to/my-model"]`
+as its arguments. On Windows, use `npx.cmd` as the command and an absolute Windows
+folder path. The server waits for MCP messages on stdin and prints no banner to stdout.
+
+## Build from source
+
+From the repository root:
 
 ```sh
 npm install
-npm run build -w @radical/mcp
+npm run build -w @radical.tools/mcp
 node apps/mcp/dist/index.js --folder /absolute/path/to/my-model
 ```
 
@@ -46,4 +60,72 @@ Writes preserve unrelated files and the existing `radical.md` text. A tool repor
 
 For now, keep Studio in **viewer use while the MCP client writes**. Folder writes span several files, and Studio and MCP do not share a cross-process transaction lock. Editing the same folder simultaneously from both can still race; the stamp check only catches changes visible before a write begins. Single `.radical` JSON files, snapshots (milestones), browser commands, and remote HTTP MCP are not supported by this server.
 
-Run `npm run test -w @radical/mcp` to build and exercise a real stdio connection and temporary disk folder.
+Run `npm run test -w @radical.tools/mcp` to build and exercise a real stdio connection and temporary disk folder.
+
+## Publishing (maintainers)
+
+The package contains only its ESM build, the Hub catalogue, this README, its
+manifest and the MIT license. The four private `@radical/*` workspaces are build
+dependencies bundled by tsup; users install only the MCP SDK and ELK.js as runtime
+dependencies. `prepack` builds from source, clears old build output and copies
+the catalogue and root license. The MCP handshake reports the package version.
+
+Before the first release, from the repository root:
+
+```sh
+npm ci --ignore-scripts
+npm run check:workspaces
+npm run typecheck
+npm test
+npm run test:package -w ./apps/mcp -- --out-dir ../../release
+```
+
+The last command builds and packs the package, installs it with production
+dependencies in a temporary project outside this repository, then starts its
+installed executable over stdio. It checks the handshake, disk writes and reload,
+Smart Layout's lazy-loaded chunks, and Forge's bundled Hub catalogue. Only after
+those checks pass does it copy the verified tarball into `release/`. The same
+check runs on Linux and Windows with Node 20 and 24 in CI.
+
+Log in to npm with the account that owns the `radical.tools` organization and
+publish the verified first-release archive, completing npm's 2FA challenge:
+
+```sh
+npm login
+npm whoami
+npm publish ./release/radical.tools-mcp-0.1.0.tgz --access public
+```
+
+Do this after the pull request is merged, from the reviewed main commit. A name
+and version can only be published once. For later releases, bump only this
+workspace's version (and the lockfile) in a pull request:
+
+```sh
+npm version patch -w ./apps/mcp --no-git-tag-version
+```
+
+### GitHub Actions with Trusted Publishing
+
+After the first package exists, open its npm **Settings → Trusted publishing**
+and add GitHub Actions with these values:
+
+| Field | Value |
+| --- | --- |
+| Organization or user | `radicaltools` |
+| Repository | `radical.tools` |
+| Workflow filename | `mcp-publish.yml` |
+| Environment name | Leave empty |
+| Allowed actions | Enable direct publishing with `npm publish` |
+
+No npm token or GitHub secret is needed. npm requires Node 22.14+ and npm 11.5.1+
+for Trusted Publishing; the workflow uses Node 24 and npm 11, and gives only the
+publish job `id-token: write`. A new trusted publisher must complete its first
+successful publish within two days, so configure it when the next version is
+ready. See [npm's Trusted Publishing instructions](https://docs.npmjs.com/trusted-publishers/).
+
+In GitHub **Actions → Publish MCP to npm → Run workflow**, select `main` and leave
+**dry-run** enabled to verify and upload the package without publishing. For a
+reviewed version bump, run it with **dry-run** disabled. Actual publishing is
+refused on any branch other than `main`. The workflow type-checks and tests the
+monorepo, verifies the installable tarball, and publishes that same archive with
+provenance. Pushing a branch or a desktop `v*` tag does not publish the MCP package.

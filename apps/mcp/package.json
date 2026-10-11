@@ -1,25 +1,47 @@
 {
-  "name": "@radical/mcp",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@radical.tools/mcp",
+  "version": "0.1.0",
   "description": "Local MCP server for Radical Markdown model folders.",
+  "license": "MIT",
+  "homepage": "https://radical.tools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/radicaltools/radical.tools.git",
+    "directory": "apps/mcp"
+  },
+  "bugs": "https://github.com/radicaltools/radical.tools/issues",
+  "keywords": ["mcp", "model-context-protocol", "architecture", "c4", "radical"],
   "type": "module",
+  "bin": {
+    "radical-mcp": "dist/index.js"
+  },
+  "files": ["dist", "LICENSE"],
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsup",
     "start": "node dist/index.js",
-    "test": "npm run build && vitest run"
+    "test": "npm run build && vitest run",
+    "test:package": "node scripts/test-package.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test && npm run test:package"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.2.0",
-    "@radical/common": "*",
-    "@radical/hub-catalogue": "*",
-    "@radical/layout": "*",
-    "@radical/node-files": "*",
     "elkjs": "^0.9.3"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.2.0",
+    "@radical/common": "*",
+    "@radical/hub-catalogue": "*",
+    "@radical/layout": "*",
+    "@radical/node-files": "*",
     "@types/node": "^22.20.4",
     "tsup": "^8.5.1",
     "typescript": "^5.3.3",

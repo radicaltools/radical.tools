@@ -2325,6 +2325,14 @@
     "targetId": "7e445183-ea24-4338-abca-b7934e94ccf0"
   },
   {
+    "id": "547683a3-f113-418d-a67f-788449f3664e",
+    "label": "installs MCP package",
+    "relationType": "interacts",
+    "sourceId": "27effcd1-fdf7-4173-8d66-0c1ab7a8dbb9",
+    "targetId": "c20893c8-b656-41b9-aac3-3fb9e6e3469c",
+    "technology": "npx"
+  },
+  {
     "id": "54a046dc-3560-4ceb-b301-0051f4cc3792",
     "relationType": "derives",
     "sourceId": "33ed83f4-5df3-42a3-a5d8-cce2ddabc6ac",
@@ -4816,6 +4824,12 @@
     "targetId": "72c351b2-0cb5-4ca8-95fc-873210c0cf1f"
   },
   {
+    "id": "af431be2-e9d5-494d-8faa-92f974be685e",
+    "relationType": "implements",
+    "sourceId": "3015c7f5-e82a-4a9a-b0fb-b9990a5ef6eb",
+    "targetId": "2da47ec9-900f-45a0-ab4d-b976ebf465e8"
+  },
+  {
     "id": "af4d06f9-7ef2-4f4d-acd4-fff9c85e0300",
     "relationType": "derives",
     "sourceId": "e81279dc-b55b-4e18-b449-9ed917821dbf",
@@ -5149,6 +5163,13 @@
     "relationType": "satisfies",
     "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
     "targetId": "33ed83f4-5df3-42a3-a5d8-cce2ddabc6ac"
+  },
+  {
+    "id": "c062ce64-6ed1-4db2-a23f-6e0d2d3fdcb0",
+    "label": "distributed as @radical.tools/mcp",
+    "relationType": "interacts",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "c20893c8-b656-41b9-aac3-3fb9e6e3469c"
   },
   {
     "id": "c06aad07-b6d0-4062-8f61-b168baf1716c",
@@ -5917,6 +5938,20 @@
     "relationType": "derives",
     "sourceId": "bcde343d-1b42-45bb-b0a8-b9241d458fea",
     "targetId": "7ef5cf61-e50b-4455-b7be-80ee13afafc2"
+  },
+  {
+    "id": "dc3feb22-348d-40df-a9d7-a98b259fbad6",
+    "label": "publishes verified MCP tarball",
+    "relationType": "interacts",
+    "sourceId": "f2d51835-1d89-4283-a8b9-6f3b3e060f05",
+    "targetId": "c20893c8-b656-41b9-aac3-3fb9e6e3469c",
+    "technology": "OIDC, npm provenance"
+  },
+  {
+    "id": "dcbdab7a-db7c-420e-b452-843b0e01b457",
+    "relationType": "constrains",
+    "sourceId": "2da47ec9-900f-45a0-ab4d-b976ebf465e8",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "id": "dcbed682-4c7a-4942-ad68-21dee2b079cf",

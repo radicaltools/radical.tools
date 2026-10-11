@@ -14,6 +14,10 @@ export default defineConfig({
   platform: 'node',
   target: 'node20',
   outDir: 'dist',
+  clean: true,
   noExternal: ['@radical/common', '@radical/hub-catalogue', '@radical/layout', '@radical/node-files'],
-  onSuccess: async () => { await cp(catalogue, 'dist/hub-catalogue', { recursive: true }) },
+  onSuccess: async () => {
+    await cp(catalogue, 'dist/hub-catalogue', { recursive: true })
+    await cp(fileURLToPath(new URL('../../LICENSE', import.meta.url)), 'LICENSE')
+  },
 })

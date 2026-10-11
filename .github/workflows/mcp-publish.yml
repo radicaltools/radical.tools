@@ -1,0 +1,51 @@
+name: Publish MCP to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Validate and upload the package without publishing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Publish only from main
+        if: ${{ !inputs.dry-run && github.ref != 'refs/heads/main' }}
+        run: |
+          echo '::error::Publish MCP releases from main after the pull request is merged.'
+          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+      - name: Install npm with trusted publishing support
+        run: npm install --global npm@11
+      - run: npm ci --ignore-scripts
+      - run: npm run check:workspaces
+      - run: npm run typecheck
+      - run: npm test
+      - name: Verify the installable tarball
+        run: npm run test:package -w ./apps/mcp -- --out-dir ../../release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: radical-tools-mcp-npm
+          path: release/*.tgz
+          if-no-files-found: error
+      - name: Publish the verified tarball with OIDC
+        if: ${{ !inputs.dry-run }}
+        run: npm publish release/*.tgz --access public --provenance
