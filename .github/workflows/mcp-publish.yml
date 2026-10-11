@@ -46,6 +46,9 @@ jobs:
           name: radical-tools-mcp-npm
           path: release/*.tgz
           if-no-files-found: error
+      - name: Check the publish command without releasing
+        if: ${{ inputs.dry-run }}
+        run: npm publish ./release/*.tgz --access public --provenance --dry-run
       - name: Publish the verified tarball with OIDC
         if: ${{ !inputs.dry-run }}
-        run: npm publish release/*.tgz --access public --provenance
+        run: npm publish ./release/*.tgz --access public --provenance
