@@ -42,7 +42,7 @@ apps/
   vscode/         — VS Code extension
   hub/            — Architecture Hub read-only viewer
   e2e/            — End-to-end regression suite (Playwright)
-  mcp/            — @radical.tools/mcp: local stdio MCP server for model folders
+  mcp/            — @radicaltools/mcp: local stdio MCP server for model folders
   web/            — Marketing site (radical.tools)
 packages/
   common/         — @radical/common: model types, metamodels, formats, AI tools (no UI deps)
