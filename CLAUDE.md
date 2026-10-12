@@ -6,7 +6,7 @@
 Markdown-folder model (Radical metamodel): containers, shared packages,
 ADRs, fitness functions, needs and requirements. Claude Code reaches it through
 the project MCP server `radical-architecture` (`.mcp.json`), which needs
-`npm run build -w @radical.tools/mcp` once after cloning and after MCP changes.
+`npm run build -w @radicaltools/mcp` once after cloning and after MCP changes.
 Studio can open the same folder.
 
 - **Before a structural change** (a new or removed app or package, a new

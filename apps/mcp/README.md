@@ -7,12 +7,12 @@ This local stdio MCP server lets Codex read and edit one Radical **Markdown mode
 Use Node.js 20.11 or newer. Run the published server without cloning this repository:
 
 ```sh
-npx -y @radical.tools/mcp --folder /absolute/path/to/my-model
+npx -y @radicaltools/mcp --folder /absolute/path/to/my-model
 ```
 
-For reproducible setups, pin a version, for example `@radical.tools/mcp@0.1.0`.
+For reproducible setups, pin a version, for example `@radicaltools/mcp@0.1.1`.
 To connect a coding agent, use `npx` as the command, with
-`["-y", "@radical.tools/mcp@0.1.0", "--folder", "/absolute/path/to/my-model"]`
+`["-y", "@radicaltools/mcp@0.1.1", "--folder", "/absolute/path/to/my-model"]`
 as its arguments. On Windows, use `npx.cmd` as the command and an absolute Windows
 folder path. The server waits for MCP messages on stdin and prints no banner to stdout.
 
@@ -22,7 +22,7 @@ From the repository root:
 
 ```sh
 npm install
-npm run build -w @radical.tools/mcp
+npm run build -w @radicaltools/mcp
 node apps/mcp/dist/index.js --folder /absolute/path/to/my-model
 ```
 
@@ -60,9 +60,14 @@ Writes preserve unrelated files and the existing `radical.md` text. A tool repor
 
 For now, keep Studio in **viewer use while the MCP client writes**. Folder writes span several files, and Studio and MCP do not share a cross-process transaction lock. Editing the same folder simultaneously from both can still race; the stamp check only catches changes visible before a write begins. Single `.radical` JSON files, snapshots (milestones), browser commands, and remote HTTP MCP are not supported by this server.
 
-Run `npm run test -w @radical.tools/mcp` to build and exercise a real stdio connection and temporary disk folder.
+Run `npm run test -w @radicaltools/mcp` to build and exercise a real stdio connection and temporary disk folder.
 
 ## Publishing (maintainers)
+
+The package is published under the `radicaltools` npm organization. The earlier
+`@radical.tools/mcp` releases have a separate npm identity; their versions and
+Trusted Publishing settings do not transfer to `@radicaltools/mcp`. Switching
+clients requires replacing the package name in their `npx` configuration.
 
 The package contains only its ESM build, the Hub catalogue, this README, its
 manifest and the MIT license. The four private `@radical/*` workspaces are build
@@ -87,13 +92,13 @@ Smart Layout's lazy-loaded chunks, and Forge's bundled Hub catalogue. Only after
 those checks pass does it copy the verified tarball into `release/`. The same
 check runs on Linux and Windows with Node 20 and 24 in CI.
 
-Log in to npm with the account that owns the `radical.tools` organization and
+Log in to npm with the account that owns the `radicaltools` organization and
 publish the verified first-release archive, completing npm's 2FA challenge:
 
 ```sh
-npm login
+npm login --auth-type=web
 npm whoami
-npm publish ./release/radical.tools-mcp-0.1.0.tgz --access public
+npm publish ./release/radicaltools-mcp-0.1.1.tgz --access public
 ```
 
 Do this after the pull request is merged, from the reviewed main commit. A name
@@ -106,7 +111,7 @@ npm version patch -w ./apps/mcp --no-git-tag-version
 
 ### GitHub Actions with Trusted Publishing
 
-After the first package exists, open its npm **Settings → Trusted publishing**
+After `@radicaltools/mcp` exists, open its npm **Settings → Trusted publishing**
 and add GitHub Actions with these values:
 
 | Field | Value |

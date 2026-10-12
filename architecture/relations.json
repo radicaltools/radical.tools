@@ -513,6 +513,12 @@
     "targetId": "637e5f54-27f5-4e22-bf73-380d9f4f772a"
   },
   {
+    "id": "129104aa-1d48-4573-8acb-4a041b7507a1",
+    "relationType": "implements",
+    "sourceId": "3015c7f5-e82a-4a9a-b0fb-b9990a5ef6eb",
+    "targetId": "53a770a9-ce40-4708-aea8-7d5ef717d8f3"
+  },
+  {
     "id": "12cea1b1-339a-4901-a4f5-7e767726afe1",
     "label": "implements the host contract of",
     "relationType": "interacts",
@@ -5166,7 +5172,7 @@
   },
   {
     "id": "c062ce64-6ed1-4db2-a23f-6e0d2d3fdcb0",
-    "label": "distributed as @radical.tools/mcp",
+    "label": "distributed as @radicaltools/mcp",
     "relationType": "interacts",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
     "targetId": "c20893c8-b656-41b9-aac3-3fb9e6e3469c"
@@ -5334,6 +5340,12 @@
     "relationType": "derives",
     "sourceId": "297a8c8e-57a5-4509-979d-e2a50892fb7c",
     "targetId": "157f7331-5a0f-4b2e-8524-06a7a9152234"
+  },
+  {
+    "id": "c6d95acf-d573-4b06-aaec-8682b07c09ee",
+    "relationType": "constrains",
+    "sourceId": "53a770a9-ce40-4708-aea8-7d5ef717d8f3",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "id": "c6eb953e-5fa6-48a3-9683-94a2ec0156e1",

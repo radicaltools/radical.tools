@@ -1,5 +1,5 @@
 {
-  "name": "@radical.tools/mcp",
+  "name": "@radicaltools/mcp",
   "version": "0.1.1",
   "description": "Local MCP server for Radical Markdown model folders.",
   "license": "MIT",
