@@ -377,10 +377,13 @@ function DiagramInner({ metamodel, filter, selection, onSelect, onEdit }: Props)
 
   const graph = useMemo(() => buildMetamodelGraph(metamodel, filter), [metamodel, filter])
 
-  // Same pipeline as Smart Layout on the model canvas: Smart Layout places
-  // everything, then the live WebCoLa physics settles the result from those
-  // positions (no re-arrangement from scratch) — link lengths pull related
-  // types together, overlaps are pushed apart, groups hold their members.
+  // Smart Layout places everything, then the live WebCoLa physics settles
+  // the result from those positions (no re-arrangement from scratch) — link
+  // lengths pull related types together, overlaps are pushed apart, groups
+  // hold their members. A model's canvas no longer relaxes after Smart
+  // Layout (it keeps the better-scoring of the two); here the relaxed
+  // result is the one wanted: Smart Layout alone spreads the category
+  // frames over a mostly empty canvas.
   useEffect(() => {
     let cancelled = false
     let settled = false
@@ -447,9 +450,8 @@ function DiagramInner({ metamodel, filter, selection, onSelect, onEdit }: Props)
               })
           },
         })
-        // skipBulk: start from Smart Layout's positions, as the canvas does
-        // after Smart Layout, instead of cola's own initial arrangement.
-        cola.start(true)
+        // From Smart Layout's positions, not cola's own initial arrangement.
+        cola.relax()
         // WebCoLa does not always converge with nested groups (see
         // known-issues.spec.ts), so the physics gets a time budget.
         budget = setTimeout(settle, PHYSICS_BUDGET_MS)

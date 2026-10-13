@@ -51,6 +51,7 @@ import { compoundPadding, projectToVisibleGraph } from './geometry'
 import { finalizeLayout as finalizeUnconstrained, ROOT_GAP, CHILD_GAP } from './layoutFinalize'
 import { alignmentError, enforceAlignments, type Alignment } from './constraints'
 import { labelGaps, labelNeed, labelSizeOf, pairKey, type PairGap } from './labelRoom'
+import { relaxLayout } from './liveColaEngine'
 
 /** finalizeLayout (with room for relation labels) plus the user's
  *  alignments, so every stage scores and refines what the canvas will keep. */
@@ -1069,6 +1070,42 @@ function scoreCandidate(
   }
 }
 
+/**
+ * What the live physics makes of a layout, as one more candidate. The canvas
+ * used to relax every small diagram after a layout, whatever Smart Layout
+ * had chosen: mostly for the worse on C4 diagrams, for the better where the
+ * engines spread many unrelated root elements wide. Scored here like the
+ * others, that relaxation is kept only when it wins, and the canvas leaves
+ * the result alone. Null for a diagram too large to relax, or when the
+ * physics does not keep the alignments.
+ */
+function relaxedCandidate(
+  nodes: Record<string, C4Node>,
+  relations: Record<string, C4Relation>,
+  from: SmartLayoutCandidate,
+  alignments: readonly Alignment[],
+): SmartLayoutCandidate | null {
+  try {
+    const moved = relaxLayout({ nodes: projectPositions(nodes, from.positions), relations, alignments: [...alignments] })
+    if (!moved) return null
+    const positions: PositionMap = { ...from.positions }
+    for (const [id, p] of Object.entries(moved)) {
+      if (nodes[id]) positions[id] = { ...positions[id], ...p }
+    }
+    const projected = projectPositions(nodes, positions)
+    if (alignmentError(projected, {}, alignments) > 1) return null
+    return {
+      name: `${from.name} · relaxed`,
+      positions,
+      metrics: computeLayoutMetrics(projected, relations),
+      score: computeCompositeScore(projected, relations),
+    }
+  } catch (err) {
+    console.warn('[smartLayout] relaxed candidate failed:', err)
+    return null
+  }
+}
+
 /** Result when no candidate survived: leave the diagram as it is. */
 function unchangedResult(
   nodes: Record<string, C4Node>,
@@ -1112,7 +1149,7 @@ export type ELKPhaseResult =
  */
 export type SmartLayoutProgress =
   | { phase: 'candidates' | 'ranking'; done: number; total: number }
-  | { phase: 'refining-a' | 'refining-b' | 'refining-c' }
+  | { phase: 'refining-a' | 'refining-b' | 'refining-c' | 'relaxing' }
 
 export type SmartLayoutOnProgress = (progress: SmartLayoutProgress) => void
 
@@ -1327,6 +1364,15 @@ export async function runSmartLayoutWorkerPhase(
     score: computeCompositeScore(refined, relations),
   }
   if (valid[0].score.composite < winner.score.composite) winner = valid[0]
+
+  onProgress?.({ phase: 'relaxing' })
+  await yieldToUI()
+  const relaxed = relaxedCandidate(nodes, relations, winner, alignments)
+  if (relaxed) {
+    valid.push(relaxed)
+    valid.sort((a, b) => a.score.composite - b.score.composite)
+    if (relaxed.score.composite < winner.score.composite) winner = relaxed
+  }
 
   const currentScore = computeCompositeScore(nodes, relations)
   // The layout on screen competes only while it keeps the alignments (a

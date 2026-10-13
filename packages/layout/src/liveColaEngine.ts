@@ -1,7 +1,7 @@
 /**
- * The live WebCoLa engine. LiveColaLayout (liveColaLayout.ts) runs it in a
- * Web Worker (liveCola.worker.ts), or on the main thread where workers are
- * not available.
+ * The live WebCoLa engine. Studio's LiveColaLayout (@radical/ui
+ * liveColaLayout.ts) runs it in a Web Worker (liveCola.worker.ts), or on the
+ * main thread where workers are not available.
  *
  * Live (dynamic) WebCoLa layout — exact same pattern as the official
  * "smallgroups" example:
@@ -10,6 +10,12 @@
  * Key: d3adaptor(d3) with .start() (keepRunning=true) starts a d3.timer
  * that calls tick() each frame. When stress < threshold the timer stops.
  * User drag calls resume() to restart the timer.
+ *
+ * A diagram that has a layout keeps it: the engine moves only what is new
+ * (an added element, the children an expand shows), with its surroundings,
+ * and what a drag moves. It arranges a whole diagram in two cases only: one
+ * that has no layout yet, and relaxLayout(), the candidate Smart Layout
+ * tries.
  */
 
 import { d3adaptor, Layout, InputNode, Group, Link, Rectangle, computeGroupBounds } from 'webcola'
@@ -136,6 +142,15 @@ const CALM_GAP = 24
  *  there, overlaps left as they are. */
 const CALM_MAX_PUSHES = 400
 
+/** An element related only to open groups is drawn to them until its drawn
+ *  box is this far from theirs (holdByGroups): about where a relation
+ *  between two leaves keeps them. */
+const GROUP_HOLD_GAP = 240
+/** Share of the way still to go that such an element covers per step, and
+ *  the most it moves in one. */
+const GROUP_HOLD_RATE = 0.2
+const GROUP_HOLD_STEP = 40
+
 export interface LiveColaCallbacks {
   getModel: () => LiveColaModel
   /** Only the nodes that moved or resized since they were last reported. */
@@ -147,16 +162,24 @@ export interface LiveColaCallbacks {
 /** A node is reported again once it moved or resized by more than this. */
 const REPORT_PX = 0.5
 
-/** From this many nodes the physics is local only. Relaxing the whole graph
- *  takes minutes (about 95 s on 450 nodes) and spreads it over tens of
- *  thousands of pixels, so: rebuilds (open, view switch, undo, Smart Layout)
- *  keep the positions they get; new nodes and drags move only their nearest
+/** The physics is local: rebuilds (open, view switch, undo, Smart Layout)
+ *  keep the positions they get, and new nodes move only their nearest
  *  LOCAL_DRAG_SIZE nodes by relation and containment steps (hubs would
  *  otherwise pull in most of the graph within two steps); the rest stays
- *  frozen until the layout rests. Arranging the whole diagram is Smart
- *  Layout's job. Smaller diagrams relax as a whole. */
-export const LOCAL_PHYSICS_MIN_NODES = 150
+ *  frozen until the layout rests. Relaxing a whole diagram moves every
+ *  element of one Smart Layout arranged (by hundreds of pixels on a dozen
+ *  nodes), and mostly to a layout that scores worse. */
 const LOCAL_DRAG_SIZE = 40
+/** Below this many nodes the physics may still move a whole diagram: to
+ *  arrange one that has no layout yet (the first start), for the candidate
+ *  Smart Layout tries (relaxLayout), and during a push drag, which asks for
+ *  it. From here up that takes minutes (about 95 s on 450 nodes) and
+ *  spreads the diagram over tens of thousands of pixels, so a push drag
+ *  moves its surroundings only. */
+export const WHOLE_DIAGRAM_MAX_NODES = 150
+/** Steps relaxLayout takes at most. Counted, not timed: the same diagram
+ *  gets the same layout on every machine. */
+const RELAX_MAX_STEPS = 600
 /** cola's `fixed` is a bit mask (2 = dragged); this bit marks frozen nodes. */
 const FROZEN = 8
 /** And this one pinned nodes (PinConstraint): held like frozen ones, for good. */
@@ -221,6 +244,10 @@ export class LiveColaEngine {
   private alignedWith = new Map<string, Set<string>>()
   private groupAlignments: GroupAlignment[] = []
   private groupOrders: GroupOrder[] = []
+  /** Leaves no link holds, with the open groups they are related to (holdByGroups). */
+  private heldByGroups: { leaf: ColaNode; groupIds: string[] }[] = []
+  /** The separations WebCoLa keeps, by node index (roomFor). */
+  private separations: { axis: 'x' | 'y'; left: number; right: number; gap: number }[] = []
   /** Positions last handed to applyPositions, to report only changes. */
   private reported = new Map<string, { x: number; y: number; width?: number; height?: number }>()
   /** Absolute top-left last reported per element (calm drags, emitPositions). */
@@ -240,6 +267,8 @@ export class LiveColaEngine {
   private pushFrom: { x: number; y: number; moved: boolean } | null = null
 
   private readonly paceRenders: boolean
+  /** Set while relax() steps without a timer: nothing in that run may depend on the clock. */
+  private untimed = false
 
   constructor(callbacks: LiveColaCallbacks, options: LiveColaEngineOptions = {}) {
     this.callbacks = callbacks
@@ -259,17 +288,19 @@ export class LiveColaEngine {
 
   /**
    * Start the live layout.
-   * @param skipBulk When true, the cola model is initialised from the
-   *   current c4Nodes positions WITHOUT running bulk synchronous
-   *   iterations (i.e. `rebuild(false)`). Use this when the diagram was
-   *   loaded from disk and already has correct positions — running the
-   *   110-iteration bulk pass would rearrange everything and overwrite
-   *   the persisted layout.
+   * @param skipBulk True when the diagram has positions (loaded from a
+   *   file): they are kept as they are. False for a diagram that has none
+   *   yet: below WHOLE_DIAGRAM_MAX_NODES nodes, the first start arranges it.
    */
   start(skipBulk = false): void {
     if (this._running) return
     this._running = true
-    if (this._bulkDone && this.cola) {
+    if (skipBulk) {
+      // Another document, or this one read again: nothing cached holds.
+      this.forget()
+      this.rebuild('rest')
+      this._bulkDone = true
+    } else if (this._bulkDone && this.cola) {
       // Resume an existing layout WITHOUT calling cola.resume(): that
       // method sets alpha=0.1 which immediately runs a synchronous
       // convergence (kick) and visibly shifts nodes. We just re-arm
@@ -278,10 +309,7 @@ export class LiveColaEngine {
       // + resume in webcola).
       // No-op otherwise — cola sits idle and positions stay put.
     } else {
-      // First start: bulk-arrange only when we don't have saved positions.
-      // When skipBulk=true (loaded from disk), we seed from c4Nodes and
-      // run 0 initial iterations so cola accepts the stored positions as-is.
-      this.rebuild(!skipBulk)
+      this.rebuild('first')
       this._bulkDone = true
     }
   }
@@ -301,26 +329,70 @@ export class LiveColaEngine {
     return this._running
   }
 
+  /** The model changed (an element added, removed, expanded, collapsed):
+   *  what is new finds its place, the rest stays. */
   invalidate(): void {
-    if (this._running) this.rebuild(false)
+    if (this._running) this.rebuild('local')
   }
 
   /**
-   * Like invalidate(), but discards cola's cached positions first so the
-   * next rebuild seeds itself from the current c4Nodes coordinates instead
-   * of carrying over stale ones. Use this whenever the store's positions
-   * were replaced wholesale (view switch, milestone load, file load, etc.).
+   * The store's positions were replaced wholesale (view switch, undo,
+   * milestone, Smart Layout): they are taken as they are, and nothing moves
+   * until an element is added or dragged. `free` names elements that should
+   * settle from where they were put (the members of an alignment just
+   * made, snapped onto their line): they move, with their surroundings.
    */
-  reset(): void {
-    // Drop cached positions; rebuild() will fall back to toAbsoluteTopLeft
-    // (which reads from c4Nodes) for every node.
+  reset(free: string[] = []): void {
+    this.forget()
+    if (this._running) this.rebuild(free.length ? 'local' : 'rest', free)
+  }
+
+  /**
+   * Relaxes the whole diagram from the positions it has, in one go (no
+   * timer), reporting where everything comes to rest. For relaxLayout.
+   * False when the diagram is too large for that.
+   */
+  relax(): boolean {
+    this.forget()
+    this._running = true
+    this.untimed = true
+    this.rebuild('whole')
+    const run = this.cola as { tick(): boolean; _alpha: number; _running: boolean } | null
+    const small = this.colaNodes.length < WHOLE_DIAGRAM_MAX_NODES
+    if (run && small) {
+      // What cola.resume() sets, without the timer it starts.
+      run._alpha = 0.1
+      run._running = true
+      for (let step = 0; step < RELAX_MAX_STEPS && this.cola === run && !run.tick(); step++) { /* stepping */ }
+      this.emitPositions()
+    }
+    this.untimed = false
+    this._running = false
+    return !!run && small
+  }
+
+  /**
+   * Relaxes the whole diagram from the positions it has, on the timer, so
+   * a canvas can show it settle. For a diagram that is laid out and relaxed
+   * on purpose every time it is drawn (the metamodel editor's); a model's
+   * canvas does not do this (see the top of this file).
+   */
+  relaxLive(): void {
+    this.forget()
+    this._running = true
+    this.rebuild('whole')
+    this.cola?.resume()
+  }
+
+  /** Drops cola's cached positions: the next rebuild takes every node's
+   *  from the model. */
+  private forget(): void {
     this.colaNodes = []
     this.idToNode.clear()
     this.colaGroups = []
     this.idToGroup.clear()
     // The positions are new: so are the lines the alignments run along.
     this.groupAlignments = []
-    if (this._running) this.rebuild(false)
   }
 
   // ─── Grab / drag / release ─────────────────────────────────────────────────
@@ -376,7 +448,7 @@ export class LiveColaEngine {
     for (const leaf of this.leavesOf(nodeId)) leaf.fixed = (leaf.fixed ?? 0) & ~PINNED
     this.calm = null
     this.pushFrom = { x: rfX, y: rfY, moved: false }
-    if (this.colaNodes.length >= LOCAL_PHYSICS_MIN_NODES) this.freezeAllBut(nodeId)
+    if (this.colaNodes.length >= WHOLE_DIAGRAM_MAX_NODES) this.freezeAllBut(nodeId)
     const cn = this.idToNode.get(nodeId)
     if (cn) {
       Layout.dragStart(cn)
@@ -899,12 +971,21 @@ export class LiveColaEngine {
     if (this._grabbedId) return false
     if (this.quietTicks >= SETTLE_TICKS) return true
     if (!this.groupAlignments.length && !this.groupOrders.length) return false
+    // relax() counts its steps instead (RELAX_MAX_STEPS).
+    if (this.untimed) return false
     const now = performance.now()
     if (!this.runStartedAt) this.runStartedAt = now
     return now - this.runStartedAt >= MAX_PROJECTED_RUN_MS
   }
 
-  private rebuild(firstRun: boolean = false): void {
+  /**
+   * Builds the WebCoLa layout from the model. `run` says what may move:
+   * 'first' arranges a diagram that has no layout yet (small ones only),
+   * 'local' moves the nodes that are new since the previous build and
+   * those named in `free`, with their surroundings, 'rest' moves nothing,
+   * 'whole' leaves everything free (relax, relaxLive).
+   */
+  private rebuild(run: 'first' | 'local' | 'rest' | 'whole', free: string[] = []): void {
     if (this.cola) this.cola.stop()
     this.resetPace()
     // The store may hold other positions now (view switch, undo, load):
@@ -1281,6 +1362,27 @@ export class LiveColaEngine {
     this.groupAlignments.sort((a, b) => a.depth - b.depth)
     this.applyPins()
 
+    // ── G: Elements only open groups hold ────────────────────────────────
+    // A relation that ends on an open group is no link: WebCoLa links
+    // leaves, and a group has none of its own. An element whose relations
+    // all end that way has nothing keeping it by the diagram, and stays
+    // behind when the rest moves; the tick handler holds it (holdByGroups).
+    // On the canvas only: inside a group, the group holds it. Not one the
+    // user aligned: it stays on its line.
+    this.separations = constraints.filter((c) => c.type === 'separation')
+    this.heldByGroups = []
+    const linked = new Set<ColaNode>(colaLinks.flatMap((l) => [l.source as ColaNode, l.target as ColaNode]))
+    const groupsOf = new Map<ColaNode, Set<string>>()
+    for (const rel of Object.values(relations)) {
+      for (const [id, groupId] of [[rel.sourceId, rel.targetId], [rel.targetId, rel.sourceId]]) {
+        const leaf = this.idToNode.get(id)
+        if (!leaf || linked.has(leaf) || nodes[id].parentId || this.alignedWith.has(id) || !this.idToGroup.has(groupId)) continue
+        if (!groupsOf.has(leaf)) groupsOf.set(leaf, new Set())
+        groupsOf.get(leaf)!.add(groupId)
+      }
+    }
+    for (const [leaf, groupIds] of groupsOf) this.heldByGroups.push({ leaf, groupIds: [...groupIds] })
+
     if (constraints.length > 0) {
       ;(layout as any).constraints(constraints)
     }
@@ -1288,6 +1390,7 @@ export class LiveColaEngine {
     layout.on('tick', () => {
       if (!this._running) return
       this.projectGroupAlignments()
+      this.holdByGroups()
       this.pinFrozen()
       const now = performance.now()
       const heavy = this.lastTickAt > 0 && now - this.lastTickAt > HEAVY_TICK_MS
@@ -1307,32 +1410,31 @@ export class LiveColaEngine {
       this.emitPositions()
     })
 
-    // First start: heavy bulk iterations to settle the diagram quickly so
-    // the user doesn't watch the layout slowly assemble from scratch.
-    // Subsequent rebuilds (model edits): NO bulk iterations — let the live
-    // d3.timer evolve positions tick-by-tick so changes animate smoothly
-    // from current positions to the new equilibrium. Persisting prevPos
-    // across rebuilds means newly-added nodes start near their neighbours
-    // instead of jumping in from the origin.
-    // Large diagrams: no bulk arrangement and no global relaxation. Only nodes
-    // that are new since the previous build (added, or shown by an expand)
-    // move, with their surroundings; with none, the timer does not start.
-    const local = this.colaNodes.length >= LOCAL_PHYSICS_MIN_NODES
-    const fresh = local && prevPos.size > 0 ? leafNodes.filter((n) => !prevPos.has(n.id)).map((n) => n.id) : []
+    // A diagram with no layout yet: heavy bulk iterations, so the user does
+    // not watch it assemble from scratch, then the timer relaxes it. Large
+    // ones are left to Smart Layout.
+    // Otherwise the layout stands. Only nodes that are new since the
+    // previous build (added, or shown by an expand) move, with their
+    // surroundings; with none, the timer does not start. Keeping prevPos
+    // across rebuilds means a new node starts near its neighbours instead
+    // of jumping in from the origin.
+    const arrange = run === 'first' && this.colaNodes.length < WHOLE_DIAGRAM_MAX_NODES
+    const fresh = run === 'local' && prevPos.size > 0 ? leafNodes.filter((n) => !prevPos.has(n.id)).map((n) => n.id) : []
+    for (const id of free) if (this.idToNode.has(id) || this.idToGroup.has(id)) fresh.push(id)
     if (fresh.length) this.freezeAllBut(...fresh)
     try {
-      if (firstRun && !local) {
+      if (arrange) {
         ;(layout as any).start(30, 30, 50, 0, true, true)
       } else {
-        ;(layout as any).start(0, 0, 0, 0, !local || fresh.length > 0, false)
+        ;(layout as any).start(0, 0, 0, 0, fresh.length > 0, false)
       }
     } catch (err) {
       console.error('[cola] start() failed:', err)
     }
 
     this.cola = layout
-    // Nothing to move on a large diagram: it is at rest as built.
-    if (local && !fresh.length) this.callbacks.onSettled?.()
+    // Nothing to move: it is at rest as built.
+    if (!arrange && !fresh.length && run !== 'whole') this.callbacks.onSettled?.()
 
     // Restore grab state if rebuild happened during drag
     if (this._grabbedId) {
@@ -1386,6 +1488,71 @@ export class LiveColaEngine {
       const cg = typeof child === 'number' ? this.colaGroups[child] : child
       if (cg) this.shiftBounds(cg as C4Group, axis, d)
     }
+  }
+
+  /**
+   * Draws each element that only open groups hold (heldByGroups) toward
+   * them, after each WebCoLa step, until it stands GROUP_HOLD_GAP away. It
+   * moves through free room only, straight or along what is in its way, so
+   * nothing else is pushed and a diagram at rest stays at rest. One that is
+   * dragged, pinned or frozen stays where it is.
+   */
+  private holdByGroups(): void {
+    for (const { leaf, groupIds } of this.heldByGroups) {
+      if (leaf.fixed) continue
+      const box = this.boxOf(leaf.c4id)
+      if (!box) continue
+      let pullX = 0
+      let pullY = 0
+      for (const groupId of groupIds) {
+        const g = this.boxOf(groupId)
+        if (!g) continue
+        const dx = g.x > box.X ? g.x - box.X : g.X < box.x ? g.X - box.x : 0
+        const dy = g.y > box.Y ? g.y - box.Y : g.Y < box.y ? g.Y - box.y : 0
+        const gap = Math.hypot(dx, dy)
+        if (gap <= GROUP_HOLD_GAP) continue
+        pullX += (dx / gap) * (gap - GROUP_HOLD_GAP)
+        pullY += (dy / gap) * (gap - GROUP_HOLD_GAP)
+      }
+      const pull = Math.hypot(pullX, pullY)
+      if (pull < SETTLE_PX) continue
+      const step = Math.min(pull * GROUP_HOLD_RATE, GROUP_HOLD_STEP) / pull
+      for (const [dx, dy] of [[pullX * step, pullY * step], [pullX * step, 0], [0, pullY * step]]) {
+        if (Math.hypot(dx, dy) < SETTLE_PX || !this.roomFor(leaf, leaf.x + dx, leaf.y + dy)) continue
+        this.placeLeaf(leaf, leaf.x + dx, leaf.y + dy)
+        // WebCoLa ends its run once its own layout has converged, which it
+        // may have: it does not know of this move. One more step.
+        const run = this.cola as { _alpha?: number } | null
+        if (run && !((run._alpha ?? 0) >= 0.1)) run._alpha = 0.1
+        break
+      }
+    }
+  }
+
+  /** True when a leaf on the canvas, moved to centre (x, y), keeps clear of
+   *  the other elements there and comes no nearer than its separations allow. */
+  private roomFor(leaf: ColaNode, x: number, y: number): boolean {
+    const i = this.nodeIndexOf.get(leaf)
+    for (const c of this.separations) {
+      if (c.left !== i && c.right !== i) continue
+      const moved = (j: number): number => (j !== i ? this.colaNodes[j][c.axis] : c.axis === 'x' ? x : y)
+      const apart = moved(c.right) - moved(c.left)
+      if (apart < c.gap && apart < this.colaNodes[c.right][c.axis] - this.colaNodes[c.left][c.axis]) return false
+    }
+    // Boxes as overlap removal keeps them apart; touching is clear.
+    const l = x - leaf.width / 2 + SETTLE_PX
+    const r = x + leaf.width / 2 - SETTLE_PX
+    const t = y - leaf.height / 2 + SETTLE_PX
+    const b = y + leaf.height / 2 - SETTLE_PX
+    for (const id of this.childrenOf.get('') ?? []) {
+      if (id === leaf.c4id) continue
+      const cn = this.idToNode.get(id)
+      const o = cn
+        ? { x: cn.x - cn.width / 2, X: cn.x + cn.width / 2, y: cn.y - cn.height / 2, Y: cn.y + cn.height / 2 }
+        : (this.idToGroup.get(id) as any)?.bounds
+      if (o && l < o.X && r > o.x && t < o.Y && b > o.y) return false
+    }
+    return true
   }
 
   /**
@@ -1596,3 +1763,27 @@ export class LiveColaEngine {
   }
 }
 
+/**
+ * Where the live physics brings a whole diagram from the positions it has:
+ * what a canvas showed after every layout while the physics still relaxed
+ * small diagrams, and now a candidate Smart Layout scores against its own.
+ * Positions are relative to the parent, groups come with their size. Null
+ * for a diagram of WHOLE_DIAGRAM_MAX_NODES nodes or more.
+ */
+export function relaxLayout(model: LiveColaModel): LiveColaPositions | null {
+  const positions: LiveColaPositions = {}
+  const engine = new LiveColaEngine({
+    getModel: () => model,
+    applyPositions: (moved) => {
+      for (const [id, pos] of Object.entries(moved)) {
+        const at = (positions[id] ??= { x: pos.x, y: pos.y })
+        at.x = pos.x
+        at.y = pos.y
+        // A leaf is reported without a size: it keeps the one it has.
+        if (pos.width != null) at.width = pos.width
+        if (pos.height != null) at.height = pos.height
+      }
+    },
+  })
+  return engine.relax() ? positions : null
+}

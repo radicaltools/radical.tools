@@ -70,7 +70,6 @@ import {
 // Re-exported for components that read view collapse state from the store module.
 export { computeViewCollapsedSet, isEffectivelyCollapsed }
 import { LiveColaLayout, type DragMode } from '../layout/liveColaLayout'
-import { LOCAL_PHYSICS_MIN_NODES } from '../layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
@@ -145,12 +144,11 @@ function _pushUndo(state: DiagramStore): void {
   _redoStack.length = 0 // clear redo on new change
 }
 
-/** A large diagram where many elements overlap their siblings has not been
- *  laid out yet; its live layout is local only (LOCAL_PHYSICS_MIN_NODES), so
+/** A diagram where many elements overlap their siblings has not been laid
+ *  out yet. The live layout keeps the positions a document comes with, so
  *  only Smart Layout will arrange it. */
 function looksUnarranged(nodes: Record<string, C4Node>): boolean {
   const list = Object.values(nodes)
-  if (list.length < LOCAL_PHYSICS_MIN_NODES) return false
   const byParent = new Map<string, C4Node[]>()
   for (const n of list) {
     const key = n.parentId ?? ''
@@ -178,7 +176,7 @@ function looksUnarranged(nodes: Record<string, C4Node>): boolean {
 function suggestSmartLayoutIfUnarranged(): void {
   const s = useDiagramStore.getState()
   if (!looksUnarranged(s.c4Nodes)) return
-  s.pushNotification('This large diagram is not laid out yet. The live layout only moves what you drag or add here: use Smart Layout to arrange it.', 'info')
+  s.pushNotification('This diagram is not laid out yet. The live layout only moves what you drag or add: use Smart Layout to arrange it.', 'info')
 }
 
 /** Snapshot all node positions from c4Nodes into a positions map */
@@ -2690,7 +2688,9 @@ export const useDiagramStore = create<DiagramStore>()(
         const id = uid()
         set((state) => { model.insertAlignment(state, viewId, id, axis, ids, ordered) })
         get()._enforceLayoutConstraints()
-        _liveLayout?.reset()
+        // The members were snapped onto their line: the physics settles them
+        // there, with what they now touch; the rest of the diagram stays.
+        _liveLayout?.reset(ids)
         return id
       },
 
@@ -2708,7 +2708,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const id = uid()
         set((state) => { model.insertGrid(state, viewId, id, ids, cols) })
         get()._arrangeGrid(id)
-        _liveLayout?.reset()
+        _liveLayout?.reset(ids)
         return id
       },
 
@@ -2726,7 +2726,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { model.setGridColumns(state, viewId, id, columns) })
         if (viewId === get().activeViewId) {
           get()._arrangeGrid(id)
-          _liveLayout?.reset()
+          _liveLayout?.reset(c.nodeIds)
         }
       },
 
@@ -2772,7 +2772,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { model.setAlignmentOrder(state, viewId, id, ids) })
         if (viewId === get().activeViewId) {
           get()._enforceLayoutConstraints()
-          _liveLayout?.reset()
+          _liveLayout?.reset(c.nodeIds)
         }
       },
 
@@ -3307,18 +3307,13 @@ export const useDiagramStore = create<DiagramStore>()(
           // user's alignments; put them back.
           get()._enforceLayoutConstraints()
 
-          // Drop cola caches so the live layout doesn't snap nodes back to
-          // their pre-smart positions on the next rebuild.
+          // The live layout takes the new positions as they are: it does
+          // not relax a diagram Smart Layout arranged (Smart Layout scored
+          // that relaxation itself, as one of its candidates).
           _liveLayout?.reset()
 
-          // Persist immediately. The default auto-persist is debounced
-          // 400 ms — but the live cola layout starts ticking right now
-          // (via reset() above) and its gradient descent will drift the
-          // nodes back toward its prior equilibrium within that window,
-          // so a delayed save would capture the drifted positions instead
-          // of smart layout's output. Calling the flush hook here saves
-          // smart layout's exact result before cola has a chance to move
-          // anything.
+          // Persist now rather than after the autosave delay: a reload
+          // right after the layout shows it.
           if (typeof window !== 'undefined') {
             const flush = (window as any).__radicalFlushPersist as (() => Promise<void>) | undefined
             void flush?.()
@@ -4607,8 +4602,8 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         get()._sync()
         get()._enforceLayoutConstraints()
-        // skipBulk=true: loaded positions are already correct; the 110-iteration
-        // cola bulk phase would immediately rearrange and overwrite them.
+        // skipBulk=true: the loaded positions stand, the live layout only
+        // moves what is added or dragged from here on.
         get().startLiveLayout({ skipBulk: true })
         suggestSmartLayoutIfUnarranged()
         // Apply restored camera (loaded as activeViewId=null → default view).
@@ -4811,9 +4806,8 @@ export const useDiagramStore = create<DiagramStore>()(
 
 // Auto-start live cola layout (skip in test/SSR environments)
 if (typeof requestAnimationFrame !== 'undefined') {
-  // Pass skipBulk=true when the store was initialised from localStorage so
-  // cola's 110-iteration synchronous bulk phase doesn't immediately
-  // overwrite the persisted positions.
+  // skipBulk=true when the store was initialised from localStorage: the
+  // persisted positions stand.
   useDiagramStore.getState().startLiveLayout({ skipBulk: _initLoadedFromDisk })
   if (_initLoadedFromDisk) suggestSmartLayoutIfUnarranged()
 }

@@ -1,11 +1,12 @@
 /**
- * Web Worker host for the live WebCoLa engine (liveColaEngine.ts), so each
+ * Web Worker host for the live WebCoLa engine (@radical/layout liveColaEngine.ts), so each
  * physics step (tens of milliseconds on a few hundred nodes) runs off the
  * main thread. LiveColaLayout (liveColaLayout.ts) is the main-thread side.
  *
  * Protocol
  * ─────────
- * Main → Worker  { type: 'start', skipBulk, model, gen } | { type: 'invalidate' | 'reset', model, gen }
+ * Main → Worker  { type: 'start', skipBulk, model, gen } | { type: 'invalidate' | 'relax', model, gen }
+ *              | { type: 'reset', model, gen, free? }
  *              | { type: 'stop' } | { type: 'seed', id, x, y }
  *              | { type: 'grab', id, x, y, mode, abs?, withIds? } | { type: 'drag', id, x, y, abs? }
  *              | { type: 'release', id }
@@ -17,7 +18,7 @@
  * already in flight when a newer model was sent.
  */
 
-import { LiveColaEngine } from './liveColaEngine'
+import { LiveColaEngine } from '@radical/layout/liveColaEngine'
 import type { LiveColaMessage, LiveColaReply } from './liveColaLayout'
 
 let model: Extract<LiveColaMessage, { model: unknown }>['model'] = { nodes: {}, relations: {} }
@@ -36,7 +37,8 @@ self.onmessage = (e: MessageEvent<LiveColaMessage>) => {
   switch (m.type) {
     case 'start': engine.start(m.skipBulk); break
     case 'invalidate': engine.invalidate(); break
-    case 'reset': engine.reset(); break
+    case 'reset': engine.reset(m.free); break
+    case 'relax': engine.relaxLive(); break
     case 'stop': engine.stop(); break
     case 'seed': engine.seedPosition(m.id, m.x, m.y); break
     case 'grab': engine.grab(m.id, m.x, m.y, m.mode, m.abs, m.withIds); break

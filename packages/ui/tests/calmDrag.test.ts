@@ -18,7 +18,7 @@
  *     drops deleted elements from it
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { LiveColaEngine } from '../src/layout/liveColaEngine'
+import { LiveColaEngine, relaxLayout } from '@radical/layout/liveColaEngine'
 import { useDiagramStore } from '../src/store/diagramStore'
 import { NODE_SIZES, pinnedNodeIds, type C4Node, type C4Relation, type DiagramView } from '@radical/common/c4'
 import type { Alignment } from '@radical/layout/constraints'
@@ -309,9 +309,8 @@ describe('Calm drag', () => {
 })
 
 describe('Pins', () => {
-  it('keep a dropped element where it is when the physics runs on a small diagram', async () => {
-    // A small diagram relaxes as a whole after every rebuild: the relations
-    // pull a and b together, but b was dropped and stays.
+  it('keep a dropped element where it is when the physics moves the diagram around it', async () => {
+    // The relations pull a and b together, but b was dropped and stays.
     const nodes: Nodes = {
       a: node('a', 'system', { x: 0, y: 0 }),
       b: node('b', 'system', { x: 2000, y: 1500 }),
@@ -326,17 +325,17 @@ describe('Pins', () => {
     engine.start(true)
     calmDrag(engine, nodes, 'b', { x: 2400, y: 1800 })
     engine.release('b')
+    engine.stop()
     expect(absOf(nodes, 'b')).toEqual({ x: 2400, y: 1800 })
 
-    // The store records the pin; the next build reads it from the model.
+    // The store records the pin; a run of the physics reads it from the model.
     pinned.push('b')
-    engine.invalidate()
-    await wait(400)
-    engine.stop()
-    expect(absOf(nodes, 'b').x).toBeCloseTo(2400, 0)
-    expect(absOf(nodes, 'b').y).toBeCloseTo(1800, 0)
+    const relaxed = relaxLayout({ nodes, relations, pinned })!
+    expect(relaxed.b?.x ?? nodes.b.x).toBeCloseTo(2400, 0)
+    expect(relaxed.b?.y ?? nodes.b.y).toBeCloseTo(1800, 0)
     // The others did move.
-    expect(absOf(nodes, 'a')).not.toEqual({ x: 0, y: 0 })
+    expect(relaxed.a).toBeDefined()
+    expect(Math.hypot(relaxed.a.x, relaxed.a.y)).toBeGreaterThan(100)
   })
 
   it('let a drop push a pinned element clear, which stays pinned where it lands', async () => {

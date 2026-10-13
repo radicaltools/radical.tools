@@ -47,6 +47,7 @@ function smartLayoutProgressLabel(p: SmartLayoutProgress | null): string | null 
   if (p.phase === 'ranking') return `Scoring layouts… ${p.done}/${p.total}`
   if (p.phase === 'refining-a') return 'Refining with simulated annealing…'
   if (p.phase === 'refining-b') return 'Refining containers…'
+  if (p.phase === 'relaxing') return 'Trying the live layout…'
   return 'Polishing…'
 }
 
