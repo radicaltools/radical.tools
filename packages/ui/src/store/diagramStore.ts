@@ -140,10 +140,20 @@ function _captureState(state: DiagramStore): HistoryEntry {
 }
 
 function _pushUndo(state: DiagramStore): void {
-  _undoStack.push(_captureState(state))
+  _pushUndoEntry(_captureState(state))
+}
+
+function _pushUndoEntry(entry: HistoryEntry): void {
+  _undoStack.push(entry)
   if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
   _redoStack.length = 0 // clear redo on new change
 }
+
+/** The model as it was when the drag in progress began (liveGrab). A drag
+ *  changes it over many frames, and only its end says whether anything
+ *  moved (React Flow reports a click as a drag): the undo step is made
+ *  then, from this. */
+let _beforeDrag: HistoryEntry | null = null
 
 /** A diagram where many elements overlap their siblings has not been laid
  *  out yet. The live layout keeps the positions a document comes with, so
@@ -3520,6 +3530,9 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       liveGrab(nodeId, x, y, mode = 'calm', abs, withIds) {
+        // Viewer and Presenter have no undo: what is moved there is put back
+        // on the way out.
+        _beforeDrag = get().appMode === 'designer' ? _captureState(get()) : null
         _liveLayout?.grab(nodeId, x, y, mode, abs, withIds)
       },
 
@@ -3529,9 +3542,18 @@ export const useDiagramStore = create<DiagramStore>()(
 
       liveRelease(nodeId, withIds = [], moved = true) {
         _liveLayout?.release(nodeId)
+        // One undo step for the drag: the elements it moved or pushed go
+        // back, and the pins it set come off. It used to have none, so the
+        // next undo took back the drag together with whatever was done
+        // before it.
+        const before = _beforeDrag
+        _beforeDrag = null
+        if (moved && before && get().appMode === 'designer') {
+          _pushUndoEntry(before)
+          set((state) => { state.canUndo = true; state.canRedo = false })
+        }
         // The physics already holds it (release); the rule keeps it held
-        // after a rebuild and in the saved file. No undo step: the drag
-        // itself has none.
+        // after a rebuild and in the saved file.
         if (moved && get().appMode === 'designer') {
           set((state) => { model.setPinned(state, state.activeViewId, [nodeId, ...withIds], true, uid) })
         }

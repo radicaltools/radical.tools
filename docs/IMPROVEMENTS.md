@@ -759,11 +759,10 @@ and import, Forge, a model of exactly 150 elements.
    is dragged or added inside of is still refit to the physics' padding
    (the leftover under item 1).
 
-To decide, not counted: a drag has no undo step. The toolbar's Undo stays
-disabled after one, ⌘Z does nothing, and one undo after "add an element,
-then drag another" takes back both. `liveRelease` says so on purpose ("No
-undo step: the drag itself has none"); the manual says everything is
-undoable.
+Decided after the run: a drag is an undo step of its own (it had none:
+the toolbar's Undo stayed disabled after one, and one undo after "add an
+element, then drag another" took back both). `liveGrab` keeps the model as
+it was, `liveRelease` makes the step from it when something moved.
 
 Seen once: `align_nodes` with a `viewId` accepts an element that is not in
 that view; a system may `interacts` with itself through the server; the

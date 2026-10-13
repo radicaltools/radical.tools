@@ -43,9 +43,8 @@ script.
    with no relation or container in common with the new one move.
 3. **Undo is exact.** Undo after any action gives back the document as it
    was, positions included; redo gives the action back. A chain of undos
-   returns to the start. The camera is not part of undo. A drag has no
-   undo step of its own today; whether it should is open (run 2), so do
-   not report it again.
+   returns to the start. The camera is not part of undo. A drag is one
+   step: the elements it moved or pushed go back and its pins come off.
 4. **Geometry.** Siblings do not overlap. A child is inside its parent. No
    element sits far from all the others without the user having put it
    there. After Smart Layout: running it again reports that the current
