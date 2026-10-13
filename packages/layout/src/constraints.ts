@@ -14,7 +14,7 @@
  * places they hold, in the order asked for.
  *
  * The live physics keeps the same rules with WebCoLa alignment constraints
- * (packages/ui/src/layout/liveColaEngine.ts); this pass is for everything
+ * (liveColaEngine.ts); this pass is for everything
  * without physics: Smart Layout's finalisation, a rule just created, the
  * MCP server.
  */

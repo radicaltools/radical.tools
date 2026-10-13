@@ -1,5 +1,5 @@
 /**
- * Live WebCoLa layout, main-thread side. The engine (liveColaEngine.ts) runs
+ * Live WebCoLa layout, main-thread side. The engine (@radical/layout liveColaEngine.ts) runs
  * in a Web Worker (liveCola.worker.ts): a physics step on a few hundred nodes
  * takes tens of milliseconds, which used to come out of every frame. Where
  * workers are unavailable (Node / Vitest) or fail to load, or the page asks
@@ -10,7 +10,7 @@
  * worker imports the engine, so the ?worker import must not live there.
  */
 
-import { LiveColaEngine, type DragMode, type LiveColaCallbacks, type LiveColaModel, type LiveColaPositions } from './liveColaEngine'
+import { LiveColaEngine, type DragMode, type LiveColaCallbacks, type LiveColaModel, type LiveColaPositions } from '@radical/layout/liveColaEngine'
 import LiveColaWorkerClass from './liveCola.worker?worker'
 
 export type { DragMode, LiveColaCallbacks, LiveColaPositions }
@@ -22,7 +22,8 @@ type Model = LiveColaModel
  *  come from. */
 export type LiveColaMessage =
   | { type: 'start'; skipBulk: boolean; model: Model; gen: number }
-  | { type: 'invalidate' | 'reset'; model: Model; gen: number }
+  | { type: 'invalidate' | 'relax'; model: Model; gen: number }
+  | { type: 'reset'; model: Model; gen: number; free?: string[] }
   | { type: 'stop' }
   | { type: 'seed'; id: string; x: number; y: number }
   | { type: 'grab'; id: string; x: number; y: number; mode: DragMode; abs?: { x: number; y: number }; withIds?: string[] }
@@ -142,9 +143,17 @@ export class LiveColaLayout {
     else if (this._running) this.post({ type: 'invalidate', model: this.callbacks.getModel(), gen: this.nextGen() })
   }
 
-  reset(): void {
-    if (this.engine) this.engine.reset()
-    else this.post({ type: 'reset', model: this.callbacks.getModel(), gen: this.nextGen() })
+  /** See LiveColaEngine.reset. */
+  reset(free?: string[]): void {
+    if (this.engine) this.engine.reset(free)
+    else this.post({ type: 'reset', model: this.callbacks.getModel(), gen: this.nextGen(), free })
+  }
+
+  /** Starts the layout relaxing the whole diagram (LiveColaEngine.relaxLive). */
+  relax(): void {
+    this._running = true
+    if (this.engine) this.engine.relaxLive()
+    else this.post({ type: 'relax', model: this.callbacks.getModel(), gen: this.nextGen() })
   }
 
   seedPosition(id: string, x: number, y: number): void {

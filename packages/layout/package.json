@@ -2,7 +2,7 @@
   "name": "@radical/layout",
   "version": "0.0.0",
   "private": true,
-  "description": "Smart Layout and the other headless layout engines (ELK ensemble, Radical semantic C4 layout, crossing minimisation, annealing, port allocation, edge routing).",
+  "description": "Smart Layout and the other headless layout engines (ELK ensemble, Radical semantic C4 layout, crossing minimisation, annealing, port allocation, edge routing) and the live WebCoLa physics engine.",
   "type": "module",
   "exports": {
     "./smartLayout": "./src/smartLayout.ts",
@@ -15,7 +15,8 @@
     "./edgeLabels": "./src/edgeLabels.ts",
     "./side": "./src/side.ts",
     "./viewInput": "./src/viewInput.ts",
-    "./constraints": "./src/constraints.ts"
+    "./constraints": "./src/constraints.ts",
+    "./liveColaEngine": "./src/liveColaEngine.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -23,7 +24,11 @@
   },
   "dependencies": {
     "@radical/common": "*",
-    "elkjs": "^0.9.3"
+    "d3-dispatch": "^3.0.1",
+    "d3-drag": "^3.0.0",
+    "d3-timer": "^3.0.1",
+    "elkjs": "^0.9.3",
+    "webcola": "^3.4.0"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

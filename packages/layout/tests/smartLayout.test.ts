@@ -197,7 +197,18 @@ describe('runSmartLayoutCore guarantees', () => {
     const { nodes, relations } = pileUp()
     nodes.sys = { ...nodes.sys, collapsed: true }
     const result = await runSmartLayoutCore(nodes, relations)
-    expect(result.candidates).toHaveLength(10)
+    // The ten engines, and what the live physics makes of the best of them.
+    expect(result.candidates.filter((c) => !c.name.endsWith('· relaxed'))).toHaveLength(10)
     expect(result.winner.positions.web).toBeUndefined()
+  })
+
+  it('scores what the live physics makes of its winner, and keeps the better of the two', async () => {
+    const { nodes, relations } = pileUp()
+    const result = await runSmartLayoutCore(nodes, relations)
+    const relaxed = result.candidates.filter((c) => c.name.endsWith('· relaxed'))
+    expect(relaxed).toHaveLength(1)
+    expect(result.winner.score.composite).toBeLessThanOrEqual(relaxed[0].score.composite)
+    // It has a place for every element the winner has one for.
+    expect(Object.keys(relaxed[0].positions).sort()).toEqual(Object.keys(result.winner.positions).sort())
   })
 })

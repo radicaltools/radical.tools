@@ -1,25 +1,46 @@
 import type { Locator, Page } from '@playwright/test'
-import { test, expect, fixture, type Studio } from '../../support/fixtures'
+import { test, expect, fixture, type Studio, type StoredDoc } from '../../support/fixtures'
 
 // The live WebCoLa layout (packages/ui/src/layout/liveColaLayout.ts) on a
 // real clock. Its own convergence test never passes once groups are
 // projected, so it stops itself when nodes stop moving.
 
-test('a canvas with nested elements comes to rest and stays there', async ({ page, studio }) => {
+test('a diagram keeps the layout it is opened with', async ({ page, studio }) => {
   await studio.seed()
   await studio.open('v-containers')
-  // The physics relaxes the saved positions for a few seconds, then stops
-  // (WebCoLa alone took about 15 s to give up on this view).
-  let previous = await studio.positions()
-  await expect.poll(async () => {
-    await page.waitForTimeout(1000)
-    const current = await studio.positions()
-    const still = JSON.stringify(current) === JSON.stringify(previous)
-    previous = current
-    return still
-  }, { timeout: 10_000, intervals: [0] }).toBe(true)
-  await page.waitForTimeout(2000)
-  expect(await studio.positions()).toEqual(previous)
+  // The physics used to relax every small diagram for a few seconds after
+  // opening it. It leaves one that has a layout as it is.
+  const doc = JSON.parse(fixture('bookstore')) as StoredDoc
+  const saved = doc.views!.find((v) => v.id === 'v-containers')!.positions
+  const parentOf = Object.fromEntries(doc.nodes.map((n) => [n.id, n.parentId]))
+  // The canvas draws at absolute positions; the document keeps them
+  // relative to the parent.
+  const shown = async (): Promise<Record<string, { x: number; y: number }>> => {
+    const drawn = Object.fromEntries(Object.entries(await studio.positions()).map(([id, at]) => {
+      const [, x, y] = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(at)!
+      return [id, { x: Number(x), y: Number(y) }]
+    }))
+    return Object.fromEntries(Object.entries(drawn).map(([id, at]) => {
+      const parent = parentOf[id] ? drawn[parentOf[id]!] : { x: 0, y: 0 }
+      return [id, { x: at.x - parent.x, y: at.y - parent.y }]
+    }))
+  }
+  const asSaved = Object.fromEntries(Object.entries(saved).map(([id, p]) => [id, { x: p.x, y: p.y }]))
+  expect(await shown()).toEqual(asSaved)
+  await page.waitForTimeout(3000)
+  expect(await shown()).toEqual(asSaved)
+})
+
+test('the layout Smart Layout gives is the one that stays and is saved', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await studio.smartLayout()
+  const laidOut = await studio.positions()
+  await page.waitForTimeout(3000)
+  expect(await studio.positions()).toEqual(laidOut)
+  await page.reload()
+  await studio.ready()
+  expect(await studio.positions()).toEqual(laidOut)
 })
 
 test('edits on a view with nested elements are saved without a reload', async ({ studio }) => {
@@ -141,7 +162,7 @@ test('a large diagram keeps its positions on open and suggests Smart Layout when
   await studio.seedDocument(gridDocument({ x: 120, y: 60 }))
   // The hint is a toast that dismisses itself: watch for it while opening.
   await Promise.all([
-    expect(page.getByText(/This large diagram is not laid out yet/)).toBeVisible({ timeout: 15_000 }),
+    expect(page.getByText(/This diagram is not laid out yet/)).toBeVisible({ timeout: 15_000 }),
     studio.open('canvas'),
   ])
   const before = await studio.positions()
@@ -173,6 +194,10 @@ test('Smart fit brings the diagram back when it has left the screen', async ({ p
     }).length
   })
   expect(await onScreen()).toBeGreaterThan(0)
+  // Past the window in which opening a view refits the camera every frame
+  // (the diagram is at rest from the start now, so the test gets here
+  // inside it).
+  await page.waitForTimeout(2000)
   // Not a gesture: the camera ends up away from the diagram, as when the
   // physics carries the diagram off after an expand.
   // Read back one frame later in the same call: Smart fit starts pulling the

@@ -566,7 +566,7 @@ headless pass for Smart Layout, a new rule and the MCP server. Still open:
 
 Added in `feat/calm-drag`: a drag moves only what is dragged and pins it on
 the drop (`DragMode` and `clearOverlaps` in
-`packages/ui/src/layout/liveColaEngine.ts`, `PinConstraint` in
+`packages/layout/src/liveColaEngine.ts` since 2026-10-13, `PinConstraint` in
 `packages/common/src/c4.ts`; ADR "Calm drags pin what they drop"). Still open:
 
 1. **Smart Layout unpins rather than honours pins.** It is run on purpose
@@ -596,6 +596,56 @@ the drop (`DragMode` and `clearOverlaps` in
    frame** when it grows left or up (React Flow keeps the child's position
    relative to its parent until the pointer moves): the engine reports the
    child relative to the parent's new place, one worker message late.
+
+6. **A laid-out diagram is left alone (2026-10-13, `fix/layout-stands`).**
+   The physics used to relax every diagram under 150 nodes as a whole after
+   each rebuild (open, view switch, undo, Smart Layout). Measured with
+   Smart Layout's own composite score, raw winner against the same layout
+   after the physics: the sample's All elements 16 937 → 20 713, Core
+   Banking 5 → 47, System Context 0 → 14 (every element moved, by up to
+   1 690 px); only a Forge-built model with 76 root elements improved
+   (353 349 → 303 022), because the engines spread it over
+   10 700 × 12 300. Now the engine (moved to
+   `packages/layout/src/liveColaEngine.ts`) rests on a rebuild, moves only
+   new nodes with their surroundings at every size (and the members of an
+   alignment just made), and `relaxLayout` runs the whole-diagram
+   relaxation in one go as a Smart Layout candidate, kept only when it
+   scores better (ADR "A laid-out diagram stands"). Still open:
+   - A push drag (⌘/Ctrl) on a diagram under 150 nodes still relaxes the
+     whole diagram, as before: it is the gesture that asks for the physics,
+     and with only the relation neighbourhood free, a dragged element with
+     no relations pushes nothing (it stops against the frozen ones).
+   - An element an agent adds through the MCP server while Studio is open
+     arrives with the reload of the folder, so it is not "new" to the
+     physics and stays where the server put it, on small diagrams too now.
+   - The composite score decides between the engines' winner and its
+     relaxation, and it does not see everything the eye does: on the
+     sample's All elements the relaxed layout scores worse (223 crossings
+     against 145) but has the people on top and the external systems to
+     the right, which the physics' separation constraints give and the
+     winning ELK candidate does not. The metamodel editor's diagram keeps
+     its own physics pass for the same kind of reason (Smart Layout alone
+     spreads its category frames over a mostly empty canvas). A term for
+     the C4 reading order in the score would let Smart Layout make that
+     call itself.
+   - The engines' sparse result on diagrams with many unrelated root
+     elements is covered by the relaxed candidate only below 150 nodes.
+7. **A relation that ends on an open group has no force in the live
+   layout.** WebCoLa links leaves, and an open group is drawn around its
+   children, so the relation is left out (66 of 351 on All elements of a
+   Forge-built model). An element on the canvas with only such relations
+   stayed behind when the diagram moved; `holdByGroups` brings it back by
+   the group, through free room only. Both ways of giving every such
+   relation a force were tried and dropped: a link to the nearest leaf
+   inside the group bends what is inside it (a state machine's row of
+   states, pulled by its entity), and pulling every related element toward
+   the group after each step never comes to rest against WebCoLa's own
+   forces (still moving after 46 s). Since item 6 this matters only while
+   the physics moves something; Smart Layout counts these relations.
+8. **Smart Layout keeps a layout with a stray pinned element.** With an
+   element pinned far from the diagram, Smart Layout reported that the
+   current layout already scores best and changed nothing, so the pin
+   stayed too. The score barely counts one very long relation.
 
 ### Radical Forge over MCP (2026-10-07)
 

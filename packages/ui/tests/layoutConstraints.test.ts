@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { activeLayoutConstraints, childrenInView, useDiagramStore } from '../src/store/diagramStore'
 import { LiveColaLayout } from '../src/layout/liveColaLayout'
-import { LiveColaEngine } from '../src/layout/liveColaEngine'
+import { LiveColaEngine } from '@radical/layout/liveColaEngine'
 import { NODE_SIZES, type AlignConstraint, type C4Node, type C4Relation, type DiagramView } from '@radical/common/c4'
 import type { Alignment } from '@radical/layout/constraints'
 
@@ -236,7 +236,8 @@ describe('Live layout physics with alignments', () => {
       r2: { id: 'r2', sourceId: 'c', targetId: 'd' } as C4Relation,
     }
     const layout = run(nodes, relations, [{ axis: 'y', ids: ['a', 'b', 'c'], orders: [] }])
-    layout.start(true)
+    // A diagram with no layout yet: the physics arranges it.
+    layout.start()
     await wait(300)
     const spread = (): number => {
       const cs = ['a', 'b', 'c'].map((id) => centreY(nodes[id]))
@@ -407,7 +408,7 @@ describe('Live layout physics with alignments', () => {
     }
     const relations: Record<string, C4Relation> = { r1: { id: 'r1', sourceId: 'a', targetId: 'b' } as C4Relation }
     const layout = run(nodes, relations, [{ axis: 'x', ids: ['s1', 's2'], orders: [] }])
-    layout.start(true)
+    layout.start()
     await wait(400)
     layout.stop()
     const cx = (id: string): number => nodes[id].x + nodes[id].width / 2
