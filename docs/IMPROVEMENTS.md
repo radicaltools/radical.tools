@@ -647,6 +647,62 @@ the drop (`DragMode` and `clearOverlaps` in
    current layout already scores best and changed nothing, so the pin
    stayed too. The score barely counts one very long relation.
 
+### Found by exploratory runs
+
+Runs made from `docs/EXPLORATORY-TESTING.md`. Each entry was reproduced
+twice from a fresh page by the run and once more by hand.
+
+**Run 1, 2026-10-13, commit a8dc297.** Covered: Smart Layout with repeat
+and undo, collapse and expand with undo, canvases kept separate, an add
+into a container with undo, redo and reload, Viewer and Presenter, actions
+during a running Smart Layout. Not covered: the MCP server, files and
+folders, alignments, pins, milestones, model sizes, Hub.
+
+1. ~~**A reload moves a container's children down after the physics placed
+   them.**~~ Fixed 2026-10-13. Add an element into an
+   open container, or collapse and expand it, then reload or switch views
+   and back: the children the physics left about 60 px below the
+   container's top were drawn at 110 px (bookstore, Containers: Web App
+   and API from y 60 to 110; sample, Core Banking: seven elements by 20 to
+   72 px), while the saved document kept 60. `deriveRFNodes` in
+   `packages/ui/src/store/diagramStore.ts` drew every child of an open
+   parent at 110 or lower, on every rebuild; until PR #176 the physics ran
+   again after each rebuild and put them back, which hid it. The canvas
+   now draws a child where the model has it, and lower only when the file
+   has it on the parent's header (`LIVE_CHILD_TOP_MIN`, the least the
+   physics keeps). Left as it was: the physics keeps about 60 px above a
+   container's children where Smart Layout leaves 120, so the first add or
+   expand inside a laid-out container moves its children up by that much,
+   close under a one-line label and onto the second line of a longer one.
+   Giving the physics the layouts' header room needs a taller frame above
+   the group's bounds, and the alignment and calm-drag code that reads the
+   frame to follow.
+2. ~~**Smart Layout in Viewer or Presenter is saved.**~~ Fixed 2026-10-13.
+   `runSmartLayout` and `runTreeLayout` asked
+   for the document to be written right after the layout
+   (`window.__radicalFlushPersist()`), and `flushPersist` in
+   `apps/studio/src/renderer/src/persistence/autosave.ts` did not check
+   the perspective (only the subscription that schedules a save did). The
+   canvas went back to the Designer layout on return, but the file held
+   the Viewer's, and a reload showed it; a collapse made in Viewer before
+   the layout was saved with it. The layouts now ask for that save in
+   Designer only, and any save made while exploring writes the model
+   Designer had.
+3. ~~**Smart Layout lands on another view when the view is switched while
+   it computes.**~~ Fixed 2026-10-13. On the sample's
+   All elements (about three seconds), opening Core Banking during
+   "Scoring layouts…" put All elements' positions on Core Banking's 14
+   elements and saved them there. `runSmartLayout` took its input before
+   the await and applied the result to whichever canvas was active
+   afterwards. A layout whose canvas is no longer the one shown (another
+   view, perspective, milestone or model) is now dropped, with a notice.
+   Not done: applying it to the canvas it was started on, which is not on
+   screen any more. Elements added or removed while a layout runs are
+   still not checked for.
+
+Seen, not counted: the camera saved with a view stays where Smart Layout's
+fit left it after an undo of the layout.
+
 ### Radical Forge over MCP (2026-10-07)
 
 Added in `feat/forge-mcp`: the MCP server runs Radical Forge with the

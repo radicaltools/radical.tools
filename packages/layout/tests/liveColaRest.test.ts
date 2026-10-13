@@ -8,7 +8,7 @@
  * scores as a candidate.
  */
 import { describe, it, expect } from 'vitest'
-import { LiveColaEngine, relaxLayout, WHOLE_DIAGRAM_MAX_NODES, type LiveColaPositions } from '../src/liveColaEngine'
+import { LiveColaEngine, relaxLayout, LIVE_CHILD_TOP_MIN, WHOLE_DIAGRAM_MAX_NODES, type LiveColaPositions } from '../src/liveColaEngine'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 type Nodes = Record<string, C4Node>
@@ -153,6 +153,32 @@ describe('relaxLayout', () => {
     engine.stop()
     expect(Object.keys(moved).sort()).toEqual(['a', 'b', 'c'])
     expect(at(nodes)).not.toEqual(before)
+  })
+
+  it('keeps every child at least LIVE_CHILD_TOP_MIN below the top of its parent', () => {
+    // The canvas draws a child nearer the top than that lower (a safeguard
+    // for old files). Were the physics to place one nearer, the canvas
+    // would show it elsewhere than the model has it after the next reload.
+    const box = (id: string, type: string, x: number, y: number, w: number, h: number, parentId?: string): C4Node =>
+      ({ id, type, label: id, x, y, width: w, height: h, collapsed: false, parentId } as C4Node)
+    const nodes: Nodes = {
+      sys: box('sys', 'system', 0, 0, 1400, 900),
+      grp: box('grp', 'group', 40, 130, 900, 600, 'sys'),
+      ctn: box('ctn', 'container', 40, 130, 600, 400, 'grp'),
+      c1: box('c1', 'component', 30, 120, 200, 120, 'ctn'),
+      c2: box('c2', 'component', 300, 120, 200, 120, 'ctn'),
+      api: box('api', 'container', 700, 130, 300, 200, 'grp'),
+      db: box('db', 'database', 1000, 130, 190, 130, 'sys'),
+    }
+    const relations: Record<string, C4Relation> = {
+      r1: { id: 'r1', sourceId: 'c1', targetId: 'c2' },
+      r2: { id: 'r2', sourceId: 'c2', targetId: 'api' },
+      r3: { id: 'r3', sourceId: 'api', targetId: 'db' },
+    }
+    const relaxed = relaxLayout({ nodes, relations })!
+    for (const n of Object.values(nodes)) {
+      if (n.parentId) expect(relaxed[n.id].y, `${n.id} in ${n.parentId}`).toBeGreaterThanOrEqual(LIVE_CHILD_TOP_MIN)
+    }
   })
 
   it('does not take on a diagram too large to relax', () => {

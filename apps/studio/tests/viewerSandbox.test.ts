@@ -272,3 +272,39 @@ describe('presentation edits in presenter mode persist (regression)', () => {
     useDiagramStore.getState().removePresentation(presId)
   })
 })
+
+describe('a layout made while exploring is not saved', () => {
+  // Smart Layout asks for the document to be written at once (so a reload
+  // right after it shows the layout). It did so in Viewer and Presenter
+  // too: the canvas went back to the designer's layout on return, but the
+  // file held the Viewer's, and the next reload showed it.
+  for (const mode of ['viewer', 'presenter'] as const) {
+    it(`Smart Layout in ${mode} leaves the saved document as the designer had it`, async () => {
+      const meta = documents.createLSDocument(`layout-in-${mode}`, useDiagramStore.getState().saveDiagram())
+      documents.setActiveId(meta.id)
+      await new Promise((r) => setTimeout(r, 100))
+      useDiagramStore.getState().setAppMode('designer')
+      const saved = async (): Promise<Record<string, { x: number; y: number }>> => {
+        const doc = await documents.loadDocument(meta.id)
+        return Object.fromEntries(doc!.nodes.map((n) => [n.id, { x: n.x, y: n.y }]))
+      }
+      const before = await saved()
+
+      useDiagramStore.getState().setAppMode(mode)
+      // Scatter the canvas so that Smart Layout has something to do.
+      useDiagramStore.setState((s) => ({
+        c4Nodes: Object.fromEntries(Object.values(s.c4Nodes).map((n, i) => [n.id, n.parentId ? n : { ...n, x: (i * 37) % 900, y: (i * 91) % 700 }])),
+      }))
+      await useDiagramStore.getState().runSmartLayout()
+      await new Promise((r) => setTimeout(r, 600))
+      expect(await saved()).toEqual(before)
+
+      // Whatever asks for a save while exploring writes the designer's model.
+      await ((window as any).__radicalFlushPersist as () => Promise<void>)()
+      expect(await saved()).toEqual(before)
+
+      useDiagramStore.getState().setAppMode('designer')
+      documents.deleteDocument(meta.id, { wipePayload: true })
+    }, 120_000)
+  }
+})

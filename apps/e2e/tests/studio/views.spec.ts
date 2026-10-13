@@ -200,3 +200,29 @@ test.describe('Viewer', () => {
     expect(moved(shown, containers)).toEqual([])
   })
 })
+
+test.describe('what is arranged in Viewer and Presenter stays there', () => {
+  for (const perspective of ['Viewer', 'Presenter']) {
+    test(`Smart Layout in ${perspective} is not saved`, async ({ page, studio }) => {
+      // Smart Layout writes the document at once so that a reload shows it.
+      // It did that here too: back in Designer the canvas showed the old
+      // layout, the file held this one, and a reload brought it up.
+      await studio.seed()
+      await studio.open('v-containers')
+      const designer = await studio.positions()
+      const saved = await studio.storedJson()
+
+      await page.getByRole('button', { name: perspective, exact: true }).click()
+      await studio.settle()
+      await studio.smartLayout()
+      await page.waitForTimeout(1000)
+      expect(await studio.storedJson()).toBe(saved)
+
+      await page.getByRole('button', { name: 'Designer', exact: true }).click()
+      await studio.settle()
+      await page.reload()
+      await studio.ready()
+      expect(await studio.positions()).toEqual(designer)
+    })
+  }
+})

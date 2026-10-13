@@ -43,6 +43,60 @@ test('the layout Smart Layout gives is the one that stays and is saved', async (
   expect(await studio.positions()).toEqual(laidOut)
 })
 
+test('what the physics places inside a container is what a reload shows', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  // An element added into Bookstore lets the physics settle its children,
+  // nearer to Bookstore's top than a layout puts them. The canvas used to
+  // draw them lower again after a reload, and the file kept the other place.
+  const pane = (await studio.pane.boundingBox())!
+  const bookstore = (await studio.node('bookstore').boundingBox())!
+  await studio.addFromPalette('Container', {
+    x: bookstore.x - pane.x + bookstore.width / 2,
+    y: bookstore.y - pane.y + bookstore.height - 30,
+  })
+  await expect(studio.nodes).toHaveCount(7)
+  let settled = await studio.positions()
+  await expect.poll(async () => {
+    await page.waitForTimeout(1000)
+    const current = await studio.positions()
+    const still = JSON.stringify(current) === JSON.stringify(settled)
+    settled = current
+    return still
+  }, { timeout: 15_000, intervals: [0] }).toBe(true)
+  // The autosave has the settled positions.
+  await page.waitForTimeout(1000)
+  await page.reload()
+  await studio.ready()
+  expect(await studio.positions()).toEqual(settled)
+})
+
+test('a layout started on one canvas does not land on another', async ({ page, studio }) => {
+  // Smart Layout takes about three seconds on the sample's All elements.
+  // Opening another view meanwhile used to put All elements' positions on
+  // that view's elements and save them there.
+  await studio.openSample('view-core')
+  const docId = studio.activeDocId()
+  const core = await studio.positions()
+  await studio.open('canvas', 'designer', docId)
+  await page.waitForTimeout(800)
+  const saved = (await studio.storedDoc(docId)).views!.find((v) => v.id === 'view-core')!.positions
+
+  await page.getByText('Views', { exact: true }).first().click()
+  const card = page.locator('.lp-view-card').filter({ hasText: 'Core Banking' }).first()
+  await expect(card).toBeVisible()
+  await page.getByRole('button', { name: 'Smart Layout', exact: true }).click()
+  await page.waitForTimeout(400)
+  await card.click()
+  await expect(page).toHaveURL(/\/v\/view-core$/)
+  await expect(page.getByText(/The layout was not applied/)).toBeVisible({ timeout: 30_000 })
+
+  await studio.settle()
+  expect(await studio.positions()).toEqual(core)
+  await page.waitForTimeout(800)
+  expect((await studio.storedDoc(docId)).views!.find((v) => v.id === 'view-core')!.positions).toEqual(saved)
+})
+
 test('edits on a view with nested elements are saved without a reload', async ({ studio }) => {
   await studio.seed()
   await studio.open('v-containers')
