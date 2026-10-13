@@ -167,3 +167,33 @@ describe('edit mode', () => {
     expect(store().nodeWizard).toBeNull()
   })
 })
+
+describe('addNodes', () => {
+  it('adds a list of nodes with their links as one undo step, each in a place of its own', () => {
+    const need = store().addNode(draft('need', 'Checkout brief'))
+    const ids = store().addNodes(['Keep the basket', 'Tell the customer why'].map((label) => ({
+      node: draft('requirement', label),
+      links: [{ relationType: 'derives', direction: 'out' as const, otherId: need }],
+    })))
+    expect(ids).toHaveLength(2)
+    const [a, b] = ids.map((id) => store().c4Nodes[id])
+    expect([a.label, b.label]).toEqual(['Keep the basket', 'Tell the customer why'])
+    expect([a.x, a.y]).not.toEqual([b.x, b.y])
+    expect(Object.values(store().c4Relations).filter((r) => r.relationType === 'derives' && r.targetId === need)).toHaveLength(2)
+
+    store().undo()
+    expect(Object.values(store().c4Nodes).filter((n) => n.type === 'requirement')).toHaveLength(0)
+    expect(Object.values(store().c4Relations)).toHaveLength(0)
+    expect(store().c4Nodes[need]).toBeDefined()
+  })
+
+  it('stops at the node the metamodel refuses and keeps the ones before it', () => {
+    const ids = store().addNodes([
+      { node: draft('requirement', 'Kept') },
+      { node: { ...draft('component', 'Refused'), parentId: 'db' } },
+      { node: draft('requirement', 'Never reached') },
+    ])
+    expect(ids).toHaveLength(1)
+    expect(Object.values(store().c4Nodes).map((n) => n.label)).not.toContain('Never reached')
+  })
+})

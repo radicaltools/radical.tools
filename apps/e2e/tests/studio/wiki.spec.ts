@@ -94,3 +94,111 @@ test.describe('wiki', () => {
     await expect(page.locator('.wiki-nav-empty')).toBeVisible()
   })
 })
+
+// Writing in the wiki: a new model is written down from its Overview, with
+// no wizard and no change of page.
+test.describe('writing in the wiki', () => {
+  const EMPTY = JSON.stringify({
+    nodes: [],
+    relations: [],
+    sequences: [],
+    views: [{ id: 'v-wiki', kind: 'wiki', name: 'Wiki', nodeIds: [], positions: {}, viewport: { x: 0, y: 0, zoom: 1 } }],
+    snapshots: [],
+    presentations: [],
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+  })
+
+  test.beforeEach(async ({ page, studio }) => {
+    await studio.seedDocument(EMPTY)
+    await studio.open('v-wiki')
+    await expect(page.locator('.wiki-view')).toBeVisible()
+  })
+
+  test('requirements are written line by line and a pasted list is one for each line', async ({ page, studio }) => {
+    // An empty page says where to start, by the categories of the palette.
+    const start = page.locator('.wiki-write-start')
+    await expect(start).toContainText('Nothing is written yet. Start with:')
+    await start.getByRole('button', { name: 'Requirements', exact: true }).click()
+
+    // The line has the focus, and keeps it after each requirement.
+    const line = page.getByRole('textbox', { name: 'Write a requirement' })
+    await expect(line).toBeFocused()
+    await page.keyboard.type('When a payment fails, the system shall tell the customer why')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('The Payments Service must reject a transfer above the daily limit')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('Users can export their statements')
+    await page.keyboard.press('Enter')
+    await expect(line).toBeFocused()
+    await expect(line).toHaveValue('')
+    await expect(page.getByRole('heading', { name: 'Requirements (3)' })).toBeVisible()
+
+    // In the order written, each with its sentence; a line that is no EARS
+    // sentence is only named.
+    const parts = page.locator('.wiki-part')
+    await expect(parts).toHaveCount(3)
+    await expect(parts.nth(0).getByRole('link')).toHaveText('Tell the customer why when a payment fails')
+    await expect(parts.nth(0)).toContainText('— When a payment fails, the system shall tell the customer why.')
+    await expect(parts.nth(1).getByRole('link')).toHaveText('Reject a transfer above the daily limit')
+    await expect(parts.nth(1)).toContainText('— The Payments Service shall reject a transfer above the daily limit.')
+    await expect(parts.nth(2).getByRole('link')).toHaveText('Users can export their statements')
+    await expect(parts.nth(2)).not.toContainText('shall')
+
+    // A pasted list is shown before it is added.
+    await line.evaluate((el, text) => {
+      const data = new DataTransfer()
+      data.setData('text/plain', text)
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    }, '- The system shall keep an audit trail of every transfer\n- [ ] If the daily limit is exceeded, the system shall refuse the transfer\n\n3. The system shall encrypt data at rest')
+    const pasted = page.getByRole('group', { name: 'Pasted lines' })
+    await expect(pasted.locator('li')).toHaveText([
+      'Keep an audit trail of every transfer',
+      'Refuse the transfer if the daily limit is exceeded',
+      'Encrypt data at rest',
+    ])
+    await pasted.getByRole('button', { name: 'Add three requirements' }).click()
+    await expect(page.getByRole('heading', { name: 'Requirements (6)' })).toBeVisible()
+
+    await expect.poll(async () => {
+      const saved = await studio.storedDoc() as unknown as { nodes: Array<Record<string, unknown>> }
+      const refuse = saved.nodes.find((n) => n.label === 'Refuse the transfer if the daily limit is exceeded')
+      return refuse && [refuse.type, refuse.ears_type, refuse.unwanted_condition, refuse.action]
+    }, { timeout: 15_000 }).toEqual(['requirement', 'unwanted-behaviour', 'the daily limit is exceeded', 'refuse the transfer'])
+
+    // The pasted list is one step to undo.
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(page.getByRole('heading', { name: 'Requirements (3)' })).toBeVisible()
+  })
+
+  test('a sentence is rewritten whole, and a group at the top is not offered parts of a system', async ({ page }) => {
+    await page.locator('.wiki-write-start').getByRole('button', { name: 'Requirements', exact: true }).click()
+    await page.keyboard.type('When a payment fails, the system shall tell the customer why')
+    await page.keyboard.press('Enter')
+    await page.getByRole('link', { name: 'Tell the customer why when a payment fails' }).click()
+    await expect(page.locator('.ears-sentence')).toContainText('When a payment fails, the system shall tell the customer why.')
+
+    // Rewritten with another pattern: its parts are read again.
+    await page.locator('.ears-sentence').hover()
+    await page.getByRole('button', { name: 'Rewrite the sentence' }).click()
+    const sentence = page.getByRole('textbox', { name: 'The requirement as one sentence' })
+    await expect(sentence).toHaveValue('When a payment fails, the system shall tell the customer why.')
+    await sentence.fill('While a payment is pending, if the bank does not answer, the system shall tell the customer why')
+    await sentence.press('Enter')
+    await expect(page.locator('.ears-sentence')).toContainText(
+      'While a payment is pending, if the bank does not answer, the system shall tell the customer why.',
+    )
+    await expect(page.locator('.wiki-infobox')).toContainText('complex')
+
+    // A group holds what its place allows: at the top of the model, no
+    // containers or components.
+    await page.getByRole('button', { name: 'Overview', exact: true }).click()
+    await page.getByRole('button', { name: 'Add element' }).click()
+    await page.locator('.wiki-add-item', { hasText: /^Group$/ }).click()
+    await expect(page.locator('.wiki-title')).toHaveText('New Group')
+    const offer = page.locator('.wiki-write-start')
+    await expect(offer.getByRole('button', { name: 'Requirements', exact: true })).toBeVisible()
+    await expect(offer.getByRole('button', { name: 'Software systems', exact: true })).toBeVisible()
+    await expect(offer.getByRole('button', { name: 'Components', exact: true })).toHaveCount(0)
+    await expect(offer.getByRole('button', { name: 'Containers', exact: true })).toHaveCount(0)
+  })
+})

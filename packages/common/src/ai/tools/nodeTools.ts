@@ -53,7 +53,7 @@ export function buildNodeToolDefs(mm: Metamodel | undefined): ToolDef[] {
     },
     {
       name: 'move_node',
-      description: 'Move an existing node (with its children) into another parent, or to the root with parentId null. Its canvas position is kept; the metamodel\'s allowedParents applies.',
+      description: 'Move an existing node (with its children) into another parent, or to the root with parentId null. Its canvas position is kept; the metamodel\'s allowedParents applies, and a group holds only what its place allows.',
       inputSchema: {
         type: 'object',
         properties: {

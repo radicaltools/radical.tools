@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react'
 import { activeLayoutConstraints, childrenInView, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, saveStudioSettings } from '@radical/ui/studioSettings'
-import { isParentAllowed } from '@radical/common/metamodel'
+import { isParentAllowed, isPlacementAllowed } from '@radical/common/metamodel'
 import { defaultGridColumns } from '@radical/common/c4'
 
 /**
@@ -104,7 +104,7 @@ export function SelectionActionBar(): React.ReactElement | null {
       } else if (nodes.length === 1 && nodes[0].type === def.id) {
         disabled = true
         reason = `Already a ${def.label}.`
-      } else if (!isParentAllowed(metamodel, def.id, commonParent?.type)) {
+      } else if (!isPlacementAllowed(metamodel, def.id, commonParent, c4Nodes)) {
         disabled = true
         const allowed = def.allowedParents
         const allowedStr = allowed && allowed.length
@@ -174,8 +174,8 @@ export function SelectionActionBar(): React.ReactElement | null {
       return segs.join(' / ')
     }
 
-    const isAllowedTarget = (targetType: string | undefined): boolean =>
-      nodes.every((n) => isParentAllowed(metamodel, n.type, targetType))
+    const isAllowedTarget = (target: (typeof nodes)[number] | undefined): boolean =>
+      nodes.every((n) => isPlacementAllowed(metamodel, n.type, target, c4Nodes))
 
     const out: { id: string | null; label: string; path: string }[] = []
     // Root option (only when not already at root and all selected types are
@@ -186,7 +186,7 @@ export function SelectionActionBar(): React.ReactElement | null {
     for (const cand of Object.values(c4Nodes)) {
       if (forbidden.has(cand.id)) continue
       if (cand.id === commonParentId) continue
-      if (!isAllowedTarget(cand.type)) continue
+      if (!isAllowedTarget(cand)) continue
       const labelDef = metamodel.nodeTypes[cand.type]
       const typeLabel = labelDef?.label ?? cand.type
       out.push({

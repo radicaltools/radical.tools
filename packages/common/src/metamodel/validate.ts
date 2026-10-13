@@ -2,6 +2,7 @@
 
 import { C4Node, C4Relation } from '../c4'
 import { Metamodel, PropertyDef } from './types'
+import { GROUP_TYPE, hasPlaceUnder, placeOf } from './lookup'
 import { validateStateMachines } from './statechart'
 import { validateDomainModel } from './domainModel'
 import { refIds, refProblem } from './refs'
@@ -54,6 +55,17 @@ export function validateModel(
           id: `bad-parent:${n.id}`,
           severity: 'error',
           message: `${def.label} "${n.label}" cannot be inside ${parentLabel}. Allowed parents: ${allowed.length ? allowed.join(', ') : '(none — must be root)'}.`,
+          nodeId: n.id,
+        })
+      } else if (parent.type === GROUP_TYPE && !hasPlaceUnder(metamodel, n.type, placeOf(parent, nodes)?.type)) {
+        // A group gives no place the element could not have without it. A
+        // warning: models made before the rule may hold such elements.
+        const place = placeOf(parent, nodes)
+        const where = place ? `inside ${metamodel.nodeTypes[place.type]?.label ?? place.type} "${place.label}"` : 'at the top of the model'
+        issues.push({
+          id: `bad-place:${n.id}`,
+          severity: 'warning',
+          message: `${def.label} "${n.label}" is in group "${parent.label}", which is ${where}, where a ${def.label} has no place.`,
           nodeId: n.id,
         })
       }

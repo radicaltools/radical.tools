@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { composeEarsSentence, resolveEarsSubject, parseEarsSentence } from '../src/metamodel/index'
+import { composeEarsSentence, resolveEarsSubject, parseEarsSentence, requirementFromLine, labelFromText } from '../src/metamodel/index'
 
 describe('composeEarsSentence', () => {
   it('ubiquitous with subject: "<Subject> shall <action>."', () => {
@@ -95,7 +95,7 @@ describe('parseEarsSentence', () => {
     expect(parsed).toEqual({ ears_type: 'ubiquitous', action: 'log every failed login attempt' })
   })
 
-  it('no shall/must at all → ubiquitous, whole text becomes the action', () => {
+  it('no shall, must, should or will at all → ubiquitous, whole text becomes the action', () => {
     const parsed = parseEarsSentence('Log every failed login attempt')
     expect(parsed).toEqual({ ears_type: 'ubiquitous', action: 'Log every failed login attempt' })
   })
@@ -112,22 +112,22 @@ describe('parseEarsSentence', () => {
   })
 
   it('while-clause → state-driven', () => {
-    const parsed = parseEarsSentence('While the battery level is low, the device shall dim the screen.')
+    const parsed = parseEarsSentence('While the battery level is low, the device shall dim the screen.', 'The device')
     expect(parsed).toEqual({ ears_type: 'state-driven', action: 'dim the screen', precondition: 'the battery level is low' })
   })
 
   it('if-clause → unwanted-behaviour, "then" boilerplate is discarded', () => {
-    const parsed = parseEarsSentence('If the connection times out, then the client must retry.')
+    const parsed = parseEarsSentence('If the connection times out, then the client must retry.', 'the client')
     expect(parsed).toEqual({ ears_type: 'unwanted-behaviour', action: 'retry', unwanted_condition: 'the connection times out' })
   })
 
   it('where-clause → optional', () => {
-    const parsed = parseEarsSentence('Where offline mode is enabled, the app shall cache data locally.')
+    const parsed = parseEarsSentence('Where offline mode is enabled, the app shall cache data locally.', 'the app')
     expect(parsed).toEqual({ ears_type: 'optional', action: 'cache data locally', feature: 'offline mode is enabled' })
   })
 
   it('two clauses → complex', () => {
-    const parsed = parseEarsSentence('While in degraded mode, when a new request arrives, the service shall queue it.')
+    const parsed = parseEarsSentence('While in degraded mode, when a new request arrives, the service shall queue it.', 'the service')
     expect(parsed).toEqual({
       ears_type: 'complex',
       action: 'queue it',
@@ -140,12 +140,82 @@ describe('parseEarsSentence', () => {
     expect(parseEarsSentence('   ')).toEqual({ ears_type: 'ubiquitous', action: '' })
   })
 
-  it('splits at the LAST shall/must, so "must" inside the condition clause does not confuse the split', () => {
+  it('splits at the shall of the main clause, so "must" inside the condition clause does not confuse the split', () => {
     const parsed = parseEarsSentence('If the request must be retried, the system shall queue it.')
     expect(parsed).toEqual({
       ears_type: 'unwanted-behaviour',
       action: 'queue it',
       unwanted_condition: 'the request must be retried',
+    })
+  })
+
+  // No word of a sentence is dropped: what the fields have no place for
+  // stays in the action, as a clause of its own.
+  const written = (sentence: string, subject?: string): string =>
+    composeEarsSentence({ ...parseEarsSentence(sentence, subject) }, subject).sentence
+
+  it('keeps a subject that is not the system, and says "shall" for must, should and will', () => {
+    expect(parseEarsSentence('While the battery level is low, the device shall dim the screen.')).toEqual({
+      ears_type: 'state-driven', action: 'the device shall dim the screen', precondition: 'the battery level is low',
+    })
+    expect(written('The Payments Service must reject a transfer above the daily limit')).toBe(
+      'The Payments Service shall reject a transfer above the daily limit.',
+    )
+    expect(written('The system should encrypt data at rest')).toBe('The system shall encrypt data at rest.')
+    expect(written('Users will be able to export their statements')).toBe('Users shall be able to export their statements.')
+  })
+
+  it('keeps the commas of a condition, and a condition that opens with no clause word', () => {
+    expect(parseEarsSentence('When the user, being logged in, clicks save, the system shall persist the document')).toEqual({
+      ears_type: 'event-driven', action: 'persist the document', trigger: 'the user, being logged in, clicks save',
+    })
+    expect(written('After three failed logins, the system shall lock the account')).toBe(
+      'After three failed logins, the system shall lock the account.',
+    )
+    expect(written('In case of fire, the system shall unlock all doors')).toBe('In case of fire, the system shall unlock all doors.')
+  })
+
+  it('reads a sentence with no comma before "the system", in any case of letters', () => {
+    expect(parseEarsSentence('When the user clicks save the system shall persist the document')).toEqual({
+      ears_type: 'event-driven', action: 'persist the document', trigger: 'the user clicks save',
+    })
+    expect(parseEarsSentence('If the card is declined then the system shall keep the basket')).toEqual({
+      ears_type: 'unwanted-behaviour', action: 'keep the basket', unwanted_condition: 'the card is declined',
+    })
+    expect(written('WHEN a payment fails THE SYSTEM SHALL retry it')).toBe('When a payment fails, the system shall retry it.')
+    expect(parseEarsSentence('When the user, being logged in, clicks save the system shall persist the document')).toEqual({
+      ears_type: 'event-driven', action: 'persist the document', trigger: 'the user, being logged in, clicks save',
+    })
+    // A subject that only ends in "the system" is a subject.
+    expect(written('When a payment fails, the user that runs the system shall be told')).toBe(
+      'When a payment fails, the user that runs the system shall be told.',
+    )
+  })
+
+  it('keeps a sentence whole when it cannot tell the condition from the subject', () => {
+    expect(parseEarsSentence('When a payment fails the gateway must retry it')).toEqual({
+      ears_type: 'ubiquitous', action: 'When a payment fails the gateway shall retry it',
+    })
+  })
+
+  it('takes a "shall" inside the action for part of the action', () => {
+    expect(written('The system shall show a list of what the user shall pay')).toBe(
+      'The system shall show a list of what the user shall pay.',
+    )
+  })
+
+  it('reads the other ways a condition opens, and "and when" as a second condition', () => {
+    expect(written('As soon as the order ships, the system shall e-mail the tracking link')).toBe(
+      'When the order ships, the system shall e-mail the tracking link.',
+    )
+    expect(parseEarsSentence('While the account is locked and when the user signs in, the system shall show how to unlock it')).toEqual({
+      ears_type: 'complex', action: 'show how to unlock it', precondition: 'the account is locked', trigger: 'the user signs in',
+    })
+  })
+
+  it('leaves the action empty when nothing follows "shall"', () => {
+    expect(parseEarsSentence('When a payment fails, the system shall:')).toEqual({
+      ears_type: 'event-driven', action: '', trigger: 'a payment fails',
     })
   })
 
@@ -159,5 +229,50 @@ describe('parseEarsSentence', () => {
     const parsed = parseEarsSentence('If the disk is full, where archiving is enabled, the system shall purge old logs.')
     const { sentence } = composeEarsSentence({ ...parsed })
     expect(sentence).toBe('If the disk is full, where archiving is enabled, the system shall purge old logs.')
+  })
+})
+
+describe('requirementFromLine', () => {
+  it('names an EARS sentence by its action and condition, and fills its fields', () => {
+    expect(requirementFromLine('When the user clicks save, the system shall persist the document.')).toEqual({
+      label: 'Persist the document when the user clicks save',
+      fields: { ears_type: 'event-driven', trigger: 'the user clicks save', action: 'persist the document' },
+    })
+  })
+
+  it('keeps a subject other than the system, so the sentence reads as written', () => {
+    const { label, fields } = requirementFromLine('While offline, the wiki view shall show the last saved pages')
+    expect(label).toBe('Show the last saved pages while offline')
+    expect(fields.action).toBe('the wiki view shall show the last saved pages')
+    expect(requirementFromLine('The system shall show a list of what the user shall pay').label).toBe(
+      'Show a list of what the user shall pay',
+    )
+    expect(composeEarsSentence(fields).sentence).toBe('While offline, the wiki view shall show the last saved pages.')
+  })
+
+  it('names it by the action alone when the condition would make the name too long', () => {
+    const { label } = requirementFromLine('If the daily limit of the account is exceeded by the amount of the transfer, the system shall refuse the transfer')
+    expect(label).toBe('Refuse the transfer')
+  })
+
+  it('keeps a line that is no EARS sentence as its name, with no sentence made up', () => {
+    expect(requirementFromLine('Users can reset their password')).toEqual({
+      label: 'Users can reset their password',
+      fields: {},
+    })
+  })
+
+  it('keeps a long line whole in the description when its name is cut', () => {
+    const line = 'Customers want to see every payment of the last two years in one list without paging through it'
+    const { label, fields } = requirementFromLine(line)
+    expect(label).toBe('Customers want to see every payment of the last two years in…')
+    expect(fields).toEqual({ description: line })
+  })
+})
+
+describe('labelFromText', () => {
+  it('cuts at a word and drops closing punctuation', () => {
+    expect(labelFromText('iOS app.')).toBe('iOS app')
+    expect(labelFromText('one two three four', 12)).toBe('one two…')
   })
 })

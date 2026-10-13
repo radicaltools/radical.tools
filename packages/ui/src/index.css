@@ -1803,7 +1803,26 @@ h4.wiki-heading { font-size: 16px; }
   line-height: 1.6;
   color: var(--text-primary);
 }
-.ears-editable { cursor: default; }
+.ears-editable { cursor: default; position: relative; }
+/* [rewrite], on the top edge of the sentence: there while the sentence is
+   pointed at or the link has the focus, and over no word of it. */
+.ears-rewrite {
+  position: absolute;
+  top: -10px;
+  right: 10px;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 18px;
+  background: var(--bg-app);
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.ears-sentence:hover > .ears-rewrite,
+.ears-rewrite:focus-visible { opacity: 1; }
+@media (hover: none) { .ears-rewrite { opacity: 1; } }
+.ears-rewriting .wiki-inline-textarea { font-size: 15px; line-height: 1.6; }
+.ears-rewriting .wiki-write-hint { display: block; }
 .ears-fixed {
   color: var(--text-muted);
   font-style: italic;
@@ -1952,6 +1971,62 @@ h3.wiki-heading .wiki-heading-count,
 h4.wiki-heading .wiki-heading-count,
 h5.wiki-heading .wiki-heading-count,
 h6.wiki-heading .wiki-heading-count { font-size: 0.8em; vertical-align: 0; }
+/* The line a group ends with for a designer: the next element is written in
+   it. An empty line of the page, ruled like one, until it is written in. */
+.wiki-write { margin: 10px 0 0; }
+.wiki-write-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--border-color);
+  border-radius: 0;
+  padding: 3px 0 4px;
+  outline: none;
+}
+/* Brought back into sight after each line written, with its hint. */
+.wiki-write-input { scroll-margin: 96px 0; }
+.wiki-write-input::placeholder { color: var(--text-muted); font-style: italic; }
+.wiki-write-input:hover { border-bottom-color: var(--text-muted); }
+/* The rule under the line shows where it is written: no ring around it. */
+.wiki-write-input:focus,
+.wiki-write-input:focus-visible { border-bottom: 1px solid var(--accent); outline: none; box-shadow: none; }
+/* How the line works, said while it is being written in. */
+.wiki-write-hint { display: none; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
+.wiki-write-input:focus + .wiki-write-hint { display: block; }
+/* A pasted list, before it becomes elements: what its lines will be named. */
+.wiki-write-pasted {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-panel);
+}
+.wiki-write-preview { margin: 0; padding-left: 22px; font-size: 14px; line-height: 1.6; }
+.wiki-write-more { margin: 2px 0 0 22px; font-size: 13px; color: var(--text-muted); }
+.wiki-write-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+/* The types a page has no element of yet: one opens its heading. */
+.wiki-write-start { margin: 22px 0 0; font-size: 13.5px; line-height: 1.9; color: var(--text-secondary); }
+.wiki-section .wiki-write-start { margin-top: 10px; }
+.wiki-write-start-line { margin: 0; }
+.wiki-write-start-hint { color: var(--text-muted); }
+.wiki-write-start-type { white-space: nowrap; }
+/* Many types: by the category the palette has them in. */
+.wiki-write-start-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 16px;
+  margin: 2px 0 0;
+}
+.wiki-write-start-list dt { color: var(--text-muted); }
+.wiki-write-start-list dd { margin: 0; }
 /* A group inside a chapter sits closer to the text it belongs to. */
 .wiki-section section.wiki-group { margin-top: 14px; }
 .wiki-section section.wiki-group > .wiki-heading { margin-bottom: 4px; }

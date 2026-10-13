@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
 import {
-  isParentAllowed,
+  GROUP_TYPE,
+  isPlacementAllowed,
   isPropertyVisible,
   resolveEarsSubject,
   composeEarsSentence,
+  parseEarsSentence,
   earsActionIsClause,
   refLabels,
   relationSentences,
@@ -24,6 +26,7 @@ import {
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { WikiMenu, type WikiMenuItem, type WikiMenuPage } from './WikiMenu'
 import { fieldTitle, wikiSearchHit, type WikiSearchHit } from './wikiSearch'
+import { elementFromLine, writtenLines } from './wikiWrite'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
@@ -57,14 +60,16 @@ function allNodeTypeIds(metamodel: Metamodel): string[] {
   return Object.keys(TYPE_LABELS)
 }
 
-// Node types that may be created as a child of `parentType` (undefined → root).
+// Node types that may be created as a child of `parent` (undefined → root),
+// where it stands in the model: a group holds only what its place allows.
 function childTypeOptions(
   metamodel: Metamodel,
-  parentType: string | undefined,
+  parent: C4Node | undefined,
+  nodes: Record<string, C4Node>,
   typeMeta: TypeMeta,
 ): TypeOption[] {
   return allNodeTypeIds(metamodel)
-    .filter((t) => isParentAllowed(metamodel, t, parentType))
+    .filter((t) => isPlacementAllowed(metamodel, t, parent, nodes))
     .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }
@@ -191,12 +196,15 @@ interface MenuTarget {
 
 type MenuPoint = { x: number; y: number; alignRight?: boolean }
 
-// What the pages need from the view to act on the model: its one menu, and
-// the two editors that a menu opens in the page (a relation's line, the
-// facts in the infobox).
+// What the pages need from the view to act on the model: its one menu, the
+// two editors that a menu opens in the page (a relation's line, the facts in
+// the infobox), and the elements a line written under a heading stands for.
 interface WikiActions {
   readOnly: boolean
   openMenu: (target: MenuTarget, at: MenuPoint) => void
+  /** Add an element of `type` for each line, as children of `under` (null:
+   *  at the top of the model). Returns the ids of the ones added. */
+  write: (type: string, lines: string[], under: C4Node | null) => string[]
   editingRelation: { ownerId: string; relationId: string } | null
   setEditingRelation: (editing: { ownerId: string; relationId: string } | null) => void
   factsFor: string | null
@@ -239,14 +247,17 @@ function menuUnderButton(
 
 // Node types that may be created as a child of `node`: via allowedParents
 // normally, or via the hierarchyRelation's allowedPairs (whichever types may
-// derive from this node's type) when its type nests by a relation.
-function childTypesOf(node: C4Node, metamodel: Metamodel, typeMeta: TypeMeta): TypeOption[] {
+// derive from this node's type) when its type nests by a relation. Such a
+// child sits beside `node`, in its container, and must be allowed there.
+function childTypesOf(node: C4Node, nodes: Record<string, C4Node>, metamodel: Metamodel, typeMeta: TypeMeta): TypeOption[] {
   const hierarchy = metamodel?.nodeTypes[node.type]?.hierarchyRelation
-  if (!hierarchy) return childTypeOptions(metamodel, node.type, typeMeta)
+  if (!hierarchy) return childTypeOptions(metamodel, node, nodes, typeMeta)
   const fromTypes = new Set(
     (metamodel?.relationTypes[hierarchy]?.allowedPairs ?? []).filter((p) => p.to === node.type).map((p) => p.from),
   )
+  const container = node.parentId ? nodes[node.parentId] : undefined
   return [...fromTypes]
+    .filter((t) => isPlacementAllowed(metamodel, t, container, nodes))
     .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }
@@ -319,6 +330,7 @@ export function WikiView(): React.ReactElement {
   const updateNode = useDiagramStore((s) => s.updateNode)
   const updateRelation = useDiagramStore((s) => s.updateRelation)
   const requestCreateNode = useDiagramStore((s) => s.requestCreateNode)
+  const addNodes = useDiagramStore((s) => s.addNodes)
   const removeNode = useDiagramStore((s) => s.removeNode)
   const addRelation = useDiagramStore((s) => s.addRelation)
   const removeRelation = useDiagramStore((s) => s.removeRelation)
@@ -392,9 +404,34 @@ export function WikiView(): React.ReactElement {
   const [menu, setMenu] = useState<{ target: MenuTarget; at: MenuPoint } | null>(null)
   const [editingRelation, setEditingRelation] = useState<WikiActions['editingRelation']>(null)
   const [factsFor, setFactsFor] = useState<string | null>(null)
+  // The elements written in a line under a heading: no wizard and no change
+  // of page, so that the next one can be written at once. Where they go
+  // follows from the page, as "Add child" of its menu has it.
+  const writeElements: WikiActions['write'] = (type, lines, under) => {
+    const hierarchy = under ? metamodel?.nodeTypes[under.type]?.hierarchyRelation : undefined
+    const parentId = under ? (hierarchy ? under.parentId : under.id) : undefined
+    const links: WizardLink[] = under && hierarchy ? [{ relationType: hierarchy, direction: 'out', otherId: under.id }] : []
+    return addNodes(lines.map((line) => ({
+      node: {
+        type: type as C4ElementType,
+        description: '',
+        technology: '',
+        collapsed: false,
+        external: false,
+        ...elementFromLine(type, line),
+        parentId,
+        x: 0,
+        y: 0,
+        ...nodeTypeSize(type, metamodel),
+      },
+      links,
+    })))
+  }
+
   const actions: WikiActions = {
     readOnly,
     openMenu: (target, at) => setMenu({ target, at }),
+    write: writeElements,
     editingRelation,
     setEditingRelation,
     factsFor,
@@ -513,7 +550,7 @@ export function WikiView(): React.ReactElement {
     }
     if (node && !relation) {
       const categoryRank = (type: string): number => NODE_TYPE_CATEGORIES.findIndex((c) => c.types.includes(type))
-      const childTypes = childTypesOf(node, metamodel, typeMeta).sort((a, b) => categoryRank(a.id) - categoryRank(b.id))
+      const childTypes = childTypesOf(node, c4Nodes, metamodel, typeMeta).sort((a, b) => categoryRank(a.id) - categoryRank(b.id))
       if (childTypes.length > 0) {
         items.push({
           id: 'add-child',
@@ -652,9 +689,9 @@ export function WikiView(): React.ReactElement {
 
 // ─── Navigation (left column) ────────────────────────────────────────────────
 
-// A group is how a model is divided, not a kind of thing in it: the wiki
-// speaks of a group by its name and description and never calls it a group.
-const GROUP_TYPE = 'group'
+// A group (GROUP_TYPE) is how a model is divided, not a kind of thing in it:
+// the wiki speaks of a group by its name and description and never calls it
+// a group.
 
 // The page that is not about an element: the wiki's glossary. It is a focus
 // like any other, so it has an address and is remembered with the view.
@@ -1042,6 +1079,10 @@ function WikiPartList({ parts, paragraphs = false, nodes, relations, onNavigate 
 // named and linked. Groups come first and take the place of such a heading
 // themselves: each is a chapter at the heading's level, or a paragraph that
 // opens with its name and goes on with its description.
+//
+// For a designer a group of a type ends with a line to write the next
+// element in (`writeUnder`), and the page or chapter with the types it has
+// none of yet (`starters`): choosing one opens its heading with such a line.
 function WikiChildren({
   parts,
   level,
@@ -1052,6 +1093,9 @@ function WikiChildren({
   typeMeta,
   onNavigate,
   renderChapter,
+  writeUnder,
+  starters,
+  startHint = 'Add',
 }: {
   parts: C4Node[]
   /** The heading level of a group; its chapters are one below. */
@@ -1063,13 +1107,41 @@ function WikiChildren({
   typeMeta: TypeMeta
   onNavigate: (id: string) => void
   renderChapter?: (node: C4Node, level: number) => React.ReactNode
+  /** The element whose children these are, or null for the top of the
+   *  model: what is written here is added to it. Left out, nothing is. */
+  writeUnder?: C4Node | null
+  /** Offer the types that have no element here yet: all of them on the
+   *  element's own page, in a chapter all but more of its own type (a
+   *  requirement refined into requirements is written on its page), so
+   *  that an article of many chapters is not a list of offers. */
+  starters?: 'page' | 'chapter'
+  /** What the offer of those types opens with. */
+  startHint?: string
 }): React.ReactElement {
+  const actions = useWikiActions()
   const order = allNodeTypeIds(metamodel)
   const rank = (type: string): number => (order.indexOf(type) < 0 ? order.length : order.indexOf(type))
+  // The types that may be written here. A group is how the model is
+  // divided, not something a line of text names: it is added from the menu.
+  const writable = writeUnder === undefined || actions.readOnly
+    ? []
+    : (writeUnder ? childTypesOf(writeUnder, nodes, metamodel, typeMeta) : childTypeOptions(metamodel, undefined, nodes, typeMeta))
+        .filter((t) => t.id !== GROUP_TYPE)
+        .sort((a, b) => rank(a.id) - rank(b.id))
+  // The headings opened to write the first element of a type under.
+  const [started, setStarted] = useState<string[]>([])
+  // What has been written here since the page opened, by type. It stays
+  // under the rest of its group in the order of writing, each written out,
+  // so that a list grows where it is being written: in order of name the
+  // next line would land somewhere among the others, or out of sight.
+  const [written, setWritten] = useState<Record<string, string[]>>({})
   const groups = parts.filter((n) => n.type === GROUP_TYPE)
-  const types = [...new Set(parts.map((n) => n.type))]
+  const types = [...new Set([...parts.map((n) => n.type), ...started])]
     .filter((type) => type !== GROUP_TYPE)
     .sort((a, b) => rank(a) - rank(b))
+  const toStart = starters
+    ? writable.filter((t) => !types.includes(t.id) && (starters === 'page' || t.id !== writeUnder?.type))
+    : []
   const Heading = `h${Math.min(level, 6)}` as 'h2'
   return (
     <>
@@ -1087,6 +1159,8 @@ function WikiChildren({
       )}
       {types.map((type) => {
         const group = parts.filter((n) => n.type === type)
+        const fresh = (written[type] ?? []).map((id) => group.find((n) => n.id === id)).filter((n): n is C4Node => !!n)
+        const settled = fresh.length > 0 ? group.filter((n) => !fresh.includes(n)) : group
         const title = capitalise(typeNoun(typeMeta(type).label, true))
         return (
           <section className="wiki-block wiki-group" key={type}>
@@ -1094,10 +1168,10 @@ function WikiChildren({
               id={`${idPrefix}-type-${type}`}
               className="wiki-heading"
               data-toc={title}
-              data-toc-count={group.length}
+              {...(group.length > 0 ? { 'data-toc-count': group.length } : {})}
               data-level={level}
             >
-              {title} <span className="wiki-heading-count">({group.length})</span>
+              {title}{group.length > 0 && <> <span className="wiki-heading-count">({group.length})</span></>}
             </Heading>
             {/* What the type is. A page says it once, where it first names
                 the type (see useFirstMentions). */}
@@ -1105,19 +1179,268 @@ function WikiChildren({
               <p className="wiki-hatnote" data-first-mention={type}>{metamodel.nodeTypes[type].description}</p>
             )}
             {renderChapter ? (
-              group.map((n) => renderChapter(n, level + 1))
+              [...settled, ...fresh].map((n) => renderChapter(n, level + 1))
             ) : (
-              <WikiPartList
-                parts={group}
-                nodes={nodes}
-                relations={relations}
-                onNavigate={onNavigate}
+              <>
+                {settled.length > 0 && (
+                  <WikiPartList
+                    parts={settled}
+                    nodes={nodes}
+                    relations={relations}
+                    onNavigate={onNavigate}
+                  />
+                )}
+                {fresh.length > 0 && (
+                  <WikiPartList
+                    parts={fresh}
+                    paragraphs
+                    nodes={nodes}
+                    relations={relations}
+                    onNavigate={onNavigate}
+                  />
+                )}
+              </>
+            )}
+            {writeUnder !== undefined && writable.some((t) => t.id === type) && (
+              <WikiWriteLine
+                type={type}
+                typeLabel={typeMeta(type).label}
+                under={writeUnder}
+                autoFocus={started.includes(type) && group.length === 0}
+                onWritten={(ids) => setWritten((before) => ({ ...before, [type]: [...(before[type] ?? []), ...ids] }))}
               />
             )}
           </section>
         )
       })}
+      {toStart.length > 0 && (
+        <WikiStartRow
+          hint={startHint}
+          types={toStart}
+          under={writeUnder ?? null}
+          nodes={nodes}
+          metamodel={metamodel}
+          folded={starters === 'chapter'}
+          onStart={(type) => setStarted((open) => [...open, type])}
+        />
+      )}
     </>
+  )
+}
+
+// The types a page or chapter has no element of yet, each a link that opens
+// its heading to write the first one under. A few are a line of links. Of
+// many, the line names the ones the element's peers already hold (a new
+// group beside groups of needs and requirements is offered those) and keeps
+// the rest behind "more"; with no peers to go by, they are listed by the
+// category the palette has them in, which a chapter shows only when asked.
+const START_LINE = 6
+
+function WikiStartRow({ hint, types, under, nodes, metamodel, folded, onStart }: {
+  hint: string
+  types: TypeOption[]
+  under: C4Node | null
+  nodes: Record<string, C4Node>
+  metamodel: Metamodel
+  folded: boolean
+  onStart: (type: string) => void
+}): React.ReactElement {
+  const [all, setAll] = useState(false)
+  // What the elements like this one, in the same place, are made of.
+  const usedByPeers = useMemo(() => {
+    const used = new Set<string>()
+    if (!under || types.length <= START_LINE) return used
+    const peers = new Set(
+      Object.values(nodes)
+        .filter((n) => n.id !== under.id && n.type === under.type && (n.parentId ?? null) === (under.parentId ?? null))
+        .map((n) => n.id),
+    )
+    for (const n of Object.values(nodes)) {
+      if (n.parentId && peers.has(n.parentId)) used.add(n.type)
+    }
+    return used
+  }, [nodes, under, types.length])
+
+  const first = types.length <= START_LINE ? types : types.filter((t) => usedByPeers.has(t.id))
+  const rest = types.filter((t) => !first.includes(t))
+  const listed = rest.length > 0 && (all || (first.length === 0 && !folded))
+  const categories = [...NODE_TYPE_CATEGORIES, { ...CUSTOM_CATEGORY, types: [] as string[] }]
+    .map((category) => ({
+      ...category,
+      types: rest.filter((t) => nodeTypeCategory(t.id).id === category.id),
+    }))
+    .filter((category) => category.types.length > 0)
+
+  const links = (of: TypeOption[]): React.ReactNode =>
+    of.map((t, i) => (
+      // The dot stays with the name before it: no line starts with one.
+      <React.Fragment key={t.id}>
+        <span className="wiki-write-start-type">
+          <button
+            className="wiki-link"
+            title={metamodel?.nodeTypes[t.id]?.description}
+            onClick={() => {
+              // The list has done its work: what is left is offered folded again.
+              setAll(false)
+              onStart(t.id)
+            }}
+          >
+            {capitalise(typeNoun(t.label, true))}
+          </button>
+          {i < of.length - 1 && <span className="wiki-link-run-sep"> ·</span>}
+        </span>{' '}
+      </React.Fragment>
+    ))
+
+  return (
+    <div className="wiki-write-start">
+      <p className="wiki-write-start-line">
+        <span className="wiki-write-start-hint">{hint}:</span>{' '}
+        {links(first)}
+        {rest.length > 0 && !listed && (
+          <button className="wiki-tool" aria-expanded={false} onClick={() => setAll(true)}>
+            {first.length > 0 ? 'more' : 'choose what'}
+          </button>
+        )}
+      </p>
+      {listed && (
+        <dl className="wiki-write-start-list">
+          {categories.map((category) => (
+            <React.Fragment key={category.id}>
+              <dt>{category.label}</dt>
+              <dd>{links(category.types)}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      )}
+    </div>
+  )
+}
+
+// The line a group of elements ends with for a designer: what is typed in
+// it and entered becomes the next element of the group, right above, and
+// the line stays for the one after. A requirement is written as its
+// sentence, anything else is named. A pasted list is an element for each of
+// its lines, once that is confirmed.
+const WRITE_PREVIEW = 5
+
+function WikiWriteLine({ type, typeLabel, under, autoFocus = false, onWritten }: {
+  type: string
+  typeLabel: string
+  under: C4Node | null
+  autoFocus?: boolean
+  /** The ids of the elements the line has just added. */
+  onWritten: (ids: string[]) => void
+}): React.ReactElement {
+  const actions = useWikiActions()
+  const [draft, setDraft] = useState('')
+  const [pasted, setPasted] = useState<string[] | null>(null)
+  const [writes, setWrites] = useState(0)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const confirmRef = useRef<HTMLButtonElement | null>(null)
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus()
+  }, [autoFocus])
+  useEffect(() => {
+    if (pasted) confirmRef.current?.focus()
+  }, [pasted])
+  // What was written is now above the line and has pushed it down, a whole
+  // chapter at a time in Multi page: the line stays where it can be seen.
+  // A frame later, once the page has settled (its contents box may grow).
+  useEffect(() => {
+    if (writes === 0) return
+    const frame = requestAnimationFrame(() => inputRef.current?.scrollIntoView({ block: 'nearest' }))
+    return () => cancelAnimationFrame(frame)
+  }, [writes])
+
+  const write = (lines: string[]): boolean => {
+    const ids = actions.write(type, lines, under)
+    if (ids.length === 0) return false
+    onWritten(ids)
+    setWrites((n) => n + 1)
+    return true
+  }
+  const enter = (): void => {
+    const lines = writtenLines(draft)
+    if (lines.length === 0) return
+    if (!write(lines)) return
+    setDraft('')
+    if (inputRef.current) inputRef.current.style.height = ''
+  }
+  const closePasted = (): void => {
+    setPasted(null)
+    inputRef.current?.focus()
+  }
+
+  const noun = typeNoun(typeLabel)
+  return (
+    <div className="wiki-write">
+      <textarea
+        ref={inputRef}
+        className="wiki-write-input"
+        rows={1}
+        value={draft}
+        aria-label={`Write a ${noun}`}
+        placeholder={
+          type === 'requirement'
+            ? 'Write a requirement: “When a payment fails, the system shall tell the customer”'
+            : `Name a new ${noun}`
+        }
+        onChange={(e) => {
+          setDraft(e.target.value)
+          autoSize(e.target)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            enter()
+          }
+          if (e.key === 'Escape') {
+            setDraft('')
+            e.currentTarget.blur()
+          }
+        }}
+        onPaste={(e) => {
+          const lines = writtenLines(e.clipboardData.getData('text/plain'))
+          if (lines.length < 2) return
+          e.preventDefault()
+          setPasted(lines)
+        }}
+      />
+      <span className="wiki-write-hint">Enter adds it. Paste a list to add one for each line.</span>
+      {pasted && (
+        <div
+          className="wiki-write-pasted"
+          role="group"
+          aria-label="Pasted lines"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') closePasted()
+          }}
+        >
+          <ol className="wiki-write-preview">
+            {pasted.slice(0, WRITE_PREVIEW).map((line, i) => (
+              <li key={i}>{elementFromLine(type, line).label}</li>
+            ))}
+          </ol>
+          {pasted.length > WRITE_PREVIEW && (
+            <p className="wiki-write-more">and {pasted.length - WRITE_PREVIEW} more</p>
+          )}
+          <div className="wiki-write-actions">
+            <button
+              ref={confirmRef}
+              className="wiki-add-btn"
+              onClick={() => {
+                if (write(pasted)) closePasted()
+              }}
+            >
+              Add {countedNoun(pasted.length, [typeLabel])}
+            </button>
+            <button className="wiki-tool" onClick={closePasted}>cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1159,7 +1482,7 @@ function WikiOverview({
   remainingDepth?: number
 }): React.ReactElement {
   const rootTypes = useMemo(
-    () => childTypeOptions(metamodel, undefined, typeMeta),
+    () => childTypeOptions(metamodel, undefined, nodes, typeMeta),
     [metamodel, typeMeta],
   )
   const articleRef = useRef<HTMLElement | null>(null)
@@ -1183,7 +1506,7 @@ function WikiOverview({
           {totalRelations === 1 ? '' : 's'}
         </p>
       </header>
-      {roots.length === 0 ? (
+      {roots.length === 0 && readOnly ? (
         <p className="wiki-muted">No elements yet.</p>
       ) : (
         <>
@@ -1197,6 +1520,9 @@ function WikiOverview({
             metamodel={metamodel}
             typeMeta={typeMeta}
             onNavigate={onNavigate}
+            writeUnder={null}
+            starters="page"
+            startHint={roots.length === 0 ? 'Nothing is written yet. Start with' : 'Add'}
             renderChapter={pageMode === 'multi' && remainingDepth > 0 ? (n, level) => (
               <WikiElementPage
                 key={n.id}
@@ -1637,7 +1963,7 @@ function WikiElementPage({
   const parentCandidates = useMemo(
     () =>
       Object.values(nodes)
-        .filter((n) => n.id !== node.id && isParentAllowed(metamodel, node.type, n.type))
+        .filter((n) => n.id !== node.id && isPlacementAllowed(metamodel, node.type, n, nodes))
         .sort((a, b) => a.label.localeCompare(b.label)),
     [nodes, node, metamodel],
   )
@@ -1646,11 +1972,17 @@ function WikiElementPage({
   const parent = node.parentId ? nodes[node.parentId] : undefined
   const getVal = (key: string) => (node as unknown as Record<string, unknown>)[key]
   const lead = fallbackLead
+  // A requirement that is only named so far has no sentence to read: its
+  // empty pattern ("The system shall ‹action›") is shown where it is filled
+  // in, on its own page, for a designer.
+  const earsStarted = [...earsSentenceKeys].some((key) => String(getVal(key) ?? '').trim())
 
   // The facts that have something to say, as the byline writes them. The
   // technology and a set boolean ("external") stand without their label.
   const facts = hasMeta ? factProps : fallbackFacts
   const bylineFacts = facts
+    // The pattern of a sentence that is not written yet says nothing.
+    .filter((p) => !(node.type === 'requirement' && p.key === 'ears_type' && !earsStarted))
     .map((p) => ({
       key: p.key,
       label: p.type === 'boolean' || p.key === 'technology' ? '' : typeNoun(p.label),
@@ -1826,7 +2158,7 @@ function WikiElementPage({
           }
         />
       )}
-      {node.type === 'requirement' && (
+      {node.type === 'requirement' && (earsStarted || (!embedded && !readOnly)) && (
         <div className="wiki-ears-sentence">
           <EarsSentenceEditor
             node={node as unknown as Record<string, unknown>}
@@ -1838,6 +2170,7 @@ function WikiElementPage({
           {!embedded && !earsComplete && (
             <EarsQuickEntry
               nodeId={node.id}
+              subject={earsSubject}
               readOnly={readOnly}
               updateNode={(id, patch) => updateNode(id, patch as Parameters<UpdateNode>[1])}
             />
@@ -1909,7 +2242,7 @@ function WikiElementPage({
 
       {/* Children, grouped by type: chapters of this article, or named
           and linked. */}
-      {children.length > 0 && (
+      {(children.length > 0 || !readOnly) && (
         <WikiChildren
           parts={children}
           level={level + 1}
@@ -1919,6 +2252,8 @@ function WikiElementPage({
           metamodel={metamodel}
           typeMeta={typeMeta}
           onNavigate={onNavigate}
+          writeUnder={node}
+          starters={embedded ? 'chapter' : 'page'}
           renderChapter={expandChildren ? (c, chapterLevel) => (
             <WikiElementPage
               key={c.id}
@@ -2463,6 +2798,33 @@ function EarsSlot({
 }
 
 function EarsSentenceEditor({ node, nodeId, subject: subjectProp, readOnly, updateNode }: EarsSentenceEditorProps) {
+  // The sentence is also edited whole, as the text it is: its parts are read
+  // from it again, which is how its pattern changes ("When" to "While").
+  const [rewriting, setRewriting] = useState(false)
+  const [draft, setDraft] = useState('')
+  const rewriteRef = useRef<HTMLTextAreaElement | null>(null)
+  useLayoutEffect(() => {
+    const el = rewriteRef.current
+    if (!rewriting || !el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+    autoSize(el)
+  }, [rewriting])
+  const rewrite = (): void => {
+    const parsed = parseEarsSentence(draft, subjectProp)
+    setRewriting(false)
+    if (!parsed.action) return
+    // Every part is set, the ones the new sentence has not are cleared.
+    updateNode(nodeId, {
+      ears_type: parsed.ears_type,
+      action: parsed.action,
+      trigger: parsed.trigger,
+      precondition: parsed.precondition,
+      unwanted_condition: parsed.unwanted_condition,
+      feature: parsed.feature,
+    })
+  }
+
   const earsType = String(node.ears_type ?? 'ubiquitous')
   const subject = subjectProp || 'the system'
   const action = String(node.action ?? '')
@@ -2543,24 +2905,32 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, readOnly, upda
         </>
       )
       break
-    case 'complex':
+    case 'complex': {
+      // The conditions the requirement has, in the order a sentence gives
+      // them. With none yet, the two that most often go together stand as
+      // holes to fill.
+      const all = [
+        { word: 'while', value: precondition, hole: '‹precondition›', key: 'precondition' },
+        { word: 'when', value: trigger, hole: '‹trigger›', key: 'trigger' },
+        { word: 'if', value: unwanted, hole: '‹condition›', key: 'unwanted_condition' },
+        { word: 'where', value: feature, hole: '‹feature›', key: 'feature' },
+      ]
+      const set = all.filter((c) => c.value)
+      const clauses = set.length > 0 ? set : all.slice(0, 2)
       content = (
         <>
-          <span className="ears-fixed">While </span>
-          {slot(precondition, '‹precondition›', 'precondition')}
-          <span className="ears-fixed">, when </span>
-          {slot(trigger, '‹trigger›', 'trigger')}
-          {unwanted || feature ? (
-            <>
-              {unwanted && (<><span className="ears-fixed">, if </span>{slot(unwanted, '‹condition›', 'unwanted_condition')}</>)}
-              {feature && (<><span className="ears-fixed">, where </span>{slot(feature, '‹feature›', 'feature')}</>)}
-            </>
-          ) : null}
-          <span className="ears-fixed">, </span>
+          {clauses.map((c, i) => (
+            <React.Fragment key={c.key}>
+              <span className="ears-fixed">{i === 0 ? capitalise(c.word) : c.word} </span>
+              {slot(c.value, c.hole, c.key)}
+              <span className="ears-fixed">, </span>
+            </React.Fragment>
+          ))}
           {shallClause}
         </>
       )
       break
+    }
     default: // ubiquitous
       content = ownClause ? shallClause : (
         <>
@@ -2572,9 +2942,50 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, readOnly, upda
       )
   }
 
+  if (rewriting && !readOnly) {
+    return (
+      <blockquote className="ears-sentence ears-editable ears-rewriting">
+        <textarea
+          ref={rewriteRef}
+          className="wiki-inline-input wiki-inline-textarea"
+          aria-label="The requirement as one sentence"
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value)
+            autoSize(e.target)
+          }}
+          onBlur={() => setRewriting(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setRewriting(false)
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              rewrite()
+            }
+          }}
+        />
+        <span className="wiki-write-hint">Enter reads the sentence into its parts again. Esc leaves it as it was.</span>
+      </blockquote>
+    )
+  }
+
   return (
     <blockquote className="ears-sentence ears-editable">
       {content}
+      {!readOnly && (
+        <button
+          className="wiki-tool ears-rewrite"
+          title="Write the whole sentence again: its parts are read from it"
+          aria-label="Rewrite the sentence"
+          onClick={() => {
+            const { sentence, complete } = composeEarsSentence(node, subjectProp)
+            // A pattern with holes in it is no sentence to start from.
+            setDraft(complete ? sentence : '')
+            setRewriting(true)
+          }}
+        >
+          rewrite
+        </button>
+      )}
     </blockquote>
   )
 }
