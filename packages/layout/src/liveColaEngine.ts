@@ -252,6 +252,16 @@ export class LiveColaEngine {
   private alignedWith = new Map<string, Set<string>>()
   private groupAlignments: GroupAlignment[] = []
   private groupOrders: GroupOrder[] = []
+  /**
+   * Open groups still drawn with the frame the model has, and their bounds
+   * here when the layout was built. A layout leaves more room around a
+   * container's children than these bounds do (120 px above them, where the
+   * physics keeps about 60), so reporting every group's own bounds re-framed
+   * every open container of a laid-out diagram at the first drag, wherever
+   * it was. A group keeps the model's frame until its bounds change:
+   * something in it moved (frameOf).
+   */
+  private keptFrames = new Map<string, { frame: Box; built: Box }>()
   /** Leaves no link holds, with the open groups they are related to (holdByGroups). */
   private heldByGroups: { leaf: ColaNode; groupIds: string[] }[] = []
   /** The separations WebCoLa keeps, by node index (roomFor). */
@@ -764,9 +774,35 @@ export class LiveColaEngine {
       return { x, X: x + drawn.width, y, Y: y + drawn.height }
     }
     const g = this.idToGroup.get(id)
-    const b = (g as any)?.bounds
+    return g ? this.frameOf(g) : undefined
+  }
+
+  /**
+   * A group's frame as the canvas draws it. The model's, while nothing in
+   * the group has moved since the layout was built (keptFrames); moved with
+   * the group when the group moved as a whole; else the group's bounds here,
+   * drawn smaller than the room overlap removal keeps (visualShrink), so
+   * that sibling groups do not share a border.
+   */
+  private frameOf(g: C4Group): Box | undefined {
+    const b = (g as any).bounds as Box | undefined
     if (!b || !Number.isFinite(b.x)) return undefined
-    const s = g!.visualShrink ?? 0
+    const kept = this.keptFrames.get(g.c4id)
+    if (kept) {
+      const dx = b.x - kept.built.x
+      const dy = b.y - kept.built.y
+      const sameSize = Math.abs((b.X - b.x) - (kept.built.X - kept.built.x)) <= REPORT_PX
+        && Math.abs((b.Y - b.y) - (kept.built.Y - kept.built.y)) <= REPORT_PX
+      if (sameSize) {
+        if (Math.abs(dx) > REPORT_PX || Math.abs(dy) > REPORT_PX) {
+          kept.frame = { x: kept.frame.x + dx, X: kept.frame.X + dx, y: kept.frame.y + dy, Y: kept.frame.Y + dy }
+          kept.built = { x: b.x, X: b.X, y: b.y, Y: b.Y }
+        }
+        return kept.frame
+      }
+      this.keptFrames.delete(g.c4id)
+    }
+    const s = g.visualShrink ?? 0
     return { x: b.x + s, X: b.X - s, y: b.y + s, Y: b.Y - s }
   }
 
@@ -1441,6 +1477,21 @@ export class LiveColaEngine {
     }
 
     this.cola = layout
+    // A diagram that has a layout: its open groups keep the frames it has.
+    this.keptFrames.clear()
+    if (run === 'rest' || run === 'local') {
+      this.refreshBounds()
+      for (const g of this.colaGroups) {
+        const n = nodes[g.c4id]
+        const b = (g as any).bounds as Box | undefined
+        if (!n || !b || !Number.isFinite(b.x)) continue
+        const at = toAbsoluteTopLeft(n, nodes)
+        this.keptFrames.set(g.c4id, {
+          frame: { x: at.x, X: at.x + n.width, y: at.y, Y: at.y + n.height },
+          built: { x: b.x, X: b.X, y: b.y, Y: b.Y },
+        })
+      }
+    }
     // Nothing to move: it is at rest as built.
     if (!arrange && !fresh.length && run !== 'whole') this.callbacks.onSettled?.()
 
@@ -1712,19 +1763,8 @@ export class LiveColaEngine {
     }
     for (const g of this.colaGroups) {
       if (skip.has(g.c4id)) continue
-      const b = (g as any).bounds
-      if (b) {
-        // Shrink the rendered box vs collision box so sibling groups don't
-        // share borders. Collision uses bounds at full `padding`; we render
-        // at `padding - visualShrink` ≈ a small visible inner padding.
-        const s = g.visualShrink ?? 0
-        abs[g.c4id] = {
-          x: b.x + s,
-          y: b.y + s,
-          width: (b.X - b.x) - 2 * s,
-          height: (b.Y - b.y) - 2 * s,
-        }
-      }
+      const frame = this.frameOf(g)
+      if (frame) abs[g.c4id] = { x: frame.x, y: frame.y, width: frame.X - frame.x, height: frame.Y - frame.y }
     }
 
     // 2. Convert to RF-relative (subtract parent's absolute position)

@@ -2,7 +2,7 @@
 
 import { NODE_SIZES, type C4ElementType, type C4Node } from '../../c4'
 import type { Metamodel } from '../../metamodel'
-import { checkReparent } from '../../model'
+import { checkNodeUpdate, checkReparent } from '../../model'
 import { fail, type ToolDef, type ToolHandler } from './types'
 import { validateProperties } from './propertyBag'
 
@@ -144,6 +144,14 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
         ...propValues,
       }).filter(([, value]) => value !== undefined)) as Partial<Omit<C4Node, 'id'>>
 
+      const refused = checkNodeUpdate({
+        c4Nodes: nodes,
+        c4Relations: ctx.diagram.getRelations(),
+        views: ctx.diagram.getViews?.() ?? {},
+        activeViewId: null,
+        metamodel: mm,
+      }, realId, updates)
+      if (refused) return fail(`update_node: ${refused}`)
       ctx.diagram.updateNode(realId, updates)
       const resultText = notes.length ? `Updated node ${realId}. ${notes.join('; ')}` : `Updated node ${realId}.`
       return { ok: true, resultText, updated: { nodes: 1 } }

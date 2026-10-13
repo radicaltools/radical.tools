@@ -197,6 +197,26 @@ function applyPositions(nodes: Record<string, C4Node>, positions: Record<string,
   }
 }
 
+/**
+ * The nodes of a saved document as All elements has them. A document is
+ * saved with its nodes where the canvas shown at that moment had them (a
+ * view's positions, when a view was open) and All elements' own places in
+ * `defaultPositions`. It always opens on All elements, so that is what the
+ * nodes must hold: opened with a view's positions in them, the first switch
+ * to a view (the one in the address, on every reload) stored those as All
+ * elements' and the view's layout replaced it for good.
+ */
+function atDefaultPositions(nodes: readonly C4Node[], positions: Record<string, NodePosition> | undefined): Record<string, C4Node> {
+  const out: Record<string, C4Node> = {}
+  for (const n of nodes) {
+    const p = positions?.[n.id]
+    out[n.id] = p && (p.x !== n.x || p.y !== n.y || p.width !== n.width || p.height !== n.height)
+      ? { ...n, x: p.x, y: p.y, width: p.width, height: p.height }
+      : n
+  }
+  return out
+}
+
 /** The model a slide shows: its linked milestone when it has one (linked by
  *  hand, so it wins), else the copy captured when the slide was added. A slide
  *  with neither shows the live model. */
@@ -1420,10 +1440,9 @@ export const useDiagramStore = create<DiagramStore>()(
       : documentBackend()?.openActive(buildSampleData) ?? null
 
     if (persisted && Array.isArray(persisted.nodes) && Array.isArray(persisted.relations)) {
-      initNodes = {}
+      initNodes = atDefaultPositions(persisted.nodes, persisted.defaultPositions)
       initRelations = {}
       initViews = {}
-      for (const n of persisted.nodes) initNodes[n.id] = n
       for (const r of persisted.relations) initRelations[r.id] = r
       if (persisted.views) for (const v of persisted.views) initViews[v.id] = v
       const initSequences: Record<string, DiagramSequence> = {}
@@ -4553,11 +4572,10 @@ export const useDiagramStore = create<DiagramStore>()(
         get().stopLiveLayout()
         _undoStack.length = 0
         _redoStack.length = 0
-        const nodes: Record<string, C4Node> = {}
+        const nodes = atDefaultPositions(data.nodes, data.defaultPositions)
         const relations: Record<string, C4Relation> = {}
         const views: Record<string, DiagramView> = {}
         const sequences: Record<string, DiagramSequence> = {}
-        for (const n of data.nodes) nodes[n.id] = n
         for (const r of data.relations) relations[r.id] = r
         if (data.views) for (const v of data.views) views[v.id] = v
         if (data.sequences) for (const s of data.sequences) sequences[s.id] = s

@@ -168,15 +168,34 @@ export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<
     return `Cannot move ${typeLabel(state.metamodel, newType)} "${existing.label}" into ${placementError(state.metamodel, newType, parent, state.c4Nodes)}`
   }
   const misplaced = 'parentId' in updates ? misplacedInGroup(state, { ...existing, type: newType } as C4Node, parent) : undefined
-  return misplaced ? groupContentsError(state.metamodel, existing, misplaced) : null
+  if (misplaced) return groupContentsError(state.metamodel, existing, misplaced)
+  // A retyped element keeps its relations: each must be one the metamodel
+  // has between the new type and the other end.
+  if (newType !== existing.type) {
+    for (const rel of Object.values(state.c4Relations)) {
+      if (rel.sourceId !== id && rel.targetId !== id) continue
+      const other = state.c4Nodes[rel.sourceId === id ? rel.targetId : rel.sourceId]
+      if (!other) continue
+      const from = rel.sourceId === id ? newType : other.type
+      const to = rel.targetId === id ? newType : other.type
+      if (!isRelationAllowed(state.metamodel, from, to)) {
+        return `Cannot change "${existing.label}" to ${typeLabel(state.metamodel, newType)}: its relation ${rel.sourceId === id ? 'to' : 'from'} "${other.label}" would be ${typeLabel(state.metamodel, from)} → ${typeLabel(state.metamodel, to)}, which the metamodel does not permit. Remove the relation first.`
+      }
+    }
+  }
+  return null
 }
 
 /** Applies the updates; a retyped node gets its new type's defaults. */
 export function patchNode(state: ModelState, id: string, updates: Partial<Omit<C4Node, 'id'>>): void {
   const node = state.c4Nodes[id] as NodeRecord | undefined
   if (!node) return
+  const retyped = 'type' in updates && updates.type !== node.type
   Object.assign(node, updates)
   if ('type' in updates) materializeDefaults(node, state.metamodel)
+  // Its relations keep a type that fits the new pair (checkNodeUpdate made
+  // sure there is one).
+  if (retyped) for (const rel of Object.values(state.c4Relations)) if (rel.sourceId === id || rel.targetId === id) refitRelationType(state, rel)
 }
 
 /** Why `ids` cannot move under `newParentId` (null = the root), or null.
@@ -263,8 +282,33 @@ function withoutNodes(constraints: LayoutConstraint[], removed: Set<string>): La
 export function checkAddRelation(state: ModelState, rel: Omit<C4Relation, 'id'>): string | null {
   const src = state.c4Nodes[rel.sourceId]
   const dst = state.c4Nodes[rel.targetId]
-  if (!src || !dst || isRelationAllowed(state.metamodel, src.type, dst.type)) return null
-  return `Relation not allowed: ${typeLabel(state.metamodel, src.type)} → ${typeLabel(state.metamodel, dst.type)}. The metamodel does not permit this connection.`
+  if (!src || !dst) return null
+  if (!isRelationAllowed(state.metamodel, src.type, dst.type)) {
+    return `Relation not allowed: ${typeLabel(state.metamodel, src.type)} → ${typeLabel(state.metamodel, dst.type)}. The metamodel does not permit this connection.`
+  }
+  // A relation that names its type must be one that type has between the two.
+  const def = rel.relationType ? state.metamodel?.relationTypes[rel.relationType] : undefined
+  if (def && !relationTypeAllows(def, src.type, dst.type)) {
+    return `Relation not allowed: "${def.label}" does not connect ${typeLabel(state.metamodel, src.type)} → ${typeLabel(state.metamodel, dst.type)}.`
+  }
+  return null
+}
+
+function relationTypeAllows(def: { allowedPairs: { from: string; to: string }[] }, from: string, to: string): boolean {
+  return def.allowedPairs.length === 0 || def.allowedPairs.some((p) => p.from === from && p.to === to)
+}
+
+/** Gives a relation whose type no longer has its pair (an end moved, an end
+ *  was retyped) the one type that does, or none when several could. */
+function refitRelationType(state: ModelState, rel: C4Relation): void {
+  if (!rel.relationType) return
+  const src = state.c4Nodes[rel.sourceId]
+  const dst = state.c4Nodes[rel.targetId]
+  const def = state.metamodel?.relationTypes[rel.relationType]
+  if (!src || !dst || !def || relationTypeAllows(def, src.type, dst.type)) return
+  const inferred = inferRelationType(state.metamodel, src.type, dst.type)
+  if (inferred) rel.relationType = inferred
+  else delete rel.relationType
 }
 
 /** Adds the relation, inferring its relationType from the metamodel when not given. */
@@ -275,11 +319,16 @@ export function insertRelation(state: ModelState, id: string, rel: Omit<C4Relati
   state.c4Relations[id] = { id, ...rel, ...(relationType ? { relationType } : {}) }
 }
 
-/** Refusal for moving a relation's source or target, as for a new relation. */
+/** Refusal for moving a relation's source or target, or giving it another
+ *  type, as for a new relation. A moved end may leave the type it had
+ *  behind (patchRelation finds the one that fits); a type given here must
+ *  have the pair. */
 export function checkPatchRelation(state: ModelState, id: string, updates: Partial<Omit<C4Relation, 'id'>>): string | null {
   const rel = state.c4Relations[id]
-  if (!rel || (updates.sourceId === undefined && updates.targetId === undefined)) return null
-  return checkAddRelation(state, { ...rel, ...updates })
+  if (!rel) return null
+  const retyped = updates.relationType !== undefined && updates.relationType !== rel.relationType
+  if (updates.sourceId === undefined && updates.targetId === undefined && !retyped) return null
+  return checkAddRelation(state, { ...rel, ...updates, relationType: retyped ? updates.relationType : undefined })
 }
 
 export function patchRelation(state: ModelState, id: string, updates: Partial<Omit<C4Relation, 'id'>>): void {
@@ -289,15 +338,7 @@ export function patchRelation(state: ModelState, id: string, updates: Partial<Om
     || (updates.targetId !== undefined && updates.targetId !== rel.targetId)
   Object.assign(rel, updates)
   // A moved end can leave the relation type behind; infer it again, as on insert.
-  if (!moved || updates.relationType !== undefined || !rel.relationType) return
-  const src = state.c4Nodes[rel.sourceId]
-  const dst = state.c4Nodes[rel.targetId]
-  const def = state.metamodel?.relationTypes[rel.relationType]
-  if (!src || !dst || !def) return
-  if (def.allowedPairs.length === 0 || def.allowedPairs.some((p) => p.from === src.type && p.to === dst.type)) return
-  const inferred = inferRelationType(state.metamodel, src.type, dst.type)
-  if (inferred) rel.relationType = inferred
-  else delete rel.relationType
+  if (moved && updates.relationType === undefined) refitRelationType(state, rel)
 }
 
 export function deleteRelation(state: ModelState, id: string): void {

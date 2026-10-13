@@ -186,6 +186,19 @@ describe('runSmartLayoutCore guarantees', () => {
     expect(b.winner.positions).toEqual(a.winner.positions)
   })
 
+  it('gives the same layout whatever order the document keeps its nodes and relations in', async () => {
+    // A model read back from a folder has its nodes sorted by id; the same
+    // model in the browser's storage has them as they were created.
+    const reordered = <T>(record: Record<string, T>, order: (keys: string[]) => string[]): Record<string, T> =>
+      Object.fromEntries(order(Object.keys(record)).map((k) => [k, record[k]]))
+    const first = await runSmartLayoutCore(pileUp().nodes, pileUp().relations)
+    for (const order of [(k: string[]) => [...k].reverse(), (k: string[]) => [...k].sort()]) {
+      const again = await runSmartLayoutCore(reordered(pileUp().nodes, order), reordered(pileUp().relations, order))
+      expect(again.winner.name).toBe(first.winner.name)
+      expect(again.winner.positions).toEqual(first.winner.positions)
+    }
+  })
+
   it('keeps the current layout when running again cannot beat it', async () => {
     const { nodes, relations } = pileUp()
     const first = await runSmartLayoutCore(nodes, relations)

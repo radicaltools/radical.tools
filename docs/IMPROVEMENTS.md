@@ -703,6 +703,72 @@ folders, alignments, pins, milestones, model sizes, Hub.
 Seen, not counted: the camera saved with a view stays where Smart Layout's
 fit left it after an undo of the layout.
 
+**Run 2, 2026-10-13, commit 44c4dc5.** Covered: the MCP server over stdio
+(labels and properties through a restart, refusals, alignments, grids,
+views, milestones), folder-backed models with the server writing to the
+same folder, milestones in Studio, generated models of 0, 3, 119, 126 and
+335 elements, the seven Hub blueprints opened in Studio, drags and pins
+with undo. Not covered: the Hub app, the metamodel editor, writing in the
+wiki, alignments made in Studio, milestone edits, `.radical` files, export
+and import, Forge, a model of exactly 150 elements.
+
+4. ~~**Smart Layout depends on the order of the nodes in the document.**~~
+   Fixed 2026-10-13. The same bookstore diagram from the same positions
+   got three different layouts with `nodes` in file order, sorted by id
+   and reversed. The folder format writes siblings sorted by id, so a
+   folder-backed model read back had another order than the one Studio
+   held in memory: after a reload, Smart Layout rearranged all six
+   elements of a layout it had just called best, and the MCP server's
+   `smart_layout` picked another winner than Studio on the same folder.
+   `projectToVisibleGraph` in `packages/layout/src/geometry.ts` now hands
+   the engines the nodes in id order, as it did the relations. Layouts of
+   models kept in browser storage or a `.radical` file change once with
+   it. Still open: on the same folder Studio and the server now pick the
+   same winner, but their positions differ (bookstore, All elements: the
+   root elements by up to 134 px), and the server replaces Studio's with
+   its own, which Studio then calls best. Not found why; Studio runs a
+   separation pass over the root elements after the layout that the
+   server does not (a guess).
+5. ~~**A reload while a view is shown writes that view's layout onto All
+   elements.**~~ Fixed 2026-10-13. Found with a milestone selected, but any
+   reload with a view in the address did it: a document is saved with its
+   nodes where the shown canvas has them, it opened on All elements with
+   those in its nodes, and the first switch to the view stored them as
+   All elements' own (bookstore, System Context: Bookstore from 860×350 at
+   x 0 to 360×260 at x 250, its children left outside it; the sample: 24
+   elements moved). The store now opens a document with its nodes at
+   `defaultPositions` (`atDefaultPositions`).
+6. ~~**`update_relation` sets a relation type the pair does not allow.**~~
+   Fixed 2026-10-13. The MCP server (and the AI chat, which shares the
+   tool) refused `add_relation` person → system `constrains`, but accepted
+   the same relation added as `interacts` and then updated to
+   `constrains`; `get_issues` reported no issue. `checkAddRelation` and
+   `checkPatchRelation` in `packages/common/src/model.ts` now check the
+   relation's own type, the validation flags a relation whose type does
+   not have its pair (`bad-rel-type`), and an element is not retyped away
+   from under a relation nothing allows for the new pair (the relation
+   takes the type that fits when there is one).
+7. ~~**A drag re-frames open containers it does not touch.**~~ Fixed
+   2026-10-13. After Smart Layout, dragging Customer away from Bookstore
+   changed Bookstore's frame by x −30, y +60, width +60, height −30; on
+   the sample's Core Banking, dragging one database changed the frames of
+   three groups the drop did not touch. The engine reported every open
+   group at its own bounds with the first drag. A group now keeps the
+   frame the model has until something in it moves (`keptFrames`), and
+   moves with it when it is dragged as a whole. The container an element
+   is dragged or added inside of is still refit to the physics' padding
+   (the leftover under item 1).
+
+To decide, not counted: a drag has no undo step. The toolbar's Undo stays
+disabled after one, ⌘Z does nothing, and one undo after "add an element,
+then drag another" takes back both. `liveRelease` says so on purpose ("No
+undo step: the drag itself has none"); the manual says everything is
+undoable.
+
+Seen once: `align_nodes` with a `viewId` accepts an element that is not in
+that view; a system may `interacts` with itself through the server; the
+sample's System Context opens with the "not laid out yet" hint.
+
 ### Radical Forge over MCP (2026-10-07)
 
 Added in `feat/forge-mcp`: the MCP server runs Radical Forge with the

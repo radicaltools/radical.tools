@@ -142,6 +142,22 @@ export function validateModel(
     }
   }
 
+  // A relation that names its type is one that type has between its ends
+  // (the check above only asks whether any type has the pair).
+  for (const r of Object.values(relations)) {
+    const def = r.relationType ? metamodel.relationTypes[r.relationType] : undefined
+    const src = nodes[r.sourceId]
+    const dst = nodes[r.targetId]
+    if (!def || !src || !dst || def.allowedPairs.length === 0) continue
+    if (def.allowedPairs.some(p => p.from === src.type && p.to === dst.type)) continue
+    issues.push({
+      id: `bad-rel-type:${r.id}`,
+      severity: 'warning',
+      message: `Relation "${src.label}" → "${dst.label}" is "${def.label}", which does not connect ${src.type}→${dst.type}.`,
+      relationId: r.id,
+    })
+  }
+
   // Reference properties point at existing nodes of their type.
   const checkRefs = (item: Record<string, unknown>, props: PropertyDef[] | undefined, at: { nodeId?: string; relationId?: string }, what: string): void => {
     for (const p of props ?? []) {
