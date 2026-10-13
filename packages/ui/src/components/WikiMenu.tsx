@@ -1,5 +1,4 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 
 // ─── Menu of the wiki view ───────────────────────────────────────────────────
 //
@@ -116,7 +115,9 @@ export function WikiMenu({ at, root, onClose }: {
     item.onSelect?.()
   }
 
-  return createPortal(
+  // Drawn where it is rendered, at the end of the wiki view: `position:
+  // fixed` places it by the window, as `at` is given.
+  return (
     <div
       ref={ref}
       className="wiki-menu"
@@ -162,7 +163,6 @@ export function WikiMenu({ at, root, onClose }: {
           </React.Fragment>
         ))}
       </div>
-    </div>,
-    document.body,
+    </div>
   )
 }
