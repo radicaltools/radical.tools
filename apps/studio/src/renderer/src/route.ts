@@ -292,10 +292,18 @@ export function startRouteSync(): () => void {
     queueMicrotask(schedule)
   })
 
-  const onHash = (): void => {
+  const onHash = (e: HashChangeEvent): void => {
     if (applying) return
-    const r = parseHash(location.hash)
-    if (r) applyRoute(r)
+    // The address that was asked for is read from the event, not from the
+    // location: a write of ours that was due just before this event has by
+    // now put the old state back there, and the link would be lost.
+    const asked = e.newURL ? new URL(e.newURL).hash : location.hash
+    const r = parseHash(asked)
+    if (!r) return
+    applyRoute(r)
+    // Should such a write have overwritten the address, write what was
+    // applied (after `applying` is reset; a no-op when the two agree).
+    queueMicrotask(schedule)
   }
   window.addEventListener('hashchange', onHash)
 
