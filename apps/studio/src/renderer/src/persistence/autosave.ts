@@ -87,7 +87,12 @@ if (typeof window !== 'undefined') {
     const pre = (window as any).__preModeLayout as
       | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; views: Record<string, DiagramView>; defaultPositions: Record<string, NodePosition> }
       | undefined
-    if (_layoutSafePending && pre) {
+    // The same for any save asked for while exploring (a flush after a
+    // layout, the page going away): what is arranged in Viewer or Presenter
+    // is never written.
+    const { appMode } = useDiagramStore.getState()
+    const exploring = appMode !== 'designer' && appMode !== 'metamodel'
+    if ((_layoutSafePending || exploring) && pre) {
       data.nodes = Object.values(pre.c4Nodes)
       data.relations = Object.values(pre.c4Relations)
       data.views = Object.values(pre.views)

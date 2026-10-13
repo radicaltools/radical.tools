@@ -177,6 +177,14 @@ const LOCAL_DRAG_SIZE = 40
  *  spreads the diagram over tens of thousands of pixels, so a push drag
  *  moves its surroundings only. */
 export const WHOLE_DIAGRAM_MAX_NODES = 150
+/** The nearest the physics places a child to the top of its open parent's
+ *  frame: the least padding a group shows inside its frame (12), plus half
+ *  of the margin overlap removal keeps around a leaf (80), with a little to
+ *  spare for rounding. Smart Layout leaves 120 there; once the physics has
+ *  moved a container's children, this is what they keep. The canvas must
+ *  not draw a child lower than the model says for standing above the
+ *  layouts' 120: it would show one place and save another. */
+export const LIVE_CHILD_TOP_MIN = 50
 /** Steps relaxLayout takes at most. Counted, not timed: the same diagram
  *  gets the same layout on every machine. */
 const RELAX_MAX_STEPS = 600

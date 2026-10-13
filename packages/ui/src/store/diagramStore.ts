@@ -70,6 +70,7 @@ import {
 // Re-exported for components that read view collapse state from the store module.
 export { computeViewCollapsedSet, isEffectivelyCollapsed }
 import { LiveColaLayout, type DragMode } from '../layout/liveColaLayout'
+import { LIVE_CHILD_TOP_MIN } from '@radical/layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
@@ -658,10 +659,6 @@ function deriveRFNodes(
   // COLLAPSED_HEIGHT instead of its full model height.
   const parentSet = new Set(sorted.map((n) => n.parentId).filter(Boolean))
 
-  // Minimum top offset for children inside an expanded parent — must clear
-  // the header (~30px) + 2-line label (~52px) + small gap. Mirrors the value
-  // used by ELK / smartLayout / fitParentToChildren.
-  const PARENT_LABEL_PAD = 110
 
   for (const n of sorted) {
     const hidden = isNodeHidden(n.id, nodes, viewCollapsedSet, expandedSet)
@@ -689,9 +686,13 @@ function deriveRFNodes(
         ? COLLAPSED_WIDTH[n.type]
         : n.width
 
-    // Render-time safeguard: if a child sits too close to its parent's top
-    // (because the saved layout pre-dates the larger header padding), push
-    // the visible position down without mutating the model.
+    // Render-time safeguard: a child saved on top of its parent's header
+    // (a layout from before containers kept room for it) is drawn below
+    // it, without mutating the model. Only that: a child the live physics
+    // placed stands LIVE_CHILD_TOP_MIN or more below the top, and is drawn
+    // where the model says. This used to push everything above 110 down,
+    // so children the physics had settled at 60 jumped on every reload,
+    // view switch and redo, and the canvas showed what the file did not.
     let renderY = n.y
     if (n.parentId) {
       const parent = nodes[n.parentId]
@@ -700,8 +701,8 @@ function deriveRFNodes(
         isContainerType(parent.type) &&
         !isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet) &&
         parentSet.has(parent.id)
-      if (parentExpanded && renderY < PARENT_LABEL_PAD) {
-        renderY = PARENT_LABEL_PAD
+      if (parentExpanded && renderY < LIVE_CHILD_TOP_MIN) {
+        renderY = LIVE_CHILD_TOP_MIN
       }
     }
 
@@ -1323,6 +1324,33 @@ function _insertWizardLinks(state: model.ModelState, nodeId: string, links: Wiza
     )
     if (!exists) model.insertRelation(state, uid(), rel)
   }
+}
+
+// Counts the times the whole model was replaced (a document loaded, a new or
+// sample model started): what was computed for the model before is not for
+// the one after.
+let _modelLoads = 0
+
+/** The canvas a layout run was started on. Smart Layout and the tree layout
+ *  take seconds on a large view, and the user can open another view, change
+ *  perspective, look at a milestone or load another model meanwhile: the
+ *  result is for the canvas it was computed from and no other. */
+function layoutTarget(s: Pick<DiagramStore, 'activeViewId' | 'appMode' | 'activeSnapshotId'>): string {
+  return [_modelLoads, s.appMode, s.activeViewId ?? '', s.activeSnapshotId ?? ''].join('|')
+}
+
+/** Tells the user a layout was dropped because its canvas is no longer shown. */
+function layoutMissedItsCanvas(push: DiagramStore['pushNotification']): void {
+  push('The layout was not applied: the canvas it was computed for is no longer the one shown. Run it again here.', 'warning')
+}
+
+/** Writes the document right after a layout instead of after the autosave
+ *  delay, so a reload straight after it shows the layout. Designer only:
+ *  Viewer and Presenter save nothing of what is arranged there. */
+function saveLayoutNow(appMode: DiagramStore['appMode']): void {
+  if (appMode !== 'designer' || typeof window === 'undefined') return
+  const flush = (window as any).__radicalFlushPersist as (() => Promise<void>) | undefined
+  void flush?.()
 }
 
 // Set to true during store init when an existing document was loaded from
@@ -3199,7 +3227,12 @@ export const useDiagramStore = create<DiagramStore>()(
         try {
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
+          const target = layoutTarget(get())
           const positions = await applyTreeLayout(input.nodes, input.relations)
+          if (layoutTarget(get()) !== target) {
+            layoutMissedItsCanvas(get().pushNotification)
+            return
+          }
           // One undo step for the whole layout. Viewer reverts positions on exit anyway.
           if (get().appMode === 'designer') get()._pushUndo()
           get()._markMilestoneEdit()
@@ -3231,10 +3264,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // Drop cola caches so the live layout doesn't snap nodes back to
           // their pre-layout positions on the next rebuild.
           _liveLayout?.reset()
-          if (typeof window !== 'undefined') {
-            const flush = (window as any).__radicalFlushPersist as (() => Promise<void>) | undefined
-            void flush?.()
-          }
+          saveLayoutNow(get().appMode)
           if (typeof requestAnimationFrame !== 'undefined') {
             requestAnimationFrame(() => { _getFitViewFn()?.() })
           } else {
@@ -3266,9 +3296,14 @@ export const useDiagramStore = create<DiagramStore>()(
         try {
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
+          const target = layoutTarget(get())
           const result = await runSmartLayout(input.nodes, input.relations, get().metamodel as Metamodel | undefined, (progress) => {
             set((s) => { s.smartLayoutProgress = progress })
           }, { alignments: input.alignments })
+          if (layoutTarget(get()) !== target) {
+            layoutMissedItsCanvas(get().pushNotification)
+            return
+          }
           if (result.candidates.length === 0) {
             get().pushNotification('Smart layout: no candidate produced a result.', 'warning')
             return
@@ -3312,12 +3347,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // that relaxation itself, as one of its candidates).
           _liveLayout?.reset()
 
-          // Persist now rather than after the autosave delay: a reload
-          // right after the layout shows it.
-          if (typeof window !== 'undefined') {
-            const flush = (window as any).__radicalFlushPersist as (() => Promise<void>) | undefined
-            void flush?.()
-          }
+          saveLayoutNow(get().appMode)
 
           // Friendly summary so the user sees what happened.
           const before = result.baseline
@@ -4519,6 +4549,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // ── I/O ─────────────────────────────────────────────────────────────
       loadDiagram(data) {
+        _modelLoads++
         get().stopLiveLayout()
         _undoStack.length = 0
         _redoStack.length = 0
@@ -4657,6 +4688,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       resetDiagram() {
+        _modelLoads++
         get().stopLiveLayout()
         _undoStack.length = 0
         _redoStack.length = 0
@@ -4696,6 +4728,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       newDiagram() {
+        _modelLoads++
         get().stopLiveLayout()
         _undoStack.length = 0
         _redoStack.length = 0
