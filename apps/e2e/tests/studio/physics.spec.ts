@@ -228,6 +228,34 @@ test('opening a view with Smart fit frames it at once, without a camera flight',
   expect(frames.slice(3).every((f) => f.onScreen === 6)).toBe(true)
 })
 
+test('Viewer fits a view with a saved camera when it opens', async ({ page, studio }) => {
+  // The saved camera reached the canvas as a revoked draft: placing it threw,
+  // and the view stayed under the previous view's camera.
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.views.find((v: { id: string }) => v.id === 'v-containers').viewport = { x: 3000, y: 3000, zoom: 0.8 }
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-context', 'viewer')
+  await page.locator('.lp-view-card').filter({ hasText: 'Containers' }).click()
+  await expect(studio.nodes).toHaveCount(6)
+  await studio.settle()
+  const off = await page.evaluate(() => {
+    const pane = document.querySelector('.react-flow')!.getBoundingClientRect()
+    const boxes = Array.from(document.querySelectorAll('.react-flow__node')).map((el) => el.getBoundingClientRect())
+    const left = Math.min(...boxes.map((b) => b.left))
+    const right = Math.max(...boxes.map((b) => b.right))
+    const top = Math.min(...boxes.map((b) => b.top))
+    const bottom = Math.max(...boxes.map((b) => b.bottom))
+    return {
+      x: (left + right) / 2 - (pane.left + pane.right) / 2,
+      y: (top + bottom) / 2 - (pane.top + pane.bottom) / 2,
+      inside: left >= pane.left && right <= pane.right && top >= pane.top && bottom <= pane.bottom,
+    }
+  })
+  expect(off.inside).toBe(true)
+  expect(Math.abs(off.x)).toBeLessThan(5)
+  expect(Math.abs(off.y)).toBeLessThan(5)
+})
+
 test('an expanded element grows around the centre of its collapsed box', async ({ page, studio }) => {
   await studio.seed()
   await studio.open('v-containers')

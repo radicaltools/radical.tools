@@ -207,6 +207,27 @@ describe('setActiveView in viewer (explore) mode', () => {
     useDiagramStore.getState().setActiveView(null)
     expect(useDiagramStore.getState().views[vid].positions.ctn1.x).toBe(11)
   })
+
+  it('hands the canvas the incoming view\'s saved camera as a readable value', () => {
+    const vid = useDiagramStore.getState().addView('Curated')
+    useDiagramStore.setState((s: any) => {
+      s.views[vid].viewport = { x: 40, y: 50, zoom: 0.5 }
+      return s
+    })
+    useDiagramStore.setState({ appMode: 'viewer' } as any)
+    // As Canvas' placeCamera does: it reads the camera after set() returned
+    // (a draft taken out of the producer is revoked by then, and throws).
+    let placed: { x: number; y: number; zoom: number } | null = null
+    ;(window as any).__rfPlaceCamera = (vp: { x: number; y: number; zoom: number } | null) => {
+      placed = vp && { x: vp.x, y: vp.y, zoom: vp.zoom }
+    }
+    try {
+      useDiagramStore.getState().setActiveView(vid)
+    } finally {
+      delete (window as any).__rfPlaceCamera
+    }
+    expect(placed).toEqual({ x: 40, y: 50, zoom: 0.5 })
+  })
 })
 
 describe('renameView', () => {
