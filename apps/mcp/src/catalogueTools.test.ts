@@ -39,6 +39,34 @@ async function call(client: Client, name: string, args: Record<string, unknown>)
 }
 
 describe('MCP document tools', () => {
+  it('refuses a relation type its pair does not have, on update as on add', async () => {
+    // update_relation passed the type through: person → system could become
+    // "constrains", and get_issues said nothing.
+    const { client, read } = await connect()
+    try {
+      await call(client, 'add_node', { tempId: 'user', type: 'person', label: 'Buyer' })
+      await call(client, 'add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+      const refusedAdd = await client.callTool({ name: 'add_relation', arguments: { sourceId: 'user', targetId: 'shop', relationType: 'constrains' } })
+      expect(refusedAdd.isError).toBe(true)
+      await call(client, 'add_relation', { sourceId: 'user', targetId: 'shop', relationType: 'interacts' })
+      const relation = (await read()).relations[0]
+
+      const refused = await client.callTool({ name: 'update_relation', arguments: { id: relation.id, relationType: 'constrains' } })
+      expect(refused.isError).toBe(true)
+      expect(JSON.stringify(refused.content)).toContain('does not allow person → system')
+      expect((await read()).relations[0].relationType).toBe('interacts')
+
+      // An element is not retyped away from under its relations either.
+      const user = (await read()).nodes.find((n) => n.label === 'Buyer')!
+      const retype = await client.callTool({ name: 'update_node', arguments: { id: user.id, type: 'scenario' } })
+      expect(retype.isError).toBe(true)
+      expect((await read()).nodes.find((n) => n.id === user.id)!.type).toBe('person')
+      expect(await call(client, 'get_issues', {})).toContain('No issues')
+    } finally {
+      await client.close()
+    }
+  })
+
   it('lays out one view into its own positions and builds a presentation over it', async () => {
     const { client, read } = await connect()
     try {

@@ -169,8 +169,16 @@ export function projectToVisibleGraph(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
 ): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } {
+  // In id order, like the relations below: every engine, the annealer's
+  // seed and the tie-breaks between equal candidates follow the order of
+  // this record, and the order a document keeps its nodes in is not part of
+  // the diagram (a model read back from a folder has them sorted by id,
+  // the same model in the browser's storage as they were created). In
+  // document order, the same diagram got another layout after a reload,
+  // and another from the MCP server than from Studio.
   const visible: Record<string, C4Node> = {}
-  for (const n of Object.values(nodes)) {
+  for (const id of Object.keys(nodes).sort()) {
+    const n = nodes[id]
     if (!isVisible(n, nodes)) continue
     if (isContainerType(n.type) && n.collapsed) {
       const w = COLLAPSED_WIDTH[n.type]

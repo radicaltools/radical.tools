@@ -96,6 +96,16 @@ test('download a concept as a .radical file', async ({ page, studio }) => {
   expect(doc.relations.length).toBeGreaterThan(0)
 })
 
+test('a concept link followed inside the Hub opens that concept', async ({ page, studio }) => {
+  // The address was written back to the catalogue's while the concept was
+  // still loading, and the link opened nothing.
+  await page.goto('/#/browse')
+  await studio.until(page.getByPlaceholder('Search concepts…'))
+  await page.goto(`/#/c/${CONCEPT}/v/canvas`)
+  await studio.until(studio.nodes)
+  await expect(page).toHaveURL(new RegExp(`#/c/${CONCEPT}`))
+})
+
 test('an unknown concept link falls back to the catalogue', async ({ page, studio }) => {
   await page.goto('/#/c/no-such-concept')
   await studio.until(page.getByPlaceholder('Search concepts…'))

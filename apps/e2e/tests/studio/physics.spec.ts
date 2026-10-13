@@ -97,6 +97,42 @@ test('a layout started on one canvas does not land on another', async ({ page, s
   expect((await studio.storedDoc(docId)).views!.find((v) => v.id === 'view-core')!.positions).toEqual(saved)
 })
 
+test('a drag is undone and redone as one step of its own', async ({ page, studio }) => {
+  // A drag had no undo step: Undo did nothing after one, and after "add an
+  // element, then drag another" it took back both.
+  await studio.seed()
+  await studio.open('v-context')
+  await studio.addFromPalette('Software System', { x: 150, y: 750 })
+  await expect(studio.nodes).toHaveCount(4)
+  await studio.settle()
+  const before = await studio.positions()
+
+  await dragBy(page, studio.node('customer'), 220, -90)
+  await page.waitForTimeout(600)
+  const dragged = await studio.positions()
+  expect(dragged.customer).not.toBe(before.customer)
+  const pins = async (): Promise<string[]> => {
+    const view = (await studio.storedDoc() as { views: { id: string; layoutConstraints?: { type: string; nodeIds: string[] }[] }[] }).views.find((v) => v.id === 'v-context')!
+    return (view.layoutConstraints ?? []).filter((c) => c.type === 'pin').flatMap((c) => c.nodeIds)
+  }
+  await expect.poll(pins).toEqual(['customer'])
+
+  // The drag goes back, the element added before it stays.
+  await studio.pane.click({ position: { x: 20, y: 20 } })
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => studio.positions()).toEqual(before)
+  await expect(studio.nodes).toHaveCount(4)
+  await expect.poll(pins).toEqual([])
+
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await expect.poll(() => studio.positions()).toEqual(dragged)
+  await expect.poll(pins).toEqual(['customer'])
+
+  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(studio.nodes).toHaveCount(3)
+})
+
 test('edits on a view with nested elements are saved without a reload', async ({ studio }) => {
   await studio.seed()
   await studio.open('v-containers')
@@ -363,4 +399,47 @@ test('an expanded element grows around the centre of its collapsed box', async (
   expect(after.w).toBeGreaterThan(before.w * 1.5)
   expect(after.x + after.w / 2).toBeCloseTo(before.x + before.w / 2, -2)
   expect(after.y + after.h / 2).toBeCloseTo(before.y + before.h / 2, -2)
+})
+
+test.describe('All elements keeps its own layout', () => {
+  test('a reload while a view is shown does not give All elements that view\'s layout', async ({ page, studio }) => {
+    // A document is saved with its nodes where the shown canvas has them.
+    // After a reload the view in the address was opened again, and what
+    // the nodes held (that view's layout) was stored as All elements'.
+    await studio.seed()
+    await studio.open('canvas')
+    const all = await studio.positions()
+    await studio.open('v-context')
+    await page.waitForTimeout(1000) // the autosave
+    await page.reload()
+    await studio.ready()
+    await expect(page.getByText('Structure: System Context')).toBeVisible()
+    await studio.open('canvas')
+    expect(await studio.positions()).toEqual(all)
+    expect(await studio.layoutViolations()).toEqual([])
+  })
+
+  test('nor does a reload while a milestone is shown in a view', async ({ page, studio }) => {
+    await studio.seed()
+    await studio.open('canvas')
+    const all = await studio.positions()
+    await studio.open('v-context')
+    await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+    await page.getByRole('button', { name: 'New milestone' }).click()
+    await page.getByPlaceholder('Milestone name…').fill('M1')
+    await page.keyboard.press('Enter')
+    const milestone = page.locator('.lp-snap-card', { hasText: 'M1' })
+    await expect(milestone).toBeVisible()
+    await page.waitForTimeout(1000) // the autosave
+    await milestone.click()
+    await expect(page).toHaveURL(/\/v\/v-context\/s\//)
+    await page.waitForTimeout(1000)
+    await page.reload()
+    await studio.ready()
+    await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+    await page.locator('.lp-snap-current').click()
+    await studio.open('canvas')
+    expect(await studio.positions()).toEqual(all)
+    expect(await studio.layoutViolations()).toEqual([])
+  })
 })

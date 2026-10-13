@@ -63,6 +63,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A reload, a view switch or a redo no longer moves a container's children down after an element was added into the container or the container was expanded: the canvas drew them about 50 px lower than the file had them
 - Smart Layout run in Viewer or Presenter is no longer saved into the model: the canvas went back to the Designer layout on return, but the file kept the other one and a reload showed it
 - Smart Layout no longer lands on another view when a view is opened while it is computing: it wrote the positions computed for the first canvas onto the second and saved them there. The layout is dropped with a notice instead
+- Reloading the page while a view is shown no longer replaces the layout of All elements with that view's: a container could shrink to the size it has in the view and leave its children outside it
+- Smart Layout gives the same layout whatever order the document keeps its elements in. A model kept in a folder was rearranged by Smart Layout after a reload although it had just reported the layout as the best, and the MCP server picked another arrangement than Studio for the same folder. Layouts of models kept in the browser or in a `.radical` file may come out differently once
+- `update_relation` (MCP server and AI assistant) refuses a relation type that does not connect the two elements, as `add_relation` does; the validation lists a relation whose type does not fit its ends; an element cannot be retyped when a relation it has would not be allowed for its new type
+- Dragging an element no longer changes the frames of open containers it does not touch
+- Undo no longer damages milestones or the live model: Undo right after opening a milestone, followed by an edit saved with "Propagate", turned every milestone into a copy of the live model, and Undo after leaving a milestone turned the live model into the milestone. The live model and each milestone now have their own undo steps
+- Undo goes back to the canvas the step was made on. Undone from another view, a step gave that view the layout of the one it was made on
+- Hub: a concept link followed inside the Hub (from another concept, or pasted into the same tab) opens that concept; it used to open nothing
+- From 150 elements, an element dropped after a ⌘/Ctrl drag stays where it was dropped; it could end up thousands of pixels away. The live physics no longer forces people to the top and external systems to the right on a diagram whose layout does not have them there
+- A node or relation type that elements still use cannot be deleted in the metamodel editor (the MCP server already refused this)
+- An element dragged within a second of opening a view no longer flies off while the camera zooms out
+- Adding an element no longer changes the frames of open containers it is not in
+- A drag can be undone: Undo puts back what the drag moved or pushed and takes off the pins it set. It used to do nothing after a drag, or take back the drag together with the edit made before it
 - A small diagram whose elements overlap when it is opened gets the hint to run Smart Layout, as large ones did; the physics no longer rearranges it on its own
 - A link opened right after another one (a deep link to a wiki page followed by one to another page, or to another perspective) is no longer lost now and then: the address the link asked for is applied even when Studio had just written its own state back to the address bar
 - Viewer and Presenter fit a view when it opens: a view with a saved camera stayed under the previous view's camera, off centre or partly off screen (the saved camera reached the canvas as a value it could no longer read, so the fit never started)

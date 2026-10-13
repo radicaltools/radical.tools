@@ -348,6 +348,13 @@ function HubAppInner(): React.ReactElement {
   // so the browser Back button returns to the landing page.
   const prevBrowsing = useRef(browsing)
   useEffect(() => {
+    // A concept asked for by the address is still loading: the address is
+    // ahead of the state, not behind it. Written back now it would lose the
+    // concept (a link followed inside the Hub fires two events; the second
+    // read the address this effect had rewritten to the catalogue's).
+    // (An id the catalogue does not have, or a file that failed to load,
+    // is not on its way: the address falls back to the catalogue's.)
+    if (conceptId && !concept && !conceptError && (concepts.length === 0 || summary)) return
     const hash = formatHubHash({
       browse: browsing,
       concept: concept?.id,
@@ -364,7 +371,7 @@ function HubAppInner(): React.ReactElement {
     const url = hash || window.location.pathname
     if (changed) history.pushState(null, '', url)
     else history.replaceState(null, '', url)
-  }, [browsing, concept, viewKind, namedViewId, activeCategory, activeTags, activeStatuses, sortBy])
+  }, [browsing, conceptId, concept, conceptError, concepts.length, summary, viewKind, namedViewId, activeCategory, activeTags, activeStatuses, sortBy])
 
   // URL → state (back/forward, pasted links).
   useEffect(() => {

@@ -308,6 +308,73 @@ describe('Calm drag', () => {
   })
 })
 
+describe('A drag and the open containers it does not touch', () => {
+  // A layout leaves 120 px above a container's children; the physics keeps
+  // about 60 around them. The engine reported every open container at its
+  // own bounds with the first drag, so dragging anything re-framed every
+  // container of a laid-out diagram.
+  const laidOut = (): Nodes => ({
+    shop: node('shop', 'system', { x: 0, y: 300, width: 760, height: 380 }),
+    web: node('web', 'container', { parentId: 'shop', x: 40, y: 120 }),
+    api: node('api', 'container', { parentId: 'shop', x: 400, y: 120 }),
+    user: node('user', 'person', { x: 300, y: 0 }),
+    bank: node('bank', 'system', { x: 1100, y: 400 }),
+  })
+  const relations: Record<string, C4Relation> = {
+    r1: { id: 'r1', sourceId: 'user', targetId: 'web' } as C4Relation,
+    r2: { id: 'r2', sourceId: 'web', targetId: 'api' } as C4Relation,
+    r3: { id: 'r3', sourceId: 'api', targetId: 'bank' } as C4Relation,
+  }
+  const frame = (nodes: Nodes, id: string) => (({ x, y, width, height }) => ({ x, y, width, height }))(nodes[id])
+
+  it('leaves a container as the layout framed it when an element outside it is dragged', () => {
+    const nodes = laidOut()
+    const before = structuredClone(nodes)
+    const engine = engineFor(nodes, relations)
+    engine.start(true)
+    calmDrag(engine, nodes, 'user', { x: -400, y: -200 })
+    engine.release('user')
+    engine.stop()
+    expect(absOf(nodes, 'user')).toEqual({ x: -400, y: -200 })
+    for (const id of ['shop', 'web', 'api', 'bank']) expect(frame(nodes, id)).toEqual(frame(before, id))
+  })
+
+  it('moves a dragged container with the frame it had', () => {
+    const nodes = laidOut()
+    const engine = engineFor(nodes, relations)
+    engine.start(true)
+    calmDrag(engine, nodes, 'shop', { x: 0, y: 900 })
+    engine.release('shop')
+    engine.stop()
+    expect(frame(nodes, 'shop')).toEqual({ x: 0, y: 900, width: 760, height: 380 })
+    expect(frame(nodes, 'web')).toMatchObject({ x: 40, y: 120 })
+  })
+
+  it('leaves it as the layout framed it when an element is added outside it', async () => {
+    const nodes = laidOut()
+    const before = structuredClone(nodes)
+    const engine = engineFor(nodes, relations)
+    engine.start(true)
+    // A new element far from the container, related to nothing.
+    nodes.guest = node('guest', 'person', { x: -900, y: -600 })
+    engine.invalidate()
+    await wait(500)
+    engine.stop()
+    for (const id of ['shop', 'web', 'api', 'bank', 'user']) expect(frame(nodes, id)).toEqual(frame(before, id))
+  })
+
+  it('refits the container an element is dragged inside of', () => {
+    const nodes = laidOut()
+    const engine = engineFor(nodes, relations)
+    engine.start(true)
+    calmDrag(engine, nodes, 'api', { x: 400, y: 700 })
+    engine.release('api')
+    engine.stop()
+    // It grew down to hold the element where it was dropped.
+    expect(nodes.shop.y + nodes.shop.height).toBeGreaterThan(700 + nodes.api.height)
+  })
+})
+
 describe('Pins', () => {
   it('keep a dropped element where it is when the physics moves the diagram around it', async () => {
     // The relations pull a and b together, but b was dropped and stays.

@@ -125,6 +125,56 @@ describe('Live layout physics: a diagram that has a layout', () => {
   })
 })
 
+describe('Live layout physics: a push drag on a diagram that has a layout', () => {
+  // A grid with a person in every row. The physics keeps people above
+  // everything else when it arranges a diagram; this layout does not have
+  // them there. Imposed on it, that order threw the first element the
+  // physics could move across the diagram: the dropped one ended up below
+  // the whole grid, 3 400 px away, though it was pinned at the drop.
+  function grid(count: number): { nodes: Nodes; relations: Record<string, C4Relation> } {
+    const nodes: Nodes = {}
+    const relations: Record<string, C4Relation> = {}
+    const name = (i: number): string => `n${String(i).padStart(3, '0')}`
+    for (let i = 0; i < count; i++) {
+      nodes[name(i)] = { ...node(name(i), (i % 15) * 460, Math.floor(i / 15) * 360), type: i % 7 === 0 ? 'person' : 'system' } as C4Node
+      if (i % 2 === 1) relations[`r${i}`] = { id: `r${i}`, sourceId: name(i - 1), targetId: name(i) }
+    }
+    return { nodes, relations }
+  }
+
+  // Below the size from which a push drag frees only its surroundings, and at it.
+  for (const count of [WHOLE_DIAGRAM_MAX_NODES - 1, WHOLE_DIAGRAM_MAX_NODES]) {
+    it(`leaves the element where it was dropped (${count} elements)`, async () => {
+      const { nodes, relations } = grid(count)
+      const before = at(nodes)
+      const { engine } = engineOver(nodes, relations)
+      engine.start(true)
+      const from = before.n016
+      engine.grab('n016', from.x, from.y, 'push', from)
+      for (let step = 1; step <= 10; step++) {
+        const x = from.x + 10.3 * step
+        nodes.n016 = { ...nodes.n016, x }
+        engine.drag('n016', x, from.y, { x, y: from.y })
+        await wait(30)
+      }
+      engine.release('n016')
+      await wait(1500)
+      engine.stop()
+
+      const after = at(nodes)
+      expect(after.n016.x).toBeCloseTo(from.x + 103, 0)
+      expect(after.n016.y).toBeCloseTo(from.y, 0)
+      // From that size up only its surroundings are free: its neighbour
+      // made room, nobody was sent across the diagram. (Below it, a push
+      // drag relaxes the whole diagram, which is what it is for.)
+      if (count >= WHOLE_DIAGRAM_MAX_NODES) {
+        const farthest = Math.max(...Object.keys(before).map((id) => Math.hypot(after[id].x - before[id].x, after[id].y - before[id].y)))
+        expect(farthest).toBeLessThan(300)
+      }
+    }, 20_000)
+  }
+})
+
 describe('relaxLayout', () => {
   it('brings a whole diagram to rest, the same way every time', () => {
     const first = relaxLayout(spread())!

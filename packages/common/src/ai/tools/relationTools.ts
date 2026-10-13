@@ -134,6 +134,16 @@ export function buildRelationToolHandlers(): Record<string, ToolHandler> {
       if (!ctx.diagram.updateRelation) return fail('update_relation: relations are not editable in this context')
 
       const mm = ctx.diagram.getMetamodel?.()
+      // The type asked for must have this pair, as in add_relation.
+      if (typeof input.relationType === 'string' && input.relationType && input.relationType !== rels[realId].relationType) {
+        const def = mm?.relationTypes[input.relationType]
+        if (mm && !def) return fail(`update_relation: unknown relationType "${input.relationType}"`)
+        const nodes = ctx.diagram.getNodes()
+        const srcType = nodes[rels[realId].sourceId]?.type
+        const dstType = nodes[rels[realId].targetId]?.type
+        const pairOk = !def || def.allowedPairs.length === 0 || def.allowedPairs.some((p) => p.from === srcType && p.to === dstType)
+        if (!pairOk) return fail(`update_relation: relationType "${input.relationType}" does not allow ${srcType} → ${dstType}`)
+      }
       const effectiveType = typeof input.relationType === 'string' ? input.relationType : rels[realId].relationType
       const { values: propValues, notes } = validateProperties(
         input.properties,
