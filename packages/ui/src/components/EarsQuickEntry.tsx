@@ -18,11 +18,15 @@ const EARS_TYPE_LABEL: Record<string, string> = {
  */
 export function EarsQuickEntry({
   nodeId,
+  subject,
   readOnly,
   updateNode,
   compact,
 }: {
   nodeId: string
+  /** The element the requirement is known to be about: the sentence may
+   *  name it in place of "the system". */
+  subject?: string
   readOnly?: boolean
   updateNode: (id: string, patch: Record<string, unknown>) => void
   compact?: boolean
@@ -42,7 +46,7 @@ export function EarsQuickEntry({
   const apply = () => {
     const text = draft.trim()
     if (!text) return
-    const parsed = parseEarsSentence(text)
+    const parsed = parseEarsSentence(text, subject)
     if (!parsed.action) return
     updateNode(nodeId, {
       ears_type: parsed.ears_type,
