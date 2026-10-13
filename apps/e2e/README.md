@@ -25,6 +25,7 @@ The first time, install Chromium: `npx playwright install chromium`.
 | `studio/boot` | Welcome screen (New model / Open steps, recent models, the sample), a new empty model, the Models dialog |
 | `studio/editing` | Palette drop, rename, Alt-drag connect, forbidden relation, undo/redo, delete, reload |
 | `studio/views` | Static, nested, dynamic and table views; sample treemap, matrix, wiki; Viewer and Presenter perspectives |
+| `studio/wiki` | Wiki pages read as articles (relations as sentences, children by type, chapters in Multi page), the glossary, the element menu, search by what a page says |
 | `studio/layout` | Smart Layout: no overlapping siblings, children inside their parent, same result on every run |
 | `studio/presentation` | Playing slides, keyboard navigation, slide deep links |
 | `studio/export` | PNG and SVG export produce real files |

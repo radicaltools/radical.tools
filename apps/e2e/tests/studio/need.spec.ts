@@ -101,12 +101,13 @@ test('needs nest under a broader need: a tree in the table, and Add child on its
   await expect(page.locator('tr[data-node-id="req-pickup"]')).toBeVisible()
   await expect(page.locator('tr[data-node-id="req-pickup"] .tv-tree-indent')).toHaveCount(0)
 
-  // Wiki: the sub-need is listed under "Derives from this", and Add child offers a Need, linked on creation.
+  // Wiki: the sub-need is listed under "Needs" on the page of its parent, and Add child offers a Need, linked on creation.
   await studio.open('v-wiki/f/need-discovery')
-  await expect(page.getByRole('heading', { name: /Derives from this/ })).toBeVisible()
-  await expect(page.getByText('Shop staff interviews').first()).toBeVisible()
-  await page.getByRole('button', { name: 'Add child' }).click()
-  await page.locator('.wiki-add-item', { hasText: 'Need' }).click()
+  await expect(page.getByRole('heading', { name: /^Needs \(1\)/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Shop staff interviews' })).toBeVisible()
+  await page.getByRole('button', { name: 'Edit Click & collect discovery' }).click()
+  await page.getByRole('menuitem', { name: 'Add child' }).click()
+  await page.getByRole('menuitem', { name: 'Need' }).click()
   const wizard = page.getByRole('dialog', { name: /New Need/ })
   await expect(wizard).toBeVisible()
   await wizard.getByLabel('Name').fill('Customer survey')

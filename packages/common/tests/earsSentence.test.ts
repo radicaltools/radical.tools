@@ -8,6 +8,14 @@ describe('composeEarsSentence', () => {
     expect(complete).toBe(true)
   })
 
+  it('an action that is a clause of its own keeps its subject and one full stop', () => {
+    const action = 'The wiki view shall show an overview page.'
+    expect(composeEarsSentence({ ears_type: 'ubiquitous', action }, '@radical/ui').sentence)
+      .toBe('The wiki view shall show an overview page.')
+    expect(composeEarsSentence({ ears_type: 'event-driven', trigger: 'a view opens', action }, '@radical/ui').sentence)
+      .toBe('When a view opens, the wiki view shall show an overview page.')
+  })
+
   it('ubiquitous without subject defaults to "the system"', () => {
     const { sentence } = composeEarsSentence({ ears_type: 'ubiquitous', action: 'respond within 1s' })
     expect(sentence).toBe('The system shall respond within 1s.')

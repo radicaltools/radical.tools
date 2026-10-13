@@ -100,7 +100,7 @@ A `need` holds raw free-text input (brief, user story, notes, raw requirements) 
 
 ## Custom metamodel
 
-Embed a full custom `metamodel` only when built-in presets do not provide the needed types. It needs `id`, `name`, `nodeTypes`, and `relationTypes`. Each node type needs `id`, `label`, `color`, `fg`, `iconPath` (16×16 SVG path), `width`, and `height`; add optional `collapsedWidth`, `collapsedHeight`, `allowedParents`, `allowedAtRoot`, and `properties` as needed. Each relation type needs `id`, `label`, and `allowedPairs: [{from,to}]`. Use `packages/common/src/metamodel/types.ts` as the authoritative shape.
+Embed a full custom `metamodel` only when built-in presets do not provide the needed types. It needs `id`, `name`, `nodeTypes`, and `relationTypes`. Each node type needs `id`, `label`, `color`, `fg`, `iconPath` (16×16 SVG path), `width`, and `height`; add optional `collapsedWidth`, `collapsedHeight`, `allowedParents`, `allowedAtRoot`, and `properties` as needed. Each relation type needs `id`, `label`, and `allowedPairs: [{from,to}]`. Both kinds of type may carry a `description` (what the type is; the wiki view shows it), and a relation type `forwardLabel` / `inverseLabel` (how it reads in a sentence from its source and from its target, e.g. `Constrains` / `Constrained by`). Use `packages/common/src/metamodel/types.ts` as the authoritative shape.
 
 ## Collapsed sizes
 

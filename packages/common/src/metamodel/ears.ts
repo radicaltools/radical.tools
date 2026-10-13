@@ -6,6 +6,14 @@
 
 function capitalize(s: string): string { return s.charAt(0).toUpperCase() + s.slice(1) }
 
+/** True when an action is a whole clause with a subject of its own ("The
+ *  wiki view shall show an overview page") rather than what follows "shall".
+ *  Such a requirement reads by its own subject: prefixing the element that
+ *  satisfies it would say "shall" twice. */
+export function earsActionIsClause(action: string): boolean {
+  return /\S\s+shall\s+\S/i.test(action)
+}
+
 /**
  * Compose the EARS requirement sentence from a node's fields.
  * Returns an object with `sentence` (the full EARS statement) and
@@ -32,8 +40,11 @@ export function composeEarsSentence(node: Record<string, unknown>, subject?: str
   const unwanted = String(node.unwanted_condition ?? '').trim()
   const feature = String(node.feature ?? '').trim()
 
-  const actionPart = action || '‹action›'
-  const shallClause = `${subj} shall ${actionPart}`
+  // The sentence ends with its own full stop, whatever the action brings.
+  const actionPart = action.replace(/\.+$/, '') || '‹action›'
+  const ownClause = earsActionIsClause(actionPart)
+  // After a condition the clause is mid-sentence: "When …, the system shall …".
+  const shallClause = ownClause ? actionPart.replace(/^(The|A|An)\b/, (w) => w.toLowerCase()) : `${subj} shall ${actionPart}`
 
   let sentence: string
   let complete = !!action
@@ -69,7 +80,7 @@ export function composeEarsSentence(node: Record<string, unknown>, subject?: str
       break
     }
     default: // ubiquitous
-      sentence = `${capitalize(subj)} shall ${actionPart}.`
+      sentence = ownClause ? `${capitalize(actionPart)}.` : `${capitalize(subj)} shall ${actionPart}.`
       break
   }
 

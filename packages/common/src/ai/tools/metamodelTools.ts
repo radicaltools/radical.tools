@@ -41,6 +41,7 @@ export function buildMetamodelToolDefs(): ToolDef[] {
         properties: {
           id: { type: 'string', description: 'Lowercase id, e.g. "service" or "risk".' },
           label: { type: 'string' },
+          description: { type: 'string', description: 'What an element of this type is, in a sentence or two. The wiki view shows it under the type and in its glossary. "" clears it.' },
           baseType: { type: 'string', description: 'New types only: copy shape, size and icon from this existing type (default: a system-like box).' },
           color: { type: 'string', description: 'Fill colour, e.g. "#0ea5e9".' },
           fg: { type: 'string', description: 'Text colour.' },
@@ -71,7 +72,10 @@ export function buildMetamodelToolDefs(): ToolDef[] {
         type: 'object',
         properties: {
           id: { type: 'string' },
-          label: { type: 'string' },
+          label: { type: 'string', description: 'The name of the type, read from source to target: "Constrains".' },
+          description: { type: 'string', description: 'What a relation of this type says about its two ends, in a sentence or two. The wiki view shows it. "" clears it.' },
+          forwardLabel: { type: 'string', description: 'How it reads in a sentence from source to target, when the label is a name rather than a verb ("Uses" for "Interacts"). "" clears it.' },
+          inverseLabel: { type: 'string', description: 'How it reads from target to source: "Constrained by". The wiki view uses it; the canvas does not show it. "" clears it.' },
           color: { type: 'string' },
           allowedPairs: {
             type: 'array',
@@ -183,9 +187,13 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       } else {
         const base = input.baseType ? mm.nodeTypes[input.baseType as string] : builtInC4Metamodel().nodeTypes.system
         const { wizard: _wizard, hierarchyRelation: _hierarchy, hubOnly: _hubOnly, ...look } = base
-        def = { ...look, id, label: '', builtin: false, color: '#6b7280', fg: '#ffffff', allowedParents: undefined, properties: [] }
+        def = { ...look, id, label: '', description: undefined, builtin: false, color: '#6b7280', fg: '#ffffff', allowedParents: undefined, properties: [] }
       }
       if (typeof input.label === 'string') def.label = input.label.trim()
+      if (input.description !== undefined) {
+        if (typeof input.description !== 'string') return fail('upsert_node_type: description must be a string')
+        def.description = input.description.trim() || undefined
+      }
       if (typeof input.color === 'string') def.color = input.color
       if (typeof input.fg === 'string') def.fg = input.fg
       if (Array.isArray(input.allowedParents)) def.allowedParents = input.allowedParents as string[]
@@ -243,6 +251,13 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       const { mm, note } = editable(current)
       const def: RelationTypeDef = existing ? { ...mm.relationTypes[id] } : { id, label: '', allowedPairs: [], builtin: false }
       if (typeof input.label === 'string') def.label = input.label.trim()
+      for (const key of ['description', 'forwardLabel', 'inverseLabel'] as const) {
+        const value = input[key]
+        if (value === undefined) continue
+        if (typeof value !== 'string') return fail(`upsert_relation_type: ${key} must be a string`)
+        if (value.trim()) def[key] = value.trim()
+        else delete def[key]
+      }
       if (typeof input.color === 'string') def.color = input.color
       if (pairs) def.allowedPairs = pairs
       if (properties) def.properties = properties
