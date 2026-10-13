@@ -41,6 +41,7 @@ import {
   builtInGovernanceMetamodel,
   isRelationAllowed,
   isParentAllowed,
+  isPlacementAllowed,
   canAddMoreOfType,
   inferRelationType,
   wizardFor,
@@ -55,7 +56,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { fittedParentSize, isFixedSizeType, projectToVisibleGraph } from '@radical/layout/geometry'
+import { createBatchPlacer, fittedParentSize, isFixedSizeType, projectToVisibleGraph } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
@@ -966,6 +967,12 @@ interface DiagramStore {
 
   // ── actions: nodes ──
   addNode: (node: Omit<C4Node, 'id'>) => string
+  /** Add several nodes, each with its links, as one undo step (a list
+   *  written or pasted in the wiki). They come without a place on the
+   *  canvas and get one beside their siblings. Stops at the first node the
+   *  metamodel refuses, with its error toast. Returns the ids of the nodes
+   *  added. */
+  addNodes: (items: { node: Omit<C4Node, 'id'>; links?: WizardLink[] }[]) => string[]
   updateNode: (id: string, updates: Partial<Omit<C4Node, 'id'>>) => void
   /** Fetch a lazily-loaded node's description from disk and merge it in.
    *  No-op if the node isn't pending. Not a user edit: doesn't push undo or
@@ -1603,6 +1610,36 @@ export const useDiagramStore = create<DiagramStore>()(
         return id
       },
 
+      addNodes(items) {
+        const ids: string[] = []
+        const place = createBatchPlacer(() => get().c4Nodes)
+        for (const { node: unplaced, links = [] } of items) {
+          const node = { ...unplaced, ...place(unplaced.parentId ?? undefined) }
+          // Checked one by one: a node added before may fill a cardinality.
+          const refused = model.checkAddNode(get(), node)
+          if (refused) {
+            get().pushNotification(refused, 'error')
+            break
+          }
+          if (ids.length === 0) {
+            get()._pushUndo()
+            get()._markMilestoneEdit()
+          }
+          const id = uid()
+          set((state) => {
+            model.insertNode(state, id, node)
+            _insertWizardLinks(state, id, links)
+          })
+          ids.push(id)
+        }
+        if (ids.length === 0) return ids
+        const parents = new Set(ids.map((id) => get().c4Nodes[id]?.parentId).filter((p): p is string => !!p))
+        for (const parentId of parents) get().fitParentToChildren(parentId)
+        get()._sync()
+        _liveLayout?.invalidate()
+        return ids
+      },
+
       // ── node wizard ──────────────────────────────────────────────────────
       requestCreateNode(node, opts = {}) {
         const links = opts.links ?? []
@@ -2153,7 +2190,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const commonParent = commonParentId ? state0.c4Nodes[commonParentId] : undefined
 
         // Wrapper must be allowed inside the common parent.
-        if (!isParentAllowed(mm, parentTypeId, commonParent?.type)) {
+        if (!isPlacementAllowed(mm, parentTypeId, commonParent, state0.c4Nodes)) {
           const allowed = parentDef.allowedParents
           const allowedStr = allowed && allowed.length
             ? allowed.map(t => mm?.nodeTypes[t]?.label ?? t).join(', ')
@@ -2271,7 +2308,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Validate: each direct child must be allowed to live inside the
         // grandparent (or at root). Block early with a useful message.
         for (const c of directChildren) {
-          if (!isParentAllowed(mm, c.type, grandparent?.type)) {
+          if (!isPlacementAllowed(mm, c.type, grandparent, state0.c4Nodes)) {
             const childDef = mm?.nodeTypes[c.type]
             const childLabel = childDef?.label ?? c.type
             const allowed = childDef?.allowedParents
