@@ -233,6 +233,18 @@ function NodeTypeCard({
           </div>
           <div className="mm-row">
             <label className="mm-field">
+              <span>Description</span>
+              <textarea
+                className="mm-input"
+                rows={2}
+                value={def.description ?? ''}
+                placeholder="What an element of this type is. The wiki shows it."
+                onChange={(e) => onChange({ description: e.target.value || undefined })}
+              />
+            </label>
+          </div>
+          <div className="mm-row">
+            <label className="mm-field">
               <span>Default width</span>
               <input
                 className="mm-input"
@@ -406,6 +418,40 @@ function RelationTypeCard({
                 className="mm-input"
                 value={def.label}
                 onChange={(e) => onChange({ label: e.target.value })}
+              />
+            </label>
+          </div>
+          <div className="mm-row">
+            <label className="mm-field">
+              <span>Description</span>
+              <textarea
+                className="mm-input"
+                rows={2}
+                value={def.description ?? ''}
+                placeholder="What a relation of this type says about its two ends. The wiki shows it."
+                onChange={(e) => onChange({ description: e.target.value || undefined })}
+              />
+            </label>
+          </div>
+          <div className="mm-row">
+            <label className="mm-field">
+              <span>Reads as</span>
+              <input
+                className="mm-input"
+                value={def.forwardLabel ?? ''}
+                placeholder={def.label}
+                title="How the wiki reads the relation from its source, when the label is a name rather than a verb"
+                onChange={(e) => onChange({ forwardLabel: e.target.value || undefined })}
+              />
+            </label>
+            <label className="mm-field">
+              <span>Reads back as</span>
+              <input
+                className="mm-input"
+                value={def.inverseLabel ?? ''}
+                placeholder="e.g. Constrained by"
+                title="How the wiki reads the relation from its target. The canvas does not show it."
+                onChange={(e) => onChange({ inverseLabel: e.target.value || undefined })}
               />
             </label>
           </div>

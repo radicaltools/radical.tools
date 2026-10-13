@@ -41,6 +41,7 @@ export function builtInDddC4Metamodel(): Metamodel {
   const domain: NodeTypeDef = {
     id: 'domain',
     label: 'Domain',
+    description: 'A part of the problem space, in the language of the business rather than of the software.',
     color: '#4c1d95',
     fg: '#fff',
     iconPath: 'M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9Zm1.5 1A.5.5 0 0 0 3 5v6a.5.5 0 0 0 .5.5h9A.5.5 0 0 0 13 11V5a.5.5 0 0 0-.5-.5h-9ZM5 7h2v2H5V7Zm4 0h2v2H9V7Z',
@@ -58,6 +59,7 @@ export function builtInDddC4Metamodel(): Metamodel {
   const entity: NodeTypeDef = {
     id: 'entity',
     label: 'Entity',
+    description: 'A thing the domain keeps track of and that has an identity over time: a reservation, an order, a payment.',
     color: '#7e22ce',
     fg: '#fff',
     // A record card with a key
@@ -87,6 +89,8 @@ export function builtInDddC4Metamodel(): Metamodel {
   const realises: RelationTypeDef = {
     id: 'realises',
     label: 'Realises',
+    description: "The software behind a domain or an entity: the bounded context that implements the domain, or the element that owns the entity's data.",
+    inverseLabel: 'Realised by',
     allowedPairs: [
       { from: 'system',    to: 'domain' },
       { from: 'container', to: 'domain' },
@@ -101,6 +105,8 @@ export function builtInDddC4Metamodel(): Metamodel {
   const partOf: RelationTypeDef = {
     id: 'part-of',
     label: 'Part of',
+    description: 'A part of an aggregate points to its root.',
+    inverseLabel: 'Made up of',
     allowedPairs: [{ from: 'entity', to: 'entity' }],
     properties: [],
     color: '#7e22ce',
@@ -112,6 +118,8 @@ export function builtInDddC4Metamodel(): Metamodel {
   const references: RelationTypeDef = {
     id: 'references',
     label: 'References',
+    description: 'One aggregate refers to another by id.',
+    inverseLabel: 'Referenced by',
     allowedPairs: [{ from: 'entity', to: 'entity' }],
     properties: [
       {
@@ -137,6 +145,8 @@ export function builtInDddC4Metamodel(): Metamodel {
   const dependsOn: RelationTypeDef = {
     id: 'depends-on',
     label: 'Depends on',
+    description: 'The source domain needs the target to do its work.',
+    inverseLabel: 'Depended on by',
     allowedPairs: ddPairs,
     properties: [
       { key: 'description', label: 'Description', type: 'text' },
@@ -147,6 +157,9 @@ export function builtInDddC4Metamodel(): Metamodel {
   const partnership: RelationTypeDef = {
     id: 'partnership',
     label: 'Partnership',
+    description: 'How the models of two domains meet, with a context-mapping pattern.',
+    forwardLabel: 'Partners with',
+    inverseLabel: 'Partners with',
     allowedPairs: ddPairs,
     properties: [
       {

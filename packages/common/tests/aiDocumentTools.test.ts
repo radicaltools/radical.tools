@@ -78,6 +78,26 @@ describe('metamodel tools', () => {
     expect(mm.relationTypes.mitigates.allowedPairs).toEqual([])
     expect((await call('delete_relation_type', { id: 'mitigates' })).ok).toBe(true)
   })
+
+  it('describe a new type, without inheriting the description of its base type', async () => {
+    const { facade, call } = setup()
+    await call('upsert_node_type', { id: 'risk', label: 'Risk', baseType: 'adr', allowedAtRoot: true })
+    expect(facade.getMetamodel!()!.nodeTypes.risk.description).toBeUndefined()
+    await call('upsert_node_type', { id: 'risk', description: ' Something that may go wrong. ' })
+    expect(facade.getMetamodel!()!.nodeTypes.risk.description).toBe('Something that may go wrong.')
+    await call('upsert_relation_type', { id: 'mitigates', label: 'Mitigates', description: 'The control lowers the risk.' })
+    expect(facade.getMetamodel!()!.relationTypes.mitigates.description).toBe('The control lowers the risk.')
+  })
+
+  it('set and clear how a relation type reads from either end', async () => {
+    const { facade, call } = setup()
+    await call('upsert_relation_type', { id: 'ownership', label: 'Ownership', forwardLabel: 'Owns', inverseLabel: ' Owned by ' })
+    expect(facade.getMetamodel!()!.relationTypes.ownership).toMatchObject({ label: 'Ownership', forwardLabel: 'Owns', inverseLabel: 'Owned by' })
+    await call('upsert_relation_type', { id: 'ownership', forwardLabel: '' })
+    const def = facade.getMetamodel!()!.relationTypes.ownership
+    expect(def.forwardLabel).toBeUndefined()
+    expect(def.inverseLabel).toBe('Owned by')
+  })
 })
 
 describe('presentation tools', () => {

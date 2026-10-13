@@ -32,6 +32,10 @@ export interface PropertyDef {
 export interface NodeTypeDef {
   id: string
   label: string
+  /** What an element of this type is, in a sentence or two. The wiki writes
+   *  it under the type's heading and in its glossary, so that a model
+   *  explains the words it is written in. */
+  description?: string
   color: string
   fg: string
   /** SVG path data (16×16 viewBox). */
@@ -132,7 +136,21 @@ export interface RelationPair {
 
 export interface RelationTypeDef {
   id: string
+  /** The type's name, which the properties panel and the metamodel editor
+   *  show. The canvas draws each relation's own label, never this one. */
   label: string
+  /** What a relation of this type says about its two ends, in a sentence or
+   *  two. The wiki writes it in its glossary and as a hint on the sentences
+   *  it builds from the type. */
+  description?: string
+  /** How the relation reads in a sentence from source to target, when the
+   *  label is a name rather than a verb: "Uses" for "Interacts". Defaults to
+   *  `label`. Only prose uses it (the wiki). */
+  forwardLabel?: string
+  /** How it reads from target to source: "Constrained by" for "Constrains".
+   *  Only prose uses it (the wiki), for the relations that end at a page's
+   *  element. */
+  inverseLabel?: string
   /** Empty list ⇒ "any pair allowed". */
   allowedPairs: RelationPair[]
   properties?: PropertyDef[]
