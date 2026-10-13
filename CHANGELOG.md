@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sequence view participants are drawn as their C4 shapes (person, database cylinder, queue, web app, boxes) in the canvas node colours, instead of one dark box style for every type
 
 ### Fixed
+- Viewer and Presenter fit a view when it opens: a view with a saved camera stayed under the previous view's camera, off centre or partly off screen (the saved camera reached the canvas as a value it could no longer read, so the fit never started)
 - Wiki: an element's description keeps its paragraphs and line breaks instead of running them together
 - Wiki: children linked by a relation rather than contained (requirements deriving from a need or a parent requirement) are headed by that relation, e.g. "Derives from this", instead of "Contains"
 - Table view: a requirement deriving from a need stays in the Requirements tree instead of dropping out of it with its sub-requirements

@@ -2425,7 +2425,9 @@ export const useDiagramStore = create<DiagramStore>()(
         // are for exploring only, and the pre-mode snapshot in setAppMode
         // restores the designer layout on the way back.
         if (appMode !== 'designer') {
-          let incomingViewport: { x: number; y: number; zoom: number } | null = null
+          // Read outside the producer: a draft taken out of set() is revoked
+          // when it returns, and placeCamera threw on reading it (no fit).
+          const incomingViewport = (newId === null ? get().defaultViewport : get().views[newId]?.viewport) ?? null
           set((state) => {
             const incoming = newId === null
               ? state.defaultPositions as Record<string, NodePosition>
@@ -2433,7 +2435,6 @@ export const useDiagramStore = create<DiagramStore>()(
             if (incoming && Object.keys(incoming).length > 0) {
               applyPositions(state.c4Nodes as Record<string, C4Node>, incoming)
             }
-            incomingViewport = (newId === null ? state.defaultViewport : state.views[newId]?.viewport) as typeof incomingViewport ?? null
             state.activeViewId = newId
           })
           get()._sync()
