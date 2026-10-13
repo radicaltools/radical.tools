@@ -768,6 +768,84 @@ Seen once: `align_nodes` with a `viewId` accepts an element that is not in
 that view; a system may `interacts` with itself through the server; the
 sample's System Context opens with the "not laid out yet" hint.
 
+**Run 3, 2026-10-13, commit 356b8dc.** Covered: the drag undo step on one
+canvas (single, child, container, multi-selection, push drag, drops that
+push, rows and grids, redo, reload), across a view switch and in a
+milestone; a relation's own type through the MCP server; frames kept
+through drags and an add; a `.radical` file reloaded on a view; the Hub
+app (all 128 concepts by link, links inside a tab, Add to Studio);
+adding, using and deleting a node type; alignments and grids made in
+Studio; milestone edits (propagate, discard); models of 149, 150 and 151
+elements. Not covered: writing in the wiki, Presenter and slides, "Save
+as new milestone", export and import, folder models with outside edits
+on a view, expand and collapse next to kept frames, most of the
+metamodel editor, Hub filters and search.
+
+8. ~~**Undo next to a milestone destroys milestones, or replaces the live
+   model.**~~ Fixed 2026-10-13. Open a milestone and press Undo: the
+   canvas showed the live model while the milestone was still the active
+   one, and the next edit saved with "Propagate" made every milestone a
+   copy of the live model (the sample: v1 from 11 nodes to 65, as v2, v3
+   and v4). Or: drag in a milestone, discard, Undo on the live model: the
+   live model became the milestone (65 nodes to 11), and a reload kept
+   it. A history entry did not say which model it belonged to. The live
+   model's history is now parked while a milestone is shown and comes
+   back with the live model; a milestone starts with none, and loses its
+   own when it is left or its edits are committed. Opening a milestone is
+   no undo step any more.
+9. ~~**Undo on another canvas than the one the step was made on puts that
+   canvas's layout on the one shown.**~~ Fixed 2026-10-13. Drag on
+   Containers, open System Context, Undo: System Context got Containers'
+   positions (Bookstore from 360×260 at x 250 to 860×350 at x 0) and
+   saved them. A history entry now keeps the canvas it was taken on and
+   All elements' positions, and undo and redo go back to that canvas.
+10. ~~**Hub: a concept link followed in a tab that already shows the Hub
+    opens nothing.**~~ Fixed 2026-10-13. The address was rewritten to
+    `#/browse` while the concept was still loading, and the second of the
+    two events the navigation fires read that. The state-to-address
+    effect in `apps/hub/src/HubApp.tsx` now waits for a concept that is on
+    its way.
+11. ~~**From 150 elements, an element dropped after a ⌘/Ctrl drag does not
+    stay where it was put.**~~ Fixed 2026-10-13. It was pinned at the
+    drop, then ended 3 435 px lower, below a grid of 150. Two causes. The
+    physics kept people above everything else and external systems to
+    the right on every diagram, also one whose layout does not have them
+    there: the first element it was free to move was thrown across the
+    diagram to satisfy that (the same rule put the actor of the very
+    first report above the whole diagram). On a diagram that has a layout
+    it now keeps that order only where the layout has it. And the drop
+    took the place the solver had pulled the element to, not the
+    pointer's.
+12. ~~**Studio deletes a node or relation type that elements use.**~~
+    Fixed 2026-10-13. No question, and the validation then listed the
+    elements as of an unknown type; the MCP server refused the same
+    deletion. The store now refuses it with the count
+    (`checkRemoveNodeType`, `checkRemoveRelationType` in
+    `packages/common/src/model.ts`).
+13. ~~**An element grabbed within about 1.5 s of a view opening flies
+    away.**~~ Fixed 2026-10-13. Smart fit kept refitting the camera every
+    frame while the layout moved, and a drag counted as moving: 60×120 px
+    of mouse travel moved an element 1 958×1 042 px. A drag that moves an
+    element now takes the camera, as a pan or a zoom does.
+14. ~~**Adding an element at the root re-frames open containers it does
+    not touch.**~~ Fixed 2026-10-13. A person dropped far from Bookstore
+    changed Bookstore's frame by x −80, y +60, width +120, height −30. A
+    group's kept frame was dropped when its bounds changed, and the run
+    for the new element computes them slightly differently; it is now
+    dropped when one of the group's leaves moves against the others.
+
+Left as it is from item 11's cases: below 150 elements a ⌘/Ctrl drag
+still relaxes the whole diagram (a few pixels of drag on a tidy grid of
+149 moved all of them, by stress alone now, the farthest by some 3 000 px).
+
+To decide: an element of a custom node type is drawn as React Flow's
+default node, dark text on the dark canvas (the editor says styling
+"lands in a follow-up"); a Hub ADR imports into a plain C4 model with a
+"metamodel" warning and then shows as an unknown type; undo of a Hub
+import leaves its `hubTemplates` record; `upsert_relation_type` that removes a pair relations use reports no new
+warning though `get_issues` then lists it; "Keep in a row" on two root
+elements moved all six elements of the view.
+
 ### Radical Forge over MCP (2026-10-07)
 
 Added in `feat/forge-mcp`: the MCP server runs Radical Forge with the

@@ -277,6 +277,25 @@ function withoutNodes(constraints: LayoutConstraint[], removed: Set<string>): La
     .filter((c) => c.nodeIds.length >= (c.type === 'pin' ? 1 : 2))
 }
 
+// ── Types in use ─────────────────────────────────────────────────────────────
+
+/** Why a node type cannot be deleted from the metamodel: elements are still
+ *  of it. Null when none is (built-in types are the caller's to refuse). */
+export function checkRemoveNodeType(state: ModelState, typeId: string): string | null {
+  const used = Object.values(state.c4Nodes).filter((n) => n.type === typeId).length
+  if (!used) return null
+  return `${used} ${used === 1 ? 'element is' : 'elements are'} still of type ${typeLabel(state.metamodel, typeId)}: retype or delete ${used === 1 ? 'it' : 'them'} first.`
+}
+
+/** Why a relation type cannot be deleted from the metamodel: relations are
+ *  still of it. */
+export function checkRemoveRelationType(state: ModelState, typeId: string): string | null {
+  const used = Object.values(state.c4Relations).filter((r) => r.relationType === typeId).length
+  if (!used) return null
+  const label = state.metamodel?.relationTypes[typeId]?.label ?? typeId
+  return `${used} ${used === 1 ? 'relation is' : 'relations are'} still of type "${label}": change or delete ${used === 1 ? 'it' : 'them'} first.`
+}
+
 // ── Relations ────────────────────────────────────────────────────────────────
 
 export function checkAddRelation(state: ModelState, rel: Omit<C4Relation, 'id'>): string | null {

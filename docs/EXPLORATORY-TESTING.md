@@ -45,6 +45,8 @@ script.
    was, positions included; redo gives the action back. A chain of undos
    returns to the start. The camera is not part of undo. A drag is one
    step: the elements it moved or pushed go back and its pins come off.
+   Undo goes back to the canvas the step was made on. A milestone has its
+   own steps, and opening one is none.
 4. **Geometry.** Siblings do not overlap. A child is inside its parent. No
    element sits far from all the others without the user having put it
    there. After Smart Layout: running it again reports that the current
@@ -88,8 +90,9 @@ Spend most of the run where bugs are likely, not where it is easy:
   drag while the physics settles, a view switch during a save). Smart
   Layout on the sample's All elements takes about three seconds, long
   enough to act during it; on the small fixtures it is over at once.
-- **Sizes.** An empty model, one element, a model near 150 elements (the
-  physics behaves differently from there up), several hundred.
+- **Sizes.** An empty model, one element, a model near 150 drawn leaves
+  (from there up a ⌘/Ctrl drag frees only the held element's surroundings,
+  and Smart Layout does not try the physics' relaxation), several hundred.
 - **Different models.** The sample (Open → Sample model),
   `apps/e2e/fixtures/*.radical`, and the Hub blueprints in
   `packages/hub-catalogue/catalogue`. Models with state machines, domains,
@@ -123,6 +126,16 @@ Do not walk the same path twice in a row. Each run, choose differently.
   section's header, so click the section's header first (the same for
   milestones, `.lp-snap-card`). The sample gets a new document id each
   time it is opened; read it from the address.
+- The first edit in a milestone opens a prompt whose backdrop covers the
+  left panel: answer it before clicking a view or milestone card.
+  "Current (live)" discards the milestone's edits without asking.
+- Compare a document against one Studio has already saved, not against
+  the fixture: the first save adds `defaultPositions`, `defaultViewport`,
+  the metamodel and a presentation.
+- The Hub is served from `apps/hub` with
+  `npx vite preview --port <port> --strictPort`. Its requests to
+  `hub.radical.tools`, and Studio's, are answered locally as
+  `apps/e2e/tests/hub` does.
 - A flow (dynamic) view has no `.react-flow__viewport`: a helper that
   waits for the canvas to be still must not wait on it there.
 - Smart Layout's notice may still be on screen from the run before. Tell
@@ -149,7 +162,8 @@ scratch directory, and do not send anything outside `localhost`.
 ## What to hand back
 
 Stop at three findings that hold, or after a serious try at five
-different combinations or areas, whichever comes first. At most two
+different combinations or areas, whichever comes first (a run asked to
+cover named areas covers them and reports what it finds). At most two
 findings from one area: a third is worth less than a first look somewhere
 no run has been (each run lists what it did not cover).
 

@@ -253,15 +253,15 @@ export class LiveColaEngine {
   private groupAlignments: GroupAlignment[] = []
   private groupOrders: GroupOrder[] = []
   /**
-   * Open groups still drawn with the frame the model has, and their bounds
-   * here when the layout was built. A layout leaves more room around a
-   * container's children than these bounds do (120 px above them, where the
-   * physics keeps about 60), so reporting every group's own bounds re-framed
-   * every open container of a laid-out diagram at the first drag, wherever
-   * it was. A group keeps the model's frame until its bounds change:
-   * something in it moved (frameOf).
+   * Open groups still drawn with the frame the model has, and where their
+   * leaves stood when the layout was built. A layout leaves more room
+   * around a container's children than the bounds here do (120 px above
+   * them, where the physics keeps about 60), so reporting every group's own
+   * bounds re-framed every open container of a laid-out diagram at the
+   * first drag or added element, wherever it was. A group keeps the model's
+   * frame until one of its leaves moves against the others (frameOf).
    */
-  private keptFrames = new Map<string, { frame: Box; built: Box }>()
+  private keptFrames = new Map<string, { frame: Box; leaves: { node: ColaNode; x: number; y: number }[] }>()
   /** Leaves no link holds, with the open groups they are related to (holdByGroups). */
   private heldByGroups: { leaf: ColaNode; groupIds: string[] }[] = []
   /** The separations WebCoLa keeps, by node index (roomFor). */
@@ -579,6 +579,16 @@ export class LiveColaEngine {
     }
     const cn = this.idToNode.get(nodeId)
     if (cn) {
+      // The drop is where the pointer left it. The solver only pulls a
+      // dragged leaf toward the pointer, against everything in its way, and
+      // the pin below would hold it wherever that pull had got to.
+      if (this.pushFrom?.moved && cn.px !== undefined && cn.py !== undefined) {
+        const held = (this.cola as { _descent?: { x: number[][] } } | null)?._descent?.x
+        const i = this.nodeIndexOf.get(cn) ?? -1
+        cn.x = cn.px
+        cn.y = cn.py
+        if (held && i >= 0) { held[0][i] = cn.px; held[1][i] = cn.py }
+      }
       Layout.dragEnd(cn)
     } else {
       for (const leaf of this.groupLeaves(nodeId)) {
@@ -780,7 +790,7 @@ export class LiveColaEngine {
   /**
    * A group's frame as the canvas draws it. The model's, while nothing in
    * the group has moved since the layout was built (keptFrames); moved with
-   * the group when the group moved as a whole; else the group's bounds here,
+   * the group when all of it moved alike; else the group's bounds here,
    * drawn smaller than the room overlap removal keeps (visualShrink), so
    * that sibling groups do not share a border.
    */
@@ -789,14 +799,15 @@ export class LiveColaEngine {
     if (!b || !Number.isFinite(b.x)) return undefined
     const kept = this.keptFrames.get(g.c4id)
     if (kept) {
-      const dx = b.x - kept.built.x
-      const dy = b.y - kept.built.y
-      const sameSize = Math.abs((b.X - b.x) - (kept.built.X - kept.built.x)) <= REPORT_PX
-        && Math.abs((b.Y - b.y) - (kept.built.Y - kept.built.y)) <= REPORT_PX
-      if (sameSize) {
+      // Still as built, or moved as one (a drag of the group, a push)?
+      const first = kept.leaves[0]
+      const dx = first ? first.node.x - first.x : 0
+      const dy = first ? first.node.y - first.y : 0
+      const rigid = kept.leaves.every((l) => Math.abs(l.node.x - l.x - dx) <= REPORT_PX && Math.abs(l.node.y - l.y - dy) <= REPORT_PX)
+      if (rigid) {
         if (Math.abs(dx) > REPORT_PX || Math.abs(dy) > REPORT_PX) {
           kept.frame = { x: kept.frame.x + dx, X: kept.frame.X + dx, y: kept.frame.y + dy, Y: kept.frame.Y + dy }
-          kept.built = { x: b.x, X: b.X, y: b.y, Y: b.Y }
+          for (const l of kept.leaves) { l.x = l.node.x; l.y = l.node.y }
         }
         return kept.frame
       }
@@ -1320,26 +1331,27 @@ export class LiveColaEngine {
     > = []
     const halfH = (i: number): number => this.colaNodes[i].height / 2
     const halfW = (i: number): number => this.colaNodes[i].width / 2
+    // When the physics arranges a diagram (one with no layout yet, the
+    // candidate Smart Layout tries) it imposes this order. On a diagram
+    // that has a layout it only keeps the order where the layout has it:
+    // imposed there, the first element the physics was free to move was
+    // thrown across the diagram to satisfy it (a system dropped after a
+    // push drag on a grid with a person in a lower row ended up below the
+    // whole grid, 3 400 px away; an actor a layout had put beside its
+    // system, above everything).
+    const imposing = run === 'first' || run === 'whole'
+    const holds = (left: number, right: number, axis: 'x' | 'y', gap: number): boolean =>
+      imposing || this.colaNodes[right][axis] - this.colaNodes[left][axis] >= gap - REPORT_PX
     for (const p of personIdx) {
       for (const s of [...internalIdx, ...externalIdx]) {
-        constraints.push({
-          type: 'separation',
-          axis: 'y',
-          left: p,
-          right: s,
-          gap: halfH(p) + halfH(s) + PERSON_GAP_PX,
-        })
+        const gap = halfH(p) + halfH(s) + PERSON_GAP_PX
+        if (holds(p, s, 'y', gap)) constraints.push({ type: 'separation', axis: 'y', left: p, right: s, gap })
       }
     }
     for (const i of internalIdx) {
       for (const e of externalIdx) {
-        constraints.push({
-          type: 'separation',
-          axis: 'x',
-          left: i,
-          right: e,
-          gap: halfW(i) + halfW(e) + EXT_GAP_PX,
-        })
+        const gap = halfW(i) + halfW(e) + EXT_GAP_PX
+        if (holds(i, e, 'x', gap)) constraints.push({ type: 'separation', axis: 'x', left: i, right: e, gap })
       }
     }
     // ── F: User alignments ───────────────────────────────────────────────
@@ -1488,7 +1500,7 @@ export class LiveColaEngine {
         const at = toAbsoluteTopLeft(n, nodes)
         this.keptFrames.set(g.c4id, {
           frame: { x: at.x, X: at.x + n.width, y: at.y, Y: at.y + n.height },
-          built: { x: b.x, X: b.X, y: b.y, Y: b.Y },
+          leaves: this.groupLeaves(g.c4id).map((node) => ({ node, x: node.x, y: node.y })),
         })
       }
     }

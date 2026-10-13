@@ -350,6 +350,19 @@ describe('A drag and the open containers it does not touch', () => {
     expect(frame(nodes, 'web')).toMatchObject({ x: 40, y: 120 })
   })
 
+  it('leaves it as the layout framed it when an element is added outside it', async () => {
+    const nodes = laidOut()
+    const before = structuredClone(nodes)
+    const engine = engineFor(nodes, relations)
+    engine.start(true)
+    // A new element far from the container, related to nothing.
+    nodes.guest = node('guest', 'person', { x: -900, y: -600 })
+    engine.invalidate()
+    await wait(500)
+    engine.stop()
+    for (const id of ['shop', 'web', 'api', 'bank', 'user']) expect(frame(nodes, id)).toEqual(frame(before, id))
+  })
+
   it('refits the container an element is dragged inside of', () => {
     const nodes = laidOut()
     const engine = engineFor(nodes, relations)

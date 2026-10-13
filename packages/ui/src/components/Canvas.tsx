@@ -992,12 +992,19 @@ function StructuralCanvas(): React.ReactElement {
   const dragDragsAlong = useRef<string[]>([])
   // React Flow reports a click as a drag too: only a move pins.
   const dragFrom = useRef<{ x: number; y: number } | null>(null)
+  // The camera is the user's once an element moves under the pointer. For
+  // a moment after a view opens, Smart fit refits every frame while the
+  // layout moves, and a drag counts as moving: the camera zoomed out under
+  // the pointer, which carried the element further, which zoomed it out
+  // more (60 px of mouse travel moved an element 2 000 px).
+  const dragTookCamera = useRef(false)
   const onNodeDragStart: NodeDragHandler = useCallback(
     (event, node, nodes) => {
       const mod = useDiagramStore.getState().connectionModifier
       const push = (mod !== 'meta' && event.metaKey) || (mod !== 'ctrl' && event.ctrlKey)
       dragDragsAlong.current = push ? [] : nodes.filter((n) => n.id !== node.id).map((n) => n.id)
       dragFrom.current = { ...node.position }
+      dragTookCamera.current = false
       liveGrab(node.id, node.position.x, node.position.y, push ? 'push' : 'calm', node.positionAbsolute, dragDragsAlong.current)
     },
     [liveGrab]
@@ -1005,9 +1012,13 @@ function StructuralCanvas(): React.ReactElement {
 
   const onNodeDrag: NodeMouseHandler = useCallback(
     (_event, node) => {
+      if (!dragTookCamera.current) {
+        dragTookCamera.current = true
+        takeCamera()
+      }
       liveDrag(node.id, node.position.x, node.position.y, node.positionAbsolute)
     },
-    [liveDrag]
+    [liveDrag, takeCamera]
   )
 
   const onNodeDragStop: NodeMouseHandler = useCallback(

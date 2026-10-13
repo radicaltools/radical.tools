@@ -118,6 +118,12 @@ interface HistoryEntry {
   c4Relations: Record<string, C4Relation>
   views: Record<string, DiagramView>
   defaultLayoutConstraints: LayoutConstraint[]
+  /** The canvas that was shown: `c4Nodes` hold its positions. Undo goes
+   *  back to it. Restored under another canvas, they became that canvas's
+   *  layout (a drag on one view, undone on another, gave the second the
+   *  first one's positions). */
+  activeViewId: string | null
+  defaultPositions: Record<string, NodePosition>
   /** Only on entries that also change sequences (clearModel). */
   sequences?: Record<string, DiagramSequence>
 }
@@ -125,6 +131,40 @@ interface HistoryEntry {
 const MAX_HISTORY = 100
 const _undoStack: HistoryEntry[] = []
 const _redoStack: HistoryEntry[] = []
+/**
+ * The live model's history, parked while a milestone is shown. A step
+ * belongs to the model it was made on: steps made on the live model undone
+ * while a milestone was shown put the live model under the milestone's name
+ * (and "propagate" then copied it over every milestone), and steps made in a
+ * milestone undone after leaving it made the milestone the live model.
+ */
+let _liveHistory: { undo: HistoryEntry[]; redo: HistoryEntry[] } | null = null
+
+/** A milestone is about to be shown: its steps start from nothing. The
+ *  live model's are kept for the way back. */
+function _historyEntersMilestone(fromLive: boolean): void {
+  const parked = { undo: _undoStack.splice(0), redo: _redoStack.splice(0) }
+  if (fromLive) _liveHistory = parked
+}
+
+/** The live model is shown again: the milestone's steps go, its own come
+ *  back, unless the milestone's edits were carried into it (`changed`). */
+function _historyBackOnLive(changed = false): void {
+  _undoStack.length = 0
+  _redoStack.length = 0
+  if (_liveHistory && !changed) {
+    _undoStack.push(..._liveHistory.undo)
+    _redoStack.push(..._liveHistory.redo)
+  }
+  _liveHistory = null
+}
+
+/** Another model was loaded: nothing of the history belongs to it. */
+function _historyForgotten(): void {
+  _undoStack.length = 0
+  _redoStack.length = 0
+  _liveHistory = null
+}
 
 function _captureState(state: DiagramStore): HistoryEntry {
   // No clone needed: the store is immer-managed, so `state.c4Nodes` etc. are
@@ -136,6 +176,8 @@ function _captureState(state: DiagramStore): HistoryEntry {
     c4Relations: state.c4Relations,
     views: state.views,
     defaultLayoutConstraints: state.defaultLayoutConstraints,
+    activeViewId: state.activeViewId,
+    defaultPositions: state.defaultPositions,
   }
 }
 
@@ -1483,6 +1525,33 @@ export const useDiagramStore = create<DiagramStore>()(
       initSnapshots = sample.snapshots
       initPres = buildPresentationsFromData(undefined, [])
       initMetamodel = builtInC4Metamodel()
+    }
+
+    // Puts the model back as a history entry has it, on the canvas the
+    // entry was taken on (undo and redo).
+    const _restoreHistoryEntry = (entry: HistoryEntry): void => {
+      const canvasChanged = entry.activeViewId !== get().activeViewId
+      set((state) => {
+        state.c4Nodes = entry.c4Nodes as any
+        state.c4Relations = entry.c4Relations as any
+        state.views = entry.views as any
+        state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
+        state.defaultPositions = entry.defaultPositions as any
+        // A view the entry knows may be gone when the entry is older than
+        // the view; its positions are All elements' then.
+        state.activeViewId = entry.activeViewId && entry.views[entry.activeViewId] ? entry.activeViewId : null
+        if (entry.sequences) state.sequences = entry.sequences as any
+        state.canUndo = _undoStack.length > 0
+        state.canRedo = _redoStack.length > 0
+      })
+      get()._sync()
+      if (canvasChanged && typeof window !== 'undefined') {
+        const viewId = get().activeViewId
+        const camera = (viewId ? get().views[viewId]?.viewport : get().defaultViewport) ?? null
+        const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+        ;(window as any).__rfPlaceCamera?.(camera, shown)
+      }
+      _liveLayout?.reset()
     }
 
     // addNode plus its wizard links, as one undo step.
@@ -3582,17 +3651,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const entry = _undoStack.pop()!
         // push current state to redo
         _redoStack.push({ ..._captureState(get()), ...(entry.sequences ? { sequences: get().sequences } : {}) })
-        set((state) => {
-          state.c4Nodes = entry.c4Nodes as any
-          state.c4Relations = entry.c4Relations as any
-          state.views = entry.views as any
-          state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
-          if (entry.sequences) state.sequences = entry.sequences as any
-          state.canUndo = _undoStack.length > 0
-          state.canRedo = true
-        })
-        get()._sync()
-        _liveLayout?.reset()
+        _restoreHistoryEntry(entry)
       },
 
       clearModel() {
@@ -3622,17 +3681,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const entry = _redoStack.pop()!
         // push current state to undo
         _undoStack.push({ ..._captureState(get()), ...(entry.sequences ? { sequences: get().sequences } : {}) })
-        set((state) => {
-          state.c4Nodes = entry.c4Nodes as any
-          state.c4Relations = entry.c4Relations as any
-          state.views = entry.views as any
-          state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
-          if (entry.sequences) state.sequences = entry.sequences as any
-          state.canUndo = true
-          state.canRedo = _redoStack.length > 0
-        })
-        get()._sync()
-        _liveLayout?.reset()
+        _restoreHistoryEntry(entry)
       },
 
       // ── snapshots (versions) ────────────────────────────────────────────
@@ -3672,8 +3721,11 @@ export const useDiagramStore = create<DiagramStore>()(
 
       removeSnapshot(id) {
         const backup = get().liveBackup
+        if (get().activeSnapshotId === id) _historyBackOnLive()
         set((state) => {
           state.snapshots = state.snapshots.filter(s => s.id !== id) as any
+          state.canUndo = _undoStack.length > 0
+          state.canRedo = _redoStack.length > 0
           if (state.activeSnapshotId === id) {
             // If the active milestone is being deleted, restore live and clear flags.
             if (backup) {
@@ -3770,7 +3822,7 @@ export const useDiagramStore = create<DiagramStore>()(
               snap.relations as Record<string, C4Relation>,
             )
           : { nodes: {}, relations: {} }
-        _pushUndo(get())
+        _historyEntersMilestone(!activeSnapshotId)
         set((state) => {
           // `snap.nodes` is shared (never mutated in place, see _captureState).
           // When preserving layout, shallow-copy the map and only build a
@@ -3822,7 +3874,10 @@ export const useDiagramStore = create<DiagramStore>()(
 
       discardMilestoneChanges() {
         const { liveBackup } = get()
+        if (get().activeSnapshotId) _historyBackOnLive()
         set((state) => {
+          state.canUndo = _undoStack.length > 0
+          state.canRedo = _redoStack.length > 0
           if (liveBackup) {
             state.c4Nodes = liveBackup.nodes as any
             state.c4Relations = liveBackup.relations as any
@@ -3873,6 +3928,10 @@ export const useDiagramStore = create<DiagramStore>()(
             relations: editedRels,
             sequences: editedSeqs,
           }
+          // The edits are the new milestone now: there is nothing behind
+          // them to undo to.
+          _undoStack.length = 0
+          _redoStack.length = 0
           set((state) => {
             state.snapshots.splice(idx + 1, 0, newSnap as any)
             // Stay viewing the freshly-created milestone (canvas already shows its content).
@@ -3880,6 +3939,8 @@ export const useDiagramStore = create<DiagramStore>()(
             state.activeSnapshotId = newId
             state.milestoneDirty = false
             state.milestonePromptOpen = false
+            state.canUndo = false
+            state.canRedo = false
           })
           get()._sync()
           _liveLayout?.reset()
@@ -3987,8 +4048,15 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           state.milestoneDirty = false
           state.milestonePromptOpen = false
+          state.canUndo = false
+          state.canRedo = false
           // Keep activeSnapshotId + liveBackup so user can still discard / switch later.
         })
+        // The edits are in this milestone, the later ones and the live model
+        // now: no step from before, here or on the live model, leads back.
+        _undoStack.length = 0
+        _redoStack.length = 0
+        _liveHistory = null
         get()._sync()
         _liveLayout?.reset()
       },
@@ -4167,6 +4235,13 @@ export const useDiagramStore = create<DiagramStore>()(
         })
       },
       removeNodeType(id) {
+        // Elements of a type the metamodel no longer has would be left
+        // behind as "unknown type"; the MCP server refuses this too.
+        const refused = model.checkRemoveNodeType(get(), id)
+        if (refused) {
+          get().pushNotification(`Cannot delete this type: ${refused}`, 'error')
+          return
+        }
         set((state) => {
           if ((state.metamodel as Metamodel).nodeTypes[id]?.builtin) return
           state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
@@ -4180,6 +4255,11 @@ export const useDiagramStore = create<DiagramStore>()(
         })
       },
       removeRelationType(id) {
+        const refused = model.checkRemoveRelationType(get(), id)
+        if (refused) {
+          get().pushNotification(`Cannot delete this type: ${refused}`, 'error')
+          return
+        }
         set((state) => {
           if ((state.metamodel as Metamodel).relationTypes[id]?.builtin) return
           state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
@@ -4592,8 +4672,7 @@ export const useDiagramStore = create<DiagramStore>()(
       loadDiagram(data) {
         _modelLoads++
         get().stopLiveLayout()
-        _undoStack.length = 0
-        _redoStack.length = 0
+        _historyForgotten()
         const nodes = atDefaultPositions(data.nodes, data.defaultPositions)
         const relations: Record<string, C4Relation> = {}
         const views: Record<string, DiagramView> = {}
@@ -4730,8 +4809,7 @@ export const useDiagramStore = create<DiagramStore>()(
       resetDiagram() {
         _modelLoads++
         get().stopLiveLayout()
-        _undoStack.length = 0
-        _redoStack.length = 0
+        _historyForgotten()
         const sample = buildSampleDiagram()
         const presInit = buildPresentationsFromData(undefined, [])
         set((state) => {
@@ -4770,8 +4848,7 @@ export const useDiagramStore = create<DiagramStore>()(
       newDiagram() {
         _modelLoads++
         get().stopLiveLayout()
-        _undoStack.length = 0
-        _redoStack.length = 0
+        _historyForgotten()
         const presInit = buildPresentationsFromData(undefined, [])
         set((state) => {
           state.c4Nodes = {}
