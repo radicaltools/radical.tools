@@ -4,8 +4,11 @@
 
 `architecture/` is the architecture of radical.tools itself, kept as a Radical
 Markdown-folder model (Radical metamodel): containers, shared packages,
-ADRs, fitness functions, needs and requirements. Claude Code reaches it through
-the project MCP server `radical-architecture` (`.mcp.json`), which needs
+ADRs, fitness functions, needs and requirements. It lives on the maintainer's
+machine, not in the repository: the folder is git-ignored, so it is never part
+of a commit or a pull request, and a fresh clone has none (the MCP server then
+starts an empty model there). Claude Code reaches it through the project MCP
+server `radical-architecture` (`.mcp.json`), which needs
 `npm run build -w @radicaltools/mcp` once after cloning and after MCP changes.
 Studio can open the same folder.
 
@@ -13,7 +16,7 @@ Studio can open the same folder.
   dependency between workspaces, a new external service, or going against a
   decision): call `get_model_summary`, then `search_model` for the elements
   involved and read the ADRs that constrain them (`GET NEIGHBORS OF <id>`).
-- **In the same pull request**, update the model through the MCP tools rather
+- **Along with the change**, update the model through the MCP tools rather
   than by editing the files: add or move elements and relations, record a new
   decision as an ADR (status, date, context, decision, consequences,
   alternatives) linked with `constrains`, and an automated check as a fitness
