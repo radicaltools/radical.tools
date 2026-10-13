@@ -3,7 +3,7 @@ import { useDiagramStore } from '../store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType } from '@radical/common/c4'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
 import type { Metamodel, PropertyDef } from '@radical/common/metamodel'
-import { isParentAllowed, composeEarsSentence, requirementStatePhrase, resolveEarsSubject } from '@radical/common/metamodel'
+import { isParentAllowed, isPlacementAllowed, composeEarsSentence, requirementStatePhrase, resolveEarsSubject } from '@radical/common/metamodel'
 import { RefPicker } from './RefPicker'
 
 // ─── Column definitions ──────────────────────────────────────────────────────
@@ -342,10 +342,10 @@ export function TableView(): React.ReactElement {
 
       let parentId: string | undefined = undefined
       if (dropOnNode) {
-        if (isParentAllowed(mm, typeStr, dropOnNode.type)) {
+        if (isPlacementAllowed(mm, typeStr, dropOnNode, nodes)) {
           // Dropped onto a valid parent row.
           parentId = dropOnNode.id
-        } else if (dropOnNode.parentId && isParentAllowed(mm, typeStr, nodes[dropOnNode.parentId]?.type)) {
+        } else if (dropOnNode.parentId && isPlacementAllowed(mm, typeStr, nodes[dropOnNode.parentId], nodes)) {
           // Dropped onto a sibling row — inherit its (valid) parent.
           parentId = dropOnNode.parentId
         } else {

@@ -73,6 +73,72 @@ export function isParentAllowed(
   return !!allowed && allowed.includes(parentType)
 }
 
+/** The type that only gathers other elements and says nothing about them. */
+export const GROUP_TYPE = 'group'
+
+/** What placing a node needs to know of the nodes around it. */
+export interface PlacedNode {
+  type: string
+  parentId?: string | null
+}
+
+/** The element a group stands in: its nearest ancestor that is not a group
+ *  (itself, for anything but a group), or undefined at the top of the model. */
+export function placeOf<N extends PlacedNode>(node: N | undefined, nodes: Record<string, N>): N | undefined {
+  const seen = new Set<N>()
+  let cur = node
+  while (cur && cur.type === GROUP_TYPE && !seen.has(cur)) {
+    seen.add(cur)
+    cur = cur.parentId ? nodes[cur.parentId] : undefined
+  }
+  return cur && cur.type !== GROUP_TYPE ? cur : undefined
+}
+
+/**
+ * True when a node of `childType` has a place under an element of
+ * `placeType` (or at the top of the model, when undefined), with any number
+ * of groups in between: directly, or deeper down by the allowedParents of
+ * the types in between. A component has a place under a system, whose
+ * containers hold components; it has none at the top of the model.
+ */
+export function hasPlaceUnder(metamodel: Metamodel | undefined, childType: string, placeType: string | undefined): boolean {
+  if (!metamodel || !metamodel.nodeTypes[childType]) return true
+  if (placeType == null) return isParentAllowed(metamodel, childType, undefined)
+  const seen = new Set<string>()
+  const queue = [childType]
+  while (queue.length > 0) {
+    for (const parent of metamodel.nodeTypes[queue.pop()!]?.allowedParents ?? []) {
+      if (parent === placeType) return true
+      if (parent === GROUP_TYPE || seen.has(parent)) continue
+      seen.add(parent)
+      queue.push(parent)
+    }
+  }
+  return false
+}
+
+/**
+ * Returns true when a node of `childType` may be placed inside `parent` (or
+ * at the root, when undefined) of a model with these `nodes`.
+ *
+ * It is `isParentAllowed`, and one thing more: a group gives no place that
+ * the element could not have without it. A type that lists the group among
+ * its allowedParents may sit in a group only where the group stands (see
+ * `placeOf`) has a place for it (`hasPlaceUnder`). So a group at the top of
+ * the model holds what may be at the top, and a group inside a system holds
+ * the parts of a system.
+ */
+export function isPlacementAllowed<N extends PlacedNode>(
+  metamodel: Metamodel | undefined,
+  childType: string,
+  parent: N | undefined,
+  nodes: Record<string, N>,
+): boolean {
+  if (!isParentAllowed(metamodel, childType, parent?.type)) return false
+  if (!parent || parent.type !== GROUP_TYPE) return true
+  return hasPlaceUnder(metamodel, childType, placeOf(parent, nodes)?.type)
+}
+
 /**
  * Returns true when adding one more node of `typeId` would NOT exceed the
  * type's cardinality.max constraint. `currentCount` is the number of nodes

@@ -394,6 +394,20 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     `id`, while `smart_layout`, `align_nodes`, `grid_nodes` and
     `remove_alignment` take `viewId` (2026-10-08, Forge views ADR): the first
     call failed schema validation. One name across the view tools would do.
+22. **Rebuilding the MCP server breaks the one that is running.** The build
+    splits Smart Layout's ELK code into a chunk with a hash in its name
+    (`dist/elkLayout-<hash>.js`) that `index.js` imports on first use. After
+    `npm run build -w @radicaltools/mcp` a server started before the build
+    still asks for the old name, so `smart_layout` fails with "Cannot find
+    module …/dist/elkLayout-….js" until the client restarts the server
+    (2026-10-13: the view "Decisions and requirements" could not be laid out
+    after two nodes were added). Every other tool keeps working, which hides
+    it. Build one file, or load the chunk when the server starts.
+23. **`GET VIEW` answers with every node in full.** For a view of 55 nodes
+    `search_model "GET VIEW <id>"` returned 72 000 characters, more than a
+    client takes in one result, when the ids were all that `set_view_nodes`
+    needed. There is no tool that adds a node to a view: the whole list has
+    to be read and sent back.
 
 ### Reverse-engineered requirements (2026-10-06)
 

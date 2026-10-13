@@ -4,7 +4,7 @@ import { useHubStore, toggleInSet, type HubConcept, type HubConceptSummary, type
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { C4Node, C4Relation, C4ElementType, DiagramSequence } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
-import { isParentAllowed } from '@radical/common/metamodel'
+import { isPlacementAllowed } from '@radical/common/metamodel'
 import { nodeTypeTheme } from '@radical/ui/types/hubTheme'
 import { conceptViewsToDiagram } from '@radical/common/hubViews'
 
@@ -439,7 +439,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
     if (!selectedNodeId) return null
     const parentNode = c4Nodes[selectedNodeId]
     if (!parentNode) return null
-    const allAllowed = concept.rootTypes.every((t) => isParentAllowed(metamodel, t, parentNode.type))
+    const allAllowed = concept.rootTypes.every((t) => isPlacementAllowed(metamodel, t, parentNode, c4Nodes))
     return allAllowed ? 'ok' : 'incompatible'
   }, [selectedNodeId, c4Nodes, metamodel])
 
@@ -461,7 +461,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         dropParent !== null &&
         concept.nodes
           .filter((n) => !n.parentId)
-          .every((n) => isParentAllowed(store.metamodel, (n.type as string) ?? 'component', dropParent.type))
+          .every((n) => isPlacementAllowed(store.metamodel, (n.type as string) ?? 'component', dropParent, store.c4Nodes))
 
       // Determine the viewport center in canvas coordinates.
       const getViewport = (window as any).__rfGetViewport as

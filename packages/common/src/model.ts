@@ -15,9 +15,13 @@ import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
   canAddMoreOfType,
+  GROUP_TYPE,
+  hasPlaceUnder,
   inferRelationType,
   isParentAllowed,
+  isPlacementAllowed,
   isRelationAllowed,
+  placeOf,
   type Metamodel,
 } from './metamodel'
 
@@ -80,13 +84,42 @@ function typeLabel(mm: Metamodel | undefined, type: string): string {
   return mm?.nodeTypes[type]?.label ?? type
 }
 
-function placementError(mm: Metamodel | undefined, type: string, parent: C4Node | undefined): string {
+/** Where a node of `type` was refused, and what it may sit in: the end of
+ *  "Cannot place Component inside …". A group that the type may sit in
+ *  refuses it for where the group stands. */
+function placementError(mm: Metamodel | undefined, type: string, parent: C4Node | undefined, nodes: Record<string, C4Node>): string {
   const allowed = mm?.nodeTypes[type]?.allowedParents
   const parentLabel = parent ? typeLabel(mm, parent.type) : 'the canvas root'
+  if (parent && isParentAllowed(mm, type, parent.type)) {
+    const place = placeOf(parent, nodes)
+    const where = place ? `inside ${typeLabel(mm, place.type)} "${place.label}"` : 'at the top of the model'
+    return `${parentLabel} "${parent.label}": the group is ${where}, where a ${typeLabel(mm, type)} has no place. A group holds only what its place allows.`
+  }
   const allowedStr = allowed && allowed.length
     ? allowed.map((t) => typeLabel(mm, t)).join(', ')
     : 'the canvas root'
   return `${parentLabel}. Allowed parents: ${allowedStr}.`
+}
+
+/** The first element inside the group `node` that would have no place if
+ *  the group stood under `newParent`: what a group holds moves with it. */
+function misplacedInGroup(state: ModelState, node: C4Node, newParent: C4Node | undefined): C4Node | undefined {
+  if (node.type !== GROUP_TYPE) return undefined
+  const place = placeOf(newParent, state.c4Nodes)
+  const stack = [node.id]
+  while (stack.length > 0) {
+    const groupId = stack.pop()!
+    for (const child of Object.values(state.c4Nodes)) {
+      if (child.parentId !== groupId) continue
+      if (child.type === GROUP_TYPE) stack.push(child.id)
+      else if (!hasPlaceUnder(state.metamodel, child.type, place?.type)) return child
+    }
+  }
+  return undefined
+}
+
+function groupContentsError(mm: Metamodel | undefined, group: C4Node, misplaced: C4Node): string {
+  return `Cannot move Group "${group.label}" there: its ${typeLabel(mm, misplaced.type)} "${misplaced.label}" would have no place. A group holds only what its place allows.`
 }
 
 /** Metamodel defaults (e.g. requirement ears_type='ubiquitous') become real
@@ -107,8 +140,8 @@ export function checkAddNode(state: ModelState, node: Omit<C4Node, 'id'>): strin
     return `Cannot add another ${label}: maximum (${mm?.nodeTypes[node.type]?.cardinality?.max}) reached in the metamodel.`
   }
   const parent = node.parentId ? state.c4Nodes[node.parentId] : undefined
-  if (!isParentAllowed(mm, node.type, parent?.type)) {
-    return `Cannot place ${label} inside ${placementError(mm, node.type, parent)}`
+  if (!isPlacementAllowed(mm, node.type, parent, state.c4Nodes)) {
+    return `Cannot place ${label} inside ${placementError(mm, node.type, parent, state.c4Nodes)}`
   }
   return null
 }
@@ -131,8 +164,11 @@ export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<
   const newType = (updates.type as string | undefined) ?? existing.type
   const newParentId = ('parentId' in updates ? (updates.parentId as string | null | undefined) : existing.parentId) ?? undefined
   const parent = newParentId ? state.c4Nodes[newParentId] : undefined
-  if (isParentAllowed(state.metamodel, newType, parent?.type)) return null
-  return `Cannot move ${typeLabel(state.metamodel, newType)} "${existing.label}" into ${placementError(state.metamodel, newType, parent)}`
+  if (!isPlacementAllowed(state.metamodel, newType, parent, state.c4Nodes)) {
+    return `Cannot move ${typeLabel(state.metamodel, newType)} "${existing.label}" into ${placementError(state.metamodel, newType, parent, state.c4Nodes)}`
+  }
+  const misplaced = 'parentId' in updates ? misplacedInGroup(state, { ...existing, type: newType } as C4Node, parent) : undefined
+  return misplaced ? groupContentsError(state.metamodel, existing, misplaced) : null
 }
 
 /** Applies the updates; a retyped node gets its new type's defaults. */
@@ -158,9 +194,11 @@ export function checkReparent(state: ModelState, ids: string[], newParentId: str
   const moved = new Set(nodes.flatMap((n) => [n.id, ...descendantIds(n.id, state.c4Nodes)]))
   if (newParentId && moved.has(newParentId)) return 'Cannot move a node into itself or one of its descendants.'
   for (const n of nodes) {
-    if (!isParentAllowed(state.metamodel, n.type, newParent?.type)) {
-      return `Cannot place ${typeLabel(state.metamodel, n.type)} "${n.label}" inside ${placementError(state.metamodel, n.type, newParent)}`
+    if (!isPlacementAllowed(state.metamodel, n.type, newParent, state.c4Nodes)) {
+      return `Cannot place ${typeLabel(state.metamodel, n.type)} "${n.label}" inside ${placementError(state.metamodel, n.type, newParent, state.c4Nodes)}`
     }
+    const misplaced = misplacedInGroup(state, n, newParent)
+    if (misplaced) return groupContentsError(state.metamodel, n, misplaced)
   }
   return null
 }

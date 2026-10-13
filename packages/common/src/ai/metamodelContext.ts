@@ -65,7 +65,10 @@ export function buildMetamodelMessage(
   return [
     `Metamodel "${mm.name}". Use ONLY the node/relation types listed below; respect`,
     '`allowedParents` (empty ⇒ requires `allowedAtRoot: true` to be a root node),',
-    '`cardinality.max`, and `allowedPairs`. Each type\'s `properties` array (where',
+    '`cardinality.max`, and `allowedPairs`. A `group` only gathers elements and',
+    'holds what its place allows: at the root, the types with `allowedAtRoot`;',
+    'inside a system, what a system can hold at any depth (a component fits in a',
+    'group inside a system, not in a group at the root). Each type\'s `properties` array (where',
     'present) is the exact set of keys valid in that type\'s `properties` tool-call',
     'bag — key, label, type, and (for enums) the allowed `options`. A type with no',
     '`properties` array here still exists and can be created — its property schema',
