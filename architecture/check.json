@@ -33,7 +33,8 @@
         "apps/e2e/**"
       ],
       "exclude": [
-        "**/known-issues.spec.ts"
+        "**/known-issues.spec.ts",
+        "**/bench.spec.ts"
       ]
     }
   }

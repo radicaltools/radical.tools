@@ -18,6 +18,23 @@ npm run e2e:report -w @radical/e2e            # open the last HTML report
 
 The first time, install Chromium: `npx playwright install chromium`.
 
+## Benchmark: opening a view
+
+`studio/bench` measures how long a view of a real model takes to open, from
+the click until it is drawn and the main thread has been free of long tasks
+for 1.5 s. It is skipped unless `BENCH_MODEL` names a Markdown model folder:
+
+```bash
+npm run build:web -w radical-model
+BENCH_MODEL=$PWD/architecture npm run e2e -w @radical/e2e -- tests/studio/bench.spec.ts --project=studio
+```
+
+`BENCH_VIEW` picks the view (default: Structure view), `BENCH_FROM` the view
+each run starts from, `BENCH_RUNS` the number of runs, and `BENCH_OUT` a
+folder for the samples and a CPU profile of the last run (open it in Chrome
+DevTools › Performance; build with `npx vite build --config
+vite.web.config.ts --minify false` in `apps/studio` for readable names).
+
 ## What it covers
 
 | Spec | |
