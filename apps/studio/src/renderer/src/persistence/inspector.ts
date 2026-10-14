@@ -13,6 +13,7 @@ import { create } from 'zustand'
 import { checkModel, parseCheckConfig, parseTestResults, type CheckConfig, type CheckResult, type TestResults } from '@radical/common/check'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from '../store/documentStore'
+import { loadingDocumentId, onDocumentLoaded } from './autosave'
 
 const POLL_MS = 3000
 /** After the last change of the model, so a drag does not check every frame. */
@@ -30,7 +31,16 @@ interface InspectorState {
 
 export const useInspectorStore = create<InspectorState>(() => ({ results: null, config: {}, configError: null, check: null }))
 
+/** The document whose test results and check.json have been read: the
+ *  check waits for them, or a link that opens the Inspector showed the
+ *  model without its test results first and then again with them. */
+let filesReadFor: string | null = null
+
 function recheck(): void {
+  const id = documents.getActiveId()
+  // Until the model and the files beside it are in, there is nothing whole
+  // to show; the Inspector says it is checking.
+  if (!id || filesReadFor !== id || loadingDocumentId() === id) return
   const { results, config } = useInspectorStore.getState()
   // saveDiagram gives the live model also while a milestone is on screen.
   const check = checkModel(useDiagramStore.getState().saveDiagram(), config, results ? { tests: results.cases } : {})
@@ -46,16 +56,19 @@ if (typeof window !== 'undefined') {
     const id = documents.getActiveId()
     if (id !== polledFor) {
       polledFor = id
+      filesReadFor = null
       lastResults = lastConfig = ''
-      useInspectorStore.setState({ results: null, config: {}, configError: null })
-      recheck()
+      useInspectorStore.setState({ results: null, config: {}, configError: null, check: null })
     }
     if (!id) return
     const files = await documents.readCheckFiles(id).catch(() => null)
-    if (documents.getActiveId() !== id) return
-    const resultsText = files?.results ?? ''
-    const configText = files?.config ?? ''
-    if (resultsText === lastResults && configText === lastConfig) return
+    // Not readable yet (a browser folder waits for its access): try again
+    // on the next poll rather than check without them.
+    if (documents.getActiveId() !== id || !files) return
+    const resultsText = files.results ?? ''
+    const configText = files.config ?? ''
+    if (filesReadFor === id && resultsText === lastResults && configText === lastConfig) return
+    filesReadFor = id
     lastResults = resultsText
     lastConfig = configText
     let config: CheckConfig = {}
@@ -75,6 +88,9 @@ if (typeof window !== 'undefined') {
     clearTimeout(timer)
     timer = setTimeout(recheck, RECHECK_MS)
   })
+  // The model of the active document is in, and its folder can be read:
+  // read the files beside it now rather than at the next poll.
+  onDocumentLoaded((id) => { if (id === documents.getActiveId()) { recheck(); void poll() } })
 
   setInterval(() => { void poll() }, POLL_MS)
   useDocumentsStore.subscribe((s) => { if (s.activeId !== polledFor) void poll() })

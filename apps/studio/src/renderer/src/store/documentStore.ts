@@ -781,7 +781,9 @@ export interface DocumentsAPI {
    *  the MCP server), or null when there is none or it cannot be read. */
   readForgeRun(id: string): Promise<string | null>
   /** What `radical check` keeps beside an md-folder model (test results,
-   *  check.json); null for a document that is no folder or not reachable. */
+   *  check.json), each null when it is not there; both null for a document
+   *  that is no folder. Null when the folder cannot be read yet (a browser
+   *  folder before its access is back). */
   readCheckFiles(id: string): Promise<{ results: string | null; config: string | null } | null>
 
   /** Convenience: ensure there's at least one document; create an empty LS
@@ -1268,7 +1270,7 @@ export const documents: DocumentsAPI = {
 
   async readCheckFiles(id) {
     const meta = readIndex().docs.find((d) => d.id === id)
-    if (meta?.source !== 'md') return null
+    if (meta?.source !== 'md') return { results: null, config: null }
     const h = host()
     if (meta.folderPath && h.readCheckFiles) {
       const res = await h.readCheckFiles(meta.folderPath)

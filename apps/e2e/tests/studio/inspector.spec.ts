@@ -87,3 +87,32 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await expect(page.locator('.insp-verdict')).toHaveText(/No errors/)
   await expect(page.locator('.insp-tile').first()).toContainText('1 / 10 broken')
 })
+
+test('a deep link opens the Inspector at once, and only with all it reads', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
+  await folder.write('.radical/test-results.json', results('failed'))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+  await expect(page).toHaveURL(/m\/inspector/)
+
+  // Record what the page shows from its first paint on.
+  await page.addInitScript(() => {
+    const seen = new Set<string>()
+    ;(window as unknown as { __seen: Set<string> }).__seen = seen
+    new MutationObserver(() => {
+      if (document.querySelector('.react-flow')) seen.add('canvas')
+      if (document.querySelector('.insp-notice')) seen.add('inspector without test results')
+      const tile = document.querySelector('.insp-tile .insp-label')?.textContent
+      if (tile && tile !== 'Requirements verified') seen.add(`tile ${tile}`)
+    }).observe(document, { childList: true, subtree: true, characterData: true })
+  })
+  await page.reload()
+  await expect(page.locator('.insp-verdict')).toHaveText(/✖ 1 errors/, { timeout: 15_000 })
+  await expect(page.locator('.insp-tile').first()).toContainText('0 / 11 broken')
+  expect(await page.evaluate(() => [...(window as unknown as { __seen: Set<string> }).__seen])).toEqual([])
+})
