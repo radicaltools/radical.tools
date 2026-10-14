@@ -287,3 +287,46 @@ describe('a model loaded while a drag is in progress', () => {
     expect(s().c4Nodes.bank.label).toBe('Renamed outside')
   })
 })
+
+describe('deleting with the Delete key', () => {
+  // React Flow hands over the selected elements and the relations that go
+  // with them. Each was deleted with its own undo step, and the relations
+  // were gone already with their elements: the first Undos did nothing,
+  // then the elements came back one at a time.
+  it('is one undo step', () => {
+    const before = { nodes: Object.keys(s().c4Nodes).length, relations: Object.keys(s().c4Relations).length }
+    useDiagramStore.setState({ pendingDelete: { nodeIds: ['web', 'db'], edgeIds: ['r1', 'r2'] } } as never)
+    s().resolvePendingDelete('model')
+    expect(s().c4Nodes.web).toBeUndefined()
+    expect(s().c4Nodes.db).toBeUndefined()
+    s().undo()
+    expect(Object.keys(s().c4Nodes).length).toBe(before.nodes)
+    expect(Object.keys(s().c4Relations).length).toBe(before.relations)
+    stillBefore()
+  })
+
+  it('removing from the view only is one step too', () => {
+    s().setActiveView('v1')
+    useDiagramStore.setState((st) => ({ views: { ...st.views, v1: { ...st.views.v1, nodeIds: ['shop', 'web', 'api', 'db', 'bank'] } } }))
+    useDiagramStore.setState({ pendingDelete: { nodeIds: ['web', 'db'], edgeIds: [] } } as never)
+    s().resolvePendingDelete('view')
+    expect(s().views.v1.nodeIds).toEqual(['shop', 'api', 'bank'])
+    s().undo()
+    expect(s().views.v1.nodeIds).toEqual(['shop', 'web', 'api', 'db', 'bank'])
+  })
+})
+
+describe('steps that arrive one after another for one action', () => {
+  // A Hub concept with its related concepts is imported in parts (the
+  // related ones while the template form is still open): one Undo took back
+  // only the last part.
+  it('become one step with _mergeStepsSince', () => {
+    const mark = s()._historyMark()
+    for (const label of ['A', 'B', 'C']) add('system', label)
+    s()._mergeStepsSince(mark)
+    expect(['A', 'B', 'C'].every((l) => Object.values(s().c4Nodes).some((n) => n.label === l))).toBe(true)
+    s().undo()
+    expect(['A', 'B', 'C'].some((l) => Object.values(s().c4Nodes).some((n) => n.label === l))).toBe(false)
+    stillBefore()
+  })
+})

@@ -627,6 +627,17 @@ function StructuralCanvas(): React.ReactElement {
     return () => el.removeEventListener('wheel', takeCamera, { capture: true })
   }, [takeCamera])
 
+  // The camera functions this canvas put on window: taken off when it goes
+  // (a slide without a canvas unmounts it), so no one moves a camera that
+  // is not on screen any more.
+  const registeredViewportFns = useRef<{ getViewport: unknown; setViewport: unknown } | null>(null)
+  useEffect(() => () => {
+    const W = window as any
+    const mine = registeredViewportFns.current
+    if (!mine) return
+    if (W.__rfSetViewport === mine.setViewport) delete W.__rfSetViewport
+    if (W.__rfGetViewport === mine.getViewport) delete W.__rfGetViewport
+  }, [])
   const onInit = useCallback((instance: ReactFlowInstance) => {
     rfInstanceRef.current = instance
     setFitViewFn(
@@ -639,10 +650,10 @@ function StructuralCanvas(): React.ReactElement {
       // physics solver while still snapping back after collapse/expand.
       () => smoothFitView(550, false),
     )
-    setViewportFns(
-      () => instance.getViewport(),
-      (vp, opts) => instance.setViewport(vp, opts),
-    )
+    const getViewport = () => instance.getViewport()
+    const setViewport = (vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => instance.setViewport(vp, opts)
+    registeredViewportFns.current = { getViewport, setViewport }
+    setViewportFns(getViewport, setViewport)
     // Quick-search uses this to pan + zoom onto a specific node. Computed
     // here because only the RF instance knows the node's absolute layout
     // position (parent-relative coords would otherwise need translation).
@@ -701,6 +712,14 @@ function StructuralCanvas(): React.ReactElement {
     // Falls back to fit-all if no viewport was persisted yet.
     setTimeout(() => {
       const s = useDiagramStore.getState()
+      // A slide asked for its camera while this canvas was mounting.
+      const pending = (window as any).__rfPendingCamera as { vp: { x: number; y: number; zoom: number } } | undefined
+      if (pending) {
+        ;(window as any).__rfPendingCamera = undefined
+        suppressAutoFit(1800)
+        instance.setViewport(pending.vp)
+        return
+      }
       const stored = s.activeViewId
         ? s.views[s.activeViewId]?.viewport ?? null
         : s.defaultViewport

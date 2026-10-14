@@ -363,3 +363,24 @@ describe('reference properties through the tools', () => {
     expect(good.ok).toBe(true)
   })
 })
+
+describe('add_relation with no type and a properties bag', () => {
+  // The bag was spread into the relation: `targetId` or `relationType` in
+  // it replaced the checked ends and type, and get_issues said nothing.
+  it('takes no end, type, label or id from the bag', async () => {
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await call('add_node', { tempId: 'bank', type: 'system', label: 'Bank' })
+    const res = await call('add_relation', {
+      sourceId: 'shop', targetId: 'bank', label: 'pays',
+      properties: { targetId: 'ghost-node', relationType: 'nonexistent-type', id: 'x', note: 'kept' },
+    })
+    expect(res.ok, res.resultText).toBe(true)
+    expect(res.resultText).toMatch(/ignored property "targetId"/)
+    const rel = Object.values(facade.getRelations())[0] as unknown as Record<string, unknown>
+    const nodes = facade.getNodes()
+    expect(nodes[rel.targetId as string]?.label).toBe('Bank')
+    expect(rel.relationType).not.toBe('nonexistent-type')
+    expect(rel.note).toBe('kept')
+  })
+})

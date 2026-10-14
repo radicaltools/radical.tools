@@ -52,6 +52,7 @@ import { finalizeLayout as finalizeUnconstrained, ROOT_GAP, CHILD_GAP } from './
 import { alignmentError, enforceAlignments, type Alignment } from './constraints'
 import { labelGaps, labelNeed, labelSizeOf, pairKey, type PairGap } from './labelRoom'
 import { relaxLayout } from './liveColaEngine'
+import { resizeParentsBottomUp } from './viewInput'
 
 /** finalizeLayout (with room for relation labels) plus the user's
  *  alignments, so every stage scores and refines what the canvas will keep. */
@@ -1093,6 +1094,18 @@ function relaxedCandidate(
       if (nodes[id]) positions[id] = { ...positions[id], ...p }
     }
     const projected = projectPositions(nodes, positions)
+    // The frames the physics leaves are not the ones the candidate gets when
+    // it is applied: each container is fitted to its children then. Scored
+    // with the physics' frames, the winner on the sample's All elements
+    // scored better than what was saved, and every later run "improved" on
+    // it again without moving anything. Fit them here, as applying does.
+    resizeParentsBottomUp(projected, { viewFilter: undefined, viewCollapsedSet: new Set<string>(), expandedSet: undefined })
+    for (const [id, n] of Object.entries(projected)) {
+      if (!positions[id] || nodes[id].collapsed) continue
+      if (positions[id].width !== n.width || positions[id].height !== n.height) {
+        positions[id] = { ...positions[id], width: n.width, height: n.height }
+      }
+    }
     if (alignmentError(projected, {}, alignments) > 1) return null
     return {
       name: `${from.name} · relaxed`,

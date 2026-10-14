@@ -251,3 +251,47 @@ describe('a sidecar file that cannot be read', () => {
     expect(deserializeFromMdFolder(without).data.relations).toEqual([])
   })
 })
+
+describe('a node file in a folder model', () => {
+  const model = (): DiagramData => ({
+    nodes: [
+      { id: 'shop', type: 'system', label: 'Shop', collapsed: false, x: 0, y: 0, width: 600, height: 400 },
+      { id: 'api', type: 'container', label: 'API', collapsed: false, parentId: 'shop', x: 40, y: 120, width: 240, height: 160 } as C4Node,
+    ],
+    relations: [],
+    defaultPositions: { shop: { x: 0, y: 0, width: 600, height: 400 }, api: { x: 40, y: 120, width: 240, height: 160 } },
+  })
+
+  it('keeps a property whose key has a space, a dot or a non-ASCII letter', () => {
+    // The reader took keys of letters, digits, _ and - only and skipped the
+    // rest: the value was gone after a reload, and from the file after the
+    // next save.
+    const data = model()
+    Object.assign(data.nodes[1], { 'SLA target': '99.9%', 'właściciel': 'Ola', 'owner.email': 'a@b.c', 'quote"d': 'x' })
+    const back = deserializeFromMdFolder(serializeToMdFolder(data, 'model')).data.nodes.find((n) => n.id === 'api') as unknown as Record<string, unknown>
+    expect(back['SLA target']).toBe('99.9%')
+    expect(back['właściciel']).toBe('Ola')
+    expect(back['owner.email']).toBe('a@b.c')
+    expect(back['quote"d']).toBe('x')
+  })
+
+  it('with git conflict markers is an error that names it', () => {
+    // Skipped as "no node", the element vanished without a word and the
+    // next save dropped its layout.
+    const files = serializeToMdFolder(model(), 'model')
+    const path = Object.keys(files).find((p) => p.startsWith('nodes/') && files[p].includes('"API"'))!
+    files[path] = `<<<<<<< HEAD\n${files[path]}=======\n${files[path].replace('API', 'API v2')}>>>>>>> feature\n`
+    expect(() => deserializeFromMdFolder(files)).toThrow(MalformedFolderFileError)
+    expect(() => deserializeFromMdFolder(files)).toThrow(path)
+  })
+
+  it('that _layout.json does not know gets its type\'s size, not 0×0', () => {
+    // A file written by hand or brought in by git: drawn and saved with no
+    // size at all.
+    const files = serializeToMdFolder(model(), 'model')
+    files['nodes/shop/search.md'] = '---\nid: "search"\ntype: "database"\nlabel: "Search Index"\n---\n'
+    const search = deserializeFromMdFolder(files).data.nodes.find((n) => n.id === 'search')!
+    expect(search.width).toBeGreaterThan(0)
+    expect(search.height).toBeGreaterThan(0)
+  })
+})

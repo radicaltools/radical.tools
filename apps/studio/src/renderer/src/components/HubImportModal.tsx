@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useHubStore, toggleInSet, type HubConcept, type HubConceptSummary, type TemplateParam, type HubImportRecord } from '@radical/ui/store/hubStore'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
@@ -7,6 +7,8 @@ import { NODE_SIZES } from '@radical/common/c4'
 import { isPlacementAllowed } from '@radical/common/metamodel'
 import { nodeTypeTheme } from '@radical/ui/types/hubTheme'
 import { conceptViewsToDiagram } from '@radical/common/hubViews'
+import { freeSpotNear } from '@radical/layout/geometry'
+import { computeViewNodeSet } from '@radical/layout/viewInput'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -443,6 +445,9 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
     return allAllowed ? 'ok' : 'incompatible'
   }, [selectedNodeId, c4Nodes, metamodel])
 
+  // Where the undo history stood when "Add to Model" was clicked.
+  const batchMark = useRef<number | null>(null)
+
   const handleImport = useCallback(
     (
       concept: HubConcept,
@@ -495,11 +500,19 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         if (rx + rw > maxX) maxX = rx + rw
         if (ry + rh > maxY) maxY = ry + rh
       }
-      // Offset that shifts the root-node cluster to land on the viewport center.
-      const clusterW = maxX - minX
-      const clusterH = maxY - minY
-      const offsetX = isFinite(minX) ? centerX - minX - clusterW / 2 : centerX
-      const offsetY = isFinite(minY) ? centerY - minY - clusterH / 2 : centerY
+      // Offset that moves the root-node cluster to the free spot nearest the
+      // viewport centre. Centred as it was, every concept landed on whatever
+      // was there, and on each other (three requirements from one Hub link
+      // at the same place, over an element of the model).
+      const clusterW = isFinite(minX) ? maxX - minX : 200
+      const clusterH = isFinite(minY) ? maxY - minY : 120
+      const shown = store.activeViewId ? computeViewNodeSet(store.views[store.activeViewId], store.c4Nodes) : undefined
+      const taken = Object.values(store.c4Nodes)
+        .filter((n) => !n.parentId && (!shown || shown.has(n.id)))
+        .map((n) => ({ x: n.x, y: n.y, width: n.width, height: n.height }))
+      const spot = freeSpotNear(taken, { width: clusterW, height: clusterH }, { x: centerX, y: centerY })
+      const offsetX = isFinite(minX) ? spot.x - minX : spot.x
+      const offsetY = isFinite(minY) ? spot.y - minY : spot.y
 
       // Build node objects with remapped IDs.
       const newNodes: Record<string, C4Node> = {}
@@ -596,6 +609,10 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       )
 
       store._pushUndo()
+      // Everything one "Add to Model" brings in (a concept, its related
+      // concepts, a blueprint's parts) is one undo step; they arrive one
+      // after another, the related ones before the template form is done.
+      if (batchMark.current !== null) store._mergeStepsSince(batchMark.current)
       store._markMilestoneEdit()
       useDiagramStore.setState((state) => {
         Object.assign(state.c4Nodes, newNodes)
@@ -709,6 +726,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
   // import immediately.
   const handleImportClick = useCallback(
     async (summary: HubConceptSummary) => {
+      batchMark.current = useDiagramStore.getState()._historyMark()
       setFetchingIds((prev) => new Set(prev).add(summary.id))
       let concept: HubConcept
       try {

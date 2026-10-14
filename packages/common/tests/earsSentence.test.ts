@@ -308,3 +308,16 @@ describe('"…, then the system shall …"', () => {
     expect(first).toBe('If the daily limit is exceeded, then the system shall refuse the transfer.')
   })
 })
+
+describe('a state-driven requirement that points at a state', () => {
+  // The wizard's Sentence step writes the precondition text, and the state
+  // picked afterwards only stood in for an empty text: the sentence kept
+  // the words typed and did not follow a rename of the state. The state
+  // takes the place of the text, as the metamodel says.
+  it('reads by the state, also when it has a precondition text', () => {
+    const node = { ears_type: 'state-driven', precondition: 'the order is confirmed', action: 'ship the order' }
+    expect(composeEarsSentence(node, undefined, 'the Order is Confirmed').sentence)
+      .toBe('While the Order is Confirmed, the system shall ship the order.')
+    expect(composeEarsSentence(node).sentence).toBe('While the order is confirmed, the system shall ship the order.')
+  })
+})

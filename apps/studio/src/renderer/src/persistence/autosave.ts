@@ -112,8 +112,13 @@ if (typeof window !== 'undefined') {
     _storageFullShown = true
     if (typeof window.alert === 'function') window.alert(e.message)
   }
+  /** A presentation is playing: the store holds what a slide shows (its
+   *  model, its layout), not the document. Started by F5 in Designer it
+   *  kept the perspective at Designer, and a slide of a milestone was saved
+   *  as the live model. What was edited before it is saved when it stops. */
+  const presenting = (): boolean => useDiagramStore.getState().presentationActive
   const flushPersist = async (): Promise<void> => {
-    if (_suspended) return
+    if (_suspended || presenting()) return
     const activeId = documents.getActiveId()
     if (!activeId) return
     try {
@@ -143,6 +148,7 @@ if (typeof window !== 'undefined') {
     // restores everything on the way back to designer, so by simply not
     // scheduling a persist while we're outside designer, the explore
     // session stays fully ephemeral.
+    if (s.presentationActive) { prev = s; return }
     const isExploreMode = s.appMode !== 'designer' && s.appMode !== 'metamodel'
     const modelChanged =
       s.c4Nodes !== prev.c4Nodes ||
@@ -303,7 +309,7 @@ if (typeof window !== 'undefined') {
     prevActive = s.activeId
     // An edit still inside the debounce window belongs to the document being
     // left, which the store still holds: write it there before replacing it.
-    if (_persistTimer !== null && leaving && !_suspended) {
+    if (_persistTimer !== null && leaving && !_suspended && !presenting()) {
       clearTimeout(_persistTimer)
       _persistTimer = null
       const data = buildPersistData()
@@ -323,7 +329,7 @@ if (typeof window !== 'undefined') {
   // reload (within the 400 ms debounce) from losing the most recent edit
   // (e.g. a freshly-applied smart layout).
   const flushSync = (): void => {
-    if (_suspended) return
+    if (_suspended || presenting()) return
     if (_persistTimer === null) return // nothing pending
     clearTimeout(_persistTimer)
     _persistTimer = null

@@ -201,3 +201,61 @@ export function resizeParentsBottomUp(
     parent.height = fitted.height
   }
 }
+
+/** Gap the tree layout keeps between siblings it had to part. */
+const TREE_SIBLING_GAP = 28
+
+/**
+ * resizeParentsBottomUp for a layout that sized containers itself (the tree
+ * layout): a container the refit makes larger than the engine laid it out
+ * (it grows to its type's least size) comes to lie on the sibling beside it.
+ * Level by level from the deepest, the siblings are parted (each moved right
+ * of the ones it overlaps, in the order they stand) before their parent is
+ * fitted. Mutates `nodes`.
+ */
+export function fitAndSeparateBottomUp(
+  nodes: Record<string, C4Node>,
+  input: Pick<LayoutInput, 'viewFilter' | 'viewCollapsedSet' | 'expandedSet'>,
+): void {
+  const { viewFilter, viewCollapsedSet, expandedSet } = input
+  const inView = (n: C4Node): boolean => !viewFilter || viewFilter.has(n.id)
+  const size = (n: C4Node): { width: number; height: number } => (
+    isContainerType(n.type) && isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet)
+      ? { width: COLLAPSED_WIDTH[n.type], height: COLLAPSED_HEIGHT[n.type] }
+      : { width: n.width, height: n.height }
+  )
+  const depth = (id: string | undefined): number => {
+    let d = 0
+    for (let cur = id ? nodes[id]?.parentId : undefined; cur && d < 64; cur = nodes[cur]?.parentId) d++
+    return id ? d + 1 : 0
+  }
+  const part = (children: C4Node[]): void => {
+    const ordered = [...children].sort((a, b) => a.x - b.x || a.y - b.y || (a.id < b.id ? -1 : 1))
+    const placed: C4Node[] = []
+    for (const c of ordered) {
+      for (let guard = 0; guard < ordered.length; guard++) {
+        const sc = size(c)
+        const hit = placed.find((q) => {
+          const sq = size(q)
+          return c.x < q.x + sq.width + TREE_SIBLING_GAP && q.x < c.x + sc.width + TREE_SIBLING_GAP
+            && c.y < q.y + sq.height && q.y < c.y + sc.height
+        })
+        if (!hit) break
+        c.x = hit.x + size(hit).width + TREE_SIBLING_GAP
+      }
+      placed.push(c)
+    }
+  }
+  const parents = new Set<string | undefined>([undefined])
+  for (const n of Object.values(nodes)) if (inView(n) && n.parentId) parents.add(n.parentId)
+  const byDepth = [...parents].sort((a, b) => depth(b) - depth(a))
+  for (const id of byDepth) {
+    const children = Object.values(nodes).filter((c) => (c.parentId ?? undefined) === id && inView(c))
+    if (children.length > 1) part(children)
+    const parent = id ? nodes[id] : undefined
+    if (!parent || !isContainerType(parent.type) || isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet) || !children.length) continue
+    const fitted = fittedParentSize(parent, children.map((c) => ({ x: c.x, y: c.y, ...size(c) })))
+    parent.width = fitted.width
+    parent.height = fitted.height
+  }
+}

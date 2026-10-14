@@ -1142,7 +1142,8 @@ directory renamed outside Studio is renamed back at the next save;
 `delete_node` leaves the ids in the saved positions.
 
 **Runs 7 to 12, 2026-10-14, commit 879ea0e** (PR #179), six at the same
-time, each in its own areas. Nothing below is fixed yet.
+time, each in its own areas. All 19 were fixed on 2026-10-14, each with a test
+that fails without the fix; the "To decide" list is still open.
 
 *Run 7.* Covered: F5 from Designer with the saved document checked on
 every slide, reloads and a closed tab while playing, all twelve sample
@@ -1152,7 +1153,7 @@ covered: re-capturing a slide, the Link milestone and Link view pickers,
 the diff toggle next to slides, copy to clipboard, folder-backed
 presentations, the MCP presentation tools.
 
-40. **F5 in Designer saves the slide on screen as the live model.** While
+40. ~~**F5 in Designer saves the slide on screen as the live model.**~~ While
     the sample's slide 12 (linked to milestone v1) plays, the saved
     document has 11 elements and 5 relations instead of 65 and 109; a
     reload or a closed tab then keeps them (54 elements gone, Undo
@@ -1160,21 +1161,29 @@ presentations, the MCP presentation tools.
     started by F5 keeps `appMode` at `designer`, so autosave saves what
     `goToSlide` swapped into the store; `__prePresState` lives in memory
     only (a guess).
-41. **A canvas slide shown right after a flow, table, matrix or wiki slide
-    loses its camera, with about 200 console errors.** Slide 3 after → ←:
+    Fixed 2026-10-14: While a presentation plays nothing is saved
+    (autosave skips while `presentationActive`); what was edited before
+    is saved when it stops.
+41. ~~**A canvas slide shown right after a flow, table, matrix or wiki slide
+    loses its camera, with about 200 console errors.**~~ Slide 3 after → ←:
     `translate(428.9, 87.3) scale(0.554)` instead of the captured (64, 14,
     0.55), and errors like `<circle> attribute cx: Expected length, "NaN"`;
     the twelve sample slides played in a row give 629. The same switch
     through view cards in Designer or Viewer gives none. `goToSlide` and
     `previewSlide` set the camera while the canvas is still mounting (a
     guess).
-42. **Adding a slide in Presenter takes back the layout edits made in
-    Designer on the view that was open.** A drag in System Context saved at
+    Fixed 2026-10-14: A slide's camera waits for the canvas
+    (`__rfPendingCamera`, taken by Canvas when it is ready), and a
+    canvas takes its camera functions off `window` when it goes.
+42. ~~**Adding a slide in Presenter takes back the layout edits made in
+    Designer on the view that was open.**~~ A drag in System Context saved at
     y 409.7 is saved back at y 120 by the slide's save (the elements it
     pushed go back too, three positions are dropped, the view's camera
     changes), and a reload shows the old layout. `buildPersistData` writes
     the views `setAppMode` parked, which lack the positions and camera of
     the canvas shown that `saveDiagram` only adds when it saves.
+    Fixed 2026-10-14: Leaving Designer puts the canvas's positions and
+    camera into its view (or All elements) before setting them aside.
 
 *Run 8.* Covered: Alt-drag connect (new pair, duplicate pair, Esc), the
 connect key through a reload, deleting with relations and the undo chain,
@@ -1185,8 +1194,8 @@ relation's type or label next to undo or milestones, hidden relations
 next to undo, the wiki's "Add relationship" and the table's Relations tab
 in the browser, label placement at zoom.
 
-43. **A second relation between the same two elements is never drawn, and
-    its label shows nowhere.** Alt-drag Customer → Web App next to "browses
+43. ~~**A second relation between the same two elements is never drawn, and
+    its label shows nowhere.**~~ Alt-drag Customer → Web App next to "browses
     and orders": the document has 5 relations, the canvas 4 edges, and the
     new relation cannot be selected, edited or deleted on any canvas; each
     further drag adds another. A second relation added through the MCP
@@ -1194,23 +1203,34 @@ in the browser, label placement at zoom.
     different events too). `deriveRFEdges` skips a second relation with the
     same visible ends and appends its label to `existing.label`, which the
     edge does not render.
-44. **Deleting elements with the Delete key leaves undo steps that do
-    nothing, then gives the elements back one at a time.** Web App and
+    Fixed 2026-10-14: Each relation between two elements is an edge of
+    its own; relations rolled up onto a collapsed container share one
+    edge whose label lists them all.
+44. ~~**Deleting elements with the Delete key leaves undo steps that do
+    nothing, then gives the elements back one at a time.**~~ Web App and
     Orders DB deleted: three Undos change nothing, the fourth brings one
     element back, the fifth the other. `resolvePendingDelete` removes each
     node (with its relations) and then each relation React Flow added to
     the delete, every call with its own step.
-45. **One click on a filled matrix cell deletes the relation when it was
-    selected on another view.** Select API Gateway → Payments Service on
+    Fixed 2026-10-14: The delete is one undo step, and relations gone
+    with their elements are not deleted again.
+45. ~~**One click on a filled matrix cell deletes the relation when it was
+    selected on another view.**~~ Select API Gateway → Payments Service on
     Core Banking, open Dependency Matrix, click the cell once: 109 → 108
     relations. The matrix removes on a click when `selectedEdgeId` is the
     cell's relation, and a view switch keeps the selection.
-46. **MCP `add_relation` takes `sourceId`, `targetId` and `relationType`
-    from `properties`.** `properties: {targetId: "ghost-node"}` creates a
+    Fixed 2026-10-14: A second click removes only when the first was
+    made on that cell in the matrix.
+46. ~~**MCP `add_relation` takes `sourceId`, `targetId` and `relationType`
+    from `properties`.**~~ `properties: {targetId: "ghost-node"}` creates a
     relation to nothing, `{relationType: "nonexistent-type"}` one of an
     unknown type (refused as a top-level argument); `get_issues` reports
     neither. The properties bag is spread into the relation without checks
     (`relationTools.ts`).
+    Fixed 2026-10-14: The untyped properties bag drops `id`, `sourceId`,
+    `targetId`, `relationType`, `label` and `technology` with a note;
+    the validation lists a relation to no element and one of an unknown
+    type.
 
 *Run 9.* Covered: flow views (repeated steps, notes, removal, a deleted
 sequence and its undo), flow views next to milestones (ghost steps), a
@@ -1219,27 +1239,34 @@ action writes, Structurizr DSL import. Not covered: export of the
 scenarios (needs an AI provider), moving a file-backed model to a folder,
 the desktop `--file` reload, ghost steps of a relation that appears twice.
 
-47. **Removing one copy of a step that appears twice leaves it listed, and
-    removing it again deletes another step.** Bookstore, Place Order: add
+47. ~~**Removing one copy of a step that appears twice leaves it listed, and
+    removing it again deletes another step.**~~ Bookstore, Place Order: add
     "calls" again as step 5, remove step 2: the model holds 4 steps, the
     list shows 5 rows numbered 1, 2, 2, 3, 4; Remove on the stale row
     deletes "API → Orders DB". Both step lists in `RightPanel.tsx` key the
     rows by relation id, which repeats (the flow view keys by
     `${relationId}-${idx}`).
-48. **A custom property whose key has a space, a dot or a non-ASCII letter
-    is lost in a folder model.** `SLA target: "99.9%"` is written to the
+    Fixed 2026-10-14: The rows are keyed by relation and place.
+48. ~~**A custom property whose key has a space, a dot or a non-ASCII letter
+    is lost in a folder model.**~~ `SLA target: "99.9%"` is written to the
     element's `.md`; after a reload the field is empty and the next save
     removes the line (`właściciel`, `owner.email` the same; `slaTarget`
     survives). `parseMarkdown` reads only keys matching
     `[A-Za-z0-9_-]+` and skips the rest. The MCP server reads folders the
     same way (not run).
-49. **Structurizr DSL import drops everything after the first `https://`.**
+    Fixed 2026-10-14: A key the reader cannot take bare is written
+    JSON-quoted, and quoted keys are read.
+49. ~~**Structurizr DSL import drops everything after the first `https://`.**~~
     One `url "https://shop.example.com"` line gives "2 nodes · 0
     relations" instead of 6 and 4, with no message. `tokenize` strips
     `//` comments before tokenising, also inside strings. In the same
     importer, two relationships between the same pair keep only the first,
     and a relationship with an implied source inside an element's block is
     dropped, both silently.
+    Fixed 2026-10-14: Comments are skipped as the tokenizer meets them,
+    outside strings; two relationships between a pair that say different
+    things are both kept; `-> target` inside an element's block has the
+    element as its source.
 
 *Run 10.* Covered: Hub import into an existing model (menu and `?hub=`
 links, on a view and on All elements, related concepts, template form,
@@ -1251,23 +1278,29 @@ import from Studio, import into a selected container, import with a
 milestone shown or in Viewer, the same concept twice, the Hub's concept
 viewer.
 
-50. **A concept imported from the Hub is dropped on top of the diagram.**
+50. ~~**A concept imported from the Hub is dropped on top of the diagram.**~~
     Three requirements added from a `?hub=` link land at exactly 904,308,
     on each other and over Payment Provider (6 overlaps); the API Gateway
     pattern on the sample's System Context makes 7, still there after a
     reload. `handleImport` in `HubImportModal.tsx` centres each concept on
     the camera's centre without looking at what is there (a guess).
-51. **One Undo after "Import (3)" leaves the related concepts in the
-    model.** 9 elements, 12 after importing a concept with two related
+    Fixed 2026-10-14: Each concept goes to the free spot nearest the
+    camera's centre (`freeSpotNear`).
+51. ~~**One Undo after "Import (3)" leaves the related concepts in the
+    model.**~~ 9 elements, 12 after importing a concept with two related
     ones, 11 after one Undo; it takes three. Each concept is imported by
     its own `handleImport`, each with an undo step.
-52. **"While in state" changes nothing when the requirement has a
-    precondition text, which the wizard's own Sentence step writes.** The
+    Fixed 2026-10-14: Everything one "Add to Model" brings in is one
+    undo step (`_mergeStepsSince`).
+52. ~~**"While in state" changes nothing when the requirement has a
+    precondition text, which the wizard's own Sentence step writes.**~~ The
     card keeps "While the order is confirmed…" and does not follow a rename
     of the state; with the text emptied it reads "While the Order is
     Confirmed" and follows. `composeEarsSentence` takes `precondition ||
     statePrecondition`, while the preset says the state takes the place of
     the text.
+    Fixed 2026-10-14: The state takes the place of the text, as the
+    metamodel and the manual say (`composeEarsSentence`).
 
 *Run 11.* Covered: Smart Layout run two and three times with undo
 (bookstore, the sample's All elements and five views, generated models
@@ -1279,27 +1312,34 @@ covered: layouts with a milestone shown or in Viewer and Presenter,
 "Unpin all", several hundred elements, Smart Layout interrupted by an add
 or a reload.
 
-56. **Smart Layout on the sample's All elements never says the layout
-    already scores best.** Every rerun reports "crossings 202 → 201 (0%
+56. ~~**Smart Layout on the sample's All elements never says the layout
+    already scores best.**~~ Every rerun reports "crossings 202 → 201 (0%
     better)", moves none of the 65 elements, and leaves an undo step that
     does nothing; the MCP server reports the same and writes nothing. The
     winner is scored with container frames that the parent refit
     (`resizeParentsBottomUp`) replaces when it is applied (`sys-core`
     87.6 px taller, `dom-banking` 44 px narrower), so what is saved scores
     202. Measured outside the browser; the relaxed candidate is a guess.
-57. **Tree Layout puts sibling groups on top of each other.** Core
+    Fixed 2026-10-14: The relaxed candidate's container frames are
+    fitted to their children before it is scored, as applying it does.
+57. ~~**Tree Layout puts sibling groups on top of each other.**~~ Core
     Banking: Access & Security over Risk & Data by 150×500 px (also on
     Payments Domain), through reruns and reloads. ELK's tree output has no
     overlap; the parent refit widens a group, and `runTreeLayout`
     separates root siblings only. A second Tree Layout also leaves an
     empty undo step.
-58. **The MCP server's `smart_layout` ignores a view's "Hierarchical
-    nested tree" setting.** On bookstore Containers the server's Layered
+    Fixed 2026-10-14: The tree layout parts siblings level by level
+    before fitting their parent (`fitAndSeparateBottomUp`).
+58. ~~**The MCP server's `smart_layout` ignores a view's "Hierarchical
+    nested tree" setting.**~~ On bookstore Containers the server's Layered
     LR moves all 6 elements, and Studio's Tree Layout puts them back (23 of
     23 on the sample's Requirements Traceability). Studio's
     `runSmartLayout` hands a tree view to `runTreeLayout`; the server
     always runs `runSmartLayoutCore`, and `create_view` / `update_view`
     cannot set the mode.
+    Fixed 2026-10-14: The server lays out a view whose mode is "tree"
+    with the same tree layout and refit as Studio, and says so; the
+    tool's description says it too.
 
 *Run 12* (what PR #179 changed, next to its neighbours). Covered: the
 property key field (add, remove, Enter, Escape, reserved keys), placement
@@ -1310,24 +1350,31 @@ sequence edit, a view switch and a milestone; collapse inside a grid or
 alignment; Restore to live in a folder model; the MCP server on these
 folders.
 
-53. **"Add property" makes a second property with a key another one
-    already has.** Add, Add, remove `prop4`, Add: the keys are `…, prop5,
+53. ~~**"Add property" makes a second property with a key another one
+    already has.**~~ Add, Add, remove `prop4`, Add: the keys are `…, prop5,
     prop5`, the validation shows nothing, and the two fields in the
     properties panel edit one value. `upsert_node_type` refuses the same
     list. `add` names the property `prop${properties.length + 1}`.
-54. **In a folder model, an element whose `.md` cannot be read disappears
+    Fixed 2026-10-14: A new property gets a key no other has, and the
+    validation lists two properties with one key.
+54. ~~**In a folder model, an element whose `.md` cannot be read disappears
     without a word, the next edit drops its layout, and once the file is
-    fixed it comes back 0×0.** Conflict markers around `orders-db.md`:
+    fixed it comes back 0×0.**~~ Conflict markers around `orders-db.md`:
     "5 nodes", no notice; a drag removes `db` from `_layout.json` and the
     view's positions; after the fix Orders DB is 0×0 and not drawn, with
     `console.error <ellipse> rx -2`. `deserializeFromMdFolder` skips a file
     with no `id`/`type`; item 35 covered only the JSON files.
-55. **An element added as a `.md` file by hand (or by git) is drawn and
-    saved at 0×0.** A database and a person written by hand are drawn with
+    Fixed 2026-10-14: A node file with git conflict markers is a
+    `MalformedFolderFileError` that names it; Studio says so and saves
+    nothing until it reads again (as for the JSON files).
+55. ~~**An element added as a `.md` file by hand (or by git) is drawn and
+    saved at 0×0.**~~ A database and a person written by hand are drawn with
     no size on every canvas and saved as `width 0, height 0`, with the same
     console error. An element missing from `_layout.json` reads as
     `{x:0, y:0, width:0, height:0}`, and `placeUnplaced` sets only its
     place.
+    Fixed 2026-10-14: A node the layout does not know gets its type's
+    size (from the stored metamodel, else the C4 sizes).
 
 To decide (runs 7 to 12): after a reload in Presenter, Designer opens on
 All elements, and the presentation picker on the first presentation;

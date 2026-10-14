@@ -114,3 +114,33 @@ describe('a folder file that cannot be parsed', () => {
     warn.mockRestore()
   })
 })
+
+describe('a node file with git conflict markers', () => {
+  beforeEach(() => {
+    ;(globalThis as any).localStorage = new MemLS()
+    useDiagramStore.setState({ notifications: [] } as any)
+    useDiagramStore.getState().setAppMode('designer')
+  })
+
+  it('is named, the model stays, and nothing is written until it is fixed', async () => {
+    // Read as "not a node", the element vanished without a word, and the
+    // next save removed it from the layout.
+    const good = serializeToMdFolder(SAMPLE, 'model')
+    const folder = installFolderApi(good)
+    documents.createMdDocument('/tmp/model')
+    await settle()
+    const path = Object.keys(good).find((p) => p.startsWith('nodes/') && good[p].includes('Ledger'))!
+    folder.disk[path] = `<<<<<<< HEAD\n${good[path]}=======\n${good[path].replace('Ledger', 'Books')}>>>>>>> feature\n`
+    folder.emit([path])
+    await settle()
+    expect(Object.keys(useDiagramStore.getState().c4Nodes).sort()).toEqual(['sys1', 'sys2'])
+    expect(notices().some((m) => m.includes(path) && /conflict markers/.test(m))).toBe(true)
+
+    folder.api.writeFolder.mockClear()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    useDiagramStore.getState().updateNode('sys1', { description: 'edited meanwhile' })
+    await saved()
+    expect(folder.api.writeFolder).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+})

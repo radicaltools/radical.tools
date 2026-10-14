@@ -60,6 +60,11 @@ export function MatrixView(): React.ReactElement {
     y: number
   }
   const [popup, setPopup] = useState<PopupState | null>(null)
+  // The relation whose cell was clicked last, here in the matrix: a second
+  // click on that cell removes it. The selection alone is no such click: a
+  // relation selected on a canvas (or in the table) and still selected when
+  // the matrix opened was removed by one click.
+  const [armedId, setArmedId] = useState<string | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -163,11 +168,13 @@ export function MatrixView(): React.ReactElement {
           return
         }
         const existingId = relIds[0]
-        if (!readonly && selectedEdgeId === existingId) {
+        if (!readonly && armedId === existingId && selectedEdgeId === existingId) {
           removeRelation(existingId)
+          setArmedId(null)
           pushNotification(`Removed relation: ${source.label} \u2192 ${target.label}`, 'info')
         } else {
           selectEdge(existingId)
+          setArmedId(existingId)
         }
         return
       }
@@ -181,7 +188,7 @@ export function MatrixView(): React.ReactElement {
       addRelation({ sourceId: source.id, targetId: target.id })
       pushNotification(`Added relation: ${source.label} \u2192 ${target.label}`, 'info')
     },
-    [relMap, selectedEdgeId, selectEdge, removeRelation, addRelation, metamodel, pushNotification, readonly],
+    [relMap, selectedEdgeId, armedId, selectEdge, removeRelation, addRelation, metamodel, pushNotification, readonly],
   )
 
   const n = orderedNodes.length

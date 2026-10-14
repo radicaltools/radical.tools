@@ -182,6 +182,35 @@ export function placeUnplaced(
   return unplaced.map((n) => n.id)
 }
 
+/**
+ * The top-left corner for a box of `size` as near `center` as there is room:
+ * clear of every box in `taken` by `gap`. Tried on rings around the centre,
+ * nearest first; with no room within reach, right of everything.
+ */
+export function freeSpotNear(
+  taken: ReadonlyArray<{ x: number; y: number; width: number; height: number }>,
+  size: { width: number; height: number },
+  center: { x: number; y: number },
+  gap = 60,
+): { x: number; y: number } {
+  const fits = (x: number, y: number): boolean => taken.every((b) =>
+    x + size.width + gap <= b.x || b.x + b.width + gap <= x || y + size.height + gap <= b.y || b.y + b.height + gap <= y)
+  const start = { x: center.x - size.width / 2, y: center.y - size.height / 2 }
+  const step = 80
+  for (let ring = 0; ring <= 40; ring++) {
+    const spots: Array<{ x: number; y: number }> = []
+    if (ring === 0) spots.push(start)
+    for (let k = -ring; k <= ring && ring > 0; k++) {
+      spots.push({ x: start.x + k * step, y: start.y - ring * step }, { x: start.x + k * step, y: start.y + ring * step })
+      if (k !== -ring && k !== ring) spots.push({ x: start.x - ring * step, y: start.y + k * step }, { x: start.x + ring * step, y: start.y + k * step })
+    }
+    spots.sort((a, b) => Math.hypot(a.x - start.x, a.y - start.y) - Math.hypot(b.x - start.x, b.y - start.y))
+    for (const s of spots) if (fits(s.x, s.y)) return s
+  }
+  const right = taken.length ? Math.max(...taken.map((b) => b.x + b.width)) : start.x
+  return { x: right + gap, y: start.y }
+}
+
 /** Spacing of the cells a batch placer hands out. */
 export const BATCH_CELL = { width: 360, height: 280 }
 /** Gap between the nodes already on a canvas and a new batch beside them. */

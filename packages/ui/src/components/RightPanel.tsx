@@ -699,13 +699,16 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
             {((!compact && isActive) || (compact && isExpanded)) && seq.relationIds.length > 0 && (
               <div style={{ padding: '2px 8px 8px', borderLeft: '2px solid var(--accent)', marginLeft: 10 }}>
                 <div style={{ display: 'grid', gap: 3, marginBottom: 4, minWidth: 0 }}>
+                  {/* Keyed by place too: a relation may be a step more than once,
+                      and rows keyed by its id alone kept a removed copy listed
+                      (with its index), so a second Remove took another step. */}
                   {seq.relationIds.map((relId, idx) => {
                     const rel = c4Relations[relId]
                     const src = rel ? c4Nodes[rel.sourceId] : null
                     const tgt = rel ? c4Nodes[rel.targetId] : null
                     const stepDesc = seq.stepDescriptions?.[idx]
                     return (
-                      <div key={relId} className="seq-step" style={{ display: 'flex', alignItems: 'flex-start', gap: 5, background: 'var(--surface-2,rgba(255,255,255,0.04))', borderRadius: 5, padding: '4px 6px' }}>
+                      <div key={`${relId}-${idx}`} className="seq-step" style={{ display: 'flex', alignItems: 'flex-start', gap: 5, background: 'var(--surface-2,rgba(255,255,255,0.04))', borderRadius: 5, padding: '4px 6px' }}>
                         <span style={{
                           width: 18, height: 18, borderRadius: '50%',
                           background: 'var(--accent)', color: '#fff',
@@ -1426,7 +1429,7 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
               const tgt = rel ? c4Nodes[rel.targetId] : null
               const stepDesc = seq.stepDescriptions?.[idx]
               return (
-                <div key={relId} className="seq-step" style={{ display: 'flex', alignItems: 'flex-start', gap: 5, background: 'var(--surface-2,rgba(255,255,255,0.04))', borderRadius: 5, padding: '5px 7px' }}>
+                <div key={`${relId}-${idx}`} className="seq-step" style={{ display: 'flex', alignItems: 'flex-start', gap: 5, background: 'var(--surface-2,rgba(255,255,255,0.04))', borderRadius: 5, padding: '5px 7px' }}>
                   <span style={{
                     width: 20, height: 20, borderRadius: '50%',
                     background: 'var(--accent)', color: '#fff',

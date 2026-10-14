@@ -63,6 +63,7 @@ import {
   applyLayoutPositions,
   computeViewCollapsedSet,
   computeViewNodeSet,
+  fitAndSeparateBottomUp,
   isEffectivelyCollapsed,
   viewLayoutInput,
   type LayoutInput,
@@ -995,18 +996,22 @@ function deriveRFEdges(
     const key = `${visSource}→${visTarget}`
     const isVirtual = visSource !== rel.sourceId || visTarget !== rel.targetId
 
-    if (seen.has(key)) {
-      // Append label to existing edge instead of duplicating
-      const existing = rfEdges.find(
-        (e) => e.source === visSource && e.target === visTarget
-      )
+    // A relation between the two elements themselves is an edge of its own,
+    // however many others join them: it is selected, edited and deleted on
+    // its own (a second one used to be skipped, so it could not be seen at
+    // all). Relations rolled up onto a collapsed container share one edge,
+    // whose label lists them all.
+    if (isVirtual && seen.has(key)) {
+      const existing = rfEdges.find((e) => e.id === `virtual-${key}`)
       const label = relationDisplayLabel(rel, nodes)
       if (existing && label) {
-        existing.label = existing.label ? `${existing.label}\n${label}` : label
+        const joined = existing.data?.label ? `${existing.data.label}\n${label}` : label
+        existing.label = joined
+        if (existing.data) existing.data.label = joined
       }
       continue
     }
-    seen.add(key)
+    if (isVirtual) seen.add(key)
 
     // Edge must render above the parent containers of its endpoints so it's
     // not hidden behind them. Use the same depth * 10 formula as deriveRFNodes
@@ -1421,6 +1426,12 @@ interface DiagramStore {
   setMetamodel: (m: Metamodel) => void
   resetMetamodelToC4: () => void
   _forgetStepsOfLostTypes: () => void
+  /** Where the undo history stands now, for _mergeStepsSince. */
+  _historyMark: () => number
+  /** The steps pushed since `mark` become one: undo goes back to where the
+   *  history stood then. For an action of the user whose parts arrive one
+   *  after another (a Hub concept with its related concepts). */
+  _mergeStepsSince: (mark: number) => void
   upsertNodeType: (def: NodeTypeDef) => void
   removeNodeType: (id: string) => void
   upsertRelationType: (def: RelationTypeDef) => void
@@ -1582,6 +1593,26 @@ const _getViewportFn = (): (() => { x: number; y: number; zoom: number }) | null
   (window as any).__rfGetViewport ?? null
 const _setViewportFn = (): ((vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => void) | null =>
   (window as any).__rfSetViewport ?? null
+
+/**
+ * Sets a slide's captured camera. After a slide without a canvas (flow,
+ * table, matrix, wiki) the canvas is still mounting: the setter left behind
+ * by the canvas that went away drew NaN transforms (about 200 console
+ * errors a step), and the new canvas then placed the view's own camera.
+ * The camera waits for the canvas instead (`__rfPendingCamera`, taken by
+ * Canvas when it is ready).
+ */
+function setSlideCamera(vp: { x: number; y: number; zoom: number }, duration: number): void {
+  const W = window as any
+  W.__rfPendingCamera = { vp, duration }
+  requestAnimationFrame(() => {
+    const pending = W.__rfPendingCamera as { vp: typeof vp; duration: number } | undefined
+    const setViewport = _setViewportFn()
+    if (!pending || !setViewport) return
+    W.__rfPendingCamera = undefined
+    setViewport(pending.vp, { duration: pending.duration })
+  })
+}
 
 // ─── Store implementation ────────────────────────────────────────────────────
 
@@ -3372,22 +3403,29 @@ export const useDiagramStore = create<DiagramStore>()(
         if (action === 'cancel') return
 
         const { nodeIds, edgeIds } = pending
-        if (action === 'view') {
-          const viewId = get().activeViewId
-          if (viewId) {
-            // Hide nodes from the active view only. Edges follow their
-            // endpoints, so we don't need a separate edge-hide step.
-            for (const id of nodeIds) get().removeNodeFromView(viewId, id)
-          } else {
-            // No active view → fall back to model deletion.
-            for (const id of nodeIds) get().removeNode(id)
-            for (const id of edgeIds) get().removeRelation(id)
-          }
-          return
+        // One undo step for the whole delete. Each element and relation used
+        // to take its own, and the relations React Flow hands over with the
+        // elements were gone already with them: the first Undos did nothing,
+        // then the elements came back one at a time.
+        const removeFromModel = (): void => {
+          for (const id of nodeIds) if (get().c4Nodes[id]) get().removeNode(id)
+          for (const id of edgeIds) if (get().c4Relations[id]) get().removeRelation(id)
         }
-        // action === 'model'
-        for (const id of nodeIds) get().removeNode(id)
-        for (const id of edgeIds) get().removeRelation(id)
+        _asOneStep(() => {
+          if (action === 'view') {
+            const viewId = get().activeViewId
+            if (viewId) {
+              // Hide nodes from the active view only. Edges follow their
+              // endpoints, so we don't need a separate edge-hide step.
+              for (const id of nodeIds) get().removeNodeFromView(viewId, id)
+            } else {
+              // No active view → fall back to model deletion.
+              removeFromModel()
+            }
+            return
+          }
+          removeFromModel()
+        })
       },
 
       resolveOverlaps(draggedId) {
@@ -3548,6 +3586,9 @@ export const useDiagramStore = create<DiagramStore>()(
           get()._markMilestoneEdit()
           set((state) => {
             applyLayoutPositions(state.c4Nodes, positions, input)
+            // A container the refit grows past what ELK laid it out at lay
+            // on its neighbour: siblings are parted, level by level.
+            fitAndSeparateBottomUp(state.c4Nodes, input)
             unpinLaidOut(state, get().appMode)
           })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
@@ -4401,6 +4442,25 @@ export const useDiagramStore = create<DiagramStore>()(
         // elements" view (which writes to defaultPositions instead).
         const W = window as any
         if (prevMode === 'designer' && mode !== 'designer') {
+          // The canvas shown keeps its positions in the nodes until it is
+          // left or saved: put them, and its camera, into its view (or All
+          // elements') first. Parked without them, the save a slide asks for
+          // in Presenter wrote the view's layout from when it was opened.
+          if (!get().activeSnapshotId) {
+            const currentPos = snapshotPositions(get().c4Nodes)
+            const rawVP = W.__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined
+            const camera = rawVP ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom } : null
+            set((state) => {
+              const viewId = state.activeViewId
+              if (viewId === null) {
+                state.defaultPositions = currentPos as any
+                if (camera) state.defaultViewport = camera
+              } else if (state.views[viewId]) {
+                state.views[viewId].positions = currentPos as any
+                if (camera) state.views[viewId].viewport = camera
+              }
+            })
+          }
           W.__preModeLayout = parkDesigner(get())
           // Edits of a milestone not yet kept or dropped stay Designer's
           // question: Viewer and Presenter browse without being asked.
@@ -4467,6 +4527,14 @@ export const useDiagramStore = create<DiagramStore>()(
       },
       /** The metamodel is not part of an undo step, so a step that holds
        *  elements of a type it has lost cannot be gone back to. */
+      _historyMark() {
+        return _undoStack.length
+      },
+      _mergeStepsSince(mark) {
+        if (mark < 0 || _undoStack.length <= mark + 1) return
+        _undoStack.splice(mark + 1)
+        set((state) => { state.canUndo = _undoStack.length > 0; state.canRedo = _redoStack.length > 0 })
+      },
       _forgetStepsOfLostTypes() {
         _historyKeepsTypes(get().metamodel)
         set((state) => { state.canUndo = _undoStack.length > 0; state.canRedo = _redoStack.length > 0 })
@@ -4784,10 +4852,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // and dragging the camera to a fit-all framing right after we set
           // the slide's own captured viewport below.
           ;(window as any).__rfSuppressAutoFit?.(600 + 1200)
-          requestAnimationFrame(() => _setViewportFn()?.(
-            { x: vp.x, y: vp.y, zoom: vp.zoom },
-            { duration: 600 },
-          ))
+          setSlideCamera({ x: vp.x, y: vp.y, zoom: vp.zoom }, 600)
         } else if (slide.focusNodeIds?.length) {
           // No captured camera: zoom onto the slide's focus elements.
           const focus = slide.focusNodeIds
@@ -4860,10 +4925,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (vp && (vp.zoom || vp.x || vp.y)) {
           // See goToSlide — same auto-fit race, same fix.
           ;(window as any).__rfSuppressAutoFit?.(400 + 1200)
-          requestAnimationFrame(() => _setViewportFn()?.(
-            { x: vp.x, y: vp.y, zoom: vp.zoom },
-            { duration: 400 },
-          ))
+          setSlideCamera({ x: vp.x, y: vp.y, zoom: vp.zoom }, 400)
         } else if (slide.focusNodeIds?.length) {
           // No captured camera: zoom onto the slide's focus elements.
           const focus = slide.focusNodeIds

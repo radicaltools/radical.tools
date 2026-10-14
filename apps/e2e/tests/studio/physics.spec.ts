@@ -549,3 +549,20 @@ test('a milestone picked in Viewer is not the one Designer edits', async ({ page
   expect((await studio.storedDoc()).nodes.length).toBe(7)
   expect(await milestoneSize()).toBe(6)
 })
+
+test('a canvas slide after a slide without a canvas has its own camera', async ({ page, studio }) => {
+  // The camera was set on the canvas that had gone with the flow slide
+  // (about 200 console errors, NaN transforms), and the new canvas then
+  // took the view's own camera. The guard fixture fails on any error.
+  await studio.openSample('view-ctx')
+  await page.getByRole('button', { name: 'Presenter', exact: true }).click()
+  await studio.settle()
+  await page.locator('.pres-slide-card').nth(2).click()
+  await page.getByRole('button', { name: 'Present', exact: true }).click()
+  const viewport = page.locator('.react-flow__viewport')
+  await expect(viewport).toHaveAttribute('style', /translate\(64px, 14px\) scale\(0\.55\)/)
+  await page.keyboard.press('ArrowRight') // a flow view
+  await expect(page.locator('.sequence-area').first()).toBeVisible()
+  await page.keyboard.press('ArrowLeft')
+  await expect(viewport).toHaveAttribute('style', /translate\(64px, 14px\) scale\(0\.55\)/, { timeout: 5000 })
+})
