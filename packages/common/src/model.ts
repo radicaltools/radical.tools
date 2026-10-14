@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { constraintLines, pinnedNodeIds, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
+import { addToViewList, constraintLines, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
 import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
@@ -43,8 +43,14 @@ type NodeRecord = C4Node & Record<string, unknown>
  *  stored by id and replaced with the current preset; a document without
  *  one uses C4. The retired C4 + DDD preset loads as the Radical metamodel,
  *  which holds all of its types unchanged. */
-export function documentMetamodel(stored: Metamodel | undefined): Metamodel {
-  if (!stored) return builtInC4Metamodel()
+export function documentMetamodel(stored: Metamodel | undefined, nodes?: ReadonlyArray<{ type: string }>): Metamodel {
+  if (!stored) {
+    // A document saved without a metamodel (a Hub concept downloaded as a
+    // file) is C4 unless it holds types only the Radical preset has: opened
+    // under C4, its mockups, requirements and ADRs were unknown types.
+    const c4 = builtInC4Metamodel()
+    return nodes?.some((n) => !c4.nodeTypes[n.type]) ? builtInGovernanceMetamodel() : c4
+  }
   if (stored.id === 'c4-builtin') return builtInC4Metamodel()
   if (stored.id === 'c4-ddd-builtin' || stored.id === 'c4-ddd-governance-builtin') return builtInGovernanceMetamodel()
   return stored
@@ -140,6 +146,10 @@ export function checkAddNode(state: ModelState, node: Omit<C4Node, 'id'>): strin
     return `Cannot add another ${label}: maximum (${mm?.nodeTypes[node.type]?.cardinality?.max}) reached in the metamodel.`
   }
   const parent = node.parentId ? state.c4Nodes[node.parentId] : undefined
+  // A parent that is gone (a wizard finished after the element it was
+  // opened in was undone or deleted) is no root: inserted, the child
+  // pointed at nothing and the model could not be drawn again.
+  if (node.parentId && !parent) return `Cannot add ${label}: the element it was to go into no longer exists.`
   if (!isPlacementAllowed(mm, node.type, parent, state.c4Nodes)) {
     return `Cannot place ${label} inside ${placementError(mm, node.type, parent, state.c4Nodes)}`
   }
@@ -154,7 +164,7 @@ export function insertNode(state: ModelState, id: string, node: Omit<C4Node, 'id
   materializeDefaults(created, state.metamodel)
   state.c4Nodes[id] = created
   const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-  if (view && view.nodeIds.length > 0) view.nodeIds.push(id)
+  if (view) addToViewList(view, [id])
 }
 
 export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<Omit<C4Node, 'id'>>): string | null {
@@ -285,7 +295,7 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
     if (removed.has(rel.sourceId) || removed.has(rel.targetId)) delete state.c4Relations[rid]
   }
   for (const view of Object.values(state.views)) {
-    view.nodeIds = view.nodeIds.filter((nid) => !removed.has(nid))
+    removeFromViewList(view, removed)
     if (view.collapsedNodeIds?.length) view.collapsedNodeIds = view.collapsedNodeIds.filter((nid) => !removed.has(nid))
     if (view.expandedNodeIds?.length) view.expandedNodeIds = view.expandedNodeIds.filter((nid) => !removed.has(nid))
     if (view.layoutConstraints?.length) view.layoutConstraints = withoutNodes(view.layoutConstraints, removed)
@@ -310,8 +320,45 @@ function withoutNodes(constraints: LayoutConstraint[], removed: Set<string>): La
  *  of it. Null when none is (built-in types are the caller's to refuse). */
 export function checkRemoveNodeType(state: ModelState, typeId: string): string | null {
   const used = Object.values(state.c4Nodes).filter((n) => n.type === typeId).length
-  if (!used) return null
-  return `${used} ${used === 1 ? 'element is' : 'elements are'} still of type ${typeLabel(state.metamodel, typeId)}: retype or delete ${used === 1 ? 'it' : 'them'} first.`
+  if (used) return `${used} ${used === 1 ? 'element is' : 'elements are'} still of type ${typeLabel(state.metamodel, typeId)}: retype or delete ${used === 1 ? 'it' : 'them'} first.`
+  return state.metamodel ? checkRemoveNodeTypeFromMetamodel(state.metamodel, typeId) : null
+}
+
+/**
+ * Why the metamodel cannot lose node type `typeId`: a relation type whose
+ * pairs all name it would be left with none, which means "any pair" (the
+ * MCP server's delete turned such a type into one that connects anything),
+ * or a property of a type points at it.
+ */
+export function checkRemoveNodeTypeFromMetamodel(mm: Metamodel, typeId: string): string | null {
+  const label = typeLabel(mm, typeId)
+  for (const rel of Object.values(mm.relationTypes)) {
+    if (rel.allowedPairs.length > 0 && rel.allowedPairs.every((p) => p.from === typeId || p.to === typeId)) {
+      return `relation type "${rel.label}" connects only ${label}: change its pairs, or delete it, first.`
+    }
+  }
+  for (const def of [...Object.values(mm.nodeTypes), ...Object.values(mm.relationTypes)]) {
+    if (def.id === typeId) continue
+    const ref = (def.properties ?? []).find((p) => p.type === 'ref' && p.refType === typeId)
+    if (ref) return `the property "${ref.label}" of "${def.label}" points at ${label}: change or remove it first.`
+  }
+  return null
+}
+
+/** The metamodel without node type `typeId`, and without what names it: it
+ *  is no allowed parent and in no relation pair any more. Studio left both
+ *  behind, so the editor showed those entries as another type, and the next
+ *  new type took them over. Returns a copy. */
+export function metamodelWithoutNodeType(mm: Metamodel, typeId: string): Metamodel {
+  const next = JSON.parse(JSON.stringify(mm)) as Metamodel
+  delete next.nodeTypes[typeId]
+  for (const type of Object.values(next.nodeTypes)) {
+    if (type.allowedParents?.includes(typeId)) type.allowedParents = type.allowedParents.filter((t) => t !== typeId)
+  }
+  for (const rel of Object.values(next.relationTypes)) {
+    rel.allowedPairs = rel.allowedPairs.filter((pair) => pair.from !== typeId && pair.to !== typeId)
+  }
+  return next
 }
 
 /** Why the model's metamodel cannot be replaced by `next`: elements or
@@ -426,6 +473,7 @@ export function setViewNodeIds(state: ModelState, viewId: string, nodeIds: strin
     if (id in state.c4Nodes && !seen.has(id)) { seen.add(id); ordered.push(id) }
   }
   view.nodeIds = ordered
+  delete view.empty
   return true
 }
 

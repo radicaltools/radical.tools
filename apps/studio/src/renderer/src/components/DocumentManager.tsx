@@ -174,7 +174,14 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   }
 
   const handleRenameCommit = (): void => {
-    if (renamingId) documents.renameDocument(renamingId, renameValue)
+    if (renamingId) {
+      try {
+        documents.renameDocument(renamingId, renameValue)
+      } catch (e) {
+        // Browser storage is full: say so (as saving and creating a model do).
+        window.alert(e instanceof Error ? e.message : String(e))
+      }
+    }
     setRenamingId(null)
     setRenameValue('')
   }

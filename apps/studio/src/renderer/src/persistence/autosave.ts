@@ -316,7 +316,18 @@ if (typeof window !== 'undefined') {
       _layoutSafePending = false
       documents.saveDocument(leaving, data).catch((e) => reportSaveError(e))
     }
-    if (!s.activeId) return
+    if (!s.activeId) {
+      // The only model was deleted. It stayed on screen with nowhere to save
+      // to, and a reload showed another one: start an empty model instead.
+      if (s.docs.length === 0) {
+        try {
+          documents.createLSDocument('Untitled', { nodes: [], relations: [], metamodel: builtInGovernanceMetamodel() })
+        } catch (e) {
+          reportSaveError(e)
+        }
+      }
+      return
+    }
     loadActive(s.activeId, documents.listDocuments().find(d => d.id === s.activeId)?.source)
   })
 

@@ -24,17 +24,38 @@ function substituteParams(str: string, values: Record<string, string>): string {
   return str.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, key: string) => values[key] ?? `{{${key}}}`)
 }
 
-/** Returns a copy of `concept` with every node's string fields substituted. */
-function applyTemplateParams(concept: HubConcept, values: Record<string, string>): HubConcept {
-  if (!concept.templateParams?.length) return concept
-  const subst = (node: Record<string, unknown>): Record<string, unknown> => {
+/** Returns a copy of `concept` with the `{{KEY}}` tokens of its nodes,
+ *  relations and sequences (names and step notes) substituted. Nodes only
+ *  were: a flow's step notes kept their tokens in the model. */
+export function applyTemplateParams(concept: HubConcept, values: Record<string, string>): HubConcept {
+  const subst = (item: Record<string, unknown>): Record<string, unknown> => {
     const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(node)) {
-      out[k] = typeof v === 'string' ? substituteParams(v, values) : v
+    for (const [k, v] of Object.entries(item)) {
+      out[k] = typeof v === 'string'
+        ? substituteParams(v, values)
+        : Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? substituteParams(x, values) : x)) : v
     }
     return out
   }
-  return { ...concept, nodes: concept.nodes.map(subst) }
+  return {
+    ...concept,
+    nodes: concept.nodes.map(subst),
+    ...(concept.relations ? { relations: concept.relations.map(subst) } : {}),
+    ...(concept.sequences ? { sequences: concept.sequences.map(subst) } : {}),
+  }
+}
+
+/** The keys of the `{{KEY}}` tokens a concept's texts hold. */
+export function templateKeysUsed(concept: Pick<HubConcept, 'nodes' | 'relations' | 'sequences'>): Set<string> {
+  const keys = new Set<string>()
+  const scan = (v: unknown): void => {
+    if (typeof v === 'string') for (const m of v.matchAll(/\{\{([A-Z0-9_]+)\}\}/g)) keys.add(m[1])
+    else if (Array.isArray(v)) v.forEach(scan)
+  }
+  for (const item of [...concept.nodes, ...(concept.relations ?? []), ...(concept.sequences ?? [])]) {
+    for (const v of Object.values(item)) scan(v)
+  }
+  return keys
 }
 
 export interface ConceptInsertOptions {

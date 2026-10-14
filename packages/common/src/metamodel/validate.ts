@@ -195,6 +195,25 @@ export function validateModel(
     }
   }
 
+  // A relation's required properties are checked as an element's are.
+  for (const r of Object.values(relations)) {
+    const def = r.relationType ? metamodel.relationTypes[r.relationType] : undefined
+    for (const p of def?.properties ?? []) {
+      if (!p.required) continue
+      const v = (r as unknown as Record<string, unknown>)[p.key]
+      if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) {
+        const src = nodes[r.sourceId]?.label ?? r.sourceId
+        const dst = nodes[r.targetId]?.label ?? r.targetId
+        issues.push({
+          id: `missing-prop:${r.id}:${p.key}`,
+          severity: 'warning',
+          message: `Relation "${src}" → "${dst}" (${def!.label}) is missing required property "${p.label}".`,
+          relationId: r.id,
+        })
+      }
+    }
+  }
+
   // A relation that names its type is one that type has between its ends
   // (the check above only asks whether any type has the pair).
   for (const r of Object.values(relations)) {

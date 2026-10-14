@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { checkAddRelation, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, patchNode, patchRelation, type ModelState } from '../src/model'
+import { checkAddNode, checkAddRelation, checkRemoveNodeTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, patchNode, patchRelation, type ModelState } from '../src/model'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel } from '../src/metamodel'
-import type { C4Node } from '../src/c4'
+import { viewShowsEveryNode, type C4Node } from '../src/c4'
 
 const node = (id: string, type: string): C4Node =>
   ({ id, type, label: id, description: '', x: 0, y: 0, width: 100, height: 60, collapsed: false }) as C4Node
@@ -192,5 +192,83 @@ describe('a relation the model cannot hold', () => {
     const ids = validateModel(s.c4Nodes, s.c4Relations, s.metamodel!).map((i) => i.id)
     expect(ids).toContain('rel-end-missing:ghost')
     expect(ids).toContain('unknown-rel-type:odd')
+  })
+})
+
+describe('an element added into an element that is gone', () => {
+  // A wizard finished after the element it was opened in had been undone:
+  // the new element was added as a child of nothing.
+  it('is refused', () => {
+    const s = state()
+    expect(checkAddNode(s, { ...node('x', 'adr'), parentId: 'gone' } as C4Node)).toMatch(/no longer exists/)
+    expect(checkAddNode(s, node('x', 'adr'))).toBeNull()
+  })
+})
+
+describe('a view whose listed elements are all deleted', () => {
+  // An empty list means "every element": deleting what a view listed turned
+  // it into a view of the whole model.
+  it('shows none of the elements left', () => {
+    const s = state()
+    s.views = { v: { id: 'v', name: 'Only the shop', nodeIds: ['shop'], positions: {} } }
+    deleteNode(s, 'shop')
+    expect(s.views.v.nodeIds).toEqual([])
+    expect(viewShowsEveryNode(s.views.v)).toBe(false)
+    // A view that showed every element still does.
+    s.views.all = { id: 'all', name: 'All', nodeIds: [], positions: {} }
+    deleteNode(s, 'user')
+    expect(viewShowsEveryNode(s.views.all)).toBe(true)
+  })
+})
+
+describe('a document saved without a metamodel', () => {
+  // A Hub blueprint downloaded as a file has none: it opened under C4, with
+  // its mockups, requirements and ADRs as unknown types.
+  it('opens under the Radical preset when it holds types only that preset has', () => {
+    expect(documentMetamodel(undefined, [{ type: 'system' }, { type: 'mockup' }]).id).toBe('c4-ddd-governance-builtin')
+    expect(documentMetamodel(undefined, [{ type: 'system' }, { type: 'container' }]).id).toBe('c4-builtin')
+    expect(documentMetamodel(undefined).id).toBe('c4-builtin')
+  })
+})
+
+describe('deleting a node type that others name', () => {
+  const withBadge = () => {
+    const mm = builtInGovernanceMetamodel()
+    mm.nodeTypes.badge = { ...mm.nodeTypes.system, id: 'badge', label: 'Badge', builtin: false, properties: [] }
+    mm.nodeTypes.card = { ...mm.nodeTypes.system, id: 'card', label: 'Card', builtin: false, allowedParents: ['badge', 'group'], properties: [] }
+    mm.relationTypes.issues = { id: 'issues', label: 'Issues', allowedPairs: [{ from: 'badge', to: 'badge' }], builtin: false } as never
+    mm.relationTypes.links = { id: 'links', label: 'Links', allowedPairs: [{ from: 'badge', to: 'card' }, { from: 'card', to: 'card' }], builtin: false } as never
+    return mm
+  }
+
+  it('is refused when a relation type would be left with no pair (which means any pair)', () => {
+    expect(checkRemoveNodeTypeFromMetamodel(withBadge(), 'badge')).toMatch(/"Issues" connects only Badge/)
+  })
+
+  it('is refused when a property points at the type', () => {
+    const mm = withBadge()
+    delete (mm.relationTypes as Record<string, unknown>).issues
+    mm.nodeTypes.card.properties = [{ key: 'owner', label: 'Owner', type: 'ref', refType: 'badge' }]
+    expect(checkRemoveNodeTypeFromMetamodel(mm, 'badge')).toMatch(/"Owner" of "Card" points at Badge/)
+  })
+
+  it('takes the type out of allowed parents and pairs', () => {
+    const mm = withBadge()
+    delete (mm.relationTypes as Record<string, unknown>).issues
+    expect(checkRemoveNodeTypeFromMetamodel(mm, 'badge')).toBeNull()
+    const next = metamodelWithoutNodeType(mm, 'badge')
+    expect(next.nodeTypes.badge).toBeUndefined()
+    expect(next.nodeTypes.card.allowedParents).toEqual(['group'])
+    expect(next.relationTypes.links.allowedPairs).toEqual([{ from: 'card', to: 'card' }])
+  })
+})
+
+describe('a required property of a relation type', () => {
+  // Only elements were checked: a relation without the value went unlisted.
+  it('is listed when a relation lacks it', () => {
+    const s = state()
+    s.metamodel!.relationTypes.interacts.properties = [{ key: 'evidence', label: 'Evidence', type: 'text', required: true }]
+    const issues = validateModel(s.c4Nodes, s.c4Relations, s.metamodel!)
+    expect(issues.find((i) => i.id === 'missing-prop:uses:evidence')?.relationId).toBe('uses')
   })
 })

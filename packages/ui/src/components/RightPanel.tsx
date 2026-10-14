@@ -7,13 +7,14 @@ import { EarsQuickEntry } from './EarsQuickEntry'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
+import { viewShowsEveryNode } from '@radical/common/c4'
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 
-/** A view with no node list shows the whole model. */
-function viewNodeCount(view: { nodeIds: string[] }): string {
+/** A view with no node list shows the whole model, unless it was emptied. */
+function viewNodeCount(view: { nodeIds: string[]; empty?: true }): string {
   const n = view.nodeIds.length
-  return n === 0 ? 'All nodes' : `${n} ${n === 1 ? 'node' : 'nodes'}`
+  return viewShowsEveryNode(view) ? 'All nodes' : `${n} ${n === 1 ? 'node' : 'nodes'}`
 }
 
 function AutoResizeTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
@@ -127,7 +128,7 @@ function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
   const canCollapse = isContainerType(node.type) && hasChildren
   const isHierarchy = activeView?.kind === 'treemap'
   const inView = !activeView
-    || activeView.nodeIds.length === 0
+    || viewShowsEveryNode(activeView)
     || activeView.nodeIds.includes(nodeId)
   const isFilterMatch = !!matchedSet?.has(nodeId)
   // Effective collapsed: per-view if a named view is active, else model-level.
@@ -269,7 +270,7 @@ function RelationsSection(): React.ReactElement {
   }
   // A relation is "in view" when no view is active OR the active view does
   // not have it on its hidden list AND both endpoints are visible there.
-  const inViewNodes = activeView && activeView.nodeIds.length > 0 ? new Set(activeView.nodeIds) : null
+  const inViewNodes = activeView && !viewShowsEveryNode(activeView) ? new Set(activeView.nodeIds) : null
   const hiddenIds = new Set(activeView?.hiddenRelationIds ?? [])
   return (
     <>
@@ -1593,26 +1594,6 @@ function EarsSentencePreview({ node, nodeId, subject: subjectProp, readOnly, upd
 
 // ── Hub Template Reconfigure ──────────────────────────────────────────────────
 
-function substituteInStr(str: string, values: Record<string, string>): string {
-  return str.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, key: string) => values[key] ?? `{{${key}}}`)
-}
-
-function reapplyTemplate(
-  record: HubImportRecord,
-  newValues: Record<string, string>,
-  updateNode: (id: string, updates: Record<string, unknown>) => void,
-): void {
-  for (const [nodeId, origNode] of Object.entries(record.originalNodes)) {
-    const patch: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(origNode)) {
-      // Never overwrite structural / position fields
-      if (['id', 'type', 'parentId', 'x', 'y', 'width', 'height', 'collapsed'].includes(k)) continue
-      if (typeof v === 'string') patch[k] = substituteInStr(v, newValues)
-    }
-    updateNode(nodeId, patch)
-  }
-}
-
 function HubTemplateSection({
   record,
   importId,
@@ -1626,7 +1607,7 @@ function HubTemplateSection({
   readOnly: boolean
   updateNode: (id: string, updates: Record<string, unknown>) => void
 }) {
-  const upsertHubTemplate = useDiagramStore((s) => s.upsertHubTemplate)
+  const applyHubTemplate = useDiagramStore((s) => s.applyHubTemplate)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Record<string, string>>(record.paramValues)
 
@@ -1692,8 +1673,8 @@ function HubTemplateSection({
           className="props-delete"
           style={{ flex: 1, background: 'var(--accent)', color: '#fff', padding: '5px 0', marginTop: 0 }}
           onClick={() => {
-            reapplyTemplate(record, draft, updateNode)
-            upsertHubTemplate(importId, { ...record, paramValues: draft })
+            // One step; only the fields that hold a parameter change.
+            applyHubTemplate(importId, draft)
             setEditing(false)
           }}
         >
@@ -1812,7 +1793,8 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
           [p.key]: p.type === 'boolean'
             ? (e.target as HTMLInputElement).checked
             : p.type === 'number'
-              ? Number(e.target.value)
+              // An emptied field clears the value (Number('') saved 0).
+              ? (e.target.value === '' ? undefined : Number(e.target.value))
               : e.target.value,
         } as Parameters<typeof updateNode>[1])
       }
@@ -1869,8 +1851,8 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
       return (
         <div className="props-field" key={p.key}>
           <label className="props-label">{p.label}</label>
-          <input className="props-input" value={String(value ?? p.default ?? '')}
-            onChange={onChange} readOnly={readOnly} />
+          <input className="props-input" type={p.type === 'number' ? 'number' : undefined}
+            value={String(value ?? p.default ?? '')} onChange={onChange} readOnly={readOnly} />
         </div>
       )
     }
@@ -2027,6 +2009,19 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
                 <option value="" />
                 {options.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
+            </div>
+          )
+        }
+        if (type === 'number') {
+          // A number, as on elements (a text field saved "abc5" as typed).
+          return (
+            <div className="props-field" key={key}>
+              <label className="props-label">{label}</label>
+              <input className="props-input" type="number" value={strVal} readOnly={readOnly}
+                onChange={(e) => {
+                  if (readOnly) return
+                  updateRelation(rel.id, { [key]: e.target.value === '' ? undefined : Number(e.target.value) } as Parameters<typeof updateRelation>[1])
+                }} />
             </div>
           )
         }

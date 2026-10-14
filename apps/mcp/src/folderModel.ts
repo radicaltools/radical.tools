@@ -258,7 +258,7 @@ export class FolderModel {
       checkData(data)
       const facade = createModelFacade(data, {
         runLayout: async (doc, viewId) => {
-          const layout = await this.smartLayout(doc, documentMetamodel(doc.metamodel), viewId, options)
+          const layout = await this.smartLayout(doc, documentMetamodel(doc.metamodel, doc.nodes), viewId, options)
           return { ok: layout.ok, text: layout.text, data: layout.changed }
         },
       })

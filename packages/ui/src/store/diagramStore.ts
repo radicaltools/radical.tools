@@ -56,7 +56,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { createBatchPlacer, fittedParentSize, isFixedSizeType, placeBesideSiblings, placeUnplaced, projectToVisibleGraph } from '@radical/layout/geometry'
+import { compoundPadding, createBatchPlacer, fittedParentSize, isFixedSizeType, placeBesideSiblings, placeUnplaced, projectToVisibleGraph } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
@@ -75,6 +75,7 @@ import { LIVE_CHILD_TOP_MIN } from '@radical/layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
+import { removeFromViewList, viewShowsEveryNode } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -129,6 +130,8 @@ interface HistoryEntry {
    *  them out, so Undo after a removed step or a deleted sequence took back
    *  the edit made before it instead. */
   sequences: Record<string, DiagramSequence>
+  /** The Hub templates' values: changing them is a step of its own. */
+  hubTemplates: Record<string, HubImportRecord>
 }
 
 const MAX_HISTORY = 100
@@ -204,6 +207,7 @@ function _captureState(state: DiagramStore): HistoryEntry {
     activeViewId: state.activeViewId,
     defaultPositions: state.defaultPositions,
     sequences: state.sequences,
+    hubTemplates: state.hubTemplates,
   }
 }
 
@@ -304,15 +308,33 @@ let _beforeSlidePreview: { nodes: Record<string, C4Node>; relations: Record<stri
 
 /** A diagram where many elements overlap their siblings has not been laid
  *  out yet. The live layout keeps the positions a document comes with, so
- *  only Smart Layout will arrange it. */
-function looksUnarranged(nodes: Record<string, C4Node>): boolean {
-  const list = Object.values(nodes)
-  const byParent = new Map<string, C4Node[]>()
+ *  only Smart Layout will arrange it. Elements are taken as drawn: a
+ *  collapsed container at its collapsed size, and what it holds not at all
+ *  (with stored sizes, containers Smart Layout packed collapsed read as
+ *  overlapping, and the notice asked for a layout that already scored best). */
+export function looksUnarranged(nodes: Record<string, C4Node>, activeViewId?: string | null, view?: DiagramView): boolean {
+  const collapsed = (n: C4Node): boolean => isContainerType(n.type) && nodeEffectivelyCollapsedInView(n, activeViewId, view)
+  const hidden = (n: C4Node): boolean => {
+    for (let p = n.parentId ? nodes[n.parentId] : undefined; p; p = p.parentId ? nodes[p.parentId] : undefined) {
+      if (collapsed(p)) return true
+    }
+    return false
+  }
+  const list = Object.values(nodes).filter((n) => !hidden(n))
+  const parents = new Set(list.map((n) => n.parentId).filter(Boolean))
+  // As deriveRFNodes draws it.
+  const box = (n: C4Node): { x: number; y: number; width: number; height: number } =>
+    isFixedSizeType(n.type) ? { x: n.x, y: n.y, ...NODE_SIZES[n.type] }
+    : isContainerType(n.type) && (collapsed(n) || (!parents.has(n.id) && !n.collapsed))
+      ? { x: n.x, y: n.y, width: COLLAPSED_WIDTH[n.type], height: COLLAPSED_HEIGHT[n.type] }
+      : n
+  const byParent = new Map<string, Array<{ id: string; x: number; y: number; width: number; height: number }>>()
   for (const n of list) {
     const key = n.parentId ?? ''
+    const entry = { id: n.id, ...box(n) }
     const siblings = byParent.get(key)
-    if (siblings) siblings.push(n)
-    else byParent.set(key, [n])
+    if (siblings) siblings.push(entry)
+    else byParent.set(key, [entry])
   }
   const overlapping = new Set<string>()
   for (const siblings of byParent.values()) {
@@ -333,7 +355,7 @@ function looksUnarranged(nodes: Record<string, C4Node>): boolean {
 /** Called after a document loads (at boot or on switching documents). */
 function suggestSmartLayoutIfUnarranged(): void {
   const s = useDiagramStore.getState()
-  if (!looksUnarranged(s.c4Nodes)) return
+  if (!looksUnarranged(s.c4Nodes, s.activeViewId, s.activeViewId ? s.views[s.activeViewId] : undefined)) return
   s.pushNotification('This diagram is not laid out yet. The live layout only moves what you drag or add: use Smart Layout to arrange it.', 'info')
 }
 
@@ -908,7 +930,9 @@ function deriveRFNodes(
       id: n.id,
       type: n.type,
       position: { x: n.x, y: renderY },
-      parentNode: n.parentId,
+      // A parent that is not in the model (a broken file) is drawn as none:
+      // React Flow throws on it, and the whole model could not be opened.
+      parentNode: n.parentId && nodes[n.parentId] ? n.parentId : undefined,
       extent: undefined,
       expandParent: false,
       hidden,
@@ -1186,6 +1210,8 @@ interface DiagramStore {
    *  the normal synchronous search). */
   scanDescriptions: (query: string) => Promise<Set<string>>
   removeNode: (id: string) => void
+  /** Removes the elements (with what lies inside them) as one undo step. */
+  removeNodes: (ids: string[]) => void
   toggleCollapse: (id: string) => void
   /** Opens every container around `nodeId` that the canvas shown has
    *  collapsed, outermost first, as one undo step. */
@@ -1440,6 +1466,9 @@ interface DiagramStore {
   // ── hub import templates (per document) ──
   /** Keyed by import-instance UUID. Allows reconfiguring template values after import. */
   hubTemplates: Record<string, HubImportRecord>
+  /** New values for an imported Hub template: the fields that hold its
+   *  parameters are written again from the Hub's text, as one undo step. */
+  applyHubTemplate: (id: string, values: Record<string, string>) => void
   upsertHubTemplate: (id: string, record: HubImportRecord) => void
   deleteHubTemplate: (id: string) => void
   /** Catalogue metadata of a hub concept file; carried through load/save untouched. */
@@ -1459,6 +1488,9 @@ interface DiagramStore {
   presentationSlides: PresentationSlide[]
   presentationActive: boolean
   presentationSlideIndex: number
+  /** The drill level a slide of a hierarchy view shows, over the view's
+   *  own, while the slide is shown (not saved into the view). */
+  slideTreemapFocus: { viewId: string; focusId: string | null } | null
   addPresentation: (name?: string) => string
   /** Replace every presentation (AI tools). Keeps the active one when it
    *  still exists; an empty list leaves one empty presentation. */
@@ -1663,7 +1695,7 @@ export const useDiagramStore = create<DiagramStore>()(
       initPres = buildPresentationsFromData(persisted.presentations, persisted.presentationSlides)
       // Auto-refresh built-in presets so persisted documents pick up
       // metamodel updates shipped with new app versions.
-      initMetamodel = model.documentMetamodel(persisted.metamodel)
+      initMetamodel = model.documentMetamodel(persisted.metamodel, persisted.nodes)
       // Signal the boot startLiveLayout() call to skip cola's bulk phase
       // so the persisted positions aren't immediately overwritten.
       _initLoadedFromDisk = true
@@ -1693,13 +1725,25 @@ export const useDiagramStore = create<DiagramStore>()(
       set((state) => {
         state.c4Nodes = entry.c4Nodes as any
         state.c4Relations = entry.c4Relations as any
-        state.views = entry.views as any
+        // What a view is looking at (the hierarchy's drill level, the wiki's
+        // page, the table's tab) is like a camera: no step takes it back.
+        // Restored with the views, Undo of a drag reset the hierarchy to the
+        // top, and that was saved.
+        let views = entry.views as Record<string, DiagramView>
+        for (const [id, v] of Object.entries(entry.views as Record<string, DiagramView>)) {
+          const now = state.views[id] as DiagramView | undefined
+          if (!now || (now.treemapFocusId === v.treemapFocusId && now.wikiFocusId === v.wikiFocusId && now.tableActiveTab === v.tableActiveTab)) continue
+          if (views === entry.views) views = { ...views }
+          views[id] = { ...v, treemapFocusId: now.treemapFocusId, wikiFocusId: now.wikiFocusId, tableActiveTab: now.tableActiveTab } as DiagramView
+        }
+        state.views = views as any
         state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
         state.defaultPositions = entry.defaultPositions as any
         // A view the entry knows may be gone when the entry is older than
         // the view; its positions are All elements' then.
         state.activeViewId = entry.activeViewId && entry.views[entry.activeViewId] ? entry.activeViewId : null
         state.sequences = entry.sequences as any
+        if (entry.hubTemplates) state.hubTemplates = entry.hubTemplates as any
         if (state.activeSequenceId && !entry.sequences[state.activeSequenceId]) state.activeSequenceId = null
         state.canUndo = _undoStack.length > 0
         state.canRedo = _redoStack.length > 0
@@ -1715,7 +1759,31 @@ export const useDiagramStore = create<DiagramStore>()(
     }
 
     // addNode plus its wizard links, as one undo step.
-    const _createNodeWithLinks = (node: Omit<C4Node, 'id'>, links: WizardLink[]): string => {
+    /**
+     * Where a new element goes inside its parent. Dropped on a collapsed
+     * container, the drop point is a point of its small box, not a place
+     * inside it: taken as one, the element lay on the header once the
+     * container was opened (and stayed there when the container was pinned,
+     * which holds what is in it). It goes beside the others in it instead.
+     * Centred on the drop point in a parent drawn smaller than the element
+     * (a state with no states yet), it began above and left of the parent:
+     * it is kept below the header and right of the side padding.
+     */
+    const _placeNewChild = <T extends Omit<C4Node, 'id'>>(node: T): T => {
+      const { c4Nodes, activeViewId, views } = get()
+      const parent = node.parentId ? c4Nodes[node.parentId] : undefined
+      if (!parent) return node
+      const view = activeViewId ? views[activeViewId] : undefined
+      if (nodeEffectivelyCollapsedInView(parent, activeViewId, view)) {
+        const shown = view ? computeViewNodeSet(view, c4Nodes) : null
+        return { ...node, ...placeBesideSiblings(c4Nodes, parent.id, (s) => !shown || shown.has(s.id)) }
+      }
+      const pad = compoundPadding(parent.type)
+      return { ...node, x: Math.max(node.x, pad.side), y: Math.max(node.y, pad.top) }
+    }
+
+    const _createNodeWithLinks = (draft: Omit<C4Node, 'id'>, links: WizardLink[]): string => {
+      const node = _placeNewChild(draft)
       const refused = model.checkAddNode(get(), node)
       if (refused) {
         get().pushNotification(refused, 'error')
@@ -1785,6 +1853,7 @@ export const useDiagramStore = create<DiagramStore>()(
       presentationSlides: initPres.presentations[0].slides,
       presentationActive: false,
       presentationSlideIndex: 0,
+      slideTreemapFocus: null,
 
       // ── sync helper ──────────────────────────────────────────────────────
       _sync() {
@@ -1884,18 +1953,7 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._pushUndo()
         get()._markMilestoneEdit()
         const id = uid()
-        // Dropped on a collapsed container, the drop point is a point of its
-        // small box, not a place inside it: taken as one, the element lay on
-        // the header once the container was opened (and stayed there when
-        // the container was pinned, which holds what is in it). It goes
-        // beside the others in it instead.
-        const { c4Nodes, activeViewId, views } = get()
-        const parent = node.parentId ? c4Nodes[node.parentId] : undefined
-        const view = activeViewId ? views[activeViewId] : undefined
-        if (parent && nodeEffectivelyCollapsedInView(parent, activeViewId, view)) {
-          const shown = view ? computeViewNodeSet(view, c4Nodes) : null
-          node = { ...node, ...placeBesideSiblings(c4Nodes, parent.id, (s) => !shown || shown.has(s.id)) }
-        }
+        node = _placeNewChild(node)
         set((state) => { model.insertNode(state, id, node) })
         // Expand parent to fit the new child
         if (node.parentId) {
@@ -2029,6 +2087,10 @@ export const useDiagramStore = create<DiagramStore>()(
           get().reparentNodes([id], (updates.parentId as string | null | undefined) ?? null)
           return
         }
+        // Nothing changes: no step (a cell opened and left without typing
+        // made an undo step that did nothing).
+        const existing = get().c4Nodes[id] as unknown as Record<string, unknown>
+        if (Object.entries(updates).every(([k, v]) => existing[k] === v)) return
         // A reparent or retype must respect the metamodel's containment rules.
         const refused = model.checkNodeUpdate(get(), id, updates)
         if (refused) {
@@ -2101,6 +2163,12 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { model.deleteNode(state, id) })
         get()._sync()
         _liveLayout?.invalidate()
+      },
+
+      removeNodes(ids) {
+        _asOneStep(() => {
+          for (const id of ids) if (get().c4Nodes[id]) get().removeNode(id)
+        })
       },
 
       expandAncestors(nodeId) {
@@ -2299,17 +2367,44 @@ export const useDiagramStore = create<DiagramStore>()(
         // Walk up the ancestor chain:
         // At each level: separate siblings of current node, then refit the parent.
         // This propagates size changes upward so grandparent containers also shrink/grow.
-        // Under live physics no separation: the physics makes room itself, so
-        // this arrangement would only be drawn until its first reply — the
-        // toggled group pushed off its centre, siblings pushed aside, all
-        // snapping back a few frames later.
-        const separate = !_liveLayout?.running
+        // Under live physics no separation on a collapse: the box shrinks
+        // where it stands and nothing needs room. An expand makes room here
+        // and the physics takes the result as it is (reset below): left to
+        // the physics, every child it showed counted as new and freed the 40
+        // elements nearest to it by relation, across other containers whose
+        // frames stayed fixed. On a large nested model that scattered a
+        // hundred elements, never came to rest, and a reload drew another
+        // picture.
+        const separate = !_liveLayout?.running || prevCollapsed
         // Opening: the frame is the one its children need now. One added
         // while it was collapsed was not fit for (a collapsed container
         // keeps its size) and lay outside the frame it came back with.
         if (prevCollapsed) {
           const openVcs = loopVcs ? new Set([...loopVcs].filter((nid) => nid !== id)) : undefined
           get().fitParentToChildren(id, loopViewFilter, openVcs, loopExpandedSet)
+        }
+        const growFrameLeftUp = (parentId: string, viewFilter?: Set<string>): void => {
+          const nodes = get().c4Nodes
+          const parent = nodes[parentId]
+          if (!parent) return
+          const kids = Object.values(nodes).filter((c) => c.parentId === parentId && (!viewFilter || viewFilter.has(c.id)))
+          if (!kids.length) return
+          const pad = compoundPadding(parent.type)
+          const minX = Math.min(...kids.map((c) => c.x))
+          const minY = Math.min(...kids.map((c) => c.y))
+          const dx = minX < 0 ? pad.side - minX : 0
+          const dy = minY < LIVE_CHILD_TOP_MIN ? pad.top - minY : 0
+          if (!dx && !dy) return
+          set((state) => {
+            const p = state.c4Nodes[parentId]
+            if (!p) return
+            p.x -= dx
+            p.y -= dy
+            for (const k of kids) {
+              const c = state.c4Nodes[k.id]
+              if (c) { c.x += dx; c.y += dy }
+            }
+          })
         }
         let currentId: string | undefined = id
         while (currentId) {
@@ -2325,6 +2420,10 @@ export const useDiagramStore = create<DiagramStore>()(
 
           const current: C4Node | undefined = get().c4Nodes[currentId]
           if (current?.parentId) {
+            // Opened round its centre, or pushed aside, a child can reach
+            // past its parent's left or top edge, where a refit (which grows
+            // right and down) does not follow: the frame grows that way.
+            if (prevCollapsed) growFrameLeftUp(current.parentId, loopViewFilter)
             get().fitParentToChildren(current.parentId, loopViewFilter, loopVcs, loopExpandedSet)
             currentId = current.parentId
           } else {
@@ -2363,8 +2462,20 @@ export const useDiagramStore = create<DiagramStore>()(
           })
         }
 
+        if (prevCollapsed) {
+          // Children kept in a row or column while it was collapsed line up
+          // now: the physics, which held them on their line, takes this
+          // result as it is.
+          const input = layoutInputForView(get())
+          if (input.alignments.length) {
+            let snapped = false
+            set((state) => { snapped = applyAlignments(state.c4Nodes, input) })
+            if (snapped) get()._resizeParentsBottomUp(input.viewFilter, input.viewCollapsedSet, input.expandedSet)
+          }
+        }
         get()._sync()
-        _liveLayout?.invalidate()
+        if (prevCollapsed) _liveLayout?.reset()
+        else _liveLayout?.invalidate()
         // Smart fit frames the result as soon as the canvas shows it, not on
         // its next 300 ms tick. React Flow takes the new nodes in an effect,
         // a frame or two after this: ask again each frame meanwhile (a call
@@ -2400,6 +2511,8 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       updateRelation(id, updates) {
+        const existing = get().c4Relations[id] as unknown as Record<string, unknown> | undefined
+        if (!existing || Object.entries(updates).every(([k, v]) => existing[k] === v)) return
         // Moving an end obeys the same metamodel rules as adding a relation.
         const refused = model.checkPatchRelation(get(), id, updates)
         if (refused) {
@@ -2682,7 +2795,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // Remove the node from every view; its children stay in views they
           // were already part of.
           for (const view of Object.values(state.views)) {
-            view.nodeIds = view.nodeIds.filter((nid) => nid !== id)
+            removeFromViewList(view as DiagramView, new Set([id]))
           }
         })
 
@@ -2886,7 +2999,10 @@ export const useDiagramStore = create<DiagramStore>()(
         const view = get().views[viewId]
         if (!view || view.nodeIds.includes(nodeId)) return
         get()._pushUndo()
-        set((state) => { state.views[viewId].nodeIds.push(nodeId) })
+        set((state) => {
+          state.views[viewId].nodeIds.push(nodeId)
+          delete state.views[viewId].empty
+        })
         get()._sync()
       },
       removeNodeFromView(viewId, nodeIds) {
@@ -2900,12 +3016,13 @@ export const useDiagramStore = create<DiagramStore>()(
           // computeViewNodeSet to re-include the parent (ancestor walk),
           // so the parent would keep appearing even after its eye was toggled off.
           const toRemove = new Set(ids.flatMap((id) => [id, ...getDescendants(id, state.c4Nodes)]))
-          if (view.nodeIds.length === 0) {
+          if (viewShowsEveryNode(view as DiagramView)) {
             // Empty nodeIds means "show all". First removal transitions to
             // "show all except this subtree" by explicitly listing every other node.
             view.nodeIds = Object.keys(state.c4Nodes).filter(id => !toRemove.has(id))
+            if (view.nodeIds.length === 0) view.empty = true
           } else {
-            view.nodeIds = view.nodeIds.filter((id) => !toRemove.has(id))
+            removeFromViewList(view as DiagramView, toRemove)
           }
           // Also clean up per-view collapse state for all removed nodes
           if (view.collapsedNodeIds?.length)
@@ -3316,6 +3433,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // of silently dropping nodes from the canvas (which previously left
         // them in the model and out-of-sync with rfNodes).
         const removals = changes.filter((c) => c.type === 'remove') as Array<{ type: 'remove'; id: string }>
+        // Deleting is Designer's, and not while a presentation plays.
+        if (removals.length > 0 && (get().appMode !== 'designer' || get().presentationActive)) return
         if (removals.length > 0) {
           const ids = removals.map((c) => c.id)
           set((state) => {
@@ -3371,6 +3490,8 @@ export const useDiagramStore = create<DiagramStore>()(
 
       onEdgesChange(changes) {
         const removals = changes.filter((c) => c.type === 'remove') as Array<{ type: 'remove'; id: string }>
+        // Deleting is Designer's, and not while a presentation plays.
+        if (removals.length > 0 && (get().appMode !== 'designer' || get().presentationActive)) return
         if (removals.length > 0) {
           const ids = removals.map((c) => c.id)
           set((state) => {
@@ -3882,8 +4003,9 @@ export const useDiagramStore = create<DiagramStore>()(
         // A drag while editing a milestone is a real edit too — mark dirty
         // so the user is asked how to persist it (propagate / save as new).
         // Without this, positions never make it into the snapshot and switching
-        // milestones reverts the move.
-        get()._markMilestoneEdit()
+        // milestones reverts the move. A click (nothing moved) is no edit: it
+        // asked how to save changes nobody had made.
+        if (moved) get()._markMilestoneEdit()
       },
 
       setConnectionModifier(mod) {
@@ -4228,9 +4350,14 @@ export const useDiagramStore = create<DiagramStore>()(
           } else {
             const before = baseNodes[id]
             const after = editedNodes[id]
+            // Every field: a property of the metamodel (a status, an EARS
+            // clause) is a field of the node like a label. A fixed list of
+            // fields left them behind in later milestones and the live model.
             const updates: Partial<C4Node> = {}
-            for (const k of ['label', 'description', 'technology', 'type', 'parentId', 'external', 'x', 'y', 'width', 'height', 'collapsed'] as const) {
-              if ((before as any)[k] !== (after as any)[k]) (updates as any)[k] = (after as any)[k]
+            for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) {
+              if (k === 'id') continue
+              const a = (before as any)[k], b = (after as any)[k]
+              if (a !== b && JSON.stringify(a) !== JSON.stringify(b)) (updates as any)[k] = b
             }
             if (Object.keys(updates).length > 0) updatedNodes.push({ id, updates })
           }
@@ -4249,8 +4376,10 @@ export const useDiagramStore = create<DiagramStore>()(
             const before = baseRels[id]
             const after = editedRels[id]
             const updates: Partial<C4Relation> = {}
-            for (const k of ['sourceId', 'targetId', 'label', 'technology'] as const) {
-              if ((before as any)[k] !== (after as any)[k]) (updates as any)[k] = (after as any)[k]
+            for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) {
+              if (k === 'id') continue
+              const a = (before as any)[k], b = (after as any)[k]
+              if (a !== b && JSON.stringify(a) !== JSON.stringify(b)) (updates as any)[k] = b
             }
             if (Object.keys(updates).length > 0) updatedRels.push({ id, updates })
           }
@@ -4284,12 +4413,25 @@ export const useDiagramStore = create<DiagramStore>()(
           for (const { id, updates } of updatedNodes) {
             if (targetNodes[id]) Object.assign(targetNodes[id], updates)
           }
-          for (const id of removedNodeIds) delete targetNodes[id]
+          // What lies inside a removed element there goes with it, and so do
+          // the relations to anything removed: a later model can hold children
+          // and relations the edited milestone never had. Left behind, a child
+          // kept a parent that was gone (Studio could not draw the model).
+          const gone = new Set<string>()
+          for (const id of removedNodeIds) {
+            if (!targetNodes[id]) continue
+            gone.add(id)
+            for (const d of model.descendantIds(id, targetNodes)) gone.add(d)
+          }
+          for (const id of gone) delete targetNodes[id]
           for (const r of addedRels) targetRels[r.id] = JSON.parse(JSON.stringify(r))
           for (const { id, updates } of updatedRels) {
             if (targetRels[id]) Object.assign(targetRels[id], updates)
           }
           for (const id of removedRelIds) delete targetRels[id]
+          for (const [rid, r] of Object.entries(targetRels)) {
+            if (!targetNodes[r.sourceId] || !targetNodes[r.targetId]) delete targetRels[rid]
+          }
           for (const seq of addedSeqs) targetSeqs[seq.id] = JSON.parse(JSON.stringify(seq))
           for (const { id, seq } of updatedSeqs) targetSeqs[id] = JSON.parse(JSON.stringify(seq))
           for (const id of removedSeqIds) delete targetSeqs[id]
@@ -4502,7 +4644,7 @@ export const useDiagramStore = create<DiagramStore>()(
         } else {
           get().startLiveLayout()
         }
-        set((state) => { state.appMode = mode as any })
+        set((state) => { state.appMode = mode as any; state.slideTreemapFocus = null })
         // Rebuild rfNodes so per-node draggable/selectable flags reflect
         // the new mode (designer = editable, viewer/presenter = locked).
         get()._sync()
@@ -4558,8 +4700,8 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         set((state) => {
           if ((state.metamodel as Metamodel).nodeTypes[id]?.builtin) return
-          state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
-          delete (state.metamodel as Metamodel).nodeTypes[id]
+          const forked = model.forkPresetMetamodel(state.metamodel as Metamodel) ?? (state.metamodel as Metamodel)
+          state.metamodel = model.metamodelWithoutNodeType(forked, id) as any
         })
         get()._forgetStepsOfLostTypes()
       },
@@ -4584,6 +4726,29 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       // ── Hub import templates ────────────────────────────────────────────
+      applyHubTemplate(id, values) {
+        const record = get().hubTemplates[id] as HubImportRecord | undefined
+        if (!record) return
+        const subst = (text: string): string => text.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_m, key: string) => values[key] ?? `{{${key}}}`)
+        _asOneStep(() => {
+          get()._pushUndo()
+          set((state) => {
+            // Only the fields the Hub's text gave a parameter: the others may
+            // have been edited since (a rename was lost to "Apply").
+            for (const [nodeId, original] of Object.entries(record.originalNodes)) {
+              const n = state.c4Nodes[nodeId] as unknown as Record<string, unknown> | undefined
+              if (!n) continue
+              for (const [key, value] of Object.entries(original)) {
+                if (typeof value === 'string' && /\{\{[A-Z0-9_]+\}\}/.test(value)) n[key] = subst(value)
+              }
+            }
+            ;(state.hubTemplates as Record<string, HubImportRecord>)[id] = { ...record, paramValues: { ...values } }
+            state.canUndo = _undoStack.length > 0
+            state.canRedo = _redoStack.length > 0
+          })
+        })
+        get()._sync()
+      },
       upsertHubTemplate(id, record) {
         set((state) => { (state.hubTemplates as Record<string, HubImportRecord>)[id] = record })
       },
@@ -4670,7 +4835,10 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           const pres = state.presentations.find(p => p.id === state.activePresentationId)
           if (!pres) return
-          pres.slides.push({ id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, modelSnapshot } as any)
+          // A hierarchy view's camera is the element it is drilled into.
+          const view = activeViewId ? state.views[activeViewId] : undefined
+          const treemapFocusId = view?.kind === 'treemap' ? (view.treemapFocusId ?? null) : undefined
+          pres.slides.push({ id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, modelSnapshot, ...(treemapFocusId !== undefined ? { treemapFocusId } : {}) } as any)
           state.presentationSlides = pres.slides
         })
       },
@@ -4729,7 +4897,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       stopPresentation() {
-        set((state) => { state.presentationActive = false })
+        set((state) => { state.presentationActive = false; state.slideTreemapFocus = null })
         get().setDiffHighlight({})
         const pre = (window as any).__prePresState as
           | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null }
@@ -4810,6 +4978,13 @@ export const useDiagramStore = create<DiagramStore>()(
         if (targetViewId !== currentViewId) {
           set((state) => { state.activeViewId = targetViewId })
         }
+
+        // A slide of a hierarchy view shows the element it was drilled into.
+        set((state) => {
+          state.slideTreemapFocus = targetViewId && (slide as { treemapFocusId?: string | null }).treemapFocusId !== undefined
+            ? { viewId: targetViewId, focusId: (slide as { treemapFocusId?: string | null }).treemapFocusId ?? null }
+            : null
+        })
 
         // Re-derive rfNodes / rfEdges (always needed: view filter or canvas state may have changed)
         get()._sync()
@@ -4916,6 +5091,12 @@ export const useDiagramStore = create<DiagramStore>()(
         if (targetViewId !== get().activeViewId) {
           set((state) => { state.activeViewId = targetViewId })
         }
+
+        set((state) => {
+          state.slideTreemapFocus = targetViewId && (slide as { treemapFocusId?: string | null }).treemapFocusId !== undefined
+            ? { viewId: targetViewId, focusId: (slide as { treemapFocusId?: string | null }).treemapFocusId ?? null }
+            : null
+        })
 
         // Re-derive rfNodes / rfEdges.
         get()._sync()
@@ -5060,7 +5241,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.presentationSlides = presInit.presentations[0].slides as any
           state.presentationActive = false
           state.presentationSlideIndex = 0
-          state.metamodel = model.documentMetamodel(data.metamodel) as any
+          state.metamodel = model.documentMetamodel(data.metamodel, data.nodes) as any
           state.hubTemplates = (data.hubTemplates ?? {}) as any
           state.hubMeta = data.hub ?? null
         })

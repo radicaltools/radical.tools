@@ -1822,7 +1822,7 @@ h4.wiki-heading { font-size: 16px; }
 .ears-rewrite:focus-visible { opacity: 1; }
 @media (hover: none) { .ears-rewrite { opacity: 1; } }
 .ears-rewriting .wiki-inline-textarea { font-size: 15px; line-height: 1.6; }
-.ears-rewriting .wiki-write-hint { display: block; }
+.ears-rewriting .wiki-write-hint { visibility: visible; }
 .ears-fixed {
   color: var(--text-muted);
   font-style: italic;
@@ -1999,8 +1999,10 @@ h6.wiki-heading .wiki-heading-count { font-size: 0.8em; vertical-align: 0; }
 .wiki-write-input:focus,
 .wiki-write-input:focus-visible { border-bottom: 1px solid var(--accent); outline: none; box-shadow: none; }
 /* How the line works, said while it is being written in. */
-.wiki-write-hint { display: none; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
-.wiki-write-input:focus + .wiki-write-hint { display: block; }
+/* It keeps its room when hidden: taken away on blur, everything below moved
+   up between mouse down and up, and a click on an "Add:" link was lost. */
+.wiki-write-hint { visibility: hidden; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
+.wiki-write-input:focus + .wiki-write-hint { visibility: visible; }
 /* A pasted list, before it becomes elements: what its lines will be named. */
 .wiki-write-pasted {
   margin-top: 8px;

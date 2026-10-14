@@ -81,8 +81,13 @@ export interface DiagramView {
   kind?: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki'
   /** ID of the DiagramSequence to visualise when kind='dynamic' */
   sequenceId?: string
-  /** C4 node IDs included in this view. Ancestors are auto-included. */
+  /** C4 node IDs included in this view. Ancestors are auto-included. An
+   *  empty list shows every node, unless `empty` says the view lists none. */
   nodeIds: string[]
+  /** The view lists no node: what it listed was deleted or hidden. Its
+   *  empty list would otherwise show every node (deleting the elements a
+   *  view listed turned it into one of the whole model). */
+  empty?: true
   /**
    * Relation IDs explicitly hidden from this view, even though both their
    * endpoints (or visible ancestors) are present. Optional for backwards
@@ -315,6 +320,8 @@ export interface PresentationSlide {
    * camera frames just these, so several slides can show parts of one view.
    */
   focusNodeIds?: string[]
+  /** A slide of a hierarchy view: the element it was drilled into. */
+  treemapFocusId?: string | null
   /** Full node positions + collapsed flags at the time the slide was created/captured */
   canvasState?: SlideCanvasState
   /**
@@ -441,3 +448,25 @@ export const TYPE_LABELS: Record<C4ElementType, string> = pluckPerType(def => de
 
 /** SVG path data for each C4 element type (viewBox 0 0 16 16) */
 export const TYPE_ICON_PATHS: Record<C4ElementType, string> = pluckPerType(def => def.iconPath)
+
+/** Whether a view shows every node of the model: it lists none and was not
+ *  emptied (`empty`). */
+export function viewShowsEveryNode(view: Pick<DiagramView, 'nodeIds' | 'empty'>): boolean {
+  return view.nodeIds.length === 0 && !view.empty
+}
+
+/** Removes ids from a view's list; a list emptied this way lists nothing
+ *  (`empty`), not every node. Mutates the view. */
+export function removeFromViewList(view: DiagramView, removed: { has(id: string): boolean }): void {
+  if (view.nodeIds.length === 0) return
+  view.nodeIds = view.nodeIds.filter((nid) => !removed.has(nid))
+  if (view.nodeIds.length === 0) view.empty = true
+}
+
+/** Adds ids to a view that lists its nodes (or lists none): a view that
+ *  shows every node already shows them. Mutates the view. */
+export function addToViewList(view: DiagramView, ids: string[]): void {
+  if (viewShowsEveryNode(view)) return
+  for (const id of ids) if (!view.nodeIds.includes(id)) view.nodeIds.push(id)
+  if (view.nodeIds.length > 0) delete view.empty
+}

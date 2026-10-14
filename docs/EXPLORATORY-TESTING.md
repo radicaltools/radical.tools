@@ -114,6 +114,15 @@ Do not walk the same path twice in a row. Each run, choose differently.
   @radicaltools/mcp`, `npx playwright install chromium`. Serve Studio from
   `apps/studio` with
   `npx vite preview --config vite.web.config.ts --port <port> --strictPort`.
+  When the checkout is shared (several runs at once, or someone fixing
+  while you test), copy `apps/studio/out/renderer` into your scratch
+  directory first and serve the copy (`--outDir <copy>`): a rebuild of the
+  shared output in the middle of a run gives white pages after a reload
+  and a Smart Layout worker that fails to load, which are not findings.
+  Say in the report which build you tested (commit, or the time of the copy).
+- Note the window size your scripts use (the e2e suite runs at 1280×720):
+  what is off screen there is scrolled to, and a scrolled page can hide
+  a jump that a taller window shows.
 - Drive it with Playwright scripts you write in a scratch directory
   outside the repo. `apps/e2e/support/fixtures.ts` shows how: a document is
   seeded into `localStorage` before the app loads (`radical-docs-index`,

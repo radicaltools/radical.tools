@@ -12,6 +12,7 @@ import { buildContextMessage } from '@radical/common/ai/systemPrompt'
 import { buildToolDefs, runTool, type ToolGroup, type ToolRunContext } from '@radical/common/ai/tools'
 import { createBatchPlacer } from '@radical/layout/geometry'
 import { addTokenUsage, textOf, toolCallsOf, type AISettings, type ChatContentBlock, type ChatMessage, type TokenUsage } from './types'
+import { viewShowsEveryNode } from '@radical/common/c4'
 
 export interface RunAIResult {
   summary: string
@@ -133,7 +134,7 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
   // that grows sideways (see createBatchPlacer).
   const placeNext = createBatchPlacer(() => diagram.getNodes(), () => {
     const view = diagram.getActiveView?.()
-    if (!view?.nodeIds.length) return undefined
+    if (!view || viewShowsEveryNode(view)) return undefined
     const nodes = diagram.getNodes()
     const shown = new Set<string>()
     for (const id of view.nodeIds) {

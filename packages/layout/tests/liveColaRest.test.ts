@@ -175,6 +175,60 @@ describe('Live layout physics: a push drag on a diagram that has a layout', () =
   }
 })
 
+describe('Live layout physics: a push drag on a large diagram', () => {
+  // Run 19: from 150 elements a push drag freed the 40 nearest by relation
+  // and froze the rest. Relations to frozen elements far away pulled those
+  // 40 across the diagram (2 500 to 5 000 px), the canvas took a minute or
+  // more to rest, and they came to rest on top of frozen ones.
+  it('moves what is held, and clears only what it lands on', async () => {
+    const nodes: Nodes = {}
+    const relations: Record<string, C4Relation> = {}
+    const name = (i: number): string => `n${String(i).padStart(3, '0')}`
+    const count = WHOLE_DIAGRAM_MAX_NODES + 50
+    for (let i = 0; i < count; i++) nodes[name(i)] = node(name(i), (i % 20) * 460, Math.floor(i / 20) * 360)
+    // Relations across the diagram, as a laid-out model has them.
+    for (let i = 0; i < count; i++) {
+      const j = (i * 37 + 11) % count
+      if (j !== i) relations[`r${i}`] = { id: `r${i}`, sourceId: name(i), targetId: name(j) }
+    }
+    const before = at(nodes)
+    const { engine } = engineOver(nodes, relations)
+    engine.start(true)
+    const held = 'n106'
+    const from = before[held]
+    engine.grab(held, from.x, from.y, 'push', from)
+    // Onto its right-hand neighbour's place.
+    for (let step = 1; step <= 10; step++) {
+      const x = from.x + 46 * step
+      const y = from.y + 9 * step
+      nodes[held] = { ...nodes[held], x, y }
+      engine.drag(held, x, y, { x, y })
+      await wait(20)
+    }
+    engine.release(held)
+    await wait(1500)
+    engine.stop()
+
+    const after = at(nodes)
+    expect(after[held].x).toBeCloseTo(from.x + 460, 0)
+    expect(after[held].y).toBeCloseTo(from.y + 90, 0)
+    const moves = Object.keys(before).filter((id) => id !== held)
+      .map((id) => Math.hypot(after[id].x - before[id].x, after[id].y - before[id].y))
+    // Only what it landed on made room, by about its own size.
+    expect(moves.filter((d) => d > 0.5).length).toBeLessThanOrEqual(3)
+    expect(Math.max(...moves)).toBeLessThan(500)
+    const ids = Object.keys(after)
+    const overlapping: string[] = []
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = after[ids[i]], b = after[ids[j]]
+        if (a.x < b.x + 280 && b.x < a.x + 280 && a.y < b.y + 180 && b.y < a.y + 180) overlapping.push(`${ids[i]}/${ids[j]}`)
+      }
+    }
+    expect(overlapping).toEqual([])
+  }, 20_000)
+})
+
 describe('relaxLayout', () => {
   it('brings a whole diagram to rest, the same way every time', () => {
     const first = relaxLayout(spread())!

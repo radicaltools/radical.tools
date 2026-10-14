@@ -89,6 +89,9 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       if (typeof input.label !== 'string' || !input.label.trim()) return fail('add_node: label is required')
 
       const mm = ctx.diagram.getMetamodel?.()
+      // The schema an MCP client validates with may be older than the
+      // metamodel (another writer added a type): the handler checks it.
+      if (mm && !mm.nodeTypes[input.type]) return fail(`add_node: unknown type "${input.type}". The metamodel has: ${Object.keys(mm.nodeTypes).join(', ')}`)
       const { values: propValues, notes } = validateProperties(input.properties, mm?.nodeTypes[input.type]?.properties, { nodes: ctx.diagram.getNodes(), resolveId: ctx.resolveId })
 
       const size = NODE_SIZES[input.type as C4ElementType] ?? { width: 240, height: 140 }
@@ -132,6 +135,7 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       if (input.type !== undefined && typeof input.type !== 'string') return fail('update_node: type must be a string')
 
       const mm = ctx.diagram.getMetamodel?.()
+      if (mm && typeof input.type === 'string' && !mm.nodeTypes[input.type]) return fail(`update_node: unknown type "${input.type}". The metamodel has: ${Object.keys(mm.nodeTypes).join(', ')}`)
       const effectiveType = typeof input.type === 'string' ? input.type : nodes[realId].type
       const { values: propValues, notes } = validateProperties(input.properties, mm?.nodeTypes[effectiveType]?.properties, { nodes, resolveId: ctx.resolveId })
 

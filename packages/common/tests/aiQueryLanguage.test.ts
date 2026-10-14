@@ -186,3 +186,21 @@ describe('runModelQuery', () => {
     expect(result.result).toEqual({ total: 1, rows: [expect.objectContaining({ id: 'v2', kind: 'table' })] })
   })
 })
+describe('a view that lists no elements', () => {
+  // It shows every element in Studio; the query language answered that it
+  // was empty.
+  const all: Record<string, DiagramView> = { ...views, everything: { id: 'everything', name: 'Everything', nodeIds: [], positions: {} } }
+  it('shows every element', () => {
+    const view = runModelQuery('GET VIEW everything', { nodes, relations, views: all }).result as { view: { nodeCount: number; relationCount: number } }
+    expect(view.view.nodeCount).toBe(Object.keys(nodes).length)
+    expect(view.view.relationCount).toBe(Object.keys(relations).length)
+    const node = runModelQuery('GET NODE c4', { nodes, relations, views: all }).result as { views: Array<{ id: string }> }
+    expect(node.views.map((v) => v.id)).toContain('everything')
+  })
+
+  it('unless it was emptied: then it shows none', () => {
+    const emptied: Record<string, DiagramView> = { gone: { id: 'gone', name: 'Gone', nodeIds: [], positions: {}, empty: true } }
+    const view = runModelQuery('GET VIEW gone', { nodes, relations, views: emptied }).result as { view: { nodeCount: number } }
+    expect(view.view.nodeCount).toBe(0)
+  })
+})

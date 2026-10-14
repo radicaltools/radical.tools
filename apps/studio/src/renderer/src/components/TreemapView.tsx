@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
+import { viewShowsEveryNode } from '@radical/common/c4'
 
 // ─── Color palette per C4 type ──────────────────────────────────────────────
 const TYPE_COLORS_LIGHT: Record<string, readonly [string, string, string]> = {
@@ -213,7 +214,13 @@ export function TreemapView(): React.ReactElement {
   const setTreemapMaxDepth = useDiagramStore(s => s.setTreemapMaxDepth)
 
   const activeView = activeViewId ? views[activeViewId] : null
-  const focusId    = activeView?.treemapFocusId ?? null
+  // A slide shows the drill level it was added on; otherwise the view's
+  // own. An element the model shown does not have (a milestone without it)
+  // is shown as the top, without changing the view.
+  const slideFocus = useDiagramStore(s => s.slideTreemapFocus)
+  const activeSnapshotId = useDiagramStore(s => s.activeSnapshotId)
+  const savedFocusId = slideFocus && slideFocus.viewId === activeViewId ? slideFocus.focusId : (activeView?.treemapFocusId ?? null)
+  const focusId    = savedFocusId && c4Nodes[savedFocusId] ? savedFocusId : null
   const sizeBy: SizeBy = activeView?.treemapSizeBy ?? 'leaves'
   // null/undefined = unlimited. Default = 2 levels below focus (children +
   // grandchildren) — keeps the view legible; user can change via dropdown.
@@ -242,6 +249,7 @@ export function TreemapView(): React.ReactElement {
 
   const setFocus = useCallback((id: string | null) => {
     if (!activeViewId) return
+    if (useDiagramStore.getState().slideTreemapFocus) useDiagramStore.setState({ slideTreemapFocus: null })
     setTreemapFocus(activeViewId, id)
   }, [activeViewId, setTreemapFocus])
 
@@ -250,7 +258,7 @@ export function TreemapView(): React.ReactElement {
   // treemap view should never be empty).
   const viewFilter = useMemo(() => {
     if (!activeView) return undefined
-    if (!activeView.nodeIds || activeView.nodeIds.length === 0) return undefined
+    if (!activeView.nodeIds || viewShowsEveryNode(activeView)) return undefined
     const s = new Set<string>()
     for (const id of activeView.nodeIds) {
       let cur: string | undefined = id
@@ -281,10 +289,13 @@ export function TreemapView(): React.ReactElement {
     return path
   }, [focusId, c4Nodes])
 
-  // Reset focus if focused node was removed
+  // Forget the view's focus when its element was deleted from the live
+  // model. Not while a milestone is shown: views belong to the live model,
+  // and a milestone without the element erased the focus for good.
   useEffect(() => {
-    if (focusId && !c4Nodes[focusId]) setFocus(null)
-  }, [focusId, c4Nodes, setFocus])
+    const own = activeView?.treemapFocusId
+    if (own && !c4Nodes[own] && !activeSnapshotId && !slideFocus) setFocus(null)
+  }, [activeView?.treemapFocusId, c4Nodes, activeSnapshotId, slideFocus, setFocus])
 
   // Single static layout for the WHOLE tree, rooted at the true top level.
   // Recomputed only when the data, filter, container size or sizing mode

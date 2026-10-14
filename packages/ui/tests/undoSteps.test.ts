@@ -330,3 +330,26 @@ describe('steps that arrive one after another for one action', () => {
     stillBefore()
   })
 })
+
+describe('an edit that changes nothing', () => {
+  // A table cell opened and left without typing saved its value again: an
+  // undo step that did nothing.
+  it('is no undo step', () => {
+    s().updateNode('bank', { description: 'before' })
+    s().updateRelation('r1', { label: undefined })
+    s().undo()
+    expect(s().c4Nodes.bank.description).toBeUndefined()
+  })
+})
+
+describe('deleting several elements from the selection bar', () => {
+  // One undo step per element: it took as many Undos as elements.
+  it('is one undo step', () => {
+    const before = Object.keys(s().c4Nodes).length
+    s().removeNodes(['web', 'db', 'bank'])
+    expect(Object.keys(s().c4Nodes).length).toBe(before - 3)
+    s().undo()
+    expect(Object.keys(s().c4Nodes).length).toBe(before)
+    stillBefore()
+  })
+})

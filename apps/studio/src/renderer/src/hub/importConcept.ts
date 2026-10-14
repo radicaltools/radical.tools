@@ -10,6 +10,7 @@
 import { buildConceptInsert } from '@radical/common/hubImport'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { HubConcept } from '@radical/ui/store/hubStore'
+import { addToViewList } from '@radical/common/c4'
 
 export interface ImportHubConceptResult {
   nodeIds: string[]
@@ -44,8 +45,8 @@ export function importHubConceptIntoDiagram(
     Object.assign(state.sequences, insert.sequences)
     for (const v of insert.views) state.views[v.id] = v
     // Empty nodeIds means "show all" — the imported nodes are already in it.
-    if (state.activeViewId && state.views[state.activeViewId]?.nodeIds.length) {
-      state.views[state.activeViewId].nodeIds.push(...Object.keys(insert.nodes))
+    if (state.activeViewId && state.views[state.activeViewId]) {
+      addToViewList(state.views[state.activeViewId], Object.keys(insert.nodes))
     }
   })
 

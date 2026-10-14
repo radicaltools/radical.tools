@@ -8,6 +8,7 @@ import {
 import type { C4Node } from '@radical/common/c4'
 import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
 import { isRelationAllowed } from '@radical/common/metamodel'
+import { viewShowsEveryNode } from '@radical/common/c4'
 
 // ─── Tree ordering helper (hierarchical, parents before children) ────────────
 
@@ -65,6 +66,7 @@ export function MatrixView(): React.ReactElement {
   // relation selected on a canvas (or in the table) and still selected when
   // the matrix opened was removed by one click.
   const [armedId, setArmedId] = useState<string | null>(null)
+  useEffect(() => { setArmedId(null) }, [readonly])
   const popupRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -84,7 +86,7 @@ export function MatrixView(): React.ReactElement {
   // ── Collapse-aware view state ──────────────────────────────────────────────
 
   const viewFilter = useMemo<Set<string> | undefined>(() => {
-    if (!activeView || activeView.nodeIds.length === 0) return undefined
+    if (!activeView || viewShowsEveryNode(activeView)) return undefined
     return new Set(activeView.nodeIds)
   }, [activeView])
 
@@ -174,7 +176,9 @@ export function MatrixView(): React.ReactElement {
           pushNotification(`Removed relation: ${source.label} \u2192 ${target.label}`, 'info')
         } else {
           selectEdge(existingId)
-          setArmedId(existingId)
+          // In Viewer a click only selects: armed there, the first click
+          // back in Designer removed the relation.
+          setArmedId(readonly ? null : existingId)
         }
         return
       }
