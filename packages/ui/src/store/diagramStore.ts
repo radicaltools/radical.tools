@@ -1280,6 +1280,9 @@ interface DiagramStore {
   unhideRelationInView: (viewId: string, relationId: string) => void
   /** Replace the view's hidden relations (one undo step). Unknown ids are ignored. */
   setViewHiddenRelations: (viewId: string, relationIds: string[]) => void
+  /** Show elements folded or open in one view only, over their model-level
+   *  fold; one undo step. */
+  setViewCollapsed: (viewId: string, nodeIds: string[], collapsed: boolean) => void
   /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', and 'wiki'. */
   setViewKind: (viewId: string, kind: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki') => void
   /** Persist treemap drill-down focus (null = top "All"). */
@@ -3067,6 +3070,13 @@ export const useDiagramStore = create<DiagramStore>()(
         if (!get().views[viewId]) return
         get()._pushUndo()
         set((state) => { model.setViewHiddenRelations(state, viewId, relationIds) })
+        get()._sync()
+      },
+
+      setViewCollapsed(viewId, nodeIds, collapsed) {
+        if (!get().views[viewId]) return
+        get()._pushUndo()
+        set((state) => { model.setViewCollapsed(state, viewId, nodeIds, collapsed) })
         get()._sync()
       },
 

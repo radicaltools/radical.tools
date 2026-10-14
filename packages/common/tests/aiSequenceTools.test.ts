@@ -90,6 +90,26 @@ describe('update_view', () => {
     expect(facade.getViews!()[ctx.resolveId('v')].hiddenRelationIds).toEqual([])
   })
 
+  it('shows elements open or folded in the view only, over their fold on the model', () => {
+    const { facade, call, ctx } = setup()
+    call('add_node', { tempId: 'grp', type: 'group', label: 'Layer' })
+    call('add_node', { tempId: 'inner', type: 'system', label: 'Inner', parentId: 'grp' })
+    call('create_view', { tempId: 'v', name: 'Layer view', nodeIds: ['grp', 'inner'] })
+    const grp = ctx.resolveId('grp')
+    // Folded on the model, as a collapse in Studio's All elements leaves it.
+    facade.getNodes()[grp].collapsed = true
+    const opened = call('update_view', { id: 'v', expand: ['grp'] })
+    expect(opened.ok, opened.resultText).toBe(true)
+    expect(facade.getViews!()[ctx.resolveId('v')]).toMatchObject({ expandedNodeIds: [grp], collapsedNodeIds: [] })
+    expect(call('update_view', { id: 'v', collapse: ['grp'] }).ok).toBe(true)
+    expect(facade.getViews!()[ctx.resolveId('v')]).toMatchObject({ expandedNodeIds: [], collapsedNodeIds: [grp] })
+    // Open on the model: opening it in the view needs no override.
+    facade.getNodes()[grp].collapsed = false
+    expect(call('update_view', { id: 'v', expand: ['grp'] }).ok).toBe(true)
+    expect(facade.getViews!()[ctx.resolveId('v')]).toMatchObject({ expandedNodeIds: [], collapsedNodeIds: [] })
+    expect(call('update_view', { id: 'v', expand: ['nope'] }).resultText).toContain('unknown element')
+  })
+
   it('refuses switching to dynamic without a sequence, and unknown relations', () => {
     const { call } = setup()
     call('create_view', { tempId: 'v', name: 'Context' })

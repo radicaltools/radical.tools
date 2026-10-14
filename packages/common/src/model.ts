@@ -499,6 +499,27 @@ export function setViewHiddenRelations(state: ModelState, viewId: string, relati
   if (view) view.hiddenRelationIds = [...new Set(relationIds.filter((id) => id in state.c4Relations))]
 }
 
+/** Shows elements folded (`collapsed`) or open in one view only, over the
+ *  element's model-level fold, as a collapse or expand on that view's canvas
+ *  records it. */
+export function setViewCollapsed(state: ModelState, viewId: string, nodeIds: string[], collapsed: boolean): void {
+  const view = state.views[viewId]
+  if (!view) return
+  const folded = new Set(view.collapsedNodeIds ?? [])
+  const opened = new Set(view.expandedNodeIds ?? [])
+  for (const id of nodeIds) {
+    const node = state.c4Nodes[id]
+    if (!node) continue
+    if (collapsed) { folded.add(id); opened.delete(id) }
+    else {
+      folded.delete(id)
+      if (node.collapsed) opened.add(id); else opened.delete(id)
+    }
+  }
+  view.collapsedNodeIds = [...folded]
+  view.expandedNodeIds = [...opened]
+}
+
 // ── Layout constraints ───────────────────────────────────────────────────────
 // Per canvas: a view's own, or All elements' when viewId is null.
 

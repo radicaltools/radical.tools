@@ -53,7 +53,7 @@ export function buildViewToolDefs(): ToolDef[] {
     },
     {
       name: 'update_view',
-      description: "Rename a view, change its kind or linked sequence, or set which relations it hides. Use set_view_nodes to change its nodes.",
+      description: "Rename a view, change its kind or linked sequence, set which relations it hides, or show elements open or folded in it. Use set_view_nodes to change its nodes.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -65,6 +65,16 @@ export function buildViewToolDefs(): ToolDef[] {
             type: 'array',
             items: { type: 'string' },
             description: 'The complete set of relations to hide in this view even though both endpoints are visible. [] shows them all.',
+          },
+          expand: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Elements (real ids or tempIds) to show open in this view, also when they are folded on the model or folded by someone in Studio; their children in the view become visible.',
+          },
+          collapse: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Elements to show folded in this view only.',
           },
         },
         required: ['id'],
@@ -139,7 +149,7 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
     },
 
     update_view: (rawInput, ctx) => {
-      const input = rawInput as { id?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; hiddenRelationIds?: unknown }
+      const input = rawInput as { id?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; hiddenRelationIds?: unknown; expand?: unknown; collapse?: unknown }
       if (typeof input.id !== 'string' || !input.id) return fail('update_view: id is required')
       if (!ctx.diagram.getViews) return fail('update_view: views are not editable in this context')
       const vId = ctx.resolveId(input.id)
@@ -179,6 +189,17 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         const unknown = ids.filter((id) => !(id in relations))
         if (unknown.length) return fail(`update_view: unknown relation id(s) ${unknown.join(', ')}`)
         changes.push(() => ctx.diagram.setViewHiddenRelations!(vId, ids))
+      }
+      for (const [key, collapsed] of [['expand', false], ['collapse', true]] as const) {
+        const raw = input[key]
+        if (raw === undefined) continue
+        if (!Array.isArray(raw)) return fail(`update_view: ${key} must be an array`)
+        if (!ctx.diagram.setViewCollapsed) return fail(`update_view: elements cannot be ${collapsed ? 'folded' : 'opened'} in this context`)
+        const nodes = ctx.diagram.getNodes()
+        const ids = raw.filter((x): x is string => typeof x === 'string').map((id) => ctx.resolveId(id))
+        const unknown = ids.filter((id) => !(id in nodes))
+        if (unknown.length) return fail(`update_view: unknown element id(s) ${unknown.join(', ')}`)
+        changes.push(() => ctx.diagram.setViewCollapsed!(vId, ids, collapsed))
       }
       if (!changes.length) return fail('update_view: nothing to change')
       for (const change of changes) change()

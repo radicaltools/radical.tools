@@ -421,6 +421,13 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     relation. `radical check` (2026-10-14) now answers these for the fixed
     rules; a `WHERE NOT ... ` over relations would let a project write its
     own.
+26. **An agent could not open what someone folded.** A group folded on the
+    model in Studio stays folded in every new view, and no tool could open
+    it in a view: rebuilding the views of `architecture/` (2026-10-14) gave
+    C4 views showing one folded "Logical & physical" box, and smart_layout
+    answered "the current layout already scores best" for them. update_view
+    now takes `expand` and `collapse`. smart_layout could still say why it
+    finds nothing to arrange (everything folded) instead of "already best".
 
 ### Reverse-engineered requirements (2026-10-06)
 
