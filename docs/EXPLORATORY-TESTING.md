@@ -159,7 +159,8 @@ Do not walk the same path twice in a row. Each run, choose differently.
   The MCP server does not start on a folder with malformed JSON, and
   Studio names the file and saves nothing until it reads again.
 - The toolbar's Undo and Redo are covered by the search bar at 1440 px (a
-  known issue): use the keyboard or a wider window.
+  known issue): use the keyboard or a wider window. In headless Chromium
+  on macOS, Meta+Z does not reach Studio's undo: press Control+Z.
 - Use the real controls (buttons by their accessible name, mouse drags),
   as a user would. Reaching into the store proves nothing about the
   product. Type with real keys (`keyboard.type`, `pressSequentially`):
