@@ -1803,6 +1803,13 @@
     "targetId": "52d92a7d-1535-4dc9-ba1b-adef2f7a888c"
   },
   {
+    "description": "runs on the user's provider in Studio",
+    "id": "2a4f2f7a-d846-438c-b383-fd939a611cc3",
+    "relationType": "depends-on",
+    "sourceId": "942e9364-a1a5-450b-a153-741fe9b42e48",
+    "targetId": "ed0a90d5-2ada-4e1a-a534-2b77eb3860df"
+  },
+  {
     "id": "2a6db983-9899-4e57-a34e-fdb8db346e44",
     "relationType": "derives",
     "sourceId": "2922887c-b981-44de-a855-bcfd1205ef00",
@@ -2136,6 +2143,13 @@
     "relationType": "derives",
     "sourceId": "10e2526a-b37a-4c1e-86b7-d7d938ca64f7",
     "targetId": "83ee4096-d1a1-4876-948b-2cc58afc28db"
+  },
+  {
+    "description": "runs on the agent's model over MCP",
+    "id": "32754d4c-9af9-4d33-9bef-b071d69f11e2",
+    "relationType": "depends-on",
+    "sourceId": "942e9364-a1a5-450b-a153-741fe9b42e48",
+    "targetId": "64ca6112-45d2-4729-b17e-bcdb952da389"
   },
   {
     "id": "327aa6cb-b472-4200-a011-1219da5aa692",
@@ -2645,6 +2659,13 @@
     "relationType": "derives",
     "sourceId": "8a93c06a-1e5c-4360-b2c6-c16a367ffc97",
     "targetId": "b3833741-0a68-4714-9b2b-cd84c8de9331"
+  },
+  {
+    "description": "arranges the views of the model",
+    "id": "3e18813f-3e2b-4b1b-a1c6-67bb1d8d9151",
+    "relationType": "depends-on",
+    "sourceId": "04ded13f-e1a2-4f8a-9333-a2964708e377",
+    "targetId": "4dd09e43-c313-4300-b9f2-d9f937b789bf"
   },
   {
     "id": "3e45b219-48c0-4853-9421-4f08861d5695",
@@ -5431,6 +5452,13 @@
     "targetId": "48604bc7-944d-4bea-bf39-ec39a7b329b0"
   },
   {
+    "description": "keeps copies of the model and shows its views",
+    "id": "7ef3e770-91a0-4ed9-a8a2-ca7624a700d0",
+    "relationType": "depends-on",
+    "sourceId": "52d309eb-0fc1-4e14-b580-6c1e75e452e8",
+    "targetId": "4dd09e43-c313-4300-b9f2-d9f937b789bf"
+  },
+  {
     "id": "7f04037e-6e63-471b-bdb1-ec155ce24a53",
     "label": "uses the host contract of",
     "relationType": "interacts",
@@ -7253,6 +7281,13 @@
     "targetId": "685e5a06-ef77-4146-b553-bb39f42b3562"
   },
   {
+    "description": "edits the model through the shared tool catalogue",
+    "id": "aad40cd1-a4f6-4ae1-b9eb-64a845ab7d57",
+    "relationType": "depends-on",
+    "sourceId": "64ca6112-45d2-4729-b17e-bcdb952da389",
+    "targetId": "4dd09e43-c313-4300-b9f2-d9f937b789bf"
+  },
+  {
     "id": "aaec4a47-1bfa-46d4-ae5d-b92896ef9829",
     "relationType": "verifies",
     "sourceId": "0ed4271c-bfc7-45ba-a874-fc3340b339c9",
@@ -8965,6 +9000,13 @@
     "targetId": "b9eb64d3-73a7-4fb4-929b-38317f58956e"
   },
   {
+    "description": "edits the model through the shared tool catalogue",
+    "id": "d4076dbc-066c-4c77-aac1-df04a66367fb",
+    "relationType": "depends-on",
+    "sourceId": "ed0a90d5-2ada-4e1a-a534-2b77eb3860df",
+    "targetId": "4dd09e43-c313-4300-b9f2-d9f937b789bf"
+  },
+  {
     "id": "d411095c-494a-4d29-a941-7e72234fdc3c",
     "relationType": "derives",
     "sourceId": "a590d935-5ebb-42f7-a2ae-4606be15a0f1",
@@ -9102,6 +9144,13 @@
     "relationType": "traces-to",
     "sourceId": "c0eb2ce8-68fc-4204-b15a-cabd919ce575",
     "targetId": "8a2fb157-4bb6-4043-9748-42152f8cb625"
+  },
+  {
+    "description": "is kept and opened",
+    "id": "d63bcfca-0b49-4b41-a7d6-b51521cfc0dd",
+    "relationType": "depends-on",
+    "sourceId": "4dd09e43-c313-4300-b9f2-d9f937b789bf",
+    "targetId": "83d68252-97e0-4961-8541-4fb30e1dd772"
   },
   {
     "id": "d64ddb40-ebbb-4c34-b1b1-04d5b7947b73",
