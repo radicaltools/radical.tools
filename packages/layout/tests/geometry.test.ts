@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BATCH_CELL, createBatchPlacer, fitAncestors, fittedParentSize, placeNewNode } from '../src/geometry'
+import { BATCH_CELL, createBatchPlacer, fitAncestors, fittedParentSize, placeNewNode, placeUnplaced } from '../src/geometry'
 import { NODE_SIZES, type C4Node } from '@radical/common/c4'
 
 const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
@@ -84,5 +84,52 @@ describe('createBatchPlacer', () => {
     expect(place('sys')).toEqual({ x: 30 + BATCH_CELL.width, y: 120 })
     expect(place(undefined)).toEqual({ x: NODE_SIZES.system.width + 120, y: 0 })
     expect(createBatchPlacer(() => ({}))(undefined)).toEqual({ x: 0, y: 0 })
+  })
+})
+
+describe('placeUnplaced', () => {
+  const n = (id: string, type: string, x: number, y: number, width: number, height: number, parentId?: string): C4Node =>
+    ({ id, type, label: id, collapsed: false, x, y, width, height, ...(parentId ? { parentId } : {}) } as C4Node)
+  const canvas = (): Record<string, C4Node> => ({
+    shop: n('shop', 'system', 0, 0, 400, 520),
+    web: n('web', 'container', 60, 120, 240, 150, 'shop'),
+    api: n('api', 'container', 60, 320, 240, 150, 'shop'),
+    // Added on another canvas: still where that one had it.
+    search: n('search', 'container', 1040, 120, 240, 150, 'shop'),
+    part: n('part', 'component', 30, 110, 180, 60, 'search'),
+    mail: n('mail', 'system', -900, 4000, 300, 200),
+  })
+  const known = { shop: 1, web: 1, api: 1 }
+
+  it('puts a node the canvas has no place for beside its siblings, inside a parent refit for it', () => {
+    const nodes = canvas()
+    expect(placeUnplaced(nodes, known).sort()).toEqual(['mail', 'search'])
+    expect(nodes.search).toMatchObject({ x: 60 + 240 + 20, y: 120 })
+    expect(nodes.search.x + nodes.search.width).toBeLessThanOrEqual(nodes.shop.width)
+    // At the root: right of the root nodes, top-aligned with them.
+    expect(nodes.mail.y).toBe(0)
+    expect(nodes.mail.x).toBeGreaterThanOrEqual(nodes.shop.x + nodes.shop.width)
+    // What the canvas had placed stays.
+    expect(nodes.web).toMatchObject({ x: 60, y: 120 })
+    expect(nodes.api).toMatchObject({ x: 60, y: 320 })
+  })
+
+  it('leaves what is inside a node placed this way where it was in it', () => {
+    const nodes = canvas()
+    placeUnplaced(nodes, known)
+    expect(nodes.part).toMatchObject({ x: 30, y: 110 })
+  })
+
+  it('places only what a view shows', () => {
+    const nodes = canvas()
+    expect(placeUnplaced(nodes, known, new Set(['shop', 'web', 'api', 'search', 'part']))).toEqual(['search'])
+    expect(nodes.mail).toMatchObject({ x: -900, y: 4000 })
+  })
+
+  it('leaves a canvas with no positions at all alone', () => {
+    const nodes = canvas()
+    expect(placeUnplaced(nodes, {})).toEqual([])
+    expect(placeUnplaced(nodes, undefined)).toEqual([])
+    expect(nodes.search).toMatchObject({ x: 1040, y: 120 })
   })
 })

@@ -3,6 +3,7 @@ import {
   serializeToMdFolder,
   serializeToMdFolderWithPaths,
   deserializeFromMdFolder,
+  MalformedFolderFileError,
   isMdFolder,
   staleMdFolderFiles,
   MD_MANIFEST_FILE,
@@ -208,5 +209,45 @@ describe('md-folder ownership', () => {
       'docs/intro.md': '---\nid: "a"\ntype: "system"\n---\n', // outside nodes/
     }
     expect(staleMdFolderFiles(existing, next).sort()).toEqual(['hubTemplates.json', 'nodes/old-name.md'])
+  })
+})
+
+describe('a sidecar file that cannot be read', () => {
+  // Read as "no such file", a relations.json with a trailing comma (or git
+  // conflict markers, or caught half written) gave a model with no
+  // relations, and the next save removed the file as stale.
+  const model: DiagramData = {
+    nodes: [
+      { id: 'a', type: 'system', label: 'A', collapsed: false, x: 0, y: 0, width: 200, height: 100 },
+      { id: 'b', type: 'system', label: 'B', collapsed: false, x: 300, y: 0, width: 200, height: 100 },
+    ],
+    relations: [{ id: 'ab', sourceId: 'a', targetId: 'b', label: 'uses' }],
+    views: [{ id: 'v', name: 'View', nodeIds: [], positions: {} }],
+  }
+  const files = (): Record<string, string> => serializeToMdFolder(model, 'model')
+
+  for (const path of ['relations.json', 'views.json', '_layout.json']) {
+    it(`${path} with a trailing comma is an error that names the file`, () => {
+      const broken = files()
+      expect(broken[path]).toBeDefined()
+      broken[path] = broken[path].replace(/\]\s*$|\}\s*$/, (end) => `,${end}`)
+      expect(() => JSON.parse(broken[path])).toThrow()
+      expect(() => deserializeFromMdFolder(broken)).toThrow(MalformedFolderFileError)
+      expect(() => deserializeFromMdFolder(broken)).toThrow(path)
+    })
+  }
+
+  it('a file cut short, or emptied, the same', () => {
+    const cut = files()
+    cut['relations.json'] = cut['relations.json'].slice(0, 20)
+    expect(() => deserializeFromMdFolder(cut)).toThrow(/relations\.json/)
+    const empty = { ...files(), 'views.json': '' }
+    expect(() => deserializeFromMdFolder(empty)).toThrow(/views\.json/)
+  })
+
+  it('a folder without the file still reads as having none', () => {
+    const without = files()
+    delete without['relations.json']
+    expect(deserializeFromMdFolder(without).data.relations).toEqual([])
   })
 })

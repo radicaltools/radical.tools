@@ -273,6 +273,40 @@ describe('presentation edits in presenter mode persist (regression)', () => {
   })
 })
 
+describe('a slide added in Presenter while Designer shows a milestone', () => {
+  // Designer's nodes are parked on the way to Presenter. With a milestone
+  // shown they are the milestone's, and the save a slide asks for wrote them
+  // as the live model (65 elements became 11).
+  it('saves the live model, not the milestone', async () => {
+    const meta = documents.createLSDocument('slide-on-milestone', useDiagramStore.getState().saveDiagram())
+    documents.setActiveId(meta.id)
+    await new Promise((r) => setTimeout(r, 100))
+    const store = useDiagramStore.getState
+    store().setAppMode('designer')
+    const milestone = store().createSnapshot('Before')
+    const added = store().addNode({ type: 'system', label: 'Only in live', x: 0, y: 0, width: 200, height: 100, collapsed: false } as Omit<C4Node, 'id'>)
+    expect(added).not.toBe('')
+    await new Promise((r) => setTimeout(r, 600))
+    const live = (await documents.loadDocument(meta.id))!.nodes.map((n) => n.id).sort()
+    expect(live).toContain(added)
+
+    store().selectMilestone(milestone)
+    expect(store().c4Nodes[added]).toBeUndefined()
+    store().setAppMode('presenter')
+    store().addPresentationSlide('On the milestone')
+    await new Promise((r) => setTimeout(r, 600))
+    expect((await documents.loadDocument(meta.id))!.nodes.map((n) => n.id).sort()).toEqual(live)
+
+    // Any other save asked for while exploring, the same.
+    await ((window as any).__radicalFlushPersist as () => Promise<void>)()
+    expect((await documents.loadDocument(meta.id))!.nodes.map((n) => n.id).sort()).toEqual(live)
+
+    store().setAppMode('designer')
+    store().discardMilestoneChanges()
+    documents.deleteDocument(meta.id, { wipePayload: true })
+  })
+})
+
 describe('a layout made while exploring is not saved', () => {
   // Smart Layout asks for the document to be written at once (so a reload
   // right after it shows the layout). It did so in Viewer and Presenter

@@ -4,7 +4,7 @@
 // would swap the preset back in and drop the change. Tool schemas are built
 // from the metamodel, so callers rebuild them after these run.
 
-import { builtInC4Metamodel, type Metamodel, type NodeTypeDef, type PropertyDef, type RelationPair, type RelationTypeDef } from '../../metamodel'
+import { builtInC4Metamodel, propertyKeyProblem, type Metamodel, type NodeTypeDef, type PropertyDef, type RelationPair, type RelationTypeDef } from '../../metamodel'
 import { forkPresetMetamodel } from '../../model'
 import { fail, type ToolDef, type ToolHandler, type ToolResult, type ToolRunContext } from './types'
 
@@ -106,13 +106,15 @@ export function buildMetamodelToolDefs(): ToolDef[] {
   ]
 }
 
-function parseProperties(tool: string, raw: unknown): PropertyDef[] | string {
+function parseProperties(tool: string, raw: unknown, of: 'node' | 'relation'): PropertyDef[] | string {
   if (!Array.isArray(raw)) return `${tool}: properties must be an array`
   const seen = new Set<string>()
   const out: PropertyDef[] = []
   for (const [i, item] of raw.entries()) {
     const p = item as Partial<PropertyDef>
     if (typeof p?.key !== 'string' || !/^[a-z_][a-z0-9_]*$/i.test(p.key)) return `${tool}: property ${i + 1} needs a key (letters, digits, _)`
+    const reserved = propertyKeyProblem(p.key, of)
+    if (reserved) return `${tool}: property key ${reserved}`
     if (seen.has(p.key)) return `${tool}: duplicate property key "${p.key}"`
     seen.add(p.key)
     if (typeof p.label !== 'string' || !p.label.trim()) return `${tool}: property "${p.key}" needs a label`
@@ -177,7 +179,7 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       if (input.maxCount !== undefined && input.maxCount !== null && (typeof input.maxCount !== 'number' || input.maxCount < 1)) {
         return fail('upsert_node_type: maxCount must be a positive number or null')
       }
-      const properties = input.properties === undefined ? undefined : parseProperties('upsert_node_type', input.properties)
+      const properties = input.properties === undefined ? undefined : parseProperties('upsert_node_type', input.properties, 'node')
       if (typeof properties === 'string') return fail(properties)
 
       const { mm, note } = editable(current)
@@ -245,7 +247,7 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
           pairs.push({ from: pair.from, to: pair.to })
         }
       }
-      const properties = input.properties === undefined ? undefined : parseProperties('upsert_relation_type', input.properties)
+      const properties = input.properties === undefined ? undefined : parseProperties('upsert_relation_type', input.properties, 'relation')
       if (typeof properties === 'string') return fail(properties)
 
       const { mm, note } = editable(current)

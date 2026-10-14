@@ -54,6 +54,64 @@ test('undo and redo', async ({ page, studio }) => {
   await expect(studio.nodes).toHaveCount(4)
 })
 
+test('the undo keys in a text field are about the typing, not the model', async ({ page, studio }) => {
+  // The handler sat on the window and did not look at the focus: a typo
+  // "undone" while writing took back the model's last step instead.
+  await studio.addFromPalette('Software System', { x: 150, y: 750 })
+  await expect(studio.nodes).toHaveCount(4)
+  const search = page.getByPlaceholder(/^Search/)
+  await search.click()
+  await page.keyboard.type('boo')
+  await page.keyboard.press('ControlOrMeta+z')
+  await page.waitForTimeout(300)
+  await expect(studio.nodes).toHaveCount(4)
+  // Out of the field, they undo the model again.
+  await page.keyboard.press('Escape')
+  await studio.pane.click({ position: { x: 5, y: 5 } })
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(studio.nodes).toHaveCount(3)
+})
+
+for (const perspective of ['Viewer', 'Presenter']) {
+  test(`the undo keys take none of Designer's steps in ${perspective}`, async ({ page, studio }) => {
+    await studio.addFromPalette('Software System', { x: 150, y: 750 })
+    await expect(studio.nodes).toHaveCount(4)
+    await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
+    await page.getByRole('button', { name: perspective, exact: true }).click()
+    await studio.settle()
+    await studio.pane.click({ position: { x: 5, y: 5 } })
+    await page.keyboard.press('ControlOrMeta+z')
+    await page.waitForTimeout(600)
+    await expect(studio.nodes).toHaveCount(4)
+    expect((await studio.storedDoc()).nodes.length).toBe(7)
+    // The step is still Designer's to undo.
+    await page.getByRole('button', { name: 'Designer', exact: true }).click()
+    await studio.settle()
+    await expect(studio.nodes).toHaveCount(4)
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect(studio.nodes).toHaveCount(3)
+  })
+}
+
+test('the Parent field moves an element into its new parent, and refuses a loop', async ({ page, studio }) => {
+  await studio.open('canvas')
+  const parent = page.locator('.props-field').filter({ has: page.getByText('Parent', { exact: true }) }).locator('select')
+  await studio.node('payments').click()
+  await parent.selectOption({ label: 'Bookstore' })
+  await expect.poll(async () => (await studio.storedDoc()).nodes.find((n) => n.id === 'payments')?.parentId).toBe('bookstore')
+  // It lies inside Bookstore's frame (it kept its old offset and lay outside).
+  await studio.settle()
+  await expect.poll(async () => studio.layoutViolations()).toEqual([])
+
+  // Bookstore into its own child: the types allow a system in a system.
+  await studio.node('bookstore').click({ position: { x: 30, y: 12 } })
+  await expect(parent).toHaveValue('')
+  await parent.selectOption({ label: 'Payment Provider' })
+  await expect(page.getByText('Cannot move a node into itself or one of its descendants.').first()).toBeVisible()
+  await expect(studio.node('bookstore')).toBeVisible()
+  expect((await studio.storedDoc()).nodes.find((n) => n.id === 'bookstore')?.parentId).toBeUndefined()
+})
+
 test('delete an element', async ({ page, studio }) => {
   await studio.node('payments').click()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()

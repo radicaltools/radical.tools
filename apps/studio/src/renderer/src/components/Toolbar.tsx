@@ -507,6 +507,17 @@ function AppMenu({
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
+/** Input kinds that hold no text: Ctrl/Cmd+Z there is not about typing. */
+const NOT_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image'])
+
+/** Whether the key event comes from a field the user types text into. */
+function typingInTextField(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  if (!el || typeof el.tagName !== 'string') return false
+  if (el.isContentEditable || el.tagName === 'TEXTAREA') return true
+  return el.tagName === 'INPUT' && !NOT_TEXT_INPUTS.has((el as HTMLInputElement).type)
+}
+
 export function Toolbar(): React.ReactElement {
   const appMode = useDiagramStore((s) => s.appMode)
   const setAppMode = useDiagramStore((s) => s.setAppMode)
@@ -574,12 +585,19 @@ export function Toolbar(): React.ReactElement {
       }
       const mod = e.metaKey || e.ctrlKey
       if (!mod) return
-      if (e.key === 'z' && !e.shiftKey) {
+      const undoKey = e.key === 'z' && !e.shiftKey
+      const redoKey = (e.key === 'z' && e.shiftKey) || e.key === 'y'
+      if (undoKey || redoKey) {
+        // While a text field has the focus the keys are its own: they take
+        // back typing. Here they took back the model's last step instead (a
+        // typo "undone" in the wiki's writing line deleted the requirement
+        // written before it). And undo belongs to Designer: from Viewer or
+        // Presenter it took one of Designer's steps, unseen.
+        if (typingInTextField(e.target)) return
+        if (useDiagramStore.getState().appMode !== 'designer') return
         e.preventDefault()
-        useDiagramStore.getState().undo()
-      } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
-        e.preventDefault()
-        useDiagramStore.getState().redo()
+        if (undoKey) useDiagramStore.getState().undo()
+        else useDiagramStore.getState().redo()
       } else if ((e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') && (window as any).__radicalZoomIn) {
         // The canvas and the Flow view register zoom; elsewhere the browser zooms the page.
         e.preventDefault()

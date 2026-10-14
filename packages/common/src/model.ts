@@ -164,6 +164,12 @@ export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<
   const newType = (updates.type as string | undefined) ?? existing.type
   const newParentId = ('parentId' in updates ? (updates.parentId as string | null | undefined) : existing.parentId) ?? undefined
   const parent = newParentId ? state.c4Nodes[newParentId] : undefined
+  // A system may lie inside a system: the types alone allow a parent to be
+  // given its own child as parent, and the tree then has a loop that every
+  // walk up or down it never leaves.
+  if ('parentId' in updates && newParentId && (newParentId === id || descendantIds(id, state.c4Nodes).includes(newParentId))) {
+    return 'Cannot move a node into itself or one of its descendants.'
+  }
   if (!isPlacementAllowed(state.metamodel, newType, parent, state.c4Nodes)) {
     return `Cannot move ${typeLabel(state.metamodel, newType)} "${existing.label}" into ${placementError(state.metamodel, newType, parent, state.c4Nodes)}`
   }
@@ -249,6 +255,27 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
   }
 }
 
+/** Why a node cannot be removed with its children kept (they move one level
+ *  up, into its parent), or null. */
+export function checkUnwrap(state: ModelState, id: string): string | null {
+  const node = state.c4Nodes[id]
+  if (!node) return null
+  const mm = state.metamodel
+  const grandparent = node.parentId ? state.c4Nodes[node.parentId] : undefined
+  for (const child of Object.values(state.c4Nodes)) {
+    if (child.parentId !== id) continue
+    if (!isPlacementAllowed(mm, child.type, grandparent, state.c4Nodes)) {
+      return `Cannot unwrap: ${typeLabel(mm, child.type)} "${child.label}" is not allowed inside ${placementError(mm, child.type, grandparent, state.c4Nodes)}`
+    }
+    // A group is allowed almost anywhere; what it holds is not.
+    const misplaced = misplacedInGroup(state, child, grandparent)
+    if (misplaced) {
+      return `Cannot unwrap: Group "${child.label}" would be left where its ${typeLabel(mm, misplaced.type)} "${misplaced.label}" has no place. A group holds only what its place allows.`
+    }
+  }
+  return null
+}
+
 /** Removes the node, its descendants, their relations and every view
  *  reference to them. Returns the removed node ids. */
 export function deleteNode(state: ModelState, id: string): Set<string> {
@@ -285,6 +312,25 @@ export function checkRemoveNodeType(state: ModelState, typeId: string): string |
   const used = Object.values(state.c4Nodes).filter((n) => n.type === typeId).length
   if (!used) return null
   return `${used} ${used === 1 ? 'element is' : 'elements are'} still of type ${typeLabel(state.metamodel, typeId)}: retype or delete ${used === 1 ? 'it' : 'them'} first.`
+}
+
+/** Why the model's metamodel cannot be replaced by `next`: elements or
+ *  relations are of types it does not have (they would be left behind as
+ *  unknown types, with nothing in the editor to bring the types back). */
+export function checkReplaceMetamodel(state: ModelState, next: Metamodel): string | null {
+  const count = (items: string[]): Map<string, number> => {
+    const out = new Map<string, number>()
+    for (const t of items) out.set(t, (out.get(t) ?? 0) + 1)
+    return out
+  }
+  const nodeTypes = count(Object.values(state.c4Nodes).map((n) => n.type).filter((t) => !next.nodeTypes[t]))
+  const relationTypes = count(Object.values(state.c4Relations).flatMap((r) => r.relationType && !next.relationTypes[r.relationType] ? [r.relationType] : []))
+  if (nodeTypes.size === 0 && relationTypes.size === 0) return null
+  const parts = [
+    ...[...nodeTypes].map(([t, n]) => `${n} ${typeLabel(state.metamodel, t)}`),
+    ...[...relationTypes].map(([t, n]) => `${n} "${state.metamodel?.relationTypes[t]?.label ?? t}" ${n === 1 ? 'relation' : 'relations'}`),
+  ]
+  return `${next.name} has no type for what the model holds: ${parts.join(', ')}. Retype or delete them first.`
 }
 
 /** Why a relation type cannot be deleted from the metamodel: relations are

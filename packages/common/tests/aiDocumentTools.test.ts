@@ -67,6 +67,22 @@ describe('metamodel tools', () => {
     expect((await call('delete_node_type', { id: 'risk' })).resultText).toContain('still use')
   })
 
+  it('refuse a property keyed like a field every element or relation has', async () => {
+    // A property is a plain field of the element: keyed `type`, the
+    // properties panel edited the element's type with it.
+    const { facade, call } = setup()
+    for (const key of ['type', 'id', 'parentId', 'x', 'collapsed']) {
+      const res = await call('upsert_node_type', { id: 'risk', label: 'Risk', properties: [{ key, label: 'K', type: 'text' }] })
+      expect(res.ok, key).toBe(false)
+      expect(res.resultText).toContain(`"${key}" is a field every element has`)
+    }
+    expect(facade.getMetamodel!()!.nodeTypes.risk).toBeUndefined()
+    const rel = await call('upsert_relation_type', { id: 'r', label: 'R', allowedPairs: [], properties: [{ key: 'sourceId', label: 'K', type: 'text' }] })
+    expect(rel.resultText).toContain('"sourceId" is a field every relation has')
+    // A relation has no `type` or `x` of its own.
+    expect((await call('upsert_relation_type', { id: 'r', label: 'R', allowedPairs: [], properties: [{ key: 'type', label: 'K', type: 'text' }] })).ok).toBe(true)
+  })
+
   it('delete a custom type and its parent and pair references', async () => {
     const { facade, call } = setup()
     await call('upsert_node_type', { id: 'risk', label: 'Risk', allowedAtRoot: true })

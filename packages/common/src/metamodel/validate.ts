@@ -2,7 +2,7 @@
 
 import { C4Node, C4Relation } from '../c4'
 import { Metamodel, PropertyDef } from './types'
-import { GROUP_TYPE, hasPlaceUnder, placeOf } from './lookup'
+import { GROUP_TYPE, hasPlaceUnder, placeOf, propertyKeyProblem } from './lookup'
 import { validateStateMachines } from './statechart'
 import { validateDomainModel } from './domainModel'
 import { refIds, refProblem } from './refs'
@@ -113,6 +113,24 @@ export function validateModel(
         message: `Model has ${count} ${def.label} (maximum ${c.max}).`,
         nodeTypeId: def.id,
       })
+    }
+  }
+
+  // A property keyed like a field every element has would edit that field.
+  for (const def of Object.values(metamodel.nodeTypes)) {
+    for (const p of def.properties ?? []) {
+      const problem = propertyKeyProblem(p.key, 'node')
+      if (problem) {
+        issues.push({ id: `reserved-prop:${def.id}:${p.key}`, severity: 'error', message: `${def.label}: property key ${problem}`, nodeTypeId: def.id })
+      }
+    }
+  }
+  for (const def of Object.values(metamodel.relationTypes)) {
+    for (const p of def.properties ?? []) {
+      const problem = propertyKeyProblem(p.key, 'relation')
+      if (problem) {
+        issues.push({ id: `reserved-rel-prop:${def.id}:${p.key}`, severity: 'error', message: `Relation type "${def.label}": property key ${problem}` })
+      }
     }
   }
 

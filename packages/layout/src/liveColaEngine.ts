@@ -1072,6 +1072,8 @@ export class LiveColaEngine {
     for (const cn of this.colaNodes) {
       prevPos.set(cn.c4id, { x: cn.x, y: cn.y })
     }
+    // The open containers of the build before this one.
+    const prevGroups = new Set(this.colaGroups.map((g) => g.c4id))
 
     this.colaNodes = []
     this.idToNode.clear()
@@ -1475,7 +1477,14 @@ export class LiveColaEngine {
     // across rebuilds means a new node starts near its neighbours instead
     // of jumping in from the origin.
     const arrange = run === 'first' && this.colaNodes.length < WHOLE_DIAGRAM_MAX_NODES
-    const fresh = run === 'local' && prevPos.size > 0 ? leafNodes.filter((n) => !prevPos.has(n.id)).map((n) => n.id) : []
+    // A container that was collapsed since is a box now where it was a frame
+    // around others, and is not new: it shrinks where it stands. Taken for
+    // a new element, it freed the 40 elements nearest to it, reaching into
+    // other containers whose frames and other children stayed fixed (a
+    // model nested four levels deep never came to rest after one collapse).
+    const fresh = run === 'local' && prevPos.size > 0
+      ? leafNodes.filter((n) => !prevPos.has(n.id) && !prevGroups.has(n.id)).map((n) => n.id)
+      : []
     for (const id of free) if (this.idToNode.has(id) || this.idToGroup.has(id)) fresh.push(id)
     if (fresh.length) this.freezeAllBut(...fresh)
     try {

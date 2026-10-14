@@ -28,6 +28,23 @@ function showAllEdgeLabels(el: HTMLElement): () => void {
   }
 }
 
+/** What the view shown is drawn in: the canvas (also of a flow view), or
+ *  the page of a wiki, table, matrix or hierarchy view. Export looked for
+ *  the canvas only, so on those views PNG and SVG did nothing, with no
+ *  file and no notice. */
+const EXPORT_TARGETS = '.canvas-area, .wiki-view, .tv-wrap, .mx-wrap, .treemap-wrap-outer'
+
+function exportTarget(): HTMLElement | null {
+  const el = document.querySelector(EXPORT_TARGETS) as HTMLElement | null
+  if (!el) useDiagramStore.getState().pushNotification('There is nothing on screen to export.', 'warning')
+  return el
+}
+
+function exportFailed(err: unknown): void {
+  console.error('[Export]', err)
+  useDiagramStore.getState().pushNotification('The export failed: the view could not be drawn as an image.', 'error')
+}
+
 export function useExport(): {
   exportBusy: boolean
   exportAs: (format: 'png' | 'svg') => void
@@ -56,7 +73,7 @@ export function useExport(): {
   }, [activeDoc, activeViewId, views, activeSnapshotId, snapshots])
 
   const exportAs = useCallback((format: 'png' | 'svg') => {
-    const el = document.querySelector('.canvas-area') as HTMLElement | null
+    const el = exportTarget()
     if (!el) return
     setExportBusy(true)
     const restoreLabels = showAllEdgeLabels(el)
@@ -78,12 +95,12 @@ export function useExport(): {
       ? toPng(el, options).then((d) => fetch(d).then((r) => r.blob()).then((b) => downloadBlob(b, `${filename}.png`)))
       : toSvg(el, options).then((d) => fetch(d).then((r) => r.blob()).then((b) => downloadBlob(b, `${filename}.svg`)))
     run
-      .catch((err) => console.error('[Export]', err))
+      .catch(exportFailed)
       .finally(() => { restoreLabels(); setExportBusy(false) })
   }, [buildFilename])
 
   const copyToClipboard = useCallback(() => {
-    const el = document.querySelector('.canvas-area') as HTMLElement | null
+    const el = exportTarget()
     if (!el) return
     setExportBusy(true)
     const restoreLabels = showAllEdgeLabels(el)
@@ -106,7 +123,7 @@ export function useExport(): {
         const item = new ClipboardItem({ 'image/png': blob })
         return navigator.clipboard.write([item])
       })
-      .catch((err) => console.error('[Export] clipboard', err))
+      .catch(exportFailed)
       .finally(() => { restoreLabels(); setExportBusy(false) })
   }, [])
 

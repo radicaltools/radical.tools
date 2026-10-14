@@ -159,7 +159,7 @@
         </figure>
         <h3>Toolbar</h3>
         <ul>
-          <li><strong>Radical menu</strong> (logo, top-left) — <em>Manage models…</em>, <em>Import from Hub…</em>, <em>Metamodel editor…</em>, light/dark theme, Smart Fit, the connect key, <em>AI providers…</em> and export (PNG, SVG, copy to clipboard).</li>
+          <li><strong>Radical menu</strong> (logo, top-left) — <em>Manage models…</em>, <em>Import from Hub…</em>, <em>Metamodel editor…</em>, light/dark theme, Smart Fit, the connect key, <em>AI providers…</em> and export (PNG, SVG, copy to clipboard) of the view shown, whatever its kind.</li>
           <li><strong>Fit All</strong>, zoom out / in, <strong>Smart Layout</strong> (or <em>Tree Layout</em> when the view asks for it), Undo / Redo.</li>
           <li><strong>Quick Search</strong> (<kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>P</kbd>) — find any element, relation or view; doubles as the AI prompt.</li>
           <li><strong>Perspective switch</strong> — <em>Designer</em> edits, <em>Viewer</em> explores read-only, <em>Presenter</em> builds and plays slide decks.</li>
@@ -337,7 +337,7 @@
           <li><strong>Unwrap</strong> — remove a container but keep its children and their relations.</li>
           <li><strong>Align…</strong> — keep the elements in a row, a column or a grid on this canvas, optionally in the order you selected them (see <a href="#alignments">Alignments</a>). With a single container selected it reads <strong>Align children…</strong>.</li>
           <li><strong>Hide from view</strong> — take the elements out of the active view without touching the model.</li>
-          <li><strong>Delete</strong> — remove from the model (with children); <kbd>Delete</kbd> does the same. Everything is undoable with <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd>.</li>
+          <li><strong>Delete</strong> — remove from the model (with children); <kbd>Delete</kbd> does the same. Everything is undoable with <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd>, views and sequences included. Undo belongs to Designer: Viewer and Presenter have none, and in a text field the keys take back typing.</li>
         </ul>
       </section>
 
@@ -472,7 +472,7 @@
         <p>A drag is one undo step: <em>Undo</em> puts back everything it moved or pushed and takes off the pins it set.</p>
         <p>A dropped element is <strong>pinned</strong>: the live physics (below) leaves it where you put it from then on. Select it to see the pin at its corner; click the pin to unpin it. A view's pinned elements are listed in its properties, with a button that unpins them all. Running Smart Layout rearranges the whole canvas and unpins everything on it (<em>Undo</em> brings the pins back with the old positions); if it keeps the current layout, the pins stay.</p>
         <h3>Live physics</h3>
-        <p>A light force simulation keeps containers hugging their children and makes room when an element is added or a container expanded: the new elements and their surroundings move, the rest of the diagram stays where it is. A diagram you open, a view you switch to and a layout Smart Layout just made are left exactly as they are. An element whose only relations go to expanded containers is drawn back next to them when the physics runs, if there is free room on the way. Hold <kbd>⌘</kbd>/<kbd>Ctrl</kbd> as you start a drag to let the physics nudge neighbours out of the way while you drag; the node you hold stays where you put it, and pinned elements do not move.</p>
+        <p>A light force simulation keeps containers hugging their children and makes room when an element is added or a container expanded: the new elements and their surroundings move, the rest of the diagram stays where it is. A container that is collapsed shrinks where it stands, and nothing around it moves. A diagram you open, a view you switch to and a layout Smart Layout just made are left exactly as they are. An element whose only relations go to expanded containers is drawn back next to them when the physics runs, if there is free room on the way. Hold <kbd>⌘</kbd>/<kbd>Ctrl</kbd> as you start a drag to let the physics nudge neighbours out of the way while you drag; the node you hold stays where you put it, and pinned elements do not move.</p>
         <h3 id="alignments">Alignments</h3>
         <p>Select two or more elements and choose <strong>Align… → Keep in a row</strong> (centres on one horizontal line) or <strong>Keep in a column</strong> (one vertical line). The rule belongs to the canvas you made it on — <em>All elements</em> or one view — and every layout keeps it: drag one member — or an element inside a member container, which grows or shrinks it — and the others follow, the live physics holds the line, Smart Layout picks its best arrangement with the alignment applied. Members may sit in different containers, and expanded containers can be aligned by their boxes.</p>
         <p>With <strong>Keep their order</strong> ticked in the same menu (the default; Studio remembers your choice) the elements also keep the order you selected them in, left to right or top to bottom — select them right to left and the row swaps them round. Drag one past its neighbour and the neighbour is pushed ahead, and Smart Layout never swaps them. Dashed guides show each alignment, with arrowheads when the order is kept; select a member to get buttons that switch order-keeping and remove the alignment, or use <em>Align… → Stop keeping aligned</em>. A view's alignments are also listed in its properties, each with an <em>in order</em> switch (the order they are listed in, which is the order they were selected in).</p>
@@ -503,6 +503,7 @@
           <li><strong>Diff</strong> — the toggle on the chip colours what changed since the previous milestone: added, changed, and removed elements drawn as ghosts. Flow views show removed steps the same way.</li>
           <li><strong>Editing in the past</strong> — if you change something while a milestone is active you are asked what you meant: <em>propagate</em> the change to that milestone and every later one, <em>save as a new milestone</em> right after it, or <em>discard</em>.</li>
           <li><strong>Slides</strong> can be pinned to a milestone, so a presentation can tell the story in order.</li>
+          <li><strong>Restore to live</strong> — in a milestone's properties (hover its card): the milestone becomes the live model, and no milestone is shown. It is one undo step; the milestones themselves stay as they are.</li>
         </ul>
       </section>
 
@@ -514,7 +515,7 @@
           <figcaption>Viewer: everything you can do in Designer to <em>look</em>, nothing that changes the saved model.</figcaption>
         </figure>
         <p>
-          <strong>Viewer</strong> is a sandbox. Every view opens with the layout it has in Designer; drag, collapse, re-layout, switch views and milestones — all of it is thrown away when you return to Designer, so you can explore freely in front of others. It is also the perspective the <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a> uses to show concepts.
+          <strong>Viewer</strong> is a sandbox. Every view opens with the layout it has in Designer; drag, collapse, re-layout, switch views and milestones — all of it is thrown away when you return to Designer (which shows the milestone, or the live model, it showed before), so you can explore freely in front of others. It is also the perspective the <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a> uses to show concepts.
         </p>
         <figure class="doc-shot">
           <img class="shot-light" src="screenshots/presenter-light.png" alt="Presenter perspective: the slide dock along the bottom lists the Architecture Walkthrough slides with Present and Add slide buttons" loading="lazy" />
@@ -930,6 +931,9 @@ codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.
 └─ _layout.json               <span class="cm"># positions, camera &amp; All-elements alignments — the only noisy file</span></code></pre>
         <p>
           Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the element's properties, sorted) and the description as body. Hierarchy is the directory tree. Output is deterministic — sorted keys, stable file names — so Git diffs show what changed and nothing else. Edit the files by hand, or let an agent edit them through the <a href="#mcp">MCP server</a>; the app picks them up.
+        </p>
+        <p>
+          A JSON file that cannot be read (a trailing comma, Git conflict markers) is not taken for an empty one: Studio says which file it is, keeps the model that was on screen, and saves nothing to the folder until the file reads again. The MCP server refuses such a folder with the same message.
         </p>
       </section>
 

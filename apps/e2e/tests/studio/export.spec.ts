@@ -47,3 +47,19 @@ test('an export zoomed out keeps the relation labels the canvas hides', async ({
   // The canvas hides them again afterwards.
   await expect(studio.canvas).toHaveAttribute('data-edge-labels', 'none')
 })
+
+test.describe('views without a canvas', () => {
+  // Export looked for the canvas only: on a table, wiki, matrix or
+  // hierarchy view the menu items did nothing, with no file and no notice.
+  test('a table view is exported too', async ({ page, studio }) => {
+    await studio.open('v-table')
+    await expect(page.locator('tbody tr').first()).toBeVisible()
+    const png = await exportAs(page, 'Export as PNG…')
+    expect(png.name).toMatch(/Element Table\.png$/)
+    expect(png.data.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    expect(png.data.readUInt32BE(16)).toBeGreaterThan(200)
+    const svg = (await exportAs(page, 'Export as SVG…')).data.toString('utf8')
+    expect(svg).toMatch(/^<svg[\s>]/)
+    expect(svg).toContain('Payment Provider')
+  })
+})

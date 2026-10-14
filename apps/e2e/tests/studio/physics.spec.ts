@@ -443,3 +443,109 @@ test.describe('All elements keeps its own layout', () => {
     expect(await studio.layoutViolations()).toEqual([])
   })
 })
+
+test('an element grabbed right after a view opens stays under the pointer', async ({ page, studio }) => {
+  // Smart fit refits the camera every frame for a moment after a view
+  // opens, and a drag counted as "the layout moves": the camera zoomed out
+  // under the pointer, which carried the element further (60×120 px of
+  // mouse travel moved an element some 2 000 px). A drag takes the camera.
+  await studio.seed()
+  await page.goto(`/#/d/${encodeURIComponent('ls:e2e-doc')}/m/designer/v/v-containers`)
+  const node = studio.node('payments')
+  await expect(node).toBeVisible()
+  await expect(page.locator('.autofit-active')).toHaveCount(1)
+  // Inside the window in which the view is still being fitted.
+  await page.waitForTimeout(250)
+  const before = (await node.boundingBox())!
+  const from = { x: before.x + before.width / 2, y: before.y + before.height / 2 }
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  for (let i = 1; i <= 12; i++) {
+    await page.mouse.move(from.x + 5 * i, from.y + 10 * i)
+    await page.waitForTimeout(25)
+  }
+  await page.mouse.up()
+  await page.waitForTimeout(800)
+  const after = (await node.boundingBox())!
+  // Where the pointer let go of it, give or take the snap of a drop.
+  expect(Math.abs(after.x + after.width / 2 - (from.x + 60))).toBeLessThan(40)
+  expect(Math.abs(after.y + after.height / 2 - (from.y + 120))).toBeLessThan(40)
+  expect(after.width).toBeGreaterThan(before.width * 0.8)
+})
+
+test.describe('Quick Search shows what it finds', () => {
+  const search = async (page: Page, studio: Studio, text: string): Promise<void> => {
+    await page.getByPlaceholder(/^Search/).click()
+    await page.keyboard.type(text)
+    await page.waitForTimeout(500)
+    await page.keyboard.press('Enter')
+    await studio.settle()
+  }
+
+  test('a container collapsed on All elements and open in the view stays open', async ({ page, studio }) => {
+    // It looked at the element's own "collapsed", and collapse is per view:
+    // the toggle meant to open the container closed it in the view, hid the
+    // element it had found, and saved that.
+    await studio.seed()
+    await studio.open('canvas')
+    await studio.node('bookstore').locator('.c4-node-collapse-btn').first().click()
+    await expect(studio.node('db')).toHaveCount(0)
+    await studio.open('v-containers')
+    await studio.node('bookstore').locator('.c4-node-collapse-btn').first().click()
+    await expect(studio.node('db')).toBeVisible()
+    await page.waitForTimeout(1000) // the autosave
+
+    await search(page, studio, 'Orders DB')
+    await expect(studio.node('db')).toBeVisible()
+    await page.waitForTimeout(1000)
+    const view = (JSON.parse(await studio.storedJson()) as { views: Array<{ id: string; collapsedNodeIds?: string[] }> })
+      .views.find((v) => v.id === 'v-containers')!
+    expect(view.collapsedNodeIds ?? []).toEqual([])
+  })
+
+  test('a container collapsed in the view is opened', async ({ page, studio }) => {
+    await studio.seed()
+    await studio.open('v-containers')
+    await studio.node('bookstore').locator('.c4-node-collapse-btn').first().click()
+    await expect(studio.node('db')).toHaveCount(0)
+    await search(page, studio, 'Orders DB')
+    await expect(studio.node('db')).toBeVisible()
+  })
+})
+
+test('a milestone picked in Viewer is not the one Designer edits', async ({ page, studio }) => {
+  // Leaving Designer set aside the nodes but not which milestone is shown:
+  // back in Designer the live model was on the canvas under the milestone's
+  // name, and a drag followed by "Propagate" copied it over every milestone.
+  await studio.seed()
+  await studio.open('canvas')
+  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('button', { name: 'New milestone' }).click()
+  await page.getByPlaceholder('Milestone name…').fill('Before')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.lp-snap-card', { hasText: 'Before' })).toBeVisible()
+  // The live model moves on (the panel is an accordion: back to the palette).
+  await page.locator('.lp-section-header', { hasText: 'Elements' }).click()
+  await studio.addFromPalette('Software System', { x: 150, y: 750 })
+  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
+  const milestoneSize = async (): Promise<number> =>
+    (JSON.parse(await studio.storedJson()) as { snapshots: Array<{ nodes: Record<string, unknown> }> }).snapshots.map((s) => Object.keys(s.nodes).length)[0]
+  expect(await milestoneSize()).toBe(6)
+
+  await page.getByRole('button', { name: 'Viewer', exact: true }).click()
+  await studio.settle()
+  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'Before' }).click()
+  await expect(studio.nodes).toHaveCount(6)
+
+  await page.getByRole('button', { name: 'Designer', exact: true }).click()
+  await studio.settle()
+  await expect(studio.nodes).toHaveCount(7)
+  await expect(page).not.toHaveURL(/\/s\//)
+  // An edit of the live model asks nothing about a milestone.
+  await dragBy(page, studio.node('customer'), 40, 20)
+  await page.waitForTimeout(1200)
+  await expect(page.locator('.milestone-modal')).toHaveCount(0)
+  expect((await studio.storedDoc()).nodes.length).toBe(7)
+  expect(await milestoneSize()).toBe(6)
+})

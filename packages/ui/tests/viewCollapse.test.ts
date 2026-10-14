@@ -290,3 +290,55 @@ describe('view-filter parent without children', () => {
     expect(rfSys1!.data.hasChildren).toBe(true)
   })
 })
+
+describe('showing an element that is searched for (expandAncestors)', () => {
+  // Quick Search opens the containers around what it finds. It looked at
+  // the element's own `collapsed`, and collapse is per view: a container
+  // collapsed on All elements and open in the view was "expanded" by a
+  // toggle that closed it there (hiding the element found, and saved), and a
+  // container closed in the view only was left closed.
+  const viewWith = (): string => {
+    const store = useDiagramStore.getState()
+    const vid = store.addView('Search view')
+    for (const id of ['sys1', 'ctn1', 'ctn2']) store.addNodeToView(vid, id)
+    return vid
+  }
+  const shown = (id: string): boolean => useDiagramStore.getState().rfNodes.find((n) => n.id === id)?.hidden !== true
+
+  it('leaves a container open that is collapsed on All elements but open in the view', () => {
+    useDiagramStore.getState().toggleCollapse('sys1') // on All elements
+    expect(useDiagramStore.getState().c4Nodes.sys1.collapsed).toBe(true)
+    const vid = viewWith()
+    useDiagramStore.getState().setActiveView(vid)
+    useDiagramStore.getState().toggleCollapse('sys1') // open in the view
+    expect(shown('ctn1')).toBe(true)
+
+    useDiagramStore.getState().expandAncestors('ctn1')
+    expect(shown('ctn1')).toBe(true)
+    expect(useDiagramStore.getState().views[vid].collapsedNodeIds ?? []).not.toContain('sys1')
+  })
+
+  it('opens a container that is collapsed in the view only', () => {
+    const vid = viewWith()
+    useDiagramStore.getState().setActiveView(vid)
+    useDiagramStore.getState().toggleCollapse('sys1')
+    expect(useDiagramStore.getState().views[vid].collapsedNodeIds).toContain('sys1')
+    expect(shown('ctn1')).toBe(false)
+
+    useDiagramStore.getState().expandAncestors('ctn1')
+    expect(shown('ctn1')).toBe(true)
+  })
+
+  it('is one undo step however many containers it opens', () => {
+    const store = useDiagramStore.getState
+    store().toggleCollapse('ctn1')
+    store().toggleCollapse('sys1')
+    const child = Object.values(store().c4Nodes).find((n) => n.parentId === 'ctn1')
+    if (!child) return // the sample has no component under ctn1
+    store().expandAncestors(child.id)
+    expect(shown(child.id)).toBe(true)
+    store().undo()
+    expect(store().c4Nodes.sys1.collapsed).toBe(true)
+    expect(store().c4Nodes.ctn1.collapsed).toBe(true)
+  })
+})

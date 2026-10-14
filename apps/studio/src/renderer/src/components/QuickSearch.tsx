@@ -29,7 +29,6 @@ export function QuickSearch(): React.ReactElement | null {
   const views = useDiagramStore((s) => s.views)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
-  const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
   const selectNode = useDiagramStore((s) => s.selectNode)
   const selectEdge = useDiagramStore((s) => s.selectEdge)
   const setSelectedNodeIds = useDiagramStore((s) => s.setSelectedNodeIds)
@@ -374,24 +373,9 @@ export function QuickSearch(): React.ReactElement | null {
   useEffect(() => { setHover(0) }, [q])
 
 
-  // Walk the parent chain from outermost ancestor downward to the target's
-  // direct parent and expand any that are currently collapsed. Outermost
-  // first so each toggleCollapse call's auto-fit math runs against an
-  // already-expanded outer container.
-  const expandAncestors = (nodeId: string): void => {
-    const chain: string[] = []
-    let cur: string | undefined = c4Nodes[nodeId]?.parentId
-    const seen = new Set<string>()
-    while (cur && !seen.has(cur)) {
-      seen.add(cur)
-      chain.push(cur)
-      cur = c4Nodes[cur]?.parentId
-    }
-    chain.reverse()
-    for (const id of chain) {
-      if (c4Nodes[id]?.collapsed) toggleCollapse(id)
-    }
-  }
+  // Open the containers around the target that the view shown has
+  // collapsed (the store decides per view, see expandAncestors).
+  const expandAncestors = (nodeId: string): void => useDiagramStore.getState().expandAncestors(nodeId)
 
   // `viewOverride` lets the caller decide where to open the result:
   //   undefined  → smart pick (current view if it has the node, else any view containing it)
