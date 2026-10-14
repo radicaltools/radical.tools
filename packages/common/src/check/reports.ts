@@ -147,3 +147,25 @@ export function findTests(id: TestId, cases: TestCase[]): { fileSeen: boolean; m
  *  passed when one passed, otherwise skipped. */
 export const outcomeOf = (matches: TestCase[]): TestStatus =>
   matches.some((c) => c.status === 'failed') ? 'failed' : matches.some((c) => c.status === 'passed') ? 'passed' : 'skipped'
+
+const globCache = new Map<string, RegExp>()
+
+/** Where a glob over repository paths (`apps/e2e/**`, `**\/*.spec.ts`)
+ *  matches `file`, which a report may name absolutely: the file cut to the
+ *  matched part (`apps/e2e/tests/a.spec.ts`), or null. */
+export function globMatch(glob: string, file: string): string | null {
+  let re = globCache.get(glob)
+  if (!re) {
+    // A directory (`apps/e2e/`) holds every file under it.
+    const pattern = normalize(glob).replace(/\/+$/, (slash) => slash ? '/**' : '')
+    const body = pattern.split(/(\*\*\/?|\*|\?)/).map((part) =>
+      part === '**/' ? '(?:[^/]+/)*' : part === '**' ? '.*' : part === '*' ? '[^/]*' : part === '?' ? '[^/]' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&')).join('')
+    re = new RegExp(`(?:^|/)(${body})$`)
+    globCache.set(glob, re)
+  }
+  const m = re.exec(normalize(file))
+  if (!m) return null
+  // A glob that starts anywhere (`**/…`) has no root to cut the path to.
+  return glob.startsWith('**') ? normalize(file) : m[1]
+}
+

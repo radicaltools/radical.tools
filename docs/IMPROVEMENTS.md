@@ -2066,9 +2066,15 @@ requirements and 8 ADRs verified, no errors. Still open:
    open: markers on the cards in Designer and a "Check" section in the
    properties panel; the metamodel editor's Validation list moving into the
    Inspector; an MCP `run_check` tool for agents.
-4. **A renamed test needs its id renamed in the model.** Ids match titles;
+4. **Tests no scenario names** (`test-unbound`, 2026-10-14). On
+   `architecture/` with `include: apps/e2e/**`: 86 of 157 e2e tests in 21
+   files, among them every test of runs-13-24.spec.ts, wiki.spec.ts,
+   metamodel-editor.spec.ts and hub-import.spec.ts. An agent could draft
+   the missing scenarios from the titles and the test code over MCP, as the
+   first requirements of architecture/ were reverse-engineered.
+5. **A renamed test needs its id renamed in the model.** Ids match titles;
    a rename shows as test-not-found in the next run, never silently.
-5. **Drift.** Compare the containers' relations with the workspaces'
+6. **Drift.** Compare the containers' relations with the workspaces'
    dependencies and imports.
-6. **`radical mcp` and publishing.** Serve the MCP server as a subcommand
+7. **`radical mcp` and publishing.** Serve the MCP server as a subcommand
    too, and publish @radicaltools/cli the way the MCP server is published.

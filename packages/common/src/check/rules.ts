@@ -10,7 +10,7 @@
 import type { C4Node, C4Relation } from '../c4'
 import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamodel } from '../metamodel'
 import { linkedNodes, testIdsOf, testOutcomes, TESTED_TYPES, type TestOutcome } from './evidence'
-import type { TestCase } from './reports'
+import { findTests, globMatch, type TestCase } from './reports'
 
 export type CheckSeverity = 'error' | 'warning'
 
@@ -28,6 +28,12 @@ export interface RuleFinding {
   /** Other elements the finding is about: what a failed test leaves
    *  unverified. Studio links them. */
   relatedIds?: string[]
+  /** A test file the finding is about, as the reports name it but cut to
+   *  the repository path the rule's `include` matched. */
+  testFile?: string
+  /** Lines that belong to the finding, such as the titles of the tests it
+   *  counts. */
+  details?: string[]
 }
 
 export interface CheckModel {
@@ -36,6 +42,8 @@ export interface CheckModel {
   metamodel: Metamodel
   /** The test cases of the reports passed in; the test rules run only with them. */
   tests?: TestCase[]
+  /** The config's rule settings, for rules that take options. */
+  settings?: Record<string, import('./index').RuleSetting>
 }
 
 export interface CheckRule {
@@ -265,4 +273,41 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'warning',
     run: testRule('not-run', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: no report has the file of test ${id}.`),
   },
+  {
+    id: 'test-unbound',
+    description: 'With --report and an include in check.json: every test in the files it includes is named by a scenario or a fitness function, by its title or its describe block (a whole file or directory does not count). One finding per test file.',
+    severity: 'warning',
+    run: unboundTests,
+  },
 ]
+
+/** The tests in the files a project includes that no scenario or fitness
+ *  function names precisely. A file or directory a fitness function names
+ *  as a whole (`apps/e2e/tests`) is an umbrella over many behaviours and
+ *  covers none of them. */
+function unboundTests(model: CheckModel): RuleFinding[] {
+  const setting = model.settings?.['test-unbound']
+  if (!model.tests || typeof setting !== 'object' || !setting.include?.length) return []
+  const include = setting.include
+  const exclude = setting.exclude ?? []
+  const bound = new Set<TestCase>()
+  for (const node of Object.values(model.nodes)) {
+    if (!(TESTED_TYPES as readonly string[]).includes(node.type)) continue
+    for (const id of testIdsOf(node)) if (id.title.length) findTests(id, model.tests).matches.forEach((c) => bound.add(c))
+  }
+  const byFile = new Map<string, { total: number; unbound: string[] }>()
+  for (const c of model.tests) {
+    const file = include.map((g) => globMatch(g, c.file)).find((m) => m !== null)
+    if (file === undefined || exclude.some((g) => globMatch(g, c.file) !== null)) continue
+    const entry = byFile.get(file) ?? { total: 0, unbound: [] }
+    entry.total++
+    if (!bound.has(c)) entry.unbound.push(c.title.join(' › '))
+    byFile.set(file, entry)
+  }
+  return [...byFile].filter(([, e]) => e.unbound.length).sort(([a], [b]) => a.localeCompare(b)).map(([file, e]) => ({
+    testFile: file,
+    message: `${file}: ${e.unbound.length} of ${e.total} test${e.total === 1 ? '' : 's'} named by no scenario or fitness function.`,
+    details: e.unbound,
+  }))
+}
+

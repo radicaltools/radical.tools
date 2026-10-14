@@ -49,6 +49,20 @@ check, so an existing model can adopt a rule before every gap is closed.
 `--ratchet` lowers each `max` to the count found now and writes the config
 back; it never raises one.
 
+### Tests no scenario names
+
+`test-unbound` lists, per test file, the tests no scenario or fitness function
+names. It looks only at the files its `include` matches, so that unit tests of
+internals stay out of it; a scenario has to name a test by its title or its
+describe block, since a fitness function that names a whole file or directory
+(`apps/e2e/tests`) is an umbrella over many behaviours:
+
+```json
+{ "rules": { "test-unbound": { "severity": "warning", "include": ["apps/e2e/**"], "exclude": ["**/known-issues.spec.ts"] } } }
+```
+
+`--verbose` and the Inspector list the titles of those tests.
+
 ### Tests and evidence
 
 A scenario or a fitness function names the tests that run it in its `tests`

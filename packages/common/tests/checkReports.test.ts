@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { checkModel, formatCheckText, parseCheckConfig, parseTestIds, parseTestReport, parseTestResults, runCheck, serializeTestResults, type TestCase } from '../src/check'
-import { findTests } from '../src/check/reports'
+import { checkModel, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestIds, parseTestReport, parseTestResults, runCheck, serializeTestResults, type TestCase } from '../src/check'
+import { findTests, globMatch } from '../src/check/reports'
 import { serializeToMdFolderWithPaths } from '../src/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
@@ -220,6 +220,62 @@ describe('radical check on a model in memory, and the files beside it', () => {
     expect(parseCheckConfig('{"rules":{"metamodel":"error"}}')).toEqual({ rules: { metamodel: 'error' } })
     expect(() => parseCheckConfig('[]')).toThrow('a config is a JSON object')
     expect(() => parseCheckConfig('{"rules":[]}')).toThrow('"rules" is an object of rule settings')
+  })
+})
+
+describe('test-unbound', () => {
+  const unbound = (data: DiagramData, setting?: unknown) => {
+    const config = setting === undefined ? {} : { rules: { 'test-unbound': setting as never } }
+    return runCheck(serializeToMdFolderWithPaths(data, 'T').files, config, { tests }).findings.filter((f) => f.rule === 'test-unbound')
+  }
+
+  it('finds nothing unless the project includes test files', () => {
+    expect(unbound(model())).toEqual([])
+    expect(unbound(model(), 'warning')).toEqual([])
+  })
+
+  it('counts per file the tests no element names by title or describe block; a whole file or directory covers none', () => {
+    const data = model()
+    // An umbrella over the whole e2e suite, as "E2E regression" has.
+    data.nodes.push(node('ff-all', 'fitness-fn', 'All e2e', { threshold: 't', tests: 'apps/e2e/tests' }))
+    const [finding] = unbound(data, { include: ['apps/e2e/**'] })
+    // The fitness function "Guard" names one test of the four precisely.
+    expect(finding).toMatchObject({
+      severity: 'warning',
+      testFile: 'apps/e2e/tests/studio/boot.spec.ts',
+      message: 'apps/e2e/tests/studio/boot.spec.ts: 3 of 4 tests named by no scenario or fitness function.',
+      details: ['boots', 'Forge › files stages', 'Forge › is flaky'],
+    })
+    expect(finding.nodeId).toBeUndefined()
+  })
+
+  it('takes a describe block as naming the tests in it, and leaves excluded files out', () => {
+    const data = model()
+    data.nodes.push(node('sc-forge', 'scenario', 'Forge', { given: 'g', when: 'w', then: 't', tests: 'apps/e2e/tests/studio/boot.spec.ts › Forge' }))
+    expect(unbound(data, { include: ['apps/e2e/'] }).map((f) => f.details)).toEqual([['boots']])
+    expect(unbound(data, { include: ['apps/e2e/**'], exclude: ['**/boot.spec.ts'] })).toEqual([])
+    // The unit tests are no part of it unless included.
+    expect(unbound(data, { include: ['apps/cli/**'] }).map((f) => f.testFile)).toEqual(['apps/cli/src/cli.test.ts'])
+  })
+
+  it('is listed with the test file in the text and as a GitHub annotation on it', () => {
+    const data = model()
+    const result = runCheck(serializeToMdFolderWithPaths(data, 'T').files, { rules: { 'test-unbound': { include: ['apps/e2e/**'] } } }, { tests })
+    expect(formatCheckText(result, { folder: 'm', verbose: true })).toContain(
+      '    warning  apps/e2e/tests/studio/boot.spec.ts: 3 of 4 tests named by no scenario or fitness function.\n               boots\n')
+    // As an error, so the cap on warning annotations does not drop it.
+    const strict = runCheck(serializeToMdFolderWithPaths(data, 'T').files, { rules: { 'test-unbound': { severity: 'error', include: ['apps/e2e/**'] } } }, { tests })
+    expect(formatCheckGithub(strict, { folder: 'm' })).toContain('::error file=apps/e2e/tests/studio/boot.spec.ts,title=radical check%3A test-unbound::')
+  })
+
+  it('matches globs over repository paths against the paths reports give', () => {
+    expect(globMatch('apps/e2e/**', '/repo/apps/e2e/tests/a.spec.ts')).toBe('apps/e2e/tests/a.spec.ts')
+    expect(globMatch('apps/e2e/', '/__w/r/r/apps/e2e/b.spec.ts')).toBe('apps/e2e/b.spec.ts')
+    expect(globMatch('apps/*/tests/*.ts', '/repo/apps/e2e/tests/d.ts')).toBe('apps/e2e/tests/d.ts')
+    expect(globMatch('apps/*/tests/*.ts', '/repo/apps/e2e/tests/sub/d.ts')).toBeNull()
+    expect(globMatch('apps/e2e/**', '/repo/apps/e2e2/x.ts')).toBeNull()
+    expect(globMatch('**/*.spec.ts', '/repo/x/c.spec.ts')).toBe('/repo/x/c.spec.ts')
+    expect(globMatch('tests/a.b.ts', 'tests/aXb.ts')).toBeNull()
   })
 })
 

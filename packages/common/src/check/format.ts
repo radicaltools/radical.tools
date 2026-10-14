@@ -16,7 +16,7 @@ const join = (folder: string, path: string): string =>
   folder === '.' || folder === '' ? path : `${folder.replace(/\/+$/, '')}/${path}`
 
 const where = (f: CheckFinding, folder: string): string =>
-  f.path ? join(folder, f.path) : f.nodeId ? `node ${f.nodeId}` : f.relationId ? `relation ${f.relationId}` : folder
+  f.testFile ?? (f.path ? join(folder, f.path) : f.nodeId ? `node ${f.nodeId}` : f.relationId ? `relation ${f.relationId}` : folder)
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 
@@ -31,7 +31,12 @@ export function formatCheckText(result: CheckResult, options: FormatOptions): st
     lines.push(`${mark} ${rule.id}  ${rule.count}${rule.max !== undefined ? ` (max ${rule.max})` : ''}`)
     const list = result.findings.filter((f) => f.key === rule.id)
     const shown = options.verbose ? list : list.filter((f, i) => f.severity === 'error' || i < WARNINGS_SHOWN)
-    for (const f of shown) lines.push(`    ${f.severity === 'error' ? 'error  ' : 'warning'}  ${where(f, options.folder)}  ${f.message}`)
+    for (const f of shown) {
+      // A finding about a test file names it at the start of its message.
+      const at = f.testFile ? '' : `${where(f, options.folder)}  `
+      lines.push(`    ${f.severity === 'error' ? 'error  ' : 'warning'}  ${at}${f.message}`)
+      if (options.verbose) for (const detail of f.details ?? []) lines.push(`               ${detail}`)
+    }
     if (shown.length < list.length) lines.push(`    … ${list.length - shown.length} more (--verbose shows them)`)
   }
   if (result.evidence) lines.push('', ...evidenceSummary(result))
@@ -49,7 +54,8 @@ export function formatCheckGithub(result: CheckResult, options: FormatOptions): 
   let warnings = 0
   for (const f of result.findings) {
     if (f.severity === 'warning' && ++warnings > 10) continue
-    const file = f.path ? `file=${prop(join(options.folder, f.path))},` : ''
+    const path = f.testFile ?? (f.path ? join(options.folder, f.path) : undefined)
+    const file = path ? `file=${prop(path)},` : ''
     lines.push(`::${f.severity} ${file}title=${prop(`radical check: ${f.rule}${f.code ? `/${f.code}` : ''}`)}::${escape(f.message)}`)
   }
   return [...lines, formatCheckText(result, options)].join('\n')
