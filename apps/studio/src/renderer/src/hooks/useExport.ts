@@ -17,15 +17,23 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /** Zoomed out, the canvas hides relation labels it is too small to read
- *  (data-edge-labels, see Canvas). An export is read at its own size, so it
- *  shows them all; returns the undo. */
-function showAllEdgeLabels(el: HTMLElement): () => void {
+ *  (data-edge-labels, see Canvas), and does not place them. An export is
+ *  read at its own size, so it shows them all, placed: resolves, once the
+ *  edges have drawn them, with the undo. */
+function showAllEdgeLabels(el: HTMLElement): Promise<() => void> {
   const detail = el.dataset.edgeLabels
   el.dataset.edgeLabels = 'full'
-  return () => {
+  const store = useDiagramStore.getState()
+  const placed = store.allEdgeLabelsShown
+  if (!placed) useDiagramStore.setState({ allEdgeLabelsShown: true })
+  const restore = () => {
     if (detail === undefined) delete el.dataset.edgeLabels
     else el.dataset.edgeLabels = detail
+    if (!placed) useDiagramStore.setState({ allEdgeLabelsShown: false })
   }
+  if (placed) return Promise.resolve(restore)
+  // Two frames: React re-renders the edges, then the browser lays them out.
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(restore))))
 }
 
 /** What the view shown is drawn in: the canvas (also of a flow view), or
@@ -76,7 +84,7 @@ export function useExport(): {
     const el = exportTarget()
     if (!el) return
     setExportBusy(true)
-    const restoreLabels = showAllEdgeLabels(el)
+    const labelsShown = showAllEdgeLabels(el)
     const filename = buildFilename()
     const options = {
       cacheBust: true,
@@ -91,10 +99,14 @@ export function useExport(): {
         return true
       },
     }
-    const run = format === 'png'
-      ? toPng(el, options).then((d) => fetch(d).then((r) => r.blob()).then((b) => downloadBlob(b, `${filename}.png`)))
-      : toSvg(el, options).then((d) => fetch(d).then((r) => r.blob()).then((b) => downloadBlob(b, `${filename}.svg`)))
-    run
+    let restoreLabels = () => {}
+    labelsShown
+      .then((restore) => {
+        restoreLabels = restore
+        return format === 'png'
+          ? toPng(el, options).then((d) => fetch(d).then((r) => r.blob()).then((b) => downloadBlob(b, `${filename}.png`)))
+          : toSvg(el, options).then((d) => fetch(d).then((r) => r.blob()).then((b) => downloadBlob(b, `${filename}.svg`)))
+      })
       .catch(exportFailed)
       .finally(() => { restoreLabels(); setExportBusy(false) })
   }, [buildFilename])
@@ -103,7 +115,7 @@ export function useExport(): {
     const el = exportTarget()
     if (!el) return
     setExportBusy(true)
-    const restoreLabels = showAllEdgeLabels(el)
+    const labelsShown = showAllEdgeLabels(el)
     const options = {
       cacheBust: true,
       backgroundColor: getComputedStyle(el).backgroundColor || '#1e1e2e',
@@ -117,7 +129,9 @@ export function useExport(): {
         return true
       },
     }
-    toPng(el, options)
+    let restoreLabels = () => {}
+    labelsShown
+      .then((restore) => { restoreLabels = restore; return toPng(el, options) })
       .then((dataUrl) => fetch(dataUrl).then((r) => r.blob()))
       .then((blob) => {
         const item = new ClipboardItem({ 'image/png': blob })

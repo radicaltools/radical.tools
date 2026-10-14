@@ -3,6 +3,7 @@ import { estimateLabelSize, labelOverlaps, placeEdgeLabels, relationLabelLines, 
 import type { C4Node } from '@radical/common/c4'
 import { computeRoutedEdge, type RoutingObstacle } from '../src/edgeRouting'
 import { Position } from '../src/side'
+import { largeCanvas } from './largeCanvas'
 
 const STYLE = { maxWidth: 200, padX: 8, padY: 3, border: 1, lineHeight: 1.4 }
 
@@ -107,5 +108,23 @@ describe('computeRoutedEdge points', () => {
     expect(r.points[0]).toEqual({ x: 0, y: 0 })
     expect(r.points[r.points.length - 1]).toEqual({ x: 300, y: 400 })
     expect(r.points).toContainEqual({ x: r.labelX, y: r.labelY })
+  })
+})
+
+describe('placeEdgeLabels on a large canvas', () => {
+  // Opening the Structure view of radical.tools' own model (about 1400
+  // labels) took over 6 s, nearly all of it placing labels; the budget keeps
+  // it a fraction of a second. Best of three runs, so a busy machine does
+  // not fail it.
+  it('places 1400 labels among 1600 nodes within 600 ms', () => {
+    const { edges, obstacles } = largeCanvas()
+    let best = Infinity
+    for (let run = 0; run < 3; run++) {
+      const start = performance.now()
+      const centres = placeEdgeLabels(edges, obstacles)
+      best = Math.min(best, performance.now() - start)
+      expect(centres.size).toBe(edges.length)
+    }
+    expect(best).toBeLessThan(600)
   })
 })

@@ -188,6 +188,47 @@ class Buckets<T> {
   }
 }
 
+/**
+ * Samples of every edge path on a uniform grid, kept flat (edge, x, y per
+ * sample) since a large canvas has hundreds of thousands of them. A sample is
+ * a point, so it sits in exactly one cell and is never visited twice.
+ */
+class LineSamples {
+  private readonly cells = new Map<number, number[]>()
+  constructor(private readonly size = 50) {}
+
+  private key(cx: number, cy: number): number {
+    return cx * 1_048_576 + cy
+  }
+
+  add(edge: number, x: number, y: number): void {
+    const key = this.key(Math.floor(x / this.size), Math.floor(y / this.size))
+    const list = this.cells.get(key)
+    if (list) list.push(edge, x, y)
+    else this.cells.set(key, [edge, x, y])
+  }
+
+  /** How many samples of edges other than `edge` lie inside `r`. */
+  countInside(r: Rect, edge: number): number {
+    let count = 0
+    const x1 = r.x + r.w
+    const y1 = r.y + r.h
+    for (let cx = Math.floor(r.x / this.size); cx <= Math.floor(x1 / this.size); cx++) {
+      for (let cy = Math.floor(r.y / this.size); cy <= Math.floor(y1 / this.size); cy++) {
+        const list = this.cells.get(this.key(cx, cy))
+        if (!list) continue
+        for (let k = 0; k < list.length; k += 3) {
+          if (list[k] === edge) continue
+          const x = list[k + 1]
+          const y = list[k + 2]
+          if (x >= r.x && x <= x1 && y >= r.y && y <= y1) count++
+        }
+      }
+    }
+    return count
+  }
+}
+
 function overlapArea(a: Rect, b: Rect): number {
   const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)
   const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
@@ -248,19 +289,33 @@ function candidates(edge: LabelEdge, lengths: number[]): Candidate[] {
  * covering them is. Edges whose label fits at its anchor keep the anchor.
  */
 export function placeEdgeLabels(edges: LabelEdge[], obstacles: LabelObstacle[]): Map<string, Pt> {
-  const nodes = new Buckets<LabelObstacle>()
-  for (const o of obstacles) nodes.add(o, o)
+  // Obstacles and labels by index; a stamp per index marks the ones one
+  // cost() call has counted already (a rect can lie in several cells).
+  const nodes = new Buckets<number>()
+  obstacles.forEach((o, k) => nodes.add(o, k))
+  const nodeSeen = new Int32Array(obstacles.length)
+  const labelSeen = new Int32Array(edges.length)
+  let stamp = 0
 
   // Samples of every path, so a label knows which lines it would hide.
-  const lines = new Buckets<{ edge: number; p: Pt }>(100)
+  // The same points pointAt gives at s / steps, walking each path once.
+  const lines = new LineSamples()
   const lengths = edges.map((e) => arcLengths(e.points))
   edges.forEach((edge, i) => {
-    const total = lengths[i][lengths[i].length - 1]
-    if (edge.points.length < 2 || total === 0) return
+    const pts = edge.points
+    const len = lengths[i]
+    const total = len[len.length - 1]
+    if (pts.length < 2 || total === 0) return
     const steps = Math.max(1, Math.ceil(total / LINE_STEP))
+    let seg = 1
     for (let s = 0; s <= steps; s++) {
-      const { p } = pointAt(edge.points, lengths[i], s / steps)
-      lines.add({ x: p.x, y: p.y, w: 0, h: 0 }, { edge: i, p })
+      const at = total * (s / steps)
+      while (seg < pts.length - 1 && len[seg] < at) seg++
+      const a = pts[seg - 1]
+      const b = pts[seg]
+      const segLen = len[seg] - len[seg - 1]
+      const t = segLen > 0 ? (at - len[seg - 1]) / segLen : 0
+      lines.add(i, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
     }
   })
 
@@ -272,27 +327,20 @@ export function placeEdgeLabels(edges: LabelEdge[], obstacles: LabelObstacle[]):
     const rect = rectAt(c, edges[i].size)
     const area = rect.w * rect.h || 1
     let covered = 0
-    const seenNodes = new Set<LabelObstacle>()
-    nodes.near(rect, (o) => {
-      if (seenNodes.has(o)) return
-      seenNodes.add(o)
+    const call = ++stamp
+    nodes.near(rect, (k) => {
+      if (nodeSeen[k] === call) return
+      nodeSeen[k] = call
+      const o = obstacles[k]
       covered += overlapArea(rect, o) * W_NODE * (o.weight ?? 1)
     })
     const padded = { x: rect.x - LABEL_GAP, y: rect.y - LABEL_GAP, w: rect.w + 2 * LABEL_GAP, h: rect.h + 2 * LABEL_GAP }
-    const seenLabels = new Set<object>()
     labels.near(padded, (l) => {
-      if (l.edge === i || seenLabels.has(l)) return
-      seenLabels.add(l)
+      if (l.edge === i || labelSeen[l.edge] === call) return
+      labelSeen[l.edge] = call
       covered += overlapArea(padded, l.rect) * W_LABEL
     })
-    let hidden = 0
-    const seenPoints = new Set<object>()
-    lines.near(rect, (s) => {
-      if (s.edge === i || seenPoints.has(s)) return
-      seenPoints.add(s)
-      if (s.p.x >= rect.x && s.p.x <= rect.x + rect.w && s.p.y >= rect.y && s.p.y <= rect.y + rect.h) hidden++
-    })
-    return covered / area + hidden * W_LINE
+    return covered / area + lines.countInside(rect, i) * W_LINE
   }
 
   const place = (i: number): void => {

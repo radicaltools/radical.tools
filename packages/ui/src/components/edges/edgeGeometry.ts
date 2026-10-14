@@ -31,6 +31,13 @@ export function edgeLabelDetail(zoom: number): EdgeLabelDetail {
   return zoom < LABEL_HIDDEN_BELOW ? 'none' : zoom < TECH_HIDDEN_BELOW ? 'name' : 'full'
 }
 
+/** Whether the zoom shows relation labels at all. Below it they are not
+ *  placed either: placing the labels of a large canvas takes the better
+ *  part of a second, and a whole large model fits on screen far below it. */
+export function edgeLabelsShownAt(zoom: number): boolean {
+  return zoom >= LABEL_HIDDEN_BELOW
+}
+
 /** A compound node keeps its name in a header this tall; the rest of it is
  *  space for its children, where labels may go. */
 const COMPOUND_HEADER = 60
@@ -129,7 +136,12 @@ interface RouteEntry { key: string; route: RoutedEdge; box: Box }
 
 let routeCache = new Map<string, RouteEntry>()
 let routedAgainst: ObstacleCandidates | null = null
-let geometryCache: { nodes: NodeInternals; edges: RFEdges; moving: boolean; result: Map<string, EdgeGeometry> } | null = null
+let geometryCache: { nodes: NodeInternals; edges: RFEdges; moving: boolean; placeLabels: boolean; result: Map<string, EdgeGeometry> } | null = null
+/** The last label placement and what it was placed against: React Flow
+ *  hands over new state objects several times while a view opens (node
+ *  sizes measured, nodes set), and placing a large canvas's labels again
+ *  each time cost seconds when none of their inputs changed. */
+let labelCache: { candidates: ObstacleCandidates; routes: Map<string, RouteEntry>; sizes: Map<string, string>; labels: Map<string, Pt> } | null = null
 
 /**
  * Sides, ports, path and label centre of every edge React Flow draws, by
@@ -137,10 +149,12 @@ let geometryCache: { nodes: NodeInternals; edges: RFEdges; moving: boolean; resu
  * ends stay put and no node moves near it, and keeps its geometry object
  * while nothing it draws changed, so an edge re-renders only when it has to.
  * While the live layout moves the nodes (`moving`), edges are plain curves
- * and labels sit at their middle; both are redone at rest.
+ * and labels sit at their middle; both are redone at rest. Labels also sit
+ * at their middle while they are not shown (`placeLabels` false: zoomed out),
+ * and are placed when they are.
  */
-export function edgeGeometry(nodes: NodeInternals, edges: RFEdges, moving: boolean): Map<string, EdgeGeometry> {
-  if (geometryCache?.nodes === nodes && geometryCache.edges === edges && geometryCache.moving === moving) return geometryCache.result
+export function edgeGeometry(nodes: NodeInternals, edges: RFEdges, moving: boolean, placeLabels = true): Map<string, EdgeGeometry> {
+  if (geometryCache?.nodes === nodes && geometryCache.edges === edges && geometryCache.moving === moving && geometryCache.placeLabels === placeLabels) return geometryCache.result
 
   const ports = portsFor(nodes, edges)
   const candidates = obstacleCandidates(nodes)
@@ -177,7 +191,7 @@ export function edgeGeometry(nodes: NodeInternals, edges: RFEdges, moving: boole
   }
   routeCache = routes
 
-  const labels = moving ? new Map<string, Pt>() : placeLabels(edges, routes, candidates)
+  const labels = moving || !placeLabels ? new Map<string, Pt>() : labelSpots(edges, routes, candidates, changed)
 
   const previous = geometryCache?.result
   const result = new Map<string, EdgeGeometry>()
@@ -196,14 +210,15 @@ export function edgeGeometry(nodes: NodeInternals, edges: RFEdges, moving: boole
       label,
     })
   }
-  geometryCache = { nodes, edges, moving, result }
+  geometryCache = { nodes, edges, moving, placeLabels, result }
   return result
 }
 
 /** Label centres of the edges that have a label, placed together so they
  *  avoid the nodes and each other. */
-function placeLabels(edges: RFEdges, routes: Map<string, RouteEntry>, candidates: ObstacleCandidates): Map<string, Pt> {
+function labelSpots(edges: RFEdges, routes: Map<string, RouteEntry>, candidates: ObstacleCandidates, changed: RoutingObstacle[] | null): Map<string, Pt> {
   const labelled: LabelEdge[] = []
+  const sizes = new Map<string, string>()
   for (const e of edges) {
     const entry = routes.get(e.id)
     if (!entry || e.hidden) continue
@@ -211,8 +226,18 @@ function placeLabels(edges: RFEdges, routes: Map<string, RouteEntry>, candidates
     if (!size) continue
     const { route } = entry
     labelled.push({ id: e.id, points: route.points, anchor: { x: route.labelX, y: route.labelY }, size })
+    sizes.set(e.id, `${size.w}x${size.h}`)
   }
   if (labelled.length === 0) return new Map()
+
+  // Nothing they are placed against changed: the same labels.
+  const last = labelCache
+  if (last && changed && changed.length === 0 && sameParents(last.candidates, candidates)
+    && last.sizes.size === sizes.size
+    && labelled.every((l) => last.routes.get(l.id) === routes.get(l.id) && last.sizes.get(l.id) === sizes.get(l.id))) {
+    labelCache = { ...last, candidates, routes }
+    return last.labels
+  }
 
   // A label may sit inside a group, but not on its name, nor on a leaf
   // node, least of all on the leaf's name.
@@ -226,5 +251,16 @@ function placeLabels(edges: RFEdges, routes: Map<string, RouteEntry>, candidates
       obstacles.push(rect, { ...rect, h: Math.min(rect.h, LEAF_HEADER), weight: HEADER_WEIGHT - 1 })
     }
   }
-  return placeEdgeLabels(labelled, obstacles)
+  const labels = placeEdgeLabels(labelled, obstacles)
+  labelCache = { candidates, routes, sizes, labels }
+  return labels
+}
+
+/** Whether every node has the same parent as before (a label may sit in a
+ *  group but not on a leaf, so a new parent changes the obstacles). */
+function sameParents(before: ObstacleCandidates, after: ObstacleCandidates): boolean {
+  if (before === after) return true
+  if (before.byId.size !== after.byId.size) return false
+  for (const [id, c] of after.byId) if (before.byId.get(id)?.ancestors[0] !== c.ancestors[0]) return false
+  return true
 }

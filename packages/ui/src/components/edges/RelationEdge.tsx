@@ -9,7 +9,7 @@ import {
 } from 'reactflow'
 import { C4EdgeRFData } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
-import { edgeGeometry, LABEL_BOX } from './edgeGeometry'
+import { edgeGeometry, edgeLabelsShownAt, LABEL_BOX } from './edgeGeometry'
 
 // ─── Custom arrowhead ─────────────────────────────────────────────────────────
 
@@ -150,9 +150,10 @@ export const RelationEdge = memo(
     // canvas (edgeGeometry.ts); the geometry object stays the same while
     // nothing this edge draws changed, so only the edges that moved re-render.
     const moving = useDiagramStore((s) => s.liveLayoutMoving)
+    const allLabels = useDiagramStore((s) => s.allEdgeLabelsShown)
     const geometrySelector = useCallback(
-      (s: ReactFlowState) => edgeGeometry(s.nodeInternals, s.edges, moving).get(id),
-      [id, moving],
+      (s: ReactFlowState) => edgeGeometry(s.nodeInternals, s.edges, moving, allLabels || edgeLabelsShownAt(s.transform[2])).get(id),
+      [id, moving, allLabels],
     )
     const geometry = useStore(geometrySelector)
     const diffKind = useDiagramStore(s => s.showDiff ? s.diffHighlight[id] : undefined)

@@ -1184,6 +1184,9 @@ interface DiagramStore {
   /** The live layout is moving nodes; false once it reports rest. Edges skip
    *  costly routing while it moves and route fully when it stops. */
   liveLayoutMoving: boolean
+  /** Every relation label is shown whatever the zoom (an export is being
+   *  drawn), so the labels are placed even when zoomed out. */
+  allEdgeLabelsShown: boolean
 
   // ── connect mode ──
   connectSource: string | null
@@ -1844,6 +1847,7 @@ export const useDiagramStore = create<DiagramStore>()(
       lastSmartLayoutReport: null,
       liveLayoutActive: true,
       liveLayoutMoving: false,
+      allEdgeLabelsShown: false,
       connectSource: null,
       connectionModifier: 'alt' as const,
       autoFitActive: loadStudioSettings().smartFit,
