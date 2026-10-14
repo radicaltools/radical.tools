@@ -11,6 +11,7 @@ import { WikiView } from '@radical/ui/components/WikiView'
 import { PresentationBar, PresenterDock } from './components/PresentationBar'
 import { RightPanel, LeftPanel } from '@radical/ui/components/RightPanel'
 import { MetamodelEditor } from './components/MetamodelEditor'
+import { Inspector } from './components/Inspector'
 import { NotificationHost } from '@radical/ui/components/NotificationHost'
 import { NodeWizard } from '@radical/ui/components/NodeWizard'
 import { SelectionActionBar } from './components/SelectionActionBar'
@@ -43,7 +44,8 @@ function AppInner(): React.ReactElement {
   const isViewer = appMode === 'viewer'
   const isPresenter = appMode === 'presenter'
   const isMetamodel = appMode === 'metamodel'
-  const isReadOnlyMode = !isDesigner && !isMetamodel
+  const isInspector = appMode === 'inspector'
+  const isReadOnlyMode = !isDesigner && !isMetamodel && !isInspector
 
   const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() => localStorage.getItem(LS_LEFT) === '1')
   const [rightCollapsed, setRightCollapsed] = useState<boolean>(() => localStorage.getItem(LS_RIGHT) === '1')
@@ -96,6 +98,7 @@ function AppInner(): React.ReactElement {
   const layoutClass = [
     'app-layout',
     isPresenting ? 'mode-presenting' : '',
+    !isPresenting && isInspector ? 'mode-inspector' : '',
     !isPresenting && isReadOnlyMode ? 'mode-presentation' : '',
     !isPresenting && leftCollapsed ? 'lp-collapsed' : '',
     !isPresenting && rightCollapsed ? 'rp-collapsed' : '',
@@ -107,14 +110,14 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : <Canvas />}
+      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : <Canvas />}
       {!isPresenting && isDesigner && <RightPanel collapsed={rightCollapsed} onToggleCollapsed={toggleRight} />}
       {!isPresenting && isViewer && <RightPanel readOnly collapsed={rightCollapsed} onToggleCollapsed={toggleRight} />}
       {!isPresenting && isPresenter && <PresenterDock />}
       <PresentationBar />
-      {!isPresenting && isCanvasView && <SelectionActionBar />}
-      {!isPresenting && isCanvasView && <EdgeActionBar />}
-      {isCanvasView && <QuickSearch />}
+      {!isPresenting && !isInspector && isCanvasView && <SelectionActionBar />}
+      {!isPresenting && !isInspector && isCanvasView && <EdgeActionBar />}
+      {!isInspector && isCanvasView && <QuickSearch />}
       {isDesigner && <NodeWizard />}
       <NotificationHost />
       <MilestoneEditOverlay />

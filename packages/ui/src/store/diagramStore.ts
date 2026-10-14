@@ -214,7 +214,7 @@ function _captureState(state: DiagramStore): HistoryEntry {
 function _pushUndo(state: DiagramStore): void {
   // Undo belongs to Designer. What is collapsed or laid out in Viewer or
   // Presenter is put back on the way out and is no step of Designer's.
-  if (state.appMode === 'viewer' || state.appMode === 'presenter') return
+  if (state.appMode === 'viewer' || state.appMode === 'presenter' || state.appMode === 'inspector') return
   _pushUndoEntry(_captureState(state))
 }
 
@@ -1444,8 +1444,11 @@ interface DiagramStore {
   toggleShowDiff: () => void
 
   // ── app mode ──
-  appMode: 'designer' | 'viewer' | 'presenter' | 'metamodel'
-  setAppMode: (mode: 'designer' | 'viewer' | 'presenter' | 'metamodel') => void
+  /** The perspective: Designer edits; Viewer and Presenter explore and
+   *  present; the metamodel editor and the Inspector (what `radical check`
+   *  says about the model) show no canvas. */
+  appMode: 'designer' | 'viewer' | 'presenter' | 'metamodel' | 'inspector'
+  setAppMode: (mode: 'designer' | 'viewer' | 'presenter' | 'metamodel' | 'inspector') => void
 
   // ── metamodel (per document) ──
   metamodel: Metamodel
@@ -4639,7 +4642,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // snapshot above (restored on return) and by the auto-persist
         // subscriber gating writes on appMode === 'designer'. We stop it
         // only in metamodel mode where the canvas isn't shown.
-        if (mode === 'metamodel') {
+        if (mode === 'metamodel' || mode === 'inspector') {
           get().stopLiveLayout()
         } else {
           get().startLiveLayout()
@@ -4914,7 +4917,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Resume live layout when returning to any non-metamodel mode
         // (designer or viewer). Reset the cola cache so it picks up the
         // restored c4Nodes positions instead of the slide-shown ones.
-        if (get().appMode !== 'metamodel') {
+        if (get().appMode !== 'metamodel' && get().appMode !== 'inspector') {
           _liveLayout?.reset()
           get().startLiveLayout()
         }

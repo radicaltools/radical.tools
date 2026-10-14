@@ -5,6 +5,7 @@ import {
   parseSelection, type CanvasSelection,
 } from '@radical/common/formats/canvasSelection'
 import { FORGE_RUN_FILE, parseForgeRun, type ForgeRunStatus } from '@radical/common/formats/forgeRunStatus'
+import { CHECK_CONFIG_FILE, TEST_RESULTS_FILE } from '@radical/common/check'
 
 /** Refuses a symlinked `.radical`, which could redirect the write elsewhere. */
 async function selectionDir(root: string, create: boolean): Promise<string | null> {
@@ -62,3 +63,17 @@ export async function readForgeRunFile(root: string): Promise<ForgeRunStatus | n
   const text = await readEditorStateFile(root, FORGE_RUN_FILE)
   return text === null ? null : parseForgeRun(text)
 }
+
+/** What `radical check` keeps beside a model for Studio: the test results
+ *  under `.radical/` and the model's own check.json; null for one that is
+ *  not there. */
+export async function readCheckFiles(root: string): Promise<{ results: string | null; config: string | null }> {
+  const results = await readEditorStateFile(root, TEST_RESULTS_FILE)
+  const configPath = join(resolve(root), CHECK_CONFIG_FILE)
+  let config: string | null = null
+  try {
+    if (!(await lstat(configPath)).isSymbolicLink()) config = await readFile(configPath, 'utf-8')
+  } catch { config = null }
+  return { results, config }
+}
+
