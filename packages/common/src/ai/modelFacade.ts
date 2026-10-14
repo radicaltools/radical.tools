@@ -148,6 +148,12 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     setViewCollapsed(id: string, nodeIds: string[], collapsed: boolean) {
       model.setViewCollapsed(state, id, nodeIds, collapsed)
     },
+    setViewFolder(id: string, folder: string | null) {
+      model.setViewFolder(state, id, folder)
+    },
+    orderViews(ids: string[]) {
+      model.orderViews(state, ids)
+    },
     getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(state, viewId),
     addAlignment(viewId: string | null, axis: AlignConstraint['axis'], nodeIds: string[], ordered = false) {
       const refused = model.checkAddAlignment(state, viewId, axis, nodeIds, ordered)

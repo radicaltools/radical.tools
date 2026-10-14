@@ -80,7 +80,7 @@ describe('buildToolDefs', () => {
     expect(names).toEqual(expect.arrayContaining([
       'add_node', 'update_node', 'move_node', 'delete_node',
       'add_relation', 'update_relation', 'delete_relation',
-      'create_view', 'set_view_nodes', 'delete_view', 'set_active_view',
+      'create_view', 'set_view_nodes', 'order_views', 'delete_view', 'set_active_view',
       'search_model', 'focus_node', 'reset_diagram',
     ]))
     const addNode = defs.find((d) => d.name === 'add_node')!

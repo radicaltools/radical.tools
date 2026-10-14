@@ -79,6 +79,9 @@ export interface DiagramView {
    * 'wiki'    = documentation-style pages per element with inline editing.
    */
   kind?: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki'
+  /** Where the view sits in the list of views: a folder path such as
+   *  "C4/Components" (segments split by "/"). No folder: at the top. */
+  folder?: string
   /** ID of the DiagramSequence to visualise when kind='dynamic' */
   sequenceId?: string
   /** C4 node IDs included in this view. Ancestors are auto-included. An
@@ -448,6 +451,85 @@ export const TYPE_LABELS: Record<C4ElementType, string> = pluckPerType(def => de
 
 /** SVG path data for each C4 element type (viewBox 0 0 16 16) */
 export const TYPE_ICON_PATHS: Record<C4ElementType, string> = pluckPerType(def => def.iconPath)
+
+/** A folder path as views keep it: segments trimmed, empty ones dropped,
+ *  joined by "/". "" for no folder. */
+export function normalizeViewFolder(folder: string | null | undefined): string {
+  return (folder ?? '').split('/').map((part) => part.trim()).filter(Boolean).join('/')
+}
+
+/** One folder of the list of views: its subfolders, then its views. */
+export interface ViewFolder<V extends Pick<DiagramView, 'folder'> = DiagramView> {
+  /** The whole path ("C4/Components"); "" for the top of the list. */
+  path: string
+  /** The last segment ("Components"); "" for the top. */
+  name: string
+  folders: ViewFolder<V>[]
+  /** In the order the model keeps them. */
+  views: V[]
+  /** Its folders and views together, in the model's order: a folder
+   *  stands where its first view does. */
+  entries: Array<{ folder: ViewFolder<V> } | { view: V }>
+  /** Views in this folder and all below it. */
+  count: number
+}
+
+/** The list of views as a tree of folders, by each view's `folder` path.
+ *  Folders and views keep the model's order: a folder stands where its
+ *  first view does (moveViewFolder changes it). */
+export function viewFolderTree<V extends Pick<DiagramView, 'folder'>>(views: V[]): ViewFolder<V> {
+  const root: ViewFolder<V> = { path: '', name: '', folders: [], views: [], entries: [], count: 0 }
+  const byPath = new Map<string, ViewFolder<V>>([['', root]])
+  const folderAt = (path: string): ViewFolder<V> => {
+    const known = byPath.get(path)
+    if (known) return known
+    const cut = path.lastIndexOf('/')
+    const parent = folderAt(cut < 0 ? '' : path.slice(0, cut))
+    const folder: ViewFolder<V> = { path, name: path.slice(cut + 1), folders: [], views: [], entries: [], count: 0 }
+    parent.folders.push(folder)
+    parent.entries.push({ folder })
+    byPath.set(path, folder)
+    return folder
+  }
+  for (const view of views) {
+    const path = normalizeViewFolder(view.folder)
+    const folder = folderAt(path)
+    folder.views.push(view)
+    folder.entries.push({ view })
+    for (let p = path; ; p = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '') {
+      byPath.get(p)!.count++
+      if (!p) break
+    }
+  }
+  return root
+}
+
+/** Where renaming the folder `path` to `name` takes it: the new path, or
+ *  null for an empty name, a name with "/" or a folder no view is in. */
+export function viewFolderRenameTarget(views: Pick<DiagramView, 'folder'>[], path: string, name: string): string | null {
+  const from = normalizeViewFolder(path)
+  const leaf = name.trim()
+  if (!from || !leaf || leaf.includes('/')) return null
+  if (!views.some((view) => isInViewFolder(view, from))) return null
+  const cut = from.lastIndexOf('/')
+  return cut < 0 ? leaf : `${from.slice(0, cut)}/${leaf}`
+}
+
+/** Whether a view sits in the folder `path` or in a folder below it. */
+export function isInViewFolder(view: Pick<DiagramView, 'folder'>, path: string): boolean {
+  const folder = normalizeViewFolder(view.folder)
+  return folder === path || folder.startsWith(`${path}/`)
+}
+
+/** Every folder path in use, parents included, sorted. */
+export function viewFolderPaths(views: Pick<DiagramView, 'folder'>[]): string[] {
+  const paths = new Set<string>()
+  for (const view of views) {
+    const parts = normalizeViewFolder(view.folder).split('/').filter(Boolean)
+    for (let i = 1; i <= parts.length; i++) paths.add(parts.slice(0, i).join('/'))
+  }
+  return [...paths].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+}
 
 /** Whether a view shows every node of the model: it lists none and was not
  *  emptied (`empty`). */

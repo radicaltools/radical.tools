@@ -75,7 +75,7 @@ import { LIVE_CHILD_TOP_MIN } from '@radical/layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
-import { removeFromViewList, viewShowsEveryNode } from '@radical/common/c4'
+import { removeFromViewList, viewFolderRenameTarget, viewShowsEveryNode } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -1283,6 +1283,18 @@ interface DiagramStore {
   /** Show elements folded or open in one view only, over their model-level
    *  fold; one undo step. */
   setViewCollapsed: (viewId: string, nodeIds: string[], collapsed: boolean) => void
+  /** Put a view into a folder of the list of views ("C4/Components"), or
+   *  at the top for null or ""; one undo step. */
+  setViewFolder: (viewId: string, folder: string | null) => void
+  /** Rename a folder of the list of views; its views and subfolders move
+   *  along, as one undo step. Returns the new path, or null when refused
+   *  (empty name, "/" in it, no such folder). */
+  renameViewFolder: (path: string, name: string) => string | null
+  /** Move a folder of the list of views one place up (-1) or down (1)
+   *  among the folders beside it; one undo step. */
+  moveViewFolder: (path: string, direction: -1 | 1) => void
+  /** Order the listed views among the places they hold; one undo step. */
+  orderViews: (viewIds: string[]) => void
   /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', and 'wiki'. */
   setViewKind: (viewId: string, kind: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki') => void
   /** Persist treemap drill-down focus (null = top "All"). */
@@ -3070,6 +3082,42 @@ export const useDiagramStore = create<DiagramStore>()(
         if (!get().views[viewId]) return
         get()._pushUndo()
         set((state) => { model.setViewHiddenRelations(state, viewId, relationIds) })
+        get()._sync()
+      },
+
+      orderViews(viewIds) {
+        const views = get().views
+        const before = Object.keys(views)
+        const probe = { views: { ...views } } as Parameters<typeof model.orderViews>[0]
+        model.orderViews(probe, viewIds)
+        if (Object.keys(probe.views).every((id, i) => id === before[i])) return
+        get()._pushUndo()
+        set((state) => { model.orderViews(state, viewIds) })
+        get()._sync()
+      },
+
+      moveViewFolder(path, direction) {
+        const probe = { views: { ...get().views } } as Parameters<typeof model.moveViewFolder>[0]
+        if (!model.moveViewFolder(probe, path, direction)) return
+        get()._pushUndo()
+        set((state) => { model.moveViewFolder(state, path, direction) })
+        get()._sync()
+      },
+
+      renameViewFolder(path, name) {
+        const to = viewFolderRenameTarget(Object.values(get().views), path, name)
+        if (to === null || to === model.normalizeViewFolder(path)) return to
+        get()._pushUndo()
+        set((state) => { model.renameViewFolder(state, path, name) })
+        get()._sync()
+        return to
+      },
+
+      setViewFolder(viewId, folder) {
+        const view = get().views[viewId]
+        if (!view || (view.folder ?? '') === model.normalizeViewFolder(folder)) return
+        get()._pushUndo()
+        set((state) => { model.setViewFolder(state, viewId, folder) })
         get()._sync()
       },
 

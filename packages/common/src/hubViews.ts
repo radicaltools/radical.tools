@@ -17,7 +17,7 @@
 // (Studio centres them on the viewport), so it drops them and the view keeps
 // the imported layout.
 
-import type { DiagramView, NodePosition } from './c4'
+import { normalizeViewFolder, type DiagramView, type NodePosition } from './c4'
 
 type Raw = Record<string, unknown>
 type IdMap = (id: string) => string | undefined
@@ -88,6 +88,8 @@ export function conceptViewsToDiagram(
       positions: opts.keepPositions ? mapPositions(raw.positions, maps.node) : {},
     }
     if (sequenceId) view.sequenceId = sequenceId
+    const folder = typeof raw.folder === 'string' ? normalizeViewFolder(raw.folder) : ''
+    if (folder) view.folder = folder
     if (kind === 'wiki') {
       const focus = typeof raw.wikiFocusId === 'string' ? maps.node(raw.wikiFocusId) : undefined
       view.wikiFocusId = focus ?? null

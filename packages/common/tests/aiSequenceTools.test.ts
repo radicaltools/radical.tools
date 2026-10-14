@@ -110,6 +110,31 @@ describe('update_view', () => {
     expect(call('update_view', { id: 'v', expand: ['nope'] }).resultText).toContain('unknown element')
   })
 
+  it('puts views into folders of the list of views, and back at the top', () => {
+    const { facade, call, ctx } = setup()
+    expect(call('create_view', { tempId: 'v', name: 'Studio', folder: ' C4 / Components/ ' }).ok).toBe(true)
+    const v = () => facade.getViews!()[ctx.resolveId('v')]
+    expect(v().folder).toBe('C4/Components')
+    expect(call('update_view', { id: 'v', folder: 'C4' }).ok).toBe(true)
+    expect(v().folder).toBe('C4')
+    expect(call('update_view', { id: 'v', folder: '' }).ok).toBe(true)
+    expect(v()).not.toHaveProperty('folder')
+    expect(call('update_view', { id: 'v', folder: 3 }).resultText).toContain('folder must be a string')
+  })
+
+  it('orders views among the places they hold, which orders folders too', () => {
+    const { facade, call } = setup()
+    call('create_view', { tempId: 'a', name: 'A', folder: 'One' })
+    call('create_view', { tempId: 'b', name: 'B' })
+    call('create_view', { tempId: 'c', name: 'C', folder: 'Two' })
+    call('create_view', { tempId: 'd', name: 'D', folder: 'One' })
+    const names = () => Object.values(facade.getViews!()).map((v) => v.name)
+    expect(call('order_views', { ids: ['d', 'c', 'a'] }).ok).toBe(true)
+    expect(names()).toEqual(['D', 'B', 'C', 'A'])
+    expect(call('order_views', { ids: ['c', 'nope'] }).resultText).toContain('unknown view')
+    expect(call('order_views', { ids: ['c', 'c'] }).resultText).toContain('listed twice')
+  })
+
   it('refuses switching to dynamic without a sequence, and unknown relations', () => {
     const { call } = setup()
     call('create_view', { tempId: 'v', name: 'Context' })

@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { addToViewList, constraintLines, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
+import { addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
 import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
@@ -497,6 +497,71 @@ export function setViewSequence(state: ModelState, viewId: string, sequenceId: s
 export function setViewHiddenRelations(state: ModelState, viewId: string, relationIds: string[]): void {
   const view = state.views[viewId]
   if (view) view.hiddenRelationIds = [...new Set(relationIds.filter((id) => id in state.c4Relations))]
+}
+
+export { normalizeViewFolder }
+
+/** Puts a view into a folder of the list of views, or at the top for none. */
+export function setViewFolder(state: ModelState, viewId: string, folder: string | null): void {
+  const view = state.views[viewId]
+  if (!view) return
+  const path = normalizeViewFolder(folder)
+  if (path) view.folder = path
+  else delete view.folder
+}
+
+/** Renames a folder of the list of views (its last segment): every view in
+ *  it or in a folder below it moves along. Returns the new path, or null
+ *  for an empty name, a name with "/" or a folder no view is in. */
+export function renameViewFolder(state: ModelState, path: string, name: string): string | null {
+  const views = Object.values(state.views)
+  const to = viewFolderRenameTarget(views, path, name)
+  if (to === null) return null
+  const from = normalizeViewFolder(path)
+  for (const view of views) {
+    if (isInViewFolder(view, from)) view.folder = to + normalizeViewFolder(view.folder).slice(from.length)
+  }
+  return to
+}
+
+/** Orders the listed views: they take, in the order given, the places in
+ *  the list of views that they held; the other views keep theirs. A folder
+ *  stands where its first view does, so this orders folders too. */
+export function orderViews(state: ModelState, viewIds: string[]): void {
+  const listed = [...new Set(viewIds)].filter((id) => id in state.views)
+  const chosen = new Set(listed)
+  let next = 0
+  const ordered = Object.values(state.views).map((view) => (chosen.has(view.id) ? state.views[listed[next++]] : view))
+  state.views = Object.fromEntries(ordered.map((view) => [view.id, view]))
+}
+
+/** Moves a folder of the list of views one place up (-1) or down (1) among
+ *  the folders beside it, by moving its views in the model's order of
+ *  views. Returns false when there is no folder there to swap with. */
+export function moveViewFolder(state: ModelState, path: string, direction: -1 | 1): boolean {
+  const from = normalizeViewFolder(path)
+  if (!from) return false
+  const views = Object.values(state.views)
+  const cut = from.lastIndexOf('/')
+  const parentPath = cut < 0 ? '' : from.slice(0, cut)
+  let parent: ViewFolder | undefined = viewFolderTree(views)
+  for (const part of parentPath ? parentPath.split('/') : []) parent = parent?.folders.find((f) => f.name === part)
+  const siblings = parent?.folders ?? []
+  const index = siblings.findIndex((f) => f.path === from)
+  const other = siblings[index + direction]
+  if (index < 0 || !other) return false
+  const [first, second] = direction < 0 ? [from, other.path] : [other.path, from]
+  const block = (p: string) => views.filter((view) => isInViewFolder(view, p))
+  const moved = [...block(first), ...block(second)]
+  // Both blocks go, swapped, where the earlier of them stood.
+  const ordered: DiagramView[] = []
+  let placed = false
+  for (const view of views) {
+    if (!isInViewFolder(view, first) && !isInViewFolder(view, second)) ordered.push(view)
+    else if (!placed) { ordered.push(...moved); placed = true }
+  }
+  state.views = Object.fromEntries(ordered.map((view) => [view.id, view]))
+  return true
 }
 
 /** Shows elements folded (`collapsed`) or open in one view only, over the

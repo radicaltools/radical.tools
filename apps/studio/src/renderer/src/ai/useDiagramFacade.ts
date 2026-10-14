@@ -58,6 +58,10 @@ export function createStoreFacade(): DiagramFacade {
       useDiagramStore.getState().setViewHiddenRelations(id, relationIds),
     setViewCollapsed: (id: string, nodeIds: string[], collapsed: boolean) =>
       useDiagramStore.getState().setViewCollapsed(id, nodeIds, collapsed),
+    setViewFolder: (id: string, folder: string | null) =>
+      useDiagramStore.getState().setViewFolder(id, folder),
+    orderViews: (ids: string[]) =>
+      useDiagramStore.getState().orderViews(ids),
     getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(useDiagramStore.getState(), viewId),
     addAlignment: (viewId: string | null, axis: AlignConstraint['axis'], nodeIds: string[], ordered = false) => {
       // The store aligns on the canvas on screen, so switch to the requested one first.

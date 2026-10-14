@@ -315,6 +315,7 @@ export class FolderModel {
           relations: data.relations.length,
           views: (data.views ?? []).map((view) => ({
             id: view.id, name: view.name, kind: view.kind ?? 'static',
+            ...(view.folder ? { folder: view.folder } : {}),
             ...(view.sequenceId ? { sequenceId: view.sequenceId } : {}),
             ...(view.layoutConstraints?.length ? { alignments: view.layoutConstraints } : {}),
           })),
