@@ -1,8 +1,9 @@
-import { readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { CHECK_RULES, FOLDER_RULES, formatCheckGithub, formatCheckText, parseTestReport, ratchetConfig, runCheck, type CheckConfig, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_RULES, FOLDER_RULES, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestReport, ratchetConfig, runCheck, serializeTestResults, type CheckConfig, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
+import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
@@ -11,13 +12,14 @@ Checks a Radical Markdown model folder: its files, its metamodel, and that it
 is complete (requirements have scenarios, accepted ADRs fitness functions, …).
 
   folder              the model folder (default: the working directory)
-  --config <file>     rule settings (default: radical-check.json in the working
-                      directory, when there is one)
+  --config <file>     rule settings (default: check.json in the model folder,
+                      when there is one)
   --format <format>   text (default), json, or github (annotations for Actions)
   --report <path>     a test report (Vitest or Jest JSON, Playwright JSON, JUnit
                       XML), or a directory of them (.json and .xml files); repeat
                       for more. The tests that scenarios and fitness functions
-                      name are looked up in them
+                      name are looked up in them. The test cases read are kept
+                      in the model folder's .radical/test-results.json for Studio
   --evidence <file>   with --report: write what the reports say about each
                       scenario, fitness function, requirement and ADR as JSON
   --ratchet           lower each baseline (max) in the config to the count found
@@ -26,8 +28,6 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
   --list-rules        list the rules and their default severity
 
 Exit status: 0 no errors, 1 errors found, 2 the check could not run.`
-
-export const DEFAULT_CONFIG = 'radical-check.json'
 
 export interface Io {
   cwd: string
@@ -69,26 +69,28 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
 
   const folder = positionals[0] ?? '.'
-  const configPath = values.config ? resolve(io.cwd, values.config) : resolve(io.cwd, DEFAULT_CONFIG)
+  let root: string
+  let files
+  try {
+    root = await realpath(resolve(io.cwd, folder))
+    if (!(await stat(root)).isDirectory()) throw new Error('not a directory')
+    files = await new MdFolderSession(diskFolderStorage(root)).readAll()
+  } catch (error) {
+    io.err(`Cannot read the model folder ${folder}: ${(error as Error).message}`)
+    return 2
+  }
+
+  // The model's own check.json, unless --config names another.
+  const configPath = values.config ? resolve(io.cwd, values.config) : join(root, CHECK_CONFIG_FILE)
   let config: CheckConfig = {}
   try {
-    config = JSON.parse(await readFile(configPath, 'utf8')) as CheckConfig
+    config = parseCheckConfig(await readFile(configPath, 'utf8'))
   } catch (error) {
     const missing = (error as NodeJS.ErrnoException).code === 'ENOENT'
     if (!missing || values.config || values.ratchet) {
       io.err(missing ? `No config at ${configPath}.` : `Cannot read the config ${configPath}: ${(error as Error).message}`)
       return 2
     }
-  }
-
-  let files
-  try {
-    const path = await realpath(resolve(io.cwd, folder))
-    if (!(await stat(path)).isDirectory()) throw new Error('not a directory')
-    files = await new MdFolderSession(diskFolderStorage(path)).readAll()
-  } catch (error) {
-    io.err(`Cannot read the model folder ${folder}: ${(error as Error).message}`)
-    return 2
   }
 
   let tests: TestCase[] | undefined
@@ -105,9 +107,12 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
 
   const result = runCheck(files, config, tests ? { tests } : {})
-  if (values.evidence && result.evidence) {
-    await writeFile(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
+  if (tests) {
+    // For Studio, which works out from them what the tests say about the
+    // model while it is edited.
+    await writeBeside(join(root, TEST_RESULTS_FILE), serializeTestResults(tests, values.report ?? []))
   }
+  if (values.evidence && result.evidence) await writeBeside(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
   const options = { folder, verbose: values.verbose }
   io.out(values.format === 'json' ? JSON.stringify(result, null, 2)
     : values.format === 'github' ? formatCheckGithub(result, options)
@@ -137,3 +142,16 @@ async function reportFiles(paths: string[], cwd: string): Promise<string[]> {
   return files
 }
 
+/** Writes a file beside the model, making its directory. In a model
+ *  folder's .radical directory, Studio's place for what is not the model, it
+ *  also writes the .gitignore that keeps that directory out of version control. */
+async function writeBeside(path: string, content: string): Promise<void> {
+  const dir = dirname(path)
+  await mkdir(dir, { recursive: true })
+  if (basename(dir) === SELECTION_DIR) {
+    await writeFile(join(dir, '.gitignore'), SELECTION_GITIGNORE_CONTENT, { flag: 'wx' }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'EEXIST') throw error
+    })
+  }
+  await writeFile(path, content)
+}

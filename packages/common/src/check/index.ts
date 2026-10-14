@@ -10,7 +10,7 @@
 // Pure: it takes the folder's files and a config, and returns findings. The
 // `radical` CLI (apps/cli) reads the files and prints the result.
 
-import type { C4Node, C4Relation, DiagramSequence, DiagramView, Presentation } from '../c4'
+import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramView, Presentation } from '../c4'
 import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isValidMdFolderManifest, mdFolderNodeFiles, type FolderFiles } from '../formats/mdFolder'
 import { documentMetamodel } from '../model'
 import { CHECK_RULES, type CheckSeverity, type RuleFinding } from './rules'
@@ -19,6 +19,7 @@ import type { TestCase } from './reports'
 
 export { CHECK_RULES, type CheckRule, type CheckSeverity, type CheckModel, type RuleFinding } from './rules'
 export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
+export { CHECK_CONFIG_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, type TestResults } from './files'
 export { computeEvidence, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome } from './evidence'
 
 /** Rules about the folder's files and its views, sequences and slides. */
@@ -115,28 +116,46 @@ export function runCheck(files: FolderFiles, config: CheckConfig = {}, options: 
     }
   }
 
-  let nodeCount = 0
-  let relationCount = 0
-  let evidence: Evidence | undefined
-  if (!found.some((f) => FATAL.has(f.rule))) {
-    const data = deserializeFromMdFolder(files).data
-    const nodes = byId(data.nodes)
-    const relations = byId(data.relations)
-    nodeCount = Object.keys(nodes).length
-    relationCount = Object.keys(relations).length
-    staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations)
-      .forEach((finding) => add('stale-reference', finding))
-    const model = { nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), ...(options.tests ? { tests: options.tests } : {}) }
-    for (const rule of CHECK_RULES) rule.run(model).forEach((finding) => add(rule.id, finding))
-    if (options.tests) evidence = computeEvidence(model)
-  }
+  let model: ModelCheck = { found: [], nodeCount: 0, relationCount: 0 }
+  if (!found.some((f) => FATAL.has(f.rule))) model = checkData(deserializeFromMdFolder(files).data, options)
 
-  const result = settle(found.map((f) => ({
+  const result = settle([...found, ...model.found].map((f) => ({
     ...f,
     ...(!f.path && f.nodeId && pathOf.has(f.nodeId) ? { path: pathOf.get(f.nodeId) } : {}),
     ...(!f.path && f.relationId ? { path: 'relations.json' } : {}),
-  })), config, nodeCount, relationCount)
-  return evidence ? { ...result, evidence } : result
+  })), config, model.nodeCount, model.relationCount)
+  return model.evidence ? { ...result, evidence: model.evidence } : result
+}
+
+interface ModelCheck {
+  found: Array<RuleFinding & { rule: string }>
+  nodeCount: number
+  relationCount: number
+  evidence?: Evidence
+}
+
+function checkData(data: DiagramData, options: CheckOptions): ModelCheck {
+  const found: Array<RuleFinding & { rule: string }> = []
+  const nodes = byId(data.nodes)
+  const relations = byId(data.relations)
+  staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations)
+    .forEach((finding) => found.push({ rule: 'stale-reference', ...finding }))
+  const model = { nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), ...(options.tests ? { tests: options.tests } : {}) }
+  for (const rule of CHECK_RULES) rule.run(model).forEach((finding) => found.push({ rule: rule.id, ...finding }))
+  return {
+    found,
+    nodeCount: Object.keys(nodes).length,
+    relationCount: Object.keys(relations).length,
+    ...(options.tests ? { evidence: computeEvidence(model) } : {}),
+  }
+}
+
+/** Checks a model already in memory, as Studio holds it: every rule but the
+ *  ones about the folder's files, which only a folder has. */
+export function checkModel(data: DiagramData, config: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
+  const model = checkData(data, options)
+  const result = settle(model.found, config, model.nodeCount, model.relationCount)
+  return model.evidence ? { ...result, evidence: model.evidence } : result
 }
 
 function staleReferences(

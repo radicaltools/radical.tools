@@ -11,6 +11,7 @@ import type { AISettings, ChatMessage, TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
 import { forgeRunClientName, forgeRunCurrentStage } from '@radical/common/formats/forgeRunStatus'
 import { agentForgePhase, useAgentForgeStore } from '../persistence/agentForge'
+import { viewNodeSets as viewNodeSetsOf } from '../navigation'
 
 /**
  * Cmd/Ctrl+P quick-search palette.
@@ -244,21 +245,7 @@ export function QuickSearch(): React.ReactElement | null {
   // computeViewNodeSet so we can answer "which views contain node X?" and
   // pick a sensible fallback view when jumping to a node that isn't in the
   // currently-active one.
-  const viewNodeSets = useMemo<Record<string, Set<string>>>(() => {
-    const out: Record<string, Set<string>> = {}
-    for (const v of Object.values(views)) {
-      const set = new Set<string>()
-      for (const id of v.nodeIds) {
-        let cur: string | undefined = id
-        while (cur && c4Nodes[cur]) {
-          set.add(cur)
-          cur = c4Nodes[cur].parentId ?? undefined
-        }
-      }
-      out[v.id] = set
-    }
-    return out
-  }, [views, c4Nodes])
+  const viewNodeSets = useMemo(() => viewNodeSetsOf(views, c4Nodes), [views, c4Nodes])
 
   // Pick a stable view to switch into when the user jumps to a node that
   // isn't visible in the active view. Prefers (in order): the active view

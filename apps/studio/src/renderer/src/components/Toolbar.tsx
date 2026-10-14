@@ -3,6 +3,7 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { host } from '../platform/host'
 import { SmartLayoutButton } from '@radical/ui/components/SmartLayoutButton'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
+import { useInspectorStore } from '../persistence/inspector'
 import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
 import { HubImportModal } from './HubImportModal'
@@ -527,6 +528,36 @@ function typingInTextField(target: EventTarget | null): boolean {
   return el.tagName === 'INPUT' && !NOT_TEXT_INPUTS.has((el as HTMLInputElement).type)
 }
 
+/** The Inspector perspective, with how many errors and warnings the check
+ *  finds in the model now. Greyed out while the model has no report of
+ *  `radical check --report` beside it: there is nothing to inspect yet. */
+function InspectorModeButton({ active, onClick }: { active: boolean; onClick: () => void }): React.ReactElement {
+  const check = useInspectorStore((s) => s.check)
+  const hasReport = useInspectorStore((s) => s.results !== null)
+  const enabled = hasReport || active
+  const title = !enabled
+    ? 'Inspector — no check report beside this model yet. Run radical check <model folder> --report <test reports> to make one; Studio picks it up by itself.'
+    : check
+      ? `Inspector — what radical check says about the model: ${check.errors} errors, ${check.warnings} warnings`
+      : 'Inspector — what radical check says about the model'
+  return (
+    <button className={`toolbar-mode-btn${active ? ' active' : ''}`} onClick={onClick} disabled={!enabled} title={title}>
+      <IconInspect /> Inspector
+      {enabled && check && (check.errors > 0 || check.warnings > 0) && (
+        <span className="insp-count">{check.errors > 0 && <span className="e">✖ {check.errors}</span>}<span className="w">⚠ {check.warnings}</span></span>
+      )}
+    </button>
+  )
+}
+
+function IconInspect(): React.ReactElement {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" strokeLinecap="round" /><path d="M5 7l1.5 1.5L9 5.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function Toolbar(): React.ReactElement {
   const appMode = useDiagramStore((s) => s.appMode)
   const setAppMode = useDiagramStore((s) => s.setAppMode)
@@ -784,6 +815,7 @@ export function Toolbar(): React.ReactElement {
         >
           <IconPresentation /> Presenter
         </button>
+        <InspectorModeButton active={appMode === 'inspector'} onClick={() => setAppMode('inspector')} />
       </div>
 
       <DocumentManagerModal open={managerOpen} onClose={() => setManagerOpen(false)} />

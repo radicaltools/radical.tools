@@ -5,7 +5,7 @@ import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'f
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { readEditorStateFile, writeSelectionFile } from '@radical/node-files/selectionFile'
+import { readCheckFiles, readEditorStateFile, writeSelectionFile } from '@radical/node-files/selectionFile'
 import { FORGE_RUN_FILE } from '@radical/common/formats/forgeRunStatus'
 
 /** One session per model folder, kept for the app's lifetime: it remembers
@@ -227,6 +227,16 @@ app.whenReady().then(() => {
   ipcMain.handle('folder:read-forge-run', async (_event, folderPath: string) => {
     try {
       return { success: true, content: await readEditorStateFile(folderPath, FORGE_RUN_FILE) }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
+
+  // What radical check keeps beside the model (test results, check.json),
+  // for the Inspector.
+  ipcMain.handle('folder:read-check-files', async (_event, folderPath: string) => {
+    try {
+      return { success: true, ...(await readCheckFiles(folderPath)) }
     } catch (e) {
       return { success: false, error: (e as Error).message }
     }

@@ -219,6 +219,17 @@ export async function readForgeRunFromHandle(root: FsDirHandle): Promise<string 
   }
 }
 
+/** What `radical check` keeps beside the model: `.radical/test-results.json`
+ *  and the model's check.json; each null when there is none. */
+export async function readCheckFilesFromHandle(root: FsDirHandle): Promise<{ results: string | null; config: string | null }> {
+  const text = async (dir: FsDirHandle, name: string): Promise<string | null> => {
+    try { return await (await (await dir.getFileHandle(name)).getFile()).text() } catch { return null }
+  }
+  let results: string | null = null
+  try { results = await text(await root.getDirectoryHandle(SELECTION_DIR), 'test-results.json') } catch { results = null }
+  return { results, config: await text(root, 'check.json') }
+}
+
 // ─── IndexedDB handle persistence ────────────────────────────────────────────
 
 const DB_NAME = 'radical-fs'

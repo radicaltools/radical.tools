@@ -39,6 +39,7 @@ import {
   removeHandle,
   writeSelectionToHandle,
   readForgeRunFromHandle,
+  readCheckFilesFromHandle,
 } from '../persist/webFolder'
 
 const LS_INDEX_KEY = 'radical-docs-index'
@@ -779,6 +780,9 @@ export interface DocumentsAPI {
   /** The agent Forge run status file of an md-folder document (written by
    *  the MCP server), or null when there is none or it cannot be read. */
   readForgeRun(id: string): Promise<string | null>
+  /** What `radical check` keeps beside an md-folder model (test results,
+   *  check.json); null for a document that is no folder or not reachable. */
+  readCheckFiles(id: string): Promise<{ results: string | null; config: string | null } | null>
 
   /** Convenience: ensure there's at least one document; create an empty LS
    *  doc if the index is empty. Returns the active doc. */
@@ -1260,6 +1264,19 @@ export const documents: DocumentsAPI = {
     if (h.readFolder || !connectedWebHandles.has(id)) return null
     const handle = await loadHandle(id)
     return handle ? readForgeRunFromHandle(handle) : null
+  },
+
+  async readCheckFiles(id) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') return null
+    const h = host()
+    if (meta.folderPath && h.readCheckFiles) {
+      const res = await h.readCheckFiles(meta.folderPath)
+      return res.success ? { results: res.results ?? null, config: res.config ?? null } : null
+    }
+    if (h.readFolder || !connectedWebHandles.has(id)) return null
+    const handle = await loadHandle(id)
+    return handle ? readCheckFilesFromHandle(handle) : null
   },
 
   watchDocument(id, onExternalChange) {

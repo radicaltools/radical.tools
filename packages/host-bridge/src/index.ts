@@ -71,6 +71,10 @@ export interface HostCapabilities {
   /** Read the status of an agent's Forge run (`.radical/forge-run.json`) in an
    *  md-folder, written by the MCP server; content is null when there is none. */
   readForgeRun?(folderPath: string): Promise<HostResult & { content?: string | null }>
+  /** Read what `radical check` keeps beside an md-folder model: the test
+   *  results (`.radical/test-results.json`) and the rule settings
+   *  (`check.json`); each is null when there is none. */
+  readCheckFiles?(folderPath: string): Promise<HostResult & { results?: string | null; config?: string | null }>
   /** The file the host opened Studio with (CLI --file, VS Code editor), if any. */
   getWatchedPath?(): Promise<string | null>
   /** Called when the watched file changes outside Studio. */

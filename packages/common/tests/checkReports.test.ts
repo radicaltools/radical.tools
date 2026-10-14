@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatCheckText, parseTestIds, parseTestReport, runCheck, type TestCase } from '../src/check'
+import { checkModel, formatCheckText, parseCheckConfig, parseTestIds, parseTestReport, parseTestResults, runCheck, serializeTestResults, type TestCase } from '../src/check'
 import { findTests } from '../src/check/reports'
 import { serializeToMdFolderWithPaths } from '../src/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
@@ -195,3 +195,31 @@ describe('radical check with test reports', () => {
     ].join('\n'))
   })
 })
+
+describe('radical check on a model in memory, and the files beside it', () => {
+  it('gives what runCheck gives, but for the folder rules, and links what a failure takes down', () => {
+    const data = model()
+    const inMemory = checkModel(data, {}, { tests })
+    const fromFolder = checkWith(data)
+    expect(inMemory.findings.map((f) => f.message).sort()).toEqual(fromFolder.findings.map((f) => f.message).sort())
+    expect(inMemory.evidence).toEqual(fromFolder.evidence)
+    expect(inMemory.findings.find((f) => f.rule === 'test-failed')).toMatchObject({ nodeId: 's-fail', relatedIds: ['fail'] })
+    expect(inMemory.findings.find((f) => f.rule === 'test-skipped')!.relatedIds).toBeUndefined()
+  })
+
+  it('writes and reads the test results, dropping what is not a test case', () => {
+    const text = serializeTestResults(tests, ['v.json', 'pw.json'], new Date('2026-10-14T12:54:00Z'))
+    expect(parseTestResults(text)).toEqual({ version: 1, readAt: '2026-10-14T12:54:00.000Z', reports: ['v.json', 'pw.json'], cases: tests })
+    const bad = JSON.stringify({ version: 1, readAt: 'x', cases: [{ file: 'a', title: ['t'], status: 'odd' }, tests[0]] })
+    expect(parseTestResults(bad)!.cases).toEqual([tests[0]])
+    expect(parseTestResults('{"version":2}')).toBeNull()
+    expect(parseTestResults('nope')).toBeNull()
+  })
+
+  it('reads a config and refuses what is none', () => {
+    expect(parseCheckConfig('{"rules":{"metamodel":"error"}}')).toEqual({ rules: { metamodel: 'error' } })
+    expect(() => parseCheckConfig('[]')).toThrow('a config is a JSON object')
+    expect(() => parseCheckConfig('{"rules":[]}')).toThrow('"rules" is an object of rule settings')
+  })
+})
+

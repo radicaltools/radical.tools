@@ -30,8 +30,8 @@ import { documents, useDocumentsStore } from './store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
 import { host } from './platform/host'
 
-type Mode = 'designer' | 'viewer' | 'presenter' | 'metamodel'
-const MODES: readonly Mode[] = ['designer', 'viewer', 'presenter', 'metamodel'] as const
+type Mode = 'designer' | 'viewer' | 'presenter' | 'metamodel' | 'inspector'
+const MODES: readonly Mode[] = ['designer', 'viewer', 'presenter', 'metamodel', 'inspector'] as const
 
 export interface Route {
   /** `ls:<id>`, `fs:<absolutePath>` or `md:<absolutePath>`; undefined = keep active document. */

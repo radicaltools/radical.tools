@@ -54,9 +54,9 @@ describe('radical check', () => {
     expect(out).toContain('✓ 0 errors, 1 warning')
   })
 
-  it('exits 1 when the config makes a finding an error, read from radical-check.json', async () => {
+  it('exits 1 when the config makes a finding an error, read from the model\'s check.json', async () => {
     const cwd = await workspace()
-    await writeFile(join(cwd, 'radical-check.json'), JSON.stringify({ rules: { 'requirement-without-scenario': 'error' } }))
+    await writeFile(join(cwd, 'model/check.json'), JSON.stringify({ rules: { 'requirement-without-scenario': 'error' } }))
     const { code, out } = await run(cwd, 'check', 'model')
     expect(code).toBe(1)
     expect(out).toContain('✖ 1 error, 0 warnings')
@@ -93,7 +93,7 @@ describe('radical check', () => {
     expect((await run(cwd, 'check', 'model', '--format', 'xml')).code).toBe(2)
     expect((await run(cwd, 'check', 'model', '--config', 'missing.json')).code).toBe(2)
     expect((await run(cwd, 'check', 'model', '--bogus')).code).toBe(2)
-    await writeFile(join(cwd, 'radical-check.json'), '{ nope')
+    await writeFile(join(cwd, 'model/check.json'), '{ nope')
     expect((await run(cwd, 'check', 'model')).err).toContain('Cannot read the config')
   })
 
@@ -118,6 +118,16 @@ describe('radical check', () => {
     expect(red.out).toContain('  Requirements: 1 broken')
     const evidence = JSON.parse(await readFile(join(cwd, 'evidence.json'), 'utf8'))
     expect(evidence.nodes.req).toMatchObject({ status: 'broken', by: ['sc'] })
+
+    // The test cases are kept beside the model for Studio.
+    const results = JSON.parse(await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8'))
+    expect(results).toMatchObject({ version: 1, reports: ['red.json'] })
+    expect(results.cases).toHaveLength(2)
+    expect(await readFile(join(cwd, 'model/.radical/.gitignore'), 'utf8')).toBe('*\n')
+    // Into the model folder's .radical directory, made with its .gitignore.
+    await run(cwd, 'check', 'model', '--report', 'red.json', '--evidence', 'model/.radical/evidence.json')
+    expect(JSON.parse(await readFile(join(cwd, 'model/.radical/evidence.json'), 'utf8')).nodes.req.status).toBe('broken')
+    expect(await readFile(join(cwd, 'model/.radical/.gitignore'), 'utf8')).toBe('*\n')
 
     const green = await run(cwd, 'check', 'model', '--report', 'red.json', '--report', 'green.json')
     // Either report failing the test fails it.
