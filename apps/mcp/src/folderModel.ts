@@ -5,7 +5,7 @@ import { buildToolDefs, runTool, type ToolDef, type ToolRunContext } from '@radi
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
 import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
-import { deserializeFromMdFolder, isMdFolder, isOwnedMdFolderFile, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
+import { MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
@@ -25,7 +25,6 @@ import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult 
  *  external client. */
 const EXCLUDED_TOOLS = new Set(['set_active_view', 'focus_node', 'reset_diagram'])
 const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'search_model', 'list_milestones', 'compare_milestones'])
-const JSON_FILES = ['_layout.json', 'relations.json', 'views.json', 'sequences.json', 'snapshots.json', 'presentations.json', 'metamodel.json', 'hubTemplates.json']
 
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
@@ -82,12 +81,10 @@ export interface OpenOptions {
 }
 
 function checkFiles(files: FolderFiles): void {
-  if (!isMdFolder(files)
-    || !/^radicalFormat:\s*["']?md-folder["']?\s*$/m.test(files['radical.md'])
-    || !/^version:\s*1\s*$/m.test(files['radical.md'])) {
+  if (!isValidMdFolderManifest(files['radical.md'])) {
     throw new Error('Folder is missing a valid radical.md Markdown-folder manifest. Point --folder at an empty or new folder to start a model there.')
   }
-  for (const path of JSON_FILES) {
+  for (const path of MD_FOLDER_JSON_FILES) {
     if (!(path in files)) continue
     try { JSON.parse(files[path]) }
     catch { throw new Error(`Malformed JSON in ${path}`) }

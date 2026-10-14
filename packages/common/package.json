@@ -8,6 +8,7 @@
     "./c4": "./src/c4.ts",
     "./metamodel": "./src/metamodel/index.ts",
     "./model": "./src/model.ts",
+    "./check": "./src/check/index.ts",
     "./hubFormat": "./src/hubFormat.ts",
     "./hubViews": "./src/hubViews.ts",
     "./hubImport": "./src/hubImport.ts",

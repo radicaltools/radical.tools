@@ -415,6 +415,12 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     one paragraph more, four times over. One slip drops an earlier
     amendment without a word. An append mode for text properties, or an
     `amend_decision` tool that adds a dated paragraph, would do.
+25. **`search_model` cannot answer "which X has no Y".** Finding the
+    requirements no scenario verifies took a script over `relations.json`;
+    the query language lists nodes and relations but cannot negate a
+    relation. `radical check` (2026-10-14) now answers these for the fixed
+    rules; a `WHERE NOT ... ` over relations would let a project write its
+    own.
 
 ### Reverse-engineered requirements (2026-10-06)
 
@@ -2020,4 +2026,34 @@ a read-only view with the wizard's step bar. Still open:
 4. **Polling.** Studio reads the file every 2 s while a folder model is open,
    whether or not an agent is connected; the folder watcher's change events
    could drive it instead.
+
+### radical check (2026-10-14)
+
+`radical check [folder]` (apps/cli, rules in `@radical/common/check`) checks a
+Markdown model folder: its files, the metamodel (the same validator as
+Studio's Validation list) and completeness (requirements with scenarios,
+accepted ADRs with fitness functions, …), with baselines in
+`radical-check.json` that `--ratchet` lowers. ADRs "One radical CLI" and
+"Editors prevent, check detects". On `architecture/` it finds 125 warnings
+and no errors: 104 requirements without a scenario, 8 accepted ADRs without a
+fitness function, 7 requirements that derive from nothing, 3 ADRs without a
+date, 2 requirements nothing satisfies, 1 incomplete EARS requirement. Next:
+
+1. **Scenarios and fitness functions name their tests in prose.** 117
+   scenarios say `# Covered by: <file> › <title>` in `gherkin`, the fitness
+   functions in their description. Properties `verified_by` (scenario) and
+   `check` (fitness function) holding test ids would let the check say when
+   a test is gone or renamed.
+2. **Test evidence.** Read Playwright/Vitest JSON and JUnit XML reports
+   (`--report`), mark a scenario broken when its test fails and the
+   requirements it verifies with it, write the status to
+   `.radical/evidence.json` (not into the model files) for Studio and MCP.
+3. **One catalogue everywhere.** Studio's Validation list and an MCP
+   `run_check` tool should show the completeness rules too.
+4. **Drift.** Compare the containers' relations with the workspaces'
+   dependencies and imports.
+5. **No CI run of this repository's model.** `architecture/` is local-only,
+   so CI runs the check's tests only.
+6. **`radical mcp` and publishing.** Serve the MCP server as a subcommand
+   too, and publish @radicaltools/cli the way the MCP server is published.
 

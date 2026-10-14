@@ -497,6 +497,45 @@ export function isOwnedMdFolderFile(path: string, content: string): boolean {
   return !!front.id && !!front.type
 }
 
+/** True when `content` is a manifest this version reads: Markdown-folder
+ *  format, version 1. */
+export function isValidMdFolderManifest(content: string | undefined): boolean {
+  return content !== undefined
+    && /^radicalFormat:\s*["']?md-folder["']?\s*$/m.test(content)
+    && /^version:\s*1\s*$/m.test(content)
+}
+
+/** The JSON sidecars a folder may hold. */
+export const MD_FOLDER_JSON_FILES: readonly string[] = [...SIDECAR_FILES]
+
+/** A `.md` file under `nodes/`, as its frontmatter reads. */
+export interface MdFolderNodeFile {
+  path: string
+  id?: string
+  type?: string
+  /** The file starts with a frontmatter block. A file without one (a
+   *  hand-written README) is no node and not meant to be. */
+  frontmatter: boolean
+  /** Git left conflict markers in it. */
+  conflict: boolean
+}
+
+/** Every `.md` file under `nodes/` with the node its frontmatter names. */
+export function mdFolderNodeFiles(files: FolderFiles): MdFolderNodeFile[] {
+  return Object.entries(files)
+    .filter(([path]) => path.startsWith(NODES_DIR + '/') && path.endsWith('.md'))
+    .map(([path, content]) => {
+      const { front } = parseMarkdown(content)
+      return {
+        path,
+        ...(front.id ? { id: String(front.id) } : {}),
+        ...(front.type ? { type: String(front.type) } : {}),
+        frontmatter: content.replace(/\r\n/g, '\n').startsWith('---\n'),
+        conflict: CONFLICT_MARKER.test(content),
+      }
+    })
+}
+
 /** Paths in `existing` (what is on disk now) that a write of `next` leaves
  *  stale: files we own that `next` no longer contains. */
 export function staleMdFolderFiles(existing: FolderFiles, next: FolderFiles): string[] {
