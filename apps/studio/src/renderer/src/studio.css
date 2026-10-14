@@ -3482,7 +3482,14 @@ label.app-menu-row { cursor: pointer; }
 .insp-peek-finding { font-size: 12.5px; color: var(--text-secondary); border-left: 2px solid var(--warning); padding-left: 8px; }
 .insp-peek-finding.error { border-color: var(--danger); }
 
-/* Toolbar: the Inspector perspective with what the check finds */
-.toolbar-mode-btn .insp-count { display: inline-flex; gap: 6px; margin-left: 6px; font-variant-numeric: tabular-nums; font-size: 11.5px; }
-.toolbar-mode-btn .insp-count .e { color: var(--danger); }
-.toolbar-mode-btn .insp-count .w { color: var(--warning); }
+/* Toolbar: the Inspector perspective with what the check finds. On the
+   active (accent) button the counts sit on chips of their own, so the
+   warning and danger colours do not run into the accent. */
+.toolbar-mode-btn .insp-count { display: inline-flex; gap: 4px; margin-left: 6px; font-variant-numeric: tabular-nums; font-size: 11.5px; font-weight: 600; }
+.toolbar-mode-btn .insp-count span { padding: 0 5px; border-radius: 4px; line-height: 1.5; }
+.toolbar-mode-btn .insp-count .e { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.toolbar-mode-btn .insp-count .w { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
+.toolbar-mode-btn.active .insp-count .e,
+.toolbar-mode-btn.active .insp-count .w { color: #fff; background: rgba(0, 0, 0, 0.28); }
+.toolbar-mode-btn:disabled { opacity: 0.4; cursor: default; }
+.toolbar-mode-btn:disabled:hover { background: transparent; }

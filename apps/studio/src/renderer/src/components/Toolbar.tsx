@@ -529,16 +529,21 @@ function typingInTextField(target: EventTarget | null): boolean {
 }
 
 /** The Inspector perspective, with how many errors and warnings the check
- *  finds in the model now. */
+ *  finds in the model now. Greyed out while the model has no report of
+ *  `radical check --report` beside it: there is nothing to inspect yet. */
 function InspectorModeButton({ active, onClick }: { active: boolean; onClick: () => void }): React.ReactElement {
   const check = useInspectorStore((s) => s.check)
-  const title = check
-    ? `Inspector perspective — what radical check says about the model: ${check.errors} errors, ${check.warnings} warnings`
-    : 'Inspector perspective — what radical check says about the model'
+  const hasReport = useInspectorStore((s) => s.results !== null)
+  const enabled = hasReport || active
+  const title = !enabled
+    ? 'Inspector — no check report beside this model yet. Run radical check <model folder> --report <test reports> to make one; Studio picks it up by itself.'
+    : check
+      ? `Inspector — what radical check says about the model: ${check.errors} errors, ${check.warnings} warnings`
+      : 'Inspector — what radical check says about the model'
   return (
-    <button className={`toolbar-mode-btn${active ? ' active' : ''}`} onClick={onClick} title={title}>
+    <button className={`toolbar-mode-btn${active ? ' active' : ''}`} onClick={onClick} disabled={!enabled} title={title}>
       <IconInspect /> Inspector
-      {check && (check.errors > 0 || check.warnings > 0) && (
+      {enabled && check && (check.errors > 0 || check.warnings > 0) && (
         <span className="insp-count">{check.errors > 0 && <span className="e">✖ {check.errors}</span>}<span className="w">⚠ {check.warnings}</span></span>
       )}
     </button>
