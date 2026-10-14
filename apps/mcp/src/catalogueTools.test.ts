@@ -75,6 +75,7 @@ describe('MCP document tools', () => {
       await call(client, 'add_node', { tempId: 'bank', type: 'system', label: 'Bank' })
       await call(client, 'add_relation', { sourceId: 'user', targetId: 'shop', relationType: 'interacts', label: 'Orders' })
       await call(client, 'add_relation', { sourceId: 'shop', targetId: 'bank', relationType: 'interacts', label: 'Charges' })
+      await call(client, 'add_node', { tempId: 'aside', type: 'system', label: 'Aside' })
       await call(client, 'create_view', { tempId: 'ctx', name: 'Context', nodeIds: ['user', 'shop', 'bank'] })
       const before = await read()
       const view = before.views![0]
@@ -84,8 +85,9 @@ describe('MCP document tools', () => {
       const after = await read()
       // The model's own (All elements) positions are untouched; the view got its own.
       expect(after.nodes.map((n) => [n.x, n.y])).toEqual(before.nodes.map((n) => [n.x, n.y]))
+      // Only of the elements it draws, not of Aside.
       const positions = after.views![0].positions
-      expect(Object.keys(positions).sort()).toEqual(after.nodes.map((n) => n.id).sort())
+      expect(Object.keys(positions).sort()).toEqual(after.nodes.filter((n) => n.label !== 'Aside').map((n) => n.id).sort())
 
       await call(client, 'create_presentation', { name: 'Pitch', slides: [{ name: 'Overview' }, { name: 'Context', viewId: view.id }] })
       const presented = await read()

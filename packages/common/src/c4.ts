@@ -537,6 +537,41 @@ export function viewShowsEveryNode(view: Pick<DiagramView, 'nodeIds' | 'empty'>)
   return view.nodeIds.length === 0 && !view.empty
 }
 
+/**
+ * The positions a view keeps of `positions` (where the canvas had the nodes):
+ * those of the nodes it draws, its listed nodes and their ancestors, when it
+ * is drawn on a canvas; none for a table, wiki, matrix, hierarchy or flow
+ * view, which draw no positions; all of them when it shows every node. The
+ * canvas keeps one set of positions in the nodes, so it used to store every
+ * node's into each view: 99% of a large model's views.json.
+ */
+export function viewCanvasPositions<P>(
+  view: Pick<DiagramView, 'kind' | 'nodeIds' | 'empty'>,
+  nodes: Record<string, Pick<C4Node, 'parentId'>>,
+  positions: Record<string, P>,
+): Record<string, P> {
+  if (view.kind && view.kind !== 'static') return {}
+  if (viewShowsEveryNode(view)) return positions
+  const kept: Record<string, P> = {}
+  const seen = new Set<string>()
+  for (const id of view.nodeIds) {
+    for (let cur: string | undefined = id; cur && nodes[cur] && !seen.has(cur); cur = nodes[cur].parentId) {
+      seen.add(cur)
+      if (cur in positions) kept[cur] = positions[cur]
+    }
+  }
+  return kept
+}
+
+/** Views with only the positions they draw (viewCanvasPositions); a view
+ *  that keeps no more than that is returned as it is. */
+export function withCanvasPositions<V extends DiagramView>(views: V[], nodes: Record<string, Pick<C4Node, 'parentId'>>): V[] {
+  return views.map((view) => {
+    const kept = viewCanvasPositions(view, nodes, view.positions ?? {})
+    return Object.keys(kept).length === Object.keys(view.positions ?? {}).length ? view : { ...view, positions: kept }
+  })
+}
+
 /** Removes ids from a view's list; a list emptied this way lists nothing
  *  (`empty`), not every node. Mutates the view. */
 export function removeFromViewList(view: DiagramView, removed: { has(id: string): boolean }): void {
