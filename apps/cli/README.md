@@ -31,7 +31,7 @@ Actions annotations.
 
 ### Config
 
-`radical-check.json` in the working directory (or `--config <file>`) sets
+`check.json` in the model folder (or `--config <file>`) sets
 rules by id, or one kind of metamodel issue by `metamodel/<code>`:
 
 ```json
@@ -78,8 +78,7 @@ directory of them (its .json and .xml files), and may be repeated.
 In this repository `npm run test:reports` runs every workspace's tests and
 leaves a report per workspace in `reports/`, the e2e suite adds
 `reports/e2e.json`, and `npm run check:architecture` checks the local
-`architecture/` model against them (evidence in
-`architecture/.radical/evidence.json`). CI keeps `reports/` as the
+`architecture/` model against them. CI keeps `reports/` as the
 `test-reports` artifact (and `reports/e2e.json` in `e2e-report`). A named
 test that failed or is gone from the report of its file (renamed, deleted)
 is an error; one that was skipped, or whose file no report has, a warning.
@@ -88,4 +87,9 @@ functions the reports verify. `--evidence` writes that status per element
 as JSON (`verified`, `broken`, `unverified` for requirements and ADRs;
 `passed`, `failed`, `not-run`, `no-tests` for scenarios and fitness
 functions); it never writes into the model.
+
+With `--report` the command also keeps the test cases it read in the model
+folder's `.radical/test-results.json` (out of git, like the rest of
+`.radical/`). Studio's Inspector perspective reads them and the model's
+`check.json`, and runs the same check on the model as it is edited.
 

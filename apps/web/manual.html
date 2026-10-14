@@ -84,6 +84,7 @@
             <li><a href="#layout">Layout &amp; navigation</a></li>
             <li><a href="#milestones">Milestones</a></li>
             <li><a href="#presenting">Viewer &amp; Presenter</a></li>
+            <li><a href="#inspector">Inspector</a></li>
           </ul>
         </div>
         <div class="toc-group">
@@ -525,6 +526,19 @@
         <p>
           <strong>Presenter</strong> adds the slide dock. Pick or create a presentation, then <em>Add slide</em> to capture what is on screen: the view, the camera, the layout and collapse state, and the model at that moment. Slides can be renamed, reordered, re-captured, and linked to a view or a milestone. <em>Present</em> (or <kbd>F5</kbd> from anywhere) goes full-screen: <kbd>→</kbd> <kbd>↓</kbd> <kbd>Space</kbd> advance, <kbd>←</kbd> <kbd>↑</kbd> go back, <kbd>Esc</kbd> exits. A Flow-view slide replays its sequence one step at a time. The URL updates as you present, so a listener can open the same slide.
         </p>
+      </section>
+
+      <section class="doc-section" id="inspector">
+        <h2>Inspector</h2>
+        <p>
+          <strong>Inspector</strong> shows what <code>radical check</code> says about the model, as one page: how many requirements and decisions the tests verify, what fails, the requirements by group and the elements that satisfy them, each ADR with the fitness functions that check it, and every finding by rule. Each element the page names is a link: it opens a panel with the element's findings and tests, and from there <em>Show on canvas</em> goes to Designer on a view that shows it, or <em>Open wiki page</em> to its page.
+        </p>
+        <ul>
+          <li><strong>The rules about the model</strong> (the metamodel, a requirement without a scenario, an accepted ADR without a fitness function, an incomplete EARS sentence, …) run on the model as you edit it, with the same code the command line runs.</li>
+          <li><strong>What the tests say</strong> comes from the last <code>radical check &lt;model folder&gt; --report &lt;test reports&gt;</code>: it keeps the test cases it read in the folder's <code>.radical/test-results.json</code>, and Studio picks them up by itself. A scenario or a fitness function names its tests in its <em>Tests</em> property, one <code>file › title</code> per line. Until a report is there, the Inspector button is greyed out.</li>
+          <li><strong>Rule settings</strong> are the model folder's <code>check.json</code>, which the command line reads too, so Studio and CI agree.</li>
+          <li>The Inspector button counts the errors and warnings in every perspective. Nothing in the Inspector changes the model.</li>
+        </ul>
       </section>
 
       <!-- ═══════════════ EXTEND ═══════════════ -->

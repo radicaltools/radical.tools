@@ -2033,7 +2033,7 @@ a read-only view with the wizard's step bar. Still open:
 Markdown model folder: its files, the metamodel (the same validator as
 Studio's Validation list) and completeness (requirements with scenarios,
 accepted ADRs with fitness functions, …), with baselines in
-`radical-check.json` that `--ratchet` lowers. Scenarios and fitness functions
+the model folder's `check.json` that `--ratchet` lowers. Scenarios and fitness functions
 name their tests in a `tests` property (`file › title`, one per line);
 `--report` reads Vitest/Jest JSON, Playwright JSON and JUnit XML and
 `--evidence` writes the status of each scenario, fitness function,
@@ -2060,9 +2060,12 @@ requirements and 8 ADRs verified, no errors. Still open:
    `npm run check:architecture` runs locally; with the CI reports it takes a
    `gh run download` first. A project whose model is in its repository can
    run `radical check --report reports` as a CI step.
-3. **One catalogue everywhere.** Studio's Validation list and an MCP
-   `run_check` tool should show the completeness rules, and Studio the
-   evidence (a red requirement on the canvas).
+3. **One catalogue everywhere.** Studio has the Inspector perspective
+   (2026-10-14): the whole check on the model as it is edited, the test
+   results from `.radical/test-results.json`, links to the elements. Still
+   open: markers on the cards in Designer and a "Check" section in the
+   properties panel; the metamodel editor's Validation list moving into the
+   Inspector; an MCP `run_check` tool for agents.
 4. **A renamed test needs its id renamed in the model.** Ids match titles;
    a rename shows as test-not-found in the next run, never silently.
 5. **Drift.** Compare the containers' relations with the workspaces'

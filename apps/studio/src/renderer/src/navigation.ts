@@ -79,6 +79,7 @@ export function revealOnCanvas(nodeId: string): void {
     const w = window as unknown as { __rfFocusNode?: FocusFn; __rfCurrentViewport?: { zoom: number } }
     const started = Date.now()
     const focus = (): void => {
+      if (typeof document === 'undefined') return
       const drawn = document.querySelector(`.react-flow__node[data-id="${CSS.escape(nodeId)}"]`)
       if (drawn && w.__rfFocusNode) w.__rfFocusNode(nodeId, { zoom: FOCUS_ZOOM, duration: 400 })
       if (Date.now() - started > 4000) return
