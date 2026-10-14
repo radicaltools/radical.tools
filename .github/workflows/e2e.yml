@@ -39,4 +39,5 @@ jobs:
           path: |
             apps/e2e/playwright-report/
             apps/e2e/test-results/
+            reports/e2e.json
           retention-days: 14

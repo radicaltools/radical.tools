@@ -123,6 +123,13 @@ describe('radical check', () => {
     // Either report failing the test fails it.
     expect(green.code).toBe(1)
     expect((await run(cwd, 'check', 'model', '--report', 'green.json')).code).toBe(0)
+    // A directory: every report in it.
+    await mkdir(join(cwd, 'reports'))
+    await writeFile(join(cwd, 'reports/green.json'), report('passed'))
+    await writeFile(join(cwd, 'reports/notes.txt'), 'not a report')
+    const dir = await run(cwd, 'check', 'model', '--report', 'reports')
+    expect(dir.code).toBe(0)
+    expect(dir.out).toContain('Test reports: 2 test cases')
   })
 
   it('exits 2 on a report it cannot read, or evidence without a report', async () => {

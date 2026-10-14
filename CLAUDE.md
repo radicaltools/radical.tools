@@ -22,6 +22,13 @@ Studio can open the same folder.
   alternatives) linked with `constrains`, and an automated check as a fitness
   function that `implements` it. Then run `smart_layout` on the views you
   changed.
+- Scenarios and fitness functions name the tests that run them in `tests`
+  (one `file › title` per line). When you add a scenario, or rename, move or
+  delete a test one names, update `tests` with it.
+- To see what the tests say about the model: `npm run test:reports` (plus
+  `npm run e2e` for the e2e tests; both write to `reports/`), then
+  `npm run check:architecture`. It must report no errors; a test the model
+  names that failed or is gone is one.
 - Write the model in English.
 - When the product gets in the way while doing this (a missing tool, an
   awkward format, a bad layout), add it to `docs/IMPROVEMENTS.md` under

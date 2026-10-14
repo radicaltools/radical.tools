@@ -2054,8 +2054,12 @@ requirements and 8 ADRs verified, no errors. Still open:
    Layout quality" (benchmarks) and "Model in step with code" (review) name
    no tests. A `command` property, or a JUnit report from those scripts,
    would let them count.
-2. **CI does not keep reports.** `npm test` and the e2e job write no JSON or
-   JUnit report; with them a pipeline could run `radical check --report`.
+2. **The model's check runs only on the maintainer's machine.** CI keeps
+   the reports (`npm run test:reports` → artifact `test-reports`, e2e →
+   `reports/e2e.json` in `e2e-report`), but `architecture/` is local-only, so
+   `npm run check:architecture` runs locally; with the CI reports it takes a
+   `gh run download` first. A project whose model is in its repository can
+   run `radical check --report reports` as a CI step.
 3. **One catalogue everywhere.** Studio's Validation list and an MCP
    `run_check` tool should show the completeness rules, and Studio the
    evidence (a red requirement on the canvas).
@@ -2063,7 +2067,5 @@ requirements and 8 ADRs verified, no errors. Still open:
    a rename shows as test-not-found in the next run, never silently.
 5. **Drift.** Compare the containers' relations with the workspaces'
    dependencies and imports.
-6. **No CI run of this repository's model.** `architecture/` is local-only,
-   so CI runs the check's tests only.
-7. **`radical mcp` and publishing.** Serve the MCP server as a subcommand
+6. **`radical mcp` and publishing.** Serve the MCP server as a subcommand
    too, and publish @radicaltools/cli the way the MCP server is published.

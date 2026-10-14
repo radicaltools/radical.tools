@@ -69,10 +69,18 @@ workspace-relative ones in a JUnit file both do.
 ```sh
 npx vitest run --reporter=json --outputFile=reports/unit.json
 npx playwright test --reporter=json > reports/e2e.json
-radical check model --report reports/unit.json --report reports/e2e.json --evidence evidence.json
+radical check model --report reports --evidence evidence.json
 ```
 
-`--report` takes Vitest or Jest JSON, Playwright JSON and JUnit XML. A named
+`--report` takes Vitest or Jest JSON, Playwright JSON and JUnit XML, or a
+directory of them (its .json and .xml files), and may be repeated.
+
+In this repository `npm run test:reports` runs every workspace's tests and
+leaves a report per workspace in `reports/`, the e2e suite adds
+`reports/e2e.json`, and `npm run check:architecture` checks the local
+`architecture/` model against them (evidence in
+`architecture/.radical/evidence.json`). CI keeps `reports/` as the
+`test-reports` artifact (and `reports/e2e.json` in `e2e-report`). A named
 test that failed or is gone from the report of its file (renamed, deleted)
 is an error; one that was skipped, or whose file no report has, a warning.
 The text output sums up how many requirements, scenarios, ADRs and fitness

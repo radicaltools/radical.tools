@@ -37,7 +37,15 @@ jobs:
       - run: npm ci
       - run: npm run check:workspaces
       - run: npm run typecheck
-      - run: npm test
+      # npm test, keeping a JSON report per workspace for radical check.
+      - run: npm run test:reports
+      - name: Upload test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: reports/
+          retention-days: 14
 
   e2e:
     name: E2E

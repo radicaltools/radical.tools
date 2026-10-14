@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# Test reports for radical check (npm run test:reports, the e2e suite)
+reports/
 release/
 out/
 .DS_Store

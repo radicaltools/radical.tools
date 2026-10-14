@@ -1,5 +1,5 @@
-import { readFile, realpath, stat, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { CHECK_RULES, FOLDER_RULES, formatCheckGithub, formatCheckText, parseTestReport, ratchetConfig, runCheck, type CheckConfig, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
@@ -14,9 +14,10 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
   --config <file>     rule settings (default: radical-check.json in the working
                       directory, when there is one)
   --format <format>   text (default), json, or github (annotations for Actions)
-  --report <file>     a test report (Vitest or Jest JSON, Playwright JSON, JUnit
-                      XML); repeat for more. The tests that scenarios and fitness
-                      functions name are looked up in them
+  --report <path>     a test report (Vitest or Jest JSON, Playwright JSON, JUnit
+                      XML), or a directory of them (.json and .xml files); repeat
+                      for more. The tests that scenarios and fitness functions
+                      name are looked up in them
   --evidence <file>   with --report: write what the reports say about each
                       scenario, fitness function, requirement and ADR as JSON
   --ratchet           lower each baseline (max) in the config to the count found
@@ -93,7 +94,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   let tests: TestCase[] | undefined
   if (values.report?.length) {
     tests = []
-    for (const report of values.report) {
+    for (const report of await reportFiles(values.report, io.cwd)) {
       try {
         tests.push(...parseTestReport(await readFile(resolve(io.cwd, report), 'utf8'), report))
       } catch (error) {
@@ -122,3 +123,17 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
   return result.ok ? 0 : 1
 }
+
+/** The report files `paths` name: a file as it is, a directory's .json and
+ *  .xml files. A path that is not there is passed on, and fails to read. */
+async function reportFiles(paths: string[], cwd: string): Promise<string[]> {
+  const files: string[] = []
+  for (const path of paths) {
+    const isDir = await stat(resolve(cwd, path)).then((s) => s.isDirectory(), () => false)
+    if (!isDir) { files.push(path); continue }
+    const names = (await readdir(resolve(cwd, path))).filter((name) => /\.(json|xml)$/i.test(name)).sort()
+    files.push(...names.map((name) => join(path, name)))
+  }
+  return files
+}
+
