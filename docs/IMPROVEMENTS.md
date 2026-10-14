@@ -415,6 +415,12 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     one paragraph more, four times over. One slip drops an earlier
     amendment without a word. An append mode for text properties, or an
     `amend_decision` tool that adds a dated paragraph, would do.
+25. **`search_model` cannot answer "which X has no Y".** Finding the
+    requirements no scenario verifies took a script over `relations.json`;
+    the query language lists nodes and relations but cannot negate a
+    relation. `radical check` (2026-10-14) now answers these for the fixed
+    rules; a `WHERE NOT ... ` over relations would let a project write its
+    own.
 
 ### Reverse-engineered requirements (2026-10-06)
 
@@ -2021,3 +2027,45 @@ a read-only view with the wizard's step bar. Still open:
    whether or not an agent is connected; the folder watcher's change events
    could drive it instead.
 
+### radical check (2026-10-14)
+
+`radical check [folder]` (apps/cli, rules in `@radical/common/check`) checks a
+Markdown model folder: its files, the metamodel (the same validator as
+Studio's Validation list) and completeness (requirements with scenarios,
+accepted ADRs with fitness functions, …), with baselines in
+`radical-check.json` that `--ratchet` lowers. Scenarios and fitness functions
+name their tests in a `tests` property (`file › title`, one per line);
+`--report` reads Vitest/Jest JSON, Playwright JSON and JUnit XML and
+`--evidence` writes the status of each scenario, fitness function,
+requirement and ADR. ADRs "One radical CLI", "Editors prevent, check
+detects" and "The model names its tests".
+
+On `architecture/` the 117 `# Covered by:` comments and the fitness
+functions' prose became `tests` (2026-10-14). Checked against real reports
+first, they held four stale bindings: two titles cut short
+(forgeClarify.test.ts, forge.test.ts), a test moved from known-issues.spec.ts
+to physics.spec.ts, and "an idle canvas with nested elements stays still",
+removed in #176 (now physics.spec.ts › a diagram keeps the layout it is
+opened with). With the unit test reports and a Playwright `--list`: 71
+requirements and 8 ADRs verified, no errors. Still open:
+
+1. **Checks that are no test runner.** "Installable MCP package"
+   (test-package.mjs), "Workspace boundaries" (check-workspaces.mjs), "Smart
+   Layout quality" (benchmarks) and "Model in step with code" (review) name
+   no tests. A `command` property, or a JUnit report from those scripts,
+   would let them count.
+2. **The model's check runs only on the maintainer's machine.** CI keeps
+   the reports (`npm run test:reports` → artifact `test-reports`, e2e →
+   `reports/e2e.json` in `e2e-report`), but `architecture/` is local-only, so
+   `npm run check:architecture` runs locally; with the CI reports it takes a
+   `gh run download` first. A project whose model is in its repository can
+   run `radical check --report reports` as a CI step.
+3. **One catalogue everywhere.** Studio's Validation list and an MCP
+   `run_check` tool should show the completeness rules, and Studio the
+   evidence (a red requirement on the canvas).
+4. **A renamed test needs its id renamed in the model.** Ids match titles;
+   a rename shows as test-not-found in the next run, never silently.
+5. **Drift.** Compare the containers' relations with the workspaces'
+   dependencies and imports.
+6. **`radical mcp` and publishing.** Serve the MCP server as a subcommand
+   too, and publish @radicaltools/cli the way the MCP server is published.

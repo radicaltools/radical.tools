@@ -36,7 +36,12 @@ export default defineConfig({
   forbidOnly: CI,
   retries: CI ? 2 : 0,
   workers: CI ? 2 : undefined,
-  reporter: CI ? [['github'], ['html', { open: 'never' }]] : [['list'], ['html', { open: 'never' }]],
+  // reports/e2e.json is for `radical check --report reports` (npm run check:architecture).
+  reporter: [
+    ...(CI ? [['github'] as const] : [['list'] as const]),
+    ['html', { open: 'never' }],
+    ['json', { outputFile: '../../reports/e2e.json' }],
+  ],
   timeout: 60_000,
 
   ignoreSnapshots: !visual,
