@@ -640,8 +640,11 @@ export function Toolbar(): React.ReactElement {
         e.preventDefault()
         if (undoKey) useDiagramStore.getState().undo()
         else useDiagramStore.getState().redo()
-      } else if ((e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') && (window as any).__radicalZoomIn) {
-        // The canvas and the Flow view register zoom; elsewhere the browser zooms the page.
+      } else if ((e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') && (window as any).__radicalZoomIn
+        && useDiagramStore.getState().appMode !== 'inspector') {
+        // The canvas and the Flow view register zoom; elsewhere (the
+        // Inspector shows no canvas, though the one left registered) the
+        // browser zooms the page.
         e.preventDefault()
         if (e.key === '+' || e.key === '=') useDiagramStore.getState().zoomIn()
         else useDiagramStore.getState().zoomOut()
@@ -744,52 +747,56 @@ export function Toolbar(): React.ReactElement {
         onCopyToClipboard={copyToClipboard}
         exportBusy={exportBusy}
       />
-      <div className="toolbar-sep" />
+      {/* The canvas controls and undo: the Inspector has no canvas and
+          changes nothing. */}
+      {appMode !== 'inspector' && (<>
+        <div className="toolbar-sep" />
 
-      <button
-        className="toolbar-btn"
-        onClick={fitAll}
-        title="Fit all visible nodes to viewport"
-      >
-        <IconFitAll /> Fit All
-      </button>
-      <button
-        className="toolbar-btn"
-        onClick={zoomOut}
-        title="Zoom out (⌘−)"
-      >
-        <IconZoomOut />
-      </button>
-      <button
-        className="toolbar-btn"
-        onClick={zoomIn}
-        title="Zoom in (⌘+)"
-      >
-        <IconZoomIn />
-      </button>
+        <button
+          className="toolbar-btn"
+          onClick={fitAll}
+          title="Fit all visible nodes to viewport"
+        >
+          <IconFitAll /> Fit All
+        </button>
+        <button
+          className="toolbar-btn"
+          onClick={zoomOut}
+          title="Zoom out (⌘−)"
+        >
+          <IconZoomOut />
+        </button>
+        <button
+          className="toolbar-btn"
+          onClick={zoomIn}
+          title="Zoom in (⌘+)"
+        >
+          <IconZoomIn />
+        </button>
 
-      {activeViewKind !== 'treemap' && activeViewKind !== 'dynamic' && activeViewKind !== 'table' && activeViewKind !== 'matrix' && (
-        <SmartLayoutButton />
-      )}
+        {activeViewKind !== 'treemap' && activeViewKind !== 'dynamic' && activeViewKind !== 'table' && activeViewKind !== 'matrix' && (
+          <SmartLayoutButton />
+        )}
 
-      <div className="toolbar-sep" />
+        <div className="toolbar-sep" />
 
-      <button
-        className="toolbar-btn"
-        onClick={undo}
-        disabled={!canUndo}
-        title="Undo (⌘Z)"
-      >
-        <IconUndo /> Undo
-      </button>
-      <button
-        className="toolbar-btn"
-        onClick={redo}
-        disabled={!canRedo}
-        title="Redo (⌘⇧Z)"
-      >
-        <IconRedo /> Redo
-      </button>
+        <button
+          className="toolbar-btn"
+          onClick={undo}
+          disabled={!canUndo}
+          title="Undo (⌘Z)"
+        >
+          <IconUndo /> Undo
+        </button>
+        <button
+          className="toolbar-btn"
+          onClick={redo}
+          disabled={!canRedo}
+          title="Redo (⌘⇧Z)"
+        >
+          <IconRedo /> Redo
+        </button>
+      </>)}
 
       <div style={{ flex: 1 }} />
 

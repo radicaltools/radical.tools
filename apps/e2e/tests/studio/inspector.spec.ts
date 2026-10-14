@@ -58,6 +58,10 @@ test('the Inspector shows what radical check says, and its links lead to the ele
 
   await inspector.click()
   await expect(page.locator('.insp-verdict')).toHaveText(/✖ 1 errors/)
+  // No canvas here: no Fit All, zoom, Smart Layout, Undo or Redo.
+  for (const name of ['Fit All', 'Smart Layout', 'Undo', 'Redo']) {
+    await expect(page.locator('.toolbar').getByRole('button', { name })).toHaveCount(0)
+  }
   const error = page.locator('.insp-error')
   await expect(error).toContainText('test tests/pay.test.ts › pays by card failed.')
   await expect(page.locator('.insp-tile').first()).toContainText('0 / 11 broken')
@@ -72,6 +76,7 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   // From there to Designer, on the canvas that shows it, selected.
   await peek.getByRole('button', { name: 'Show on canvas' }).click()
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  await expect(page.locator('.toolbar').getByRole('button', { name: 'Fit All' })).toBeVisible()
   await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Specification')
   await expect(studio.node('req')).toHaveClass(/selected/)
 
