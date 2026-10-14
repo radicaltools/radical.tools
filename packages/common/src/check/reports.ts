@@ -105,11 +105,11 @@ export interface TestId {
   title: string[]
 }
 
-/** The test ids in a `tests` property: one per line (or separated by "; ").
- *  Blank lines and lines starting with # are left out. */
+/** The test ids in a `tests` property, one per line (a title may hold
+ *  "; "). Blank lines and lines starting with # are left out. */
 export function parseTestIds(text: unknown): TestId[] {
   if (typeof text !== 'string') return []
-  return text.split(/\n|;\s+/)
+  return text.split('\n')
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#'))
     .map((raw) => {
@@ -124,12 +124,22 @@ export function parseTestIds(text: unknown): TestId[] {
 const fileMatches = (reportFile: string, idFile: string): boolean =>
   reportFile === idFile || reportFile.endsWith('/' + idFile) || idFile.endsWith('/' + reportFile)
 
-/** The cases a test id names, and whether its file is in the reports at all. */
+/** The cases a test id names, and whether its file is in the reports at
+ *  all. A title names the test it ends (`file › test`, `file › describe ›
+ *  test`) or, failing that, every test in the describe block it starts
+ *  (`file › describe`); no title names every test in the file, or under
+ *  the directory. */
 export function findTests(id: TestId, cases: TestCase[]): { fileSeen: boolean; matches: TestCase[] } {
+  const n = id.title.length
+  if (!n) {
+    // A file, or a directory: every test under it.
+    const under = cases.filter((c) => fileMatches(c.file, id.file) || c.file.includes(`/${id.file.replace(/\/$/, '')}/`) || c.file.startsWith(`${id.file.replace(/\/$/, '')}/`))
+    return { fileSeen: under.length > 0, matches: under }
+  }
   const inFile = cases.filter((c) => fileMatches(c.file, id.file))
-  if (!id.title.length) return { fileSeen: inFile.length > 0, matches: [] }
-  const tail = id.title.join(' › ')
-  const matches = inFile.filter((c) => c.title.length >= id.title.length && c.title.slice(-id.title.length).join(' › ') === tail)
+  const key = id.title.join(' › ')
+  const tail = inFile.filter((c) => c.title.length >= n && c.title.slice(-n).join(' › ') === key)
+  const matches = tail.length ? tail : inFile.filter((c) => c.title.length > n && c.title.slice(0, n).join(' › ') === key)
   return { fileSeen: inFile.length > 0, matches }
 }
 

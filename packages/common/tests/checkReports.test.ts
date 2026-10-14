@@ -81,11 +81,11 @@ describe('test reports', () => {
     expect(() => parseTestReport('nope', 'r.txt')).toThrow('r.txt is neither JSON nor JUnit XML')
   })
 
-  it('reads test ids one per line or separated by "; ", leaving out comments', () => {
-    expect(parseTestIds('# Covered by:\napps/cli/src/cli.test.ts › radical check › prints JSON; apps/e2e/tests/studio/boot.spec.ts › boots\n\n')
+  it('reads test ids one per line, leaving out comments; a title may hold "; "', () => {
+    expect(parseTestIds('# Covered by:\napps/cli/src/cli.test.ts › radical check › prints JSON\n\napps/e2e/tests/studio/wizard.spec.ts › opens its wizard; finishing creates it\n')
       .map((id) => [id.file, id.title])).toEqual([
       ['apps/cli/src/cli.test.ts', ['radical check', 'prints JSON']],
-      ['apps/e2e/tests/studio/boot.spec.ts', ['boots']],
+      ['apps/e2e/tests/studio/wizard.spec.ts', ['opens its wizard; finishing creates it']],
     ])
     expect(parseTestIds(undefined)).toEqual([])
   })
@@ -102,6 +102,12 @@ describe('test reports', () => {
     expect(findTests(short, cases).matches).toHaveLength(2)
     const [other] = parseTestIds('apps/cli/src/cli.test.ts › prints XML')
     expect(findTests(other, cases)).toEqual({ fileSeen: true, matches: [] })
+    const [block] = parseTestIds('apps/cli/src/cli.test.ts › radical check')
+    expect(findTests(block, cases).matches).toEqual([cases[0], cases[1]])
+    const [file] = parseTestIds('apps/cli/src/cli.test.ts')
+    expect(findTests(file, cases).matches).toEqual([cases[0], cases[1]])
+    const [dir] = parseTestIds('apps/cli')
+    expect(findTests(dir, cases).matches).toEqual([cases[0]])
     const [elsewhere] = parseTestIds('apps/web/a.test.ts › prints JSON')
     expect(findTests(elsewhere, cases)).toEqual({ fileSeen: false, matches: [] })
   })
