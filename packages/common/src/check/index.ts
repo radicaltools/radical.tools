@@ -44,7 +44,15 @@ export interface CheckFinding extends RuleFinding {
 
 /** A rule's setting in the config: a severity, `off`, or a severity with a
  *  baseline: up to `max` findings are reported as warnings and pass. */
-export type RuleSetting = CheckSeverity | 'off' | { severity?: CheckSeverity | 'off'; max?: number }
+export type RuleSetting = CheckSeverity | 'off' | {
+  severity?: CheckSeverity | 'off'
+  max?: number
+  /** For rules about test files (test-unbound): the files they look at, as
+   *  globs over repository paths (`apps/e2e/**`). */
+  include?: string[]
+  /** Files left out of `include`. */
+  exclude?: string[]
+}
 
 export interface CheckConfig {
   /** By rule id, or `rule/code` for one kind of finding (`metamodel/sm-unreachable`). */
@@ -117,7 +125,7 @@ export function runCheck(files: FolderFiles, config: CheckConfig = {}, options: 
   }
 
   let model: ModelCheck = { found: [], nodeCount: 0, relationCount: 0 }
-  if (!found.some((f) => FATAL.has(f.rule))) model = checkData(deserializeFromMdFolder(files).data, options)
+  if (!found.some((f) => FATAL.has(f.rule))) model = checkData(deserializeFromMdFolder(files).data, options, config)
 
   const result = settle([...found, ...model.found].map((f) => ({
     ...f,
@@ -134,13 +142,16 @@ interface ModelCheck {
   evidence?: Evidence
 }
 
-function checkData(data: DiagramData, options: CheckOptions): ModelCheck {
+function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig): ModelCheck {
   const found: Array<RuleFinding & { rule: string }> = []
   const nodes = byId(data.nodes)
   const relations = byId(data.relations)
   staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations)
     .forEach((finding) => found.push({ rule: 'stale-reference', ...finding }))
-  const model = { nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), ...(options.tests ? { tests: options.tests } : {}) }
+  const model = {
+    nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), settings: config.rules ?? {},
+    ...(options.tests ? { tests: options.tests } : {}),
+  }
   for (const rule of CHECK_RULES) rule.run(model).forEach((finding) => found.push({ rule: rule.id, ...finding }))
   return {
     found,
@@ -153,7 +164,7 @@ function checkData(data: DiagramData, options: CheckOptions): ModelCheck {
 /** Checks a model already in memory, as Studio holds it: every rule but the
  *  ones about the folder's files, which only a folder has. */
 export function checkModel(data: DiagramData, config: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
-  const model = checkData(data, options)
+  const model = checkData(data, options, config)
   const result = settle(model.found, config, model.nodeCount, model.relationCount)
   return model.evidence ? { ...result, evidence: model.evidence } : result
 }
@@ -190,7 +201,7 @@ function staleReferences(
 const keyOf = (f: { rule: string; code?: string }, rules: Record<string, RuleSetting>): string =>
   f.code && rules[`${f.rule}/${f.code}`] !== undefined ? `${f.rule}/${f.code}` : f.rule
 
-const settingOf = (setting: RuleSetting | undefined): { severity?: CheckSeverity | 'off'; max?: number } =>
+const settingOf = (setting: RuleSetting | undefined): Exclude<RuleSetting, string> =>
   setting === undefined ? {} : typeof setting === 'string' ? { severity: setting } : setting
 
 function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfig, nodeCount: number, relationCount: number): CheckResult {

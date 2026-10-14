@@ -320,7 +320,16 @@ export function Inspector(): React.ReactElement {
                   </summary>
                   <div className="insp-items">
                     {list.slice(0, shown).map((f, i) => (
-                      <div key={i} className="insp-item">{f.path && !f.nodeId && <code className="insp-path">{f.path}</code>}<Message f={f} ctx={ctx} /></div>
+                      <div key={i} className="insp-item">
+                        {f.path && !f.nodeId && <code className="insp-path">{f.path}</code>}
+                        <Message f={f} ctx={ctx} />
+                        {f.details && f.details.length > 0 && (
+                          <details className="insp-details">
+                            <summary>{f.details.length === 1 ? '1 test' : `${f.details.length} tests`}</summary>
+                            <ul>{f.details.map((d) => <li key={d}><code>{d}</code></li>)}</ul>
+                          </details>
+                        )}
+                      </div>
                     ))}
                     {list.length > shown && <button type="button" className="insp-more" onClick={() => setOpened({ ...opened, [r.id]: list.length })}>Show {list.length - shown} more</button>}
                   </div>
