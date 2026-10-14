@@ -326,6 +326,31 @@ describe('long Smart Layout runs', () => {
     expect(after.defaultLayoutConstraints ?? []).toEqual([])
   }, 60_000)
 
+  it('lays out a view set to "Hierarchical nested tree" as a tree, as Studio does', async () => {
+    // It always ran Smart Layout: the agent and Studio's Tree Layout put the
+    // same view in two different places.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = [
+      { id: 'shop', type: 'system', label: 'Shop', x: 0, y: 0, width: 800, height: 400, collapsed: false },
+      ...['web', 'api', 'db'].map((id, i) => ({ id, type: 'container', label: id, parentId: 'shop', x: 40 + i * 5, y: 120, width: 240, height: 160, collapsed: false })),
+    ] as never
+    data.relations = [{ id: 'r1', sourceId: 'web', targetId: 'api' }, { id: 'r2', sourceId: 'api', targetId: 'db' }]
+    data.views = [{ id: 'v', name: 'Tree', nodeIds: [], positions: {}, layoutMode: 'tree' } as never]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const outcome = await model.call('smart_layout', { viewId: 'v' })
+    expect(outcome.text).toMatch(/^Tree Layout \(Tree\)/)
+    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const pos = after.views!.find((v) => v.id === 'v')!.positions
+    // A tree: each container below the one it calls.
+    expect(pos.api.y).toBeGreaterThan(pos.web.y)
+    expect(pos.db.y).toBeGreaterThan(pos.api.y)
+  }, 60_000)
+
   it('exits when the client closes its end', async () => {
     const folder = await fixture()
     const server = spawn(process.execPath, [join(import.meta.dirname, '../dist/index.js'), '--folder', folder], { stdio: ['pipe', 'ignore', 'ignore'] })

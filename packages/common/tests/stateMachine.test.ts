@@ -196,7 +196,7 @@ describe('state machine rules', () => {
 })
 
 describe('requirements while in a state', () => {
-  it('read "While the <entity> is <state>" from the state they point at, unless the precondition says otherwise', () => {
+  it('read "While the <entity> is <state>" from the state they point at, in place of the precondition text', () => {
     const m = orderMachine()
     const req = node('requirement', 'Hold stock', undefined, { ears_type: 'state-driven', action: 'hold the stock', precondition_state: m.pending.id })
     const all = byId([...m.nodes, req])
@@ -206,9 +206,10 @@ describe('requirements while in a state', () => {
       .toBe('While the Order is Pending, the shop shall hold the stock.')
     // Without the machine's entity it names the state alone.
     expect(requirementStatePhrase(req, all, byId(m.relations.filter((r) => r.relationType !== 'lifecycle-of')))).toBe('in Pending')
-    // Text wins over the reference; no reference, no phrase.
+    // The reference takes the place of the text (the wizard writes one);
+    // no reference, no phrase.
     expect(composeEarsSentence({ ...req, precondition: 'the shop is open' } as unknown as Record<string, unknown>, 'the shop', 'the Order is Pending').sentence)
-      .toBe('While the shop is open, the shop shall hold the stock.')
+      .toBe('While the Order is Pending, the shop shall hold the stock.')
     expect(requirementStatePhrase({ ...req, precondition_state: undefined } as unknown as C4Node, all, rels)).toBe('')
     // The reference must point at a state.
     const wrong = { ...req, precondition_state: m.order.id } as unknown as C4Node

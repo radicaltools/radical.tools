@@ -1,7 +1,7 @@
 // ─── Relation tools: add_relation / update_relation / delete_relation ───────
 
 import type { C4Relation } from '../../c4'
-import type { Metamodel } from '../../metamodel'
+import { isReservedPropertyKey, type Metamodel } from '../../metamodel'
 import { fail, type ToolDef, type ToolHandler } from './types'
 import { validateProperties, type PropertyValue } from './propertyBag'
 
@@ -100,8 +100,16 @@ export function buildRelationToolHandlers(): Record<string, ToolHandler> {
         notes = validated.notes
       } else if (input.properties && typeof input.properties === 'object') {
         // Type wasn't given (will be auto-inferred by the store) — pass values
-        // through as-is since we can't validate against an unknown type's schema.
-        propValues = input.properties as Record<string, PropertyValue>
+        // through, but never a field every relation has: spread into the
+        // relation, `targetId` or `relationType` in the bag replaced the
+        // checked ends and type (a relation to nothing, of an unknown type).
+        for (const [key, value] of Object.entries(input.properties as Record<string, PropertyValue>)) {
+          if (isReservedPropertyKey(key, 'relation') || key === 'label' || key === 'technology') {
+            notes.push(`ignored property "${key}" — give it as an argument of its own`)
+          } else {
+            propValues[key] = value
+          }
+        }
       }
 
       const beforeCount = Object.keys(ctx.diagram.getRelations()).length

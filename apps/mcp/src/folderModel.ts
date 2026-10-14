@@ -14,8 +14,9 @@ import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
 import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
-import { viewLayoutInput, applyAlignments, applyLayoutPositions, resizeParentsBottomUp } from '@radical/layout/viewInput'
-import { pinnedNodeIds, type C4Node, type DiagramData, type NodePosition } from '@radical/common/c4'
+import { viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
+import { applyTreeLayout } from '@radical/layout/elkLayout'
+import { pinnedNodeIds, type C4Node, type DiagramData, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
 import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
 
@@ -412,6 +413,9 @@ export class FolderModel {
     if (!Object.keys(input.nodes).length) return { ok: true, text: 'Smart Layout: there are no nodes to lay out.' }
     // Large models take minutes: report each step, and stop at the next one
     // once the client has cancelled (or gone away) rather than finish unseen.
+    // A view set to "Hierarchical nested tree" is laid out as a tree, as
+    // Studio's layout button does on it.
+    if (view?.layoutMode === 'tree') return this.treeLayout(changed, nodes, view, input, constraints)
     let step = 0
     const result = await runSmartLayoutCore(input.nodes, input.relations, metamodel, (p) => {
       if (options.signal?.aborted) throw new Error(CANCELLED)
@@ -442,6 +446,27 @@ export class FolderModel {
       ok: true,
       changed,
       text: `Smart Layout${view ? ` (${view.name})` : ''}: ${result.winner.name}; crossings ${before.crossings} -> ${after.crossings}, overdraws ${before.overdraws} -> ${after.overdraws}.${unpinned ? ` Unpinned ${unpinned} element${unpinned === 1 ? '' : 's'}.` : ''}`,
+    }
+  }
+
+  /** Tree Layout of a view whose layout mode is "tree": the same engine and
+   *  refit as Studio's (applyTreeLayout, fitAndSeparateBottomUp). */
+  private async treeLayout(
+    changed: DiagramData, nodes: Record<string, C4Node>, view: NonNullable<DiagramData['views']>[number],
+    input: ReturnType<typeof viewLayoutInput>, constraints: LayoutConstraint[] | undefined,
+  ): Promise<{ ok: boolean; text: string; changed?: DiagramData }> {
+    const positions = await applyTreeLayout(input.nodes, input.relations)
+    applyLayoutPositions(nodes, positions, input)
+    fitAndSeparateBottomUp(nodes, input)
+    const unpinned = pinnedNodeIds(constraints).length
+    view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
+    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
+    view.positions = Object.fromEntries(Object.values(nodes).map((node): [string, NodePosition] =>
+      [node.id, { x: node.x, y: node.y, width: node.width, height: node.height }]))
+    return {
+      ok: true,
+      changed,
+      text: `Tree Layout (${view.name}): the view is set to a hierarchical nested tree, so it was laid out as one.${unpinned ? ` Unpinned ${unpinned} element${unpinned === 1 ? '' : 's'}.` : ''}`,
     }
   }
 

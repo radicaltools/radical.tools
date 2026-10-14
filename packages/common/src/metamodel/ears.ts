@@ -26,17 +26,19 @@ export function earsActionIsClause(action: string): boolean {
  *  unwanted-behaviour: "If <condition>, then the <system> shall <action>."
  *  optional:           "Where <feature>, the <system> shall <action>."
  *  complex:            "While <pre>, when <trigger>, the <system> shall <action>."
- *  `statePrecondition` stands in for an empty precondition text: the phrase
- *  for the state machine state the requirement points at.
+ *  `statePrecondition` is the phrase for the state machine state the
+ *  requirement points at; it takes the place of the precondition text.
  */
 export function composeEarsSentence(node: Record<string, unknown>, subject?: string, statePrecondition?: string): { sentence: string; complete: boolean } {
   const earsType = String(node.ears_type ?? 'ubiquitous')
   const subj = (subject || 'the system').trim()
   const action = String(node.action ?? '').trim()
   const trigger = String(node.trigger ?? '').trim()
-  // The precondition text, or else the state it points at (see
-  // requirementStatePhrase): "the Reservation is Confirmed".
-  const precondition = String(node.precondition ?? '').trim() || (statePrecondition ?? '').trim()
+  // The state it points at (see requirementStatePhrase), "the Reservation
+  // is Confirmed", or else the precondition text. The text used to win,
+  // and the wizard's Sentence step always writes one: picking a state then
+  // changed nothing and the sentence did not follow a rename of the state.
+  const precondition = (statePrecondition ?? '').trim() || String(node.precondition ?? '').trim()
   const unwanted = String(node.unwanted_condition ?? '').trim()
   const feature = String(node.feature ?? '').trim()
 

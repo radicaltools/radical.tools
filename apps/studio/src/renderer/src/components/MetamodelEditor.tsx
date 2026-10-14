@@ -119,11 +119,15 @@ function PropertyEditor({
     onChange(next)
   }
   const remove = (idx: number) => onChange(properties.filter((_, i) => i !== idx))
-  const add = () =>
-    onChange([
-      ...properties,
-      { key: `prop${properties.length + 1}`, label: 'New property', type: 'text' },
-    ])
+  // A key no other property has: counted from the list's length, a removed
+  // property left a gap and the next one got a key that was taken, so two
+  // fields edited one value.
+  const add = () => {
+    const taken = new Set(properties.map((p) => p.key))
+    let n = properties.length + 1
+    while (taken.has(`prop${n}`)) n++
+    onChange([...properties, { key: `prop${n}`, label: 'New property', type: 'text' }])
+  }
 
   return (
     <div className="mm-prop-list">

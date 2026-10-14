@@ -116,6 +116,18 @@ export function validateModel(
     }
   }
 
+  // Two properties of a type with one key are one field of the element.
+  for (const def of [...Object.values(metamodel.nodeTypes), ...Object.values(metamodel.relationTypes)]) {
+    const seen = new Set<string>()
+    for (const p of def.properties ?? []) {
+      if (seen.has(p.key)) {
+        const isNode = !!metamodel.nodeTypes[def.id] && metamodel.nodeTypes[def.id] === def
+        issues.push({ id: `dup-prop:${def.id}:${p.key}`, severity: 'error', message: `${isNode ? def.label : `Relation type "${def.label}"`}: two properties have the key "${p.key}"; give one another key.`, ...(isNode ? { nodeTypeId: def.id } : {}) })
+      }
+      seen.add(p.key)
+    }
+  }
+
   // A property keyed like a field every element has would edit that field.
   for (const def of Object.values(metamodel.nodeTypes)) {
     for (const p of def.properties ?? []) {
@@ -157,6 +169,29 @@ export function validateModel(
           relationId: r.id,
         })
       }
+    }
+  }
+
+  // A relation joins two elements of the model, and is of a type the
+  // metamodel has (one written through the MCP server's properties bag was
+  // neither, and nothing said so).
+  for (const r of Object.values(relations)) {
+    const missing = [r.sourceId, r.targetId].filter((id) => !nodes[id])
+    if (missing.length) {
+      issues.push({
+        id: `rel-end-missing:${r.id}`,
+        severity: 'error',
+        message: `Relation "${r.label ?? r.id}" ${missing.length === 2 ? 'has no element at either end' : `points at "${missing[0]}", which is no element of the model`}.`,
+        relationId: r.id,
+      })
+    }
+    if (r.relationType && !metamodel.relationTypes[r.relationType]) {
+      issues.push({
+        id: `unknown-rel-type:${r.id}`,
+        severity: 'error',
+        message: `Relation "${r.label ?? r.id}" has unknown type "${r.relationType}".`,
+        relationId: r.id,
+      })
     }
   }
 

@@ -170,3 +170,27 @@ describe('a property keyed like a field of every element', () => {
     expect(issues.find((i) => i.id === 'reserved-prop:system:type')?.message).toMatch(/"type" is a field every element has/)
   })
 })
+
+describe('two properties of a type with one key', () => {
+  it('are listed by the validation', () => {
+    const s = state()
+    s.metamodel!.nodeTypes.system.properties = [
+      ...(s.metamodel!.nodeTypes.system.properties ?? []),
+      { key: 'prop5', label: 'A', type: 'text' },
+      { key: 'prop5', label: 'B', type: 'text' },
+    ]
+    const issues = validateModel(s.c4Nodes, s.c4Relations, s.metamodel!)
+    expect(issues.find((i) => i.id === 'dup-prop:system:prop5')?.message).toMatch(/two properties have the key "prop5"/)
+  })
+})
+
+describe('a relation the model cannot hold', () => {
+  it('to no element, or of an unknown type, is listed by the validation', () => {
+    const s = state()
+    s.c4Relations.ghost = { id: 'ghost', sourceId: 'user', targetId: 'nobody', relationType: 'interacts' }
+    s.c4Relations.odd = { id: 'odd', sourceId: 'user', targetId: 'shop', relationType: 'nonexistent-type' }
+    const ids = validateModel(s.c4Nodes, s.c4Relations, s.metamodel!).map((i) => i.id)
+    expect(ids).toContain('rel-end-missing:ghost')
+    expect(ids).toContain('unknown-rel-type:odd')
+  })
+})

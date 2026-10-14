@@ -35,11 +35,10 @@ type TokKind = 'STR' | 'IDENT' | 'ARROW' | 'LBRACE' | 'RBRACE' | 'EQ' | 'EOF'
 interface Tok { kind: TokKind; val: string }
 
 function tokenize(src: string): Tok[] {
-  // Strip comments before tokenising.
+  // Comments are skipped as they come, outside strings: stripped from the
+  // whole source first, the "//" of a URL in a string cut its line, the
+  // string stayed open, and the rest of the workspace was lost.
   const s = src
-    .replace(/\/\/[^\n]*/g, '')        // line comments
-    .replace(/\/\*[\s\S]*?\*\//g, '')  // block comments
-
   const out: Tok[] = []
   let i = 0
 
@@ -47,6 +46,17 @@ function tokenize(src: string): Tok[] {
     const c = s[i]
 
     if (/\s/.test(c)) { i++; continue }
+
+    // Line comment  // …   and block comment  /* … */
+    if (c === '/' && s[i + 1] === '/') {
+      while (i < s.length && s[i] !== '\n') i++
+      continue
+    }
+    if (c === '/' && s[i + 1] === '*') {
+      const end = s.indexOf('*/', i + 2)
+      i = end === -1 ? s.length : end + 2
+      continue
+    }
 
     // Arrow  ->
     if (c === '-' && s[i + 1] === '>') {
@@ -261,6 +271,11 @@ export function parseStructurizrDsl(src: string): StructurizrDslResult {
         parseRel(); continue
       }
 
+      // Relationship from the element itself:  -> identifier ...
+      if (t.kind === 'ARROW') {
+        parseRel(parentId); continue
+      }
+
       // Unknown IDENT followed by a block — skip
       if (t.kind === 'IDENT' && peek(1).kind === 'LBRACE') {
         eat(); skipBlock(); continue
@@ -349,18 +364,22 @@ export function parseStructurizrDsl(src: string): StructurizrDslResult {
 
   // ── Parse a relationship ───────────────────────────────────────────────────
 
-  function parseRel(): void {
-    const srcRef = eat().val // source identifier
+  /** A relationship; `implied` is the element whose block holds a
+   *  `-> target …` line with no source of its own. */
+  function parseRel(implied?: string): void {
+    const srcRef = implied === undefined ? eat().val : null // source identifier
     eat()                    // consume ->
     if (peek().kind !== 'IDENT') { consumeStrings(); return }
     const tgtRef = eat().val // target identifier
     const ss     = consumeStrings()
 
-    const srcId = resolveId(srcRef)
+    const srcId = srcRef === null ? implied : resolveId(srcRef)
     const tgtId = resolveId(tgtRef)
     if (!srcId || !tgtId || srcId === tgtId) return
-    // Deduplicate: skip if an identical source→target pair already exists.
-    if (relations.some(r => r.sourceId === srcId && r.targetId === tgtId)) return
+    // Skip only a relationship given twice: two between the same pair that
+    // say different things ("Reads orders", "Writes orders") are both kept.
+    if (relations.some(r => r.sourceId === srcId && r.targetId === tgtId
+      && (r.label ?? '') === (ss[0] ?? '') && (r.technology ?? '') === (ss[1] ?? ''))) return
 
     relations.push({
       id:         `rel-${++relIdx}`,

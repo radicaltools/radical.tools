@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BATCH_CELL, createBatchPlacer, fitAncestors, fittedParentSize, placeNewNode, placeUnplaced } from '../src/geometry'
+import { BATCH_CELL, createBatchPlacer, fitAncestors, fittedParentSize, freeSpotNear, placeNewNode, placeUnplaced } from '../src/geometry'
 import { NODE_SIZES, type C4Node } from '@radical/common/c4'
 
 const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
@@ -131,5 +131,31 @@ describe('placeUnplaced', () => {
     expect(placeUnplaced(nodes, {})).toEqual([])
     expect(placeUnplaced(nodes, undefined)).toEqual([])
     expect(nodes.search).toMatchObject({ x: 1040, y: 120 })
+  })
+})
+
+describe('freeSpotNear', () => {
+  const size = { width: 200, height: 80 }
+  const clear = (spot: { x: number; y: number }, boxes: Array<{ x: number; y: number; width: number; height: number }>) =>
+    boxes.every((b) => spot.x + size.width <= b.x || b.x + b.width <= spot.x || spot.y + size.height <= b.y || b.y + b.height <= spot.y)
+
+  it('is the centre itself when nothing is there', () => {
+    expect(freeSpotNear([], size, { x: 500, y: 300 })).toEqual({ x: 400, y: 260 })
+  })
+
+  it('moves off what is there, staying near the centre', () => {
+    const boxes = [{ x: 300, y: 200, width: 400, height: 200 }]
+    const spot = freeSpotNear(boxes, size, { x: 500, y: 300 })
+    expect(clear(spot, boxes)).toBe(true)
+    expect(Math.hypot(spot.x - 400, spot.y - 260)).toBeLessThan(400)
+  })
+
+  it('gives each of several boxes placed in turn a place of its own', () => {
+    const boxes: Array<{ x: number; y: number; width: number; height: number }> = [{ x: 0, y: 0, width: 1000, height: 600 }]
+    for (let i = 0; i < 3; i++) {
+      const spot = freeSpotNear(boxes, size, { x: 500, y: 300 })
+      expect(clear(spot, boxes)).toBe(true)
+      boxes.push({ ...spot, ...size })
+    }
   })
 })

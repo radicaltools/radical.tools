@@ -27,7 +27,7 @@ import type {
   LayoutConstraint,
   NodePosition,
 } from '../c4'
-import { isContainerType } from '../c4'
+import { NODE_SIZES, isContainerType } from '../c4'
 import type { Metamodel } from '../metamodel'
 
 /** File map: relative POSIX path → UTF-8 file content. */
@@ -106,12 +106,17 @@ function sortObjectKeys(value: unknown): unknown {
   return value
 }
 
+const BARE_KEY = /^[A-Za-z0-9_-]+$/
+
 /** Serialize a flat object as a `---`-delimited frontmatter block. Strings are
  *  JSON-quoted (so `"3"` never round-trips to a number), numbers/booleans are
  *  bare, and multi-line strings use a `|` block scalar. */
 function serializeFrontmatter(obj: Record<string, Scalar>): string {
   const lines: string[] = ['---']
-  for (const [key, value] of Object.entries(obj)) {
+  for (const [name, value] of Object.entries(obj)) {
+    // A key the reader takes bare, or else JSON-quoted (a property may be
+    // keyed "SLA target" or "właściciel").
+    const key = BARE_KEY.test(name) ? name : JSON.stringify(name)
     if (typeof value === 'string') {
       if (value.includes('\n')) {
         lines.push(`${key}: |`)
@@ -167,9 +172,12 @@ function parseMarkdown(content: string): { front: Record<string, Scalar>; body: 
       i++
       break
     }
-    const match = /^([A-Za-z0-9_-]+):\s?(.*)$/.exec(line)
+    const match = /^([A-Za-z0-9_-]+|"(?:[^"\\]|\\.)*"):\s?(.*)$/.exec(line)
     if (!match) continue
-    const key = match[1]
+    let key = match[1]
+    if (key.startsWith('"')) {
+      try { key = JSON.parse(key) as string } catch { continue }
+    }
     const rest = match[2]
     if (rest === '|') {
       // Block scalar: consume following lines indented by 2 spaces.
@@ -385,11 +393,21 @@ export function deserializeFromMdFolder(
     parentDirKey: string
   }
 
+  const storedMetamodel = readJson<Metamodel>(files, METAMODEL_FILE)
+  const typeSize = (type: string): { width: number; height: number } => {
+    const def = storedMetamodel?.nodeTypes?.[type]
+    if (def?.width && def?.height) return { width: def.width, height: def.height }
+    return NODE_SIZES[type as keyof typeof NODE_SIZES] ?? { width: 200, height: 100 }
+  }
+
   const parsedByDirKey = new Map<string, string>() // dirKey → node id
   const parsed: ParsedNode[] = []
 
   for (const [path, content] of Object.entries(files)) {
     if (!path.startsWith(NODES_DIR + '/') || !path.endsWith('.md')) continue
+    // Skipped as "not a node", an element in a file git could not merge
+    // vanished without a word, and the next save dropped its layout.
+    if (CONFLICT_MARKER.test(content)) throw new MalformedFolderFileError(path, 'git conflict markers')
     const { front, body } = parseMarkdown(content)
     if (!front.id || !front.type) continue
     const isIndex = path.endsWith('/' + INDEX_BASENAME)
@@ -407,7 +425,10 @@ export function deserializeFromMdFolder(
   const nodes: C4Node[] = parsed.map((p) => {
     const id = String(p.front.id)
     const parentId = p.parentDirKey === NODES_DIR ? undefined : parsedByDirKey.get(p.parentDirKey)
-    const lay = layout.nodes[id] ?? { x: 0, y: 0, width: 0, height: 0, collapsed: false }
+    // A node the layout does not know (a file written by hand, or brought in
+    // by git) has its type's size; Studio gives it a place (placeUnplaced).
+    const size = typeSize(String(p.front.type))
+    const lay = layout.nodes[id] ?? { x: 0, y: 0, width: size.width, height: size.height, collapsed: false }
     const node: Record<string, unknown> = {
       id,
       type: p.front.type,
@@ -441,8 +462,7 @@ export function deserializeFromMdFolder(
   if (snapshots) data.snapshots = snapshots
   const presentations = readJson<Presentation[]>(files, PRESENTATIONS_FILE)
   if (presentations) data.presentations = presentations
-  const metamodel = readJson<Metamodel>(files, METAMODEL_FILE)
-  if (metamodel) data.metamodel = metamodel
+  if (storedMetamodel) data.metamodel = storedMetamodel
   const hubTemplates = readJson<DiagramData['hubTemplates']>(files, HUB_TEMPLATES_FILE)
   if (hubTemplates) data.hubTemplates = hubTemplates
 
@@ -487,11 +507,14 @@ export function staleMdFolderFiles(existing: FolderFiles, next: FolderFiles): st
 
 /** A file of the folder that is there but cannot be read as what it is. */
 export class MalformedFolderFileError extends Error {
-  constructor(readonly path: string) {
-    super(`Malformed JSON in ${path}`)
+  constructor(readonly path: string, readonly reason = 'malformed JSON') {
+    super(`${reason[0].toUpperCase()}${reason.slice(1)} in ${path}`)
     this.name = 'MalformedFolderFileError'
   }
 }
+
+/** Lines git leaves in a file it could not merge. */
+const CONFLICT_MARKER = /^(<{7}|>{7})( |$)|^={7}$/m
 
 /** The JSON file at `path`, or undefined when the folder has none. A file
  *  that is there and does not parse is an error. It used to read as "no

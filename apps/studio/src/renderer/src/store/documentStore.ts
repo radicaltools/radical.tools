@@ -176,9 +176,9 @@ function readLSPayload(id: string): DiagramData | null {
  *  and, until a read succeeds, nothing is saved to the folder: a save would
  *  write the model without what the file holds, or remove the file. */
 export class DocumentUnreadableError extends Error {
-  constructor(readonly file: string) {
+  constructor(readonly file: string, readonly reason = 'malformed JSON') {
     super(
-      `${file} in this model's folder cannot be read (malformed JSON). ` +
+      `${file} in this model's folder cannot be read (${reason}). ` +
       'Nothing is saved to the folder until the file is fixed; the model is read again when it changes.',
     )
     this.name = 'DocumentUnreadableError'
@@ -186,7 +186,7 @@ export class DocumentUnreadableError extends Error {
 }
 
 /** Folder documents whose last read failed on a file (id → the file). */
-const mdUnreadable = new Map<string, string>()
+const mdUnreadable = new Map<string, { file: string; reason: string }>()
 
 /** The model in a folder's files, remembered as what document `id` was
  *  loaded from. Null when the files hold no model that can be read; a file
@@ -200,8 +200,8 @@ function readFolderModel(id: string, files: FolderFiles): DiagramData | null {
     return data
   } catch (e) {
     if (!(e instanceof MalformedFolderFileError)) return null
-    mdUnreadable.set(id, e.path)
-    throw new DocumentUnreadableError(e.path)
+    mdUnreadable.set(id, { file: e.path, reason: e.reason })
+    throw new DocumentUnreadableError(e.path, e.reason)
   }
 }
 
@@ -897,7 +897,7 @@ export const documents: DocumentsAPI = {
     const meta = idx.docs.find(d => d.id === id)
     if (!meta) return
     const unreadable = meta.source === 'md' ? mdUnreadable.get(id) : undefined
-    if (unreadable) throw new DocumentUnreadableError(unreadable)
+    if (unreadable) throw new DocumentUnreadableError(unreadable.file, unreadable.reason)
     if (meta.source !== 'ls') return enqueueSave(id, data)
     if (!writeLSPayload(id, data)) throw new StorageFullError()
     meta.lastModified = Date.now()

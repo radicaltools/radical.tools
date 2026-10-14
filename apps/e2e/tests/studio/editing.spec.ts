@@ -158,3 +158,39 @@ test('a click on a collapse button reaches it even when an edge lies over it', a
   await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2)
   await expect(studio.node('bookstore').locator('.c4-node-collapse-btn').first()).toHaveAttribute('title', 'Expand')
 })
+
+test('a second relation between the same two elements is drawn and can be selected', async ({ page, studio }) => {
+  // It was never drawn: invisible, and impossible to select or delete.
+  await studio.open('v-containers')
+  await expect(studio.edges).toHaveCount(4)
+  await studio.connect(studio.node('customer'), studio.node('web'))
+  await expect.poll(async () => (await studio.storedDoc()).relations.length).toBe(5)
+  await expect(studio.edges).toHaveCount(5)
+  const added = (await studio.storedDoc()).relations.find((r) => !['r1', 'r2', 'r3', 'r4'].includes(r.id))!
+  await expect(page.getByTestId(`rf__edge-${added.id}`)).toHaveCount(1)
+})
+
+test('removing one of two steps of the same relation leaves the list as the sequence is', async ({ page, studio }) => {
+  // The rows were keyed by relation id: after removing step 2 the list
+  // still showed it, and removing it again took another step.
+  await studio.open('v-containers')
+  await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+  await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
+  const edge = page.locator('[data-testid="rf__edge-r2"] path.react-flow__edge-interaction').first()
+  const mid = await edge.evaluate((el) => {
+    const path = el as SVGPathElement
+    const p = path.getPointAtLength(path.getTotalLength() / 2)
+    const m = path.getScreenCTM()!
+    return { x: p.x * m.a + m.e, y: p.y * m.d + m.f }
+  })
+  await page.mouse.click(mid.x, mid.y)
+  const steps = page.locator('.seq-step')
+  await expect(steps).toHaveCount(5)
+  await steps.nth(1).hover()
+  await steps.nth(1).getByTitle('Remove step').click()
+  await expect(steps).toHaveCount(4)
+  await expect(steps.nth(1)).toContainText('API')
+  await expect(steps.nth(1)).toContainText('Orders DB')
+  await expect.poll(async () => (JSON.parse(await studio.storedJson()) as { sequences: Array<{ relationIds: string[] }> }).sequences[0].relationIds)
+    .toEqual(['r1', 'r3', 'r4', 'r2'])
+})

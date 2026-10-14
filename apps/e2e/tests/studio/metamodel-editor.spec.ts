@@ -66,6 +66,23 @@ test.describe('custom properties of a type', () => {
     }).toBe('gold')
   })
 
+  test('a new property never gets a key another one has', async ({ page }) => {
+    // Its key was counted from the list's length: Add, Add, remove the
+    // first, Add gave two properties one key, which edited one value.
+    await openEditor(page)
+    const card = page.locator('.mm-card', { has: page.locator('.mm-type-id', { hasText: /^container$/ }) })
+    await card.locator('.mm-card-header').click()
+    const add = card.getByRole('button', { name: 'Add property' })
+    await add.click()
+    await add.click()
+    const rows = card.locator('.mm-prop-row')
+    const count = await rows.count()
+    await rows.nth(count - 2).getByTitle('Remove property').click()
+    await add.click()
+    const keys = await card.locator('.mm-prop-key').evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value))
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+
   test('a property cannot be keyed like a field every element has', async ({ page, studio }) => {
     // Keyed "type", the properties panel edited the element's type with it.
     await openEditor(page)

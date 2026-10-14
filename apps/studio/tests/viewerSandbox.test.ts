@@ -307,6 +307,80 @@ describe('a slide added in Presenter while Designer shows a milestone', () => {
   })
 })
 
+describe('a presentation played from Designer (F5)', () => {
+  // A presentation started in Designer keeps the perspective at Designer,
+  // and autosave wrote what a slide had swapped into the store: a milestone
+  // slide saved the milestone as the live model (65 elements became 11 on a
+  // reload while it played).
+  it('saves nothing of what the slides show', async () => {
+    const meta = documents.createLSDocument('f5-in-designer', useDiagramStore.getState().saveDiagram())
+    documents.setActiveId(meta.id)
+    await new Promise((r) => setTimeout(r, 100))
+    const store = useDiagramStore.getState
+    store().setAppMode('designer')
+    const milestone = store().createSnapshot('Small')
+    store().addNode({ type: 'system', label: 'Only in live', x: 0, y: 900, width: 200, height: 100, collapsed: false } as Omit<C4Node, 'id'>)
+    await new Promise((r) => setTimeout(r, 600))
+    const live = (await documents.loadDocument(meta.id))!.nodes.map((n) => n.id).sort()
+
+    const presId = store().addPresentation('Deck')
+    store().setActivePresentation(presId)
+    useDiagramStore.setState((st) => ({
+      presentations: st.presentations.map((p) => p.id !== presId ? p : {
+        ...p, slides: [{ id: 'm', name: 'Then', snapshotId: milestone, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } }],
+      }),
+    }))
+    store().setActivePresentation(presId)
+    await new Promise((r) => setTimeout(r, 600))
+    store().startPresentation()
+    store().goToSlide(0)
+    expect(Object.keys(store().c4Nodes).length).toBeLessThan(live.length)
+    await new Promise((r) => setTimeout(r, 600))
+    await ((window as any).__radicalFlushPersist as () => Promise<void>)()
+    expect((await documents.loadDocument(meta.id))!.nodes.map((n) => n.id).sort()).toEqual(live)
+
+    store().stopPresentation()
+    expect(Object.keys(store().c4Nodes).sort()).toEqual(live)
+    store().removePresentation(presId)
+    documents.deleteDocument(meta.id, { wipePayload: true })
+  })
+})
+
+describe('a slide added in Presenter after edits in Designer', () => {
+  // Leaving Designer set aside the views as they were when the canvas was
+  // opened: a canvas keeps its positions in the nodes until it is left or
+  // saved, so the slide's save wrote the view's old layout back.
+  for (const onView of [true, false]) {
+    it(`keeps the layout edited on ${onView ? 'a view' : 'All elements'}`, async () => {
+      const meta = documents.createLSDocument('slide-after-drag', useDiagramStore.getState().saveDiagram())
+      documents.setActiveId(meta.id)
+      await new Promise((r) => setTimeout(r, 100))
+      const store = useDiagramStore.getState
+      store().setAppMode('designer')
+      const viewId = onView ? store().addView('Edited') : null
+      if (viewId) store().setActiveView(viewId)
+      const id = Object.keys(store().c4Nodes).find((k) => !store().c4Nodes[k].parentId)!
+      const x = store().c4Nodes[id].x + 333
+      useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, [id]: { ...st.c4Nodes[id], x } } }))
+      await new Promise((r) => setTimeout(r, 600))
+      const saved = async (): Promise<number | undefined> => {
+        const doc = (await documents.loadDocument(meta.id))!
+        return viewId ? doc.views!.find((v) => v.id === viewId)!.positions[id]?.x : doc.defaultPositions![id]?.x
+      }
+      expect(await saved()).toBe(x)
+
+      store().setAppMode('presenter')
+      store().addPresentationSlide('After the drag')
+      await new Promise((r) => setTimeout(r, 600))
+      expect(await saved()).toBe(x)
+      store().setAppMode('designer')
+      expect(store().c4Nodes[id].x).toBe(x)
+      if (viewId) store().setActiveView(null)
+      documents.deleteDocument(meta.id, { wipePayload: true })
+    })
+  }
+})
+
 describe('a layout made while exploring is not saved', () => {
   // Smart Layout asks for the document to be written at once (so a reload
   // right after it shows the layout). It did so in Viewer and Presenter
