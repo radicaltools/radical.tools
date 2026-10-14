@@ -4,6 +4,7 @@ import { host } from '../platform/host'
 import { SmartLayoutButton } from '@radical/ui/components/SmartLayoutButton'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { useInspectorStore } from '../persistence/inspector'
+import { dropPendingMode, useShownMode } from '../route'
 import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
 import { HubImportModal } from './HubImportModal'
@@ -559,8 +560,11 @@ function IconInspect(): React.ReactElement {
 }
 
 export function Toolbar(): React.ReactElement {
-  const appMode = useDiagramStore((s) => s.appMode)
-  const setAppMode = useDiagramStore((s) => s.setAppMode)
+  // The perspective drawn, which a link still waiting for its document sets.
+  const appMode = useShownMode()
+  const setStoreMode = useDiagramStore((s) => s.setAppMode)
+  // Picking a perspective wins over a link still waiting.
+  const setAppMode = useCallback((mode: Parameters<typeof setStoreMode>[0]) => { dropPendingMode(); setStoreMode(mode) }, [setStoreMode])
   const autoFitActive = useDiagramStore((s) => s.autoFitActive)
   const toggleAutoFit = useDiagramStore((s) => s.toggleAutoFit)
   const fitAll = useDiagramStore((s) => s.fitAll)

@@ -20,14 +20,15 @@ import { QuickSearch } from './components/QuickSearch'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { MilestoneEditOverlay } from './components/MilestoneEditOverlay'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { useRouteSync, parseHash } from './route'
+import { useRouteSync, useShownMode, parseHash } from './route'
 
 const LS_LEFT = 'radical-leftpanel-collapsed'
 const LS_RIGHT = 'radical-rightpanel-collapsed'
 
 function AppInner(): React.ReactElement {
   const runRadicalLayout = useDiagramStore((s) => s.runRadicalLayout)
-  const appMode = useDiagramStore((s) => s.appMode)
+  // A link still waiting for its document is drawn in its own perspective.
+  const appMode = useShownMode()
   const presentationActive = useDiagramStore((s) => s.presentationActive)
   const activeViewKind = useDiagramStore((s) =>
     s.activeViewId ? (s.views[s.activeViewId]?.kind ?? 'static') : 'static'

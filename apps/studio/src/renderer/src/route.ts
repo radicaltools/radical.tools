@@ -25,6 +25,7 @@
 //             a presentation is actually running.
 
 import { useEffect } from 'react'
+import { create } from 'zustand'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from './store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
@@ -60,6 +61,26 @@ let applying = false
 // applied once the load has landed. A browser folder that lost its access
 // keeps waiting until Reconnect loads it. While a route waits, the URL keeps it.
 let pending: { route: Route; docId: string } | null = null
+
+/** The perspective a link asks for while its document still loads, so the
+ *  app shows that one from its first paint, not Designer's canvas for a
+ *  moment (the store switches only once the route is applied). Read from
+ *  the address when the module loads, before the first render. */
+export const usePendingMode = create<{ mode: Mode | null }>(() => ({
+  mode: typeof window !== 'undefined' && window.location ? parseHash(window.location.hash)?.mode ?? null : null,
+}))
+
+/** The perspective to draw: the one a pending link asks for, else the store's. */
+export function useShownMode(): Mode {
+  const pendingMode = usePendingMode((s) => s.mode)
+  const appMode = useDiagramStore((s) => s.appMode)
+  return pendingMode ?? appMode
+}
+
+/** The user picked a perspective: a link still waiting gives way to it. */
+export function dropPendingMode(): void {
+  usePendingMode.setState({ mode: null })
+}
 
 // ─── Parse / format ──────────────────────────────────────────────────────────
 
@@ -179,6 +200,7 @@ function resolveDoc(doc: string): boolean {
 }
 
 function applyViewModeFocus(route: Route): void {
+  dropPendingMode()
   withApplying(() => {
     const store = useDiagramStore.getState()
     if ((MODES as readonly string[]).includes(route.mode) && store.appMode !== route.mode) {
@@ -242,6 +264,7 @@ export function applyRoute(route: Route): void {
   const activeId = documents.getActiveId()
   if (activeId && (switched || loadingDocumentId() === activeId || documents.awaitsReconnect(activeId))) {
     pending = { route, docId: activeId }
+    usePendingMode.setState({ mode: route.mode })
     return
   }
   applyViewModeFocus(route)
@@ -265,6 +288,8 @@ export function startRouteSync(): () => void {
   const initial = parseHash(location.hash)
   if (initial) applyRoute(initial)
   else writeUrl()
+  // A route applied at once, or none: nothing waits.
+  if (!pending) dropPendingMode()
 
   let timer: ReturnType<typeof setTimeout> | null = null
   const schedule = (): void => {
@@ -281,6 +306,7 @@ export function startRouteSync(): () => void {
     // Another document was opened meanwhile: the route no longer applies.
     if (id !== pending.docId) {
       pending = null
+      dropPendingMode()
       schedule()
       return
     }
@@ -326,6 +352,7 @@ export function startRouteSync(): () => void {
     window.removeEventListener('hashchange', onHash)
     unsubLoad()
     pending = null
+    dropPendingMode()
     unsubDiagram()
     unsubDocs()
     if (timer) clearTimeout(timer)
