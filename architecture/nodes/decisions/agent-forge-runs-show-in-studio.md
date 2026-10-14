@@ -1,0 +1,11 @@
+---
+id: "742c9ca4-1e99-4c0b-8e5b-2c6dd667dccf"
+type: "adr"
+label: "Agent Forge runs show in Studio"
+alternatives: "A socket or HTTP bridge between Studio and the server (a port to manage, impossible from a browser tab). The run's state in a model file (every step would be a model change and a git diff). MCP notifications (they reach the agent's client, not Studio). Answering the agent's questions from Studio (a channel back and a rule for who wins; left for later)."
+consequences: "People see an agent's Forge run where they look at the model, without switching to the agent's window. The file is outside the model paths, so it never trips the folder session or the outside-edit watcher, and .radical/.gitignore keeps it out of git. Two servers on one folder overwrite each other's status. A killed server cannot close its run, so Studio shows it until the 30 minutes pass. Studio reads the file every 2 s for a folder model even when no agent is connected."
+context: "An agent can run Radical Forge over MCP (ADR Forge on the agent's model), but Studio, open on the same folder, saw only elements appearing, not which stage the run was at or that the agent was waiting for an answer in its chat. The MCP server and Studio share no process or socket, only the model folder (as for ADR Canvas selection in model folder), and the server keeps the run in memory."
+date: "2026-10-09"
+decision: "After every forge_* step that succeeds, the MCP server writes the run's status to .radical/forge-run.json in the model folder (@radical/common formats/forgeRunStatus.ts, @radical/node-files): the client's name, the need, each stage's status (pending, clarifying, generating, done with summary and counts) and active / finished / closed; it marks an unfinished run closed when its client goes away. Studio polls the file every 2 s for the open md-folder model (Electron through IPC, the browser through the folder handle). The Forge button in the search bar pulses blue while a stage is generated and amber while the agent waits for the user, shows the stage it is at, and opens a read-only view with the wizard's step bar and one line of status; it stops when the run finishes, closes, or goes 30 minutes without a change. Studio never writes to the run."
+status: "accepted"
+---

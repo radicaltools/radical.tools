@@ -1,0 +1,8 @@
+---
+id: "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
+type: "container"
+label: "CLI"
+technology: "Node.js"
+---
+
+The `radical` command line (apps/cli, package @radicaltools/cli, private until a distribution decision). `radical check [folder]` checks a Markdown model folder before a commit or in CI: the files read as a model, the model follows its metamodel, it is complete (requirements have scenarios, accepted ADRs fitness functions, scenarios and fitness functions name their tests, …), and with --report the tests they name passed in the Vitest, Jest, Playwright or JUnit reports given. --evidence writes the status of each scenario, fitness function, requirement and ADR as JSON, and --report also keeps the test cases in the folder's .radical/test-results.json for Studio's Inspector. It never writes the model's own files. Rules are set per project in check.json in the model folder (or --config), with baselines that --ratchet lowers and writes back. Output as text, JSON or GitHub annotations; exit 0 (no errors), 1 (errors) or 2 (could not run). The rules live in @radical/common (src/check), so Studio's Inspector runs the same check. The build bundles the private workspaces, as the MCP server's does. CI runs it on the repository's own model (job Architecture model, with the run's test reports); npm run check:architecture runs it locally.

@@ -2054,12 +2054,10 @@ requirements and 8 ADRs verified, no errors. Still open:
    Layout quality" (benchmarks) and "Model in step with code" (review) name
    no tests. A `command` property, or a JUnit report from those scripts,
    would let them count.
-2. **The model's check runs only on the maintainer's machine.** CI keeps
-   the reports (`npm run test:reports` → artifact `test-reports`, e2e →
-   `reports/e2e.json` in `e2e-report`), but `architecture/` is local-only, so
-   `npm run check:architecture` runs locally; with the CI reports it takes a
-   `gh run download` first. A project whose model is in its repository can
-   run `radical check --report reports` as a CI step.
+2. **The model is checked in CI** (2026-10-14). `architecture/` is
+   committed again; the job "Architecture model" runs `radical check` with
+   the run's unit and e2e reports and fails on an error
+   (`architecture/check.json`). It is not a required check yet.
 3. **One catalogue everywhere.** Studio has the Inspector perspective
    (2026-10-14): the whole check on the model as it is edited, the test
    results from `.radical/test-results.json`, links to the elements. Still
@@ -2078,3 +2076,41 @@ requirements and 8 ADRs verified, no errors. Still open:
    dependencies and imports.
 7. **`radical mcp` and publishing.** Serve the MCP server as a subcommand
    too, and publish @radicaltools/cli the way the MCP server is published.
+
+### Found by the code audit of the architecture model (2026-10-14)
+
+Rebuilding `architecture/` to match the code (milestones "As-is 2026-10-14"
+and "Rebuilt 2026-10-14") meant reading the code area by area. These came up
+along the way. They are in the code or the manual, not the model, and none is
+fixed yet:
+
+1. **The bundled Hub catalogue fallback probably fails in every build.**
+   hubStore falls back to `/hub/` on Studio's own origin. deploy.yml uploads
+   only Studio's assets/ and index.html, so CloudFront answers that path with
+   index.html. In the desktop app (file://) `/hub/` is the filesystem root.
+2. **The desktop CSP may block AI and Hub fetches.** The production policy
+   in src/main has no connect-src, so it falls back to 'self'. Not verified
+   in a running app.
+3. **The VS Code JSON schema is too strict.**
+   apps/vscode/schemas/c4.schema.json refuses unknown top-level keys and does
+   not list defaultLayoutConstraints or hubTemplates, which Studio writes.
+4. **Wiki and table may show empty descriptions in a folder model.**
+   Descriptions load lazily (on selection, the wizard, a search scan), and
+   nothing in WikiView or TableView loads them.
+5. **"Structure view" is still in the UI.** The view card in the left panel
+   says Structure view; the canvas caption, the tools and the manual say All
+   elements.
+6. **The manual claims what the code does not do:**
+   - "+ New view starts with the elements currently on screen";
+   - slides can be reordered, and a Flow slide replays step by step;
+   - a click drills into the Hierarchy view (it is a double-click);
+   - the metamodel editor sets icon, collapsed size, enum default and
+     visible-when;
+   - Alt-click adds to the selection;
+   - fitness function and requirement fields that do not exist;
+   - the VS Code command names;
+   - the deep-link mode list leaves out inspector.
+7. **get_issues' description calls a disallowed relation pair an error;** the
+   validator rates it a warning. The comment at the top of
+   apps/mcp/src/forge.ts names three Forge views; there are five.
+

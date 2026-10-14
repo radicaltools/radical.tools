@@ -1,0 +1,11 @@
+---
+id: "fe6dd0dc-c792-4e57-b951-9f4e5468dce6"
+type: "adr"
+label: "Inspector perspective"
+alternatives: "A view kind 'report' in views.json: it would have to be created and saved in the model, and every model would need one; it may come later for slides that show a part of the report. A panel in Designer: too little room for the whole report. Calling the perspective Auditor, Reviewer, Verifier or Checker: the other perspectives name a role, Reviewer would clash with a review mode with comments, and Verifier with the verifies relation."
+consequences: "Every model gets the report without setup and nothing is written into the model's files for it. Going to an element is one shared path (navigation.ts) for the Inspector and Quick Search. The Validation list in the metamodel editor still shows the metamodel issues on their own until it moves into the Inspector. Markers on the cards in Designer are a later step."
+context: "radical check reports on the whole model (files, metamodel, completeness, what the tests say), but only as text in a terminal or CI log. The product owner wants the report in Studio, visual, with a link to every element it names. Studio already had four perspectives (Designer, Viewer, Presenter, the metamodel editor) and the Validation list, which shows the metamodel issues only."
+date: "2026-10-14"
+decision: "Add a fifth perspective, Inspector, beside Designer, Viewer and Presenter. It shows the check of the open model as one page: summary tiles, errors with what they leave unverified, requirements by group, the elements that satisfy them, ADRs with their fitness functions, and every finding by rule. Each element it names is a link to a panel with its findings and tests, from which Studio shows it on a canvas or opens its wiki page. Like Viewer it edits nothing: leaving Designer parks the model and returning gives it back, and it takes no undo step. The toolbar button counts errors and warnings in every perspective and is greyed out while the model has no check report beside it."
+status: "accepted"
+---
