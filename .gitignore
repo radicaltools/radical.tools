@@ -40,7 +40,6 @@ apps/e2e/test-results/
 apps/e2e/playwright-report/
 apps/e2e/blob-report/
 
-# The architecture model of radical.tools itself (a Radical Markdown-folder
-# model, read and edited through the `radical-architecture` MCP server) is
-# kept on the maintainer's machine, not in the repository
-/architecture/
+# What Studio and radical check keep beside the architecture model (canvas
+# selection, Forge run status, test results); the model itself is committed.
+/architecture/.radical/

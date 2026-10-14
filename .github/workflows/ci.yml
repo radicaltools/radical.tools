@@ -52,6 +52,38 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
     uses: ./.github/workflows/e2e.yml
 
+  # The repository's own architecture model (architecture/), checked with
+  # radical check against this run's test reports: the unit reports of
+  # Type-check & Test and, unless the e2e suite was skipped, reports/e2e.json.
+  # Its rule settings and baselines are architecture/check.json.
+  architecture:
+    name: Architecture model
+    needs: [test, e2e]
+    if: ${{ !cancelled() && needs.test.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @radicaltools/cli
+      - uses: actions/download-artifact@v4
+        with:
+          name: test-reports
+          path: reports
+      - name: Download the e2e report
+        if: ${{ needs.e2e.result == 'success' || needs.e2e.result == 'failure' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-report
+          path: e2e-report
+      - name: radical check
+        run: |
+          if [ -f e2e-report/reports/e2e.json ]; then cp e2e-report/reports/e2e.json reports/; fi
+          node apps/cli/dist/index.js check architecture --report reports --format github
+
   mcp-package:
     name: MCP package (${{ matrix.os }}, Node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
