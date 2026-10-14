@@ -421,6 +421,21 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     relation. `radical check` (2026-10-14) now answers these for the fixed
     rules; a `WHERE NOT ... ` over relations would let a project write its
     own.
+26. **An agent could not open what someone folded.** A group folded on the
+    model in Studio stays folded in every new view, and no tool could open
+    it in a view: rebuilding the views of `architecture/` (2026-10-14) gave
+    C4 views showing one folded "Logical & physical" box, and smart_layout
+    answered "the current layout already scores best" for them. update_view
+    now takes `expand` and `collapse`. smart_layout could still say why it
+    finds nothing to arrange (everything folded) instead of "already best".
+27. **No order for views, nor a folder for them.** With 26 views in
+    `architecture/` (2026-10-14) the flat list of views was hard to read,
+    and neither Studio nor an agent could change the order of views. Views
+    now have a `folder` path (Studio: the view's properties; folder
+    properties rename a folder and move it up or down), and MCP has
+    `order_views`. Still missing: ordering views inside a folder in Studio
+    (drag and drop, or Move up/down in a view's properties), and a tool
+    to rename a folder in one call.
 
 ### Reverse-engineered requirements (2026-10-06)
 

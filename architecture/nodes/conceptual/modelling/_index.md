@@ -6,4 +6,4 @@ kind: "core"
 vision: "One living model of a system, its decisions and its requirements, that people and agents edit and every view, slide and check reads."
 ---
 
-The model and everything kept in it: elements, relations, views, sequences, milestones and presentations.
+The model and everything kept in it, and working on it: elements, relations, views of every kind, sequences, the canvas, the panels, the wizards, search and undo.

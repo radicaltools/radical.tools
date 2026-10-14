@@ -80,6 +80,13 @@ export interface DiagramFacade {
   setViewSequence?(id: string, sequenceId: string | null): void
   /** Optional — hides exactly these relations in the view. */
   setViewHiddenRelations?(id: string, relationIds: string[]): void
+  /** Optional — shows these elements folded (`collapsed`) or open in the
+   *  view only, over their fold on the model. */
+  setViewCollapsed?(id: string, nodeIds: string[], collapsed: boolean): void
+  /** Optional — puts the view into a folder of the list of views ("C4/Components"); null or "" for none. */
+  setViewFolder?(id: string, folder: string | null): void
+  /** Optional — orders the listed views among the places they hold in the list of views. */
+  orderViews?(ids: string[]): void
   /** Optional layout constraints of a canvas: a view, or All elements (null). */
   getLayoutConstraints?(viewId: string | null): LayoutConstraint[]
   /** Keeps nodes on one line on a canvas (with `ordered`, in the order of

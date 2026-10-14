@@ -7,7 +7,7 @@ import { EarsQuickEntry } from './EarsQuickEntry'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
-import { viewShowsEveryNode } from '@radical/common/c4'
+import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 
@@ -423,6 +423,11 @@ const Icon = {
       <path d="M8 4 V12 M4.5 8.5 L8 12 L11.5 8.5"/>
     </svg>
   ),
+  Folder: () => (
+    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+      <path d="M1.75 4.25 a1 1 0 0 1 1 -1 h3.2 l1.5 1.5 h5.8 a1 1 0 0 1 1 1 v6.5 a1 1 0 0 1 -1 1 h-10.5 a1 1 0 0 1 -1 -1 z"/>
+    </svg>
+  ),
   ChevronRight: () => (
     <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 3 L11 8 L5 13"/>
@@ -821,6 +826,10 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const setGridColumns = useDiagramStore((s) => s.setGridColumns)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
   const labels = useNodeLabels()
+  const setViewFolder = useDiagramStore((s) => s.setViewFolder)
+  const allViews = useDiagramStore((s) => s.views)
+  const folderPaths = useMemo(() => viewFolderPaths(Object.values(allViews)), [allViews])
+  const [editingFolder, setEditingFolder] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState('')
   const seqList = Object.values(sequences)
@@ -862,6 +871,29 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
               {!readOnly && (
                 <button className="lp-icon-btn" title="Rename view"
                   onClick={() => { setNameVal(view.name); setEditingName(true) }}><Icon.Pencil /></button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div>
+        <div className="props-section-title">Folder</div>
+        <div className="props-field">
+          {editingFolder ? (
+            <ViewFolderPicker
+              current={normalizeViewFolder(view.folder)}
+              folders={folderPaths}
+              onPick={(folder) => { setViewFolder(view.id, folder); setEditingFolder(false) }}
+              onCancel={() => setEditingFolder(false)}
+            />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ flex: 1, fontSize: 12, padding: '3px 0', color: view.folder ? undefined : 'var(--text-muted)' }}>
+                {view.folder || 'No folder'}
+              </div>
+              {!readOnly && (
+                <button className="lp-icon-btn" title="Move to folder…"
+                  onClick={() => setEditingFolder(true)}><Icon.Folder /></button>
               )}
             </div>
           )}
@@ -1129,14 +1161,254 @@ function MilestonePropertiesContent({ snapId, readOnly = false, onClose }: { sna
 
 // ── View list (left panel) ────────────────────────────────────────────────────
 
-function ViewList({ readOnly = false, onOpenProps }: { readOnly?: boolean; onOpenProps?: (viewId: string) => void }) {
+const VIEW_BADGE_STYLE: React.CSSProperties = { marginLeft: 4, fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }
+
+/** Properties of a folder of the list of views: its name (renaming moves
+ *  every view in it and below it along), where it sits, and its views. */
+function FolderPropertiesContent({ path, readOnly = false, onRenamed }: {
+  path: string
+  readOnly?: boolean
+  onRenamed: (path: string) => void
+}) {
   const views = useDiagramStore((s) => s.views)
-  const sequences = useDiagramStore((s) => s.sequences)
+  const activeViewId = useDiagramStore((s) => s.activeViewId)
+  const setActiveView = useDiagramStore((s) => s.setActiveView)
+  const renameViewFolder = useDiagramStore((s) => s.renameViewFolder)
+  const moveViewFolder = useDiagramStore((s) => s.moveViewFolder)
+  const [editingName, setEditingName] = useState(false)
+  const [nameVal, setNameVal] = useState('')
+  const [nameError, setNameError] = useState<string | null>(null)
+  const inside = Object.values(views).filter((v) => isInViewFolder(v, path))
+  const cut = path.lastIndexOf('/')
+  const name = path.slice(cut + 1)
+  const parent = cut < 0 ? '' : path.slice(0, cut)
+  // Where the folder stands among the folders beside it.
+  const siblings = useMemo(() => {
+    let folder: ViewFolder | undefined = viewFolderTree(Object.values(views))
+    for (const part of parent ? parent.split('/') : []) folder = folder?.folders.find((f) => f.name === part)
+    return folder?.folders.map((f) => f.path) ?? []
+  }, [views, parent])
+  const place = siblings.indexOf(path)
+
+  const commitName = () => {
+    const next = nameVal.trim()
+    if (!next || next === name) { setEditingName(false); setNameError(null); return }
+    if (next.includes('/')) { setNameError('A folder name holds no "/".'); return }
+    const to = renameViewFolder(path, next)
+    if (to === null) { setNameError('This folder cannot be renamed.'); return }
+    setEditingName(false)
+    setNameError(null)
+    onRenamed(to)
+  }
+
+  if (inside.length === 0) {
+    return <div className="props-content"><div className="lp-empty-state">No view is in this folder any more.</div></div>
+  }
+  return (
+    <div className="props-content">
+      <div className="props-type-badge" style={{ background: '#334155', color: '#fff' }}>
+        <Icon.Folder />&nbsp;FOLDER
+      </div>
+      <div>
+        <div className="props-section-title">Name</div>
+        <div className="props-field">
+          {editingName ? (
+            <>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input className="props-input" autoFocus value={nameVal} aria-label="Folder name"
+                  onChange={(e) => { setNameVal(e.target.value); setNameError(null) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitName(); if (e.key === 'Escape') { setEditingName(false); setNameError(null) } }}
+                  style={{ flex: 1 }} />
+                <button className="lp-icon-btn primary" onClick={commitName} title="Save"><Icon.Check /></button>
+                <button className="lp-icon-btn" onClick={() => { setEditingName(false); setNameError(null) }} title="Cancel"><Icon.Close /></button>
+              </div>
+              {nameError && <div className="lp-folder-error" role="alert">{nameError}</div>}
+            </>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ flex: 1, fontSize: 13, fontWeight: 600, padding: '3px 0' }}>{name}</div>
+              {!readOnly && (
+                <button className="lp-icon-btn" title="Rename folder"
+                  onClick={() => { setNameVal(name); setEditingName(true) }}><Icon.Pencil /></button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div>
+        <div className="props-section-title">In</div>
+        <div style={{ fontSize: 12, color: parent ? undefined : 'var(--text-muted)' }}>{parent || 'Top of the list'}</div>
+      </div>
+      {!readOnly && siblings.length > 1 && (
+        <div>
+          <div className="props-section-title">Order · {place + 1} of {siblings.length}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+            <button className="lp-order-btn" disabled={place <= 0} onClick={() => moveViewFolder(path, -1)}>
+              <Icon.ArrowUp /> Move up
+            </button>
+            <button className="lp-order-btn" disabled={place < 0 || place >= siblings.length - 1} onClick={() => moveViewFolder(path, 1)}>
+              <Icon.ArrowDown /> Move down
+            </button>
+          </div>
+        </div>
+      )}
+      <div>
+        <div className="props-section-title">Views · {inside.length}</div>
+        <div className="lp-folder-views">
+          {inside.map((v) => {
+            const sub = normalizeViewFolder(v.folder).slice(path.length + 1)
+            return (
+              <button key={v.id} className={`lp-folder-choice${activeViewId === v.id ? ' active' : ''}`}
+                onClick={() => setActiveView(v.id)} title={`Open ${v.name}`}>
+                <span>{sub ? `${sub} / ` : ''}{v.name}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Picks a folder for a view: one in use (the list narrows as you type),
+ *  or a new path typed as "C4/Components". */
+function ViewFolderPicker({ current, folders, onPick, onCancel }: {
+  current: string
+  folders: string[]
+  onPick: (folder: string) => void
+  onCancel: () => void
+}) {
+  const [value, setValue] = useState(current)
+  const pick = () => onPick(normalizeViewFolder(value))
+  const typed = normalizeViewFolder(value).toLowerCase()
+  const shown = folders.filter((f) => f !== current && (!typed || typed === current.toLowerCase() || f.toLowerCase().includes(typed)))
+  return (
+    <div className="lp-folder-picker" onClick={(e) => e.stopPropagation()}>
+      <div className="lp-inline-form">
+        <input className="lp-inline-input" autoFocus value={value}
+          placeholder="Folder, e.g. C4/Components" aria-label="Folder"
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') pick(); if (e.key === 'Escape') onCancel() }} />
+        <button className="lp-icon-btn primary" onClick={pick} title="Move"><Icon.Check /></button>
+        <button className="lp-icon-btn" onClick={onCancel} title="Cancel"><Icon.Close /></button>
+      </div>
+      {(shown.length > 0 || current) && (
+        <div className="lp-folder-choices">
+          {current && (
+            <button className="lp-folder-choice" onClick={() => onPick('')}><span>No folder</span></button>
+          )}
+          {shown.map((f) => (
+            <button key={f} className="lp-folder-choice" title={`Move to ${f}`} onClick={() => onPick(f)}>
+              <Icon.Folder /><span>{f}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
+  readOnly?: boolean
+  onOpenProps?: (viewId: string) => void
+  onOpenFolder?: (path: string) => void
+}) {
+  const views = useDiagramStore((s) => s.views)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
   const addView = useDiagramStore((s) => s.addView)
   const totalNodes = useDiagramStore((s) => Object.keys(s.c4Nodes).length)
   const viewList = Object.values(views)
+  const tree = useMemo(() => viewFolderTree(viewList), [views])
+  // Folders start open; the one holding the active view opens again.
+  const [closed, setClosed] = useState<Set<string>>(() => new Set())
+  const activeFolder = activeViewId ? normalizeViewFolder(views[activeViewId]?.folder) : ''
+  useEffect(() => {
+    if (!activeFolder) return
+    setClosed((prev) => {
+      const ancestors = activeFolder.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'))
+      if (!ancestors.some((p) => prev.has(p))) return prev
+      const next = new Set(prev)
+      ancestors.forEach((p) => next.delete(p))
+      return next
+    })
+  }, [activeFolder])
+  const toggleFolder = (path: string) => setClosed((prev) => {
+    const next = new Set(prev)
+    if (next.has(path)) next.delete(path); else next.add(path)
+    return next
+  })
+
+  const renderView = (v: DiagramView) => {
+    const isActive = activeViewId === v.id
+    const isDynamic = v.kind === 'dynamic'
+    const isTreemap = v.kind === 'treemap'
+    const isTable   = v.kind === 'table'
+    const isMatrix  = v.kind === 'matrix'
+    const isWiki    = v.kind === 'wiki'
+    const badge = isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : 'structure'
+    return (
+      <div key={v.id}>
+        <div
+          className={`lp-card lp-view-card${isActive ? ' active' : ''}`}
+          onClick={() => setActiveView(v.id)}
+        >
+          <div className="lp-view-icon" style={{ color: isDynamic ? 'var(--accent)' : undefined }}>
+            {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : <Icon.Layers />}
+          </div>
+          <div className="lp-card-body">
+            <div className="lp-card-title">{v.name}</div>
+            <div className="lp-card-meta">
+              <span>{viewNodeCount(v)}</span>
+              <span style={{ ...VIEW_BADGE_STYLE, color: badge === 'structure' ? 'var(--text-muted)' : 'var(--accent)' }}>{badge}</span>
+            </div>
+          </div>
+          {!readOnly && onOpenProps && (
+            <div className="lp-card-actions">
+              <button
+                className="lp-icon-btn"
+                onClick={(e) => { e.stopPropagation(); onOpenProps(v.id) }}
+                title="View properties"
+              ><Icon.Settings /></button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const renderFolder = (folder: ViewFolder): React.ReactNode => {
+    const open = !closed.has(folder.path)
+    return (
+      <div key={`folder:${folder.path}`} className="lp-folder">
+        <div className={`lp-folder-row${open ? ' open' : ''}`}>
+          <button
+            className="lp-folder-toggle"
+            onClick={() => toggleFolder(folder.path)}
+            aria-expanded={open}
+            title={folder.path}
+          >
+            <span className="lp-folder-chevron"><Icon.ChevronRight /></span>
+            <span className="lp-folder-icon"><Icon.Folder /></span>
+            <span className="lp-folder-name">{folder.name}</span>
+            <span className="lp-folder-count">{folder.count}</span>
+          </button>
+          {!readOnly && onOpenFolder && (
+            <button
+              className="lp-icon-btn lp-folder-props"
+              onClick={() => onOpenFolder(folder.path)}
+              title="Folder properties"
+            ><Icon.Settings /></button>
+          )}
+        </div>
+        {open && (
+          <div className="lp-folder-body">
+            {folder.entries.map((entry) => ('folder' in entry ? renderFolder(entry.folder) : renderView(entry.view)))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="lp-view-list">
@@ -1149,51 +1421,11 @@ function ViewList({ readOnly = false, onOpenProps }: { readOnly?: boolean; onOpe
           <div className="lp-card-title">Structure view</div>
           <div className="lp-card-meta">
             <span>{totalNodes} {totalNodes === 1 ? 'node' : 'nodes'}</span>
-            <span style={{ marginLeft: 4, color: 'var(--text-muted)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>structure</span>
+            <span style={{ ...VIEW_BADGE_STYLE, color: 'var(--text-muted)' }}>structure</span>
           </div>
         </div>
       </div>
-      {viewList.map((v) => {
-        const isActive = activeViewId === v.id
-        const isDynamic = v.kind === 'dynamic'
-        const isTreemap = v.kind === 'treemap'
-        const isTable   = v.kind === 'table'
-        const isMatrix  = v.kind === 'matrix'
-        const isWiki    = v.kind === 'wiki'
-        return (
-          <div key={v.id}>
-            <div
-              className={`lp-card lp-view-card${isActive ? ' active' : ''}`}
-              onClick={() => setActiveView(v.id)}
-            >
-              <div className="lp-view-icon" style={{ color: isDynamic ? 'var(--accent)' : undefined }}>
-                {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : <Icon.Layers />}
-              </div>
-              <div className="lp-card-body">
-                <div className="lp-card-title">{v.name}</div>
-                <div className="lp-card-meta">
-                  <span>{viewNodeCount(v)}</span>
-                  {isDynamic && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>flow</span>}
-                  {isTreemap && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>hierarchy</span>}
-                  {isTable && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>table</span>}
-                  {isMatrix && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>matrix</span>}
-                  {isWiki && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>wiki</span>}
-                  {!isDynamic && !isTreemap && !isTable && !isMatrix && !isWiki && <span style={{ marginLeft: 4, color: 'var(--text-muted)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>structure</span>}
-                </div>
-              </div>
-              {!readOnly && onOpenProps && (
-                <div className="lp-card-actions">
-                  <button
-                    className="lp-icon-btn"
-                    onClick={(e) => { e.stopPropagation(); onOpenProps(v.id) }}
-                    title="View properties"
-                  ><Icon.Settings /></button>
-                </div>
-              )}
-            </div>
-          </div>
-        )
-      })}
+      {tree.entries.map((entry) => ('folder' in entry ? renderFolder(entry.folder) : renderView(entry.view)))}
       {!readOnly && (
         <button className="lp-add-btn" onClick={() => {
           const id = addView(`View ${viewList.length + 1}`)
@@ -1208,6 +1440,75 @@ function ViewList({ readOnly = false, onOpenProps }: { readOnly?: boolean; onOpe
 }
 
 // ── LeftPanel (accordion) ────────────────────────────────────────────────────
+
+// ── Left panel width (drag handle on its inner edge) ────────────────────────
+
+const LEFT_PANEL_WIDTH_KEY = 'radical.leftPanelWidth'
+const LEFT_PANEL_MIN = 200
+const LEFT_PANEL_MAX = 560
+
+function clampLeftPanelWidth(width: number): number {
+  return Math.round(Math.min(LEFT_PANEL_MAX, Math.max(LEFT_PANEL_MIN, width)))
+}
+
+/** Sets the left panel's width on the layout grid (`--left-panel-w`); null
+ *  goes back to the stylesheet's default. */
+function applyLeftPanelWidth(layout: HTMLElement | null, width: number | null): void {
+  if (!layout) return
+  if (width === null) layout.style.removeProperty('--left-panel-w')
+  else layout.style.setProperty('--left-panel-w', `${width}px`)
+}
+
+/** Drag handle on the left panel's inner edge: drag to widen or narrow the
+ *  panel, double-click for its default width. The width is kept in this
+ *  browser. */
+function LeftPanelResizer() {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    let saved: number | null = null
+    try {
+      const raw = localStorage.getItem(LEFT_PANEL_WIDTH_KEY)
+      if (raw && Number.isFinite(Number(raw))) saved = clampLeftPanelWidth(Number(raw))
+    } catch { /* storage unavailable */ }
+    if (saved !== null) applyLeftPanelWidth(ref.current?.closest('.app-layout') ?? null, saved)
+  }, [])
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    const panel = ref.current?.parentElement
+    const layout = ref.current?.closest<HTMLElement>('.app-layout') ?? null
+    if (!panel || !layout) return
+    e.preventDefault()
+    const handle = e.currentTarget
+    handle.setPointerCapture(e.pointerId)
+    const startX = e.clientX
+    const startWidth = panel.getBoundingClientRect().width
+    let width = startWidth
+    layout.classList.add('lp-resizing')
+    const move = (ev: PointerEvent) => {
+      width = clampLeftPanelWidth(startWidth + ev.clientX - startX)
+      applyLeftPanelWidth(layout, width)
+    }
+    const up = () => {
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', up)
+      handle.removeEventListener('pointercancel', up)
+      layout.classList.remove('lp-resizing')
+      try { localStorage.setItem(LEFT_PANEL_WIDTH_KEY, String(width)) } catch { /* storage unavailable */ }
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', up)
+    handle.addEventListener('pointercancel', up)
+  }
+  const onDoubleClick = () => {
+    applyLeftPanelWidth(ref.current?.closest<HTMLElement>('.app-layout') ?? null, null)
+    try { localStorage.removeItem(LEFT_PANEL_WIDTH_KEY) } catch { /* storage unavailable */ }
+  }
+  return (
+    <div ref={ref} className="panel-resize" role="separator" aria-orientation="vertical"
+      aria-label="Resize panel" title="Drag to resize · double-click for the default width"
+      onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} />
+  )
+}
 
 // ── Panel collapse toggle (chevron tab on inner edge) ────────────────────────
 
@@ -1279,7 +1580,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
 
   const defaultSection = mode === 'designer' ? 'elements' : 'views'
   const [openSection, setOpenSection] = useState<'elements' | 'views' | 'milestones'>(defaultSection as any)
-  type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string }
+  type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string }
   const [paneContent, setPaneContent] = useState<PaneContent | null>(null)
   const hasPaneContent = !!paneContent
 
@@ -1312,6 +1613,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
               <ViewList
                 readOnly={isReadOnly}
                 onOpenProps={!isReadOnly ? (id) => { setPaneContent({ kind: 'view', id }); setOpenSection('views') } : undefined}
+                onOpenFolder={!isReadOnly ? (path) => { setPaneContent({ kind: 'folder', id: path }); setOpenSection('views') } : undefined}
               />
             </AccordionSection>
             <AccordionSection title="Milestones" count={snapshotsCount}
@@ -1330,6 +1632,13 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
                 onClose={() => setPaneContent(null)}
               />
             )}
+            {paneContent?.kind === 'folder' && (
+              <FolderPropertiesContent
+                path={paneContent.id}
+                readOnly={isReadOnly}
+                onRenamed={(path) => setPaneContent({ kind: 'folder', id: path })}
+              />
+            )}
             {paneContent?.kind === 'milestone' && (
               <MilestonePropertiesContent
                 snapId={paneContent.id}
@@ -1341,6 +1650,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
 
         </div>
       </div>
+      {!collapsed && <LeftPanelResizer />}
       {toggle}
     </div>
   )

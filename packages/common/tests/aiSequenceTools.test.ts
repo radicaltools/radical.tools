@@ -90,6 +90,51 @@ describe('update_view', () => {
     expect(facade.getViews!()[ctx.resolveId('v')].hiddenRelationIds).toEqual([])
   })
 
+  it('shows elements open or folded in the view only, over their fold on the model', () => {
+    const { facade, call, ctx } = setup()
+    call('add_node', { tempId: 'grp', type: 'group', label: 'Layer' })
+    call('add_node', { tempId: 'inner', type: 'system', label: 'Inner', parentId: 'grp' })
+    call('create_view', { tempId: 'v', name: 'Layer view', nodeIds: ['grp', 'inner'] })
+    const grp = ctx.resolveId('grp')
+    // Folded on the model, as a collapse in Studio's All elements leaves it.
+    facade.getNodes()[grp].collapsed = true
+    const opened = call('update_view', { id: 'v', expand: ['grp'] })
+    expect(opened.ok, opened.resultText).toBe(true)
+    expect(facade.getViews!()[ctx.resolveId('v')]).toMatchObject({ expandedNodeIds: [grp], collapsedNodeIds: [] })
+    expect(call('update_view', { id: 'v', collapse: ['grp'] }).ok).toBe(true)
+    expect(facade.getViews!()[ctx.resolveId('v')]).toMatchObject({ expandedNodeIds: [], collapsedNodeIds: [grp] })
+    // Open on the model: opening it in the view needs no override.
+    facade.getNodes()[grp].collapsed = false
+    expect(call('update_view', { id: 'v', expand: ['grp'] }).ok).toBe(true)
+    expect(facade.getViews!()[ctx.resolveId('v')]).toMatchObject({ expandedNodeIds: [], collapsedNodeIds: [] })
+    expect(call('update_view', { id: 'v', expand: ['nope'] }).resultText).toContain('unknown element')
+  })
+
+  it('puts views into folders of the list of views, and back at the top', () => {
+    const { facade, call, ctx } = setup()
+    expect(call('create_view', { tempId: 'v', name: 'Studio', folder: ' C4 / Components/ ' }).ok).toBe(true)
+    const v = () => facade.getViews!()[ctx.resolveId('v')]
+    expect(v().folder).toBe('C4/Components')
+    expect(call('update_view', { id: 'v', folder: 'C4' }).ok).toBe(true)
+    expect(v().folder).toBe('C4')
+    expect(call('update_view', { id: 'v', folder: '' }).ok).toBe(true)
+    expect(v()).not.toHaveProperty('folder')
+    expect(call('update_view', { id: 'v', folder: 3 }).resultText).toContain('folder must be a string')
+  })
+
+  it('orders views among the places they hold, which orders folders too', () => {
+    const { facade, call } = setup()
+    call('create_view', { tempId: 'a', name: 'A', folder: 'One' })
+    call('create_view', { tempId: 'b', name: 'B' })
+    call('create_view', { tempId: 'c', name: 'C', folder: 'Two' })
+    call('create_view', { tempId: 'd', name: 'D', folder: 'One' })
+    const names = () => Object.values(facade.getViews!()).map((v) => v.name)
+    expect(call('order_views', { ids: ['d', 'c', 'a'] }).ok).toBe(true)
+    expect(names()).toEqual(['D', 'B', 'C', 'A'])
+    expect(call('order_views', { ids: ['c', 'nope'] }).resultText).toContain('unknown view')
+    expect(call('order_views', { ids: ['c', 'c'] }).resultText).toContain('listed twice')
+  })
+
   it('refuses switching to dynamic without a sequence, and unknown relations', () => {
     const { call } = setup()
     call('create_view', { tempId: 'v', name: 'Context' })

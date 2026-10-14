@@ -5,7 +5,9 @@
 .app-layout {
   display: grid;
   grid-template-rows: 48px 1fr auto;
-  grid-template-columns: 220px 1fr 260px;
+  /* The left panel's width; its edge handle drags it (LeftPanel). */
+  --left-panel-w: 260px;
+  grid-template-columns: var(--left-panel-w) 1fr 260px;
   grid-template-areas:
     "toolbar    toolbar    toolbar"
     "leftpanel  canvas     rightpanel"
@@ -13,11 +15,12 @@
   height: 100vh;
   transition: grid-template-columns 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.app-layout.lp-resizing { transition: none; cursor: col-resize; }
 /* Collapsed panel rails */
 .app-layout.lp-collapsed { grid-template-columns: 18px 1fr 260px; }
 /* Presentation mode — same 3-column layout as modelling (left panel + canvas + right panel) */
 .app-layout.mode-presentation {
-  grid-template-columns: 240px 1fr 260px;
+  grid-template-columns: var(--left-panel-w) 1fr 260px;
   grid-template-rows: 48px 1fr auto;
   grid-template-areas:
     "toolbar    toolbar    toolbar"

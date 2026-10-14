@@ -1,0 +1,9 @@
+---
+id: "08929203-71a8-4000-9dbe-8cb5f0ff93cd"
+type: "scenario"
+label: "Agent opens a folded group"
+given: "a group folded on the model and a view that lists it and its child"
+tests: "packages/common/tests/aiSequenceTools.test.ts › update_view › shows elements open or folded in the view only, over their fold on the model"
+then: "the view records it as opened over the model's fold, then as folded; opening an element the model shows open needs no override; an unknown id is refused"
+when: "update_view opens it, then folds it, in that view"
+---
