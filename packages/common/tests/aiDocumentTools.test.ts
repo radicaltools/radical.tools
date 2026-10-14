@@ -87,12 +87,24 @@ describe('metamodel tools', () => {
     const { facade, call } = setup()
     await call('upsert_node_type', { id: 'risk', label: 'Risk', allowedAtRoot: true })
     await call('upsert_node_type', { id: 'control', label: 'Control', allowedParents: ['risk'] })
-    await call('upsert_relation_type', { id: 'mitigates', label: 'Mitigates', allowedPairs: [{ from: 'adr', to: 'risk' }] })
+    await call('upsert_relation_type', { id: 'mitigates', label: 'Mitigates', allowedPairs: [{ from: 'adr', to: 'risk' }, { from: 'adr', to: 'control' }] })
     expect((await call('delete_node_type', { id: 'risk' })).ok).toBe(true)
     const mm = facade.getMetamodel!()!
     expect(mm.nodeTypes.control.allowedParents).toEqual([])
-    expect(mm.relationTypes.mitigates.allowedPairs).toEqual([])
+    expect(mm.relationTypes.mitigates.allowedPairs).toEqual([{ from: 'adr', to: 'control' }])
     expect((await call('delete_relation_type', { id: 'mitigates' })).ok).toBe(true)
+  })
+
+  it('refuse to delete a type the only pairs of a relation type name', async () => {
+    // Left with no pair, the relation type allowed any pair: an ADR could
+    // then be connected to a need, and nothing said so.
+    const { facade, call } = setup()
+    await call('upsert_node_type', { id: 'badge', label: 'Badge', allowedAtRoot: true })
+    await call('upsert_relation_type', { id: 'issues', label: 'Issues', allowedPairs: [{ from: 'badge', to: 'badge' }] })
+    const res = await call('delete_node_type', { id: 'badge' })
+    expect(res.ok).toBe(false)
+    expect(res.resultText).toContain('connects only Badge')
+    expect(facade.getMetamodel!()!.relationTypes.issues.allowedPairs).toEqual([{ from: 'badge', to: 'badge' }])
   })
 
   it('describe a new type, without inheriting the description of its base type', async () => {
@@ -132,6 +144,10 @@ describe('presentation tools', () => {
     expect((await call('update_presentation', { id: pitch.id, name: 'Pitch v2', slides: [{ id: kept.id, name: 'Context!', viewId: 'v' }] })).ok).toBe(true)
     expect(facade.toDiagramData().presentations).toEqual([expect.objectContaining({ name: 'Pitch v2', slides: [{ ...kept, name: 'Context!' }] })])
     expect((await call('update_presentation', { id: pitch.id, slides: [{ name: 'X', viewId: 'nope' }] })).resultText).toContain('unknown viewId')
+    // A slide is listed once (Studio's delete then took both from the file).
+    const twice = await call('update_presentation', { id: pitch.id, slides: [{ id: kept.id, name: 'A' }, { id: kept.id, name: 'B' }] })
+    expect(twice.ok).toBe(false)
+    expect(twice.resultText).toContain('repeats the id')
     expect((await call('delete_presentation', { id: pitch.id })).ok).toBe(true)
     expect(facade.getPresentations!()).toEqual([])
   })
@@ -382,5 +398,16 @@ describe('add_relation with no type and a properties bag', () => {
     expect(nodes[rel.targetId as string]?.label).toBe('Bank')
     expect(rel.relationType).not.toBe('nonexistent-type')
     expect(rel.note).toBe('kept')
+  })
+})
+
+describe('a type added by another writer', () => {
+  // The schema an MCP client validates with lags behind; the handler checks
+  // the type against the metamodel the call runs on.
+  it('add_node refuses a type the metamodel does not have, naming the ones it has', async () => {
+    const { call } = setup()
+    const res = await call('add_node', { tempId: 'x', type: 'no-such-type', label: 'X' })
+    expect(res.ok).toBe(false)
+    expect(res.resultText).toMatch(/unknown type "no-such-type"/)
   })
 })

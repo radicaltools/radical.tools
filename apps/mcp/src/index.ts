@@ -57,6 +57,37 @@ function forgePrompt(description: string): string {
   ].join('\n')
 }
 
+/**
+ * The element and relation types a tool's schema lists come from the
+ * metamodel the server saw last. The SDK checks a call against that schema
+ * before the server reads the folder again, so a type that Studio, another
+ * server or a hand edit had just added was refused until some other call
+ * refreshed the schemas. Clients still see the lists; the call is checked
+ * against the schema without them, and the handlers check the type against
+ * the metamodel the call runs on.
+ */
+function openTypeEnums(schema: Record<string, unknown>): Record<string, unknown> {
+  const properties = schema.properties as Record<string, Record<string, unknown>> | undefined
+  if (!properties) return schema
+  const open: Record<string, Record<string, unknown>> = {}
+  for (const [key, prop] of Object.entries(properties)) {
+    if ((key === 'type' || key === 'relationType') && Array.isArray(prop.enum)) {
+      const { enum: _allowed, ...rest } = prop
+      open[key] = { ...rest, type: 'string' }
+    } else {
+      open[key] = prop
+    }
+  }
+  return { ...schema, properties: open }
+}
+
+/** A tool's schema as clients see it, checked without its type lists. */
+function toolSchema(inputSchema: Record<string, unknown>): ReturnType<typeof fromJsonSchema> {
+  const shown = fromJsonSchema(inputSchema)
+  const checked = fromJsonSchema(openTypeEnums(inputSchema))
+  return { '~standard': { ...checked['~standard'], jsonSchema: shown['~standard'].jsonSchema } }
+}
+
 async function main(): Promise<void> {
   const { folder, metamodel } = parseArgs(process.argv.slice(2))
   const model = await FolderModel.open(folder, { metamodel })
@@ -66,13 +97,14 @@ async function main(): Promise<void> {
   const advertise = (): void => {
     for (const tool of model.tools) {
       const existing = registered.get(tool.name)
+      const schema = toolSchema(tool.inputSchema)
       if (existing) {
-        existing.update({ description: tool.description, paramsSchema: fromJsonSchema(tool.inputSchema) })
+        existing.update({ description: tool.description, paramsSchema: schema })
         continue
       }
       registered.set(tool.name, server.registerTool(tool.name, {
         description: tool.description,
-        inputSchema: fromJsonSchema(tool.inputSchema),
+        inputSchema: schema,
         annotations: { readOnlyHint: READ_ONLY_TOOLS.has(tool.name) },
       }, async (input, ctx) => {
         // Progress goes out only to a client that asked for it with a token.

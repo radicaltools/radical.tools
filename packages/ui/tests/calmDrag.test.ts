@@ -33,9 +33,9 @@ type Nodes = Record<string, C4Node>
 
 /** 160 linked containers far to the right: the diagram is large, so the
  *  physics is local and at rest once built. */
-function withFillers(nodes: Nodes, relations: Record<string, C4Relation>): void {
-  for (let i = 0; i < 160; i++) nodes[`f${i}`] = node(`f${i}`, 'container', { x: 6000 + (i % 16) * 320, y: Math.floor(i / 16) * 220 })
-  for (let i = 1; i < 160; i++) relations[`fr${i}`] = { id: `fr${i}`, sourceId: `f${i - 1}`, targetId: `f${i}` } as C4Relation
+function withFillers(nodes: Nodes, relations: Record<string, C4Relation>, count = 160): void {
+  for (let i = 0; i < count; i++) nodes[`f${i}`] = node(`f${i}`, 'container', { x: 6000 + (i % 16) * 320, y: Math.floor(i / 16) * 220 })
+  for (let i = 1; i < count; i++) relations[`fr${i}`] = { id: `fr${i}`, sourceId: `f${i - 1}`, targetId: `f${i}` } as C4Relation
 }
 
 function engineFor(nodes: Nodes, relations: Record<string, C4Relation>, alignments: Alignment[] = [], pinned: string[] = []): LiveColaEngine {
@@ -480,7 +480,9 @@ describe('Pins', () => {
       b: node('b', 'system', { x: 400, y: 0 }),
     }
     const relations: Record<string, C4Relation> = {}
-    withFillers(nodes, relations)
+    // Under WHOLE_DIAGRAM_MAX_NODES: from there up a push drag is a calm
+    // one, whose drop pushes pinned elements clear too.
+    withFillers(nodes, relations, 100)
     const engine = engineFor(nodes, relations, [], ['b'])
     engine.start(true)
     // Push a onto b: the physics makes room, but not by moving b.

@@ -408,6 +408,13 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     client takes in one result, when the ids were all that `set_view_nodes`
     needed. There is no tool that adds a node to a view: the whole list has
     to be read and sent back.
+24. **Amending an ADR means sending its whole text back.** An amendment is
+    a paragraph added to `consequences`, but `update_node` replaces the
+    property: recording runs 13 to 24 (2026-10-14) meant reading "A laid-out
+    diagram stands" (about 4 000 characters) and sending all of it back with
+    one paragraph more, four times over. One slip drops an earlier
+    amendment without a word. An append mode for text properties, or an
+    `amend_decision` tool that adds a dated paragraph, would do.
 
 ### Reverse-engineered requirements (2026-10-06)
 
@@ -1392,6 +1399,465 @@ overlapping; changing a view's auto-layout mode is not an undo step;
 related concepts imported from the Hub have no template record, and
 Cancel on the template form leaves them imported; Hub filters change the
 address without a history entry and the search text is lost on reload.
+
+**Runs 13 to 24, 2026-10-14, commit 2825bee**, twelve at the same time,
+each in its own areas. All 36 were fixed on 2026-10-14, each with a test
+that fails without the fix; the "To decide" list is still open.
+
+*Run 13.* Covered: writing the model in the wiki (EARS sentences written
+and rewritten, with and without a state; two containers written with undo
+and redo; a pasted list of three lines; the result on Containers and All
+elements; reloads 2 s and 5 s after a write), group pages, a delete from
+the wiki on a view that lists its own elements. Not covered: page-title
+renames with undo, Multi page chapters, search and glossary after
+writing, links between pages, milestones, Viewer, folder models.
+
+59. ~~**The wiki reads a requirement that points at a state by its
+    precondition text, not by the state.**~~ With `precondition_state:
+    confirmed` and the text "the order is waiting" (the wizard's Sentence
+    step always writes one), the card reads "While the Order is Confirmed,
+    …" and the wiki "While the order is waiting, …"; a rewrite in the wiki
+    changes the wiki only; with no text the wiki shows the empty slot
+    "While ‹precondition›". `EarsSentenceEditor` and `partSummary` call
+    `composeEarsSentence` without the state; item 52 fixed the card only.
+    Fixed 2026-10-14: The wiki puts the state's phrase in the "While" slot
+    and in its summaries, as the card does; rewritten to another "While"
+    clause, the requirement stops pointing at the state.
+60. ~~**Deleting every element a view lists turns it into a view of the
+    whole model.**~~ Core Banking Platform deleted from Architecture Wiki,
+    which lists 14 elements under it: the overview goes from 14 to 51
+    elements, the page list from 3 to 37, the Core Banking canvas draws 51.
+    Both views are saved with `nodeIds: []`, which means "every node";
+    `deleteNode` in `model.ts` and the store filter the list down to empty.
+    Fixed 2026-10-14: A view whose list a delete or a hide empties is
+    marked `empty` and shows nothing; Studio, the layout and the MCP server
+    read it through `viewShowsEveryNode`.
+61. ~~**After writing an element in the wiki, the first click on an "Add: …"
+    link below the line does nothing.**~~ "Search Service" written as a
+    container on Bookstore, then "Software systems" clicked: nothing; the
+    second click works. The mouse-down blurs the line, its hint (shown only
+    while focused) goes, and the link moves up 19 px before the mouse-up.
+    Fixed 2026-10-14: The hint keeps its room when hidden (`visibility`),
+    so nothing below it moves.
+
+*Run 14.* Covered: the Requirements Register's 13 tabs; text cells with
+Enter, Escape, Tab and click-away next to undo and redo; Viewer (inert
+cells); the Relations tab's columns from a relation type's properties,
+checked against the properties panel; palette drops onto a table and onto
+a row. Not covered: number cells and required properties, multi-ref chips
+next to undo, table edits with a milestone shown, folder models, the wiki
+showing table edits.
+
+62. ~~**A yes/no cell on the table's Relations tab does nothing when
+    clicked.**~~ A boolean `urgent` on `transition`: the cell stays "—" and
+    the relation is saved without it, with no notice; the properties
+    panel's checkbox works. `handleBoolToggle` in `TableView.tsx` called
+    `updateNode` with a relation's id.
+    Fixed 2026-10-14: On the Relations tab the cell updates the relation.
+63. ~~**A table enum cell with no value shows its first option as if set,
+    and that option cannot be picked.**~~ Pending payment → Confirmed, Kind:
+    the select opens on `external`, choosing it fires no change and `kind`
+    stays unset (the State tab's Kind the same). The table's version of
+    item 33, which was fixed in the properties panel only.
+    Fixed 2026-10-14: An empty enum cell opens on "(not set)", so every
+    option can be picked.
+64. ~~**Opening a table cell and leaving it without typing makes an undo step
+    that does nothing, and writes `""` into an empty property.**~~ After a
+    name edit and two cells opened and left, it takes three Ctrl+Z to undo
+    the edit; an empty Payload cell opened and left saves `payload: ""`.
+    `commitEdit` saved on every blur, and `updateNode` / `updateRelation`
+    pushed a step for a patch that changes nothing.
+    Fixed 2026-10-14: A cell left as it was saves nothing, an emptied
+    property is cleared instead of set to "", and an update that changes
+    nothing is no undo step.
+
+*Run 15.* Covered: hierarchy drilling (double-click, Esc, breadcrumb,
+reload), drilling and Size in Viewer, deletes next to the focus with undo,
+generated nested models up to 1 215 elements; the matrix's row order, an
+add on an empty cell with undo and redo from another view, the two-click
+remove, an add with a milestone shown. Not covered: the popup for several
+relations, hidden relations next to matrix clicks, matrix refusals on the
+Radical metamodel in the browser, Size and Levels next to undo, folder
+models.
+
+65. ~~**One click on a matrix cell deletes the relation when the cell was
+    clicked in Viewer first.**~~ Dependency Matrix in Viewer, click API
+    Gateway → Auth Service, back to Designer, click it once: "Removed
+    relation", 109 → 108. `onCellClick` armed the cell in Viewer too, and
+    the selection survives the switch; the class of item 45.
+    Fixed 2026-10-14: A click in Viewer only selects, and a change of
+    perspective disarms the cell.
+66. ~~**The hierarchy's drill level is lost, and the loss is saved.**~~ A drag
+    on Core Banking, Platform Hierarchy drilled into Banking Services,
+    Ctrl+Z: the drag is undone and the hierarchy is back at "All", saved so
+    (`_restoreHistoryEntry` restored the views with the focus they had at
+    the drag). Drilled to Payments Service, milestone v1 (which lacks it)
+    opened: "All", also back on the live model and after a reload (the
+    "focused node was removed" effect in `TreemapView.tsx`).
+    Fixed 2026-10-14: Undo leaves what each view looks at (the hierarchy's
+    focus, the wiki's page, the table's tab) alone, like a camera; a model
+    without the focused element shows the top without changing the view,
+    which forgets its focus only when the element is deleted from the live
+    model.
+67. ~~**A slide added on a drilled-in hierarchy plays at the top level.**~~
+    Presenter, Platform Hierarchy drilled to Banking Services, Add slide,
+    Esc up to All: the slide shows "All", from its card and while playing.
+    `PresentationSlide` had no field for the drill level.
+    Fixed 2026-10-14: A slide of a hierarchy view keeps the element it was
+    drilled into (`treemapFocusId`) and shows it while the slide is shown,
+    without changing the view's own focus.
+
+*Run 16.* Covered: Screen Map (mockups with wireframes, collapse and
+expand of flow groups with undo and reload, Smart Layout), Alt-drag
+connections from and to mockups, the Mockup wizard into a flow group,
+Remove wireframe with undo, redo and reload in the panel and the wiki,
+PNG and SVG export, a folder model, the MCP mockup tools and
+`forge_wireframe`. Not covered: slides and flow playback with mockups, the
+milestone diff toggle, table cells of mockups, the File System Access
+picker, a blueprint imported from Studio.
+
+68. ~~**A Hub blueprint downloaded as `.radical` opens under the C4
+    metamodel.**~~ `bp-ecommerce-platform.radical` (the Hub's Download)
+    opened with Open → File…: 125 validation issues such as `unknown type
+    "requirement"` (83 on bp-saas-b2b-platform), no UX palette group,
+    mockup → mockup refused, a mockup's panel without its fields, while the
+    wireframes still draw. Blueprints carry no `metamodel`, and
+    `documentMetamodel(undefined)` returned C4.
+    Fixed 2026-10-14: A document without a metamodel opens under the
+    Radical preset when it holds types only that preset has, in Studio and
+    in the MCP server.
+69. ~~**"Propagate to later milestones" carries a mockup's new label forward,
+    but not its Screen / route or a removed wireframe.**~~ Screen Map in v4:
+    route `/accounts` → `/accounts/v2`, Remove wireframe, label + " X",
+    Propagate: v5 and the live model get the label only. The diff in
+    `commitMilestoneChanges` compared a fixed list of fields (for relations
+    the ends, label and technology).
+    Fixed 2026-10-14: Propagate carries every field of an element and of a
+    relation forward, metamodel properties and relation types included.
+
+*Run 17.* Covered: the ADR and Requirement wizards from the canvas
+(Ctrl+Enter from the first and the relations step; Ctrl+Z, F5 and
+Backspace with the focus on a chip), drops on collapsed containers, a
+state machine built by hand (palette drops, Alt-drag transitions and
+emits, the validation's warnings), compound states with collapse, expand
+and reload. Not covered: Back and Cancel in a wizard; the need, scenario,
+fitness function and mockup wizards; wizards from the table and the wiki;
+"Fill in with wizard…"; editing a transition's fields; parallel, history
+and final states.
+
+70. ~~**Ctrl+Z inside a wizard undoes the model behind it, and Create then
+    saves a model that cannot be opened again.**~~ A Software System
+    dropped, an ADR dropped into it, a status chip clicked, Ctrl+Z: the
+    system goes while the wizard stays open; Ctrl+Enter saves the ADR with
+    a `parentId` that is gone, and Studio shows "Runtime Error: Parent node
+    … not found", after a reload too (5 of 5). F5 in the wizard started the
+    presentation behind it and the ADR was lost. The keys on `window` in
+    `Toolbar.tsx` did not check for a wizard, and `checkAddNode` took a
+    missing parent for the root.
+    Fixed 2026-10-14: Ctrl/Cmd+Z and F5 leave the model alone while a
+    wizard or another modal dialog is open; an element added into one that
+    no longer exists is refused; a child whose parent is missing is drawn
+    without one, so such a model opens.
+71. ~~**An ADR or requirement dropped on a collapsed container through the
+    wizard lands on its header, over a sibling.**~~ Bookstore collapsed and
+    dragged, an ADR dropped on it and created, Bookstore expanded: the ADR
+    is at (49, 81), over Web App by 180×13 (a requirement by 200×27). Item
+    39 again: `_createNodeWithLinks` lacked `addNode`'s branch for a
+    collapsed parent.
+    Fixed 2026-10-14: The wizard places its element as `addNode` does,
+    beside the others in a collapsed container, below its header
+    (`_placeNewChild`).
+72. ~~**A state dropped into a state that has no children lies outside it,
+    and a reload moves it.**~~ On order-machine's Order view a State dropped
+    onto Pending payment is saved at (−76, −67), size 320×220, above and
+    left of the parent's frame, which stays empty; a reload moves it
+    117.5 px down. It was centred on the drop point at its stored size in a
+    parent drawn at 170×72.
+    Fixed 2026-10-14: A new child starts no further up or left than its
+    parent's header and side padding.
+
+*Run 18.* Covered: milestone edits on the sample (v1 to v4, on All
+elements and Core Banking): a property change, a rename, deleting a leaf
+and a container, Propagate, reload; the same in a folder model next to the
+MCP server's milestone tools and `get_issues`. Not covered: "Save as new
+milestone" and Discard after each kind of edit, undo around the choice,
+reparenting, collapse, drags, alignments and sequences in a milestone, the
+diff toggle, renaming and deleting milestones.
+
+73. ~~**Propagating the delete of a container made in an early milestone
+    breaks Studio for good, and a deleted element leaves its later
+    relations behind.**~~ Banking Services deleted in v1 and propagated: the
+    live model and v2 to v4 keep Payments Service and Event Bus under the
+    deleted parent, and 4 relations to nothing; Current (live) and every
+    reload show "Runtime Error: Parent node dom-banking not found". Web
+    Banking deleted the same way leaves 11 relations to it in the live
+    model ("107 relations", 96 edges drawn). `removedNodeIds` came from the
+    edited milestone only.
+    Fixed 2026-10-14: A propagated delete also removes what lies inside the
+    element in each later model, and every relation left without an end.
+74. ~~**Propagate does not carry a changed property to later milestones or
+    the live model.**~~ ADR-001's status set to deprecated and its label
+    edited in v3, then Propagate: v4 and the live model get the label and
+    keep `accepted`, in a folder model too. The cause of item 69.
+    Fixed 2026-10-14: With item 69.
+75. ~~**Clicking an element in a milestone asks how to save changes nobody
+    made.**~~ v4 opened, ADR-001 clicked once: the "Editing milestone"
+    prompt opens and the chip says "unsaved", with nothing moved.
+    `liveRelease` marked a milestone edit also when nothing moved.
+    Fixed 2026-10-14: Only a release that moved something edits the
+    milestone.
+
+*Run 19.* Covered: opening, the hint, Smart Layout, a rerun and a reload
+on seven generated models of 200 to 570 elements (6.7 to 31.3 s, each
+rerun "already best", 0 overlaps); actions during Smart Layout; plain
+drags and an undo chain on 215 elements; Quick Search, wiki, table, matrix
+and hierarchy on 570; a folder of 575 files; the browser storage quota;
+MCP `smart_layout` against Studio (0 of 215 positions differ). Not
+covered: 600 elements with 1 800 relations (no output), MCP parity on
+flat models, views and milestones on large models.
+
+76. ~~**Expanding one container on a large nested model scatters elements
+    across every system, never comes to rest, and a reload shows another
+    picture.**~~ n3-200 (5 systems × 6 containers × 6 components), Service
+    0.0 collapsed and expanded: 93 elements outside it move (57 with nothing
+    in common with it, one by 1 069 px), 99 still move after 60 s, 86 to 91
+    overlaps or children outside frames, and a reload moves 138 to 140
+    (also on 124 elements). Each child the expand showed counted as new and
+    freed the 40 elements nearest by relation, across containers whose
+    frames stayed fixed.
+    Fixed 2026-10-14: An expand makes room in the store (siblings parted
+    level by level, a parent's frame growing left or up where a child
+    reaches past it), and the physics takes the result as it is (`reset`,
+    not `invalidate`); nothing else moves.
+77. ~~**From 150 elements, one ⌘ drag throws about 40 elements thousands of
+    pixels and leaves them on top of others.**~~ 200 root elements after
+    Smart Layout, System 106 ⌘-dragged by 150×90: 40 move, the farthest by
+    2 496 to 3 696 px, at rest after about 60 s or still moving at 90 s,
+    with 5 to 13 overlaps left (5 of 5). `freezeAllBut` put the frozen
+    nodes back each tick, so the freed ones were pulled toward far frozen
+    neighbours and landed on them.
+    Fixed 2026-10-14: From `WHOLE_DIAGRAM_MAX_NODES` (150) a push drag is a
+    calm drag: what is held moves, and the drop clears what it lands on.
+78. ~~**"This diagram is not laid out yet" after a reload of a model Smart
+    Layout just arranged.**~~ n3-200 with its 30 containers collapsed,
+    Smart Layout (0 violations), reload: the notice, and Smart Layout then
+    says the layout already scores best (3 of 3). `looksUnarranged` used
+    stored sizes, for a collapsed container its expanded one (708×410
+    against 240×160 drawn), and ignored a view's collapse.
+    Fixed 2026-10-14: `looksUnarranged` takes elements as drawn: collapsed
+    containers at their collapsed size, what they hold skipped, with the
+    active view's collapse.
+
+*Run 20.* Covered: the metamodel tools with valid and invalid properties,
+defaults, refs and deletes; `add_node`, `update_node` and `move_node`;
+tempIds; views of every kind, sequences, presentations, milestones; 55
+`search_model` queries; two servers on one folder and a hand edit of
+`metamodel.json`; Studio opened on the folders. Not covered:
+`get_selection`, the `forge_*` tools, `compare_milestones` across
+milestones, a restart during a call, hand edits of node files while the
+server runs, relation properties through `update_relation`.
+
+79. ~~**The MCP server refuses a node or relation type that Studio, another
+    server or a hand edit has just added, until some other tool is
+    called.**~~ Server B upserts `service` and `calls` (or `metamodel.json`
+    is edited by hand); server A's `add_node` with `service` fails with
+    "data/type must be equal to one of the allowed values" (4 of 4). The
+    SDK checks a call against the registered schema, whose lists come from
+    the metamodel A saw last, before `refreshTools` runs.
+    Fixed 2026-10-14: The schemas still list the types, but calls are
+    checked without the lists; `add_node` and `update_node` check the type
+    against the metamodel the call runs on and name the ones it has.
+80. ~~**`search_model` says a view that shows every element is empty.**~~ A
+    view made by `create_view` with no `nodeIds` (every node, its
+    description says): `LIST VIEWS` gives 0 nodes and 0 relations, `GET
+    VIEW` none, `GET NODE api` leaves the view out, while Studio draws 6
+    elements and `smart_layout` lays out 6. `viewNodeSet` in
+    `queryLanguage.ts` walked `view.nodeIds` only.
+    Fixed 2026-10-14: A view that lists no node, and was not emptied (item
+    60), shows every node to the query language too.
+81. ~~**`update_presentation` accepts one slide id twice; deleting one of
+    them in Presenter deletes both from the file.**~~ Slides A and B (both
+    `slide-1`) and C: Delete slide on B leaves cards A and C, both numbered
+    1, and `presentations.json` with C only. `parseSlides` never marked a
+    kept id as used.
+    Fixed 2026-10-14: A repeated slide id is refused, with a hint to leave
+    the id out for a new slide.
+
+*Run 21.* Covered: Shift, ⌘, Ctrl and Alt clicks, box select, Delete from
+the selection bar and the key next to undo, Delete in Designer, Viewer,
+Presenter and during F5 and with the focus in dialogs, the arrow keys, the
+presenting keys, Esc in the presenter, the Delete prompt and dialogs. Not
+covered: ⌘/Ctrl+P and the zoom keys, Tab order, Enter in table cells, the
+wiki's writing line with Delete and Backspace, Wrap, Move to, Align and
+Hide next to undo, the Shift connect key with a multiple selection.
+
+82. ~~**The arrow keys move the selected element on screen only.**~~ Web App
+    with Shift+ArrowLeft ×20 moves 400 px left, out of Bookstore, which is
+    not refit; nothing is saved, Undo stays disabled, and the next drag or
+    a reload puts it back. React Flow's keyboard moves reached `rfNodes`
+    only.
+    Fixed 2026-10-14: React Flow's keyboard moves are off
+    (`disableKeyboardA11y`); the manual says to drag.
+83. ~~**Delete while an F5 presentation plays hides the element from the
+    view for good, while the model keeps it.**~~ Bookstore, F5, Payment
+    Provider clicked, Delete, "Remove from model", Esc: the view loses
+    `payments` (saved, kept on reload), the model keeps all 6 elements, and
+    the step lands in Designer's undo history. In Viewer and Presenter
+    Delete opened the prompt too. `deleteKeyCode` ignored the mode, and
+    `stopPresentation` puts back elements and relations, not views.
+    Fixed 2026-10-14: Delete removes elements and relations in Designer
+    only, and not while a presentation plays, on the key and in the
+    store's change handlers.
+84. ~~**Dragging a child while its container is also selected moves the
+    whole container on screen only, with uncaught errors.**~~ Containers:
+    Bookstore clicked, Web App Shift-clicked and dragged: all four move by
+    (192, 256), nothing is saved, no undo step, a reload puts them back,
+    and about 24 `Cannot read properties of undefined (reading 'id')`.
+    After a box select around Bookstore the same without errors, and
+    Bookstore left over Payment Provider. React Flow leaves the grabbed
+    node out when its parent is selected and hands the drag handlers
+    `undefined`; after a box select it drags the selection's frame, whose
+    handlers were not wired.
+    Fixed 2026-10-14: The first element React Flow drags stands in for the
+    grabbed one, and the `onSelectionDrag*` handlers take a box
+    selection's drag the same way: saved, and one undo step.
+85. ~~**The selection bar's Delete is one undo step per element.**~~
+    Customer and Payment Provider need 2 Ctrl+Z, three containers 3,
+    Bookstore and Web App 2 (the first does nothing). `onDelete` in
+    `SelectionActionBar.tsx` called `removeNode` per id. Reported past the
+    run's three-finding cap.
+    Fixed 2026-10-14: The bar deletes through `removeNodes`, one undo step.
+
+*Run 22.* Covered: switching models while Smart Layout runs, the sample
+from Models → Open…, a browser without the File System Access API
+(download and open give the same model and picture), a milestone and a
+typed link with Back, Forward and reload, deleting the open model while
+another exists, Create model with storage full. Not covered: Reconnect…,
+folder models in two tabs, a switch within the 400 ms debounce, a switch
+during a presentation, moving to a file or folder with storage full, the
+Welcome screen's Recent list.
+
+86. ~~**With two tabs on two browser models, an edit in one tab is saved
+    into the other tab's model.**~~ Tab A on bookstore (`doc-a`), tab B on
+    order-machine (`doc-b`), a drag in tab A: `radical-doc:doc-b` holds the
+    bookstore, the order-machine model is gone, and tab A's address says
+    `doc-b`. The saves and the address read the open document from the
+    index every tab shares (`activeId`, the last one opened).
+    Fixed 2026-10-14: Each tab keeps the document it has open; the shared
+    `activeId` only says where a new tab starts.
+87. ~~**Deleting the only model leaves it on screen, edits go nowhere, and a
+    reload shows another model.**~~ Models → Delete… on the only model: its
+    6 elements stay drawn and editable, a drag is saved nowhere, and the
+    reload shows a new "Untitled" seed model of 7. `autosave.ts` returned
+    on `!activeId` without loading anything.
+    Fixed 2026-10-14: Deleting the last model opens a new empty one, which
+    edits are saved into.
+88. ~~**With browser storage full, renaming a model does nothing and says
+    nothing.**~~ 50 characters left: Rename keeps the old name with only a
+    `console.warn`, where saving and Create model say "Browser storage is
+    full…". `writeIndex` caught the quota error.
+    Fixed 2026-10-14: A rename that storage refuses says so.
+
+*Run 23.* Covered: the Hub concept viewer (canvas, wiki, table and every
+named view of four concepts; deep links from a fresh page), a blueprint
+import with the element picker and the template form, the views and
+sequences that come with it, the Hub template's Edit and Apply with undo,
+an import into a selected container, the same concept twice. Not covered:
+an import with a milestone shown or in Viewer, reloads and folder models
+after an import, Add to Studio and Download in the Hub, Hub search and
+filters, placement of related concepts.
+
+89. ~~**A blueprint import leaves `{{KEY}}` placeholders in the model.**~~
+    Fintech into bookstore: the form asks 3 of the blueprint's 4
+    parameters, and the fitness function "Manual Adjustment Rate Guard"
+    keeps "{{MAX_ADJUSTMENT_RATE_PCT}}%"; the flows' step notes keep
+    `{{DISPUTE_INVESTIGATION_DAYS}}` and `{{RECONCILIATION_LAG_MIN}}` (every
+    blueprint has tokens there). The picker took parameters only from nodes
+    with their own `templateParams`, and only node fields were substituted
+    (also by `applyTemplateParams`, the MCP Forge path).
+    Fixed 2026-10-14: The form asks every parameter the chosen texts and
+    flows use (`templateKeysUsed`), and the values reach nodes, relations
+    and sequences, step notes included, in Studio and over MCP.
+90. ~~**"Apply" in the Hub template section undoes edits to other imported
+    elements, and one Undo does not take it back.**~~ Posting API renamed
+    (it holds no parameter), then Apply with a new SLA: 4 elements change
+    and Posting API loses its name; it takes 21 Undos to get "10 days"
+    back, and the record still says 5. `reapplyTemplate` rewrote every text
+    field of all 38 imported nodes, one `updateNode` and step each, and the
+    record was not part of undo.
+    Fixed 2026-10-14: Apply (`applyHubTemplate`) rewrites only the fields
+    whose Hub text holds a parameter, as one undo step that covers the
+    template's values too.
+91. ~~**A concept imported into a selected container lands on the container's
+    own children, and two imports land on each other.**~~ Sidecar into
+    Bookstore: Service Mesh (660×640) at Bookstore's top-left, over Web
+    App, API and Orders DB and out of the frame; two API Versioning ADRs
+    both at (0, 320). Into a drop target, roots kept the concept's own x/y;
+    `freeSpotNear` (item 50) served imports at the root only.
+    Fixed 2026-10-14: An import into a selected container goes beside what
+    it holds, below its header (`placeBesideSiblings`), and once the
+    container has grown its neighbours make room (`resolveOverlaps`).
+
+*Run 24.* Covered: deleting types that other types name (as an allowed
+parent, in a pair, as a reference's type) in Studio and over MCP, and a new
+type reusing the id; relation properties of type text, number, ref and
+enum, and "req" on node and relation types; the MCP type tools' input
+checks; the Diagram tab after a dangling type. Not covered: "Reads as" in
+the wiki, pairs or parents changed while elements break them, cardinality,
+refs switched between one and many, renaming a type, switching presets
+with custom types, a custom metamodel through a file or a folder.
+
+92. ~~**Deleting an unused element type in Studio leaves it in relation
+    pairs, allowed parents and reference properties; the editor shows them
+    as "Person", and the next new type takes them over.**~~ `type1` deleted:
+    its pair reads "Person → Person", `allowedParents: ['type1']` and
+    `refType: 'type1'` stay, the validation says 0; the next "Add node
+    type" is `type1` again, and the row reads "New type 1 → Web App".
+    `removeNodeType` deleted `nodeTypes[id]` only; the MCP server removed
+    pairs and parents.
+    Fixed 2026-10-14: Studio and the MCP server share
+    `metamodelWithoutNodeType` (the type leaves allowed parents and pairs),
+    and the delete is refused while a property of another type points at
+    it.
+93. ~~**MCP `delete_node_type` turns a relation type whose pairs all name the
+    deleted type into "any pair".**~~ `issues` with the pair `badge →
+    badge`, `badge` deleted: `allowedPairs: []`, which means any pair; ADR
+    → Need, refused before, is accepted, and `get_issues` says "No issues".
+    Fixed 2026-10-14: Deleting a type is refused, in Studio and over MCP,
+    when it would leave a relation type with no pair
+    (`checkRemoveNodeTypeFromMetamodel`).
+94. ~~**A required property of a relation type is never checked.**~~ A
+    required "Owner" on transitions: Validation 0 (3 for the same on
+    states); over MCP a required `evidence` on `derives` gives "No issues".
+    `validateModel` checked `required` for node types only.
+    Fixed 2026-10-14: Validation and `get_issues` list a relation that
+    lacks a required property. Also from this run's notes: a number
+    property is a number field on relations (a text field saved "abc5")
+    and on elements (emptied, it saved 0); emptied, it is cleared.
+
+To decide (runs 13 to 24): the wiki's Delete confirmation counts direct
+children only ("its 3 child elements" for 14), and the overview of a view
+gives the whole model's relation count; with one model in two tabs the
+tab that saves last wins, with no warning; a palette drop on a table's
+last row offers "Add inside" a mockup and goes into its parent group; the
+matrix creates a relation between a container and its own child, and
+lists rows in model order rather than the view's; Esc and Backspace in
+the hierarchy (and every Escape listener) sit on `window` with no check
+for a dialog or a focused select, so one Esc closes both the Delete prompt
+and the Models dialog over it; a milestone opens under the view's live
+camera (Screen Map's groups off screen); a Navigates to with only a
+Trigger shows its type name on the edge; a transition's Kind select has
+no "(not set)"; MCP `update_node` says "Updated" when nothing changed and
+cannot clear an enum, number or boolean value, `update_view` refuses even
+a rename of a dynamic view `delete_sequence` unlinked, `upsert_node_type`
+accepts a default its property refuses and a `refType` of no type, and
+`LIST VIEWS` counts no relations on rolled-up edges; "Add relation type"
+makes a type with no pairs, which allows every pair; pair min/max is
+stored but read by nothing, and the editor takes a maximum cardinality
+below 1; a fresh profile lists an "Untitled" model nobody made, and
+"Download as file…" names the file `.c4.json`; a propagated delete
+rewrites `views.json` and `_layout.json`; the milestone diff is not
+recomputed after an edit.
 
 ### Radical Forge over MCP (2026-10-07)
 

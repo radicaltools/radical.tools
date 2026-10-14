@@ -5,6 +5,7 @@ import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common
 import type { Metamodel, PropertyDef } from '@radical/common/metamodel'
 import { isParentAllowed, isPlacementAllowed, composeEarsSentence, requirementStatePhrase, resolveEarsSubject } from '@radical/common/metamodel'
 import { RefPicker } from './RefPicker'
+import { viewShowsEveryNode } from '@radical/common/c4'
 
 // ─── Column definitions ──────────────────────────────────────────────────────
 //
@@ -105,6 +106,8 @@ interface EditCell {
   rowId: string
   colKey: string
   draft: string
+  /** What the cell held when it was opened. */
+  initial: string
 }
 
 // ─── Tree ordering helper ────────────────────────────────────────────────────
@@ -177,7 +180,7 @@ export function TableView(): React.ReactElement {
   const [dragKind, setDragKind] = useState<'new' | 'existing' | null>(null)
 
   const visibleNodeIds = useMemo<Set<string> | null>(() => {
-    if (!activeView || activeView.nodeIds.length === 0) return null
+    if (!activeView || viewShowsEveryNode(activeView)) return null
     return new Set(activeView.nodeIds)
   }, [activeView])
 
@@ -398,7 +401,7 @@ export function TableView(): React.ReactElement {
     const node = nodes[nodeId]
     if (!node) { pushNotification('Node not found.', 'error'); return }
 
-    if (activeView.nodeIds.length === 0 || activeView.nodeIds.includes(nodeId)) {
+    if (viewShowsEveryNode(activeView) || activeView.nodeIds.includes(nodeId)) {
       pushNotification(`"${node.label}" is already in this view.`, 'warning')
       return
     }
@@ -408,7 +411,10 @@ export function TableView(): React.ReactElement {
 
   const commitEdit = useCallback(() => {
     if (!editCell) return
-    const { rowId, colKey, draft } = editCell
+    const { rowId, colKey, draft, initial } = editCell
+    // Left without a change: nothing to save. It used to save anyway (an
+    // undo step that did nothing, and "" written into an empty property).
+    if (draft === initial) { setEditCell(null); return }
     const isNumber = cols.find(c => c.key === colKey)?.type === 'number'
     const numVal = draft === '' ? undefined : Number(draft)
     if (tab === 'relations') {
@@ -418,7 +424,7 @@ export function TableView(): React.ReactElement {
         updateNode(rowId, { [colKey]: draft || undefined } as Partial<C4Node>)
       } else {
         // governance property stored directly on node via Object.assign
-        updateNode(rowId, { [colKey]: isNumber ? numVal : draft } as Parameters<typeof updateNode>[1])
+        updateNode(rowId, { [colKey]: isNumber ? numVal : (draft === '' ? undefined : draft) } as Parameters<typeof updateNode>[1])
       }
     }
     setEditCell(null)
@@ -428,7 +434,7 @@ export function TableView(): React.ReactElement {
 
   const startEdit = useCallback((rowId: string, colKey: string, current: string) => {
     if (readOnly) return
-    setEditCell({ rowId, colKey, draft: current })
+    setEditCell({ rowId, colKey, draft: current, initial: current })
   }, [readOnly])
 
   const handleRowClick = useCallback((rowId: string) => {
@@ -438,8 +444,11 @@ export function TableView(): React.ReactElement {
 
   const handleBoolToggle = useCallback((rowId: string, colKey: string, current: string) => {
     if (readOnly) return
-    updateNode(rowId, { [colKey]: current !== 'true' } as Parameters<typeof updateNode>[1])
-  }, [readOnly, updateNode])
+    // A row of the Relations tab is a relation: given to updateNode, the
+    // click did nothing.
+    if (tab === 'relations') updateRelation(rowId, { [colKey]: current !== 'true' } as Partial<C4Relation>)
+    else updateNode(rowId, { [colKey]: current !== 'true' } as Parameters<typeof updateNode>[1])
+  }, [readOnly, tab, updateNode, updateRelation])
 
   function renderCell(row: C4Node | C4Relation, col: ColDef, depth = 0): React.ReactNode {
     const isNodeRow = tab !== 'relations'
@@ -528,6 +537,9 @@ export function TableView(): React.ReactElement {
             onKeyDown={(e) => { if (e.key === 'Escape') cancelEdit() }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Without a value the select showed its first option as if set,
+                and picking that option changed nothing. */}
+            {editCell!.draft === '' && <option value="">(not set)</option>}
             {col.options!.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         )

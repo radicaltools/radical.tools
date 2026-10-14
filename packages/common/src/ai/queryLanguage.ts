@@ -1,4 +1,4 @@
-import type { C4Node, C4Relation, DiagramSequence, DiagramView } from '../c4'
+import { viewShowsEveryNode, type C4Node, type C4Relation, type DiagramSequence, type DiagramView } from '../c4'
 
 export const MODEL_QUERY_LANGUAGE_HELP = `Query the CURRENT diagram structure with a small built-in query language —
 use this whenever you need exact data before answering or acting, instead of
@@ -300,6 +300,9 @@ function applyWhere<T>(rows: T[], expr: WhereExpr | null, getter: (row: T, field
 }
 
 function viewNodeSet(view: DiagramView, nodes: Record<string, C4Node>): Set<string> {
+  // A view that lists none shows every node, as in Studio (it answered that
+  // such a view was empty).
+  if (viewShowsEveryNode(view)) return new Set(Object.keys(nodes))
   const set = new Set<string>()
   for (const id of view.nodeIds) {
     let cur: string | undefined = id

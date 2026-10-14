@@ -7,10 +7,12 @@ import ReactFlow, {
   EdgeTypes,
   NodeMouseHandler,
   NodeDragHandler,
+  SelectionDragHandler,
   ReactFlowInstance,
   useStoreApi,
   getNodesBounds,
   getViewportForBounds,
+  type Node as RFNode,
 } from 'reactflow'
 import { zoomIdentity } from 'd3-zoom'
 import { useDiagramStore } from '../store/diagramStore'
@@ -49,6 +51,15 @@ const nodeTypes: NodeTypes = {
 
 const edgeTypes: EdgeTypes = {
   c4relation: RelationEdge as any,
+}
+
+// When the grabbed element's parent is selected too, React Flow drags the
+// parent and leaves the grabbed one out of what it moves (handing over
+// no node, or one that does not move): the first element it drags stands
+// in. Read as given, the drag threw on every frame, or moved the parent on
+// screen only, and was neither saved nor an undo step.
+function draggedNode(grabbedNode: RFNode | undefined, nodes: RFNode[]): RFNode | undefined {
+  return (grabbedNode && nodes.find((n) => n.id === grabbedNode.id)) ?? nodes[0] ?? grabbedNode
 }
 
 /** How long Smart fit keeps refitting after an expand or collapse (the live
@@ -1018,7 +1029,9 @@ function StructuralCanvas(): React.ReactElement {
   // more (60 px of mouse travel moved an element 2 000 px).
   const dragTookCamera = useRef(false)
   const onNodeDragStart: NodeDragHandler = useCallback(
-    (event, node, nodes) => {
+    (event, grabbedNode, nodes) => {
+      const node = draggedNode(grabbedNode, nodes)
+      if (!node) return
       const mod = useDiagramStore.getState().connectionModifier
       const push = (mod !== 'meta' && event.metaKey) || (mod !== 'ctrl' && event.ctrlKey)
       dragDragsAlong.current = push ? [] : nodes.filter((n) => n.id !== node.id).map((n) => n.id)
@@ -1029,8 +1042,10 @@ function StructuralCanvas(): React.ReactElement {
     [liveGrab]
   )
 
-  const onNodeDrag: NodeMouseHandler = useCallback(
-    (_event, node) => {
+  const onNodeDrag: NodeDragHandler = useCallback(
+    (_event, grabbedNode, nodes) => {
+      const node = draggedNode(grabbedNode, nodes)
+      if (!node) return
       if (!dragTookCamera.current) {
         dragTookCamera.current = true
         takeCamera()
@@ -1040,8 +1055,10 @@ function StructuralCanvas(): React.ReactElement {
     [liveDrag, takeCamera]
   )
 
-  const onNodeDragStop: NodeMouseHandler = useCallback(
-    (_event, node) => {
+  const onNodeDragStop: NodeDragHandler = useCallback(
+    (_event, grabbedNode, nodes) => {
+      const node = draggedNode(grabbedNode, nodes)
+      if (!node) return
       const from = dragFrom.current
       const moved = !from || Math.abs(node.position.x - from.x) > 0.5 || Math.abs(node.position.y - from.y) > 0.5
       liveRelease(node.id, dragDragsAlong.current, moved)
@@ -1049,6 +1066,21 @@ function StructuralCanvas(): React.ReactElement {
       dragFrom.current = null
     },
     [liveRelease]
+  )
+
+  // After a box select React Flow drags the selection's frame, not a node:
+  // the same drag, which went unsaved and was no undo step.
+  const onSelectionDragStart: SelectionDragHandler = useCallback(
+    (event, nodes) => onNodeDragStart(event, nodes[0], nodes),
+    [onNodeDragStart]
+  )
+  const onSelectionDrag: SelectionDragHandler = useCallback(
+    (event, nodes) => onNodeDrag(event, nodes[0], nodes),
+    [onNodeDrag]
+  )
+  const onSelectionDragStop: SelectionDragHandler = useCallback(
+    (event, nodes) => onNodeDragStop(event, nodes[0], nodes),
+    [onNodeDragStop]
   )
 
   // CSS class for connecting mode visual feedback
@@ -1212,6 +1244,9 @@ function StructuralCanvas(): React.ReactElement {
         onNodeDragStart={onNodeDragStart}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
+        onSelectionDragStart={onSelectionDragStart}
+        onSelectionDrag={onSelectionDrag}
+        onSelectionDragStop={onSelectionDragStop}
         onEdgeClick={onEdgeClick as any}
         onPaneClick={onPaneClick}
         onInit={onInit}
@@ -1225,7 +1260,13 @@ function StructuralCanvas(): React.ReactElement {
         isValidConnection={isValidConnection}
         minZoom={0.05}
         maxZoom={3}
-        deleteKeyCode="Delete"
+        // Delete edits the model: in Designer only, and not while a
+        // presentation plays (there it hid the element from the view for
+        // good while the model kept it). The arrow keys moved the selected
+        // element on screen only (nothing saved, no undo, out of its
+        // container): React Flow's keyboard moves are off.
+        deleteKeyCode={isViewMode || presentationActive ? null : 'Delete'}
+        disableKeyboardA11y
         multiSelectionKeyCode={connectionModifier === 'shift' ? 'Meta' : 'Shift'}
         selectNodesOnDrag={false}
         elevateEdgesOnSelect

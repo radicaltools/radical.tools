@@ -58,6 +58,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sequence view participants are drawn as their C4 shapes (person, database cylinder, queue, web app, boxes) in the canvas node colours, instead of one dark box style for every type
 
 ### Fixed
+- Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else
+- Deleting every element a view lists leaves the view empty; it used to turn into a view of the whole model (51 elements on a wiki that listed 14)
+- Wiki: after writing an element, one click on an "Add: …" link below the line opens its line (the first click was lost)
+- Table view: a yes/no cell on the Relations tab can be ticked (the click did nothing)
+- Table view: an enum cell without a value opens on *(not set)*, so its first option can be picked (it showed that option as if set, and choosing it did nothing)
+- Table view: opening a cell and leaving it without typing no longer makes an undo step that does nothing, or writes an empty text into an empty property; an edit that changes nothing is no undo step anywhere
+- Matrix: a cell clicked in Viewer is no longer removed by the first click on it back in Designer
+- Hierarchy views keep their drill level: Undo of another edit no longer takes it back to the top, and opening a milestone without the focused element no longer erases it for good
+- A slide added on a drilled-in hierarchy view plays at that level instead of at the top
+- A Hub blueprint downloaded as a `.radical` file opens under the Radical metamodel; under C4 its mockups, requirements and ADRs were unknown types (125 validation issues)
+- *Propagate to later milestones* carries every changed field forward: a status, a mockup's route, a removed wireframe and a relation's type stayed behind while the label went through
+- Ctrl/Cmd+Z and F5 in an open wizard or dialog leave the model behind it alone: undo removed the container the wizard was creating its element in, and Create then saved a model that showed "Runtime Error" every time it was opened. Such a model opens again
+- An ADR or requirement created through the wizard on a collapsed container goes beside the others in it, not onto its header over a sibling
+- A state dropped into a state that has no states yet lies inside it (it lay above and left of its frame, and moved on reload)
+- Propagating the delete of a container made in an early milestone also removes its children and relations in later milestones and the live model; they were left behind and Studio could no longer open the model
+- Propagating a changed property (an ADR's status, for one) reaches later milestones and the live model; only the label did
+- Clicking an element in a past milestone no longer asks how to save changes nobody made
+- Expanding a container on a large nested model moves only its neighbours, just enough, and comes to rest; it scattered about 90 elements across every system, never settled, and a reload showed another picture
+- From 150 elements, an element dragged with ⌘/Ctrl moves alone and whatever it is dropped on makes room; some 40 elements were thrown thousands of pixels and left on top of others
+- "This diagram is not laid out yet" no longer appears after a reload of a model Smart Layout arranged with its containers collapsed
+- MCP server: a node or relation type that Studio, another server or a hand edit has just added can be used at once (it was refused until some other tool was called)
+- MCP server: `search_model` counts a view that shows every element with all of them (it said such a view was empty)
+- MCP server: `update_presentation` refuses one slide id used twice (deleting one of the two in Presenter deleted both from the file)
+- The arrow keys no longer move the selected element on screen only (out of its container, unsaved, not undoable)
+- Delete does nothing while a presentation plays, and in Viewer and Presenter; during F5 it hid the element from the view for good while the model kept it
+- Dragging an element whose container is selected too, or a box selection, moves, saves and undoes like any drag; it moved them on screen only, with errors in the console
+- Deleting several elements from the selection bar is one undo step (it took one Undo per element)
+- Two browser tabs on two models each save into their own model; an edit in one tab overwrote the model open in the other
+- Deleting the only model opens a new empty one; the deleted model stayed on screen, edits went nowhere, and a reload showed another model
+- Renaming a model with browser storage full says so instead of doing nothing
+- Importing a blueprint from the Hub asks for every parameter its texts and flows use and fills them in everywhere, step notes included; `{{KEY}}` placeholders were left in the model
+- *Apply* in a Hub template's section changes only the texts that hold its parameters, as one undo step; it reset edits to other imported elements and took some 20 Undos to take back
+- A Hub concept imported into a selected container goes beside what it holds, below its header, and the container's neighbours make room; it landed on the container's children, and two imports on each other
+- Deleting a node type in the metamodel editor takes it out of relation pairs and allowed parents; they stayed, showed as another type, and the next new type took them over. A type a reference property points at cannot be deleted
+- A node type cannot be deleted when a relation type would be left with no pair, which allows any pair (the MCP server's `delete_node_type` let any two elements be connected after it)
+- Validation and `get_issues` list a relation that lacks a required property, as they do for elements
+- A number property is a number field on relations and elements: a relation saved "abc5" as typed, and an emptied field on an element saved 0
 - A presentation started with F5 in Designer no longer saves what its slides show: a reload during a milestone's slide used to keep the milestone as the live model (65 elements became 11). Adding a slide in Presenter no longer takes back the layout edits made in Designer on the open view. A canvas slide after a flow, table, matrix or wiki slide keeps its own camera (it took the view's, with some 200 console errors)
 - A second relation between the same two elements is drawn, and can be selected, edited and deleted (it was invisible); relations rolled up onto a collapsed container show all their labels
 - Deleting with the Delete key is one undo step (it left empty steps, then gave the elements back one at a time); a concept imported from the Hub with its related concepts is one undo step too, and lands in free room near the middle of the screen instead of on top of the diagram

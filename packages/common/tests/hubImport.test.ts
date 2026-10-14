@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildConceptInsert } from '../src/hubImport'
+import { buildConceptInsert, templateKeysUsed } from '../src/hubImport'
 import type { HubConcept } from '../src/hubFormat'
 
 const concept: HubConcept = {
@@ -43,5 +43,28 @@ describe('buildConceptInsert', () => {
     expect(insert.views[0].nodeIds.sort()).toEqual(nodes.map((node) => node.id).sort())
     expect(insert.template?.record).toMatchObject({ conceptId: 'pattern-x', paramValues: { NAME: 'Orders' } })
     expect(insert.template?.record.nodeIds.sort()).toEqual(nodes.map((node) => node.id).sort())
+  })
+})
+
+describe('template values in a flow', () => {
+  // Only nodes were substituted: the step notes of a blueprint's flows kept
+  // "{{DISPUTE_INVESTIGATION_DAYS}}" in the model.
+  it('reach the step notes of its sequences', () => {
+    const concept = {
+      id: 'c', name: 'C', category: 'blueprint', tags: [], description: '',
+      templateParams: [{ key: 'DAYS', label: 'Days', defaultValue: '10' }],
+      nodes: [{ id: 'a', type: 'system', label: 'A', x: 0, y: 0 }, { id: 'b', type: 'system', label: 'B', x: 300, y: 0 }],
+      relations: [{ id: 'r', sourceId: 'a', targetId: 'b', label: 'within {{DAYS}} days' }],
+      sequences: [{ id: 's', name: 'Flow', relationIds: ['r'], stepDescriptions: ['answers within {{DAYS}} days'] }],
+    } as never
+    let n = 0
+    const insert = buildConceptInsert(concept, { newId: () => `id${++n}`, place: () => ({ x: 0, y: 0 }), paramValues: { DAYS: '5' } })
+    expect(JSON.stringify(insert)).not.toMatch(/\{\{[A-Z0-9_]+\}\}/)
+    expect(Object.values(insert.sequences)[0].stepDescriptions).toEqual(['answers within 5 days'])
+    expect(Object.values(insert.relations)[0].label).toBe('within 5 days')
+  })
+
+  it('templateKeysUsed finds tokens in nodes, relations and step notes', () => {
+    expect([...templateKeysUsed({ nodes: [{ threshold: 'below {{A}}%' }], relations: [], sequences: [{ stepDescriptions: ['{{B}}'] }] } as never)].sort()).toEqual(['A', 'B'])
   })
 })

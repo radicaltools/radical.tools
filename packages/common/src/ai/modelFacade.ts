@@ -55,7 +55,7 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     state.views = byId(views)
     state.defaultLayoutConstraints = clone(defaultLayoutConstraints ?? [])
     state.sequences = byId(sequences)
-    state.metamodel = model.documentMetamodel(doc.metamodel)
+    state.metamodel = model.documentMetamodel(doc.metamodel, doc.nodes)
     keepSequences = sequences !== undefined
   }
   load(data)

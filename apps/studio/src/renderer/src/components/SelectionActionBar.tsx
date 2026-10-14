@@ -24,7 +24,7 @@ export function SelectionActionBar(): React.ReactElement | null {
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const metamodel = useDiagramStore((s) => s.metamodel)
   const wrap = useDiagramStore((s) => s.wrapSelectionInNewParent)
-  const removeNode = useDiagramStore((s) => s.removeNode)
+  const removeNodes = useDiagramStore((s) => s.removeNodes)
   const unwrapNode = useDiagramStore((s) => s.unwrapNode)
   const reparentNodes = useDiagramStore((s) => s.reparentNodes)
   const setSelectedNodeIds = useDiagramStore((s) => s.setSelectedNodeIds)
@@ -216,9 +216,10 @@ export function SelectionActionBar(): React.ReactElement | null {
     // Use the same "model vs view" resolution that the Delete-key path uses.
     // Simpler: drop them straight from the model (consistent with explicit
     // user intent via the bar). View-only hide stays available via Delete-key.
+    // One undo step for all of them (one per element took several Undos).
     const ids = [...selectedNodeIds]
     setSelectedNodeIds([])
-    for (const id of ids) removeNode(id)
+    removeNodes(ids)
   }
 
   return (

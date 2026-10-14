@@ -6,6 +6,7 @@ import {
   isPropertyVisible,
   resolveEarsSubject,
   composeEarsSentence,
+  requirementStatePhrase,
   parseEarsSentence,
   earsActionIsClause,
   refLabels,
@@ -42,6 +43,7 @@ import {
   TYPE_LABELS,
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
+import { viewShowsEveryNode } from '@radical/common/c4'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
 type AddNode = ReturnType<typeof useDiagramStore.getState>['addNode']
@@ -361,7 +363,7 @@ export function WikiView(): React.ReactElement {
   // visible set (empty = show all). Ancestors are included so the hierarchy
   // stays navigable, mirroring the canvas/treemap behaviour.
   const visibleSet = useMemo<Set<string> | null>(() => {
-    if (!view || view.nodeIds.length === 0) return null
+    if (!view || viewShowsEveryNode(view)) return null
     const result = new Set<string>()
     for (const id of view.nodeIds) {
       let cur: string | undefined = id
@@ -983,6 +985,7 @@ function partSummary(node: C4Node, nodes: Record<string, C4Node>, relations: Rec
   const { sentence, complete } = composeEarsSentence(
     node as unknown as Record<string, unknown>,
     resolveEarsSubject(node.id, relations, nodes),
+    requirementStatePhrase(node, nodes, relations) || undefined,
   )
   return complete ? sentence : ''
 }
@@ -2046,8 +2049,12 @@ function WikiElementPage({
   // The box that takes a requirement typed as one sentence is for writing
   // it: once the sentence is whole, its parts are edited in place.
   const earsSubject = node.type === 'requirement' ? resolveEarsSubject(node.id, relations, nodes) : undefined
+  // The state the requirement holds in, when it points at one: it takes the
+  // place of the precondition text, as on the canvas card (the wiki showed
+  // the text, so the two read differently).
+  const earsState = node.type === 'requirement' ? requirementStatePhrase(node, nodes, relations) || undefined : undefined
   const earsComplete = node.type === 'requirement'
-    && composeEarsSentence(node as unknown as Record<string, unknown>, earsSubject).complete
+    && composeEarsSentence(node as unknown as Record<string, unknown>, earsSubject, earsState).complete
   return (
     <Root
       className={embedded ? 'wiki-section' : 'wiki-doc'}
@@ -2164,6 +2171,7 @@ function WikiElementPage({
             node={node as unknown as Record<string, unknown>}
             nodeId={node.id}
             subject={earsSubject}
+            statePhrase={earsState}
             readOnly={readOnly}
             updateNode={(id, patch) => updateNode(id, patch as Parameters<UpdateNode>[1])}
           />
@@ -2740,6 +2748,8 @@ interface EarsSentenceEditorProps {
   node: Record<string, unknown>
   nodeId: string
   subject?: string
+  /** "the Order is Confirmed": the state the requirement points at. */
+  statePhrase?: string
   readOnly?: boolean
   updateNode: (id: string, patch: Record<string, unknown>) => void
 }
@@ -2797,7 +2807,7 @@ function EarsSlot({
   )
 }
 
-function EarsSentenceEditor({ node, nodeId, subject: subjectProp, readOnly, updateNode }: EarsSentenceEditorProps) {
+function EarsSentenceEditor({ node, nodeId, subject: subjectProp, statePhrase, readOnly, updateNode }: EarsSentenceEditorProps) {
   // The sentence is also edited whole, as the text it is: its parts are read
   // from it again, which is how its pattern changes ("When" to "While").
   const [rewriting, setRewriting] = useState(false)
@@ -2814,7 +2824,10 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, readOnly, upda
     const parsed = parseEarsSentence(draft, subjectProp)
     setRewriting(false)
     if (!parsed.action) return
-    // Every part is set, the ones the new sentence has not are cleared.
+    // Every part is set, the ones the new sentence has not are cleared. A
+    // "While" rewritten to something else than the state's phrase no longer
+    // points at the state.
+    const keepsState = !!statePhrase && (parsed.precondition ?? '').trim().toLowerCase() === statePhrase.toLowerCase()
     updateNode(nodeId, {
       ears_type: parsed.ears_type,
       action: parsed.action,
@@ -2822,6 +2835,7 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, readOnly, upda
       precondition: parsed.precondition,
       unwanted_condition: parsed.unwanted_condition,
       feature: parsed.feature,
+      ...(statePhrase && !keepsState ? { precondition_state: undefined } : {}),
     })
   }
 
@@ -2829,7 +2843,7 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, readOnly, upda
   const subject = subjectProp || 'the system'
   const action = String(node.action ?? '')
   const trigger = String(node.trigger ?? '')
-  const precondition = String(node.precondition ?? '')
+  const precondition = statePhrase || String(node.precondition ?? '')
   const unwanted = String(node.unwanted_condition ?? '')
   const feature = String(node.feature ?? '')
 
@@ -2879,7 +2893,7 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, readOnly, upda
       content = (
         <>
           <span className="ears-fixed">While </span>
-          {slot(precondition, '‹precondition›', 'precondition')}
+          {statePhrase ? <span className="ears-fixed" title="The state it points at (While in state)">{statePhrase}</span> : slot(precondition, '‹precondition›', 'precondition')}
           <span className="ears-fixed">, </span>
           {shallClause}
         </>
@@ -2977,7 +2991,7 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, readOnly, upda
           title="Write the whole sentence again: its parts are read from it"
           aria-label="Rewrite the sentence"
           onClick={() => {
-            const { sentence, complete } = composeEarsSentence(node, subjectProp)
+            const { sentence, complete } = composeEarsSentence(node, subjectProp, statePhrase)
             // A pattern with holes in it is no sentence to start from.
             setDraft(complete ? sentence : '')
             setRewriting(true)

@@ -197,3 +197,33 @@ describe('addNodes', () => {
     expect(Object.values(store().c4Nodes).map((n) => n.label)).not.toContain('Never reached')
   })
 })
+
+describe('an element a wizard creates inside a container', () => {
+  // The wizard's path had none of the placement of a plain add: dropped on
+  // a collapsed container, an ADR landed on its header once it was opened;
+  // dropped into a parent drawn smaller than itself, an element began above
+  // and left of the parent, outside it.
+  it('goes beside the others in a collapsed container, below its header', () => {
+    useDiagramStore.setState((s: any) => ({
+      c4Nodes: {
+        ...s.c4Nodes,
+        sys: { ...s.c4Nodes.sys, width: 900, height: 400, collapsed: true },
+        web: { id: 'web', type: 'container', label: 'Web', parentId: 'sys', collapsed: false, x: 30, y: 120, width: 240, height: 160 },
+      },
+    }))
+    store().requestCreateNode({ ...draft('adr'), parentId: 'sys', x: 49, y: 81 })
+    const id = store().finishNodeWizard({ label: 'Use Postgres' }, [])
+    expect(id).toBeTruthy()
+    const adr = store().c4Nodes[id]
+    expect(adr.y).toBeGreaterThanOrEqual(120)
+    expect(adr.x).toBeGreaterThanOrEqual(30 + 240)
+  })
+
+  it('starts inside a parent drawn smaller than itself', () => {
+    store().requestCreateNode({ ...draft('adr'), parentId: 'sys', x: -76, y: -67 })
+    const id = store().finishNodeWizard({ label: 'Use Postgres' }, [])
+    const adr = store().c4Nodes[id]
+    expect(adr.x).toBeGreaterThanOrEqual(0)
+    expect(adr.y).toBeGreaterThanOrEqual(100)
+  })
+})

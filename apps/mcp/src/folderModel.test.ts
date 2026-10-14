@@ -351,6 +351,30 @@ describe('long Smart Layout runs', () => {
     expect(pos.db.y).toBeGreaterThan(pos.api.y)
   }, 60_000)
 
+  it('takes a type that another writer added to the metamodel since its last call', async () => {
+    // The client checks a call against the tool schema, whose list of types
+    // is the metamodel the server saw last: a type added by Studio, another
+    // server or a hand edit was refused until some other call refreshed it.
+    const folder = await fixture()
+    const client = new Client({ name: 'radical-test', version: '1.0.0' })
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(import.meta.dirname, '../dist/index.js'), '--folder', folder] }))
+    try {
+      await client.callTool({ name: 'get_model_summary', arguments: {} })
+      const metamodel = builtInGovernanceMetamodel()
+      metamodel.id = 'radical-custom'
+      metamodel.nodeTypes.service = { ...metamodel.nodeTypes.system, id: 'service', label: 'Service', builtin: false }
+      metamodel.relationTypes.calls = { id: 'calls', label: 'Calls', allowedPairs: [{ from: 'service', to: 'service' }], builtin: false } as never
+      await writeFile(join(folder, 'metamodel.json'), JSON.stringify(metamodel, null, 2))
+      const added = await client.callTool({ name: 'add_node', arguments: { tempId: 'a', type: 'service', label: 'A' } })
+      expect(added.isError, JSON.stringify(added.content)).not.toBe(true)
+      await client.callTool({ name: 'add_node', arguments: { tempId: 'b', type: 'service', label: 'B' } })
+      const related = await client.callTool({ name: 'add_relation', arguments: { sourceId: 'a', targetId: 'b', relationType: 'calls' } })
+      expect(related.isError, JSON.stringify(related.content)).not.toBe(true)
+    } finally {
+      await client.close()
+    }
+  }, 30_000)
+
   it('exits when the client closes its end', async () => {
     const folder = await fixture()
     const server = spawn(process.execPath, [join(import.meta.dirname, '../dist/index.js'), '--folder', folder], { stdio: ['pipe', 'ignore', 'ignore'] })

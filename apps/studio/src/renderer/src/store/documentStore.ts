@@ -129,7 +129,16 @@ function uid(): string {
   return crypto.randomUUID()
 }
 
-function readIndex(): DocumentsIndex {
+/**
+ * The document this tab has open. The index in localStorage is shared by
+ * every tab, and its `activeId` is only the last one opened (where a new tab
+ * starts): read as "this tab's document", a tab saved its edits into the
+ * model another tab had opened since, and took that tab's address.
+ * Undefined until the tab has read the index once.
+ */
+let tabActiveId: string | null | undefined
+
+function readStoredIndex(): DocumentsIndex {
   if (typeof localStorage === 'undefined') return { docs: [], activeId: null }
   try {
     const raw = localStorage.getItem(LS_INDEX_KEY)
@@ -142,10 +151,22 @@ function readIndex(): DocumentsIndex {
   }
 }
 
-function writeIndex(idx: DocumentsIndex): void {
-  if (typeof localStorage === 'undefined') return
-  try { localStorage.setItem(LS_INDEX_KEY, JSON.stringify(idx)) } catch (e) {
+function readIndex(): DocumentsIndex {
+  const idx = readStoredIndex()
+  if (tabActiveId === undefined) tabActiveId = idx.activeId
+  return { ...idx, activeId: tabActiveId }
+}
+
+/** Writes the index. False when the browser refused it (storage full). */
+function writeIndex(idx: DocumentsIndex): boolean {
+  tabActiveId = idx.activeId
+  if (typeof localStorage === 'undefined') return true
+  try {
+    localStorage.setItem(LS_INDEX_KEY, JSON.stringify(idx))
+    return true
+  } catch (e) {
     console.warn('[documentStore] writeIndex failed:', e)
+    return false
   }
 }
 
@@ -910,7 +931,8 @@ export const documents: DocumentsAPI = {
     const meta = idx.docs.find(d => d.id === id)
     if (!meta) return
     meta.name = newName.trim() || meta.name
-    writeIndex(idx)
+    // Refused by full storage, the rename did nothing and said nothing.
+    if (!writeIndex(idx)) throw new StorageFullError()
     notify()
   },
 

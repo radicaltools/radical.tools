@@ -7,6 +7,7 @@
 
 import type { C4Node, DiagramView, Presentation, PresentationSlide } from '../../c4'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
+import { viewShowsEveryNode } from '../../c4'
 
 const randomId = (): string =>
   (globalThis as unknown as { crypto: { randomUUID(): string } }).crypto.randomUUID()
@@ -75,7 +76,7 @@ const newSlide = (id: string, name: string, viewId: string | null, focus: string
 
 /** Nodes a view shows: its listed nodes and their ancestors (every node when it lists none). */
 function shownIn(view: DiagramView | undefined, nodes: Record<string, C4Node>): ((id: string) => boolean) {
-  if (!view || view.nodeIds.length === 0) return (id) => id in nodes
+  if (!view || viewShowsEveryNode(view)) return (id) => id in nodes
   const shown = new Set<string>()
   for (let id of view.nodeIds) {
     while (id && nodes[id] && !shown.has(id)) {
@@ -104,11 +105,16 @@ function parseSlides(tool: string, raw: unknown, ctx: ToolRunContext, existing: 
   const milestones = ctx.diagram.getMilestones?.() ?? []
   const kept = new Map(existing.map((slide) => [slide.id, slide]))
   const slides: PresentationSlide[] = []
+  // A slide is listed once: two slides with one id were one to Studio,
+  // whose delete then took both from the file and left one on screen.
+  const used = new Set<string>()
   for (const [i, item] of raw.entries()) {
     const s = item as { id?: unknown; name?: unknown; viewId?: unknown; focus?: unknown; milestone?: unknown }
     if (typeof s?.name !== 'string' || !s.name.trim()) return `${tool}: slide ${i + 1} needs a name`
     const previous = typeof s.id === 'string' ? kept.get(s.id) : undefined
     if (typeof s.id === 'string' && !previous) return `${tool}: slide ${i + 1} has unknown id "${s.id}"`
+    if (typeof s.id === 'string' && used.has(s.id)) return `${tool}: slide ${i + 1} repeats the id "${s.id}" of an earlier slide; leave the id out for a new slide`
+    if (typeof s.id === 'string') used.add(s.id)
     let snapshotId = previous?.snapshotId ?? null
     if (s.milestone !== undefined) {
       if (s.milestone !== null && typeof s.milestone !== 'string') return `${tool}: slide ${i + 1} has an invalid milestone`

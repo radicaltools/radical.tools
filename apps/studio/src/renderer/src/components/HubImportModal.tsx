@@ -7,8 +7,10 @@ import { NODE_SIZES } from '@radical/common/c4'
 import { isPlacementAllowed } from '@radical/common/metamodel'
 import { nodeTypeTheme } from '@radical/ui/types/hubTheme'
 import { conceptViewsToDiagram } from '@radical/common/hubViews'
-import { freeSpotNear } from '@radical/layout/geometry'
+import { applyTemplateParams, templateKeysUsed } from '@radical/common/hubImport'
+import { freeSpotNear, placeBesideSiblings } from '@radical/layout/geometry'
 import { computeViewNodeSet } from '@radical/layout/viewInput'
+import { addToViewList } from '@radical/common/c4'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -277,14 +279,9 @@ function substituteParams(str: string, values: Record<string, string>): string {
 /** Return a copy of the concept with {{KEY}} tokens substituted in all node string fields. */
 function applyTemplate(concept: HubConcept, values: Record<string, string>): HubConcept {
   if (!concept.templateParams?.length) return concept
-  const subst = (node: Record<string, unknown>): Record<string, unknown> => {
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(node)) {
-      out[k] = typeof v === 'string' ? substituteParams(v, values) : v
-    }
-    return out
-  }
-  return { ...concept, nodes: concept.nodes.map(subst) }
+  // Nodes, relations and the step notes of sequences (nodes only, before:
+  // a flow's notes kept their {{KEY}} tokens).
+  return applyTemplateParams(concept, values) as HubConcept
 }
 
 /** Apply each templateParam's own default (or hint) — used for concepts
@@ -513,6 +510,14 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       const spot = freeSpotNear(taken, { width: clusterW, height: clusterH }, { x: centerX, y: centerY })
       const offsetX = isFinite(minX) ? spot.x - minX : spot.x
       const offsetY = isFinite(minY) ? spot.y - minY : spot.y
+      // Into a selected container: beside what it holds, below its header.
+      // The concept's own coordinates put it on the container's children
+      // (and two imports on each other).
+      const inside = useDropParent && dropParentId
+        ? placeBesideSiblings(store.c4Nodes, dropParentId, (n) => !shown || shown.has(n.id))
+        : null
+      const insideX = inside && isFinite(minX) ? inside.x - minX : 0
+      const insideY = inside && isFinite(minY) ? inside.y - minY : 0
 
       // Build node objects with remapped IDs.
       const newNodes: Record<string, C4Node> = {}
@@ -542,10 +547,10 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
           // Roots dropped into a selected parent: use hub-data positions as relative coords inside the new parent.
           // Roots without a drop target: apply the viewport centering offset.
           x: isChild ? ((raw.x as number) ?? 20)
-            : useDropParent ? ((raw.x as number) ?? 20)
+            : useDropParent ? ((raw.x as number) ?? 0) + insideX
             : ((raw.x as number) ?? 0) + offsetX,
           y: isChild ? ((raw.y as number) ?? 20)
-            : useDropParent ? ((raw.y as number) ?? 20)
+            : useDropParent ? ((raw.y as number) ?? 0) + insideY
             : ((raw.y as number) ?? 0) + offsetY,
           width: (raw.width as number) ?? defaults.width,
           height: (raw.height as number) ?? defaults.height,
@@ -620,8 +625,8 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         Object.assign(state.sequences, newSequences)
         for (const v of newViews) state.views[v.id] = v
         // Empty nodeIds means "show all" — the imported nodes are already in it.
-        if (state.activeViewId && state.views[state.activeViewId]?.nodeIds.length) {
-          state.views[state.activeViewId].nodeIds.push(...Object.keys(newNodes))
+        if (state.activeViewId && state.views[state.activeViewId]) {
+          addToViewList(state.views[state.activeViewId], Object.keys(newNodes))
         }
       })
 
@@ -633,6 +638,9 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         const view = storeAfter.activeViewId ? storeAfter.views[storeAfter.activeViewId] : undefined
         const vf = view ? new Set(view.nodeIds) : undefined
         storeAfter._resizeParentsBottomUp(vf)
+        // The container grew to hold the import: its neighbours make room,
+        // as after a drop (it was left lying over them).
+        if (useDropParent && dropParentId && storeAfter.c4Nodes[dropParentId]) storeAfter.resolveOverlaps(dropParentId)
       }
 
       store._sync()
@@ -1116,6 +1124,13 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
                           if (!seenKeys.has(p.key)) { seenKeys.add(p.key); collectedParams.push(p) }
                         }
                       }
+                    }
+                    // And every parameter of the blueprint that the selection's
+                    // texts or flows use, also where no node lists it (a fitness
+                    // function's threshold kept "{{MAX_ADJUSTMENT_RATE_PCT}}").
+                    const used = templateKeysUsed({ nodes: filteredNodes, relations: filteredRelations, sequences: concept.sequences })
+                    for (const p of concept.templateParams ?? []) {
+                      if (used.has(p.key) && !seenKeys.has(p.key)) { seenKeys.add(p.key); collectedParams.push(p) }
                     }
                     const filteredConcept = { ...concept, nodes: filteredNodes, relations: filteredRelations, templateParams: collectedParams.length ? collectedParams : undefined }
                     if (filteredConcept.templateParams?.length) {

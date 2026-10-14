@@ -510,6 +510,15 @@ function AppMenu({
 /** Input kinds that hold no text: Ctrl/Cmd+Z there is not about typing. */
 const NOT_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image'])
 
+/** A modal dialog is open (a node wizard, the Models dialog, the metamodel
+ *  editor…): Studio's own shortcuts stay out of it. Ctrl/Cmd+Z in a wizard
+ *  took back the element the wizard was creating its child in, and Create
+ *  then saved a child of nothing (the model could not be opened again); F5
+ *  started a presentation behind it. */
+function inModalDialog(): boolean {
+  return !!document.querySelector('[role="dialog"][aria-modal="true"]') || !!useDiagramStore.getState().nodeWizard
+}
+
 /** Whether the key event comes from a field the user types text into. */
 function typingInTextField(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null
@@ -578,6 +587,7 @@ export function Toolbar(): React.ReactElement {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'F5') {
         e.preventDefault()
+        if (inModalDialog()) return
         const state = useDiagramStore.getState()
         if (state.presentationActive) state.stopPresentation()
         else state.startPresentation()
@@ -594,6 +604,7 @@ export function Toolbar(): React.ReactElement {
         // written before it). And undo belongs to Designer: from Viewer or
         // Presenter it took one of Designer's steps, unseen.
         if (typingInTextField(e.target)) return
+        if (inModalDialog()) return
         if (useDiagramStore.getState().appMode !== 'designer') return
         e.preventDefault()
         if (undoKey) useDiagramStore.getState().undo()

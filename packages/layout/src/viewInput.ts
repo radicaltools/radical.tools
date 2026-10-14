@@ -3,14 +3,14 @@
 // rules and hidden relations the canvas applies when it renders — and how
 // its result is written back. Shared by Studio's store and the MCP server.
 
-import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, type C4Node, type C4Relation, type DiagramView, type LayoutConstraint, type PositionMap } from '@radical/common/c4'
+import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, viewShowsEveryNode, type C4Node, type C4Relation, type DiagramView, type LayoutConstraint, type PositionMap } from '@radical/common/c4'
 import { alignmentError, enforceAlignments, resolveAlignments, type Alignment } from './constraints'
 import { fittedParentSize, projectToVisibleGraph } from './geometry'
 
 /** Compute the effective set of node IDs for a view: explicit nodeIds + all their ancestors */
 export function computeViewNodeSet(view: DiagramView | undefined, nodes: Record<string, C4Node>): Set<string> | undefined {
   if (!view) return undefined
-  if (view.nodeIds.length === 0) return undefined
+  if (viewShowsEveryNode(view)) return undefined
   const result = new Set<string>()
   for (const id of view.nodeIds) {
     let cur = id

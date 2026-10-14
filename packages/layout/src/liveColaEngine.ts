@@ -175,7 +175,7 @@ const LOCAL_DRAG_SIZE = 40
  *  Smart Layout tries (relaxLayout), and during a push drag, which asks for
  *  it. From here up that takes minutes (about 95 s on 450 nodes) and
  *  spreads the diagram over tens of thousands of pixels, so a push drag
- *  moves its surroundings only. */
+ *  is a calm one (grab). */
 export const WHOLE_DIAGRAM_MAX_NODES = 150
 /** The nearest the physics places a child to the top of its open parent's
  *  frame: the least padding a group shows inside its frame (12), plus half
@@ -457,6 +457,12 @@ export class LiveColaEngine {
   grab(nodeId: string, rfX: number, rfY: number, mode: DragMode = 'push', abs?: { x: number; y: number }, withIds: string[] = []): void {
     this._grabbedId = nodeId
     this.resetPace()
+    // From WHOLE_DIAGRAM_MAX_NODES up a push drag freed the nodes nearest by
+    // relation and froze the rest: those pulled toward frozen ones far away
+    // (by thousands of pixels), never came to rest, and lay on top of them.
+    // It is a calm drag there: what is held moves, and the drop clears the
+    // overlaps it leaves.
+    if (mode === 'push' && this.colaNodes.length >= WHOLE_DIAGRAM_MAX_NODES) mode = 'calm'
     if (mode === 'calm') {
       // Held while the physics may still run, until it moves (calmDrag).
       for (const leaf of this.leavesOf(nodeId)) Layout.dragStart(leaf)
@@ -466,7 +472,6 @@ export class LiveColaEngine {
     for (const leaf of this.leavesOf(nodeId)) leaf.fixed = (leaf.fixed ?? 0) & ~PINNED
     this.calm = null
     this.pushFrom = { x: rfX, y: rfY, moved: false }
-    if (this.colaNodes.length >= WHOLE_DIAGRAM_MAX_NODES) this.freezeAllBut(nodeId)
     const cn = this.idToNode.get(nodeId)
     if (cn) {
       Layout.dragStart(cn)

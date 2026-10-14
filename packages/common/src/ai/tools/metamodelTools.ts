@@ -5,7 +5,7 @@
 // from the metamodel, so callers rebuild them after these run.
 
 import { builtInC4Metamodel, propertyKeyProblem, type Metamodel, type NodeTypeDef, type PropertyDef, type RelationPair, type RelationTypeDef } from '../../metamodel'
-import { forkPresetMetamodel } from '../../model'
+import { checkRemoveNodeTypeFromMetamodel, forkPresetMetamodel, metamodelWithoutNodeType } from '../../model'
 import { fail, type ToolDef, type ToolHandler, type ToolResult, type ToolRunContext } from './types'
 
 const PROPERTY_TYPES = ['text', 'textarea', 'boolean', 'number', 'enum', 'ref']
@@ -217,14 +217,10 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       if (def.builtin) return fail(`delete_node_type: "${def.id}" is built in and cannot be deleted`)
       const used = Object.values(ctx.diagram.getNodes()).filter((node) => node.type === def.id).length
       if (used) return fail(`delete_node_type: ${used} node(s) still use "${def.id}"; retype or delete them first`)
-      const { mm, note } = editable(current)
-      delete mm.nodeTypes[def.id]
-      for (const type of Object.values(mm.nodeTypes)) {
-        if (type.allowedParents?.includes(def.id)) type.allowedParents = type.allowedParents.filter((t) => t !== def.id)
-      }
-      for (const rel of Object.values(mm.relationTypes)) {
-        rel.allowedPairs = rel.allowedPairs.filter((pair) => pair.from !== def.id && pair.to !== def.id)
-      }
+      const refused = checkRemoveNodeTypeFromMetamodel(current, def.id)
+      if (refused) return fail(`delete_node_type: ${refused}`)
+      const { mm: editableMm, note } = editable(current)
+      const mm = metamodelWithoutNodeType(editableMm, def.id)
       return save(ctx, mm, `Deleted node type "${def.id}".${note}`)
     },
 
