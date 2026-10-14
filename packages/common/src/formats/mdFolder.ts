@@ -374,7 +374,7 @@ export function deserializeFromMdFolder(
   opts?: DeserializeMdFolderOptions,
 ): DeserializeMdFolderResult {
   const lazy = opts?.lazy ?? false
-  const layout = readJson<LayoutSidecar>(files[LAYOUT_FILE]) ?? { nodes: {} }
+  const layout = readJson<LayoutSidecar>(files, LAYOUT_FILE) ?? { nodes: {} }
 
   interface ParsedNode {
     path: string
@@ -430,20 +430,20 @@ export function deserializeFromMdFolder(
     return node as unknown as C4Node
   })
 
-  const relations = readJson<C4Relation[]>(files[RELATIONS_FILE]) ?? []
+  const relations = readJson<C4Relation[]>(files, RELATIONS_FILE) ?? []
   const data: DiagramData = { nodes, relations }
 
-  const views = readJson<DiagramView[]>(files[VIEWS_FILE])
+  const views = readJson<DiagramView[]>(files, VIEWS_FILE)
   if (views) data.views = views
-  const sequences = readJson<DiagramSequence[]>(files[SEQUENCES_FILE])
+  const sequences = readJson<DiagramSequence[]>(files, SEQUENCES_FILE)
   if (sequences) data.sequences = sequences
-  const snapshots = readJson<DiagramSnapshot[]>(files[SNAPSHOTS_FILE])
+  const snapshots = readJson<DiagramSnapshot[]>(files, SNAPSHOTS_FILE)
   if (snapshots) data.snapshots = snapshots
-  const presentations = readJson<Presentation[]>(files[PRESENTATIONS_FILE])
+  const presentations = readJson<Presentation[]>(files, PRESENTATIONS_FILE)
   if (presentations) data.presentations = presentations
-  const metamodel = readJson<Metamodel>(files[METAMODEL_FILE])
+  const metamodel = readJson<Metamodel>(files, METAMODEL_FILE)
   if (metamodel) data.metamodel = metamodel
-  const hubTemplates = readJson<DiagramData['hubTemplates']>(files[HUB_TEMPLATES_FILE])
+  const hubTemplates = readJson<DiagramData['hubTemplates']>(files, HUB_TEMPLATES_FILE)
   if (hubTemplates) data.hubTemplates = hubTemplates
 
   if (layout.defaultPositions) data.defaultPositions = layout.defaultPositions
@@ -485,12 +485,26 @@ export function staleMdFolderFiles(existing: FolderFiles, next: FolderFiles): st
   )
 }
 
-function readJson<T>(content: string | undefined): T | undefined {
-  if (!content) return undefined
+/** A file of the folder that is there but cannot be read as what it is. */
+export class MalformedFolderFileError extends Error {
+  constructor(readonly path: string) {
+    super(`Malformed JSON in ${path}`)
+    this.name = 'MalformedFolderFileError'
+  }
+}
+
+/** The JSON file at `path`, or undefined when the folder has none. A file
+ *  that is there and does not parse is an error. It used to read as "no
+ *  such file": a trailing comma in relations.json (or git conflict markers,
+ *  or a file caught half written) gave a model with no relations and no
+ *  message, and the next save removed the file as stale. */
+function readJson<T>(files: FolderFiles, path: string): T | undefined {
+  const content = files[path]
+  if (content === undefined) return undefined
   try {
     return JSON.parse(content) as T
   } catch {
-    return undefined
+    throw new MalformedFolderFileError(path)
   }
 }
 

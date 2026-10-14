@@ -276,3 +276,35 @@ describe('labelFromText', () => {
     expect(labelFromText('one two three four', 12)).toBe('one two…')
   })
 })
+
+describe('"…, then the system shall …"', () => {
+  // The sentence Studio itself composes for an unwanted-behaviour
+  // requirement. With a comma before it, "then" was read as the end of the
+  // condition: the condition was kept as "the daily limit is exceeded, then",
+  // and each rewrite added one more ", then".
+  const cases: Array<[string, Record<string, string>]> = [
+    ['If the daily limit is exceeded, then the system shall refuse the transfer.',
+      { ears_type: 'unwanted-behaviour', unwanted_condition: 'the daily limit is exceeded', action: 'refuse the transfer' }],
+    ['When the user signs in, then the system shall show the dashboard.',
+      { ears_type: 'event-driven', trigger: 'the user signs in', action: 'show the dashboard' }],
+    ['While the engine runs, if the oil pressure drops, then the system shall stop the engine.',
+      { precondition: 'the engine runs', unwanted_condition: 'the oil pressure drops', action: 'stop the engine' }],
+  ]
+  for (const [sentence, fields] of cases) {
+    it(sentence, () => {
+      const parsed = parseEarsSentence(sentence)
+      expect(parsed).toMatchObject(fields)
+      for (const value of Object.values(parsed)) {
+        if (typeof value === 'string') expect(value).not.toMatch(/,?\s*then$/i)
+      }
+    })
+  }
+
+  it('written again without a change, it stays the sentence it was', () => {
+    let fields: Record<string, unknown> = { ...parseEarsSentence('If the daily limit is exceeded, then the system shall refuse the transfer.') }
+    const first = composeEarsSentence(fields).sentence
+    for (let i = 0; i < 3; i++) fields = { ...parseEarsSentence(composeEarsSentence(fields).sentence) }
+    expect(composeEarsSentence(fields).sentence).toBe(first)
+    expect(first).toBe('If the daily limit is exceeded, then the system shall refuse the transfer.')
+  })
+})

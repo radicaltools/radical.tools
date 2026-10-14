@@ -36,8 +36,9 @@ script.
    and after switching to another view and back.
 2. **Nothing moves by itself.** With no input, elements stay where they
    are and the saved document does not change. An element moves only when
-   the user moved it, added something next to it, expanded or collapsed
-   something, or ran a layout. How far an add or an expand may reach is
+   the user moved it, added something next to it, expanded something, or
+   ran a layout. A collapse moves nothing: the container shrinks where it
+   stands. How far an add or an expand may reach is
    not settled: up to 40 elements by relation and containment may move, so
    on a small view that can be all of them. Report it only when elements
    with no relation or container in common with the new one move.
@@ -46,10 +47,14 @@ script.
    returns to the start. The camera is not part of undo. A drag is one
    step: the elements it moved or pushed go back and its pins come off.
    Undo goes back to the canvas the step was made on. A milestone has its
-   own steps, and opening one is none.
-4. **Geometry.** Siblings do not overlap. A child is inside its parent. No
-   element sits far from all the others without the user having put it
-   there. After Smart Layout: running it again reports that the current
+   own steps, and opening one is none. Undo belongs to Designer: in
+   Viewer and Presenter, and while a text field has the focus, it must
+   not take one of Designer's steps. Adding, renaming and deleting a
+   view or a sequence, and each edit of a sequence, are steps. A step
+   that holds elements of a type deleted since is gone.
+4. **Geometry.** Siblings do not overlap. A child is inside its parent,
+   on every canvas, also one it was not added on. No element sits far
+   from all the others without the user having put it there. After Smart Layout: running it again reports that the current
    layout already scores best, and the same diagram gets the same layout.
 5. **Canvases are separate.** A layout, alignment, pin or collapse made in
    one view does not change another view or All elements.
@@ -57,7 +62,10 @@ script.
    opening it again gives the same model and the same picture. So do
    export and import. Studio writes only the files that changed.
 7. **Perspectives do not edit.** Whatever is dragged, collapsed or laid
-   out in Viewer or Presenter, the saved document stays as it was.
+   out in Viewer or Presenter, the saved document stays as it was. Only
+   the slides managed in Presenter are saved, and nothing else with them.
+   Back in Designer, the canvas, the milestone shown and the undo steps
+   are what they were when it was left.
 8. **The metamodel is kept.** Studio does not let the user build what its
    own validation then flags, and a refused action says why. The MCP
    server refuses the same things Studio does.
@@ -145,13 +153,29 @@ Do not walk the same path twice in a row. Each run, choose differently.
   directory in the browser's own file system, in a persistent profile, and
   the test "an MCP model edit appears in the open browser canvas" in
   `apps/e2e/tests/studio/folders.spec.ts` shows how to let the MCP server
-  write to the same folder. A reload of a folder model opens All elements,
-  not the view that was shown (a known item).
+  write to the same folder. After a reload brought in by an outside
+  edit, removed relations stay drawn as dashed lines for a few seconds:
+  count from the search bar ("N nodes · M relations"), not the edges.
+  The MCP server does not start on a folder with malformed JSON, and
+  Studio names the file and saves nothing until it reads again.
 - The toolbar's Undo and Redo are covered by the search bar at 1440 px (a
   known issue): use the keyboard or a wider window.
 - Use the real controls (buttons by their accessible name, mouse drags),
   as a user would. Reaching into the store proves nothing about the
-  product.
+  product. Type with real keys (`keyboard.type`, `pressSequentially`):
+  `fill` sets a value in one go and `selectOption` fires a change for
+  the option already shown, and each has hidden a bug.
+- Shortcuts follow the platform: Quick Search is ⌘P on macOS and Ctrl+P
+  elsewhere, and exists on structure views only. F5 starts the
+  presentation.
+- After an add, the save comes only when the physics is still, seconds
+  later: wait for the change you expect in the saved document, not for
+  the document to stop changing.
+- The sample's four milestones have 11, 17, 30 and 65 elements, which
+  tells the models apart at a glance. "Milestone properties" (on a
+  milestone card, on hover) has Rename, Restore to live and Delete.
+- Delete in the wiki asks through `window.confirm`; the delete prompt on
+  the canvas is a `.milestone-modal`, not a dialog.
 - Drive the MCP server as `apps/mcp/scripts/test-package.mjs` does: a stdio
   client against `apps/mcp/dist/index.js --folder <a temp folder>`.
 - Take a screenshot when something looks wrong; it goes into the report.

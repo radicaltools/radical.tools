@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { checkAddRelation, checkNodeUpdate, checkPatchRelation, patchNode, patchRelation, type ModelState } from '../src/model'
-import { builtInGovernanceMetamodel, validateModel } from '../src/metamodel'
+import { checkAddRelation, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, patchNode, patchRelation, type ModelState } from '../src/model'
+import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel } from '../src/metamodel'
 import type { C4Node } from '../src/c4'
 
 const node = (id: string, type: string): C4Node =>
@@ -93,5 +93,80 @@ describe('retyping an element that has relations', () => {
     patchNode(s, 'user', { type: 'adr' } as never)
     expect(s.c4Relations.uses.relationType).toBe('constrains')
     expect(validateModel(s.c4Nodes, s.c4Relations, s.metamodel!).some((i) => i.id.startsWith('bad-rel'))).toBe(false)
+  })
+})
+
+describe('the parent of an element', () => {
+  // A system may lie inside a system, so the types alone allow a loop.
+  const nested = (): ModelState => {
+    const s = state()
+    s.c4Nodes.inner = { ...node('inner', 'system'), parentId: 'shop' }
+    s.c4Nodes.innermost = { ...node('innermost', 'system'), parentId: 'inner' }
+    return s
+  }
+
+  it('cannot be the element itself, its child or a deeper descendant', () => {
+    for (const parentId of ['shop', 'inner', 'innermost']) {
+      expect(checkNodeUpdate(nested(), 'shop', { parentId })).toBe('Cannot move a node into itself or one of its descendants.')
+    }
+  })
+
+  it('can be any other element the type may lie in', () => {
+    const s = nested()
+    s.c4Nodes.other = node('other', 'system')
+    expect(checkNodeUpdate(s, 'inner', { parentId: 'other' })).toBeNull()
+    expect(checkNodeUpdate(s, 'inner', { parentId: undefined })).toBeNull()
+  })
+})
+
+describe('unwrapping an element (its children move one level up)', () => {
+  const grouped = (): ModelState => {
+    const s = state()
+    s.c4Nodes.group = { ...node('group', 'group'), parentId: 'shop' }
+    s.c4Nodes.api = { ...node('api', 'container'), parentId: 'group' }
+    return s
+  }
+
+  it('is refused when a group among them would hold what its new place does not allow', () => {
+    // A group may lie at the root; the container in it may not.
+    expect(checkUnwrap(grouped(), 'shop')).toMatch(/Cannot unwrap: Group "group" would be left where its Container "api" has no place/)
+  })
+
+  it('is refused when a child itself has no place there', () => {
+    const s = state()
+    s.c4Nodes.api = { ...node('api', 'container'), parentId: 'shop' }
+    expect(checkUnwrap(s, 'shop')).toMatch(/Cannot unwrap: Container "api" is not allowed inside the canvas root/)
+  })
+
+  it('is allowed when everything keeps a place', () => {
+    // The group goes: its container lies in the system directly.
+    expect(checkUnwrap(grouped(), 'group')).toBeNull()
+    expect(checkUnwrap(state(), 'shop')).toBeNull()
+  })
+})
+
+describe('replacing the metamodel', () => {
+  it('is refused while the model holds what the new one has no type for', () => {
+    const refused = checkReplaceMetamodel(state(), builtInC4Metamodel())
+    expect(refused).toMatch(/has no type for what the model holds/)
+    expect(refused).toMatch(/2 /) // the two ADRs
+    expect(refused).toMatch(/relation/) // "constrains"
+  })
+
+  it('is allowed when every element and relation has a type there', () => {
+    const s = state()
+    delete s.c4Nodes.adrOld
+    delete s.c4Nodes.adrNew
+    delete s.c4Relations.rule
+    expect(checkReplaceMetamodel(s, builtInC4Metamodel())).toBeNull()
+  })
+})
+
+describe('a property keyed like a field of every element', () => {
+  it('is listed by the validation', () => {
+    const s = state()
+    s.metamodel!.nodeTypes.system.properties = [...(s.metamodel!.nodeTypes.system.properties ?? []), { key: 'type', label: 'Kind', type: 'text' }]
+    const issues = validateModel(s.c4Nodes, s.c4Relations, s.metamodel!)
+    expect(issues.find((i) => i.id === 'reserved-prop:system:type')?.message).toMatch(/"type" is a field every element has/)
   })
 })

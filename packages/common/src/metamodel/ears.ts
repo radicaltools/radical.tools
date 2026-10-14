@@ -163,6 +163,15 @@ function splitEarsSentence(text: string): EarsParts | null {
     .map((s) => s.trim())
     .filter(Boolean)
 
+  // "If …, then the system shall …": the "then" after the comma belongs to
+  // neither the condition nor the subject. Left on the stretch, it was read
+  // as the end of the condition ("the limit is exceeded, then"), and each
+  // rewrite of the sentence added one more.
+  if (segments.length > 1) {
+    const afterThen = segments[segments.length - 1].replace(/^then\b\s*/i, '')
+    if (afterThen) segments[segments.length - 1] = afterThen
+  }
+
   let subject = ''
   const last = segments[segments.length - 1]
   // With no comma before the subject, only "the system" can be told apart

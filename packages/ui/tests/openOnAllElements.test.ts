@@ -60,10 +60,20 @@ describe('A document saved while a view was shown', () => {
     expect(JSON.stringify(data)).toBe(before)
   })
 
-  it('leaves an element All elements has no place for where it was saved', () => {
+  it('gives an element All elements has no place for a place beside the others', () => {
+    // Added while the view was shown, at a place of the view's: on All
+    // elements that is on top of the shop (see placedOnEveryCanvas.test.ts).
     const data = savedOnAView()
-    data.nodes.push({ id: 'new', type: 'system', label: 'new', collapsed: false, x: 5, y: 6, width: 300, height: 180 } as C4Node)
+    data.nodes.push({ id: 'new', type: 'system', label: 'new', collapsed: false, x: 5, y: 276, width: 300, height: 180 } as C4Node)
     s().loadDiagram(data)
-    expect(box('new')).toEqual({ x: 5, y: 6, width: 300, height: 180 })
+    const placed = box('new')
+    expect({ width: placed.width, height: placed.height }).toEqual({ width: 300, height: 180 })
+    for (const other of ['shop', 'bank']) {
+      const o = box(other)
+      const apart = placed.x >= o.x + o.width || o.x >= placed.x + placed.width || placed.y >= o.y + o.height || o.y >= placed.y + placed.height
+      expect(apart, `clear of ${other}`).toBe(true)
+    }
+    expect(box('shop')).toEqual(data.defaultPositions!.shop)
+    expect(box('bank')).toEqual(data.defaultPositions!.bank)
   })
 })

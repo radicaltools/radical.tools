@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { builtInC4Metamodel, validateModel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, propertyKeyProblem, validateModel } from '@radical/common/metamodel'
 import { forkPresetMetamodel } from '@radical/common/model'
 import type {
   NodeTypeDef,
@@ -34,14 +34,84 @@ const IconTrash = () => (
 
 // ── Property editor (used inside type cards) ───────────────────────────────
 
+/** The options of an enum, typed as one comma-separated line. The field
+ *  keeps the text as typed and parses it on the way out: re-made from the
+ *  parsed options on each key, a comma or a space at the end never survived
+ *  ("gold, silver" became one option "goldsilver"). */
+function EnumOptionsInput({ options, onChange }: { options: string[]; onChange: (next: string[]) => void }): React.ReactElement {
+  const parse = (text: string): string[] => text.split(',').map((s) => s.trim()).filter(Boolean)
+  const [text, setText] = useState(options.join(', '))
+  // Options changed from elsewhere (undo of a type edit, another card).
+  useEffect(() => {
+    setText((cur) => (parse(cur).join('\u0000') === options.join('\u0000') ? cur : options.join(', ')))
+  }, [options.join('\u0000')]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <input
+      className="mm-input mm-prop-options"
+      value={text}
+      placeholder="opt1, opt2"
+      onChange={(e) => { setText(e.target.value); onChange(parse(e.target.value)) }}
+      onBlur={() => setText(parse(text).join(', '))}
+    />
+  )
+}
+
+/** The key of a property: taken when the field is left or Enter is
+ *  pressed, and only when it is one a property may have. Applied on each
+ *  key, "type" (or "x", on the way to "xml") was the element's own field
+ *  for a moment, and the properties panel then edited that field. */
+function PropertyKeyInput({ value, taken, of, onCommit }: {
+  value: string
+  taken: string[]
+  of: 'node' | 'relation'
+  onCommit: (key: string) => void
+}): React.ReactElement {
+  const pushNotification = useDiagramStore((s) => s.pushNotification)
+  const [text, setText] = useState(value)
+  useEffect(() => { setText(value) }, [value])
+  const key = text.trim()
+  const problem = key === value ? null
+    : !key ? 'A property needs a key.'
+    : taken.includes(key) ? `Another property already has the key "${key}".`
+    : propertyKeyProblem(key, of)
+  const commit = (): void => {
+    if (key === value) { setText(value); return }
+    if (problem) {
+      pushNotification(`Property key not changed: ${problem}`, 'error')
+      setText(value)
+      return
+    }
+    onCommit(key)
+  }
+  return (
+    <input
+      className="mm-input mm-prop-key"
+      value={text}
+      placeholder="key"
+      title={problem ?? undefined}
+      aria-invalid={problem ? true : undefined}
+      style={problem ? { borderColor: 'var(--danger, #dc2626)' } : undefined}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        else if (e.key === 'Escape') setText(value)
+      }}
+    />
+  )
+}
+
 function PropertyEditor({
   properties,
   nodeTypes,
+  of,
   onChange,
 }: {
   properties: PropertyDef[]
   /** What a 'ref' property may point at. */
   nodeTypes: NodeTypeDef[]
+  /** Whose properties these are: an element type's or a relation type's. */
+  of: 'node' | 'relation'
   onChange: (next: PropertyDef[]) => void
 }): React.ReactElement {
   const update = (idx: number, patch: Partial<PropertyDef>) => {
@@ -60,11 +130,11 @@ function PropertyEditor({
       {properties.length === 0 && <div className="mm-empty">No custom properties.</div>}
       {properties.map((p, i) => (
         <div key={i} className="mm-prop-row">
-          <input
-            className="mm-input mm-prop-key"
+          <PropertyKeyInput
             value={p.key}
-            placeholder="key"
-            onChange={(e) => update(i, { key: e.target.value })}
+            taken={properties.filter((_, j) => j !== i).map((x) => x.key)}
+            of={of}
+            onCommit={(key) => update(i, { key })}
           />
           <input
             className="mm-input mm-prop-label"
@@ -98,19 +168,7 @@ function PropertyEditor({
             req
           </label>
           {p.type === 'enum' && (
-            <input
-              className="mm-input mm-prop-options"
-              value={(p.options ?? []).join(', ')}
-              placeholder="opt1, opt2"
-              onChange={(e) =>
-                update(i, {
-                  options: e.target.value
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                })
-              }
-            />
+            <EnumOptionsInput options={p.options ?? []} onChange={(options) => update(i, { options })} />
           )}
           {p.type === 'ref' && (
             <>
@@ -347,6 +405,7 @@ function NodeTypeCard({
           <PropertyEditor
             properties={def.properties ?? []}
             nodeTypes={allTypes}
+            of="node"
             onChange={(properties) => onChange({ properties })}
           />
         </div>
@@ -518,6 +577,7 @@ function RelationTypeCard({
           <PropertyEditor
             properties={def.properties ?? []}
             nodeTypes={allTypes}
+            of="relation"
             onChange={(properties) => onChange({ properties })}
           />
         </div>

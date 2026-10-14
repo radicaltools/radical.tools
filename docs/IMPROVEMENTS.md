@@ -846,6 +846,301 @@ import leaves its `hubTemplates` record; `upsert_relation_type` that removes a p
 warning though `get_issues` then lists it; "Keep in a row" on two root
 elements moved all six elements of the view.
 
+**Runs 4, 5 and 6, 2026-10-13, commit 24069b1**, made at the same time,
+each in its own areas. All 25 were fixed on 2026-10-14, each with a test
+that fails without the fix; the "To decide" lists are still open.
+
+*Run 4.* Covered: the wiki (reading; writing on overview and element
+pages, 57 elements of every kind offered; undo, redo, rename, delete; in
+Viewer; with a milestone shown), Presenter (cards, play, keys, deep
+links, focus, add, rename and delete of a slide), Viewer, milestones
+(save as new, rename, delete, discard, restore), export and import (PNG,
+SVG, download and open, move to a file). Not covered: slide reorder and
+capture, several presentations, the diff toggle, copy to clipboard,
+Structurizr import.
+
+15. ~~**"If …, then the system shall …" gains a ", then" when written, and
+    one more with each rewrite.**~~ "If the daily limit is exceeded, then
+    the system shall refuse the transfer" is kept with the condition "the
+    daily limit is exceeded, then"; Rewrite and Enter with no change adds
+    another. It is the sentence Studio itself composes for an
+    unwanted-behaviour requirement. `splitEarsSentence` in
+    `packages/common/src/metamodel/ears.ts`: with a comma before it, "then
+    the system" matches with "then" in the wrong group. "When …, then the
+    system shall" and "While A, if B, then the system shall" the same.
+    Fixed 2026-10-14: The "then" after the comma is dropped before the
+    stretch is read as the end of the condition or the subject.
+16. ~~**An element added under its parent in the wiki, or on a view, lies
+    outside the parent on All elements.**~~ "Search Service" written on
+    Bookstore's page is at x 1000 on All elements, outside Bookstore's
+    860 px frame and over Payment Provider; a container dropped into
+    Bookstore on Containers is below the frame on All elements. Saved. A
+    node a canvas has no position for keeps the parent-relative place it
+    got on the canvas it was added on, and nothing places it on the
+    others or refits the parent there. For the wiki, the write also runs
+    the live layout on the wiki view's own positions, which nobody sees.
+    Fixed 2026-10-14: A canvas gives the elements it has no place for
+    one of their own when it is shown and when a document is loaded:
+    right of the siblings it has placed, top-aligned, with the ancestors
+    refit (`placeUnplaced` in `packages/layout/src/geometry.ts`), and
+    the live layout settles them with their surroundings.
+17. ~~**A milestone picked in Viewer stays the active one in Designer over
+    the live model, and "Current (live)" picked in Viewer leaves the
+    milestone as the live model.**~~ The first, followed by a drag and
+    "Propagate", makes every milestone a copy of the live model (11, 17,
+    30, 65 nodes to 65 each); the second saves the milestone as the live
+    model (65 nodes to 11). `setAppMode` parks and restores the nodes and
+    relations (`__preModeLayout`) but not `activeSnapshotId` or
+    `liveBackup`.
+    Fixed 2026-10-14: Leaving Designer sets aside the milestone shown,
+    the live model behind it, the sequences and the diff along with the
+    nodes, and the return puts them back; Viewer and Presenter keep no
+    undo steps of their own, so Designer's are where they were.
+18. ~~**Adding a slide in Presenter while a milestone is shown saves the
+    milestone as the live model.**~~ `buildPersistData` in
+    `apps/studio/src/renderer/src/persistence/autosave.ts` replaces the
+    nodes `saveDiagram` took from `liveBackup` with the parked ones, which
+    are the milestone's. Same root as 17.
+    Fixed 2026-10-14: A save made while exploring writes the live model
+    of the Designer that was left: the one it had set aside when it was
+    showing a milestone (`parkedLiveModel`).
+19. ~~**In Presenter, after the card of a milestone slide was clicked, the
+    other slides show the milestone's model**~~, and the presentation plays
+    with it, until Designer is visited. `previewSlide` swaps in a slide's
+    model and never puts the live one back for a slide that has none.
+    Fixed 2026-10-14: A slide without a model of its own puts back what
+    the card of a milestone slide replaced.
+20. ~~**Ctrl/Cmd+Z undoes Designer's last step from anywhere.**~~ In Viewer
+    and Presenter (the step is then gone from Designer: Undo disabled,
+    Redo changes nothing), and while typing in a text field (a typo
+    "undone" in the wiki's writing line deletes the requirement written
+    before it; in a page title, the rename before it). The handler in
+    `apps/studio/src/renderer/src/components/Toolbar.tsx` is on `window`
+    and does not look at the perspective or the focus.
+    Fixed 2026-10-14: The keys are left to a text field that has the
+    focus, and undo and redo do nothing outside Designer (the store
+    refuses them too, and takes no step for what is collapsed or laid
+    out in Viewer and Presenter).
+21. ~~**"Restore to live" leaves the restored milestone marked as the one
+    shown.**~~ The next edit of the live model asks about "editing a
+    milestone", and Undo then Propagate overwrites that milestone; with
+    another milestone shown, the canvas shows the restored one and the
+    live model is not changed at all. `restoreSnapshot` sets
+    `activeSnapshotId` and leaves `liveBackup` alone.
+    Fixed 2026-10-14: "Restore to live" makes the milestone the live
+    model, with no milestone shown, as one undo step; while another
+    milestone is shown the live model is shown first, and edits of that
+    milestone not yet kept or dropped are asked about first.
+22. ~~**Export as PNG or SVG is offered on the wiki, table, matrix and
+    hierarchy views and does nothing there.**~~ No file, no notice.
+    `exportAs` in `apps/studio/src/renderer/src/hooks/useExport.ts`
+    returns when there is no canvas.
+    Fixed 2026-10-14: Export draws the page of the view shown when there
+    is no canvas (as the window shows it), and a failed export says so.
+
+To decide (run 4): deleting in the wiki says "This cannot be undone from
+here" and Undo undoes it; a page title can be emptied (label ""); an
+export is the window's cut, not the view; a drag in a milestone leaves a
+pin in the live document, also after Discard; an element written while a
+milestone is shown is added to the view's node list, which the live
+model shares; the wiki search does not find words of a relation
+sentence; other EARS round trips that change words ("Whenever possible"
+to "When possible", "The system shall: log" to "shall : log"); Home and
+End do nothing while a presentation plays.
+
+*Run 5.* Covered: the metamodel editor (reset to C4, properties,
+cardinality, add and delete a type, the Diagram tab), the properties
+panel and the selection bar (Parent field, Move to, wrap and unwrap,
+delete prompts, typing), sequences, table, matrix, hierarchy, quick
+search, views next to undo, the wizards for ADR, need, requirement and
+scenario (the validation stayed empty after each: no finding there). Not
+covered: changing a relation's type or ends in the panel, reparent by
+drag, table cells beyond a name, matrix clicks, playing a flow view,
+state machines and mockups through the palette.
+
+23. ~~**"Reset to C4 preset" on a model with governance elements leaves
+    them as unknown types, with no way back.**~~ The confirmation says only
+    that custom types will be lost; on the order-machine fixture the
+    validation goes from 0 to 13, Undo stays disabled, and the editor has
+    no control to return to the Radical metamodel. `resetMetamodelToC4`
+    has no check, and the metamodel is not part of a history entry.
+    Fixed 2026-10-14: The reset is refused while the model holds
+    elements or relations the preset has no type for, and says which
+    (`checkReplaceMetamodel`).
+24. ~~**Enum options cannot be typed.**~~ The field re-parses its text on each
+    key, so a comma or a space at the end never survives: `gold, silver,
+    bronze` becomes one option `goldsilverbronze`. Pasting works.
+    `PropertyEditor` in
+    `apps/studio/src/renderer/src/components/MetamodelEditor.tsx`.
+    Fixed 2026-10-14: The field keeps the text as typed and parses it on
+    the way out.
+25. ~~**The Parent field in the properties panel freezes the tab when a
+    parent is given its own child as parent, and leaves a moved element
+    outside its new parent.**~~ It calls `updateNode({ parentId })`, and
+    `checkNodeUpdate` has no descendant check and neither rebases the
+    position nor refits the parent, which "Move to…" and a drag do
+    (`checkReparent`, `reparentNodes`). Whether the MCP server's
+    `update_node` with a `parentId` shares this was not checked.
+    Fixed 2026-10-14: The field moves the element as "Move to…" does (so
+    does `updateNode` given only a parent), and `checkNodeUpdate`
+    refuses an element's own descendant as its parent.
+26. ~~**"Wrap into…" is several undo steps.**~~ One Undo after wrapping two
+    elements leaves one in the new group and one out; it takes one per
+    wrapped element plus one. `wrapSelectionInNewParent` calls `addNode`
+    and `updateNode`, each with its own step.
+    Fixed 2026-10-14: The whole wrap is one step.
+27. ~~**Editing a sequence or a view is not an undo step.**~~ Removing or
+    moving a step, a step's note, deleting a sequence (no confirmation,
+    and no way back), creating or deleting a view: Undo after any of them
+    takes back the edit made before instead. The sequence actions and
+    `addView`, `removeView`, `renameView` never push a step; a history
+    entry carries the views (so they are restored as a side effect) but
+    the sequences only for `clearModel`.
+    Fixed 2026-10-14: Adding, renaming and deleting a view or a
+    sequence, adding, removing and moving a step, clearing a sequence, a
+    step's note and the sequence a view plays are undo steps; a history
+    entry carries the sequences.
+28. ~~**Reordering steps moves a note onto another step.**~~ In a sequence
+    where not every step has a note (any new one), `reorderSequence`
+    splices the shorter notes array at the relations' indexes.
+    Fixed 2026-10-14: The notes are padded to the steps before a move.
+29. ~~**Quick Search hides the element it finds**~~ when its container is
+    collapsed on All elements and expanded in the view (it collapses the
+    container in the view and saves that), and does not open a container
+    collapsed in the view. `expandAncestors` in
+    `apps/studio/src/renderer/src/components/QuickSearch.tsx` tests the
+    model-level `collapsed`, and collapse is per view.
+    Fixed 2026-10-14: Quick Search opens the containers that the view
+    shown has collapsed (`expandAncestors` in the store, one undo step).
+30. ~~**Unwrap puts a group at a place where its contents are not allowed.**~~
+    Unwrapping Bookstore around a group of containers leaves the group at
+    the top of the model with three validation warnings; "Move to… →
+    Canvas root" refuses the same. `unwrapNode` checks direct children
+    only, not `misplacedInGroup`.
+    Fixed 2026-10-14: Unwrap asks `checkUnwrap`, which looks into the
+    groups among the children.
+31. ~~**Undo brings back an element whose type was deleted since.**~~ Delete
+    the element, delete its type (allowed, none left), Undo: the element
+    is back as an unknown type. The metamodel is not in a history entry.
+    Fixed 2026-10-14: When the metamodel loses a type (a type deleted,
+    the preset reset), the undo and redo steps that hold elements or
+    relations of it, and those beyond them, are dropped.
+32. ~~**A custom property whose key is `type` edits the element's type**~~
+    (and `id`, `parentId`, `x`, `label` … are open the same way): the
+    editor accepts any key, and properties are plain fields of the node.
+    Fixed 2026-10-14: A property cannot be keyed `id`, `type`,
+    `parentId`, `x`, `y`, `width`, `height` or `collapsed` (a
+    relation's: `id`, `sourceId`, `targetId`, `relationType`): the
+    editor takes a key when the field is left and refuses these,
+    `upsert_node_type` and `upsert_relation_type` refuse them, the
+    validation lists them, and the properties panel does not show such a
+    property.
+33. ~~**An enum property without a value shows its first option as if
+    set**~~, so that option cannot be chosen, and a required one stays
+    "missing". The select has no empty option
+    (`packages/ui/src/components/RightPanel.tsx`).
+    Fixed 2026-10-14: The select has a "(not set)" option while there is
+    no value.
+
+To decide (run 5): the manual's metamodel editor section lists an icon,
+a collapsed size, an enum default, "visible only when" and a relation
+colour that the editor does not have; the manual says a click drills
+into the hierarchy view, it is a double click; Quick Search exists on
+structure views only; typing in the properties panel is one undo step
+per key; deleting a relation leaves its id in a sequence; clearing a
+name in the table removes `label`; the editor accepts a minimum of
+instances above the maximum; "Delete node (and children)" in the panel,
+Delete sequence and Delete view ask no confirmation.
+
+*Run 6.* Covered: folder-backed models with edits made outside Studio (on
+a view, in Viewer, with a milestone shown, during a drag, during Smart
+Layout; broken, cut and emptied files; moved directories), the MCP server
+(views, sequences, slides, milestones, move and delete, alignments,
+`get_selection`, 34 `search_model` queries, tempIds, restarts, two
+servers on one folder, a Forge run, Studio open while the server
+writes), containers three and four levels deep with collapse, drag and
+expand, undo next to views and deletes. Not covered: the desktop build's
+own folder watcher, a call while Studio is saving, per-view against
+model-level collapse, the Parent field. The MCP server gave no finding.
+
+34. ~~**An outside edit that arrives while Viewer shows a view puts All
+    elements' layout on that view.**~~ Folder model on System Context,
+    Viewer, a label changed in a file, back to Designer: the view is
+    drawn with All elements' positions (Bookstore from 360×260 at x 250
+    to 860×350 at x 0), and the next edit saves them as the view's.
+    `loadDiagram` parks the freshly loaded nodes (at All elements'
+    positions) in `__preModeLayout` under the view's id, and `setAppMode`
+    puts them back under it.
+    Fixed 2026-10-14: A load made outside Designer sets the new nodes
+    aside where the view Designer had open has them.
+35. ~~**A sidecar file Studio cannot parse silently empties that part of
+    the model, and the next edit deletes the file.**~~ A trailing comma in
+    `relations.json` (or git conflict markers, or a file caught half
+    written): "0 relations", no message, and after the next drag the
+    file is gone from the folder; a cut `views.json` loses every view; a
+    cut `_layout.json` is rewritten with every element at 0,0 and size
+    0. The MCP server refuses the same folder ("Malformed JSON in
+    relations.json"). `readJson` in
+    `packages/common/src/formats/mdFolder.ts` returns undefined on a
+    parse error, the callers fall back to empty, and the writer prunes
+    the file as stale. A broken `snapshots.json` would lose every
+    milestone the same way (not run).
+    Fixed 2026-10-14: A file that is there and does not parse is an
+    error that names it (`MalformedFolderFileError`). Studio says which
+    file, keeps the model on screen when it was open, and saves nothing
+    to the folder until a read succeeds; the folder is read again when
+    it changes.
+36. ~~**Undo of a drag takes back an outside edit that arrived during the
+    drag.**~~ The outside change disappears from the canvas and from the
+    folder, with no notice. `liveGrab` keeps the model from before the
+    drag (the drag undo step, PR #178); `loadDiagram` forgets the history
+    but not that copy, and `liveRelease` pushes it.
+    Fixed 2026-10-14: A load forgets the copy a drag in progress keeps
+    for its undo step.
+37. ~~**Adding or deleting a view is not an undo step, yet Undo and Redo of
+    other steps add and delete views.**~~ The same as item 27, seen from
+    the views: one Undo after "drag, New view" removes the view and
+    undoes the drag; with something on the redo stack, Redo after New
+    view removes the new view. Redo is not cleared by a view action.
+    Fixed 2026-10-14: See item 27.
+38. ~~**Collapsing one container in a model nested four levels deep: the
+    canvas does not come to rest, and elements of other containers end
+    outside their frames or on top of each other.**~~ Generated model, 2
+    systems × 2 groups × 3 containers × 5 components, tidy at the start:
+    after one collapse 17 to 41 elements still move in every 3 s sample
+    two minutes later, two containers of the untouched system overlap by
+    116×275, and a reload shows another picture than the screen. After
+    Smart Layout it rests in 9 s but leaves children 12 to 26 px outside
+    their frames. On the sample, collapsing Digital Channels leaves Event
+    Bus 24 px outside Banking Services and moves 46 of 65 elements. Not
+    looked into; the numbers match the 40-element neighbourhood the
+    physics frees around a change, reaching into containers whose frames
+    and other children stay fixed.
+    Fixed 2026-10-14: A container that is collapsed shrinks where it
+    stands and nothing else moves: the live layout took it for a new
+    element and freed its surroundings.
+39. ~~**An element added into a collapsed container that was dragged lands
+    on the container's header when it is expanded**~~, over its label and a
+    sibling, and a reload moves it again. Without the drag it is placed
+    properly. The pin the drag leaves on the container seems to keep its
+    children from being seeded on expand (a guess).
+    Fixed 2026-10-14: An element dropped on a collapsed container goes
+    beside the others in it, below the header, and a container that is
+    opened is fit to what it holds.
+
+To decide (run 6): the manual says a parent can be changed by dragging an
+element into another container, and no drag does; an outside edit while
+a milestone is shown puts the user on the live model without a word; a
+folder emptied while open gives an empty canvas and no message;
+`delete_view` leaves slides pointing at the view and `delete_relation`
+leaves the id in a sequence, with `get_issues` silent (Studio does the
+same); `create_view` and `set_view_nodes` drop unknown ids silently
+where `update_view` refuses them; a tempId equal to an existing id
+shadows it; `forge_finish` names five views also when only one exists;
+`search_model` answers an unknown field with 0 rows and no message; a
+directory renamed outside Studio is renamed back at the next save;
+`delete_node` leaves the ids in the saved positions.
+
 ### Radical Forge over MCP (2026-10-07)
 
 Added in `feat/forge-mcp`: the MCP server runs Radical Forge with the

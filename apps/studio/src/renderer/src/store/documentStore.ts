@@ -15,6 +15,7 @@ import {
   serializeToMdFolder,
   serializeToMdFolderWithPaths,
   deserializeFromMdFolder,
+  MalformedFolderFileError,
   extractNodeBody,
   isMdFolder,
   type FolderFiles,
@@ -168,6 +169,39 @@ function readLSPayload(id: string): DiagramData | null {
   } catch (e) {
     console.warn('[documentStore] readLSPayload failed:', e)
     return null
+  }
+}
+
+/** A folder model with a file Studio cannot parse. Its model is not loaded
+ *  and, until a read succeeds, nothing is saved to the folder: a save would
+ *  write the model without what the file holds, or remove the file. */
+export class DocumentUnreadableError extends Error {
+  constructor(readonly file: string) {
+    super(
+      `${file} in this model's folder cannot be read (malformed JSON). ` +
+      'Nothing is saved to the folder until the file is fixed; the model is read again when it changes.',
+    )
+    this.name = 'DocumentUnreadableError'
+  }
+}
+
+/** Folder documents whose last read failed on a file (id → the file). */
+const mdUnreadable = new Map<string, string>()
+
+/** The model in a folder's files, remembered as what document `id` was
+ *  loaded from. Null when the files hold no model that can be read; a file
+ *  that is there but does not parse is a DocumentUnreadableError. */
+function readFolderModel(id: string, files: FolderFiles): DiagramData | null {
+  try {
+    const { data, bodyPaths } = deserializeFromMdFolder(files, { lazy: true })
+    mdBodyPaths.set(id, bodyPaths ?? {})
+    mdLoadedFiles.set(id, files)
+    mdUnreadable.delete(id)
+    return data
+  } catch (e) {
+    if (!(e instanceof MalformedFolderFileError)) return null
+    mdUnreadable.set(id, e.path)
+    throw new DocumentUnreadableError(e.path)
   }
 }
 
@@ -827,26 +861,19 @@ export const documents: DocumentsAPI = {
       const res = await h.readFolder(meta.folderPath)
       if (!res.success || !res.files) return null
       if (Object.keys(res.files).length === 0) return null // empty/new folder
-      try {
-        const { data, bodyPaths } = deserializeFromMdFolder(res.files, { lazy: true })
-        mdBodyPaths.set(id, bodyPaths ?? {})
-        mdLoadedFiles.set(id, res.files)
-        return data
-      } catch { return null }
+      return readFolderModel(id, res.files)
     }
     if (meta.source === 'md' && !h.readFolder && webFolderSupported()) {
       const handle = await loadHandle(id)
       if (!handle) return null
       if (!(await verifyPermission(handle, 'readwrite', false))) return null // needs reconnect
       connectedWebHandles.add(id)
+      let files: FolderFiles
       try {
-        const files = await webSession(id, handle).readAll()
-        if (Object.keys(files).length === 0) return null // empty/new folder
-        const { data, bodyPaths } = deserializeFromMdFolder(files, { lazy: true })
-        mdBodyPaths.set(id, bodyPaths ?? {})
-        mdLoadedFiles.set(id, files)
-        return data
+        files = await webSession(id, handle).readAll()
       } catch { return null }
+      if (Object.keys(files).length === 0) return null // empty/new folder
+      return readFolderModel(id, files)
     }
     return null
   },
@@ -869,6 +896,8 @@ export const documents: DocumentsAPI = {
     const idx = readIndex()
     const meta = idx.docs.find(d => d.id === id)
     if (!meta) return
+    const unreadable = meta.source === 'md' ? mdUnreadable.get(id) : undefined
+    if (unreadable) throw new DocumentUnreadableError(unreadable)
     if (meta.source !== 'ls') return enqueueSave(id, data)
     if (!writeLSPayload(id, data)) throw new StorageFullError()
     meta.lastModified = Date.now()
@@ -894,6 +923,7 @@ export const documents: DocumentsAPI = {
     if (opts?.wipePayload !== false) deleteLSPayload(id)
     if (removed?.source === 'md') {
       connectedWebHandles.delete(id)
+      mdUnreadable.delete(id)
       mdBodyPaths.delete(id)
       webSessions.delete(id)
       void removeHandle(id)

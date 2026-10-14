@@ -154,3 +154,26 @@ export function canAddMoreOfType(
   if (!def?.cardinality?.max) return true
   return currentCount < def.cardinality.max
 }
+
+/**
+ * Keys a property of a type cannot have. A property's value is a plain
+ * field of the element (or relation), next to the fields every one has: a
+ * property keyed `type` edited the element's type from the properties
+ * panel, and `parentId`, `x` or `id` were open the same way. (`label`,
+ * `description`, `technology` and `external` are fields the built-in types
+ * themselves list as properties.)
+ */
+const RESERVED_PROPERTY_KEYS = {
+  node: new Set(['id', 'type', 'parentId', 'x', 'y', 'width', 'height', 'collapsed']),
+  relation: new Set(['id', 'sourceId', 'targetId', 'relationType']),
+}
+
+export function isReservedPropertyKey(key: string, of: 'node' | 'relation'): boolean {
+  return RESERVED_PROPERTY_KEYS[of].has(key)
+}
+
+/** Why a type's property cannot have this key, or null. */
+export function propertyKeyProblem(key: string, of: 'node' | 'relation'): string | null {
+  if (!isReservedPropertyKey(key, of)) return null
+  return `"${key}" is a field every ${of === 'node' ? 'element' : 'relation'} has (${[...RESERVED_PROPERTY_KEYS[of]].join(', ')}): give the property another key.`
+}

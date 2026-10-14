@@ -2,7 +2,7 @@ import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback, 
 import { useDiagramStore, nodeEffectivelyCollapsedInView } from '../store/diagramStore'
 import { useChildIds, useNodeContent, useNodeLabels } from '../store/nodeSelectors'
 import { type C4Relation, C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '@radical/common/c4'
-import { resolveEarsSubject, NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY, type PropertyDef } from '@radical/common/metamodel'
+import { resolveEarsSubject, isReservedPropertyKey, NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
@@ -1715,6 +1715,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
   const c4Relations = useDiagramStore((s) => s.c4Relations)
   const metamodel = useDiagramStore((s) => s.metamodel)
   const updateNode = useDiagramStore((s) => s.updateNode)
+  const reparentNodes = useDiagramStore((s) => s.reparentNodes)
   const removeNode = useDiagramStore((s) => s.removeNode)
   const updateRelation = useDiagramStore((s) => s.updateRelation)
   const removeRelation = useDiagramStore((s) => s.removeRelation)
@@ -1834,6 +1835,10 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
               disabled={readOnly}
               onChange={onChange as ChangeEvent<HTMLSelectElement>['target']['onchange'] extends infer _ ? any : any}
             >
+              {/* Without a value the select showed its first option as if
+                  set: picking that one changed nothing, so it could not be
+                  chosen and a required property stayed "missing". */}
+              {(value ?? p.default ?? '') === '' && <option value="">(not set)</option>}
               {p.options.map(opt => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
@@ -1873,6 +1878,9 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
     const earsSentenceFields = new Set(['trigger', 'precondition', 'unwanted_condition', 'feature', 'action'])
     const metaProps = (nodeTypeDef?.properties ?? []).filter(p => {
       if (p.key === 'label') return false
+      // A property is a plain field of the element: one keyed `type` or
+      // `parentId` would edit the element itself.
+      if (isReservedPropertyKey(p.key, 'node')) return false
       if (node.type === 'requirement' && earsSentenceFields.has(p.key)) return false
       if (p.visibleWhen) {
         const cur = String((node as unknown as Record<string, unknown>)[p.visibleWhen.key] ?? '')
@@ -1904,7 +1912,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
           className="props-input"
           value={node.parentId ?? ''}
           disabled={readOnly}
-          onChange={(e) => !readOnly && updateNode(node.id, { parentId: e.target.value || undefined })}
+          onChange={(e) => !readOnly && reparentNodes([node.id], e.target.value || null)}
         >
           <option value="">(none)</option>
           {Object.values(c4Nodes)
@@ -2038,7 +2046,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
       }
 
       // Determine which extra properties to show: metamodel-driven or classic technology field.
-      const relMetaProps = relTypeDef?.properties ?? []
+      const relMetaProps = (relTypeDef?.properties ?? []).filter((p) => !isReservedPropertyKey(p.key, 'relation'))
       const badgeBg = relTypeDef?.color ?? '#334155'
       const badgeFg = '#fff'
       const badgeLabel = relTypeDef?.label ?? 'RELATION'

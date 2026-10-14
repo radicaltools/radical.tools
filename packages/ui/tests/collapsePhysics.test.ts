@@ -4,9 +4,9 @@
  * Reproduces the workflow:
  *   1. start live layout against a small model (parent + 2 children)
  *   2. wait for the d3.timer to tick at least once → applyPositions called
- *   3. flip parent.collapsed = true and call invalidate()
- *   4. wait for more ticks → applyPositions must be called again with the
- *      collapsed-size parent (= COLLAPSED_WIDTH/HEIGHT)
+ *   3. flip parent.collapsed = true and call invalidate(): nothing moves
+ *   4. add an element next to it and call invalidate() → applyPositions
+ *      must be called again
  *
  * If physics dies on collapse, step 4 never produces fresh emissions.
  */
@@ -79,20 +79,24 @@ describe('Live layout physics survives a collapse', () => {
     // Layout must still be running after invalidate
     expect(layout.running).toBe(true)
 
-    // Wait for further ticks
+    // A collapse moves nothing: the container shrinks where it stands (it
+    // used to count as a new element, which freed its surroundings; see
+    // "collapsing a container" in packages/layout/tests/liveColaRest.test.ts).
     await wait(200)
-    const afterCount = emissionCount
+    expect(emissionCount).toBe(beforeCount)
 
-    expect(afterCount).toBeGreaterThan(beforeCount)
-
-    // Once collapsed, the parent ('sys') is a leaf cola node again, so
-    // emitPositions reports {x, y} for it (no width/height — leaf path).
-    // Children become hidden (parent collapsed) → not present in emission.
-    expect(lastEmission.sys).toBeTruthy()
+    // The physics is alive: an element added next to it is placed, with
+    // the collapsed parent as a leaf and its children out of the picture.
+    nodes.fresh = {
+      id: 'fresh', type: 'system', label: 'Fresh', collapsed: false,
+      x: 820, y: 120, ...NODE_SIZES.system,
+    } as any
+    layout.invalidate()
+    await wait(300)
+    expect(emissionCount).toBeGreaterThan(beforeCount)
+    expect(lastEmission.fresh).toBeTruthy()
     expect(lastEmission.a).toBeUndefined()
     expect(lastEmission.b).toBeUndefined()
-    // External system still present
-    expect(lastEmission.ext).toBeTruthy()
 
     layout.stop()
     expect(layout.running).toBe(false)

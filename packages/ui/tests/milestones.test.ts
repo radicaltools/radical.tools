@@ -12,7 +12,8 @@
  *   - selectMilestone in VIEWER preserves the user's current x/y for
  *     surviving nodes (only newly-introduced nodes take their snapshot
  *     positions)
- *   - restoreSnapshot loads the snapshot into c4Nodes/c4Relations
+ *   - restoreSnapshot makes the snapshot the live model (see also
+ *     perspectiveMilestones.test.ts)
  *   - sequence mutations while in milestone view mark milestoneDirty
  *     and block switching to another milestone
  *   - renameSnapshot updates the name
@@ -160,7 +161,8 @@ describe('restoreSnapshot', () => {
     useDiagramStore.getState().restoreSnapshot('snap-1')
     const s = useDiagramStore.getState()
     expect(s.c4Nodes['ctn4']).toBeUndefined()
-    expect(s.activeSnapshotId).toBe('snap-1')
+    // It is the live model now: no milestone is "the one shown".
+    expect(s.activeSnapshotId).toBeNull()
     // v1 had only sys1 + ctn1 + ctn2 + usr1
     expect(Object.keys(s.c4Nodes).sort()).toEqual(['ctn1', 'ctn2', 'sys1', 'usr1'])
   })

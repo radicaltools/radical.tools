@@ -11,10 +11,10 @@
 // initial state, configured by ./configureDocuments.
 
 import './configureDocuments' // must run before the store module is evaluated
-import type { C4Node, C4Relation, DiagramData, DiagramView, NodePosition } from '@radical/common/c4'
+import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { documents, useDocumentsStore, StorageFullError, type DocumentSource } from '../store/documentStore'
+import { useDiagramStore, parkedLiveModel, type ParkedDesigner } from '@radical/ui/store/diagramStore'
+import { documents, useDocumentsStore, DocumentUnreadableError, StorageFullError, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
 
 let reloadActive: () => void = () => {}
@@ -84,17 +84,20 @@ if (typeof window !== 'undefined') {
     const data = useDiagramStore.getState().saveDiagram()
     // In explore mode, override the model slice with the layout snapshot taken
     // when we left designer, so ephemeral drags/collapses don't reach disk.
-    const pre = (window as any).__preModeLayout as
-      | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; views: Record<string, DiagramView>; defaultPositions: Record<string, NodePosition> }
-      | undefined
+    const pre = (window as any).__preModeLayout as ParkedDesigner | undefined
     // The same for any save asked for while exploring (a flush after a
     // layout, the page going away): what is arranged in Viewer or Presenter
     // is never written.
     const { appMode } = useDiagramStore.getState()
     const exploring = appMode !== 'designer' && appMode !== 'metamodel'
     if ((_layoutSafePending || exploring) && pre) {
-      data.nodes = Object.values(pre.c4Nodes)
-      data.relations = Object.values(pre.c4Relations)
+      // Designer's live model: with a milestone shown there, its parked
+      // nodes are the milestone's, and the live model is the one it had set
+      // aside (a slide added in Presenter saved the milestone as live).
+      const live = parkedLiveModel(pre)
+      data.nodes = Object.values(live.nodes)
+      data.relations = Object.values(live.relations)
+      data.sequences = Object.values(live.sequences)
       data.views = Object.values(pre.views)
       data.defaultPositions = pre.defaultPositions
     }
@@ -224,7 +227,22 @@ if (typeof window !== 'undefined') {
           metamodel: builtInGovernanceMetamodel(),
         })
       }
-    }).catch((e) => console.warn('[diagramStore] document load failed:', e))
+    }).catch((e) => {
+      if (!(e instanceof DocumentUnreadableError)) {
+        console.warn('[diagramStore] document load failed:', e)
+        return
+      }
+      if (seq !== _loadSeq || documents.getActiveId() !== id) return
+      // A file of the folder cannot be parsed. Say so and leave the folder
+      // alone (the document store refuses to save until a read succeeds).
+      // On a reload the model on screen stays, as it was before the file
+      // broke; otherwise the screen holds the document just left.
+      const store = useDiagramStore.getState()
+      if (!opts?.keepUi) store.loadDiagram({ nodes: [], relations: [], metamodel: builtInGovernanceMetamodel() })
+      store.pushNotification(opts?.keepUi ? `${e.message} The model on screen is the one from before.` : e.message, 'error')
+      // Follow the folder: the fix arrives as a change.
+      if (source === 'md') watchActive(id)
+    })
       .finally(() => {
         if (seq !== _loadSeq) return
         _suspended = false

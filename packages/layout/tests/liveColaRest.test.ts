@@ -237,3 +237,62 @@ describe('relaxLayout', () => {
     expect(relaxLayout({ nodes, relations: {} })).toBeNull()
   })
 })
+
+describe('Live layout physics: collapsing a container', () => {
+  // A container that is collapsed becomes one box where it was a frame
+  // around others. The engine took it for a new element and freed the 40
+  // elements nearest to it, reaching into other containers whose frames and
+  // other children stayed fixed: in a model nested four levels deep the
+  // canvas never came to rest, and elements ended outside their frames.
+  function nested(): { nodes: Nodes; relations: Record<string, C4Relation> } {
+    const nodes: Nodes = {}
+    const relations: Record<string, C4Relation> = {}
+    const box = (id: string, type: string, x: number, y: number, width: number, height: number, parentId?: string): void => {
+      nodes[id] = { id, type, label: id, x, y, width, height, collapsed: false, parentId } as C4Node
+    }
+    for (let s = 0; s < 2; s++) {
+      box(`s${s}`, 'system', s * 1700, 0, 1600, 1500)
+      for (let c = 0; c < 3; c++) {
+        box(`s${s}c${c}`, 'container', 40 + c * 510, 130, 480, 1300, `s${s}`)
+        for (let k = 0; k < 5; k++) box(`s${s}c${c}k${k}`, 'component', 40, 130 + k * 220, 400, 180, `s${s}c${c}`)
+        if (c > 0) relations[`s${s}c${c}`] = { id: `s${s}c${c}`, sourceId: `s${s}c${c - 1}k0`, targetId: `s${s}c${c}k0` }
+      }
+    }
+    relations.across = { id: 'across', sourceId: 's0c2k1', targetId: 's1c0k1' }
+    return { nodes, relations }
+  }
+
+  it('moves nothing: the container shrinks where it is', async () => {
+    const { nodes, relations } = nested()
+    const { engine, moved } = engineOver(nodes, relations)
+    engine.start(true)
+    await wait(100)
+    for (const id of Object.keys(moved)) delete moved[id]
+
+    nodes.s0c1 = { ...nodes.s0c1, collapsed: true }
+    const before = at(nodes)
+    engine.invalidate()
+    await wait(800)
+    engine.stop()
+    expect(Object.keys(moved)).toEqual([])
+    expect(at(nodes)).toEqual(before)
+  })
+
+  it('opening it again frees what it shows, with its surroundings', async () => {
+    const { nodes, relations } = nested()
+    nodes.s0c1 = { ...nodes.s0c1, collapsed: true }
+    const { engine, moved } = engineOver(nodes, relations)
+    engine.start(true)
+    await wait(100)
+    // The children come back on top of each other: the engine parts them.
+    for (let k = 0; k < 5; k++) nodes[`s0c1k${k}`] = { ...nodes[`s0c1k${k}`], x: 40, y: 130 }
+    nodes.s0c1 = { ...nodes.s0c1, collapsed: false }
+    for (const id of Object.keys(moved)) delete moved[id]
+    engine.invalidate()
+    await wait(1500)
+    engine.stop()
+    expect(Object.keys(moved).some((id) => id.startsWith('s0c1k'))).toBe(true)
+    const ys = [0, 1, 2, 3, 4].map((k) => nodes[`s0c1k${k}`].y)
+    expect(new Set(ys.map((y) => Math.round(y))).size).toBe(5)
+  })
+})

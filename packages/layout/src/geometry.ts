@@ -116,6 +116,72 @@ export function placeNewNode(nodes: Record<string, C4Node>, parentId: string | u
   return { x: siblings.length ? right + 20 : pad.side, y: pad.top }
 }
 
+/** A place under `parentId` (the root when undefined) clear of the
+ *  siblings that `counts` accepts: right of them and top-aligned with them,
+ *  or below the parent's header when there are none. Relative to the
+ *  parent, like C4Node.x/y. */
+export function placeBesideSiblings(
+  nodes: Record<string, C4Node>,
+  parentId: string | undefined,
+  counts: (sibling: C4Node) => boolean = () => true,
+): { x: number; y: number } {
+  const parent = parentId ? nodes[parentId] : undefined
+  const siblings = Object.values(nodes).filter((s) => (s.parentId ?? undefined) === (parent?.id ?? undefined) && counts(s))
+  if (siblings.length === 0) {
+    const pad = parent ? compoundPadding(parent.type) : { top: 0, side: 0 }
+    return { x: pad.side, y: pad.top }
+  }
+  return {
+    x: Math.max(...siblings.map((s) => s.x + effectiveWidth(s))) + (parent ? 20 : 80),
+    y: Math.min(...siblings.map((s) => s.y)),
+  }
+}
+
+/**
+ * Gives the nodes a canvas has no place for a place on it. `nodes` hold the
+ * canvas's positions for every node it knows (`positions`, its own map); a
+ * node added on another canvas is still where that one had it, relative to
+ * a parent that is laid out differently here: outside its frame, or on a
+ * sibling. Each such node goes right of the siblings the canvas has placed,
+ * top-aligned with them, and its ancestors are refit. What is inside a node
+ * placed this way keeps its place in it. Only nodes in `shown` (the ones a
+ * view lists) are placed, when given. Mutates `nodes`; returns the ids it
+ * placed. A canvas with no positions at all has not been laid out and is
+ * left as it is.
+ */
+export function placeUnplaced(
+  nodes: Record<string, C4Node>,
+  positions: Record<string, unknown> | undefined,
+  shown?: Set<string>,
+): string[] {
+  if (!positions || Object.keys(positions).length === 0) return []
+  const known = (id: string): boolean => id in positions
+  const depth = (n: C4Node): number => {
+    let d = 0
+    const seen = new Set<string>([n.id])
+    for (let cur = n.parentId ? nodes[n.parentId] : undefined; cur && !seen.has(cur.id); cur = cur.parentId ? nodes[cur.parentId] : undefined) {
+      seen.add(cur.id)
+      d++
+    }
+    return d
+  }
+  const unplaced = Object.values(nodes)
+    // Inside a parent that is itself new here, a node moves with it.
+    .filter((n) => !known(n.id) && (!shown || shown.has(n.id)) && (!n.parentId || !nodes[n.parentId] || known(n.parentId)))
+    // Deepest first: a parent has grown for what is new inside it before
+    // its own level is looked at.
+    .sort((a, b) => depth(b) - depth(a) || (a.id < b.id ? -1 : 1))
+  const waiting = new Set(unplaced.map((n) => n.id))
+  for (const node of unplaced) {
+    const at = placeBesideSiblings(nodes, node.parentId, (s) => s.id !== node.id && !waiting.has(s.id) && (!shown || shown.has(s.id)))
+    node.x = at.x
+    node.y = at.y
+    waiting.delete(node.id)
+    fitAncestors(nodes, node.parentId)
+  }
+  return unplaced.map((n) => n.id)
+}
+
 /** Spacing of the cells a batch placer hands out. */
 export const BATCH_CELL = { width: 360, height: 280 }
 /** Gap between the nodes already on a canvas and a new batch beside them. */
