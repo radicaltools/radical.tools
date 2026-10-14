@@ -21,7 +21,8 @@ Checks one model folder and prints what it finds:
   a fitness function and their date, context, decision and consequences;
   fitness functions linked and with a threshold.
 
-`radical check --list-rules` lists every rule. It reads the files only and
+With test reports it also checks that the tests the model names passed (see
+below). `radical check --list-rules` lists every rule. It reads the files only and
 never writes the model.
 
 Exit status: 0 no errors (warnings allowed), 1 errors, 2 the check could not
@@ -47,3 +48,36 @@ With `max`, up to that many findings pass as warnings and one more fails the
 check, so an existing model can adopt a rule before every gap is closed.
 `--ratchet` lowers each `max` to the count found now and writes the config
 back; it never raises one.
+
+### Tests and evidence
+
+A scenario or a fitness function names the tests that run it in its `tests`
+property, one per line, as Vitest and Playwright print them:
+
+```
+apps/cli/src/cli.test.ts › radical check › prints the result as JSON
+apps/e2e/tests/studio/forge.spec.ts › Forge files each stage into its view
+packages/layout/tests/geometry.test.ts › createBatchPlacer
+apps/e2e/tests
+```
+
+An id names the test whose title it ends, otherwise every test in the
+describe block it starts; one without a title names every test in a file or
+directory. File paths match by suffix, so absolute paths in a report and
+workspace-relative ones in a JUnit file both do.
+
+```sh
+npx vitest run --reporter=json --outputFile=reports/unit.json
+npx playwright test --reporter=json > reports/e2e.json
+radical check model --report reports/unit.json --report reports/e2e.json --evidence evidence.json
+```
+
+`--report` takes Vitest or Jest JSON, Playwright JSON and JUnit XML. A named
+test that failed or is gone from the report of its file (renamed, deleted)
+is an error; one that was skipped, or whose file no report has, a warning.
+The text output sums up how many requirements, scenarios, ADRs and fitness
+functions the reports verify. `--evidence` writes that status per element
+as JSON (`verified`, `broken`, `unverified` for requirements and ADRs;
+`passed`, `failed`, `not-run`, `no-tests` for scenarios and fitness
+functions); it never writes into the model.
+

@@ -2033,27 +2033,37 @@ a read-only view with the wizard's step bar. Still open:
 Markdown model folder: its files, the metamodel (the same validator as
 Studio's Validation list) and completeness (requirements with scenarios,
 accepted ADRs with fitness functions, …), with baselines in
-`radical-check.json` that `--ratchet` lowers. ADRs "One radical CLI" and
-"Editors prevent, check detects". On `architecture/` it finds 125 warnings
-and no errors: 104 requirements without a scenario, 8 accepted ADRs without a
-fitness function, 7 requirements that derive from nothing, 3 ADRs without a
-date, 2 requirements nothing satisfies, 1 incomplete EARS requirement. Next:
+`radical-check.json` that `--ratchet` lowers. Scenarios and fitness functions
+name their tests in a `tests` property (`file › title`, one per line);
+`--report` reads Vitest/Jest JSON, Playwright JSON and JUnit XML and
+`--evidence` writes the status of each scenario, fitness function,
+requirement and ADR. ADRs "One radical CLI", "Editors prevent, check
+detects" and "The model names its tests".
 
-1. **Scenarios and fitness functions name their tests in prose.** 117
-   scenarios say `# Covered by: <file> › <title>` in `gherkin`, the fitness
-   functions in their description. Properties `verified_by` (scenario) and
-   `check` (fitness function) holding test ids would let the check say when
-   a test is gone or renamed.
-2. **Test evidence.** Read Playwright/Vitest JSON and JUnit XML reports
-   (`--report`), mark a scenario broken when its test fails and the
-   requirements it verifies with it, write the status to
-   `.radical/evidence.json` (not into the model files) for Studio and MCP.
+On `architecture/` the 117 `# Covered by:` comments and the fitness
+functions' prose became `tests` (2026-10-14). Checked against real reports
+first, they held four stale bindings: two titles cut short
+(forgeClarify.test.ts, forge.test.ts), a test moved from known-issues.spec.ts
+to physics.spec.ts, and "an idle canvas with nested elements stays still",
+removed in #176 (now physics.spec.ts › a diagram keeps the layout it is
+opened with). With the unit test reports and a Playwright `--list`: 71
+requirements and 8 ADRs verified, no errors. Still open:
+
+1. **Checks that are no test runner.** "Installable MCP package"
+   (test-package.mjs), "Workspace boundaries" (check-workspaces.mjs), "Smart
+   Layout quality" (benchmarks) and "Model in step with code" (review) name
+   no tests. A `command` property, or a JUnit report from those scripts,
+   would let them count.
+2. **CI does not keep reports.** `npm test` and the e2e job write no JSON or
+   JUnit report; with them a pipeline could run `radical check --report`.
 3. **One catalogue everywhere.** Studio's Validation list and an MCP
-   `run_check` tool should show the completeness rules too.
-4. **Drift.** Compare the containers' relations with the workspaces'
+   `run_check` tool should show the completeness rules, and Studio the
+   evidence (a red requirement on the canvas).
+4. **A renamed test needs its id renamed in the model.** Ids match titles;
+   a rename shows as test-not-found in the next run, never silently.
+5. **Drift.** Compare the containers' relations with the workspaces'
    dependencies and imports.
-5. **No CI run of this repository's model.** `architecture/` is local-only,
+6. **No CI run of this repository's model.** `architecture/` is local-only,
    so CI runs the check's tests only.
-6. **`radical mcp` and publishing.** Serve the MCP server as a subcommand
+7. **`radical mcp` and publishing.** Serve the MCP server as a subcommand
    too, and publish @radicaltools/cli the way the MCP server is published.
-
