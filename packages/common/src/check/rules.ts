@@ -25,6 +25,9 @@ export interface RuleFinding {
   code?: string
   /** Overrides the rule's severity (the validator rates each issue). */
   severity?: CheckSeverity
+  /** Other elements the finding is about: what a failed test leaves
+   *  unverified. Studio links them. */
+  relatedIds?: string[]
 }
 
 export interface CheckModel {
@@ -83,24 +86,31 @@ const TYPE_NAME: Record<string, string> = { scenario: 'Scenario', 'fitness-fn': 
 
 /** What a failing check of `node` takes down with it: the requirements a
  *  scenario verifies, the ADRs a fitness function implements. */
+const affectedBy = (model: CheckModel, node: C4Node): C4Node[] => node.type === 'scenario'
+  ? linkedNodes(model, node.id, 'verifies', 'target', 'requirement')
+  : linkedNodes(model, node.id, 'implements', 'target', 'adr')
+
 function brokenWith(model: CheckModel, node: C4Node): string {
-  const affected = node.type === 'scenario'
-    ? linkedNodes(model, node.id, 'verifies', 'target', 'requirement')
-    : linkedNodes(model, node.id, 'implements', 'target', 'adr')
+  const affected = affectedBy(model, node)
   if (!affected.length) return ''
   const what = node.type === 'scenario' ? 'requirement' : 'ADR'
   return ` Not verified now: ${what}${affected.length === 1 ? '' : 's'} ${affected.map(quote).join(', ')}.`
 }
 
-/** A rule over the outcome of each test id the model names, with reports. */
+/** A rule over the outcome of each test id the model names, with reports.
+ *  A failing outcome names what it leaves unverified as related. */
 function testRule(outcome: TestOutcome, message: (node: C4Node, id: string, model: CheckModel) => string): (model: CheckModel) => RuleFinding[] {
+  const failing = outcome === 'failed' || outcome === 'not-found'
   return (model) => {
     if (!model.tests) return []
     return Object.values(model.nodes)
       .filter((n) => (TESTED_TYPES as readonly string[]).includes(n.type))
       .flatMap((node) => testOutcomes(node, model)
         .filter((o) => o.outcome === outcome)
-        .map((o) => ({ nodeId: node.id, message: message(node, o.id.raw, model) })))
+        .map((o) => {
+          const related = failing ? affectedBy(model, node).map((n) => n.id) : []
+          return { nodeId: node.id, message: message(node, o.id.raw, model), ...(related.length ? { relatedIds: related } : {}) }
+        }))
   }
 }
 

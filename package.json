@@ -27,7 +27,7 @@
     "e2e": "npm run build:web && npm run build:hub && npm run e2e -w @radical/e2e",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check:workspaces": "node tools/check-workspaces.mjs",
-    "check:architecture": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js check architecture --report reports --evidence architecture/.radical/evidence.json"
+    "check:architecture": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js check architecture --report reports"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
