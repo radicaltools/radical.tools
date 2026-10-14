@@ -1,7 +1,7 @@
 import { readFile, realpath, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { CHECK_RULES, FOLDER_RULES, formatCheckGithub, formatCheckText, ratchetConfig, runCheck, type CheckConfig } from '@radical/common/check'
+import { CHECK_RULES, FOLDER_RULES, formatCheckGithub, formatCheckText, parseTestReport, ratchetConfig, runCheck, type CheckConfig, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 
@@ -14,6 +14,11 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
   --config <file>     rule settings (default: radical-check.json in the working
                       directory, when there is one)
   --format <format>   text (default), json, or github (annotations for Actions)
+  --report <file>     a test report (Vitest or Jest JSON, Playwright JSON, JUnit
+                      XML); repeat for more. The tests that scenarios and fitness
+                      functions name are looked up in them
+  --evidence <file>   with --report: write what the reports say about each
+                      scenario, fitness function, requirement and ADR as JSON
   --ratchet           lower each baseline (max) in the config to the count found
                       now, so a rule that got better cannot get worse again
   --verbose           list every warning, not the first five of each rule
@@ -39,6 +44,8 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
       options: {
         config: { type: 'string' },
         format: { type: 'string', default: 'text' },
+        report: { type: 'string', multiple: true },
+        evidence: { type: 'string' },
         ratchet: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'list-rules': { type: 'boolean', default: false },
@@ -55,7 +62,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     for (const rule of [...FOLDER_RULES, ...CHECK_RULES]) io.out(`${rule.id.padEnd(30)} ${rule.severity.padEnd(8)} ${rule.description}`)
     return 0
   }
-  if (positionals.length > 1 || !['text', 'json', 'github'].includes(values.format)) {
+  if (positionals.length > 1 || !['text', 'json', 'github'].includes(values.format) || (values.evidence && !values.report?.length)) {
     io.err(CHECK_USAGE)
     return 2
   }
@@ -83,7 +90,23 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     return 2
   }
 
-  const result = runCheck(files, config)
+  let tests: TestCase[] | undefined
+  if (values.report?.length) {
+    tests = []
+    for (const report of values.report) {
+      try {
+        tests.push(...parseTestReport(await readFile(resolve(io.cwd, report), 'utf8'), report))
+      } catch (error) {
+        io.err(`Cannot read the test report ${report}: ${(error as Error).message}`)
+        return 2
+      }
+    }
+  }
+
+  const result = runCheck(files, config, tests ? { tests } : {})
+  if (values.evidence && result.evidence) {
+    await writeFile(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
+  }
   const options = { folder, verbose: values.verbose }
   io.out(values.format === 'json' ? JSON.stringify(result, null, 2)
     : values.format === 'github' ? formatCheckGithub(result, options)

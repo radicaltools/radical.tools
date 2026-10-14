@@ -19,9 +19,9 @@ function complete(): DiagramData {
       node('sys', 'system', 'Shop'),
       node('need', 'need', 'Brief'),
       node('req', 'requirement', 'Pay', { ears_type: 'event-driven', trigger: 'the user pays', action: 'take the payment' }),
-      node('sc', 'scenario', 'Paying', { given: 'a cart', when: 'paying', then: 'paid' }),
+      node('sc', 'scenario', 'Paying', { given: 'a cart', when: 'paying', then: 'paid', tests: 'tests/pay.test.ts › pays' }),
       node('adr', 'adr', 'Use cards', ACCEPTED_ADR),
-      node('ff', 'fitness-fn', 'Card check', { threshold: 'passes' }),
+      node('ff', 'fitness-fn', 'Card check', { threshold: 'passes', tests: 'tests/cards.test.ts › only cards' }),
     ],
     relations: [
       rel('r1', 'derives', 'req', 'need'),

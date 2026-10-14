@@ -9,6 +9,8 @@
 
 import type { C4Node, C4Relation } from '../c4'
 import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamodel } from '../metamodel'
+import { linkedNodes, testIdsOf, testOutcomes, TESTED_TYPES, type TestOutcome } from './evidence'
+import type { TestCase } from './reports'
 
 export type CheckSeverity = 'error' | 'warning'
 
@@ -29,6 +31,8 @@ export interface CheckModel {
   nodes: Record<string, C4Node>
   relations: Record<string, C4Relation>
   metamodel: Metamodel
+  /** The test cases of the reports passed in; the test rules run only with them. */
+  tests?: TestCase[]
 }
 
 export interface CheckRule {
@@ -74,6 +78,31 @@ function unlinked(model: CheckModel, type: string, relation: string, end: 'in' |
 }
 
 const quote = (n: C4Node): string => `"${n.label}"`
+
+const TYPE_NAME: Record<string, string> = { scenario: 'Scenario', 'fitness-fn': 'Fitness function' }
+
+/** What a failing check of `node` takes down with it: the requirements a
+ *  scenario verifies, the ADRs a fitness function implements. */
+function brokenWith(model: CheckModel, node: C4Node): string {
+  const affected = node.type === 'scenario'
+    ? linkedNodes(model, node.id, 'verifies', 'target', 'requirement')
+    : linkedNodes(model, node.id, 'implements', 'target', 'adr')
+  if (!affected.length) return ''
+  const what = node.type === 'scenario' ? 'requirement' : 'ADR'
+  return ` Not verified now: ${what}${affected.length === 1 ? '' : 's'} ${affected.map(quote).join(', ')}.`
+}
+
+/** A rule over the outcome of each test id the model names, with reports. */
+function testRule(outcome: TestOutcome, message: (node: C4Node, id: string, model: CheckModel) => string): (model: CheckModel) => RuleFinding[] {
+  return (model) => {
+    if (!model.tests) return []
+    return Object.values(model.nodes)
+      .filter((n) => (TESTED_TYPES as readonly string[]).includes(n.type))
+      .flatMap((node) => testOutcomes(node, model)
+        .filter((o) => o.outcome === outcome)
+        .map((o) => ({ nodeId: node.id, message: message(node, o.id.raw, model) })))
+  }
+}
 
 export const CHECK_RULES: CheckRule[] = [
   {
@@ -187,5 +216,43 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'warning',
     run: (model) => nodesOf(model, 'fitness-fn').filter((n) => !prop(n, 'threshold'))
       .map((n) => ({ nodeId: n.id, message: `Fitness function ${quote(n)} states no threshold.` })),
+  },
+  {
+    id: 'scenario-without-tests',
+    description: 'Every scenario names the automated tests that run it (property `tests`, one `file › title` per line).',
+    severity: 'warning',
+    run: (model) => nodesOf(model, 'scenario').filter((n) => !testIdsOf(n).length)
+      .map((n) => ({ nodeId: n.id, message: `Scenario ${quote(n)} names no test.` })),
+  },
+  {
+    id: 'fitness-fn-without-tests',
+    description: 'Every fitness function names the automated checks that run it (property `tests`).',
+    severity: 'warning',
+    run: (model) => nodesOf(model, 'fitness-fn').filter((n) => !testIdsOf(n).length)
+      .map((n) => ({ nodeId: n.id, message: `Fitness function ${quote(n)} names no test.` })),
+  },
+  {
+    id: 'test-failed',
+    description: 'With --report: every test a scenario or fitness function names passed.',
+    severity: 'error',
+    run: testRule('failed', (node, id, model) => `${TYPE_NAME[node.type]} ${quote(node)}: test ${id} failed.${brokenWith(model, node)}`),
+  },
+  {
+    id: 'test-not-found',
+    description: 'With --report: every test a scenario or fitness function names is in the report of its file (a renamed or deleted test is not).',
+    severity: 'error',
+    run: testRule('not-found', (node, id, model) => `${TYPE_NAME[node.type]} ${quote(node)}: no test ${id} in the reports, though its file ran; renamed or deleted?${brokenWith(model, node)}`),
+  },
+  {
+    id: 'test-skipped',
+    description: 'With --report: no test a scenario or fitness function names was skipped.',
+    severity: 'warning',
+    run: testRule('skipped', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: test ${id} was skipped.`),
+  },
+  {
+    id: 'test-not-run',
+    description: 'With --report: every file a scenario or fitness function names a test in is in the reports.',
+    severity: 'warning',
+    run: testRule('not-run', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: no report has the file of test ${id}.`),
   },
 ]

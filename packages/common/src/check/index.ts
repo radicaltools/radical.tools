@@ -14,8 +14,12 @@ import type { C4Node, C4Relation, DiagramSequence, DiagramView, Presentation } f
 import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isValidMdFolderManifest, mdFolderNodeFiles, type FolderFiles } from '../formats/mdFolder'
 import { documentMetamodel } from '../model'
 import { CHECK_RULES, type CheckSeverity, type RuleFinding } from './rules'
+import { computeEvidence, type Evidence } from './evidence'
+import type { TestCase } from './reports'
 
 export { CHECK_RULES, type CheckRule, type CheckSeverity, type CheckModel, type RuleFinding } from './rules'
+export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
+export { computeEvidence, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome } from './evidence'
 
 /** Rules about the folder's files and its views, sequences and slides. */
 export const FOLDER_RULES: ReadonlyArray<{ id: string; description: string; severity: CheckSeverity }> = [
@@ -67,6 +71,15 @@ export interface CheckResult {
   unknownRules: string[]
   nodeCount: number
   relationCount: number
+  /** With test reports: what they say about each scenario, fitness
+   *  function, requirement and ADR. */
+  evidence?: Evidence
+}
+
+export interface CheckOptions {
+  /** Test cases from the reports (parseTestReport). Without them the rules
+   *  that read test outcomes find nothing and there is no evidence. */
+  tests?: TestCase[]
 }
 
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
@@ -76,7 +89,7 @@ const RULE_IDS = new Set([...FOLDER_RULES.map((r) => r.id), ...CHECK_RULES.map((
 const DEFAULT_SEVERITY = new Map([...FOLDER_RULES, ...CHECK_RULES].map((r) => [r.id, r.severity]))
 
 /** Checks the model in `files` (paths relative to the model folder). */
-export function runCheck(files: FolderFiles, config: CheckConfig = {}): CheckResult {
+export function runCheck(files: FolderFiles, config: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
   const found: Array<RuleFinding & { rule: string }> = []
   const add = (rule: string, finding: RuleFinding): void => { found.push({ rule, ...finding }) }
 
@@ -104,6 +117,7 @@ export function runCheck(files: FolderFiles, config: CheckConfig = {}): CheckRes
 
   let nodeCount = 0
   let relationCount = 0
+  let evidence: Evidence | undefined
   if (!found.some((f) => FATAL.has(f.rule))) {
     const data = deserializeFromMdFolder(files).data
     const nodes = byId(data.nodes)
@@ -112,15 +126,17 @@ export function runCheck(files: FolderFiles, config: CheckConfig = {}): CheckRes
     relationCount = Object.keys(relations).length
     staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations)
       .forEach((finding) => add('stale-reference', finding))
-    const model = { nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes) }
+    const model = { nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), ...(options.tests ? { tests: options.tests } : {}) }
     for (const rule of CHECK_RULES) rule.run(model).forEach((finding) => add(rule.id, finding))
+    if (options.tests) evidence = computeEvidence(model)
   }
 
-  return settle(found.map((f) => ({
+  const result = settle(found.map((f) => ({
     ...f,
     ...(!f.path && f.nodeId && pathOf.has(f.nodeId) ? { path: pathOf.get(f.nodeId) } : {}),
     ...(!f.path && f.relationId ? { path: 'relations.json' } : {}),
   })), config, nodeCount, relationCount)
+  return evidence ? { ...result, evidence } : result
 }
 
 function staleReferences(

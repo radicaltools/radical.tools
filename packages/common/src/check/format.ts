@@ -34,6 +34,7 @@ export function formatCheckText(result: CheckResult, options: FormatOptions): st
     for (const f of shown) lines.push(`    ${f.severity === 'error' ? 'error  ' : 'warning'}  ${where(f, options.folder)}  ${f.message}`)
     if (shown.length < list.length) lines.push(`    … ${list.length - shown.length} more (--verbose shows them)`)
   }
+  if (result.evidence) lines.push('', ...evidenceSummary(result))
   if (result.unknownRules.length) lines.push('', `⚠ The config names rules that do not exist: ${result.unknownRules.join(', ')}`)
   lines.push('', `${result.ok ? '✓' : '✖'} ${plural(result.errors, 'error')}, ${plural(result.warnings, 'warning')}`)
   return lines.join('\n')
@@ -52,5 +53,23 @@ export function formatCheckGithub(result: CheckResult, options: FormatOptions): 
     lines.push(`::${f.severity} ${file}title=${prop(`radical check: ${f.rule}${f.code ? `/${f.code}` : ''}`)}::${escape(f.message)}`)
   }
   return [...lines, formatCheckText(result, options)].join('\n')
+}
+
+const STATUS_ORDER = ['verified', 'passed', 'broken', 'failed', 'not-run', 'unverified', 'no-tests']
+const SUMMARY_TYPES: Array<[string, string]> = [['requirement', 'Requirements'], ['scenario', 'Scenarios'], ['adr', 'ADRs'], ['fitness-fn', 'Fitness functions']]
+
+/** One line per type: how many have each status in the evidence. */
+function evidenceSummary(result: CheckResult): string[] {
+  const entries = Object.values(result.evidence!.nodes)
+  const lines = [`Test reports: ${plural(result.evidence!.testCases, 'test case')}`]
+  for (const [type, name] of SUMMARY_TYPES) {
+    const ofType = entries.filter((e) => e.type === type)
+    if (!ofType.length) continue
+    const counts = new Map<string, number>()
+    for (const e of ofType) counts.set(e.status, (counts.get(e.status) ?? 0) + 1)
+    const ordered = STATUS_ORDER.filter((status) => counts.has(status))
+    lines.push(`  ${name}: ${ordered.map((status) => `${counts.get(status)} ${status}`).join(', ')}`)
+  }
+  return lines
 }
 

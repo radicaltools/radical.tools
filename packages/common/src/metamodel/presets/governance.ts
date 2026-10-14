@@ -20,6 +20,15 @@ import { builtInDddC4Metamodel } from './ddd'
 /** What the default metamodel is called in the app. */
 export const RADICAL_METAMODEL_NAME = 'Radical'
 
+/** The automated tests that check a scenario or a fitness function, one per
+ *  line as `<file> › <title>` (the title may start with its describe
+ *  blocks). `radical check --report` finds them in the test reports. */
+const TESTS_PROPERTY: PropertyDef = {
+  key: 'tests',
+  label: 'Tests (one per line: file › title)',
+  type: 'textarea',
+}
+
 export function builtInGovernanceMetamodel(): Metamodel {
   const base = builtInDddC4Metamodel()
 
@@ -87,6 +96,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
       default: 'structural',
     },
     { key: 'threshold', label: 'Threshold / Success criteria', type: 'text' },
+    TESTS_PROPERTY,
   ]
 
   const fitnessFn: NodeTypeDef = {
@@ -336,6 +346,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     { key: 'when',    label: 'When',  type: 'textarea' },
     { key: 'then',    label: 'Then',  type: 'textarea' },
     { key: 'gherkin', label: 'Extra steps (And/But, raw Gherkin)', type: 'textarea' },
+    TESTS_PROPERTY,
   ]
 
   const scenario: NodeTypeDef = {

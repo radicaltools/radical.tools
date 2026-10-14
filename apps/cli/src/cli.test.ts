@@ -97,6 +97,44 @@ describe('radical check', () => {
     expect((await run(cwd, 'check', 'model')).err).toContain('Cannot read the config')
   })
 
+  it('reads test reports, fails on a failed test, and writes the evidence', async () => {
+    const cwd = await workspace({
+      nodes: [
+        node('req', 'requirement', 'Pay', { action: 'take the payment' }),
+        node('sc', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't', tests: 'src/pay.test.ts › pays\nsrc/pay.test.ts › refunds' }),
+      ],
+      relations: [{ id: 'v', relationType: 'verifies', sourceId: 'sc', targetId: 'req' }],
+    })
+    const report = (refunds: string) => JSON.stringify({ testResults: [{ name: `${cwd}/src/pay.test.ts`, assertionResults: [
+      { ancestorTitles: [], title: 'pays', status: 'passed' },
+      { ancestorTitles: [], title: 'refunds', status: refunds },
+    ] }] })
+    await writeFile(join(cwd, 'red.json'), report('failed'))
+    await writeFile(join(cwd, 'green.json'), report('passed'))
+
+    const red = await run(cwd, 'check', 'model', '--report', 'red.json', '--evidence', 'evidence.json')
+    expect(red.code).toBe(1)
+    expect(red.out).toContain('Scenario "Paying": test src/pay.test.ts › refunds failed. Not verified now: requirement "Pay".')
+    expect(red.out).toContain('  Requirements: 1 broken')
+    const evidence = JSON.parse(await readFile(join(cwd, 'evidence.json'), 'utf8'))
+    expect(evidence.nodes.req).toMatchObject({ status: 'broken', by: ['sc'] })
+
+    const green = await run(cwd, 'check', 'model', '--report', 'red.json', '--report', 'green.json')
+    // Either report failing the test fails it.
+    expect(green.code).toBe(1)
+    expect((await run(cwd, 'check', 'model', '--report', 'green.json')).code).toBe(0)
+  })
+
+  it('exits 2 on a report it cannot read, or evidence without a report', async () => {
+    const cwd = await workspace()
+    await writeFile(join(cwd, 'bad.json'), '{"stats":{}}')
+    const bad = await run(cwd, 'check', 'model', '--report', 'bad.json')
+    expect(bad.code).toBe(2)
+    expect(bad.err).toContain('Cannot read the test report bad.json')
+    expect((await run(cwd, 'check', 'model', '--report', 'missing.json')).code).toBe(2)
+    expect((await run(cwd, 'check', 'model', '--evidence', 'e.json')).code).toBe(2)
+  })
+
   it('lists the rules', async () => {
     const { code, out } = await run(await workspace(), 'check', '--list-rules')
     expect(code).toBe(0)
