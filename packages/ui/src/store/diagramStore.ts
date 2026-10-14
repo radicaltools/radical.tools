@@ -75,7 +75,7 @@ import { LIVE_CHILD_TOP_MIN } from '@radical/layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
-import { removeFromViewList, viewFolderRenameTarget, viewShowsEveryNode } from '@radical/common/c4'
+import { removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -1289,6 +1289,13 @@ interface DiagramStore {
   /** Put a view into a folder of the list of views ("C4/Components"), or
    *  at the top for null or ""; one undo step. */
   setViewFolder: (viewId: string, folder: string | null) => void
+  /** Puts the positions and camera of the canvas shown (in the nodes until
+   *  it is left) into its view, or into All elements'. Only for the live
+   *  model: a milestone's are not saved into the live views. */
+  _saveShownCanvas: () => void
+  /** Puts the positions of the canvas shown onto the nodes: its view's, or
+   *  All elements' (a milestone's own while one is shown). */
+  _showLiveCanvasPositions: () => void
   /** Rename a folder of the list of views; its views and subfolders move
    *  along, as one undo step. Returns the new path, or null when refused
    *  (empty name, "/" in it, no such folder). */
@@ -1569,6 +1576,11 @@ function unpinLaidOut(state: DiagramStore, appMode: DiagramStore['appMode']): vo
 // ─── Live layout singleton (not serialisable → kept outside store) ───────────
 
 let _liveLayout: LiveColaLayout | null = null
+/** While a milestone is shown, where its All elements has the nodes. Views
+ *  keep one layout for every milestone, so the live views give a milestone
+ *  their positions and nothing of it is saved into them; its All elements is
+ *  its own. Set when a milestone is shown. */
+let _milestoneAllPositions: Record<string, NodePosition> | null = null
 
 // The open create-wizard's callback — a function, so it stays out of the
 // (immer-drafted) store state.
@@ -1708,7 +1720,8 @@ export const useDiagramStore = create<DiagramStore>()(
       initRelations = {}
       initViews = {}
       for (const r of persisted.relations) initRelations[r.id] = r
-      if (persisted.views) for (const v of persisted.views) initViews[v.id] = v
+      // Older documents kept every node's position in each view.
+      if (persisted.views) for (const v of withCanvasPositions(persisted.views, initNodes)) initViews[v.id] = v
       const initSequences: Record<string, DiagramSequence> = {}
       if (persisted.sequences) for (const s of persisted.sequences) initSequences[s.id] = s
       initDefaultPositions = persisted.defaultPositions ?? snapshotPositions(initNodes)
@@ -2965,22 +2978,28 @@ export const useDiagramStore = create<DiagramStore>()(
           ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom }
           : null
 
+        // A milestone shown: its All elements keeps its own positions, and
+        // nothing of it goes into the live views (see _milestoneAllPositions).
+        const inMilestone = !!get().activeSnapshotId
         let placed: string[] = []
         set((state) => {
           // 2. Save to outgoing context
-          if (activeViewId === null) {
+          if (inMilestone) {
+            if (activeViewId === null) _milestoneAllPositions = currentPos
+          } else if (activeViewId === null) {
             state.defaultPositions = currentPos as any
             if (currentViewport) state.defaultViewport = currentViewport
           } else if (state.views[activeViewId]) {
-            state.views[activeViewId].positions = currentPos as any
-            if (currentViewport) state.views[activeViewId].viewport = currentViewport
+            const view = state.views[activeViewId]
+            view.positions = viewCanvasPositions(view, c4Nodes, currentPos) as any
+            if (currentViewport) view.viewport = currentViewport
           }
 
           // 3. Load from incoming context
           let incoming: Record<string, NodePosition> | undefined
           let incomingViewport: { x: number; y: number; zoom: number } | null = null
           if (newId === null) {
-            incoming = state.defaultPositions as Record<string, NodePosition>
+            incoming = (inMilestone && _milestoneAllPositions) || state.defaultPositions as Record<string, NodePosition>
             incomingViewport = state.defaultViewport as typeof incomingViewport
           } else {
             const view = state.views[newId]
@@ -3087,6 +3106,31 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._pushUndo()
         set((state) => { model.setViewHiddenRelations(state, viewId, relationIds) })
         get()._sync()
+      },
+
+      _showLiveCanvasPositions() {
+        set((state) => {
+          const view = state.activeViewId ? state.views[state.activeViewId] as DiagramView | undefined : undefined
+          const positions = view ? view.positions : (_milestoneAllPositions ?? state.defaultPositions)
+          if (positions && Object.keys(positions).length > 0) showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions as Record<string, NodePosition>, view)
+        })
+      },
+
+      _saveShownCanvas() {
+        const currentPos = snapshotPositions(get().c4Nodes)
+        const rawVP = (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined
+        const camera = rawVP ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom } : null
+        set((state) => {
+          const viewId = state.activeViewId
+          if (viewId === null) {
+            state.defaultPositions = currentPos as any
+            if (camera) state.defaultViewport = camera
+          } else if (state.views[viewId]) {
+            const view = state.views[viewId]
+            view.positions = viewCanvasPositions(view, get().c4Nodes, currentPos) as any
+            if (camera) view.viewport = camera
+          }
+        })
       },
 
       orderViews(viewIds) {
@@ -4131,11 +4175,14 @@ export const useDiagramStore = create<DiagramStore>()(
         const id = uid()
         // Reference the live model directly — safe under immer's copy-on-write
         // (see _captureState). Avoids cloning the whole model per snapshot.
+        // With a view shown the nodes hold its positions: a milestone keeps
+        // All elements' (what is not there yet keeps where it is).
+        const { c4Nodes, activeViewId, defaultPositions } = get()
         const snap: DiagramSnapshot = {
           id,
           name,
           timestamp: Date.now(),
-          nodes: get().c4Nodes,
+          nodes: activeViewId === null ? c4Nodes : atDefaultPositions(Object.values(c4Nodes), defaultPositions),
           relations: get().c4Relations,
           sequences: get().sequences,
         }
@@ -4169,13 +4216,17 @@ export const useDiagramStore = create<DiagramStore>()(
           state.canUndo = _undoStack.length > 0
           state.canRedo = _redoStack.length > 0
         })
+        // The milestone's nodes hold its All elements positions; a view shown
+        // keeps its own layout.
+        get()._showLiveCanvasPositions()
         get()._sync()
         _liveLayout?.reset()
       },
 
       removeSnapshot(id) {
         const backup = get().liveBackup
-        if (get().activeSnapshotId === id) _historyBackOnLive()
+        const wasShown = get().activeSnapshotId === id
+        if (wasShown) _historyBackOnLive()
         set((state) => {
           state.snapshots = state.snapshots.filter(s => s.id !== id) as any
           state.canUndo = _undoStack.length > 0
@@ -4199,6 +4250,10 @@ export const useDiagramStore = create<DiagramStore>()(
             state.diffGhostRelations = {} as any
           }
         })
+        if (wasShown) {
+          _milestoneAllPositions = null
+          get()._showLiveCanvasPositions()
+        }
         get()._sync()
         _liveLayout?.reset()
       },
@@ -4225,6 +4280,10 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         const snap = snapshots.find(s => s.id === id)
         if (!snap) return
+        // Coming from the live model in Designer: the canvas shown keeps its
+        // positions in the nodes until it is left; save them first, as
+        // nothing of the milestone will be saved into the live views.
+        if (!activeSnapshotId && get().appMode === 'designer') get()._saveShownCanvas()
         // Backup live HEAD if we don't already have one.
         const backup = activeSnapshotId
           ? get().liveBackup
@@ -4316,8 +4375,14 @@ export const useDiagramStore = create<DiagramStore>()(
           state.canUndo = _undoStack.length > 0
           state.canRedo = _redoStack.length > 0
         })
+        // The milestone's nodes hold its All elements positions; a view shows
+        // the layout it has for every milestone.
+        if (!preserveLayout) {
+          _milestoneAllPositions = snapshotPositions(snap.nodes as Record<string, C4Node>)
+          get()._showLiveCanvasPositions()
+        }
         get()._sync()
-        // Reseed cola from the freshly-loaded milestone positions so the
+        // Reseed cola from the freshly-loaded milestone positions so the        // Reseed cola from the freshly-loaded milestone positions so the
         // live layout continues from there (instead of carrying over the
         // previous canvas's cached coords). Physics keeps running so the
         // user can still drag / nudge nodes around on the milestone.
@@ -4350,6 +4415,10 @@ export const useDiagramStore = create<DiagramStore>()(
           state.diffGhostNodes = {} as any
           state.diffGhostRelations = {} as any
         })
+        // The live nodes are where the canvas shown when the milestone was
+        // opened had them; show the canvas shown now.
+        _milestoneAllPositions = null
+        get()._showLiveCanvasPositions()
         get()._sync()
         _liveLayout?.reset()
       },
@@ -4363,8 +4432,13 @@ export const useDiagramStore = create<DiagramStore>()(
         // Reference the current (edited) canvas state directly — read-only use
         // below (diffing, or embedding whole into a snapshot); safe under
         // immer's copy-on-write (see _captureState).
-        const editedNodes = c4Nodes as Record<string, C4Node>
+        // With a view shown the nodes hold its (shared) layout: what is kept
+        // in the milestone, or carried on as a change, is its All elements'.
+        const editedNodes = get().activeViewId === null
+          ? c4Nodes as Record<string, C4Node>
+          : atDefaultPositions(Object.values(c4Nodes), _milestoneAllPositions ?? snapshotPositions(snapshots[idx].nodes as Record<string, C4Node>))
         const editedRels = c4Relations as Record<string, C4Relation>
+        _milestoneAllPositions = snapshotPositions(editedNodes)
         const editedSeqs = sequences as Record<string, DiagramSequence>
         // Snapshot of the milestone BEFORE edits — used to compute the diff.
         const baseSnap = snapshots[idx]
@@ -4653,21 +4727,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // left or saved: put them, and its camera, into its view (or All
           // elements') first. Parked without them, the save a slide asks for
           // in Presenter wrote the view's layout from when it was opened.
-          if (!get().activeSnapshotId) {
-            const currentPos = snapshotPositions(get().c4Nodes)
-            const rawVP = W.__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined
-            const camera = rawVP ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom } : null
-            set((state) => {
-              const viewId = state.activeViewId
-              if (viewId === null) {
-                state.defaultPositions = currentPos as any
-                if (camera) state.defaultViewport = camera
-              } else if (state.views[viewId]) {
-                state.views[viewId].positions = currentPos as any
-                if (camera) state.views[viewId].viewport = camera
-              }
-            })
-          }
+          if (!get().activeSnapshotId) get()._saveShownCanvas()
           W.__preModeLayout = parkDesigner(get())
           // Edits of a milestone not yet kept or dropped stay Designer's
           // question: Viewer and Presenter browse without being asked.
@@ -5253,7 +5313,8 @@ export const useDiagramStore = create<DiagramStore>()(
         const views: Record<string, DiagramView> = {}
         const sequences: Record<string, DiagramSequence> = {}
         for (const r of data.relations) relations[r.id] = r
-        if (data.views) for (const v of data.views) views[v.id] = v
+        // Older documents kept every node's position in each view.
+        if (data.views) for (const v of withCanvasPositions(data.views, nodes)) views[v.id] = v
         if (data.sequences) for (const s of data.sequences) sequences[s.id] = s
 
         // Restore snapshots (backward compat: old files won't have them)
@@ -5369,7 +5430,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const savedDefaultVP = activeViewId === null ? (currentVP ?? defaultViewport) : defaultViewport
         const savedViews = Object.values(views).map(v => ({
           ...v,
-          positions: v.id === activeViewId && currentPos ? currentPos : v.positions,
+          positions: v.id === activeViewId && currentPos ? viewCanvasPositions(v, liveNodes, currentPos) : v.positions,
           viewport: v.id === activeViewId ? (currentVP ?? v.viewport) : v.viewport,
         }))
 

@@ -16,7 +16,7 @@ import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
-import { pinnedNodeIds, type C4Node, type DiagramData, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
+import { pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
 import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
 
@@ -253,6 +253,9 @@ export class FolderModel {
       checkFiles(before)
       const data = deserializeFromMdFolder(before).data
       checkData(data)
+      // Older folders kept every node's position in each view; a view keeps
+      // those it draws, so the first write trims views.json.
+      if (data.views) data.views = withCanvasPositions(data.views, Object.fromEntries(data.nodes.map((n) => [n.id, n])))
       const facade = createModelFacade(data, {
         runLayout: async (doc, viewId) => {
           const layout = await this.smartLayout(doc, documentMetamodel(doc.metamodel, doc.nodes), viewId, options)
@@ -434,10 +437,7 @@ export class FolderModel {
     applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
     // All elements writes the nodes themselves (settleGeometry then syncs
     // defaultPositions); a view keeps its own positions.
-    if (view) {
-      view.positions = Object.fromEntries(Object.values(nodes).map((node): [string, NodePosition] =>
-        [node.id, { x: node.x, y: node.y, width: node.width, height: node.height }]))
-    }
+    if (view) view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes))
     const before = result.baseline
     const after = result.winner.metrics
     return {
@@ -459,8 +459,7 @@ export class FolderModel {
     const unpinned = pinnedNodeIds(constraints).length
     view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
     applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
-    view.positions = Object.fromEntries(Object.values(nodes).map((node): [string, NodePosition] =>
-      [node.id, { x: node.x, y: node.y, width: node.width, height: node.height }]))
+    view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes))
     return {
       ok: true,
       changed,
@@ -506,4 +505,10 @@ export class FolderModel {
     this.tempIds.clear()
     for (const [temp, real] of previous) this.tempIds.set(temp, real)
   }
+}
+
+/** Where the nodes are, by id. */
+function positionsOf(nodes: Record<string, C4Node>): Record<string, NodePosition> {
+  return Object.fromEntries(Object.values(nodes).map((node): [string, NodePosition] =>
+    [node.id, { x: node.x, y: node.y, width: node.width, height: node.height }]))
 }
