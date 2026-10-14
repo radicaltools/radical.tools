@@ -1,8 +1,9 @@
-import { readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { CHECK_RULES, FOLDER_RULES, formatCheckGithub, formatCheckText, parseTestReport, ratchetConfig, runCheck, type CheckConfig, type TestCase } from '@radical/common/check'
+import { CHECK_RULES, FOLDER_RULES, formatCheckGithub, formatCheckText, parseTestReport, ratchetConfig, runCheck, type CheckConfig, type Evidence, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
+import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
@@ -105,9 +106,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
 
   const result = runCheck(files, config, tests ? { tests } : {})
-  if (values.evidence && result.evidence) {
-    await writeFile(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
-  }
+  if (values.evidence && result.evidence) await writeEvidence(resolve(io.cwd, values.evidence), result.evidence)
   const options = { folder, verbose: values.verbose }
   io.out(values.format === 'json' ? JSON.stringify(result, null, 2)
     : values.format === 'github' ? formatCheckGithub(result, options)
@@ -135,5 +134,19 @@ async function reportFiles(paths: string[], cwd: string): Promise<string[]> {
     files.push(...names.map((name) => join(path, name)))
   }
   return files
+}
+
+/** Writes the evidence, making its directory. In a model folder's .radical
+ *  directory, Studio's place for what is not the model, it also writes the
+ *  .gitignore that keeps that directory out of version control. */
+async function writeEvidence(path: string, evidence: Evidence): Promise<void> {
+  const dir = dirname(path)
+  await mkdir(dir, { recursive: true })
+  if (basename(dir) === SELECTION_DIR) {
+    await writeFile(join(dir, '.gitignore'), SELECTION_GITIGNORE_CONTENT, { flag: 'wx' }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'EEXIST') throw error
+    })
+  }
+  await writeFile(path, JSON.stringify(evidence, null, 2) + '\n')
 }
 

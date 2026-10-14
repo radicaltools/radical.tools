@@ -119,6 +119,11 @@ describe('radical check', () => {
     const evidence = JSON.parse(await readFile(join(cwd, 'evidence.json'), 'utf8'))
     expect(evidence.nodes.req).toMatchObject({ status: 'broken', by: ['sc'] })
 
+    // Into the model folder's .radical directory, made with its .gitignore.
+    await run(cwd, 'check', 'model', '--report', 'red.json', '--evidence', 'model/.radical/evidence.json')
+    expect(JSON.parse(await readFile(join(cwd, 'model/.radical/evidence.json'), 'utf8')).nodes.req.status).toBe('broken')
+    expect(await readFile(join(cwd, 'model/.radical/.gitignore'), 'utf8')).toBe('*\n')
+
     const green = await run(cwd, 'check', 'model', '--report', 'red.json', '--report', 'green.json')
     // Either report failing the test fails it.
     expect(green.code).toBe(1)
