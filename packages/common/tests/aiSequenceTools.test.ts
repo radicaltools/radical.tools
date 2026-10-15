@@ -153,3 +153,35 @@ describe('update_view', () => {
     expect(call('update_view', { id: 'v' }).resultText).toContain('nothing to change')
   })
 })
+
+describe('view filter chains over tools', () => {
+  it('create_view and update_view set a chain, checked against the model, and null removes it', () => {
+    const { facade, call, ctx } = setup()
+    call('add_node', { tempId: 'api', type: 'container', label: 'API', parentId: 'shop' })
+    const chain = {
+      levels: [
+        { ways: [{ types: ['system'] }], filters: [{ kind: 'text', text: 'shop' }] },
+        { ways: [{ via: { contains: true }, types: ['container'] }] },
+      ],
+      edges: 'all',
+    }
+    const created = call('create_view', { tempId: 'v', name: 'Shop inside', pipeline: chain })
+    expect(created.ok, created.resultText).toBe(true)
+    const view = () => facade.getViews!()[ctx.resolveId('v')]
+    expect(view().pipeline).toEqual(chain)
+    // Its query answer is what the chain gives: Shop and its API, not the Bank.
+    const got = runModelQuery(`GET VIEW ${ctx.resolveId('v')}`, { nodes: facade.getNodes(), relations: facade.getRelations(), views: facade.getViews!(), sequences: {} })
+    expect((got.result as { nodes: { label: string }[] }).nodes.map((n) => n.label).sort()).toEqual(['API', 'Shop'])
+
+    // A within filter takes a tempId; unknown types and elements are refused.
+    const within = call('update_view', { id: 'v', pipeline: { levels: [{ ways: [{ types: ['container'] }], filters: [{ kind: 'within', nodeId: 'shop' }] }] } })
+    expect(within.ok, within.resultText).toBe(true)
+    expect(view().pipeline!.levels![0].filters).toEqual([{ kind: 'within', nodeId: ctx.resolveId('shop') }])
+    const bad = call('update_view', { id: 'v', pipeline: { levels: [{ ways: [{ types: ['spaceship'] }], filters: [{ kind: 'within', nodeId: 'nowhere' }] }] } })
+    expect(bad.ok).toBe(false)
+    expect(bad.resultText).toMatch(/unknown node type "spaceship".*unknown element "nowhere"/)
+
+    expect(call('update_view', { id: 'v', pipeline: null }).ok).toBe(true)
+    expect(view().pipeline).toBeUndefined()
+  })
+})

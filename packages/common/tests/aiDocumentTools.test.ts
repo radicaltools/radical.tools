@@ -166,16 +166,17 @@ describe('presentation focus', () => {
       slides: [
         { name: 'Overview', viewId: 'v' },
         { name: 'API', viewId: 'v', focus: ['a'] },
-        // The system is shown as the containers' ancestor.
-        { name: 'Shop', viewId: 'v', focus: ['s', 'd'] },
+        { name: 'Both', viewId: 'v', focus: ['a', 'd'] },
       ],
     })
     expect(created.ok, created.resultText).toBe(true)
     const tour = facade.getPresentations!()[0]
-    expect(tour.slides.map((slide) => slide.focusNodeIds)).toEqual([undefined, [ctx.resolveId('a')], [ctx.resolveId('s'), ctx.resolveId('d')]])
+    expect(tour.slides.map((slide) => slide.focusNodeIds)).toEqual([undefined, [ctx.resolveId('a')], [ctx.resolveId('a'), ctx.resolveId('d')]])
     expect(tour.slides.every((slide) => slide.viewId === ctx.resolveId('v') && slide.viewport.zoom === 0)).toBe(true)
 
     expect((await call('update_presentation', { id: tour.id, slides: [{ name: 'Bank', viewId: 'v', focus: ['x'] }] })).resultText).toContain('not in view "Containers"')
+    // The system holds the containers on the canvas, but the view does not show it.
+    expect((await call('update_presentation', { id: tour.id, slides: [{ name: 'Shop', viewId: 'v', focus: ['s'] }] })).resultText).toContain('not in view "Containers"')
     expect((await call('update_presentation', { id: tour.id, slides: [{ name: 'Gone', viewId: 'v', focus: ['nope'] }] })).resultText).toContain('unknown node')
 
     // A slide framed in Studio keeps its camera until a new focus replaces it.

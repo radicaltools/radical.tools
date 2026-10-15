@@ -44,11 +44,21 @@ test.describe('bookstore views', () => {
     const rows = page.locator('tbody tr')
     await expect(rows).toHaveCount(6)
     await expect(rows.filter({ hasText: 'Payment Provider' })).toContainText('Card payments')
-    const tabs = page.locator('.tv-tabs')
-    await tabs.getByRole('button', { name: /^Relations\s*4$/ }).click()
-    await expect(page.locator('tbody tr')).toHaveCount(4)
-    await tabs.getByRole('button', { name: /^All Nodes/ }).click()
+    // The containment tree: Bookstore's containers under it, one guide line in.
+    await expect(page.locator('.tv-chain-row.depth-1')).toHaveCount(3)
+    await expect(page.locator('.tv-tabs')).toHaveCount(0)
     await expect(page).toHaveScreenshot('bookstore-table.png')
+  })
+
+  test('a name is renamed in place in the table', async ({ page, studio }) => {
+    await studio.open('v-table')
+    await page.locator('tr[data-node-id="payments"] .tv-chain-cell').click()
+    const input = page.locator('tr[data-node-id="payments"] input.tv-cell-input')
+    await input.fill('Card Gateway')
+    await input.press('Enter')
+    await expect(page.locator('tr[data-node-id="payments"]')).toContainText('Card Gateway')
+    await studio.advance(1000) // the autosave, on the frozen clock
+    await expect.poll(async () => (await studio.storedDoc()).nodes.find((n) => n.id === 'payments')?.label).toBe('Card Gateway')
   })
 })
 
@@ -223,42 +233,13 @@ test.describe('perspectives', () => {
   })
 })
 
-test.describe('custom metamodel', () => {
-  // Built-in presets have no boolean column on a type with its own table tab,
-  // so give Software System a tab: its External column is a boolean.
-  test.beforeEach(async ({ studio }) => {
-    const doc = JSON.parse(fixture('bookstore'))
-    const metamodel = builtInC4Metamodel()
-    metamodel.id = 'c4-system-tab'
-    metamodel.nodeTypes.system.tableTab = true
-    await studio.seedDocument(JSON.stringify({ ...doc, metamodel }))
-  })
-
-  test('boolean table cells are read-only in Viewer', async ({ page, studio }) => {
-    await studio.open('v-table', 'viewer')
-    await page.locator('.tv-tabs').getByRole('button', { name: /^Software System/ }).click()
-    const external = page.locator('tbody tr').filter({ hasText: 'Payment Provider' }).locator('.tv-bool')
-    await expect(external).toHaveText('✓')
-    await external.click()
-    await studio.advance(500)
-    await expect(external).toHaveText('✓')
-  })
-})
-
 test.describe('hidden relations', () => {
-  // "charges card" (api → payments) is hidden in the table and the matrix view.
+  // "charges card" (api → payments) is hidden in the matrix view.
   test.beforeEach(async ({ studio }) => {
     const doc = JSON.parse(fixture('bookstore'))
     const views = doc.views.map((v: { id: string }) => (v.id === 'v-table' ? { ...v, hiddenRelationIds: ['r4'] } : v))
     views.push({ id: 'v-matrix', name: 'Matrix', kind: 'matrix', nodeIds: [], positions: {}, hiddenRelationIds: ['r4'] })
     await studio.seedDocument(JSON.stringify({ ...doc, views }))
-  })
-
-  test('stay out of the Relations tab', async ({ page, studio }) => {
-    await studio.open('v-table')
-    await page.locator('.tv-tabs').getByRole('button', { name: /^Relations\s*3$/ }).click()
-    await expect(page.locator('tbody tr')).toHaveCount(3)
-    await expect(page.locator('tbody')).not.toContainText('charges card')
   })
 
   test('stay out of the matrix', async ({ page, studio }) => {

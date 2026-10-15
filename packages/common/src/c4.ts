@@ -73,6 +73,65 @@ export interface DiagramSequence {
  *  relation has to go around an element. */
 export type EdgeStyle = 'curved' | 'orthogonal'
 
+/** One filter of a view's pipeline; `off` keeps it without applying it.
+ *  `join: 'or'` joins it to the filter before: a run of filters joined with
+ *  or lets through what any of them lets through, and every run must let an
+ *  element through (and between runs). */
+export type ViewFilter = (
+  | { kind: 'type'; types: string[] }
+  /** `is`/`is-not`: the value is (not) one of `values`; `set`/`unset`: it has (no) value. */
+  | { kind: 'property'; key: string; op: 'is' | 'is-not' | 'set' | 'unset'; values?: string[] }
+  /** The element has (`has`) or lacks a relation of this type, this way. */
+  | { kind: 'relation'; relationType: string; direction: 'out' | 'in'; has: boolean }
+  /** The element lies inside this one, at any depth. */
+  | { kind: 'within'; nodeId: string }
+  /** Its name, description or technology holds this text. */
+  | { kind: 'text'; text: string }
+) & { off?: true; join?: 'or' }
+
+/** The order of a view's rows within their groups. */
+export interface ViewSort {
+  by: 'label' | 'type' | 'property'
+  key?: string
+  desc?: true
+}
+
+/** How a chain level's elements hang under the level above: along a
+ *  relation (`out`: the element above is its source, so its targets come
+ *  next; `in`: its sources), along any relation of any type either way, or
+ *  as the children it contains. */
+export type ChainVia =
+  | { relationType: string; direction: 'out' | 'in' }
+  | { anyRelation: true }
+  | { contains: true }
+
+/** One way to a chain level's elements: of these types (none: any),
+ *  reached along `via` from the level above (none on the first level). */
+export interface ChainWay {
+  via?: ChainVia
+  types?: string[]
+}
+
+/** One level of a view's chain: the elements any of its ways reaches (or
+ *  between them: needs or ADRs; refined into requirements or verified by
+ *  scenarios) that pass its filters. */
+export interface ChainLevel {
+  ways: ChainWay[]
+  filters?: ViewFilter[]
+}
+
+/** What a view does with its elements (viewPipeline.ts): a chain of levels, each under the one above (needs, the
+ *  requirements refined from each, the scenarios verifying each of those),
+ *  and the order within a level. The table view and the Nodes tree show
+ *  the result; a canvas draws its own elements. */
+export interface ViewPipeline {
+  levels?: ChainLevel[]
+  sort?: ViewSort
+  /** On a canvas: 'all' draws every relation between the elements shown;
+   *  none, only the relations the chain follows. */
+  edges?: 'all'
+}
+
 export interface DiagramView {
   id: string
   name: string
@@ -166,6 +225,9 @@ export interface DiagramView {
    * switching away and back (or reopening the view) restores the tab.
    */
   tableActiveTab?: string
+  /** The steps from the model to what the view's table and Nodes tree show;
+   *  none: the view's elements as they are. */
+  pipeline?: ViewPipeline
   /**
    * Node IDs explicitly collapsed by the user in this named view.
    * Independent of the model-level `node.collapsed` flag — collapsing in one

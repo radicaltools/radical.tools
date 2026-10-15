@@ -5,9 +5,9 @@
 // slide's focus elements: several slides can zoom onto parts of one view. A
 // slide shows the current model, or a milestone (a phase of the system).
 
-import type { C4Node, DiagramView, Presentation, PresentationSlide } from '../../c4'
+import type { C4Node, C4Relation, DiagramView, Presentation, PresentationSlide } from '../../c4'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
-import { viewShowsEveryNode } from '../../c4'
+import { viewShownNodes } from '../../viewPipeline'
 
 const randomId = (): string =>
   (globalThis as unknown as { crypto: { randomUUID(): string } }).crypto.randomUUID()
@@ -74,23 +74,16 @@ const newSlide = (id: string, name: string, viewId: string | null, focus: string
   // A zero viewport and no canvas state make Studio fit the slide's view (or its focus).
   ({ id, name, snapshotId, viewId, viewport: NO_VIEWPORT, ...(focus?.length ? { focusNodeIds: focus } : {}) })
 
-/** Nodes a view shows: its listed nodes and their ancestors (every node when it lists none). */
-function shownIn(view: DiagramView | undefined, nodes: Record<string, C4Node>): ((id: string) => boolean) {
-  if (!view || viewShowsEveryNode(view)) return (id) => id in nodes
-  const shown = new Set<string>()
-  for (let id of view.nodeIds) {
-    while (id && nodes[id] && !shown.has(id)) {
-      shown.add(id)
-      id = nodes[id].parentId ?? ''
-    }
-  }
-  return (id) => shown.has(id)
+/** Nodes a view shows: what its chain gives, or its listed nodes, with their ancestors (every node when it lists none). */
+function shownIn(view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): ((id: string) => boolean) {
+  const shown = viewShownNodes(view, nodes, relations)
+  return shown ? (id) => shown.has(id) : (id) => id in nodes
 }
 
 /** `nodes`: the model the slide shows, the current one or its milestone's. */
-function parseFocus(tool: string, i: number, raw: unknown, ctx: ToolRunContext, view: DiagramView | undefined, nodes: Record<string, C4Node>): string[] | string {
+function parseFocus(tool: string, i: number, raw: unknown, ctx: ToolRunContext, view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): string[] | string {
   if (!Array.isArray(raw) || raw.some((id) => typeof id !== 'string')) return `${tool}: slide ${i + 1} focus must be an array of node ids`
-  const shown = shownIn(view, nodes)
+  const shown = shownIn(view, nodes, relations)
   const focus = [...new Set((raw as string[]).map((id) => ctx.resolveId(id)))]
   const unknown = focus.filter((id) => !(id in nodes))
   if (unknown.length) return `${tool}: slide ${i + 1} focuses on unknown node(s) ${unknown.map((id) => `"${id}"`).join(', ')}`
@@ -130,7 +123,7 @@ function parseSlides(tool: string, raw: unknown, ctx: ToolRunContext, existing: 
     }
     let focus: string[] | undefined
     if (s.focus !== undefined) {
-      const parsed = parseFocus(tool, i, s.focus, ctx, viewId ? views[viewId] : undefined, milestone?.nodes ?? ctx.diagram.getNodes())
+      const parsed = parseFocus(tool, i, s.focus, ctx, viewId ? views[viewId] : undefined, milestone?.nodes ?? ctx.diagram.getNodes(), milestone?.relations ?? ctx.diagram.getRelations())
       if (typeof parsed === 'string') return parsed
       focus = parsed
     }

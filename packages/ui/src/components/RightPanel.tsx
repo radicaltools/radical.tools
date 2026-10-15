@@ -1,10 +1,11 @@
-import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback, memo } from 'react'
-import { useDiagramStore, nodeEffectivelyCollapsedInView } from '../store/diagramStore'
-import { useChildIds, useNodeContent, useNodeLabels } from '../store/nodeSelectors'
-import { type C4Relation, C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '@radical/common/c4'
+import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useDiagramStore } from '../store/diagramStore'
+import { useNodeLabels } from '../store/nodeSelectors'
+import { type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } from '@radical/common/c4'
 import { resolveEarsSubject, isReservedPropertyKey, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
-import { PALETTE_ORDER } from './ElementPalette'
+import { ViewPipelinePanel } from './ViewPipelinePanel'
+import { StructurePanel } from './StructurePanel'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
@@ -38,210 +39,6 @@ function AutoResizeTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElem
       style={{ overflow: 'hidden', ...props.style }}
       onInput={resize}
     />
-  )
-}
-
-// ── Icons ─────────────────────────────────────────────────────────────────────
-
-function C4Icon({ type, size = 12 }: { type: C4ElementType; size?: number }) {
-  return (
-    <svg
-      className="type-icon" viewBox="0 0 16 16" width={size} height={size}
-      style={{ flexShrink: 0, '--type-color': NODE_COLORS[type] } as React.CSSProperties}
-    >
-      <path d={TYPE_ICON_PATHS[type]} />
-    </svg>
-  )
-}
-
-// ── Tree node ─────────────────────────────────────────────────────────────────
-
-function TreeNodeItem({ nodeId, depth, filterSet, matchedSet }: {
-  nodeId: string
-  depth: number
-  /** When set, only render children present in this set (a search/type filter is active). Ancestors of matches are included so the tree path stays visible. */
-  filterSet?: Set<string> | null
-  /** Nodes that directly match the active filter (vs. shown only as an ancestor path) — used to highlight them. */
-  matchedSet?: Set<string> | null
-}) {
-  // Content, not geometry: the live layout moves nodes every frame.
-  const node = useNodeContent(nodeId)
-  const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
-  const selectNode = useDiagramStore((s) => s.selectNode)
-  const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
-  const childIds = useChildIds(nodeId)
-  const activeViewId = useDiagramStore((s) => s.activeViewId)
-  const activeView = useDiagramStore((s) => s.activeViewId ? s.views[s.activeViewId] : undefined)
-  const addNodeToView = useDiagramStore((s) => s.addNodeToView)
-  const removeNodeFromView = useDiagramStore((s) => s.removeNodeFromView)
-
-  if (!node) return null
-
-  const children = childIds.filter((id) => !filterSet || filterSet.has(id))
-  const hasChildren = children.length > 0
-  const isSelected = selectedNodeId === nodeId
-  const canCollapse = isContainerType(node.type) && hasChildren
-  const isHierarchy = activeView?.kind === 'treemap'
-  const inView = !activeView
-    || viewShowsEveryNode(activeView)
-    || activeView.nodeIds.includes(nodeId)
-  const isFilterMatch = !!matchedSet?.has(nodeId)
-  // Effective collapsed: per-view if a named view is active, else model-level.
-  // A model-collapsed node can be overridden in this view via expandedNodeIds.
-  // While a search/type filter is active, force-expand so matches stay reachable.
-  const isEffectivelyCollapsed = filterSet ? false : nodeEffectivelyCollapsedInView(node, activeViewId, activeView)
-
-  const onDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData('application/c4-node-id', nodeId)
-    e.dataTransfer.effectAllowed = 'copy'
-    e.stopPropagation()
-  }
-
-  return (
-    <>
-      <div
-        className={`tree-node ${isSelected ? 'selected' : ''}${isFilterMatch ? ' filter-match' : ''}`}
-        style={{ paddingLeft: 12 + depth * 14, opacity: inView ? 1 : 0.35 }}
-        draggable
-        onDragStart={onDragStart}
-        onClick={() => selectNode(nodeId)}
-      >
-        <span
-          className="tree-toggle"
-          onClick={(e) => { if (!canCollapse) return; e.stopPropagation(); toggleCollapse(nodeId) }}
-          style={{ cursor: canCollapse ? 'pointer' : 'default', opacity: canCollapse ? 1 : 0.3 }}
-        >
-          {canCollapse ? (isEffectivelyCollapsed ? '▶' : '▼') : '·'}
-        </span>
-        <span className="tree-badge"><C4Icon type={node.type} size={10} /></span>
-        <span className="tree-node-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-          {node.label}
-        </span>
-        {activeViewId && (
-          <span
-            className="tree-view-toggle"
-            title={inView ? 'Remove from view' : 'Add to view'}
-            onClick={(e) => {
-              e.stopPropagation()
-              if (inView) removeNodeFromView(activeViewId, nodeId)
-              else addNodeToView(activeViewId, nodeId)
-            }}
-          >
-            {inView ? '👁' : '👁‍🗨'}
-          </span>
-        )}
-      </div>
-      {!isEffectivelyCollapsed && children.map((childId) => (
-        <TreeNodeItem key={childId} nodeId={childId} depth={depth + 1} filterSet={filterSet} matchedSet={matchedSet} />
-      ))}
-    </>
-  )
-}
-
-// ── Relation row ──────────────────────────────────────────────────────────────
-
-interface RelationListItemProps {
-  rel: C4Relation
-  sourceLabel: string
-  targetLabel: string
-  isSelected: boolean
-  /** Active view, when one is; then whether the relation is hidden there and
-   *  both its ends are in it. */
-  activeViewId: string | null
-  hidden: boolean
-  endpointsInView: boolean
-}
-
-/** One row of the Relations list. Props only: with a thousand relations,
- *  a store subscription per row ran on every live-layout frame. */
-const RelationListItem = memo(function RelationListItem({
-  rel, sourceLabel, targetLabel, isSelected, activeViewId, hidden, endpointsInView,
-}: RelationListItemProps): React.ReactElement {
-  const selectEdge = useDiagramStore((s) => s.selectEdge)
-  const hideRelationFromView = useDiagramStore((s) => s.hideRelationFromView)
-  const unhideRelationInView = useDiagramStore((s) => s.unhideRelationInView)
-  const inView = !activeViewId || (!hidden && endpointsInView)
-
-  return (
-    <div
-      className={`tree-node ${isSelected ? 'selected' : ''}`}
-      style={{ paddingLeft: 12, opacity: inView ? 1 : 0.35 }}
-      onClick={() => selectEdge(rel.id)}
-      title={rel.label || `${sourceLabel} → ${targetLabel}`}
-    >
-      <span className="tree-toggle" style={{ opacity: 0.3 }}>·</span>
-      <span className="tree-badge" aria-hidden>
-        <svg viewBox="0 0 16 16" width={10} height={10} fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M2 8h10M9 5l3 3-3 3" />
-        </svg>
-      </span>
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-        <span style={{ opacity: 0.8 }}>{sourceLabel}</span>
-        <span style={{ opacity: 0.5, padding: '0 4px' }}>→</span>
-        <span style={{ opacity: 0.8 }}>{targetLabel}</span>
-        {rel.label && (
-          <span style={{ opacity: 0.55, marginLeft: 6, fontStyle: 'italic' }}>{rel.label}</span>
-        )}
-      </span>
-      {activeViewId && endpointsInView && (
-        <span
-          className="tree-view-toggle"
-          title={hidden ? 'Show in view' : 'Hide from view'}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (hidden) unhideRelationInView(activeViewId, rel.id)
-            else hideRelationFromView(activeViewId, rel.id)
-          }}
-        >
-          {hidden ? '👁‍🗨' : '👁'}
-        </span>
-      )}
-    </div>
-  )
-})
-
-function RelationsSection(): React.ReactElement {
-  const relations = useDiagramStore((s) => s.c4Relations)
-  // Labels only: the live layout replaces c4Nodes every frame.
-  const labels = useNodeLabels()
-  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
-  const activeViewId = useDiagramStore((s) => s.activeViewId)
-  const activeView = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
-  const rels = useMemo(() => {
-    return Object.values(relations)
-      .filter((r) => labels.has(r.sourceId) && labels.has(r.targetId))
-      .sort((a, b) => {
-        const sa = (labels.get(a.sourceId) || '').localeCompare(labels.get(b.sourceId) || '')
-        if (sa !== 0) return sa
-        return (labels.get(a.targetId) || '').localeCompare(labels.get(b.targetId) || '')
-      })
-  }, [relations, labels])
-  // An element without a label is named by its type. Read once per change
-  // of labels: subscribing to c4Nodes would re-render on every frame.
-  const nameOf = (id: string): string => labels.get(id) || useDiagramStore.getState().c4Nodes[id]?.type || '?'
-
-  if (rels.length === 0) {
-    return <div className="lp-empty-state" style={{ padding: '4px 12px 8px' }}>No relations.</div>
-  }
-  // A relation is "in view" when no view is active OR the active view does
-  // not have it on its hidden list AND both endpoints are visible there.
-  const inViewNodes = activeView && !viewShowsEveryNode(activeView) ? new Set(activeView.nodeIds) : null
-  const hiddenIds = new Set(activeView?.hiddenRelationIds ?? [])
-  return (
-    <>
-      {rels.map((r) => (
-        <RelationListItem
-          key={r.id}
-          rel={r}
-          sourceLabel={nameOf(r.sourceId)}
-          targetLabel={nameOf(r.targetId)}
-          isSelected={selectedEdgeId === r.id}
-          activeViewId={activeViewId}
-          hidden={hiddenIds.has(r.id)}
-          endpointsInView={!inViewNodes || (inViewNodes.has(r.sourceId) && inViewNodes.has(r.targetId))}
-        />
-      ))}
-    </>
   )
 }
 
@@ -422,79 +219,6 @@ const Icon = {
 // technology/type). "Show matches" / "Hide matches" additionally write the
 // matched set into the active view's nodeIds via the same store actions the
 // per-node eye toggle already uses.
-
-function NodesFilterBar({
-  search, onSearchChange, typeCounts, typeFilter, onToggleType,
-  matchedCount, totalCount, filterActive, hasActiveView, onShowAll, onShowMatches, onHideMatches, onClearFilter,
-}: {
-  search: string
-  onSearchChange: (v: string) => void
-  typeCounts: { type: C4ElementType; count: number }[]
-  typeFilter: Set<C4ElementType>
-  onToggleType: (t: C4ElementType) => void
-  matchedCount: number
-  totalCount: number
-  filterActive: boolean
-  hasActiveView: boolean
-  onShowAll: () => void
-  onShowMatches: () => void
-  onHideMatches: () => void
-  onClearFilter: () => void
-}) {
-  return (
-    <div className="rp-filter-bar">
-      <div className="rp-filter-search">
-        <span className="rp-filter-search-icon" aria-hidden><Icon.Search /></span>
-        <input
-          className="props-input"
-          placeholder="Filter nodes…"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Escape') onClearFilter() }}
-        />
-        {search && (
-          <button className="rp-filter-search-clear" onClick={() => onSearchChange('')} title="Clear search">
-            <Icon.Close />
-          </button>
-        )}
-      </div>
-
-      {typeCounts.length > 1 && (
-        <div className="rp-filter-chips">
-          {typeCounts.map(({ type, count }) => (
-            <button
-              key={type}
-              className={`rp-filter-chip${typeFilter.has(type) ? ' active' : ''}`}
-              onClick={() => onToggleType(type)}
-              title={`${TYPE_LABELS[type] || type} (${count})`}
-            >
-              <C4Icon type={type} size={9} />
-              <span>{TYPE_LABELS[type] || type}</span>
-              <span className="rp-filter-chip-count">{count}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {filterActive ? (
-        <div className="rp-filter-actions">
-          <span className="rp-filter-summary">{matchedCount} of {totalCount}</span>
-          {hasActiveView && (
-            <>
-              <button className="rp-filter-action-btn" onClick={onShowMatches} disabled={matchedCount === 0}>Show matches</button>
-              <button className="rp-filter-action-btn" onClick={onHideMatches} disabled={matchedCount === 0}>Hide matches</button>
-            </>
-          )}
-          <button className="rp-filter-action-btn subtle" onClick={onClearFilter}>Clear</button>
-        </div>
-      ) : hasActiveView ? (
-        <div className="rp-filter-actions">
-          <button className="rp-filter-action-btn subtle" onClick={onShowAll}>Show all</button>
-        </div>
-      ) : null}
-    </div>
-  )
-}
 
 /** Format a timestamp as "just now", "5m ago", "3h ago", "2d ago", "MMM d" */
 function formatRelative(ts: number): string {
@@ -1053,10 +777,9 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
           )}
         </div>
       )}
-      <div>
-        <div className="props-section-title">Nodes</div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{viewNodeCount(view)}</div>
-      </div>
+      {/* What the view shows, step by step: Structure on the right shows the
+          result. A flow view plays its sequence instead. */}
+      {view.kind !== 'dynamic' && <ViewPipelinePanel view={view} readOnly={readOnly} />}
       {!readOnly && (
         <button className="props-delete" onClick={() => { removeView(view.id); setActiveView(null); onClose() }}>
           🗑 Delete view
@@ -2370,84 +2093,17 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
   collapsed?: boolean
   onToggleCollapsed?: () => void
 }) {
-  const allNodes = useDiagramStore((s) => s.c4Nodes)
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
   const selectNode = useDiagramStore((s) => s.selectNode)
   const selectEdge = useDiagramStore((s) => s.selectEdge)
   const activeSequenceId = useDiagramStore((s) => s.activeSequenceId)
   const setActiveSequence = useDiagramStore((s) => s.setActiveSequence)
-  const activeViewId = useDiagramStore((s) => s.activeViewId)
-  const setViewNodes = useDiagramStore((s) => s.setViewNodes)
-  const removeNodeFromView = useDiagramStore((s) => s.removeNodeFromView)
-  const nodesCount = useDiagramStore((s) => Object.keys(s.c4Nodes).length)
-  const relationsCount = useDiagramStore((s) => Object.keys(s.c4Relations).length)
+  const activeView = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
   const sequencesCount = useDiagramStore((s) => Object.keys(s.sequences).length)
-  const pendingBodyNodeIds = useDiagramStore((s) => s.pendingBodyNodeIds)
-  const scanDescriptions = useDiagramStore((s) => s.scanDescriptions)
   // One section open at a time; a click on the open one folds it.
-  const [openSection, setOpenSection] = useState<'nodes' | 'relations' | 'sequences' | null>('nodes')
+  const [openSection, setOpenSection] = useState<'structure' | 'sequences' | null>('structure')
 
-  // ── Nodes tree filter: free-text search + type chips ──────────────────────
-  const [nodeSearch, setNodeSearch] = useState('')
-  const [nodeTypeFilter, setNodeTypeFilter] = useState<Set<C4ElementType>>(new Set())
-  const nodeFilterActive = nodeSearch.trim() !== '' || nodeTypeFilter.size > 0
-
-  // Descriptions on unopened nodes of a lazily-loaded doc aren't in memory
-  // yet, so the instant search below can't see them. "Search descriptions"
-  // is an explicit opt-in scan over just those nodes (see scanDescriptions).
-  // Matches get merged into c4Nodes by that action, so they flow back into
-  // the synchronous search below automatically once it resolves — no local
-  // result-merging needed here.
-  const pendingCount = Object.keys(pendingBodyNodeIds).length
-  const [descScanning, setDescScanning] = useState(false)
-  const handleScanDescriptions = () => {
-    const q = nodeSearch.trim()
-    if (!q) return
-    setDescScanning(true)
-    scanDescriptions(q).finally(() => setDescScanning(false))
-  }
-
-  const { nodesMatchedSet, nodesVisibleSet, nodeTypeCounts } = useMemo(() => {
-    const counts = new Map<C4ElementType, number>()
-    for (const n of Object.values(allNodes)) counts.set(n.type, (counts.get(n.type) ?? 0) + 1)
-    const known = PALETTE_ORDER.filter((t) => counts.has(t as C4ElementType)) as C4ElementType[]
-    const custom = Array.from(counts.keys()).filter((t) => !PALETTE_ORDER.includes(t)).sort()
-    const typeCounts = [...known, ...custom].map((type) => ({ type, count: counts.get(type)! }))
-
-    if (!nodeFilterActive) return { nodesMatchedSet: null, nodesVisibleSet: null, nodeTypeCounts: typeCounts }
-
-    const q = nodeSearch.trim().toLowerCase()
-    const matched = new Set<string>()
-    for (const n of Object.values(allNodes)) {
-      if (nodeTypeFilter.size > 0 && !nodeTypeFilter.has(n.type)) continue
-      const haystack = `${n.label} ${n.description ?? ''} ${n.technology ?? ''} ${TYPE_LABELS[n.type] ?? n.type}`.toLowerCase()
-      if (!q || haystack.includes(q)) matched.add(n.id)
-    }
-    const visible = new Set(matched)
-    for (const id of matched) {
-      let cur = allNodes[id]?.parentId
-      while (cur && allNodes[cur] && !visible.has(cur)) { visible.add(cur); cur = allNodes[cur].parentId }
-    }
-    return { nodesMatchedSet: matched, nodesVisibleSet: visible, nodeTypeCounts: typeCounts }
-  }, [allNodes, nodeSearch, nodeTypeFilter, nodeFilterActive])
-
-  const rootNodes = Object.values(allNodes).filter((n) => !n.parentId && (!nodesVisibleSet || nodesVisibleSet.has(n.id)))
-
-  const handleToggleNodeType = (t: C4ElementType) => {
-    setNodeTypeFilter((prev) => {
-      const next = new Set(prev)
-      if (next.has(t)) next.delete(t); else next.add(t)
-      return next
-    })
-  }
-  const handleClearNodeFilter = () => { setNodeSearch(''); setNodeTypeFilter(new Set()) }
-  const handleShowAllNodes = () => { if (activeViewId) setViewNodes(activeViewId, []) }
-  const handleShowMatches = () => { if (activeViewId && nodesMatchedSet) setViewNodes(activeViewId, Array.from(nodesMatchedSet)) }
-  const handleHideMatches = () => {
-    if (!activeViewId || !nodesMatchedSet) return
-    removeNodeFromView(activeViewId, Array.from(nodesMatchedSet))
-  }
 
   // Pane 2 is shown when any item is selected
   const hasSelection = !!(selectedNodeId || selectedEdgeId || activeSequenceId)
@@ -2474,50 +2130,11 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
       <div className="panel-content">
         <div className={`rp-slider${hasSelection ? ' show-props' : ''}`}>
 
-          {/* Pane 1 — Vertical accordion: Nodes / Relations / Sequences (single open) */}
+          {/* Pane 1 — Vertical accordion: Structure (what the view's filter gives) / Sequences (single open) */}
           <div className="rp-pane">
-            <AccordionSection title="Nodes" count={nodesCount}
-              open={openSection === 'nodes'} onToggle={() => setOpenSection((o) => (o === 'nodes' ? null : 'nodes'))}>
-              {nodesCount > 0 && (
-                <NodesFilterBar
-                  search={nodeSearch}
-                  onSearchChange={setNodeSearch}
-                  typeCounts={nodeTypeCounts}
-                  typeFilter={nodeTypeFilter}
-                  onToggleType={handleToggleNodeType}
-                  matchedCount={nodesMatchedSet?.size ?? 0}
-                  totalCount={nodesCount}
-                  filterActive={nodeFilterActive}
-                  hasActiveView={!!activeViewId}
-                  onShowAll={handleShowAllNodes}
-                  onShowMatches={handleShowMatches}
-                  onHideMatches={handleHideMatches}
-                  onClearFilter={handleClearNodeFilter}
-                />
-              )}
-              {nodeFilterActive && pendingCount > 0 && (
-                <button
-                  className="lp-icon-btn"
-                  style={{ margin: '0 12px 8px', fontSize: 12, width: 'auto', padding: '4px 8px' }}
-                  disabled={descScanning}
-                  onClick={handleScanDescriptions}
-                  title={`Also search the ${pendingCount} node description(s) not yet opened`}
-                >
-                  {descScanning ? 'Searching descriptions…' : `Search descriptions (${pendingCount} unopened)`}
-                </button>
-              )}
-              {rootNodes.length === 0
-                ? <div className="lp-empty-state" style={{ padding: '4px 12px 8px' }}>
-                    {nodeFilterActive ? 'No matches.' : 'No nodes.'}
-                  </div>
-                : rootNodes.map((n) => (
-                    <TreeNodeItem key={n.id} nodeId={n.id} depth={0} filterSet={nodesVisibleSet} matchedSet={nodesMatchedSet} />
-                  ))
-              }
-            </AccordionSection>
-            <AccordionSection title="Relations" count={relationsCount}
-              open={openSection === 'relations'} onToggle={() => setOpenSection((o) => (o === 'relations' ? null : 'relations'))}>
-              <RelationsSection />
+            <AccordionSection title="Structure"
+              open={openSection === 'structure'} onToggle={() => setOpenSection((o) => (o === 'structure' ? null : 'structure'))}>
+              <StructurePanel />
             </AccordionSection>
             <AccordionSection title="Sequences" count={sequencesCount}
               open={openSection === 'sequences'} onToggle={() => setOpenSection((o) => (o === 'sequences' ? null : 'sequences'))}>

@@ -568,79 +568,178 @@ body {
 .tree-node.filter-match .tree-node-label { color: var(--accent); font-weight: 600; }
 
 /* ─── Right panel · nodes filter bar (search + type chips + bulk actions) ── */
-.rp-filter-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 6px 12px 8px;
-  border-bottom: 1px solid var(--border-color);
-  margin-bottom: 2px;
-}
-.rp-filter-search { position: relative; display: flex; align-items: center; }
-.rp-filter-search .props-input { padding: 5px 26px; font-size: 12px; }
-.rp-filter-search-icon {
-  position: absolute;
-  left: 8px;
-  display: flex;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-.rp-filter-search-clear {
-  position: absolute;
-  right: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 3px;
-}
-.rp-filter-search-clear:hover { color: var(--text-primary); background: var(--hover-bg-faint); }
-
-.rp-filter-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.rp-filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 20px;
-  padding: 0 7px;
-  border-radius: 10px;
-  font-size: 10.5px;
-  font-weight: 500;
-  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
-  color: var(--text-muted);
+/* ── View steps (ViewPipelinePanel, viewPipeline.ts) ─────────────────────── */
+.rp-pipeline {
+  margin: 0 12px 10px;
+  padding: 6px;
+  background: var(--hover-bg-faint, rgba(255,255,255,0.03));
   border: 1px solid var(--border-color);
-  cursor: pointer;
-  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+  border-radius: 8px;
+  display: flex; flex-direction: column; gap: 2px;
 }
-.rp-filter-chip:hover { border-color: var(--border-color-strong); color: var(--text-primary); }
-.rp-filter-chip.active {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+.rp-pipeline-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 4px 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-muted);
 }
-.rp-filter-chip-count { opacity: 0.65; font-variant-numeric: tabular-nums; }
+.rp-pipeline-reset {
+  border: none; background: none; padding: 0; cursor: pointer;
+  color: var(--text-muted); font-size: 10px; letter-spacing: 0; text-transform: none;
+}
+.rp-pipeline-reset:hover { color: var(--accent); }
+.rp-step {
+  display: flex; align-items: center; gap: 6px;
+  min-height: 26px; padding: 2px 4px;
+  border-radius: 5px;
+  font-size: 12px; color: var(--text-primary);
+}
+.rp-step:hover { background: var(--hover-bg-subtle); }
+.rp-step.off .rp-step-label, .rp-step.off .rp-step-count { opacity: .45; text-decoration: line-through; }
+.rp-step-icon { display: inline-flex; color: var(--accent); flex-shrink: 0; }
+/* One level of the chain: a card with its heading and its filters. */
+.rp-level {
+  display: flex; flex-direction: column; gap: 1px;
+  margin: 2px 0; padding: 3px 3px 4px;
+  border: 1px solid var(--border-color); border-radius: 6px;
+  background: var(--bg-panel);
+}
+.rp-level + .rp-level { position: relative; }
+.rp-level-head {
+  display: flex; align-items: center; gap: 6px;
+  min-height: 24px; padding: 1px 4px;
+  font-size: 12px; font-weight: 600; color: var(--text-primary);
+}
+.rp-level-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(var(--accent-rgb), 0.18); color: var(--accent);
+  font-size: 10px; font-weight: 700;
+}
+.rp-step-link {
+  padding: 0; border: none; background: none; cursor: pointer;
+  color: var(--accent); font-size: 11px;
+}
+.rp-step-link:hover { text-decoration: underline; }
+.rp-step-check { cursor: pointer; color: var(--text-secondary); }
+.rp-step-check input { margin: 0 2px 0 1px; accent-color: var(--accent); }
+/* A level's other way, joined with or. */
+.rp-level-way {
+  display: flex; align-items: center; gap: 6px;
+  min-height: 22px; padding: 0 4px 0 26px;
+  font-size: 12px; font-weight: 600; color: var(--text-primary);
+}
+.rp-level-way .rp-step-kind { color: var(--accent); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.rp-level-actions { display: flex; gap: 2px; padding: 1px 4px 0 22px; }
+.rp-level-add { position: relative; }
+.rp-level-add .rp-step-menu { left: -22px; right: auto; width: 230px; }
+.rp-level-add-btn {
+  padding: 1px 6px;
+  border: none; border-radius: 4px; background: transparent;
+  color: var(--text-muted); cursor: pointer; font-size: 11px;
+}
+.rp-level-add-btn:hover, .rp-level-add-btn.active { color: var(--accent); background: var(--hover-bg-subtle); }
 
-.rp-filter-actions { display: flex; align-items: center; gap: 6px; }
-.rp-filter-summary { font-size: 10.5px; color: var(--text-muted); margin-right: auto; }
-.rp-filter-action-btn {
-  font-size: 10.5px;
-  font-weight: 500;
-  padding: 3px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-  background: transparent;
-  color: var(--text-primary);
-  cursor: pointer;
+/* and / or between two filters: a click switches it. */
+.rp-step-join {
+  align-self: flex-start;
+  margin: -1px 0 -1px 22px; padding: 0 6px;
+  border: none; border-radius: 4px; background: transparent;
+  color: var(--text-muted); cursor: pointer;
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
 }
-.rp-filter-action-btn:hover { border-color: var(--accent); color: var(--accent); }
-.rp-filter-action-btn:disabled { opacity: 0.4; cursor: default; }
-.rp-filter-action-btn:disabled:hover { border-color: var(--border-color); color: var(--text-primary); }
-.rp-filter-action-btn.subtle { border-color: transparent; color: var(--text-muted); padding: 3px 4px; }
-.rp-filter-action-btn.subtle:hover { color: var(--accent); }
+.rp-step-join:hover:not(:disabled) { background: var(--hover-bg); color: var(--text-primary); }
+.rp-step-join.or { color: var(--accent); }
+.rp-step-join:disabled { cursor: default; }
+/* A run of filters joined with or: one bracket around them. */
+.rp-step.in-run { border-left: 2px solid rgba(var(--accent-rgb), 0.6); border-radius: 0; margin-left: 2px; }
+.rp-step.in-run.run-first { border-top-left-radius: 5px; }
+.rp-step.in-run.run-last { border-bottom-left-radius: 5px; }
+/* Up to two lines: the panel is narrow and a step's words are its point. */
+.rp-step-label {
+  flex: 1; min-width: 0; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.rp-step-kind { color: var(--text-muted); }
+.rp-step-select {
+  width: 100%; padding: 1px 2px;
+  background: transparent; border: none; color: var(--text-primary);
+  font-size: 12px; cursor: pointer;
+}
+.rp-step-count { color: var(--text-muted); font-size: 10.5px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.rp-step-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0; flex-shrink: 0;
+  border: none; border-radius: 4px; background: transparent;
+  color: var(--text-muted); cursor: pointer; font-size: 12px; line-height: 1;
+}
+.rp-step-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+.rp-step-add { position: relative; display: flex; gap: 4px; padding: 4px 2px 0; }
+.rp-step-add-btn {
+  flex: 1; padding: 3px 0;
+  border: 1px dashed var(--border-color); border-radius: 5px;
+  background: transparent; color: var(--text-secondary);
+  cursor: pointer; font-size: 11px;
+}
+.rp-step-add-btn:hover, .rp-step-add-btn.active { border-color: var(--accent); color: var(--accent); }
+.rp-step-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20;
+  max-height: 340px; overflow-y: auto;
+  padding: 4px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color); border-radius: 8px;
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,0.25));
+}
+.rp-step-menu-text { padding: 2px 2px 4px; }
+.rp-step-menu-text .props-input { width: 100%; }
+.rp-step-menu-empty { padding: 6px 8px; color: var(--text-muted); font-size: 12px; }
+.rp-step-menu-section {
+  padding: 8px 8px 3px;
+  color: var(--text-muted); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rp-step-option {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 5px 8px;
+  border: none; border-radius: 5px; background: transparent;
+  color: var(--text-primary); cursor: pointer; text-align: left; font-size: 12px;
+}
+.rp-step-option:hover { background: var(--hover-bg); }
+.rp-step-option-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp-step-option-bar { width: 44px; height: 4px; border-radius: 2px; background: var(--hover-bg); overflow: hidden; flex-shrink: 0; }
+.rp-step-option-bar span { display: block; height: 100%; background: var(--accent); }
+.rp-step-option-count { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+/* A way or a filter is a button: a click edits it in place. */
+.rp-step-edit-btn {
+  padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; color: inherit; text-align: left;
+}
+.rp-step-edit-btn:hover, .rp-step-edit-btn.active { color: var(--accent); }
+.rp-step-edit-btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; border-radius: 3px; }
+.rp-edit {
+  display: flex; flex-direction: column; gap: 6px;
+  margin: 2px 4px 6px 22px; padding: 8px;
+  border: 1px solid var(--border-color); border-radius: 6px;
+  background: var(--bg-panel);
+  font-size: 12px;
+}
+.rp-edit .props-input { width: 100%; }
+.rp-edit-row { display: flex; flex-direction: column; gap: 6px; }
+.rp-edit-hint { color: var(--text-muted); font-size: 11px; }
+.rp-edit-choices { display: flex; flex-direction: column; max-height: 180px; overflow-y: auto; }
+.rp-edit-choice { display: flex; align-items: center; gap: 6px; padding: 2px 2px; border-radius: 4px; cursor: pointer; }
+.rp-edit-choice:hover { background: var(--hover-bg-subtle); }
+.rp-edit-choice input { margin: 0; accent-color: var(--accent); }
+.rp-edit-choice-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp-edit-done {
+  align-self: flex-end; padding: 3px 10px;
+  border: 1px solid var(--border-color); border-radius: 5px;
+  background: transparent; color: var(--text-primary); cursor: pointer; font-size: 11px;
+}
+.rp-edit-done:hover { background: var(--hover-bg); }
+
+
 
 /* ─── Right panel (horizontal slider: tree ↔ props) ─────────────────── */
 .right-panel {
@@ -3785,6 +3884,45 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .tv-tab.active .tv-tab-count {
   background: var(--accent, #3b82f6);
   color: #fff;
+}
+
+/* ── The view's chain in the table (viewPipeline.ts) ─────────────────────── */
+
+/* Folds what hangs under a row of the chain. */
+.tv-group-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0; flex-shrink: 0;
+  border: none; border-radius: 4px;
+  background: transparent; color: var(--text-muted);
+  cursor: pointer;
+}
+.tv-group-toggle svg { transition: transform 0.15s ease; }
+.tv-group-toggle.open svg { transform: rotate(90deg); }
+.tv-group-toggle:hover { background: var(--hover-bg); color: var(--text-primary); }
+.tv-group-toggle-space { display: inline-block; width: 18px; flex-shrink: 0; }
+/* The chain's tree in the Name column: guides, toggle, type, name. */
+.tv-cell-value.tv-chain-cell { display: flex; align-items: center; gap: 5px; padding-left: 6px; }
+.tv-tree-guide {
+  align-self: stretch; width: 20px; flex-shrink: 0;
+  margin: -8px 0;
+  background: linear-gradient(var(--border-color), var(--border-color)) no-repeat 8px 0 / 1px 100%;
+}
+.tv-chain-type {
+  padding: 1px 6px; border-radius: 4px; flex-shrink: 0;
+  font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+}
+/* The element's summary (nodeSummary.ts): one line, read only, the whole of it in the tooltip. */
+.tv-cell-value.tv-cell-summary { cursor: default; color: var(--text-secondary); }
+.tv-summary-text { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The top level reads as headings. */
+.tv-chain-row.depth-0 { background: var(--bg-panel); }
+.tv-chain-row.depth-0 .tv-chain-cell { font-weight: 600; }
+.tv-chain-row.depth-2 .tv-chain-cell, .tv-chain-row.depth-3 .tv-chain-cell { color: var(--text-secondary); }
+/* An element shown under more than one parent. */
+.tv-also-in {
+  margin-left: 6px; padding: 0 5px; border-radius: 8px;
+  background: rgba(var(--accent-rgb), 0.14); color: var(--accent);
+  font-size: 10px; flex-shrink: 0;
 }
 
 /* ── Table scroll wrapper ────────────────────────────────────────────────── */

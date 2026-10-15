@@ -62,7 +62,9 @@ import {
   applyAlignments,
   applyLayoutPositions,
   computeViewCollapsedSet,
+  chainHiddenRelations,
   computeViewNodeSet,
+  viewFrames,
   fitAndSeparateBottomUp,
   isEffectivelyCollapsed,
   viewLayoutInput,
@@ -75,7 +77,7 @@ import { LIVE_CHILD_TOP_MIN } from '@radical/layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
-import { type EdgeStyle, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, withCanvasPositions } from '@radical/common/c4'
+import { type EdgeStyle, type ViewPipeline, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -390,12 +392,13 @@ function showCanvasPositions(
   nodes: Record<string, C4Node>,
   positions: Record<string, NodePosition>,
   view: DiagramView | undefined,
+  relations: Record<string, C4Relation>,
 ): string[] {
   applyPositions(nodes, positions)
   // Only a canvas draws positions: a table, wiki, matrix, hierarchy or flow
   // view keeps what it was given.
   if (view && view.kind && view.kind !== 'static') return []
-  return placeUnplaced(nodes, positions, view ? computeViewNodeSet(view, nodes) ?? undefined : undefined)
+  return placeUnplaced(nodes, positions, view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined)
 }
 
 /**
@@ -839,6 +842,7 @@ function deriveRFNodes(
   ghostIds?: Set<string>,
   locked?: boolean,
   expandedSet?: Set<string>,
+  frames?: Set<string>,
 ): Node<C4NodeRFData>[] {
   const rfNodes: Node<C4NodeRFData>[] = []
 
@@ -882,7 +886,9 @@ function deriveRFNodes(
 
 
   for (const n of sorted) {
-    const hidden = isNodeHidden(n.id, nodes, viewCollapsedSet, expandedSet)
+    // A container the view does not show, there only to hold what it does
+    // (viewFrames), is on React Flow for its children's places, invisible.
+    const hidden = isNodeHidden(n.id, nodes, viewCollapsedSet, expandedSet) || !!frames?.has(n.id)
     const hasChildren = parentSet.has(n.id)
     const collapsed = isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet)
     const isGhost = ghostIds?.has(n.id) ?? false
@@ -1311,6 +1317,8 @@ interface DiagramStore {
   orderViews: (viewIds: string[]) => void
   /** How a view draws relations; null: the model's default. One undo step. */
   setViewEdgeStyle: (viewId: string, style: EdgeStyle | null) => void
+  /** A view's pipeline (viewPipeline.ts): source, filters, grouping, order; one undo step, saved. */
+  setViewPipeline: (viewId: string, pipeline: ViewPipeline) => void
   /** How All elements and views without their own draw relations. One undo step. */
   setDefaultEdgeStyle: (style: EdgeStyle) => void
   /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', and 'wiki'. */
@@ -1322,8 +1330,6 @@ interface DiagramStore {
   /** Switch how an element's page renders its children — short preview
    *  cards ('single', default) or each child's full content inline ('multi'). */
   setWikiPageMode: (viewId: string, mode: 'single' | 'multi') => void
-  /** Persist the active Table View tab ('all', 'relations', or a node-type id). */
-  setTableActiveTab: (viewId: string, tab: string) => void
   /** Choose how treemap rectangles are sized for a view. */
   setTreemapSizeBy: (viewId: string, mode: 'leaves' | 'uniform' | 'relations') => void
   setTreemapMaxDepth: (viewId: string, depth: number | null) => void
@@ -1859,7 +1865,7 @@ export const useDiagramStore = create<DiagramStore>()(
       if (!parent) return node
       const view = activeViewId ? views[activeViewId] : undefined
       if (nodeEffectivelyCollapsedInView(parent, activeViewId, view)) {
-        const shown = view ? computeViewNodeSet(view, c4Nodes) : null
+        const shown = view ? computeViewNodeSet(view, c4Nodes, get().c4Relations) : null
         return { ...node, ...placeBesideSiblings(c4Nodes, parent.id, (s) => !shown || shown.has(s.id)) }
       }
       const pad = compoundPadding(parent.type)
@@ -1956,7 +1962,8 @@ export const useDiagramStore = create<DiagramStore>()(
           const liveRels = state.c4Relations as Record<string, C4Relation>
           const mergedNodes: Record<string, C4Node> = hasGhosts ? { ...ghostNodes, ...liveNodes } : liveNodes
           const mergedRels: Record<string, C4Relation> = hasGhosts ? { ...ghostRels, ...liveRels } : liveRels
-          const filter = computeViewNodeSet(view as DiagramView | undefined, mergedNodes)
+          // A canvas view with a chain in its steps draws what the chain gives.
+          const filter = computeViewNodeSet(view as DiagramView | undefined, mergedNodes, mergedRels)
           const vcs = computeViewCollapsedSet(filter, mergedNodes)
           // Also include nodes the user explicitly collapsed in this named view
           if (view?.collapsedNodeIds?.length) {
@@ -1974,11 +1981,15 @@ export const useDiagramStore = create<DiagramStore>()(
           // While a presentation is active we also lock — slides are
           // static and must not drift from accidental drags.
           const locked = state.appMode === 'metamodel' || state.presentationActive
-          state.rfNodes = deriveRFNodes(mergedNodes, filter, vcs, ghostIdSet, locked, expandedSet) as any
-          const hiddenRels = view?.hiddenRelationIds && view.hiddenRelationIds.length
-            ? new Set(view.hiddenRelationIds)
+          const frames = viewFrames(view as DiagramView | undefined, mergedNodes, mergedRels)
+          state.rfNodes = deriveRFNodes(mergedNodes, filter, vcs, ghostIdSet, locked, expandedSet, frames) as any
+          const chainHidden = chainHiddenRelations(view as DiagramView | undefined, mergedNodes, mergedRels)
+          const hiddenRels = view?.hiddenRelationIds?.length || chainHidden.length
+            ? new Set([...(view?.hiddenRelationIds ?? []), ...chainHidden])
             : undefined
-          const derivedEdges = deriveRFEdges(mergedNodes, mergedRels, filter, vcs, hiddenRels, expandedSet)
+          // Lines end only at elements the view shows, not at its frames.
+          const lineEnds = filter && frames.size ? new Set([...filter].filter((id) => !frames.has(id))) : filter
+          const derivedEdges = deriveRFEdges(mergedNodes, mergedRels, lineEnds, vcs, hiddenRels, expandedSet)
           // Annotate edges with step numbers:
           // 1. When actively editing a sequence (activeSequenceId set) — always show numbers
           // 2. When view is dynamic and linked to a sequence — show numbers in view mode
@@ -2433,7 +2444,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (activeViewId) {
           const view = get().views[activeViewId]
           if (view) {
-            loopViewFilter = computeViewNodeSet(view as any, get().c4Nodes)
+            loopViewFilter = computeViewNodeSet(view as any, get().c4Nodes, get().c4Relations)
             loopVcs = computeViewCollapsedSet(loopViewFilter, get().c4Nodes)
             if (view.collapsedNodeIds?.length) {
               for (const nid of view.collapsedNodeIds) loopVcs.add(nid)
@@ -2976,7 +2987,7 @@ export const useDiagramStore = create<DiagramStore>()(
           delete state.views[id]
           if (state.activeViewId === id) {
             // Restore default positions before switching away
-            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, state.defaultPositions as Record<string, NodePosition>, undefined)
+            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, state.defaultPositions as Record<string, NodePosition>, undefined, state.c4Relations as Record<string, C4Relation>)
             state.activeViewId = null
             positionsRestored = true
           }
@@ -3011,7 +3022,7 @@ export const useDiagramStore = create<DiagramStore>()(
               ? state.defaultPositions as Record<string, NodePosition>
               : state.views[newId]?.positions as Record<string, NodePosition> | undefined
             if (incoming && Object.keys(incoming).length > 0) {
-              placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView)
+              placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView, state.c4Relations as Record<string, C4Relation>)
             }
             state.activeViewId = newId
           })
@@ -3065,7 +3076,7 @@ export const useDiagramStore = create<DiagramStore>()(
           }
 
           if (incoming) {
-            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView)
+            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView, state.c4Relations as Record<string, C4Relation>)
           }
 
           state.activeViewId = newId
@@ -3167,7 +3178,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           const view = state.activeViewId ? state.views[state.activeViewId] as DiagramView | undefined : undefined
           const positions = view ? view.positions : (_milestoneAllPositions ?? state.defaultPositions)
-          if (positions && Object.keys(positions).length > 0) showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions as Record<string, NodePosition>, view)
+          if (positions && Object.keys(positions).length > 0) showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions as Record<string, NodePosition>, view, state.c4Relations as Record<string, C4Relation>)
         })
       },
 
@@ -3193,6 +3204,18 @@ export const useDiagramStore = create<DiagramStore>()(
         if (!view || (view.edgeStyle ?? null) === style) return
         get()._pushUndo()
         set((state) => { model.setViewEdgeStyle(state, viewId, style) })
+        get()._sync()
+      },
+
+      setViewPipeline(viewId, pipeline) {
+        const view = get().views[viewId]
+        if (!view) return
+        // Nothing changes: no undo step.
+        const probe = { views: { [viewId]: { ...view } } } as unknown as model.ModelState
+        model.setViewPipeline(probe, viewId, pipeline)
+        if (JSON.stringify(probe.views[viewId].pipeline ?? {}) === JSON.stringify(view.pipeline ?? {})) return
+        get()._pushUndo()
+        set((state) => { model.setViewPipeline(state, viewId, pipeline) })
         get()._sync()
       },
 
@@ -3274,15 +3297,6 @@ export const useDiagramStore = create<DiagramStore>()(
           const view = state.views[viewId]
           if (!view) return
           view.wikiPageMode = mode
-        })
-        get()._sync()
-      },
-
-      setTableActiveTab(viewId, tab) {
-        set((state) => {
-          const view = state.views[viewId]
-          if (!view) return
-          view.tableActiveTab = tab
         })
         get()._sync()
       },

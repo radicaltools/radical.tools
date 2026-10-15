@@ -44,6 +44,7 @@ import {
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
 import { viewShowsEveryNode } from '@radical/common/c4'
+import { pipelineOf, runPipeline, type PipelineContext } from '@radical/common/viewPipeline'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
 type AddNode = ReturnType<typeof useDiagramStore.getState>['addNode']
@@ -215,6 +216,11 @@ interface WikiActions {
 
 const WikiActionsContext = createContext<WikiActions | null>(null)
 
+/** With a chain in the view's steps (viewPipeline.ts): the elements under
+ *  each one in the chain, by its id, and the chain's roots under NAV_ROOT.
+ *  The overview, the pages and the tree follow it instead of containment. */
+const WikiChainContext = createContext<Record<string, C4Node[]> | null>(null)
+
 function useWikiActions(): WikiActions {
   const actions = useContext(WikiActionsContext)
   if (!actions) throw new Error('WikiActionsContext is missing')
@@ -375,16 +381,43 @@ export function WikiView(): React.ReactElement {
     return result
   }, [view, c4Nodes])
 
+  // A chain in the view's steps: the article follows it — the overview
+  // lists its first level, each page has the elements under it in the
+  // chain as its children — and shows only what the chain gives.
+  const pipelineCtx = useMemo<PipelineContext>(() => ({ nodes: c4Nodes, relations: c4Relations, metamodel }), [c4Nodes, c4Relations, metamodel])
+  const chain = useMemo(
+    () => (view && pipelineOf(view)?.levels?.length ? runPipeline(view, pipelineCtx) : null),
+    [view, pipelineCtx],
+  )
+  const chainChildren = useMemo<Record<string, C4Node[]> | null>(() => {
+    if (!chain?.rows) return null
+    const map: Record<string, C4Node[]> = { [NAV_ROOT]: chain.levels[0]?.shown ?? [] }
+    const listed = new Map<string, Set<string>>()
+    for (const row of chain.rows) {
+      if (row.depth === 0) continue
+      const ids = row.path.split('/')
+      const parentId = ids[ids.length - 2]
+      const seen = listed.get(parentId) ?? new Set<string>()
+      if (seen.has(row.node.id)) continue
+      seen.add(row.node.id)
+      listed.set(parentId, seen)
+      ;(map[parentId] ??= []).push(row.node)
+    }
+    return map
+  }, [chain])
+  const chainSet = useMemo(() => (chain ? new Set(chain.nodes.map((n) => n.id)) : null), [chain])
+  const shownSet = chainSet ?? visibleSet
+
   const glossary = focusId === GLOSSARY_FOCUS
   const focusNode = focusId && !glossary ? c4Nodes[focusId] : null
-  const focus = focusNode && (!visibleSet || visibleSet.has(focusNode.id)) ? focusNode : null
+  const focus = focusNode && (!shownSet || shownSet.has(focusNode.id)) ? focusNode : null
 
   const nodeList = useMemo(
-    () => Object.values(c4Nodes).filter((n) => !visibleSet || visibleSet.has(n.id)),
-    [c4Nodes, visibleSet],
+    () => Object.values(c4Nodes).filter((n) => !shownSet || shownSet.has(n.id)),
+    [c4Nodes, shownSet],
   )
 
-  const childrenOf = useMemo(() => {
+  const containmentChildren = useMemo(() => {
     const map: Record<string, C4Node[]> = {}
     for (const n of nodeList) {
       const key = n.parentId ?? '__root__'
@@ -395,6 +428,7 @@ export function WikiView(): React.ReactElement {
     }
     return map
   }, [nodeList])
+  const childrenOf = chainChildren ?? containmentChildren
 
   const goTo = (id: string | null) => {
     if (view) setWikiFocus(view.id, id)
@@ -511,7 +545,7 @@ export function WikiView(): React.ReactElement {
   const relationshipPage = (node: C4Node): WikiMenuPage => ({
     title: 'Add relationship',
     emptyHint: 'No relation is allowed from here',
-    items: relationReadingsOf(node, c4Nodes, c4Relations, visibleSet, metamodel).map((reading) => ({
+    items: relationReadingsOf(node, c4Nodes, c4Relations, shownSet, metamodel).map((reading) => ({
       id: reading.key,
       label: `${reading.text}…`,
       page: () => ({
@@ -598,6 +632,7 @@ export function WikiView(): React.ReactElement {
 
   return (
     <WikiActionsContext.Provider value={actions}>
+    <WikiChainContext.Provider value={chainChildren}>
     <div className="wiki-view">
       <WikiNav
         filter={filter}
@@ -633,7 +668,7 @@ export function WikiView(): React.ReactElement {
             nodeList={nodeList}
             nodes={c4Nodes}
             relations={c4Relations}
-            visibleSet={visibleSet}
+            visibleSet={shownSet}
             metamodel={metamodel}
             typeMeta={typeMeta}
           />
@@ -643,7 +678,7 @@ export function WikiView(): React.ReactElement {
             node={focus}
             nodes={c4Nodes}
             relations={c4Relations}
-            visibleSet={visibleSet}
+            visibleSet={shownSet}
             metamodel={metamodel}
             updateNode={updateNode}
             updateRelation={updateRelation}
@@ -659,7 +694,7 @@ export function WikiView(): React.ReactElement {
             roots={childrenOf['__root__'] ?? []}
             nodes={c4Nodes}
             relations={c4Relations}
-            visibleSet={visibleSet}
+            visibleSet={shownSet}
             metamodel={metamodel}
             updateNode={updateNode}
             updateRelation={updateRelation}
@@ -685,6 +720,7 @@ export function WikiView(): React.ReactElement {
         />
       )}
     </div>
+    </WikiChainContext.Provider>
     </WikiActionsContext.Provider>
   )
 }
@@ -1884,9 +1920,12 @@ function WikiElementPage({
     return chain
   }, [node, nodes])
 
+  const chainChildren = useContext(WikiChainContext)
   const children = useMemo(
     () =>
-      hierarchyRelationType
+      chainChildren
+        ? (chainChildren[node.id] ?? [])
+        : hierarchyRelationType
         ? Object.values(relations)
             .filter((r) => r.relationType === hierarchyRelationType && r.targetId === node.id)
             .map((r) => nodes[r.sourceId])
@@ -1895,7 +1934,7 @@ function WikiElementPage({
         : Object.values(nodes)
             .filter((n) => n.parentId === node.id && (!visibleSet || visibleSet.has(n.id)))
             .sort((a, b) => a.label.localeCompare(b.label)),
-    [nodes, relations, node.id, visibleSet, hierarchyRelationType],
+    [chainChildren, nodes, relations, node.id, visibleSet, hierarchyRelationType],
   )
 
   // The relations the page writes about. The ones that make an element a

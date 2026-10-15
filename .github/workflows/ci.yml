@@ -98,6 +98,18 @@ jobs:
           if [ "$(git rev-parse HEAD)" != "$TESTED" ]; then
             echo "The branch moved on since this run started; its own run updates the screenshots."; exit 0
           fi
+          # One baseline commit per push of someone's: a run that tested the
+          # bot's own commit and still sees changed screenshots has a flaky
+          # one, and committing it again started a loop (each commit runs
+          # this job anew). The strict run after the bot's commit shows it.
+          if [ "$(git log -1 --format=%ae "$TESTED")" = "41898282+github-actions[bot]@users.noreply.github.com" ]; then
+            {
+              echo "### Screenshots still change after the bot's own baseline commit"
+              echo "Not committed again: a screenshot that differs from run to run is flaky."
+              ls -R new-baselines | sed 's/^/    /'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           cp -R new-baselines/. .
           git add apps/e2e/tests
           if git diff --cached --quiet; then

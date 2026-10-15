@@ -9,7 +9,7 @@
 // per-view node positions, and fitting a parent's size around a new child.
 // Lay the result out with @radical/layout if positions matter.
 
-import type { EdgeStyle, AlignConstraint, C4Node, C4Relation, DiagramData, DiagramSnapshot, DiagramView, Presentation } from '../c4'
+import type { EdgeStyle, AlignConstraint, C4Node, C4Relation, DiagramData, DiagramSnapshot, DiagramView, Presentation, ViewPipeline } from '../c4'
 import type { Metamodel } from '../metamodel'
 import * as model from '../model'
 import type { DiagramFacade } from './diagramFacade'
@@ -156,6 +156,9 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     },
     setViewEdgeStyle(id: string, style: EdgeStyle | null) {
       model.setViewEdgeStyle(state, id, style)
+    },
+    setViewPipeline(id: string, pipeline: ViewPipeline) {
+      model.setViewPipeline(state, id, pipeline)
     },
     getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(state, viewId),
     addAlignment(viewId: string | null, axis: AlignConstraint['axis'], nodeIds: string[], ordered = false) {

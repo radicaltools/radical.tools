@@ -4,26 +4,16 @@
 // it (Quick Search, the Inspector): the view it opens, the containers it
 // expands, the selection and the camera.
 
-import type { C4Node, DiagramView } from '@radical/common/c4'
+import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
+import { viewShownNodes } from '@radical/common/viewPipeline'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 
-/** For each view, the elements it shows: those it lists and their
- *  ancestors (the store's computeViewNodeSet). A view that lists none and
+/** For each view, the elements it shows (viewShownNodes): what its chain
+ *  gives, or those it lists and their ancestors. A view that lists none and
  *  is not marked empty shows every element. */
-export function viewNodeSets(views: Record<string, DiagramView>, nodes: Record<string, C4Node>): Record<string, Set<string>> {
+export function viewNodeSets(views: Record<string, DiagramView>, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Record<string, Set<string>> {
   const out: Record<string, Set<string>> = {}
-  for (const v of Object.values(views)) {
-    if (!v.nodeIds.length && !v.empty) { out[v.id] = new Set(Object.keys(nodes)); continue }
-    const set = new Set<string>()
-    for (const id of v.nodeIds) {
-      let cur: string | undefined = id
-      while (cur && nodes[cur]) {
-        set.add(cur)
-        cur = nodes[cur].parentId ?? undefined
-      }
-    }
-    out[v.id] = set
-  }
+  for (const v of Object.values(views)) out[v.id] = viewShownNodes(v, nodes, relations) ?? new Set(Object.keys(nodes))
   return out
 }
 
@@ -32,8 +22,8 @@ const isCanvas = (v: DiagramView): boolean => !v.kind || v.kind === 'static'
 /** The canvas to show `nodeId` on: the active view when it is a canvas that
  *  shows it, else the smallest canvas view that does, else All elements (null). */
 export function canvasViewFor(nodeId: string): string | null {
-  const { views, c4Nodes, activeViewId } = useDiagramStore.getState()
-  const sets = viewNodeSets(views, c4Nodes)
+  const { views, c4Nodes, c4Relations, activeViewId } = useDiagramStore.getState()
+  const sets = viewNodeSets(views, c4Nodes, c4Relations)
   const active = activeViewId ? views[activeViewId] : undefined
   if (active && isCanvas(active) && sets[active.id]?.has(nodeId)) return active.id
   let best: { id: string; size: number } | null = null
@@ -46,8 +36,8 @@ export function canvasViewFor(nodeId: string): string | null {
 
 /** A wiki view with a page for `nodeId`, or null when the model has none. */
 export function wikiViewFor(nodeId: string): string | null {
-  const { views, c4Nodes } = useDiagramStore.getState()
-  const sets = viewNodeSets(views, c4Nodes)
+  const { views, c4Nodes, c4Relations } = useDiagramStore.getState()
+  const sets = viewNodeSets(views, c4Nodes, c4Relations)
   const wikis = Object.values(views).filter((v) => v.kind === 'wiki' && sets[v.id]?.has(nodeId))
   wikis.sort((a, b) => sets[a.id].size - sets[b.id].size)
   return wikis[0]?.id ?? null

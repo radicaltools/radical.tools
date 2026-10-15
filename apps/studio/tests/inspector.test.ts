@@ -58,10 +58,10 @@ describe('the Inspector perspective', () => {
 })
 
 describe('going to an element', () => {
-  it('lists what each view shows, its ancestors included, and all for an unfiltered view', () => {
-    const { views, c4Nodes } = useDiagramStore.getState()
-    const sets = viewNodeSets(views, c4Nodes)
-    expect([...sets['v-api']].sort()).toEqual(['api', 'sys'])
+  it('lists what each view shows — not the containers it holds them in — and all for an unfiltered view', () => {
+    const { views, c4Nodes, c4Relations } = useDiagramStore.getState()
+    const sets = viewNodeSets(views, c4Nodes, c4Relations)
+    expect([...sets['v-api']].sort()).toEqual(['api'])
     expect(sets['v-wiki'].size).toBe(4)
   })
 

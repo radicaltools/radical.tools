@@ -107,8 +107,8 @@ test('a concept imported into a selected container lands beside what it holds', 
   await studio.seedDocument(JSON.stringify(doc))
   await studio.open('v-containers')
   for (let i = 0; i < 2; i++) {
-    const tree = page.locator('.tree-node', { hasText: /^\W*Bookstore/ }).first()
-    if (!/selected/.test((await tree.getAttribute('class')) ?? '')) await tree.click()
+    const bookstore = studio.node('bookstore')
+    if (!/selected/.test((await bookstore.getAttribute('class')) ?? '')) await bookstore.click({ position: { x: 30, y: 12 } })
     await page.getByTitle('Menu', { exact: true }).click()
     await page.getByText(/Import from Hub/).first().click()
     const dialog = page.locator('[aria-label="Import from Hub"]')

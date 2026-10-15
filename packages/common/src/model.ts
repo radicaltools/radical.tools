@@ -10,7 +10,8 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
+import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
+import { readPipeline } from './viewPipeline'
 import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
@@ -532,6 +533,40 @@ export function setViewEdgeStyle(state: ModelState, viewId: string, style: EdgeS
   if (!view) return
   if (style) view.edgeStyle = style
   else delete view.edgeStyle
+}
+
+/** A view's pipeline (viewPipeline.ts); one with no step is removed. */
+export function setViewPipeline(state: ModelState, viewId: string, raw: ViewPipeline): void {
+  const view = state.views[viewId]
+  if (!view) return
+  const pipeline = readPipeline(raw) ?? {}
+  const next: ViewPipeline = {}
+  if (pipeline.levels?.length) {
+    next.levels = pipeline.levels.map((level, i) => {
+      const out: ChainLevel = {
+        ways: level.ways.map((way) => {
+          const w: ChainWay = {}
+          // The first level is the roots: nothing above to hang under.
+          if (i > 0 && way.via) w.via = way.via
+          if (way.types?.length) w.types = way.types
+          return w
+        }),
+      }
+      if (level.filters?.length) {
+        // A level's first filter has nothing before it to be joined to.
+        const [first, ...rest] = level.filters
+        const head = { ...first }
+        delete head.join
+        out.filters = [head, ...rest]
+      }
+      return out
+    })
+  }
+  // Any order counts, by name too.
+  if (pipeline.sort) next.sort = pipeline.sort
+  if (pipeline.edges === 'all') next.edges = 'all'
+  if (Object.keys(next).length) view.pipeline = next
+  else delete view.pipeline
 }
 
 /** How All elements and the views without their own draw relations. */

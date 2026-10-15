@@ -76,7 +76,7 @@ test.describe('on the governance bookstore', () => {
   })
 })
 
-test('needs nest under a broader need: a tree in the table, and Add child on its wiki page', async ({ page, studio }) => {
+test('needs nest under a broader need: a tree in the table\'s chain, and Add child on its wiki page', async ({ page, studio }) => {
   const doc = governanceBookstore()
   const need = (id: string, label: string) =>
     ({ id, type: 'need', label, description: `${label} text`, kind: 'brief', x: 0, y: 900, width: 200, height: 80, collapsed: false })
@@ -90,16 +90,18 @@ test('needs nest under a broader need: a tree in the table, and Add child on its
     { id: 'd-pickup', sourceId: 'req-pickup', targetId: 'need-shop', relationType: 'derives' },
   )
   doc.views.push({ id: 'v-wiki', name: 'Wiki', kind: 'wiki', nodeIds: ['need-discovery', 'need-shop', 'req-pickup'], positions: {} })
+  // The table's chain: needs that derive from none, then what is refined from them, twice.
+  const refined = { ways: [{ via: { relationType: 'derives', direction: 'in' } }] }
+  doc.views = (doc.views as Array<{ id: string }>).map((v) => (v.id === 'v-table' ? { ...v, pipeline: { levels: [
+    { ways: [{ types: ['need'] }], filters: [{ kind: 'relation', relationType: 'derives', direction: 'out', has: false }] }, refined, refined,
+  ] } } : v))
   await studio.seedDocument(JSON.stringify(doc))
 
-  // Table: the sub-need is indented under its parent; the requirement stays a root of its own tab.
+  // Table: the sub-need under its parent, the requirement under the sub-need.
   await studio.open('v-table')
-  await page.locator('.tv-tab', { hasText: 'Need' }).click()
-  await expect(page.locator('tr[data-node-id="need-shop"] .tv-tree-indent')).toBeVisible()
-  await expect(page.locator('tr[data-node-id="need-discovery"] .tv-tree-indent')).toHaveCount(0)
-  await page.locator('.tv-tab', { hasText: 'Requirement' }).click()
-  await expect(page.locator('tr[data-node-id="req-pickup"]')).toBeVisible()
-  await expect(page.locator('tr[data-node-id="req-pickup"] .tv-tree-indent')).toHaveCount(0)
+  await expect(page.locator('tr.depth-0[data-node-id="need-discovery"]')).toBeVisible()
+  await expect(page.locator('tr.depth-1[data-node-id="need-shop"]')).toBeVisible()
+  await expect(page.locator('tr.depth-2[data-node-id="req-pickup"]')).toBeVisible()
 
   // Wiki: the sub-need is listed under "Needs" on the page of its parent, and Add child offers a Need, linked on creation.
   await studio.open('v-wiki/f/need-discovery')

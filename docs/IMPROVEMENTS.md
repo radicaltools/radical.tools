@@ -2143,3 +2143,5 @@ fixed yet:
    validator rates it a warning. The comment at the top of
    apps/mcp/src/forge.ts names three Forge views; there are five.
 
+
+- **`tableTab` on node types does nothing now** (2026-10-15). The table view lost its tabs per type (it shows the view's chain as a tree with each element's summary), but the metamodel editor's "Own Table View tab" checkbox, `upsert_node_type`'s `tableTab` and the Inspector's mention remain. Remove them, or give the flag a new meaning (e.g. the types offered first in View steps).
