@@ -9,7 +9,7 @@ import { StructurePanel } from './StructurePanel'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
-import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, type ViewFolder, type DiagramView } from '@radical/common/c4'
+import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 
@@ -513,6 +513,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const setViewKind = useDiagramStore((s) => s.setViewKind)
   const setViewSequence = useDiagramStore((s) => s.setViewSequence)
   const setViewLayoutMode = useDiagramStore((s) => s.setViewLayoutMode)
+  const setWikiDepth = useDiagramStore((s) => s.setWikiDepth)
   const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
   const setAlignmentOrdered = useDiagramStore((s) => s.setAlignmentOrdered)
   const setGridColumns = useDiagramStore((s) => s.setGridColumns)
@@ -683,7 +684,25 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
           </div>
         </div>
       )}
-      {!readOnly && !isTreemap && !isDynamic && !isTable && !isMatrix && (
+      {isWiki && (
+        <div>
+          <div className="props-section-title">Depth</div>
+          <select
+            aria-label="Depth"
+            value={wikiDepthOf(view)}
+            disabled={readOnly}
+            onChange={(e) => setWikiDepth(view.id, Number(e.target.value))}
+            className="props-input"
+            style={{ cursor: readOnly ? 'default' : 'pointer', width: '100%' }}
+            title="Multi page: how many levels of children are written out as chapters before the rest show as preview cards"
+          >
+            {Array.from({ length: WIKI_DEPTH_MAX - WIKI_DEPTH_MIN + 1 }, (_, i) => WIKI_DEPTH_MIN + i).map((n) => (
+              <option key={n} value={n}>{n} level{n === 1 ? '' : 's'}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {!readOnly && isStatic && (
         <div>
           <div className="props-section-title">Auto-layout</div>
           <select

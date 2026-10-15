@@ -17,7 +17,7 @@
 // (Studio centres them on the viewport), so it drops them and the view keeps
 // the imported layout.
 
-import { normalizeViewFolder, type DiagramView, type NodePosition, type ViewFilter, type ViewPipeline } from './c4'
+import { normalizeViewFolder, wikiDepthOf, type DiagramView, type NodePosition, type ViewFilter, type ViewPipeline } from './c4'
 
 type Raw = Record<string, unknown>
 type IdMap = (id: string) => string | undefined
@@ -114,6 +114,7 @@ export function conceptViewsToDiagram(
       const focus = typeof raw.wikiFocusId === 'string' ? maps.node(raw.wikiFocusId) : undefined
       view.wikiFocusId = focus ?? null
       if (raw.wikiPageMode === 'single' || raw.wikiPageMode === 'multi') view.wikiPageMode = raw.wikiPageMode
+      if (typeof raw.wikiDepth === 'number') view.wikiDepth = wikiDepthOf({ wikiDepth: raw.wikiDepth })
     }
     if (kind === 'table' && typeof raw.tableActiveTab === 'string') view.tableActiveTab = raw.tableActiveTab
     const collapsed = mapIds(raw.collapsedNodeIds, maps.node)

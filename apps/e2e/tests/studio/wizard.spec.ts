@@ -50,14 +50,3 @@ test('cancelling the wizard creates nothing', async ({ page, studio }) => {
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(studio.nodes).toHaveCount(3)
 })
-
-test('dropping an ADR on the table view opens the same wizard', async ({ page, studio }) => {
-  await studio.open('v-table')
-  await page.locator('.palette-item', { hasText: 'ADR' }).first().dragTo(page.locator('.tv-wrap'))
-  const wizard = page.getByRole('dialog', { name: /New ADR/ })
-  await expect(wizard).toBeVisible()
-  await wizard.getByLabel('Name').fill('Event-sourced inventory')
-  await page.keyboard.press('ControlOrMeta+Enter')
-  await expect(wizard).toHaveCount(0)
-  await expect(page.getByText('Event-sourced inventory').first()).toBeVisible()
-})

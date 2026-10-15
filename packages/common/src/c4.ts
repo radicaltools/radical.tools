@@ -219,6 +219,11 @@ export interface DiagramView {
    * Persisted per view so reopening the view restores the chosen mode.
    */
   wikiPageMode?: 'single' | 'multi'
+  /** Wiki-only: how many levels of children Multi page writes out as
+   *  chapters before the rest show as preview cards
+   *  (WIKI_DEPTH_MIN..WIKI_DEPTH_MAX, default WIKI_DEPTH_MIN). Set in the
+   *  view's properties. */
+  wikiDepth?: number
   /**
    * Table-only: id of the currently-selected tab ('all', 'relations', or a
    * node-type id). `undefined` = "All Nodes". Persisted per view so
@@ -601,6 +606,17 @@ export function viewFolderPaths(views: Pick<DiagramView, 'folder'>[]): string[] 
     for (let i = 1; i <= parts.length; i++) paths.add(parts.slice(0, i).join('/'))
   }
   return [...paths].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+}
+
+export const WIKI_DEPTH_MIN = 1
+export const WIKI_DEPTH_MAX = 5
+
+/** How many levels of children a wiki view's Multi page writes out as
+ *  chapters: its `wikiDepth`, kept within WIKI_DEPTH_MIN..WIKI_DEPTH_MAX. */
+export function wikiDepthOf(view: Pick<DiagramView, 'wikiDepth'> | null | undefined): number {
+  const d = view?.wikiDepth
+  if (typeof d !== 'number' || !Number.isFinite(d)) return WIKI_DEPTH_MIN
+  return Math.min(WIKI_DEPTH_MAX, Math.max(WIKI_DEPTH_MIN, Math.floor(d)))
 }
 
 /** Whether a view shows every node of the model: it lists none and was not
