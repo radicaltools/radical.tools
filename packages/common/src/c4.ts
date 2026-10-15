@@ -68,6 +68,11 @@ export interface DiagramSequence {
   stepDescriptions?: (string | undefined)[]
 }
 
+/** How a canvas draws relations: smooth curves, or horizontal and vertical
+ *  segments with rounded corners. Each style keeps to itself when a
+ *  relation has to go around an element. */
+export type EdgeStyle = 'curved' | 'orthogonal'
+
 export interface DiagramView {
   id: string
   name: string
@@ -82,6 +87,8 @@ export interface DiagramView {
   /** Where the view sits in the list of views: a folder path such as
    *  "C4/Components" (segments split by "/"). No folder: at the top. */
   folder?: string
+  /** How the view draws relations; none: the model's (DiagramData.defaultEdgeStyle). */
+  edgeStyle?: EdgeStyle
   /** ID of the DiagramSequence to visualise when kind='dynamic' */
   sequenceId?: string
   /** C4 node IDs included in this view. Ancestors are auto-included. An
@@ -357,6 +364,9 @@ export interface DiagramData {
   defaultViewport?: { x: number; y: number; zoom: number } | null
   /** Layout constraints of the "All" (default) view; a named view keeps its own. */
   defaultLayoutConstraints?: LayoutConstraint[]
+  /** How All elements, and every view without its own, draw relations
+   *  (curved when none). */
+  defaultEdgeStyle?: EdgeStyle
   /** Named snapshots (versions) */
   snapshots?: DiagramSnapshot[]
   /** Multiple named presentations */

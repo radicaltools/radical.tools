@@ -151,9 +151,10 @@ export const RelationEdge = memo(
     // nothing this edge draws changed, so only the edges that moved re-render.
     const moving = useDiagramStore((s) => s.liveLayoutMoving)
     const allLabels = useDiagramStore((s) => s.allEdgeLabelsShown)
+    const edgeStyle = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId]?.edgeStyle : undefined) ?? s.defaultEdgeStyle)
     const geometrySelector = useCallback(
-      (s: ReactFlowState) => edgeGeometry(s.nodeInternals, s.edges, moving, allLabels || edgeLabelsShownAt(s.transform[2])).get(id),
-      [id, moving, allLabels],
+      (s: ReactFlowState) => edgeGeometry(s.nodeInternals, s.edges, moving, allLabels || edgeLabelsShownAt(s.transform[2]), edgeStyle).get(id),
+      [id, moving, allLabels, edgeStyle],
     )
     const geometry = useStore(geometrySelector)
     const diffKind = useDiagramStore(s => s.showDiff ? s.diffHighlight[id] : undefined)

@@ -319,6 +319,7 @@ export class FolderModel {
           views: (data.views ?? []).map((view) => ({
             id: view.id, name: view.name, kind: view.kind ?? 'static',
             ...(view.folder ? { folder: view.folder } : {}),
+            ...(view.edgeStyle ? { edgeStyle: view.edgeStyle } : {}),
             ...(view.sequenceId ? { sequenceId: view.sequenceId } : {}),
             ...(view.layoutConstraints?.length ? { alignments: view.layoutConstraints } : {}),
           })),
@@ -422,7 +423,7 @@ export class FolderModel {
       if (options.signal?.aborted) throw new Error(CANCELLED)
       const count = 'done' in p ? ` ${p.done}/${p.total}` : ''
       options.onProgress?.({ progress: ++step, message: `Smart Layout: ${p.phase}${count}` })
-    }, { alignments: input.alignments })
+    }, { alignments: input.alignments, edgeStyle: view?.edgeStyle ?? changed.defaultEdgeStyle ?? 'curved' })
     if (options.signal?.aborted) return { ok: false, text: CANCELLED }
     if (!result.candidates.length) return { ok: false, text: 'Smart Layout: no candidate produced a result.' }
     if (result.keptCurrent) return { ok: true, text: 'Smart Layout: the current layout already scores best; nothing changed.' }

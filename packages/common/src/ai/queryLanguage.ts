@@ -372,6 +372,7 @@ function summarizeView(view: DiagramView, nodes: Record<string, C4Node>, relatio
     name: view.name,
     kind: view.kind ?? 'static',
     ...(view.folder ? { folder: view.folder } : {}),
+    ...(view.edgeStyle ? { edgeStyle: view.edgeStyle } : {}),
     nodeCount: set.size,
     relationCount,
     hiddenRelationCount: hidden.size,

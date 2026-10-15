@@ -296,7 +296,7 @@ describe('long Smart Layout runs', () => {
     const steps: { progress: number; message: string }[] = []
     const outcome = await model.call('smart_layout', {}, { onProgress: (p) => steps.push(p) })
     expect(outcome.ok, outcome.text).toBe(true)
-    expect(steps.map((s) => s.message)).toContain('Smart Layout: candidates 1/10')
+    expect(steps.map((s) => s.message)).toContain('Smart Layout: candidates 1/12')
     expect(steps.map((s) => s.progress)).toEqual(steps.map((_, i) => i + 1))
   }, 60_000)
 

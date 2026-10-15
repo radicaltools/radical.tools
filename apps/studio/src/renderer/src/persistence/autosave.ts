@@ -158,6 +158,7 @@ if (typeof window !== 'undefined') {
       s.defaultPositions !== prev.defaultPositions ||
       s.defaultViewport !== prev.defaultViewport ||
       s.defaultLayoutConstraints !== prev.defaultLayoutConstraints ||
+      s.defaultEdgeStyle !== prev.defaultEdgeStyle ||
       s.snapshots !== prev.snapshots ||
       s.presentations !== prev.presentations ||
       s.metamodel !== prev.metamodel

@@ -36,6 +36,7 @@ export function buildViewToolDefs(): ToolDef[] {
       inputSchema: {
         type: 'object',
         properties: {
+          edgeStyle: { type: 'string', enum: ['curved', 'orthogonal', 'model'], description: 'How the view draws relations: curved, orthogonal (horizontal and vertical segments), or "model" for the model\'s default.' },
           folder: { type: 'string', description: 'The folder the view sits in in the list of views, a path such as "C4/Components"; "" puts it at the top.' },
           tempId: { type: 'string' },
           name: { type: 'string' },
@@ -54,10 +55,11 @@ export function buildViewToolDefs(): ToolDef[] {
     },
     {
       name: 'update_view',
-      description: "Rename a view, move it into a folder of the list of views, change its kind or linked sequence, set which relations it hides, or show elements open or folded in it. Use set_view_nodes to change its nodes.",
+      description: "Rename a view, move it into a folder of the list of views, change its kind, line style or linked sequence, set which relations it hides, or show elements open or folded in it. Use set_view_nodes to change its nodes.",
       inputSchema: {
         type: 'object',
         properties: {
+          edgeStyle: { type: 'string', enum: ['curved', 'orthogonal', 'model'], description: 'How the view draws relations: curved, orthogonal (horizontal and vertical segments), or "model" for the model\'s default.' },
           folder: { type: 'string', description: 'The folder the view sits in in the list of views, a path such as "C4/Components"; "" puts it at the top.' },
           id: { type: 'string' },
           name: { type: 'string' },
@@ -132,7 +134,7 @@ export function buildViewToolDefs(): ToolDef[] {
 export function buildViewToolHandlers(): Record<string, ToolHandler> {
   return {
     create_view: (rawInput, ctx) => {
-      const input = rawInput as { tempId?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; nodeIds?: unknown; active?: unknown; folder?: unknown }
+      const input = rawInput as { tempId?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; nodeIds?: unknown; active?: unknown; folder?: unknown; edgeStyle?: unknown }
       if (typeof input.tempId !== 'string' || !input.tempId) return fail('create_view: tempId is required')
       if (typeof input.name !== 'string' || !input.name.trim()) return fail('create_view: name is required')
       if (!ctx.diagram.addView || !ctx.diagram.setViewNodes) return fail('create_view: views are not editable in this context')
@@ -155,6 +157,10 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         if (!ctx.diagram.setViewKind) return fail('create_view: view kind cannot be set in this context')
         ctx.diagram.setViewKind(realId, input.kind as DiagramView['kind'])
       }
+      if (input.edgeStyle === 'curved' || input.edgeStyle === 'orthogonal') {
+        if (!ctx.diagram.setViewEdgeStyle) return fail('create_view: line styles are not available in this context')
+        ctx.diagram.setViewEdgeStyle(realId, input.edgeStyle)
+      }
       if (typeof input.folder === 'string' && input.folder.trim()) {
         if (!ctx.diagram.setViewFolder) return fail('create_view: folders of views are not available in this context')
         ctx.diagram.setViewFolder(realId, input.folder)
@@ -165,7 +171,7 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
     },
 
     update_view: (rawInput, ctx) => {
-      const input = rawInput as { id?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; hiddenRelationIds?: unknown; expand?: unknown; collapse?: unknown; folder?: unknown }
+      const input = rawInput as { id?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; hiddenRelationIds?: unknown; expand?: unknown; collapse?: unknown; folder?: unknown; edgeStyle?: unknown }
       if (typeof input.id !== 'string' || !input.id) return fail('update_view: id is required')
       if (!ctx.diagram.getViews) return fail('update_view: views are not editable in this context')
       const vId = ctx.resolveId(input.id)
@@ -192,6 +198,12 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         if (!ctx.diagram.renameView) return fail('update_view: views cannot be renamed in this context')
         const name = input.name.trim()
         changes.push(() => ctx.diagram.renameView!(vId, name))
+      }
+      if (input.edgeStyle !== undefined) {
+        if (input.edgeStyle !== 'curved' && input.edgeStyle !== 'orthogonal' && input.edgeStyle !== 'model') return fail('update_view: edgeStyle must be "curved", "orthogonal" or "model"')
+        if (!ctx.diagram.setViewEdgeStyle) return fail('update_view: line styles are not available in this context')
+        const style = input.edgeStyle === 'model' ? null : input.edgeStyle
+        changes.push(() => ctx.diagram.setViewEdgeStyle!(vId, style))
       }
       if (input.folder !== undefined) {
         if (typeof input.folder !== 'string') return fail('update_view: folder must be a string ("" for none)')

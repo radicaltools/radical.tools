@@ -15,8 +15,10 @@ test('the Diagram tab draws every node type and its relations', async ({ page, s
 
   const diagram = editor.locator('.mmd-canvas')
   const legend = editor.locator('.mmd-legend')
-  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(21)
+  // The types show once Smart Layout has placed them: wait for it as the
+  // other steps do (about 2.5 s here, twice that on a CI runner).
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 30_000 })
+  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(21, { timeout: 30_000 })
   await expect(diagram.locator('.react-flow__edge').first()).toBeVisible()
   // Smart Layout, then the physics settles it: no two type boxes overlap.
   const boxes = await diagram.locator('.react-flow__node-mmType').evaluateAll((els) =>
@@ -103,7 +105,7 @@ test('selecting a type shows its rules; Edit opens it in the list', async ({ pag
   await expect(diagram.locator('.mmd-category-label')).toHaveText(['C4', 'Domain', 'Governance', 'Requirements'])
   if (process.env.E2E_SHOTS) await page.screenshot({ path: `${process.env.E2E_SHOTS}/relation.png` })
   await page.keyboard.press('Escape')
-  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(21)
+  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(21, { timeout: 30_000 })
 
   await editor.locator('.mmd-canvas').getByTestId('rf__node-requirement').click()
   const inspector = editor.locator('.mm-editor-side')
