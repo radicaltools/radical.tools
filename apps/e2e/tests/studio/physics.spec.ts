@@ -82,7 +82,6 @@ test('a layout started on one canvas does not land on another', async ({ page, s
   await page.waitForTimeout(800)
   const saved = (await studio.storedDoc(docId)).views!.find((v) => v.id === 'view-core')!.positions
 
-  await page.getByText('Views', { exact: true }).first().click()
   const card = page.locator('.lp-view-card').filter({ hasText: 'Core Banking' }).first()
   await expect(card).toBeVisible()
   await page.getByRole('button', { name: 'Smart Layout', exact: true }).click()
@@ -102,7 +101,7 @@ test('a drag is undone and redone as one step of its own', async ({ page, studio
   // element, then drag another" it took back both.
   await studio.seed()
   await studio.open('v-context')
-  await studio.addFromPalette('Software System', { x: 150, y: 750 })
+  await studio.addFromPalette('Software System', await studio.nearBottom())
   await expect(studio.nodes).toHaveCount(4)
   await studio.settle()
   const before = await studio.positions()
@@ -136,7 +135,7 @@ test('a drag is undone and redone as one step of its own', async ({ page, studio
 test('edits on a view with nested elements are saved without a reload', async ({ studio }) => {
   await studio.seed()
   await studio.open('v-containers')
-  await studio.addFromPalette('Software System', { x: 150, y: 780 })
+  await studio.addFromPalette('Software System', await studio.nearBottom(150, 72))
   await expect(studio.nodes).toHaveCount(7)
   // Endless live-layout updates used to restart the 400 ms autosave debounce.
   await expect.poll(async () => (await studio.storedDoc()).nodes.length, { timeout: 5000 }).toBe(7)
@@ -524,9 +523,8 @@ test('a milestone picked in Viewer is not the one Designer edits', async ({ page
   await page.getByPlaceholder('Milestone name…').fill('Before')
   await page.keyboard.press('Enter')
   await expect(page.locator('.lp-snap-card', { hasText: 'Before' })).toBeVisible()
-  // The live model moves on (the panel is an accordion: back to the palette).
-  await page.locator('.lp-section-header', { hasText: 'Elements' }).click()
-  await studio.addFromPalette('Software System', { x: 150, y: 750 })
+  // The live model moves on.
+  await studio.addFromPalette('Software System', await studio.nearBottom())
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
   const milestoneSize = async (): Promise<number> =>
     (JSON.parse(await studio.storedJson()) as { snapshots: Array<{ nodes: Record<string, unknown> }> }).snapshots.map((s) => Object.keys(s.nodes).length)[0]

@@ -1,7 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { host } from '../platform/host'
-import { SmartLayoutButton } from '@radical/ui/components/SmartLayoutButton'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { useInspectorStore } from '../persistence/inspector'
 import { dropPendingMode, useShownMode } from '../route'
@@ -84,26 +83,8 @@ const IconReset = () => (
   </svg>
 )
 
-const IconFitAll = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3" />
-    <rect x="5" y="5" width="6" height="6" rx="1" />
-  </svg>
-)
 
-const IconZoomIn = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <circle cx="7" cy="7" r="5" />
-    <path d="M7 5v4M5 7h4M12 12l2 2" />
-  </svg>
-)
 
-const IconZoomOut = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <circle cx="7" cy="7" r="5" />
-    <path d="M5 7h4M12 12l2 2" />
-  </svg>
-)
 
 // Sparkle / wand icon — indicates the "smart" auto-arrange action.
 const IconSearch = () => (
@@ -586,12 +567,6 @@ export function Toolbar(): React.ReactElement {
   const setAppMode = useCallback((mode: Parameters<typeof setStoreMode>[0]) => { dropPendingMode(); setStoreMode(mode) }, [setStoreMode])
   const autoFitActive = useDiagramStore((s) => s.autoFitActive)
   const toggleAutoFit = useDiagramStore((s) => s.toggleAutoFit)
-  const fitAll = useDiagramStore((s) => s.fitAll)
-  const zoomIn = useDiagramStore((s) => s.zoomIn)
-  const zoomOut = useDiagramStore((s) => s.zoomOut)
-  const activeViewKind = useDiagramStore((s) =>
-    s.activeViewId ? s.views[s.activeViewId]?.kind ?? 'static' : 'static'
-  )
   const connectionModifier = useDiagramStore((s) => s.connectionModifier)
   const setConnectionModifier = useDiagramStore((s) => s.setConnectionModifier)
 
@@ -770,37 +745,9 @@ export function Toolbar(): React.ReactElement {
         onCopyToClipboard={copyToClipboard}
         exportBusy={exportBusy}
       />
-      {/* The canvas controls and undo: the Inspector has no canvas and
-          changes nothing. */}
+      {/* Undo: the Inspector changes nothing. Fit, zoom and Smart Layout are
+          on the canvas (CanvasControls). */}
       {appMode !== 'inspector' && (<>
-        <div className="toolbar-sep" />
-
-        <button
-          className="toolbar-btn"
-          onClick={fitAll}
-          title="Fit all visible nodes to viewport"
-        >
-          <IconFitAll /> Fit All
-        </button>
-        <button
-          className="toolbar-btn"
-          onClick={zoomOut}
-          title="Zoom out (⌘−)"
-        >
-          <IconZoomOut />
-        </button>
-        <button
-          className="toolbar-btn"
-          onClick={zoomIn}
-          title="Zoom in (⌘+)"
-        >
-          <IconZoomIn />
-        </button>
-
-        {activeViewKind !== 'treemap' && activeViewKind !== 'dynamic' && activeViewKind !== 'table' && activeViewKind !== 'matrix' && (
-          <SmartLayoutButton />
-        )}
-
         <div className="toolbar-sep" />
 
         <button

@@ -2,8 +2,9 @@ import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback, 
 import { useDiagramStore, nodeEffectivelyCollapsedInView } from '../store/diagramStore'
 import { useChildIds, useNodeContent, useNodeLabels } from '../store/nodeSelectors'
 import { type C4Relation, C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isContainerType } from '@radical/common/c4'
-import { resolveEarsSubject, isReservedPropertyKey, NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY, type PropertyDef } from '@radical/common/metamodel'
+import { resolveEarsSubject, isReservedPropertyKey, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
+import { PALETTE_ORDER } from './ElementPalette'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
@@ -50,52 +51,6 @@ function C4Icon({ type, size = 12 }: { type: C4ElementType; size?: number }) {
     >
       <path d={TYPE_ICON_PATHS[type]} />
     </svg>
-  )
-}
-
-// ── Palette ───────────────────────────────────────────────────────────────────
-
-// Sublabels for built-in C4/DDD types. Custom types fall back to def.description.
-const PALETTE_SUBLABELS: Record<string, string> = {
-  person:    'Actor / user',
-  system:    'Software system',
-  container: 'App, DB, service…',
-  component: 'Class, module…',
-  database:  'Database store',
-  webapp:    'Web application',
-  queue:     'Message queue / bus',
-  domain:    'DDD problem space',
-}
-
-// Order: domain first (when present), then standard C4 order, then any custom types last.
-const PALETTE_ORDER = ['domain', 'group', 'person', 'system', 'container', 'component', 'database', 'webapp', 'queue']
-
-// Groups shown in the palette. Types not listed here fall into "Custom".
-const PALETTE_GROUPS = NODE_TYPE_CATEGORIES
-
-function PaletteItem({ typeId, label, sublabel, color, iconPath }: {
-  typeId: string
-  label: string
-  sublabel: string
-  color: string
-  iconPath: string
-}) {
-  const onDragStart = (event: React.DragEvent) => {
-    event.dataTransfer.setData('application/c4-type', typeId)
-    event.dataTransfer.effectAllowed = 'copy'
-  }
-  return (
-    <div className="palette-item" draggable onDragStart={onDragStart}>
-      <div className="palette-badge" style={{ background: color }}>
-        <svg viewBox="0 0 16 16" width="16" height="16" fill="#fff">
-          <path d={iconPath} />
-        </svg>
-      </div>
-      <div>
-        <div className="palette-label">{label}</div>
-        <div className="palette-sublabel">{sublabel}</div>
-      </div>
-    </div>
   )
 }
 
@@ -426,6 +381,19 @@ const Icon = {
   Folder: () => (
     <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
       <path d="M1.75 4.25 a1 1 0 0 1 1 -1 h3.2 l1.5 1.5 h5.8 a1 1 0 0 1 1 1 v6.5 a1 1 0 0 1 -1 1 h-10.5 a1 1 0 0 1 -1 -1 z"/>
+    </svg>
+  ),
+  // A views folder in the list: filled, in the accent colour (CSS), open
+  // while its views show.
+  FolderClosed: () => (
+    <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden>
+      <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4.1l1.8 1.8h7.1A1.5 1.5 0 0 1 18 7.3v7.2a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5z"/>
+    </svg>
+  ),
+  FolderOpen: () => (
+    <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden>
+      <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4.1l1.8 1.8h7.1A1.5 1.5 0 0 1 18 7.3V8H6.2a2 2 0 0 0-1.9 1.4L2 15.6z" opacity=".55"/>
+      <path d="M4.9 9.6A1.2 1.2 0 0 1 6 8.8h12.3a.8.8 0 0 1 .8 1l-1.6 5.3a1.2 1.2 0 0 1-1.1.9H2.6a.5.5 0 0 1-.5-.6z"/>
     </svg>
   ),
   ChevronRight: () => (
@@ -1408,7 +1376,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
             title={folder.path}
           >
             <span className="lp-folder-chevron"><Icon.ChevronRight /></span>
-            <span className="lp-folder-icon"><Icon.Folder /></span>
+            <span className="lp-folder-icon">{open ? <Icon.FolderOpen /> : <Icon.FolderClosed />}</span>
             <span className="lp-folder-name">{folder.name}</span>
             <span className="lp-folder-count">{folder.count}</span>
           </button>
@@ -1563,42 +1531,9 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
   const isReadOnly = readOnly || mode !== 'designer'
   const viewsCount = useDiagramStore((s) => Object.keys(s.views).length)
   const snapshotsCount = useDiagramStore((s) => s.snapshots.length)
-  const metamodel = useDiagramStore((s) => s.metamodel)
-
-  // Build palette dynamically from metamodel; fall back to static C4 records
-  // for built-in types and to def.description / metadata for custom types.
-  const paletteGroups = useMemo(() => {
-    const allTypeIds = metamodel ? Object.keys(metamodel.nodeTypes) : [...PALETTE_ORDER]
-
-    const makeItem = (typeId: string) => {
-      const def = metamodel?.nodeTypes[typeId]
-      const t = typeId as C4ElementType
-      const builtIn = (TYPE_LABELS as Record<string, string>)[typeId] !== undefined
-      return {
-        typeId,
-        label: def?.label ?? (builtIn ? TYPE_LABELS[t] : typeId),
-        sublabel: PALETTE_SUBLABELS[typeId] ?? '',
-        color: builtIn ? NODE_COLORS[t] : (def?.color ?? '#64748b'),
-        iconPath: builtIn ? TYPE_ICON_PATHS[t] : (TYPE_ICON_PATHS.system),
-      }
-    }
-
-    const assignedTypes = new Set(PALETTE_GROUPS.flatMap(g => g.types))
-    const customTypes = allTypeIds.filter(t => !assignedTypes.has(t) && !metamodel?.nodeTypes[t]?.hubOnly)
-
-    const groups = PALETTE_GROUPS
-      .map(g => ({ label: g.label, items: g.types.filter(t => allTypeIds.includes(t) && !metamodel?.nodeTypes[t]?.hubOnly).map(makeItem) }))
-      .filter(g => g.items.length > 0)
-
-    if (customTypes.length > 0) {
-      groups.push({ label: CUSTOM_CATEGORY.label, items: customTypes.map(makeItem) })
-    }
-
-    return groups
-  }, [metamodel])
-
-  const defaultSection = mode === 'designer' ? 'elements' : 'views'
-  const [openSection, setOpenSection] = useState<'elements' | 'views' | 'milestones'>(defaultSection as any)
+  // The element types are in the palette under the toolbar (ElementPalette).
+  // One section open at a time; a click on the open one folds it.
+  const [openSection, setOpenSection] = useState<'views' | 'milestones' | null>('views')
   type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string }
   const [paneContent, setPaneContent] = useState<PaneContent | null>(null)
   const hasPaneContent = !!paneContent
@@ -1614,21 +1549,8 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
 
           {/* Pane 1 — accordion */}
           <div className="rp-pane">
-            {mode === 'designer' && (
-              <AccordionSection title="Elements"
-                open={openSection === 'elements'} onToggle={() => setOpenSection('elements')}>
-                {paletteGroups.map((group) => (
-                  <React.Fragment key={group.label}>
-                    <div className="palette-group-label">{group.label}</div>
-                    {group.items.map((item) => (
-                      <PaletteItem key={item.typeId} {...item} />
-                    ))}
-                  </React.Fragment>
-                ))}
-              </AccordionSection>
-            )}
             <AccordionSection title="Views" count={viewsCount}
-              open={openSection === 'views'} onToggle={() => setOpenSection('views')}>
+              open={openSection === 'views'} onToggle={() => setOpenSection((o) => (o === 'views' ? null : 'views'))}>
               <ViewList
                 readOnly={isReadOnly}
                 onOpenProps={!isReadOnly ? (id) => { setPaneContent({ kind: 'view', id }); setOpenSection('views') } : undefined}
@@ -1636,7 +1558,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
               />
             </AccordionSection>
             <AccordionSection title="Milestones" count={snapshotsCount}
-              open={openSection === 'milestones'} onToggle={() => setOpenSection('milestones')}>
+              open={openSection === 'milestones'} onToggle={() => setOpenSection((o) => (o === 'milestones' ? null : 'milestones'))}>
               <SnapshotList readOnly={isReadOnly} onOpenProps={!isReadOnly ? (id) => { setPaneContent({ kind: 'milestone', id }); setOpenSection('milestones') } : undefined} />
             </AccordionSection>
           </div>
@@ -2463,7 +2385,8 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
   const sequencesCount = useDiagramStore((s) => Object.keys(s.sequences).length)
   const pendingBodyNodeIds = useDiagramStore((s) => s.pendingBodyNodeIds)
   const scanDescriptions = useDiagramStore((s) => s.scanDescriptions)
-  const [openSection, setOpenSection] = useState<'nodes' | 'relations' | 'sequences'>('nodes')
+  // One section open at a time; a click on the open one folds it.
+  const [openSection, setOpenSection] = useState<'nodes' | 'relations' | 'sequences' | null>('nodes')
 
   // ── Nodes tree filter: free-text search + type chips ──────────────────────
   const [nodeSearch, setNodeSearch] = useState('')
@@ -2554,7 +2477,7 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
           {/* Pane 1 — Vertical accordion: Nodes / Relations / Sequences (single open) */}
           <div className="rp-pane">
             <AccordionSection title="Nodes" count={nodesCount}
-              open={openSection === 'nodes'} onToggle={() => setOpenSection('nodes')}>
+              open={openSection === 'nodes'} onToggle={() => setOpenSection((o) => (o === 'nodes' ? null : 'nodes'))}>
               {nodesCount > 0 && (
                 <NodesFilterBar
                   search={nodeSearch}
@@ -2593,11 +2516,11 @@ export function RightPanel({ readOnly = false, collapsed = false, onToggleCollap
               }
             </AccordionSection>
             <AccordionSection title="Relations" count={relationsCount}
-              open={openSection === 'relations'} onToggle={() => setOpenSection('relations')}>
+              open={openSection === 'relations'} onToggle={() => setOpenSection((o) => (o === 'relations' ? null : 'relations'))}>
               <RelationsSection />
             </AccordionSection>
             <AccordionSection title="Sequences" count={sequencesCount}
-              open={openSection === 'sequences'} onToggle={() => setOpenSection('sequences')}>
+              open={openSection === 'sequences'} onToggle={() => setOpenSection((o) => (o === 'sequences' ? null : 'sequences'))}>
               <SequenceList readOnly={readOnly} compact={true} />
             </AccordionSection>
           </div>

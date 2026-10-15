@@ -175,6 +175,13 @@ export class Studio {
     await this.page.keyboard.up('Alt')
   }
 
+  /** A spot on the canvas `gap` px above its bottom edge and `x` px from its
+   *  left: empty in the seeded models, whatever the palette above takes. */
+  async nearBottom(x = 150, gap = 100): Promise<{ x: number; y: number }> {
+    const pane = (await this.pane.boundingBox())!
+    return { x, y: pane.height - gap }
+  }
+
   /** Drag an element type from the Elements palette onto the canvas. */
   async addFromPalette(typeLabel: string, at: { x: number; y: number }): Promise<void> {
     await this.page.locator('.palette-item', { hasText: typeLabel }).first()

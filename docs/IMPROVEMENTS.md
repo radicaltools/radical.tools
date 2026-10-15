@@ -150,8 +150,10 @@ that turns red once the bug is fixed.
 3. **Double-click on the empty canvas does not add a system.** React Flow's
    `zoomOnDoubleClick` (default on) swallows the event before
    `Canvas.onCanvasDoubleClick` sees it.
-4. **The Quick Search bar covers Undo/Redo** in the toolbar on canvas views at
-   1440 px width.
+4. ~~**The Quick Search bar covers Undo/Redo** in the toolbar on canvas views at
+   1440 px width.~~ Fixed: Fit All, zoom and Smart Layout moved onto the canvas
+   (CanvasControls), which leaves the toolbar room; the test in
+   `known-issues.spec.ts` is a guard now.
 5. **Hub's local catalogue fallback fails for concepts.** When
    `hub.radical.tools` is unreachable, `fetchJson` in
    `packages/ui/src/store/hubStore.ts` falls back to `/hub/`, but rejects the

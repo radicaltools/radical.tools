@@ -32,7 +32,6 @@ test('bench: opening a view', async ({ page, studio }) => {
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.locator('.lp-section-header', { hasText: /^Views/ }).click()
   const card = (name: string) => page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) }).first()
   const from = process.env.BENCH_FROM ? card(process.env.BENCH_FROM) : page.locator('.lp-view-card').nth(1)
 

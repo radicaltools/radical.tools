@@ -17,7 +17,7 @@ test.describe('on the governance bookstore', () => {
 
   test('a Need is created through its wizard and shows the start of its text on the canvas', async ({ page, studio }) => {
     await studio.open('v-context')
-    await studio.addFromPalette('Need', { x: 150, y: 750 })
+    await studio.addFromPalette('Need', await studio.nearBottom())
     const wizard = page.getByRole('dialog', { name: /New Need/ })
     await expect(wizard).toBeVisible()
 

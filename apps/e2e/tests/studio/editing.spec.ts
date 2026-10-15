@@ -10,10 +10,67 @@ test.beforeEach(async ({ studio }) => {
 })
 
 test('add an element from the palette', async ({ studio }) => {
-  await studio.addFromPalette('Software System', { x: 150, y: 750 })
+  await studio.addFromPalette('Software System', await studio.nearBottom())
   await expect(studio.nodes).toHaveCount(4)
   await expect(studio.nodeByLabel('System')).toBeVisible()
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
+})
+
+test('the palette sits above the canvas and the table, folds away and stays folded', async ({ page, studio }) => {
+  const palette = page.locator('.canvas-column .element-palette')
+  await expect(palette.locator('.palette-group-label', { hasText: 'C4' })).toBeVisible()
+  await expect(palette.locator('.palette-item', { hasText: 'Software System' })).toBeVisible()
+  // The left panel keeps only views and milestones.
+  await expect(page.locator('.left-panel .palette-item')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Hide the elements' }).click()
+  await expect(palette.locator('.palette-item')).toHaveCount(0)
+  await page.reload()
+  await studio.ready()
+  await expect(page.locator('.palette-item')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Show the elements' }).click()
+  await expect(palette.locator('.palette-item').first()).toBeVisible()
+
+  // The table view has it too (its types drop onto a row); Viewer has none.
+  await studio.open('v-table')
+  await expect(page.locator('.tv-wrap .element-palette .palette-item').first()).toBeVisible()
+  await studio.open('v-context', 'viewer')
+  await expect(page.locator('.react-flow__node').first()).toBeVisible()
+  await expect(page.locator('.element-palette')).toHaveCount(0)
+})
+
+test('fit, zoom and Smart Layout sit on the canvas, not in the toolbar', async ({ page }) => {
+  const controls = page.locator('.canvas-column .canvas-controls')
+  for (const name of [/Fit All/, /Zoom out/, /Zoom in/, /Smart Layout/]) {
+    await expect(controls.getByRole('button', { name }).first()).toBeVisible()
+    await expect(page.locator('.toolbar').getByRole('button', { name })).toHaveCount(0)
+  }
+  // Only the canvas has them: not the table view.
+  await page.goto(page.url().replace(/\/v\/[^/]+$/, '/v/v-table'))
+  await expect(page.locator('.tv-wrap')).toBeVisible()
+  await expect(page.locator('.canvas-controls')).toHaveCount(0)
+})
+
+test('a click on an open panel section folds it; another section opens alone', async ({ page }) => {
+  const header = (side: string, title: string) => page.locator(`.${side}-panel .lp-section-header`, { hasText: title })
+  // A folded section keeps its content, at no height.
+  const isOpen = (side: string, title: string) => page.locator(`.${side}-panel .lp-section`)
+    .filter({ has: page.locator('.lp-section-header', { hasText: title }) }).locator('.lp-section-body.open')
+  await expect(isOpen('left', 'Views')).toHaveCount(1)
+  await header('left', 'Views').click()
+  await expect(isOpen('left', 'Views')).toHaveCount(0)
+  await header('left', 'Views').click()
+  await expect(isOpen('left', 'Views')).toHaveCount(1)
+  await header('left', 'Milestones').click()
+  await expect(isOpen('left', 'Views')).toHaveCount(0)
+  await expect(isOpen('left', 'Milestones')).toHaveCount(1)
+
+  const tree = page.locator('.right-panel .lp-section-body.open')
+  await expect(tree).toHaveCount(1)
+  await header('right', 'Nodes').click()
+  await expect(tree).toHaveCount(0)
+  await header('right', 'Relations').click()
+  await expect(tree).toHaveCount(1)
 })
 
 test('rename an element in the properties panel', async ({ page, studio }) => {
@@ -46,7 +103,7 @@ test('a connection the metamodel forbids is refused', async ({ page, studio }) =
 })
 
 test('undo and redo', async ({ page, studio }) => {
-  await studio.addFromPalette('Software System', { x: 150, y: 750 })
+  await studio.addFromPalette('Software System', await studio.nearBottom())
   await expect(studio.nodes).toHaveCount(4)
   await page.keyboard.press('ControlOrMeta+z')
   await expect(studio.nodes).toHaveCount(3)
@@ -57,7 +114,7 @@ test('undo and redo', async ({ page, studio }) => {
 test('the undo keys in a text field are about the typing, not the model', async ({ page, studio }) => {
   // The handler sat on the window and did not look at the focus: a typo
   // "undone" while writing took back the model's last step instead.
-  await studio.addFromPalette('Software System', { x: 150, y: 750 })
+  await studio.addFromPalette('Software System', await studio.nearBottom())
   await expect(studio.nodes).toHaveCount(4)
   const search = page.getByPlaceholder(/^Search/)
   await search.click()
@@ -74,7 +131,7 @@ test('the undo keys in a text field are about the typing, not the model', async 
 
 for (const perspective of ['Viewer', 'Presenter']) {
   test(`the undo keys take none of Designer's steps in ${perspective}`, async ({ page, studio }) => {
-    await studio.addFromPalette('Software System', { x: 150, y: 750 })
+    await studio.addFromPalette('Software System', await studio.nearBottom())
     await expect(studio.nodes).toHaveCount(4)
     await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
     await page.getByRole('button', { name: perspective, exact: true }).click()
@@ -121,7 +178,7 @@ test('delete an element', async ({ page, studio }) => {
 })
 
 test('edits survive a reload', async ({ page, studio }) => {
-  await studio.addFromPalette('Software System', { x: 150, y: 750 })
+  await studio.addFromPalette('Software System', await studio.nearBottom())
   await studio.connect(studio.node('payments'), studio.node('customer'))
   await expect(studio.edges).toHaveCount(3)
   await page.reload()

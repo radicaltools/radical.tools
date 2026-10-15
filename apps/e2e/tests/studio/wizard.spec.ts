@@ -12,7 +12,7 @@ test('dropping an ADR on the canvas opens its wizard; finishing creates it with 
   await studio.open('v-context')
   await expect(studio.nodes).toHaveCount(3)
 
-  await studio.addFromPalette('ADR', { x: 150, y: 750 })
+  await studio.addFromPalette('ADR', await studio.nearBottom())
   const wizard = page.getByRole('dialog', { name: /New ADR/ })
   await expect(wizard).toBeVisible()
   // Nothing is created until the wizard finishes.
@@ -44,7 +44,7 @@ test('dropping an ADR on the canvas opens its wizard; finishing creates it with 
 
 test('cancelling the wizard creates nothing', async ({ page, studio }) => {
   await studio.open('v-context')
-  await studio.addFromPalette('ADR', { x: 150, y: 750 })
+  await studio.addFromPalette('ADR', await studio.nearBottom())
   await expect(page.getByRole('dialog', { name: /New ADR/ })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)

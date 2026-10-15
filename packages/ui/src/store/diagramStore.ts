@@ -1590,6 +1590,38 @@ let _liveLayout: LiveColaLayout | null = null
  *  its own. Set when a milestone is shown. */
 let _milestoneAllPositions: Record<string, NodePosition> | null = null
 
+/** What was selected on each canvas when the user left it ('' = All
+ *  elements). Each view keeps its own selection: switching views puts the
+ *  outgoing one here and brings back the incoming one. Not saved. */
+let _viewSelections = new Map<string, { nodeIds: string[]; edgeId: string | null }>()
+/** The document `_viewSelections` belongs to. */
+let _viewSelectionsDoc: string | null = null
+
+/** Selects `nodeIds` (or the edge) on the canvas and mirrors it into the
+ *  React Flow nodes and edges, keeping only what the canvas shows. */
+function showSelection(state: DiagramStore, nodeIds: readonly string[], edgeId: string | null): void {
+  const shownNodes = new Set(state.rfNodes.filter((n) => !n.hidden).map((n) => n.id))
+  const ids = nodeIds.filter((id) => shownNodes.has(id))
+  const edge = ids.length === 0 && edgeId && state.rfEdges.some((e) => e.id === edgeId && !e.hidden) ? edgeId : null
+  state.selectedNodeIds = ids
+  state.selectedNodeId = ids[0] ?? null
+  state.selectedEdgeId = edge
+  mirrorSelection(state)
+}
+
+/** Paints the store's selection on the React Flow nodes and edges. */
+function mirrorSelection(state: DiagramStore): void {
+  const ids = new Set(state.selectedNodeIds)
+  for (const rn of state.rfNodes as Array<{ id: string; selected?: boolean }>) {
+    const want = ids.has(rn.id)
+    if (!!rn.selected !== want) rn.selected = want
+  }
+  for (const re of state.rfEdges as Array<{ id: string; selected?: boolean }>) {
+    const want = re.id === state.selectedEdgeId
+    if (!!re.selected !== want) re.selected = want
+  }
+}
+
 // The open create-wizard's callback — a function, so it stays out of the
 // (immer-drafted) store state.
 let _wizardOnCreated: ((id: string) => void) | undefined
@@ -1691,6 +1723,15 @@ function setSlideCamera(vp: { x: number; y: number; zoom: number }, duration: nu
 
 export const useDiagramStore = create<DiagramStore>()(
   immer((set, get) => {
+    /** Leaving canvas `from` for `to`: keeps `from`'s selection and brings
+     *  back what was selected on `to` (nothing the first time). */
+    const swapViewSelection = (from: string | null, to: string | null): void => {
+      const { selectedNodeIds, selectedEdgeId } = get()
+      _viewSelections.set(from ?? '', { nodeIds: [...selectedNodeIds], edgeId: selectedEdgeId })
+      const incoming = _viewSelections.get(to ?? '')
+      set((state) => showSelection(state as DiagramStore, incoming?.nodeIds ?? [], incoming?.edgeId ?? null))
+    }
+
     // ── Document persistence boot ────────────────────────────────────────
     // We always have an "active" document. If the index is empty we seed one
     // with the built-in sample. For LS-backed docs we can hydrate
@@ -1963,6 +2004,8 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           }
           state.rfEdges = derivedEdges as any
+          // The nodes and edges are rebuilt: keep the selection painted.
+          mirrorSelection(state as DiagramStore)
         })
       },
 
@@ -2973,6 +3016,7 @@ export const useDiagramStore = create<DiagramStore>()(
             state.activeViewId = newId
           })
           get()._sync()
+          swapViewSelection(activeViewId, newId)
           const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
           ;(window as any).__rfPlaceCamera?.(incomingViewport, shown)
           _liveLayout?.reset(placed)
@@ -3030,6 +3074,7 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(state as any).__pendingViewport = incomingViewport
         })
         get()._sync()
+        swapViewSelection(activeViewId, newId)
         // The camera for the incoming view, in one step: no flight from the
         // outgoing view's camera (see Canvas placeCamera).
         const pending = (get() as any).__pendingViewport as
@@ -5359,6 +5404,15 @@ export const useDiagramStore = create<DiagramStore>()(
         if (docs && activeDocId) {
           for (const id of docs.getPendingBodyNodeIds(activeDocId)) pendingBody[id] = true
         }
+        // Another document forgets the views' selections; the same one read
+        // again (an outside change) keeps them, the open canvas's included.
+        if ((activeDocId ?? null) !== _viewSelectionsDoc) {
+          _viewSelections = new Map()
+          _viewSelectionsDoc = activeDocId ?? null
+        } else {
+          const { activeViewId, selectedNodeIds, selectedEdgeId } = get()
+          _viewSelections.set(activeViewId ?? '', { nodeIds: [...selectedNodeIds], edgeId: selectedEdgeId })
+        }
 
         set((state) => {
           state.pendingBodyNodeIds = pendingBody as any
@@ -5421,6 +5475,9 @@ export const useDiagramStore = create<DiagramStore>()(
           } satisfies ParkedDesigner
         }
         get()._sync()
+        // The document opens on All elements, with what was selected there.
+        const allSelection = _viewSelections.get('')
+        if (allSelection) set((state) => showSelection(state as DiagramStore, allSelection.nodeIds, allSelection.edgeId))
         get()._enforceLayoutConstraints()
         // skipBulk=true: the loaded positions stand, the live layout only
         // moves what is added or dragged from here on.

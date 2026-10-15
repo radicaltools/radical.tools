@@ -18,9 +18,12 @@ import { zoomIdentity } from 'd3-zoom'
 import { useDiagramStore } from '../store/diagramStore'
 import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
-import { edgeLabelDetail } from './edges/edgeGeometry'
+import { edgeLabelDetail, edgeLabelsShownAt } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { AlignmentGuides } from './AlignmentGuides'
+import { selectCanvasFocus } from '../store/canvasFocus'
+import { ElementPalette, usePaletteCollapsed } from './ElementPalette'
+import { CanvasControls } from './CanvasControls'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize } from '@radical/common/c4'
 import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
 
@@ -53,6 +56,18 @@ const edgeTypes: EdgeTypes = {
   c4relation: RelationEdge as any,
 }
 
+// One dimmed copy per node object: a node that did not change keeps the same
+// object from render to render, so React Flow leaves it alone.
+const focusDimmedCopies = new WeakMap<RFNode, RFNode>()
+function focusDimmed(n: RFNode): RFNode {
+  let copy = focusDimmedCopies.get(n)
+  if (!copy) {
+    copy = { ...n, className: (n.className ?? '') + ' focus-dim' }
+    focusDimmedCopies.set(n, copy)
+  }
+  return copy
+}
+
 // When the grabbed element's parent is selected too, React Flow drags the
 // parent and leaves the grabbed one out of what it moves (handing over
 // no node, or one that does not move): the first element it drags stands
@@ -60,6 +75,17 @@ const edgeTypes: EdgeTypes = {
 // screen only, and was neither saved nor an undo step.
 function draggedNode(grabbedNode: RFNode | undefined, nodes: RFNode[]): RFNode | undefined {
   return (grabbedNode && nodes.find((n) => n.id === grabbedNode.id)) ?? nodes[0] ?? grabbedNode
+}
+
+/** How long the camera takes to frame a selection, or to go back. */
+const SELECTION_CAMERA_MS = 400
+/** Framing a selection zooms in no further than this, or than the zoom in
+ *  use when that is closer already. */
+const SELECTION_MAX_ZOOM = 1
+
+/** Whether two cameras show the same (to a pixel and a fraction of zoom). */
+function sameCamera(a: { x: number; y: number; zoom: number }, b: { x: number; y: number; zoom: number }): boolean {
+  return Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1 && Math.abs(a.zoom - b.zoom) < 0.001
 }
 
 /** How long Smart fit keeps refitting after an expand or collapse (the live
@@ -135,6 +161,8 @@ function StructuralCanvas(): React.ReactElement {
 
   const rfNodes = useDiagramStore((s) => s.rfNodes)
   const rfEdges = useDiagramStore((s) => s.rfEdges)
+  const focus = useDiagramStore(selectCanvasFocus)
+  const activeViewId = useDiagramStore((s) => s.activeViewId)
   const onNodesChange = useDiagramStore((s) => s.onNodesChange)
   const onEdgesChange = useDiagramStore((s) => s.onEdgesChange)
   const selectNode = useDiagramStore((s) => s.selectNode)
@@ -649,6 +677,96 @@ function StructuralCanvas(): React.ReactElement {
     if (W.__rfSetViewport === mine.setViewport) delete W.__rfSetViewport
     if (W.__rfGetViewport === mine.getViewport) delete W.__rfGetViewport
   }, [])
+  /** Frames the nodes `ids` the canvas shows, once React Flow has drawn them
+   *  (a slide switch may have just swapped the view), zooming in no further
+   *  than `maxZoom`. With none of them shown, fits the whole canvas. */
+  const frameNodes = useCallback((
+    ids: string[], duration: number, maxZoom: number,
+    onTarget?: (vp: { x: number; y: number; zoom: number }) => void,
+  ) => {
+    const instance = rfInstanceRef.current
+    if (!instance) return
+    const wanted = new Set(ids)
+    suppressAutoFit(duration + 1800)
+    let frames = 0
+    const frame = () => {
+      const focus = instance.getNodes().filter((n) => wanted.has(n.id) && !n.hidden)
+      const drawn = focus.length > 0 && focus.every((n) => n.width && n.height)
+      if (!drawn && ++frames < 30) {
+        requestAnimationFrame(frame)
+        return
+      }
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!drawn || !rect || rect.width === 0 || rect.height === 0) {
+        smoothFitView(duration, true)
+        return
+      }
+      const bounds = getNodesBounds(focus)
+      const MARGIN = 60
+      const target = getViewportForBounds(
+        { x: bounds.x - MARGIN, y: bounds.y - MARGIN, width: bounds.width + MARGIN * 2, height: bounds.height + MARGIN * 2 },
+        rect.width, rect.height, 0.05, maxZoom, 0.08,
+      )
+      suppressAutoFit(duration + 1800)
+      instance.setViewport(target, { duration })
+      onTarget?.(target)
+    }
+    requestAnimationFrame(frame)
+  }, [suppressAutoFit, smoothFitView])
+
+  // A click that selects on the canvas frames the selection with what it is
+  // connected to, as the metamodel diagram does, unless all of it is in view
+  // and readable already; a click on the empty canvas brings back the camera
+  // from before. Clicks that add to a selection leave the camera alone (the
+  // next element to pick must stay where it is). Only clicks on the canvas move it: a
+  // search, a view switch or a slide that selects sets its own camera. Not
+  // in a presentation, whose slides set the camera. A camera the user moved
+  // after the framing stays.
+  const preFocusCameraRef = useRef<{ x: number; y: number; zoom: number } | null>(null)
+  const framedCameraRef = useRef<{ x: number; y: number; zoom: number } | null>(null)
+  const frameSelection = useCallback(() => {
+    // After the click's selection has reached the store.
+    requestAnimationFrame(() => {
+      const instance = rfInstanceRef.current
+      const s = useDiagramStore.getState()
+      if (!instance || s.presentationActive) return
+      const focus = selectCanvasFocus(s)
+      if (!focus) {
+        const back = preFocusCameraRef.current
+        const framed = framedCameraRef.current
+        preFocusCameraRef.current = null
+        framedCameraRef.current = null
+        if (back && framed && sameCamera(instance.getViewport(), framed)) {
+          suppressAutoFit(SELECTION_CAMERA_MS + 1800)
+          instance.setViewport(back, { duration: SELECTION_CAMERA_MS })
+        }
+        return
+      }
+      const now = instance.getViewport()
+      // Already in view, zoomed in far enough to show relation labels: the
+      // camera stays.
+      const rect = containerRef.current?.getBoundingClientRect()
+      const shown = instance.getNodes().filter((n) => focus.frame.has(n.id) && !n.hidden && n.width && n.height)
+      if (rect && shown.length > 0 && edgeLabelsShownAt(now.zoom)) {
+        const b = getNodesBounds(shown)
+        const left = b.x * now.zoom + now.x
+        const top = b.y * now.zoom + now.y
+        if (left >= 0 && top >= 0 && left + b.width * now.zoom <= rect.width && top + b.height * now.zoom <= rect.height) return
+      }
+      // Framing again from the framed camera keeps the one from before.
+      if (!preFocusCameraRef.current || !framedCameraRef.current || !sameCamera(now, framedCameraRef.current)) {
+        preFocusCameraRef.current = now
+      }
+      framedCameraRef.current = null
+      frameNodes([...focus.frame], SELECTION_CAMERA_MS, Math.max(now.zoom, SELECTION_MAX_ZOOM), (vp) => { framedCameraRef.current = vp })
+    })
+  }, [frameNodes, suppressAutoFit])
+  // The camera to go back to belongs to the canvas it was taken on.
+  useEffect(() => {
+    preFocusCameraRef.current = null
+    framedCameraRef.current = null
+  }, [activeViewId])
+
   const onInit = useCallback((instance: ReactFlowInstance) => {
     rfInstanceRef.current = instance
     setFitViewFn(
@@ -687,32 +805,7 @@ function StructuralCanvas(): React.ReactElement {
     // Hidden ones (inside a collapsed group) are left out; with none shown,
     // the slide falls back to fitting the whole view.
     ;(window as any).__rfFocusNodes = (ids: string[], opts?: { duration?: number }) => {
-      const dur = opts?.duration ?? 600
-      const wanted = new Set(ids)
-      suppressAutoFit(dur + 1800)
-      let frames = 0
-      const frame = () => {
-        const focus = instance.getNodes().filter((n) => wanted.has(n.id) && !n.hidden)
-        const drawn = focus.length > 0 && focus.every((n) => n.width && n.height)
-        if (!drawn && ++frames < 30) {
-          requestAnimationFrame(frame)
-          return
-        }
-        const rect = containerRef.current?.getBoundingClientRect()
-        if (!drawn || !rect || rect.width === 0 || rect.height === 0) {
-          smoothFitView(dur, true)
-          return
-        }
-        const bounds = getNodesBounds(focus)
-        const MARGIN = 60
-        const target = getViewportForBounds(
-          { x: bounds.x - MARGIN, y: bounds.y - MARGIN, width: bounds.width + MARGIN * 2, height: bounds.height + MARGIN * 2 },
-          rect.width, rect.height, 0.05, 1.5, 0.08,
-        )
-        suppressAutoFit(dur + 1800)
-        instance.setViewport(target, { duration: dur })
-      }
-      requestAnimationFrame(frame)
+      frameNodes(ids, opts?.duration ?? 600, 1.5)
     }
     // Presentation slide navigation (diagramStore's goToSlide/previewSlide)
     // uses this to stop the auto-fit interval from fighting the slide's own
@@ -748,7 +841,7 @@ function StructuralCanvas(): React.ReactElement {
       delete (window as any).__radicalZoomIn
       delete (window as any).__radicalZoomOut
     }
-  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, placeCamera])
+  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, placeCamera, frameNodes])
 
   // Double-click on the canvas background → add a new System at that position
   const onCanvasDoubleClick = useCallback(
@@ -789,8 +882,9 @@ function StructuralCanvas(): React.ReactElement {
       const multi = e.shiftKey || e.metaKey || e.ctrlKey
       if (multi) return
       selectNode(node.id)
+      frameSelection()
     },
-    [cancelConnection, selectNode]
+    [cancelConnection, selectNode, frameSelection]
   )
 
   // Use a native mousedown/mouseup flow on the container to handle
@@ -879,7 +973,8 @@ function StructuralCanvas(): React.ReactElement {
     cancelConnection()
     selectNode(null)
     selectEdge(null)
-  }, [cancelConnection, selectNode, selectEdge])
+    frameSelection()
+  }, [cancelConnection, selectNode, selectEdge, frameSelection])
 
   // Metamodel-aware validation for ReactFlow's built-in connect drag.
   const isValidConnection = useCallback((conn: { source: string | null; target: string | null }) => {
@@ -900,8 +995,9 @@ function StructuralCanvas(): React.ReactElement {
         return
       }
       selectEdge(edge.id)
+      frameSelection()
     },
-    [selectEdge]
+    [selectEdge, frameSelection]
   )
 
   // Handle drag-from-sidebar drop
@@ -1089,12 +1185,13 @@ function StructuralCanvas(): React.ReactElement {
   if (modifierHeld) canvasClasses.push('connect-ready')
   if (autoFitActive) canvasClasses.push('autofit-active')
 
-  // Annotate nodes: connecting-source class when in connect mode
-  const annotatedNodes = connectSource
+  // Annotate nodes: connecting-source class when in connect mode, focus-dim
+  // on the nodes a selection leaves out (canvasFocus.ts).
+  const annotatedNodes = connectSource || focus
     ? rfNodes.map((n) =>
         n.id === connectSource
           ? { ...n, className: (n.className ?? '') + ' connecting-source' }
-          : n
+          : focus && !focus.nodes.has(n.id) ? focusDimmed(n) : n
       )
     : rfNodes
 
@@ -1336,6 +1433,21 @@ function StructuralCanvas(): React.ReactElement {
   )
 }
 
-export function Canvas(): React.ReactElement {
-  return <StructuralCanvas />
+/** The canvas, with the elements palette above it in Designer and its
+ *  controls centred at its bottom (neither while a presentation plays). The
+ *  palette is folded away with its tab; that is remembered in this browser.
+ *  `smartLayoutNote` goes to the Smart Layout button (CanvasControls). */
+export function Canvas({ smartLayoutNote }: { smartLayoutNote?: string } = {}): React.ReactElement {
+  const presenting = useDiagramStore((s) => s.presentationActive)
+  const showPalette = useDiagramStore((s) => s.appMode === 'designer') && !presenting
+  const [paletteCollapsed, togglePalette] = usePaletteCollapsed()
+  // One element around both, whether the palette shows or not: switching
+  // modes must not mount the canvas again.
+  return (
+    <div className="canvas-column">
+      {showPalette && <ElementPalette collapsed={paletteCollapsed} onToggleCollapsed={togglePalette} />}
+      <StructuralCanvas />
+      {!presenting && <CanvasControls smartLayoutNote={smartLayoutNote} />}
+    </div>
+  )
 }

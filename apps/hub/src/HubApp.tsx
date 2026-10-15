@@ -15,7 +15,6 @@ import {
   HUB_CATEGORIES,
   NotificationHost,
   RightPanel,
-  SmartLayoutButton,
   TableView,
   WikiView,
   buildConnectionCounts,
@@ -48,13 +47,6 @@ const SORT_LABELS: Record<HubSortKey, string> = { name: 'Name', category: 'Categ
 const TypeIcon = ({ path, size = 14, color }: { path: string; size?: number; color?: string }) => (
   <svg viewBox="0 0 16 16" width={size} height={size} fill={color ?? 'currentColor'} aria-hidden="true">
     <path d={path} />
-  </svg>
-)
-
-const IconFitAll = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3" />
-    <rect x="5" y="5" width="6" height="6" rx="1" />
   </svg>
 )
 
@@ -719,12 +711,6 @@ function HubAppInner(): React.ReactElement {
                       ))}
                     </select>
                   )}
-                  {viewKind === 'canvas' && (
-                    <>
-                      <button type="button" className="toolbar-btn" onClick={fitAll} title="Fit all nodes to viewport"><IconFitAll /> Fit</button>
-                      <SmartLayoutButton readOnlyNote="Exploration only — nothing is saved." />
-                    </>
-                  )}
                   <div style={{ flex: 1 }} />
                   <button type="button" className="toolbar-btn" disabled={!conceptDoc} onClick={() => conceptDoc && void copyJson(concept, conceptDoc)} title="Copy as .radical JSON"><IconCopy /> Copy JSON</button>
                   <button type="button" className="toolbar-btn" disabled={!conceptDoc} onClick={() => conceptDoc && downloadConcept(conceptDoc)} title="Download as .radical file (opens in Radical Studio)"><IconDownload /> Download</button>
@@ -759,7 +745,7 @@ function HubAppInner(): React.ReactElement {
             ) : viewKind === 'table' ? (
               <TableView />
             ) : (
-              <Canvas />
+              <Canvas smartLayoutNote="Exploration only — nothing is saved." />
             )}
 
             {concept && related.length > 0 && (

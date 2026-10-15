@@ -14,7 +14,6 @@ test('one click on a cell selects its relation, even when it was selected on ano
   await studio.open('v-containers')
   await page.getByTestId('rf__edge-r2').locator('path').first().click({ force: true })
   await expect(page.locator('.props-type-badge')).toHaveText(/relation/i)
-  await page.locator('.lp-section-header', { hasText: /^Views/ }).click()
   await page.locator('.lp-view-card', { hasText: 'Matrix' }).click()
   const cell = page.locator('.mx-cell.mx-has-rel[title*="calls"]')
   await cell.click()
