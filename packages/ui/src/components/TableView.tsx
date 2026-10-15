@@ -5,6 +5,7 @@ import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common
 import type { Metamodel, PropertyDef } from '@radical/common/metamodel'
 import { isParentAllowed, isPlacementAllowed, composeEarsSentence, requirementStatePhrase, resolveEarsSubject } from '@radical/common/metamodel'
 import { RefPicker } from './RefPicker'
+import { ElementPalette, usePaletteCollapsed } from './ElementPalette'
 import { viewShowsEveryNode } from '@radical/common/c4'
 
 // ─── Column definitions ──────────────────────────────────────────────────────
@@ -174,6 +175,8 @@ export function TableView(): React.ReactElement {
     if (activeViewId) setTableActiveTab(activeViewId, next)
   }, [activeViewId, setTableActiveTab])
 
+  // The palette, as above the canvas: its types drop onto a row to nest.
+  const [paletteCollapsed, togglePalette] = usePaletteCollapsed()
   const [editCell, setEditCell]   = useState<EditCell | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [dropParentId, setDropParentId] = useState<string | null>(null)
@@ -628,6 +631,8 @@ export function TableView(): React.ReactElement {
           </div>
         )
       )}
+
+      {!readOnly && <ElementPalette collapsed={paletteCollapsed} onToggleCollapsed={togglePalette} />}
 
       {/* Tab bar */}
       <div className="tv-tabs">

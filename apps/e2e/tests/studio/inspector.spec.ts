@@ -76,7 +76,7 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   // From there to Designer, on the canvas that shows it, selected.
   await peek.getByRole('button', { name: 'Show on canvas' }).click()
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
-  await expect(page.locator('.toolbar').getByRole('button', { name: 'Fit All' })).toBeVisible()
+  await expect(page.locator('.canvas-controls').getByRole('button', { name: 'Fit All' })).toBeVisible()
   await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Specification')
   await expect(studio.node('req')).toHaveClass(/selected/)
 

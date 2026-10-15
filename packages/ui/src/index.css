@@ -411,33 +411,113 @@ body {
   min-width: 0;
 }
 
+/* The canvas with the elements palette above it (Canvas). */
+.canvas-column {
+  grid-area: canvas;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.canvas-column > .canvas-area { flex: 1; }
+
+/* Fit, zoom and Smart Layout (CanvasControls), centred at the canvas's
+   bottom, below the selection bar (90px up). */
+.canvas-controls {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 12px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+/* Near the bottom of the screen the report opens upwards. */
+.canvas-controls .smart-layout-report-popover { top: auto; bottom: calc(100% + 8px); }
+
+.element-palette {
+  position: relative;
+  flex-shrink: 0;
+  /* Its tab hangs over the canvas below; the side panels' tabs (z-index 5)
+     lie over it. */
+  z-index: 4;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  /* Clear of the side panels' collapse tabs, which overlap the column edges. */
+  padding: 10px 26px 0;
+  background: var(--bg-canvas);
+}
+/* Folded away: only its tab, at the top of the canvas. */
+.element-palette.collapsed { height: 0; padding: 0; }
+.element-palette.collapsed .panel-toggle-top { bottom: auto; top: 0; }
+/* A card like the canvas controls, centred, as wide as its chips need. */
+.element-palette-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  column-gap: 4px;
+  row-gap: 6px;
+  max-width: 100%;
+  padding: 5px 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+/* Too narrow for one row: the groups wrap onto more. */
+.element-palette-strip.wrapped { flex-wrap: wrap; }
+.palette-group {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+  padding-right: 4px;
+}
+.palette-group:last-child { border-right: 0; }
+.palette-group-items { display: flex; align-items: center; justify-content: center; gap: 1px; }
+/* The group's name, centred above its chips. */
 .palette-group-label {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: .08em;
+  line-height: 14px;
+  letter-spacing: .06em;
   text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
   color: var(--text-muted);
-  padding: 8px 10px 2px;
-  opacity: .6;
+  padding: 2px 4px 0;
+  margin-bottom: 5px;
 }
 
 .palette-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 2px;
+  min-width: 48px;
+  padding: 4px 4px 3px;
   border-radius: 6px;
   cursor: grab;
   transition: background 0.15s;
-  margin-bottom: 4px;
   border: 1px solid transparent;
   user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .palette-item:hover { background: var(--hover-bg-subtle); border-color: var(--border-color); }
 .palette-item:active { cursor: grabbing; }
 
 .palette-badge {
-  width: 28px; height: 24px;
+  width: 30px; height: 26px;
   border-radius: 5px;
   flex-shrink: 0;
   display: flex;
@@ -445,8 +525,7 @@ body {
   justify-content: center;
 }
 
-.palette-label { font-size: 12px; }
-.palette-sublabel { font-size: 10px; color: var(--text-muted); }
+.palette-label { font-size: 11px; line-height: 1.25; color: var(--text-secondary, var(--text-primary)); }
 
 .tree-node {
   display: flex;
@@ -715,6 +794,16 @@ body {
   border-radius: 6px 0 0 6px;
   border-right: none;
 }
+.panel-toggle-top {
+  left: 50%;
+  top: auto;
+  bottom: -10px;
+  width: 36px;
+  height: 18px;
+  margin-left: -18px;
+  border-radius: 0 0 6px 6px;
+  border-top: none;
+}
 .left-panel.collapsed .panel-toggle-left,
 .right-panel.collapsed .panel-toggle-right {
   /* keep the tab visible inside the collapsed rail */
@@ -963,10 +1052,10 @@ body {
 .lp-folder-toggle {
   flex: 1; min-width: 0;
   display: flex; align-items: center; gap: 6px;
-  padding: 5px 6px;
+  padding: 6px 6px;
   background: none; border: none; border-radius: 6px;
   cursor: pointer; text-align: left;
-  color: var(--text-secondary); font-size: 11.5px; font-weight: 600;
+  color: var(--text-primary); font-size: 12.5px; font-weight: 600;
   transition: color 0.12s ease;
 }
 .lp-folder-row:hover .lp-folder-toggle { color: var(--text-primary); }
@@ -990,10 +1079,11 @@ body {
   transition: transform 0.15s ease;
 }
 .lp-folder-row.open .lp-folder-chevron { transform: rotate(90deg); }
-.lp-folder-icon { display: inline-flex; color: var(--text-muted); }
+/* Folders in Radical's blue, so they stand out from the views in them. */
+.lp-folder-icon { display: inline-flex; color: var(--accent); }
 .lp-folder-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lp-folder-count {
-  color: var(--text-muted); font-size: 10px; font-weight: 500;
+  color: var(--text-muted); font-size: 11px; font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 .lp-folder-body {
@@ -2690,6 +2780,15 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
   outline: 3px solid var(--accent) !important;
   outline-offset: 3px;
   box-shadow: 0 0 12px rgba(var(--accent-rgb, 99,102,241), 0.45);
+}
+
+/* ── Selection focus (canvasFocus.ts): what a selection leaves out is dimmed.
+   Opacity only: a filter on every card slows panning a large view. ── */
+.react-flow__node.focus-dim,
+.react-flow__edge g.focus-dim,
+.relation-label.focus-dim {
+  opacity: 0.18;
+  transition: opacity 120ms ease;
 }
 
 /* background */

@@ -65,7 +65,6 @@ test.describe('views panel', () => {
 
   test('a view moves into a folder from its properties, the folder opens, closes and is renamed', async ({ page, studio }) => {
     await studio.open('v-context')
-    await page.locator('.lp-section-header', { hasText: /^Views/ }).click()
     const card = page.locator('.lp-view-card').filter({ hasText: 'System Context' })
     await card.hover()
     await card.getByTitle('View properties').click()
@@ -96,7 +95,6 @@ test.describe('views panel', () => {
     // Kept with the model; the folder of the active view opens by itself.
     await page.reload()
     await studio.ready()
-    await page.locator('.lp-section-header', { hasText: /^Views/ }).click()
     await expect(page.locator('.lp-folder-body .lp-view-card')).toHaveText(/System Context/)
     await expect(page.locator('.lp-folder-row').first()).toContainText('Model')
     await card.hover()
@@ -110,7 +108,6 @@ test.describe('views panel', () => {
 
   test('a folder moves up and down among the folders beside it', async ({ page, studio }) => {
     await studio.open('v-context')
-    await page.locator('.lp-section-header', { hasText: /^Views/ }).click()
     const moveTo = async (viewName: string, folder: string) => {
       const card = page.locator('.lp-view-card').filter({ hasText: viewName })
       await card.hover()
@@ -145,7 +142,6 @@ test.describe('line style', () => {
     const paths = () => page.locator('.react-flow__edge-path').evaluateAll((els) => els.map((e) => e.getAttribute('d') ?? ''))
     // Curved: cubic Béziers.
     await expect.poll(async () => (await paths()).every((d) => d.includes('C'))).toBe(true)
-    await page.locator('.lp-section-header', { hasText: /^Views/ }).click()
     const card = page.locator('.lp-view-card').filter({ hasText: 'Containers' })
     await card.hover()
     await card.getByTitle('View properties').click()

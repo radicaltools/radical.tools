@@ -154,21 +154,22 @@
       <section class="doc-section" id="workspace">
         <h2>The workspace</h2>
         <figure class="doc-shot">
-          <img class="shot-light" src="screenshots/designer-light.png" alt="Designer perspective: element palette and views on the left, canvas in the centre, model tree on the right, toolbar on top" loading="lazy" />
-          <img class="shot-dark" src="screenshots/designer-dark.png" alt="Designer perspective: element palette and views on the left, canvas in the centre, model tree on the right, toolbar on top" loading="lazy" />
+          <img class="shot-light" src="screenshots/designer-light.png" alt="Designer perspective: views on the left, the element palette above the canvas in the centre, model tree on the right, toolbar on top" loading="lazy" />
+          <img class="shot-dark" src="screenshots/designer-dark.png" alt="Designer perspective: views on the left, the element palette above the canvas in the centre, model tree on the right, toolbar on top" loading="lazy" />
           <figcaption>Designer perspective with the <em>System Context</em> view of the sample model active.</figcaption>
         </figure>
         <h3>Toolbar</h3>
         <ul>
           <li><strong>Radical menu</strong> (logo, top-left) — <em>Manage models…</em>, <em>Import from Hub…</em>, <em>Metamodel editor…</em>, light/dark theme, Smart Fit, the connect key, <em>AI providers…</em> and export (PNG, SVG, copy to clipboard) of the view shown, whatever its kind.</li>
-          <li><strong>Fit All</strong>, zoom out / in, <strong>Smart Layout</strong> (or <em>Tree Layout</em> when the view asks for it), Undo / Redo.</li>
+          <li><strong>Undo / Redo</strong>.</li>
           <li><strong>Quick Search</strong> (<kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>P</kbd>) — find any element, relation or view; doubles as the AI prompt.</li>
           <li><strong>Perspective switch</strong> — <em>Designer</em> edits, <em>Viewer</em> explores read-only, <em>Presenter</em> builds and plays slide decks.</li>
         </ul>
         <h3>Left panel</h3>
-        <p>Three collapsible sections: <strong>Elements</strong> (the palette — drag onto the canvas), <strong>Views</strong> (one card per view, with node count and kind) and <strong>Milestones</strong>. In Viewer and Presenter the palette disappears and Views takes the top.</p>
+        <p>Two sections, <strong>Views</strong> (one card per view, with node count and kind) and <strong>Milestones</strong>. Click a section's header to open it, which folds the other, or to fold it when it is open; the right panel's sections work the same.</p>
         <h3>Canvas</h3>
-        <p>The chip in the top-left corner names the active view (<em>Structure: System Context</em>) or, when time-travelling, the active milestone. Nodes can be dragged, nested, collapsed and connected here; the other view kinds replace the canvas with their own surface.</p>
+        <p>In Designer the <strong>Elements palette</strong> is a card centred above the canvas: one chip per element type, with its icon and name, grouped under C4, Domain, Governance, Requirements, States, UX and Other — drag a chip onto the canvas; its tooltip describes the type. When the canvas is too narrow for one row the groups wrap onto a second. The tab on its bottom edge folds it away, leaving just the tab at the top of the canvas, and this browser remembers which. The table view shows the same palette, to drop a type onto a row; the other view kinds, Viewer and Presenter have none.</p>
+        <p>At the bottom of the canvas, in the middle, are <strong>Fit All</strong>, zoom out / in and <strong>Smart Layout</strong> (or <em>Tree Layout</em> when the view asks for it). The chip in the top-left corner names the active view (<em>Structure: System Context</em>) or, when time-travelling, the active milestone. Nodes can be dragged, nested, collapsed and connected here; the other view kinds replace the canvas, its palette and its controls with their own surface.</p>
         <h3>Right panel</h3>
         <p><strong>Nodes</strong> is the model tree — every element, whether or not the current view shows it; the eye icon toggles visibility in the active view and dimmed rows are outside it. <strong>Relations</strong> and <strong>Sequences</strong> follow. Selecting anything slides the panel to its <strong>properties</strong>.</p>
       </section>
@@ -330,8 +331,9 @@
       <section class="doc-section" id="selection">
         <h2>Working with selections</h2>
         <p>
-          Click selects one element; <kbd>Shift</kbd>, <kbd>⌘</kbd>/<kbd>Ctrl</kbd> or <kbd>Alt</kbd>-click adds more. With several nodes selected the <strong>selection bar</strong> appears above the canvas:
+          Click selects one element; <kbd>Shift</kbd>, <kbd>⌘</kbd>/<kbd>Ctrl</kbd> or <kbd>Alt</kbd>-click adds more. A selection brings its relations forward: the selected elements, their relations (and those of anything inside a selected container) and the elements at the other ends stay as they are, the relations turn the accent colour, and the rest of the canvas is dimmed. A selected relation does the same for itself and its two ends. The camera frames what stays, and a click on the empty canvas clears the selection and brings back the camera from before, unless you moved it in the meantime. Each view keeps its own selection: another view opens with what you last selected there, and a view you come back to shows its selection again.
         </p>
+        <p>With several nodes selected the <strong>selection bar</strong> appears above the canvas:</p>
         <ul>
           <li><strong>Wrap into…</strong> — create a new container of an allowed type around the selection.</li>
           <li><strong>Move to…</strong> — re-parent the selection into another container.</li>

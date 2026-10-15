@@ -9,6 +9,7 @@ import {
 } from 'reactflow'
 import { C4EdgeRFData } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
+import { edgeFocus } from '../../store/canvasFocus'
 import { edgeGeometry, edgeLabelsShownAt, LABEL_BOX } from './edgeGeometry'
 
 // ─── Custom arrowhead ─────────────────────────────────────────────────────────
@@ -166,6 +167,8 @@ export const RelationEdge = memo(
       [source, target],
     )
     const endSelected = useStore(endSelectedSelector)
+    // A selection brings its relations forward and dims the rest (canvasFocus.ts).
+    const focus = useDiagramStore((s) => edgeFocus(s, id))
 
     // Not drawable yet (an end is hidden or not measured).
     if (!geometry) return null
@@ -178,7 +181,7 @@ export const RelationEdge = memo(
     // an event is a completion transition and is drawn bare.
     const typeName = data?.relationType === 'transition' ? undefined : data?.relationType
 
-    const strokeColor = selected ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'
+    const strokeColor = selected || focus === 'focus' ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'
     const strokeDash  = data?.isVirtual ? '6 3' : undefined
 
     // Diff highlight
@@ -191,7 +194,7 @@ export const RelationEdge = memo(
     const diffOpacity = diffKind === 'removed' ? 0.55 : 1
 
     return (
-      <>
+      <g className={focus === 'dim' ? 'focus-dim' : undefined}>
         <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
           <BaseEdge
             id={id}
@@ -199,7 +202,7 @@ export const RelationEdge = memo(
             style={{
               ...style,
               stroke:          diffStroke ?? strokeColor,
-              strokeWidth:     diffStroke ? 3 : selected ? 2 : 1.5,
+              strokeWidth:     diffStroke ? 3 : selected || focus === 'focus' ? 2 : 1.5,
               strokeDasharray: diffDash ?? strokeDash,
               strokeLinejoin:  'round',
               strokeLinecap:   'round',
@@ -244,6 +247,7 @@ export const RelationEdge = memo(
               className={[
                 'nodrag nopan relation-label',
                 selected || hovered || endSelected ? 'relation-label-active' : '',
+                focus === 'dim' ? 'focus-dim' : '',
                 data.label || typeName ? '' : 'relation-label-tech-only',
               ].join(' ')}
             >
@@ -288,7 +292,7 @@ export const RelationEdge = memo(
             </div>
           </EdgeLabelRenderer>
         )}
-      </>
+      </g>
     )
   }
 )

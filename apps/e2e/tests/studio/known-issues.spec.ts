@@ -15,10 +15,9 @@ test('double-click on the empty canvas adds a system', async ({ page, studio }) 
 })
 
 test('Undo and Redo in the toolbar can be clicked at 1440px', async ({ page, studio }) => {
-  test.fail(true, 'The centred Quick Search bar covers the Undo/Redo buttons on canvas views at this width')
   await studio.seed()
   await studio.open('v-context')
-  await studio.addFromPalette('Software System', { x: 150, y: 750 })
+  await studio.addFromPalette('Software System', await studio.nearBottom())
   await page.getByRole('button', { name: 'Undo', exact: true }).click({ timeout: 3000 })
   await expect(studio.nodes).toHaveCount(3)
 })
