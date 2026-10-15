@@ -32,7 +32,6 @@ import { EarsQuickEntry } from './EarsQuickEntry'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
 import { wireframeDataUri } from '@radical/common/wireframe'
-import { loadStudioSettings, STUDIO_SETTINGS_CHANGED_EVENT } from '../studioSettings'
 import {
   C4Node,
   C4Relation,
@@ -43,7 +42,7 @@ import {
   TYPE_LABELS,
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
-import { viewShowsEveryNode } from '@radical/common/c4'
+import { viewShowsEveryNode, wikiDepthOf } from '@radical/common/c4'
 import { pipelineOf, runPipeline, type PipelineContext } from '@radical/common/viewPipeline'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
@@ -356,14 +355,9 @@ export function WikiView(): React.ReactElement {
 
   const [filter, setFilter] = useState('')
 
-  // Studio-wide preference (see components/Toolbar.tsx's "Wiki multi-page
-  // depth" control) — how many levels 'multi' page mode embeds inline.
-  const [multiPageDepth, setMultiPageDepth] = useState(() => loadStudioSettings().wikiMultiPageDepth)
-  useEffect(() => {
-    const onChange = (): void => setMultiPageDepth(loadStudioSettings().wikiMultiPageDepth)
-    window.addEventListener(STUDIO_SETTINGS_CHANGED_EVENT, onChange)
-    return () => window.removeEventListener(STUDIO_SETTINGS_CHANGED_EVENT, onChange)
-  }, [])
+  // How many levels 'multi' page mode embeds inline: the view's Depth, set
+  // in its properties.
+  const multiPageDepth = wikiDepthOf(view)
 
   // Respect the right-panel visibility filter: a view's nodeIds defines the
   // visible set (empty = show all). Ancestors are included so the hierarchy
@@ -1892,7 +1886,7 @@ function WikiElementPage({
   /** For a chapter, the element whose page it is written into. */
   chapterOf?: string
   /** How many more levels 'multi' page mode may still embed inline, from
-   *  here down — the Studio-wide "Wiki multi-page depth" setting at the top
+   *  here down — the view's Depth (its properties) at the top
    *  level, decremented by one on each embedded recursion. 0 = show this
    *  node's own children as preview cards even in 'multi' mode (the depth
    *  budget is spent). Defaults to 1 for any caller that doesn't pass it. */

@@ -40,6 +40,25 @@ test.describe('wiki', () => {
     await expect(page.locator('.wiki-title')).toHaveText('Banking Services')
   })
 
+  test('the Depth in the view properties sets how many levels Multi page writes out', async ({ page, studio }) => {
+    await studio.open('view-wiki/f/sys-core', 'designer', studio.activeDocId())
+    await page.getByRole('button', { name: 'Multi page' }).click()
+    // One level: the domains are chapters, their containers only named.
+    await expect(page.getByRole('heading', { level: 2, name: 'Banking Services' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Payments Service' })).toHaveCount(0)
+    const card = page.locator('.lp-view-card', { hasText: 'Architecture Wiki' })
+    await card.hover()
+    await card.getByTitle('View properties').click()
+    const depth = page.locator('.props-content').getByLabel('Depth')
+    await expect(depth).toHaveValue('1')
+    // A wiki has no layout to choose.
+    await expect(page.locator('.props-content')).not.toContainText('Auto-layout')
+    await depth.selectOption('2')
+    await expect(page.getByRole('heading', { name: 'Payments Service' })).toBeVisible()
+    // The menu at the top no longer has it.
+    await expect(page.getByText('Wiki multi-page depth')).toHaveCount(0)
+  })
+
   test('the glossary says what the types and relations of the model are', async ({ page }) => {
     await page.getByRole('button', { name: 'Glossary' }).click()
     await expect(page).toHaveURL(/\/v\/view-wiki\/f\/_glossary$/)

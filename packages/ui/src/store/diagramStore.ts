@@ -77,7 +77,7 @@ import { LIVE_CHILD_TOP_MIN } from '@radical/layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
-import { type EdgeStyle, type ViewPipeline, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, withCanvasPositions } from '@radical/common/c4'
+import { type EdgeStyle, type ViewPipeline, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -1330,6 +1330,7 @@ interface DiagramStore {
   /** Switch how an element's page renders its children — short preview
    *  cards ('single', default) or each child's full content inline ('multi'). */
   setWikiPageMode: (viewId: string, mode: 'single' | 'multi') => void
+  setWikiDepth: (viewId: string, depth: number) => void
   /** Choose how treemap rectangles are sized for a view. */
   setTreemapSizeBy: (viewId: string, mode: 'leaves' | 'uniform' | 'relations') => void
   setTreemapMaxDepth: (viewId: string, depth: number | null) => void
@@ -3297,6 +3298,15 @@ export const useDiagramStore = create<DiagramStore>()(
           const view = state.views[viewId]
           if (!view) return
           view.wikiPageMode = mode
+        })
+        get()._sync()
+      },
+
+      setWikiDepth(viewId, depth) {
+        set((state) => {
+          const view = state.views[viewId]
+          if (!view) return
+          view.wikiDepth = wikiDepthOf({ wikiDepth: depth })
         })
         get()._sync()
       },

@@ -9,14 +9,34 @@ import { StructurePanel } from './StructurePanel'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
-import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, type ViewFolder, type DiagramView } from '@radical/common/c4'
+import { viewShownNodes } from '@radical/common/viewPipeline'
+import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 
-/** A view with no node list shows the whole model, unless it was emptied. */
-function viewNodeCount(view: { nodeIds: string[]; empty?: true }): string {
-  const n = view.nodeIds.length
-  return viewShowsEveryNode(view) ? 'All nodes' : `${n} ${n === 1 ? 'node' : 'nodes'}`
+/** How many elements each view shows (viewShownNodes: its filter's chain,
+ *  else its list); undefined for a view that shows the whole model. Running
+ *  every view's chain takes tens of milliseconds on a large model, so it
+ *  waits until the model has stopped changing for a moment. */
+function useViewNodeCounts(views: Record<string, DiagramView>): Record<string, number | undefined> {
+  const nodes = useDiagramStore((s) => s.c4Nodes)
+  const relations = useDiagramStore((s) => s.c4Relations)
+  const count = useCallback(() => {
+    const out: Record<string, number | undefined> = {}
+    for (const v of Object.values(views)) out[v.id] = viewShownNodes(v, nodes, relations)?.size
+    return out
+  }, [views, nodes, relations])
+  const [counts, setCounts] = useState(count)
+  useEffect(() => {
+    const t = setTimeout(() => setCounts(count()), 300)
+    return () => clearTimeout(t)
+  }, [count])
+  return counts
+}
+
+function viewNodeCount(view: DiagramView, shown: number | undefined): string {
+  if (shown === undefined) return viewShowsEveryNode(view) ? 'All nodes' : ''
+  return `${shown} ${shown === 1 ? 'node' : 'nodes'}`
 }
 
 function AutoResizeTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
@@ -513,6 +533,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const setViewKind = useDiagramStore((s) => s.setViewKind)
   const setViewSequence = useDiagramStore((s) => s.setViewSequence)
   const setViewLayoutMode = useDiagramStore((s) => s.setViewLayoutMode)
+  const setWikiDepth = useDiagramStore((s) => s.setWikiDepth)
   const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
   const setAlignmentOrdered = useDiagramStore((s) => s.setAlignmentOrdered)
   const setGridColumns = useDiagramStore((s) => s.setGridColumns)
@@ -683,7 +704,25 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
           </div>
         </div>
       )}
-      {!readOnly && !isTreemap && !isDynamic && !isTable && !isMatrix && (
+      {isWiki && (
+        <div>
+          <div className="props-section-title">Depth</div>
+          <select
+            aria-label="Depth"
+            value={wikiDepthOf(view)}
+            disabled={readOnly}
+            onChange={(e) => setWikiDepth(view.id, Number(e.target.value))}
+            className="props-input"
+            style={{ cursor: readOnly ? 'default' : 'pointer', width: '100%' }}
+            title="Multi page: how many levels of children are written out as chapters before the rest show as preview cards"
+          >
+            {Array.from({ length: WIKI_DEPTH_MAX - WIKI_DEPTH_MIN + 1 }, (_, i) => WIKI_DEPTH_MIN + i).map((n) => (
+              <option key={n} value={n}>{n} level{n === 1 ? '' : 's'}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {!readOnly && isStatic && (
         <div>
           <div className="props-section-title">Auto-layout</div>
           <select
@@ -1028,6 +1067,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
   const setActiveView = useDiagramStore((s) => s.setActiveView)
   const addView = useDiagramStore((s) => s.addView)
   const totalNodes = useDiagramStore((s) => Object.keys(s.c4Nodes).length)
+  const counts = useViewNodeCounts(views)
   const viewList = Object.values(views)
   const tree = useMemo(() => viewFolderTree(viewList), [views])
   // Folders start open; the one holding the active view opens again.
@@ -1069,7 +1109,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
           <div className="lp-card-body">
             <div className="lp-card-title">{v.name}</div>
             <div className="lp-card-meta">
-              <span>{viewNodeCount(v)}</span>
+              <span>{viewNodeCount(v, counts[v.id])}</span>
               <span style={{ ...VIEW_BADGE_STYLE, color: badge === 'structure' ? 'var(--text-muted)' : 'var(--accent)' }}>{badge}</span>
             </div>
           </div>

@@ -15,8 +15,6 @@ import {
   loadStudioSettings,
   saveStudioSettings,
   STUDIO_SETTINGS_CHANGED_EVENT,
-  WIKI_MULTI_PAGE_DEPTH_MIN,
-  WIKI_MULTI_PAGE_DEPTH_MAX,
   type StudioSettings,
 } from '@radical/ui/studioSettings'
 
@@ -270,16 +268,8 @@ function AppMenu({
   // Studio-wide preferences (localStorage, not part of the .radical file) —
   // self-contained here the same way AI settings are self-contained in
   // AISettingsModal: load once, persist + broadcast on change so any other
-  // mounted view (e.g. WikiView) picks it up live.
+  // mounted view picks it up live.
   const [studioSettings, setStudioSettings] = useState<StudioSettings>(() => loadStudioSettings())
-  const setWikiMultiPageDepth = useCallback((depth: number) => {
-    setStudioSettings((prev) => {
-      const next = { ...prev, wikiMultiPageDepth: depth }
-      saveStudioSettings(next)
-      window.dispatchEvent(new Event(STUDIO_SETTINGS_CHANGED_EVENT))
-      return next
-    })
-  }, [])
   const setNodeWizardOnCreate = useCallback((on: boolean) => {
     setStudioSettings((prev) => {
       const next = { ...prev, nodeWizardOnCreate: on }
@@ -395,22 +385,6 @@ function AppMenu({
               >
                 <option value="curved">Curved</option>
                 <option value="orthogonal">Orthogonal</option>
-              </select>
-            </div>
-            <div className="app-menu-row">
-              <span className="app-menu-row-label">Wiki multi-page depth</span>
-              <select
-                className="app-menu-select"
-                value={studioSettings.wikiMultiPageDepth}
-                onChange={(e) => setWikiMultiPageDepth(Number(e.target.value))}
-                title="Wiki 'Multi page' mode: how many levels of children get their full content shown inline before falling back to preview cards"
-              >
-                {Array.from(
-                  { length: WIKI_MULTI_PAGE_DEPTH_MAX - WIKI_MULTI_PAGE_DEPTH_MIN + 1 },
-                  (_, i) => WIKI_MULTI_PAGE_DEPTH_MIN + i,
-                ).map((n) => (
-                  <option key={n} value={n}>{n} level{n === 1 ? '' : 's'}</option>
-                ))}
               </select>
             </div>
           </div>

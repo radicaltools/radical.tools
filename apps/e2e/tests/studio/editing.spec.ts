@@ -16,7 +16,7 @@ test('add an element from the palette', async ({ studio }) => {
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
 })
 
-test('the palette sits above the canvas and the table, folds away and stays folded', async ({ page, studio }) => {
+test('the palette sits above the canvas, not the table, folds away and stays folded', async ({ page, studio }) => {
   const palette = page.locator('.canvas-column .element-palette')
   await expect(palette.locator('.palette-group-label', { hasText: 'C4' })).toBeVisible()
   await expect(palette.locator('.palette-item', { hasText: 'Software System' })).toBeVisible()
@@ -31,9 +31,10 @@ test('the palette sits above the canvas and the table, folds away and stays fold
   await page.getByRole('button', { name: 'Show the elements' }).click()
   await expect(palette.locator('.palette-item').first()).toBeVisible()
 
-  // The table view has it too (its types drop onto a row); Viewer has none.
+  // The table view has none, nor has Viewer.
   await studio.open('v-table')
-  await expect(page.locator('.tv-wrap .element-palette .palette-item').first()).toBeVisible()
+  await expect(page.locator('.tv-wrap')).toBeVisible()
+  await expect(page.locator('.element-palette')).toHaveCount(0)
   await studio.open('v-context', 'viewer')
   await expect(page.locator('.react-flow__node').first()).toBeVisible()
   await expect(page.locator('.element-palette')).toHaveCount(0)

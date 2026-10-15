@@ -7,14 +7,7 @@
 export const STUDIO_SETTINGS_KEY = 'radical-studio-settings'
 export const STUDIO_SETTINGS_CHANGED_EVENT = 'radical:studio-settings-changed'
 
-export const WIKI_MULTI_PAGE_DEPTH_MIN = 1
-export const WIKI_MULTI_PAGE_DEPTH_MAX = 5
-
 export interface StudioSettings {
-  /** Wiki "Multi page" mode: how many levels of children get their full
-   *  page content embedded inline before falling back to preview cards.
-   *  1 = parent + direct children only (the original, fixed behaviour). */
-  wikiMultiPageDepth: number
   /** Open a node type's wizard when the user creates a node of that type. */
   nodeWizardOnCreate: boolean
   /** Smart fit: the camera follows the diagram (fit on open, zoom out to
@@ -26,18 +19,14 @@ export interface StudioSettings {
 }
 
 export function defaultStudioSettings(): StudioSettings {
-  return { wikiMultiPageDepth: WIKI_MULTI_PAGE_DEPTH_MIN, nodeWizardOnCreate: true, smartFit: true, alignKeepsOrder: true }
+  return { nodeWizardOnCreate: true, smartFit: true, alignKeepsOrder: true }
 }
 
 export function normalizeStudioSettings(raw: unknown): StudioSettings {
   const base = defaultStudioSettings()
   if (!raw || typeof raw !== 'object') return base
   const r = raw as Partial<StudioSettings>
-  const depth = typeof r.wikiMultiPageDepth === 'number' && Number.isFinite(r.wikiMultiPageDepth)
-    ? Math.floor(r.wikiMultiPageDepth)
-    : base.wikiMultiPageDepth
   return {
-    wikiMultiPageDepth: Math.min(WIKI_MULTI_PAGE_DEPTH_MAX, Math.max(WIKI_MULTI_PAGE_DEPTH_MIN, depth)),
     nodeWizardOnCreate: typeof r.nodeWizardOnCreate === 'boolean' ? r.nodeWizardOnCreate : base.nodeWizardOnCreate,
     smartFit: typeof r.smartFit === 'boolean' ? r.smartFit : base.smartFit,
     alignKeepsOrder: typeof r.alignKeepsOrder === 'boolean' ? r.alignKeepsOrder : base.alignKeepsOrder,
