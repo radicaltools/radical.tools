@@ -90,6 +90,7 @@ describe('headless facade matches the Studio store', () => {
       ['update_view', { id: 'v', collapse: ['db'], expand: ['sys2'] }],
       ['update_view', { id: 'v', folder: 'C4/Components' }],
       ['order_views', { ids: ['v'] }],
+      ['update_view', { id: 'v', edgeStyle: 'orthogonal' }],
       ['create_sequence', { tempId: 'seq', name: 'Flow', steps: [{ relationId: otherRelation.id, description: 'First step' }] }],
       ['update_sequence', { id: 'seq', name: 'Main flow', steps: [{ relationId: otherRelation.id }, { relationId: otherRelation.id }] }],
       ['create_view', { tempId: 'dyn', name: 'Flow view', kind: 'dynamic', sequenceId: 'seq' }],

@@ -280,6 +280,11 @@ function AppMenu({
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac')
+  // How the model's canvases draw relations (All elements, and the views
+  // that do not choose their own in their properties).
+  const defaultEdgeStyle = useDiagramStore((s) => s.defaultEdgeStyle)
+  const setDefaultEdgeStyle = useDiagramStore((s) => s.setDefaultEdgeStyle)
+  const editable = useDiagramStore((s) => s.appMode === 'designer')
 
   // Studio-wide preferences (localStorage, not part of the .radical file) —
   // self-contained here the same way AI settings are self-contained in
@@ -397,6 +402,20 @@ function AppMenu({
               <span className="app-menu-icon"><IconSmartFit /></span>
               <span className="app-menu-text">Smart fit {smartFitActive ? '(on)' : '(off)'}</span>
             </button>
+            <div className="app-menu-row">
+              <span className="app-menu-row-label">Lines in this model</span>
+              <select
+                className="app-menu-select"
+                aria-label="Lines in this model"
+                value={defaultEdgeStyle}
+                disabled={!editable}
+                onChange={(e) => setDefaultEdgeStyle(e.target.value as 'curved' | 'orthogonal')}
+                title="How All elements, and every view that does not choose its own in its properties, draws relations"
+              >
+                <option value="curved">Curved</option>
+                <option value="orthogonal">Orthogonal</option>
+              </select>
+            </div>
             <div className="app-menu-row">
               <span className="app-menu-row-label">Wiki multi-page depth</span>
               <select

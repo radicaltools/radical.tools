@@ -1,7 +1,17 @@
 /**
- * Orthogonal edge routing with obstacle avoidance.
- * Uses A* pathfinding on a coarse grid to find paths around diagram nodes.
+ * Edge routing: how a relation is drawn between two sides of two nodes, in
+ * the canvas's edge style.
+ *
+ *  - curved: a cubic Bézier along the sides' normals; around a node in the
+ *    way, a smooth curve through the corners of an A* route, pulled tight.
+ *  - orthogonal: horizontal and vertical segments with rounded corners; a Z
+ *    or an L between the sides, and the A* route around a node in the way.
+ *
+ * Each style keeps to itself: a curved relation used to turn into right
+ * angles wherever a node was in the way, so one diagram mixed curves,
+ * straight lines and right angles.
  */
+import type { EdgeStyle } from '@radical/common/c4'
 import { Position } from './side'
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -66,39 +76,39 @@ function astarSearch(
   const heapF: number[] = []
   const heapI: number[] = []
 
+  // A binary heap sifted by moving a hole, not by swapping pairs: the same
+  // comparisons in the same order (so the same routes), without allocating
+  // a pair per swap or resizing the arrays on every pop, which was most of
+  // a routed Smart Layout score.
   function push(f: number, i: number) {
     let pos = heapF.length
     heapF.push(f); heapI.push(i)
     while (pos > 0) {
       const p = (pos - 1) >> 1
-      if (heapF[pos] < heapF[p]) {
-        ;[heapF[pos], heapF[p]] = [heapF[p], heapF[pos]]
-        ;[heapI[pos], heapI[p]] = [heapI[p], heapI[pos]]
+      if (f < heapF[p]) {
+        heapF[pos] = heapF[p]; heapI[pos] = heapI[p]
         pos = p
       } else break
     }
+    heapF[pos] = f; heapI[pos] = i
   }
 
   function pop(): number {
     const top = heapI[0]
-    const n = heapF.length - 1
+    const lastF = heapF.pop()!, lastI = heapI.pop()!
+    const n = heapF.length
     if (n > 0) {
-      heapF[0] = heapF[n]; heapI[0] = heapI[n]
-      heapF.length = n; heapI.length = n
       let pos = 0
       while (true) {
-        let s = pos
-        const l = 2 * pos + 1, r = 2 * pos + 2
-        if (l < n && heapF[l] < heapF[s]) s = l
-        if (r < n && heapF[r] < heapF[s]) s = r
-        if (s !== pos) {
-          ;[heapF[pos], heapF[s]] = [heapF[s], heapF[pos]]
-          ;[heapI[pos], heapI[s]] = [heapI[s], heapI[pos]]
-          pos = s
-        } else break
+        const l = 2 * pos + 1, r = l + 1
+        let s = -1, best = lastF
+        if (l < n && heapF[l] < best) { s = l; best = heapF[l] }
+        if (r < n && heapF[r] < best) { s = r; best = heapF[r] }
+        if (s < 0) break
+        heapF[pos] = heapF[s]; heapI[pos] = heapI[s]
+        pos = s
       }
-    } else {
-      heapF.length = 0; heapI.length = 0
+      heapF[pos] = lastF; heapI[pos] = lastI
     }
     return top
   }
@@ -467,6 +477,138 @@ export function directCurveBox(
   }
 }
 
+/** Consecutive duplicate points dropped. */
+function withoutRepeats(pts: Pt[]): Pt[] {
+  const out: Pt[] = []
+  for (const p of pts) {
+    const last = out[out.length - 1]
+    if (!last || Math.abs(last.x - p.x) > 0.01 || Math.abs(last.y - p.y) > 0.01) out.push(p)
+  }
+  return out
+}
+
+/**
+ * The orthogonal connector between two sides when nothing is in the way:
+ * out of each side by EXIT_DIST, then a Z between sides of the same
+ * orientation (turning halfway) or an L between a vertical and a
+ * horizontal side. Aligned sides give a straight line.
+ */
+export function orthogonalConnector(s: Pt, sSide: Position, t: Pt, tSide: Position): Pt[] {
+  const a = extendPt(s.x, s.y, sSide, EXIT_DIST)
+  const b = extendPt(t.x, t.y, tSide, EXIT_DIST)
+  let middle: Pt[]
+  if (isVertical(sSide) && isVertical(tSide)) {
+    const m = (a.y + b.y) / 2
+    middle = [{ x: a.x, y: m }, { x: b.x, y: m }]
+  } else if (!isVertical(sSide) && !isVertical(tSide)) {
+    const m = (a.x + b.x) / 2
+    middle = [{ x: m, y: a.y }, { x: m, y: b.y }]
+  } else if (isVertical(sSide)) {
+    middle = [{ x: a.x, y: b.y }]
+  } else {
+    middle = [{ x: b.x, y: a.y }]
+  }
+  return simplifyPath(withoutRepeats([s, a, ...middle, b, t]))
+}
+
+/** Does the polyline pass through an obstacle (sampled every 8 px)? The
+ *  first and last EXIT_DIST, at the nodes it joins, are not tested. */
+function polylineHitsObstacles(pts: Pt[], obstacles: RoutingObstacle[] | ObstacleSet, pad: number): boolean {
+  const set = Array.isArray(obstacles) ? null : obstacles
+  const list = Array.isArray(obstacles) ? obstacles : null
+  if (list && list.length === 0) return false
+  const first = pts[0], last = pts[pts.length - 1]
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i]
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 8))
+    for (let k = 0; k <= n; k++) {
+      const x = a.x + (b.x - a.x) * k / n, y = a.y + (b.y - a.y) * k / n
+      if (Math.hypot(x - first.x, y - first.y) < EXIT_DIST || Math.hypot(x - last.x, y - last.y) < EXIT_DIST) continue
+      if (set ? set.hits(x, y, pad) : list!.some((o) => x >= o.x - pad && x <= o.x + o.w + pad && y >= o.y - pad && y <= o.y + o.h + pad)) return true
+    }
+  }
+  return false
+}
+
+/** Is the straight segment a–b clear of every obstacle (padded)? */
+function segmentClear(a: Pt, b: Pt, obstacles: RoutingObstacle[], pad: number): boolean {
+  const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 8))
+  for (let k = 0; k <= n; k++) {
+    const x = a.x + (b.x - a.x) * k / n, y = a.y + (b.y - a.y) * k / n
+    for (const o of obstacles) if (x >= o.x - pad && x <= o.x + o.w + pad && y >= o.y - pad && y <= o.y + o.h + pad) return false
+  }
+  return true
+}
+
+/** Padding a pulled-tight waypoint keeps from the nodes. */
+const TIGHT_PAD = 10
+
+/**
+ * The curved style around nodes in the way: the corners of the A* route
+ * pulled tight (a corner is dropped while the straight line past it stays
+ * clear of the nodes), then a centripetal Catmull-Rom curve through what is
+ * left, leaving and entering along the sides' normals.
+ *
+ * The curve leaves a side exactly as far as the route does (EXIT_DIST), and
+ * the route's own stub points there are dropped: leaving further than the
+ * route's first corner sent the curve out and back, a hook at every end
+ * (38 of 41 routed relations in random scenes). Centripetal, not uniform:
+ * a uniform Catmull-Rom overshoots and loops on a sharp turn, which a route
+ * coming back past its own node makes. Returns the SVG path and samples.
+ */
+function curveThrough(s: Pt, sSide: Position, t: Pt, tSide: Position, route: Pt[], obstacles: RoutingObstacle[]): { path: string; points: Pt[] } {
+  const sOut = extendPt(s.x, s.y, sSide, EXIT_DIST)
+  const tOut = extendPt(t.x, t.y, tSide, EXIT_DIST)
+  const offStub = (p: Pt) => Math.hypot(p.x - s.x, p.y - s.y) > EXIT_DIST + CELL && Math.hypot(p.x - t.x, p.y - t.y) > EXIT_DIST + CELL
+  const way = withoutRepeats([sOut, ...route.slice(1, -1).filter(offStub), tOut])
+  // Pulling tight keeps out of the joined nodes too (see computeRoutedEdge).
+  const blocked = [...obstacles, keepOut(s, sSide), keepOut(t, tSide)]
+  const tight: Pt[] = [way[0]]
+  for (let i = 0; i < way.length - 1;) {
+    let j = way.length - 1
+    while (j > i + 1 && !segmentClear(way[i], way[j], blocked, TIGHT_PAD)) j--
+    tight.push(way[j])
+    i = j
+  }
+  const p = withoutRepeats([s, ...tight, t])
+  let path = `M${p[0].x},${p[0].y}`
+  const points: Pt[] = [p[0]]
+  for (let i = 0; i < p.length - 1; i++) {
+    const { c1, c2 } = centripetalControls(p[i - 1] ?? p[i], p[i], p[i + 1], p[i + 2] ?? p[i + 1])
+    const p1 = p[i], p2 = p[i + 1]
+    path += `C${c1.x},${c1.y} ${c2.x},${c2.y} ${p2.x},${p2.y}`
+    for (let k = 1; k <= 8; k++) points.push(cubicAt(p1.x, p1.y, c1.x, c1.y, c2.x, c2.y, p2.x, p2.y, k / 8))
+  }
+  return { path, points }
+}
+
+/** A block behind the side at `p`, inside the node the side belongs to. */
+function keepOut(p: Pt, side: Position): RoutingObstacle {
+  const depth = 60, half = 40
+  switch (side) {
+    case Position.Top: return { x: p.x - half, y: p.y + 1, w: 2 * half, h: depth }
+    case Position.Bottom: return { x: p.x - half, y: p.y - 1 - depth, w: 2 * half, h: depth }
+    case Position.Left: return { x: p.x + 1, y: p.y - half, w: depth, h: 2 * half }
+    case Position.Right: return { x: p.x - 1 - depth, y: p.y - half, w: depth, h: 2 * half }
+  }
+}
+
+/** Bézier control points of the centripetal Catmull-Rom segment p1–p2
+ *  (Yuksel, Schaefer & Keyser 2011): no cusps and no loops within a segment. */
+function centripetalControls(p0: Pt, p1: Pt, p2: Pt, p3: Pt): { c1: Pt; c2: Pt } {
+  const d = (a: Pt, b: Pt) => Math.sqrt(Math.hypot(b.x - a.x, b.y - a.y)) || 1e-6
+  const d1 = p0 === p1 ? 0 : d(p0, p1), d2 = d(p1, p2), d3 = p2 === p3 ? 0 : d(p2, p3)
+  const c1 = d1 === 0 ? { x: p1.x + (p2.x - p1.x) / 3, y: p1.y + (p2.y - p1.y) / 3 } : {
+    x: (d1 * d1 * p2.x - d2 * d2 * p0.x + (2 * d1 * d1 + 3 * d1 * d2 + d2 * d2) * p1.x) / (3 * d1 * (d1 + d2)),
+    y: (d1 * d1 * p2.y - d2 * d2 * p0.y + (2 * d1 * d1 + 3 * d1 * d2 + d2 * d2) * p1.y) / (3 * d1 * (d1 + d2)),
+  }
+  const c2 = d3 === 0 ? { x: p2.x - (p2.x - p1.x) / 3, y: p2.y - (p2.y - p1.y) / 3 } : {
+    x: (d3 * d3 * p1.x - d2 * d2 * p3.x + (2 * d3 * d3 + 3 * d3 * d2 + d2 * d2) * p2.x) / (3 * d3 * (d3 + d2)),
+    y: (d3 * d3 * p1.y - d2 * d2 * p3.y + (2 * d3 * d3 + 3 * d3 * d2 + d2 * d2) * p2.y) / (3 * d3 * (d3 + d2)),
+  }
+  return { c1, c2 }
+}
+
 export interface RoutedEdge {
   /** SVG path data. */
   path: string
@@ -487,31 +629,115 @@ export function computeRoutedEdge(
   tx: number, ty: number, tgtSide: Position,
   obstacles: RoutingObstacle[] | ObstacleSet,
   allObstacles?: () => RoutingObstacle[],
+  style: EdgeStyle = 'curved',
 ): RoutedEdge {
-  // Prefer a single cubic bezier with control points pulled along each
-  // side's exit normal — clean arrowhead alignment, natural flow.
-  // Only fall back to obstacle-avoiding A* + smoothed polyline when the
-  // direct curve would actually cross a node, since A* paths look stiffer.
   const s = { x: sx, y: sy }
   const t = { x: tx, y: ty }
   const { c1, c2 } = bezierControlPoints(s, srcSide, t, tgtSide)
+  const direct = style === 'orthogonal' ? orthogonalConnector(s, srcSide, t, tgtSide) : null
 
-  const hits = bezierHitsObstacles(s, c1, c2, t, obstacles, HIT_PAD)
+  // The direct line (the Bézier, or the Z / L connector) when no node is in
+  // its way; the route around them otherwise, drawn in the same style.
+  const hits = direct ? polylineHitsObstacles(direct, obstacles, HIT_PAD) : bezierHitsObstacles(s, c1, c2, t, obstacles, HIT_PAD)
+  const plain = (): RoutedEdge => direct ? orthogonalEdge(direct) : bezierEdge(s, c1, c2, t, srcSide, tgtSide)
+  if (!hits) return plain()
 
-  if (!hits) return bezierEdge(s, c1, c2, t, srcSide, tgtSide)
-
-  // Direct curve hits at least one node — route around with A*.
   // A set that knows its bounds lets a hopeless route (one routeAround would
   // refuse as too big) skip listing every obstacle.
   const set = Array.isArray(obstacles) ? null : obstacles
   const hopeless = !allObstacles && !!set?.bounds && routingCells(s, t, set.bounds()) > MAX_ROUTING_CELLS
-  const polyline = hopeless ? null : routeAround(s, srcSide, t, tgtSide, allObstacles ? allObstacles() : set ? set.all() : obstacles as RoutingObstacle[])
-  // Routing failed (grid too big, or unreachable) — fall back to direct.
-  if (!polyline || polyline.length < 2) return bezierEdge(s, c1, c2, t, srcSide, tgtSide)
+  const all = hopeless ? [] : allObstacles ? allObstacles() : set ? set.all() : obstacles as RoutingObstacle[]
+  // The nodes the relation joins are not obstacles, so the route could run
+  // through one of them and reach its side from behind; a keep-out block
+  // behind each side makes it come in from the front.
+  const polyline = hopeless ? null : routeAround(s, srcSide, t, tgtSide, [...all, keepOut(s, srcSide), keepOut(t, tgtSide)])
+  // Routing failed (grid too big, or unreachable) — the direct line.
+  if (!polyline || polyline.length < 2) return plain()
+  if (style === 'orthogonal') return orthogonalEdge(polyline)
+  const curve = curveThrough(s, srcSide, t, tgtSide, polyline, all)
+  const mid = polyMidpoint(curve.points)
+  return { path: curve.path, labelX: mid.x, labelY: mid.y, points: curve.points }
+}
 
-  const path = buildSvgPath(polyline)
-  const mid = polyMidpoint(polyline)
-  return { path, labelX: mid.x, labelY: mid.y, points: polyline }
+/**
+ * Orthogonal relations that share a stretch of one line are drawn on top of
+ * each other, indistinguishable. This spreads every group of inner segments
+ * lying on one line and overlapping along it SEGMENT_SPACING apart (less
+ * when there are many, to stay within SEGMENT_SPREAD_MAX), ordered by where
+ * each turns next so that they do not cross on the way out. The first and
+ * last segment of a route, at its ports, stay: the ports are spread along
+ * the sides already. Returns new point lists for the routes it changed.
+ */
+export function separateParallelSegments(routes: Map<string, Pt[]>): Map<string, Pt[]> {
+  const out = new Map<string, Pt[]>()
+  const pts = (id: string) => {
+    let copy = out.get(id)
+    if (!copy) { copy = routes.get(id)!.map((p) => ({ ...p })); out.set(id, copy) }
+    return copy
+  }
+  for (const horizontal of [true, false]) {
+    // Inner segments on one line: key = the line's coordinate, rounded.
+    const lines = new Map<number, Array<{ id: string; i: number; lo: number; hi: number; heading: number }>>()
+    for (const [id, route] of routes) {
+      const p = out.get(id) ?? route
+      for (let i = 1; i < p.length - 2; i++) {
+        const a = p[i], b = p[i + 1]
+        const on = horizontal ? Math.abs(a.y - b.y) < 0.5 : Math.abs(a.x - b.x) < 0.5
+        if (!on) continue
+        const at = Math.round(horizontal ? a.y : a.x)
+        const lo = Math.min(horizontal ? a.x : a.y, horizontal ? b.x : b.y)
+        const hi = Math.max(horizontal ? a.x : a.y, horizontal ? b.x : b.y)
+        // Where the route goes before and after the segment, across it.
+        const heading = horizontal ? (p[i - 1].y + p[i + 2].y) / 2 - a.y : (p[i - 1].x + p[i + 2].x) / 2 - a.x
+        const list = lines.get(at) ?? []
+        list.push({ id, i, lo, hi, heading })
+        lines.set(at, list)
+      }
+    }
+    for (const list of lines.values()) {
+      if (list.length < 2) continue
+      list.sort((a, b) => a.lo - b.lo)
+      // Clusters of segments overlapping along the line.
+      let cluster: typeof list = []
+      let reach = -Infinity
+      const spread = () => {
+        const ids = new Set(cluster.map((c) => c.id))
+        if (ids.size > 1) {
+          cluster.sort((a, b) => a.heading - b.heading || (a.id < b.id ? -1 : 1))
+          const spacing = Math.min(SEGMENT_SPACING, SEGMENT_SPREAD_MAX / (cluster.length - 1))
+          cluster.forEach((c, k) => {
+            const shift = (k - (cluster.length - 1) / 2) * spacing
+            const p = pts(c.id)
+            if (horizontal) { p[c.i].y += shift; p[c.i + 1].y += shift } else { p[c.i].x += shift; p[c.i + 1].x += shift }
+          })
+        }
+        cluster = []
+      }
+      for (const seg of list) {
+        if (cluster.length > 0 && seg.lo >= reach - 1) spread()
+        cluster.push(seg)
+        reach = cluster.length === 1 ? seg.hi : Math.max(reach, seg.hi)
+      }
+      spread()
+    }
+  }
+  return out
+}
+
+/** Gap between orthogonal segments separateParallelSegments spreads apart. */
+const SEGMENT_SPACING = 8
+/** Widest a group of spread segments gets, however many there are. */
+const SEGMENT_SPREAD_MAX = 60
+
+/** An orthogonal route drawn from its points (after separateParallelSegments). */
+export function orthogonalRoute(pts: Pt[]): RoutedEdge {
+  return orthogonalEdge(pts)
+}
+
+/** Horizontal and vertical segments through `pts`, with rounded corners. */
+function orthogonalEdge(pts: Pt[]): RoutedEdge {
+  const mid = polyMidpoint(pts)
+  return { path: buildSvgPath(pts), labelX: mid.x, labelY: mid.y, points: pts }
 }
 
 /** Samples of the direct curve in `points`: enough for label placement to

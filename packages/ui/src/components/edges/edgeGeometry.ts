@@ -1,6 +1,6 @@
 import type { ReactFlowState } from 'reactflow'
-import type { C4EdgeRFData } from '@radical/common/c4'
-import { computeRoutedEdge, directCurveBox, ObstacleGrid, type ObstacleSet, type Pt, type RoutedEdge, type RoutingObstacle } from '@radical/layout/edgeRouting'
+import type { C4EdgeRFData, EdgeStyle } from '@radical/common/c4'
+import { computeRoutedEdge, directCurveBox, ObstacleGrid, orthogonalRoute, separateParallelSegments, type ObstacleSet, type Pt, type RoutedEdge, type RoutingObstacle } from '@radical/layout/edgeRouting'
 import { placeEdgeLabels, relationLabelSize, RELATION_LABEL_BOX, type LabelEdge, type LabelObstacle } from '@radical/layout/edgeLabels'
 import { allocatePorts } from '@radical/layout/portAllocator'
 import type { Position } from '@radical/layout/side'
@@ -136,7 +136,7 @@ interface RouteEntry { key: string; route: RoutedEdge; box: Box }
 
 let routeCache = new Map<string, RouteEntry>()
 let routedAgainst: ObstacleCandidates | null = null
-let geometryCache: { nodes: NodeInternals; edges: RFEdges; moving: boolean; placeLabels: boolean; result: Map<string, EdgeGeometry> } | null = null
+let geometryCache: { nodes: NodeInternals; edges: RFEdges; moving: boolean; placeLabels: boolean; style: EdgeStyle; result: Map<string, EdgeGeometry> } | null = null
 /** The last label placement and what it was placed against: React Flow
  *  hands over new state objects several times while a view opens (node
  *  sizes measured, nodes set), and placing a large canvas's labels again
@@ -148,13 +148,14 @@ let labelCache: { candidates: ObstacleCandidates; routes: Map<string, RouteEntry
  * edge id. Cached per React Flow state; an edge keeps its route while its
  * ends stay put and no node moves near it, and keeps its geometry object
  * while nothing it draws changed, so an edge re-renders only when it has to.
+ * Edges are drawn in `style` (curved or orthogonal).
  * While the live layout moves the nodes (`moving`), edges are plain curves
  * and labels sit at their middle; both are redone at rest. Labels also sit
  * at their middle while they are not shown (`placeLabels` false: zoomed out),
  * and are placed when they are.
  */
-export function edgeGeometry(nodes: NodeInternals, edges: RFEdges, moving: boolean, placeLabels = true): Map<string, EdgeGeometry> {
-  if (geometryCache?.nodes === nodes && geometryCache.edges === edges && geometryCache.moving === moving && geometryCache.placeLabels === placeLabels) return geometryCache.result
+export function edgeGeometry(nodes: NodeInternals, edges: RFEdges, moving: boolean, placeLabels = true, style: EdgeStyle = 'curved'): Map<string, EdgeGeometry> {
+  if (geometryCache?.nodes === nodes && geometryCache.edges === edges && geometryCache.moving === moving && geometryCache.placeLabels === placeLabels && geometryCache.style === style) return geometryCache.result
 
   const ports = portsFor(nodes, edges)
   const candidates = obstacleCandidates(nodes)
@@ -175,21 +176,22 @@ export function edgeGeometry(nodes: NodeInternals, edges: RFEdges, moving: boole
       excludeIds.has(c.id) || c.ancestors.includes(source) || c.ancestors.includes(target))
   }
 
-  const routes = new Map<string, RouteEntry>()
+  let routes = new Map<string, RouteEntry>()
   for (const e of edges) {
     const alloc = ports.get(e.id)
     if (!alloc) continue
     const sp = alloc.sourcePoint, tp = alloc.targetPoint
-    const key = `${moving ? 'm' : 'r'}|${sp.x},${sp.y},${alloc.sourceSide}|${tp.x},${tp.y},${alloc.targetSide}`
+    const key = `${moving ? 'm' : 'r'}|${style}|${sp.x},${sp.y},${alloc.sourceSide}|${tp.x},${tp.y},${alloc.targetSide}`
     const prev = routeCache.get(e.id)
     if (prev && prev.key === key && changed && !changed.some((r) => touches(r, prev.box))) {
       routes.set(e.id, prev)
       continue
     }
-    const route = computeRoutedEdge(sp.x, sp.y, alloc.sourceSide, tp.x, tp.y, alloc.targetSide, obstaclesFor(e.source, e.target))
+    const route = computeRoutedEdge(sp.x, sp.y, alloc.sourceSide, tp.x, tp.y, alloc.targetSide, obstaclesFor(e.source, e.target), undefined, style)
     routes.set(e.id, { key, route, box: routeBox(sp, alloc.sourceSide, tp, alloc.targetSide, route) })
   }
   routeCache = routes
+  if (style === 'orthogonal' && !moving) routes = separated(routes)
 
   const labels = moving || !placeLabels ? new Map<string, Pt>() : labelSpots(edges, routes, candidates, changed)
 
@@ -210,8 +212,28 @@ export function edgeGeometry(nodes: NodeInternals, edges: RFEdges, moving: boole
       label,
     })
   }
-  geometryCache = { nodes, edges, moving, placeLabels, result }
+  geometryCache = { nodes, edges, moving, placeLabels, style, result }
   return result
+}
+
+/** The last spreading of orthogonal routes and what it was made from: the
+ *  same routes give the same entries, so label placement can reuse its
+ *  result (it compares route entries by identity). */
+let separatedCache: { input: Map<string, RouteEntry>; output: Map<string, RouteEntry> } | null = null
+
+/** Orthogonal routes with segments that share a line spread apart
+ *  (separateParallelSegments); unchanged entries are passed through. */
+function separated(routes: Map<string, RouteEntry>): Map<string, RouteEntry> {
+  const last = separatedCache
+  if (last && last.input.size === routes.size && [...routes].every(([id, entry]) => last.input.get(id) === entry)) return last.output
+  const moved = separateParallelSegments(new Map([...routes].map(([id, entry]) => [id, entry.route.points])))
+  const output = new Map<string, RouteEntry>()
+  for (const [id, entry] of routes) {
+    const points = moved.get(id)
+    output.set(id, points ? { ...entry, route: orthogonalRoute(points) } : entry)
+  }
+  separatedCache = { input: routes, output }
+  return output
 }
 
 /** Label centres of the edges that have a label, placed together so they

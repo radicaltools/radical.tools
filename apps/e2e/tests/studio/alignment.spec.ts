@@ -44,7 +44,14 @@ test('a row on All elements holds through a drag, Smart Layout and a reload', as
   const types = async (): Promise<string[] | undefined> => (await studio.storedDoc() as { defaultLayoutConstraints?: Array<{ type: string }> }).defaultLayoutConstraints?.map((c) => c.type)
   await expect.poll(types).toEqual(['align', 'pin'])
 
-  // Smart Layout keeps the row and unpins the canvas.
+  // Smart Layout keeps a layout no worse than what it finds, so first send
+  // the database far off: then it rearranges, keeps the row and unpins the
+  // canvas.
+  const db = (await studio.node('db').boundingBox())!
+  await page.mouse.move(db.x + db.width / 2, db.y + 12)
+  await page.mouse.down()
+  await page.mouse.move(db.x + db.width / 2 + 700, db.y + 500, { steps: 12 })
+  await page.mouse.up()
   await studio.smartLayout()
   await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
   await expect.poll(types).toEqual(['align'])

@@ -25,6 +25,7 @@ import type {
   DiagramSnapshot,
   Presentation,
   LayoutConstraint,
+  EdgeStyle,
   NodePosition,
 } from '../c4'
 import { NODE_SIZES, isContainerType } from '../c4'
@@ -82,6 +83,7 @@ interface LayoutSidecar {
   defaultPositions?: Record<string, NodePosition>
   defaultViewport?: { x: number; y: number; zoom: number } | null
   defaultLayoutConstraints?: LayoutConstraint[]
+  defaultEdgeStyle?: EdgeStyle
 }
 
 // ─── YAML frontmatter (minimal, lossless for our scalar/multiline needs) ─────
@@ -318,6 +320,7 @@ export function serializeToMdFolderWithPaths(data: DiagramData, modelName?: stri
   if (data.defaultPositions) layout.defaultPositions = data.defaultPositions
   if (data.defaultViewport !== undefined) layout.defaultViewport = data.defaultViewport
   if (data.defaultLayoutConstraints?.length) layout.defaultLayoutConstraints = data.defaultLayoutConstraints
+  if (data.defaultEdgeStyle && data.defaultEdgeStyle !== 'curved') layout.defaultEdgeStyle = data.defaultEdgeStyle
   files[LAYOUT_FILE] = stableStringify(layout)
 
   // Non-semantic / structurally-complex collections → JSON sidecars.
@@ -469,6 +472,7 @@ export function deserializeFromMdFolder(
   if (layout.defaultPositions) data.defaultPositions = layout.defaultPositions
   if (layout.defaultViewport !== undefined) data.defaultViewport = layout.defaultViewport
   if (layout.defaultLayoutConstraints?.length) data.defaultLayoutConstraints = layout.defaultLayoutConstraints
+  if (layout.defaultEdgeStyle === 'orthogonal') data.defaultEdgeStyle = layout.defaultEdgeStyle
 
   return lazy ? { data, bodyPaths } : { data }
 }

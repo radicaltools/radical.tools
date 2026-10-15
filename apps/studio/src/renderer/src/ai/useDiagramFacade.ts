@@ -62,6 +62,8 @@ export function createStoreFacade(): DiagramFacade {
       useDiagramStore.getState().setViewFolder(id, folder),
     orderViews: (ids: string[]) =>
       useDiagramStore.getState().orderViews(ids),
+    setViewEdgeStyle: (id: string, style: 'curved' | 'orthogonal' | null) =>
+      useDiagramStore.getState().setViewEdgeStyle(id, style),
     getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(useDiagramStore.getState(), viewId),
     addAlignment: (viewId: string | null, axis: AlignConstraint['axis'], nodeIds: string[], ordered = false) => {
       // The store aligns on the canvas on screen, so switch to the requested one first.

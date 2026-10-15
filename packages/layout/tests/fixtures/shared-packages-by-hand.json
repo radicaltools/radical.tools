@@ -1,0 +1,489 @@
+{
+ "about": "The \"Shared packages\" view of radical.tools' own model as its author arranged it by hand (2026-10-14): applications around the shared packages they use. Smart Layout must not replace it with a worse one.",
+ "nodes": [
+  {
+   "id": "c3073e61-3a0b-4d1f-980b-a65f1e4992f5",
+   "type": "group",
+   "label": "Logical & physical",
+   "x": -58,
+   "y": 240.87974388417717,
+   "width": 2520.504552628345,
+   "height": 1741.6000570271444
+  },
+  {
+   "id": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "type": "system",
+   "label": "radical.tools",
+   "parentId": "c3073e61-3a0b-4d1f-980b-a65f1e4992f5",
+   "x": 90,
+   "y": 90,
+   "width": 2340.504552628345,
+   "height": 1561.6000570271444
+  },
+  {
+   "id": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "type": "webapp",
+   "label": "Architecture Hub",
+   "technology": "React, Vite",
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "collapsed": true,
+   "x": 1283.1658334844476,
+   "y": 104.82583883107668,
+   "width": 210,
+   "height": 140
+  },
+  {
+   "id": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+   "type": "container",
+   "label": "CLI",
+   "technology": "Node.js",
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "collapsed": true,
+   "x": 58,
+   "y": 65.93649463541493,
+   "width": 300,
+   "height": 260
+  },
+  {
+   "id": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "type": "container",
+   "label": "Desktop app",
+   "technology": "Electron 29",
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "collapsed": true,
+   "x": 59.67209006086273,
+   "y": 1135.9644118633169,
+   "width": 300,
+   "height": 200
+  },
+  {
+   "id": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+   "type": "container",
+   "label": "MCP server",
+   "technology": "Node.js, MCP over stdio",
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "collapsed": true,
+   "x": 674.8953351253977,
+   "y": 58,
+   "width": 300,
+   "height": 200
+  },
+  {
+   "id": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "type": "group",
+   "label": "Shared packages",
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "x": 655.9119431221708,
+   "y": 431.0423337149507,
+   "width": 1150.2825001815013,
+   "height": 1026.5577233121935
+  },
+  {
+   "id": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "type": "component",
+   "label": "@radical/common",
+   "technology": "TypeScript",
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "x": 30,
+   "y": 669.5358479111529,
+   "width": 200,
+   "height": 120
+  },
+  {
+   "id": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed",
+   "type": "component",
+   "label": "@radical/host-bridge",
+   "technology": "TypeScript",
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "x": 920.2825001815014,
+   "y": 525.0607277257687,
+   "width": 200,
+   "height": 120
+  },
+  {
+   "id": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "type": "component",
+   "label": "@radical/hub-catalogue",
+   "technology": "TypeScript, Vite plugin",
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "x": 451.59292979496774,
+   "y": 184.7281889275829,
+   "width": 200,
+   "height": 120
+  },
+  {
+   "id": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+   "type": "component",
+   "label": "@radical/layout",
+   "technology": "TypeScript, ELK.js, WebCoLa",
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "x": 330.10055153266,
+   "y": 632.1772723896717,
+   "width": 200,
+   "height": 120
+  },
+  {
+   "id": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a",
+   "type": "component",
+   "label": "@radical/node-files",
+   "technology": "Node.js",
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "x": 79.36170210401838,
+   "y": 120,
+   "width": 200,
+   "height": 120
+  },
+  {
+   "id": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "type": "component",
+   "label": "@radical/ui",
+   "technology": "React, ReactFlow, Zustand",
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "x": 503.23334430680177,
+   "y": 876.5577233121936,
+   "width": 200,
+   "height": 120
+  },
+  {
+   "id": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "type": "webapp",
+   "label": "Studio",
+   "technology": "React 18, ReactFlow 11, Zustand, Vite",
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "collapsed": true,
+   "x": 2067.606009182678,
+   "y": 251.79616587448265,
+   "width": 210,
+   "height": 140
+  },
+  {
+   "id": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+   "type": "container",
+   "label": "VS Code extension",
+   "technology": "VS Code API, webview",
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "collapsed": true,
+   "x": 2042.5045526283452,
+   "y": 1307.0574505145423,
+   "width": 300,
+   "height": 200
+  }
+ ],
+ "relations": [
+  {
+   "id": "026ecee4-be6e-48c6-8f4b-b269cd9d7ce7",
+   "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "0e07a14f-54a7-4929-b037-6e54743876ce",
+   "sourceId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a",
+   "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "12cea1b1-339a-4901-a4f5-7e767726afe1",
+   "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "targetId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed",
+   "label": "implements the host contract of",
+   "relationType": "interacts"
+  },
+  {
+   "id": "13719c12-0800-40d4-bacc-f31c5a4a56c8",
+   "sourceId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "17d34391-c29c-4715-b4b9-4b1b461bb346",
+   "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+   "targetId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "label": "ranks and imports concepts of the bundled copy of",
+   "relationType": "interacts"
+  },
+  {
+   "id": "18f155c2-5da5-4f67-8a2d-4ef127e0f9fe",
+   "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "targetId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "label": "renders concepts with",
+   "relationType": "interacts"
+  },
+  {
+   "id": "24256a36-bd42-4e6c-98e9-57a6a791a1c0",
+   "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "targetId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+   "label": "computes layouts with\nroutes edges with",
+   "relationType": "interacts"
+  },
+  {
+   "id": "24d855a0-2def-4efb-b135-511233b15200",
+   "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "label": "imports concepts from",
+   "relationType": "interacts"
+  },
+  {
+   "id": "32d42f42-dcb3-4ede-a347-feff53b9382f",
+   "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "4042cdea-30ef-4769-83bf-d3dcffbab86e",
+   "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "label": "serialises Markdown folders and imports Structurizr with\nruns the shared tool catalogue of\nchanges the model and checks the metamodel with",
+   "relationType": "interacts"
+  },
+  {
+   "id": "50f05929-28eb-422f-9709-aa7d83c9e946",
+   "sourceId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a",
+   "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "5dfb2182-8083-4bf4-8956-307571f3bb4a",
+   "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "label": "uses",
+   "relationType": "interacts"
+  },
+  {
+   "id": "5f148124-5174-4008-9bee-b006796437c5",
+   "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "628edb1c-f15e-463d-ac33-a9382ae7fff9",
+   "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "label": "loads the renderer of",
+   "relationType": "interacts"
+  },
+  {
+   "id": "6d213464-11ad-466e-b584-f5b0b8817629",
+   "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+   "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "7a0f74d8-9bb2-4c2b-bd81-de0aa8362b21",
+   "sourceId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a",
+   "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "7d6a3ca5-b7c8-427b-a2fd-82cadab77efe",
+   "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+   "targetId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a",
+   "label": "reads the folder with",
+   "relationType": "interacts"
+  },
+  {
+   "id": "7f04037e-6e63-471b-bdb1-ec155ce24a53",
+   "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "targetId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed",
+   "label": "uses the host contract of",
+   "relationType": "interacts"
+  },
+  {
+   "id": "80b3dd10-bc26-4535-b99f-1adede34a6fd",
+   "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "label": "runs the check rules of",
+   "relationType": "interacts"
+  },
+  {
+   "id": "82d86482-daed-4839-b554-a6c86db99e5c",
+   "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "label": "embeds the web build",
+   "relationType": "interacts"
+  },
+  {
+   "id": "87039db6-cf89-4ba9-b3db-ed11056a182e",
+   "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "label": "embeds the web build of",
+   "relationType": "interacts"
+  },
+  {
+   "id": "89c5bce0-8f60-4412-8a6a-7fea98c93a90",
+   "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "label": "reads the Hub format and presets of",
+   "relationType": "interacts"
+  },
+  {
+   "id": "9b2a6d1c-20d1-4685-8566-8fbba0bad8da",
+   "sourceId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "label": "uses",
+   "relationType": "interacts"
+  },
+  {
+   "id": "9bb72bca-5a0c-419e-8a37-038c18602c61",
+   "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "targetId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+   "label": "lays out with",
+   "relationType": "interacts"
+  },
+  {
+   "id": "9be37c16-9e9a-406c-a043-3b5b155b4f17",
+   "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "targetId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a",
+   "label": "reads and writes files with",
+   "relationType": "interacts"
+  },
+  {
+   "id": "9d0a0976-8454-409a-b83c-99ed2cf90bd2",
+   "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "9e04957d-c8c6-4e2e-8161-aba2d8034809",
+   "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "label": "uses",
+   "relationType": "interacts"
+  },
+  {
+   "id": "a0766c35-6aaa-4ea8-a8ed-6b8ce288dba0",
+   "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+   "targetId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed",
+   "label": "injects the boot script of",
+   "relationType": "interacts"
+  },
+  {
+   "id": "a4d41255-e475-430b-a703-0234f3970d80",
+   "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "label": "runs the same renderer",
+   "relationType": "interacts"
+  },
+  {
+   "id": "aa9d9002-4ec1-4f8e-a394-1ef7230f0bac",
+   "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "ad305d72-73e1-4665-bd21-44a15c3d56c6",
+   "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "ad337018-f002-4179-9cbb-b741aea65dc5",
+   "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "targetId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "label": "falls back to the copy served beside the page of",
+   "relationType": "interacts"
+  },
+  {
+   "id": "afe86c25-fb85-4328-bdba-8d5545cd1676",
+   "sourceId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed",
+   "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "bec370d6-64f8-4aa6-b819-35b6c81a767d",
+   "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "label": "uses",
+   "relationType": "interacts"
+  },
+  {
+   "id": "c0226532-fe85-417e-a4d6-723cdb9da3b7",
+   "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+   "targetId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a",
+   "label": "reads and writes files with",
+   "relationType": "interacts"
+  },
+  {
+   "id": "c76d1ab2-c298-49c2-bae6-a3793499ac37",
+   "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "label": "edits the model with the tool catalogue of\ntakes Forge's stages and prompts from",
+   "relationType": "interacts"
+  },
+  {
+   "id": "ccb81fd6-b628-4305-b5cc-60981f73a15f",
+   "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+   "targetId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+   "label": "runs Smart Layout with",
+   "relationType": "interacts"
+  },
+  {
+   "id": "d1012364-e8ee-4950-82d4-6921aec03690",
+   "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "label": "keeps a baseline and refuses conflicts with MdFolderSession of",
+   "relationType": "interacts"
+  },
+  {
+   "id": "d5b3529c-5002-4ce7-b561-9396228fa9b6",
+   "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "e117dc04-393d-4d54-8626-a240dfb4b6ee",
+   "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "e15a0abc-9f23-4140-997b-e26a118f6ced",
+   "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "ec8e44f7-bce3-4b1c-966e-526b9f0c9d7f",
+   "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "label": "bundled into",
+   "relationType": "interacts"
+  },
+  {
+   "id": "fa44dd78-50bf-4792-a949-9341e16c5b21",
+   "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "label": "fetches the catalogue from",
+   "relationType": "interacts"
+  },
+  {
+   "id": "fb922af7-32b9-45b8-9824-636ecb7de489",
+   "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "label": "hands selected concepts to (?hub=<ids>)",
+   "relationType": "interacts"
+  },
+  {
+   "id": "fc40812a-8303-4298-982d-4e0b04be6285",
+   "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+   "label": "bundled into",
+   "relationType": "interacts"
+  }
+ ]
+}

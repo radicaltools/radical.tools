@@ -830,6 +830,8 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const allViews = useDiagramStore((s) => s.views)
   const folderPaths = useMemo(() => viewFolderPaths(Object.values(allViews)), [allViews])
   const [editingFolder, setEditingFolder] = useState(false)
+  const setViewEdgeStyle = useDiagramStore((s) => s.setViewEdgeStyle)
+  const defaultEdgeStyle = useDiagramStore((s) => s.defaultEdgeStyle)
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState('')
   const seqList = Object.values(sequences)
@@ -899,6 +901,23 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
           )}
         </div>
       </div>
+      {(!view.kind || view.kind === 'static') && (
+        <div>
+          <div className="props-section-title">Lines</div>
+          <select
+            className="props-input"
+            aria-label="Lines"
+            value={view.edgeStyle ?? ''}
+            disabled={readOnly}
+            onChange={(e) => setViewEdgeStyle(view.id, (e.target.value || null) as 'curved' | 'orthogonal' | null)}
+            title="How this view draws relations; the model's setting is in the Radical menu"
+          >
+            <option value="">Model's ({defaultEdgeStyle === 'orthogonal' ? 'orthogonal' : 'curved'})</option>
+            <option value="curved">Curved</option>
+            <option value="orthogonal">Orthogonal</option>
+          </select>
+        </div>
+      )}
       {!readOnly && (
         <div>
           <div className="props-section-title">Type</div>
