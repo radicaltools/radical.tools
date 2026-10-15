@@ -2206,6 +2206,12 @@ section.wiki-block { margin-top: 24px; }
 .wiki-runin { margin-top: 8px; }
 .wiki-runin-label { font-weight: 700; color: var(--text-primary); font-size: 15px; line-height: 1.7; }
 .wiki-runin .wiki-prose { display: inline; }
+/* A long field rendered (MarkdownText) keeps its line breaks as <br>, so its
+   white space is not kept. In a run-in its first paragraph goes on from
+   the label. */
+.wiki-md { white-space: normal; }
+.wiki-runin .wiki-md .md-text,
+.wiki-runin .wiki-md .md-text > p:first-child { display: inline; }
 .wiki-prose {
   display: block;
   font-size: 15px;
@@ -4088,3 +4094,50 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
   background: var(--accent);
   color: var(--bg-panel);
 }
+
+/* ─── Markdown text (MarkdownText) ─────────────────────────────────────── */
+/* An element's long fields rendered: plain paragraphs and lists sized by the
+   text around them, quiet headings, code in the panel's colours. */
+.md-text > :first-child { margin-top: 0; }
+.md-text > :last-child { margin-bottom: 0; }
+.md-text p { margin: 0 0 0.7em; }
+.md-text ul, .md-text ol { margin: 0 0 0.7em; padding-left: 1.4em; }
+.md-text li > p { margin: 0; }
+.md-text h1, .md-text h2, .md-text h3, .md-text h4, .md-text h5, .md-text h6 {
+  margin: 0.9em 0 0.4em;
+  font-size: 1em;
+  font-weight: 700;
+  line-height: inherit;
+  color: var(--text-primary);
+}
+.md-text h1, .md-text h2 { font-size: 1.1em; }
+.md-text a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.md-text code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: var(--hover-bg-subtle);
+}
+.md-text pre {
+  margin: 0 0 0.7em;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--hover-bg-subtle);
+  overflow-x: auto;
+}
+.md-text pre code { padding: 0; background: none; }
+.md-text blockquote {
+  margin: 0 0 0.7em;
+  padding-left: 0.9em;
+  border-left: 3px solid var(--border-color-strong);
+  color: var(--text-secondary);
+}
+.md-text table { border-collapse: collapse; margin: 0 0 0.7em; }
+.md-text th, .md-text td { border: 1px solid var(--border-color); padding: 3px 8px; text-align: left; }
+.md-text hr { border: none; border-top: 1px solid var(--border-color); margin: 0.9em 0; }
+.md-text img { max-width: 100%; }
+/* In a one-line summary marks are only emphasis: code stays in the line. */
+.tv-summary-text code { padding: 0 0.25em; }
+/* What matters in a summary is bold, in the text colour; the rest stays secondary. */
+.tv-summary-text strong { font-weight: 600; color: var(--text-primary); }

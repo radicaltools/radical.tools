@@ -62,6 +62,9 @@ function AutoResizeTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElem
   )
 }
 
+// A node's long field is Markdown (markdown.ts): the wiki and the table render it.
+const MARKDOWN_HINT = 'Markdown: **bold**, _italic_, `code`, - lists, [links](https://…)'
+
 // ── Accordion section ────────────────────────────────────────────────────────
 
 function AccordionSection({
@@ -1776,7 +1779,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
           <div className="props-field" key={key}>
             <label className="props-label">{label}</label>
             <AutoResizeTextarea value={String(value ?? '')} onChange={onChange}
-              readOnly={readOnly} />
+              readOnly={readOnly} placeholder={MARKDOWN_HINT} />
           </div>
         )
       }
@@ -1858,7 +1861,7 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
           <div className="props-field" key={p.key}>
             <label className="props-label">{p.label}</label>
             <AutoResizeTextarea value={String(value ?? p.default ?? '')}
-              onChange={onChange} readOnly={readOnly} />
+              onChange={onChange} readOnly={readOnly} placeholder={MARKDOWN_HINT} />
           </div>
         )
       }

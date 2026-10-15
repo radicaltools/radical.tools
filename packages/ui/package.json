@@ -13,6 +13,7 @@
     "./components/Canvas": "./src/components/Canvas.tsx",
     "./components/WikiView": "./src/components/WikiView.tsx",
     "./components/TableView": "./src/components/TableView.tsx",
+    "./components/MarkdownText": "./src/components/MarkdownText.tsx",
     "./components/RightPanel": "./src/components/RightPanel.tsx",
     "./components/NotificationHost": "./src/components/NotificationHost.tsx",
     "./components/NodeWizard": "./src/components/NodeWizard.tsx",
@@ -36,6 +37,7 @@
     "@radical/layout": "*",
     "d3-zoom": "^3.0.0",
     "immer": "^10.0.3",
+    "markdown-to-jsx": "^9.10.3",
     "react": "^18.2.0",
     "reactflow": "^11.11.4",
     "zustand": "^4.5.0"

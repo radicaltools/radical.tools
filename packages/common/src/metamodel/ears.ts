@@ -89,6 +89,43 @@ export function composeEarsSentence(node: Record<string, unknown>, subject?: str
   return { sentence, complete }
 }
 
+/** The first phrase of a text: up to its first colon, semicolon, dash
+ *  aside or sentence end, where it goes on with detail. */
+export function firstPhrase(text: string): string {
+  const end = text.search(/:\s|;\s|\s[—–]\s|[.!?](\s|$)/)
+  return (end > 0 ? text.slice(0, end) : text).trim()
+}
+
+/** A requirement read obligation first, for a summary on one line: who
+ *  shall do what ("MCP server shall reject the write…", the action's first
+ *  phrase) and the condition it holds under ("if a tool call would…",
+ *  empty for a ubiquitous one), so that what is cut off is the condition,
+ *  not the meaning. Empty parts when there is no action or no condition. */
+export function earsSummaryParts(node: Record<string, unknown>, subject?: string, statePrecondition?: string): { obligation: string; condition: string } {
+  const action = String(node.action ?? '').trim().replace(/\.+$/, '')
+  if (!action) return { obligation: '', condition: '' }
+  const phrase = firstPhrase(action)
+  const obligation = earsActionIsClause(phrase) || earsActionIsClause(action)
+    ? capitalize(phrase)
+    : `${capitalize((subject || 'the system').trim())} shall ${phrase}`
+  const text = (key: string) => String(node[key] ?? '').trim()
+  const precondition = (statePrecondition ?? '').trim() || text('precondition')
+  const parts: Record<string, string[]> = {
+    'event-driven': [text('trigger') && `when ${text('trigger')}`],
+    'state-driven': [precondition && `while ${precondition}`],
+    'unwanted-behaviour': [text('unwanted_condition') && `if ${text('unwanted_condition')}`],
+    optional: [text('feature') && `where ${text('feature')}`],
+    complex: [
+      precondition && `while ${precondition}`,
+      text('trigger') && `when ${text('trigger')}`,
+      text('unwanted_condition') && `if ${text('unwanted_condition')}`,
+      text('feature') && `where ${text('feature')}`,
+    ],
+  }
+  const condition = (parts[String(node.ears_type ?? 'ubiquitous')] ?? []).filter(Boolean).join(', ')
+  return { obligation, condition }
+}
+
 type EarsSlot = 'trigger' | 'precondition' | 'unwanted_condition' | 'feature'
 
 // How a condition clause may open, and the field it then fills. The words

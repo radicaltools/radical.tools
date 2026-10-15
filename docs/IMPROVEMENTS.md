@@ -450,6 +450,13 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     rank them, fit the criterion weights to the ranking and keep the
     judgements as a test (ranking.test.ts › a view arranged by hand is
     skipped until then).
+29. **A running MCP server does not say it is out of date.** On 2026-10-15
+    the `radical-architecture` server Claude Code had open was built before
+    #194: its `upsert_node_type` still offered `tableTab` and had no
+    `summary`, so the fitness-function summary template of `architecture/`
+    had to be written into `metamodel.json` by hand. The server could
+    compare its build with the workspace sources (or the catalogue's tool
+    schema) and say so in `get_model_summary`.
 
 ### Reverse-engineered requirements (2026-10-06)
 

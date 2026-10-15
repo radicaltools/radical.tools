@@ -51,6 +51,7 @@ import {
   relationDisplayLabel,
 } from '@radical/common/metamodel'
 import * as model from '@radical/common/model'
+import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
@@ -835,6 +836,20 @@ function separateSiblings(
 
 // ─── RF state derivation ─────────────────────────────────────────────────────
 
+// A description as a card shows it (markdownToPlain), once per text: cards
+// are derived again on every change of the model.
+const plainDescriptions = new Map<string, string>()
+function plainDescription(text: string | undefined): string | undefined {
+  if (!text) return text
+  let plain = plainDescriptions.get(text)
+  if (plain === undefined) {
+    if (plainDescriptions.size > 5000) plainDescriptions.clear()
+    plain = markdownToPlain(text)
+    plainDescriptions.set(text, plain)
+  }
+  return plain
+}
+
 function deriveRFNodes(
   nodes: Record<string, C4Node>,
   viewFilter?: Set<string>,
@@ -955,7 +970,8 @@ function deriveRFNodes(
         c4id: n.id,
         type: n.type,
         label: n.label,
-        description: n.description,
+        // A card has room for plain text only: the Markdown without its marks.
+        description: plainDescription(n.description),
         technology: n.technology,
         parentId: n.parentId,
         collapsed,
