@@ -76,39 +76,39 @@ function astarSearch(
   const heapF: number[] = []
   const heapI: number[] = []
 
+  // A binary heap sifted by moving a hole, not by swapping pairs: the same
+  // comparisons in the same order (so the same routes), without allocating
+  // a pair per swap or resizing the arrays on every pop, which was most of
+  // a routed Smart Layout score.
   function push(f: number, i: number) {
     let pos = heapF.length
     heapF.push(f); heapI.push(i)
     while (pos > 0) {
       const p = (pos - 1) >> 1
-      if (heapF[pos] < heapF[p]) {
-        ;[heapF[pos], heapF[p]] = [heapF[p], heapF[pos]]
-        ;[heapI[pos], heapI[p]] = [heapI[p], heapI[pos]]
+      if (f < heapF[p]) {
+        heapF[pos] = heapF[p]; heapI[pos] = heapI[p]
         pos = p
       } else break
     }
+    heapF[pos] = f; heapI[pos] = i
   }
 
   function pop(): number {
     const top = heapI[0]
-    const n = heapF.length - 1
+    const lastF = heapF.pop()!, lastI = heapI.pop()!
+    const n = heapF.length
     if (n > 0) {
-      heapF[0] = heapF[n]; heapI[0] = heapI[n]
-      heapF.length = n; heapI.length = n
       let pos = 0
       while (true) {
-        let s = pos
-        const l = 2 * pos + 1, r = 2 * pos + 2
-        if (l < n && heapF[l] < heapF[s]) s = l
-        if (r < n && heapF[r] < heapF[s]) s = r
-        if (s !== pos) {
-          ;[heapF[pos], heapF[s]] = [heapF[s], heapF[pos]]
-          ;[heapI[pos], heapI[s]] = [heapI[s], heapI[pos]]
-          pos = s
-        } else break
+        const l = 2 * pos + 1, r = l + 1
+        let s = -1, best = lastF
+        if (l < n && heapF[l] < best) { s = l; best = heapF[l] }
+        if (r < n && heapF[r] < best) { s = r; best = heapF[r] }
+        if (s < 0) break
+        heapF[pos] = heapF[s]; heapI[pos] = heapI[s]
+        pos = s
       }
-    } else {
-      heapF.length = 0; heapI.length = 0
+      heapF[pos] = lastF; heapI[pos] = lastI
     }
     return top
   }

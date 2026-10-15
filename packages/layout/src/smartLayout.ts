@@ -325,8 +325,9 @@ export interface RenderedEdge {
  *  leave a node away from the other end). */
 /** Relations up to which the ranking score routes them around elements as
  *  the canvas does (A* per blocked relation); above, and in the annealer's
- *  energy, they are drawn direct, from their spread ports. */
-export const ROUTED_SCORE_MAX_EDGES = 300
+ *  energy, they are drawn direct, from their spread ports. At 300 the
+ *  metamodel diagram (133 relations) took twice as long to lay out. */
+export const ROUTED_SCORE_MAX_EDGES = 120
 
 function renderEdges(
   relations: Record<string, C4Relation>,
