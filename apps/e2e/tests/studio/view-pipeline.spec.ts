@@ -10,6 +10,14 @@ async function openFilter(page: Page, name: string): Promise<void> {
   await expect(page.locator('.rp-pipeline')).toBeVisible()
 }
 
+/** The sample's Requirements Register comes with its chain (needs →
+ *  requirements → scenarios or mockups); tests that build one start from none. */
+async function openRegisterWithoutChain(page: Page): Promise<void> {
+  await openFilter(page, 'Requirements Register')
+  await page.locator('.rp-pipeline').getByRole('button', { name: 'Reset' }).click()
+  await expect(page.locator('.rp-pipeline .rp-level')).toHaveCount(0)
+}
+
 // A view's filter, set in its properties: a chain of
 // levels — needs, under each the requirements refined from it, under each
 // of those the scenarios verifying it — each level with its own filters.
@@ -17,7 +25,7 @@ async function openFilter(page: Page, name: string): Promise<void> {
 
 test('needs → requirements → scenarios, built in the Filter panel, shown as a tree in the table', async ({ page, studio }) => {
   await studio.openSample('canvas')
-  await openFilter(page, 'Requirements Register')
+  await openRegisterWithoutChain(page)
   const steps = page.locator('.rp-pipeline')
   await expect(page.locator('.tv-row').first()).toBeVisible()
 
@@ -75,7 +83,7 @@ test('needs → requirements → scenarios, built in the Filter panel, shown as 
 
 test('the table adds an element under a row, on the next level of the chain as its filters ask, and one at the top', async ({ page, studio }) => {
   await studio.openSample('canvas')
-  await openFilter(page, 'Requirements Register')
+  await openRegisterWithoutChain(page)
   const steps = page.locator('.rp-pipeline')
   await steps.getByRole('button', { name: '+ Start with' }).click()
   await page.getByRole('menuitem', { name: /^Need/ }).click()
@@ -176,7 +184,7 @@ test('a wiki view follows the same chain: needs on the overview, their requireme
 
 test('a level takes any of its ways: needs or requirements as roots, the scenarios verifying either under them', async ({ page, studio }) => {
   await studio.openSample('canvas')
-  await openFilter(page, 'Requirements Register')
+  await openRegisterWithoutChain(page)
   const steps = page.locator('.rp-pipeline')
   await steps.getByRole('button', { name: '+ Start with' }).click()
   await page.getByRole('menuitem', { name: /^Need/ }).click()
@@ -296,7 +304,7 @@ test('every kind of view follows its chain, again when the chain or the model ch
 
 test('a way and a filter are edited in place, and a level can follow any relation', async ({ page, studio }) => {
   await studio.openSample('canvas')
-  await openFilter(page, 'Requirements Register')
+  await openRegisterWithoutChain(page)
   const steps = page.locator('.rp-pipeline')
   await steps.getByRole('button', { name: '+ Start with' }).click()
   await page.getByRole('menuitem', { name: /^Requirement/ }).click()

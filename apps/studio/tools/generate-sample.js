@@ -638,7 +638,17 @@ async function main() {
         positions: layout.positions, viewport: layout.viewport, sequenceId: `seq-${flow.id}`,
       })),
       { id: 'view-trace',    name: 'Requirements Traceability', kind: 'static', nodeIds: TRACE_IDS, positions: trace.positions, viewport: trace.viewport },
-      { id: 'view-register', name: 'Requirements Register', kind: 'table', nodeIds: REGISTER_IDS, positions: defaultPositions, viewport: tableVp, tableActiveTab: 'requirement' },
+      { id: 'view-register', name: 'Requirements Register', kind: 'table', nodeIds: REGISTER_IDS, positions: defaultPositions, viewport: tableVp,
+        // Needs, the requirements refined from each, and the scenarios that
+        // verify each requirement or the mockups that illustrate it.
+        pipeline: { levels: [
+          { ways: [{ types: ['need'] }] },
+          { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }] },
+          { ways: [
+            { via: { relationType: 'verifies', direction: 'in' }, types: ['scenario'] },
+            { via: { relationType: 'illustrates', direction: 'in' }, types: ['mockup'] },
+          ] },
+        ] } },
       { id: 'view-treemap',  name: 'Platform Hierarchy', kind: 'treemap', nodeIds: TREEMAP_IDS, positions: treemapPositions, viewport: treemapVp },
       { id: 'view-matrix',   name: 'Dependency Matrix', kind: 'matrix', nodeIds: MATRIX_IDS, positions: defaultPositions, viewport: tableVp },
       { id: 'view-governance', name: 'Governance', kind: 'table', nodeIds: GOVERNANCE_IDS, positions: defaultPositions, viewport: tableVp },

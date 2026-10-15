@@ -16,13 +16,13 @@
 
 ## Why radical.tools?
 
-Architecture diagrams go stale because they are pictures. In radical.tools they are **views of one model**. Every element lives once, and the canvas, dependency matrix, sequence diagram, table and wiki all read from it. The decisions, requirements and fitness functions that explain the architecture live in the same model, linked to the elements they govern.
+Architecture diagrams go stale because they are pictures. In radical.tools they are **views of one model**. Every element lives once, and the structure and flow canvases, hierarchy, dependency matrix, table and wiki all read from it. The decisions, requirements and fitness functions that explain the architecture live in the same model, linked to the elements they govern.
 
 - **No account, nothing to install.** Open it in the browser and start modelling. Your model stays in local storage or plain files you can commit.
 - **C4 without the busywork.** Smart Layout places nodes, minimises crossings and fits groups for you, and keeps the rows, columns and grids you pin.
 - **From a paragraph to a model.** Radical Forge turns a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model, one reviewable stage at a time.
 - **Bring your own AI.** OpenAI, Anthropic, Gemini, or a local model through Ollama.
-- **Don't start from zero.** Import from 120+ curated patterns, ADRs, fitness functions and blueprints in the [Architecture Hub](https://hub.radical.tools).
+- **Don't start from zero.** Import from 120+ curated requirements, patterns, ADRs, fitness functions and blueprints in the [Architecture Hub](https://hub.radical.tools).
 
 <table>
   <tr>
@@ -30,7 +30,7 @@ Architecture diagrams go stale because they are pictures. In radical.tools they 
     <td width="50%"><img alt="Architecture Hub catalogue of patterns, ADRs and blueprints" src="apps/web/screenshots/hub-catalogue-light.png"><br><sub><b>Architecture Hub</b>, curated concepts you can import in one click</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img alt="Dependency matrix view of containers" src="apps/web/screenshots/matrix-light.png"><br><sub><b>Dependency matrix</b>, one of six views over the same model</sub></td>
+    <td width="50%"><img alt="Dependency matrix view of the sample model" src="apps/web/screenshots/matrix-light.png"><br><sub><b>Dependency matrix</b>, one of six views over the same model</sub></td>
     <td width="50%"><img alt="Generated architecture wiki page" src="apps/web/screenshots/wiki-light.png"><br><sub><b>Architecture wiki</b>, documentation generated from the model</sub></td>
   </tr>
 </table>
@@ -39,29 +39,32 @@ Architecture diagrams go stale because they are pictures. In radical.tools they 
 
 Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothing to install.
 
-**Desktop app:** there are no prebuilt installers yet. To run it as an Electron app, build it from source (see [Getting started](#getting-started)): `npm install && npm run dist` produces an installer for your OS in `dist/`.
+**Desktop app:** there are no prebuilt installers yet. To run it as an Electron app, build it from source (see [Getting started](#getting-started)): `npm install && npm run dist` produces an installer for your OS in `apps/studio/dist/`.
 
 **VS Code:** an extension that opens `.radical` files right in the editor lives in [apps/vscode](apps/vscode).
 
 ## Features
 
-- **C4 model**: Person, Software System, Container, Component, Database, Web App, Queue, Relation
-- **Domain & Governance elements**: Domain, Entity (aggregate root or entity, with *part of* and *references* between entities), ADR, Fitness Function, Need (raw free-text input such as a brief or notes), Requirement (EARS, derived from needs), Blueprint
+- **C4 model**: Person, Software System, Container, Component, Database, Web App, Queue, Group, joined by *Interacts*
+- **Domain & Governance elements**: Domain, Entity (aggregate root or entity, with *part of* and *references* between entities), ADR, Fitness Function, Need (raw free-text input such as a brief or notes), Requirement (EARS, derived from needs), Scenario (Gherkin, verifies requirements, names the tests that run it), Blueprint
 - **State machines**: event-driven hierarchical statecharts (SCXML semantics) — State Machine, State (compound, parallel regions, final), Pseudostate (initial, history, choice) and Event, linked by transitions that point at their trigger and the events they raise; each machine is the lifecycle of a domain Entity and is implemented by C4 elements; Studio checks that each machine can run (initial states, reachability, unguarded conflicts)
 - **UI mockups**: Mockup element with a design link or an AI-generated low-fi wireframe, linked to requirements and scenarios (*illustrates*), to the container that renders it (*presented by*) and to other screens (*navigates to*) to model screen flows
-- **Smart Layout**: SA-based auto-layout with crossing minimisation, edge-length optimisation, aspect-ratio penalty, and compound parent fitting
+- **Smart Layout**: twelve layout algorithms (ELK layered variants, stress, force-directed, tree, a C4-aware layout), the best refined by simulated annealing, ranked on how the layout reads as drawn (crossings, overdraws, label room, edge lengths, proportions); curved or orthogonal lines per view
 - **Alignments**: keep elements in a row, a column or a grid per view, optionally in the order you selected them (or a container's children with *Align children…*); drags, live physics and Smart Layout hold them, and the AI tools and MCP server can set them
 - **Calm drags**: a drag moves only what you drag and pushes clear only what you drop it on; dropped elements stay pinned where you put them (⌘/Ctrl-drag lets the live physics make room instead)
 - **Multiple layout engines**: ELK (hierarchical/layered/force), webcola (live physics), custom Smart Layout pipeline
 - **AI assistant**: chat with OpenAI / Anthropic / Gemini / Ollama to generate and modify diagrams
 - **Radical Forge**: turn a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model, one reviewable stage at a time; the description is kept in the model as a Need the requirements derive from
 - **Architecture Hub**: browse and import 120+ curated architecture concepts (patterns, fitness functions, ADRs, requirements, blueprints) from [hub.radical.tools](https://hub.radical.tools); blueprints include per-actor screen flows and named views
-- **Multiple views**: Canvas, Matrix, Sequence, Treemap, Table, Wiki per diagram
-- **Presentation mode**: fullscreen slides with navigation bar
+- **Six view kinds**: Structure, Flow, Hierarchy, Table, Matrix and Wiki, each filtered by a chain of levels (needs → requirements → scenarios) and kept in folders
+- **Presentation mode**: slides over views and milestones, played in the window with a navigation bar
 - **Metamodel editor**: customise node types, relation types, and constraints, with typed properties including references to other elements
-- **Time travel**: milestone-based snapshots with named undo/redo
-- **Document manager**: multiple diagrams, localStorage + file-system backed
-- **Export**: PNG/SVG export, JSON save/load, Electron file dialogs
+- **Time travel**: milestones of the whole model, with a diff against the previous one and edits that propagate to later milestones
+- **Inspector**: what `radical check` says about the model — verified requirements and ADRs, failing tests, findings by rule — with links to each element
+- **radical check**: a CLI that checks a model folder's metamodel rules, completeness and the tests it names; CI runs it on this repository's own model ([architecture/](architecture))
+- **MCP server**: [@radicaltools/mcp](apps/mcp) lets Claude Code, Claude Desktop or Codex read and edit a Markdown model folder, with the same tools as the AI assistant
+- **Models**: kept in the browser, in one `.radical` file or in a folder of Markdown files (git-friendly); Structurizr DSL import
+- **Export**: PNG/SVG export and copy to clipboard of any view
 
 ## Tech stack
 
@@ -76,7 +79,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 
 ## Getting started
 
-**Prerequisites:** Node.js ≥ 20, npm ≥ 9
+**Prerequisites:** Node.js ≥ 20.11 (CI uses 24), npm ≥ 9
 
 ```bash
 # Install dependencies
@@ -100,12 +103,17 @@ npm start
 # Desktop installers for the current OS (outputs to apps/studio/dist/)
 npm run dist
 
-# Build web-only renderer (for deployment to studio.radical.tools)
+# Browser build of Studio: dev server / production build (studio.radical.tools)
+npm run dev:web
 npm run build:web
 
 # Architecture Hub (hub.radical.tools): dev server / production build
 npm run dev:hub
 npm run build:hub
+
+# Check this repository's own architecture model, as CI does
+npm run test:reports
+npm run check:architecture
 ```
 
 ### Releasing the desktop app (maintainers)
@@ -147,6 +155,8 @@ apps/
   e2e/            End-to-end regression suite (Playwright) for the web builds
                   of Studio and Hub, with screenshot baselines
   mcp/            @radicaltools/mcp: local stdio MCP server for model folders
+  cli/            @radicaltools/cli: `radical check`, which checks a model folder
+                  (metamodel, completeness, the tests it names)
   web/            Marketing site and manual (radical.tools)
 packages/
   common/         @radical/common: C4 + metamodel types, file formats, query
@@ -162,8 +172,10 @@ packages/
   hub-catalogue/  @radical/hub-catalogue: the Hub's concept catalogue (one
                   .radical document per concept), its validation and the Vite
                   plugin that serves and bundles it for the Hub and Studio
+  node-files/     @radical/node-files: model folders on disk for Node (MCP, CLI)
+architecture/     The architecture model of radical.tools itself, checked in CI
 infra/            Terraform: AWS S3 + CloudFront + Route53 + IAM (OIDC)
-tools/            Repo-wide scripts (generate-icon.js)
+tools/            Repo-wide scripts (check-workspaces.mjs, test-reports.mjs, generate-icon.js)
 docs/             Architecture notes and improvement log
 ```
 
@@ -178,10 +190,16 @@ npm run test:watch
 
 # End-to-end regression suite (Playwright) against the web builds
 npm run e2e
+
+# One JSON report per workspace, for radical check
+npm run test:reports
+
+# The manual's screenshots (apps/web/screenshots), light and dark
+npm run docs:screenshots
 ```
 
-See [apps/e2e/README.md](apps/e2e/README.md) for the e2e suite and its
-screenshot baselines.
+See [apps/e2e/README.md](apps/e2e/README.md) for the e2e suite, its
+screenshot baselines and the manual's screenshots.
 
 ## Contributing
 
