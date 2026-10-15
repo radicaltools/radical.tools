@@ -80,18 +80,24 @@ Screenshot tests call `studio.freezeTime()` first. The page clock (timers,
 `requestAnimationFrame`) then only moves when the test advances it, so
 animations and the live layout render the same frame on every run.
 
-**Updating baselines** after an intended visual change: add the
-`update-screenshots` label to the PR. The `E2E — update screenshots` workflow
-regenerates the baselines that changed, commits them to the branch and removes
-the label. Check the images in the PR diff, then push a commit to start the CI
-checks (`git commit --allow-empty -m "ci: re-run checks" && git push`): a bot
-push does not start them, and re-running an earlier run tests its old commit
-with the old baselines.
+**Updating baselines** happens on its own. On a pull request, CI does not fail
+on a screenshot that differs from its baseline: the shard writes the new image,
+and once the suite passed, the job *Commit new screenshot baselines* commits the
+changed images to the branch (`test(e2e): update screenshot baselines`) and
+starts CI by hand on that commit, which compares them strictly. Check the
+images in the PR diff before merging: an unintended visual change shows up
+there, not as a failed check. Pull before pushing again. Before a deploy from
+`main`, a differing screenshot fails the suite.
 
 ## CI
 
 `ci.yml` runs type-check, unit tests and this suite once per pull request into
-`main`, on the PR's merge commit. Branches without a PR are not checked
+`main`, on the PR's merge commit. The suite runs in four shards side by side
+(`--shard=n/4`, each with a blob report); the *E2E (Playwright)* job merges them with
+`playwright.merge.config.ts` into the HTML report and `reports/e2e.json`
+(artifact `e2e-report`), and fails when a shard failed. It is the check
+`main`'s branch protection requires (*E2E / E2E (Playwright)*), so renaming it
+needs the protection updated too. Branches without a PR are not checked
 automatically; start CI by hand from the Actions tab (*Run workflow*) if you
 need it. A new push to a PR cancels the checks still running for the previous
 commit. On `main`, `deploy.yml` runs this suite before every deploy.
@@ -112,5 +118,5 @@ regression guard.
 ## Upgrading Playwright
 
 `@playwright/test` is pinned to an exact version. Bump it together with the
-image tag in `.github/workflows/e2e.yml` and `e2e-update-screenshots.yml`,
-then regenerate the baselines.
+image tag in `.github/workflows/e2e.yml`; the next PR run commits the
+regenerated baselines.

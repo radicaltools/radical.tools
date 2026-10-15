@@ -37,11 +37,15 @@ export default defineConfig({
   retries: CI ? 2 : 0,
   workers: CI ? 2 : undefined,
   // reports/e2e.json is for `radical check --report reports` (npm run check:architecture).
-  reporter: [
-    ...(CI ? [['github'] as const] : [['list'] as const]),
-    ['html', { open: 'never' }],
-    ['json', { outputFile: '../../reports/e2e.json' }],
-  ],
+  // CI runs the suite in shards (E2E_BLOB=1): each keeps a blob report, and
+  // playwright.merge.config.ts merges them into the same HTML and JSON reports.
+  reporter: process.env.E2E_BLOB
+    ? [['github'], ['blob']]
+    : [
+        ...(CI ? [['github'] as const] : [['list'] as const]),
+        ['html', { open: 'never' }],
+        ['json', { outputFile: '../../reports/e2e.json' }],
+      ],
   timeout: 60_000,
 
   ignoreSnapshots: !visual,
