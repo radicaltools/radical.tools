@@ -4,9 +4,11 @@ name: E2E
 # web builds of Studio and Hub, including screenshot comparison.
 #
 # Called by ci.yml and deploy.yml. The suite runs in four shards side by side;
-# the E2E report job merges their blob reports into the HTML report and
-# reports/e2e.json (artifact e2e-report), which radical check reads. Runs
-# inside the Playwright image so fonts and rendering match the committed
+# the E2E (Playwright) job merges their blob reports into the HTML report and
+# reports/e2e.json (artifact e2e-report), which radical check reads, and fails
+# when a shard failed. Its name is the check main's branch protection requires
+# ("E2E / E2E (Playwright)"); keep the two in step. The shards run inside the
+# Playwright image so fonts and rendering match the committed
 # screenshot baselines; keep the image tag equal to the @playwright/test
 # version in apps/e2e/package.json.
 #
@@ -87,7 +89,7 @@ jobs:
           retention-days: 14
 
   report:
-    name: E2E report
+    name: E2E (Playwright)
     needs: e2e
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
@@ -114,3 +116,8 @@ jobs:
             apps/e2e/playwright-report/
             reports/e2e.json
           retention-days: 14
+      - name: Fail when a shard failed
+        if: ${{ needs.e2e.result != 'success' }}
+        run: |
+          echo "E2E shards: ${{ needs.e2e.result }}"
+          exit 1

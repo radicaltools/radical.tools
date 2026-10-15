@@ -93,9 +93,11 @@ there, not as a failed check. Pull before pushing again. Before a deploy from
 
 `ci.yml` runs type-check, unit tests and this suite once per pull request into
 `main`, on the PR's merge commit. The suite runs in four shards side by side
-(`--shard=n/4`, each with a blob report); the *E2E report* job merges them with
+(`--shard=n/4`, each with a blob report); the *E2E (Playwright)* job merges them with
 `playwright.merge.config.ts` into the HTML report and `reports/e2e.json`
-(artifact `e2e-report`). Branches without a PR are not checked
+(artifact `e2e-report`), and fails when a shard failed. It is the check
+`main`'s branch protection requires (*E2E / E2E (Playwright)*), so renaming it
+needs the protection updated too. Branches without a PR are not checked
 automatically; start CI by hand from the Actions tab (*Run workflow*) if you
 need it. A new push to a PR cancels the checks still running for the previous
 commit. On `main`, `deploy.yml` runs this suite before every deploy.

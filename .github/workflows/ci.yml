@@ -6,8 +6,9 @@ name: CI
 # branch without a PR, start this workflow by hand (workflow_dispatch). On
 # main, deploy.yml runs the E2E suite before every deploy.
 #
-# The "Protect main" ruleset requires the "Type-check & Test" check, which
-# the pull_request run reports.
+# The "Protect main" ruleset requires the "Type-check & Test" check, and
+# main's branch protection also "E2E / E2E (Playwright)", the e2e.yml job that
+# merges the shards' reports. The pull_request run reports both.
 #
 # A pull request run commits the screenshot baselines that changed to the
 # branch (job screenshots) and starts this workflow by hand on that commit.
