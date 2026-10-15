@@ -58,7 +58,7 @@ The server binds to one folder at launch, then reads it afresh for every tool ca
 
 Writes preserve unrelated files and the existing `radical.md` text. A tool reports success only after the changed model files are written. If a file changed between the server's read and write, it returns a conflict without writing. Studio's external-change reload no longer queues an autosave of the loaded data. After such a reload Studio highlights what changed for about five seconds (new and changed elements badged, removed ones as ghosts; layout alone shows nothing), so you can follow an agent at work.
 
-For now, keep Studio in **viewer use while the MCP client writes**. Folder writes span several files, and Studio and MCP do not share a cross-process transaction lock. Editing the same folder simultaneously from both can still race; the stamp check only catches changes visible before a write begins. Single `.radical` JSON files, snapshots (milestones), browser commands, and remote HTTP MCP are not supported by this server.
+For now, keep Studio in **viewer use while the MCP client writes**. Folder writes span several files, and Studio and MCP do not share a cross-process transaction lock. Editing the same folder simultaneously from both can still race; the stamp check only catches changes visible before a write begins. Single `.radical` JSON files, loading a milestone over the current model (the milestone tools save, list, rename, delete and compare them), commands that drive Studio's canvas, and remote HTTP MCP are not supported by this server.
 
 Run `npm run test -w @radicaltools/mcp` to build and exercise a real stdio connection and temporary disk folder.
 

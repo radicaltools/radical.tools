@@ -10,7 +10,8 @@
     "pree2e:ui": "npm run build -w @radicaltools/mcp",
     "e2e:ui": "playwright test --ui",
     "e2e:report": "playwright show-report",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "docs:screenshots": "playwright test -c playwright.docs.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

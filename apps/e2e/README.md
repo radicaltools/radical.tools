@@ -48,6 +48,13 @@ vite.web.config.ts --minify false` in `apps/studio` for readable names).
 | `studio/export` | PNG and SVG export produce real files |
 | `studio/folders` | Models stored as a folder of Markdown files: move to a folder, new model in a folder, reload, renames that move files, outside edits (including MCP), files Studio must not touch |
 | `studio/files` | Models kept in a single `.radical` file: open, edits saved back, reopen after a reload, new model in a file |
+| `studio/view-pipeline` | A view's filter as a chain of levels; every view kind shows exactly what it gives |
+| `studio/selection-focus` | A selection brings its relations forward; camera and per-view selection |
+| `studio/alignment`, `studio/physics`, `studio/edge-labels` | Rows, columns and grids; calm drags, pins and the live physics; edge label placement |
+| `studio/matrix`, `studio/markdown`, `studio/need`, `studio/wizard` | Matrix edits; Markdown fields and summaries; needs; node wizards |
+| `studio/metamodel-editor`, `studio/metamodel-diagram`, `studio/state-machines` | The metamodel editor, its Diagram tab, statecharts |
+| `studio/forge`, `studio/hub-import` | Radical Forge stages; importing from the Hub |
+| `studio/inspector` | The Inspector shows what radical check says; its links lead to the element; a deep link opens it |
 | `studio/known-issues` | Open bugs, marked `test.fail` (see below) |
 | `hub/hub` | Landing page, categories, search, concept canvas / wiki / table, `.radical` download |
 
@@ -88,6 +95,17 @@ starts CI by hand on that commit, which compares them strictly. Check the
 images in the PR diff before merging: an unintended visual change shows up
 there, not as a failed check. Pull before pushing again. Before a deploy from
 `main`, a differing screenshot fails the suite.
+
+## Manual screenshots
+
+`playwright.docs.config.ts` and `docs/` are not tests: they take the
+screenshots of the manual (`apps/web/screenshots/<name>-light.png` and
+`-dark.png`) from the web builds, one `test` per figure. Run
+`npm run docs:screenshots` from the root after a UI change (`-- -g wiki` for
+one figure), look at the images, and commit them with the manual. Unlike the
+suite, they load web fonts and come from macOS. The Inspector figure reads the
+repository's own `architecture/` model and the test results
+`npm run check:architecture` left in `architecture/.radical/`.
 
 ## CI
 

@@ -5843,7 +5843,54 @@
         "y": 0,
         "zoom": 1
       },
-      "tableActiveTab": "requirement"
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "need"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "via": {
+                  "relationType": "derives",
+                  "direction": "in"
+                },
+                "types": [
+                  "requirement"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "via": {
+                  "relationType": "verifies",
+                  "direction": "in"
+                },
+                "types": [
+                  "scenario"
+                ]
+              },
+              {
+                "via": {
+                  "relationType": "illustrates",
+                  "direction": "in"
+                },
+                "types": [
+                  "mockup"
+                ]
+              }
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "view-treemap",

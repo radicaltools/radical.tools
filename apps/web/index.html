@@ -73,7 +73,7 @@
         <div class="tile" style="--c:#5b21b6">
           <span class="tile-icon"><svg viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2Zm0 1.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9ZM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Zm0 1a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/></svg></span>
           <span class="tile-head"><span class="tile-name">Checked against</span></span>
-          <span class="tile-text">Fitness functions and requirements catch code that drifts from the model.</span>
+          <span class="tile-text">Scenarios and fitness functions name the tests that prove them; <code>radical check</code> fails CI when code drifts from the model.</span>
         </div>
       </div>
     </section>
@@ -85,7 +85,7 @@
         <span class="tile-head"><span class="tile-name">Metamodel</span><span class="tile-n">01</span></span>
         <span class="tile-text">The rules: types, relations, containment. Radical or plain C4, fully editable.</span>
       </a>
-      <a class="tile" href="manual.html#adding-elements" style="--c:#1168bd">
+      <a class="tile" href="manual.html#elements" style="--c:#1168bd">
         <span class="tile-icon"><svg viewBox="0 0 16 16"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9ZM4 5h8v1H4V5Zm0 2.5h8v1H4v-1Zm0 2.5h5v1H4V10Z"/></svg></span>
         <span class="tile-head"><span class="tile-name">Model</span><span class="tile-n">02</span></span>
         <span class="tile-text">One validated graph. Add an element once, see it in every view.</span>
@@ -154,11 +154,11 @@
         </li>
         <li>
           <span class="f-icon" style="--c:#1e3a5f"><svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><path d="M11.25 9.5h1.5v2.25H15v1.5h-2.25v2.25h-1.5v-2.25H9v-1.5h2.25V9.5Z"/></svg></span>
-          <span><strong>Concept Hub.</strong> 120+ ready-made requirements, ADRs, patterns and blueprints.</span>
+          <span><strong>Concept Hub.</strong> 120+ ready-made requirements, ADRs, fitness functions, patterns and blueprints.</span>
         </li>
         <li>
           <span class="f-icon" style="--c:#16a34a"><svg viewBox="0 0 16 16"><circle cx="3" cy="3" r="1.6"/><circle cx="13" cy="3" r="1.6"/><circle cx="3" cy="13" r="1.6"/><circle cx="13" cy="13" r="1.6"/><circle cx="8" cy="8" r="1.8"/><path d="M4.2 4.2 6.6 6.6M11.8 4.2 9.4 6.6M4.2 11.8 6.6 9.4M11.8 11.8 9.4 9.4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg></span>
-          <span><strong>Smart Layout.</strong> Tries several layout engines and keeps the cleanest result.</span>
+          <span><strong>Smart Layout.</strong> Tries twelve layouts, scores each as drawn and keeps the cleanest; curved or orthogonal lines per view.</span>
         </li>
         <li>
           <span class="f-icon" style="--c:#b45309"><svg viewBox="0 0 16 16"><rect x="1" y="5" width="3.5" height="6" rx="1"/><rect x="6.25" y="5" width="3.5" height="6" rx="1"/><rect x="11.5" y="5" width="3.5" height="6" rx="1"/><path d="M0 2h16M0 14h16" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.6 1.4" fill="none"/></svg></span>
@@ -166,7 +166,7 @@
         </li>
         <li>
           <span class="f-icon" style="--c:#5b21b6"><svg viewBox="0 0 16 16"><path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3Zm1 .5V11h10V3.5H3ZM5 13h6v1H5v-1Z"/></svg></span>
-          <span><strong>Design, view, present.</strong> Edit, explore read-only or turn views into slides.</span>
+          <span><strong>Design, view, present, inspect.</strong> Edit, explore read-only, turn views into slides, or see what <code>radical check</code> says about the model.</span>
         </li>
         <li>
           <span class="f-icon" style="--c:#64748b"><svg viewBox="0 0 16 16"><path d="M4.5 1C3.67 1 3 1.67 3 2.5v11c0 .83.67 1.5 1.5 1.5h7c.83 0 1.5-.67 1.5-1.5V6L9 1H4.5ZM9 2l3 3.5H9V2ZM5 8h6v1H5V8Zm0 2.5h6v1H5v-1Zm0 2.5h3.5v1H5V13Z"/></svg></span>
@@ -200,7 +200,7 @@
         <h2>Connect your agent</h2>
         <p>
           A local MCP server gives Claude Code, Claude Desktop, Codex or any MCP client the model as tools:
-          read the summary and the metamodel rules, search, add and move elements, create views, sequences and slides, run Smart Layout, keep elements in rows, columns or grids, or run Radical Forge stage by stage.
+          read the summary and the metamodel rules, search, add and move elements, create views, sequences and slides, run Smart Layout, keep elements in rows, columns or grids, run Radical Forge stage by stage, save and compare milestones, list the model's issues, read what is selected in Studio, or extend the metamodel with your own types.
           Every write is checked against the metamodel, and Studio shows it on the open canvas.
         </p>
         <div class="install-links">
@@ -208,12 +208,8 @@
           <a href="https://github.com/radicaltools/radical.tools/tree/main/apps/mcp" target="_blank" rel="noopener">Source →</a>
         </div>
       </div>
-      <pre class="code"><code><span class="cm"># Node.js ≥ 20, from the repository root</span>
-npm run build -w @radicaltools/mcp
-
-<span class="cm"># point it at a Markdown model folder</span>
-claude mcp add radical-folder -- node \
-  /path/to/radical.tools/apps/mcp/dist/index.js \
+      <pre class="code"><code><span class="cm"># Node.js ≥ 20.11 — point it at a Markdown model folder</span>
+claude mcp add radical-folder -- npx -y @radicaltools/mcp \
   --folder /path/to/my-model</code></pre>
     </section>
 
@@ -221,7 +217,7 @@ claude mcp add radical-folder -- node \
     <section class="install" id="install">
       <div class="install-text">
         <h2>Run it locally</h2>
-        <p>Node.js ≥ 18 — or skip the install and use <a href="https://studio.radical.tools" target="_blank" rel="noopener">studio.radical.tools</a>.</p>
+        <p>Node.js ≥ 20.11 — or skip the install and use <a href="https://studio.radical.tools" target="_blank" rel="noopener">studio.radical.tools</a>.</p>
         <div class="install-links">
           <a href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener">GitHub →</a>
           <a href="https://github.com/radicaltools/radical.tools/releases" target="_blank" rel="noopener">Releases →</a>

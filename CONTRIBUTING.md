@@ -30,7 +30,7 @@ npm workspaces monorepo; run commands from the repo root.
 
 ```
 apps/
-  studio/         — Radical Studio (Electron + web) and the Hub viewer
+  studio/         — Radical Studio (Electron app + web SPA)
     src/main/       — Electron main process
     src/preload/    — Electron preload bridge
     src/renderer/src/
@@ -43,13 +43,16 @@ apps/
   hub/            — Architecture Hub read-only viewer
   e2e/            — End-to-end regression suite (Playwright)
   mcp/            — @radicaltools/mcp: local stdio MCP server for model folders
-  web/            — Marketing site (radical.tools)
+  cli/            — @radicaltools/cli: radical check, which checks a model folder
+  web/            — Marketing site and manual (radical.tools)
 packages/
   common/         — @radical/common: model types, metamodels, formats, AI tools (no UI deps)
   layout/         — @radical/layout: Smart Layout and headless layout engines
   ui/             — @radical/ui: canvas, panels, views and the diagram store (Studio + Hub)
   host-bridge/    — @radical/host-bridge: Studio ↔ host contract (Electron, VS Code, browser)
   hub-catalogue/  — @radical/hub-catalogue: Hub concepts (.radical files), validation, Vite plugin
+  node-files/     — @radical/node-files: model folders on disk for Node (MCP, CLI)
+architecture/     — the architecture model of radical.tools itself, checked in CI
 ```
 
 ## Workspace boundaries
@@ -68,7 +71,7 @@ packages/
 ## Daily workflow (for maintainers)
 
 The `main` branch is protected — direct pushes are rejected. All changes go through a PR.
-CI (`Type-check & Test` and `E2E`) must pass before merging.
+CI (`Type-check & Test`, `E2E` and `Architecture model`) must pass before merging. The last runs `radical check` on `architecture/` with the test reports: a change that alters behaviour updates the model (requirements, scenarios and the tests they name). Run `npm run test:reports` and `npm run check:architecture` locally first. A change to the UI also updates the manual (`apps/web/manual.html`) and its screenshots (`npm run docs:screenshots`).
 
 Recommended git aliases (set up once globally):
 
