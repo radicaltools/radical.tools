@@ -1,12 +1,16 @@
+import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 import { fixture } from '../support/fixtures'
-import { expect, test } from './shots'
+import { SHOTS_DIR, calm, expect, test } from './shots'
 
 // Every Studio screenshot of the manual, on the Fintech sample unless it says
-// otherwise. One test per figure; its name is the file name.
+// otherwise. One test per figure; its name is the file name. README's demo GIF
+// and the social preview are at the end.
 
 const SAMPLE = readFileSync(fileURLToPath(new URL('../../studio/src/renderer/src/store/fintechSampleData.json', import.meta.url)), 'utf8')
 const ARCHITECTURE = fileURLToPath(new URL('../../../architecture/', import.meta.url))
@@ -237,4 +241,108 @@ test('inspector', async ({ page, shot }) => {
   await expect(page.locator('.insp-verdict')).toBeVisible()
   await settle(page)
   await shot('inspector')
+})
+
+/** Opens the view whose card in the left panel says `name`, as a reader would. */
+async function pickView(page: Page, name: string): Promise<void> {
+  await page.locator('.lp-view-card', { hasText: name }).first().click()
+  await settle(page)
+}
+
+function hasFfmpeg(): boolean {
+  try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true } catch { return false }
+}
+
+/**
+ * README's demo (screenshots/demo.gif): the sample's views one after another,
+ * picked in the left panel, recorded and turned into a GIF by ffmpeg. Light only.
+ */
+test('demo', async ({ playwright, theme }, testInfo) => {
+  test.skip(theme !== 'light', 'the README shows the light demo')
+  test.skip(!hasFfmpeg(), 'needs ffmpeg on the PATH')
+  test.setTimeout(180_000)
+  const { viewport, deviceScaleFactor, locale, timezoneId, colorScheme, baseURL, userAgent } = testInfo.project.use
+  const size = viewport ?? { width: 1440, height: 900 }
+  const profile = await mkdtemp(join(tmpdir(), 'radical-demo-'))
+  const videos = testInfo.outputPath('video')
+  const context = await playwright.chromium.launchPersistentContext(profile, {
+    headless: true, viewport, deviceScaleFactor, locale, timezoneId, colorScheme, baseURL, userAgent,
+    recordVideo: { dir: videos, size },
+  })
+  const page = context.pages()[0] ?? await context.newPage()
+  const started = Date.now()
+  await page.addInitScript(() => { localStorage.setItem('radical-theme', 'light') })
+  await seedModels(page)
+  await open(page, 'view-ctx')
+  await calm(page)
+  const from = (Date.now() - started) / 1000
+
+  await page.waitForTimeout(2500)
+  await page.getByTestId('rf__node-sys-core').locator('.c4-node-label').first().click()
+  await settle(page)
+  await page.waitForTimeout(2500)
+  for (const view of ['Core Banking', 'Payment Flow', 'Platform Hierarchy', 'Dependency Matrix', 'Requirements Register', 'Architecture Wiki']) {
+    await pickView(page, view)
+    await page.waitForTimeout(2800)
+  }
+  const video = page.video()
+  await context.close()
+  const webm = await video!.path()
+  await rm(profile, { recursive: true, force: true })
+
+  // 880 px wide like the README's <img>, 10 fps, one palette for the whole clip.
+  execFileSync('ffmpeg', [
+    '-loglevel', 'error', '-y', '-ss', from.toFixed(2), '-i', webm,
+    '-vf', 'fps=10,scale=880:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle',
+    `${SHOTS_DIR}demo.gif`,
+  ])
+})
+
+/**
+ * The GitHub repo's social preview and radical.tools' og:image
+ * (apps/web/social-preview.png, 1280×640): the pitch beside Designer on the
+ * sample in dark. Dark only.
+ */
+test('social-preview', async ({ page, theme }) => {
+  test.skip(theme !== 'dark', 'the social preview is dark')
+  await open(page, 'view-core')
+  await calm(page)
+  const studio = (await page.screenshot({ animations: 'disabled', caret: 'hide' })).toString('base64')
+
+  await page.setViewportSize({ width: 1280, height: 640 })
+  await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0 }
+  body { width: 1280px; height: 640px; overflow: hidden; font-family: Inter, sans-serif; color: #e8eaf6;
+    background:
+      radial-gradient(700px 420px at 100% 0%, rgba(110,168,255,.22), transparent 70%),
+      linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 32px 32px,
+      linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 32px 32px,
+      #0d0d1a; }
+  .pitch { position: absolute; left: 80px; top: 88px; width: 540px }
+  .logo { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 600; letter-spacing: -.01em }
+  .logo em { font-style: normal; color: #6ea8ff }
+  h1 { margin-top: 44px; font-size: 54px; line-height: 1.08; font-weight: 800; letter-spacing: -.035em }
+  h1 span { color: #8ab8ff }
+  p { margin-top: 24px; font-size: 21px; hyphens: none; line-height: 1.5; color: #b3b8d4 }
+  .chips { display: flex; gap: 10px; margin-top: 28px }
+  .chips span { padding: 7px 14px; border: 1px solid rgba(110,168,255,.35); border-radius: 999px; background: rgba(110,168,255,.1); font-size: 16px; font-weight: 600 }
+  .foot { position: absolute; left: 80px; bottom: 56px; font: 500 18px 'JetBrains Mono', monospace; color: #e8eaf6 }
+  .foot span { color: #8a90b0 }
+  .shot { position: absolute; left: 650px; top: 86px; width: 900px; border-radius: 14px; overflow: hidden;
+    border: 1px solid rgba(110,168,255,.35); box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 6px rgba(110,168,255,.06) }
+  .shot img { display: block; width: 100% }
+</style></head><body>
+  <div class="pitch">
+    <div class="logo"><svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" fill="none" stroke="#6ea8ff" stroke-width="3" stroke-dasharray="5 4"/><circle cx="20" cy="20" r="6" fill="#6ea8ff"/></svg><span>radical<em>.tools</em></span></div>
+    <h1>Architecture as<br><span>one living model.</span></h1>
+    <p>Open-source studio for C4 models, ADRs, fitness functions and requirements, with an AI co-architect.</p>
+    <div class="chips"><span>C4</span><span>ADRs</span><span>Fitness functions</span><span>AI</span><span>MIT</span></div>
+  </div>
+  <div class="foot">studio.radical.tools <span>· free, in the browser</span></div>
+  <div class="shot"><img src="data:image/png;base64,${studio}"></div>
+</body></html>`)
+  await calm(page)
+  await page.screenshot({ path: join(SHOTS_DIR, '..', 'social-preview.png') })
 })

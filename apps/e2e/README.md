@@ -105,7 +105,11 @@ screenshots of the manual (`apps/web/screenshots/<name>-light.png` and
 one figure), look at the images, and commit them with the manual. Unlike the
 suite, they load web fonts and come from macOS. The Inspector figure reads the
 repository's own `architecture/` model and the test results
-`npm run check:architecture` left in `architecture/.radical/`.
+`npm run check:architecture` left in `architecture/.radical/`. Two more come
+from the same run: README's `screenshots/demo.gif` (a recording of the
+sample's views, turned into a GIF by `ffmpeg`, which must be on the PATH) and
+`apps/web/social-preview.png`, the repo's social preview and the site's
+`og:image`. Upload a new social preview in the GitHub repo's settings too.
 
 ## CI
 
