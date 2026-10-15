@@ -46,6 +46,8 @@
   padding: 20px 0;
   max-height: calc(100vh - 96px);
   overflow-y: auto;
+  /* The wheel at the TOC's end does not scroll the page under it. */
+  overscroll-behavior: contain;
 }
 .toc-group + .toc-group { margin-top: 18px; }
 
