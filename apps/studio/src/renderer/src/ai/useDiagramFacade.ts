@@ -9,7 +9,7 @@
 import { useMemo } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
-import type { AlignConstraint, Presentation } from '@radical/common/c4'
+import type { AlignConstraint, Presentation, ViewPipeline } from '@radical/common/c4'
 import * as model from '@radical/common/model'
 import type { Metamodel } from '@radical/common/metamodel'
 
@@ -64,6 +64,8 @@ export function createStoreFacade(): DiagramFacade {
       useDiagramStore.getState().orderViews(ids),
     setViewEdgeStyle: (id: string, style: 'curved' | 'orthogonal' | null) =>
       useDiagramStore.getState().setViewEdgeStyle(id, style),
+    setViewPipeline: (id: string, pipeline: ViewPipeline) =>
+      useDiagramStore.getState().setViewPipeline(id, pipeline),
     getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(useDiagramStore.getState(), viewId),
     addAlignment: (viewId: string | null, axis: AlignConstraint['axis'], nodeIds: string[], ordered = false) => {
       // The store aligns on the canvas on screen, so switch to the requested one first.

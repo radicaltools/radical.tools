@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
-import { viewShowsEveryNode } from '@radical/common/c4'
+import { computeViewNodeSet } from '@radical/layout/viewInput'
 
 // ─── Color palette per C4 type ──────────────────────────────────────────────
 const TYPE_COLORS_LIGHT: Record<string, readonly [string, string, string]> = {
@@ -253,19 +253,13 @@ export function TreemapView(): React.ReactElement {
     setTreemapFocus(activeViewId, id)
   }, [activeViewId, setTreemapFocus])
 
-  // View filter — show ancestors of every selected nodeId. If the view has no
-  // nodes selected at all, fall back to showing the whole model (a fresh
-  // treemap view should never be empty).
-  const viewFilter = useMemo(() => {
-    if (!activeView) return undefined
-    if (!activeView.nodeIds || viewShowsEveryNode(activeView)) return undefined
-    const s = new Set<string>()
-    for (const id of activeView.nodeIds) {
-      let cur: string | undefined = id
-      while (cur && c4Nodes[cur]) { s.add(cur); cur = c4Nodes[cur].parentId }
-    }
-    return s
-  }, [activeView, c4Nodes])
+  // View filter — the view's elements, or what its filter chain gives
+  // (viewPipeline.ts), with their ancestors. A view without elements shows
+  // the whole model (a fresh treemap view should never be empty).
+  const viewFilter = useMemo(
+    () => computeViewNodeSet(activeView ?? undefined, c4Nodes, c4Relations),
+    [activeView, c4Nodes, c4Relations],
+  )
 
   // Relation count (only needed when sizeBy='relations' or for tooltip meta).
   const relCount = useMemo(() => {
@@ -575,6 +569,7 @@ export function TreemapView(): React.ReactElement {
                 return (
                   <rect
                     key={n.id}
+                    data-id={n.id}
                     ref={(el) => {
                       if (el) rectRefs.current.set(n.id, el)
                       else rectRefs.current.delete(n.id)

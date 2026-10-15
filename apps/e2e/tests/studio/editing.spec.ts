@@ -67,9 +67,9 @@ test('a click on an open panel section folds it; another section opens alone', a
 
   const tree = page.locator('.right-panel .lp-section-body.open')
   await expect(tree).toHaveCount(1)
-  await header('right', 'Nodes').click()
+  await header('right', 'Structure').click()
   await expect(tree).toHaveCount(0)
-  await header('right', 'Relations').click()
+  await header('right', 'Sequences').click()
   await expect(tree).toHaveCount(1)
 })
 

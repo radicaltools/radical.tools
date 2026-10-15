@@ -240,12 +240,11 @@ export function QuickSearch(): React.ReactElement | null {
     return segs.join(' / ')
   }
 
-  // For each view, compute the effective set of node IDs that are visible
-  // in it (explicit nodeIds + all their ancestors). Mirrors the store's
-  // computeViewNodeSet so we can answer "which views contain node X?" and
+  // For each view, the elements it shows (its chain's, or its own and their
+  // ancestors), so we can answer "which views contain node X?" and
   // pick a sensible fallback view when jumping to a node that isn't in the
   // currently-active one.
-  const viewNodeSets = useMemo(() => viewNodeSetsOf(views, c4Nodes), [views, c4Nodes])
+  const viewNodeSets = useMemo(() => viewNodeSetsOf(views, c4Nodes, c4Relations), [views, c4Nodes, c4Relations])
 
   // Pick a stable view to switch into when the user jumps to a node that
   // isn't visible in the active view. Prefers (in order): the active view

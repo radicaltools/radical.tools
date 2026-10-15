@@ -17,7 +17,7 @@
 // (Studio centres them on the viewport), so it drops them and the view keeps
 // the imported layout.
 
-import { normalizeViewFolder, type DiagramView, type NodePosition } from './c4'
+import { normalizeViewFolder, type DiagramView, type NodePosition, type ViewFilter, type ViewPipeline } from './c4'
 
 type Raw = Record<string, unknown>
 type IdMap = (id: string) => string | undefined
@@ -52,6 +52,25 @@ function mapPositions(raw: unknown, map: IdMap): Record<string, NodePosition> {
     }
   }
   return out
+}
+
+/** A view's filter chain with the elements its filters name mapped; a
+ *  filter within an element the concept leaves out is dropped. */
+function mapPipeline(raw: unknown, map: IdMap): ViewPipeline | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const pipeline = JSON.parse(JSON.stringify(raw)) as ViewPipeline
+  if (pipeline.levels !== undefined && !Array.isArray(pipeline.levels)) return undefined
+  for (const level of pipeline.levels ?? []) {
+    if (!level || !Array.isArray(level.ways)) return undefined
+    if (level.filters) {
+      level.filters = level.filters.flatMap((f): ViewFilter[] => {
+        if (f.kind !== 'within') return [f]
+        const nodeId = map(f.nodeId)
+        return nodeId ? [{ ...f, nodeId }] : []
+      })
+    }
+  }
+  return pipeline.levels?.length || pipeline.sort ? pipeline : undefined
 }
 
 function mapIds(raw: unknown, map: IdMap): string[] {
@@ -103,6 +122,8 @@ export function conceptViewsToDiagram(
     if (expanded.length) view.expandedNodeIds = expanded
     const hidden = mapIds(raw.hiddenRelationIds, maps.relation)
     if (hidden.length) view.hiddenRelationIds = hidden
+    const pipeline = mapPipeline(raw.pipeline, maps.node)
+    if (pipeline) view.pipeline = pipeline
     out.push(view)
   }
   return out

@@ -1,6 +1,7 @@
 // ─── View tools: create_view / update_view / set_view_nodes / delete_view / set_active_view
 
-import type { DiagramView } from '../../c4'
+import type { DiagramView, ViewPipeline } from '../../c4'
+import { readPipeline } from '../../viewPipeline'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 
 // 'dynamic' needs a sequence (create_sequence) — the handlers refuse it without one.
@@ -15,6 +16,63 @@ function sequenceFor(ctx: ToolRunContext, tool: string, raw: unknown): { id: str
   const id = ctx.resolveId(raw)
   if (!(id in ctx.diagram.getSequences())) return { error: `${tool}: unknown sequenceId "${raw}"` }
   return { id }
+}
+
+const VIA_SCHEMA = {
+  type: 'object',
+  description: 'How the level hangs under the level above: {relationType, direction} along a relation — direction "in" takes the elements whose relation points at the element above (requirements that derive from a need: {"relationType":"derives","direction":"in"}), "out" the ones it points at — {anyRelation: true} along any relation of any type either way, or {contains: true} for the children the element above contains. Not on the first level.',
+}
+const FILTER_SCHEMA = {
+  type: 'object',
+  description: 'One of {kind:"type",types:[…]}, {kind:"property",key,op:"is"|"is-not"|"set"|"unset",values?:[…]}, {kind:"relation",relationType,direction:"out"|"in",has:boolean}, {kind:"within",nodeId} (the element sits inside nodeId, at any depth), {kind:"text",text}. Add join:"or" to join it to the filter before with or (and by default), off:true to keep it switched off.',
+}
+const PIPELINE_SCHEMA = {
+  type: ['object', 'null'],
+  description: `What the view shows, as a chain of levels among the view's elements (all of them when its node list is empty): the first level's elements are the roots, each next level's hang under an element of the level above. A table and the Structure tree show the chain as a tree, a wiki as chapters; a canvas, matrix or hierarchy draws its elements and the relations it follows (every relation between them with edges:"all"). Example — needs inside a domain, the requirements refined from each, the scenarios verifying those: {levels:[{ways:[{types:["need"]}],filters:[{kind:"within",nodeId:"<domain id>"}]},{ways:[{via:{relationType:"derives",direction:"in"},types:["requirement"]}]},{ways:[{via:{relationType:"verifies",direction:"in"},types:["scenario"]}]}]}. null removes the chain.`,
+  properties: {
+    levels: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          ways: { type: 'array', description: 'Ways into the level, joined with or. A way with neither types nor via takes every element.', items: { type: 'object', properties: { types: { type: 'array', items: { type: 'string' }, description: 'Node type ids; omit for any type.' }, via: VIA_SCHEMA } } },
+          filters: { type: 'array', items: FILTER_SCHEMA },
+        },
+        required: ['ways'],
+      },
+    },
+    sort: { type: 'object', description: '{by:"label"|"type"|"property", key? (for property), desc?: true}' },
+    edges: { type: 'string', enum: ['all'], description: 'On a canvas, matrix or hierarchy: draw every relation between the elements, not only the ones the chain follows.' },
+  },
+}
+
+/** A chain given to a tool, read and checked against the model: element ids
+ *  (tempIds too) resolved, unknown types, relation types and elements refused. */
+function pipelineFor(ctx: ToolRunContext, tool: string, raw: unknown): { pipeline: ViewPipeline } | { error: string } {
+  if (raw === null) return { pipeline: {} }
+  const pipeline = readPipeline(raw)
+  if (!pipeline) return { error: `${tool}: pipeline has no level or sort it can read` }
+  const metamodel = ctx.diagram.getMetamodel?.()
+  const nodes = ctx.diagram.getNodes()
+  const problems: string[] = []
+  const type = (t: string) => { if (metamodel && !metamodel.nodeTypes[t]) problems.push(`unknown node type "${t}"`) }
+  const relation = (r: string) => { if (metamodel && !metamodel.relationTypes[r]) problems.push(`unknown relation type "${r}"`) }
+  for (const level of pipeline.levels ?? []) {
+    for (const way of level.ways) {
+      way.types?.forEach(type)
+      if (way.via && 'relationType' in way.via) relation(way.via.relationType)
+    }
+    level.filters = level.filters?.map((f) => {
+      if (f.kind === 'type') f.types.forEach(type)
+      if (f.kind === 'relation') relation(f.relationType)
+      if (f.kind !== 'within') return f
+      const nodeId = ctx.resolveId(f.nodeId)
+      if (!(nodeId in nodes)) problems.push(`unknown element "${f.nodeId}" in a within filter`)
+      return { ...f, nodeId }
+    })
+  }
+  if (problems.length) return { error: `${tool}: ${problems.join('; ')}` }
+  return { pipeline }
 }
 
 /** Step endpoints of a sequence — what a new dynamic view shows by default. */
@@ -48,6 +106,7 @@ export function buildViewToolDefs(): ToolDef[] {
             description: "Real node ids or tempIds from this run. Omit or leave empty to show every node (a dynamic view defaults to its sequence's nodes).",
           },
           active: { type: 'boolean', description: 'Switch to this view immediately after creating it.' },
+          pipeline: PIPELINE_SCHEMA,
         },
         required: ['tempId', 'name'],
         additionalProperties: false,
@@ -55,7 +114,7 @@ export function buildViewToolDefs(): ToolDef[] {
     },
     {
       name: 'update_view',
-      description: "Rename a view, move it into a folder of the list of views, change its kind, line style or linked sequence, set which relations it hides, or show elements open or folded in it. Use set_view_nodes to change its nodes.",
+      description: "Rename a view, move it into a folder of the list of views, change its kind, line style or linked sequence, set which relations it hides, show elements open or folded in it, or set its filter chain (pipeline). Use set_view_nodes to change its nodes; [] there makes the chain work among every element.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -80,6 +139,7 @@ export function buildViewToolDefs(): ToolDef[] {
             items: { type: 'string' },
             description: 'Elements to show folded in this view only.',
           },
+          pipeline: PIPELINE_SCHEMA,
         },
         required: ['id'],
         additionalProperties: false,
@@ -87,7 +147,7 @@ export function buildViewToolDefs(): ToolDef[] {
     },
     {
       name: 'set_view_nodes',
-      description: "Replace a view's visible-node set.",
+      description: "Replace a view's visible-node set; [] shows every element (a view's filter chain then works among all of them).",
       inputSchema: {
         type: 'object',
         properties: {
@@ -134,13 +194,16 @@ export function buildViewToolDefs(): ToolDef[] {
 export function buildViewToolHandlers(): Record<string, ToolHandler> {
   return {
     create_view: (rawInput, ctx) => {
-      const input = rawInput as { tempId?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; nodeIds?: unknown; active?: unknown; folder?: unknown; edgeStyle?: unknown }
+      const input = rawInput as { tempId?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; nodeIds?: unknown; active?: unknown; folder?: unknown; edgeStyle?: unknown; pipeline?: unknown }
       if (typeof input.tempId !== 'string' || !input.tempId) return fail('create_view: tempId is required')
       if (typeof input.name !== 'string' || !input.name.trim()) return fail('create_view: name is required')
       if (!ctx.diagram.addView || !ctx.diagram.setViewNodes) return fail('create_view: views are not editable in this context')
 
       const sequence = input.kind === 'dynamic' ? sequenceFor(ctx, 'create_view', input.sequenceId) : undefined
       if (sequence && 'error' in sequence) return fail(sequence.error)
+      const chain = input.pipeline === undefined ? undefined : pipelineFor(ctx, 'create_view', input.pipeline)
+      if (chain && 'error' in chain) return fail(chain.error)
+      if (chain && !ctx.diagram.setViewPipeline) return fail('create_view: filter chains are not available in this context')
 
       const realId = ctx.diagram.addView(input.name.trim())
       if (!realId) return fail(`create_view "${input.name}" was rejected by the store`)
@@ -165,13 +228,14 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         if (!ctx.diagram.setViewFolder) return fail('create_view: folders of views are not available in this context')
         ctx.diagram.setViewFolder(realId, input.folder)
       }
+      if (chain) ctx.diagram.setViewPipeline!(realId, chain.pipeline)
       if (input.active === true && ctx.diagram.setActiveView) ctx.diagram.setActiveView(realId)
 
       return { ok: true, resultText: `Created view ${realId}.`, added: { views: 1 } }
     },
 
     update_view: (rawInput, ctx) => {
-      const input = rawInput as { id?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; hiddenRelationIds?: unknown; expand?: unknown; collapse?: unknown; folder?: unknown; edgeStyle?: unknown }
+      const input = rawInput as { id?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; hiddenRelationIds?: unknown; expand?: unknown; collapse?: unknown; folder?: unknown; edgeStyle?: unknown; pipeline?: unknown }
       if (typeof input.id !== 'string' || !input.id) return fail('update_view: id is required')
       if (!ctx.diagram.getViews) return fail('update_view: views are not editable in this context')
       const vId = ctx.resolveId(input.id)
@@ -234,6 +298,12 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         const unknown = ids.filter((id) => !(id in nodes))
         if (unknown.length) return fail(`update_view: unknown element id(s) ${unknown.join(', ')}`)
         changes.push(() => ctx.diagram.setViewCollapsed!(vId, ids, collapsed))
+      }
+      if (input.pipeline !== undefined) {
+        const chain = pipelineFor(ctx, 'update_view', input.pipeline)
+        if ('error' in chain) return fail(chain.error)
+        if (!ctx.diagram.setViewPipeline) return fail('update_view: filter chains are not available in this context')
+        changes.push(() => ctx.diagram.setViewPipeline!(vId, chain.pipeline))
       }
       if (!changes.length) return fail('update_view: nothing to change')
       for (const change of changes) change()

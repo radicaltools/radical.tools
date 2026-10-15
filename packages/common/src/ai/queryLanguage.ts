@@ -1,4 +1,5 @@
-import { viewShowsEveryNode, type C4Node, type C4Relation, type DiagramSequence, type DiagramView } from '../c4'
+import { type C4Node, type C4Relation, type DiagramSequence, type DiagramView } from '../c4'
+import { viewShownNodes } from '../viewPipeline'
 
 export const MODEL_QUERY_LANGUAGE_HELP = `Query the CURRENT diagram structure with a small built-in query language —
 use this whenever you need exact data before answering or acting, instead of
@@ -299,19 +300,10 @@ function applyWhere<T>(rows: T[], expr: WhereExpr | null, getter: (row: T, field
   return rows.filter((row) => evalWhereExpr(expr, row, getter))
 }
 
-function viewNodeSet(view: DiagramView, nodes: Record<string, C4Node>): Set<string> {
+function viewNodeSet(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Set<string> {
   // A view that lists none shows every node, as in Studio (it answered that
-  // such a view was empty).
-  if (viewShowsEveryNode(view)) return new Set(Object.keys(nodes))
-  const set = new Set<string>()
-  for (const id of view.nodeIds) {
-    let cur: string | undefined = id
-    while (cur && nodes[cur] && !set.has(cur)) {
-      set.add(cur)
-      cur = nodes[cur].parentId ?? undefined
-    }
-  }
-  return set
+  // such a view was empty); one with a chain, what the chain gives.
+  return viewShownNodes(view, nodes, relations) ?? new Set(Object.keys(nodes))
 }
 
 const LAYOUT_ONLY_NODE_KEYS = new Set(['collapsed', 'x', 'y', 'width', 'height'])
@@ -362,7 +354,7 @@ function summarizeRelation(rel: C4Relation, nodes: Record<string, C4Node>) {
 }
 
 function summarizeView(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>) {
-  const set = viewNodeSet(view, nodes)
+  const set = viewNodeSet(view, nodes, relations)
   const hidden = new Set(view.hiddenRelationIds ?? [])
   const relationCount = Object.values(relations).filter((rel) => (
     set.has(rel.sourceId) && set.has(rel.targetId) && !hidden.has(rel.id)
@@ -640,7 +632,7 @@ export function runModelQuery(query: string, ctx: ModelQueryContext): ModelQuery
       cur = cur.parentId ? ctx.nodes[cur.parentId] : undefined
     }
     const containingViews = Object.values(views)
-      .filter((view) => viewNodeSet(view, ctx.nodes).has(nodeId))
+      .filter((view) => viewNodeSet(view, ctx.nodes, ctx.relations).has(nodeId))
       .map((view) => ({ id: view.id, name: view.name }))
       .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
     return {
@@ -662,7 +654,7 @@ export function runModelQuery(query: string, ctx: ModelQueryContext): ModelQuery
     const viewId = stripQuotes(getViewMatch[1])
     const view = views[viewId]
     if (!view) throw new Error(`Unknown view id: ${viewId}`)
-    const set = viewNodeSet(view, ctx.nodes)
+    const set = viewNodeSet(view, ctx.nodes, ctx.relations)
     const hidden = new Set(view.hiddenRelationIds ?? [])
     const nodes = [...set]
       .map((id) => ctx.nodes[id])

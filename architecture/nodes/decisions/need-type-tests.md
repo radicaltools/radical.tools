@@ -7,7 +7,7 @@ tests: |
   packages/common/tests/needType.test.ts › need node type (governance preset)
   packages/common/tests/mdFolderPersistence.test.ts › md-folder persistence › stores a need's free text as the Markdown body of its file
   apps/e2e/tests/studio/need.spec.ts › on the governance bookstore
-  apps/e2e/tests/studio/need.spec.ts › needs nest under a broader need: a tree in the table, and Add child on its wiki page
+  apps/e2e/tests/studio/need.spec.ts › needs nest under a broader need: a tree in the table's chain, and Add child on its wiki page
 threshold: "All tests pass"
 ---
 

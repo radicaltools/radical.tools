@@ -5,21 +5,44 @@
 
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, viewShowsEveryNode, type C4Node, type C4Relation, type DiagramView, type LayoutConstraint, type PositionMap } from '@radical/common/c4'
 import { alignmentError, enforceAlignments, resolveAlignments, type Alignment } from './constraints'
+import { chainCanvas, viewShownNodes, withAncestors } from '@radical/common/viewPipeline'
+import type { Metamodel } from '@radical/common/metamodel'
+
+/** Which elements a chain keeps does not depend on the metamodel's words. */
+const NO_METAMODEL: Metamodel = { id: '', name: '', nodeTypes: {}, relationTypes: {} }
+
+/** The relations a canvas view's chain leaves out (it draws only the ones
+ *  it follows unless its steps say all); none without a chain. */
+export function chainHiddenRelations(view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): string[] {
+  const chain = chainCanvas(view, { nodes, relations, metamodel: NO_METAMODEL })
+  if (!chain?.relationIds) return []
+  return Object.keys(relations).filter((id) => !chain.relationIds!.has(id))
+}
 import { fittedParentSize, projectToVisibleGraph } from './geometry'
 
-/** Compute the effective set of node IDs for a view: explicit nodeIds + all their ancestors */
-export function computeViewNodeSet(view: DiagramView | undefined, nodes: Record<string, C4Node>): Set<string> | undefined {
+/** The elements a canvas puts on React Flow for a view: those it shows
+ *  (viewShownNodes: its chain's, or its list) and the containers they sit
+ *  in, which it draws invisible when the view does not show them
+ *  (viewFrames) — children are placed relative to their parent. Without
+ *  relations, the list and its ancestors. Undefined: every element. */
+export function computeViewNodeSet(view: DiagramView | undefined, nodes: Record<string, C4Node>, relations?: Record<string, C4Relation>): Set<string> | undefined {
   if (!view) return undefined
-  if (viewShowsEveryNode(view)) return undefined
-  const result = new Set<string>()
-  for (const id of view.nodeIds) {
-    let cur = id
-    while (cur && nodes[cur]) {
-      result.add(cur)
-      cur = nodes[cur].parentId ?? ''
-    }
+  if (relations) {
+    const shown = viewShownNodes(view, nodes, relations)
+    return shown && withAncestors(shown, nodes)
   }
-  return result
+  if (viewShowsEveryNode(view)) return undefined
+  return withAncestors(view.nodeIds, nodes)
+}
+
+/** The containers a canvas puts on React Flow for a view only to hold the
+ *  elements it shows: drawn invisible, never a line's end. */
+export function viewFrames(view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Set<string> {
+  const shown = viewShownNodes(view, nodes, relations)
+  if (!shown) return new Set()
+  const frames = withAncestors(shown, nodes)
+  for (const id of shown) frames.delete(id)
+  return frames
 }
 
 /**
@@ -140,20 +163,24 @@ export function viewLayoutInput(
   allRelations: Record<string, C4Relation>,
   constraints: readonly LayoutConstraint[] | undefined = view?.layoutConstraints,
 ): LayoutInput {
-  const viewFilter = computeViewNodeSet(view, allNodes)
+  const viewFilter = computeViewNodeSet(view, allNodes, allRelations)
   const viewCollapsedSet = computeViewCollapsedSet(viewFilter, allNodes)
   for (const id of view?.collapsedNodeIds ?? []) viewCollapsedSet.add(id)
   const expandedSet = view?.expandedNodeIds?.length ? new Set(view.expandedNodeIds) : undefined
 
   const filtered = filterForView(allNodes, allRelations, viewFilter)
+  // Lines end only at elements the view shows, never at a frame drawn
+  // invisible to hold them.
+  const frames = viewFrames(view, allNodes, allRelations)
+  const lines = frames.size ? filterForView(allNodes, allRelations, new Set([...viewFilter!].filter((id) => !frames.has(id)))).relations : filtered.relations
   const nodes: Record<string, C4Node> = {}
   for (const [id, n] of Object.entries(filtered.nodes)) {
     const collapsed = isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet)
     nodes[id] = collapsed === n.collapsed ? n : { ...n, collapsed }
   }
-  const hidden = new Set(view?.hiddenRelationIds ?? [])
+  const hidden = new Set([...(view?.hiddenRelationIds ?? []), ...chainHiddenRelations(view, allNodes, allRelations)])
   const relations: Record<string, C4Relation> = {}
-  for (const [id, r] of Object.entries(filtered.relations)) {
+  for (const [id, r] of Object.entries(lines)) {
     if (!hidden.has(id)) relations[id] = r
   }
   return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet, alignments: resolveAlignments(constraints, nodes) }

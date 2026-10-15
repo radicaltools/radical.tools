@@ -5,7 +5,7 @@
 // each tool applies its own single change.
 
 import type {
-  EdgeStyle, AlignConstraint, C4Node, C4Relation, DiagramSequence, DiagramSnapshot, DiagramView, LayoutConstraint, Presentation } from '../c4'
+  EdgeStyle, AlignConstraint, C4Node, C4Relation, DiagramSequence, DiagramSnapshot, DiagramView, LayoutConstraint, Presentation, ViewPipeline } from '../c4'
 import type { Metamodel } from '../metamodel'
 
 export interface ApplyReport {
@@ -90,6 +90,8 @@ export interface DiagramFacade {
   orderViews?(ids: string[]): void
   /** Optional — how a view draws relations ('curved' | 'orthogonal'); null for the model's. */
   setViewEdgeStyle?(id: string, style: EdgeStyle | null): void
+  /** Optional — what a view does with its elements: its filter chain (viewPipeline.ts); {} removes it. */
+  setViewPipeline?(id: string, pipeline: ViewPipeline): void
   /** Optional layout constraints of a canvas: a view, or All elements (null). */
   getLayoutConstraints?(viewId: string | null): LayoutConstraint[]
   /** Keeps nodes on one line on a canvas (with `ordered`, in the order of

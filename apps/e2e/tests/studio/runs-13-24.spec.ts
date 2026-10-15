@@ -201,21 +201,6 @@ test('expanding a container in a large nested model moves only what is around it
   expect(await studio.positions()).toEqual(expanded)
 })
 
-test('a yes/no cell on the table\'s Relations tab saves the relation', async ({ page, studio }) => {
-  // The click went to updateNode with a relation's id and did nothing.
-  const doc = JSON.parse(fixture('bookstore'))
-  const metamodel = builtInC4Metamodel()
-  metamodel.id = 'c4-async'
-  metamodel.relationTypes.interacts.properties = [...(metamodel.relationTypes.interacts.properties ?? []), { key: 'async', label: 'Async', type: 'boolean' }]
-  for (const r of doc.relations) r.relationType = 'interacts'
-  await studio.seedDocument(JSON.stringify({ ...doc, metamodel }))
-  await studio.open('v-table')
-  await page.locator('.tv-tabs').getByRole('button', { name: /^Relations/ }).click()
-  await page.locator('tbody tr').filter({ hasText: 'reads/writes' }).locator('.tv-bool').click()
-  await expect.poll(async () => (JSON.parse(await studio.storedJson()) as { relations: Array<{ id: string; async?: boolean }> })
-    .relations.find((r) => r.id === 'r3')?.async).toBe(true)
-})
-
 test('a milestone without the treemap\'s drill element leaves the view\'s drill level alone', async ({ page, studio }) => {
   // Shown on a milestone that lacks the element, the treemap reset the
   // view's focus and saved that: back on the live model it showed the top.
@@ -246,33 +231,6 @@ test('a milestone without the treemap\'s drill element leaves the view\'s drill 
   expect(await focus()).toBe('ctn-payments')
 })
 
-test.describe('the table view', () => {
-  test.beforeEach(async ({ studio }) => {
-    const doc = JSON.parse(fixture('order-machine'))
-    doc.views.push({ id: 'v-tbl', name: 'Table', kind: 'table', nodeIds: [], positions: {} })
-    doc.metamodel = doc.metamodel ?? { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
-    await studio.seedDocument(JSON.stringify(doc))
-  })
-
-  test('an enum cell without a value shows as not set, and its first option can be chosen', async ({ page, studio }) => {
-    // The select showed its first option as if set; choosing it did nothing.
-    await studio.open('v-tbl')
-    await page.locator('.tv-tabs').getByRole('button', { name: /^Relations/ }).click()
-    const row = page.locator('tbody tr').filter({ hasText: 'Pending payment' }).filter({ hasText: 'Confirmed' }).first()
-    const headers = await page.locator('thead th').allInnerTexts()
-    const kindCol = headers.findIndex((h) => /^kind/i.test(h.trim()))
-    expect(kindCol).toBeGreaterThan(-1)
-    await row.locator('td').nth(kindCol).click()
-    const select = row.locator('td').nth(kindCol).locator('select')
-    await expect(select).toHaveValue('')
-    const first = await select.locator('option').nth(1).getAttribute('value')
-    await select.selectOption(first!)
-    await expect.poll(async () => {
-      const doc = JSON.parse(await studio.storedJson()) as { relations: Array<{ sourceId: string; targetId: string; kind?: string }> }
-      return doc.relations.find((r) => r.sourceId === 'pending' && r.targetId === 'confirmed')?.kind
-    }).toBe(first)
-  })
-})
 
 test('one click on a matrix cell selected in Viewer does not remove it in Designer', async ({ page, studio }) => {
   // The click in Viewer armed the cell, and the first click back in

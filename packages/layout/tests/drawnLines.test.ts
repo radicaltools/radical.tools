@@ -6,7 +6,7 @@
  * line are spread apart.
  */
 import { describe, it, expect } from 'vitest'
-import { viewLayoutInput } from '../src/viewInput'
+import { viewFrames, viewLayoutInput } from '../src/viewInput'
 import { projectToVisibleGraph } from '../src/geometry'
 import { separateParallelSegments } from '../src/edgeRouting'
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
@@ -30,6 +30,16 @@ describe('the lines a layout sees', () => {
     const rolledUp = lines.find((r) => r.id === 'r1')!
     expect(rolledUp).toMatchObject({ sourceId: 'studio', targetId: 'common' })
     expect(rolledUp.label).toBe('renders with\nkeeps the model with')
+  })
+
+  it('holds shown elements in the containers they sit in, as frames no line ends at', () => {
+    // The view lists the two components, not Studio: Studio is a frame.
+    const components = { ...view, nodeIds: ['canvas', 'store', 'common'] }
+    expect([...viewFrames(components, nodes, relations)]).toEqual(['studio'])
+    const input = viewLayoutInput(components, nodes, relations)
+    expect(Object.keys(input.nodes).sort()).toEqual(['canvas', 'common', 'store', 'studio'])
+    // Studio's own relations end at it, which is not shown: no line.
+    expect(Object.keys(input.relations).sort()).toEqual(['r1', 'r2'])
   })
 
   it('keeps every relation between two shown elements a line of its own', () => {

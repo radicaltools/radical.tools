@@ -9,6 +9,7 @@ import type { C4Node } from '@radical/common/c4'
 import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
 import { isRelationAllowed } from '@radical/common/metamodel'
 import { viewShowsEveryNode } from '@radical/common/c4'
+import { chainDrawn } from '@radical/common/viewPipeline'
 
 // ─── Tree ordering helper (hierarchical, parents before children) ────────────
 
@@ -85,10 +86,15 @@ export function MatrixView(): React.ReactElement {
 
   // ── Collapse-aware view state ──────────────────────────────────────────────
 
+  // The view's filter chain (viewPipeline.ts) gives the rows and columns and
+  // the relations in the cells; without one, the view's own elements do.
+  const chain = useMemo(() => chainDrawn(activeView, { nodes, relations, metamodel }), [activeView, nodes, relations, metamodel])
+
   const viewFilter = useMemo<Set<string> | undefined>(() => {
+    if (chain) return chain.nodeIds
     if (!activeView || viewShowsEveryNode(activeView)) return undefined
     return new Set(activeView.nodeIds)
-  }, [activeView])
+  }, [activeView, chain])
 
   const viewCollapsedSet = useMemo<Set<string>>(() => {
     const vcs = computeViewCollapsedSet(viewFilter, nodes)
@@ -123,7 +129,7 @@ export function MatrixView(): React.ReactElement {
     const m = new Map<string, Map<string, string[]>>()
     const hidden = new Set(activeView?.hiddenRelationIds ?? [])
     for (const rel of Object.values(relations)) {
-      if (hidden.has(rel.id)) continue
+      if (hidden.has(rel.id) || (chain?.relationIds && !chain.relationIds.has(rel.id))) continue
       const visSource = getViewVisibleAncestor(rel.sourceId, nodes, viewFilter, viewCollapsedSet, expandedSet)
       const visTarget = getViewVisibleAncestor(rel.targetId, nodes, viewFilter, viewCollapsedSet, expandedSet)
       if (!visSource || !visTarget || visSource === visTarget) continue
@@ -138,7 +144,7 @@ export function MatrixView(): React.ReactElement {
       }
     }
     return m
-  }, [relations, nodes, viewFilter, viewCollapsedSet, expandedSet, visibleNodeIdSet, activeView])
+  }, [relations, nodes, viewFilter, viewCollapsedSet, expandedSet, visibleNodeIdSet, activeView, chain])
 
   const relColor = useCallback(
     (relationType: string | undefined): string => {
