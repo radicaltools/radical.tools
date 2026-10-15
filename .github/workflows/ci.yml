@@ -9,6 +9,9 @@ name: CI
 # The "Protect main" ruleset requires the "Type-check & Test" check, which
 # the pull_request run reports.
 #
+# A pull request run commits the screenshot baselines that changed to the
+# branch (job screenshots) and starts this workflow by hand on that commit.
+#
 # The `skip-e2e` label on a PR skips the E2E job (Type-check & Test still
 # runs). Labels are read when a run starts, so add it before pushing, or push
 # again; adding a label does not start a run. The E2E suite still runs before
@@ -47,10 +50,67 @@ jobs:
           path: reports/
           retention-days: 14
 
+  # On a pull request a changed screenshot does not fail the suite: the new
+  # baselines are committed to the branch (job screenshots), to review in the
+  # PR diff. A run started by hand compares them strictly.
   e2e:
     name: E2E
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
     uses: ./.github/workflows/e2e.yml
+    with:
+      update-snapshots: ${{ github.event_name == 'pull_request' }}
+
+  # Commits the screenshots the E2E shards rewrote to the PR branch, then
+  # starts this workflow by hand on the new commit: a push made with
+  # GITHUB_TOKEN starts no workflow, and the required check has to report on
+  # the branch head. That run compares the new baselines strictly. Skipped
+  # when the suite failed (the next push regenerates them) or the branch
+  # moved on meanwhile (its own run does).
+  screenshots:
+    name: Commit new screenshot baselines
+    needs: e2e
+    if: ${{ !cancelled() && needs.e2e.result == 'success' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/download-artifact@v4
+        # No shard wrote one: nothing to download.
+        continue-on-error: true
+        with:
+          pattern: e2e-screenshots-*
+          merge-multiple: true
+          path: new-baselines
+      - name: Commit and re-run the checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          TESTED: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ ! -d new-baselines ] || [ -z "$(ls -A new-baselines)" ]; then
+            echo "Screenshots are up to date."; exit 0
+          fi
+          if [ "$(git rev-parse HEAD)" != "$TESTED" ]; then
+            echo "The branch moved on since this run started; its own run updates the screenshots."; exit 0
+          fi
+          cp -R new-baselines/. .
+          git add apps/e2e/tests
+          if git diff --cached --quiet; then
+            echo "Screenshots are up to date."; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test(e2e): update screenshot baselines"
+          git push origin "HEAD:$BRANCH"
+          gh workflow run ci.yml --ref "$BRANCH"
+          {
+            echo "### Screenshot baselines updated"
+            git show --stat --format= HEAD | sed 's/^/    /'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # The repository's own architecture model (architecture/), checked with
   # radical check against this run's test reports: the unit reports of

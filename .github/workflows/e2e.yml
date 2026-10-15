@@ -3,23 +3,40 @@ name: E2E
 # End-to-end regression suite (apps/e2e): Playwright against the production
 # web builds of Studio and Hub, including screenshot comparison.
 #
-# Called by ci.yml and deploy.yml. Runs inside the Playwright image so fonts
-# and rendering match the committed screenshot baselines; keep the image tag
-# equal to the @playwright/test version in apps/e2e/package.json.
+# Called by ci.yml and deploy.yml. The suite runs in four shards side by side;
+# the E2E report job merges their blob reports into the HTML report and
+# reports/e2e.json (artifact e2e-report), which radical check reads. Runs
+# inside the Playwright image so fonts and rendering match the committed
+# screenshot baselines; keep the image tag equal to the @playwright/test
+# version in apps/e2e/package.json.
+#
+# With update-snapshots (ci.yml on a pull request), a screenshot that differs
+# from its baseline does not fail: the shard writes the new image, and the
+# new images are uploaded as artifacts e2e-screenshots-<shard> for ci.yml to
+# commit. Without it (deploy.yml) a difference fails the suite.
 
 on:
   workflow_call:
+    inputs:
+      update-snapshots:
+        description: Write screenshots that differ from their baselines instead of failing.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   e2e:
-    name: E2E (Playwright)
+    name: E2E (Playwright ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,14 +47,70 @@ jobs:
       - name: Build Studio and Hub
         run: npm run build:web && npm run build:hub
       - name: Run the suite
-        run: npm run e2e -w @radical/e2e
-      - name: Upload report
+        env:
+          E2E_BLOB: '1'
+          UPDATE: ${{ inputs.update-snapshots && '--update-snapshots=changed' || '' }}
+        run: npm run e2e -w @radical/e2e -- --shard=${{ matrix.shard }}/4 $UPDATE
+      - name: Collect new screenshot baselines
+        if: ${{ inputs.update-snapshots && !cancelled() }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git ls-files --modified --others --exclude-standard -- 'apps/e2e/tests/*__screenshots__*' > new-baselines.txt
+          if [ -s new-baselines.txt ]; then
+            mkdir new-baselines
+            xargs -a new-baselines.txt -d '\n' cp --parents -t new-baselines
+            echo "### New screenshot baselines (shard ${{ matrix.shard }})" >> "$GITHUB_STEP_SUMMARY"
+            sed 's/^/- /' new-baselines.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload new screenshot baselines
+        if: ${{ inputs.update-snapshots && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots-${{ matrix.shard }}
+          path: new-baselines/
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Upload the blob report
         if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-blob-${{ matrix.shard }}
+          path: apps/e2e/blob-report/
+          retention-days: 1
+      - name: Upload failure traces
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-${{ matrix.shard }}
+          path: apps/e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  report:
+    name: E2E report
+    needs: e2e
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-blob-*
+          merge-multiple: true
+          path: apps/e2e/all-blob-reports
+      - name: Merge the shards' reports
+        working-directory: apps/e2e
+        run: npx playwright merge-reports --config playwright.merge.config.ts all-blob-reports
+      - name: Upload report
         uses: actions/upload-artifact@v4
         with:
           name: e2e-report
           path: |
             apps/e2e/playwright-report/
-            apps/e2e/test-results/
             reports/e2e.json
           retention-days: 14
