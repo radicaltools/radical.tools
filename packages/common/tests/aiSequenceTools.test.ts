@@ -135,6 +135,16 @@ describe('update_view', () => {
     expect(call('order_views', { ids: ['c', 'c'] }).resultText).toContain('listed twice')
   })
 
+  it('sets how a view draws relations, or hands it back to the model', () => {
+    const { facade, call, ctx } = setup()
+    expect(call('create_view', { tempId: 'v', name: 'Ortho', edgeStyle: 'orthogonal' }).ok).toBe(true)
+    const v = () => facade.getViews!()[ctx.resolveId('v')]
+    expect(v().edgeStyle).toBe('orthogonal')
+    expect(call('update_view', { id: 'v', edgeStyle: 'model' }).ok).toBe(true)
+    expect(v()).not.toHaveProperty('edgeStyle')
+    expect(call('update_view', { id: 'v', edgeStyle: 'wavy' }).resultText).toContain('edgeStyle must be')
+  })
+
   it('refuses switching to dynamic without a sequence, and unknown relations', () => {
     const { call } = setup()
     call('create_view', { tempId: 'v', name: 'Context' })

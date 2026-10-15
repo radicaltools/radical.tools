@@ -137,12 +137,91 @@ function parseElkResult(node: ElkNode, result: PositionMap): void {
   }
 }
 
+// ─── Packed groups ──────────────────────────────────────────────────────────
+//
+// A group of many elements that are barely linked to each other (the
+// requirements and scenarios of a domain, the ADRs of a decision log) laid
+// out in layers comes out as long, sparse rows: in radical.tools' own model
+// (890 elements) every domain did, and the whole diagram took twenty times
+// the area of its elements. Packed as rectangles it takes four times; the
+// children are ordered so that linked ones stand next to each other.
+
+/** The proportions (width / height) a packed group aims for. */
+const PACKED_ASPECT = 1.6
+
+/** Children from which a sparsely linked group is packed rather than layered. */
+const PACK_MIN_CHILDREN = 8
+/** Links between its children, per child, up to which a group is sparse. */
+const PACK_MAX_LINKS_PER_CHILD = 1
+
+const PACKED_OPTIONS: LayoutOptions = {
+  // Box layout, rows filled in the given order (rectpacking moved elements
+  // between rows to fill them, which split the linked ones apart).
+  'elk.algorithm': 'box',
+  'elk.box.packingMode': 'SIMPLE',
+  // One block in this order: split into connected components, ELK placed
+  // the components and the lone elements apart, each sorted its own way.
+  'elk.separateConnectedComponents': 'false',
+  'elk.spacing.nodeNode': '40',
+  'elk.padding': '[top=110, right=20, bottom=20, left=20]',
+}
+
+/** The links between the children of `group` (a relation between anything
+ *  inside two different children links those two), by child. */
+function childLinks(group: ElkNode, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Map<string, string[]> {
+  const childIds = new Set((group.children ?? []).map((c) => c.id))
+  const childOf = (id: string): string | undefined => {
+    for (let cur: string | undefined = id; cur && nodes[cur]; cur = nodes[cur].parentId) if (childIds.has(cur)) return cur
+    return undefined
+  }
+  const links = new Map<string, string[]>()
+  for (const r of Object.values(relations)) {
+    const a = childOf(r.sourceId)
+    const b = childOf(r.targetId)
+    if (!a || !b || a === b) continue
+    links.set(a, [...(links.get(a) ?? []), b])
+    links.set(b, [...(links.get(b) ?? []), a])
+  }
+  return links
+}
+
+/** Children by name, each followed by what it is linked to (breadth
+ *  first), so packing keeps linked children side by side in reading order. */
+function linkedOrder(children: ElkNode[], links: Map<string, string[]>, nodes: Record<string, C4Node>): ElkNode[] {
+  const name = (id: string) => (nodes[id]?.label ?? '').toLowerCase()
+  const byName = (a: string, b: string) => name(a).localeCompare(name(b)) || (a < b ? -1 : a > b ? 1 : 0)
+  children = [...children].sort((a, b) => byName(a.id, b.id))
+  for (const list of links.values()) list.sort(byName)
+  const byId = new Map(children.map((c) => [c.id, c]))
+  const seen = new Set<string>()
+  const order: ElkNode[] = []
+  for (const start of children) {
+    if (seen.has(start.id)) continue
+    const queue = [start.id]
+    seen.add(start.id)
+    while (queue.length) {
+      const id = queue.shift()!
+      order.push(byId.get(id)!)
+      for (const next of links.get(id) ?? []) if (!seen.has(next)) { seen.add(next); queue.push(next) }
+    }
+  }
+  return order
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
+
+export interface ElkLayoutOptions {
+  rootOptions?: LayoutOptions
+  childOptions?: LayoutOptions
+  /** Pack groups of many, sparsely linked children as rectangles instead of
+   *  laying them out with `childOptions`. */
+  packSparseGroups?: boolean
+}
 
 export async function applyElkLayout(
   inputNodes: Record<string, C4Node>,
   inputRelations: Record<string, C4Relation>,
-  opts?: { rootOptions?: LayoutOptions; childOptions?: LayoutOptions },
+  opts?: ElkLayoutOptions,
 ): Promise<PositionMap> {
   // ELK throws on edges whose endpoints aren't in its graph, which is what
   // an edge to a child of a collapsed container would be.
@@ -156,6 +235,22 @@ export async function applyElkLayout(
     const apply = (node: ElkNode): void => {
       if (node.children && node.children.length > 0) {
         node.layoutOptions = childOpts
+        if (opts?.packSparseGroups && node.children.length >= PACK_MIN_CHILDREN) {
+          const links = childLinks(node, c4Nodes, c4Relations)
+          let count = 0
+          for (const list of links.values()) count += list.length
+          if (count / 2 <= node.children.length * PACK_MAX_LINKS_PER_CHILD) {
+            // Box layout reads the aspect ratio in units of its elements'
+            // shape: 200 x 80 elements need 4 for a block of about 1.6.
+            const w = node.children.reduce((sum, c) => sum + (c.width ?? 0), 0)
+            const h = node.children.reduce((sum, c) => sum + (c.height ?? 0), 0)
+            node.layoutOptions = { ...PACKED_OPTIONS, 'elk.aspectRatio': String(PACKED_ASPECT * (h > 0 ? w / h : 1)) }
+            node.children = linkedOrder(node.children, links, c4Nodes)
+            // Box layout sorts by priority (highest first), not stably.
+            const count = node.children.length
+            node.children.forEach((c, i) => { c.layoutOptions = { ...c.layoutOptions, 'elk.priority': String(count - i) } })
+          }
+        }
         for (const c of node.children) apply(c)
       }
     }

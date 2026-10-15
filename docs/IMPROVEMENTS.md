@@ -436,6 +436,18 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     `order_views`. Still missing: ordering views inside a folder in Studio
     (drag and drop, or Move up/down in a view's properties), and a tool
     to rename a folder in one call.
+28. **Calibrate Smart Layout's ranking on the author's judgement.** Since
+    2026-10-15 the ranking sums standardised criteria with equal weights
+    (Huang, Huang & Lin 2016) and the score sees every line the canvas
+    draws. On the "Shared packages" view the author's own arrangement, which
+    they find clearly better, loses to layouts with far fewer crossings (19
+    against 63) that read worse: elements strung along a diagonal, long
+    lines across the view. Equal weights are the paper's untested
+    assumption. Plan: render 4–6 layouts of a few views (Shared packages,
+    System context, Containers, a blueprint, a pattern), have the author
+    rank them, fit the criterion weights to the ranking and keep the
+    judgements as a test (ranking.test.ts › a view arranged by hand is
+    skipped until then).
 
 ### Reverse-engineered requirements (2026-10-06)
 

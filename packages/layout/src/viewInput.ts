@@ -83,9 +83,34 @@ export function filterForView(
     }
   }
 
+  // A relation from or to an element the view does not list is drawn to its
+  // nearest ancestor the view does (deriveRFEdges); the relations rolled up
+  // onto one pair share one line, labelled with all their names. Layouts and
+  // their score used to leave them out: on the "Shared packages" view of
+  // radical.tools' own model, 20 of the 45 lines drawn.
+  const inView = (id: string): string | undefined => {
+    for (let cur: string | undefined = id; cur; cur = allNodes[cur]?.parentId) if (viewFilter.has(cur)) return cur
+    return undefined
+  }
+  const isAncestor = (a: string, b: string): boolean => {
+    for (let cur = allNodes[b]?.parentId; cur; cur = allNodes[cur]?.parentId) if (cur === a) return true
+    return false
+  }
   const relations: Record<string, C4Relation> = {}
-  for (const [id, r] of Object.entries(allRelations)) {
-    if (viewFilter.has(r.sourceId) && viewFilter.has(r.targetId)) relations[id] = r
+  const rolledUpLine = new Map<string, string>()
+  for (const id of Object.keys(allRelations).sort()) {
+    const r = allRelations[id]
+    if (viewFilter.has(r.sourceId) && viewFilter.has(r.targetId)) { relations[id] = r; continue }
+    const s = inView(r.sourceId), t = inView(r.targetId)
+    if (!s || !t || s === t || isAncestor(s, t) || isAncestor(t, s)) continue
+    const key = `${s}\u0000${t}`
+    const kept = rolledUpLine.get(key)
+    if (kept) {
+      if (r.label) relations[kept] = { ...relations[kept], label: relations[kept].label ? `${relations[kept].label}\n${r.label}` : r.label }
+      continue
+    }
+    rolledUpLine.set(key, id)
+    relations[id] = { ...r, sourceId: s, targetId: t }
   }
   return { nodes, relations }
 }

@@ -210,8 +210,8 @@ describe('runSmartLayoutCore guarantees', () => {
     const { nodes, relations } = pileUp()
     nodes.sys = { ...nodes.sys, collapsed: true }
     const result = await runSmartLayoutCore(nodes, relations)
-    // The ten engines, and what the live physics makes of the best of them.
-    expect(result.candidates.filter((c) => !c.name.endsWith('· relaxed'))).toHaveLength(10)
+    // The twelve engines, and what the live physics makes of the best of them.
+    expect(result.candidates.filter((c) => !c.name.endsWith('· relaxed'))).toHaveLength(12)
     expect(result.winner.positions.web).toBeUndefined()
   })
 

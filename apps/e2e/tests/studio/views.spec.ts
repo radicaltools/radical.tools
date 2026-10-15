@@ -138,6 +138,26 @@ test.describe('views panel', () => {
   })
 })
 
+test.describe('line style', () => {
+  test('a view draws its relations curved or orthogonal, as set in its properties, and keeps it', async ({ page, studio }) => {
+    await studio.seed()
+    await studio.open('v-containers')
+    const paths = () => page.locator('.react-flow__edge-path').evaluateAll((els) => els.map((e) => e.getAttribute('d') ?? ''))
+    // Curved: cubic Béziers.
+    await expect.poll(async () => (await paths()).every((d) => d.includes('C'))).toBe(true)
+    await page.locator('.lp-section-header', { hasText: /^Views/ }).click()
+    const card = page.locator('.lp-view-card').filter({ hasText: 'Containers' })
+    await card.hover()
+    await card.getByTitle('View properties').click()
+    await page.getByLabel('Lines').selectOption('orthogonal')
+    // Orthogonal: straight segments and rounded corners, no Bézier.
+    await expect.poll(async () => (await paths()).every((d) => !d.includes('C'))).toBe(true)
+    await page.reload()
+    await studio.ready()
+    await expect.poll(async () => (await paths()).every((d) => !d.includes('C'))).toBe(true)
+  })
+})
+
 test.describe('left panel', () => {
   test('its edge drags it wider, it stays so after a reload, and a double-click sets it back', async ({ page, studio }) => {
     await studio.seed()

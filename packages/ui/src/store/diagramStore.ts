@@ -75,7 +75,7 @@ import { LIVE_CHILD_TOP_MIN } from '@radical/layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
-import { removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, withCanvasPositions } from '@radical/common/c4'
+import { type EdgeStyle, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -120,6 +120,7 @@ interface HistoryEntry {
   c4Relations: Record<string, C4Relation>
   views: Record<string, DiagramView>
   defaultLayoutConstraints: LayoutConstraint[]
+  defaultEdgeStyle: EdgeStyle
   /** The canvas that was shown: `c4Nodes` hold its positions. Undo goes
    *  back to it. Restored under another canvas, they became that canvas's
    *  layout (a drag on one view, undone on another, gave the second the
@@ -204,6 +205,7 @@ function _captureState(state: DiagramStore): HistoryEntry {
     c4Relations: state.c4Relations,
     views: state.views,
     defaultLayoutConstraints: state.defaultLayoutConstraints,
+    defaultEdgeStyle: state.defaultEdgeStyle,
     activeViewId: state.activeViewId,
     defaultPositions: state.defaultPositions,
     sequences: state.sequences,
@@ -1155,6 +1157,8 @@ interface DiagramStore {
    *  own in `layoutConstraints`. Read the active canvas's with
    *  activeLayoutConstraints(). */
   defaultLayoutConstraints: LayoutConstraint[]
+  /** How All elements and views without their own draw relations. */
+  defaultEdgeStyle: EdgeStyle
   /** Node ids on a lazily-loaded md-folder doc whose `description` hasn't
    *  been fetched from disk yet — see `hydrateNode`. Empty for other
    *  document sources. */
@@ -1305,6 +1309,10 @@ interface DiagramStore {
   moveViewFolder: (path: string, direction: -1 | 1) => void
   /** Order the listed views among the places they hold; one undo step. */
   orderViews: (viewIds: string[]) => void
+  /** How a view draws relations; null: the model's default. One undo step. */
+  setViewEdgeStyle: (viewId: string, style: EdgeStyle | null) => void
+  /** How All elements and views without their own draw relations. One undo step. */
+  setDefaultEdgeStyle: (style: EdgeStyle) => void
   /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', and 'wiki'. */
   setViewKind: (viewId: string, kind: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki') => void
   /** Persist treemap drill-down focus (null = top "All"). */
@@ -1772,6 +1780,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         state.views = views as any
         state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
+        state.defaultEdgeStyle = entry.defaultEdgeStyle
         state.defaultPositions = entry.defaultPositions as any
         // A view the entry knows may be gone when the entry is older than
         // the view; its positions are All elements' then.
@@ -1848,6 +1857,7 @@ export const useDiagramStore = create<DiagramStore>()(
       defaultPositions: initDefaultPositions,
       defaultViewport: persisted?.defaultViewport ?? null,
       defaultLayoutConstraints: persisted?.defaultLayoutConstraints ?? [],
+      defaultEdgeStyle: persisted?.defaultEdgeStyle ?? 'curved',
       pendingBodyNodeIds: {},
       rfNodes: deriveRFNodes(initNodes),
       rfEdges: deriveRFEdges(initNodes, initRelations),
@@ -3133,6 +3143,21 @@ export const useDiagramStore = create<DiagramStore>()(
         })
       },
 
+      setViewEdgeStyle(viewId, style) {
+        const view = get().views[viewId]
+        if (!view || (view.edgeStyle ?? null) === style) return
+        get()._pushUndo()
+        set((state) => { model.setViewEdgeStyle(state, viewId, style) })
+        get()._sync()
+      },
+
+      setDefaultEdgeStyle(style) {
+        if (get().defaultEdgeStyle === style) return
+        get()._pushUndo()
+        set((state) => { state.defaultEdgeStyle = style })
+        get()._sync()
+      },
+
       orderViews(viewIds) {
         const views = get().views
         const before = Object.keys(views)
@@ -3880,7 +3905,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const target = layoutTarget(get())
           const result = await runSmartLayout(input.nodes, input.relations, get().metamodel as Metamodel | undefined, (progress) => {
             set((s) => { s.smartLayoutProgress = progress })
-          }, { alignments: input.alignments })
+          }, { alignments: input.alignments, edgeStyle: model.edgeStyleOf(get(), get().activeViewId) })
           if (layoutTarget(get()) !== target) {
             layoutMissedItsCanvas(get().pushNotification)
             return
@@ -4149,6 +4174,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.c4Relations = {} as any
           state.views = {} as any
           state.defaultLayoutConstraints = []
+          state.defaultEdgeStyle = 'curved'
           state.sequences = {} as any
           state.activeViewId = null
           state.selectedNodeId = null
@@ -5344,6 +5370,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.defaultPositions = defaultPos as any
           state.defaultViewport = defaultVP
           state.defaultLayoutConstraints = (data.defaultLayoutConstraints ?? []) as any
+          state.defaultEdgeStyle = data.defaultEdgeStyle ?? 'curved'
           state.activeViewId = null
           state.selectedNodeId = null
           state.selectedEdgeId = null
@@ -5442,6 +5469,7 @@ export const useDiagramStore = create<DiagramStore>()(
           defaultPositions: savedDefaultPos,
           defaultViewport: savedDefaultVP,
           ...(get().defaultLayoutConstraints.length ? { defaultLayoutConstraints: get().defaultLayoutConstraints as LayoutConstraint[] } : {}),
+          ...(get().defaultEdgeStyle !== 'curved' ? { defaultEdgeStyle: get().defaultEdgeStyle } : {}),
           snapshots: snapshots as DiagramSnapshot[],
           presentations: presentations as Presentation[],
           metamodel: metamodel as Metamodel,
@@ -5465,6 +5493,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.activeViewId = null
           state.defaultPositions = snapshotPositions(sample.nodes) as any
           state.defaultLayoutConstraints = []
+          state.defaultEdgeStyle = 'curved'
           state.selectedNodeId = null
           state.selectedEdgeId = null
           state.nodeWizard = null
@@ -5503,6 +5532,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.activeViewId = null
           state.defaultPositions = {} as any
           state.defaultLayoutConstraints = []
+          state.defaultEdgeStyle = 'curved'
           state.selectedNodeId = null
           state.selectedEdgeId = null
           state.nodeWizard = null

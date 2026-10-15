@@ -41,11 +41,13 @@
 
 import type { LayoutOptions } from 'elkjs'
 import { Position } from './side'
-import type { C4Node, C4Relation, PositionMap } from '@radical/common/c4'
+import type { C4Node, C4Relation, EdgeStyle, PositionMap } from '@radical/common/c4'
+import { computeRoutedEdge, ObstacleGrid, separateParallelSegments, type RoutingObstacle } from './edgeRouting'
+import { labelOverlaps, placeEdgeLabels, type LabelEdge, type LabelObstacle } from './edgeLabels'
+import { allocatePorts } from './portAllocator'
 import type { Metamodel } from '@radical/common/metamodel'
 import { applyRadicalLayout } from './radicalLayout'
 import { minimizeCrossings, computeLayoutMetrics, type LayoutMetrics } from './crossingOpt'
-import { pickSides } from './portAllocator'
 import { ELK_ROOT_SPACING, ELK_CHILD_SPACING } from './elkSpacingBase'
 import { compoundPadding, projectToVisibleGraph } from './geometry'
 import { finalizeLayout as finalizeUnconstrained, ROOT_GAP, CHILD_GAP } from './layoutFinalize'
@@ -68,6 +70,7 @@ function pairGapsOf(g: LayoutGraph, nodes: Record<string, C4Node>, relations: Re
   const gaps = labelGaps(nodes, relations)
   return (a, b) => gaps.get(pairKey(g.ids[a], g.ids[b]))
 }
+import { bestIndex, bestIndexKeepingCurrent, rankByQuality } from './ranking'
 import {
   anneal, buildLayoutGraph, createRng, graphSeed, FunctionEnergy, ProxyEnergy,
   type AnnealOptions, type Bounds, type LayoutGraph, type Rng,
@@ -75,6 +78,9 @@ import {
 import {
   W_CROSS, W_OVERDRAW, W_STUBLOOP, W_LONG, W_LMEAN, W_LMAX, W_LEAF, W_ASPECT, W_COMPACT, W_SYMMETRY, W_LABEL,
   LEN_MEAN_KNEE, LEN_MAX_KNEE, overlapCost, aspectPenalty,
+  edgeScale, pairScale, LEAF_COMPACTNESS_FROM_NODES,
+  CORRIDOR_CELL, CORRIDOR_FREE, CORRIDOR_END_CLEAR, W_CORRIDOR, SHALLOW_CROSSING_DEG, CROWDED_ANGLE_DEG, W_LABEL_COLLISION,
+  SIDE_FREE, W_SIDE_LOAD, W_SPACE_IMBALANCE,
 } from './scoreWeights'
 
 // ─── Composite aesthetic score ────────────────────────────────────────────
@@ -95,8 +101,9 @@ import {
 //   compactness      — bounding-box area / sum of node areas
 //   symmetry         — distance from a mirror-symmetric arrangement
 //   labelCrowding    — labelled relations whose ends leave no room for the label
+//   corridorCrowding — relations squeezed through one narrow place
 
-interface CompositeScore {
+export interface CompositeScore {
   crossings: number
   renderedCrossings: number
   overdraws: number
@@ -116,6 +123,23 @@ interface CompositeScore {
   symmetryDeficit: number
   /** Σ over labelled relations of (missing share of the room its label needs)². */
   labelCrowding: number
+  /** Σ over CORRIDOR_CELL squares of (relations through it, away from their
+   *  ends, past CORRIDOR_FREE)². */
+  corridorCrowding: number
+  /** Rendered crossings at an angle under SHALLOW_CROSSING_DEG. */
+  shallowCrossings: number
+  /** Pairs of relations leaving one element less than CROWDED_ANGLE_DEG apart. */
+  crowdedAngles: number
+  /** Standard deviation of the edge lengths, in mean node sizes. */
+  edgeLengthSd: number
+  /** Relation labels, placed as the canvas places them, that cover another
+   *  label or an element (pairs); 0 when the relations are not routed. */
+  labelCollisions: number
+  /** Σ over element sides of (relations on the side past SIDE_FREE)². */
+  sideLoad: number
+  /** Σ over containers of 4+ elements (and the canvas) of the largest minus
+   *  the smallest share of their elements in one quadrant. */
+  spaceImbalance: number
   composite: number
 }
 
@@ -159,58 +183,7 @@ function buildAncestors(nodes: Record<string, C4Node>): Record<string, Set<strin
   return out
 }
 
-/**
- * Render-aware edge metrics.
- *
- * Edges are rendered as **cubic Béziers** (see RelationEdge.tsx → buildBezierPath)
- * with control points pulled along each endpoint's exit normal. The chosen
- * exit/entry side comes from pickSides() in portAllocator.ts using the
- * "nearest-point of OTHER box" heuristic. We replicate the exact same
- * geometry here, sample each Bézier on N points, and score the resulting
- * polylines:
- *
- *   - **renderedCrossings**: count segment×segment intersections between
- *     sampled polylines of different edges (excluding edges sharing an
- *     endpoint, which trivially "meet").
- *   - **renderedOverdraws**: sample points landing inside an unrelated
- *     node's bbox — catches Béziers that swing through a third node.
- *   - **stubLoopPenalty**: if the exit-normal at an endpoint points away
- *     from the target (dot product with the source→target vector is
- *     negative), the curve loops back. Heavily penalised because it's
- *     the most visually offensive failure mode.
- */
-function borderPoint(
-  bx: number, by: number, w: number, h: number, side: Position,
-): { x: number; y: number; nx: number; ny: number } {
-  // Returns border point + outward unit normal.
-  switch (side) {
-    case Position.Left:   return { x: bx,         y: by + h / 2, nx: -1, ny: 0 }
-    case Position.Right:  return { x: bx + w,     y: by + h / 2, nx:  1, ny: 0 }
-    case Position.Top:    return { x: bx + w / 2, y: by,         nx:  0, ny: -1 }
-    case Position.Bottom: return { x: bx + w / 2, y: by + h,     nx:  0, ny:  1 }
-  }
-}
 
-function sampleCubicBezier(
-  sx: number, sy: number, c1x: number, c1y: number,
-  c2x: number, c2y: number, tx: number, ty: number,
-  n: number,
-): { x: number; y: number }[] {
-  const out: { x: number; y: number }[] = new Array(n + 1)
-  for (let i = 0; i <= n; i++) {
-    const t = i / n
-    const u = 1 - t
-    const b0 = u * u * u
-    const b1 = 3 * u * u * t
-    const b2 = 3 * u * t * t
-    const b3 = t * t * t
-    out[i] = {
-      x: b0 * sx + b1 * c1x + b2 * c2x + b3 * tx,
-      y: b0 * sy + b1 * c1y + b2 * c2y + b3 * ty,
-    }
-  }
-  return out
-}
 
 function segmentsCross(
   ax: number, ay: number, bx: number, by: number,
@@ -237,59 +210,192 @@ interface RenderMetrics {
   renderedCrossings: number
   renderedOverdraws: number
   stubLoopPenalty: number
+  corridorCrowding: number
+  shallowCrossings: number
+  crowdedAngles: number
+  labelCollisions: number
+  sideLoad: number
 }
 
-function computeRenderAwareEdgeMetrics(
+/**
+ * Labels placed as the canvas places them (placeEdgeLabels, avoiding the
+ * leaves and the headers of compound nodes), counted where they still cover
+ * another label or an element. A layout that packs its elements close left
+ * the labels nowhere to go, and nothing in the score saw it.
+ */
+function labelCollisions(
+  polys: readonly RenderedEdge[],
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
+  abs: Record<string, { x: number; y: number; w: number; h: number }>,
+): number {
+  const labelled: LabelEdge[] = []
+  for (const p of polys) {
+    const r = relations[p.id]
+    const size = r ? labelSizeOf(r, nodes) : null
+    if (!size) continue
+    labelled.push({ id: p.id, points: p.samples, anchor: p.samples[Math.floor(p.samples.length / 2)], size })
+  }
+  if (labelled.length === 0) return 0
+  const parents = new Set<string>()
+  for (const id of Object.keys(abs)) { const parent = nodes[id]?.parentId; if (parent && abs[parent]) parents.add(parent) }
+  const obstacles: LabelObstacle[] = []
+  const covered: RoutingObstacle[] = []
+  for (const [id, r] of Object.entries(abs)) {
+    if (parents.has(id)) {
+      const header = { x: r.x, y: r.y, w: r.w, h: Math.min(r.h, 60) }
+      obstacles.push({ ...header, weight: 2 })
+      covered.push(header)
+    } else {
+      obstacles.push({ x: r.x, y: r.y, w: r.w, h: r.h }, { x: r.x, y: r.y, w: r.w, h: Math.min(r.h, 40), weight: 1 })
+      covered.push({ x: r.x, y: r.y, w: r.w, h: r.h })
+    }
+  }
+  const { labelLabel, labelNode } = labelOverlaps(labelled, placeEdgeLabels(labelled, obstacles), covered)
+  return labelLabel + labelNode
+}
+/** Pairs of relations leaving one element less than CROWDED_ANGLE_DEG
+ *  apart, each taken in the direction from its end to a quarter of the way
+ *  along the curve (the side normal alone makes every relation leaving one
+ *  side parallel). */
+function crowdedAngles(polys: readonly RenderedEdge[]): number {
+  const directions = new Map<string, number[]>()
+  const add = (id: string, from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const list = directions.get(id) ?? []
+    list.push(Math.atan2(to.y - from.y, to.x - from.x))
+    directions.set(id, list)
+  }
+  for (const p of polys) {
+    const s = p.samples, q = Math.max(1, Math.floor(s.length / 4))
+    add(p.sId, s[0], s[q])
+    add(p.tId, s[s.length - 1], s[s.length - 1 - q])
+  }
+  const limit = CROWDED_ANGLE_DEG * Math.PI / 180
+  let crowded = 0
+  for (const list of directions.values()) {
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        let d = Math.abs(list[i] - list[j]) % (2 * Math.PI)
+        if (d > Math.PI) d = 2 * Math.PI - d
+        if (d < limit) crowded++
+      }
+    }
+  }
+  return crowded
+}
+
+/** Σ over CORRIDOR_CELL squares of (relations through it, away from their
+ *  ends, past CORRIDOR_FREE)²: see CORRIDOR_CELL in scoreWeights.ts. */
+function corridorCrowding(polys: readonly RenderedEdge[]): number {
+  const cells = new Map<number, number>()
+  const lastIn = new Map<number, number>()
+  const step = CORRIDOR_CELL / 4
+  polys.forEach((p, e) => {
+    const start = p.samples[0], end = p.samples[p.samples.length - 1]
+    for (let i = 1; i < p.samples.length; i++) {
+      const a = p.samples[i - 1], b = p.samples[i]
+      const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step))
+      for (let k = i === 1 ? 0 : 1; k <= n; k++) {
+        const x = a.x + (b.x - a.x) * k / n, y = a.y + (b.y - a.y) * k / n
+        if (Math.hypot(x - start.x, y - start.y) < CORRIDOR_END_CLEAR || Math.hypot(x - end.x, y - end.y) < CORRIDOR_END_CLEAR) continue
+        const key = Math.floor(x / CORRIDOR_CELL) * 1_048_576 + Math.floor(y / CORRIDOR_CELL)
+        if (lastIn.get(key) === e) continue
+        lastIn.set(key, e)
+        cells.set(key, (cells.get(key) ?? 0) + 1)
+      }
+    }
+  })
+  let crowding = 0
+  for (const count of cells.values()) if (count > CORRIDOR_FREE) crowding += (count - CORRIDOR_FREE) ** 2
+  return crowding
+}
+
+/** One relation as the canvas draws it: from its ports (allocatePorts),
+ *  direct or around elements, in the view's style, as a polyline, with its
+ *  bounding box. */
+export interface RenderedEdge {
+  id: string
+  samples: { x: number; y: number }[]
+  sId: string
+  tId: string
+  minX: number; minY: number; maxX: number; maxY: number
+}
+
+/** The relations as drawn, and how far their ends loop back (stubs that
+ *  leave a node away from the other end). */
+/** Relations up to which the ranking score routes them around elements as
+ *  the canvas does (A* per blocked relation); above, and in the annealer's
+ *  energy, they are drawn direct, from their spread ports. */
+export const ROUTED_SCORE_MAX_EDGES = 300
+
+function renderEdges(
+  relations: Record<string, C4Relation>,
   abs: Record<string, { x: number; y: number; w: number; h: number; cx: number; cy: number }>,
-  ancestors: Record<string, Set<string>>,
-): RenderMetrics {
+  style: EdgeStyle = 'curved',
+  ancestors?: Record<string, Set<string>>,
+  routed = false,
+): { polys: RenderedEdge[]; stubLoopPenalty: number; sideLoad: number } {
   const edges = Object.values(relations).filter((r) => abs[r.sourceId] && abs[r.targetId])
   // 16 segments per edge — captures Bézier curvature with enough resolution
   // to detect when a curve grazes a narrow node (e.g. a Database cylinder).
   // 8 was occasionally letting overdraw through.
   const SAMPLES = 16
-  // Pre-build all sample polylines + endpoints.
-  const polys: {
-    samples: { x: number; y: number }[]
-    sId: string
-    tId: string
-    minX: number; minY: number; maxX: number; maxY: number
-  }[] = []
   let stubLoopPenalty = 0
 
-  for (const e of edges) {
-    const sn = abs[e.sourceId], tn = abs[e.targetId]
-    // Replicate exactly what portAllocator.pickSides + RelationEdge does.
-    const view = (n: typeof sn, id: string) => ({
-      id, positionAbsolute: { x: n.x, y: n.y }, width: n.w, height: n.h,
-    })
-    const { sSide, tSide } = pickSides(view(sn, e.sourceId), view(tn, e.targetId))
-    const sb = borderPoint(sn.x, sn.y, sn.w, sn.h, sSide)
-    const tb = borderPoint(tn.x, tn.y, tn.w, tn.h, tSide)
-    const dist = Math.hypot(tb.x - sb.x, tb.y - sb.y)
-    // Mirrors edgeRouting.ts's controlPointPull() — kept as an inlined
-    // literal (not imported) so this file stays free of any non-elkSpacing
-    // dependency the SA Web Worker chunk would otherwise pick up. If that
-    // formula changes, update this one too.
-    const pull = Math.min(180, Math.max(40, dist * 0.5))
-    const c1x = sb.x + sb.nx * pull, c1y = sb.y + sb.ny * pull
-    const c2x = tb.x + tb.nx * pull, c2y = tb.y + tb.ny * pull
+  // The ports the canvas gives the relations: the side each leaves and
+  // enters, and where along it (relations on one side are spread along it).
+  const views = new Map(Object.entries(abs).map(([id, n]) => [id, { id, positionAbsolute: { x: n.x, y: n.y }, width: n.w, height: n.h }]))
+  const ports = allocatePorts(views, edges.map((e) => ({ id: e.id, source: e.sourceId, target: e.targetId })))
 
+  // Elements a relation goes around: all but its ends, their ancestors
+  // (it crosses their borders) and their descendants (inside them).
+  const grid = routed && ancestors
+    ? new ObstacleGrid(Object.entries(abs).map(([id, n]) => ({ id, rect: { x: n.x, y: n.y, w: n.w, h: n.h } })))
+    : null
+  const obstaclesFor = (sId: string, tId: string) => grid
+    ? grid.without((it) => it.id === sId || it.id === tId || !!ancestors![sId]?.has(it.id) || !!ancestors![tId]?.has(it.id)
+        || !!ancestors![it.id]?.has(sId) || !!ancestors![it.id]?.has(tId))
+    : []
+
+  // Relations per side of each element.
+  const onSide = new Map<string, number>()
+  for (const [id, port] of ports) {
+    const r = relations[id]
+    for (const key of [`${r.sourceId}|${port.sourceSide}`, `${r.targetId}|${port.targetSide}`]) onSide.set(key, (onSide.get(key) ?? 0) + 1)
+  }
+  let sideLoad = 0
+  for (const count of onSide.values()) if (count > SIDE_FREE) sideLoad += (count - SIDE_FREE) ** 2
+
+  const lines = new Map<string, { e: C4Relation; points: { x: number; y: number }[] }>()
+  for (const e of edges) {
+    const port = ports.get(e.id)
+    if (!port) continue
+    const sp = port.sourcePoint, tp = port.targetPoint
+    const sn = normalOf(port.sourceSide), tn = normalOf(port.targetSide)
+    const dist = Math.hypot(tp.x - sp.x, tp.y - sp.y)
     // Stub-loop penalty: exit normal vs source→target direction.
     // dot < 0 means the curve initially shoots *away* from the target.
     if (dist > 0) {
-      const ux = (tb.x - sb.x) / dist, uy = (tb.y - sb.y) / dist
-      const dotS = sb.nx * ux + sb.ny * uy           // source-side
-      const dotT = -(tb.nx * ux + tb.ny * uy)        // target-side (incoming)
+      const ux = (tp.x - sp.x) / dist, uy = (tp.y - sp.y) / dist
+      const dotS = sn.x * ux + sn.y * uy           // source-side
+      const dotT = -(tn.x * ux + tn.y * uy)        // target-side (incoming)
       // Convert dot ∈ [-1, 1] to penalty: only negative values count,
       // and squared so a sharp loop is much worse than a gentle backstep.
       if (dotS < 0) stubLoopPenalty += dotS * dotS
       if (dotT < 0) stubLoopPenalty += dotT * dotT
     }
+    // As the canvas draws it in this style: direct, or around elements.
+    const route = computeRoutedEdge(sp.x, sp.y, port.sourceSide, tp.x, tp.y, port.targetSide, obstaclesFor(e.sourceId, e.targetId), undefined, style)
+    lines.set(e.id, { e, points: route.points })
+  }
+  if (style === 'orthogonal') {
+    const moved = separateParallelSegments(new Map([...lines].map(([id, l]) => [id, l.points])))
+    for (const [id, points] of moved) lines.get(id)!.points = points
+  }
 
-    const samples = sampleCubicBezier(sb.x, sb.y, c1x, c1y, c2x, c2y, tb.x, tb.y, SAMPLES)
+  const polys: RenderedEdge[] = []
+  for (const { e, points } of lines.values()) {
+    const samples = style === 'orthogonal' || points.length < SAMPLES ? resample(points, SAMPLES) : points
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const pt of samples) {
       if (pt.x < minX) minX = pt.x
@@ -297,11 +403,94 @@ function computeRenderAwareEdgeMetrics(
       if (pt.x > maxX) maxX = pt.x
       if (pt.y > maxY) maxY = pt.y
     }
-    polys.push({ samples, sId: e.sourceId, tId: e.targetId, minX, minY, maxX, maxY })
+    polys.push({ id: e.id, samples, sId: e.sourceId, tId: e.targetId, minX, minY, maxX, maxY })
   }
+
+  return { polys, stubLoopPenalty, sideLoad }
+}
+
+/** Σ over containers of four or more elements, and the canvas, of the
+ *  largest minus the smallest share of their elements (by centre) in one
+ *  quadrant of the container (below its header). */
+function spaceImbalanceOf(
+  nodes: Record<string, C4Node>,
+  abs: Record<string, { x: number; y: number; w: number; h: number; cx: number; cy: number }>,
+): number {
+  const groups = new Map<string, string[]>()
+  for (const id of Object.keys(abs)) {
+    const parent = nodes[id]?.parentId
+    const key = parent && abs[parent] ? parent : ''
+    const list = groups.get(key) ?? []
+    list.push(id)
+    groups.set(key, list)
+  }
+  let total = 0
+  for (const [parent, ids] of groups) {
+    if (ids.length < 4) continue
+    let x0: number, y0: number, x1: number, y1: number
+    if (parent) {
+      const p = abs[parent]
+      x0 = p.x; x1 = p.x + p.w; y0 = p.y + Math.min(60, p.h / 3); y1 = p.y + p.h
+    } else {
+      x0 = Math.min(...ids.map((id) => abs[id].x)); x1 = Math.max(...ids.map((id) => abs[id].x + abs[id].w))
+      y0 = Math.min(...ids.map((id) => abs[id].y)); y1 = Math.max(...ids.map((id) => abs[id].y + abs[id].h))
+    }
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+    const quadrants = [0, 0, 0, 0]
+    for (const id of ids) quadrants[(abs[id].cx < cx ? 0 : 1) + (abs[id].cy < cy ? 0 : 2)]++
+    total += (Math.max(...quadrants) - Math.min(...quadrants)) / ids.length
+  }
+  return total
+}
+
+/** The outward unit normal of a side. */
+function normalOf(side: Position): { x: number; y: number } {
+  switch (side) {
+    case Position.Left: return { x: -1, y: 0 }
+    case Position.Right: return { x: 1, y: 0 }
+    case Position.Top: return { x: 0, y: -1 }
+    case Position.Bottom: return { x: 0, y: 1 }
+  }
+}
+
+/** The relations of a laid-out diagram as the canvas draws them. */
+export function renderedEdges(nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, style: EdgeStyle = 'curved'): RenderedEdge[] {
+  return renderEdges(relations, buildAbsCenters(nodes), style, buildAncestors(nodes), Object.keys(relations).length <= ROUTED_SCORE_MAX_EDGES).polys
+}
+
+/** `count` + 1 points evenly along the polyline, its corners kept. */
+function resample(pts: { x: number; y: number }[], count: number): { x: number; y: number }[] {
+  const lengths = [0]
+  for (let i = 1; i < pts.length; i++) lengths.push(lengths[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y))
+  const total = lengths[lengths.length - 1]
+  if (total === 0 || pts.length < 2) return pts
+  const out = new Map<number, { x: number; y: number }>()
+  for (let k = 0; k <= count; k++) {
+    const at = total * k / count
+    let i = 1
+    while (i < pts.length - 1 && lengths[i] < at) i++
+    const seg = lengths[i] - lengths[i - 1]
+    const u = seg > 0 ? (at - lengths[i - 1]) / seg : 0
+    out.set(at, { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * u, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * u })
+  }
+  for (let i = 1; i < pts.length - 1; i++) out.set(lengths[i], pts[i])
+  return [...out.entries()].sort((a, b) => a[0] - b[0]).map(([, p]) => p)
+}
+
+function computeRenderAwareEdgeMetrics(
+  nodes: Record<string, C4Node>,
+  relations: Record<string, C4Relation>,
+  abs: Record<string, { x: number; y: number; w: number; h: number; cx: number; cy: number }>,
+  ancestors: Record<string, Set<string>>,
+  style: EdgeStyle = 'curved',
+  routed = false,
+): RenderMetrics {
+  const { polys, stubLoopPenalty, sideLoad } = renderEdges(relations, abs, style, ancestors, routed)
 
   // Crossings on actual sampled polylines.
   let renderedCrossings = 0
+  let shallowCrossings = 0
+  const shallowLimit = SHALLOW_CROSSING_DEG * Math.PI / 180
   for (let i = 0; i < polys.length; i++) {
     const A = polys[i]
     for (let j = i + 1; j < polys.length; j++) {
@@ -319,6 +508,9 @@ function computeRenderAwareEdgeMetrics(
           const r = B.samples[b], s = B.samples[b + 1]
           if (segmentsCross(p.x, p.y, q.x, q.y, r.x, r.y, s.x, s.y)) {
             crossed = true
+            let angle = Math.abs(Math.atan2(q.y - p.y, q.x - p.x) - Math.atan2(s.y - r.y, s.x - r.x)) % Math.PI
+            if (angle > Math.PI / 2) angle = Math.PI - angle
+            if (angle < shallowLimit) shallowCrossings++
             break
           }
         }
@@ -350,32 +542,37 @@ function computeRenderAwareEdgeMetrics(
     }
   }
 
-  return { renderedCrossings, renderedOverdraws, stubLoopPenalty }
+  return { renderedCrossings, renderedOverdraws, stubLoopPenalty, corridorCrowding: corridorCrowding(polys), shallowCrossings, crowdedAngles: crowdedAngles(polys), labelCollisions: routed ? labelCollisions(polys, nodes, relations, abs) : 0, sideLoad }
 }
 
 export function computeCompositeScore(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
+  style: EdgeStyle = 'curved',
 ): CompositeScore {
   const base = computeLayoutMetrics(nodes, relations)
-  return { ...scoreParts(nodes, relations), crossings: base.crossings, overdraws: base.overdraws }
+  // The relations as drawn, around elements too (up to ROUTED_SCORE_MAX_EDGES).
+  const routed = Object.keys(relations).length <= ROUTED_SCORE_MAX_EDGES
+  return { ...scoreParts(nodes, relations, style, routed), crossings: base.crossings, overdraws: base.overdraws }
 }
 
 /** Composite cost only — what the polishing annealer minimises. */
-export function compositeEnergy(nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): number {
-  return scoreParts(nodes, relations).composite
+export function compositeEnergy(nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, style: EdgeStyle = 'curved'): number {
+  return scoreParts(nodes, relations, style).composite
 }
 
 function scoreParts(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
+  style: EdgeStyle = 'curved',
+  routed = false,
 ): Omit<CompositeScore, 'crossings' | 'overdraws'> {
   const abs = buildAbsCenters(nodes)
   const ancestors = buildAncestors(nodes)
   const ids = Object.keys(abs)
 
   // ── 0. Render-aware edge metrics (Bézier-sampled, matches what user sees) ─
-  const render = computeRenderAwareEdgeMetrics(nodes, relations, abs, ancestors)
+  const render = computeRenderAwareEdgeMetrics(nodes, relations, abs, ancestors, style, routed)
 
 
   // ── 1. Pairwise sibling node overlap (area, normalised to mean area) ──
@@ -426,6 +623,8 @@ function scoreParts(
   // Express mean edge length in "node sizes". Below 3 is tight (good),
   // above 5 is spread, above 8 is bad. Quadratic above the threshold.
   const lenInNodes = meanDimForLen > 0 ? meanLen / meanDimForLen : 0
+  const lenVar = lengths.length > 0 ? lengths.reduce((sum, l) => sum + (l - meanLen) ** 2, 0) / lengths.length : 0
+  const edgeLengthSd = meanDimForLen > 0 ? Math.sqrt(lenVar) / meanDimForLen : 0
   const edgeLengthMean = Math.max(0, lenInNodes - LEN_MEAN_KNEE) ** 2
 
   // ── 2d. Edge-length MAX in node sizes ─────────────────────────────────
@@ -492,9 +691,17 @@ function scoreParts(
   const aspect = aspectPenalty(bbW, bbH)
 
   // ── 4. Compactness: bbox area / sum of node areas ─────────────────────
+  // A large model counts its leaf elements only (LEAF_COMPACTNESS_FROM_NODES).
+  let areaOfNodes = totalArea
+  if (ids.length >= LEAF_COMPACTNESS_FROM_NODES) {
+    const parents = new Set<string>()
+    for (const id of ids) { const p = nodes[id]?.parentId; if (p && abs[p]) parents.add(p) }
+    areaOfNodes = 0
+    for (const id of ids) if (!parents.has(id)) areaOfNodes += abs[id].w * abs[id].h
+  }
   let compactness = 0
-  if (bbW > 0 && bbH > 0 && totalArea > 0) {
-    const ratio = (bbW * bbH) / totalArea
+  if (bbW > 0 && bbH > 0 && areaOfNodes > 0) {
+    const ratio = (bbW * bbH) / areaOfNodes
     // Below 4 is excellent (near-tight packing). Above 12 is sprawling.
     compactness = Math.max(0, ratio - 4)
   }
@@ -522,19 +729,26 @@ function scoreParts(
     labelCrowding += missing * missing
   }
 
+  const spaceImbalance = spaceImbalanceOf(nodes, abs)
+  const perEdge = edgeScale(edges.length)
+  const perPair = pairScale(edges.length)
   const composite =
-      render.renderedCrossings * W_CROSS
-    + render.renderedOverdraws * W_OVERDRAW
-    + render.stubLoopPenalty   * W_STUBLOOP
+      render.renderedCrossings * W_CROSS * perPair
+    + render.renderedOverdraws * W_OVERDRAW * perEdge
+    + render.stubLoopPenalty   * W_STUBLOOP * perEdge
     + overlapCost(nodeOverlap)
-    + lengthExcess             * W_LONG
+    + lengthExcess             * W_LONG * perEdge
     + edgeLengthMean           * W_LMEAN
     + edgeLengthMax            * W_LMAX
     + leafCentrality           * W_LEAF
     + aspect                   * W_ASPECT
     + compactness              * W_COMPACT
     + symNorm                  * W_SYMMETRY
-    + labelCrowding            * W_LABEL
+    + labelCrowding            * W_LABEL * perEdge
+    + render.corridorCrowding  * W_CORRIDOR * perEdge
+    + render.labelCollisions   * W_LABEL_COLLISION * perEdge
+    + render.sideLoad          * W_SIDE_LOAD * perEdge
+    + spaceImbalance           * W_SPACE_IMBALANCE
 
   return {
     renderedCrossings: render.renderedCrossings,
@@ -549,6 +763,13 @@ function scoreParts(
     compactness,
     symmetryDeficit: symNorm,
     labelCrowding,
+    corridorCrowding: render.corridorCrowding,
+    shallowCrossings: render.shallowCrossings,
+    crowdedAngles: render.crowdedAngles,
+    edgeLengthSd,
+    labelCollisions: render.labelCollisions,
+    sideLoad: render.sideLoad,
+    spaceImbalance,
     composite,
   }
 }
@@ -958,6 +1179,7 @@ function polishRoots(
   positions: PositionMap,
   rng: Rng,
   deadline: number,
+  style: EdgeStyle = 'curved',
 ): SARefinement {
   const work = projectPositions(nodes, positions)
   const g = buildLayoutGraph(work, relations)
@@ -971,7 +1193,7 @@ function polishRoots(
     stepFactor: 0.02, tempFactor: 0.25, calibrationSamples: 6,
     gap: ROOT_GAP, pairGap: pairGapsOf(g, nodes, relations), deadline,
   }
-  const res = anneal(new FunctionEnergy(g, work, relations, compositeEnergy), g, group, opts)
+  const res = anneal(new FunctionEnergy(g, work, relations, (n, r) => compositeEnergy(n, r, style)), g, group, opts)
   return { positions: readPositions(g), before: res.before, after: res.after, iterations: res.evaluations }
 }
 
@@ -1052,6 +1274,7 @@ function scoreCandidate(
   relations: Record<string, C4Relation>,
   candidate: RawCandidate,
   alignments: readonly Alignment[],
+  style: EdgeStyle = 'curved',
 ): SmartLayoutCandidate | null {
   try {
     const raw: PositionMap = { ...candidate.positions }
@@ -1063,7 +1286,7 @@ function scoreCandidate(
     const positions = finalizeLayout(nodes, relations, raw, alignments)
     const projected = projectPositions(nodes, positions)
     const metrics = computeLayoutMetrics(projected, relations)
-    const score = computeCompositeScore(projected, relations)
+    const score = computeCompositeScore(projected, relations, style)
     return { name: candidate.name, positions, metrics, score }
   } catch (err) {
     console.warn(`[smartLayout] candidate ${candidate.name} failed:`, err)
@@ -1085,6 +1308,7 @@ function relaxedCandidate(
   relations: Record<string, C4Relation>,
   from: SmartLayoutCandidate,
   alignments: readonly Alignment[],
+  style: EdgeStyle = 'curved',
 ): SmartLayoutCandidate | null {
   try {
     const moved = relaxLayout({ nodes: projectPositions(nodes, from.positions), relations, alignments: [...alignments] })
@@ -1111,7 +1335,7 @@ function relaxedCandidate(
       name: `${from.name} · relaxed`,
       positions,
       metrics: computeLayoutMetrics(projected, relations),
-      score: computeCompositeScore(projected, relations),
+      score: computeCompositeScore(projected, relations, style),
     }
   } catch (err) {
     console.warn('[smartLayout] relaxed candidate failed:', err)
@@ -1123,9 +1347,10 @@ function relaxedCandidate(
 function unchangedResult(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
+  style: EdgeStyle = 'curved',
 ): SmartLayoutResult {
   const baseline = computeLayoutMetrics(nodes, relations)
-  const score = computeCompositeScore(nodes, relations)
+  const score = computeCompositeScore(nodes, relations, style)
   return {
     baseline,
     winner: { name: 'baseline', metrics: baseline, score, positions: {} },
@@ -1189,7 +1414,7 @@ export async function runSmartLayoutELKPhase(
   const depth = maxContainmentDepth(metamodel)
   const mmDirection: 'DOWN' | 'RIGHT' = depth >= 2 ? 'RIGHT' : 'DOWN'
 
-  // Ten structurally different candidates. stress / force / mrtree may
+  // Twelve structurally different candidates. stress / force / mrtree may
   // degrade on compound graphs — generateCandidate swallows failures so the
   // remaining set still wins.
   const engines: [name: string, run: () => Promise<PositionMap> | PositionMap][] = [
@@ -1236,6 +1461,22 @@ export async function runSmartLayoutELKPhase(
       }),
     ],
     [
+      'Layered TB · packed groups',
+      () => applyElkLayout(nodes, relations, {
+        rootOptions: elkLayered('DOWN', 'BRANDES_KOEPF', true),
+        childOptions: elkLayeredChild('RIGHT', 'BRANDES_KOEPF'),
+        packSparseGroups: true,
+      }),
+    ],
+    [
+      'Layered LR · packed groups',
+      () => applyElkLayout(nodes, relations, {
+        rootOptions: elkLayered('RIGHT', 'BRANDES_KOEPF', true),
+        childOptions: elkLayeredChild('DOWN', 'BRANDES_KOEPF'),
+        packSparseGroups: true,
+      }),
+    ],
+    [
       'Stress majorisation (Gansner)',
       () => applyElkLayout(nodes, relations, {
         rootOptions: elkStress(),
@@ -1263,9 +1504,9 @@ export async function runSmartLayoutELKPhase(
   ]
 
   // Engines run one at a time with a yield in between: bundled ELK runs a
-  // whole layout synchronously on this (main) thread, so queueing all ten at
+  // whole layout synchronously on this (main) thread, so queueing all twelve at
   // once would freeze the UI for their combined time. One at a time, the
-  // longest freeze is a single layout and "N/10 algorithms tried" advances live.
+  // longest freeze is a single layout and "N/12 algorithms tried" advances live.
   const total = engines.length
   const raw: RawCandidate[] = []
   onProgress?.({ phase: 'candidates', done: 0, total })
@@ -1286,6 +1527,8 @@ export interface SmartLayoutOptions {
   seed?: number
   /** User alignments (resolveAlignments) every candidate must keep. */
   alignments?: readonly Alignment[]
+  /** How the canvas draws relations, so they are scored as they are seen. */
+  edgeStyle?: EdgeStyle
 }
 
 export async function runSmartLayoutCore(
@@ -1322,22 +1565,22 @@ export async function runSmartLayoutWorkerPhase(
   options: SmartLayoutOptions = {},
 ): Promise<SmartLayoutResult> {
   const alignments = options.alignments ?? []
+  const style = options.edgeStyle ?? 'curved'
   const baseline = computeLayoutMetrics(nodes, relations)
 
-  // Composite ranking — crossings dominate but the layout still gets
-  // penalised for node overlap, edge-length spaghetti and bad aspect ratio,
-  // which matches what users *perceive* as messy far better than raw
-  // crossing count alone.
+  // Every candidate scored on every criterion; which wins is decided by
+  // their aggregated quality among each other (ranking.ts).
   const valid: SmartLayoutCandidate[] = []
   onProgress?.({ phase: 'ranking', done: 0, total: raw.length })
   for (let i = 0; i < raw.length; i++) {
-    const scored = scoreCandidate(nodes, relations, raw[i], alignments)
+    const scored = scoreCandidate(nodes, relations, raw[i], alignments, style)
     if (scored) valid.push(scored)
     onProgress?.({ phase: 'ranking', done: i + 1, total: raw.length })
     await yieldToUI()
   }
-  if (valid.length === 0) return unchangedResult(nodes, relations)
-  valid.sort((a, b) => a.score.composite - b.score.composite)
+  if (valid.length === 0) return unchangedResult(nodes, relations, style)
+  // Best first, by aggregated quality among them (ranking.ts).
+  valid.splice(0, valid.length, ...rankByQuality(valid))
 
   const rng = createRng(options.seed ?? graphSeed(nodes, relations))
 
@@ -1352,7 +1595,7 @@ export async function runSmartLayoutWorkerPhase(
     const run = refineRoots(nodes, relations, valid[k].positions, rng, deadlineA)
     iterationsA += run.iterations
     const positions = finalizeLayout(nodes, relations, run.positions, alignments)
-    const composite = compositeEnergy(projectPositions(nodes, positions), relations)
+    const composite = compositeEnergy(projectPositions(nodes, positions), relations, style)
     if (!best || composite < best.composite) best = { from: valid[k], run, positions, composite }
   }
   const refinedFrom = best!.from
@@ -1363,35 +1606,38 @@ export async function runSmartLayoutWorkerPhase(
   await yieldToUI()
 
   onProgress?.({ phase: 'refining-c' })
-  const phaseC = polishRoots(nodes, relations, finalizeLayout(nodes, relations, phaseB.positions, alignments), rng, now() + PHASE_C_DEADLINE_MS)
+  const phaseC = polishRoots(nodes, relations, finalizeLayout(nodes, relations, phaseB.positions, alignments), rng, now() + PHASE_C_DEADLINE_MS, style)
   const finalPositions = finalizeLayout(nodes, relations, phaseC.positions, alignments)
   const refined = projectPositions(nodes, finalPositions)
 
   // Never hand back something worse than we already had: the refined
-  // layout competes with the best unrefined candidate and with the layout
-  // the user is looking at right now, all scored the same way.
-  let winner: SmartLayoutCandidate = {
+  // layout competes with every candidate, the physics' relaxation of the
+  // best and the layout the user is looking at right now, all ranked
+  // together (ranking.ts).
+  const refinedCandidate: SmartLayoutCandidate = {
     name: refinedFrom.name,
     positions: finalPositions,
     metrics: computeLayoutMetrics(refined, relations),
-    score: computeCompositeScore(refined, relations),
+    score: computeCompositeScore(refined, relations, style),
   }
-  if (valid[0].score.composite < winner.score.composite) winner = valid[0]
+  const firstPick = valid[bestIndex([refinedCandidate.score, ...valid.map((c) => c.score)]) - 1] ?? refinedCandidate
 
   onProgress?.({ phase: 'relaxing' })
   await yieldToUI()
-  const relaxed = relaxedCandidate(nodes, relations, winner, alignments)
-  if (relaxed) {
-    valid.push(relaxed)
-    valid.sort((a, b) => a.score.composite - b.score.composite)
-    if (relaxed.score.composite < winner.score.composite) winner = relaxed
-  }
+  const relaxed = relaxedCandidate(nodes, relations, firstPick, alignments, style)
+  if (relaxed) valid.push(relaxed)
+  valid.splice(0, valid.length, ...rankByQuality(valid))
 
-  const currentScore = computeCompositeScore(nodes, relations)
+  const currentScore = computeCompositeScore(nodes, relations, style)
   // The layout on screen competes only while it keeps the alignments (a
   // rule just added may not hold there yet).
-  const keptCurrent = currentScore.composite <= winner.score.composite
-    && alignmentError(nodes, {}, alignments) <= 1
+  const currentCompetes = alignmentError(nodes, {}, alignments) <= 1
+  const contenders = [refinedCandidate, ...valid]
+  const scores = contenders.map((c) => c.score)
+  if (currentCompetes) scores.push(currentScore)
+  const pick = currentCompetes ? bestIndexKeepingCurrent(scores) : bestIndex(scores)
+  const keptCurrent = currentCompetes && pick === contenders.length
+  let winner = keptCurrent ? refinedCandidate : contenders[pick]
   if (keptCurrent) {
     const positions: PositionMap = {}
     for (const n of Object.values(nodes)) positions[n.id] = { x: n.x, y: n.y, width: n.width, height: n.height }

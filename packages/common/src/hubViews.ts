@@ -90,6 +90,7 @@ export function conceptViewsToDiagram(
     if (sequenceId) view.sequenceId = sequenceId
     const folder = typeof raw.folder === 'string' ? normalizeViewFolder(raw.folder) : ''
     if (folder) view.folder = folder
+    if (raw.edgeStyle === 'curved' || raw.edgeStyle === 'orthogonal') view.edgeStyle = raw.edgeStyle
     if (kind === 'wiki') {
       const focus = typeof raw.wikiFocusId === 'string' ? maps.node(raw.wikiFocusId) : undefined
       view.wikiFocusId = focus ?? null

@@ -208,6 +208,11 @@
           "items": { "type": "string" },
           "description": "C4 node IDs included in this view. Ancestors are auto-included."
         },
+        "edgeStyle": {
+          "type": "string",
+          "enum": ["curved", "orthogonal"],
+          "description": "How the view draws relations. None: the model's (defaultEdgeStyle, curved when none)."
+        },
         "folder": {
           "type": "string",
           "description": "Folder of the list of views the view sits in, a path such as \"C4/Components\". None: at the top."

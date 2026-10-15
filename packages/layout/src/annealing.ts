@@ -22,7 +22,7 @@ import type { C4Node, C4Relation } from '@radical/common/c4'
 import type { PairGap } from './labelRoom'
 import {
   W_CROSS, W_OVERDRAW, W_LMEAN, W_LMAX, W_ASPECT,
-  LEN_MEAN_KNEE, LEN_MAX_KNEE, overlapCost, aspectPenalty,
+  LEN_MEAN_KNEE, LEN_MAX_KNEE, overlapCost, aspectPenalty, edgeScale, pairScale,
 } from './scoreWeights'
 
 // ─── Seeded randomness ────────────────────────────────────────────────────
@@ -441,8 +441,8 @@ export class ProxyEnergy implements Evaluator {
       if (this.ay[i] + h[i] > maxY) maxY = this.ay[i] + h[i]
     }
 
-    return this.crossings * W_CROSS
-      + this.overdraws * W_OVERDRAW
+    return this.crossings * W_CROSS * pairScale(E)
+      + this.overdraws * W_OVERDRAW * edgeScale(E)
       + overlapCost(meanArea > 0 ? this.overlapArea / meanArea : 0)
       + Math.max(0, meanInNodes - LEN_MEAN_KNEE) ** 2 * W_LMEAN
       + Math.max(0, maxInNodes - LEN_MAX_KNEE) ** 2 * W_LMAX

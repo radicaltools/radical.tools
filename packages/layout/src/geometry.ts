@@ -290,17 +290,37 @@ export function projectToVisibleGraph(
     return cur?.id
   }
 
+  // As the canvas draws them (deriveRFEdges): a relation between two
+  // visible elements is a line of its own, however many join them; the
+  // relations rolled up onto a folded container share one line per pair,
+  // labelled with all their names, and none is drawn between a node and its
+  // own ancestor. Engines and the score see the lines the canvas draws (the
+  // score used to merge every pair into one line, and missed the labels of
+  // the rest).
+  const isAncestor = (a: string, b: string): boolean => {
+    for (let cur = nodes[b]?.parentId; cur; cur = nodes[cur]?.parentId) if (cur === a) return true
+    return false
+  }
   const projected: Record<string, C4Relation> = {}
-  const seen = new Set<string>()
+  const rolledUpLine = new Map<string, string>()
   for (const id of Object.keys(relations).sort()) {
     const r = relations[id]
     const s = visibleAncestor(r.sourceId)
     const t = visibleAncestor(r.targetId)
     if (!s || !t || s === t) continue
+    if (s === r.sourceId && t === r.targetId) {
+      projected[id] = r
+      continue
+    }
+    if (isAncestor(s, t) || isAncestor(t, s)) continue
     const key = `${s}\u0000${t}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    projected[id] = s === r.sourceId && t === r.targetId ? r : { ...r, sourceId: s, targetId: t }
+    const kept = rolledUpLine.get(key)
+    if (kept) {
+      if (r.label) projected[kept] = { ...projected[kept], label: projected[kept].label ? `${projected[kept].label}\n${r.label}` : r.label }
+      continue
+    }
+    rolledUpLine.set(key, id)
+    projected[id] = { ...r, sourceId: s, targetId: t }
   }
   return { nodes: visible, relations: projected }
 }

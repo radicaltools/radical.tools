@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
+import { type EdgeStyle, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
 import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
@@ -35,6 +35,8 @@ export interface ModelState {
   sequences?: Record<string, DiagramSequence>
   /** Layout constraints of All elements (DiagramData.defaultLayoutConstraints). */
   defaultLayoutConstraints?: LayoutConstraint[]
+  /** How All elements and views without their own draw relations. */
+  defaultEdgeStyle?: EdgeStyle
 }
 
 type NodeRecord = C4Node & Record<string, unknown>
@@ -522,6 +524,25 @@ export function renameViewFolder(state: ModelState, path: string, name: string):
     if (isInViewFolder(view, from)) view.folder = to + normalizeViewFolder(view.folder).slice(from.length)
   }
   return to
+}
+
+/** How a view draws relations; null: the model's default. */
+export function setViewEdgeStyle(state: ModelState, viewId: string, style: EdgeStyle | null): void {
+  const view = state.views[viewId]
+  if (!view) return
+  if (style) view.edgeStyle = style
+  else delete view.edgeStyle
+}
+
+/** How All elements and the views without their own draw relations. */
+export function setDefaultEdgeStyle(state: ModelState, style: EdgeStyle): void {
+  if (style === 'curved') delete state.defaultEdgeStyle
+  else state.defaultEdgeStyle = style
+}
+
+/** How the canvas `viewId` (null: All elements) draws relations. */
+export function edgeStyleOf(state: Pick<ModelState, 'views' | 'defaultEdgeStyle'>, viewId: string | null): EdgeStyle {
+  return (viewId ? state.views[viewId]?.edgeStyle : undefined) ?? state.defaultEdgeStyle ?? 'curved'
 }
 
 /** Orders the listed views: they take, in the order given, the places in
