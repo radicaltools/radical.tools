@@ -1403,6 +1403,7 @@ label.app-menu-row { cursor: pointer; }
   align-items: center;
   gap: 8px;
 }
+.mm-summary-preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-secondary); }
 .mm-hint {
   font-weight: 400;
   text-transform: none;

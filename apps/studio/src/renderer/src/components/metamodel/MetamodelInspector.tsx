@@ -76,7 +76,7 @@ function TypeInspector({ metamodel, selection, onSelect, onEdit }: Props): React
   const facts = [
     def.builtin ? 'built-in' : 'custom',
     def.hubOnly ? 'Hub only' : null,
-    def.tableTab ? 'own Table View tab' : null,
+    def.summary ? `summary ${def.summary}` : null,
     card?.min != null || card?.max != null ? `${card?.min ?? 0}…${card?.max ?? '∞'} per document` : null,
   ].filter(Boolean)
   return (

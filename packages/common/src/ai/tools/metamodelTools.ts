@@ -48,7 +48,7 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           allowedParents: { type: 'array', items: { type: 'string' }, description: 'Node types it may sit inside. [] = none.' },
           allowedAtRoot: { type: 'boolean' },
           maxCount: { type: ['number', 'null'], description: 'Maximum number of nodes of this type; null removes the limit.' },
-          tableTab: { type: 'boolean', description: 'Give the type its own tab in table views (record-like types).' },
+          summary: { type: 'string', description: 'How the table sums up an element of this type in one line, from data it has: a template of tokens — {key} a property (or label, description, technology), {ears} a requirement\'s EARS sentence, {key.sentence} its first sentence, {key.cap} capitalised; a part in [ ] is left out when a token in it is empty. E.g. "[{status.cap}: ]{decision.sentence}". "" restores the default.' },
           properties: PROPERTIES_SCHEMA,
         },
         required: ['id'],
@@ -202,7 +202,10 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       if (typeof input.allowedAtRoot === 'boolean') def.allowedAtRoot = input.allowedAtRoot
       if (input.maxCount === null) def.cardinality = def.cardinality?.min !== undefined ? { min: def.cardinality.min } : undefined
       else if (typeof input.maxCount === 'number') def.cardinality = { ...def.cardinality, max: input.maxCount }
-      if (typeof input.tableTab === 'boolean') def.tableTab = input.tableTab
+      if (input.summary !== undefined) {
+        if (typeof input.summary !== 'string') return fail('upsert_node_type: summary must be a string')
+        def.summary = input.summary.trim() || undefined
+      }
       if (properties) def.properties = properties
       mm.nodeTypes[id] = def
       return save(ctx, mm, `${existing ? 'Updated' : 'Added'} node type "${id}".${note}`)

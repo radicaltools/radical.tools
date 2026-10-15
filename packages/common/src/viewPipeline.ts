@@ -13,6 +13,8 @@
 import type { C4Node, C4Relation, ChainLevel, ChainVia, ChainWay, DiagramView, ViewFilter, ViewPipeline, ViewSort } from './c4'
 import { viewShowsEveryNode } from './c4'
 import type { Metamodel, PropertyDef } from './metamodel/types'
+import type { WizardLink } from './metamodel/wizard'
+import { inferRelationType, isParentAllowed, isPlacementAllowed } from './metamodel/lookup'
 
 export interface PipelineContext {
   nodes: Record<string, C4Node>
@@ -208,9 +210,28 @@ export interface FilterSuggestion {
 
 /** Filters that would narrow `rows` (each lets some, not all, through):
  *  types, property values, relations, places. */
-export function suggestFilters(rows: C4Node[], ctx: PipelineContext): FilterSuggestion[] {
-  if (!rows.length) return []
+export function suggestFilters(rows: C4Node[], ctx: PipelineContext, typesHere: string[] = []): FilterSuggestion[] {
   const out: FilterSuggestion[] = []
+  // The options of the enum properties of the level's types, also those no
+  // element has yet (none, for a level built before its elements).
+  const fromMetamodel = (): FilterSuggestion[] => {
+    const held = new Set(out.map((o) => o.label))
+    const extra: FilterSuggestion[] = []
+    for (const t of typesHere) {
+      for (const p of ctx.metamodel?.nodeTypes[t]?.properties ?? []) {
+        if (p.type !== 'enum') continue
+        for (const v of p.options ?? []) {
+          const filter: ViewFilter = { kind: 'property', key: p.key, op: 'is', values: [String(v)] }
+          const label = filterLabel(filter, ctx)
+          if (held.has(label)) continue
+          held.add(label)
+          extra.push({ filter, label, count: rows.filter((n) => matchesFilter(filter, n, ctx)).length })
+        }
+      }
+    }
+    return extra
+  }
+  if (!rows.length) return fromMetamodel()
   const push = (filter: ViewFilter) => {
     const count = rows.filter((n) => matchesFilter(filter, n, ctx)).length
     if (count > 0 && count < rows.length) out.push({ filter, label: filterLabel(filter, ctx), count })
@@ -247,7 +268,7 @@ export function suggestFilters(rows: C4Node[], ctx: PipelineContext): FilterSugg
   const places = new Set<string>()
   for (const n of rows) for (const id of ancestorsOf(n, ctx).reverse().slice(0, 2)) places.add(id)
   for (const id of places) push({ kind: 'within', nodeId: id })
-  return out
+  return [...out, ...fromMetamodel().filter((o) => o.count === 0)]
 }
 
 // ─── Sort ───────────────────────────────────────────────────────────────────
@@ -556,6 +577,188 @@ export function runPipeline(view: DiagramView | undefined, ctx: PipelineContext)
   return runChain(pipelineSource(view, ctx), pipelineOf(view), ctx)
 }
 
+// ─── Adding elements where the rows are ─────────────────────────────────────
+
+/** An element the table can add: of `type`, inside `parentId` (none: at the
+ *  top of the model), linked to the row it is added under by `link`. */
+export interface AddChoice {
+  type: string
+  parentId?: string
+  link?: WizardLink
+  /** Values that let it through the level's filters ('' clears a default). */
+  properties?: Record<string, string>
+  /** The level's filters will not show it all the same (a text filter). */
+  hidden?: true
+  /** How it hangs under the row, in words: "Refined into", "Inside". */
+  group: string
+}
+
+/** What a new element of `type` needs to pass `filters` (a level's): the
+ *  values to give it and the element to put it in, or `excluded` when its
+ *  type cannot pass. Each run of filters joined with or is met by its first
+ *  filter that can be: a type it has, a property set to the first value
+ *  named (or cleared of a default that fails it), inside the element named,
+ *  the relation it gets anyway. A run none of whose filters can be met
+ *  (a text the name must hold) leaves it `hidden`. */
+function meetFilters(type: string, filters: ViewFilter[] | undefined, link: Omit<WizardLink, 'otherId'> | undefined, ctx: PipelineContext):
+  { excluded: true } | { excluded?: false; properties: Record<string, string>; within?: string; hidden?: true } {
+  const on = (filters ?? []).map((f, i) => ({ f, i })).filter(({ f }) => !f.off)
+  const props = ctx.metamodel?.nodeTypes[type]?.properties ?? []
+  const defaultOf = (key: string) => props.find((p) => p.key === key)?.default
+  const properties: Record<string, string> = {}
+  let within: string | undefined
+  let hidden = false
+  for (const run of filterRuns(on.map(({ f }) => f))) {
+    const fs = run.map((i) => on[i].f)
+    if (fs.every((f) => f.kind === 'type') && !fs.some((f) => f.kind === 'type' && f.types.includes(type))) return { excluded: true }
+    const met = fs.some((f) => {
+      switch (f.kind) {
+        case 'type': return f.types.includes(type)
+        case 'property': {
+          const known = props.some((p) => p.key === f.key)
+          const def = defaultOf(f.key)
+          const hasDefault = def !== undefined && def !== ''
+          if (f.op === 'is') { if (!known || !f.values?.length) return false; properties[f.key] = f.values[0]; return true }
+          if (f.op === 'set') {
+            if (hasDefault) return true
+            const option = props.find((p) => p.key === f.key)?.options?.[0]
+            if (!option) return false
+            properties[f.key] = option
+            return true
+          }
+          const fails = f.op === 'unset' ? hasDefault : hasDefault && !!f.values?.includes(String(def))
+          if (fails) properties[f.key] = ''
+          return true
+        }
+        case 'within': {
+          const into = ctx.nodes[f.nodeId]
+          if (!into || !isPlacementAllowed(ctx.metamodel, type, into, ctx.nodes)) return false
+          within = into.id
+          return true
+        }
+        case 'relation': {
+          // From the new element: `out` is a relation it is the source of.
+          const gets = !!link && link.relationType === f.relationType && link.direction === f.direction
+          return gets === f.has
+        }
+        case 'text': return !f.text.trim()
+      }
+    })
+    if (!met) hidden = true
+  }
+  return { properties, ...(within ? { within } : {}), ...(hidden ? { hidden: true as const } : {}) }
+}
+
+/** Where an element of `type` linked to `near` goes: beside it (in its
+ *  parent), else at the top of the model, else inside it; undefined when
+ *  none of these may hold it. */
+function placeBeside(type: string, near: C4Node, ctx: PipelineContext): { parentId?: string } | undefined {
+  const parent = near.parentId ? ctx.nodes[near.parentId] : undefined
+  if (parent ? isPlacementAllowed(ctx.metamodel, type, parent, ctx.nodes) : isParentAllowed(ctx.metamodel, type, undefined)) {
+    return parent ? { parentId: parent.id } : {}
+  }
+  if (isParentAllowed(ctx.metamodel, type, undefined)) return {}
+  if (isPlacementAllowed(ctx.metamodel, type, near, ctx.nodes)) return { parentId: near.id }
+  return undefined
+}
+
+/** Where a new top-level element of `type` goes: where most of the view's
+ *  elements of that type are (inside one parent, or at the top of the
+ *  model), else at the top of the model; undefined when it may not be
+ *  there. */
+function placeAtTop(type: string, source: C4Node[], ctx: PipelineContext): { parentId?: string } | undefined {
+  const tally = new Map<string, number>()
+  for (const n of source) if (n.type === type) tally.set(n.parentId ?? '', (tally.get(n.parentId ?? '') ?? 0) + 1)
+  for (const [id] of [...tally].sort((a, b) => b[1] - a[1])) {
+    if (!id) { if (isParentAllowed(ctx.metamodel, type, undefined)) return {}; continue }
+    if (ctx.nodes[id] && isPlacementAllowed(ctx.metamodel, type, ctx.nodes[id], ctx.nodes)) return { parentId: id }
+  }
+  return isParentAllowed(ctx.metamodel, type, undefined) ? {} : undefined
+}
+
+/** The types `via` reaches from `from`: those a relation of its type
+ *  allows on the other end, or the types a child of it may be. */
+function typesAlong(via: ChainVia, from: C4Node, ctx: PipelineContext): string[] {
+  const types = Object.keys(ctx.metamodel?.nodeTypes ?? {})
+  if ('contains' in via) return types.filter((t) => isPlacementAllowed(ctx.metamodel, t, from, ctx.nodes))
+  if ('anyRelation' in via) return types.filter((t) => relationBetween(via, from.type, t, ctx))
+  const def = ctx.metamodel?.relationTypes[via.relationType]
+  if (!def || !def.allowedPairs.length) return types
+  return types.filter((t) => def.allowedPairs.some((p) => via.direction === 'out' ? p.from === from.type && p.to === t : p.from === t && p.to === from.type))
+}
+
+/** The link a new element of `type` gets to the element above along `via`
+ *  (`out`: the element above is the source); undefined when none fits. */
+function relationBetween(via: ChainVia, aboveType: string, type: string, ctx: PipelineContext): Omit<WizardLink, 'otherId'> | undefined {
+  if ('contains' in via) return undefined
+  if ('anyRelation' in via) {
+    const out = inferRelationType(ctx.metamodel, aboveType, type)
+    if (out) return { relationType: out, direction: 'in' }
+    const back = inferRelationType(ctx.metamodel, type, aboveType)
+    return back ? { relationType: back, direction: 'out' } : undefined
+  }
+  return { relationType: via.relationType, direction: via.direction === 'out' ? 'in' : 'out' }
+}
+
+function withFilters(meet: { properties: Record<string, string>; hidden?: true }): Pick<AddChoice, 'properties' | 'hidden'> {
+  return { ...(Object.keys(meet.properties).length ? { properties: meet.properties } : {}), ...(meet.hidden ? { hidden: true as const } : {}) }
+}
+
+/** What the table of `view` can add: under the element of a row (`under`,
+ *  at its depth in the chain), or at the top. In a chain an element goes on
+ *  the next level, of its types, linked the way the level hangs under the
+ *  one above (a requirement refined from the need it is added under) and
+ *  placed beside it; at the top, of the first level's types. It is made to
+ *  pass the level's filters where it can (meetFilters): a type they leave
+ *  out is not offered. Without a
+ *  chain the rows are the containment: under a row go the types it may
+ *  hold, at the top those the top of the model may. */
+export function addChoices(view: DiagramView | undefined, ctx: PipelineContext, under?: { node: C4Node; depth: number }): AddChoice[] {
+  const levels = pipelineOf(view)?.levels ?? []
+  const allTypes = Object.keys(ctx.metamodel?.nodeTypes ?? {})
+  const out: AddChoice[] = []
+  const seen = new Set<string>()
+  const push = (c: AddChoice) => {
+    const key = `${c.type}|${c.link?.relationType ?? ''}|${c.link?.direction ?? ''}`
+    if (!seen.has(key)) { seen.add(key); out.push(c) }
+  }
+  if (!levels.length) {
+    if (!under) for (const t of allTypes) { if (isParentAllowed(ctx.metamodel, t, undefined)) push({ type: t, group: 'Add' }) }
+    else for (const t of typesAlong({ contains: true }, under.node, ctx)) push({ type: t, parentId: under.node.id, group: 'Inside' })
+    return out
+  }
+  if (!under) {
+    const source = pipelineSource(view, ctx)
+    for (const way of levels[0].ways) {
+      for (const t of way.types?.length ? way.types : allTypes) {
+        const meet = meetFilters(t, levels[0].filters, undefined, ctx)
+        if (meet.excluded) continue
+        const place = meet.within ? { parentId: meet.within } : placeAtTop(t, source, ctx)
+        if (place) push({ type: t, ...place, ...withFilters(meet), group: 'Add' })
+      }
+    }
+    return out
+  }
+  const next = levels[under.depth + 1]
+  if (!next) return out
+  for (const way of next.ways) {
+    if (!way.via) continue
+    const via = way.via
+    const reachable = typesAlong(via, under.node, ctx)
+    const types = way.types?.length ? way.types.filter((t) => reachable.includes(t)) : reachable
+    for (const t of types) {
+      const link = relationBetween(via, under.node.type, t, ctx)
+      if (!('contains' in via) && !link) continue
+      const meet = meetFilters(t, next.filters, link, ctx)
+      if (meet.excluded) continue
+      if ('contains' in via) { push({ type: t, parentId: under.node.id, ...withFilters(meet), group: viaLabel(via, ctx) }); continue }
+      const place = meet.within ? { parentId: meet.within } : placeBeside(t, under.node, ctx)
+      if (place) push({ type: t, ...place, link: { ...link!, otherId: under.node.id }, ...withFilters(meet), group: viaLabel(via, ctx) })
+    }
+  }
+  return out
+}
+
 // ─── Suggestions for levels ─────────────────────────────────────────────────
 
 export interface WaySuggestion {
@@ -573,16 +776,44 @@ export function suggestStartWays(source: C4Node[], ctx: PipelineContext, taken: 
   for (const n of source) counts.set(n.type, (counts.get(n.type) ?? 0) + 1)
   const held = new Set(taken.flatMap((w) => w.types ?? []))
   const every: WaySuggestion[] = source.length ? [{ way: {}, label: 'Every element', count: source.length }] : []
+  // Then the metamodel's types that have no element yet, for a chain built before its elements.
+  for (const t of Object.keys(ctx.metamodel?.nodeTypes ?? {})) if (!counts.has(t)) counts.set(t, 0)
   return [...every, ...[...counts.entries()]
     .filter(([t]) => !held.has(t))
     .sort((a, b) => b[1] - a[1] || typeLabel(ctx, a[0]).localeCompare(typeLabel(ctx, b[0])))
     .map(([t, count]) => ({ way: { types: [t] }, label: typeLabel(ctx, t), count }))]
 }
 
+/** The types a level can hold: those its ways name, or every type of the
+ *  metamodel when a way takes any element. */
+export function levelTypes(level: ChainLevel | undefined, ctx: PipelineContext): string[] {
+  const all = Object.keys(ctx.metamodel?.nodeTypes ?? {})
+  if (!level || level.ways.some((w) => !w.types?.length)) return all
+  return [...new Set(level.ways.flatMap((w) => w.types ?? []))]
+}
+
+/** The ways the metamodel allows from elements of `aboveTypes`: along each
+ *  relation type that names its pairs (either way), and as children, each
+ *  to the types at the other end. */
+function metamodelWays(aboveTypes: string[], ctx: PipelineContext): Array<{ via: ChainVia; type: string }> {
+  const out: Array<{ via: ChainVia; type: string }> = []
+  const above = new Set(aboveTypes)
+  for (const rt of Object.values(ctx.metamodel?.relationTypes ?? {})) {
+    for (const pair of rt.allowedPairs) {
+      if (above.has(pair.from)) out.push({ via: { relationType: rt.id, direction: 'out' }, type: pair.to })
+      if (above.has(pair.to)) out.push({ via: { relationType: rt.id, direction: 'in' }, type: pair.from })
+    }
+  }
+  for (const [t, def] of Object.entries(ctx.metamodel?.nodeTypes ?? {})) {
+    if ((def.allowedParents ?? []).some((p) => above.has(p))) out.push({ via: { contains: true }, type: t })
+  }
+  return out
+}
+
 /** Ways to a level under `above`: every relation (either way) and
  *  containment leading from them to elements of `source`, split by the type
  *  found at the other end, most elements first, besides those `taken`. */
-export function suggestNextWays(above: C4Node[], source: C4Node[], ctx: PipelineContext, taken: ChainWay[] = []): WaySuggestion[] {
+export function suggestNextWays(above: C4Node[], source: C4Node[], ctx: PipelineContext, taken: ChainWay[] = [], aboveTypes: string[] = []): WaySuggestion[] {
   const inSource = new Set(source.map((n) => n.id))
   const index = relationIndex(ctx)
   const found = new Map<string, { via: ChainVia; type: string; ids: Set<string> }>()
@@ -652,25 +883,37 @@ export function suggestNextWays(above: C4Node[], source: C4Node[], ctx: Pipeline
       anyRelation.push({ way, label: wayLabel(way, ctx), count: ids.size })
     }
   }
-  return [...[...byType, ...any].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)), ...anyRelation]
+  // Then what the metamodel allows from the level above that no element
+  // takes yet: a chain can be built before its elements.
+  const fromMetamodel: WaySuggestion[] = []
+  for (const { via, type } of metamodelWays(aboveTypes, ctx)) {
+    const key = `${JSON.stringify(via)}|${type}`
+    if (found.has(key) || held.has(key) || held.has(`${JSON.stringify(via)}|*`)) continue
+    found.set(key, { via, type, ids: new Set() })
+    const way: ChainWay = { via, types: [type] }
+    fromMetamodel.push({ way, label: wayLabel(way, ctx), count: 0 })
+  }
+  fromMetamodel.sort((a, b) => a.label.localeCompare(b.label))
+  return [...[...byType, ...any].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)), ...anyRelation, ...fromMetamodel]
 }
 
 // ─── Choices for editing a step ─────────────────────────────────────────────
 
 export interface Choice<T> { value: T; label: string; count: number }
 
-/** The types among `nodes`, most first. */
-export function typeChoices(nodes: C4Node[], ctx: PipelineContext): Choice<string>[] {
+/** The types among `nodes`, most first; then `more` (the metamodel's), with none. */
+export function typeChoices(nodes: C4Node[], ctx: PipelineContext, more: string[] = []): Choice<string>[] {
   const counts = new Map<string, number>()
   for (const n of nodes) counts.set(n.type, (counts.get(n.type) ?? 0) + 1)
+  for (const t of more) if (!counts.has(t)) counts.set(t, 0)
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t, count]) => ({ value: t, label: typeLabel(ctx, t), count }))
 }
 
-/** The properties `nodes`' types have (and their id), each with the values
- *  found on them, or the options an enum offers. */
-export function propertyChoices(nodes: C4Node[], ctx: PipelineContext): Array<{ key: string; label: string; values: Choice<string>[] }> {
+/** The properties `nodes`' types and `types` have (and their id), each with
+ *  the values found on them, or the options an enum offers. */
+export function propertyChoices(nodes: C4Node[], ctx: PipelineContext, types: string[] = []): Array<{ key: string; label: string; values: Choice<string>[] }> {
   const defs = new Map<string, PropertyDef>()
-  for (const n of nodes) for (const p of ctx.metamodel.nodeTypes[n.type]?.properties ?? []) if (!defs.has(p.key)) defs.set(p.key, p)
+  for (const t of [...new Set([...nodes.map((n) => n.type), ...types])]) for (const p of ctx.metamodel.nodeTypes[t]?.properties ?? []) if (!defs.has(p.key)) defs.set(p.key, p)
   const keys = [...defs.keys(), 'id']
   return keys.map((key) => {
     const counts = new Map<string, number>()
@@ -714,7 +957,7 @@ export function placeChoices(nodes: C4Node[], ctx: PipelineContext): Choice<stri
 
 /** The ways a level under `above` can hang there: each relation either way,
  *  any relation, and containment — each with the types it reaches. */
-export function viaChoices(above: C4Node[], source: C4Node[], ctx: PipelineContext): Array<{ via: ChainVia; label: string; types: Choice<string>[] }> {
+export function viaChoices(above: C4Node[], source: C4Node[], ctx: PipelineContext, aboveTypes: string[] = []): Array<{ via: ChainVia; label: string; types: Choice<string>[] }> {
   const inSource = new Set(source.map((n) => n.id))
   const index = relationIndex(ctx)
   const vias = new Map<string, ChainVia>()
@@ -722,10 +965,18 @@ export function viaChoices(above: C4Node[], source: C4Node[], ctx: PipelineConte
     for (const r of index.out.get(a.id) ?? []) if (r.relationType) vias.set(`out:${r.relationType}`, { relationType: r.relationType, direction: 'out' })
     for (const r of index.in.get(a.id) ?? []) if (r.relationType) vias.set(`in:${r.relationType}`, { relationType: r.relationType, direction: 'in' })
   }
+  // And the relations the metamodel allows from the level above, with the types at their other end.
+  const allowed = new Map<string, string[]>()
+  for (const { via, type } of metamodelWays(aboveTypes, ctx)) {
+    const key = 'contains' in via ? 'contains' : 'relationType' in via ? `${via.direction}:${via.relationType}` : 'any'
+    if (key !== 'contains' && !vias.has(key)) vias.set(key, via)
+    allowed.set(key, [...(allowed.get(key) ?? []), type])
+  }
   const list: ChainVia[] = [...vias.values(), { anyRelation: true }, { contains: true }]
   return list.map((via) => {
     const reached = new Map<string, C4Node>()
     for (const a of above) for (const n of followVia(a, via, ctx)) if (inSource.has(n.id)) reached.set(n.id, n)
-    return { via, label: viaLabel(via, ctx), types: typeChoices([...reached.values()], ctx) }
+    const key = 'contains' in via ? 'contains' : 'relationType' in via ? `${via.direction}:${via.relationType}` : 'any'
+    return { via, label: viaLabel(via, ctx), types: typeChoices([...reached.values()], ctx, allowed.get(key)) }
   }).filter((c, i, all) => c.types.length || i >= all.length - 2)
 }

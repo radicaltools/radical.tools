@@ -107,6 +107,24 @@ test.describe('custom properties of a type', () => {
   })
 })
 
+test('a type\'s summary template, with how it reads, sets the summary the table shows', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-table')
+  const provider = page.locator('tbody tr.tv-row', { hasText: 'Payment Provider' })
+  await expect(provider).toContainText('Card payments')
+  await openEditor(page)
+  const card = page.locator('.mm-card', { has: page.locator('.mm-type-id', { hasText: /^system$/ }) })
+  await card.locator('.mm-card-header').click()
+  const field = card.getByLabel('Summary')
+  // The built-in template shows as the placeholder, the tokens under it.
+  await expect(field).toHaveAttribute('placeholder', /\{description\.sentence\}/)
+  await expect(card.locator('.mm-hint').first()).toContainText('{technology}')
+  await field.fill('{label} — {description}')
+  await expect(card.locator('.mm-summary-preview')).toContainText('—')
+  await closeEditor(page)
+  await expect(provider).toContainText('Payment Provider — Card payments')
+})
+
 test('Reset to C4 preset is refused while the model holds what C4 has no type for', async ({ page, studio }) => {
   // It went through and left the governance elements as unknown types, with
   // nothing in the editor to bring the types back.

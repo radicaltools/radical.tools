@@ -4,7 +4,7 @@ import { viewShowsEveryNode } from '@radical/common/c4'
 import {
   applyFilters, drawsChain, filterLabel, pipelineOf, filterRuns, levelLabel, pipelineSource, runChain, sortLabel, wayLabel,
   suggestFilters, suggestNextWays, suggestSorts, suggestStartWays, type LevelResult, type PipelineContext, type WaySuggestion,
-  placeChoices, propertyChoices, relationChoices, typeChoices, viaChoices, type Choice,
+  placeChoices, propertyChoices, relationChoices, typeChoices, viaChoices, levelTypes, type Choice,
 } from '@radical/common/viewPipeline'
 import { useDiagramStore } from '../store/diagramStore'
 import { useOutsideClick } from '../hooks/useOutsideClick'
@@ -92,9 +92,11 @@ const viaKey = (via: ChainVia | undefined) => JSON.stringify(via ?? null)
 
 /** Edits one filter in place, its fields by kind; each change applies at
  *  once (one undo step), Done closes it. */
-function FilterEditor({ filter, input, ctx, onChange, onDone }: {
+function FilterEditor({ filter, input, types, ctx, onChange, onDone }: {
   filter: ViewFilter
   input: C4Node[]
+  /** The level's types: their properties are offered with no element yet. */
+  types: string[]
   ctx: PipelineContext
   onChange: (f: ViewFilter) => void
   onDone: () => void
@@ -103,10 +105,10 @@ function FilterEditor({ filter, input, ctx, onChange, onDone }: {
   const [text, setText] = useState(filter.kind === 'text' ? filter.text : '')
   let body: React.ReactNode = null
   if (filter.kind === 'type') {
-    body = <ChoiceList label="Types" choices={typeChoices(input, ctx)} picked={filter.types}
+    body = <ChoiceList label="Types" choices={typeChoices(input, ctx, types)} picked={filter.types}
       onChange={(types) => types.length && onChange({ kind: 'type', types, ...keep })} />
   } else if (filter.kind === 'property') {
-    const props = propertyChoices(input, ctx)
+    const props = propertyChoices(input, ctx, types)
     const prop = props.find((p) => p.key === filter.key)
     body = (
       <>
@@ -253,7 +255,8 @@ function LevelCard({ level, index, result, ctx, readOnly, suggestWays, wayChoice
     <WayEditor way={level.ways[j]} choices={choices} ctx={ctx} onChange={(w) => setWay(j, w)} onDone={() => setEditing(null)} />
   )
 
-  const andOptions = useMemo(() => (menu ? suggestFilters(shown, ctx) : []), [menu, shown, ctx])
+  const typesHere = useMemo(() => levelTypes(level, ctx), [level, ctx])
+  const andOptions = useMemo(() => (menu ? suggestFilters(shown, ctx, typesHere) : []), [menu, shown, ctx, typesHere])
   // Alternatives to the level's last run of filters: from what goes into
   // it, those it does not hold yet; picked, they join it with or.
   const orOptions = useMemo(() => {
@@ -261,8 +264,8 @@ function LevelCard({ level, index, result, ctx, readOnly, suggestWays, wayChoice
     const run = runs[runs.length - 1]
     const before = run[0] === 0 ? input : applyFilters(input, filters.slice(0, run[0]), ctx).nodes
     const held = new Set(run.map((i) => filterLabel(filters[i], ctx)))
-    return suggestFilters(before, ctx).filter((o) => !held.has(o.label))
-  }, [menu, filters, runs, input, ctx])
+    return suggestFilters(before, ctx, typesHere).filter((o) => !held.has(o.label))
+  }, [menu, filters, runs, input, ctx, typesHere])
 
   const setFilters = (next: ViewFilter[]) => onChange({ ...level, filters: next })
   const addFilter = (f: ViewFilter) => { setFilters([...filters, f]); setMenu(null) }
@@ -331,7 +334,7 @@ function LevelCard({ level, index, result, ctx, readOnly, suggestWays, wayChoice
               )}
             </div>
             {editingFilter === i && (
-              <FilterEditor filter={f} input={input} ctx={ctx} onDone={() => setEditing(null)}
+              <FilterEditor filter={f} input={input} types={typesHere} ctx={ctx} onDone={() => setEditing(null)}
                 onChange={(g) => setFilters(filters.map((h, j) => (j === i ? g : h)))} />
             )}
           </React.Fragment>
@@ -415,14 +418,14 @@ export function ViewPipelinePanel({ view, readOnly }: { view: DiagramView; readO
   const [menu, setMenu, menuRef] = useMenu<'level' | 'sort'>()
   const lastShown = levels.length ? result.levels[levels.length - 1]?.shown ?? [] : []
   const levelOptions = useMemo(
-    () => (menu !== 'level' ? [] : levels.length ? suggestNextWays(lastShown, source, ctx) : suggestStartWays(source, ctx)),
-    [menu, levels.length, lastShown, source, ctx],
+    () => (menu !== 'level' ? [] : levels.length ? suggestNextWays(lastShown, source, ctx, [], levelTypes(levels[levels.length - 1], ctx)) : suggestStartWays(source, ctx)),
+    [menu, levels, lastShown, source, ctx],
   )
   // The ways level `i` could also take: from what the level above keeps.
   const suggestWaysFor = (i: number) => () =>
-    i === 0 ? suggestStartWays(source, ctx, levels[0].ways) : suggestNextWays(result.levels[i - 1]?.shown ?? [], source, ctx, levels[i].ways)
+    i === 0 ? suggestStartWays(source, ctx, levels[0].ways) : suggestNextWays(result.levels[i - 1]?.shown ?? [], source, ctx, levels[i].ways, levelTypes(levels[i - 1], ctx))
   const wayChoicesFor = (i: number) => (): WayChoices =>
-    i === 0 ? { first: true, types: typeChoices(source, ctx) } : { first: false, vias: viaChoices(result.levels[i - 1]?.shown ?? [], source, ctx) }
+    i === 0 ? { first: true, types: typeChoices(source, ctx, Object.keys(ctx.metamodel?.nodeTypes ?? {})) } : { first: false, vias: viaChoices(result.levels[i - 1]?.shown ?? [], source, ctx, levelTypes(levels[i - 1], ctx)) }
   const sortOptions = useMemo(() => (menu === 'sort' ? suggestSorts(result.nodes, ctx) : []), [menu, result, ctx])
 
   const addLevel = (way: ChainWay) => { update({ levels: [...levels, { ways: [way] }] }); setMenu(null) }

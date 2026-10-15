@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { builtInC4Metamodel, propertyKeyProblem, validateModel } from '@radical/common/metamodel'
 import { forkPresetMetamodel } from '@radical/common/model'
+import { DEFAULT_SUMMARIES, nodeSummary, summaryTokens } from '@radical/common/nodeSummary'
 import type {
   NodeTypeDef,
   RelationTypeDef,
@@ -221,6 +222,35 @@ function useCardFocus(focusToken: number | undefined, setOpen: (v: boolean) => v
 
 // ── Node-type card ─────────────────────────────────────────────────────────
 
+/** The type's summary template (nodeSummary.ts), with the tokens it can use
+ *  and how it reads on an element of the type, when the model has one. */
+function SummaryField({ def, onChange }: { def: NodeTypeDef; onChange: (patch: Partial<NodeTypeDef>) => void }): React.ReactElement {
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  const nodes = useDiagramStore((s) => s.c4Nodes)
+  const relations = useDiagramStore((s) => s.c4Relations)
+  const sample = useMemo(() => Object.values(nodes).find((n) => n.type === def.id), [nodes, def.id])
+  const withDef = useMemo(() => ({ ...metamodel, nodeTypes: { ...metamodel.nodeTypes, [def.id]: def } }), [metamodel, def])
+  const preview = sample ? nodeSummary(sample, nodes, relations, withDef) : ''
+  return (
+    <div className="mm-row">
+      <label className="mm-field">
+        <span>Summary in tables</span>
+        <input
+          className="mm-input"
+          aria-label="Summary"
+          value={def.summary ?? ''}
+          placeholder={DEFAULT_SUMMARIES[def.id] ?? '{description.sentence}'}
+          onChange={(e) => onChange({ summary: e.target.value || undefined })}
+        />
+        <small className="mm-hint">
+          {summaryTokens(def.id, withDef).map((t) => `{${t}}`).join(' ')} · .sentence first sentence · .cap capital · [ ] left out when empty
+        </small>
+        {sample && <small className="mm-hint mm-summary-preview" title={preview}>{sample.label}: {preview || '—'}</small>}
+      </label>
+    </div>
+  )
+}
+
 function NodeTypeCard({
   def,
   allTypes,
@@ -394,16 +424,7 @@ function NodeTypeCard({
               })}
           </div>
 
-          <div className="mm-row">
-            <label className="mm-checkbox" title="Show this type as its own tab in Table View, with a column per property. Otherwise it only appears in the generic All Nodes tab.">
-              <input
-                type="checkbox"
-                checked={def.tableTab ?? false}
-                onChange={(e) => onChange({ tableTab: e.target.checked || undefined })}
-              />
-              Own tab in Table View
-            </label>
-          </div>
+          <SummaryField def={def} onChange={onChange} />
 
           <div className="mm-section-label">Custom properties</div>
           <PropertyEditor

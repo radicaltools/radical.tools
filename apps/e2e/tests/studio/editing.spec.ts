@@ -40,6 +40,32 @@ test('the palette sits above the canvas, not the table, folds away and stays fol
   await expect(page.locator('.element-palette')).toHaveCount(0)
 })
 
+test('the table adds an element at the top and inside a row', async ({ page, studio }) => {
+  await studio.open('v-table')
+  // Many types may go at the top: the + row at the end offers them.
+  await page.getByRole('button', { name: 'Add at the top' }).click()
+  await page.locator('.wiki-menu').getByRole('menuitem', { name: /Software System/ }).click()
+  await page.locator('.tv-cell-input').fill('Warehouse')
+  await page.keyboard.press('Enter')
+  const warehouse = page.locator('.tv-row', { hasText: 'Warehouse' })
+  await expect(warehouse).toBeVisible()
+  // Inside it go the types a system may hold, from the + row under it.
+  await page.getByRole('button', { name: 'Add under Warehouse' }).click()
+  await page.locator('.wiki-menu').getByRole('menuitem', { name: /^Container/ }).click()
+  await page.locator('.tv-cell-input').fill('Stock API')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.tv-row.depth-1', { hasText: 'Stock API' })).toBeVisible()
+  await expect.poll(async () => {
+    const doc = await studio.storedDoc()
+    const warehouseId = doc.nodes.find((n) => n.label === 'Warehouse')?.id
+    return !!warehouseId && doc.nodes.find((n) => n.label === 'Stock API')?.parentId === warehouseId
+  }).toBe(true)
+  // Viewer adds nothing.
+  await studio.open('v-table', 'viewer')
+  await expect(page.locator('.tv-wrap')).toBeVisible()
+  await expect(page.locator('.tv-add-row')).toHaveCount(0)
+})
+
 test('fit, zoom and Smart Layout sit on the canvas, not in the toolbar', async ({ page }) => {
   const controls = page.locator('.canvas-column .canvas-controls')
   for (const name of [/Fit All/, /Zoom out/, /Zoom in/, /Smart Layout/]) {

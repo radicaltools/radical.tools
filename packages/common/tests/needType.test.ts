@@ -9,7 +9,6 @@ describe('need node type (governance preset)', () => {
     const need = mm.nodeTypes.need
     expect(need).toBeDefined()
     expect(need.properties?.find((p) => p.key === 'description')?.type).toBe('textarea')
-    expect(need.tableTab).toBe(true)
     // Being in the model means it is accepted — no workflow status.
     expect(need.properties?.some((p) => p.key === 'status')).toBe(false)
   })
