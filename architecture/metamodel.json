@@ -58,7 +58,6 @@
           "type": "textarea"
         }
       ],
-      "tableTab": true,
       "width": 180,
       "wizard": {
         "prefill": {
@@ -172,7 +171,6 @@
           "type": "textarea"
         }
       ],
-      "tableTab": true,
       "width": 520
     },
     "component": {
@@ -354,7 +352,6 @@
           "type": "textarea"
         }
       ],
-      "tableTab": true,
       "width": 170
     },
     "event": {
@@ -396,7 +393,6 @@
           "type": "textarea"
         }
       ],
-      "tableTab": true,
       "width": 170
     },
     "fitness-fn": {
@@ -445,7 +441,7 @@
           "type": "textarea"
         }
       ],
-      "tableTab": true,
+      "summary": "[Checks {out:implements.bold} · ]{threshold|description.sentence}",
       "width": 180,
       "wizard": {
         "steps": [
@@ -551,7 +547,6 @@
           "type": "text"
         }
       ],
-      "tableTab": true,
       "width": 220,
       "wizard": {
         "steps": [
@@ -635,7 +630,6 @@
           "type": "text"
         }
       ],
-      "tableTab": true,
       "width": 200,
       "wizard": {
         "steps": [
@@ -874,7 +868,6 @@
           "type": "textarea"
         }
       ],
-      "tableTab": true,
       "width": 200,
       "wizard": {
         "steps": [
@@ -983,7 +976,6 @@
           "type": "textarea"
         }
       ],
-      "tableTab": true,
       "width": 200,
       "wizard": {
         "steps": [
@@ -1100,7 +1092,6 @@
           "type": "textarea"
         }
       ],
-      "tableTab": true,
       "width": 320
     },
     "state-machine": {
@@ -1127,7 +1118,6 @@
           "type": "textarea"
         }
       ],
-      "tableTab": true,
       "width": 560
     },
     "system": {

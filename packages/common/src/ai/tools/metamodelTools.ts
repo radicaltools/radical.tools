@@ -48,7 +48,7 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           allowedParents: { type: 'array', items: { type: 'string' }, description: 'Node types it may sit inside. [] = none.' },
           allowedAtRoot: { type: 'boolean' },
           maxCount: { type: ['number', 'null'], description: 'Maximum number of nodes of this type; null removes the limit.' },
-          summary: { type: 'string', description: 'How the table sums up an element of this type in one line, from data it has: a template of tokens — {key} a property (or label, description, technology), {ears} a requirement\'s EARS sentence, {key.sentence} its first sentence, {key.cap} capitalised; a part in [ ] is left out when a token in it is empty. E.g. "[{status.cap}: ]{decision.sentence}". "" restores the default.' },
+          summary: { type: 'string', description: 'How the table sums up an element of this type in one line, from data it has: a template of tokens — {key} a property (or label, description, technology), {ears} a requirement\'s EARS sentence, {obligation} who shall do what and {condition} when it holds, {transitions} where a state or event leads, {out:type}/{in:type} the elements linked by relations of a type, {key.sentence} its first sentence, {key.phrase} its first phrase, {key.cap} capitalised, {a|b} the first with a value; a part in [ ] is left out when a token in it is empty; the template may use inline Markdown. E.g. "[{status.cap}: ]{decision.sentence}". "" restores the default.' },
           properties: PROPERTIES_SCHEMA,
         },
         required: ['id'],

@@ -6,6 +6,7 @@ import { useNodeContent } from '../../store/nodeSelectors'
 import { composeEarsSentence, machineEntity, requirementStatePhrase } from '@radical/common/metamodel'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { wireframeDataUri } from '@radical/common/wireframe'
+import { markdownToPlain } from '@radical/common/markdown'
 
 // ─── Diff highlight overlay ────────────────────────────────────────────────
 // ─── Rendering under live physics ───────────────────────────────────────────
@@ -982,7 +983,10 @@ export const RequirementNode = memo(({ data, selected }: NodeProps<C4NodeRFData>
   })
   // A string, so the card re-renders only when the phrase changes.
   const statePhrase = useDiagramStore((s) => node ? requirementStatePhrase(node, s.c4Nodes, s.c4Relations) : '')
-  const { sentence, complete } = composeEarsSentence((node ?? {}) as unknown as Record<string, unknown>, subject, statePhrase)
+  const ears = composeEarsSentence((node ?? {}) as unknown as Record<string, unknown>, subject, statePhrase)
+  // The action is Markdown; a card shows plain text.
+  const sentence = markdownToPlain(ears.sentence)
+  const complete = ears.complete
 
   return (
     <div

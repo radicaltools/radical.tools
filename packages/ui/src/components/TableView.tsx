@@ -5,7 +5,8 @@ import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common
 import { addChoices, pipelineActive, pipelineOf, structureRows, viewShownNodes, type AddChoice, type ChainRow, type PipelineContext } from '@radical/common/viewPipeline'
 import { WikiMenu, type WikiMenuPage } from './WikiMenu'
 import { wizardFor } from '@radical/common/metamodel'
-import { nodeSummary } from '@radical/common/nodeSummary'
+import { nodeSummary, nodeSummaryDetail } from '@radical/common/nodeSummary'
+import { MarkdownText } from './MarkdownText'
 
 // ─── Table view ──────────────────────────────────────────────────────────────
 // Shows what the view's steps give (viewPipeline.ts, set in the Nodes panel)
@@ -13,7 +14,7 @@ import { nodeSummary } from '@radical/common/nodeSummary'
 // scenarios under those — or, without a chain, the elements' containment.
 // Each row is an element: its name, edited in place, with a guide line per
 // level and its type beside it (a row with rows under it folds them away),
-// and its summary: one line its type's template makes of the data it has
+// and its summary: one line of inline Markdown its type's template makes of the data it has
 // (nodeSummary.ts, set per type in the metamodel). Its fields are edited in the properties panel or its wizard, which the
 // buttons at the end of the row open. It has no palette: elements are added
 // where they will show, by a + row after the rows under each element (on
@@ -178,8 +179,8 @@ export function TableView(): React.ReactElement {
   function renderSummary(node: C4Node): React.ReactNode {
     const summary = nodeSummary(node, nodes, relations, metamodel)
     return (
-      <span className="tv-cell-value tv-cell-summary" title={summary}>
-        {summary ? <span className="tv-summary-text">{summary}</span> : <span className="tv-cell-placeholder">—</span>}
+      <span className="tv-cell-value tv-cell-summary" title={nodeSummaryDetail(node, nodes, relations, metamodel)}>
+        {summary ? <MarkdownText inline text={summary} className="tv-summary-text" /> : <span className="tv-cell-placeholder">—</span>}
       </span>
     )
   }

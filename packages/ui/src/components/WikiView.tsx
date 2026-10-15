@@ -30,6 +30,7 @@ import { fieldTitle, wikiSearchHit, type WikiSearchHit } from './wikiSearch'
 import { elementFromLine, writtenLines } from './wikiWrite'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { MockupWireframe } from './MockupWireframe'
+import { MarkdownText } from './MarkdownText'
 import { RefPicker } from './RefPicker'
 import { wireframeDataUri } from '@radical/common/wireframe'
 import {
@@ -1008,7 +1009,7 @@ function capitalise(text: string): string {
 }
 
 // What a page says about an element it only mentions: the start of its
-// description, or the sentence of a requirement that has none.
+// description, or the sentence of a requirement that has none (both Markdown).
 function partSummary(node: C4Node, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): string {
   const text = firstParagraph(node.description)
   if (text || node.type !== 'requirement') return text
@@ -1095,7 +1096,7 @@ function WikiPartList({ parts, paragraphs = false, nodes, relations, onNavigate 
         return (
           <p className="wiki-text wiki-part" key={n.id}>
             {ref(n)}
-            {summary && <> — {summary}</>}
+            {summary && <> — <MarkdownText inline text={summary} /></>}
             {wireframe && <img className="wiki-card-thumb" src={wireframeDataUri(wireframe)} alt="" />}
           </p>
         )
@@ -3113,14 +3114,19 @@ function InlineText({
   }
 
   const empty = value.trim() === ''
+  const viewClass = `wiki-inline-view ${className} ${empty ? 'empty' : ''} ${readOnly ? 'readonly' : ''}`
+  const edit = () => !readOnly && setEditing(true)
+  // A multiline field is a long field, so Markdown (markdown.ts): read
+  // rendered, edited as written.
+  if (multiline && !empty) {
+    return (
+      <div className={`${viewClass} wiki-md`} onClick={edit} title={readOnly ? undefined : 'Click to edit'}>
+        <MarkdownText text={value} />
+      </div>
+    )
+  }
   return (
-    <span
-      className={`wiki-inline-view ${className} ${empty ? 'empty' : ''} ${
-        readOnly ? 'readonly' : ''
-      }`}
-      onClick={() => !readOnly && setEditing(true)}
-      title={readOnly ? undefined : 'Click to edit'}
-    >
+    <span className={viewClass} onClick={edit} title={readOnly ? undefined : 'Click to edit'}>
       {empty ? placeholder : value}
     </span>
   )

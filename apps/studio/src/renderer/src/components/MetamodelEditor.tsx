@@ -4,6 +4,8 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { builtInC4Metamodel, propertyKeyProblem, validateModel } from '@radical/common/metamodel'
 import { forkPresetMetamodel } from '@radical/common/model'
 import { DEFAULT_SUMMARIES, nodeSummary, summaryTokens } from '@radical/common/nodeSummary'
+import { markdownToPlain } from '@radical/common/markdown'
+import { MarkdownText } from '@radical/ui/components/MarkdownText'
 import type {
   NodeTypeDef,
   RelationTypeDef,
@@ -243,9 +245,14 @@ function SummaryField({ def, onChange }: { def: NodeTypeDef; onChange: (patch: P
           onChange={(e) => onChange({ summary: e.target.value || undefined })}
         />
         <small className="mm-hint">
-          {summaryTokens(def.id, withDef).map((t) => `{${t}}`).join(' ')} · .sentence first sentence · .cap capital · [ ] left out when empty
+          {summaryTokens(def.id, withDef).map((t) => `{${t}}`).join(' ')}
+          {' {out:type} {in:type} linked elements · .sentence first sentence · .phrase first phrase · .cap capital · {a|b} first with a value · [ ] left out when empty · Markdown: **bold** _italic_ `code`'}
         </small>
-        {sample && <small className="mm-hint mm-summary-preview" title={preview}>{sample.label}: {preview || '—'}</small>}
+        {sample && (
+          <small className="mm-hint mm-summary-preview" title={markdownToPlain(preview)}>
+            {sample.label}: {preview ? <MarkdownText inline text={preview} /> : '—'}
+          </small>
+        )}
       </label>
     </div>
   )
