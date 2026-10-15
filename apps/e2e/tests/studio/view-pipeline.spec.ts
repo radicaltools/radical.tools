@@ -35,6 +35,10 @@ test('needs → requirements → scenarios, built in the Filter panel, shown as 
   await expect(page.locator('.tv-chain-row.depth-0')).toHaveCount(3)
   await expect(row(1, 'Four-eyes approval')).toBeVisible()
   await expect(row(2, 'Same signatory cannot approve twice')).toBeVisible()
+  // Its card counts what the chain shows, not the whole model.
+  const card = page.locator('.lp-view-card', { hasText: 'Requirements Register' }).locator('.lp-card-meta')
+  await expect(card).toContainText(/\d+ nodes/)
+  await expect(card).not.toContainText('All nodes')
   // Structure on the right shows the same tree; a click opens the element's properties.
   await page.locator('.structure-tree .tree-node', { hasText: 'Same signatory cannot approve twice' }).click()
   await expect(page.locator('.right-panel .props-type-badge')).toContainText(/scenario/i)
