@@ -4,7 +4,7 @@ import { builtInGovernanceMetamodel } from '../src/metamodel/presets/governance'
 import {
   applyFilters, chainDrawn, filterLabel, levelLabel, runChain, runPipeline, sortNodes, suggestFilters,
   suggestNextWays, suggestStartWays, viewShownNodes, readPipeline,
-  typeChoices, propertyChoices, relationChoices, placeChoices, viaChoices, type ChainRow, type PipelineContext,
+  typeChoices, propertyChoices, relationChoices, placeChoices, viaChoices, addChoices, levelTypes, type ChainRow, type PipelineContext,
 } from '../src/viewPipeline'
 import { setViewPipeline, type ModelState } from '../src/model'
 import { serializeToMdFolder, deserializeFromMdFolder } from '../src/formats/mdFolder'
@@ -248,5 +248,97 @@ describe('view pipeline: any relation, and choices for editing', () => {
     const vias = viaChoices([nodes['n-pay']], all, ctx)
     expect(vias.map((v) => v.label)).toEqual([expect.any(String), 'Any relation', 'Contains'])
     expect(vias[0].types.map((t) => t.value)).toEqual(['requirement'])
+  })
+})
+
+describe('view pipeline: adding where the rows are', () => {
+  const view = (pipeline?: ViewPipeline): DiagramView => ({ id: 'v', name: 'v', kind: 'table', nodeIds: [], positions: {}, pipeline }) as DiagramView
+  const brief = (choices: ReturnType<typeof addChoices>) =>
+    choices.map((c) => [c.type, c.parentId ?? '', c.link ? `${c.link.relationType} ${c.link.direction} ${c.link.otherId}` : ''].join(' | '))
+
+  it('under a need, a requirement refined from it, beside it in its domain', () => {
+    expect(brief(addChoices(view(traceability), ctx, { node: nodes['n-pay'], depth: 0 })))
+      .toEqual(['requirement | Billing | derives out n-pay'])
+    expect(brief(addChoices(view(traceability), ctx, { node: nodes['r3'], depth: 1 })))
+      .toEqual(['scenario | Ledger | verifies out r3'])
+  })
+
+  it('nothing under the last level', () => {
+    expect(addChoices(view(traceability), ctx, { node: nodes['s1'], depth: 2 })).toEqual([])
+  })
+
+  it('at the top, the first level\'s types, where most of them are', () => {
+    // The two needs are in two domains: the first of them wins the tie.
+    expect(addChoices(view(traceability), ctx).map((c) => c.type)).toEqual(['need'])
+    const onlyBilling = { ...ctx, nodes: { ...nodes, 'n-audit': { ...nodes['n-audit'], parentId: 'Billing' } } }
+    expect(brief(addChoices(view(traceability), onlyBilling))).toEqual(['need | Billing | '])
+  })
+
+  it('without a chain, the types a row may hold, or the top of the model may', () => {
+    const inside = addChoices(view(), ctx, { node: nodes['Billing'], depth: 0 })
+    expect(inside.map((c) => c.type)).toContain('requirement')
+    expect(inside.map((c) => c.type)).not.toContain('container')
+    expect(inside.every((c) => c.parentId === 'Billing' && !c.link)).toBe(true)
+    const top = addChoices(view(), ctx).map((c) => c.type)
+    expect(top).toContain('system')
+    expect(top).not.toContain('component')
+  })
+
+  it('meets the level\'s filters: the value named, the place named; a type they leave out is not offered', () => {
+    const filtered: ViewPipeline = { levels: [
+      { ways: [{ types: ['need'] }] },
+      { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement', 'need'] }], filters: [
+        { kind: 'type', types: ['requirement'] },
+        { kind: 'property', key: 'ears_type', op: 'is', values: ['event-driven', 'complex'] },
+        { kind: 'within', nodeId: 'Ledger' },
+      ] },
+    ] }
+    const [choice, ...rest] = addChoices(view(filtered), ctx, { node: nodes['n-pay'], depth: 0 })
+    expect(rest).toEqual([])
+    expect(choice).toMatchObject({ type: 'requirement', parentId: 'Ledger', properties: { ears_type: 'event-driven' }, link: { relationType: 'derives', direction: 'out', otherId: 'n-pay' } })
+    expect(choice.hidden).toBeUndefined()
+  })
+
+  it('a filter it cannot meet still offers the type, hidden', () => {
+    const texted: ViewPipeline = { levels: [{ ways: [{ types: ['need'] }], filters: [{ kind: 'text', text: 'audit' }] }] }
+    expect(addChoices(view(texted), ctx)[0]).toMatchObject({ type: 'need', hidden: true })
+    // Switched off, it asks nothing.
+    const off: ViewPipeline = { levels: [{ ways: [{ types: ['need'] }], filters: [{ kind: 'text', text: 'audit', off: true }] }] }
+    expect(addChoices(view(off), ctx)[0].hidden).toBeUndefined()
+  })
+
+  it('a level along containment adds a child', () => {
+    const domains: ViewPipeline = { levels: [{ ways: [{ types: ['domain'] }] }, { ways: [{ via: { contains: true }, types: ['need'] }] }] }
+    expect(brief(addChoices(view(domains), ctx, { node: nodes['Ledger'], depth: 0 }))).toEqual(['need | Ledger | '])
+  })
+})
+
+describe('view pipeline: a chain built before its elements', () => {
+  // Only the two domains: no need, requirement or scenario yet.
+  const bare: PipelineContext = { ...ctx, nodes: { Billing: nodes['Billing'], Ledger: nodes['Ledger'] }, relations: [] }
+  const source = Object.values(bare.nodes)
+
+  it('starts with a type of the metamodel that has no element, after those that have', () => {
+    const ways = suggestStartWays(source, bare)
+    expect(ways.slice(0, 2).map((w) => [w.label, w.count])).toEqual([['Every element', 2], ['Domain', 2]])
+    expect(ways.find((w) => w.label === 'Need')?.count).toBe(0)
+  })
+
+  it('offers the relations the metamodel allows from the level above', () => {
+    const labels = suggestNextWays([], source, bare, [], ['need']).map((w) => `${w.label} ${w.count}`)
+    expect(labels).toContain('Refined into → Requirement 0')
+    expect(suggestNextWays([], source, bare, [], ['requirement']).map((w) => w.label)).toContain('Verified by → Scenario')
+    // What a level already takes is not offered again.
+    const taken = [{ via: { relationType: 'derives', direction: 'in' as const }, types: ['requirement'] }]
+    expect(suggestNextWays([], source, bare, taken, ['need']).map((w) => w.label)).not.toContain('Refined into → Requirement')
+    const via = viaChoices([], source, bare, ['need']).find((c) => c.label === 'Refined into')
+    expect(via?.types.map((t) => t.value)).toContain('requirement')
+  })
+
+  it('filters a level by the values its types can have', () => {
+    const level = { ways: [{ via: { relationType: 'derives', direction: 'in' as const }, types: ['requirement'] }] }
+    expect(levelTypes(level, bare)).toEqual(['requirement'])
+    expect(suggestFilters([], bare, levelTypes(level, bare)).map((f) => f.label)).toContain('EARS type is event-driven')
+    expect(propertyChoices([], bare, ['requirement']).map((p) => p.key)).toContain('ears_type')
   })
 })

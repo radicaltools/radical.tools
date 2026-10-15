@@ -9,6 +9,6 @@ tests: |
   apps/e2e/tests/studio/views.spec.ts › bookstore views › a name is renamed in place in the table
   packages/common/tests/nodeSummary.test.ts › element summary › says what each type means by it
   packages/common/tests/nodeSummary.test.ts › element summary › falls back to the description's first sentence, in one line
-then: "6 rows in the containment tree, Bookstore's three containers one level in, no tabs, Payment Provider's summary reading 'Card payments'; the new name is saved; each summary says in one line what its type means by it, a need the first sentence of its brief"
+then: "6 rows in the containment tree under Name and Summary, Bookstore's three containers one level in, no tabs, a + row under Bookstore and at the top, Payment Provider's summary reading 'Card payments'; its properties button opens its properties in the right panel and it has no wizard button; the new name is saved; each built-in summary says in one line what its type means by it, a need the first sentence of its brief"
 when: "the user opens it and renames Payment Provider in its name cell; and summaries are taken of a requirement, a scenario, an ADR, a fitness function, a mockup, a container and a need"
 ---

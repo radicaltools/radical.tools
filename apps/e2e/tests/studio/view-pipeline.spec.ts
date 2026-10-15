@@ -1,4 +1,4 @@
-import { test, expect } from '../../support/fixtures'
+import { test, expect, fixture } from '../../support/fixtures'
 import type { Page } from '@playwright/test'
 
 /** Opens view `name` and its properties, where its Filter is. */
@@ -71,6 +71,86 @@ test('needs → requirements → scenarios, built in the Filter panel, shown as 
   await expect(steps.locator('.rp-level')).toHaveCount(0)
   // Back to the containment tree: the requirement is no longer under a need.
   await expect(row(1, 'Four-eyes approval')).toHaveCount(0)
+})
+
+test('the table adds an element under a row, on the next level of the chain as its filters ask, and one at the top', async ({ page, studio }) => {
+  await studio.openSample('canvas')
+  await openFilter(page, 'Requirements Register')
+  const steps = page.locator('.rp-pipeline')
+  await steps.getByRole('button', { name: '+ Start with' }).click()
+  await page.getByRole('menuitem', { name: /^Need/ }).click()
+  await steps.getByRole('button', { name: '+ Level under' }).click()
+  await page.getByRole('menuitem', { name: /Refined into → Requirement/ }).click()
+  // Only event-driven requirements.
+  await steps.locator('.rp-level').nth(1).getByRole('button', { name: /Add a filter/ }).click()
+  await page.getByRole('menuitem', { name: /^EARS type is event-driven/ }).click()
+  const row = (depth: number, name: string) => page.locator(`.tv-chain-row.depth-${depth}`, { hasText: name })
+
+  // The + row after a need's requirements: one refined from it, event-driven
+  // as the filter asks, straight into its wizard (the only choice).
+  const addUnder = page.getByRole('button', { name: 'Add under Corporate treasurer feedback' })
+  await expect(addUnder).toContainText('Requirement')
+  await expect(addUnder).toContainText('refined into')
+  await expect(addUnder).toContainText('EARS type: event-driven')
+  await addUnder.click()
+  const wizard = page.getByRole('dialog', { name: /New Requirement/ })
+  await wizard.getByLabel('Name').fill('Export the audit trail')
+  await page.keyboard.press('ControlOrMeta+Enter')
+  await expect(wizard).toHaveCount(0)
+  await expect(row(1, 'Export the audit trail')).toBeVisible()
+  await expect.poll(async () => {
+    const doc = await studio.storedDoc(studio.activeDocId())
+    const created = doc.nodes.find((n) => n.label === 'Export the audit trail')
+    const need = doc.nodes.find((n) => n.label === 'Corporate treasurer feedback')
+    return (created as { ears_type?: string } | undefined)?.ears_type === 'event-driven'
+      && doc.relations.some((r) => r.sourceId === created?.id && r.targetId === need?.id && (r as { relationType?: string }).relationType === 'derives')
+  }).toBe(true)
+  // The last level has no + row.
+  await expect(page.getByRole('button', { name: 'Add under Export the audit trail' })).toHaveCount(0)
+
+  // The + row at the end: a need at the top, in its wizard too.
+  await expect(page.getByRole('button', { name: 'Add at the top' })).toContainText('Need')
+  await page.getByRole('button', { name: 'Add at the top' }).click()
+  const needWizard = page.getByRole('dialog', { name: /New Need/ })
+  await needWizard.getByLabel('Name').fill('Faster month-end close')
+  await page.keyboard.press('ControlOrMeta+Enter')
+  await expect(needWizard).toHaveCount(0)
+  await expect(row(0, 'Faster month-end close')).toBeVisible()
+})
+
+test('a chain is built from the metamodel before its elements, and the table then adds them', async ({ page, studio }) => {
+  // The bookstore on the Radical metamodel: no need and no requirement yet.
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-table')
+  await openFilter(page, 'Element Table')
+  const steps = page.locator('.rp-pipeline')
+  await steps.getByRole('button', { name: '+ Start with' }).click()
+  await page.getByRole('menuitem', { name: /^Need/ }).click()
+  await steps.getByRole('button', { name: '+ Level under' }).click()
+  await page.getByRole('menuitem', { name: /Refined into → Requirement/ }).click()
+  await expect(steps.locator('.rp-level')).toHaveCount(2)
+  await expect(page.locator('.tv-chain-row')).toHaveCount(0)
+
+  // A need at the top, then a requirement under it.
+  await page.getByRole('button', { name: 'Add at the top' }).click()
+  const needWizard = page.getByRole('dialog', { name: /New Need/ })
+  await needWizard.getByLabel('Name').fill('Gift cards')
+  await page.keyboard.press('ControlOrMeta+Enter')
+  const need = page.locator('.tv-chain-row.depth-0', { hasText: 'Gift cards' })
+  await expect(need).toBeVisible()
+  await page.getByRole('button', { name: 'Add under Gift cards' }).click()
+  const wizard = page.getByRole('dialog', { name: /New Requirement/ })
+  await wizard.getByLabel('Name').fill('Redeem a gift card')
+  await page.keyboard.press('ControlOrMeta+Enter')
+  await expect(page.locator('.tv-chain-row.depth-1', { hasText: 'Redeem a gift card' })).toBeVisible()
+  // A row opens its element's wizard again.
+  await need.hover()
+  await need.getByRole('button', { name: 'Wizard for Gift cards' }).click()
+  await expect(page.getByRole('dialog', { name: /Gift cards/ })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
 test('a wiki view follows the same chain: needs on the overview, their requirements as chapters', async ({ page, studio }) => {

@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import type { C4Node } from '@radical/common/c4'
-import { NODE_COLORS, NODE_FG, TYPE_LABELS } from '@radical/common/c4'
-import { pipelineActive, pipelineOf, structureRows, type ChainRow, type PipelineContext } from '@radical/common/viewPipeline'
+import type { C4Node, C4ElementType } from '@radical/common/c4'
+import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
+import { addChoices, pipelineActive, pipelineOf, structureRows, viewShownNodes, type AddChoice, type ChainRow, type PipelineContext } from '@radical/common/viewPipeline'
+import { WikiMenu, type WikiMenuPage } from './WikiMenu'
+import { wizardFor } from '@radical/common/metamodel'
 import { nodeSummary } from '@radical/common/nodeSummary'
 
 // ─── Table view ──────────────────────────────────────────────────────────────
@@ -11,19 +13,12 @@ import { nodeSummary } from '@radical/common/nodeSummary'
 // scenarios under those — or, without a chain, the elements' containment.
 // Each row is an element: its name, edited in place, with a guide line per
 // level and its type beside it (a row with rows under it folds them away),
-// and its summary (nodeSummary.ts: a requirement's EARS sentence, a
-// scenario's Given / When / Then, …). It has no palette.
-
-interface ColDef {
-  key: 'label' | 'summary'
-  label: string
-  width: number
-}
-
-const COLS: ColDef[] = [
-  { key: 'label',   label: 'Name',    width: 420 },
-  { key: 'summary', label: 'Summary', width: 420 },
-]
+// and its summary: one line its type's template makes of the data it has
+// (nodeSummary.ts, set per type in the metamodel). Its fields are edited in the properties panel or its wizard, which the
+// buttons at the end of the row open. It has no palette: elements are added
+// where they will show, by a + row after the rows under each element (on
+// the chain's next level, linked the way that level hangs under it) and one
+// at the end of the table for the top level.
 
 interface EditCell {
   rowId: string
@@ -37,12 +32,16 @@ export function TableView(): React.ReactElement {
   const relations        = useDiagramStore((s) => s.c4Relations)
   const updateNode       = useDiagramStore((s) => s.updateNode)
   const selectNode       = useDiagramStore((s) => s.selectNode)
+  const openNodeWizard   = useDiagramStore((s) => s.openNodeWizard)
   const selectedNodeId   = useDiagramStore((s) => s.selectedNodeId)
   const activeView       = useDiagramStore((s) => s.activeViewId ? s.views[s.activeViewId] : undefined)
   const readOnly         = useDiagramStore((s) => s.appMode !== 'designer')
   const metamodel        = useDiagramStore((s) => s.metamodel)
+  const requestCreateNode = useDiagramStore((s) => s.requestCreateNode)
+  const pushNotification = useDiagramStore((s) => s.pushNotification)
 
   const [editCell, setEditCell]   = useState<EditCell | null>(null)
+  const [addMenu, setAddMenu] = useState<{ at: { x: number; y: number }; root: WikiMenuPage } | null>(null)
 
   // The rows: the chain's tree; without a chain, the containment of what
   // the steps give (flat in their order when they set one).
@@ -65,6 +64,95 @@ export function TableView(): React.ReactElement {
     return folded.length ? allRows.filter((row) => !folded.some((p) => row.path.startsWith(p + '/'))) : allRows
   }, [allRows, foldedRows])
 
+  const typeName = (type: string) => metamodel.nodeTypes[type]?.label ?? TYPE_LABELS[type as C4ElementType] ?? type
+
+  // The rows and, where something can be added, a + row where it will show:
+  // after the rows under each element that is not folded, and at the end.
+  type Line = { kind: 'row'; row: ChainRow } | { kind: 'add'; under?: ChainRow; depth: number; choices: AddChoice[] }
+  const lines = useMemo<Line[]>(() => {
+    const out: Line[] = []
+    const stack: ChainRow[] = []
+    const close = (depth: number) => {
+      while (stack.length && stack[stack.length - 1].depth >= depth) {
+        const under = stack.pop()!
+        if (foldedRows.has(under.path)) continue
+        const choices = addChoices(activeView, pipelineCtx, { node: under.node, depth: under.depth })
+        if (choices.length) out.push({ kind: 'add', under, depth: under.depth + 1, choices })
+      }
+    }
+    for (const row of rows) {
+      if (!readOnly) close(row.depth)
+      out.push({ kind: 'row', row })
+      stack.push(row)
+    }
+    if (!readOnly) {
+      close(0)
+      const top = addChoices(activeView, pipelineCtx)
+      if (top.length) out.push({ kind: 'add', depth: 0, choices: top })
+    }
+    return out
+  }, [rows, foldedRows, activeView, pipelineCtx, readOnly])
+
+  // What a choice gets besides its type, in words: where it goes, the values
+  // the filter asks for, and whether the filter will show it.
+  const choiceHint = (c: AddChoice, under?: ChainRow) => [
+    c.parentId && c.parentId !== under?.node.id && c.parentId !== under?.node.parentId ? `in ${nodes[c.parentId]?.label ?? c.parentId}` : '',
+    ...Object.entries(c.properties ?? {}).filter(([, v]) => v).map(([k, v]) => `${metamodel.nodeTypes[c.type]?.properties?.find((p) => p.key === k)?.label ?? k}: ${v}`),
+    c.hidden ? "the filter won't show it" : '',
+  ].filter(Boolean).join(' · ')
+
+  // A new element, named "New <type>" with its name open to be written
+  // (a type with a wizard opens it instead), and the row it went under
+  // unfolded.
+  const add = (choice: AddChoice, underPath?: string) => {
+    const label = `New ${typeName(choice.type)}`
+    if (underPath) setFoldedRows((prev) => { const next = new Set(prev); next.delete(underPath); return next })
+    const id = requestCreateNode({
+      type: choice.type as C4ElementType,
+      label,
+      description: '',
+      technology: '',
+      collapsed: false,
+      external: false,
+      parentId: choice.parentId,
+      x: 0,
+      y: 0,
+      ...nodeTypeSize(choice.type, metamodel),
+      ...choice.properties,
+    } as Omit<C4Node, 'id'>, {
+      links: choice.link ? [choice.link] : [],
+      onCreated: (created) => {
+        selectNode(created)
+        const s = useDiagramStore.getState()
+        const view = s.activeViewId ? s.views[s.activeViewId] : undefined
+        const shown = viewShownNodes(view, s.c4Nodes, s.c4Relations)
+        if (shown && !shown.has(created)) pushNotification(`${s.c4Nodes[created]?.label ?? label} was added, but this view's filter does not show it.`, 'warning')
+      },
+    })
+    if (id) setEditCell({ rowId: id, draft: label, initial: label })
+  }
+
+  // One choice is added at once; several open the menu of them.
+  const onAdd = (e: React.MouseEvent, choices: AddChoice[], under?: ChainRow) => {
+    e.stopPropagation()
+    if (choices.length === 1) { add(choices[0], under?.path); return }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setAddMenu({
+      at: { x: rect.left, y: rect.bottom + 4 },
+      root: {
+        items: choices.map((c) => ({
+          id: `${c.type}|${c.link?.relationType ?? ''}|${c.link?.direction ?? ''}`,
+          label: typeName(c.type),
+          color: NODE_COLORS[c.type as C4ElementType] ?? metamodel.nodeTypes[c.type]?.color,
+          hint: choiceHint(c, under) || undefined,
+          group: c.group === 'Add' ? undefined : c.group,
+          onSelect: () => add(c, under?.path),
+        })),
+        emptyHint: under ? `Nothing can be added under ${under.node.label}` : 'Nothing can be added here',
+      },
+    })
+  }
+
   const commitEdit = useCallback(() => {
     if (!editCell) return
     const { rowId, draft, initial } = editCell
@@ -80,18 +168,24 @@ export function TableView(): React.ReactElement {
     setEditCell({ rowId, draft: current, initial: current })
   }, [readOnly])
 
-  function renderCell(row: ChainRow, col: ColDef): React.ReactNode {
-    const node = row.node
+  // The element's fields: its properties in the right panel, opened if folded.
+  const openProperties = (id: string) => {
+    selectNode(id)
+    ;(window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel?.()
+  }
 
-    // The summary is read only: it is made of several fields, edited in the properties panel.
-    if (col.key === 'summary') {
-      const summary = nodeSummary(node, nodes, relations)
-      return (
-        <span className="tv-cell-value tv-cell-summary" title={summary}>
-          {summary ? <span className="tv-summary-text">{summary}</span> : <span className="tv-cell-placeholder">—</span>}
-        </span>
-      )
-    }
+  // Read only: it is made of several fields, edited in the properties panel or the wizard.
+  function renderSummary(node: C4Node): React.ReactNode {
+    const summary = nodeSummary(node, nodes, relations, metamodel)
+    return (
+      <span className="tv-cell-value tv-cell-summary" title={summary}>
+        {summary ? <span className="tv-summary-text">{summary}</span> : <span className="tv-cell-placeholder">—</span>}
+      </span>
+    )
+  }
+
+  function renderName(row: ChainRow): React.ReactNode {
+    const node = row.node
 
     const rawVal = node.label
     if (editCell?.rowId === node.id) {
@@ -109,6 +203,7 @@ export function TableView(): React.ReactElement {
             if (e.key === 'Tab') { e.preventDefault(); commitEdit() }
           }}
           onClick={(e) => e.stopPropagation()}
+          onFocus={(e) => e.currentTarget.select()}
         />
       )
     }
@@ -136,6 +231,19 @@ export function TableView(): React.ReactElement {
         {row.alsoIn > 0 && (
           <span className="tv-also-in" title={`Also under ${row.alsoIn} other element${row.alsoIn === 1 ? '' : 's'}`}>+{row.alsoIn}</span>
         )}
+        <span className="tv-row-actions">
+          <button className="tv-row-btn" aria-label={`Properties of ${rawVal}`} title="Open its properties"
+            onClick={(e) => { e.stopPropagation(); openProperties(node.id) }}>
+            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden><path d="M3 4h10M3 8h10M3 12h6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+          </button>
+          {/* The wizard's place stays when the type has none: the buttons do not move from row to row. */}
+          {!readOnly && wizardFor(metamodel, node.type) ? (
+            <button className="tv-row-btn" aria-label={`Wizard for ${rawVal}`} title="Fill in with its wizard"
+              onClick={(e) => { e.stopPropagation(); openNodeWizard(node.id) }}>
+              <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden><path d="M3 13 L10 6 M9 3 l.6 1.4L11 5l-1.4.6L9 7l-.6-1.4L7 5l1.4-.6z M13 8l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+          ) : !readOnly && <span className="tv-row-btn-space" aria-hidden />}
+        </span>
       </span>
     )
   }
@@ -144,35 +252,56 @@ export function TableView(): React.ReactElement {
     <div className="tv-wrap" onClick={() => setEditCell(null)}>
       <div className="tv-table-wrap">
         <table className="tv-table">
-          <colgroup>
-            {COLS.map(c => <col key={c.key} style={{ width: c.width }} />)}
-          </colgroup>
           <thead>
-            <tr>
-              {COLS.map(c => <th key={c.key} className="tv-th">{c.label}</th>)}
-            </tr>
+            <tr><th className="tv-th tv-th-name">Name</th><th className="tv-th">Summary</th></tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td className="tv-empty" colSpan={COLS.length}>{pipelineActive(pipeline) ? "No elements pass the view's steps." : 'No nodes.'}</td>
+                <td className="tv-empty" colSpan={2}>{pipelineActive(pipeline) ? "No elements pass the view's steps." : 'No nodes.'}</td>
               </tr>
             )}
-            {rows.map((row) => (
+            {lines.map((line) => line.kind === 'row' ? (
               <tr
-                key={row.path}
-                data-node-id={row.node.id}
-                className={`tv-row tv-chain-row depth-${Math.min(row.depth, 3)}${selectedNodeId === row.node.id ? ' tv-row-selected' : ''}`}
-                onClick={(e) => { e.stopPropagation(); selectNode(row.node.id) }}
+                key={line.row.path}
+                data-node-id={line.row.node.id}
+                className={`tv-row tv-chain-row depth-${Math.min(line.row.depth, 3)}${selectedNodeId === line.row.node.id ? ' tv-row-selected' : ''}`}
+                onClick={(e) => { e.stopPropagation(); selectNode(line.row.node.id) }}
               >
-                {COLS.map(col => (
-                  <td key={col.key} className="tv-td">{renderCell(row, col)}</td>
-                ))}
+                <td className="tv-td">{renderName(line.row)}</td>
+                <td className="tv-td">{renderSummary(line.row.node)}</td>
+              </tr>
+            ) : (
+              <tr key={`${line.under?.path ?? ''}+`} className="tv-add-row">
+                <td className="tv-td" colSpan={2}>
+                  <button className="tv-add-btn"
+                    aria-label={line.under ? `Add under ${line.under.node.label}` : 'Add at the top'}
+                    onClick={(e) => onAdd(e, line.choices, line.under)}>
+                    {Array.from({ length: line.depth }, (_, i) => <span key={i} className="tv-tree-guide" aria-hidden />)}
+                    <span className="tv-group-toggle-space" />
+                    <span className="tv-add-plus" aria-hidden>+</span>
+                    {line.choices.length === 1 ? (
+                      <>
+                        <span>{typeName(line.choices[0].type)}</span>
+                        {[line.choices[0].group === 'Add' || line.choices[0].group === 'Inside' ? '' : line.choices[0].group.toLowerCase(), choiceHint(line.choices[0], line.under)]
+                          .filter(Boolean).map((h) => <span key={h} className="tv-add-hint">· {h}</span>)}
+                      </>
+                    ) : (
+                      <span>{line.choices.length <= 3 ? line.choices.map((c) => typeName(c.type)).join(' / ') : 'Add element'}…</span>
+                    )}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {/* A choice in the menu opens the new row's name: its click must not reach the table, which closes it. */}
+      {addMenu && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <WikiMenu at={addMenu.at} root={addMenu.root} onClose={() => setAddMenu(null)} />
+        </div>
+      )}
     </div>
   )
 }

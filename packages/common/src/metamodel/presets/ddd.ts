@@ -69,7 +69,6 @@ export function builtInDddC4Metamodel(): Metamodel {
     allowedParents: ['domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
-    tableTab: true,
     // The parts of an aggregate list under its root in Table and Wiki views.
     hierarchyRelation: 'part-of',
     properties: [

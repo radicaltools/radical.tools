@@ -213,7 +213,7 @@ describe('MCP document tools', () => {
       }
       expect(await enumOf()).not.toContain('risk')
       const added = await call(client, 'upsert_node_type', {
-        id: 'risk', label: 'Risk', baseType: 'adr', tableTab: true, allowedParents: ['system'], allowedAtRoot: true,
+        id: 'risk', label: 'Risk', baseType: 'adr', summary: '[{status.cap}: ]{description}', allowedParents: ['system'], allowedAtRoot: true,
         properties: [{ key: 'severity', label: 'Severity', type: 'enum', options: ['low', 'high'] }],
       })
       expect(added).toContain('copied to the custom metamodel')
@@ -227,7 +227,7 @@ describe('MCP document tools', () => {
       const data = await read()
       expect(data.metamodel).toMatchObject({ id: 'c4-ddd-governance-custom' })
       // Reloading keeps the custom metamodel (a built-in id would be swapped for the preset).
-      expect(createModelFacade(data).getMetamodel!()!.nodeTypes.risk).toMatchObject({ label: 'Risk', tableTab: true })
+      expect(createModelFacade(data).getMetamodel!()!.nodeTypes.risk).toMatchObject({ label: 'Risk', summary: '[{status.cap}: ]{description}' })
       expect(data.nodes.find((n) => n.label === 'Data loss')).toMatchObject({ type: 'risk', severity: 'high' })
 
       const inUse = await client.callTool({ name: 'delete_node_type', arguments: { id: 'risk' } })

@@ -51,7 +51,13 @@ function initialValues(session: NodeWizardSession, wizard: NodeWizardDef, typeDe
     for (const p of typeDef?.properties ?? []) {
       if (p.default !== undefined) values[p.key] = p.default
     }
-    return { ...values, ...wizardPrefill(wizard) }
+    // Values the draft came with (a table row's filter asks for them) win.
+    const draft = session.draft as Record<string, unknown>
+    const given: Record<string, unknown> = {}
+    for (const p of typeDef?.properties ?? []) {
+      if (p.key !== 'label' && draft[p.key] !== undefined) given[p.key] = draft[p.key]
+    }
+    return { ...values, ...wizardPrefill(wizard), ...given }
   }
   const node = state.c4Nodes[session.nodeId] as (C4Node & Record<string, unknown>) | undefined
   const values: Record<string, unknown> = {}

@@ -62,7 +62,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
-    tableTab: true,
     properties: adrProps,
     wizard: {
       trigger: 'create',
@@ -114,7 +113,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
-    tableTab: true,
     properties: fitnessFnProps,
     wizard: {
       trigger: 'create',
@@ -171,7 +169,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
-    tableTab: true,
     // A need's wiki page and table tab list what derives from it — sub-needs
     // and requirements — as its children; "add child" creates either.
     hierarchyRelation: 'derives',
@@ -227,7 +224,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
-    tableTab: true,
     hierarchyRelation: 'derives',
     properties: requirementProps,
     wizard: {
@@ -364,7 +360,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
-    tableTab: true,
     properties: scenarioProps,
     wizard: {
       trigger: 'create',
@@ -427,7 +422,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedAtRoot: true,
     builtin: true,
     hubOnly: true,
-    tableTab: true,
     properties: blueprintProps,
   }
 
@@ -461,7 +455,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
-    tableTab: true,
     properties: mockupProps,
     wizard: {
       trigger: 'create',
@@ -545,7 +538,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
-    tableTab: true,
     properties: [
       { key: 'description', label: 'Description', type: 'textarea' },
     ],
@@ -566,7 +558,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['state-machine', 'state'],
     allowedAtRoot: false,
     builtin: true,
-    tableTab: true,
     properties: [
       {
         key: 'kind',
@@ -619,7 +610,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedParents: ['state-machine', 'system', 'domain', 'group'],
     allowedAtRoot: true,
     builtin: true,
-    tableTab: true,
     properties: [
       {
         key: 'source',

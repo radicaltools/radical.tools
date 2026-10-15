@@ -41,9 +41,22 @@ test.describe('bookstore views', () => {
 
   test('Element Table (table)', async ({ page, studio }) => {
     await studio.open('v-table')
-    const rows = page.locator('tbody tr')
+    const rows = page.locator('tbody tr.tv-row')
     await expect(rows).toHaveCount(6)
-    await expect(rows.filter({ hasText: 'Payment Provider' })).toContainText('Card payments')
+    // A + row where an element can go: inside Bookstore and its containers, and at the top.
+    await expect(page.getByRole('button', { name: 'Add under Bookstore' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add at the top' })).toBeVisible()
+    // Its name and its summary, by its type's template; its fields open from the end of its row.
+    await expect(page.locator('thead th')).toHaveText(['Name', 'Summary'])
+    const provider = rows.filter({ hasText: 'Payment Provider' })
+    await expect(provider).toContainText('Card payments')
+    await provider.hover()
+    await provider.getByRole('button', { name: 'Properties of Payment Provider' }).click()
+    await expect(page.locator('.right-panel .props-content')).toBeVisible()
+    await expect(page.locator('.right-panel input[value="Payment Provider"]').first()).toBeVisible()
+    // A C4 type has no wizard.
+    await expect(provider.getByRole('button', { name: /^Wizard for/ })).toHaveCount(0)
+    await page.mouse.move(0, 0)
     // The containment tree: Bookstore's containers under it, one guide line in.
     await expect(page.locator('.tv-chain-row.depth-1')).toHaveCount(3)
     await expect(page.locator('.tv-tabs')).toHaveCount(0)

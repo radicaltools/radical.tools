@@ -60,10 +60,11 @@ export interface NodeTypeDef {
   /** Hub-only types are imported from the Hub and should not appear in the
    *  canvas element palette (users cannot create them manually). */
   hubOnly?: boolean
-  /** Record-like types (ADRs, requirements, …) get their own Table View tab
-   *  with columns derived from `properties`, instead of only showing up in
-   *  the generic "All Nodes" tree. */
-  tableTab?: boolean
+  /** How the table sums up an element of this type in one line, from the
+   *  data it has: a template of {property} tokens (nodeSummary.ts). None:
+   *  the built-in one for the type's id, else the description's first
+   *  sentence. */
+  summary?: string
   /** For types that nest via a relation instead of canvas containment (e.g.
    *  a Requirement "derives" from the one it decomposes) — the id of the
    *  RelationTypeDef whose `allowedPairs` has `{from: thisType, to: thisType}`.

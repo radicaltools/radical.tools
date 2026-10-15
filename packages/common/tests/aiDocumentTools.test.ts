@@ -37,14 +37,14 @@ describe('metamodel tools', () => {
   it('copy a preset on the first edit, and the copy survives reloading', async () => {
     const { facade, call } = setup()
     const added = await call('upsert_node_type', {
-      id: 'risk', label: 'Risk', baseType: 'adr', tableTab: true,
+      id: 'risk', label: 'Risk', baseType: 'adr', summary: '[{status.cap}: ]{description}',
       properties: [{ key: 'severity', label: 'Severity', type: 'enum', options: ['low', 'high'] }],
     })
     expect(added.ok, added.resultText).toBe(true)
     expect(added.resultText).toContain('copied to the custom metamodel')
     const mm = facade.getMetamodel!()!
     expect(mm.id).toBe('c4-ddd-governance-custom')
-    expect(mm.nodeTypes.risk).toMatchObject({ label: 'Risk', builtin: false, tableTab: true })
+    expect(mm.nodeTypes.risk).toMatchObject({ label: 'Risk', builtin: false, summary: '[{status.cap}: ]{description}' })
     expect(mm.nodeTypes.risk.wizard).toBeUndefined()
     // The next edit works on the custom copy and says nothing about copying.
     const second = await call('upsert_node_type', { id: 'risk', color: '#ff0000' })

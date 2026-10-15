@@ -3835,6 +3835,7 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* The element's summary (nodeSummary.ts): one line, read only, the whole of it in the tooltip. */
 .tv-cell-value.tv-cell-summary { cursor: default; color: var(--text-secondary); }
 .tv-summary-text { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-th-name { width: 45%; }
 /* The top level reads as headings. */
 .tv-chain-row.depth-0 { background: var(--bg-panel); }
 .tv-chain-row.depth-0 .tv-chain-cell { font-weight: 600; }
@@ -3845,6 +3846,30 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
   background: rgba(var(--accent-rgb), 0.14); color: var(--accent);
   font-size: 10px; flex-shrink: 0;
 }
+
+/* The row's buttons, at its end: its properties and its wizard. Shown on
+   the row under the pointer. */
+.tv-row-actions { margin-left: auto; display: flex; gap: 4px; flex-shrink: 0; opacity: 0; }
+.tv-row:hover .tv-row-actions, .tv-row-actions:focus-within { opacity: 1; }
+.tv-row-btn, .tv-row-btn-space { width: 22px; height: 22px; flex-shrink: 0; }
+.tv-row-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border-radius: 4px;
+  border: 1px solid var(--border-color); background: var(--bg-panel);
+  color: var(--text-muted); cursor: pointer;
+}
+.tv-row-btn:hover { color: var(--accent); border-color: var(--accent); }
+/* Adds an element where it will show: after the rows under an element, or at the end. */
+.tv-add-row > .tv-td { border-bottom: none; }
+.tv-add-btn {
+  display: flex; align-items: center; gap: 5px; width: 100%;
+  padding: 3px 10px 3px 6px; border: none; background: none; text-align: left;
+  color: var(--text-muted); font-size: 12px; cursor: pointer; opacity: 0.7;
+}
+.tv-add-btn .tv-tree-guide { margin: -3px 0; }
+.tv-add-btn:hover { opacity: 1; color: var(--accent); background: var(--hover-bg, rgba(255,255,255,0.04)); }
+.tv-add-plus { font-size: 14px; line-height: 1; width: 12px; text-align: center; }
+.tv-add-hint { color: var(--text-muted); opacity: 0.8; }
 
 /* ── Table scroll wrapper ────────────────────────────────────────────────── */
 
