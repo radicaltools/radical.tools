@@ -8,17 +8,15 @@
  *   corridor relations squeezed through one place (Σ over 50 px squares)
  * Run from packages/layout: npx tsx bench/nestedLayout.bench.mts [--only name] [--out file.json] [model folders…]
  */
-import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, writeFileSync, existsSync, statSync } from 'node:fs'
 import { join, basename, dirname } from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { runSmartLayoutCore, computeCompositeScore } from '../src/smartLayout'
 import { viewLayoutInput } from '../src/viewInput'
 import { projectToVisibleGraph } from '../src/geometry'
-import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 import { documentMetamodel } from '@radical/common/model'
-import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 const args = process.argv.slice(2)
@@ -43,8 +41,21 @@ for (const f of ['bookstore.radical', 'order-machine.radical']) {
 }
 for (const folder of args) {
   if (!existsSync(folder)) continue
-  const d = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data as any
+  const d = deserializeFromMdFolder(readFolder(folder)).data as any
   fixtures.push({ name: folder.split('/').filter(Boolean).slice(-2).join('/'), nodes: d.nodes, relations: d.relations, metamodel: d.metamodel, constraints: d.defaultLayoutConstraints })
+}
+
+/** A model folder's files by path (the Markdown nodes and the JSON sidecars),
+ *  read straight from disk: this package does not depend on node-files. */
+function readFolder(root: string, dir = ''): Record<string, string> {
+  const files: Record<string, string> = {}
+  for (const name of readdirSync(join(root, dir))) {
+    if (name.startsWith('.')) continue
+    const path = dir ? `${dir}/${name}` : name
+    if (statSync(join(root, path)).isDirectory()) Object.assign(files, readFolder(root, path))
+    else if (/\.(md|json)$/.test(name)) files[path] = readFileSync(join(root, path), 'utf8')
+  }
+  return files
 }
 
 type Rect = { x: number; y: number; w: number; h: number }
