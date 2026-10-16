@@ -5,4 +5,4 @@ label: "Diagram store"
 technology: "Zustand + immer (@radical/ui)"
 ---
 
-packages/ui/src/store/diagramStore.ts. The single source of truth for nodes, relations, views, sequences, metamodel, milestones, presentations, mode and undo/redo; derives the ReactFlow nodes and edges. Shared with the Hub viewer, which starts it empty and read-only.
+packages/ui/src/store/diagramStore.ts. The single source of truth for nodes, relations, views, sequences, metamodel, milestones, presentations, mode and undo/redo; derives the ReactFlow nodes and edges. Its diff overlay (marks and ghosts) shows a milestone's diff, the flash of outside changes, and the branch's changes (branch, showBranchChanges; a milestone takes the overlay over). Shared with the Hub viewer, which starts it empty and read-only.

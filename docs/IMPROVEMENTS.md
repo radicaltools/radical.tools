@@ -503,12 +503,22 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     2026-10-16: `get_changes` (MCP) and `radical diff` list the elements and
     relations changed since the model's version in git, layout left out (the
     raw diff of PR #203 was some 540 moved elements around 16 changed
-    fields). Still open: Studio does not show that list (the changes of the
-    branch highlighted on the canvas, as the milestone diff does, would let
-    the product owner see what they hand over); changes to views, the
-    metamodel and sequences are not listed; and the running
-    `radical-architecture` server offers the tool only after a rebuild and a
-    restart of the client.
+    fields). Studio shows the same changes since 2026-10-16 (Changes on
+    branch, from `.radical/base.json` that `get_changes`, `radical diff
+    --save-base` and `radical hooks install` keep). Still open: changes to
+    views, the metamodel and sequences are not listed; table and wiki views
+    do not mark the changed rows; `radical hooks` has no `uninstall`; a
+    model with many thousand elements would want a base that holds only what
+    differs; and the running `radical-architecture` server offers new tools
+    only after a rebuild and a restart of the client.
+37. **A flaky e2e test: the first one of a full run.** `alignment.spec.ts ›
+    a row on a canvas of the whole model holds through a drag, Smart Layout
+    and a reload` failed in two of three full local runs on 2026-10-16, each
+    time as the run's first test: after the click on the empty canvas that
+    brings the camera back, Customer lay under the left panel and the click
+    on it timed out. It passed 3 of 3 on its own and 6 of 6 with six workers.
+    Waiting for the camera to rest after that click (as for item 32) would
+    make it steady.
 
 ### Reverse-engineered requirements (2026-10-06)
 

@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import type { C4Node, C4Relation } from '@radical/common/c4'
+import { parseModelBase } from '@radical/common/formats/modelBase'
 import { main } from './cli'
 
 const exec = promisify(execFile)
@@ -80,6 +81,28 @@ describe('radical diff', () => {
     const json = JSON.parse((await run(cwd, 'diff', 'model', '--since', 'main', '--format', 'json')).out)
     expect(json.base).toMatchObject({ described: 'main' })
     expect(json.elements.changed).toMatchObject([{ id: 'req', changes: [{ field: 'action', before: 'take the payment', after: 'take the payment within 2 seconds' }] }])
+  })
+
+  it('saves the base beside the model', async () => {
+    const cwd = await repo()
+    await git(cwd, 'checkout', '-q', '-b', 'feature')
+    await writeModel(join(cwd, 'model'), nodes('take the payment within 2 seconds'))
+    const before = await readFile(join(cwd, 'model/nodes/pay.md'), 'utf8')
+    const { code, out, err } = await run(cwd, 'diff', 'model', '--save-base')
+    expect(code).toBe(0)
+    expect(out).toContain('action: take the payment → take the payment within 2 seconds')
+    expect(err).toMatch(/Saved the base \([0-9a-f]{7}\) to model\/\.radical\/base\.json\./)
+    const base = parseModelBase(await readFile(join(cwd, 'model/.radical/base.json'), 'utf8'))
+    expect(base).toMatchObject({ version: 1, described: 'merge base with main', branch: 'feature' })
+    expect(base!.commit).toMatch(/^[0-9a-f]{40}$/)
+    // The model as it was at the base, positions included for the ghosts.
+    expect(base!.nodes.find((n) => n.id === 'req')).toMatchObject({ action: 'take the payment', x: 0, width: 200 })
+    expect(base!.relations.map((r) => r.id).sort()).toEqual(['r1', 'r2'])
+    expect(await readFile(join(cwd, 'model/.radical/.gitignore'), 'utf8')).toBe('*\n')
+    expect(await readFile(join(cwd, 'model/nodes/pay.md'), 'utf8')).toBe(before)
+    expect((await git(cwd, 'status', '--porcelain', '--', 'model/.radical')).stdout).toBe('')
+    // --quiet prints nothing.
+    expect(await run(cwd, 'diff', 'model', '--save-base', '--quiet')).toMatchObject({ code: 0, out: '', err: '' })
   })
 
   it('reports a model the base did not have as all added', async () => {

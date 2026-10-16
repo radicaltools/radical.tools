@@ -81,7 +81,10 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await expect(peek.locator('.insp-peek-sec').filter({ hasText: 'Checked by' })).toContainText('Paying by card')
 
   // From there to Designer, on the canvas that shows it, selected.
-  await peek.getByRole('button', { name: 'Show on canvas' }).click()
+  await peek.getByRole('button', { name: /^Show on canvas/ }).click()
+  // The canvas views that show it, to choose from.
+  await expect(page.getByRole('menuitem')).toHaveText([/^Specification/])
+  await page.getByRole('menuitem', { name: /^Specification/ }).click()
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
   await expect(page.locator('.canvas-controls').getByRole('button', { name: 'Fit All' })).toBeVisible()
   await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Specification')

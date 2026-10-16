@@ -39,6 +39,7 @@ import {
   removeHandle,
   writeSelectionToHandle,
   readForgeRunFromHandle,
+  readModelBaseFromHandle,
   readCheckFilesFromHandle,
   writeCheckConfigToHandle,
 } from '../persist/webFolder'
@@ -781,6 +782,10 @@ export interface DocumentsAPI {
   /** The agent Forge run status file of an md-folder document (written by
    *  the MCP server), or null when there is none or it cannot be read. */
   readForgeRun(id: string): Promise<string | null>
+  /** The base file of an md-folder document (the model at the git base,
+   *  written by the CLI or the MCP server), or null when there is none, the
+   *  document is no folder, or it cannot be read. */
+  readModelBase(id: string): Promise<string | null>
   /** What `radical check` keeps beside an md-folder model (test results,
    *  check.json), each null when it is not there; both null for a document
    *  that is no folder. Null when the folder cannot be read yet (a browser
@@ -1270,6 +1275,19 @@ export const documents: DocumentsAPI = {
     if (h.readFolder || !connectedWebHandles.has(id)) return null
     const handle = await loadHandle(id)
     return handle ? readForgeRunFromHandle(handle) : null
+  },
+
+  async readModelBase(id) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') return null
+    const h = host()
+    if (meta.folderPath && h.readModelBase) {
+      const res = await h.readModelBase(meta.folderPath)
+      return res.success ? res.content ?? null : null
+    }
+    if (h.readFolder || !connectedWebHandles.has(id)) return null
+    const handle = await loadHandle(id)
+    return handle ? readModelBaseFromHandle(handle) : null
   },
 
   async readCheckFiles(id) {

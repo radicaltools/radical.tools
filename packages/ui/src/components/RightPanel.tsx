@@ -1,8 +1,8 @@
 import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
-import { type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } from '@radical/common/c4'
+import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } from '@radical/common/c4'
 import { resolveEarsSubject, isReservedPropertyKey, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { ViewPipelinePanel } from './ViewPipelinePanel'
@@ -12,6 +12,8 @@ import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
 import { viewShownNodes } from '@radical/common/viewPipeline'
+import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
+import { modelFieldChanges } from '@radical/common/modelChanges'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
 import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
@@ -37,6 +39,19 @@ function useViewNodeCounts(views: Record<string, DiagramView>): Record<string, n
     return () => clearTimeout(t)
   }, [count])
   return counts
+}
+
+/** While the branch's changes are shown: how many of them each view shows. */
+function useBranchViewCounts(views: Record<string, DiagramView>): Record<string, number> | null {
+  const branch = useDiagramStore((s) => s.branch)
+  const nodes = useDiagramStore((s) => s.c4Nodes)
+  const relations = useDiagramStore((s) => s.c4Relations)
+  return useMemo(() => branch ? viewChangeCounts(Object.values(views), nodes, relations, branch.nodes) : null, [branch, views, nodes, relations])
+}
+
+function BranchCount({ n }: { n: number | undefined }): React.ReactElement | null {
+  if (!n) return null
+  return <span className="lp-branch-count" title={`${n} element${n === 1 ? '' : 's'} changed since the base`}>{n}</span>
 }
 
 function viewNodeCount(view: DiagramView, shown: number | undefined): string {
@@ -1156,6 +1171,8 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
   }
   const totalNodes = useDiagramStore((s) => Object.keys(s.c4Nodes).length)
   const counts = useViewNodeCounts(views)
+  const branchCounts = useBranchViewCounts(views)
+  const branchTotal = useDiagramStore((s) => s.branch ? Object.keys(s.branch.nodes).length : undefined)
   const viewList = Object.values(views)
   const tree = useMemo(() => viewFolderTree(viewList), [views])
   // Folders start open; the one holding the active view opens again.
@@ -1201,6 +1218,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
             <div className="lp-card-title">{v.name}</div>
             <div className="lp-card-meta">
               <span>{viewNodeCount(v, counts[v.id])}</span>
+              <BranchCount n={branchCounts?.[v.id]} />
               <span className="lp-view-kind" style={VIEW_BADGE_STYLE}>{badge}</span>
             </div>
             {viewpoint && (
@@ -1271,6 +1289,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
           <div className="lp-card-title">All elements</div>
           <div className="lp-card-meta">
             <span>{totalNodes} {totalNodes === 1 ? 'node' : 'nodes'}</span>
+            <BranchCount n={branchTotal} />
             <span className="lp-view-kind" style={VIEW_BADGE_STYLE}>table</span>
           </div>
         </div>
@@ -2029,9 +2048,76 @@ function NodeLink({ id, label }: { id: string; label: string }) {
   return <button type="button" className="pp-link" onClick={() => selectNode(id)}>{label}</button>
 }
 
-function PropertiesContent({ readOnly = false, onClose }: { readOnly?: boolean; onClose: () => void }) {
-  const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
-  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+/** The words removed from and added to a text since the base. */
+function WordChanges({ before, after }: { before: string; after: string }): React.ReactElement {
+  return (
+    <p className="pp-branch-text">
+      {wordDiff(before, after).map((part, i) => (
+        part.kind === 'removed' ? <del key={i}>{part.text}</del>
+          : part.kind === 'added' ? <ins key={i}>{part.text}</ins>
+            : <span key={i}>{part.text}</span>
+      ))}
+    </p>
+  )
+}
+
+const FIELD_NAMES: Record<string, string> = { label: 'Name', parentId: 'Place', description: 'Description', technology: 'Technology', external: 'External', type: 'Type' }
+
+/** While the branch's changes are shown: whether the element is new on the
+ *  branch, or each field that changed since the base with what it was. */
+/** The branch's changes a card shows: the marks and the base's elements. */
+export type CardBranch = Pick<BranchOverlay, 'nodes' | 'baseNodes'>
+
+function BranchFieldChanges({ node, branch }: { node: C4Node; branch?: CardBranch | null }): React.ReactElement | null {
+  // Given (the Inspector's Changes tab), else while Changes on branch is on.
+  const shown = useDiagramStore((s) => s.branch)
+  const source = branch === undefined ? shown : branch
+  const mark = source?.nodes[node.id]
+  const old = source?.baseNodes[node.id]
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  const c4Nodes = useDiagramStore((s) => s.c4Nodes)
+  const pending = useDiagramStore((s) => !!s.pendingBodyNodeIds[node.id])
+  if (!mark) return null
+  if (mark === 'new') {
+    return (
+      <section className="pp-section pp-branch" aria-label="Changes on branch">
+        <div className="pp-section-title">Changes on branch <span className="pp-branch-mark new">New</span></div>
+        <p className="pp-branch-note">Not in the base: added on this branch.</p>
+      </section>
+    )
+  }
+  if (!old) return null
+  // A description not loaded yet is no change.
+  const changes = modelFieldChanges(old, node).filter((c) => !(pending && c.field === 'description'))
+  const props = metamodel?.nodeTypes[node.type]?.properties ?? []
+  const nameOf = (field: string) => props.find((p) => p.key === field)?.label ?? FIELD_NAMES[field] ?? field
+  const place = (id: unknown) => typeof id === 'string' && id ? (c4Nodes[id]?.label ?? id) : 'the top of the model'
+  const text = (v: unknown) => v === null || v === undefined || v === '' ? '' : typeof v === 'string' ? v : JSON.stringify(v)
+  return (
+    <section className="pp-section pp-branch" aria-label="Changes on branch">
+      <div className="pp-section-title">Changes on branch <span className="pp-branch-mark changed">Changed</span></div>
+      {changes.map((c) => (
+        <div key={c.field} className="pp-branch-field">
+          <div className="pp-branch-name">{nameOf(c.field)}</div>
+          {c.field === 'parentId'
+            ? <p className="pp-branch-text">Moved from <del>{place(c.before)}</del> to <ins>{place(c.after)}</ins></p>
+            : <WordChanges before={text(c.before)} after={text(c.after)} />}
+        </div>
+      ))}
+    </section>
+  )
+}
+
+function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
+  readOnly?: boolean; onClose: () => void
+  /** The element to show instead of the selection (a card opened from outside the canvas). */
+  nodeId?: string
+  branch?: CardBranch | null
+}) {
+  const selected = useDiagramStore((s) => s.selectedNodeId)
+  const selectedNodeId = nodeId ?? selected
+  const storeEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+  const selectedEdgeId = nodeId ? null : storeEdgeId
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const c4Relations = useDiagramStore((s) => s.c4Relations)
   const metamodel = useDiagramStore((s) => s.metamodel)
@@ -2122,6 +2208,7 @@ function PropertiesContent({ readOnly = false, onClose }: { readOnly?: boolean; 
           menu={menu}
           onClose={onClose}
         />
+        <BranchFieldChanges node={node} branch={branch} />
         {node.type === 'requirement' && (
           <section className="pp-section">
             <div className="pp-section-title">Sentence</div>
@@ -2275,6 +2362,21 @@ function PropertiesContent({ readOnly = false, onClose }: { readOnly?: boolean; 
 
 const PANEL_W_KEY = 'radical-props-width'
 const PANEL_W_DEFAULT = 340
+
+/** The properties card of one element, outside the canvas (Studio's
+ *  Inspector): the same card, read-only, with `actions` under its head. */
+export function ElementCard({ nodeId, branch, onClose, actions }: {
+  nodeId: string; branch?: CardBranch | null; onClose: () => void; actions?: React.ReactNode
+}): React.ReactElement {
+  return (
+    <aside className="right-panel open element-card" aria-label="Properties" style={{ width: PANEL_W_DEFAULT }}>
+      <div className="pp-scroll">
+        {actions && <div className="element-card-actions">{actions}</div>}
+        <PropertiesContent readOnly nodeId={nodeId} branch={branch} onClose={onClose} />
+      </div>
+    </aside>
+  )
+}
 const PANEL_W_MIN = 280
 const PANEL_W_MAX = 640
 

@@ -6,7 +6,17 @@
 
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 import { viewShownNodes } from '@radical/common/viewPipeline'
+import { create } from 'zustand'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+
+/** The Inspector's tabs. */
+export type InspectorTab = 'changes' | 'model' | 'implementation' | 'settings'
+export const INSPECTOR_TABS: readonly InspectorTab[] = ['changes', 'model', 'implementation', 'settings']
+
+/** Where the Inspector is: the tab picked (null: its first, Changes when the
+ *  folder holds a base, else Model quality) and the element whose card is
+ *  open in Changes. Part of the place the route names. */
+export const useInspectorNav = create<{ tab: InspectorTab | null; cardId: string | null }>(() => ({ tab: null, cardId: null }))
 
 /** For each view, the elements it shows (viewShownNodes): what its chain
  *  gives, or those it lists and their ancestors. A view that lists none and
@@ -34,6 +44,28 @@ export function canvasViewFor(nodeId: string): string | null {
   return best?.id ?? null
 }
 
+/** Every canvas view that shows `nodeId`, the smallest first, with how
+ *  many elements it shows: the views to choose from. */
+export function canvasViewsFor(nodeId: string): ViewChoice[] {
+  return viewsFor(nodeId, isCanvas)
+}
+
+/** Every wiki view with a page for `nodeId`, the smallest first. */
+export function wikiViewsFor(nodeId: string): ViewChoice[] {
+  return viewsFor(nodeId, (v) => v.kind === 'wiki')
+}
+
+export interface ViewChoice { id: string; name: string; size: number }
+
+function viewsFor(nodeId: string, kind: (v: DiagramView) => boolean): ViewChoice[] {
+  const { views, c4Nodes, c4Relations } = useDiagramStore.getState()
+  const sets = viewNodeSets(views, c4Nodes, c4Relations)
+  return Object.values(views)
+    .filter((v) => kind(v) && sets[v.id]?.has(nodeId))
+    .map((v) => ({ id: v.id, name: v.name, size: sets[v.id].size }))
+    .sort((a, b) => a.size - b.size || a.name.localeCompare(b.name))
+}
+
 /** A wiki view with a page for `nodeId`, or null when the model has none. */
 export function wikiViewFor(nodeId: string): string | null {
   const { views, c4Nodes, c4Relations } = useDiagramStore.getState()
@@ -46,11 +78,12 @@ export function wikiViewFor(nodeId: string): string | null {
 type FocusFn = (id: string, opts?: { zoom?: number; duration?: number }) => void
 const FOCUS_ZOOM = 1.2
 
-/** Designer, on the canvas that shows `nodeId`, with it selected, its
- *  containers open and the camera on it. */
-export function revealOnCanvas(nodeId: string): void {
+/** Designer, on the canvas that shows `nodeId` (or on `viewId`, one the
+ *  user chose; null for All elements), with it selected, its containers
+ *  open and the camera on it. */
+export function revealOnCanvas(nodeId: string, viewId?: string | null): void {
   if (useDiagramStore.getState().appMode !== 'designer') useDiagramStore.getState().setAppMode('designer')
-  const target = canvasViewFor(nodeId)
+  const target = viewId !== undefined ? viewId : canvasViewFor(nodeId)
   const store = useDiagramStore.getState()
   const switching = store.activeViewId !== target
   if (switching) store.setActiveView(target)
@@ -81,10 +114,10 @@ export function revealOnCanvas(nodeId: string): void {
   }, switching ? 150 : 60)
 }
 
-/** Designer, on the page of `nodeId` in a wiki view; false when no wiki
- *  view has one. */
-export function openWikiPage(nodeId: string): boolean {
-  const viewId = wikiViewFor(nodeId)
+/** Designer, on the page of `nodeId` in a wiki view (`viewId`, one the
+ *  user chose, or the smallest that has it); false when none has one. */
+export function openWikiPage(nodeId: string, chosen?: string): boolean {
+  const viewId = chosen ?? wikiViewFor(nodeId)
   if (!viewId) return false
   if (useDiagramStore.getState().appMode !== 'designer') useDiagramStore.getState().setAppMode('designer')
   const store = useDiagramStore.getState()

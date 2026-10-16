@@ -1,0 +1,11 @@
+---
+id: "d025a7f8-ed40-469c-b92b-324bfda399c4"
+type: "adr"
+label: "Studio compares with a base beside the model"
+alternatives: "The desktop app runs git: the browser cannot, so the two would differ. The undo history as the base: in memory, one session, lost on reload, blind to agent edits. A change log kept by the model: it misses outside edits (MCP, a hand edit, a checkout, a merge), which a comparison of two copies catches. Hashes instead of a copy: no old values for the card's word diff and nothing to draw for a removed element. Studio's own copy when the folder opens: it does not know where the branch left main."
+consequences: "The browser and the desktop app show the same changes, live, without git. The file is a partial copy of the model (about 1.1 MB for architecture/, against 4.4 MB for the folder), rewritten on each save. A base goes stale until the CLI, the MCP server or a hook saves it again; Studio cannot tell the branch checked out, so it shows the base's branch and age instead. Undo stays as it is."
+context: "get_changes and radical diff list the model changes of a branch from git (Model changes come from git). The product owner wants to see them in Studio while editing the model first, but Studio reads only the model folder: in the browser it has the File System Access handle of that folder and no git, and the desktop app should behave the same. Undo keeps Immer snapshots in memory (100 steps, cleared on every load and outside reload), and the model keeps no log of its changes."
+date: "2026-10-16"
+decision: "The CLI (radical diff --save-base, and git hooks that radical hooks install adds) and the MCP server (every get_changes) write the model's elements and relations at the git base, with their All elements positions, the commit, how it was chosen, the branch and the time, to .radical/base.json, out of git like the rest of .radical/. Studio reads the file with the folder and again when it changes, and compares the model with it as it is edited, with the same modelChangeReport as the CLI; it never writes it. The comparison leaves positions out; they only place the ghosts of removed elements. Studio judges a base only by what the file says: older than a day, it is marked."
+status: "accepted"
+---

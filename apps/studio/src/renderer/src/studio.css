@@ -3418,7 +3418,7 @@ label.app-menu-row { cursor: pointer; }
     "canvas";
 }
 .insp { grid-area: canvas; position: relative; min-height: 0; overflow: hidden; display: flex; background: var(--bg-app); color: var(--text-primary); }
-.insp-main { flex: 1; min-width: 0; overflow-y: auto; padding: 22px 28px 60px; display: grid; gap: 24px; align-content: start; max-width: 1180px; margin: 0 auto; font-size: 13px; }
+.insp-main { flex: 1; min-width: 0; overflow-y: auto; padding: 22px 32px 60px; display: grid; gap: 24px; align-content: start; max-width: 1640px; margin: 0 auto; font-size: 13px; }
 .insp h1 { margin: 0; font-size: 20px; letter-spacing: -0.015em; }
 .insp h2 { margin: 0 0 3px; font-size: 14px; }
 .insp code { font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 11.5px; }
@@ -3517,11 +3517,12 @@ label.app-menu-row { cursor: pointer; }
 .insp-inline-link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
 .insp-inline-link:disabled { color: var(--text-muted); cursor: default; }
 .insp-chainrow { padding: 16px 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.insp-stop { display: grid; gap: 2px; min-width: 76px; }
+/* A stop keeps its width; a link takes what is left, its text wrapping rather than running over the stops. */
+.insp-stop { display: grid; gap: 2px; min-width: 76px; flex: none; }
 .insp-stop-n { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .insp-chain-sep { width: 1px; align-self: stretch; background: var(--border-color); margin: 0 6px; }
-.insp-link { flex: 1 1 110px; min-width: 110px; display: grid; gap: 5px; padding: 6px 8px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; font: inherit; color: inherit; text-align: center; }
-.insp-link-text { font-size: 11.5px; font-weight: 600; color: var(--success); }
+.insp-link { flex: 1 1 120px; min-width: 96px; white-space: normal; display: grid; gap: 5px; padding: 6px 8px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; font: inherit; color: inherit; text-align: center; }
+.insp-link-text { font-size: 11.5px; font-weight: 600; color: var(--success); white-space: normal; overflow-wrap: break-word; line-height: 1.3; }
 .insp-link.short { cursor: pointer; border-color: var(--border-color); background: var(--hover-bg-faint); }
 .insp-link.short .insp-link-text { color: var(--warning); }
 .insp-link.bad .insp-link-text { color: var(--danger); }
@@ -3610,3 +3611,101 @@ label.app-menu-row { cursor: pointer; }
 .toolbar-mode-btn.active .insp-count .w { color: #fff; background: rgba(0, 0, 0, 0.28); }
 .toolbar-mode-btn:disabled { opacity: 0.4; cursor: default; }
 .toolbar-mode-btn:disabled:hover { background: transparent; }
+
+/* ─── Changes on branch (the model since its base, persistence/branchChanges) ─── */
+.branch-btn-wrap { position: relative; }
+/* A small button: the icon and the count; the name is for screen readers and the tooltip. */
+.branch-btn { gap: 5px; padding: 0 8px; }
+.branch-btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.branch-btn.active, .branch-btn.active:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--accent); }
+.branch-btn.unavailable { color: var(--text-muted); }
+.branch-btn[aria-disabled="true"]:not(.unavailable) { opacity: 0.55; cursor: default; }
+.branch-count { padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; background: var(--warning); }
+.branch-count.old { background: var(--danger); }
+.branch-pop {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; width: 400px; max-width: calc(100vw - 24px);
+  display: grid; gap: 8px; padding: 14px 16px; font-size: 12.5px; line-height: 1.5; text-align: left;
+  background: var(--bg-panel); color: var(--text-primary); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); box-shadow: 0 6px 24px rgba(20, 24, 40, 0.18);
+}
+.branch-pop p { margin: 0; }
+.branch-tip {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 61; display: none; gap: 2px; width: max-content; max-width: 320px;
+  padding: 6px 10px; border-radius: 6px; font-size: 12px; line-height: 1.4; text-align: left;
+  background: var(--bg-panel); color: var(--text-primary); border: 1px solid var(--border-color); box-shadow: 0 4px 14px rgba(20, 24, 40, 0.18);
+  pointer-events: none;
+}
+.branch-tip span { color: var(--text-muted); font-size: 11.5px; }
+.branch-btn-wrap:hover .branch-tip, .branch-btn:focus-visible + .branch-tip { display: grid; }
+.branch-muted { color: var(--text-muted); font-size: 11.5px; }
+.branch-cmd { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 5px 5px 9px; border-radius: 6px; background: var(--bg-app); border: 1px solid var(--border-color); }
+.branch-cmd code { font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 11.5px; overflow-wrap: break-word; min-width: 0; }
+.branch-cmd button { flex: none; font: inherit; font-size: 11.5px; padding: 2px 8px; border-radius: 5px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-primary); cursor: pointer; }
+/* Inspector › Implementation › This change */
+.insp-change { padding: 16px 18px; display: grid; gap: 14px; border-color: color-mix(in srgb, var(--accent) 35%, var(--border-color)); }
+.insp-change-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.insp-change-progress { display: grid; gap: 8px; }
+.insp-change-num { font-size: 18px; font-variant-numeric: tabular-nums; }
+.insp-change-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.insp-seg { display: inline-flex; border: 1px solid var(--border-color); border-radius: 7px; overflow: hidden; }
+.insp-seg button { border: 0; background: var(--bg-panel); color: var(--text-secondary); font: inherit; font-size: 12px; padding: 4px 11px; cursor: pointer; }
+.insp-seg button[aria-pressed="true"] { background: var(--text-primary); color: var(--bg-panel); }
+.insp-change-rows { display: grid; }
+.insp-change-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto; gap: 14px; align-items: start; padding: 10px 0; border-top: 1px solid var(--border-color); font-size: 12.5px; }
+.insp-change-row .insp-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+@media (max-width: 760px) { .insp-change-row { grid-template-columns: 1fr; } }
+.insp-kind { font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; border-radius: 4px; padding: 2px 6px; }
+.insp-kind.added { background: var(--success); }
+.insp-kind.changed { background: var(--warning); }
+.insp-kind.removed { background: var(--danger); }
+.insp-chip.gone { cursor: default; opacity: 0.7; }
+.insp-chip.gone .insp-chip-label { text-decoration: line-through; }
+.insp-change-old { display: grid; gap: 8px; }
+.insp-change-old p { margin: 0; }
+.insp-all { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+.insp-all-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+.insp-all-group h3 { margin: 0 0 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.insp-all-group.added h3 { color: var(--success); }
+.insp-all-group.changed h3 { color: var(--warning); }
+.insp-all-group.removed h3 { color: var(--danger); }
+.insp-all-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.insp-all-group li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.insp-all-fields { color: var(--warning); font-size: 11.5px; }
+.insp-all-toggle { border: 0; background: none; padding: 0; font: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); cursor: pointer; }
+.insp-all-rel { gap: 8px !important; }
+.insp-all-rel-kind { width: 10px; font-weight: 700; }
+.insp-all-rel.added .insp-all-rel-kind { color: var(--success); }
+.insp-all-rel.changed .insp-all-rel-kind { color: var(--warning); }
+.insp-all-rel.removed .insp-all-rel-kind { color: var(--danger); }
+.insp-changes { display: grid; gap: 14px; }
+.insp-changes-panel { padding: 14px 18px; }
+.insp-changes-panel .insp-all { border-top: 0; padding-top: 0; }
+.insp-all-link { margin-left: auto; align-self: start; border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--accent); cursor: pointer; white-space: nowrap; }
+/* Show on canvas: the views to choose from. */
+.insp-show { position: relative; display: inline-block; }
+.insp-show-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 220px; max-height: 320px; overflow-y: auto; display: grid; padding: 4px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-md, 0 6px 20px rgba(0,0,0,0.25)); }
+.insp-show .insp-show-menu button { display: flex; justify-content: space-between; gap: 14px; padding: 6px 9px; border: 0; border-radius: 5px; background: none; color: var(--text-primary); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; white-space: nowrap; }
+.insp-show .insp-show-menu button:hover, .insp-show .insp-show-menu button:focus-visible { background: var(--bg-app); }
+
+/* ─── Back, forward and History (NavHistory.tsx) ─── */
+.nav-history { position: relative; display: inline-flex; align-items: center; gap: 2px; }
+.nav-btn-wrap { position: relative; }
+.nav-btn { padding: 0 7px; min-width: 30px; justify-content: center; }
+.nav-btn.active { box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.nav-btn-wrap:hover .nav-tip, .nav-btn:focus-visible + .nav-tip { display: grid; }
+.nav-btn:disabled + .nav-tip { display: none !important; }
+.nav-menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 70; width: 460px; max-width: calc(100vw - 24px); display: grid; gap: 2px; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35); }
+.nav-menu-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 8px; font-size: 11.5px; color: var(--text-muted); }
+.nav-menu-head strong { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); }
+.nav-menu-list { display: grid; gap: 2px; max-height: min(60vh, 520px); overflow-y: auto; }
+.nav-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 6px 10px; border: 0; border-radius: 7px; background: none; color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
+.nav-row:hover, .nav-row:focus-visible { background: var(--bg-app); }
+.nav-row.current { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px var(--accent); }
+.nav-row.ahead { opacity: 0.55; }
+.nav-row-main { display: grid; gap: 2px; min-width: 0; }
+.nav-row-where { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; white-space: nowrap; overflow: hidden; }
+.nav-row-where b { font-weight: 600; }
+.nav-row-mode, .nav-row-when { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+.nav-chip { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 0 8px 0 2px; border: 1px solid var(--border-color); border-radius: 999px; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+.nav-chip i { font-style: normal; font-size: 9.5px; font-weight: 600; color: #fff; border-radius: 999px; padding: 1px 6px; }
+.nav-menu-foot { padding: 8px 8px 2px; margin-top: 4px; border-top: 1px solid var(--border-color); font-size: 11.5px; color: var(--text-muted); }

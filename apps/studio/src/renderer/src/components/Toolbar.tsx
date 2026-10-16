@@ -2,7 +2,10 @@ import React, { useCallback, useState, useEffect, useRef } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { host } from '../platform/host'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
+import { BranchChangesButton } from './BranchChanges'
+import { NavHistory } from './NavHistory'
 import { useInspectorStore } from '../persistence/inspector'
+import { useBranchStore } from '../persistence/branchChanges'
 import { dropPendingMode, useShownMode } from '../route'
 import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
@@ -509,7 +512,9 @@ function typingInTextField(target: EventTarget | null): boolean {
 function InspectorModeButton({ active, onClick }: { active: boolean; onClick: () => void }): React.ReactElement {
   const check = useInspectorStore((s) => s.check)
   const hasReport = useInspectorStore((s) => s.results !== null)
-  const enabled = hasReport || active
+  // With a base beside the model, This change lists the branch's changes.
+  const hasBase = useBranchStore((s) => s.base !== null)
+  const enabled = hasReport || hasBase || active
   const title = !enabled
     ? 'Inspector — no check report beside this model yet. Run radical check <model folder> --report <test reports> to make one; Studio picks it up by itself.'
     : check
@@ -719,6 +724,14 @@ export function Toolbar(): React.ReactElement {
         onCopyToClipboard={copyToClipboard}
         exportBusy={exportBusy}
       />
+      {/* Back, forward and the History list: in every perspective. */}
+      <div className="toolbar-sep" />
+      <NavHistory />
+      {/* Not in the Inspector: it lists the changes itself, and has no canvas to mark. */}
+      {appMode !== 'inspector' && (<>
+        <div className="toolbar-sep" />
+        <BranchChangesButton />
+      </>)}
       {/* Undo: the Inspector changes nothing. Fit, zoom and Smart Layout are
           on the canvas (CanvasControls). */}
       {appMode !== 'inspector' && (<>

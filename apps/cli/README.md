@@ -21,6 +21,25 @@ compares with the merge base of the current branch and the default branch
 change. Exit status: 0 the list was written, 2 it could not be made (not a
 git repository, an unknown ref).
 
+`--save-base` also writes the model at the base (its elements and relations,
+the commit, the branch and the time) to `.radical/base.json` in the folder,
+out of git like the rest of `.radical/`. Studio has no git: it compares the
+open model with that file as it is edited and shows the changes with
+Changes on branch, in the list of views, on the properties card and in the
+Inspector. `--quiet` prints nothing.
+
+## radical hooks
+
+```sh
+node apps/cli/dist/index.js hooks install path/to/model
+```
+
+Adds one marked line to the repository's `post-checkout`, `post-commit` and
+`post-merge` hooks that runs `radical diff <folder> --save-base --quiet`, so
+the base Studio compares with follows the branch checked out. What the hooks
+already do stays, a second install adds nothing, and the line never fails
+the git command. It runs the CLI that installed it.
+
 ## radical check
 
 ```sh

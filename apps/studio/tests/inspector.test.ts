@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import type { C4Node, DiagramData } from '@radical/common/c4'
-import { canvasViewFor, openWikiPage, revealOnCanvas, viewNodeSets, wikiViewFor } from '../src/renderer/src/navigation'
+import { canvasViewFor, canvasViewsFor, openWikiPage, revealOnCanvas, viewNodeSets, wikiViewFor, wikiViewsFor } from '../src/renderer/src/navigation'
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
@@ -84,6 +84,23 @@ describe('going to an element', () => {
     expect(s.appMode).toBe('designer')
     expect(s.activeViewId).toBe('v-api')
     expect(s.selectedNodeId).toBe('api')
+  })
+
+  it('offers every canvas that shows the element, the smallest first, and opens the one chosen', () => {
+    expect(canvasViewsFor('api').map((v) => v.id)).toEqual(['v-api', 'v-all'])
+    expect(canvasViewsFor('req').map((v) => v.name)).toEqual(['Requirements', 'Everything'])
+    vi.useFakeTimers()
+    useDiagramStore.getState().setAppMode('inspector')
+    revealOnCanvas('api', 'v-all')
+    vi.advanceTimersByTime(200)
+    expect(useDiagramStore.getState()).toMatchObject({ appMode: 'designer', activeViewId: 'v-all', selectedNodeId: 'api' })
+  })
+
+  it('offers every wiki view with a page for the element, and opens the one chosen', () => {
+    expect(wikiViewsFor('req').map((v) => v.id)).toEqual(['v-wiki'])
+    useDiagramStore.getState().setAppMode('inspector')
+    expect(openWikiPage('req', 'v-wiki')).toBe(true)
+    expect(useDiagramStore.getState()).toMatchObject({ appMode: 'designer', activeViewId: 'v-wiki', selectedNodeId: 'req' })
   })
 
   it('opens the wiki page of an element, or says there is none', () => {

@@ -4336,3 +4336,20 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .react-flow__handle.c4-handle-simple { opacity: 0; pointer-events: none; }
 /* Large enough to find from afar, in the block's corner. */
 .c4-node-simple-toggle { position: absolute; top: 6px; right: 6px; width: 1.4em; height: 1.4em; font-size: inherit; line-height: 1; }
+
+/* ─── Changes on branch: counts on the view cards, changed fields on the card ─── */
+.lp-branch-count { font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; padding: 0 6px; border-radius: 999px; color: var(--warning, #d97706); background: color-mix(in srgb, var(--warning, #d97706) 16%, transparent); }
+.pp-branch { display: grid; gap: 8px; }
+.pp-branch-mark { margin-left: 6px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; border-radius: 4px; padding: 1px 6px; }
+.pp-branch-mark.new { background: var(--success); }
+.pp-branch-mark.changed { background: var(--warning, #d97706); }
+.pp-branch-note { margin: 0; font-size: 12px; color: var(--text-muted); }
+.pp-branch-field { display: grid; gap: 2px; }
+.pp-branch-name { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+.pp-branch-text { margin: 0; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pp-branch-text del { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); text-decoration: line-through; }
+.pp-branch-text ins { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); text-decoration: none; }
+/* The card outside the canvas (Studio's Inspector): over the right side of
+   the page, as over a canvas, so opening it moves nothing beneath. */
+.right-panel.element-card { position: absolute; top: 0; right: 0; bottom: 0; margin: 10px; transform: none; z-index: 6; }
+.element-card-actions { display: flex; gap: 6px; padding: 10px 14px 0; }

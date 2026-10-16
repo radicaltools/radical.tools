@@ -1,0 +1,11 @@
+---
+id: "902025b0-72e0-492f-8578-a2c3f87e625c"
+type: "adr"
+label: "Navigation is the history of routes"
+alternatives: "A history of Studio's own beside the address: two lists that drift apart, and the browser's Back would do something else. A chip 'Back to the Inspector' after a jump: one case only. Leaving the selection out of the history (replaceState): rejected by the product owner, the selection is a place. A History section in the left panel: not in the Inspector, which has no left panel."
+consequences: "Studio's ‹ ›, the keys, the desktop app's mouse buttons and the browser's own Back and Forward walk the same list, and every place can be linked. Selecting elements fills the history, which the History list makes easy to skip through. A link that does not change the route adds nothing. Nothing of it reaches the model, its files or git: the history is the window's, and Studio's list of it (at most 50 places, as Chrome and Firefox keep per tab) is in the window's sessionStorage, so it survives a reload and goes with the tab. It cannot be cleared, since the browser's history cannot be."
+context: "Studio mirrored the view and the perspective into the address with replaceState only, so nothing kept where the user had been: after Show on canvas from the Inspector, getting back meant finding the tab and the element again, which the product owner did often. The route lacked the Inspector's tab and the selected element, so it did not name the place in full."
+date: "2026-10-16"
+decision: "The route names the place on screen in one canonical form (document, perspective, view, Inspector tab, selected element or the Inspector's open card, wiki page, milestone, slide; fixed order of segments). A change of place pushes the route onto the window's history (pushState), changes within 150 ms counting as one step; applying a route (going back or forward, a link) replaces instead. Back and forward are history.back() and history.forward(); a selection is a place too. Studio keeps a list of the routes it pushed, with labels and times, beside the history (navHistory.ts, its index in each entry's history state) only to name the places in the tooltips and the History list, since a page cannot read the browser's history."
+status: "accepted"
+---

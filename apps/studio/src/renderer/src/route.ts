@@ -8,12 +8,16 @@
 //
 // URL grammar (segments are key/value pairs, each value URI-encoded):
 //
-//   #/m/<mode>/v/<viewId>[/f/<focusId>][/s/<snapshotId>]
+//   #/m/<mode>/v/<viewId>[/t/<tab>][/f/<focusId>][/e/<elementId>][/s/<snapshotId>]
 //   #/d/<docId>/m/<mode>/v/<viewId>...[/p/<presId>/play/1/sl/<n>]
 //
 //   <mode>    designer | viewer | presenter | metamodel   (default: designer)
 //   <viewId>  a view id, or `canvas` for the default Canvas (activeViewId null)
+//   <tab>     the Inspector's tab (inspector mode only): changes | model |
+//             implementation | settings
 //   <focusId> a Wiki element node id (only applied for wiki views)
+//   <elementId> the selected element; in the Inspector, the element whose
+//             card is open in Changes
 //   <docId>   `ls:<id>` (a model in this app's list: browser storage or a
 //             browser folder), `fs:<absolutePath>` (a .radical file) or
 //             `md:<absolutePath>` (a Markdown folder); paths only where the
@@ -23,6 +27,10 @@
 //   <presId>/play/1/sl/<n>  presentation playback: which presentation (`p`), the
 //             `play` flag, and the 0-based slide index (`sl`). Only present while
 //             a presentation is actually running.
+//
+// The route names the place on screen in one form (segments in this order),
+// and every change of place pushes it onto the window's history, so Back and
+// Forward walk the places (navHistory.ts names them for the toolbar).
 
 import { useEffect } from 'react'
 import { create } from 'zustand'
@@ -30,6 +38,9 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from './store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
 import { host } from './platform/host'
+import { INSPECTOR_TABS, useInspectorNav, type InspectorTab } from './navigation'
+import { useBranchStore } from './persistence/branchChanges'
+import { pushEntry, replaceEntry, moveTo, restoreNav, saveNav, useNavHistory, type NavEntry } from './navHistory'
 
 /** The view token of All elements, the table of the whole model. Links
  *  written while it was a canvas say `canvas`, and still open it. */
@@ -45,8 +56,12 @@ export interface Route {
   mode: Mode
   /** view id, or `canvas` for the default Canvas. */
   view: string
+  /** The Inspector's tab (inspector mode only). */
+  tab?: InspectorTab
   /** wiki element node id (only meaningful for wiki views). */
   focus?: string
+  /** The selected element; in the Inspector, the element whose card is open. */
+  el?: string
   /** active milestone (snapshot) id. */
   snap?: string
   /** active presentation id (only when playing). */
@@ -108,7 +123,9 @@ export function parseHash(hash: string): Route | null {
     doc: map.d || undefined,
     mode,
     view: map.v && !isAllElements(map.v) ? map.v : ALL_ELEMENTS,
+    tab: mode === 'inspector' && (INSPECTOR_TABS as readonly string[]).includes(map.t) ? (map.t as InspectorTab) : undefined,
     focus: map.f || undefined,
+    el: map.e || undefined,
     snap: map.s || undefined,
     pres: map.p || undefined,
     play: map.play === '1' || undefined,
@@ -121,7 +138,9 @@ export function formatRoute(r: Route): string {
   if (r.doc) segs.push('d', encodeURIComponent(r.doc))
   segs.push('m', encodeURIComponent(r.mode))
   segs.push('v', encodeURIComponent(r.view))
+  if (r.tab && r.mode === 'inspector') segs.push('t', encodeURIComponent(r.tab))
   if (r.focus && !isAllElements(r.view)) segs.push('f', encodeURIComponent(r.focus))
+  if (r.el) segs.push('e', encodeURIComponent(r.el))
   if (r.snap) segs.push('s', encodeURIComponent(r.snap))
   if (r.play && r.pres) {
     segs.push('p', encodeURIComponent(r.pres), 'play', '1')
@@ -150,16 +169,27 @@ export function currentRoute(): Route {
     if (v && v.kind === 'wiki' && v.wikiFocusId) focus = v.wikiFocusId
   }
   const playing = s.presentationActive
+  const inspector = s.appMode === 'inspector'
+  const nav = useInspectorNav.getState()
+  const tab = inspector ? inspectorTabShown() : undefined
+  const el = inspector ? (tab === 'changes' ? nav.cardId ?? undefined : undefined) : s.selectedNodeId ?? undefined
   return {
     doc: currentDocToken(),
     mode: s.appMode,
     view: s.activeViewId ?? ALL_ELEMENTS,
+    tab,
     focus,
+    el,
     snap: s.activeSnapshotId ?? undefined,
     pres: playing ? (s.activePresentationId ?? undefined) : undefined,
     play: playing || undefined,
     slide: playing ? s.presentationSlideIndex : undefined,
   }
+}
+
+/** The Inspector's tab on screen: the one picked, else its first. */
+export function inspectorTabShown(): InspectorTab {
+  return useInspectorNav.getState().tab ?? (useBranchStore.getState().changes ? 'changes' : 'model')
 }
 
 // ─── Route → state ───────────────────────────────────────────────────────────
@@ -237,6 +267,17 @@ function applyViewModeFocus(route: Route): void {
         s.selectMilestone(route.snap)
       }
     }
+    // The Inspector's tab and card, or the selection: the route is the whole place.
+    if (route.mode === 'inspector') {
+      useInspectorNav.setState({ tab: route.tab ?? null, cardId: route.tab === 'changes' || (!route.tab && route.el) ? route.el ?? null : null })
+    } else {
+      const s = useDiagramStore.getState()
+      const el = route.el && s.c4Nodes[route.el] ? route.el : null
+      if (s.selectedNodeId !== el || (el === null && s.selectedNodeIds.length)) {
+        s.setSelectedNodeIds(el ? [el] : [])
+        s.selectNode(el)
+      }
+    }
   })
   applyPresentation(route)
 }
@@ -277,11 +318,45 @@ export function applyRoute(route: Route): void {
 
 // ─── State → URL ─────────────────────────────────────────────────────────────
 
-function writeUrl(): void {
-  const hash = formatRoute(currentRoute())
+const MODE_NAMES: Record<Mode, string> = { designer: 'Designer', viewer: 'Viewer', presenter: 'Presenter', metamodel: 'Metamodel', inspector: 'Inspector' }
+const TAB_NAMES: Record<InspectorTab, string> = { changes: 'Changes', model: 'Model quality', implementation: 'Implementation', settings: 'Settings' }
+
+/** What the History list says of a route: where, in which perspective, on what. */
+export function describeRoute(route: Route, hash = formatRoute(route), at = Date.now()): NavEntry {
+  const s = useDiagramStore.getState()
+  const view = isAllElements(route.view) ? 'All elements' : s.views[route.view]?.name ?? route.view
+  const where = route.mode === 'inspector' ? `Inspector › ${TAB_NAMES[route.tab ?? 'model']}`
+    : route.mode === 'metamodel' ? 'Metamodel' : view
+  const id = route.el ?? route.focus
+  const node = id ? s.c4Nodes[id] : undefined
+  const def = node ? s.metamodel?.nodeTypes[node.type] : undefined
+  return { hash, where, mode: MODE_NAMES[route.mode], ...(node ? { element: { label: node.label, type: def?.label ?? node.type, color: def?.color } } : {}), at }
+}
+
+/** The index the history entry on screen carries, if it is one of ours. */
+const stateIndex = (state: unknown): number | undefined =>
+  state && typeof (state as { navIndex?: unknown }).navIndex === 'number' ? (state as { navIndex: number }).navIndex : undefined
+
+/** Writes the route of the place on screen: a new history entry when the
+ *  place changed (`push`), else in place of the current one. */
+function writeUrl(push: boolean): void {
+  const route = currentRoute()
+  const hash = formatRoute(route)
   const current = '#/' + location.hash.replace(/^#\/?/, '')
-  if (current !== hash) {
-    history.replaceState(null, '', hash)
+  const nav = useNavHistory.getState()
+  if (current === hash) {
+    // The same place: keep the list's label up to date (a renamed view).
+    if (nav.entries.length) useNavHistory.setState(replaceEntry(nav, describeRoute(route, hash)))
+    return
+  }
+  if (push && nav.entries.length) {
+    const next = pushEntry(nav, describeRoute(route, hash))
+    useNavHistory.setState(next)
+    history.pushState({ navIndex: next.index }, '', hash)
+  } else {
+    const next = replaceEntry(nav, describeRoute(route, hash))
+    useNavHistory.setState(next)
+    history.replaceState({ navIndex: next.index }, '', hash)
   }
 }
 
@@ -292,17 +367,34 @@ export function startRouteSync(): () => void {
 
   const initial = parseHash(location.hash)
   if (initial) applyRoute(initial)
-  else writeUrl()
+  // The history starts at the place opened: one entry, ours. A link still
+  // waiting for its document keeps its address until it is applied.
+  // After a reload the window's history is still there, and the list kept
+  // in sessionStorage with it.
+  const start = currentRoute()
+  const startHash = initial ? '#/' + location.hash.replace(/^#\/?/, '') : formatRoute(start)
+  const restored = restoreNav(startHash, stateIndex(history.state))
+  useNavHistory.setState(restored ?? { entries: [describeRoute(start, startHash)], index: 0 })
+  history.replaceState({ navIndex: useNavHistory.getState().index }, '', startHash)
+  const unsubNav = useNavHistory.subscribe((state) => saveNav(state))
+  saveNav(useNavHistory.getState())
   // A route applied at once, or none: nothing waits.
   if (!pending) dropPendingMode()
 
   let timer: ReturnType<typeof setTimeout> | null = null
-  const schedule = (): void => {
+  // Changes that apply a route (Back, Forward, a link, a document that has
+  // loaded) write it in place; any other change of place adds an entry.
+  // Changes within 150 ms are one step.
+  let replaceNext = false
+  const schedule = (replace = false): void => {
     if (applying || pending) return
+    if (replace) replaceNext = true
     if (timer) clearTimeout(timer)
     timer = setTimeout(() => {
       timer = null
-      writeUrl()
+      const push = !replaceNext
+      replaceNext = false
+      writeUrl(push)
     }, 150)
   }
 
@@ -312,7 +404,7 @@ export function startRouteSync(): () => void {
     if (id !== pending.docId) {
       pending = null
       dropPendingMode()
-      schedule()
+      schedule(true)
       return
     }
     if (documents.awaitsReconnect(id)) return
@@ -320,7 +412,7 @@ export function startRouteSync(): () => void {
     pending = null
     applyViewModeFocus(route)
     // A view or slide the document doesn't have fell back; show what did open.
-    queueMicrotask(schedule)
+    queueMicrotask(() => schedule(true))
   })
 
   const onHash = (e: HashChangeEvent): void => {
@@ -334,14 +426,23 @@ export function startRouteSync(): () => void {
     applyRoute(r)
     // Should such a write have overwritten the address, write what was
     // applied (after `applying` is reset; a no-op when the two agree).
-    queueMicrotask(schedule)
+    queueMicrotask(() => schedule(true))
   }
   window.addEventListener('hashchange', onHash)
+
+  // Back or forward (Studio's buttons, the keys, the browser's): the list
+  // follows the entry the history landed on; hashchange applies its route.
+  const onPop = (e: PopStateEvent): void => {
+    const index = stateIndex(e.state)
+    if (index !== undefined) useNavHistory.setState(moveTo(useNavHistory.getState(), index))
+  }
+  window.addEventListener('popstate', onPop)
 
   const unsubDiagram = useDiagramStore.subscribe((s, p) => {
     if (
       s.appMode !== p.appMode ||
       s.activeViewId !== p.activeViewId ||
+      s.selectedNodeId !== p.selectedNodeId ||
       s.views !== p.views ||
       s.activeSnapshotId !== p.activeSnapshotId ||
       s.presentationActive !== p.presentationActive ||
@@ -352,9 +453,13 @@ export function startRouteSync(): () => void {
     }
   })
   const unsubDocs = useDocumentsStore.subscribe(() => schedule())
+  const unsubInspector = useInspectorNav.subscribe(() => schedule())
 
   return () => {
     window.removeEventListener('hashchange', onHash)
+    window.removeEventListener('popstate', onPop)
+    unsubInspector()
+    unsubNav()
     unsubLoad()
     pending = null
     dropPendingMode()

@@ -219,6 +219,17 @@ export async function readForgeRunFromHandle(root: FsDirHandle): Promise<string 
   }
 }
 
+/** The model's base (see modelBase) under the model folder's `.radical/`,
+ *  or null when there is none. */
+export async function readModelBaseFromHandle(root: FsDirHandle): Promise<string | null> {
+  try {
+    const dir = await root.getDirectoryHandle(SELECTION_DIR)
+    return await (await (await dir.getFileHandle('base.json')).getFile()).text()
+  } catch {
+    return null
+  }
+}
+
 /** What `radical check` keeps beside the model: `.radical/test-results.json`
  *  and the model's check.json; each null when there is none. */
 export async function readCheckFilesFromHandle(root: FsDirHandle): Promise<{ results: string | null; config: string | null }> {
