@@ -1,4 +1,4 @@
-import { test, expect } from '../../support/fixtures'
+import { test, expect, WHOLE } from '../../support/fixtures'
 
 // The list side of the metamodel editor (the Diagram tab has its own spec).
 
@@ -56,7 +56,7 @@ test.describe('custom properties of a type', () => {
     await closeEditor(page)
 
     await studio.node('api').click()
-    const tier = page.locator('.props-field', { hasText: 'Tier' }).locator('select')
+    const tier = studio.attribute('Tier')
     // It showed "gold" as if set; picking gold then changed nothing.
     await expect(tier).toHaveValue('')
     await tier.selectOption('gold')
@@ -128,8 +128,8 @@ test('a type\'s summary template, with how it reads, sets the summary the table 
 test('Reset to C4 preset is refused while the model holds what C4 has no type for', async ({ page, studio }) => {
   // It went through and left the governance elements as unknown types, with
   // nothing in the editor to bring the types back.
-  await studio.seed('order-machine')
-  await studio.open('canvas')
+  await studio.seedWhole('order-machine')
+  await studio.open(WHOLE)
   const before = await studio.nodes.count()
   await openEditor(page)
   page.once('dialog', (dialog) => { void dialog.accept() })

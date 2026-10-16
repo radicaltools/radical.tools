@@ -4,7 +4,6 @@ import type { C4Node, C4ElementType } from '@radical/common/c4'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
 import { addChoices, pipelineActive, pipelineOf, structureRows, viewShownNodes, type AddChoice, type ChainRow, type PipelineContext } from '@radical/common/viewPipeline'
 import { WikiMenu, type WikiMenuPage } from './WikiMenu'
-import { wizardFor } from '@radical/common/metamodel'
 import { nodeSummary, nodeSummaryDetail } from '@radical/common/nodeSummary'
 import { MarkdownText } from './MarkdownText'
 
@@ -57,15 +56,20 @@ function useTableWindow(kinds: ReadonlyArray<'row' | 'add'>, wrap: React.RefObje
     return () => { el.removeEventListener('scroll', onScroll); resize.disconnect(); if (frame) cancelAnimationFrame(frame) }
   }, [on, wrap])
 
-  // Each kind's height, as drawn.
+  // Each kind's height, as drawn. Set only when it changed: a state update
+  // asked for on every commit, even one that changes nothing, counts towards
+  // React's limit on nested updates while the window is moving.
+  const heightsRef = useRef(heights)
+  heightsRef.current = heights
   useLayoutEffect(() => {
     if (!on || !body.current) return
     const row = body.current.querySelector<HTMLElement>('tr.tv-row')?.getBoundingClientRect().height
     const add = body.current.querySelector<HTMLElement>('tr.tv-add-row')?.getBoundingClientRect().height
-    setHeights((h) => {
-      const next = { row: row || h.row, add: add || h.add }
-      return Math.abs(next.row - h.row) > 0.5 || Math.abs(next.add - h.add) > 0.5 ? next : h
-    })
+    const h = heightsRef.current
+    const next = { row: row || h.row, add: add || h.add }
+    // A pixel either way is rounding: taking it would move the window,
+    // draw other lines and measure again, round and round.
+    if (Math.abs(next.row - h.row) > 1 || Math.abs(next.add - h.add) > 1) setHeights(next)
   })
 
   // Where each line starts, from the top of the body.
@@ -100,7 +104,6 @@ export function TableView(): React.ReactElement {
   const relations        = useDiagramStore((s) => s.c4Relations)
   const updateNode       = useDiagramStore((s) => s.updateNode)
   const selectNode       = useDiagramStore((s) => s.selectNode)
-  const openNodeWizard   = useDiagramStore((s) => s.openNodeWizard)
   const selectedNodeId   = useDiagramStore((s) => s.selectedNodeId)
   const activeView       = useDiagramStore((s) => s.activeViewId ? s.views[s.activeViewId] : undefined)
   const readOnly         = useDiagramStore((s) => s.appMode !== 'designer')
@@ -249,7 +252,8 @@ export function TableView(): React.ReactElement {
     setEditCell({ rowId, draft: current, initial: current })
   }, [readOnly])
 
-  // The element's fields: its properties in the right panel, opened if folded.
+  // A click on a row shows the element's attributes in the properties card
+  // (brought back if ✕ hid it); a double-click on its name renames it here.
   const openProperties = (id: string) => {
     selectNode(id)
     ;(window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel?.()
@@ -294,8 +298,8 @@ export function TableView(): React.ReactElement {
     return (
       <span
         className="tv-cell-value tv-chain-cell"
-        onClick={(e) => { e.stopPropagation(); startEdit(node.id, rawVal) }}
-        title={rawVal || 'Click to edit'}
+        onDoubleClick={(e) => { e.stopPropagation(); startEdit(node.id, rawVal) }}
+        title={readOnly ? rawVal : `${rawVal ? `${rawVal} · ` : ''}Double-click to rename`}
       >
         {Array.from({ length: row.depth }, (_, i) => <span key={i} className="tv-tree-guide" aria-hidden />)}
         {row.hasChildren ? (
@@ -308,23 +312,10 @@ export function TableView(): React.ReactElement {
         <span className="tv-chain-type" style={{ background: NODE_COLORS[node.type] ?? metamodel.nodeTypes[node.type]?.color ?? '#555', color: NODE_FG[node.type] ?? '#fff' }}>
           {metamodel.nodeTypes[node.type]?.label ?? TYPE_LABELS[node.type] ?? node.type}
         </span>
-        {rawVal || <span className="tv-cell-placeholder">Click to edit…</span>}
+        {rawVal || <span className="tv-cell-placeholder">{readOnly ? '—' : 'Double-click to name…'}</span>}
         {row.alsoIn > 0 && (
           <span className="tv-also-in" title={`Also under ${row.alsoIn} other element${row.alsoIn === 1 ? '' : 's'}`}>+{row.alsoIn}</span>
         )}
-        <span className="tv-row-actions">
-          <button className="tv-row-btn" aria-label={`Properties of ${rawVal}`} title="Open its properties"
-            onClick={(e) => { e.stopPropagation(); openProperties(node.id) }}>
-            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden><path d="M3 4h10M3 8h10M3 12h6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
-          </button>
-          {/* The wizard's place stays when the type has none: the buttons do not move from row to row. */}
-          {!readOnly && wizardFor(metamodel, node.type) ? (
-            <button className="tv-row-btn" aria-label={`Wizard for ${rawVal}`} title="Fill in with its wizard"
-              onClick={(e) => { e.stopPropagation(); openNodeWizard(node.id) }}>
-              <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden><path d="M3 13 L10 6 M9 3 l.6 1.4L11 5l-1.4.6L9 7l-.6-1.4L7 5l1.4-.6z M13 8l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
-          ) : !readOnly && <span className="tv-row-btn-space" aria-hidden />}
-        </span>
       </span>
     )
   }
@@ -348,7 +339,7 @@ export function TableView(): React.ReactElement {
                 key={line.row.path}
                 data-node-id={line.row.node.id}
                 className={`tv-row tv-chain-row depth-${Math.min(line.row.depth, 3)}${selectedNodeId === line.row.node.id ? ' tv-row-selected' : ''}`}
-                onClick={(e) => { e.stopPropagation(); selectNode(line.row.node.id) }}
+                onClick={(e) => { e.stopPropagation(); openProperties(line.row.node.id) }}
               >
                 <td className="tv-td">{renderName(line.row)}</td>
                 <td className="tv-td">{renderSummary(line.row.node)}</td>

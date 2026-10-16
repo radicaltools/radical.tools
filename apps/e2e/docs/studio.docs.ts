@@ -54,7 +54,9 @@ async function settle(page: Page): Promise<void> {
 
 async function dismissToasts(page: Page): Promise<void> {
   const close = page.getByRole('button', { name: 'Dismiss notification' })
-  while (await close.count()) await close.first().click().catch(() => {})
+  // A toast still sliding in is not "stable": a click without a timeout
+  // waited for it until the test ran out of time.
+  while (await close.count()) await close.first().click({ timeout: 2000 }).catch(() => {})
   await expect(page.locator('.toast')).toHaveCount(0)
 }
 

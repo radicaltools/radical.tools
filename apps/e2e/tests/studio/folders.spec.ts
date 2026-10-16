@@ -44,9 +44,9 @@ async function saveAsFolder(page: Page): Promise<void> {
   await models.getByRole('button', { name: 'Close' }).click()
 }
 
-/** The properties-panel Label field of the selected element. */
+/** The properties card's name field of the selected element. */
 function labelField(page: Page) {
-  return page.locator('.props-field').filter({ has: page.getByText('Label', { exact: true }) }).locator('input')
+  return page.locator('.right-panel.open').getByLabel('Name', { exact: true })
 }
 
 async function rename(page: Page, from: string, to: string): Promise<void> {
@@ -225,7 +225,8 @@ test('Open → Folder… on the welcome screen opens a model folder', async ({ p
   await page.getByRole('button', { name: 'Folder…' }).click()
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
-  await expect(studio.node('customer')).toBeVisible()
+  // It opens on All elements, the table of the whole model.
+  await expect(studio.row('customer')).toBeVisible()
   await openModels(page)
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
 })

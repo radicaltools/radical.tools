@@ -5,4 +5,4 @@ label: "Canvas"
 technology: "ReactFlow 11 (@radical/ui)"
 ---
 
-packages/ui/src/components/Canvas.tsx, ElementPalette.tsx, nodes/C4Nodes.tsx, edges/RelationEdge.tsx. The interactive editor for C4 and governance elements and their relations, with routed edges and mockup wireframes, and in Designer the Elements palette above it.
+packages/ui/src/components/Canvas.tsx, ElementPalette.tsx, propertiesCover.ts, nodes/C4Nodes.tsx, edges/RelationEdge.tsx. The interactive editor for C4 and governance elements and their relations, with routed edges and mockup wireframes, and in Designer the Elements palette down its left side; its camera fits and frames in the part the palette and the properties card leave free.

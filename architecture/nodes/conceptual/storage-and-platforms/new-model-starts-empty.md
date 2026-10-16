@@ -5,6 +5,6 @@ label: "New model starts empty"
 gherkin: ""
 given: "the Welcome screen"
 tests: "apps/e2e/tests/studio/boot.spec.ts › first visit › a new model starts empty"
-then: "the canvas has no elements and Quick Search reads \"Search 0 nodes\""
+then: "it opens on All elements, an empty table with a + row to add the first element"
 when: "the user clicks New model"
 ---

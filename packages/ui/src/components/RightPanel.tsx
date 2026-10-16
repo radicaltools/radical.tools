@@ -6,7 +6,8 @@ import { type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } f
 import { resolveEarsSubject, isReservedPropertyKey, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { ViewPipelinePanel } from './ViewPipelinePanel'
-import { StructurePanel } from './StructurePanel'
+import { MarkdownText } from './MarkdownText'
+import { isMarkdownField } from '@radical/common/markdown'
 import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
@@ -70,27 +71,70 @@ function AutoResizeTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElem
 const MARKDOWN_HINT = 'Markdown: **bold**, _italic_, `code`, - lists, [links](https://…)'
 
 // ── Accordion section ────────────────────────────────────────────────────────
+// A section of the left panel: its icon, name and count, and folded a line
+// that says what is in it. Open, it takes the panel's free height and
+// scrolls on its own; the folded ones stay under it.
+
+const SECTION_ICONS: Record<'views' | 'milestones' | 'sequences', string> = {
+  views: 'M8 2 L14 5 L8 8 L2 5 Z M2 8 L8 11 L14 8 M2 11 L8 14 L14 11',
+  milestones: 'M4 14 V2.5 M4 3 H12 L10.5 5.5 L12 8 H4',
+  sequences: 'M2 5 H11 M8.5 2.5 L11 5 L8.5 7.5 M14 11 H5 M7.5 8.5 L5 11 L7.5 13.5',
+}
+
+/** Each section's colour: its icon, its count, the cards in it. */
+const SECTION_COLORS: Record<keyof typeof SECTION_ICONS, string> = {
+  views: '#3b82f6',
+  milestones: '#f59e0b',
+  sequences: '#8b5cf6',
+}
+
+/** Each view type's colour, on its card's icon and type name. */
+const VIEW_KIND_COLORS: Record<string, string> = {
+  structure: '#3b82f6',
+  flow: '#f59e0b',
+  hierarchy: '#14b8a6',
+  table: '#22c55e',
+  matrix: '#a855f7',
+  wiki: '#ec4899',
+}
 
 function AccordionSection({
-  title, defaultOpen = true, children, count, open: openProp, onToggle,
-}: { title: string; defaultOpen?: boolean; children: React.ReactNode; count?: number; open?: boolean; onToggle?: () => void }) {
+  title, icon, preview, defaultOpen = true, children, count, open: openProp, onToggle,
+}: {
+  title: string
+  icon?: keyof typeof SECTION_ICONS
+  /** What a folded section shows under its name. */
+  preview?: string
+  defaultOpen?: boolean
+  children: React.ReactNode
+  count?: number
+  open?: boolean
+  onToggle?: () => void
+}) {
   const [openState, setOpenState] = useState(defaultOpen)
   const controlled = openProp !== undefined
   const open = controlled ? openProp : openState
   const toggle = controlled ? onToggle! : () => setOpenState((o) => !o)
   return (
-    <div className="lp-section">
-      <button className="lp-section-header" onClick={toggle}>
-        <span className="lp-section-title">
-          <svg className={`lp-section-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10" aria-hidden>
-            <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span>{title}</span>
-          {count != null && count > 0 && <span className="lp-section-count">{count}</span>}
+    <div className={`lp-section${open ? ' open' : ''}`} style={icon ? { ['--sec-color' as string]: SECTION_COLORS[icon] } : undefined}>
+      <button className="lp-section-header" onClick={toggle} aria-expanded={open}>
+        {icon && (
+          <span className="lp-section-icon" aria-hidden>
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={SECTION_ICONS[icon]} /></svg>
+          </span>
+        )}
+        <span className="lp-section-text">
+          <span className="lp-section-title">{title}</span>
+          {!open && preview && <span className="lp-section-preview">{preview}</span>}
         </span>
+        {count != null && count > 0 && <span className="lp-section-count">{count}</span>}
+        <svg className={`lp-section-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10" aria-hidden>
+          <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       </button>
-      <div className={`lp-section-body${open ? ' open' : ''}`}>
-        <div><div className="lp-section-body-pad">{children}</div></div>
+      {/* A folded section keeps its content (its state, its menus), unseen. */}
+      <div className={`lp-section-body${open ? ' open' : ''}`} hidden={!open}>
+        <div className="lp-section-body-pad">{children}</div>
       </div>
     </div>
   )
@@ -128,13 +172,6 @@ const Icon = {
     <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
       <path d="M2.5 5.5 h2 l1 -1.5 h5 l1 1.5 h2 v7 h-11 z"/>
       <circle cx="8" cy="9" r="2.3"/>
-    </svg>
-  ),
-  Globe: () => (
-    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4">
-      <circle cx="8" cy="8" r="5.5"/>
-      <ellipse cx="8" cy="8" rx="2.5" ry="5.5"/>
-      <path d="M2.5 8 h11"/>
     </svg>
   ),
   Layers: () => (
@@ -407,9 +444,10 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
           <div key={seq.id}>
             <div
               className={`lp-card lp-view-card${isActive ? ' active' : ''}`}
+              style={{ ['--kind-color' as string]: SECTION_COLORS.sequences }}
               onClick={() => setActiveSequence(isActive ? null : seq.id)}
             >
-              <div className="lp-view-icon" style={{ color: isActive ? 'var(--accent)' : undefined }}>
+              <div className="lp-view-icon">
                 <Icon.Bolt />
               </div>
               <div className="lp-card-body">
@@ -1153,16 +1191,17 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
       <div key={v.id}>
         <div
           className={`lp-card lp-view-card${isActive ? ' active' : ''}`}
+          style={{ ['--kind-color' as string]: VIEW_KIND_COLORS[badge] }}
           onClick={() => setActiveView(v.id)}
         >
-          <div className="lp-view-icon" style={{ color: isDynamic ? 'var(--accent)' : undefined }}>
+          <div className="lp-view-icon">
             {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : <Icon.Layers />}
           </div>
           <div className="lp-card-body">
             <div className="lp-card-title">{v.name}</div>
             <div className="lp-card-meta">
               <span>{viewNodeCount(v, counts[v.id])}</span>
-              <span style={{ ...VIEW_BADGE_STYLE, color: badge === 'structure' ? 'var(--text-muted)' : 'var(--accent)' }}>{badge}</span>
+              <span className="lp-view-kind" style={VIEW_BADGE_STYLE}>{badge}</span>
             </div>
             {viewpoint && (
               <div className="lp-card-viewpoint" title={viewpoint.description ?? `Viewpoint ${viewpoint.label}`}>
@@ -1219,16 +1258,20 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
 
   return (
     <div className="lp-view-list">
+      {/* All elements: the whole model as a table, always first and never
+          deleted. A canvas of the whole model is a structure view that
+          lists no elements. */}
       <div
         className={`lp-card lp-view-card${activeViewId === null ? ' active' : ''}`}
+        style={{ ['--kind-color' as string]: VIEW_KIND_COLORS.table }}
         onClick={() => setActiveView(null)}
       >
-        <div className="lp-view-icon"><Icon.Globe /></div>
+        <div className="lp-view-icon"><Icon.TableGrid /></div>
         <div className="lp-card-body">
-          <div className="lp-card-title">Structure view</div>
+          <div className="lp-card-title">All elements</div>
           <div className="lp-card-meta">
             <span>{totalNodes} {totalNodes === 1 ? 'node' : 'nodes'}</span>
-            <span style={{ ...VIEW_BADGE_STYLE, color: 'var(--text-muted)' }}>structure</span>
+            <span className="lp-view-kind" style={VIEW_BADGE_STYLE}>table</span>
           </div>
         </div>
       </div>
@@ -1237,18 +1280,18 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
         <div className="lp-add-view" ref={newMenuRef}>
           <button className="lp-add-btn" aria-expanded={viewpoints.length ? newMenuOpen : undefined} onClick={() => {
             if (viewpoints.length) setNewMenuOpen((o) => !o)
-            else openNew(addView(`View ${viewList.length + 1}`))
+            else openNew(addView(`View ${viewList.length + 1}`, 'table'))
           }}>
             <Icon.Plus /> New view
           </button>
           {newMenuOpen && createPortal(
             <div className="lp-add-view-menu" role="menu" aria-label="New view" ref={newMenuPopRef} style={newMenuAt}>
               <div className="lp-add-view-head">New view</div>
-              <button className="lp-add-view-option" role="menuitem" onClick={() => openNew(addView(`View ${viewList.length + 1}`))}>
+              <button className="lp-add-view-option" role="menuitem" onClick={() => openNew(addView(`View ${viewList.length + 1}`, 'table'))}>
                 <span className="lp-add-view-icon"><Icon.Plus /></span>
                 <span className="lp-add-view-text">
                   <span className="lp-add-view-name">Blank view</span>
-                  <span className="lp-add-view-desc">A structure view of every element; pick its view type and filter in its properties.</span>
+                  <span className="lp-add-view-desc">A table of every element; pick its view type and filter in its properties.</span>
                 </span>
               </button>
               <div className="lp-add-view-section">Viewpoints <span>from the metamodel</span></div>
@@ -1390,9 +1433,15 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
   const isReadOnly = readOnly || mode !== 'designer'
   const viewsCount = useDiagramStore((s) => Object.keys(s.views).length)
   const snapshotsCount = useDiagramStore((s) => s.snapshots.length)
-  // The element types are in the palette under the toolbar (ElementPalette).
+  const sequencesCount = useDiagramStore((s) => Object.keys(s.sequences).length)
+  // What each folded section says it holds.
+  const activeViewName = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId]?.name : undefined))
+  const latestMilestone = useDiagramStore((s) => s.snapshots[s.snapshots.length - 1]?.name)
+  const sequenceNames = useDiagramStore(useCallback((s: { sequences: Record<string, { name: string }> }) =>
+    Object.values(s.sequences).map((q) => q.name).join(', '), []))
+  // The element types are in the palette on the canvas (ElementPalette).
   // One section open at a time; a click on the open one folds it.
-  const [openSection, setOpenSection] = useState<'views' | 'milestones' | null>('views')
+  const [openSection, setOpenSection] = useState<'views' | 'milestones' | 'sequences' | null>('views')
   type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string }
   const [paneContent, setPaneContent] = useState<PaneContent | null>(null)
   const hasPaneContent = !!paneContent
@@ -1407,8 +1456,8 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
         <div className={`rp-slider${hasPaneContent ? ' show-props' : ''}`}>
 
           {/* Pane 1 — accordion */}
-          <div className="rp-pane">
-            <AccordionSection title="Views" count={viewsCount}
+          <div className="rp-pane lp-sections">
+            <AccordionSection title="Views" icon="views" count={viewsCount} preview={`Open: ${activeViewName ?? 'All elements'}`}
               open={openSection === 'views'} onToggle={() => setOpenSection((o) => (o === 'views' ? null : 'views'))}>
               <ViewList
                 readOnly={isReadOnly}
@@ -1416,9 +1465,15 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
                 onOpenFolder={!isReadOnly ? (path) => { setPaneContent({ kind: 'folder', id: path }); setOpenSection('views') } : undefined}
               />
             </AccordionSection>
-            <AccordionSection title="Milestones" count={snapshotsCount}
+            <AccordionSection title="Milestones" icon="milestones" count={snapshotsCount}
+              preview={latestMilestone ? `Latest: ${latestMilestone}` : 'None saved yet'}
               open={openSection === 'milestones'} onToggle={() => setOpenSection((o) => (o === 'milestones' ? null : 'milestones'))}>
               <SnapshotList readOnly={isReadOnly} onOpenProps={!isReadOnly ? (id) => { setPaneContent({ kind: 'milestone', id }); setOpenSection('milestones') } : undefined} />
+            </AccordionSection>
+            <AccordionSection title="Sequences" icon="sequences" count={sequencesCount}
+              preview={sequenceNames || 'None yet'}
+              open={openSection === 'sequences'} onToggle={() => setOpenSection((o) => (o === 'sequences' ? null : 'sequences'))}>
+              <SequenceList readOnly={isReadOnly} compact={true} />
             </AccordionSection>
           </div>
 
@@ -1802,7 +1857,179 @@ function HubTemplateSection({
   )
 }
 
-function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
+// ── Properties panel ─────────────────────────────────────────────────────────
+// The attributes of what is selected (an element, a relation, a sequence) in a
+// card over the right side of the canvas: it slides in on a selection and out
+// when nothing is selected, and never resizes the canvas under it. Each
+// attribute is a row, its name on the left and its value on the right; a
+// value reads as text, outlines on hover and edits in place. A long
+// (Markdown) field is shown rendered under its name, and a click edits it.
+
+/** The value a field shows: what is set, else its default. */
+function isEmptyValue(v: unknown): boolean {
+  return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
+}
+
+/** One attribute row. `missing` marks a required one with no value. */
+function AttrRow({ label, missing = false, children }: { label: string; missing?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="pp-row">
+      <div className="pp-label" title={label}>
+        <span>{label}</span>
+        {missing && <span className="pp-missing" title="Required, not set" aria-label="required, not set" />}
+      </div>
+      <div className="pp-value">{children}</div>
+    </div>
+  )
+}
+
+/** A long field: rendered Markdown that a click turns into its editor; the
+ *  editor goes back to the text when it loses focus or on Escape. */
+function MarkdownField({ label, value, readOnly, loading = false, onChange }: {
+  label: string; value: string; readOnly: boolean; loading?: boolean; onChange: (v: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  if (loading) return <div className="pp-md empty">Loading…</div>
+  if (editing && !readOnly) {
+    return (
+      <AutoResizeTextarea autoFocus aria-label={label} value={value} placeholder={MARKDOWN_HINT}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={(e) => { const t = e.currentTarget; t.setSelectionRange(t.value.length, t.value.length) }}
+        onBlur={() => setEditing(false)}
+        onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); e.currentTarget.blur() } }} />
+    )
+  }
+  const edit = () => { if (!readOnly && !window.getSelection()?.toString()) setEditing(true) }
+  return (
+    <div className={`pp-md${readOnly ? '' : ' editable'}${value ? '' : ' empty'}`}
+      role={readOnly ? undefined : 'button'} tabIndex={readOnly ? undefined : 0}
+      aria-label={readOnly ? undefined : `Edit ${label}`}
+      title={readOnly ? undefined : 'Click to edit'}
+      onClick={edit}
+      onKeyDown={(e) => { if (!readOnly && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setEditing(true) } }}>
+      {value ? <MarkdownText text={value} /> : <span className="pp-placeholder">{readOnly ? '—' : `Add ${label.toLowerCase()}…`}</span>}
+    </div>
+  )
+}
+
+/** The control for one short attribute: text, number, choice, yes/no or a
+ *  reference to other elements. */
+function AttrValue({ def, value, readOnly, onChange }: {
+  def: Pick<PropertyDef, 'key' | 'label' | 'type' | 'options' | 'default' | 'refType' | 'multiple'>
+  value: unknown
+  readOnly: boolean
+  onChange: (v: unknown) => void
+}) {
+  const shown = value ?? def.default
+  if (def.type === 'ref') {
+    return <RefPicker def={def as PropertyDef} value={value} readOnly={readOnly} className="pp-input pp-select" onChange={(v) => !readOnly && onChange(v)} />
+  }
+  if (def.type === 'boolean') {
+    return (
+      <label className="pp-check">
+        <input type="checkbox" aria-label={def.label} checked={Boolean(shown)} disabled={readOnly}
+          onChange={(e) => !readOnly && onChange(e.target.checked)} />
+      </label>
+    )
+  }
+  if (def.type === 'enum' && def.options) {
+    return (
+      <select className="pp-input pp-select" aria-label={def.label} value={String(shown ?? '')} disabled={readOnly}
+        onChange={(e) => !readOnly && onChange(e.target.value || undefined)}>
+        {/* Without a value the select showed its first option as if
+            set: picking that one changed nothing, so it could not be
+            chosen and a required property stayed "missing". */}
+        {isEmptyValue(shown) && <option value="">—</option>}
+        {def.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+      </select>
+    )
+  }
+  return (
+    <input className="pp-input" aria-label={def.label} placeholder="—"
+      type={def.type === 'number' ? 'number' : undefined}
+      value={String(shown ?? '')} readOnly={readOnly}
+      onChange={(e) => {
+        if (readOnly) return
+        // An emptied number clears the value (Number('') saved 0).
+        onChange(def.type === 'number' ? (e.target.value === '' ? undefined : Number(e.target.value)) : e.target.value)
+      }} />
+  )
+}
+
+type PanelMenuItem = { label: string; danger?: boolean; onClick: () => void }
+
+/** The card's head: the type, the name (edited in place), where it sits,
+ *  the wizard when its type has one, a ⋯ menu with what is done to it
+ *  rather than written in it, and ✕. */
+function PanelHeader({ typeLabel, color, iconPath, title, titlePlaceholder, readOnly, onTitle, context, onWizard, menu, onClose }: {
+  typeLabel: string
+  color: string
+  iconPath?: string
+  title: string
+  titlePlaceholder: string
+  readOnly: boolean
+  onTitle?: (v: string) => void
+  context?: React.ReactNode
+  /** Opens the type's wizard, when it has one. */
+  onWizard?: () => void
+  menu: PanelMenuItem[]
+  onClose: () => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useOutsideClick([menuRef], menuOpen, useCallback(() => setMenuOpen(false), []))
+  return (
+    <div className="pp-head">
+      <div className="pp-head-bar">
+        <span className="pp-type" style={{ ['--type-color' as string]: color }}>
+          {iconPath
+            ? <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden><path d={iconPath} /></svg>
+            : <span className="pp-type-dot" aria-hidden />}
+          {typeLabel}
+        </span>
+        <span className="pp-head-actions">
+          {onWizard && (
+            <button type="button" className="pp-wizard-btn" title="Fill in with the wizard" onClick={onWizard}>
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M2.5 13.5 L10 6" /><path d="M9 4.5 L11.5 7" /><path d="M12 1.5v2M11 2.5h2M14 5.5v1.6M13.2 6.3h1.6M6 1.8v1.4M5.3 2.5h1.4" />
+              </svg>
+              Wizard
+            </button>
+          )}
+          {menu.length > 0 && (
+            <div className="pp-menu-wrap" ref={menuRef}>
+              <button type="button" className="pp-icon-btn" aria-label="More actions" aria-expanded={menuOpen}
+                title="More actions" onClick={() => setMenuOpen((o) => !o)}>⋯</button>
+              {menuOpen && (
+                <div className="pp-menu" role="menu">
+                  {menu.map((m) => (
+                    <button type="button" role="menuitem" key={m.label} className={`pp-menu-item${m.danger ? ' danger' : ''}`}
+                      onClick={() => { setMenuOpen(false); m.onClick() }}>{m.label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <button type="button" className="pp-icon-btn" aria-label="Close properties" title="Close" onClick={onClose}>✕</button>
+        </span>
+      </div>
+      {(title || titlePlaceholder) && (onTitle && !readOnly
+        ? <input className="pp-title" aria-label="Name" value={title} placeholder={titlePlaceholder}
+            onChange={(e) => onTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }} />
+        : <div className={`pp-title${title ? '' : ' empty'}`}>{title || titlePlaceholder}</div>)}
+      {context && <div className="pp-context">{context}</div>}
+    </div>
+  )
+}
+
+/** A link to another element in the head (a parent, a relation's end). */
+function NodeLink({ id, label }: { id: string; label: string }) {
+  const selectNode = useDiagramStore((s) => s.selectNode)
+  return <button type="button" className="pp-link" onClick={() => selectNode(id)}>{label}</button>
+}
+
+function PropertiesContent({ readOnly = false, onClose }: { readOnly?: boolean; onClose: () => void }) {
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
@@ -1829,253 +2056,127 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
   // ── Node ──────────────────────────────────────────────────────────────────
   if (selectedNodeId && c4Nodes[selectedNodeId]) {
     const node = c4Nodes[selectedNodeId]
+    const record = node as unknown as Record<string, unknown>
     const descriptionPending = !!pendingBodyNodeIds[node.id]
-
-    // Generic field renderer — handles built-in typed fields and arbitrary
-    // extra properties stored on the node by the metamodel property definitions.
-    const field = (
-      label: string,
-      key: string,
-      type: 'text' | 'textarea' | 'checkbox' = 'text'
-    ) => {
-      const value = (node as unknown as Record<string, unknown>)[key]
-      const onChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        if (readOnly) return
-        updateNode(node.id, {
-          [key]: type === 'checkbox'
-            ? (e.target as HTMLInputElement).checked
-            : e.target.value,
-        } as Parameters<typeof updateNode>[1])
-      }
-      if (type === 'checkbox') {
-        return (
-          <div className="props-field" key={key}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-              <input type="checkbox" checked={Boolean(value)} onChange={onChange}
-                disabled={readOnly}
-                style={{ accentColor: 'var(--accent)' }} />
-              {label}
-            </label>
-          </div>
-        )
-      }
-      if (type === 'textarea') {
-        if (key === 'description' && descriptionPending) {
-          return (
-            <div className="props-field" key={key}>
-              <label className="props-label">{label}</label>
-              <AutoResizeTextarea value="Loading…" onChange={() => {}} readOnly />
-            </div>
-          )
-        }
-        return (
-          <div className="props-field" key={key}>
-            <label className="props-label">{label}</label>
-            <AutoResizeTextarea value={String(value ?? '')} onChange={onChange}
-              readOnly={readOnly} placeholder={MARKDOWN_HINT} />
-          </div>
-        )
-      }
-      return (
-        <div className="props-field" key={key}>
-          <label className="props-label">{label}</label>
-          <input className="props-input" value={String(value ?? '')} onChange={onChange}
-            readOnly={readOnly} />
-        </div>
-      )
+    const set = (key: string, v: unknown) => {
+      if (!readOnly) updateNode(node.id, { [key]: v } as Parameters<typeof updateNode>[1])
     }
 
-    // Renders a metamodel PropertyDef as a form control, including enum selects.
-    const metamodelField = (p: PropertyDef) => {
-      const value = (node as unknown as Record<string, unknown>)[p.key]
-      if (p.type === 'ref') {
-        return (
-          <div className="props-field" key={p.key}>
-            <label className="props-label">{p.label}</label>
-            <RefPicker def={p} value={value} readOnly={readOnly}
-              onChange={(v) => !readOnly && updateNode(node.id, { [p.key]: v } as Parameters<typeof updateNode>[1])} />
-          </div>
-        )
-      }
-      const onChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        if (readOnly) return
-        updateNode(node.id, {
-          [p.key]: p.type === 'boolean'
-            ? (e.target as HTMLInputElement).checked
-            : p.type === 'number'
-              // An emptied field clears the value (Number('') saved 0).
-              ? (e.target.value === '' ? undefined : Number(e.target.value))
-              : e.target.value,
-        } as Parameters<typeof updateNode>[1])
-      }
-      if (p.type === 'boolean') {
-        return (
-          <div className="props-field" key={p.key}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-              <input type="checkbox" checked={Boolean(value ?? p.default)} onChange={onChange as ChangeEvent<HTMLInputElement>['target']['onchange'] extends infer _ ? any : any}
-                disabled={readOnly}
-                style={{ accentColor: 'var(--accent)' }} />
-              {p.label}
-            </label>
-          </div>
-        )
-      }
-      if (p.type === 'enum' && p.options) {
-        return (
-          <div className="props-field" key={p.key}>
-            <label className="props-label">{p.label}</label>
-            <select
-              className="props-input"
-              value={String(value ?? p.default ?? '')}
-              disabled={readOnly}
-              onChange={onChange as ChangeEvent<HTMLSelectElement>['target']['onchange'] extends infer _ ? any : any}
-            >
-              {/* Without a value the select showed its first option as if
-                  set: picking that one changed nothing, so it could not be
-                  chosen and a required property stayed "missing". */}
-              {(value ?? p.default ?? '') === '' && <option value="">(not set)</option>}
-              {p.options.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          </div>
-        )
-      }
-      if (p.type === 'textarea') {
-        if (p.key === 'description' && descriptionPending) {
-          return (
-            <div className="props-field" key={p.key}>
-              <label className="props-label">{p.label}</label>
-              <AutoResizeTextarea value="Loading…" onChange={() => {}} readOnly />
-            </div>
-          )
-        }
-        return (
-          <div className="props-field" key={p.key}>
-            <label className="props-label">{p.label}</label>
-            <AutoResizeTextarea value={String(value ?? p.default ?? '')}
-              onChange={onChange} readOnly={readOnly} placeholder={MARKDOWN_HINT} />
-          </div>
-        )
-      }
-      return (
-        <div className="props-field" key={p.key}>
-          <label className="props-label">{p.label}</label>
-          <input className="props-input" type={p.type === 'number' ? 'number' : undefined}
-            value={String(value ?? p.default ?? '')} onChange={onChange} readOnly={readOnly} />
-        </div>
-      )
-    }
-
-    // Metamodel properties for this node type — skip 'label' (always rendered first).
     const nodeTypeDef = metamodel?.nodeTypes[node.type]
     // For requirements, EARS content fields are edited via the inline sentence editor
     const earsSentenceFields = new Set(['trigger', 'precondition', 'unwanted_condition', 'feature', 'action'])
-    const metaProps = (nodeTypeDef?.properties ?? []).filter(p => {
-      if (p.key === 'label') return false
-      // A property is a plain field of the element: one keyed `type` or
-      // `parentId` would edit the element itself.
-      if (isReservedPropertyKey(p.key, 'node')) return false
-      if (node.type === 'requirement' && earsSentenceFields.has(p.key)) return false
-      if (p.visibleWhen) {
-        const cur = String((node as unknown as Record<string, unknown>)[p.visibleWhen.key] ?? '')
-        return p.visibleWhen.values.includes(cur)
-      }
-      return true
-    })
-
-    // Built-in fallback fields when no metamodel is present.
-    const builtinFields = !nodeTypeDef ? (
-      <>
-        {field('Description', 'description', 'textarea')}
-        {(node.type === 'container' || node.type === 'component' || node.type === 'database' || node.type === 'webapp' || node.type === 'queue') &&
-          field('Technology', 'technology')}
-        {field('External', 'external', 'checkbox')}
-      </>
-    ) : null
+    const isCodeType = node.type === 'container' || node.type === 'component' || node.type === 'database' || node.type === 'webapp' || node.type === 'queue'
+    // The type's attributes; built-in ones when there is no metamodel.
+    const defs: PropertyDef[] = nodeTypeDef
+      ? (nodeTypeDef.properties ?? []).filter((p) => {
+          if (p.key === 'label') return false
+          // A property is a plain field of the element: one keyed `type` or
+          // `parentId` would edit the element itself.
+          if (isReservedPropertyKey(p.key, 'node')) return false
+          if (node.type === 'requirement' && earsSentenceFields.has(p.key)) return false
+          if (p.visibleWhen) return p.visibleWhen.values.includes(String(record[p.visibleWhen.key] ?? ''))
+          return true
+        })
+      : [
+          { key: 'description', label: 'Description', type: 'textarea' },
+          ...(isCodeType ? [{ key: 'technology', label: 'Technology', type: 'text' } as PropertyDef] : []),
+          { key: 'external', label: 'External', type: 'boolean' },
+        ]
+    const short = defs.filter((p) => !isMarkdownField(p.key, p))
+    const long = defs.filter((p) => isMarkdownField(p.key, p))
+    const missing = (p: PropertyDef) => !!p.required && isEmptyValue(record[p.key] ?? p.default)
 
     // Parent selector — driven by metamodel allowedParents when available.
     const allowedParentTypes = nodeTypeDef?.allowedParents ?? (
-      (node.type === 'container' || node.type === 'component' || node.type === 'database' || node.type === 'webapp' || node.type === 'queue')
-        ? { container: ['system'], component: ['container'], database: ['system'], webapp: ['system'], queue: ['system'] }[node.type]
+      isCodeType
+        ? ({ container: ['system'], component: ['container'], database: ['system'], webapp: ['system'], queue: ['system'] } as Record<string, string[]>)[node.type]
         : undefined
     )
-    const parentSelector = allowedParentTypes && allowedParentTypes.length > 0 ? (
-      <div className="props-field">
-        <label className="props-label">Parent</label>
-        <select
-          className="props-input"
-          value={node.parentId ?? ''}
-          disabled={readOnly}
-          onChange={(e) => !readOnly && reparentNodes([node.id], e.target.value || null)}
-        >
-          <option value="">(none)</option>
-          {Object.values(c4Nodes)
-            .filter(n => n.id !== node.id && allowedParentTypes.includes(n.type))
-            .map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
-        </select>
-      </div>
-    ) : null
+    const parents: { id: string; label: string }[] = []
+    for (let p = node.parentId ? c4Nodes[node.parentId] : undefined; p && parents.length < 8; p = p.parentId ? c4Nodes[p.parentId] : undefined) {
+      parents.unshift({ id: p.id, label: p.label })
+    }
 
-    // Type badge — prefer metamodel def colors; fall back to NODE_COLORS.
-    const badgeBg    = nodeTypeDef?.color    ?? NODE_COLORS[node.type] ?? '#334155'
-    const badgeFg    = nodeTypeDef?.fg       ?? NODE_FG[node.type]    ?? '#fff'
-    const badgeLabel = nodeTypeDef?.label    ?? TYPE_LABELS[node.type] ?? node.type
-    const badgeIcon  = nodeTypeDef?.iconPath ?? TYPE_ICON_PATHS[node.type]
+    const typeLabel = nodeTypeDef?.label ?? TYPE_LABELS[node.type] ?? node.type
+    const menu: PanelMenuItem[] = readOnly ? [] : [
+      { label: 'Delete element (and what it contains)', danger: true, onClick: () => { removeNode(node.id); selectNode(null) } },
+    ]
+    const hubEntry = Object.entries(hubTemplates as Record<string, HubImportRecord>).find(([, rec]) => rec.nodeIds.includes(node.id))
 
     return (
-      <div className="props-content">
-        <div
-          className="props-type-badge"
-          style={{ background: badgeBg, color: badgeFg }}
-        >
-          {badgeIcon && (
-            <svg viewBox="0 0 16 16" width="14" height="14" fill={badgeFg} style={{ marginRight: 6 }}>
-              <path d={badgeIcon} />
-            </svg>
+      <div className="props-content" key={node.id}>
+        <PanelHeader
+          typeLabel={typeLabel}
+          color={nodeTypeDef?.color ?? NODE_COLORS[node.type] ?? '#64748b'}
+          iconPath={nodeTypeDef?.iconPath ?? TYPE_ICON_PATHS[node.type]}
+          title={node.label}
+          titlePlaceholder="Unnamed"
+          readOnly={readOnly}
+          onTitle={(v) => set('label', v)}
+          context={parents.length > 0 && (
+            <>in {parents.map((p, i) => (
+              <React.Fragment key={p.id}>{i > 0 && <span className="pp-sep"> › </span>}<NodeLink id={p.id} label={p.label} /></React.Fragment>
+            ))}</>
           )}
-          {badgeLabel.toUpperCase()}
-        </div>
-        {!readOnly && nodeTypeDef?.wizard && (
-          <button className="props-wizard-btn" onClick={() => openNodeWizard(node.id)}>
-            Fill in with wizard…
-          </button>
-        )}
+          onWizard={!readOnly && nodeTypeDef?.wizard ? () => openNodeWizard(node.id) : undefined}
+          menu={menu}
+          onClose={onClose}
+        />
         {node.type === 'requirement' && (
-          <div className="props-ears-sentence">
-            <EarsSentencePreview node={node as unknown as Record<string, unknown>} nodeId={node.id} subject={resolveEarsSubject(node.id, c4Relations, c4Nodes)} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} />
-            <EarsQuickEntry nodeId={node.id} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} compact />
-          </div>
+          <section className="pp-section">
+            <div className="pp-section-title">Sentence</div>
+            <div className="props-ears-sentence">
+              <EarsSentencePreview node={record} nodeId={node.id} subject={resolveEarsSubject(node.id, c4Relations, c4Nodes)} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} />
+              <EarsQuickEntry nodeId={node.id} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} compact />
+            </div>
+          </section>
         )}
-        <div>
-          <div className="props-section-title">Properties</div>
-          {field('Label', 'label')}
-          {metaProps.length > 0
-            ? metaProps.map(p => metamodelField(p))
-            : builtinFields
-          }
-          {parentSelector}
-        </div>
-        {node.type === 'mockup' && <MockupWireframe nodeId={node.id} readOnly={readOnly} />}
-        {(() => {
-          const entry = Object.entries(hubTemplates as Record<string, HubImportRecord>)
-            .find(([, rec]) => rec.nodeIds.includes(node.id))
-          if (!entry) return null
-          const [importId, record] = entry
-          return (
+        {(short.length > 0 || (allowedParentTypes && allowedParentTypes.length > 0)) && (
+          <section className="pp-section pp-grid" aria-label="Attributes">
+            {short.map((p) => (
+              <AttrRow key={p.key} label={p.label} missing={missing(p)}>
+                <AttrValue def={p} value={record[p.key]} readOnly={readOnly} onChange={(v) => set(p.key, v)} />
+              </AttrRow>
+            ))}
+            {allowedParentTypes && allowedParentTypes.length > 0 && (
+              <AttrRow label="Parent">
+                <select className="pp-input pp-select" aria-label="Parent" value={node.parentId ?? ''} disabled={readOnly}
+                  onChange={(e) => !readOnly && reparentNodes([node.id], e.target.value || null)}>
+                  <option value="">—</option>
+                  {Object.values(c4Nodes)
+                    .filter((n) => n.id !== node.id && allowedParentTypes.includes(n.type))
+                    .map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
+                </select>
+              </AttrRow>
+            )}
+          </section>
+        )}
+        {long.map((p) => (
+          <section className="pp-section" key={p.key}>
+            <div className="pp-section-title">
+              {p.label}
+              {missing(p) && <span className="pp-missing" title="Required, not set" aria-label="required, not set" />}
+            </div>
+            <MarkdownField label={p.label} value={String(record[p.key] ?? p.default ?? '')} readOnly={readOnly}
+              loading={p.key === 'description' && descriptionPending} onChange={(v) => set(p.key, v)} />
+          </section>
+        ))}
+        {node.type === 'mockup' && (
+          <section className="pp-section">
+            <div className="pp-section-title">Wireframe</div>
+            <MockupWireframe nodeId={node.id} readOnly={readOnly} />
+          </section>
+        )}
+        {hubEntry && (
+          <section className="pp-section">
             <HubTemplateSection
-              record={record}
-              importId={importId}
+              record={hubEntry[1]}
+              importId={hubEntry[0]}
               nodeId={node.id}
               readOnly={readOnly}
               updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])}
             />
-          )
-        })()}
-        {!readOnly && (
-          <button className="props-delete" onClick={() => { removeNode(node.id); selectNode(null) }}>
-            🗑 Delete node (and children)
-          </button>
+          </section>
         )}
       </div>
     )
@@ -2087,77 +2188,17 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
     const rel = relId ? c4Relations[relId] : null
 
     if (rel) {
-      // Look up the relation type definition from the metamodel.
+      const record = rel as unknown as Record<string, unknown>
       const relTypeDef = metamodel?.relationTypes[rel.relationType ?? '']
-
-      // Relation field renderer — generic, stores value directly on the relation.
-      const relField = (key: string, label: string, type: 'text' | 'textarea' | 'boolean' | 'enum' | 'number' = 'text', options?: string[]) => {
-        const value = (rel as unknown as Record<string, unknown>)[key]
-        const strVal = value != null ? String(value) : ''
-        const onChange = (val: string | boolean) => {
-          if (readOnly) return
-          updateRelation(rel.id, { [key]: val } as Parameters<typeof updateRelation>[1])
-        }
-        if (type === 'boolean') {
-          return (
-            <div className="props-field" key={key}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                <input type="checkbox" checked={Boolean(value)} disabled={readOnly}
-                  onChange={(e) => onChange(e.target.checked)}
-                  style={{ accentColor: 'var(--accent)' }} />
-                {label}
-              </label>
-            </div>
-          )
-        }
-        if (type === 'enum' && options) {
-          return (
-            <div className="props-field" key={key}>
-              <label className="props-label">{label}</label>
-              <select className="props-input" value={strVal} disabled={readOnly}
-                onChange={(e) => onChange(e.target.value)}>
-                <option value="" />
-                {options.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-          )
-        }
-        if (type === 'number') {
-          // A number, as on elements (a text field saved "abc5" as typed).
-          return (
-            <div className="props-field" key={key}>
-              <label className="props-label">{label}</label>
-              <input className="props-input" type="number" value={strVal} readOnly={readOnly}
-                onChange={(e) => {
-                  if (readOnly) return
-                  updateRelation(rel.id, { [key]: e.target.value === '' ? undefined : Number(e.target.value) } as Parameters<typeof updateRelation>[1])
-                }} />
-            </div>
-          )
-        }
-        if (type === 'textarea') {
-          return (
-            <div className="props-field" key={key}>
-              <label className="props-label">{label}</label>
-              <textarea className="props-input" value={strVal} readOnly={readOnly} rows={3}
-                onChange={(e) => onChange(e.target.value)} />
-            </div>
-          )
-        }
-        return (
-          <div className="props-field" key={key}>
-            <label className="props-label">{label}</label>
-            <input className="props-input" value={strVal} readOnly={readOnly}
-              onChange={(e) => onChange(e.target.value)} />
-          </div>
-        )
+      const set = (key: string, v: unknown) => {
+        if (!readOnly) updateRelation(rel.id, { [key]: v } as Parameters<typeof updateRelation>[1])
       }
-
-      // Determine which extra properties to show: metamodel-driven or classic technology field.
-      const relMetaProps = (relTypeDef?.properties ?? []).filter((p) => !isReservedPropertyKey(p.key, 'relation'))
-      const badgeBg = relTypeDef?.color ?? '#334155'
-      const badgeFg = '#fff'
-      const badgeLabel = relTypeDef?.label ?? 'RELATION'
+      // Metamodel-driven properties; Technology only for relations with no type def.
+      const defs: PropertyDef[] = relTypeDef
+        ? (relTypeDef.properties ?? []).filter((p) => !isReservedPropertyKey(p.key, 'relation') && p.key !== 'label')
+        : [{ key: 'technology', label: 'Technology', type: 'text' }]
+      const short = defs.filter((p) => !isMarkdownField(p.key, p))
+      const long = defs.filter((p) => isMarkdownField(p.key, p))
 
       // Selectable relation types for this source→target pair.
       const srcNode = c4Nodes[rel.sourceId]
@@ -2170,52 +2211,60 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
         : []
 
       return (
-        <div className="props-content">
-          <div className="props-type-badge" style={{ background: badgeBg, color: badgeFg }}>
-            {badgeLabel.toUpperCase()}
-          </div>
-          <div>
-            <div className="props-section-title">Properties</div>
-            {/* Relation type selector (shown when metamodel has multiple compatible types) */}
-            {compatibleTypes.length > 1 && (
-              <div className="props-field">
-                <label className="props-label">Type</label>
-                <select className="props-input" value={rel.relationType ?? ''} disabled={readOnly}
-                  onChange={(e) => !readOnly && updateRelation(rel.id, { relationType: e.target.value || undefined } as Parameters<typeof updateRelation>[1])}>
-                  <option value="">(generic)</option>
-                  {compatibleTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.label}</option>)}
-                </select>
-              </div>
+        <div className="props-content" key={rel.id}>
+          <PanelHeader
+            typeLabel={relTypeDef?.label ?? 'Relation'}
+            color={relTypeDef?.color ?? '#64748b'}
+            title={String(rel.label ?? '')}
+            titlePlaceholder="No label"
+            readOnly={readOnly}
+            onTitle={(v) => set('label', v)}
+            context={(
+              <>
+                {srcNode ? <NodeLink id={srcNode.id} label={srcNode.label} /> : '?'}
+                <span className="pp-sep"> → </span>
+                {dstNode ? <NodeLink id={dstNode.id} label={dstNode.label} /> : '?'}
+              </>
             )}
-            {relField('label', 'Label')}
-            {/* Metamodel-driven properties; fallback to Technology only for relations with no type def */}
-            {relMetaProps.length > 0
-              ? relMetaProps.map(p => p.type === 'ref'
-                ? (
-                  <div className="props-field" key={p.key}>
-                    <label className="props-label">{p.label}</label>
-                    <RefPicker def={p} value={(rel as unknown as Record<string, unknown>)[p.key]} readOnly={readOnly}
-                      onChange={(v) => !readOnly && updateRelation(rel.id, { [p.key]: v } as Parameters<typeof updateRelation>[1])} />
-                  </div>
-                )
-                : relField(p.key, p.label, p.type, p.options))
-              : !relTypeDef && relField('technology', 'Technology')
-            }
-          </div>
-          {!readOnly && (
-            <button className="props-delete" onClick={() => { removeRelation(rel.id); selectEdge(null) }}>
-              🗑 Delete relation
-            </button>
+            menu={readOnly ? [] : [{ label: 'Delete relation', danger: true, onClick: () => { removeRelation(rel.id); selectEdge(null) } }]}
+            onClose={onClose}
+          />
+          {(short.length > 0 || compatibleTypes.length > 1) && (
+            <section className="pp-section pp-grid" aria-label="Attributes">
+              {compatibleTypes.length > 1 && (
+                <AttrRow label="Type">
+                  <select className="pp-input pp-select" aria-label="Type" value={rel.relationType ?? ''} disabled={readOnly}
+                    onChange={(e) => set('relationType', e.target.value || undefined)}>
+                    <option value="">(generic)</option>
+                    {compatibleTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.label}</option>)}
+                  </select>
+                </AttrRow>
+              )}
+              {short.map((p) => (
+                <AttrRow key={p.key} label={p.label} missing={!!p.required && isEmptyValue(record[p.key] ?? p.default)}>
+                  <AttrValue def={p} value={record[p.key]} readOnly={readOnly} onChange={(v) => set(p.key, v)} />
+                </AttrRow>
+              ))}
+            </section>
           )}
+          {long.map((p) => (
+            <section className="pp-section" key={p.key}>
+              <div className="pp-section-title">{p.label}</div>
+              <MarkdownField label={p.label} value={String(record[p.key] ?? p.default ?? '')} readOnly={readOnly}
+                onChange={(v) => set(p.key, v)} />
+            </section>
+          ))}
         </div>
       )
     }
 
     return (
       <div className="props-content">
+        <PanelHeader typeLabel="Relation" color="#64748b" title="" titlePlaceholder="Virtual relation"
+          readOnly menu={[]} onClose={onClose} />
         <div className="props-empty">
-          Virtual relation (collapsed nodes)<br />
-          Expand parent nodes to edit individual relations.
+          It stands for relations between elements inside collapsed ones.<br />
+          Expand them to edit each relation.
         </div>
       </div>
     )
@@ -2224,74 +2273,93 @@ function PropertiesContent({ readOnly = false }: { readOnly?: boolean }) {
   return null
 }
 
-export function RightPanel({ readOnly = false, collapsed = false, onToggleCollapsed }: {
-  readOnly?: boolean
-  collapsed?: boolean
-  onToggleCollapsed?: () => void
-}) {
-  const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
-  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
-  const selectNode = useDiagramStore((s) => s.selectNode)
-  const selectEdge = useDiagramStore((s) => s.selectEdge)
-  const activeSequenceId = useDiagramStore((s) => s.activeSequenceId)
-  const setActiveSequence = useDiagramStore((s) => s.setActiveSequence)
-  const activeView = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
-  const sequencesCount = useDiagramStore((s) => Object.keys(s.sequences).length)
-  // One section open at a time; a click on the open one folds it.
-  const [openSection, setOpenSection] = useState<'structure' | 'sequences' | null>('structure')
+const PANEL_W_KEY = 'radical-props-width'
+const PANEL_W_DEFAULT = 340
+const PANEL_W_MIN = 280
+const PANEL_W_MAX = 640
 
-
-  // Pane 2 is shown when any item is selected
-  const hasSelection = !!(selectedNodeId || selectedEdgeId || activeSequenceId)
-
-  const handleBack = () => {
-    selectNode(null)
-    selectEdge(null)
-    setActiveSequence(null)
-  }
-
-  // Determine what to show in Pane 2
-  const pane2Content = () => {
-    if (selectedNodeId || selectedEdgeId) {
-      return <PropertiesContent readOnly={readOnly} />
-    }
-    if (activeSequenceId) {
-      return <SequencePropertiesContent sequenceId={activeSequenceId} readOnly={readOnly} />
-    }
-    return null
-  }
-
-  return (
-    <div className={`right-panel${collapsed ? ' collapsed' : ''}`}>
-      <div className="panel-content">
-        <div className={`rp-slider${hasSelection ? ' show-props' : ''}`}>
-
-          {/* Pane 1 — Vertical accordion: Structure (what the view's filter gives) / Sequences (single open) */}
-          <div className="rp-pane">
-            <AccordionSection title="Structure"
-              open={openSection === 'structure'} onToggle={() => setOpenSection((o) => (o === 'structure' ? null : 'structure'))}>
-              <StructurePanel />
-            </AccordionSection>
-            <AccordionSection title="Sequences" count={sequencesCount}
-              open={openSection === 'sequences'} onToggle={() => setOpenSection((o) => (o === 'sequences' ? null : 'sequences'))}>
-              <SequenceList readOnly={readOnly} compact={true} />
-            </AccordionSection>
-          </div>
-
-          {/* Pane 2 — Properties (horizontal slide-in) */}
-          <div className="rp-pane">
-            <button className="rp-back-btn" onClick={handleBack}>
-              ◀ Back
-            </button>
-            {pane2Content()}
-          </div>
-
-        </div>
-      </div>
-      {onToggleCollapsed && (
-        <PanelToggle side="right" collapsed={collapsed} onToggle={onToggleCollapsed} />
-      )}
-    </div>
-  )
+function clampPanelWidth(w: number): number {
+  return Math.round(Math.max(PANEL_W_MIN, Math.min(PANEL_W_MAX, w)))
 }
 
+export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
+  const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
+  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+  const activeSequenceId = useDiagramStore((s) => s.activeSequenceId)
+  const setActiveSequence = useDiagramStore((s) => s.setActiveSequence)
+  // Several elements selected: the selection bar acts on them, and the card,
+  // which would show one of them, stays out of the way of the next pick.
+  const several = useDiagramStore((s) => s.selectedNodeIds.length > 1)
+
+  // What the card is about; ✕ hides it until something else is selected.
+  const subject = several ? null
+    : selectedNodeId ? `node:${selectedNodeId}`
+    : selectedEdgeId ? `edge:${selectedEdgeId}`
+    : activeSequenceId ? `sequence:${activeSequenceId}`
+    : null
+  const [dismissed, setDismissed] = useState<string | null>(null)
+  const open = !!subject && dismissed !== subject
+  const close = useCallback(() => setDismissed(subject), [subject])
+
+  // An explicit "show its properties" (Quick Search, a table row's button)
+  // brings back a card that ✕ hid.
+  useEffect(() => {
+    const w = window as unknown as { __radicalExpandRightPanel?: () => void }
+    const reopen = () => setDismissed(null)
+    w.__radicalExpandRightPanel = reopen
+    return () => { if (w.__radicalExpandRightPanel === reopen) delete w.__radicalExpandRightPanel }
+  }, [])
+
+  const [width, setWidth] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem(PANEL_W_KEY))
+      return saved ? clampPanelWidth(saved) : PANEL_W_DEFAULT
+    } catch { return PANEL_W_DEFAULT }
+  })
+  const saveWidth = (w: number) => {
+    setWidth(w)
+    try { localStorage.setItem(PANEL_W_KEY, String(w)) } catch { /* private window */ }
+  }
+  const [resizing, setResizing] = useState(false)
+  const onResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = width
+    const handle = e.currentTarget
+    handle.setPointerCapture(e.pointerId)
+    setResizing(true)
+    let last = startW
+    const move = (ev: PointerEvent) => { last = clampPanelWidth(startW + (startX - ev.clientX)); setWidth(last) }
+    const up = () => {
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', up)
+      handle.removeEventListener('pointercancel', up)
+      setResizing(false)
+      saveWidth(last)
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', up)
+    handle.addEventListener('pointercancel', up)
+  }
+
+  const content = selectedNodeId || selectedEdgeId
+    ? <PropertiesContent readOnly={readOnly} onClose={close} />
+    : activeSequenceId
+      ? (
+        <div className="props-content">
+          <PanelHeader typeLabel="Sequence" color="var(--accent)" title="" titlePlaceholder="" readOnly
+            menu={[]} onClose={() => { close(); setActiveSequence(null) }} />
+          <SequencePropertiesContent sequenceId={activeSequenceId} readOnly={readOnly} />
+        </div>
+      )
+      : null
+
+  return (
+    <aside className={`right-panel${open ? ' open' : ''}${resizing ? ' resizing' : ''}`}
+      aria-label="Properties" aria-hidden={!open} style={{ width }}>
+      <div className="pp-resize" title="Drag to resize · double-click for the default width"
+        onPointerDown={onResizeStart} onDoubleClick={() => saveWidth(PANEL_W_DEFAULT)} />
+      <div className="pp-scroll">{content}</div>
+    </aside>
+  )
+}

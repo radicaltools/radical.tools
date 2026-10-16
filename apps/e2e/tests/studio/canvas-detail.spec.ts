@@ -1,4 +1,4 @@
-import { test, expect } from '../../support/fixtures'
+import { test, expect, withWhole, WHOLE } from '../../support/fixtures'
 
 // Zoomed out, the canvas draws each element as a block of its type's colour
 // with its name (store/canvasDetail.ts, withDetail): a card's text would be a
@@ -28,8 +28,8 @@ async function wheelTo(page: Page, to: number): Promise<void> {
 }
 
 test('zoomed out the canvas draws blocks with names, zoomed in cards, and a block still folds', async ({ page, studio }) => {
-  await studio.seedDocument(systems())
-  await studio.open('canvas')
+  await studio.seedDocument(withWhole(systems()))
+  await studio.open(WHOLE)
   const block = page.locator('.c4-node-simple')
 
   // The whole model fits on screen far below the threshold.

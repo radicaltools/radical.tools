@@ -16,20 +16,21 @@ test('add an element from the palette', async ({ studio }) => {
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
 })
 
-test('the palette sits above the canvas, not the table, folds away and stays folded', async ({ page, studio }) => {
+test('the palette stands down the canvas\'s left side, always there, and not on the table', async ({ page, studio }) => {
   const palette = page.locator('.canvas-column .element-palette')
   await expect(palette.locator('.palette-group-label', { hasText: 'C4' })).toBeVisible()
   await expect(palette.locator('.palette-item', { hasText: 'Software System' })).toBeVisible()
-  // The left panel keeps only views and milestones.
+  // The left panel keeps only views, milestones and sequences.
   await expect(page.locator('.left-panel .palette-item')).toHaveCount(0)
-
-  await page.getByRole('button', { name: 'Hide the elements' }).click()
-  await expect(palette.locator('.palette-item')).toHaveCount(0)
-  await page.reload()
-  await studio.ready()
-  await expect(page.locator('.palette-item')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Show the elements' }).click()
-  await expect(palette.locator('.palette-item').first()).toBeVisible()
+  // One type to a row, down the canvas's left edge; nothing folds it away.
+  const box = (await palette.boundingBox())!
+  const canvas = (await studio.canvas.boundingBox())!
+  expect(box.height).toBeGreaterThan(box.width)
+  expect(box.x - canvas.x).toBeLessThan(30)
+  const items = palette.locator('.palette-item')
+  const [first, second] = [(await items.nth(0).boundingBox())!, (await items.nth(1).boundingBox())!]
+  expect(second.y).toBeGreaterThan(first.y)
+  await expect(page.getByRole('button', { name: /Hide the elements|Show the elements/ })).toHaveCount(0)
 
   // The table view has none, nor has Viewer.
   await studio.open('v-table')
@@ -91,19 +92,17 @@ test('a click on an open panel section folds it; another section opens alone', a
   await header('left', 'Milestones').click()
   await expect(isOpen('left', 'Views')).toHaveCount(0)
   await expect(isOpen('left', 'Milestones')).toHaveCount(1)
-
-  const tree = page.locator('.right-panel .lp-section-body.open')
-  await expect(tree).toHaveCount(1)
-  await header('right', 'Structure').click()
-  await expect(tree).toHaveCount(0)
-  await header('right', 'Sequences').click()
-  await expect(tree).toHaveCount(1)
+  await header('left', 'Sequences').click()
+  await expect(isOpen('left', 'Milestones')).toHaveCount(0)
+  await expect(isOpen('left', 'Sequences')).toHaveCount(1)
+  // A folded section says what it holds.
+  await expect(header('left', 'Views')).toContainText('Open: System Context')
+  await expect(header('left', 'Milestones')).toContainText(/Latest: |None saved yet/)
 })
 
 test('rename an element in the properties panel', async ({ page, studio }) => {
   await studio.node('payments').click()
-  // The panel's <label>s are not tied to their inputs, so find the field by its caption.
-  const label = page.locator('.props-field').filter({ has: page.getByText('Label', { exact: true }) }).locator('input')
+  const label = studio.attribute('Name')
   await expect(label).toHaveValue('Payment Provider')
   await label.fill('Card Gateway')
   await label.press('Tab')
@@ -119,7 +118,7 @@ test('connect two elements with Alt-drag', async ({ studio }) => {
 })
 
 test('a connection the metamodel forbids is refused', async ({ page, studio }) => {
-  await studio.addFromPalette('Person', { x: 150, y: 150 })
+  await studio.addFromPalette('Person', { x: 400, y: 150 })
   await expect(studio.nodes).toHaveCount(4)
   const newPerson = studio.nodes.filter({ hasNot: page.getByText('Customer', { exact: true }) })
     .filter({ has: page.getByText('Person', { exact: true }) })
@@ -178,8 +177,8 @@ for (const perspective of ['Viewer', 'Presenter']) {
 }
 
 test('the Parent field moves an element into its new parent, and refuses a loop', async ({ page, studio }) => {
-  await studio.open('canvas')
-  const parent = page.locator('.props-field').filter({ has: page.getByText('Parent', { exact: true }) }).locator('select')
+  await studio.open('v-containers')
+  const parent = studio.attribute('Parent')
   await studio.node('payments').click()
   await parent.selectOption({ label: 'Bookstore' })
   await expect.poll(async () => (await studio.storedDoc()).nodes.find((n) => n.id === 'payments')?.parentId).toBe('bookstore')
@@ -188,7 +187,10 @@ test('the Parent field moves an element into its new parent, and refuses a loop'
   await expect.poll(async () => studio.layoutViolations()).toEqual([])
 
   // Bookstore into its own child: the types allow a system in a system.
-  await studio.node('bookstore').click({ position: { x: 30, y: 12 } })
+  // Its header's right end: the camera framed Payment Provider, and the
+  // left of Bookstore may lie under the left panel.
+  const frame = (await studio.node('bookstore').boundingBox())!
+  await studio.node('bookstore').click({ position: { x: frame.width - 80, y: 12 } })
   await expect(parent).toHaveValue('')
   await parent.selectOption({ label: 'Payment Provider' })
   await expect(page.getByText('Cannot move a node into itself or one of its descendants.').first()).toBeVisible()

@@ -4,6 +4,6 @@ type: "scenario"
 label: "Recent model first"
 given: "a model was opened before"
 tests: "apps/e2e/tests/studio/boot.spec.ts › returning visit › Open lists recent models, the last one first and focused"
-then: "that model is listed first and focused, and Enter opens it on the canvas"
+then: "that model is listed first and focused, and Enter opens it on All elements, its rows listed"
 when: "the user chooses Open on the welcome screen and presses Enter"
 ---

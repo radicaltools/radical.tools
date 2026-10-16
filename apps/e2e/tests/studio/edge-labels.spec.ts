@@ -5,7 +5,7 @@ import { test, expect } from '../../support/fixtures'
 // relations, and shows them all again once zoomed in.
 
 test('relation labels follow the zoom', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSampleWhole()
   const visibleLabels = page.locator('.relation-label:visible')
 
   // The whole sample fits only far zoomed out.

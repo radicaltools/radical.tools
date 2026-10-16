@@ -18,7 +18,7 @@ async function openProps(page: Page, name: string): Promise<void> {
 // type when the metamodel changes it.
 
 test('New view offers the metamodel\'s viewpoints; a view of one follows the viewpoint', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSample()
   const filter = page.locator('.rp-pipeline')
 
   // New view: a blank view or one of the Radical metamodel's viewpoints.
@@ -85,7 +85,7 @@ test('New view offers the metamodel\'s viewpoints; a view of one follows the vie
 test('every viewpoint of the Radical metamodel opens as a view of its type', async ({ page, studio }) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
-  await studio.openSample('canvas')
+  await studio.openSample()
   const expected: Array<[string, string, boolean]> = [
     ['System context', 'STRUCTURE VIEW', true], ['Containers', 'STRUCTURE VIEW', true], ['Components', 'STRUCTURE VIEW', true],
     ['Container dependencies', 'MATRIX VIEW', true],
@@ -115,7 +115,7 @@ test('every viewpoint of the Radical metamodel opens as a view of its type', asy
 // it, inside the window, not above it out of sight.
 test('the New view menu stays inside the window in a model without views', async ({ page, studio }) => {
   await studio.seedDocument(JSON.stringify({ nodes: [], relations: [], views: [], metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} } }))
-  await studio.open('canvas')
+  await studio.open('all')
   await page.getByRole('button', { name: 'New view' }).click()
   const menu = page.getByRole('menu', { name: 'New view' })
   const box = (await menu.boundingBox())!
@@ -123,4 +123,14 @@ test('the New view menu stays inside the window in a model without views', async
   expect(box.y).toBeGreaterThanOrEqual(0)
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height)
   await expect(menu.getByRole('menuitem', { name: /^System context/ })).toBeInViewport()
+})
+
+test('a blank view is a table of every element', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-context')
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: /^Blank view/ }).click()
+  await expect(page.locator('.props-type-badge')).toContainText('TABLE VIEW')
+  // The bookstore's six elements, as the containment tree.
+  await expect(page.locator('tr.tv-row')).toHaveCount(6)
 })

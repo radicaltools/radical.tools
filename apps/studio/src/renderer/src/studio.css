@@ -7,27 +7,31 @@
   grid-template-rows: 48px 1fr auto;
   /* The left panel's width; its edge handle drags it (LeftPanel). */
   --left-panel-w: 260px;
-  grid-template-columns: var(--left-panel-w) 1fr 260px;
+  grid-template-columns: var(--left-panel-w) 1fr;
   grid-template-areas:
-    "toolbar    toolbar    toolbar"
-    "leftpanel  canvas     rightpanel"
-    "timetravel timetravel timetravel";
+    "toolbar    toolbar"
+    "leftpanel  canvas"
+    "timetravel timetravel";
   height: 100vh;
+  /* The properties card waits beyond the right edge: nothing may scroll
+     the page sideways to it. */
+  overflow: clip;
   transition: grid-template-columns 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .app-layout.lp-resizing { transition: none; cursor: col-resize; }
 /* Collapsed panel rails */
-.app-layout.lp-collapsed { grid-template-columns: 18px 1fr 260px; }
-/* Presentation mode — same 3-column layout as modelling (left panel + canvas + right panel) */
+.app-layout.lp-collapsed { grid-template-columns: 18px 1fr; }
+/* Presentation mode — same layout as modelling (left panel + canvas; the
+   properties card lies over the canvas) */
 .app-layout.mode-presentation {
-  grid-template-columns: var(--left-panel-w) 1fr 260px;
+  grid-template-columns: var(--left-panel-w) 1fr;
   grid-template-rows: 48px 1fr auto;
   grid-template-areas:
-    "toolbar    toolbar    toolbar"
-    "leftpanel  canvas     rightpanel"
-    "timetravel timetravel timetravel";
+    "toolbar    toolbar"
+    "leftpanel  canvas"
+    "timetravel timetravel";
 }
-.app-layout.mode-presentation.lp-collapsed { grid-template-columns: 18px 1fr 260px; }
+.app-layout.mode-presentation.lp-collapsed { grid-template-columns: 18px 1fr; }
 /* Active presenting — canvas only, HUD is a fixed overlay */
 .app-layout.mode-presenting {
   grid-template-columns: 1fr;

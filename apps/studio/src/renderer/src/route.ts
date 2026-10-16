@@ -31,6 +31,11 @@ import { documents, useDocumentsStore } from './store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
 import { host } from './platform/host'
 
+/** The view token of All elements, the table of the whole model. Links
+ *  written while it was a canvas say `canvas`, and still open it. */
+export const ALL_ELEMENTS = 'all'
+const isAllElements = (view: string): boolean => view === ALL_ELEMENTS || view === 'canvas'
+
 type Mode = 'designer' | 'viewer' | 'presenter' | 'metamodel' | 'inspector'
 const MODES: readonly Mode[] = ['designer', 'viewer', 'presenter', 'metamodel', 'inspector'] as const
 
@@ -102,7 +107,7 @@ export function parseHash(hash: string): Route | null {
   return {
     doc: map.d || undefined,
     mode,
-    view: map.v || 'canvas',
+    view: map.v && !isAllElements(map.v) ? map.v : ALL_ELEMENTS,
     focus: map.f || undefined,
     snap: map.s || undefined,
     pres: map.p || undefined,
@@ -116,7 +121,7 @@ export function formatRoute(r: Route): string {
   if (r.doc) segs.push('d', encodeURIComponent(r.doc))
   segs.push('m', encodeURIComponent(r.mode))
   segs.push('v', encodeURIComponent(r.view))
-  if (r.focus && r.view !== 'canvas') segs.push('f', encodeURIComponent(r.focus))
+  if (r.focus && !isAllElements(r.view)) segs.push('f', encodeURIComponent(r.focus))
   if (r.snap) segs.push('s', encodeURIComponent(r.snap))
   if (r.play && r.pres) {
     segs.push('p', encodeURIComponent(r.pres), 'play', '1')
@@ -148,7 +153,7 @@ export function currentRoute(): Route {
   return {
     doc: currentDocToken(),
     mode: s.appMode,
-    view: s.activeViewId ?? 'canvas',
+    view: s.activeViewId ?? ALL_ELEMENTS,
     focus,
     snap: s.activeSnapshotId ?? undefined,
     pres: playing ? (s.activePresentationId ?? undefined) : undefined,
@@ -209,8 +214,8 @@ function applyViewModeFocus(route: Route): void {
     // Resolve the target view. A view id that doesn't exist in the current
     // document (e.g. a link opened on a machine whose localStorage doesn't
     // hold that doc, so we fell back to the freshly-seeded sample) degrades
-    // gracefully to the default Canvas rather than leaving a dangling id.
-    const reqView = route.view === 'canvas' ? null : route.view
+    // gracefully to All elements rather than leaving a dangling id.
+    const reqView = isAllElements(route.view) ? null : route.view
     const targetView = reqView && useDiagramStore.getState().views[reqView] ? reqView : null
     if (useDiagramStore.getState().activeViewId !== targetView) {
       useDiagramStore.getState().setActiveView(targetView)

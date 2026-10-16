@@ -360,8 +360,19 @@ export function looksUnarranged(nodes: Record<string, C4Node>, activeViewId?: st
 }
 
 /** Called after a document loads (at boot or on switching documents). */
-function suggestSmartLayoutIfUnarranged(): void {
+/** Whether the document read last has still to be looked at for the "not
+ *  laid out yet" notice: on the first canvas shown after it was read. */
+let _layoutHintPending = false
+
+/** After a document is read (`loaded`), or a view opened: tells the user to
+ *  run Smart Layout when the first canvas shown looks unarranged. All
+ *  elements and the other view types are no picture to arrange. */
+function suggestSmartLayoutIfUnarranged(loaded = false): void {
+  if (loaded) _layoutHintPending = true
   const s = useDiagramStore.getState()
+  const view = s.activeViewId ? s.views[s.activeViewId] : undefined
+  if (!_layoutHintPending || !view || (view.kind ?? 'static') !== 'static') return
+  _layoutHintPending = false
   if (!looksUnarranged(s.c4Nodes, s.activeViewId, s.activeViewId ? s.views[s.activeViewId] : undefined)) return
   s.pushNotification('This diagram is not laid out yet. The live layout only moves what you drag or add: use Smart Layout to arrange it.', 'info')
 }
@@ -1301,7 +1312,9 @@ interface DiagramStore {
   reparentNodes: (ids: string[], newParentId: string | null) => void
 
   // ── actions: views ──
-  addView: (name: string) => string
+  /** A new view listing no elements, of `kind` (a structure view when
+   *  none is given); returns its id. */
+  addView: (name: string, kind?: DiagramView['kind']) => string
   removeView: (id: string) => void
   renameView: (id: string, name: string) => void
   setActiveView: (id: string | null) => void
@@ -1628,9 +1641,10 @@ let _liveLayout: LiveColaLayout | null = null
  *  its own. Set when a milestone is shown. */
 let _milestoneAllPositions: Record<string, NodePosition> | null = null
 
-/** What was selected on each canvas when the user left it ('' = All
- *  elements). Each view keeps its own selection: switching views puts the
- *  outgoing one here and brings back the incoming one. Not saved. */
+/** What was selected on the open canvas ('' = All elements) when the same
+ *  document was read again (an outside change), to show it again after the
+ *  reload. Leaving a view clears its selection, so this holds no other
+ *  view's. Not saved. */
 let _viewSelections = new Map<string, { nodeIds: string[]; edgeId: string | null }>()
 /** The document `_viewSelections` belongs to. */
 let _viewSelectionsDoc: string | null = null
@@ -1761,13 +1775,14 @@ function setSlideCamera(vp: { x: number; y: number; zoom: number }, duration: nu
 
 export const useDiagramStore = create<DiagramStore>()(
   immer((set, get) => {
-    /** Leaving canvas `from` for `to`: keeps `from`'s selection and brings
-     *  back what was selected on `to` (nothing the first time). */
-    const swapViewSelection = (from: string | null, to: string | null): void => {
-      const { selectedNodeIds, selectedEdgeId } = get()
-      _viewSelections.set(from ?? '', { nodeIds: [...selectedNodeIds], edgeId: selectedEdgeId })
-      const incoming = _viewSelections.get(to ?? '')
-      set((state) => showSelection(state as DiagramStore, incoming?.nodeIds ?? [], incoming?.edgeId ?? null))
+    /** Opening canvas `to`: nothing stays selected, on the view left or the
+     *  one opened; a selection belongs to the picture it was made on, and
+     *  coming back to a view starts afresh. Only the view that was open when
+     *  the same document was read again gets its selection back. */
+    const clearViewSelection = (to: string | null): void => {
+      const kept = _viewSelections.get(to ?? '')
+      _viewSelections.clear()
+      set((state) => showSelection(state as DiagramStore, kept?.nodeIds ?? [], kept?.edgeId ?? null))
     }
 
     // ── Document persistence boot ────────────────────────────────────────
@@ -3012,10 +3027,13 @@ export const useDiagramStore = create<DiagramStore>()(
       // yet a history entry carries the views: Undo of the step before
       // removed a new view (or brought back a deleted one) along with it,
       // and Redo was still offered after a view was added.
-      addView(name) {
+      addView(name, kind) {
         const id = uid()
         get()._pushUndo()
-        set((state) => { model.insertView(state, id, name) })
+        set((state) => {
+          model.insertView(state, id, name)
+          if (kind && kind !== 'static') state.views[id].kind = kind
+        })
         return id
       },
       removeView(id) {
@@ -3068,7 +3086,8 @@ export const useDiagramStore = create<DiagramStore>()(
             if (incomingViewport) state.lowDetail = lowDetailAt(incomingViewport.zoom, state.lowDetail)
           })
           get()._sync()
-          swapViewSelection(activeViewId, newId)
+          clearViewSelection(newId)
+          suggestSmartLayoutIfUnarranged()
           const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
           ;(window as any).__rfPlaceCamera?.(incomingViewport, shown)
           _liveLayout?.reset(placed)
@@ -3128,7 +3147,8 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(state as any).__pendingViewport = incomingViewport
         })
         get()._sync()
-        swapViewSelection(activeViewId, newId)
+        clearViewSelection(newId)
+        suggestSmartLayoutIfUnarranged()
         // The camera for the incoming view, in one step: no flight from the
         // outgoing view's camera (see Canvas placeCamera).
         const pending = (get() as any).__pendingViewport as
@@ -5583,7 +5603,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // moves what is added or dragged from here on.
         get().startLiveLayout({ skipBulk: true })
         if (placedOnLoad.length > 0) _liveLayout?.reset(placedOnLoad)
-        suggestSmartLayoutIfUnarranged()
+        suggestSmartLayoutIfUnarranged(true)
         // Apply restored camera (loaded as activeViewId=null → default view).
         const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
         ;(window as any).__rfPlaceCamera?.(defaultVP ?? null, shown)
@@ -5790,5 +5810,5 @@ if (typeof requestAnimationFrame !== 'undefined') {
   // skipBulk=true when the store was initialised from localStorage: the
   // persisted positions stand.
   useDiagramStore.getState().startLiveLayout({ skipBulk: _initLoadedFromDisk })
-  if (_initLoadedFromDisk) suggestSmartLayoutIfUnarranged()
+  if (_initLoadedFromDisk) suggestSmartLayoutIfUnarranged(true)
 }

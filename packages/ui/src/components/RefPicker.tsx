@@ -33,7 +33,7 @@ export function RefPicker({ def, value, onChange, readOnly, className = 'props-i
   if (!def.multiple) {
     const id = ids[0] ?? ''
     return (
-      <select className={className} value={id} disabled={readOnly} onChange={(e) => onChange(refValue(def, e.target.value ? [e.target.value] : []))}>
+      <select className={className} aria-label={def.label} value={id} disabled={readOnly} onChange={(e) => onChange(refValue(def, e.target.value ? [e.target.value] : []))}>
         <option value="">(none)</option>
         {id && !valid(id) && <option value={id}>⚠ missing ({id})</option>}
         {choices.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
