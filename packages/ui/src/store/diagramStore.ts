@@ -79,6 +79,7 @@ import { LIVE_CHILD_TOP_MIN } from '@radical/layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
+import { lowDetailAt } from './canvasDetail'
 import { type EdgeStyle, type ViewPipeline, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
@@ -1214,6 +1215,11 @@ interface DiagramStore {
   /** Every relation label is shown whatever the zoom (an export is being
    *  drawn), so the labels are placed even when zoomed out. */
   allEdgeLabelsShown: boolean
+  /** The canvas draws simple blocks, zoomed out (canvasDetail.ts). Canvas
+   *  keeps it in step with the zoom; switching views sets it from the
+   *  incoming camera, so a large view is not drawn as cards first. */
+  lowDetail: boolean
+  setLowDetail: (low: boolean) => void
 
   // ── connect mode ──
   connectSource: string | null
@@ -1948,6 +1954,10 @@ export const useDiagramStore = create<DiagramStore>()(
       liveLayoutActive: true,
       liveLayoutMoving: false,
       allEdgeLabelsShown: false,
+      lowDetail: false,
+      setLowDetail(low) {
+        if (get().lowDetail !== low) set((state) => { state.lowDetail = low })
+      },
       connectSource: null,
       connectionModifier: 'alt' as const,
       autoFitActive: loadStudioSettings().smartFit,
@@ -3055,6 +3065,7 @@ export const useDiagramStore = create<DiagramStore>()(
               placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView, state.c4Relations as Record<string, C4Relation>)
             }
             state.activeViewId = newId
+            if (incomingViewport) state.lowDetail = lowDetailAt(incomingViewport.zoom, state.lowDetail)
           })
           get()._sync()
           swapViewSelection(activeViewId, newId)
@@ -3110,6 +3121,8 @@ export const useDiagramStore = create<DiagramStore>()(
           }
 
           state.activeViewId = newId
+          // Drawn as blocks or cards for the camera it opens with.
+          if (incomingViewport) state.lowDetail = lowDetailAt(incomingViewport.zoom, state.lowDetail)
           // Stash for the post-set effect below; we apply the viewport AFTER
           // _sync() so React Flow has already re-rendered nodes.
           ;(state as any).__pendingViewport = incomingViewport

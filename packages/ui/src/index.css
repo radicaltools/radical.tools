@@ -1005,6 +1005,14 @@ body {
   min-width: 0;
 }
 .lp-card-meta > span { white-space: nowrap; }
+/* The viewpoint a view is of, on a line under its count and view type. */
+.lp-card-viewpoint {
+  margin-top: 1px; font-size: 10.5px; color: var(--accent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.lp-card-viewpoint-kind {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted);
+}
 .lp-meta-dot { opacity: 0.6; flex-shrink: 0; }
 /* Actions slot: part of the flex row, collapses to 0-width when hidden.
    Expands on hover/focus/active — card body shrinks naturally, no overlap. */
@@ -4227,3 +4235,15 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .tv-summary-text code { padding: 0 0.25em; }
 /* What matters in a summary is bold, in the text colour; the rest stays secondary. */
 .tv-summary-text strong { font-weight: 600; color: var(--text-primary); }
+
+/* ── Low detail: zoomed out, an element is a block with its name ─────────── */
+.c4-node-simple { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.c4-node-simple.frame { align-items: flex-start; justify-content: flex-start; }
+.c4-node-simple-label {
+  padding: 0.3em 0.5em; font-weight: 600; line-height: 1.15; text-align: center;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere;
+}
+.c4-node-simple.frame .c4-node-simple-label { text-align: left; -webkit-line-clamp: 1; }
+.react-flow__handle.c4-handle-simple { opacity: 0; pointer-events: none; }
+/* Large enough to find from afar, in the block's corner. */
+.c4-node-simple-toggle { position: absolute; top: 6px; right: 6px; width: 1.4em; height: 1.4em; font-size: inherit; line-height: 1; }
