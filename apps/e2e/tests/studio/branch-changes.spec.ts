@@ -115,8 +115,8 @@ test('the Inspector lists every change since the base, and a click leads to the 
   const inspector = page.getByRole('button', { name: /^Inspector/ })
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
   await inspector.click()
-  // The toggle and its count stay in the toolbar in every perspective.
-  await expect(page.getByRole('button', { name: /^Changes on branch/ }).locator('.branch-count')).toHaveText('3')
+  // The Inspector lists the changes itself: no toggle there.
+  await expect(page.getByRole('button', { name: /^Changes on branch/ })).toHaveCount(0)
   // Implementation's This change leads to the Changes tab.
   await page.getByRole('tab', { name: /^Implementation/ }).click()
   await page.getByRole('region', { name: 'This change' }).getByRole('button', { name: /^All changes/ }).click()
@@ -137,11 +137,19 @@ test('the Inspector lists every change since the base, and a click leads to the 
   await all.getByRole('button', { name: /^Relations/ }).click()
   await expect(all.getByRole('region', { name: 'Relations' })).toContainText('Checkout API → Fraud check')
 
-  // From the list to the element's panel, and on to a canvas that holds it.
+  // From the list to the element's card, Designer's own, read-only, with what changed.
+  const before = await page.locator('.insp-main').boundingBox()
   await all.getByRole('region', { name: 'Changed' }).getByRole('button', { name: /Checkout API/ }).click()
-  const peek = page.getByRole('complementary', { name: 'Element' })
-  await expect(peek.locator('h3')).toHaveText('Checkout API')
-  await peek.getByRole('button', { name: 'Show on canvas' }).click()
+  const card = page.getByRole('complementary', { name: 'Properties' })
+  await expect(card).toBeVisible()
+  // It lies over the page: nothing beneath moves.
+  expect(await page.locator('.insp-main').boundingBox()).toEqual(before)
+  await expect(card.locator('.pp-title')).toHaveText('Checkout API')
+  await expect(card.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
+  await expect(card.getByRole('region', { name: 'Changes on branch' }).locator('ins')).toHaveText(['card ', ' and confirms the order'])
+  await expect(page.getByRole('complementary', { name: 'Element' })).toHaveCount(0)
+  // And on to a canvas that holds it.
+  await card.getByRole('button', { name: 'Show on canvas' }).click()
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
   await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Architecture')
   await expect(studio.node('api')).toHaveClass(/selected/)

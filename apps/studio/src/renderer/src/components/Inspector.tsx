@@ -12,6 +12,8 @@ import React, { useMemo, useState } from 'react'
 import { changeWork } from '@radical/common/branchChanges'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { ElementCard, type CardBranch } from '@radical/ui/components/RightPanel'
+import { openWikiPage, revealOnCanvas } from '../navigation'
 import { useInspectorStore } from '../persistence/inspector'
 import { useBranchStore } from '../persistence/branchChanges'
 import { ThisChange } from './inspector/ThisChange'
@@ -33,9 +35,16 @@ export function Inspector(): React.ReactElement {
   const metamodel = useDiagramStore((s) => s.metamodel)
   const activeDoc = useDocumentsStore((s) => s.docs.find((d) => d.id === s.activeId) ?? null)
   const [peekId, setPeekId] = useState<string | null>(null)
+  // The Changes tab opens Designer's card of an element instead.
+  const [cardId, setCardId] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('model')
   const branch = useBranchStore()
   // The requirements and ADRs of the branch's change, by what the tests say.
+  const cardBranch = useMemo((): CardBranch | null => {
+    if (!branch.changes || !branch.baseModel) return null
+    const baseNodes = Object.fromEntries(Object.keys(branch.changes.nodes).filter((id) => branch.baseModel!.nodes[id]).map((id) => [id, branch.baseModel!.nodes[id]]))
+    return { nodes: branch.changes.nodes, baseNodes }
+  }, [branch.changes, branch.baseModel])
   const work = useMemo(() => branch.changes && branch.baseModel && branch.model
     ? changeWork(branch.changes, branch.baseModel, branch.model, metamodel, results?.cases)
     : null, [branch.changes, branch.baseModel, branch.model, metamodel, results])
@@ -94,12 +103,19 @@ export function Inspector(): React.ReactElement {
             {work && branch.changes && branch.base && branch.baseModel && <ThisChange work={work} changes={branch.changes} base={branch.base} baseModel={branch.baseModel} ctx={ctx} onAllChanges={() => setTab('changes')} />}
             <ImplementationTab check={check} ctx={ctx} relations={relations} results={results} onSettings={() => setTab('settings')} /></>}
           {tab === 'changes' && !branch.base && <p className="insp-notice">There is no base beside this model any more, so there are no changes to show.</p>}
-          {tab === 'changes' && branch.changes && branch.base && branch.baseModel && <ChangesTab changes={branch.changes} base={branch.base} baseModel={branch.baseModel} ctx={ctx} />}
+          {tab === 'changes' && branch.changes && branch.base && branch.baseModel && <ChangesTab changes={branch.changes} base={branch.base} baseModel={branch.baseModel}
+            ctx={{ ...ctx, peek: (id) => { setPeekId(null); setCardId(id) } }} />}
           {tab === 'settings' && <SettingsTab check={check} editable={isFolder}
             readOnlyReason="Settings are the check.json beside a model kept in a folder. This model is no folder, so the default rules apply and nothing here can be saved." />}
         </div>
       </div>
       {peekId && <Peek id={peekId} ctx={ctx} check={check} onClose={() => setPeekId(null)} />}
+      {tab === 'changes' && cardId && nodes[cardId] && (
+        <ElementCard nodeId={cardId} branch={cardBranch} onClose={() => setCardId(null)} actions={<>
+          <button type="button" className="insp-btn primary" onClick={() => revealOnCanvas(cardId)}>Show on canvas</button>
+          <button type="button" className="insp-btn" onClick={() => openWikiPage(cardId)}>Open wiki page</button>
+        </>} />
+      )}
     </div>
   )
 }

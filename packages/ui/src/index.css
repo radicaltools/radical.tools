@@ -4349,3 +4349,7 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .pp-branch-text { margin: 0; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .pp-branch-text del { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); text-decoration: line-through; }
 .pp-branch-text ins { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); text-decoration: none; }
+/* The card outside the canvas (Studio's Inspector): over the right side of
+   the page, as over a canvas, so opening it moves nothing beneath. */
+.right-panel.element-card { position: absolute; top: 0; right: 0; bottom: 0; margin: 10px; transform: none; z-index: 6; }
+.element-card-actions { display: flex; gap: 6px; padding: 10px 14px 0; }

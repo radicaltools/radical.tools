@@ -1,6 +1,6 @@
 import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } from '@radical/common/c4'
 import { resolveEarsSubject, isReservedPropertyKey, type PropertyDef } from '@radical/common/metamodel'
@@ -2065,9 +2065,15 @@ const FIELD_NAMES: Record<string, string> = { label: 'Name', parentId: 'Place', 
 
 /** While the branch's changes are shown: whether the element is new on the
  *  branch, or each field that changed since the base with what it was. */
-function BranchFieldChanges({ node }: { node: C4Node }): React.ReactElement | null {
-  const mark = useDiagramStore((s) => s.branch?.nodes[node.id])
-  const old = useDiagramStore((s) => s.branch?.baseNodes[node.id])
+/** The branch's changes a card shows: the marks and the base's elements. */
+export type CardBranch = Pick<BranchOverlay, 'nodes' | 'baseNodes'>
+
+function BranchFieldChanges({ node, branch }: { node: C4Node; branch?: CardBranch | null }): React.ReactElement | null {
+  // Given (the Inspector's Changes tab), else while Changes on branch is on.
+  const shown = useDiagramStore((s) => s.branch)
+  const source = branch === undefined ? shown : branch
+  const mark = source?.nodes[node.id]
+  const old = source?.baseNodes[node.id]
   const metamodel = useDiagramStore((s) => s.metamodel)
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const pending = useDiagramStore((s) => !!s.pendingBodyNodeIds[node.id])
@@ -2102,9 +2108,16 @@ function BranchFieldChanges({ node }: { node: C4Node }): React.ReactElement | nu
   )
 }
 
-function PropertiesContent({ readOnly = false, onClose }: { readOnly?: boolean; onClose: () => void }) {
-  const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
-  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
+  readOnly?: boolean; onClose: () => void
+  /** The element to show instead of the selection (a card opened from outside the canvas). */
+  nodeId?: string
+  branch?: CardBranch | null
+}) {
+  const selected = useDiagramStore((s) => s.selectedNodeId)
+  const selectedNodeId = nodeId ?? selected
+  const storeEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+  const selectedEdgeId = nodeId ? null : storeEdgeId
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const c4Relations = useDiagramStore((s) => s.c4Relations)
   const metamodel = useDiagramStore((s) => s.metamodel)
@@ -2195,7 +2208,7 @@ function PropertiesContent({ readOnly = false, onClose }: { readOnly?: boolean; 
           menu={menu}
           onClose={onClose}
         />
-        <BranchFieldChanges node={node} />
+        <BranchFieldChanges node={node} branch={branch} />
         {node.type === 'requirement' && (
           <section className="pp-section">
             <div className="pp-section-title">Sentence</div>
@@ -2349,6 +2362,21 @@ function PropertiesContent({ readOnly = false, onClose }: { readOnly?: boolean; 
 
 const PANEL_W_KEY = 'radical-props-width'
 const PANEL_W_DEFAULT = 340
+
+/** The properties card of one element, outside the canvas (Studio's
+ *  Inspector): the same card, read-only, with `actions` under its head. */
+export function ElementCard({ nodeId, branch, onClose, actions }: {
+  nodeId: string; branch?: CardBranch | null; onClose: () => void; actions?: React.ReactNode
+}): React.ReactElement {
+  return (
+    <aside className="right-panel open element-card" aria-label="Properties" style={{ width: PANEL_W_DEFAULT }}>
+      <div className="pp-scroll">
+        {actions && <div className="element-card-actions">{actions}</div>}
+        <PropertiesContent readOnly nodeId={nodeId} branch={branch} onClose={onClose} />
+      </div>
+    </aside>
+  )
+}
 const PANEL_W_MIN = 280
 const PANEL_W_MAX = 640
 

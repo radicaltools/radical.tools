@@ -723,6 +723,11 @@ export function Toolbar(): React.ReactElement {
         onCopyToClipboard={copyToClipboard}
         exportBusy={exportBusy}
       />
+      {/* Not in the Inspector: it lists the changes itself, and has no canvas to mark. */}
+      {appMode !== 'inspector' && (<>
+        <div className="toolbar-sep" />
+        <BranchChangesButton />
+      </>)}
       {/* Undo: the Inspector changes nothing. Fit, zoom and Smart Layout are
           on the canvas (CanvasControls). */}
       {appMode !== 'inspector' && (<>
@@ -772,9 +777,6 @@ export function Toolbar(): React.ReactElement {
         </button>
         <InspectorModeButton active={appMode === 'inspector'} onClick={() => setAppMode('inspector')} />
       </div>
-
-      {/* In every perspective: the count stays in sight, in the Inspector too. */}
-      <BranchChangesButton />
 
       <DocumentManagerModal open={managerOpen} onClose={() => setManagerOpen(false)} />
     </div>
