@@ -51,6 +51,7 @@ import {
   relationDisplayLabel,
 } from '@radical/common/metamodel'
 import * as model from '@radical/common/model'
+import { newViewName, viewpointsOf } from '@radical/common/viewpoints'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
@@ -1335,6 +1336,12 @@ interface DiagramStore {
   setViewEdgeStyle: (viewId: string, style: EdgeStyle | null) => void
   /** A view's pipeline (viewPipeline.ts): source, filters, grouping, order; one undo step, saved. */
   setViewPipeline: (viewId: string, pipeline: ViewPipeline) => void
+  /** Makes the view one of the metamodel's viewpoint (its kind and chain); one undo step. */
+  applyViewpoint: (viewId: string, typeId: string) => boolean
+  /** A new view of the metamodel's viewpoint, named after it; one undo step. */
+  addViewOfViewpoint: (typeId: string) => string | null
+  /** The view keeps its kind and chain, of no viewpoint; one undo step. */
+  detachViewpoint: (viewId: string) => void
   /** How All elements and views without their own draw relations. One undo step. */
   setDefaultEdgeStyle: (style: EdgeStyle) => void
   /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', and 'wiki'. */
@@ -1509,6 +1516,8 @@ interface DiagramStore {
   // ── metamodel (per document) ──
   metamodel: Metamodel
   setMetamodel: (m: Metamodel) => void
+  /** Brings the views of a viewpoint in step with the metamodel. */
+  _syncViewpoints: () => void
   resetMetamodelToC4: () => void
   _forgetStepsOfLostTypes: () => void
   /** Where the undo history stands now, for _mergeStepsSince. */
@@ -1823,6 +1832,8 @@ export const useDiagramStore = create<DiagramStore>()(
       initPres = buildPresentationsFromData(undefined, [])
       initMetamodel = builtInC4Metamodel()
     }
+    // Views of a viewpoint follow the viewpoint as the metamodel has it now.
+    model.syncViewpoints({ views: initViews, metamodel: initMetamodel } as unknown as model.ModelState)
 
     // Puts the model back as a history entry has it, on the canvas the
     // entry was taken on (undo and redo).
@@ -1843,6 +1854,8 @@ export const useDiagramStore = create<DiagramStore>()(
           views[id] = { ...v, treemapFocusId: now.treemapFocusId, wikiFocusId: now.wikiFocusId, tableActiveTab: now.tableActiveTab } as DiagramView
         }
         state.views = views as any
+        // The metamodel is in no step: a view of a viewpoint follows it as it is now.
+        model.syncViewpoints(state as unknown as model.ModelState)
         state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
         state.defaultEdgeStyle = entry.defaultEdgeStyle
         state.defaultPositions = entry.defaultPositions as any
@@ -3224,6 +3237,32 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
       },
 
+      applyViewpoint(viewId, typeId) {
+        const view = get().views[viewId]
+        const type = viewpointsOf(get().metamodel).find((t) => t.id === typeId)
+        if (!view || !type) return false
+        if (view.viewpoint === typeId) return true
+        get()._pushUndo()
+        set((state) => { model.applyViewpoint(state as unknown as model.ModelState, viewId, typeId) })
+        get()._sync()
+        return true
+      },
+      addViewOfViewpoint(typeId) {
+        const type = viewpointsOf(get().metamodel).find((t) => t.id === typeId)
+        if (!type) return null
+        const id = uid()
+        get()._pushUndo()
+        set((state) => {
+          model.insertView(state as unknown as model.ModelState, id, newViewName(type, state.views as Record<string, DiagramView>))
+          model.applyViewpoint(state as unknown as model.ModelState, id, typeId)
+        })
+        return id
+      },
+      detachViewpoint(viewId) {
+        if (!get().views[viewId]?.viewpoint) return
+        get()._pushUndo()
+        set((state) => { delete state.views[viewId].viewpoint })
+      },
       setViewPipeline(viewId, pipeline) {
         const view = get().views[viewId]
         if (!view) return
@@ -4890,6 +4929,12 @@ export const useDiagramStore = create<DiagramStore>()(
       setMetamodel(m) {
         set((state) => { state.metamodel = m as any })
         get()._forgetStepsOfLostTypes()
+        get()._syncViewpoints()
+      },
+      _syncViewpoints() {
+        let changed: string[] = []
+        set((state) => { changed = model.syncViewpoints(state as unknown as model.ModelState) })
+        if (changed.length) get()._sync()
       },
       resetMetamodelToC4() {
         // On a model with governance elements this left them as unknown
@@ -4902,6 +4947,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         set((state) => { state.metamodel = preset as any })
         get()._forgetStepsOfLostTypes()
+        get()._syncViewpoints()
       },
       /** The metamodel is not part of an undo step, so a step that holds
        *  elements of a type it has lost cannot be gone back to. */
@@ -5489,6 +5535,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.presentationActive = false
           state.presentationSlideIndex = 0
           state.metamodel = model.documentMetamodel(data.metamodel, data.nodes) as any
+          model.syncViewpoints(state as unknown as model.ModelState)
           state.hubTemplates = (data.hubTemplates ?? {}) as any
           state.hubMeta = data.hub ?? null
         })

@@ -106,6 +106,8 @@ function describeToolCall(name: string, input: unknown, ctx: ToolRunContext): st
     case 'delete_node_type': return `− element type: ${String(i.id ?? '')}`
     case 'upsert_relation_type': return `~ relation type: ${String(i.label ?? i.id ?? '')}`
     case 'delete_relation_type': return `− relation type: ${String(i.id ?? '')}`
+    case 'upsert_viewpoint': return `~ viewpoint: ${String(i.label ?? i.id ?? '')}`
+    case 'delete_viewpoint': return `− viewpoint: ${String(i.id ?? '')}`
     case 'smart_layout': return 'ran Smart Layout'
     case 'search_model': return 'searched the model'
     case 'focus_node': return 'focused a node'

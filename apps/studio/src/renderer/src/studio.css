@@ -1339,6 +1339,15 @@ label.app-menu-row { cursor: pointer; }
   font-size: 10px;
   color: var(--text-muted);
 }
+/* A viewpoint's filter in words, on its card's header. */
+.mm-viewpoint-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-muted);
+}
 .mm-rel-arrow {
   display: inline-block;
   width: 24px;

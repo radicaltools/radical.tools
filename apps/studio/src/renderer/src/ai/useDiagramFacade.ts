@@ -66,6 +66,10 @@ export function createStoreFacade(): DiagramFacade {
       useDiagramStore.getState().setViewEdgeStyle(id, style),
     setViewPipeline: (id: string, pipeline: ViewPipeline) =>
       useDiagramStore.getState().setViewPipeline(id, pipeline),
+    applyViewpoint: (id: string, typeId: string) =>
+      useDiagramStore.getState().applyViewpoint(id, typeId),
+    detachViewpoint: (id: string) =>
+      useDiagramStore.getState().detachViewpoint(id),
     getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(useDiagramStore.getState(), viewId),
     addAlignment: (viewId: string | null, axis: AlignConstraint['axis'], nodeIds: string[], ordered = false) => {
       // The store aligns on the canvas on screen, so switch to the requested one first.

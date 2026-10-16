@@ -9,6 +9,7 @@
     "./metamodel": "./src/metamodel/index.ts",
     "./model": "./src/model.ts",
     "./viewPipeline": "./src/viewPipeline.ts",
+    "./viewpoints": "./src/viewpoints.ts",
     "./nodeSummary": "./src/nodeSummary.ts",
     "./markdown": "./src/markdown.ts",
     "./check": "./src/check/index.ts",

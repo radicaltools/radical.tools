@@ -12,6 +12,7 @@
 
 import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
 import { readPipeline } from './viewPipeline'
+import { chainOfViewpoint, sameChain, viewpointsOf } from './viewpoints'
 import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
@@ -54,9 +55,27 @@ export function documentMetamodel(stored: Metamodel | undefined, nodes?: Readonl
     const c4 = builtInC4Metamodel()
     return nodes?.some((n) => !c4.nodeTypes[n.type]) ? builtInGovernanceMetamodel() : c4
   }
-  if (stored.id === 'c4-builtin') return builtInC4Metamodel()
-  if (stored.id === 'c4-ddd-builtin' || stored.id === 'c4-ddd-governance-builtin') return builtInGovernanceMetamodel()
-  return stored
+  // The viewpoints: the preset's, as the document changed them, and its own.
+  const preset = stored.id === 'c4-builtin' ? builtInC4Metamodel()
+    : stored.id === 'c4-ddd-builtin' || stored.id === 'c4-ddd-governance-builtin' ? builtInGovernanceMetamodel()
+    : null
+  if (!preset) return stored
+  return withPresetViewpoints(preset, stored)
+}
+
+/** The preset with the document's viewpoints: the preset's (but those the
+ *  document deleted), each as the document has it if it has it, then the
+ *  document's own. A preset that gains a viewpoint brings it to documents
+ *  saved before. */
+function withPresetViewpoints(preset: Metamodel, stored: Metamodel): Metamodel {
+  const own = Array.isArray(stored.viewpoints) ? stored.viewpoints : []
+  const removed = new Set(Array.isArray(stored.removedViewpoints) ? stored.removedViewpoints : [])
+  if (!own.length && !removed.size) return preset
+  const byId = new Map(own.map((v) => [v.id, v]))
+  const fromPreset = (preset.viewpoints ?? []).filter((v) => !removed.has(v.id)).map((v) => byId.get(v.id) ?? v)
+  const presetIds = new Set((preset.viewpoints ?? []).map((v) => v.id))
+  const viewpoints = [...fromPreset, ...own.filter((v) => !presetIds.has(v.id))]
+  return { ...preset, viewpoints, ...(removed.size ? { removedViewpoints: [...removed] } : {}) }
 }
 
 const PRESET_IDS = new Set(['c4-builtin', 'c4-ddd-governance-builtin'])
@@ -480,9 +499,46 @@ export function setViewNodeIds(state: ModelState, viewId: string, nodeIds: strin
   return true
 }
 
+/** Another kind: the view is of no viewpoint any more. */
 export function setViewKind(state: ModelState, viewId: string, kind: DiagramView['kind']): void {
   const view = state.views[viewId]
-  if (view) view.kind = kind
+  if (!view) return
+  view.kind = kind
+  delete view.viewpoint
+}
+
+/** Makes the view one of the metamodel's viewpoint `typeId`: the viewpoint's
+ *  kind and a copy of its chain. False if there is no such view or type. */
+export function applyViewpoint(state: ModelState, viewId: string, typeId: string): boolean {
+  const view = state.views[viewId]
+  const type = viewpointsOf(state.metamodel).find((t) => t.id === typeId)
+  if (!view || !type) return false
+  view.viewpoint = type.id
+  view.kind = type.kind
+  const chain = chainOfViewpoint(type)
+  if (chain.levels?.length || chain.sort || chain.edges) view.pipeline = chain
+  else delete view.pipeline
+  return true
+}
+
+/** Brings every view of a viewpoint in step with the viewpoint as the
+ *  metamodel has it now; a view of a viewpoint the metamodel no longer has keeps
+ *  its kind and chain, of no viewpoint. The ids of the views it changed. */
+export function syncViewpoints(state: ModelState): string[] {
+  const types = viewpointsOf(state.metamodel)
+  const changed: string[] = []
+  for (const view of Object.values(state.views)) {
+    if (!view.viewpoint) continue
+    const type = types.find((t) => t.id === view.viewpoint)
+    if (!type) {
+      delete view.viewpoint
+      changed.push(view.id)
+    } else if ((view.kind ?? 'static') !== type.kind || !sameChain(view.pipeline, type.pipeline)) {
+      applyViewpoint(state, view.id, type.id)
+      changed.push(view.id)
+    }
+  }
+  return changed
 }
 
 export function renameView(state: ModelState, viewId: string, name: string): void {
@@ -567,6 +623,8 @@ export function setViewPipeline(state: ModelState, viewId: string, raw: ViewPipe
   if (pipeline.edges === 'all') next.edges = 'all'
   if (Object.keys(next).length) view.pipeline = next
   else delete view.pipeline
+  // A chain of its own: the view is of no viewpoint any more.
+  delete view.viewpoint
 }
 
 /** How All elements and the views without their own draw relations. */

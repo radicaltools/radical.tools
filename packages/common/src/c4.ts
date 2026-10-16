@@ -143,6 +143,10 @@ export interface DiagramView {
    * 'wiki'    = documentation-style pages per element with inline editing.
    */
   kind?: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki'
+  /** The metamodel's viewpoint (ViewpointDef id) the view is of: its kind
+   *  and chain are the viewpoint's, kept in step when the viewpoint changes. Set
+   *  another kind or chain and the view is of no viewpoint any more. */
+  viewpoint?: string
   /** Where the view sits in the list of views: a folder path such as
    *  "C4/Components" (segments split by "/"). No folder: at the top. */
   folder?: string

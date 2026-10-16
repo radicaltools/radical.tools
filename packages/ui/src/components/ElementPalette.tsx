@@ -75,7 +75,7 @@ function PaletteItem({ typeId, label, sublabel, color, iconPath }: PaletteEntry)
     <div className="palette-item" draggable onDragStart={onDragStart}
       title={sublabel ? `${label} — ${sublabel}. Drag onto the canvas.` : `${label}. Drag onto the canvas.`}>
       <div className="palette-badge" style={{ background: color }}>
-        <svg viewBox="0 0 16 16" width="16" height="16" fill="#fff">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="#fff">
           <path d={iconPath} />
         </svg>
       </div>

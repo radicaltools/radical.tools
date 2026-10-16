@@ -7,6 +7,8 @@
 // The metamodel is stored per-document and validated softly: violations
 // surface in the Issues panel rather than blocking edits.
 
+import type { ViewPipeline } from '../c4'
+
 export type PropertyType = 'text' | 'textarea' | 'boolean' | 'number' | 'enum' | 'ref'
 
 export interface PropertyDef {
@@ -160,11 +162,38 @@ export interface RelationTypeDef {
   builtin?: boolean
 }
 
+/** The kinds of view a viewpoint of the metamodel can be built on (a flow
+ *  view plays a sequence, which a viewpoint cannot name). */
+export type ViewpointKind = 'static' | 'table' | 'treemap' | 'matrix' | 'wiki'
+
+/** A viewpoint of the metamodel: a kind of view and its filter chain under a
+ *  name ("Traceability": a table of needs, the requirements refined from
+ *  them, the scenarios that verify those). A view of this type
+ *  (DiagramView.viewpoint) has its kind and chain, and follows the viewpoint when
+ *  it changes; changing the view's kind or chain leaves the viewpoint. */
+export interface ViewpointDef {
+  id: string
+  label: string
+  /** The concern it serves (C4, Requirements, …): New view and the
+   *  Viewpoint list show the viewpoints under it, in the order of the list. */
+  group?: string
+  description?: string
+  kind: ViewpointKind
+  pipeline: ViewPipeline
+}
+
 export interface Metamodel {
   id: string
   name: string
   nodeTypes: Record<string, NodeTypeDef>
   relationTypes: Record<string, RelationTypeDef>
+  /** Viewpoints, in the order they are offered. A document on a built-in
+   *  preset keeps its own list when the preset is swapped in on load; with
+   *  none, it gets the preset's. */
+  viewpoints?: ViewpointDef[]
+  /** Ids of the preset's viewpoints the document deleted: on load the
+   *  preset's viewpoints come back but these (documentMetamodel). */
+  removedViewpoints?: string[]
 }
 
 export interface MetamodelPreset {

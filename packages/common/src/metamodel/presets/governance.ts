@@ -16,6 +16,7 @@
 
 import { Metamodel, NodeTypeDef, PropertyDef, RelationPair, RelationTypeDef } from '../types'
 import { builtInDddC4Metamodel } from './ddd'
+import { radicalViewpoints } from './viewpoints'
 
 /** What the default metamodel is called in the app. */
 export const RADICAL_METAMODEL_NAME = 'Radical'
@@ -723,5 +724,6 @@ export function builtInGovernanceMetamodel(): Metamodel {
       'lifecycle-of': lifecycleOf,
       emits,
     },
+    viewpoints: radicalViewpoints(),
   }
 }
