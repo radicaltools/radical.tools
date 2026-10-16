@@ -117,7 +117,10 @@ test('the Inspector lists every change since the base, and a click leads to the 
   await inspector.click()
   // The Inspector lists the changes itself: no toggle there.
   await expect(page.getByRole('button', { name: /^Changes on branch/ })).toHaveCount(0)
-  // Implementation's This change leads to the Changes tab.
+  // Changes comes first, and the Inspector opens on it.
+  await expect(page.getByRole('tab').first()).toHaveText(/^Changes/)
+  await expect(page.getByRole('tab', { name: /^Changes/ })).toHaveAttribute('aria-selected', 'true')
+  // Implementation's This change leads back to it.
   await page.getByRole('tab', { name: /^Implementation/ }).click()
   await page.getByRole('region', { name: 'This change' }).getByRole('button', { name: /^All changes/ }).click()
   const tab = page.getByRole('tab', { name: /^Changes/ })

@@ -37,8 +37,10 @@ export function Inspector(): React.ReactElement {
   const [peekId, setPeekId] = useState<string | null>(null)
   // The Changes tab opens Designer's card of an element instead.
   const [cardId, setCardId] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('model')
+  // Until the user picks one, the first tab: Changes when the folder holds a base.
+  const [picked, setTab] = useState<Tab | null>(null)
   const branch = useBranchStore()
+  const tab: Tab = picked ?? (branch.changes ? 'changes' : 'model')
   // The requirements and ADRs of the branch's change, by what the tests say.
   const cardBranch = useMemo((): CardBranch | null => {
     if (!branch.changes || !branch.baseModel) return null
@@ -64,12 +66,12 @@ export function Inspector(): React.ReactElement {
   const model = inPerspective('model')
   const impl = inPerspective('implementation')
   const tabs: Array<[Tab, string, React.ReactNode]> = [
+    ...(branch.changes && branch.base ? [['changes', 'Changes', <span key="c" className="insp-pill none">{branch.changes.counts.added + branch.changes.counts.changed + branch.changes.counts.removed}</span>] as [Tab, string, React.ReactNode]] : []),
     ['model', 'Model quality', <TabBadge key="b" metrics={model.metrics} errors={model.errors.length} />],
     ['implementation', 'Implementation', <React.Fragment key="b">
       {check.evidence ? <TabBadge metrics={impl.metrics} errors={impl.errors.length} /> : <span className="insp-pill none">no results</span>}
       {work && work.newRequirements > 0 && <span className={`insp-pill ${work.newVerified === work.newRequirements ? 'ok' : 'warn'}`} title="New requirements of this change verified">This change {work.newVerified} / {work.newRequirements}</span>}
     </React.Fragment>],
-    ...(branch.changes && branch.base ? [['changes', 'Changes', <span key="c" className="insp-pill none">{branch.changes.counts.added + branch.changes.counts.changed + branch.changes.counts.removed}</span>] as [Tab, string, React.ReactNode]] : []),
     ['settings', 'Settings', <code key="f" className="insp-muted">check.json</code>],
   ]
 
