@@ -6,7 +6,10 @@
 
 import { builtInC4Metamodel, propertyKeyProblem, type Metamodel, type NodeTypeDef, type PropertyDef, type RelationPair, type RelationTypeDef } from '../../metamodel'
 import { checkRemoveNodeTypeFromMetamodel, forkPresetMetamodel, metamodelWithoutNodeType } from '../../model'
+import { pipelineOf } from '../../viewPipeline'
+import { isViewpointKind, newViewpointId, VIEWPOINT_KINDS, viewpointsOf, withViewpoint, withoutViewpoint } from '../../viewpoints'
 import { fail, type ToolDef, type ToolHandler, type ToolResult, type ToolRunContext } from './types'
+import { PIPELINE_SCHEMA, pipelineFor } from './viewTools'
 
 const PROPERTY_TYPES = ['text', 'textarea', 'boolean', 'number', 'enum', 'ref']
 const TYPE_ID = /^[a-z][a-z0-9-]*$/
@@ -96,6 +99,33 @@ export function buildMetamodelToolDefs(): ToolDef[] {
     {
       name: 'delete_relation_type',
       description: 'Delete a custom relation type that no relation uses. Built-in types cannot be deleted.',
+      inputSchema: {
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: 'upsert_viewpoint',
+      description: "Add a viewpoint to the metamodel, or change one (only the fields you pass): a view type (kind) and a filter chain under a name (\"Traceability\": a table of needs, the requirements refined from them, the scenarios verifying those). Studio's New view offers it; create_view/update_view take it as `viewpoint`. Views of the viewpoint follow its changes. Give the chain as pipeline, or copy a view's kind and chain (fromViewId).",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'The viewpoint to change; omit to add one (its id is made from the label).' },
+          label: { type: 'string' },
+          description: { type: 'string', description: 'What a view of this viewpoint shows; New view shows it. "" clears it.' },
+          group: { type: 'string', description: 'The concern it serves ("C4", "Requirements", …): New view lists the viewpoints by group. "" clears it.' },
+          kind: { type: 'string', enum: [...VIEWPOINT_KINDS], description: "How its views show the chain: 'table', 'wiki', 'treemap' (hierarchy), 'matrix' or 'static' (canvas)." },
+          pipeline: { ...PIPELINE_SCHEMA, type: 'object' },
+          fromViewId: { type: 'string', description: 'A view whose kind and filter chain the viewpoint takes (kind and pipeline given here win).' },
+        },
+        additionalProperties: false,
+      },
+    },
+    {
+      name: 'delete_viewpoint',
+      description: 'Delete a viewpoint from the metamodel. Its views keep their kind and filter chain, of no viewpoint.',
       inputSchema: {
         type: 'object',
         properties: { id: { type: 'string' } },
@@ -278,6 +308,57 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       const { mm, note } = editable(current)
       delete mm.relationTypes[def.id]
       return save(ctx, mm, `Deleted relation type "${def.id}".${note}`)
+    },
+
+    // A built-in metamodel is not copied for a viewpoint: documentMetamodel
+    // keeps a document's viewpoints when it swaps the preset in.
+    upsert_viewpoint: (rawInput, ctx) => {
+      const input = rawInput as { id?: unknown; label?: unknown; description?: unknown; group?: unknown; kind?: unknown; pipeline?: unknown; fromViewId?: unknown }
+      const current = currentMetamodel('upsert_viewpoint', ctx)
+      if (typeof current === 'string') return fail(current)
+      const types = viewpointsOf(current)
+      const existing = input.id === undefined ? undefined : types.find((t) => t.id === input.id)
+      if (input.id !== undefined && !existing) return fail(`upsert_viewpoint: unknown viewpoint "${String(input.id)}"${types.length ? ` (the metamodel has ${types.map((t) => `"${t.id}"`).join(', ')})` : ''}`)
+      if (input.label !== undefined && (typeof input.label !== 'string' || !input.label.trim())) return fail('upsert_viewpoint: label must be a non-empty string')
+      if (!existing && input.label === undefined) return fail('upsert_viewpoint: a new viewpoint needs a label')
+      if (input.description !== undefined && typeof input.description !== 'string') return fail('upsert_viewpoint: description must be a string')
+      if (input.group !== undefined && typeof input.group !== 'string') return fail('upsert_viewpoint: group must be a string')
+      if (input.kind !== undefined && !isViewpointKind(input.kind)) return fail(`upsert_viewpoint: kind must be one of ${VIEWPOINT_KINDS.join(', ')}`)
+      let kind = existing?.kind
+      let pipeline = existing?.pipeline
+      if (input.fromViewId !== undefined) {
+        const viewId = typeof input.fromViewId === 'string' ? ctx.resolveId(input.fromViewId) : ''
+        const view = ctx.diagram.getViews?.()[viewId]
+        if (!view) return fail(`upsert_viewpoint: unknown view "${String(input.fromViewId)}"`)
+        if (!isViewpointKind(view.kind ?? 'static')) return fail(`upsert_viewpoint: a ${view.kind} view cannot be a viewpoint`)
+        kind = (view.kind ?? 'static') as typeof kind
+        pipeline = pipelineOf(view) ?? {}
+      }
+      if (input.kind !== undefined) kind = input.kind as typeof kind
+      if (input.pipeline !== undefined) {
+        if (input.pipeline === null) return fail('upsert_viewpoint: pipeline must be an object')
+        const chain = pipelineFor(ctx, 'upsert_viewpoint', input.pipeline)
+        if ('error' in chain) return fail(chain.error)
+        pipeline = chain.pipeline
+      }
+      if (!kind) return fail('upsert_viewpoint: a new viewpoint needs a kind (or fromViewId)')
+      const label = typeof input.label === 'string' ? input.label.trim() : existing!.label
+      const clash = types.find((t) => t.id !== existing?.id && t.label.trim().toLowerCase() === label.toLowerCase())
+      if (clash) return fail(`upsert_viewpoint: the viewpoint "${clash.id}" already has the name "${clash.label}"`)
+      const description = input.description === undefined ? existing?.description : (input.description as string).trim() || undefined
+      const group = input.group === undefined ? existing?.group : (input.group as string).trim() || undefined
+      const id = existing?.id ?? newViewpointId(label, types)
+      const mm = withViewpoint(current, { id, label, ...(group ? { group } : {}), ...(description ? { description } : {}), kind, pipeline: JSON.parse(JSON.stringify(pipeline ?? {})) })
+      const following = Object.values(ctx.diagram.getViews?.() ?? {}).filter((v) => v.viewpoint === id).length
+      return save(ctx, mm, `${existing ? 'Updated' : 'Added'} viewpoint "${id}".${existing && following ? ` ${following} view(s) of it follow.` : ''}`)
+    },
+
+    delete_viewpoint: (rawInput, ctx) => {
+      const input = rawInput as { id?: unknown }
+      const current = currentMetamodel('delete_viewpoint', ctx)
+      if (typeof current === 'string') return fail(current)
+      if (!viewpointsOf(current).some((t) => t.id === input.id)) return fail(`delete_viewpoint: unknown viewpoint "${String(input.id)}"`)
+      return save(ctx, withoutViewpoint(current, input.id as string), `Deleted viewpoint "${String(input.id)}".`)
     },
   }
 }

@@ -56,6 +56,7 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     state.defaultLayoutConstraints = clone(defaultLayoutConstraints ?? [])
     state.sequences = byId(sequences)
     state.metamodel = model.documentMetamodel(doc.metamodel, doc.nodes)
+    model.syncViewpoints(state)
     keepSequences = sequences !== undefined
   }
   load(data)
@@ -157,6 +158,12 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     setViewEdgeStyle(id: string, style: EdgeStyle | null) {
       model.setViewEdgeStyle(state, id, style)
     },
+    applyViewpoint(id: string, typeId: string) {
+      return model.applyViewpoint(state, id, typeId)
+    },
+    detachViewpoint(id: string) {
+      delete state.views[id]?.viewpoint
+    },
     setViewPipeline(id: string, pipeline: ViewPipeline) {
       model.setViewPipeline(state, id, pipeline)
     },
@@ -198,6 +205,7 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     setMetamodel(metamodel: Metamodel) {
       state.metamodel = clone(metamodel)
       carried.metamodel = clone(metamodel)
+      model.syncViewpoints(state)
     },
 
     getMilestones: () => carried.snapshots ?? [],

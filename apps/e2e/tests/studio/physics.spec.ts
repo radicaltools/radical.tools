@@ -263,7 +263,13 @@ test('adding an element to a large diagram moves only its surroundings', async (
   await studio.seedDocument(gridDocument())
   await studio.open('canvas')
   const before = await studio.positions()
-  await studio.addFromPalette('Software System', { x: 400, y: 400 })
+  // In the middle of the grid, in the gap between four containers (a drop on
+  // one would put the system inside it, which is refused).
+  const pane = (await studio.pane.boundingBox())!
+  const a = (await studio.nodeByLabel('N 7,7').boundingBox())!
+  const d = (await studio.nodeByLabel('N 8,8').boundingBox())!
+  const gap = { x: (a.x + a.width + d.x) / 2 - pane.x, y: (a.y + a.height + d.y) / 2 - pane.y }
+  await studio.addFromPalette('Software System', gap)
   await expect(studio.nodes).toHaveCount(226)
   await page.waitForTimeout(3000)
   const after = await studio.positions()

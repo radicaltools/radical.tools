@@ -6,6 +6,7 @@
 // presets (see `builtInGovernanceMetamodel`, the superset of all of them).
 
 import { Metamodel, NodeTypeDef, PropertyDef, RelationPair, RelationTypeDef } from '../types'
+import { c4Viewpoints } from './viewpoints'
 
 interface Visual {
   label: string
@@ -193,5 +194,5 @@ export function builtInC4Metamodel(): Metamodel {
     },
   }
 
-  return { id: 'c4-builtin', name: 'C4 (built-in)', nodeTypes, relationTypes }
+  return { id: 'c4-builtin', name: 'C4 (built-in)', nodeTypes, relationTypes, viewpoints: c4Viewpoints() }
 }

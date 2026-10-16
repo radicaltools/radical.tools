@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
 import type { C4Node, C4ElementType } from '@radical/common/c4'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
@@ -19,13 +19,80 @@ import { MarkdownText } from './MarkdownText'
 // buttons at the end of the row open. It has no palette: elements are added
 // where they will show, by a + row after the rows under each element (on
 // the chain's next level, linked the way that level hangs under it) and one
-// at the end of the table for the top level.
+// at the end of the table for the top level. A long table draws only the
+// lines around what is scrolled into sight (useTableWindow).
 
 interface EditCell {
   rowId: string
   draft: string
   /** What the cell held when it was opened. */
   initial: string
+}
+
+/** From this many lines on, the table draws only those near the scrolled
+ *  part: a register of 750 requirements took a quarter of a second to open. */
+const VIRTUAL_FROM = 200
+/** Lines drawn beyond the visible part, in pixels, each way. */
+const OVERSCAN_PX = 600
+
+/** The lines of a long table to draw: those within the scrolled part of
+ *  `wrap` and OVERSCAN_PX around it, and the height of the lines before and
+ *  after them. Each line is as high as the drawn lines of its kind measure
+ *  (a row is one line of text). `reveal` scrolls a line into sight. */
+function useTableWindow(kinds: ReadonlyArray<'row' | 'add'>, wrap: React.RefObject<HTMLDivElement>, body: React.RefObject<HTMLTableSectionElement>) {
+  const on = kinds.length >= VIRTUAL_FROM
+  const [scroll, setScroll] = useState({ top: 0, height: 900 })
+  const [heights, setHeights] = useState({ row: 33, add: 26 })
+
+  useEffect(() => {
+    const el = wrap.current
+    if (!on || !el) return
+    let frame = 0
+    const read = () => { frame = 0; setScroll({ top: el.scrollTop, height: el.clientHeight }) }
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(read) }
+    read()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    const resize = new ResizeObserver(onScroll)
+    resize.observe(el)
+    return () => { el.removeEventListener('scroll', onScroll); resize.disconnect(); if (frame) cancelAnimationFrame(frame) }
+  }, [on, wrap])
+
+  // Each kind's height, as drawn.
+  useLayoutEffect(() => {
+    if (!on || !body.current) return
+    const row = body.current.querySelector<HTMLElement>('tr.tv-row')?.getBoundingClientRect().height
+    const add = body.current.querySelector<HTMLElement>('tr.tv-add-row')?.getBoundingClientRect().height
+    setHeights((h) => {
+      const next = { row: row || h.row, add: add || h.add }
+      return Math.abs(next.row - h.row) > 0.5 || Math.abs(next.add - h.add) > 0.5 ? next : h
+    })
+  })
+
+  // Where each line starts, from the top of the body.
+  const offsets = useMemo(() => {
+    if (!on) return [0]
+    const out = new Array<number>(kinds.length + 1)
+    out[0] = 0
+    for (let i = 0; i < kinds.length; i++) out[i + 1] = out[i] + (kinds[i] === 'row' ? heights.row : heights.add)
+    return out
+  }, [on, kinds, heights])
+
+  if (!on) return { on, start: 0, end: kinds.length, before: 0, after: 0, reveal: (_i: number) => {} }
+  const firstAt = (y: number) => {
+    let lo = 0, hi = kinds.length
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (offsets[mid + 1] <= y) lo = mid + 1; else hi = mid }
+    return lo
+  }
+  const start = firstAt(Math.max(0, scroll.top - OVERSCAN_PX))
+  const end = Math.min(kinds.length, firstAt(scroll.top + scroll.height + OVERSCAN_PX) + 1)
+  const reveal = (i: number) => {
+    const el = wrap.current
+    if (!el || i < 0) return
+    const head = el.querySelector('thead')?.getBoundingClientRect().height ?? 0
+    const top = offsets[i], bottom = offsets[i + 1]
+    if (top < el.scrollTop || bottom + head > el.scrollTop + el.clientHeight) el.scrollTop = Math.max(0, top - el.clientHeight / 3)
+  }
+  return { on, start, end, before: offsets[start], after: offsets[kinds.length] - offsets[end], reveal }
 }
 
 export function TableView(): React.ReactElement {
@@ -93,6 +160,19 @@ export function TableView(): React.ReactElement {
     }
     return out
   }, [rows, foldedRows, activeView, pipelineCtx, readOnly])
+
+  // A long table draws only the lines near what is scrolled into sight; a
+  // row the user goes to from elsewhere (a new element's name to write, the
+  // element selected in Structure) is scrolled to.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLTableSectionElement>(null)
+  const kinds = useMemo(() => lines.map((l) => l.kind), [lines])
+  const win = useTableWindow(kinds, wrapRef, bodyRef)
+  const revealNode = win.reveal
+  const lineOf = useCallback((id: string) => lines.findIndex((l) => l.kind === 'row' && l.row.node.id === id), [lines])
+  const editRowId = editCell?.rowId
+  useEffect(() => { if (editRowId) revealNode(lineOf(editRowId)) }, [editRowId, lineOf]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (selectedNodeId) revealNode(lineOf(selectedNodeId)) }, [selectedNodeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // What a choice gets besides its type, in words: where it goes, the values
   // the filter asks for, and whether the filter will show it.
@@ -251,18 +331,19 @@ export function TableView(): React.ReactElement {
 
   return (
     <div className="tv-wrap" onClick={() => setEditCell(null)}>
-      <div className="tv-table-wrap">
+      <div className="tv-table-wrap" ref={wrapRef}>
         <table className="tv-table">
           <thead>
             <tr><th className="tv-th tv-th-name">Name</th><th className="tv-th">Summary</th></tr>
           </thead>
-          <tbody>
+          <tbody ref={bodyRef}>
             {rows.length === 0 && (
               <tr>
                 <td className="tv-empty" colSpan={2}>{pipelineActive(pipeline) ? "No elements pass the view's steps." : 'No nodes.'}</td>
               </tr>
             )}
-            {lines.map((line) => line.kind === 'row' ? (
+            {win.before > 0 && <tr className="tv-spacer" aria-hidden style={{ height: win.before }}><td colSpan={2} /></tr>}
+            {(win.on ? lines.slice(win.start, win.end) : lines).map((line) => line.kind === 'row' ? (
               <tr
                 key={line.row.path}
                 data-node-id={line.row.node.id}
@@ -294,6 +375,7 @@ export function TableView(): React.ReactElement {
                 </td>
               </tr>
             ))}
+            {win.after > 0 && <tr className="tv-spacer" aria-hidden style={{ height: win.after }}><td colSpan={2} /></tr>}
           </tbody>
         </table>
       </div>

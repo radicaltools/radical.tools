@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { builtInC4Metamodel, propertyKeyProblem, validateModel } from '@radical/common/metamodel'
 import { forkPresetMetamodel } from '@radical/common/model'
+import { chainSummary, VIEW_KIND_LABELS, VIEWPOINT_KINDS, viewpointsOf, withViewpoint, withoutViewpoint } from '@radical/common/viewpoints'
 import { DEFAULT_SUMMARIES, nodeSummary, summaryTokens } from '@radical/common/nodeSummary'
 import { markdownToPlain } from '@radical/common/markdown'
 import { MarkdownText } from '@radical/ui/components/MarkdownText'
@@ -12,6 +13,8 @@ import type {
   RelationPair,
   PropertyDef,
   PropertyType,
+  ViewpointDef,
+  ViewpointKind,
 } from '@radical/common/metamodel'
 import {
   MetamodelDiagram,
@@ -620,6 +623,114 @@ function RelationTypeCard({
 
 // ── Issues panel (right column inside metamodel editor) ────────────────────
 
+function ViewpointCard({
+  def,
+  summary,
+  viewCount,
+  onChange,
+  onDelete,
+}: {
+  def: ViewpointDef
+  summary: string
+  viewCount: number
+  onChange: (next: ViewpointDef) => void
+  onDelete: () => void
+}): React.ReactElement {
+  const [open, setOpen] = useState(false)
+  // A viewpoint keeps a name: an emptied field goes back to it.
+  const [label, setLabel] = useState(def.label)
+  useEffect(() => setLabel(def.label), [def.label])
+  const commitLabel = (): void => {
+    if (label.trim() && label.trim() !== def.label) onChange({ ...def, label: label.trim() })
+    else setLabel(def.label)
+  }
+
+  return (
+    <div className="mm-card">
+      <div className="mm-card-header" onClick={() => setOpen((v) => !v)}>
+        <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
+          <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="mm-type-label">{def.label}</span>
+        <span className="mm-type-id">{VIEW_KIND_LABELS[def.kind]}</span>
+        {def.group && <span className="mm-builtin-tag">{def.group}</span>}
+        <span className="mm-viewpoint-summary" title={summary}>{summary}</span>
+        <div style={{ flex: 1 }} />
+        <span className="mm-pair-count">{viewCount} view(s)</span>
+        <button
+          className="mm-icon-btn danger"
+          title="Delete viewpoint; its views keep their kind and filter"
+          aria-label={`Delete viewpoint ${def.label}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete()
+          }}
+        >
+          <IconTrash />
+        </button>
+      </div>
+      {open && (
+        <div className="mm-card-body">
+          <div className="mm-row">
+            <label className="mm-field">
+              <span>Name</span>
+              <input
+                className="mm-input"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                onBlur={commitLabel}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitLabel() }}
+              />
+            </label>
+            <label className="mm-field">
+              <span>Group</span>
+              <input
+                className="mm-input"
+                value={def.group ?? ''}
+                placeholder="Custom"
+                title="The concern it serves: New view lists the viewpoints by group"
+                onChange={(e) => {
+                  const { group: _old, ...rest } = def
+                  onChange(e.target.value ? { ...rest, group: e.target.value } : rest)
+                }}
+              />
+            </label>
+            <label className="mm-field">
+              <span>View type</span>
+              <select
+                className="mm-input"
+                value={def.kind}
+                onChange={(e) => onChange({ ...def, kind: e.target.value as ViewpointKind })}
+              >
+                {VIEWPOINT_KINDS.map((k) => <option key={k} value={k}>{VIEW_KIND_LABELS[k]}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="mm-row">
+            <label className="mm-field">
+              <span>Description</span>
+              <textarea
+                className="mm-input"
+                rows={2}
+                value={def.description ?? ''}
+                placeholder="What a view of this viewpoint shows. New view shows it."
+                onChange={(e) => {
+                  const { description: _old, ...rest } = def
+                  onChange(e.target.value ? { ...rest, description: e.target.value } : rest)
+                }}
+              />
+            </label>
+          </div>
+          <div className="mm-footer-note">
+            Filter: {summary}. To change it, detach a view of this viewpoint in its Filter, edit the
+            chain and save it as a viewpoint under this name: every view of the viewpoint follows.
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function IssuesPanel(): React.ReactElement {
   const nodes = useDiagramStore((s) => s.c4Nodes)
   const relations = useDiagramStore((s) => s.c4Relations)
@@ -683,6 +794,11 @@ export function MetamodelEditor(): React.ReactElement {
 
   const nodeTypes = useMemo(() => Object.values(metamodel.nodeTypes), [metamodel])
   const relationTypes = useMemo(() => Object.values(metamodel.relationTypes), [metamodel])
+  const viewpoints = useMemo(() => viewpointsOf(metamodel), [metamodel])
+  const nodes = useDiagramStore((s) => s.c4Nodes)
+  const relations = useDiagramStore((s) => s.c4Relations)
+  const views = useDiagramStore((s) => s.views)
+  const viewpointCtx = useMemo(() => ({ nodes, relations, metamodel }), [nodes, relations, metamodel])
 
   const addNodeType = () => {
     const base = builtInC4Metamodel().nodeTypes.system
@@ -787,7 +903,7 @@ export function MetamodelEditor(): React.ReactElement {
               onChange={(e) => setMetamodel({ ...(forkPresetMetamodel(metamodel) ?? metamodel), name: e.target.value })}
             />
             <div className="mm-subhead">
-              Per-document metamodel · {nodeTypes.length} node type(s) · {relationTypes.length} relation type(s)
+              Per-document metamodel · {nodeTypes.length} node type(s) · {relationTypes.length} relation type(s) · {viewpoints.length} viewpoint(s)
             </div>
           </div>
           <div style={{ flex: 1 }} />
@@ -863,6 +979,29 @@ export function MetamodelEditor(): React.ReactElement {
                 focusToken={focusTokenFor('relation', t.id)}
                 onChange={(patch) => upsertRelationType({ ...t, ...patch })}
                 onDelete={() => removeRelationType(t.id)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="mm-section">
+          <div className="mm-section-header">
+            <h3>Viewpoints</h3>
+          </div>
+          {viewpoints.length === 0 && (
+            <div className="mm-empty">
+              None yet. Save a view as a viewpoint from its Filter, in the view's properties.
+            </div>
+          )}
+          <div className="mm-card-list">
+            {viewpoints.map((t) => (
+              <ViewpointCard
+                key={t.id}
+                def={t}
+                summary={chainSummary(t.pipeline, viewpointCtx)}
+                viewCount={Object.values(views).filter((v) => v.viewpoint === t.id).length}
+                onChange={(next) => setMetamodel(withViewpoint(metamodel, next))}
+                onDelete={() => setMetamodel(withoutViewpoint(metamodel, t.id))}
               />
             ))}
           </div>

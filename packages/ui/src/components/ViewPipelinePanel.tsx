@@ -6,6 +6,7 @@ import {
   suggestFilters, suggestNextWays, suggestSorts, suggestStartWays, type LevelResult, type PipelineContext, type WaySuggestion,
   placeChoices, propertyChoices, relationChoices, typeChoices, viaChoices, levelTypes, type Choice,
 } from '@radical/common/viewPipeline'
+import { chainSummary, isViewpointKind, saveAsViewpoint, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
 import { useDiagramStore } from '../store/diagramStore'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 
@@ -22,7 +23,9 @@ const NO_PIPELINE: ViewPipeline = {}
 // off), and the order. "+ Start with" / "+ Level under", "+ Filter" and
 // "+ Sort" offer what fits; a click on a way or a filter edits it in place.
 // The table, the wiki, the canvas and the Structure panel on the right show
-// the result.
+// the result. A view of one of the metamodel's viewpoints (viewpoints.ts)
+// shows the viewpoint's chain, read-only until it is detached from the viewpoint; any
+// other chain can be saved as a viewpoint.
 
 const IconFilter = () => (
   <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden>
@@ -398,10 +401,69 @@ function LevelCard({ level, index, result, ctx, readOnly, suggestWays, wayChoice
   )
 }
 
-export function ViewPipelinePanel({ view, readOnly }: { view: DiagramView; readOnly: boolean }): React.ReactElement {
+/** The view's type: the metamodel's viewpoint it is of, with Detach to
+ *  edit the chain on its own, or "Save as viewpoint" to keep its kind and
+ *  chain in the metamodel under a name (a viewpoint's name replaces that viewpoint,
+ *  and every view of it follows). */
+function ViewpointRow({ view, pipeline, ctx }: { view: DiagramView; pipeline: ViewPipeline; ctx: PipelineContext }): React.ReactElement | null {
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  const setMetamodel = useDiagramStore((s) => s.setMetamodel)
+  const applyViewpoint = useDiagramStore((s) => s.applyViewpoint)
+  const detachViewpoint = useDiagramStore((s) => s.detachViewpoint)
+  const type = viewpointOfView(view, metamodel)
+  const kind = view.kind ?? 'static'
+  const [naming, setNaming] = useState<string | null>(null)
+
+  if (type) {
+    return (
+      <div className="rp-viewpoint">
+        <span className="rp-viewpoint-label" title={`${type.label}: ${type.description ? `${type.description}\n` : ''}${chainSummary(type.pipeline, ctx)}`}>
+          Set by the viewpoint
+        </span>
+        <button className="rp-step-btn rp-viewpoint-btn" onClick={() => detachViewpoint(view.id)}
+          title="Keep this chain, of no viewpoint, to edit it here">Detach</button>
+      </div>
+    )
+  }
+  if (!isViewpointKind(kind) || !(pipeline.levels?.length || pipeline.sort)) return null
+
+  const types = viewpointsOf(metamodel)
+  const replaces = naming !== null && types.find((t) => t.label.trim().toLowerCase() === naming.trim().toLowerCase())
+  const save = () => {
+    const label = naming?.trim()
+    if (!label) return
+    const saved = saveAsViewpoint(metamodel, label, kind, pipeline)
+    setMetamodel(saved.metamodel)
+    applyViewpoint(view.id, saved.type.id)
+    setNaming(null)
+  }
+  return (
+    <div className="rp-viewpoint">
+      {naming === null ? (
+        <button className="rp-step-link" onClick={() => setNaming('')}
+          title="Keep this view's kind and chain in the metamodel: New view offers it">Save as viewpoint…</button>
+      ) : (
+        <>
+          <input className="props-input rp-viewpoint-name" autoFocus aria-label="Viewpoint name" placeholder="Viewpoint name"
+            value={naming} onChange={(e) => setNaming(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') save(); else if (e.key === 'Escape') { e.stopPropagation(); setNaming(null) } }} />
+          <button className="rp-step-btn rp-viewpoint-btn" disabled={!naming.trim()} onClick={save}
+            title={replaces ? `Replace the viewpoint “${replaces.label}”: its views follow` : 'Add the viewpoint to the metamodel'}>
+            {replaces ? 'Replace' : 'Save'}
+          </button>
+          <button className="rp-step-btn" aria-label="Cancel" title="Cancel" onClick={() => setNaming(null)}>×</button>
+        </>
+      )}
+    </div>
+  )
+}
+
+export function ViewPipelinePanel({ view, readOnly: readOnlyMode }: { view: DiagramView; readOnly: boolean }): React.ReactElement {
   const nodes = useDiagramStore((s) => s.c4Nodes)
   const relations = useDiagramStore((s) => s.c4Relations)
   const metamodel = useDiagramStore((s) => s.metamodel)
+  // A view of a viewpoint has the viewpoint's chain: edited only once detached.
+  const readOnly = readOnlyMode || !!viewpointOfView(view, metamodel)
   const setViewPipeline = useDiagramStore((s) => s.setViewPipeline)
   const setViewNodes = useDiagramStore((s) => s.setViewNodes)
   const ctx = useMemo<PipelineContext>(() => ({ nodes, relations, metamodel }), [nodes, relations, metamodel])
@@ -439,6 +501,8 @@ export function ViewPipelinePanel({ view, readOnly }: { view: DiagramView; readO
           <button className="rp-pipeline-reset" onClick={() => setViewPipeline(view.id, {})} title="Remove every step">Reset</button>
         )}
       </div>
+
+      {!readOnlyMode && <ViewpointRow view={view} pipeline={pipeline} ctx={ctx} />}
 
       <div className="rp-step">
         <span className="rp-step-icon"><IconSource /></span>

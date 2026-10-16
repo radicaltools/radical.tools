@@ -1,4 +1,5 @@
 import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useDiagramStore } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
 import { type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } from '@radical/common/c4'
@@ -10,6 +11,9 @@ import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
 import { viewShownNodes } from '@radical/common/viewPipeline'
+import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
+import type { ViewpointKind } from '@radical/common/metamodel'
+import { useOutsideClick } from '../hooks/useOutsideClick'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
@@ -552,7 +556,13 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const [nameVal, setNameVal] = useState('')
   const seqList = Object.values(sequences)
 
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  const applyViewpoint = useDiagramStore((s) => s.applyViewpoint)
+  const detachViewpoint = useDiagramStore((s) => s.detachViewpoint)
+  const viewpoints = useMemo(() => viewpointsOf(metamodel), [metamodel])
+
   if (!view) return null
+  const ofType = viewpointOfView(view, metamodel)
   const isDynamic = view.kind === 'dynamic'
   const isTreemap = view.kind === 'treemap'
   const isTable   = view.kind === 'table'
@@ -570,6 +580,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
       <div className="props-type-badge" style={{ background: isDynamic ? 'var(--accent)' : isTreemap ? '#2a3a5a' : isTable ? '#1e3a2a' : isMatrix ? '#3a1e3a' : isWiki ? '#3a2e1e' : '#334155', color: '#fff' }}>
         {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : <Icon.Layers />}
         &nbsp;{isDynamic ? 'FLOW VIEW' : isTreemap ? 'HIERARCHY VIEW' : isTable ? 'TABLE VIEW' : isMatrix ? 'MATRIX VIEW' : isWiki ? 'WIKI VIEW' : 'STRUCTURE VIEW'}
+        {ofType && <>&nbsp;·&nbsp;{ofType.label.toUpperCase()}</>}
       </div>
       <div>
         <div className="props-section-title">Name</div>
@@ -634,76 +645,53 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
           </select>
         </div>
       )}
+      {/* The metamodel's viewpoints: a kind and a filter under a name; the
+          view follows its viewpoint. A list, named for what it is. */}
+      {!readOnly && viewpoints.length > 0 && (
+        <div>
+          <div className="props-section-title">Viewpoint <span className="props-section-note">from the metamodel</span></div>
+          <select
+            className={`props-input viewpoint-select${ofType ? ' set' : ''}`}
+            aria-label="Viewpoint"
+            value={ofType?.id ?? ''}
+            onChange={(e) => (e.target.value ? applyViewpoint(view.id, e.target.value) : detachViewpoint(view.id))}
+          >
+            <option value="">None — view type and filter of its own</option>
+            {viewpointGroups(viewpoints).map(({ group, viewpoints: list }) => (
+              <optgroup key={group} label={group}>
+                {list.map((t) => <option key={t.id} value={t.id}>{t.label} · {VIEW_KIND_LABELS[t.kind]}</option>)}
+              </optgroup>
+            ))}
+          </select>
+          <div className="viewpoint-help">
+            {ofType
+              ? <>{ofType.description ?? `A ${VIEW_KIND_LABELS[ofType.kind].toLowerCase()} with the viewpoint's filter.`} Its view type and filter follow the viewpoint; another view type detaches the view.</>
+              : 'Pick one to give this view its view type and filter, kept in step with the metamodel.'}
+          </div>
+        </div>
+      )}
       {!readOnly && (
         <div>
-          <div className="props-section-title">Type</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-            <button
-              onClick={() => setViewKind(view.id, 'static')}
-              style={{
-                padding: '7px 4px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                background: isStatic ? 'var(--accent)' : 'var(--surface-2, rgba(255,255,255,0.06))',
-                color: isStatic ? '#fff' : 'var(--text-muted)',
-                border: isStatic ? '1px solid var(--accent)' : '1px solid var(--border-color)',
-                fontWeight: isStatic ? 600 : 400,
-              }}
-            ><Icon.Layers /> Structure</button>
-            <button
-              onClick={() => setViewKind(view.id, 'dynamic')}
-              style={{
-                padding: '7px 4px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                background: isDynamic ? 'var(--accent)' : 'var(--surface-2, rgba(255,255,255,0.06))',
-                color: isDynamic ? '#fff' : 'var(--text-muted)',
-                border: isDynamic ? '1px solid var(--accent)' : '1px solid var(--border-color)',
-                fontWeight: isDynamic ? 600 : 400,
-              }}
-            ><Icon.Bolt /> Flow</button>
-            <button
-              onClick={() => setViewKind(view.id, 'treemap')}
-              style={{
-                padding: '7px 4px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                background: isTreemap ? 'var(--accent)' : 'var(--surface-2, rgba(255,255,255,0.06))',
-                color: isTreemap ? '#fff' : 'var(--text-muted)',
-                border: isTreemap ? '1px solid var(--accent)' : '1px solid var(--border-color)',
-                fontWeight: isTreemap ? 600 : 400,
-              }}
-            ><Icon.TreemapGrid /> Hierarchy</button>
-            <button
-              onClick={() => setViewKind(view.id, 'table')}
-              style={{
-                padding: '7px 4px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                background: isTable ? 'var(--accent)' : 'var(--surface-2, rgba(255,255,255,0.06))',
-                color: isTable ? '#fff' : 'var(--text-muted)',
-                border: isTable ? '1px solid var(--accent)' : '1px solid var(--border-color)',
-                fontWeight: isTable ? 600 : 400,
-              }}
-            ><Icon.TableGrid /> Table</button>
-            <button
-              onClick={() => setViewKind(view.id, 'matrix')}
-              style={{
-                padding: '7px 4px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                background: isMatrix ? 'var(--accent)' : 'var(--surface-2, rgba(255,255,255,0.06))',
-                color: isMatrix ? '#fff' : 'var(--text-muted)',
-                border: isMatrix ? '1px solid var(--accent)' : '1px solid var(--border-color)',
-                fontWeight: isMatrix ? 600 : 400,
-              }}
-            ><Icon.MatrixGrid /> Matrix</button>
-            <button
-              onClick={() => setViewKind(view.id, 'wiki')}
-              style={{
-                padding: '7px 4px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                background: isWiki ? 'var(--accent)' : 'var(--surface-2, rgba(255,255,255,0.06))',
-                color: isWiki ? '#fff' : 'var(--text-muted)',
-                border: isWiki ? '1px solid var(--accent)' : '1px solid var(--border-color)',
-                fontWeight: isWiki ? 600 : 400,
-              }}
-            ><Icon.Wiki /> Wiki</button>
+          <div className="props-section-title">View type</div>
+          <div className="view-kind-grid" role="group" aria-label="View type">
+            <button className={`view-kind-btn${isStatic ? ' active' : ''}`} aria-pressed={isStatic} onClick={() => setViewKind(view.id, 'static')}>
+              <Icon.Layers /> Structure
+            </button>
+            <button className={`view-kind-btn${isDynamic ? ' active' : ''}`} aria-pressed={isDynamic} onClick={() => setViewKind(view.id, 'dynamic')}>
+              <Icon.Bolt /> Flow
+            </button>
+            <button className={`view-kind-btn${isTreemap ? ' active' : ''}`} aria-pressed={isTreemap} onClick={() => setViewKind(view.id, 'treemap')}>
+              <Icon.TreemapGrid /> Hierarchy
+            </button>
+            <button className={`view-kind-btn${isTable ? ' active' : ''}`} aria-pressed={isTable} onClick={() => setViewKind(view.id, 'table')}>
+              <Icon.TableGrid /> Table
+            </button>
+            <button className={`view-kind-btn${isMatrix ? ' active' : ''}`} aria-pressed={isMatrix} onClick={() => setViewKind(view.id, 'matrix')}>
+              <Icon.MatrixGrid /> Matrix
+            </button>
+            <button className={`view-kind-btn${isWiki ? ' active' : ''}`} aria-pressed={isWiki} onClick={() => setViewKind(view.id, 'wiki')}>
+              <Icon.Wiki /> Wiki
+            </button>
           </div>
         </div>
       )}
@@ -1060,6 +1048,24 @@ function ViewFolderPicker({ current, folders, onPick, onCancel }: {
   )
 }
 
+/** Groups in two columns of about the same height, each group kept whole
+ *  and in order within its column: each goes to the shorter column. */
+function balancedColumns<T extends { viewpoints: unknown[] }>(groups: T[]): T[][] {
+  const columns: T[][] = [[], []]
+  const height = [0, 0]
+  for (const g of groups) {
+    const c = height[1] < height[0] ? 1 : 0
+    columns[c].push(g)
+    height[c] += g.viewpoints.length + 1
+  }
+  return columns.filter((c) => c.length)
+}
+
+/** The icon of each view type a viewpoint can have, as the view type buttons show it. */
+const VIEW_KIND_ICONS: Record<ViewpointKind, () => React.ReactElement> = {
+  static: Icon.Layers, table: Icon.TableGrid, treemap: Icon.TreemapGrid, matrix: Icon.MatrixGrid, wiki: Icon.Wiki,
+}
+
 function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
   readOnly?: boolean
   onOpenProps?: (viewId: string) => void
@@ -1069,6 +1075,46 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
   const addView = useDiagramStore((s) => s.addView)
+  const addViewOfViewpoint = useDiagramStore((s) => s.addViewOfViewpoint)
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  const viewpoints = useMemo(() => viewpointsOf(metamodel), [metamodel])
+  // New view offers a blank view and the metamodel's viewpoints.
+  const [newMenuOpen, setNewMenuOpen] = useState(false)
+  const newMenuRef = useRef<HTMLDivElement>(null)
+  const newMenuPopRef = useRef<HTMLDivElement>(null)
+  useOutsideClick([newMenuRef, newMenuPopRef], newMenuOpen, useCallback(() => setNewMenuOpen(false), []))
+  // The menu is wider than the panel, which clips what overflows it: it
+  // opens over the app, by the button, as wide as two columns need.
+  const [newMenuAt, setNewMenuAt] = useState<React.CSSProperties>({})
+  const placeNewMenu = useCallback(() => {
+    const r = newMenuRef.current?.getBoundingClientRect()
+    if (!r) return
+    const width = Math.max(r.width, Math.min(620, window.innerWidth - r.left - 16))
+    // Above the button when there is more room there (a long list of
+    // views), else below it (a new model, the button near the top).
+    const above = r.top > window.innerHeight - r.bottom
+    setNewMenuAt(above
+      ? { left: r.left, width, bottom: window.innerHeight - r.top + 6, maxHeight: r.top - 16 }
+      : { left: r.left, width, top: r.bottom + 6, maxHeight: window.innerHeight - r.bottom - 16 })
+  }, [])
+  useEffect(() => {
+    if (!newMenuOpen) return
+    placeNewMenu()
+    window.addEventListener('resize', placeNewMenu)
+    return () => window.removeEventListener('resize', placeNewMenu)
+  }, [newMenuOpen, placeNewMenu])
+  useEffect(() => {
+    if (!newMenuOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNewMenuOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [newMenuOpen])
+  const openNew = (id: string | null) => {
+    setNewMenuOpen(false)
+    if (!id) return
+    setActiveView(id)
+    if (onOpenProps) onOpenProps(id)
+  }
   const totalNodes = useDiagramStore((s) => Object.keys(s.c4Nodes).length)
   const counts = useViewNodeCounts(views)
   const viewList = Object.values(views)
@@ -1099,7 +1145,8 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     const isTable   = v.kind === 'table'
     const isMatrix  = v.kind === 'matrix'
     const isWiki    = v.kind === 'wiki'
-    const badge = isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : 'structure'
+    // A view of a viewpoint is called by its viewpoint.
+    const badge = viewpointOfView(v, metamodel)?.label ?? (isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : 'structure')
     return (
       <div key={v.id}>
         <div
@@ -1180,13 +1227,52 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
       </div>
       {tree.entries.map((entry) => ('folder' in entry ? renderFolder(entry.folder) : renderView(entry.view)))}
       {!readOnly && (
-        <button className="lp-add-btn" onClick={() => {
-          const id = addView(`View ${viewList.length + 1}`)
-          setActiveView(id)
-          if (onOpenProps) onOpenProps(id)
-        }}>
-          <Icon.Plus /> New view
-        </button>
+        <div className="lp-add-view" ref={newMenuRef}>
+          <button className="lp-add-btn" aria-expanded={viewpoints.length ? newMenuOpen : undefined} onClick={() => {
+            if (viewpoints.length) setNewMenuOpen((o) => !o)
+            else openNew(addView(`View ${viewList.length + 1}`))
+          }}>
+            <Icon.Plus /> New view
+          </button>
+          {newMenuOpen && createPortal(
+            <div className="lp-add-view-menu" role="menu" aria-label="New view" ref={newMenuPopRef} style={newMenuAt}>
+              <div className="lp-add-view-head">New view</div>
+              <button className="lp-add-view-option" role="menuitem" onClick={() => openNew(addView(`View ${viewList.length + 1}`))}>
+                <span className="lp-add-view-icon"><Icon.Plus /></span>
+                <span className="lp-add-view-text">
+                  <span className="lp-add-view-name">Blank view</span>
+                  <span className="lp-add-view-desc">A structure view of every element; pick its view type and filter in its properties.</span>
+                </span>
+              </button>
+              <div className="lp-add-view-section">Viewpoints <span>from the metamodel</span></div>
+              <div className="lp-add-view-groups">
+                {balancedColumns(viewpointGroups(viewpoints)).map((column, c) => (
+                  <div key={c} className="lp-add-view-column">
+                {column.map(({ group, viewpoints: list }) => (
+                  <div key={group} className="lp-add-view-group" role="group" aria-label={group}>
+                    <div className="lp-add-view-group-name">{group}</div>
+                    {list.map((t) => {
+                      const KindIcon = VIEW_KIND_ICONS[t.kind]
+                      return (
+                        <button key={t.id} className="lp-add-view-option" role="menuitem" title={t.description}
+                          onClick={() => openNew(addViewOfViewpoint(t.id))}>
+                          <span className="lp-add-view-icon"><KindIcon /></span>
+                          <span className="lp-add-view-text">
+                            <span className="lp-add-view-name">{t.label}<span className="lp-add-view-kind">{VIEW_KIND_LABELS[t.kind]}</span></span>
+                            {t.description && <span className="lp-add-view-desc">{t.description}</span>}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
+                  </div>
+                ))}
+              </div>
+            </div>,
+            document.body,
+          )}
+        </div>
       )}
     </div>
   )

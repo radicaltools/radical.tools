@@ -441,7 +441,6 @@
           "type": "textarea"
         }
       ],
-      "summary": "[Checks {out:implements.bold} · ]{threshold|description.sentence}",
       "width": 180,
       "wizard": {
         "steps": [
@@ -1950,5 +1949,695 @@
       "label": "Verifies",
       "properties": []
     }
-  }
+  },
+  "viewpoints": [
+    {
+      "description": "The people and software systems, and how they use each other (C4 level 1).",
+      "group": "C4",
+      "id": "system-context",
+      "kind": "static",
+      "label": "System context",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "person",
+                  "system"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "The software systems with the containers, web apps, databases and queues inside them, the people who use them, and every relation between them (C4 level 2).",
+      "group": "C4",
+      "id": "containers",
+      "kind": "static",
+      "label": "Containers",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "person",
+                  "system",
+                  "container",
+                  "webapp",
+                  "database",
+                  "queue"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "The containers and web apps with the components inside them, the databases and queues they use, and every relation between them (C4 level 3).",
+      "group": "C4",
+      "id": "components",
+      "kind": "static",
+      "label": "Components",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "container",
+                  "webapp",
+                  "component",
+                  "database",
+                  "queue"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A matrix of the containers, web apps, databases and queues: who uses whom, and where the cycles are.",
+      "group": "C4",
+      "id": "container-dependencies",
+      "kind": "matrix",
+      "label": "Container dependencies",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "container",
+                  "webapp",
+                  "database",
+                  "queue"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "The domains and subdomains, and how they depend on and partner with each other.",
+      "group": "Domain",
+      "id": "domain-map",
+      "kind": "static",
+      "label": "Domain map",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "domain"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "The entities and aggregates, what they are part of and what they reference.",
+      "group": "Domain",
+      "id": "domain-model",
+      "kind": "static",
+      "label": "Domain model",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "entity"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A table of domains, their entities, and the systems, containers and components that realise each.",
+      "group": "Domain",
+      "id": "domain-realisation",
+      "kind": "table",
+      "label": "Domain realisation",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "domain"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "entity"
+                ],
+                "via": {
+                  "contains": true
+                }
+              },
+              {
+                "via": {
+                  "direction": "in",
+                  "relationType": "realises"
+                }
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "via": {
+                  "direction": "in",
+                  "relationType": "realises"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A table of needs, the requirements refined from each, and the scenarios that verify those.",
+      "group": "Requirements",
+      "id": "traceability",
+      "kind": "table",
+      "label": "Traceability",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "need"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "requirement"
+                ],
+                "via": {
+                  "direction": "in",
+                  "relationType": "derives"
+                }
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "scenario"
+                ],
+                "via": {
+                  "direction": "in",
+                  "relationType": "verifies"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A table of requirements, the elements that satisfy each and the scenarios that verify it.",
+      "group": "Requirements",
+      "id": "requirement-coverage",
+      "kind": "table",
+      "label": "Requirement coverage",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "requirement"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "via": {
+                  "direction": "in",
+                  "relationType": "satisfies"
+                }
+              },
+              {
+                "types": [
+                  "scenario"
+                ],
+                "via": {
+                  "direction": "in",
+                  "relationType": "verifies"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "The requirements no scenario verifies or nothing satisfies yet.",
+      "group": "Requirements",
+      "id": "requirement-gaps",
+      "kind": "table",
+      "label": "Requirement gaps",
+      "pipeline": {
+        "levels": [
+          {
+            "filters": [
+              {
+                "direction": "in",
+                "has": false,
+                "kind": "relation",
+                "relationType": "verifies"
+              },
+              {
+                "direction": "in",
+                "has": false,
+                "join": "or",
+                "kind": "relation",
+                "relationType": "satisfies"
+              }
+            ],
+            "ways": [
+              {
+                "types": [
+                  "requirement"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A table of the systems, containers and components that satisfy requirements, each with its requirements and the scenarios that verify them.",
+      "group": "Requirements",
+      "id": "responsibilities",
+      "kind": "table",
+      "label": "Responsibilities",
+      "pipeline": {
+        "levels": [
+          {
+            "filters": [
+              {
+                "direction": "out",
+                "has": true,
+                "kind": "relation",
+                "relationType": "satisfies"
+              }
+            ],
+            "ways": [
+              {
+                "types": [
+                  "system",
+                  "container",
+                  "webapp",
+                  "component",
+                  "database",
+                  "queue"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "requirement"
+                ],
+                "via": {
+                  "direction": "out",
+                  "relationType": "satisfies"
+                }
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "scenario"
+                ],
+                "via": {
+                  "direction": "in",
+                  "relationType": "verifies"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A document of the needs, the requirements refined from each, and the scenarios and screens for each requirement.",
+      "group": "Requirements",
+      "id": "specification",
+      "kind": "wiki",
+      "label": "Specification",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "need"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "requirement"
+                ],
+                "via": {
+                  "direction": "in",
+                  "relationType": "derives"
+                }
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "scenario"
+                ],
+                "via": {
+                  "direction": "in",
+                  "relationType": "verifies"
+                }
+              },
+              {
+                "types": [
+                  "mockup"
+                ],
+                "via": {
+                  "direction": "in",
+                  "relationType": "illustrates"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A table of ADRs, the fitness functions that check each and the elements it constrains.",
+      "group": "Decisions",
+      "id": "decisions",
+      "kind": "table",
+      "label": "Decisions",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "adr"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "fitness-fn"
+                ],
+                "via": {
+                  "direction": "in",
+                  "relationType": "implements"
+                }
+              },
+              {
+                "via": {
+                  "direction": "out",
+                  "relationType": "constrains"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A document of the ADRs, the newest first, each with the decisions it supersedes.",
+      "group": "Decisions",
+      "id": "decision-log",
+      "kind": "wiki",
+      "label": "Decision log",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "adr"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "adr"
+                ],
+                "via": {
+                  "direction": "out",
+                  "relationType": "supersedes"
+                }
+              }
+            ]
+          }
+        ],
+        "sort": {
+          "by": "property",
+          "desc": true,
+          "key": "date"
+        }
+      }
+    },
+    {
+      "description": "A table of the fitness functions by category, each with the decisions it checks and the elements it constrains.",
+      "group": "Decisions",
+      "id": "fitness-functions",
+      "kind": "table",
+      "label": "Fitness functions",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "fitness-fn"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "adr"
+                ],
+                "via": {
+                  "direction": "out",
+                  "relationType": "implements"
+                }
+              },
+              {
+                "via": {
+                  "direction": "out",
+                  "relationType": "constrains"
+                }
+              }
+            ]
+          }
+        ],
+        "sort": {
+          "by": "property",
+          "key": "category"
+        }
+      }
+    },
+    {
+      "description": "The screens and how users navigate from one to the next.",
+      "group": "UX",
+      "id": "screen-flow",
+      "kind": "static",
+      "label": "Screen flow",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "mockup"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A table of the screens, each with the requirements and scenarios it illustrates and the elements that present it.",
+      "group": "UX",
+      "id": "screens",
+      "kind": "table",
+      "label": "Screens",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "mockup"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "via": {
+                  "direction": "out",
+                  "relationType": "illustrates"
+                }
+              },
+              {
+                "via": {
+                  "direction": "out",
+                  "relationType": "presented-by"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A table of the entities with a lifecycle, the state machine of each, and what implements and verifies it.",
+      "group": "States",
+      "id": "entity-lifecycles",
+      "kind": "table",
+      "label": "Entity lifecycles",
+      "pipeline": {
+        "levels": [
+          {
+            "filters": [
+              {
+                "direction": "in",
+                "has": true,
+                "kind": "relation",
+                "relationType": "lifecycle-of"
+              }
+            ],
+            "ways": [
+              {
+                "types": [
+                  "entity"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "state-machine"
+                ],
+                "via": {
+                  "direction": "in",
+                  "relationType": "lifecycle-of"
+                }
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "via": {
+                  "direction": "in",
+                  "relationType": "implements"
+                }
+              },
+              {
+                "types": [
+                  "scenario"
+                ],
+                "via": {
+                  "direction": "in",
+                  "relationType": "verifies"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "A table of the events, each with what emits it.",
+      "group": "States",
+      "id": "event-catalogue",
+      "kind": "table",
+      "label": "Event catalogue",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "event"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "via": {
+                  "direction": "in",
+                  "relationType": "emits"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

@@ -8,6 +8,7 @@
 
 import type { C4Node } from '../c4'
 import type { Metamodel } from '../metamodel'
+import { viewpointsOf } from '../viewpoints'
 
 const FALLBACK_TYPES = [
   'person', 'system', 'container', 'component', 'database', 'webapp', 'queue',
@@ -62,6 +63,7 @@ export function buildMetamodelMessage(
     allowedPairs: r.allowedPairs,
     properties: r.properties,
   }))
+  const viewpoints = viewpointsOf(mm).map((t) => ({ id: t.id, label: t.label, ...(t.group ? { group: t.group } : {}), kind: t.kind, ...(t.description ? { description: t.description } : {}) }))
   return [
     `Metamodel "${mm.name}". Use ONLY the node/relation types listed below; respect`,
     '`allowedParents` (empty ⇒ requires `allowedAtRoot: true` to be a root node),',
@@ -76,8 +78,9 @@ export function buildMetamodelMessage(
     'without a `properties` bag if unsure (unknown keys are dropped with a note,',
     'not a hard failure). A property of type `ref` takes the id of a node of type',
     '`refType` (or a tempId from this run); with `multiple: true`, an array of them.',
+    ...(viewpoints.length ? ['`viewpoints` are a view type (kind) with a filter chain under a name: create_view and', 'update_view take one as `viewpoint` (id or name); the view follows the viewpoint.'] : []),
     '```json',
-    JSON.stringify({ nodeTypes: types, relationTypes: relations }),
+    JSON.stringify({ nodeTypes: types, relationTypes: relations, ...(viewpoints.length ? { viewpoints } : {}) }),
     '```',
   ].join('\n')
 }
