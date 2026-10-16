@@ -9,6 +9,7 @@ import { MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isV
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { modelChangesSince } from '@radical/node-files/gitModel'
 import { readSelectionFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
 import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
@@ -24,7 +25,7 @@ import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult 
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
  *  external client. */
 const EXCLUDED_TOOLS = new Set(['set_active_view', 'focus_node', 'reset_diagram'])
-const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'search_model', 'list_milestones', 'compare_milestones'])
+const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'search_model', 'list_milestones', 'compare_milestones'])
 
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
@@ -41,6 +42,17 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
     name: 'get_selection',
     description: 'What the user has selected on Studio\'s canvas for this model folder: the view on screen and each selected node in full (properties, parents, children, relations, views) plus selected relations. Call it whenever the user refers to "the selected", "this", "zaznaczony" element, mockup or view instead of naming it. updatedAt tells how fresh it is; an empty selection means nothing is selected or Studio left the model.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'get_changes',
+    description: 'What changed in the model since its version in git: the elements and relations added, removed and changed, uncommitted edits included, each changed field with its old and new value, and each element with its place in the model and its relations (the component that satisfies a requirement, the ADRs that constrain it, the scenarios and the tests they name). Only the model is compared; views, positions, sizes and folding are left out. Call it when you are asked to implement what was changed in the model, and again before you report the work as done. Writes nothing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        since: { type: 'string', description: 'The git branch, tag or commit to compare with, e.g. "HEAD" for the last commit. Default: where the current branch left the default branch (the merge base with origin/main), so every model change on the branch counts.' },
+      },
+      additionalProperties: false,
+    },
   },
 ]
 
@@ -351,6 +363,11 @@ export class FolderModel {
         return { ok: true, text: issues.length ? issues.map(formatIssue).join('\n') : 'No issues: the model follows its metamodel.' }
       }
       if (name === 'get_selection') return { ok: true, text: await this.selection(facade) }
+      if (name === 'get_changes') {
+        const { since } = (input ?? {}) as { since?: unknown }
+        if (since !== undefined && typeof since !== 'string') return { ok: false, text: 'get_changes: since must be a git branch, tag or commit' }
+        return { ok: true, text: (await modelChangesSince(this.folder, data, since)).text }
+      }
       priorTempIds = new Map(this.tempIds)
       const ctx: ToolRunContext = {
         diagram: facade,

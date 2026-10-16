@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
+import { promisify } from 'node:util'
 import { tmpdir } from 'node:os'
 import { basename, join, dirname, relative } from 'node:path'
 import { Client } from '@modelcontextprotocol/client'
@@ -222,6 +223,36 @@ describe('milestones', () => {
     const compared = await model.call('compare_milestones', { from: data.snapshots![0].id })
     expect(compared.text).toContain('Elements added:\n- Payments (system, ')
     expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
+  })
+})
+
+describe('get_changes', () => {
+  const exec = promisify(execFile)
+  const git = (cwd: string, ...args: string[]) =>
+    exec('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd })
+
+  it('lists the model changes since git without the layout, and writes nothing', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    expect((await model.call('get_changes', {})).text).toContain('is not in a git repository')
+    await model.call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await git(folder, 'init', '-q', '-b', 'main')
+    await git(folder, 'add', '.')
+    await git(folder, 'commit', '-q', '-m', 'model')
+
+    await model.call('add_node', { tempId: 'pay', type: 'system', label: 'Payments' })
+    await model.call('update_node', { id: 'shop', description: 'Sells books.' })
+    await model.call('smart_layout', {})
+    const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+    const changes = await model.call('get_changes', {})
+    expect(changes.ok).toBe(true)
+    expect(changes.text).toMatch(/^Model changes since merge base with main \([0-9a-f]{7}\)/)
+    expect(changes.text).toContain('Elements: 1 added, 1 changed, 0 removed.')
+    expect(changes.text).toContain('Elements added (1):\n- system "Payments"')
+    expect(changes.text).toMatch(/Elements changed \(1\):\n- system "Shop" \([^)]+\)\n {4}description: \(none\) → Sells books\.$/)
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
+    expect((await model.call('get_changes', { since: 'nope' })).text).toContain('Unknown git ref "nope"')
+    expect(model.tools.find((tool) => tool.name === 'get_changes')?.inputSchema).toMatchObject({ properties: { since: { type: 'string' } } })
   })
 })
 
