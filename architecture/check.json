@@ -37,5 +37,19 @@
         "**/bench.spec.ts"
       ]
     }
+  },
+  "goals": {
+    "requirements-with-scenario": {
+      "min": 85
+    },
+    "requirements-verified": {
+      "min": 80
+    },
+    "adrs-verified": {
+      "min": 75
+    },
+    "tests-bound": {
+      "min": 100
+    }
   }
 }

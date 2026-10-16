@@ -15,21 +15,23 @@ import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isVali
 import { documentMetamodel } from '../model'
 import { CHECK_RULES, type CheckSeverity, type RuleFinding } from './rules'
 import { computeEvidence, type Evidence } from './evidence'
+import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
 import type { TestCase } from './reports'
 
 export { CHECK_RULES, type CheckRule, type CheckSeverity, type CheckModel, type RuleFinding } from './rules'
 export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
 export { CHECK_CONFIG_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, type TestResults } from './files'
 export { computeEvidence, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome } from './evidence'
+export { CHECK_DIMENSIONS, CHECK_METRICS, GOAL_RULE, type CheckDimension, type CheckPerspective, type CheckMetric, type CheckMetricResult, type GoalSetting } from './goals'
 
 /** Rules about the folder's files and its views, sequences and slides. */
-export const FOLDER_RULES: ReadonlyArray<{ id: string; description: string; severity: CheckSeverity }> = [
-  { id: 'folder-manifest', description: 'The folder has a radical.md manifest of the Markdown-folder format, version 1.', severity: 'error' },
-  { id: 'folder-json', description: 'Every JSON sidecar (relations.json, views.json, …) parses.', severity: 'error' },
-  { id: 'folder-conflict', description: 'No node file holds git conflict markers.', severity: 'error' },
-  { id: 'folder-not-a-node', description: 'A node file with frontmatter has an id and a type (one without them is skipped on loading, and its element is gone).', severity: 'error' },
-  { id: 'folder-duplicate-id', description: 'No two node files hold the same id.', severity: 'error' },
-  { id: 'stale-reference', description: 'Views, sequences and slides point only at elements, relations and views the model has.', severity: 'warning' },
+export const FOLDER_RULES: ReadonlyArray<{ id: string; description: string; severity: CheckSeverity; dimension: CheckDimension }> = [
+  { id: 'folder-manifest', description: 'The folder has a radical.md manifest of the Markdown-folder format, version 1.', severity: 'error', dimension: 'consistency' },
+  { id: 'folder-json', description: 'Every JSON sidecar (relations.json, views.json, …) parses.', severity: 'error', dimension: 'consistency' },
+  { id: 'folder-conflict', description: 'No node file holds git conflict markers.', severity: 'error', dimension: 'consistency' },
+  { id: 'folder-not-a-node', description: 'A node file with frontmatter has an id and a type (one without them is skipped on loading, and its element is gone).', severity: 'error', dimension: 'consistency' },
+  { id: 'folder-duplicate-id', description: 'No two node files hold the same id.', severity: 'error', dimension: 'consistency' },
+  { id: 'stale-reference', description: 'Views, sequences and slides point only at elements, relations and views the model has.', severity: 'warning', dimension: 'consistency' },
 ]
 
 /** Rules whose findings stop the check: nothing else can be read. */
@@ -57,6 +59,8 @@ export type RuleSetting = CheckSeverity | 'off' | {
 export interface CheckConfig {
   /** By rule id, or `rule/code` for one kind of finding (`metamodel/sm-unreachable`). */
   rules?: Record<string, RuleSetting>
+  /** By metric id (CHECK_METRICS): the least share in percent. */
+  goals?: Record<string, GoalSetting>
 }
 
 export interface CheckRuleResult {
@@ -78,6 +82,10 @@ export interface CheckResult {
   rules: CheckRuleResult[]
   /** Config keys that name no rule. */
   unknownRules: string[]
+  /** Goal keys that name no metric. */
+  unknownGoals: string[]
+  /** Each metric the model has something to count for, with its goal. */
+  metrics: CheckMetricResult[]
   nodeCount: number
   relationCount: number
   /** With test reports: what they say about each scenario, fitness
@@ -94,8 +102,9 @@ export interface CheckOptions {
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
   Object.fromEntries(items.map((item) => [item.id, item]))
 
-const RULE_IDS = new Set([...FOLDER_RULES.map((r) => r.id), ...CHECK_RULES.map((r) => r.id)])
-const DEFAULT_SEVERITY = new Map([...FOLDER_RULES, ...CHECK_RULES].map((r) => [r.id, r.severity]))
+const ALL_RULES = [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]
+const RULE_IDS = new Set(ALL_RULES.map((r) => r.id))
+const DEFAULT_SEVERITY = new Map(ALL_RULES.map((r) => [r.id, r.severity]))
 
 /** Checks the model in `files` (paths relative to the model folder). */
 export function runCheck(files: FolderFiles, config: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
@@ -124,14 +133,14 @@ export function runCheck(files: FolderFiles, config: CheckConfig = {}, options: 
     }
   }
 
-  let model: ModelCheck = { found: [], nodeCount: 0, relationCount: 0 }
+  let model: ModelCheck = { found: [], nodeCount: 0, relationCount: 0, metrics: [] }
   if (!found.some((f) => FATAL.has(f.rule))) model = checkData(deserializeFromMdFolder(files).data, options, config)
 
   const result = settle([...found, ...model.found].map((f) => ({
     ...f,
     ...(!f.path && f.nodeId && pathOf.has(f.nodeId) ? { path: pathOf.get(f.nodeId) } : {}),
     ...(!f.path && f.relationId ? { path: 'relations.json' } : {}),
-  })), config, model.nodeCount, model.relationCount)
+  })), config, model.nodeCount, model.relationCount, model.metrics)
   return model.evidence ? { ...result, evidence: model.evidence } : result
 }
 
@@ -139,6 +148,7 @@ interface ModelCheck {
   found: Array<RuleFinding & { rule: string }>
   nodeCount: number
   relationCount: number
+  metrics: CheckMetricResult[]
   evidence?: Evidence
 }
 
@@ -153,11 +163,15 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     ...(options.tests ? { tests: options.tests } : {}),
   }
   for (const rule of CHECK_RULES) rule.run(model).forEach((finding) => found.push({ rule: rule.id, ...finding }))
+  const evidence = options.tests ? computeEvidence(model) : undefined
+  const goals = measureGoals({ model, found, ...(evidence ? { evidence } : {}) }, config.goals ?? {})
+  goals.findings.forEach((finding) => found.push({ rule: GOAL_RULE.id, ...finding }))
   return {
     found,
     nodeCount: Object.keys(nodes).length,
     relationCount: Object.keys(relations).length,
-    ...(options.tests ? { evidence: computeEvidence(model) } : {}),
+    metrics: goals.metrics,
+    ...(evidence ? { evidence } : {}),
   }
 }
 
@@ -165,7 +179,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
  *  ones about the folder's files, which only a folder has. */
 export function checkModel(data: DiagramData, config: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
   const model = checkData(data, options, config)
-  const result = settle(model.found, config, model.nodeCount, model.relationCount)
+  const result = settle(model.found, config, model.nodeCount, model.relationCount, model.metrics)
   return model.evidence ? { ...result, evidence: model.evidence } : result
 }
 
@@ -204,14 +218,14 @@ const keyOf = (f: { rule: string; code?: string }, rules: Record<string, RuleSet
 const settingOf = (setting: RuleSetting | undefined): Exclude<RuleSetting, string> =>
   setting === undefined ? {} : typeof setting === 'string' ? { severity: setting } : setting
 
-function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfig, nodeCount: number, relationCount: number): CheckResult {
+function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfig, nodeCount: number, relationCount: number, metrics: CheckMetricResult[]): CheckResult {
   const rules = config.rules ?? {}
   const groups = new Map<string, Array<RuleFinding & { rule: string }>>()
   for (const f of found) {
     const key = keyOf(f, rules)
     groups.set(key, [...(groups.get(key) ?? []), f])
   }
-  const order = [...FOLDER_RULES.map((r) => r.id), ...CHECK_RULES.map((r) => r.id)]
+  const order = ALL_RULES.map((r) => r.id)
   const keys = [...new Set([...groups.keys(), ...Object.keys(rules).filter((k) => RULE_IDS.has(k.split('/')[0]))])]
     .sort((a, b) => order.indexOf(a.split('/')[0]) - order.indexOf(b.split('/')[0]) || a.localeCompare(b))
 
@@ -248,6 +262,8 @@ function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfi
     findings,
     rules: results,
     unknownRules: Object.keys(rules).filter((k) => !RULE_IDS.has(k.split('/')[0])),
+    unknownGoals: Object.keys(config.goals ?? {}).filter((k) => !isMetricId(k)),
+    metrics,
     nodeCount,
     relationCount,
   }
@@ -269,3 +285,7 @@ export function ratchetConfig(config: CheckConfig, result: CheckResult): { confi
 }
 
 export { formatCheckText, formatCheckGithub, type FormatOptions } from './format'
+export { compareCheckConfig, type CheckConfigChange } from './configChanges'
+
+/** A rule's severity when the config does not set it. */
+export const defaultSeverity = (rule: string): CheckSeverity => DEFAULT_SEVERITY.get(rule) ?? 'error'

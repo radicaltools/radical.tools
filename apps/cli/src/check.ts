@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_RULES, FOLDER_RULES, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestReport, ratchetConfig, runCheck, serializeTestResults, type CheckConfig, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestReport, ratchetConfig, runCheck, serializeTestResults, type CheckConfig, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
@@ -25,7 +25,9 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
   --ratchet           lower each baseline (max) in the config to the count found
                       now, so a rule that got better cannot get worse again
   --verbose           list every warning, not the first five of each rule
-  --list-rules        list the rules and their default severity
+  --list-rules        list the rules and their default severity, and the
+                      metrics check.json can set goals for ("goals":
+                      { "<metric>": { "min": <percent> } })
 
 Exit status: 0 no errors, 1 errors found, 2 the check could not run.`
 
@@ -60,7 +62,9 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   const { values, positionals } = parsed
   if (values.help) { io.out(CHECK_USAGE); return 0 }
   if (values['list-rules']) {
-    for (const rule of [...FOLDER_RULES, ...CHECK_RULES]) io.out(`${rule.id.padEnd(30)} ${rule.severity.padEnd(8)} ${rule.description}`)
+    for (const rule of [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]) io.out(`${rule.id.padEnd(30)} ${rule.severity.padEnd(8)} ${rule.description}`)
+    io.out('\nMetrics for goals (in percent):')
+    for (const metric of CHECK_METRICS) io.out(`${metric.id.padEnd(30)} ${(metric.tests ? 'reports' : '').padEnd(8)} ${metric.description}`)
     return 0
   }
   if (positionals.length > 1 || !['text', 'json', 'github'].includes(values.format) || (values.evidence && !values.report?.length)) {

@@ -5,4 +5,4 @@ label: "@radical/node-files"
 technology: "Node.js"
 ---
 
-Node-only file access shared by the Electron app, the MCP server and the CLI: diskFolderStorage (a Markdown model folder on disk, refusing paths outside the folder, non-model files and symbolic links) and selectionFile (the editor-state files under .radical/ with their .gitignore: Studio's canvas selection, the agent's Forge run status, and check.json plus .radical/test-results.json for the Inspector).
+Node-only file access shared by the Electron app, the MCP server and the CLI: diskFolderStorage (a Markdown model folder on disk, refusing paths outside the folder, non-model files and symbolic links) and selectionFile (the editor-state files under .radical/ with their .gitignore: Studio's canvas selection, the agent's Forge run status, and check.json plus .radical/test-results.json for the Inspector; writeCheckConfig saves check.json, refusing a symlinked one).

@@ -20,6 +20,7 @@ const api = {
   writeSelection: (folderPath, content) => ipcRenderer.invoke('folder:write-selection', folderPath, content),
   readForgeRun: (folderPath) => ipcRenderer.invoke('folder:read-forge-run', folderPath),
   readCheckFiles: (folderPath) => ipcRenderer.invoke('folder:read-check-files', folderPath),
+  writeCheckConfig: (folderPath, content) => ipcRenderer.invoke('folder:write-check-config', folderPath, content),
   getWatchedPath: () => ipcRenderer.invoke('file:getWatchedPath'),
   onFileChanged: (listener) => {
     ipcRenderer.on('file:external-change', (_event, data) => listener(data as FileChange))

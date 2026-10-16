@@ -46,5 +46,13 @@ export function parseCheckConfig(text: string): CheckConfig {
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('a config is a JSON object')
   const rules = (data as CheckConfig).rules
   if (rules !== undefined && (typeof rules !== 'object' || rules === null || Array.isArray(rules))) throw new Error('"rules" is an object of rule settings')
+  const goals = (data as CheckConfig).goals
+  if (goals !== undefined) {
+    if (typeof goals !== 'object' || goals === null || Array.isArray(goals)) throw new Error('"goals" is an object of goals by metric')
+    for (const [id, goal] of Object.entries(goals)) {
+      const min = (goal as { min?: unknown } | null)?.min
+      if (typeof min !== 'number' || !(min >= 0 && min <= 100)) throw new Error(`goal "${id}" needs a "min" from 0 to 100 (percent)`)
+    }
+  }
   return data as CheckConfig
 }

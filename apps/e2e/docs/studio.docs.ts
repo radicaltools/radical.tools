@@ -243,6 +243,19 @@ test('inspector', async ({ page, shot }) => {
   await expect(page.locator('.insp-verdict')).toBeVisible()
   await settle(page)
   await shot('inspector')
+
+  await page.getByRole('tab', { name: /^Implementation/ }).click()
+  await expect(page.locator('.insp-funnel').first()).toBeVisible()
+  await settle(page)
+  await shot('inspector-implementation')
+
+  // Settings with one change that loosens the gate, as the bar and the row show it.
+  await page.getByRole('tab', { name: /^Settings/ }).click()
+  const baseline = page.getByRole('spinbutton', { name: 'Baseline of requirement-without-scenario' })
+  await baseline.fill(String(Number(await baseline.inputValue()) + 9))
+  await expect(page.locator('.insp-savebar')).toBeVisible()
+  await settle(page)
+  await shot('inspector-settings')
 })
 
 /** Opens the view whose card in the left panel says `name`, as a reader would. */

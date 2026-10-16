@@ -75,6 +75,9 @@ export interface HostCapabilities {
    *  results (`.radical/test-results.json`) and the rule settings
    *  (`check.json`); each is null when there is none. */
   readCheckFiles?(folderPath: string): Promise<HostResult & { results?: string | null; config?: string | null }>
+  /** Write the rule settings and goals (`check.json`) of an md-folder model,
+   *  as the Inspector's Settings save them. */
+  writeCheckConfig?(folderPath: string, content: string): Promise<HostResult>
   /** The file the host opened Studio with (CLI --file, VS Code editor), if any. */
   getWatchedPath?(): Promise<string | null>
   /** Called when the watched file changes outside Studio. */

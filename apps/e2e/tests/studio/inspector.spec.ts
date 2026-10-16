@@ -8,7 +8,8 @@ import type { C4Node, DiagramData } from '@radical/common/c4'
 // The Inspector perspective shows what radical check says about a model
 // kept in a folder: the rules run on the model as it is, the test results
 // come from .radical/test-results.json, which `radical check --report`
-// writes beside the model.
+// writes beside the model. Its tabs: Model quality, Implementation (what
+// the tests say) and Settings (the folder's check.json).
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
@@ -62,9 +63,15 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   for (const name of ['Fit All', 'Smart Layout', 'Undo', 'Redo']) {
     await expect(page.locator('.toolbar').getByRole('button', { name })).toHaveCount(0)
   }
+  // A failed test is about the implementation, not the model.
+  await expect(page.getByRole('tab', { name: /^Model quality/ })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.locator('.insp-error')).toHaveCount(0)
+  await expect(page.locator('.insp-tile[data-dimension="traceability"]')).toContainText('100%')
+  await page.getByRole('tab', { name: /^Implementation/ }).click()
   const error = page.locator('.insp-error')
   await expect(error).toContainText('test tests/pay.test.ts › pays by card failed.')
-  await expect(page.locator('.insp-tile').first()).toContainText('0 / 11 broken')
+  await expect(page.locator('.insp-tile').first()).toContainText('0% · 0 / 1')
+  await expect(page.locator('.insp-tile').first()).toContainText('1 broken')
 
   // What the failure leaves unverified is a link to the element.
   await error.locator('.insp-chain').getByRole('button', { name: /Take card payments/ }).click()
@@ -85,7 +92,9 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await expect(inspector.locator('.insp-count .e')).toHaveCount(0, { timeout: 10_000 })
   await inspector.click()
   await expect(page.locator('.insp-verdict')).toHaveText(/No errors/)
-  await expect(page.locator('.insp-tile').first()).toContainText('1 / 10 broken')
+  await page.getByRole('tab', { name: /^Implementation/ }).click()
+  await expect(page.locator('.insp-tile').first()).toContainText('100% · 1 / 1')
+  await expect(page.locator('.insp-tile').first()).toContainText('0 broken')
 })
 
 test('a deep link opens the Inspector at once, and only with all it reads', async ({ page, studio }) => {
@@ -106,13 +115,59 @@ test('a deep link opens the Inspector at once, and only with all it reads', asyn
     ;(window as unknown as { __seen: Set<string> }).__seen = seen
     new MutationObserver(() => {
       if (document.querySelector('.react-flow')) seen.add('canvas')
-      if (document.querySelector('.insp-notice')) seen.add('inspector without test results')
+      if (document.querySelector('.insp-notice') || document.querySelector('.insp-tabs')?.textContent?.includes('no results')) seen.add('inspector without test results')
       const tile = document.querySelector('.insp-tile .insp-label')?.textContent
-      if (tile && tile !== 'Requirements verified') seen.add(`tile ${tile}`)
+      if (tile && tile !== 'Consistency') seen.add(`tile ${tile}`)
     }).observe(document, { childList: true, subtree: true, characterData: true })
   })
   await page.reload()
   await expect(page.locator('.insp-verdict')).toHaveText(/✖ 1 errors/, { timeout: 15_000 })
-  await expect(page.locator('.insp-tile').first()).toContainText('0 / 11 broken')
+  await expect(page.getByRole('tab', { name: /^Implementation/ })).toContainText('✗ 1')
   expect(await page.evaluate(() => [...(window as unknown as { __seen: Set<string> }).__seen])).toEqual([])
+})
+
+test('Settings save goals and rules to check.json, and say when a change loosens the gate', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
+  await folder.write('check.json', JSON.stringify({ rules: { 'requirement-without-scenario': { severity: 'error', max: 3 } } }, null, 2) + '\n')
+  await folder.write('.radical/test-results.json', results('passed'))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+  await page.getByRole('tab', { name: /^Settings/ }).click()
+
+  // A higher baseline lets more through: the row and the bar say so.
+  await page.getByRole('spinbutton', { name: 'Baseline of requirement-without-scenario' }).fill('5')
+  await expect(page.locator('.insp-savebar')).toContainText('1 unsaved change')
+  await expect(page.locator('.insp-savebar')).toContainText('It loosens the CI gate.')
+  await expect(page.locator('.insp-set-warn')).toContainText('max 3 → 5 loosens the CI gate')
+  await page.getByRole('button', { name: 'Discard' }).click()
+  await expect(page.locator('.insp-savebar')).toHaveCount(0)
+
+  // Ratchet brings the baseline down to what the check finds: none.
+  await page.getByRole('button', { name: 'Ratchet' }).click()
+  await expect(page.getByRole('spinbutton', { name: 'Baseline of requirement-without-scenario' })).toHaveValue('0')
+  await expect(page.locator('.insp-savebar')).toContainText('Each one tightens the gate or keeps it.')
+
+  // Two goals, one on the model and one on what the tests verify, saved
+  // with the ratchet as the diff shows them.
+  await page.getByRole('button', { name: '+ Add goal' }).click()
+  await page.getByRole('spinbutton', { name: 'Goal for Requirements verified' }).fill('100')
+  await page.getByRole('spinbutton', { name: 'Goal for Scenarios that name a test' }).fill('90')
+  await page.locator('.insp-diff summary').click()
+  await expect(page.locator('.insp-diff pre')).toContainText('+   "goals": {')
+  await page.getByRole('button', { name: 'Save to check.json' }).click()
+  await expect(page.locator('.insp-savebar')).toHaveCount(0)
+
+  const saved = JSON.parse((await folder.files())['check.json'])
+  expect(saved).toEqual({
+    rules: { 'requirement-without-scenario': { severity: 'error', max: 0 } },
+    goals: { 'requirements-verified': { min: 100 }, 'scenarios-with-tests': { min: 90 } },
+  })
+  await page.getByRole('tab', { name: /^Model quality/ }).click()
+  await expect(page.getByRole('tab', { name: /^Model quality/ })).toContainText('1 / 1 goals')
+  await expect(page.getByRole('tab', { name: /^Implementation/ })).toContainText('1 / 1 goals')
 })

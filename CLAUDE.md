@@ -7,7 +7,7 @@ Markdown-folder model (Radical metamodel): containers, shared packages,
 ADRs, fitness functions, needs and requirements, a domain model and its state
 machines. It is committed with the code, and CI checks it: the "Architecture
 model" job runs `radical check architecture` against the run's test reports,
-with the rules and baselines in `architecture/check.json`, and fails on an
+with the rules, baselines and goals in `architecture/check.json`, and fails on an
 error. Claude Code reaches it through the project MCP server
 `radical-architecture` (`.mcp.json`), which needs
 `npm run build -w @radicaltools/mcp` once after cloning and after MCP changes.
@@ -33,8 +33,9 @@ Studio can open the same folder.
 - Before pushing, run what CI runs: `npm run test:reports` (plus `npm run e2e`
   for the e2e tests; both write to `reports/`), then
   `npm run check:architecture`. It must report no errors: a failing or missing
-  test the model names, or a gap above its baseline, is one. Never raise a
-  baseline in `check.json` to get past it; `--ratchet` lowers them.
+  test the model names, a gap above its baseline, or a metric below its goal,
+  is one. Never raise a baseline or lower a goal in `check.json` to get past
+  it; `--ratchet` lowers baselines.
 - Write the model in English.
 - When the product gets in the way while doing this (a missing tool, an
   awkward format, a bad layout), add it to `docs/IMPROVEMENTS.md` under

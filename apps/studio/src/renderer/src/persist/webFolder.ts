@@ -230,6 +230,11 @@ export async function readCheckFilesFromHandle(root: FsDirHandle): Promise<{ res
   return { results, config: await text(root, 'check.json') }
 }
 
+/** Writes the model's check.json, as the Inspector's Settings save it. */
+export async function writeCheckConfigToHandle(root: FsDirHandle, content: string): Promise<void> {
+  await writeText(root, 'check.json', content)
+}
+
 // ─── IndexedDB handle persistence ────────────────────────────────────────────
 
 const DB_NAME = 'radical-fs'

@@ -11,6 +11,7 @@ import type { C4Node, C4Relation } from '../c4'
 import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamodel } from '../metamodel'
 import { linkedNodes, testIdsOf, testOutcomes, TESTED_TYPES, type TestOutcome } from './evidence'
 import { findTests, globMatch, type TestCase } from './reports'
+import type { CheckDimension } from './goals'
 
 export type CheckSeverity = 'error' | 'warning'
 
@@ -51,11 +52,13 @@ export interface CheckRule {
   /** What the rule wants, in one sentence, for `--list-rules` and docs. */
   description: string
   severity: CheckSeverity
+  /** What it is about, for the Inspector's grouping. */
+  dimension: CheckDimension
   run(model: CheckModel): RuleFinding[]
 }
 
 type Props = Record<string, unknown>
-const prop = (node: C4Node, key: string): string => {
+export const prop = (node: C4Node, key: string): string => {
   const value = (node as unknown as Props)[key]
   return typeof value === 'string' ? value.trim() : value == null ? '' : String(value)
 }
@@ -71,7 +74,7 @@ function linked(model: CheckModel, type: string, end: 'in' | 'out'): Map<string,
   return map
 }
 
-const nodesOf = (model: CheckModel, type: string): C4Node[] =>
+export const nodesOf = (model: CheckModel, type: string): C4Node[] =>
   model.metamodel.nodeTypes[type] ? Object.values(model.nodes).filter((n) => n.type === type) : []
 
 const hasRelationType = (model: CheckModel, type: string): boolean =>
@@ -127,6 +130,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'metamodel',
     description: 'The model follows its metamodel: types, parents, relation pairs, required properties, references and the state machine rules. The Validation list in Studio and get_issues over MCP, with their severities: an unknown type or a relation to no element is an error, a relation pair the metamodel does not allow a warning (`"metamodel": "error"` makes every issue one).',
     severity: 'error',
+    dimension: 'consistency',
     run: (model) => validateModel(model.nodes, model.relations, model.metamodel).map((issue) => ({
       message: issue.message,
       code: issue.id.split(':')[0],
@@ -139,6 +143,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'requirement-incomplete',
     description: 'A requirement has an action and every field its EARS type reads (an event-driven one a trigger, a state-driven one a precondition, …).',
     severity: 'warning',
+    dimension: 'completeness',
     run: (model) => nodesOf(model, 'requirement')
       .filter((n) => !composeEarsSentence(n as unknown as Props, undefined, requirementStatePhrase(n, model.nodes, model.relations)).complete)
       .map((n) => ({ nodeId: n.id, message: `Requirement ${quote(n)} (${prop(n, 'ears_type') || 'ubiquitous'}) misses the action or a field its EARS type needs.` })),
@@ -147,6 +152,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'requirement-without-scenario',
     description: 'Every requirement is verified by at least one scenario.',
     severity: 'warning',
+    dimension: 'traceability',
     run: (model) => model.metamodel.nodeTypes.scenario
       ? unlinked(model, 'requirement', 'verifies', 'in', ['scenario'])
         .map((n) => ({ nodeId: n.id, message: `No scenario verifies requirement ${quote(n)}.` }))
@@ -156,6 +162,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'requirement-unsatisfied',
     description: 'Every requirement is satisfied by an element of the architecture.',
     severity: 'warning',
+    dimension: 'traceability',
     run: (model) => unlinked(model, 'requirement', 'satisfies', 'in')
       .map((n) => ({ nodeId: n.id, message: `Nothing satisfies requirement ${quote(n)}.` })),
   },
@@ -163,6 +170,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'requirement-without-origin',
     description: 'Every requirement derives from a need or from another requirement.',
     severity: 'warning',
+    dimension: 'traceability',
     run: (model) => unlinked(model, 'requirement', 'derives', 'out', ['need', 'requirement'])
       .map((n) => ({ nodeId: n.id, message: `Requirement ${quote(n)} derives from no need and no other requirement.` })),
   },
@@ -170,6 +178,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'need-without-requirement',
     description: 'Every need has at least one requirement derived from it.',
     severity: 'warning',
+    dimension: 'traceability',
     run: (model) => unlinked(model, 'need', 'derives', 'in', ['requirement'])
       .map((n) => ({ nodeId: n.id, message: `No requirement derives from need ${quote(n)}.` })),
   },
@@ -177,6 +186,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'scenario-verifies-nothing',
     description: 'Every scenario verifies a requirement or a state machine.',
     severity: 'warning',
+    dimension: 'traceability',
     run: (model) => unlinked(model, 'scenario', 'verifies', 'out')
       .map((n) => ({ nodeId: n.id, message: `Scenario ${quote(n)} verifies no requirement and no state machine.` })),
   },
@@ -184,6 +194,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'adr-without-fitness-fn',
     description: 'Every accepted ADR is implemented by a fitness function that checks it.',
     severity: 'warning',
+    dimension: 'decisions',
     run: (model) => model.metamodel.nodeTypes['fitness-fn']
       ? unlinked(model, 'adr', 'implements', 'in', ['fitness-fn'])
         .filter((n) => prop(n, 'status') === 'accepted')
@@ -194,6 +205,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'adr-incomplete',
     description: 'An accepted ADR records its date, context, decision and consequences.',
     severity: 'warning',
+    dimension: 'completeness',
     run: (model) => nodesOf(model, 'adr')
       .filter((n) => prop(n, 'status') === 'accepted')
       .flatMap((n) => {
@@ -205,6 +217,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'adr-superseded-unlinked',
     description: 'An ADR is superseded exactly when a newer ADR supersedes it.',
     severity: 'warning',
+    dimension: 'consistency',
     run: (model) => {
       if (!hasRelationType(model, 'supersedes')) return []
       const by = linked(model, 'supersedes', 'in')
@@ -221,6 +234,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'fitness-fn-unlinked',
     description: 'Every fitness function implements an ADR or constrains an element.',
     severity: 'warning',
+    dimension: 'decisions',
     run: (model) => {
       const out = [...linked(model, 'implements', 'out').keys(), ...linked(model, 'constrains', 'out').keys()]
       const linkedIds = new Set(out)
@@ -232,6 +246,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'fitness-fn-without-threshold',
     description: 'Every fitness function states its threshold or success criteria.',
     severity: 'warning',
+    dimension: 'completeness',
     run: (model) => nodesOf(model, 'fitness-fn').filter((n) => !prop(n, 'threshold'))
       .map((n) => ({ nodeId: n.id, message: `Fitness function ${quote(n)} states no threshold.` })),
   },
@@ -239,6 +254,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'scenario-without-tests',
     description: 'Every scenario names the automated tests that run it (property `tests`, one `file › title` per line).',
     severity: 'warning',
+    dimension: 'traceability',
     run: (model) => nodesOf(model, 'scenario').filter((n) => !testIdsOf(n).length)
       .map((n) => ({ nodeId: n.id, message: `Scenario ${quote(n)} names no test.` })),
   },
@@ -246,6 +262,7 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'fitness-fn-without-tests',
     description: 'Every fitness function names the automated checks that run it (property `tests`).',
     severity: 'warning',
+    dimension: 'decisions',
     run: (model) => nodesOf(model, 'fitness-fn').filter((n) => !testIdsOf(n).length)
       .map((n) => ({ nodeId: n.id, message: `Fitness function ${quote(n)} names no test.` })),
   },
@@ -253,30 +270,35 @@ export const CHECK_RULES: CheckRule[] = [
     id: 'test-failed',
     description: 'With --report: every test a scenario or fitness function names passed.',
     severity: 'error',
+    dimension: 'tests',
     run: testRule('failed', (node, id, model) => `${TYPE_NAME[node.type]} ${quote(node)}: test ${id} failed.${brokenWith(model, node)}`),
   },
   {
     id: 'test-not-found',
     description: 'With --report: every test a scenario or fitness function names is in the report of its file (a renamed or deleted test is not).',
     severity: 'error',
+    dimension: 'tests',
     run: testRule('not-found', (node, id, model) => `${TYPE_NAME[node.type]} ${quote(node)}: no test ${id} in the reports, though its file ran; renamed or deleted?${brokenWith(model, node)}`),
   },
   {
     id: 'test-skipped',
     description: 'With --report: no test a scenario or fitness function names was skipped.',
     severity: 'warning',
+    dimension: 'tests',
     run: testRule('skipped', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: test ${id} was skipped.`),
   },
   {
     id: 'test-not-run',
     description: 'With --report: every file a scenario or fitness function names a test in is in the reports.',
     severity: 'warning',
+    dimension: 'tests',
     run: testRule('not-run', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: no report has the file of test ${id}.`),
   },
   {
     id: 'test-unbound',
     description: 'With --report and an include in check.json: every test in the files it includes is named by a scenario or a fitness function, by its title or its describe block (a whole file or directory does not count). One finding per test file.',
     severity: 'warning',
+    dimension: 'tests',
     run: unboundTests,
   },
 ]
@@ -286,8 +308,19 @@ export const CHECK_RULES: CheckRule[] = [
  *  as a whole (`apps/e2e/tests`) is an umbrella over many behaviours and
  *  covers none of them. */
 function unboundTests(model: CheckModel): RuleFinding[] {
+  return [...testBinding(model) ?? []].filter(([, e]) => e.unbound.length).sort(([a], [b]) => a.localeCompare(b)).map(([file, e]) => ({
+    testFile: file,
+    message: `${file}: ${e.unbound.length} of ${e.total} test${e.total === 1 ? '' : 's'} named by no scenario or fitness function.`,
+    details: e.unbound,
+  }))
+}
+
+/** By test file the project includes for test-unbound: how many tests it
+ *  has, and the titles of those no scenario or fitness function names.
+ *  Null without reports or without an `include`. */
+export function testBinding(model: CheckModel): Map<string, { total: number; unbound: string[] }> | null {
   const setting = model.settings?.['test-unbound']
-  if (!model.tests || typeof setting !== 'object' || !setting.include?.length) return []
+  if (!model.tests || typeof setting !== 'object' || !setting.include?.length) return null
   const include = setting.include
   const exclude = setting.exclude ?? []
   const bound = new Set<TestCase>()
@@ -304,10 +337,6 @@ function unboundTests(model: CheckModel): RuleFinding[] {
     if (!bound.has(c)) entry.unbound.push(c.title.join(' › '))
     byFile.set(file, entry)
   }
-  return [...byFile].filter(([, e]) => e.unbound.length).sort(([a], [b]) => a.localeCompare(b)).map(([file, e]) => ({
-    testFile: file,
-    message: `${file}: ${e.unbound.length} of ${e.total} test${e.total === 1 ? '' : 's'} named by no scenario or fitness function.`,
-    details: e.unbound,
-  }))
+  return byFile
 }
 
