@@ -3667,3 +3667,24 @@ label.app-menu-row { cursor: pointer; }
 .insp-kind.removed { background: var(--danger); }
 .insp-chip.gone { cursor: default; opacity: 0.7; }
 .insp-chip.gone .insp-chip-label { text-decoration: line-through; }
+.branch-chip-list { font: inherit; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--bg-app); color: var(--text-primary); cursor: pointer; }
+.branch-chip-list[aria-expanded="true"] { border-color: var(--accent); }
+.branch-list { width: 420px; max-height: min(70vh, 640px); overflow-y: auto; gap: 12px; }
+.branch-group h4 { margin: 0 0 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.branch-group.added h4 { color: var(--success); }
+.branch-group.changed h4 { color: var(--warning); }
+.branch-group.removed h4 { color: var(--danger); }
+.branch-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.branch-item { display: flex; align-items: center; gap: 7px; width: 100%; min-width: 0; padding: 4px 6px; border: 0; border-radius: 6px; background: none; color: var(--text-primary); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+button.branch-item:hover { background: var(--bg-app); }
+.branch-item.gone { cursor: default; }
+.branch-item.gone .branch-item-label { text-decoration: line-through; color: var(--text-muted); }
+.branch-item-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.branch-item .branch-muted { margin-left: auto; flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.branch-type { flex: none; font-size: 9.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px; }
+.branch-rel-toggle { border: 0; background: none; padding: 0; font: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); cursor: pointer; }
+.branch-rel { display: flex; gap: 7px; align-items: baseline; padding: 3px 6px; font-size: 12px; }
+.branch-rel-kind { width: 10px; font-weight: 700; }
+.branch-rel.added .branch-rel-kind { color: var(--success); }
+.branch-rel.changed .branch-rel-kind { color: var(--warning); }
+.branch-rel.removed .branch-rel-kind { color: var(--danger); }

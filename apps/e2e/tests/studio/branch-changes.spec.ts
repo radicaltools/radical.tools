@@ -109,6 +109,31 @@ test('the changes since the base show on the canvas, in the list of views and on
   await expect(page.locator('.lp-branch-count')).toHaveCount(0)
 })
 
+test('the chip lists the changes, and a click shows the element', async ({ page, studio }) => {
+  await openFolder(page, studio, ARCH, { '.radical/base.json': ARCH_BASE })
+  const button = page.getByRole('button', { name: /^Changes on branch/ })
+  await expect(button.locator('.branch-count')).toHaveText('3', { timeout: 10_000 })
+  await button.click()
+
+  const chip = page.getByRole('status', { name: 'Changes on branch' })
+  await chip.getByRole('button', { name: /^List/ }).click()
+  const list = page.getByRole('dialog', { name: 'Changes since main' })
+  await expect(list.getByRole('region', { name: 'Added' })).toContainText('Fraud check')
+  await expect(list.getByRole('region', { name: 'Changed' })).toContainText('Checkout API')
+  await expect(list.getByRole('region', { name: 'Changed' })).toContainText('description')
+  await expect(list.getByRole('region', { name: 'Removed' })).toContainText('Legacy billing')
+  // A removed element is no link: there is nothing to go to.
+  await expect(list.getByRole('region', { name: 'Removed' }).getByRole('button')).toHaveCount(0)
+  await list.getByRole('button', { name: /^Relations/ }).click()
+  await expect(list.getByRole('region', { name: 'Relations' })).toContainText('Checkout API → Fraud check')
+
+  // From the list to the element, on a canvas that holds it.
+  await list.getByRole('button', { name: /Checkout API/ }).click()
+  await expect(list).toBeHidden()
+  await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Architecture')
+  await expect(studio.node('api')).toHaveClass(/selected/)
+})
+
 // Five requirements and a decision changed on the branch, and a test report.
 const SPEC_NOW: DiagramData = {
   metamodel: builtInGovernanceMetamodel(),
