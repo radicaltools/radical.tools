@@ -6,7 +6,17 @@
 
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 import { viewShownNodes } from '@radical/common/viewPipeline'
+import { create } from 'zustand'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+
+/** The Inspector's tabs. */
+export type InspectorTab = 'changes' | 'model' | 'implementation' | 'settings'
+export const INSPECTOR_TABS: readonly InspectorTab[] = ['changes', 'model', 'implementation', 'settings']
+
+/** Where the Inspector is: the tab picked (null: its first, Changes when the
+ *  folder holds a base, else Model quality) and the element whose card is
+ *  open in Changes. Part of the place the route names. */
+export const useInspectorNav = create<{ tab: InspectorTab | null; cardId: string | null }>(() => ({ tab: null, cardId: null }))
 
 /** For each view, the elements it shows (viewShownNodes): what its chain
  *  gives, or those it lists and their ancestors. A view that lists none and

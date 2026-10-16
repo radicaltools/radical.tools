@@ -1087,15 +1087,18 @@ node apps/cli/dist/index.js check path/to/my-model --report reports</code></pre>
 
       <section class="doc-section" id="links">
         <h2>Deep links</h2>
-        <p>Studio mirrors its state into the URL hash so any screen can be bookmarked or shared:</p>
-<pre class="code"><code>#/m/&lt;mode&gt;/v/&lt;viewId&gt;[/f/&lt;elementId&gt;][/s/&lt;milestoneId&gt;]
+        <p>Studio keeps the place on screen in the URL hash, in one form, so any place can be bookmarked or shared:</p>
+<pre class="code"><code>#/m/&lt;mode&gt;/v/&lt;viewId&gt;[/t/&lt;tab&gt;][/f/&lt;elementId&gt;][/e/&lt;elementId&gt;][/s/&lt;milestoneId&gt;]
 #/d/&lt;docId&gt;/m/&lt;mode&gt;/v/&lt;viewId&gt;[/p/&lt;presentationId&gt;/play/1/sl/&lt;n&gt;]
 
 mode   designer | viewer | presenter | metamodel | inspector
 view   a view id, or <span class="cm">canvas</span> for the default Structure view
-f      element page (Wiki views)      s   active milestone
+t      the Inspector's tab: changes | model | implementation | settings
+f      element page (Wiki views)      e   selected element (in the Inspector: the card open in Changes)
+s      active milestone
 p / sl presentation and 0-based slide while presenting
 d      <span class="cm">ls:&lt;id&gt;</span>, <span class="cm">fs:&lt;path&gt;</span> or <span class="cm">md:&lt;folder&gt;</span> — which model (local to this machine)</code></pre>
+        <p><strong>Back and forward.</strong> Every change of place (another view, perspective, Inspector tab or selected element) adds the route to the window's history. <em>‹</em> and <em>›</em> at the left of the toolbar go back and forward and name the place they lead to; the clock next to them lists the places of this window, newest first, the current one marked, and goes to the one you pick. <kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>Alt</kbd>+<kbd>→</kbd> (<kbd>⌘</kbd>+<kbd>[</kbd> / <kbd>⌘</kbd>+<kbd>]</kbd> on a Mac), the browser's own Back and Forward, and in the desktop app a mouse's side buttons do the same.</p>
         <p>A model kept in a file or a <a href="#formats">Markdown folder</a> loads a moment after Studio opens; the link is applied once it has. A browser folder that needs <em>Reconnect…</em> keeps the link until you reconnect it. File and folder paths only open in the desktop app; in the browser a folder is identified by its id, so its links work in the browser that opened it.</p>
         <p>The Hub uses <code>#/browse</code> for the catalogue and <code>#/c/&lt;conceptId&gt;/v/canvas|wiki|table</code> for one concept (plus <code>/cv/&lt;viewId&gt;</code> for one of its named views), with the filters as <code>/cat/&lt;category&gt;</code>, <code>/tag/&lt;tag,tag&gt;</code>, <code>/status/&lt;status,status&gt;</code> and <code>/sort/name|category|connections</code>; <code>studio.radical.tools/?hub=id1,id2</code> opens Studio with those concepts queued for import.</p>
       </section>

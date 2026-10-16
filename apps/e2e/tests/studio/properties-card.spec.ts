@@ -61,6 +61,7 @@ test('the card is as wide as it was dragged, also after a reload', async ({ page
 
   await page.reload()
   await studio.ready()
-  await studio.node('payments').click()
+  // The route names the selection: the reload selects it again and opens its card.
+  await expect(studio.node('payments')).toHaveClass(/selected/)
   await expect.poll(async () => Math.round((await studio.properties.boundingBox())!.width)).toBe(Math.round(width + 100))
 })

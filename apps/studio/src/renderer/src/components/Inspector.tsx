@@ -13,6 +13,7 @@ import { changeWork } from '@radical/common/branchChanges'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { ElementCard, type CardBranch } from '@radical/ui/components/RightPanel'
+import { useInspectorNav, type InspectorTab } from '../navigation'
 import { useInspectorStore } from '../persistence/inspector'
 import { useBranchStore } from '../persistence/branchChanges'
 import { ThisChange } from './inspector/ThisChange'
@@ -23,7 +24,7 @@ import { ModelTab } from './inspector/ModelTab'
 import { ImplementationTab } from './inspector/ImplementationTab'
 import { SettingsTab } from './inspector/SettingsTab'
 
-type Tab = 'model' | 'implementation' | 'changes' | 'settings'
+type Tab = InspectorTab
 
 export function Inspector(): React.ReactElement {
   const check = useInspectorStore((s) => s.check)
@@ -35,9 +36,12 @@ export function Inspector(): React.ReactElement {
   const activeDoc = useDocumentsStore((s) => s.docs.find((d) => d.id === s.activeId) ?? null)
   const [peekId, setPeekId] = useState<string | null>(null)
   // The Changes tab opens Designer's card of an element instead.
-  const [cardId, setCardId] = useState<string | null>(null)
+  const cardId = useInspectorNav((s) => s.cardId)
+  const setCardId = (id: string | null): void => useInspectorNav.setState({ cardId: id })
   // Until the user picks one, the first tab: Changes when the folder holds a base.
-  const [picked, setTab] = useState<Tab | null>(null)
+  // In a store, not in the component: the route names the tab and the card.
+  const picked = useInspectorNav((s) => s.tab)
+  const setTab = (tab: Tab): void => useInspectorNav.setState({ tab })
   const branch = useBranchStore()
   const tab: Tab = picked ?? (branch.changes ? 'changes' : 'model')
   // The requirements and ADRs of the branch's change, by what the tests say.

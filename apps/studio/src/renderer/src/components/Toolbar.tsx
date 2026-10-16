@@ -3,6 +3,7 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { host } from '../platform/host'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { BranchChangesButton } from './BranchChanges'
+import { NavHistory } from './NavHistory'
 import { useInspectorStore } from '../persistence/inspector'
 import { useBranchStore } from '../persistence/branchChanges'
 import { dropPendingMode, useShownMode } from '../route'
@@ -723,6 +724,9 @@ export function Toolbar(): React.ReactElement {
         onCopyToClipboard={copyToClipboard}
         exportBusy={exportBusy}
       />
+      {/* Back, forward and the History list: in every perspective. */}
+      <div className="toolbar-sep" />
+      <NavHistory />
       {/* Not in the Inspector: it lists the changes itself, and has no canvas to mark. */}
       {appMode !== 'inspector' && (<>
         <div className="toolbar-sep" />

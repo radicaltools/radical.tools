@@ -80,6 +80,22 @@ describe('route parse/format', () => {
     expect(parseHash('#/m/designer')).toMatchObject({ view: 'all' })
   })
 
+  it('round-trips the Inspector tab and the selected element, in one form', () => {
+    const inspector: Route = { doc: 'md:/repo/architecture', mode: 'inspector', view: 'v-arch', tab: 'changes', el: 'api' }
+    const hash = formatRoute(inspector)
+    expect(hash).toBe('#/d/md%3A%2Frepo%2Farchitecture/m/inspector/v/v-arch/t/changes/e/api')
+    expect(parseHash(hash)).toEqual(inspector)
+    expect(formatRoute(parseHash(hash)!)).toBe(hash)
+    // On a canvas: the selection, after the view and before a milestone.
+    const canvas: Route = { mode: 'designer', view: 'v-arch', el: 'api', snap: 's1' }
+    expect(formatRoute(canvas)).toBe('#/m/designer/v/v-arch/e/api/s/s1')
+    expect(parseHash(formatRoute(canvas))).toEqual(canvas)
+    // A tab names nothing outside the Inspector, nor an unknown one.
+    expect(formatRoute({ mode: 'designer', view: 'v-arch', tab: 'model' })).toBe('#/m/designer/v/v-arch')
+    expect(parseHash('#/m/inspector/v/v-arch/t/nope')?.tab).toBeUndefined()
+    expect(parseHash('#/m/designer/v/v-arch/t/model')?.tab).toBeUndefined()
+  })
+
   it('parses doc + mode + view + focus', () => {
     expect(parseHash('#/d/ls%3Aabc/m/viewer/v/view-1/f/n1')).toEqual({
       doc: 'ls:abc',
