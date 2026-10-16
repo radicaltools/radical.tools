@@ -10,13 +10,15 @@ import ReactFlow, {
   SelectionDragHandler,
   ReactFlowInstance,
   useStoreApi,
+  useUpdateNodeInternals,
   getNodesBounds,
   getViewportForBounds,
   type Node as RFNode,
 } from 'reactflow'
 import { zoomIdentity } from 'd3-zoom'
+import { lowDetailAt } from '../store/canvasDetail'
 import { useDiagramStore } from '../store/diagramStore'
-import { PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode } from './nodes/C4Nodes'
+import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
 import { edgeLabelDetail, edgeLabelsShownAt } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
@@ -27,29 +29,30 @@ import { CanvasControls } from './CanvasControls'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize } from '@radical/common/c4'
 import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
 
-// Node and edge type registrations
+// Node and edge type registrations: each draws a card, or a block when
+// zoomed out (withDetail, store/canvasDetail.ts).
 const nodeTypes: NodeTypes = {
-  person: PersonNode as any,
-  system: SystemNode as any,
-  container: ContainerNode as any,
-  component: ComponentNode as any,
-  database: DatabaseNode as any,
-  webapp: WebAppNode as any,
-  queue: QueueNode as any,
-  domain: DomainNode as any,
-  group: GroupNode as any,
-  adr: AdrNode as any,
-  'fitness-fn': FitnessFnNode as any,
-  need: NeedNode as any,
-  requirement: RequirementNode as any,
-  scenario: ScenarioNode as any,
-  blueprint: BlueprintNode as any,
-  mockup: MockupNode as any,
-  'state-machine': StateMachineNode as any,
-  state: StateNode as any,
-  pseudostate: PseudostateNode as any,
-  event: EventNode as any,
-  entity: EntityNode as any,
+  person: withDetail(PersonNode) as any,
+  system: withDetail(SystemNode) as any,
+  container: withDetail(ContainerNode) as any,
+  component: withDetail(ComponentNode) as any,
+  database: withDetail(DatabaseNode) as any,
+  webapp: withDetail(WebAppNode) as any,
+  queue: withDetail(QueueNode) as any,
+  domain: withDetail(DomainNode) as any,
+  group: withDetail(GroupNode) as any,
+  adr: withDetail(AdrNode) as any,
+  'fitness-fn': withDetail(FitnessFnNode) as any,
+  need: withDetail(NeedNode) as any,
+  requirement: withDetail(RequirementNode) as any,
+  scenario: withDetail(ScenarioNode) as any,
+  blueprint: withDetail(BlueprintNode) as any,
+  mockup: withDetail(MockupNode) as any,
+  'state-machine': withDetail(StateMachineNode) as any,
+  state: withDetail(StateNode) as any,
+  pseudostate: withDetail(PseudostateNode) as any,
+  event: withDetail(EventNode) as any,
+  entity: withDetail(EntityNode) as any,
 }
 
 const edgeTypes: EdgeTypes = {
@@ -258,6 +261,26 @@ function StructuralCanvas(): React.ReactElement {
     record(rfStore.getState().transform)
     return rfStore.subscribe((s, prev) => { if (s.transform !== prev.transform) record(s.transform) })
   }, [rfStore])
+
+  // Cards or blocks for the zoom (store/canvasDetail.ts). After a swap the
+  // nodes have other handles: React Flow measures them again, a frame later,
+  // or it would connect to the handles a node no longer has.
+  const updateNodeInternals = useUpdateNodeInternals()
+  useEffect(() => {
+    let frame = 0
+    const follow = (zoom: number): void => {
+      const store = useDiagramStore.getState()
+      const low = lowDetailAt(zoom, store.lowDetail)
+      if (low === store.lowDetail) return
+      store.setLowDetail(low)
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => updateNodeInternals(rfStore.getState().getNodes().map((n) => n.id)))
+    }
+    // Not on mount: the camera is React Flow's default until the view's is
+    // placed, and switching views already set the detail for that camera.
+    const off = rfStore.subscribe((s, prev) => { if (s.transform[2] !== prev.transform[2]) follow(s.transform[2]) })
+    return () => { off(); cancelAnimationFrame(frame) }
+  }, [rfStore, updateNodeInternals])
 
   /** Moves the camera in this frame. React Flow's setViewport always goes
    *  through a d3 transition, which applies even a zero duration one frame

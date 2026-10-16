@@ -1,0 +1,53 @@
+import { test, expect } from '../../support/fixtures'
+
+// Zoomed out, the canvas draws each element as a block of its type's colour
+// with its name (store/canvasDetail.ts, withDetail): a card's text would be a
+// fraction of a pixel, and the browser spent most of a large view's opening
+// on building and measuring full cards. Zoomed in, the cards come back.
+
+function systems(): string {
+  const nodes: object[] = []
+  for (let s = 0; s < 6; s++) {
+    nodes.push({ id: `s${s}`, type: 'system', label: `System ${s}`, description: 'A system with containers', x: s * 900, y: 0, width: 800, height: 600, collapsed: false })
+    for (let c = 0; c < 4; c++) nodes.push({ id: `s${s}c${c}`, type: 'container', label: `Container ${s}.${c}`, description: 'Does a part of the work', technology: 'TypeScript', parentId: `s${s}`, x: 40 + (c % 2) * 380, y: 80 + Math.floor(c / 2) * 250, width: 320, height: 180, collapsed: false })
+  }
+  return JSON.stringify({ nodes, relations: [], views: [] })
+}
+
+type Page = import('@playwright/test').Page
+const zoom = (page: Page) => page.evaluate(() => (window as any).__rfCurrentViewport?.zoom as number)
+/** Wheels over the canvas, as a user zooms, until the zoom is past `to`. */
+async function wheelTo(page: Page, to: number): Promise<void> {
+  const box = (await page.locator('.react-flow__pane').boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  const zoomIn = to > await zoom(page)
+  for (let i = 0; i < 30 && (zoomIn ? await zoom(page) < to : await zoom(page) > to); i++) {
+    await page.mouse.wheel(0, zoomIn ? -200 : 200)
+    await page.waitForTimeout(80)
+  }
+}
+
+test('zoomed out the canvas draws blocks with names, zoomed in cards, and a block still folds', async ({ page, studio }) => {
+  await studio.seedDocument(systems())
+  await studio.open('canvas')
+  const block = page.locator('.c4-node-simple')
+
+  // The whole model fits on screen far below the threshold.
+  await expect.poll(() => zoom(page)).toBeLessThan(0.27)
+  await expect(block).toHaveCount(30)
+  await expect(page.locator('.c4-node-label')).toHaveCount(0)
+  await expect(studio.node('s0c1')).toContainText('Container 0.1')
+  // Two handles to measure per element, not eight.
+  await expect(studio.node('s0c1').locator('.react-flow__handle')).toHaveCount(2)
+  // A system with containers is a frame; it folds from its block.
+  await expect(studio.node('s0').locator('.c4-node-simple.frame')).toHaveCount(1)
+  await studio.node('s0').locator('.c4-node-collapse-btn').dispatchEvent('click')
+  await expect(studio.node('s0c1')).toHaveCount(0)
+  await studio.node('s0').locator('.c4-node-collapse-btn').dispatchEvent('click')
+  await expect(studio.node('s0c1')).toHaveCount(1)
+
+  await wheelTo(page, 0.5)
+  await expect(block).toHaveCount(0)
+  await expect(studio.node('s0c1').locator('.c4-node-label')).toHaveText('Container 0.1')
+  await expect(studio.node('s0c1').locator('.react-flow__handle')).toHaveCount(8)
+})

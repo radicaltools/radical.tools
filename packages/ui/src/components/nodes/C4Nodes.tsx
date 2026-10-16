@@ -1,6 +1,6 @@
 import React, { memo, useCallback } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
-import { C4NodeRFData, NODE_COLORS, TYPE_ICON_PATHS } from '@radical/common/c4'
+import { C4NodeRFData, NODE_COLORS, NODE_FG, TYPE_ICON_PATHS } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
 import { useNodeContent } from '../../store/nodeSelectors'
 import { composeEarsSentence, machineEntity, requirementStatePhrase } from '@radical/common/metamodel'
@@ -102,6 +102,70 @@ function PersonFigure({ color }: { color: string }) {
       <rect x="2" y="25" width="40" height="18" rx="10" fill={color} stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
     </svg>
   )
+}
+
+// ─── Low detail ───────────────────────────────────────────────────────────────
+// Zoomed out (store/canvasDetail.ts) an element is a block of its type's
+// colour with its name, and a container a dashed frame with its name: its
+// card's text would be a fraction of a pixel. Two handles, not eight, for
+// React Flow to measure (an edge takes the first; one cannot connect at this
+// zoom anyway). Sizes stay, so the layout does not move.
+
+const SimpleNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  // A container still opens and folds here: the whole model is seen from afar.
+  const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
+  const canEdit = useDiagramStore((s) => s.appMode !== 'metamodel' && !s.presentationActive)
+  const onToggle = useCallback((e: React.MouseEvent) => { e.stopPropagation(); toggleCollapse(data.c4id) }, [data.c4id, toggleCollapse])
+  const typeColor = useDiagramStore((s) => s.metamodel?.nodeTypes[data.type]?.color)
+  const typeFg = useDiagramStore((s) => s.metamodel?.nodeTypes[data.type]?.fg)
+  const builtIn = (NODE_COLORS as Record<string, string | undefined>)[data.type]
+  const color = data.external && (data.type === 'person' || data.type === 'system') ? ALT_COLOR : builtIn ?? typeColor ?? '#64748b'
+  const fg = (NODE_FG as Record<string, string | undefined>)[data.type] ?? typeFg ?? '#fff'
+  const frame = data.type === 'group' || (data.hasChildren && !data.collapsed)
+  // As large as the block holds in two lines (a frame: one line along its
+  // top): the name is what is left to read at this zoom.
+  const h = data.height ?? 80, w = data.width ?? 160
+  const longestWord = Math.max(0, ...data.label.split(/\s+/).map((word) => word.length))
+  const perLine = Math.max(4, longestWord, Math.ceil(data.label.length / (frame ? 1 : 2)))
+  const fontSize = Math.round(Math.max(14, Math.min(frame ? 48 : 40, frame ? Math.max(h * 0.08, 24) : h * 0.32, (w * 1.7) / perLine)))
+  return (
+    <div
+      className={`c4-node c4-node-simple${frame ? ' frame' : ''}`}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        background: frame ? 'transparent' : color,
+        border: `${selected ? 4 : 2}px ${frame ? 'dashed' : 'solid'} ${selected ? 'var(--accent)' : color}`,
+        borderRadius: data.type === 'pseudostate' ? '50%' : 8,
+        color: frame ? color : fg,
+        fontSize,
+      }}
+    >
+      <Handle type="target" position={Position.Top} isConnectable={false} className="c4-handle-simple" />
+      <Handle type="source" position={Position.Bottom} isConnectable={false} className="c4-handle-simple" />
+      <DiffOverlay c4id={data.c4id} />
+      <div className="c4-node-simple-label">{data.label}</div>
+      {data.hasChildren && canEdit && (
+        <button className="c4-node-collapse-btn c4-node-simple-toggle" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+          {data.collapsed ? '+' : '−'}
+        </button>
+      )}
+    </div>
+  )
+}, sameCard)
+
+SimpleNode.displayName = 'SimpleNode'
+
+/** `Full` while the zoom shows cards, a SimpleNode below it; always the
+ *  card while an export is drawn. */
+export function withDetail(Full: React.ComponentType<NodeProps<C4NodeRFData>>): React.ComponentType<NodeProps<C4NodeRFData>> {
+  const Detailed = memo((props: NodeProps<C4NodeRFData>) => {
+    const low = useDiagramStore((s) => s.lowDetail && !s.allEdgeLabelsShown)
+    return low ? <SimpleNode {...props} /> : <Full {...props} />
+  }, sameCard)
+  Detailed.displayName = `WithDetail(${Full.displayName ?? 'Node'})`
+  return Detailed
 }
 
 export const PersonNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
