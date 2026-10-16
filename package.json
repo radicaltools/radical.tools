@@ -28,7 +28,8 @@
     "docs:screenshots": "npm run build:web && npm run build:hub && npm run docs:screenshots -w @radical/e2e",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check:workspaces": "node tools/check-workspaces.mjs",
-    "check:architecture": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js check architecture --report reports"
+    "check:architecture": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js check architecture --report reports",
+    "hooks": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js hooks install architecture && node apps/cli/dist/index.js diff architecture --save-base --quiet"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
