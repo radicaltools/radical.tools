@@ -982,6 +982,27 @@ codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.
         <p>When the model folder is in a git repository, a change can start in the model: add or change a requirement, a scenario or a component in Studio, then ask the agent to implement it. <code>get_changes</code> lists the elements and relations added, removed and changed since the branch left <code>main</code> (or since the commit you name), with each field's old and new value and the elements each one relates to, such as the component that satisfies a requirement and the tests its scenarios name. Moving elements and editing views are not changes to implement, so they are left out. <code>radical diff</code> on the command line prints the same list.</p>
         <h3>Changes on branch</h3>
         <p>Studio shows the same changes while you edit, without git: <code>get_changes</code> and <code>radical diff --save-base</code> save the model where the branch left <code>main</code> to <code>.radical/base.json</code> in the folder, and <code>radical hooks install &lt;folder&gt;</code> adds git hooks that save it again after a checkout, a commit or a pull. With a base beside the model, the <em>Changes on branch</em> button in the toolbar counts the changed elements. Turned on, it marks new and changed elements on the canvas and shows removed ones as ghosts, every view in the list counts the changes it shows, and the properties card lists each changed field with the words removed and added. The Inspector, which a base opens even without a test report, starts its <em>Implementation</em> tab with <em>This change</em>: each requirement and ADR changed since the base, with what the last test report says of it (verified, failing, test not written) and two warnings the check cannot give, a requirement that changed while its scenarios did not, and a removed one whose test still runs. Its first tab, <em>Changes</em>, on which it opens, lists every element added, changed (with the fields that changed) and removed, and the relations; a click on an element opens its properties card, read-only, with the words that changed, <em>Show on canvas</em> and <em>Open wiki page</em>, each offering the views that show the element. A base older than a day is marked there with the commands that save it again, since Studio cannot tell which branch is checked out now.</p>
+        <h3>When the base is saved</h3>
+        <p>The base is the model at the commit where the current branch left <code>main</code> (<code>git merge-base HEAD origin/main</code>; <code>main</code>, then <code>HEAD</code>, when there is no <code>origin/main</code>). Only the command line and the MCP server work it out and save it; Studio reads <code>.radical/base.json</code> every few seconds and compares the model with it as you edit, so the list of changes is never stored, and it empties once the base catches up with the model.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Saves the base</th><th>Through</th></tr></thead>
+            <tbody>
+              <tr><td>A checkout or switch of branch</td><td>the <code>post-checkout</code> hook</td></tr>
+              <tr><td>A commit, amended too</td><td>the <code>post-commit</code> hook</td></tr>
+              <tr><td>A pull that merges or fast-forwards, a merge</td><td>the <code>post-merge</code> hook</td></tr>
+              <tr><td>A rebase, <code>git pull --rebase</code>, an amend</td><td>the <code>post-rewrite</code> hook</td></tr>
+              <tr><td>An agent's <code>get_changes</code> without <code>since</code></td><td>the MCP server</td></tr>
+              <tr><td>By hand</td><td><code>radical diff &lt;folder&gt; --save-base</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><code>radical hooks install &lt;folder&gt;</code> adds the four hooks (in this repository, <code>npm run hooks</code>). A <code>git fetch</code>, a <code>reset</code> or a <code>stash</code> runs no hook: the base stays as it was until the next checkout, commit or pull, or until you save it by hand.</p>
+        <ul>
+          <li><strong>Committing on the branch keeps the base</strong>: it is where the branch left <code>main</code>, so the list holds the whole branch's work, also what an agent has already committed.</li>
+          <li><strong>After the pull request is merged</strong>, switch to <code>main</code> and pull: the base becomes the new <code>main</code> and the list empties. On the old branch it stays, since a squash merge puts a new commit on <code>main</code> and the branch still left it where it did.</li>
+          <li><strong>To see only what is not committed yet</strong>, save the last commit as the base: <code>radical diff &lt;folder&gt; --save-base --since HEAD</code>. Without the file (<code>.radical/base.json</code> deleted) there is no base, and Changes on branch offers the commands that save one.</li>
+        </ul>
         <div class="doc-tip">
           <strong>Tip:</strong> while the agent writes, keep Studio in <a href="#presenting">Viewer</a>. A change spans several files and the two processes share no lock: the server refuses to write over a file that changed since it read it, but editing the same folder from both sides at once can still race.
         </div>

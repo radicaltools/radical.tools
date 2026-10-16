@@ -28,14 +28,23 @@ open model with that file as it is edited and shows the changes with
 Changes on branch, in the list of views, on the properties card and in the
 Inspector. `--quiet` prints nothing.
 
+When the base is saved: a checkout (`post-checkout`), a commit
+(`post-commit`), a pull or merge (`post-merge`), a rebase or an amend
+(`post-rewrite`) once `radical hooks install` has added the hooks; an
+agent's `get_changes` without `since`; and `radical diff --save-base` by
+hand. A fetch, a reset or a stash saves nothing. Committing on a branch keeps
+the base (the list is the whole branch); after the merge, switching to
+`main` and pulling empties it. `--save-base --since HEAD` makes the last
+commit the base, to list only what is not committed.
+
 ## radical hooks
 
 ```sh
 node apps/cli/dist/index.js hooks install path/to/model
 ```
 
-Adds one marked line to the repository's `post-checkout`, `post-commit` and
-`post-merge` hooks that runs `radical diff <folder> --save-base --quiet`, so
+Adds one marked line to the repository's `post-checkout`, `post-commit`,
+`post-merge` and `post-rewrite` hooks that runs `radical diff <folder> --save-base --quiet`, so
 the base Studio compares with follows the branch checked out. What the hooks
 already do stays, a second install adds nothing (or brings the line up to
 date when the CLI or node moved), and the line never fails the git command.
