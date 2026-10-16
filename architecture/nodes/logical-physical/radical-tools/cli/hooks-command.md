@@ -1,0 +1,8 @@
+---
+id: "0f2bd2dc-9024-4a47-ab42-8acb021a3591"
+type: "component"
+label: "Hooks command"
+technology: "Node.js"
+---
+
+apps/cli/src/hooks.ts (radical hooks install [folder]). Finds the repository's hooks directory with git rev-parse --git-path hooks, and adds to post-checkout, post-commit and post-merge one marked line that runs radical diff --save-base for the folder, keeping each hook's own content, never twice, and makes the hooks executable.
