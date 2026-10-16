@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
@@ -1097,7 +1097,8 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
       ? { left: r.left, width, bottom: window.innerHeight - r.top + 6, maxHeight: r.top - 16 }
       : { left: r.left, width, top: r.bottom + 6, maxHeight: window.innerHeight - r.bottom - 16 })
   }, [])
-  useEffect(() => {
+  // Before the menu is painted: it would show unplaced, as tall as all of it, for a frame.
+  useLayoutEffect(() => {
     if (!newMenuOpen) return
     placeNewMenu()
     window.addEventListener('resize', placeNewMenu)
@@ -1145,8 +1146,9 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     const isTable   = v.kind === 'table'
     const isMatrix  = v.kind === 'matrix'
     const isWiki    = v.kind === 'wiki'
-    // A view of a viewpoint is called by its viewpoint.
-    const badge = viewpointOfView(v, metamodel)?.label ?? (isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : 'structure')
+    const badge = isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : 'structure'
+    // A view of a viewpoint names it too, after its view type.
+    const viewpoint = viewpointOfView(v, metamodel)
     return (
       <div key={v.id}>
         <div
@@ -1162,6 +1164,11 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
               <span>{viewNodeCount(v, counts[v.id])}</span>
               <span style={{ ...VIEW_BADGE_STYLE, color: badge === 'structure' ? 'var(--text-muted)' : 'var(--accent)' }}>{badge}</span>
             </div>
+            {viewpoint && (
+              <div className="lp-card-viewpoint" title={viewpoint.description ?? `Viewpoint ${viewpoint.label}`}>
+                <span className="lp-card-viewpoint-kind">Viewpoint</span> {viewpoint.label}
+              </div>
+            )}
           </div>
           {!readOnly && onOpenProps && (
             <div className="lp-card-actions">
