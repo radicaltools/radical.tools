@@ -15,13 +15,14 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useInspectorStore } from '../persistence/inspector'
 import { useBranchStore } from '../persistence/branchChanges'
 import { ThisChange } from './inspector/ThisChange'
+import { ChangesTab } from './inspector/ChangesTab'
 import { useDocumentsStore } from '../store/documentStore'
 import { Errors, Peek, TabBadge, dimensionOfFinding, dimensionsOf, type Ctx } from './inspector/shared'
 import { ModelTab } from './inspector/ModelTab'
 import { ImplementationTab } from './inspector/ImplementationTab'
 import { SettingsTab } from './inspector/SettingsTab'
 
-type Tab = 'model' | 'implementation' | 'settings'
+type Tab = 'model' | 'implementation' | 'changes' | 'settings'
 
 export function Inspector(): React.ReactElement {
   const check = useInspectorStore((s) => s.check)
@@ -59,6 +60,7 @@ export function Inspector(): React.ReactElement {
       {check.evidence ? <TabBadge metrics={impl.metrics} errors={impl.errors.length} /> : <span className="insp-pill none">no results</span>}
       {work && work.newRequirements > 0 && <span className={`insp-pill ${work.newVerified === work.newRequirements ? 'ok' : 'warn'}`} title="New requirements of this change verified">This change {work.newVerified} / {work.newRequirements}</span>}
     </React.Fragment>],
+    ...(branch.changes && branch.base ? [['changes', 'Changes', <span key="c" className="insp-pill none">{branch.changes.counts.added + branch.changes.counts.changed + branch.changes.counts.removed}</span>] as [Tab, string, React.ReactNode]] : []),
     ['settings', 'Settings', <code key="f" className="insp-muted">check.json</code>],
   ]
 
@@ -89,8 +91,10 @@ export function Inspector(): React.ReactElement {
           {configError && tab !== 'settings' && <p className="insp-notice warn">{configError}. The default rule settings apply.</p>}
           {tab === 'model' && <><Errors errors={model.errors} ctx={ctx} /><ModelTab check={check} ctx={ctx} relations={relations} onSettings={() => setTab('settings')} /></>}
           {tab === 'implementation' && <><Errors errors={impl.errors} ctx={ctx} />
-            {work && branch.changes && branch.base && branch.baseModel && <ThisChange work={work} changes={branch.changes} base={branch.base} baseModel={branch.baseModel} ctx={ctx} />}
+            {work && branch.changes && branch.base && branch.baseModel && <ThisChange work={work} changes={branch.changes} base={branch.base} baseModel={branch.baseModel} ctx={ctx} onAllChanges={() => setTab('changes')} />}
             <ImplementationTab check={check} ctx={ctx} relations={relations} results={results} onSettings={() => setTab('settings')} /></>}
+          {tab === 'changes' && !branch.base && <p className="insp-notice">There is no base beside this model any more, so there are no changes to show.</p>}
+          {tab === 'changes' && branch.changes && branch.base && branch.baseModel && <ChangesTab changes={branch.changes} base={branch.base} baseModel={branch.baseModel} ctx={ctx} />}
           {tab === 'settings' && <SettingsTab check={check} editable={isFolder}
             readOnlyReason="Settings are the check.json beside a model kept in a folder. This model is no folder, so the default rules apply and nothing here can be saved." />}
         </div>

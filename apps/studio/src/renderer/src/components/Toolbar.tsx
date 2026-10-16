@@ -4,6 +4,7 @@ import { host } from '../platform/host'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { BranchChangesButton } from './BranchChanges'
 import { useInspectorStore } from '../persistence/inspector'
+import { useBranchStore } from '../persistence/branchChanges'
 import { dropPendingMode, useShownMode } from '../route'
 import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
@@ -510,7 +511,9 @@ function typingInTextField(target: EventTarget | null): boolean {
 function InspectorModeButton({ active, onClick }: { active: boolean; onClick: () => void }): React.ReactElement {
   const check = useInspectorStore((s) => s.check)
   const hasReport = useInspectorStore((s) => s.results !== null)
-  const enabled = hasReport || active
+  // With a base beside the model, This change lists the branch's changes.
+  const hasBase = useBranchStore((s) => s.base !== null)
+  const enabled = hasReport || hasBase || active
   const title = !enabled
     ? 'Inspector — no check report beside this model yet. Run radical check <model folder> --report <test reports> to make one; Studio picks it up by itself.'
     : check

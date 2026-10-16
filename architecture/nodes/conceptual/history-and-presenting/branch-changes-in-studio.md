@@ -6,6 +6,6 @@ given: "a folder model with a .radical/base.json in which one element has anothe
 tests: |
   apps/e2e/tests/studio/branch-changes.spec.ts › the changes since the base show on the canvas, in the list of views and on the card
   packages/common/tests/branchChanges.test.ts › branch changes
-then: "the canvas marks the new, changed and removed elements, the chip names the base and counts them, the list of views counts the changes each view shows, the card marks the changed description with its removed and added words, the rename counts at once as a change, and turning it off removes every mark"
+then: "the canvas marks the new, changed and removed elements and the button counts them, the list of views counts the changes each view shows, the card marks the changed description with its removed and added words, the rename counts at once as a change, and turning it off removes every mark"
 when: "the user turns on Changes on branch, selects the changed element, renames another and turns it off"
 ---

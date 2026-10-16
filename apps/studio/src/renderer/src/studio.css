@@ -3632,22 +3632,6 @@ label.app-menu-row { cursor: pointer; }
 .branch-cmd { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 5px 5px 9px; border-radius: 6px; background: var(--bg-app); border: 1px solid var(--border-color); }
 .branch-cmd code { font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 11.5px; overflow-wrap: break-word; min-width: 0; }
 .branch-cmd button { flex: none; font: inherit; font-size: 11.5px; padding: 2px 8px; border-radius: 5px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-primary); cursor: pointer; }
-.branch-chip {
-  grid-area: canvas; align-self: start; justify-self: end; z-index: 30; position: relative; margin: 10px 16px 0 0;
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; max-width: calc(100% - 32px);
-  padding: 6px 14px; border-radius: 999px; font-size: 12.5px;
-  background: var(--bg-panel); color: var(--text-primary); border: 1px solid var(--border-color); box-shadow: 0 2px 8px rgba(20, 24, 40, 0.1);
-}
-.branch-chip.old { border-color: var(--warning); }
-/* Beside the properties card, not over it. */
-.app-layout:has(.right-panel.open) .branch-chip { margin-right: calc(var(--rp-width, 0px) + 28px); }
-.branch-chip code { color: var(--text-muted); font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 11.5px; }
-.branch-stats { display: inline-flex; gap: 10px; font-variant-numeric: tabular-nums; }
-.branch-stats .added b { color: var(--success); }
-.branch-stats .changed b { color: var(--warning); }
-.branch-stats .removed b { color: var(--danger); }
-.branch-chip-old { font: inherit; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 0; color: var(--warning); background: color-mix(in srgb, var(--warning) 16%, transparent); cursor: pointer; }
-.branch-chip .branch-pop { left: auto; right: 0; }
 /* Inspector › Implementation › This change */
 .insp-change { padding: 16px 18px; display: grid; gap: 14px; border-color: color-mix(in srgb, var(--accent) 35%, var(--border-color)); }
 .insp-change-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -3667,24 +3651,24 @@ label.app-menu-row { cursor: pointer; }
 .insp-kind.removed { background: var(--danger); }
 .insp-chip.gone { cursor: default; opacity: 0.7; }
 .insp-chip.gone .insp-chip-label { text-decoration: line-through; }
-.branch-chip-list { font: inherit; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--bg-app); color: var(--text-primary); cursor: pointer; }
-.branch-chip-list[aria-expanded="true"] { border-color: var(--accent); }
-.branch-list { width: 420px; max-height: min(70vh, 640px); overflow-y: auto; gap: 12px; }
-.branch-group h4 { margin: 0 0 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.branch-group.added h4 { color: var(--success); }
-.branch-group.changed h4 { color: var(--warning); }
-.branch-group.removed h4 { color: var(--danger); }
-.branch-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
-.branch-item { display: flex; align-items: center; gap: 7px; width: 100%; min-width: 0; padding: 4px 6px; border: 0; border-radius: 6px; background: none; color: var(--text-primary); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
-button.branch-item:hover { background: var(--bg-app); }
-.branch-item.gone { cursor: default; }
-.branch-item.gone .branch-item-label { text-decoration: line-through; color: var(--text-muted); }
-.branch-item-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.branch-item .branch-muted { margin-left: auto; flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.branch-type { flex: none; font-size: 9.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px; }
-.branch-rel-toggle { border: 0; background: none; padding: 0; font: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); cursor: pointer; }
-.branch-rel { display: flex; gap: 7px; align-items: baseline; padding: 3px 6px; font-size: 12px; }
-.branch-rel-kind { width: 10px; font-weight: 700; }
-.branch-rel.added .branch-rel-kind { color: var(--success); }
-.branch-rel.changed .branch-rel-kind { color: var(--warning); }
-.branch-rel.removed .branch-rel-kind { color: var(--danger); }
+.insp-change-old { display: grid; gap: 8px; }
+.insp-change-old p { margin: 0; }
+.insp-all { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+.insp-all-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+.insp-all-group h3 { margin: 0 0 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.insp-all-group.added h3 { color: var(--success); }
+.insp-all-group.changed h3 { color: var(--warning); }
+.insp-all-group.removed h3 { color: var(--danger); }
+.insp-all-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.insp-all-group li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.insp-all-fields { color: var(--warning); font-size: 11.5px; }
+.insp-all-toggle { border: 0; background: none; padding: 0; font: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); cursor: pointer; }
+.insp-all-rel { gap: 8px !important; }
+.insp-all-rel-kind { width: 10px; font-weight: 700; }
+.insp-all-rel.added .insp-all-rel-kind { color: var(--success); }
+.insp-all-rel.changed .insp-all-rel-kind { color: var(--warning); }
+.insp-all-rel.removed .insp-all-rel-kind { color: var(--danger); }
+.insp-changes { display: grid; gap: 14px; }
+.insp-changes-panel { padding: 14px 18px; }
+.insp-changes-panel .insp-all { border-top: 0; padding-top: 0; }
+.insp-link { border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--accent); cursor: pointer; white-space: nowrap; }

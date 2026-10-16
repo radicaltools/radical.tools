@@ -65,12 +65,7 @@ test('the changes since the base show on the canvas, in the list of views and on
 
   await button.click()
   await expect(button).toHaveAttribute('aria-pressed', 'true')
-  const chip = page.getByRole('status', { name: 'Changes on branch' })
-  await expect(chip).toContainText('Changes since main')
-  await expect(chip).toContainText('534f32f')
-  await expect(chip).toContainText('1 added')
-  await expect(chip).toContainText('1 changed')
-  await expect(chip).toContainText('1 removed')
+  await expect(button).toHaveAttribute('title', /since merge base with origin\/main \(534f32f\)/)
 
   // Each view counts the changes it shows; All elements counts them all.
   const card = (name: string) => page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: name }) })
@@ -97,39 +92,50 @@ test('the changes since the base show on the canvas, in the list of views and on
   // An edit is a change at once.
   await studio.node('shop').click({ position: { x: 40, y: 12 } })
   await studio.properties.getByRole('textbox', { name: 'Name' }).fill('Book shop')
-  await expect(chip).toContainText('2 changed')
+  await expect(button.locator('.branch-count')).toHaveText('4')
   await expect(studio.node('shop')).toContainText('CHANGED')
   await expect(studio.properties.getByRole('region', { name: 'Changes on branch' }).locator('del')).toHaveText(['Shop'])
 
   // Off: no marks, no ghost, no counts.
   await button.click()
-  await expect(chip).toBeHidden()
+  await expect(button).toHaveAttribute('aria-pressed', 'false')
   await expect(studio.node('legacy')).toHaveCount(0)
   await expect(studio.node('api')).not.toContainText('CHANGED')
   await expect(page.locator('.lp-branch-count')).toHaveCount(0)
 })
 
-test('the chip lists the changes, and a click shows the element', async ({ page, studio }) => {
+test('the Inspector lists every change since the base, and a click leads to the element', async ({ page, studio }) => {
   await openFolder(page, studio, ARCH, { '.radical/base.json': ARCH_BASE })
-  const button = page.getByRole('button', { name: /^Changes on branch/ })
-  await expect(button.locator('.branch-count')).toHaveText('3', { timeout: 10_000 })
-  await button.click()
+  // No test report, but a base: the Inspector has the branch's changes to show.
+  const inspector = page.getByRole('button', { name: /^Inspector/ })
+  await expect(inspector).toBeEnabled({ timeout: 10_000 })
+  await inspector.click()
+  // Implementation's This change leads to the Changes tab.
+  await page.getByRole('tab', { name: /^Implementation/ }).click()
+  await page.getByRole('region', { name: 'This change' }).getByRole('button', { name: /^All changes/ }).click()
+  const tab = page.getByRole('tab', { name: /^Changes/ })
+  await expect(tab).toHaveAttribute('aria-selected', 'true')
+  await expect(tab).toContainText('3')
 
-  const chip = page.getByRole('status', { name: 'Changes on branch' })
-  await chip.getByRole('button', { name: /^List/ }).click()
-  const list = page.getByRole('dialog', { name: 'Changes since main' })
-  await expect(list.getByRole('region', { name: 'Added' })).toContainText('Fraud check')
-  await expect(list.getByRole('region', { name: 'Changed' })).toContainText('Checkout API')
-  await expect(list.getByRole('region', { name: 'Changed' })).toContainText('description')
-  await expect(list.getByRole('region', { name: 'Removed' })).toContainText('Legacy billing')
+  const changes = page.getByRole('region', { name: 'Changes', exact: true })
+  await expect(changes).toContainText('since main 534f32f')
+  await expect(changes).toContainText('3 elements changed: 1 added, 1 changed, 1 removed')
+  const all = changes.getByRole('region', { name: 'All changes' })
+  await expect(all.getByRole('region', { name: 'Added' })).toContainText('Fraud check')
+  await expect(all.getByRole('region', { name: 'Changed' })).toContainText('Checkout API')
+  await expect(all.getByRole('region', { name: 'Changed' })).toContainText('description')
+  await expect(all.getByRole('region', { name: 'Removed' })).toContainText('Legacy billing')
   // A removed element is no link: there is nothing to go to.
-  await expect(list.getByRole('region', { name: 'Removed' }).getByRole('button')).toHaveCount(0)
-  await list.getByRole('button', { name: /^Relations/ }).click()
-  await expect(list.getByRole('region', { name: 'Relations' })).toContainText('Checkout API → Fraud check')
+  await expect(all.getByRole('region', { name: 'Removed' }).getByRole('button')).toHaveCount(0)
+  await all.getByRole('button', { name: /^Relations/ }).click()
+  await expect(all.getByRole('region', { name: 'Relations' })).toContainText('Checkout API → Fraud check')
 
-  // From the list to the element, on a canvas that holds it.
-  await list.getByRole('button', { name: /Checkout API/ }).click()
-  await expect(list).toBeHidden()
+  // From the list to the element's panel, and on to a canvas that holds it.
+  await all.getByRole('region', { name: 'Changed' }).getByRole('button', { name: /Checkout API/ }).click()
+  const peek = page.getByRole('complementary', { name: 'Element' })
+  await expect(peek.locator('h3')).toHaveText('Checkout API')
+  await peek.getByRole('button', { name: 'Show on canvas' }).click()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
   await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Architecture')
   await expect(studio.node('api')).toHaveClass(/selected/)
 })
@@ -217,17 +223,19 @@ test('without a base the button says how to save one, and an old base is marked'
   // A base saved two days ago, on another branch.
   await folder.write('.radical/base.json', base(JSON.parse(ARCH_BASE).nodes, [], new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), 'feat/inspector-tabs'))
   await expect(button.locator('.branch-count')).toHaveText('⚠ 3', { timeout: 10_000 })
-  await button.click()
-  const chip = page.getByRole('status', { name: 'Changes on branch' })
-  await expect(chip).toContainText('saved 2 days ago on feat/inspector-tabs')
-  await chip.getByRole('button', { name: 'Old base' }).click()
-  const old = page.getByRole('dialog', { name: 'Old base' })
-  await expect(old).toContainText('Saved 2 days ago, on feat/inspector-tabs')
-  await expect(old).toContainText('radical diff <model folder> --save-base')
+  await expect(button).toHaveAttribute('title', /the base is old, saved 2 days ago on feat\/inspector-tabs/)
+  const inspector = page.getByRole('button', { name: /^Inspector/ })
+  await inspector.click()
+  await page.getByRole('tab', { name: /^Changes/ }).click()
+  const change = page.getByRole('region', { name: 'Changes', exact: true })
+  await expect(change).toContainText('The base was saved 2 days ago, on feat/inspector-tabs.')
+  await expect(change.locator('.branch-cmd code')).toHaveText(['radical hooks install <model folder>', 'radical diff <model folder> --save-base'])
+  await page.locator('.toolbar-mode-btn', { hasText: 'Designer' }).click()
 
   // A file that is no base counts as none.
   await folder.write('.radical/base.json', '{ "version": 1 }')
   await expect(button).toHaveClass(/unavailable/, { timeout: 10_000 })
-  await expect(chip).toBeHidden()
   await expect(button.locator('.branch-count')).toHaveCount(0)
+  // Neither a report nor a base: nothing to inspect.
+  await expect(inspector).toBeDisabled()
 })

@@ -2374,8 +2374,6 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
   const [dismissed, setDismissed] = useState<string | null>(null)
   const open = !!subject && dismissed !== subject
   const close = useCallback(() => setDismissed(subject), [subject])
-  // What else lies over the canvas (Studio's branch chip) keeps clear of the card.
-  const panelRef = useRef<HTMLElement>(null)
 
   // An explicit "show its properties" (Quick Search, a table row's button)
   // brings back a card that ✕ hid.
@@ -2392,9 +2390,6 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
       return saved ? clampPanelWidth(saved) : PANEL_W_DEFAULT
     } catch { return PANEL_W_DEFAULT }
   })
-  useEffect(() => {
-    panelRef.current?.parentElement?.style.setProperty('--rp-width', open ? `${width}px` : '0px')
-  }, [open, width])
   const saveWidth = (w: number) => {
     setWidth(w)
     try { localStorage.setItem(PANEL_W_KEY, String(w)) } catch { /* private window */ }
@@ -2434,7 +2429,7 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
       : null
 
   return (
-    <aside ref={panelRef} className={`right-panel${open ? ' open' : ''}${resizing ? ' resizing' : ''}`}
+    <aside className={`right-panel${open ? ' open' : ''}${resizing ? ' resizing' : ''}`}
       aria-label="Properties" aria-hidden={!open} style={{ width }}>
       <div className="pp-resize" title="Drag to resize · double-click for the default width"
         onPointerDown={onResizeStart} onDoubleClick={() => saveWidth(PANEL_W_DEFAULT)} />

@@ -6,6 +6,6 @@ given: "a folder model without .radical/base.json, then with one saved two days 
 tests: |
   apps/e2e/tests/studio/branch-changes.spec.ts › without a base the button says how to save one, and an old base is marked
   packages/common/tests/branchChanges.test.ts › base file
-then: "without a base the button shows no count and opens the commands radical hooks install and radical diff --save-base; with the old base its count is marked, and the chip's Old base says when and on which branch it was saved; a malformed file counts as no base"
+then: "without a base the button shows no count and opens the commands radical hooks install and radical diff --save-base; with the old base its count is marked, and the Inspector's Changes tab says when and on which branch it was saved and how to save it again; a malformed file counts as no base, and with neither a base nor a report the Inspector is greyed out"
 when: "the user looks at Changes on branch"
 ---

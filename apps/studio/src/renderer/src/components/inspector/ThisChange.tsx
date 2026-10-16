@@ -10,7 +10,8 @@ import React, { useState } from 'react'
 import type { ChangeWork, ChangeWorkItem, ChangeWorkStatus, BranchChanges } from '@radical/common/branchChanges'
 import type { ModelBase } from '@radical/common/formats/modelBase'
 import type { ModelCopy } from '@radical/common/model'
-import { Bar, Chip, type Ctx } from './shared'
+import { isBaseOld } from '@radical/common/formats/modelBase'
+import { Bar, Chip, SHORT_TYPE, type Ctx } from './shared'
 import { ago } from '../BranchChanges'
 
 const STATUS: Record<ChangeWorkStatus, [tone: string, text: string]> = {
@@ -49,20 +50,20 @@ function detail(item: ChangeWorkItem): React.ReactNode {
 }
 
 /** An element the model no longer has, as the base has it. */
-function GoneChip({ id, base, ctx }: { id: string; base: ModelCopy; ctx: Ctx }): React.ReactElement | null {
+export function GoneChip({ id, base, ctx }: { id: string; base: ModelCopy; ctx: Ctx }): React.ReactElement | null {
   const node = base.nodes[id]
   if (!node) return null
   const def = ctx.metamodel.nodeTypes[node.type]
   return (
     <span className="insp-chip gone" title={`${def?.label ?? node.type}: ${node.label} (removed)`}>
-      <span className="insp-chip-type" style={{ background: def?.color ?? '#64748b', color: def?.fg ?? '#fff' }}>{node.type === 'requirement' ? 'Req' : node.type === 'adr' ? 'ADR' : def?.label ?? node.type}</span>
+      <span className="insp-chip-type" style={{ background: def?.color ?? '#64748b', color: def?.fg ?? '#fff' }}>{SHORT_TYPE[node.type] ?? def?.label ?? node.type}</span>
       <span className="insp-chip-label">{node.label}</span>
     </span>
   )
 }
 
-export function ThisChange({ work, changes, base, baseModel, ctx }: {
-  work: ChangeWork; changes: BranchChanges; base: ModelBase; baseModel: ModelCopy; ctx: Ctx
+export function ThisChange({ work, changes, base, baseModel, ctx, onAllChanges }: {
+  work: ChangeWork; changes: BranchChanges; base: ModelBase; baseModel: ModelCopy; ctx: Ctx; onAllChanges: () => void
 }): React.ReactElement {
   const [left, setLeft] = useState(false)
   const { added, changed, removed } = changes.counts
@@ -80,9 +81,10 @@ export function ThisChange({ work, changes, base, baseModel, ctx }: {
             Since main <code>{base.commit.slice(0, 7)}</code> ({base.described}{base.branch ? `, ${base.branch}` : ''}) · base saved {ago(base.savedAt)} · {added + changed + removed} elements changed: {added} added, {changed} changed, {removed} removed
           </p>
         </div>
+        <button type="button" className="insp-link" onClick={onAllChanges}>All changes{isBaseOld(base) ? ' · old base' : ''} ›</button>
       </div>
       {work.items.length === 0 ? (
-        <p className="insp-muted">No requirement or ADR changed since the base{added + changed + removed ? '; the other changes show on the canvas with Changes on branch.' : '.'}</p>
+        <p className="insp-muted">No requirement or ADR changed since the base.</p>
       ) : (<>
         <div className="insp-two">
           <div className="insp-change-progress">

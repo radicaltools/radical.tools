@@ -29,7 +29,7 @@ export const dimensionOfFinding = (f: CheckFinding): CheckDimension | undefined 
 
 export const metricOf = (check: CheckResult, id: string): CheckMetricResult | undefined => check.metrics.find((m) => m.id === id)
 
-const SHORT_TYPE: Record<string, string> = { requirement: 'Req', 'fitness-fn': 'FF', scenario: 'Scenario', adr: 'ADR', need: 'Need', database: 'DB', webapp: 'Web app', component: 'Comp', container: 'Cont', system: 'System' }
+export const SHORT_TYPE: Record<string, string> = { requirement: 'Req', 'fitness-fn': 'FF', scenario: 'Scenario', adr: 'ADR', need: 'Need', database: 'DB', webapp: 'Web app', component: 'Comp', container: 'Cont', system: 'System' }
 export const MARK: Record<string, string> = { verified: '✓', passed: '✓', broken: '✗', failed: '✗', unverified: '○', 'not-run': '○', 'no-tests': '○', 'not-found': '?', skipped: '–' }
 export const FAILING = new Set(['broken', 'failed', 'not-found'])
 export const PASSING = new Set(['verified', 'passed'])
