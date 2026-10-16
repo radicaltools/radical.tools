@@ -149,7 +149,9 @@ test('the Inspector lists every change since the base, and a click leads to the 
   await expect(card.getByRole('region', { name: 'Changes on branch' }).locator('ins')).toHaveText(['card ', ' and confirms the order'])
   await expect(page.getByRole('complementary', { name: 'Element' })).toHaveCount(0)
   // And on to a canvas that holds it.
-  await card.getByRole('button', { name: 'Show on canvas' }).click()
+  await card.getByRole('button', { name: /^Show on canvas/ }).click()
+  await expect(page.getByRole('menuitem')).toHaveText([/^Architecture/])
+  await page.getByRole('menuitem', { name: /^Architecture/ }).click()
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
   await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Architecture')
   await expect(studio.node('api')).toHaveClass(/selected/)

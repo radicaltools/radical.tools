@@ -34,6 +34,17 @@ export function canvasViewFor(nodeId: string): string | null {
   return best?.id ?? null
 }
 
+/** Every canvas view that shows `nodeId`, the smallest first, with how
+ *  many elements it shows: the views to choose from. */
+export function canvasViewsFor(nodeId: string): Array<{ id: string; name: string; size: number }> {
+  const { views, c4Nodes, c4Relations } = useDiagramStore.getState()
+  const sets = viewNodeSets(views, c4Nodes, c4Relations)
+  return Object.values(views)
+    .filter((v) => isCanvas(v) && sets[v.id]?.has(nodeId))
+    .map((v) => ({ id: v.id, name: v.name, size: sets[v.id].size }))
+    .sort((a, b) => a.size - b.size || a.name.localeCompare(b.name))
+}
+
 /** A wiki view with a page for `nodeId`, or null when the model has none. */
 export function wikiViewFor(nodeId: string): string | null {
   const { views, c4Nodes, c4Relations } = useDiagramStore.getState()
@@ -46,11 +57,12 @@ export function wikiViewFor(nodeId: string): string | null {
 type FocusFn = (id: string, opts?: { zoom?: number; duration?: number }) => void
 const FOCUS_ZOOM = 1.2
 
-/** Designer, on the canvas that shows `nodeId`, with it selected, its
- *  containers open and the camera on it. */
-export function revealOnCanvas(nodeId: string): void {
+/** Designer, on the canvas that shows `nodeId` (or on `viewId`, one the
+ *  user chose; null for All elements), with it selected, its containers
+ *  open and the camera on it. */
+export function revealOnCanvas(nodeId: string, viewId?: string | null): void {
   if (useDiagramStore.getState().appMode !== 'designer') useDiagramStore.getState().setAppMode('designer')
-  const target = canvasViewFor(nodeId)
+  const target = viewId !== undefined ? viewId : canvasViewFor(nodeId)
   const store = useDiagramStore.getState()
   const switching = store.activeViewId !== target
   if (switching) store.setActiveView(target)

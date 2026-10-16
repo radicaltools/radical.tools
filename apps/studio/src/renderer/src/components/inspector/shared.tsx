@@ -4,14 +4,14 @@
 // elements it quotes as chips, bars with a goal tick, the side panel itself,
 // and the list of a rule's findings.
 
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   CHECK_DIMENSIONS, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE,
   type CheckDimension, type CheckFinding, type CheckMetricResult, type CheckPerspective, type CheckResult, type CheckRuleResult, type EvidenceEntry,
 } from '@radical/common/check'
 import type { C4Node } from '@radical/common/c4'
 import type { Metamodel } from '@radical/common/metamodel'
-import { openWikiPage, revealOnCanvas, wikiViewFor } from '../../navigation'
+import { canvasViewsFor, openWikiPage, revealOnCanvas, wikiViewFor } from '../../navigation'
 
 export const RULE_INFO = new Map<string, string>([...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE].map((r) => [r.id, r.description]))
 const RULE_DIMENSION = new Map<string, CheckDimension>([...FOLDER_RULES, ...CHECK_RULES].map((r) => [r.id, r.dimension]))
@@ -145,7 +145,7 @@ export function Peek({ id, ctx, check, onClose }: { id: string; ctx: Ctx; check:
         {ev && <><dt>Tests</dt><dd><span className={`insp-mark ${tone(ev.status)}`}>{MARK[ev.status]}</span> {ev.status}</dd></>}
       </dl>
       <div className="insp-peek-acts">
-        <button type="button" className="primary" onClick={() => revealOnCanvas(id)}>Show on canvas</button>
+        <ShowOnCanvas id={id} className="primary" />
         <button type="button" onClick={() => openWikiPage(id)} disabled={!hasWiki} title={hasWiki ? undefined : 'No wiki view shows this element'}>Open wiki page</button>
       </div>
       {ev?.tests && ev.tests.length > 0 && (
@@ -266,6 +266,38 @@ function RuleBlock({ r, check, ctx, list, focused }: { r: CheckRuleResult; check
         <span className="insp-rcount">{r.count}{r.max !== undefined && <small> / max {r.max}</small>}</span>
       </div>
       {findings.length > 0 && <RuleFindings list={findings} ctx={ctx} />}
+    </div>
+  )
+}
+
+/** Show on canvas, with the canvas views that show the element to choose
+ *  from, the smallest first; All elements when none does. */
+export function ShowOnCanvas({ id, className }: { id: string; className?: string }): React.ReactElement {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent): void => { if (!box.current?.contains(e.target as Node)) setOpen(false) }
+    const key = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', key)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', key) }
+  }, [open])
+  const views = open ? canvasViewsFor(id) : []
+  return (
+    <div className="insp-show" ref={box}>
+      <button type="button" className={className} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>Show on canvas ▾</button>
+      {open && (
+        <div className="insp-show-menu" role="menu" aria-label="Show on canvas">
+          {views.length ? views.map((v) => (
+            <button key={v.id} type="button" role="menuitem" onClick={() => { setOpen(false); revealOnCanvas(id, v.id) }}>
+              <span>{v.name}</span><span className="insp-muted">{v.size} element{v.size === 1 ? '' : 's'}</span>
+            </button>
+          )) : (
+            <button type="button" role="menuitem" onClick={() => { setOpen(false); revealOnCanvas(id, null) }}><span>All elements</span></button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

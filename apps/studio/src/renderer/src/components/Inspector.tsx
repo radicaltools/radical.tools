@@ -13,13 +13,13 @@ import { changeWork } from '@radical/common/branchChanges'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { ElementCard, type CardBranch } from '@radical/ui/components/RightPanel'
-import { openWikiPage, revealOnCanvas } from '../navigation'
+import { openWikiPage } from '../navigation'
 import { useInspectorStore } from '../persistence/inspector'
 import { useBranchStore } from '../persistence/branchChanges'
 import { ThisChange } from './inspector/ThisChange'
 import { ChangesTab } from './inspector/ChangesTab'
 import { useDocumentsStore } from '../store/documentStore'
-import { Errors, Peek, TabBadge, dimensionOfFinding, dimensionsOf, type Ctx } from './inspector/shared'
+import { Errors, Peek, ShowOnCanvas, TabBadge, dimensionOfFinding, dimensionsOf, type Ctx } from './inspector/shared'
 import { ModelTab } from './inspector/ModelTab'
 import { ImplementationTab } from './inspector/ImplementationTab'
 import { SettingsTab } from './inspector/SettingsTab'
@@ -112,7 +112,7 @@ export function Inspector(): React.ReactElement {
       {peekId && <Peek id={peekId} ctx={ctx} check={check} onClose={() => setPeekId(null)} />}
       {tab === 'changes' && cardId && nodes[cardId] && (
         <ElementCard nodeId={cardId} branch={cardBranch} onClose={() => setCardId(null)} actions={<>
-          <button type="button" className="insp-btn primary" onClick={() => revealOnCanvas(cardId)}>Show on canvas</button>
+          <ShowOnCanvas id={cardId} className="insp-btn primary" />
           <button type="button" className="insp-btn" onClick={() => openWikiPage(cardId)}>Open wiki page</button>
         </>} />
       )}
