@@ -280,6 +280,45 @@ interface RelationReading {
   partners: C4Node[]
 }
 
+// A page or chapter for each of hundreds of elements (Multi page) asked
+// the whole model for its relations and children: an index per model
+// answers them, built once (frozen data: Studio's and the Hub's stores).
+const touchingIndex = new WeakMap<object, Map<string, C4Relation[]>>()
+const childrenIndex = new WeakMap<object, Map<string, C4Node[]>>()
+
+/** The relations with `id` at either end, in the model's order. */
+function relationsTouching(relations: Record<string, C4Relation>, id: string): C4Relation[] {
+  if (!Object.isFrozen(relations)) return Object.values(relations).filter((r) => r.sourceId === id || r.targetId === id)
+  let index = touchingIndex.get(relations)
+  if (!index) {
+    index = new Map()
+    const add = (key: string, r: C4Relation) => { const list = index!.get(key); if (list) list.push(r); else index!.set(key, [r]) }
+    for (const r of Object.values(relations)) {
+      add(r.sourceId, r)
+      if (r.targetId !== r.sourceId) add(r.targetId, r)
+    }
+    touchingIndex.set(relations, index)
+  }
+  return index.get(id) ?? []
+}
+
+/** The elements whose parent is `id`, in the model's order. */
+function childrenIn(nodes: Record<string, C4Node>, id: string): C4Node[] {
+  if (!Object.isFrozen(nodes)) return Object.values(nodes).filter((n) => n.parentId === id)
+  let index = childrenIndex.get(nodes)
+  if (!index) {
+    index = new Map()
+    for (const n of Object.values(nodes)) {
+      if (!n.parentId) continue
+      const list = index.get(n.parentId)
+      if (list) list.push(n)
+      else index.set(n.parentId, [n])
+    }
+    childrenIndex.set(nodes, index)
+  }
+  return index.get(id) ?? []
+}
+
 function relationReadingsOf(
   node: C4Node,
   nodes: Record<string, C4Node>,
@@ -1921,13 +1960,13 @@ function WikiElementPage({
       chainChildren
         ? (chainChildren[node.id] ?? [])
         : hierarchyRelationType
-        ? Object.values(relations)
+        ? relationsTouching(relations, node.id)
             .filter((r) => r.relationType === hierarchyRelationType && r.targetId === node.id)
             .map((r) => nodes[r.sourceId])
             .filter((n): n is C4Node => !!n && (!visibleSet || visibleSet.has(n.id)))
             .sort((a, b) => a.label.localeCompare(b.label))
-        : Object.values(nodes)
-            .filter((n) => n.parentId === node.id && (!visibleSet || visibleSet.has(n.id)))
+        : childrenIn(nodes, node.id)
+            .filter((n) => !visibleSet || visibleSet.has(n.id))
             .sort((a, b) => a.label.localeCompare(b.label)),
     [chainChildren, nodes, relations, node.id, visibleSet, hierarchyRelationType],
   )
@@ -1936,7 +1975,7 @@ function WikiElementPage({
   // child of this one are left out: the children paragraph already says so.
   const ownRelations = useMemo(
     () =>
-      Object.values(relations).filter((r) => {
+      relationsTouching(relations, node.id).filter((r) => {
         if (r.sourceId === node.id) {
           // Nor does a chapter repeat that it belongs to the page it is on.
           if (chapterOf && r.targetId === chapterOf && r.relationType === hierarchyRelationType) return false
@@ -1997,12 +2036,14 @@ function WikiElementPage({
         { key: 'external', label: 'External', type: 'boolean' as const },
       ]
 
+  // Only the page's own infobox edits the parent: not a chapter, nor a
+  // read-only page (each chapter of Multi page went through the whole model).
   const parentCandidates = useMemo(
     () =>
-      Object.values(nodes)
+      embedded || readOnly ? [] : Object.values(nodes)
         .filter((n) => n.id !== node.id && isPlacementAllowed(metamodel, node.type, n, nodes))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [nodes, node, metamodel],
+    [nodes, node, metamodel, embedded, readOnly],
   )
 
   const meta = typeMeta(node.type)
