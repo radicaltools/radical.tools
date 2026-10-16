@@ -42,7 +42,7 @@ describe('radical hooks', () => {
 
     const first = await run(cwd, command, 'hooks', 'install', 'my model')
     expect(first.code).toBe(0)
-    expect(first.out).toContain('Added to post-checkout, post-commit, post-merge')
+    expect(first.out).toContain('Added to post-checkout, post-commit, post-merge, post-rewrite')
     expect((await run(cwd, command, 'hooks', 'install', 'my model')).out).toContain('nothing changed')
     for (const name of HOOK_NAMES) {
       const text = await readFile(join(hooks, name), 'utf8')
@@ -53,7 +53,7 @@ describe('radical hooks', () => {
     expect(await readFile(join(hooks, 'post-commit'), 'utf8')).toMatch(/^#!\/bin\/sh\necho own >> own\.txt\n# radical/)
     // The CLI moved: installing again brings the line up to date, once.
     const moved = `"${process.execPath}" "${join(cwd, 'moved.mjs')}"`
-    expect((await run(cwd, moved, 'hooks', 'install', 'my model')).out).toContain('Updated in post-checkout, post-commit, post-merge')
+    expect((await run(cwd, moved, 'hooks', 'install', 'my model')).out).toContain('Updated in post-checkout, post-commit, post-merge, post-rewrite')
     expect(await readFile(join(hooks, 'post-merge'), 'utf8')).toContain(`${moved} diff "my model"`)
     expect((await readFile(join(hooks, 'post-merge'), 'utf8')).split(HOOK_MARKER)).toHaveLength(2)
     await run(cwd, command, 'hooks', 'install', 'my model')

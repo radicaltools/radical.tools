@@ -87,7 +87,7 @@ npm install
 
 # Once after cloning: git hooks that keep architecture/.radical/base.json, the
 # base Studio's "Changes on branch" compares with, after every checkout,
-# commit and pull (radical hooks install)
+# commit, pull and rebase (radical hooks install)
 npm run hooks
 
 # Start in development mode (Electron, hot-reload)

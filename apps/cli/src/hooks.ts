@@ -8,8 +8,9 @@ const exec = promisify(execFile)
 
 export const HOOKS_USAGE = `Usage: radical hooks install [folder] [options]
 
-Adds a line to the repository's post-checkout, post-commit and post-merge git
-hooks that saves the model folder's base (radical diff --save-base), so
+Adds a line to the repository's post-checkout, post-commit, post-merge and
+post-rewrite git hooks that saves the model folder's base (radical diff
+--save-base) after a checkout, a commit, a pull or merge and a rebase, so
 Studio shows the changes of the branch checked out without anyone running
 it. What the hooks already do stays; running it again adds nothing, but
 brings the line up to date when the CLI or node has moved.
@@ -18,7 +19,8 @@ brings the line up to date when the CLI or node has moved.
 
 Exit status: 0 the hooks hold the line, 2 they could not be written.`
 
-export const HOOK_NAMES = ['post-checkout', 'post-commit', 'post-merge'] as const
+/** A checkout, a commit (amended too), a pull or merge, a rebase. */
+export const HOOK_NAMES = ['post-checkout', 'post-commit', 'post-merge', 'post-rewrite'] as const
 
 /** Marks the line, so a second install finds it. */
 export const HOOK_MARKER = '# radical: save the model base for Studio'
