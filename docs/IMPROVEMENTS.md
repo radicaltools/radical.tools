@@ -470,6 +470,13 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     crossings and 14 overdraws: a line drawn over a domain reads worse than a
     crossing, so the ranking may weigh overdraws too lightly on nested
     domains. Worth a look with the ranking calibration.
+32. **A flaky e2e test: the metamodel diagram's camera.** `metamodel-diagram.spec.ts
+    › selecting a type shows its rules` failed twice on 2026-10-16 in a full
+    local run (the camera came back to zoom 0.378 instead of 0.361, checked
+    to 0.005), and passed 25 times out of 25 on its own and under load. The
+    pane click that restores the camera may land while the fit to the
+    selection still moves it; waiting for the camera to rest before the
+    click would make it steady.
 
 ### Reverse-engineered requirements (2026-10-06)
 

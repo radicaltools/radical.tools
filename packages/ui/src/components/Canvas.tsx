@@ -263,7 +263,11 @@ function StructuralCanvas(): React.ReactElement {
    *  through a d3 transition, which applies even a zero duration one frame
    *  later: the nodes would draw once under the old camera. */
   const setCameraNow = useCallback((vp: { x: number; y: number; zoom: number }) => {
-    const { d3Zoom, d3Selection } = rfStore.getState()
+    const { d3Zoom, d3Selection, transform } = rfStore.getState()
+    // Already there: a camera move re-runs every node's and edge's selector
+    // (a few tens of ms on a large canvas), and a fit that follows the live
+    // layout asks for the same camera frame after frame once it rests.
+    if (Math.abs(transform[0] - vp.x) < 0.5 && Math.abs(transform[1] - vp.y) < 0.5 && Math.abs(transform[2] - vp.zoom) < 1e-4) return
     if (d3Zoom && d3Selection) d3Zoom.transform(d3Selection, zoomIdentity.translate(vp.x, vp.y).scale(vp.zoom))
     else rfInstanceRef.current?.setViewport(vp)
   }, [rfStore])

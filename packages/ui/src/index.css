@@ -3951,6 +3951,8 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .tv-row-btn:hover { color: var(--accent); border-color: var(--accent); }
 /* Adds an element where it will show: after the rows under an element, or at the end. */
 .tv-add-row > .tv-td { border-bottom: none; }
+/* What a long table does not draw: the height of the lines it stands for. */
+.tv-spacer > td { padding: 0; border: 0; }
 .tv-add-btn {
   display: flex; align-items: center; gap: 5px; width: 100%;
   padding: 3px 10px 3px 6px; border: none; background: none; text-align: left;

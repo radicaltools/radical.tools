@@ -31,6 +31,9 @@ interface RelationIndex {
 
 const indexCache = new WeakMap<object, { nodes: object; index: RelationIndex }>()
 
+/** The index each context was answered with (relationIndex). */
+const ctxIndex = new WeakMap<PipelineContext, RelationIndex>()
+
 const readCache = new WeakMap<object, ViewPipeline | undefined>()
 
 /** A view's chain as the engine reads it, whatever a file holds: a level
@@ -77,8 +80,17 @@ export function pipelineOf(view: DiagramView | undefined): ViewPipeline | undefi
 }
 
 function relationIndex(ctx: PipelineContext): RelationIndex {
-  const cached = indexCache.get(ctx.relations)
-  if (cached && cached.nodes === ctx.nodes) return cached.index
+  // Once per context (one run of a chain asks it for every element), and
+  // across runs for frozen data (Studio's store) only: a model changed in
+  // place (the MCP server's) would be answered from the relations it had.
+  const own = ctxIndex.get(ctx)
+  if (own) return own
+  const cacheable = Object.isFrozen(ctx.relations) && Object.isFrozen(ctx.nodes)
+  const cached = cacheable ? indexCache.get(ctx.relations) : undefined
+  if (cached && cached.nodes === ctx.nodes) {
+    ctxIndex.set(ctx, cached.index)
+    return cached.index
+  }
   const index: RelationIndex = { out: new Map(), in: new Map(), children: new Map() }
   const list = Array.isArray(ctx.relations) ? ctx.relations : Object.values(ctx.relations)
   for (const r of list) {
@@ -95,7 +107,8 @@ function relationIndex(ctx: PipelineContext): RelationIndex {
     if (c) c.push(n.id)
     else index.children.set(n.parentId, [n.id])
   }
-  indexCache.set(ctx.relations, { nodes: ctx.nodes, index })
+  ctxIndex.set(ctx, index)
+  if (cacheable) indexCache.set(ctx.relations, { nodes: ctx.nodes, index })
   return index
 }
 
@@ -103,8 +116,11 @@ function typeLabel(ctx: PipelineContext, typeId: string): string {
   return ctx.metamodel.nodeTypes[typeId]?.label ?? typeId
 }
 
-const byLabel = (a: { label: string }, b: { label: string }) =>
-  a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' })
+// One collator for every comparison: localeCompare with options builds one
+// per call, which made sorting a large view's elements take tens of ms.
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+
+const byLabel = (a: { label: string }, b: { label: string }) => collator.compare(a.label, b.label)
 
 // ─── Filters ────────────────────────────────────────────────────────────────
 
@@ -279,11 +295,13 @@ export function sortNodes(nodes: C4Node[], sort: ViewSort | undefined, ctx: Pipe
     !sort || sort.by === 'label' ? n.label
     : sort.by === 'type' ? typeLabel(ctx, n.type)
     : propertyValues(n, sort.key ?? '').map((v) => ctx.nodes[v]?.label ?? v).join(', ')
+  // Each element's key once, not once per comparison.
+  const keys = new Map(nodes.map((n) => [n, key(n)]))
   const cmp = (a: C4Node, b: C4Node) => {
-    const ka = key(a), kb = key(b)
+    const ka = keys.get(a)!, kb = keys.get(b)!
     // Elements without the value go last, whichever way.
     if (!ka !== !kb) return ka ? -1 : 1
-    const c = ka.localeCompare(kb, undefined, { numeric: true, sensitivity: 'base' })
+    const c = collator.compare(ka, kb)
     return (sort?.desc ? -c : c) || byLabel(a, b)
   }
   return [...nodes].sort(cmp)
@@ -519,6 +537,27 @@ const NO_METAMODEL: Metamodel = { id: '', name: '', nodeTypes: {}, relationTypes
  *  to the model reaches all of them. */
 export function viewShownNodes(view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Set<string> | undefined {
   if (!view) return undefined
+  // Switching views saves the outgoing view's positions, which gives every
+  // caller (the view cards' counts, Quick Search, the layout input) a new
+  // views object: the answer is kept while what it depends on is the same.
+  // Only for frozen data (Studio's store): the MCP server's model changes
+  // in place, where the same objects say something else after an edit.
+  const cacheable = Object.isFrozen(nodes) && Object.isFrozen(relations) && Object.isFrozen(view.nodeIds)
+  if (cacheable) {
+    const hit = shownCache.get(view.nodeIds)
+    if (hit && hit.nodes === nodes && hit.relations === relations && hit.pipeline === view.pipeline && hit.kind === view.kind && hit.empty === view.empty) return hit.shown
+  }
+  const shown = computeShownNodes(view, nodes, relations)
+  if (cacheable) shownCache.set(view.nodeIds, { nodes, relations, pipeline: view.pipeline, kind: view.kind, empty: view.empty, shown })
+  return shown
+}
+
+/** What viewShownNodes answered for a view's node list, and from what. */
+const shownCache = new WeakMap<readonly string[], {
+  nodes: object; relations: object; pipeline: unknown; kind: DiagramView['kind']; empty: DiagramView['empty']; shown: Set<string> | undefined
+}>()
+
+function computeShownNodes(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Set<string> | undefined {
   if (pipelineOf(view)?.levels?.length && view.kind !== 'dynamic') {
     return new Set(runPipeline(view, { nodes, relations, metamodel: NO_METAMODEL }).nodes.map((n) => n.id))
   }

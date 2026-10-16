@@ -55,7 +55,7 @@ test('bench: opening a view', async ({ page, studio }) => {
       target.click()
       const poll = () => {
         const now = performance.now()
-        const nodes = document.querySelectorAll('.react-flow__node, .tv-table tr, .wiki-article').length
+        const nodes = document.querySelectorAll('.react-flow__node, .tv-table tr, .wiki-title, .mx-table th, .mx-empty').length
         if (drawn < 0 && nodes > 0) drawn = now - t0
         const lastEnd = tasks.reduce((m, t) => Math.max(m, t.start + t.dur), t0)
         if ((drawn >= 0 && now - lastEnd > 1500) || now - t0 > 300_000) {

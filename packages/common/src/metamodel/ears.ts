@@ -303,6 +303,22 @@ export function resolveEarsSubject(
   relations: Record<string, { sourceId: string; targetId: string; relationType?: string }>,
   nodes: Record<string, { label: string }>,
 ): string | undefined {
+  // A table sums up every requirement it shows: on frozen data (Studio's
+  // store) one pass over the relations answers them all, not one each.
+  if (Object.isFrozen(relations) && Object.isFrozen(nodes)) {
+    let index = subjectIndex.get(relations)
+    if (!index || index.nodes !== nodes) {
+      const subjects = new Map<string, string>()
+      for (const rel of Object.values(relations)) {
+        if (rel.relationType !== 'satisfies' || subjects.has(rel.targetId)) continue
+        const src = nodes[rel.sourceId]
+        if (src) subjects.set(rel.targetId, src.label)
+      }
+      index = { nodes, subjects }
+      subjectIndex.set(relations, index)
+    }
+    return index.subjects.get(reqId)
+  }
   for (const rel of Object.values(relations)) {
     if (rel.relationType === 'satisfies' && rel.targetId === reqId) {
       const src = nodes[rel.sourceId]
@@ -311,6 +327,9 @@ export function resolveEarsSubject(
   }
   return undefined
 }
+
+/** The subject of each requirement, by relations object (resolveEarsSubject). */
+const subjectIndex = new WeakMap<object, { nodes: object; subjects: Map<string, string> }>()
 
 // A name is a line of a list, not a sentence: up to this many characters.
 const LINE_LABEL_MAX = 64
