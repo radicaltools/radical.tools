@@ -54,7 +54,7 @@ vite.web.config.ts --minify false` in `apps/studio` for readable names).
 | `studio/matrix`, `studio/markdown`, `studio/need`, `studio/wizard` | Matrix edits; Markdown fields and summaries; needs; node wizards |
 | `studio/metamodel-editor`, `studio/metamodel-diagram`, `studio/state-machines` | The metamodel editor, its Diagram tab, statecharts |
 | `studio/forge`, `studio/hub-import` | Radical Forge stages; importing from the Hub |
-| `studio/inspector` | The Inspector shows what radical check says; its links lead to the element; a deep link opens it |
+| `studio/inspector` | The Inspector shows what radical check says by tab; its links lead to the element; a deep link opens it; Settings save goals and rules to check.json and flag a change that loosens the gate |
 | `studio/known-issues` | Open bugs, marked `test.fail` (see below) |
 | `hub/hub` | Landing page, categories, search, concept canvas / wiki / table, `.radical` download |
 
@@ -103,7 +103,7 @@ screenshots of the manual (`apps/web/screenshots/<name>-light.png` and
 `-dark.png`) from the web builds, one `test` per figure. Run
 `npm run docs:screenshots` from the root after a UI change (`-- -g wiki` for
 one figure), look at the images, and commit them with the manual. Unlike the
-suite, they load web fonts and come from macOS. The Inspector figure reads the
+suite, they load web fonts and come from macOS. The Inspector figures read the
 repository's own `architecture/` model and the test results
 `npm run check:architecture` left in `architecture/.radical/`. Two more come
 from the same run: README's `screenshots/demo.gif` (a recording of the

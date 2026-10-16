@@ -60,7 +60,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 - **Presentation mode**: slides over views and milestones, played in the window with a navigation bar
 - **Metamodel editor**: customise node types, relation types, and constraints, with typed properties including references to other elements
 - **Time travel**: milestones of the whole model, with a diff against the previous one and edits that propagate to later milestones
-- **Inspector**: what `radical check` says about the model — verified requirements and ADRs, failing tests, findings by rule — with links to each element
+- **Inspector**: what `radical check` says about the model — its quality on its own (consistency, completeness, traceability, decisions), how faithfully the implementation follows it by the tests, and its `check.json` goals and rules as settings — with links to each element
 - **radical check**: a CLI that checks a model folder's metamodel rules, completeness and the tests it names; CI runs it on this repository's own model ([architecture/](architecture))
 - **MCP server**: [@radicaltools/mcp](apps/mcp) lets Claude Code, Claude Desktop or Codex read and edit a Markdown model folder, with the same tools as the AI assistant
 - **Models**: kept in the browser, in one `.radical` file or in a folder of Markdown files (git-friendly); Structurizr DSL import

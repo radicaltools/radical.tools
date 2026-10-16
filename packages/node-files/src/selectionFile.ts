@@ -77,3 +77,11 @@ export async function readCheckFiles(root: string): Promise<{ results: string | 
   return { results, config }
 }
 
+/** Writes the model's check.json (the Inspector's settings). Refuses a
+ *  symlinked one, which could redirect the write elsewhere. */
+export async function writeCheckConfig(root: string, content: string): Promise<void> {
+  const configPath = join(resolve(root), CHECK_CONFIG_FILE)
+  if (await lstat(configPath).then((s) => s.isSymbolicLink(), () => false)) throw new Error(`symlink in model path: ${CHECK_CONFIG_FILE}`)
+  await writeFile(configPath, content, 'utf-8')
+}
+

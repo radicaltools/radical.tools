@@ -22,8 +22,8 @@ Checks one model folder and prints what it finds:
   fitness functions linked and with a threshold.
 
 With test reports it also checks that the tests the model names passed (see
-below). `radical check --list-rules` lists every rule. It reads the files only and
-never writes the model.
+below). `radical check --list-rules` lists every rule and every metric a goal can
+be set for. It reads the files only and never writes the model.
 
 Exit status: 0 no errors (warnings allowed), 1 errors, 2 the check could not
 run. `--format json` prints the result as JSON, `--format github` as GitHub
@@ -48,6 +48,28 @@ With `max`, up to that many findings pass as warnings and one more fails the
 check, so an existing model can adopt a rule before every gap is closed.
 `--ratchet` lowers each `max` to the count found now and writes the config
 back; it never raises one.
+
+### Goals
+
+`goals` sets the least share, in percent, of a metric: requirements with a
+scenario, accepted ADRs with a fitness function, and with `--report`
+requirements and ADRs verified, scenarios passing, tests the model names, …
+(`--list-rules` lists them all):
+
+```json
+{
+  "goals": {
+    "requirements-with-scenario": { "min": 85 },
+    "requirements-verified": { "min": 80 }
+  }
+}
+```
+
+A metric below its goal is a finding of `goal-unmet`, an error unless the
+config sets that rule (or `goal-unmet/<metric>`) otherwise. A metric of the
+test reports counts only with `--report`. Where `max` says how many gaps a
+rule may have, a goal says how much of the model must be covered, so it keeps
+its meaning as the model grows.
 
 ### Tests no scenario names
 
@@ -105,5 +127,8 @@ functions); it never writes into the model.
 With `--report` the command also keeps the test cases it read in the model
 folder's `.radical/test-results.json` (out of git, like the rest of
 `.radical/`). Studio's Inspector perspective reads them and the model's
-`check.json`, and runs the same check on the model as it is edited.
+`check.json`, and runs the same check on the model as it is edited: Model
+quality and Implementation show the result by dimension, and Settings edit
+`check.json` (goals, severities, baselines), marking a change that loosens
+the gate.
 

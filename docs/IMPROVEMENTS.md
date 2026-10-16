@@ -493,6 +493,13 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     from every view's positions, and adding should place it only where it
     is drawn.
 
+35. **No tool for check.json.** Setting goals for `architecture/` on
+    2026-10-16 meant editing `architecture/check.json` by hand: the MCP
+    server can read and change the model but not its check settings, nor run
+    the check. Tools `get_check` (the result with its metrics) and
+    `set_check_config` (with the loosening warnings of compareCheckConfig)
+    would let an agent keep the gate the way Studio's Settings do.
+
 ### Reverse-engineered requirements (2026-10-06)
 
 `architecture/` now holds 36 needs, 246 EARS requirements and 123 scenarios,
@@ -2134,7 +2141,8 @@ requirements and 8 ADRs verified, no errors. Still open:
    results from `.radical/test-results.json`, links to the elements. Still
    open: markers on the cards in Designer and a "Check" section in the
    properties panel; the metamodel editor's Validation list moving into the
-   Inspector; an MCP `run_check` tool for agents.
+   Inspector; an MCP `run_check` tool for agents. Since 2026-10-16 it has
+   three tabs (Model quality, Implementation, Settings), see item 8.
 4. **Tests no scenario names** (`test-unbound`, 2026-10-14). On
    `architecture/` with `include: apps/e2e/**`: 86 of 157 e2e tests in 21
    files, among them every test of runs-13-24.spec.ts, wiki.spec.ts,
@@ -2147,6 +2155,24 @@ requirements and 8 ADRs verified, no errors. Still open:
    dependencies and imports.
 7. **`radical mcp` and publishing.** Serve the MCP server as a subcommand
    too, and publish @radicaltools/cli the way the MCP server is published.
+8. **Goals and the Inspector's tabs** (2026-10-16, ADR "Goals beside
+   baselines"). check.json takes `goals` (least share in percent per metric,
+   rule `goal-unmet`); the Inspector shows Model quality and Implementation
+   by dimension and edits check.json in Settings, marking a change that
+   loosens the gate. Still open:
+   - Settings need a check report to be reached: the Inspector button stays
+     greyed out without `.radical/test-results.json`, though goals and rules
+     about the model need none.
+   - `--ratchet` lowers baselines only; raising a goal to the share found now
+     (rounded down) would be its counterpart.
+   - The Model quality tiles compare with no earlier run: a trend (since the
+     last commit, or per milestone) would show whether the model gets better.
+   - Results older than a day are flagged, but Studio cannot tell whether the
+     code changed since; the commit the reports came from could go into
+     test-results.json.
+   - Settings cannot be saved for a model that is no folder; offering to keep
+     a check.json with it would need DiagramData to carry it (ADR "Check
+     settings beside the model" decided against).
 
 ### Found by the code audit of the architecture model (2026-10-14)
 

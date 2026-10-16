@@ -39,8 +39,14 @@ export function formatCheckText(result: CheckResult, options: FormatOptions): st
     }
     if (shown.length < list.length) lines.push(`    … ${list.length - shown.length} more (--verbose shows them)`)
   }
+  const goals = result.metrics.filter((m) => m.min !== undefined)
+  if (goals.length) {
+    lines.push('', 'Goals:')
+    for (const m of goals) lines.push(`  ${m.met ? '✓' : '✖'} ${m.id}  ${m.percent}% (${m.count} of ${m.total}, min ${m.min}%)`)
+  }
   if (result.evidence) lines.push('', ...evidenceSummary(result))
   if (result.unknownRules.length) lines.push('', `⚠ The config names rules that do not exist: ${result.unknownRules.join(', ')}`)
+  if (result.unknownGoals.length) lines.push('', `⚠ The config sets goals for metrics that do not exist: ${result.unknownGoals.join(', ')}`)
   lines.push('', `${result.ok ? '✓' : '✖'} ${plural(result.errors, 'error')}, ${plural(result.warnings, 'warning')}`)
   return lines.join('\n')
 }

@@ -575,18 +575,32 @@
       <section class="doc-section" id="inspector">
         <h2>Inspector</h2>
         <figure class="doc-shot">
-          <img class="shot-light" src="screenshots/inspector-light.png?v=__BUILD__" alt="Inspector on the radical.tools architecture model: requirements and decisions verified, scenarios passing, problems, requirements by group and by element, and each ADR with the fitness functions that check it" loading="lazy" />
-          <img class="shot-dark" src="screenshots/inspector-dark.png?v=__BUILD__" alt="Inspector on the radical.tools architecture model: requirements and decisions verified, scenarios passing, problems, requirements by group and by element, and each ADR with the fitness functions that check it" loading="lazy" />
-          <figcaption>The Inspector on the model of radical.tools itself, which CI checks with <code>radical check</code> on every push.</figcaption>
+          <img class="shot-light" src="screenshots/inspector-light.png?v=__BUILD__" alt="Inspector, Model quality tab, on the radical.tools architecture model: consistency, completeness, traceability and decisions, the traceability chain from needs to tests, gaps by group and the goals of check.json" loading="lazy" />
+          <img class="shot-dark" src="screenshots/inspector-dark.png?v=__BUILD__" alt="Inspector, Model quality tab, on the radical.tools architecture model: consistency, completeness, traceability and decisions, the traceability chain from needs to tests, gaps by group and the goals of check.json" loading="lazy" />
+          <figcaption>Model quality on the model of radical.tools itself, which CI checks with <code>radical check</code> on every push.</figcaption>
         </figure>
         <p>
-          <strong>Inspector</strong> shows what <code>radical check</code> says about the model, as one page: how many requirements and decisions the tests verify, what fails, the requirements by group and the elements that satisfy them, each ADR with the fitness functions that check it, and every finding by rule. Each element the page names is a link: it opens a panel with the element's findings and tests, and from there <em>Show on canvas</em> goes to Designer on a view that shows it, or <em>Open wiki page</em> to its page.
+          <strong>Inspector</strong> shows what <code>radical check</code> says about the model, in three tabs. Each element a tab names is a link: it opens a panel with the element's findings and tests, and from there <em>Show on canvas</em> goes to Designer on a view that shows it, or <em>Open wiki page</em> to its page. The verdict at the top counts the errors and warnings of the whole check, and each tab's badge says how many of its goals are met, or how many errors it has.
         </p>
         <ul>
-          <li><strong>The rules about the model</strong> (the metamodel, a requirement without a scenario, an accepted ADR without a fitness function, an incomplete EARS sentence, …) run on the model as you edit it, with the same code the command line runs.</li>
+          <li><strong>Model quality</strong> — how good the model is on its own, before any test runs. A tile per dimension: <em>Consistency</em> (it follows its metamodel), <em>Completeness</em> (each requirement a whole EARS sentence, each accepted ADR its context, decision and consequences), <em>Traceability</em> (needs → requirements → what satisfies them → scenarios → tests) and <em>Decisions</em> (accepted ADRs with a fitness function). A dimension is as strong as its weakest metric. Below them the traceability chain (a link that falls short opens the findings that break it), the gaps by group, the goals and baselines of <code>check.json</code>, and every finding by dimension.</li>
+          <li><strong>Implementation</strong> — how faithfully the code follows the model, by what the tests say: requirements verified (all their scenarios name tests, and all passed), accepted ADRs verified by their fitness functions, the named tests passing, and the tests the model names among those it should (rule <code>test-unbound</code>). Each axis shows what falls out at each step, the requirements each architecture element satisfies by what the tests say, and the scenarios and fitness functions that do not pass, with what they leave unverified. A note says how old the test results are: they hold for the code as it was then, while the model is checked as it is now.</li>
+          <li><strong>Settings</strong> — the model folder's <code>check.json</code> as a form: a goal in percent for any metric, and per rule its severity, baseline (<code>max</code>) and, for <code>test-unbound</code>, the test files it looks at. Changes stay a draft until <em>Save to check.json</em>; the bar above them says how many there are and which loosen the CI gate (a lower severity, a higher baseline, a lower goal, fewer test files looked at), and <em>check.json after saving</em> shows the diff review will see. <em>Ratchet</em> lowers each baseline to what the check finds now, as <code>radical check --ratchet</code> does.</li>
+        </ul>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/inspector-implementation-light.png?v=__BUILD__" alt="Inspector, Implementation tab: requirements and decisions verified, named tests passing, tests the model names, what falls out from requirement to passing test and from ADR to passing check, coverage by element and what needs attention" loading="lazy" />
+          <img class="shot-dark" src="screenshots/inspector-implementation-dark.png?v=__BUILD__" alt="Inspector, Implementation tab: requirements and decisions verified, named tests passing, tests the model names, what falls out from requirement to passing test and from ADR to passing check, coverage by element and what needs attention" loading="lazy" />
+          <figcaption>Implementation: what the last test reports say about the model.</figcaption>
+        </figure>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/inspector-settings-light.png?v=__BUILD__" alt="Inspector, Settings tab: an unsaved change that loosens the CI gate, the goals in percent, and the rules by dimension with severity and baseline" loading="lazy" />
+          <img class="shot-dark" src="screenshots/inspector-settings-dark.png?v=__BUILD__" alt="Inspector, Settings tab: an unsaved change that loosens the CI gate, the goals in percent, and the rules by dimension with severity and baseline" loading="lazy" />
+          <figcaption>Settings, with a raised baseline that loosens the gate.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>The rules about the model</strong> run on the model as you edit it, with the same code the command line runs.</li>
           <li><strong>What the tests say</strong> comes from the last <code>radical check &lt;model folder&gt; --report &lt;test reports&gt;</code>: it keeps the test cases it read in the folder's <code>.radical/test-results.json</code>, and Studio picks them up by itself. A scenario or a fitness function names its tests in its <em>Tests</em> property, one <code>file › title</code> per line. Until a report is there, the Inspector button is greyed out.</li>
-          <li><strong>Rule settings</strong> are the model folder's <code>check.json</code>, which the command line reads too, so Studio and CI agree.</li>
-          <li>Once there is a report, the Inspector button counts the errors and warnings in every perspective. Nothing in the Inspector changes the model.</li>
+          <li><strong>Settings</strong> are only for a model kept in a folder, since <code>check.json</code> lies beside it; the command line reads the same file, so Studio and CI agree. Saving them is the only thing the Inspector writes; it never changes the model.</li>
         </ul>
       </section>
 
@@ -838,7 +852,7 @@
         </ul>
         <h3>Checked by <code>radical check</code></h3>
         <p>
-          A model can follow its metamodel and still be unfinished. These rules say what is missing. The <a href="#inspector">Inspector</a> and <a href="#cli"><code>radical check</code></a> show them, the <em>Validation</em> list does not. They are warnings unless the model folder's <code>check.json</code> says otherwise; <code>radical check --list-rules</code> lists them.
+          A model can follow its metamodel and still be unfinished. These rules say what is missing. The <a href="#inspector">Inspector</a> and <a href="#cli"><code>radical check</code></a> show them, the <em>Validation</em> list does not. They are warnings unless the model folder's <code>check.json</code> says otherwise, and its goals can ask for a share of the model that meets them; <code>radical check --list-rules</code> lists them.
         </p>
         <ul>
           <li><strong>Requirements:</strong> a requirement without the action or a clause its EARS type needs; one no scenario verifies; one nothing satisfies; one that derives from no need and no other requirement; a need no requirement derives from; a scenario that verifies nothing.</li>
@@ -1013,7 +1027,7 @@ node apps/cli/dist/index.js check path/to/my-model --report reports</code></pre>
               <tr><td><code>--evidence &lt;file&gt;</code></td><td>With <code>--report</code>: writes what the reports say about each scenario, fitness function, requirement and ADR as JSON.</td></tr>
               <tr><td><code>--ratchet</code></td><td>Lowers each <code>max</code> in the config to the count found now and writes the config back. It never raises one.</td></tr>
               <tr><td><code>--verbose</code></td><td>Lists every warning, not the first five of each rule.</td></tr>
-              <tr><td><code>--list-rules</code></td><td>Lists the rules and their default severity.</td></tr>
+              <tr><td><code>--list-rules</code></td><td>Lists the rules and their default severity, and the metrics <code>goals</code> can set.</td></tr>
             </tbody>
           </table>
         </div>
@@ -1023,6 +1037,13 @@ node apps/cli/dist/index.js check path/to/my-model --report reports</code></pre>
   "rules": {
     "adr-incomplete": "off",
     "requirement-without-scenario": { "severity": "error", "max": 104 }
+  }
+}</code></pre>
+        <p><code>goals</code> sets the least share of a metric, in percent: requirements with a scenario, accepted ADRs with a fitness function, and with <code>--report</code> requirements and ADRs verified, scenarios passing, tests the model names, … (<code>--list-rules</code> lists them). A metric below its goal is a finding of <code>goal-unmet</code>, an error unless the config sets that rule otherwise. Where <code>max</code> says how many gaps a rule may have, a goal says how much must be covered, so it keeps its meaning as the model grows. The Inspector's <a href="#inspector">Settings</a> edit both.</p>
+<pre class="code"><code>{
+  "goals": {
+    "requirements-with-scenario": { "min": 85 },
+    "requirements-verified": { "min": 80 }
   }
 }</code></pre>
         <p>This repository checks its own architecture model this way on every push.</p>

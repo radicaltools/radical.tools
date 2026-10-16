@@ -40,6 +40,7 @@ import {
   writeSelectionToHandle,
   readForgeRunFromHandle,
   readCheckFilesFromHandle,
+  writeCheckConfigToHandle,
 } from '../persist/webFolder'
 
 const LS_INDEX_KEY = 'radical-docs-index'
@@ -785,6 +786,9 @@ export interface DocumentsAPI {
    *  that is no folder. Null when the folder cannot be read yet (a browser
    *  folder before its access is back). */
   readCheckFiles(id: string): Promise<{ results: string | null; config: string | null } | null>
+  /** Writes check.json beside an md-folder model; throws when the document
+   *  is no folder or its folder cannot be written. */
+  writeCheckConfig(id: string, content: string): Promise<void>
 
   /** Convenience: ensure there's at least one document; create an empty LS
    *  doc if the index is empty. Returns the active doc. */
@@ -1279,6 +1283,20 @@ export const documents: DocumentsAPI = {
     if (h.readFolder || !connectedWebHandles.has(id)) return null
     const handle = await loadHandle(id)
     return handle ? readCheckFilesFromHandle(handle) : null
+  },
+
+  async writeCheckConfig(id, content) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') throw new Error('Only a model kept in a folder has a check.json.')
+    const h = host()
+    if (meta.folderPath && h.writeCheckConfig) {
+      const res = await h.writeCheckConfig(meta.folderPath, content)
+      if (!res.success) throw new Error(res.error ?? 'check.json could not be written.')
+      return
+    }
+    const handle = !h.readFolder && connectedWebHandles.has(id) ? await loadHandle(id) : null
+    if (!handle) throw new Error('The folder is not connected; open it again to save.')
+    await writeCheckConfigToHandle(handle, content)
   },
 
   watchDocument(id, onExternalChange) {

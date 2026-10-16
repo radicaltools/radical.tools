@@ -6,8 +6,8 @@
 // from the last `radical check --report`: the CLI keeps the test cases in
 // the model folder's .radical/test-results.json, and the project's rule
 // settings are the folder's check.json. Both are polled for the active
-// md-folder document, as agentForge.ts polls the Forge run status. Nothing
-// here writes.
+// md-folder document, as agentForge.ts polls the Forge run status. The
+// only write is saveCheckConfig, when the Inspector's Settings are saved.
 
 import { create } from 'zustand'
 import { checkModel, parseCheckConfig, parseTestResults, type CheckConfig, type CheckResult, type TestResults } from '@radical/common/check'
@@ -27,9 +27,30 @@ interface InspectorState {
   configError: string | null
   /** The check of the model as it is now. */
   check: CheckResult | null
+  /** check.json as read, so Settings can tell a change of its own from the
+   *  file; empty when there is none. */
+  configText: string
 }
 
-export const useInspectorStore = create<InspectorState>(() => ({ results: null, config: {}, configError: null, check: null }))
+export const useInspectorStore = create<InspectorState>(() => ({ results: null, config: {}, configError: null, check: null, configText: '' }))
+
+/** check.json as Settings write it. */
+export const serializeCheckConfig = (config: CheckConfig): string => JSON.stringify(config, null, 2) + '\n'
+
+/** Saves `config` as the active document's check.json and checks the model
+ *  with it at once, without waiting for the next poll to read it back. */
+export async function saveCheckConfig(config: CheckConfig): Promise<void> {
+  const id = documents.getActiveId()
+  if (!id) throw new Error('No model is open.')
+  const text = serializeCheckConfig(config)
+  await documents.writeCheckConfig(id, text)
+  if (documents.getActiveId() !== id) return
+  lastConfig = text
+  useInspectorStore.setState({ config, configError: null, configText: text })
+  recheck()
+}
+
+let lastConfig = ''
 
 /** The document whose test results and check.json have been read: the
  *  check waits for them, or a link that opens the Inspector showed the
@@ -50,7 +71,6 @@ function recheck(): void {
 if (typeof window !== 'undefined') {
   let polledFor: string | null = null
   let lastResults = ''
-  let lastConfig = ''
 
   const poll = async (): Promise<void> => {
     const id = documents.getActiveId()
@@ -58,7 +78,7 @@ if (typeof window !== 'undefined') {
       polledFor = id
       filesReadFor = null
       lastResults = lastConfig = ''
-      useInspectorStore.setState({ results: null, config: {}, configError: null, check: null })
+      useInspectorStore.setState({ results: null, config: {}, configError: null, check: null, configText: '' })
     }
     if (!id) return
     const files = await documents.readCheckFiles(id).catch(() => null)
@@ -76,7 +96,7 @@ if (typeof window !== 'undefined') {
     if (configText) {
       try { config = parseCheckConfig(configText) } catch (error) { configError = `check.json: ${(error as Error).message}` }
     }
-    useInspectorStore.setState({ results: resultsText ? parseTestResults(resultsText) : null, config, configError })
+    useInspectorStore.setState({ results: resultsText ? parseTestResults(resultsText) : null, config, configError, configText })
     recheck()
   }
 
