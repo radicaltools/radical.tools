@@ -8,10 +8,13 @@
 // the element's findings, from which Studio shows it on a canvas or its
 // wiki page. The check runs on the model as it is (persistence/inspector.ts).
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
+import { changeWork } from '@radical/common/branchChanges'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useInspectorStore } from '../persistence/inspector'
+import { useBranchStore } from '../persistence/branchChanges'
+import { ThisChange } from './inspector/ThisChange'
 import { useDocumentsStore } from '../store/documentStore'
 import { Errors, Peek, TabBadge, dimensionOfFinding, dimensionsOf, type Ctx } from './inspector/shared'
 import { ModelTab } from './inspector/ModelTab'
@@ -30,6 +33,11 @@ export function Inspector(): React.ReactElement {
   const activeDoc = useDocumentsStore((s) => s.docs.find((d) => d.id === s.activeId) ?? null)
   const [peekId, setPeekId] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('model')
+  const branch = useBranchStore()
+  // The requirements and ADRs of the branch's change, by what the tests say.
+  const work = useMemo(() => branch.changes && branch.baseModel && branch.model
+    ? changeWork(branch.changes, branch.baseModel, branch.model, metamodel, results?.cases)
+    : null, [branch.changes, branch.baseModel, branch.model, metamodel, results])
 
   if (!check) return <div className="insp"><div className="insp-main"><p className="insp-muted">Checking the model…</p></div></div>
 
@@ -47,7 +55,10 @@ export function Inspector(): React.ReactElement {
   const impl = inPerspective('implementation')
   const tabs: Array<[Tab, string, React.ReactNode]> = [
     ['model', 'Model quality', <TabBadge key="b" metrics={model.metrics} errors={model.errors.length} />],
-    ['implementation', 'Implementation', check.evidence ? <TabBadge key="b" metrics={impl.metrics} errors={impl.errors.length} /> : <span className="insp-pill none">no results</span>],
+    ['implementation', 'Implementation', <React.Fragment key="b">
+      {check.evidence ? <TabBadge metrics={impl.metrics} errors={impl.errors.length} /> : <span className="insp-pill none">no results</span>}
+      {work && work.newRequirements > 0 && <span className={`insp-pill ${work.newVerified === work.newRequirements ? 'ok' : 'warn'}`} title="New requirements of this change verified">This change {work.newVerified} / {work.newRequirements}</span>}
+    </React.Fragment>],
     ['settings', 'Settings', <code key="f" className="insp-muted">check.json</code>],
   ]
 
@@ -77,7 +88,9 @@ export function Inspector(): React.ReactElement {
         <div id="insp-panel" role="tabpanel" aria-labelledby={`insp-tab-${tab}`} className="insp-tabpanel">
           {configError && tab !== 'settings' && <p className="insp-notice warn">{configError}. The default rule settings apply.</p>}
           {tab === 'model' && <><Errors errors={model.errors} ctx={ctx} /><ModelTab check={check} ctx={ctx} relations={relations} onSettings={() => setTab('settings')} /></>}
-          {tab === 'implementation' && <><Errors errors={impl.errors} ctx={ctx} /><ImplementationTab check={check} ctx={ctx} relations={relations} results={results} onSettings={() => setTab('settings')} /></>}
+          {tab === 'implementation' && <><Errors errors={impl.errors} ctx={ctx} />
+            {work && branch.changes && branch.base && branch.baseModel && <ThisChange work={work} changes={branch.changes} base={branch.base} baseModel={branch.baseModel} ctx={ctx} />}
+            <ImplementationTab check={check} ctx={ctx} relations={relations} results={results} onSettings={() => setTab('settings')} /></>}
           {tab === 'settings' && <SettingsTab check={check} editable={isFolder}
             readOnlyReason="Settings are the check.json beside a model kept in a folder. This model is no folder, so the default rules apply and nothing here can be saved." />}
         </div>

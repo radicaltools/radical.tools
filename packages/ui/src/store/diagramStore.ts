@@ -1152,6 +1152,18 @@ function buildSampleDiagram(): {
 
 // ─── Node wizard session ─────────────────────────────────────────────────────
 
+/** What Studio shows of a branch's changes since its base. */
+export interface BranchOverlay {
+  /** Elements by id: new, changed or removed since the base. */
+  nodes: Record<string, 'new' | 'changed' | 'removed'>
+  relations: Record<string, 'new' | 'changed' | 'removed'>
+  /** The changed and removed elements as the base has them. */
+  baseNodes: Record<string, C4Node>
+  /** Removed elements and relations, drawn as ghosts. */
+  ghostNodes: Record<string, C4Node>
+  ghostRelations: Record<string, C4Relation>
+}
+
 export type NodeWizardSession =
   | {
       mode: 'create'
@@ -1524,6 +1536,13 @@ interface DiagramStore {
    *  toggles explicitly to see changes vs. the previous milestone. */
   showDiff: boolean
   toggleShowDiff: () => void
+  /** The changes of the branch on show (Studio's Changes on branch, from
+   *  the base the CLI or the MCP server saved beside the model), drawn by the
+   *  diff overlay above; null when they are not shown. A milestone takes the
+   *  overlay over. */
+  branch: BranchOverlay | null
+  /** Shows the branch's changes on the canvas, or (null) stops showing them. */
+  showBranchChanges: (branch: BranchOverlay | null) => void
 
   // ── app mode ──
   /** The perspective: Designer edits; Viewer and Presenter explore and
@@ -1990,6 +2009,7 @@ export const useDiagramStore = create<DiagramStore>()(
       diffGhostNodes: {},
       diffGhostRelations: {},
       showDiff: false,
+      branch: null,
       appMode: (viewerProfile ? 'viewer' : 'designer') as 'viewer' | 'designer',
       metamodel: initMetamodel,
       hubTemplates: (persisted?.hubTemplates ?? {}) as Record<string, HubImportRecord>,
@@ -4461,6 +4481,8 @@ export const useDiagramStore = create<DiagramStore>()(
           set((state) => { state.milestonePromptOpen = true })
           return
         }
+        // The milestone's diff takes the overlay over from the branch's.
+        if (id && get().branch) set((state) => { state.branch = null; state.showDiff = false })
         const snap = snapshots.find(s => s.id === id)
         if (!snap) return
         // Coming from the live model in Designer: the canvas shown keeps its
@@ -4800,6 +4822,21 @@ export const useDiagramStore = create<DiagramStore>()(
 
       toggleShowDiff() {
         set((state) => { state.showDiff = !state.showDiff })
+        get()._sync()
+      },
+
+      showBranchChanges(branch) {
+        const { activeSnapshotId, branch: shown } = get()
+        // A milestone's diff owns the overlay while it is shown.
+        if (activeSnapshotId && branch) return
+        if (!branch && !shown) return
+        set((state) => {
+          state.branch = branch as any
+          state.diffHighlight = (branch ? { ...branch.nodes, ...branch.relations } : {}) as any
+          state.diffGhostNodes = (branch?.ghostNodes ?? {}) as any
+          state.diffGhostRelations = (branch?.ghostRelations ?? {}) as any
+          state.showDiff = !!branch
+        })
         get()._sync()
       },
 
@@ -5562,6 +5599,8 @@ export const useDiagramStore = create<DiagramStore>()(
           state.diffBaseSnapshotId = null
           state.diffGhostNodes = {} as any
           state.diffGhostRelations = {} as any
+          // Studio shows the loaded model's branch changes again once it has them.
+          if (state.branch) { state.branch = null; state.showDiff = false }
           state.presentations = presInit.presentations as any
           state.activePresentationId = presInit.activeId
           state.presentationSlides = presInit.presentations[0].slides as any

@@ -5,5 +5,5 @@ label: "Changes counted per view"
 action: "the list of views shall show beside each view the number of elements changed since the base that the view shows"
 ears_type: "state-driven"
 precondition: "the open model folder holds .radical/base.json and Changes on branch is on"
-rationale: "A change spreads over several views; the counts say where to look."
+rationale: "A change spreads over several views; the counts say where to look. A removed element counts in a view that listed it. Evidence: packages/common/src/branchChanges.ts (viewChangeCounts), packages/ui/src/components/RightPanel.tsx (useBranchViewCounts, BranchCount)"
 ---

@@ -2,6 +2,7 @@ import React, { useCallback, useState, useEffect, useRef } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { host } from '../platform/host'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
+import { BranchChangesButton } from './BranchChanges'
 import { useInspectorStore } from '../persistence/inspector'
 import { dropPendingMode, useShownMode } from '../route'
 import { DocumentManagerModal } from './DocumentManager'
@@ -740,6 +741,10 @@ export function Toolbar(): React.ReactElement {
         >
           <IconRedo /> Redo
         </button>
+      </>)}
+      {(appMode === 'designer' || appMode === 'viewer' || appMode === 'presenter') && (<>
+        <div className="toolbar-sep" />
+        <BranchChangesButton />
       </>)}
 
       <div style={{ flex: 1 }} />

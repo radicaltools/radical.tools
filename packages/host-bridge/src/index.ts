@@ -71,6 +71,9 @@ export interface HostCapabilities {
   /** Read the status of an agent's Forge run (`.radical/forge-run.json`) in an
    *  md-folder, written by the MCP server; content is null when there is none. */
   readForgeRun?(folderPath: string): Promise<HostResult & { content?: string | null }>
+  /** Read the model's base (`.radical/base.json`) in an md-folder, written by
+   *  the CLI or the MCP server; content is null when there is none. */
+  readModelBase?(folderPath: string): Promise<HostResult & { content?: string | null }>
   /** Read what `radical check` keeps beside an md-folder model: the test
    *  results (`.radical/test-results.json`) and the rule settings
    *  (`check.json`); each is null when there is none. */

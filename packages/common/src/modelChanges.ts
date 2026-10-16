@@ -66,6 +66,17 @@ function modelFields(item: object): Record<string, unknown> {
   return Object.fromEntries(Object.entries(item).filter(([key, value]) => !NOT_MODEL.has(key) && !SHOWN.has(key) && present(value)))
 }
 
+/** The model fields that differ between two versions of an element or
+ *  relation, with both values; layout left out. */
+export function modelFieldChanges(before: object, after: object): FieldChange[] {
+  const a = before as Record<string, unknown>
+  const b = after as Record<string, unknown>
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .filter((key) => !NOT_MODEL.has(key) && JSON.stringify(a[key] ?? null) !== JSON.stringify(b[key] ?? null))
+    .sort()
+    .map((field) => ({ field, before: a[field] ?? null, after: b[field] ?? null }))
+}
+
 function pathOf(node: C4Node, nodes: Record<string, C4Node>): string[] {
   const path: string[] = []
   for (let cur = node.parentId ? nodes[node.parentId] : undefined; cur && path.length < 64; cur = cur.parentId ? nodes[cur.parentId] : undefined) {

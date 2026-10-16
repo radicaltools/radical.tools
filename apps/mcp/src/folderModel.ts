@@ -45,7 +45,7 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'get_changes',
-    description: 'What changed in the model since its version in git: the elements and relations added, removed and changed, uncommitted edits included, each changed field with its old and new value, and each element with its place in the model and its relations (the component that satisfies a requirement, the ADRs that constrain it, the scenarios and the tests they name). Only the model is compared; views, positions, sizes and folding are left out. Call it when you are asked to implement what was changed in the model, and again before you report the work as done. Writes nothing.',
+    description: 'What changed in the model since its version in git: the elements and relations added, removed and changed, uncommitted edits included, each changed field with its old and new value, and each element with its place in the model and its relations (the component that satisfies a requirement, the ADRs that constrain it, the scenarios and the tests they name). Only the model is compared; views, positions, sizes and folding are left out. Call it when you are asked to implement what was changed in the model, and again before you report the work as done. It writes no model file; without since it saves the base to .radical/base.json, for Studio to show the same changes.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -366,7 +366,8 @@ export class FolderModel {
       if (name === 'get_changes') {
         const { since } = (input ?? {}) as { since?: unknown }
         if (since !== undefined && typeof since !== 'string') return { ok: false, text: 'get_changes: since must be a git branch, tag or commit' }
-        return { ok: true, text: (await modelChangesSince(this.folder, data, since)).text }
+        // The default base is the one Studio shows: keep its copy fresh.
+        return { ok: true, text: (await modelChangesSince(this.folder, data, since, { saveBase: since === undefined })).text }
       }
       priorTempIds = new Map(this.tempIds)
       const ctx: ToolRunContext = {

@@ -4,6 +4,6 @@ type: "scenario"
 label: "Hooks save the base"
 given: "a git repository with a model folder and a post-commit hook of its own"
 tests: "apps/cli/src/hooks.test.ts › radical hooks"
-then: "post-checkout, post-commit and post-merge each hold the line once, the existing hook still runs, the hooks are executable, and the commit leaves a fresh .radical/base.json"
+then: "post-checkout, post-commit and post-merge each hold the line once with the folder's path, the existing hook keeps its command, the hooks are executable, and the commit runs both; outside git and for another action the command exits 2"
 when: "radical hooks install runs twice, and a commit is made"
 ---

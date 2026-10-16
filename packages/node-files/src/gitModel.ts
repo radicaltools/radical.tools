@@ -4,6 +4,8 @@ import { deserializeFromMdFolder, isMdFolderModelPath, type FolderFiles } from '
 import { countModelChanges, formatModelChanges, modelChangeReport, type ModelChangeReport } from '@radical/common/modelChanges'
 import type { ModelCopy } from '@radical/common/model'
 import type { DiagramData } from '@radical/common/c4'
+import { MODEL_BASE_FILE, serializeModelBase } from '@radical/common/formats/modelBase'
+import { writeEditorStateFile } from './selectionFile'
 
 const exec = promisify(execFile)
 
@@ -106,15 +108,28 @@ export interface ModelChangesSince {
   text: string
 }
 
+export interface ChangesOptions {
+  /** Also write the model at the base to .radical/base.json, for Studio. */
+  saveBase?: boolean
+}
+
+/** The branch checked out in `folder`'s repository; null on a detached HEAD. */
+export const currentBranch = (folder: string): Promise<string | null> =>
+  gitOk(folder, ['symbolic-ref', '--quiet', '--short', 'HEAD']).then((name) => name || null)
+
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> => Object.fromEntries(items.map((item) => [item.id, item]))
 
 /** What changed in the model in `folder` (`current`, as read from disk, so
  *  uncommitted edits count) since its version at the git base: elements and
  *  relations with their fields, views and layout left out. */
-export async function modelChangesSince(folder: string, current: Pick<DiagramData, 'nodes' | 'relations'>, since?: string): Promise<ModelChangesSince> {
+export async function modelChangesSince(folder: string, current: Pick<DiagramData, 'nodes' | 'relations'>, since?: string, options: ChangesOptions = {}): Promise<ModelChangesSince> {
   const base = await resolveGitBase(folder, since)
   const files = await readModelAtCommit(folder, base.commit)
   const old = Object.keys(files).length ? deserializeFromMdFolder(files).data : { nodes: [], relations: [] }
+  if (options.saveBase) {
+    const content = serializeModelBase({ commit: base.commit, described: base.described, branch: await currentBranch(folder), nodes: old.nodes, relations: old.relations })
+    await writeEditorStateFile(folder, MODEL_BASE_FILE, content)
+  }
   const before: ModelCopy = { nodes: byId(old.nodes), relations: byId(old.relations) }
   const after: ModelCopy = { nodes: byId(current.nodes), relations: byId(current.relations) }
   const report = modelChangeReport(before, after)

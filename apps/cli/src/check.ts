@@ -35,6 +35,8 @@ export interface Io {
   cwd: string
   out: (text: string) => void
   err: (text: string) => void
+  /** How a shell runs this command line, for the git hooks (default: radical). */
+  command?: string
 }
 
 /** Runs `radical check` with `args` (after the command name); returns the exit status. */

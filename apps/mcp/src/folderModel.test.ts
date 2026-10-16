@@ -12,6 +12,7 @@ import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { writeSelectionFile } from '@radical/node-files/selectionFile'
 import { serializeSelection } from '@radical/common/formats/canvasSelection'
+import { parseModelBase } from '@radical/common/formats/modelBase'
 import { FolderModel } from './folderModel'
 
 const folders: string[] = []
@@ -251,6 +252,11 @@ describe('get_changes', () => {
     expect(changes.text).toContain('Elements added (1):\n- system "Payments"')
     expect(changes.text).toMatch(/Elements changed \(1\):\n- system "Shop" \([^)]+\)\n {4}description: \(none\) → Sells books\.$/)
     expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
+    // Without since it saves the base Studio shows: the model as committed.
+    const base = parseModelBase(await readFile(join(folder, '.radical/base.json'), 'utf8'))
+    expect(base).toMatchObject({ described: 'merge base with main', branch: 'main' })
+    expect(base!.nodes.map((n) => n.label)).toEqual(['Shop'])
+    expect(await readFile(join(folder, '.radical/.gitignore'), 'utf8')).toBe('*\n')
     expect((await model.call('get_changes', { since: 'nope' })).text).toContain('Unknown git ref "nope"')
     expect(model.tools.find((tool) => tool.name === 'get_changes')?.inputSchema).toMatchObject({ properties: { since: { type: 'string' } } })
   })

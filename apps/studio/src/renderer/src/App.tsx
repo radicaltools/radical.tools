@@ -19,6 +19,7 @@ import { EdgeActionBar } from './components/EdgeActionBar'
 import { QuickSearch } from './components/QuickSearch'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { MilestoneEditOverlay } from './components/MilestoneEditOverlay'
+import { BranchChip } from './components/BranchChanges'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useRouteSync, useShownMode, parseHash } from './route'
 
@@ -94,6 +95,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isViewer && <RightPanel readOnly />}
       {!isPresenting && isPresenter && <PresenterDock />}
       <PresentationBar />
+      {!isPresenting && !isInspector && !isMetamodel && <BranchChip />}
       {!isPresenting && !isInspector && isCanvasView && <SelectionActionBar />}
       {!isPresenting && !isInspector && isCanvasView && <EdgeActionBar />}
       {!isInspector && isCanvasView && <QuickSearch />}

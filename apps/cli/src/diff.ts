@@ -19,6 +19,10 @@ folding are left out. The MCP server's get_changes tool gives the same list.
   --since <ref>       the git branch, tag or commit to compare with (default:
                       the merge base with the default branch, origin/main)
   --format <format>   text (default) or json
+  --save-base         also save the model at the base to .radical/base.json in
+                      the folder, for Studio to show the changes (radical hooks
+                      install keeps it fresh)
+  --quiet             with --save-base: print nothing
 
 Exit status: 0 the list was written, 2 it could not be made.`
 
@@ -32,6 +36,8 @@ export async function diffCommand(args: string[], io: Io): Promise<number> {
       options: {
         since: { type: 'string' },
         format: { type: 'string', default: 'text' },
+        'save-base': { type: 'boolean', default: false },
+        quiet: { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
       },
     })
@@ -50,7 +56,9 @@ export async function diffCommand(args: string[], io: Io): Promise<number> {
     const root = await realpath(resolve(io.cwd, folder))
     if (!(await stat(root)).isDirectory()) throw new Error('not a directory')
     const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(root)).readAll()).data
-    const changes = await modelChangesSince(root, data, values.since)
+    const changes = await modelChangesSince(root, data, values.since, { saveBase: values['save-base'] })
+    if (values.quiet && values['save-base']) return 0
+    if (values['save-base']) io.err(`Saved the base (${changes.base.commit.slice(0, 7)}) to ${folder}/.radical/base.json.`)
     io.out(values.format === 'json'
       ? JSON.stringify({ base: changes.base, ...changes.report }, null, 2)
       : changes.text)
