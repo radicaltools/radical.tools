@@ -11,7 +11,7 @@ import {
 } from '@radical/common/check'
 import type { C4Node } from '@radical/common/c4'
 import type { Metamodel } from '@radical/common/metamodel'
-import { canvasViewsFor, openWikiPage, revealOnCanvas, wikiViewFor } from '../../navigation'
+import { canvasViewsFor, openWikiPage, revealOnCanvas, wikiViewsFor, type ViewChoice } from '../../navigation'
 
 export const RULE_INFO = new Map<string, string>([...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE].map((r) => [r.id, r.description]))
 const RULE_DIMENSION = new Map<string, CheckDimension>([...FOLDER_RULES, ...CHECK_RULES].map((r) => [r.id, r.dimension]))
@@ -133,7 +133,6 @@ export function Peek({ id, ctx, check, onClose }: { id: string; ctx: Ctx; check:
   for (let p = node.parentId ? ctx.nodes[node.parentId] : undefined; p; p = p.parentId ? ctx.nodes[p.parentId] : undefined) path.unshift(p.label)
   const own = check.findings.filter((f) => f.nodeId === id || f.relatedIds?.includes(id))
   const ev = ctx.evidence?.[id]
-  const hasWiki = !!wikiViewFor(id)
   return (
     <aside className="insp-peek" aria-label="Element">
       <button type="button" className="insp-peek-close" onClick={onClose}>Close</button>
@@ -146,7 +145,7 @@ export function Peek({ id, ctx, check, onClose }: { id: string; ctx: Ctx; check:
       </dl>
       <div className="insp-peek-acts">
         <ShowOnCanvas id={id} className="primary" />
-        <button type="button" onClick={() => openWikiPage(id)} disabled={!hasWiki} title={hasWiki ? undefined : 'No wiki view shows this element'}>Open wiki page</button>
+        <OpenWikiPage id={id} />
       </div>
       {ev?.tests && ev.tests.length > 0 && (
         <div className="insp-peek-sec">
@@ -270,9 +269,13 @@ function RuleBlock({ r, check, ctx, list, focused }: { r: CheckRuleResult; check
   )
 }
 
-/** Show on canvas, with the canvas views that show the element to choose
- *  from, the smallest first; All elements when none does. */
-export function ShowOnCanvas({ id, className }: { id: string; className?: string }): React.ReactElement {
+/** A button that opens an element in one of the views that show it: a
+ *  menu of them, the smallest first. */
+function ChooseView({ label, views, onPick, className, empty }: {
+  label: string; views: () => ViewChoice[]; onPick: (viewId: string | null) => void; className?: string
+  /** What to offer when no view shows it; none greys the button out. */
+  empty?: string
+}): React.ReactElement {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -283,21 +286,33 @@ export function ShowOnCanvas({ id, className }: { id: string; className?: string
     document.addEventListener('keydown', key)
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', key) }
   }, [open])
-  const views = open ? canvasViewsFor(id) : []
+  const list = views()
+  const none = !list.length && !empty
   return (
     <div className="insp-show" ref={box}>
-      <button type="button" className={className} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>Show on canvas ▾</button>
+      <button type="button" className={className} aria-haspopup="menu" aria-expanded={open} disabled={none}
+        title={none ? `No view shows this element` : undefined} onClick={() => setOpen((o) => !o)}>{label} ▾</button>
       {open && (
-        <div className="insp-show-menu" role="menu" aria-label="Show on canvas">
-          {views.length ? views.map((v) => (
-            <button key={v.id} type="button" role="menuitem" onClick={() => { setOpen(false); revealOnCanvas(id, v.id) }}>
+        <div className="insp-show-menu" role="menu" aria-label={label}>
+          {list.length ? list.map((v) => (
+            <button key={v.id} type="button" role="menuitem" onClick={() => { setOpen(false); onPick(v.id) }}>
               <span>{v.name}</span><span className="insp-muted">{v.size} element{v.size === 1 ? '' : 's'}</span>
             </button>
           )) : (
-            <button type="button" role="menuitem" onClick={() => { setOpen(false); revealOnCanvas(id, null) }}><span>All elements</span></button>
+            <button type="button" role="menuitem" onClick={() => { setOpen(false); onPick(null) }}><span>{empty}</span></button>
           )}
         </div>
       )}
     </div>
   )
+}
+
+/** Show on canvas: the canvas views that show the element; All elements when none does. */
+export function ShowOnCanvas({ id, className }: { id: string; className?: string }): React.ReactElement {
+  return <ChooseView label="Show on canvas" className={className} views={() => canvasViewsFor(id)} empty="All elements" onPick={(viewId) => revealOnCanvas(id, viewId)} />
+}
+
+/** Open wiki page: the wiki views with a page for the element; greyed out when none has one. */
+export function OpenWikiPage({ id, className }: { id: string; className?: string }): React.ReactElement {
+  return <ChooseView label="Open wiki page" className={className} views={() => wikiViewsFor(id)} onPick={(viewId) => { if (viewId) openWikiPage(id, viewId) }} />
 }

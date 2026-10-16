@@ -36,11 +36,22 @@ export function canvasViewFor(nodeId: string): string | null {
 
 /** Every canvas view that shows `nodeId`, the smallest first, with how
  *  many elements it shows: the views to choose from. */
-export function canvasViewsFor(nodeId: string): Array<{ id: string; name: string; size: number }> {
+export function canvasViewsFor(nodeId: string): ViewChoice[] {
+  return viewsFor(nodeId, isCanvas)
+}
+
+/** Every wiki view with a page for `nodeId`, the smallest first. */
+export function wikiViewsFor(nodeId: string): ViewChoice[] {
+  return viewsFor(nodeId, (v) => v.kind === 'wiki')
+}
+
+export interface ViewChoice { id: string; name: string; size: number }
+
+function viewsFor(nodeId: string, kind: (v: DiagramView) => boolean): ViewChoice[] {
   const { views, c4Nodes, c4Relations } = useDiagramStore.getState()
   const sets = viewNodeSets(views, c4Nodes, c4Relations)
   return Object.values(views)
-    .filter((v) => isCanvas(v) && sets[v.id]?.has(nodeId))
+    .filter((v) => kind(v) && sets[v.id]?.has(nodeId))
     .map((v) => ({ id: v.id, name: v.name, size: sets[v.id].size }))
     .sort((a, b) => a.size - b.size || a.name.localeCompare(b.name))
 }
@@ -93,10 +104,10 @@ export function revealOnCanvas(nodeId: string, viewId?: string | null): void {
   }, switching ? 150 : 60)
 }
 
-/** Designer, on the page of `nodeId` in a wiki view; false when no wiki
- *  view has one. */
-export function openWikiPage(nodeId: string): boolean {
-  const viewId = wikiViewFor(nodeId)
+/** Designer, on the page of `nodeId` in a wiki view (`viewId`, one the
+ *  user chose, or the smallest that has it); false when none has one. */
+export function openWikiPage(nodeId: string, chosen?: string): boolean {
+  const viewId = chosen ?? wikiViewFor(nodeId)
   if (!viewId) return false
   if (useDiagramStore.getState().appMode !== 'designer') useDiagramStore.getState().setAppMode('designer')
   const store = useDiagramStore.getState()
