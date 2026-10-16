@@ -65,7 +65,12 @@ test('the changes since the base show on the canvas, in the list of views and on
 
   await button.click()
   await expect(button).toHaveAttribute('aria-pressed', 'true')
-  await expect(button).toHaveAttribute('title', /since merge base with origin\/main \(534f32f\)/)
+  // On hover the name, and what the count is about.
+  await button.hover()
+  const tip = page.getByRole('tooltip')
+  await expect(tip).toBeVisible()
+  await expect(tip).toContainText('Changes on branch')
+  await expect(tip).toContainText('3 elements changed since main 534f32f')
 
   // Each view counts the changes it shows; All elements counts them all.
   const card = (name: string) => page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: name }) })
@@ -110,6 +115,8 @@ test('the Inspector lists every change since the base, and a click leads to the 
   const inspector = page.getByRole('button', { name: /^Inspector/ })
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
   await inspector.click()
+  // The toggle and its count stay in the toolbar in every perspective.
+  await expect(page.getByRole('button', { name: /^Changes on branch/ }).locator('.branch-count')).toHaveText('3')
   // Implementation's This change leads to the Changes tab.
   await page.getByRole('tab', { name: /^Implementation/ }).click()
   await page.getByRole('region', { name: 'This change' }).getByRole('button', { name: /^All changes/ }).click()
@@ -223,7 +230,8 @@ test('without a base the button says how to save one, and an old base is marked'
   // A base saved two days ago, on another branch.
   await folder.write('.radical/base.json', base(JSON.parse(ARCH_BASE).nodes, [], new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), 'feat/inspector-tabs'))
   await expect(button.locator('.branch-count')).toHaveText('⚠ 3', { timeout: 10_000 })
-  await expect(button).toHaveAttribute('title', /the base is old, saved 2 days ago on feat\/inspector-tabs/)
+  await button.hover()
+  await expect(page.getByRole('tooltip')).toContainText('old base, saved 2 days ago on feat/inspector-tabs')
   const inspector = page.getByRole('button', { name: /^Inspector/ })
   await inspector.click()
   await page.getByRole('tab', { name: /^Changes/ }).click()

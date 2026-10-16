@@ -60,11 +60,12 @@ export function BranchChangesButton(): React.ReactElement | null {
 
   const total = counts ? counts.added + counts.changed + counts.removed : 0
   const old = !!base && branchBaseIsOld(base)
-  const title = !base
-    ? 'Changes on branch: no base beside this model yet. Click to see how to save one.'
+  // Under the name, on hover: what the count is about.
+  const status = !base
+    ? 'No base yet: click to see how to save one'
     : milestone
-      ? 'Changes on branch: a milestone is shown, and its diff is on the canvas.'
-      : `Changes on branch: what changed in the model since ${base.described} (${base.commit.slice(0, 7)})${old ? `; the base is old, saved ${ago(base.savedAt)}${base.branch ? ` on ${base.branch}` : ''} (the Inspector says how to save it again)` : ''}. The list is in the Inspector.`
+      ? 'A milestone is shown, with its own diff'
+      : `${total} element${total === 1 ? '' : 's'} changed since main ${base.commit.slice(0, 7)}${old ? `; old base, saved ${ago(base.savedAt)}${base.branch ? ` on ${base.branch}` : ''}` : ''} · list in the Inspector`
   return (
     <div className="branch-btn-wrap" ref={box}>
       <button
@@ -73,7 +74,7 @@ export function BranchChangesButton(): React.ReactElement | null {
         aria-pressed={base ? on : undefined}
         aria-disabled={base && milestone ? true : undefined}
         aria-expanded={base ? undefined : help}
-        title={title}
+        aria-describedby="branch-tip"
         onClick={() => {
           if (!base) { setHelp((h) => !h); return }
           if (milestone) return
@@ -83,6 +84,12 @@ export function BranchChangesButton(): React.ReactElement | null {
         <IconBranch /><span className="branch-btn-label">Changes on branch</span>
         {base && <span className={`branch-count${old ? ' old' : ''}`}>{old ? '⚠ ' : ''}{total}</span>}
       </button>
+      {!help && (
+        <div id="branch-tip" className="branch-tip" role="tooltip">
+          <strong>Changes on branch</strong>
+          <span>{status}</span>
+        </div>
+      )}
       {help && !base && (
         <div className="branch-pop" role="dialog" aria-label="Changes on branch">
           <strong>Nothing to compare with yet</strong>

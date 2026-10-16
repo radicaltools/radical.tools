@@ -3418,7 +3418,7 @@ label.app-menu-row { cursor: pointer; }
     "canvas";
 }
 .insp { grid-area: canvas; position: relative; min-height: 0; overflow: hidden; display: flex; background: var(--bg-app); color: var(--text-primary); }
-.insp-main { flex: 1; min-width: 0; overflow-y: auto; padding: 22px 28px 60px; display: grid; gap: 24px; align-content: start; max-width: 1180px; margin: 0 auto; font-size: 13px; }
+.insp-main { flex: 1; min-width: 0; overflow-y: auto; padding: 22px 32px 60px; display: grid; gap: 24px; align-content: start; max-width: 1640px; margin: 0 auto; font-size: 13px; }
 .insp h1 { margin: 0; font-size: 20px; letter-spacing: -0.015em; }
 .insp h2 { margin: 0 0 3px; font-size: 14px; }
 .insp code { font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 11.5px; }
@@ -3517,11 +3517,12 @@ label.app-menu-row { cursor: pointer; }
 .insp-inline-link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
 .insp-inline-link:disabled { color: var(--text-muted); cursor: default; }
 .insp-chainrow { padding: 16px 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.insp-stop { display: grid; gap: 2px; min-width: 76px; }
+/* A stop keeps its width; a link takes what is left, its text wrapping rather than running over the stops. */
+.insp-stop { display: grid; gap: 2px; min-width: 76px; flex: none; }
 .insp-stop-n { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .insp-chain-sep { width: 1px; align-self: stretch; background: var(--border-color); margin: 0 6px; }
-.insp-link { flex: 1 1 110px; min-width: 110px; display: grid; gap: 5px; padding: 6px 8px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; font: inherit; color: inherit; text-align: center; }
-.insp-link-text { font-size: 11.5px; font-weight: 600; color: var(--success); }
+.insp-link { flex: 1 1 120px; min-width: 96px; white-space: normal; display: grid; gap: 5px; padding: 6px 8px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; font: inherit; color: inherit; text-align: center; }
+.insp-link-text { font-size: 11.5px; font-weight: 600; color: var(--success); white-space: normal; overflow-wrap: break-word; line-height: 1.3; }
 .insp-link.short { cursor: pointer; border-color: var(--border-color); background: var(--hover-bg-faint); }
 .insp-link.short .insp-link-text { color: var(--warning); }
 .insp-link.bad .insp-link-text { color: var(--danger); }
@@ -3612,22 +3613,30 @@ label.app-menu-row { cursor: pointer; }
 .toolbar-mode-btn:disabled:hover { background: transparent; }
 
 /* ─── Changes on branch (the model since its base, persistence/branchChanges) ─── */
-.branch-btn-wrap { position: relative; }
-/* Quick Search sits in the middle of the toolbar: the name shows only where there is room. */
+.branch-btn-wrap { position: relative; margin-left: 8px; }
+/* A small button: the icon and the count; the name is for screen readers and the tooltip. */
+.branch-btn { gap: 5px; padding: 0 8px; }
 .branch-btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-@media (min-width: 1600px) { .branch-btn-label { position: static; width: auto; height: auto; overflow: visible; clip-path: none; } }
 .branch-btn.active, .branch-btn.active:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--accent); }
 .branch-btn.unavailable { color: var(--text-muted); }
 .branch-btn[aria-disabled="true"]:not(.unavailable) { opacity: 0.55; cursor: default; }
-.branch-count { margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; background: var(--warning); }
+.branch-count { padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; background: var(--warning); }
 .branch-count.old { background: var(--danger); }
 .branch-pop {
-  position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; width: 400px; max-width: calc(100vw - 24px);
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: 400px; max-width: calc(100vw - 24px);
   display: grid; gap: 8px; padding: 14px 16px; font-size: 12.5px; line-height: 1.5; text-align: left;
   background: var(--bg-panel); color: var(--text-primary); border: 1px solid var(--border-color);
   border-radius: var(--radius-md); box-shadow: 0 6px 24px rgba(20, 24, 40, 0.18);
 }
 .branch-pop p { margin: 0; }
+.branch-tip {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 61; display: none; gap: 2px; width: max-content; max-width: 320px;
+  padding: 6px 10px; border-radius: 6px; font-size: 12px; line-height: 1.4; text-align: left;
+  background: var(--bg-panel); color: var(--text-primary); border: 1px solid var(--border-color); box-shadow: 0 4px 14px rgba(20, 24, 40, 0.18);
+  pointer-events: none;
+}
+.branch-tip span { color: var(--text-muted); font-size: 11.5px; }
+.branch-btn-wrap:hover .branch-tip, .branch-btn:focus-visible + .branch-tip { display: grid; }
 .branch-muted { color: var(--text-muted); font-size: 11.5px; }
 .branch-cmd { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 5px 5px 9px; border-radius: 6px; background: var(--bg-app); border: 1px solid var(--border-color); }
 .branch-cmd code { font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 11.5px; overflow-wrap: break-word; min-width: 0; }
@@ -3671,4 +3680,4 @@ label.app-menu-row { cursor: pointer; }
 .insp-changes { display: grid; gap: 14px; }
 .insp-changes-panel { padding: 14px 18px; }
 .insp-changes-panel .insp-all { border-top: 0; padding-top: 0; }
-.insp-link { border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--accent); cursor: pointer; white-space: nowrap; }
+.insp-all-link { margin-left: auto; align-self: start; border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--accent); cursor: pointer; white-space: nowrap; }

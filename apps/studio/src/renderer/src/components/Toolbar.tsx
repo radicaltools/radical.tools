@@ -745,10 +745,6 @@ export function Toolbar(): React.ReactElement {
           <IconRedo /> Redo
         </button>
       </>)}
-      {(appMode === 'designer' || appMode === 'viewer' || appMode === 'presenter') && (<>
-        <div className="toolbar-sep" />
-        <BranchChangesButton />
-      </>)}
 
       <div style={{ flex: 1 }} />
 
@@ -776,6 +772,9 @@ export function Toolbar(): React.ReactElement {
         </button>
         <InspectorModeButton active={appMode === 'inspector'} onClick={() => setAppMode('inspector')} />
       </div>
+
+      {/* In every perspective: the count stays in sight, in the Inspector too. */}
+      <BranchChangesButton />
 
       <DocumentManagerModal open={managerOpen} onClose={() => setManagerOpen(false)} />
     </div>

@@ -81,7 +81,7 @@ export function ThisChange({ work, changes, base, baseModel, ctx, onAllChanges }
             Since main <code>{base.commit.slice(0, 7)}</code> ({base.described}{base.branch ? `, ${base.branch}` : ''}) · base saved {ago(base.savedAt)} · {added + changed + removed} elements changed: {added} added, {changed} changed, {removed} removed
           </p>
         </div>
-        <button type="button" className="insp-link" onClick={onAllChanges}>All changes{isBaseOld(base) ? ' · old base' : ''} ›</button>
+        <button type="button" className="insp-all-link" onClick={onAllChanges}>All changes{isBaseOld(base) ? ' · old base' : ''} ›</button>
       </div>
       {work.items.length === 0 ? (
         <p className="insp-muted">No requirement or ADR changed since the base.</p>
