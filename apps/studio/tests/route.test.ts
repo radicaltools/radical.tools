@@ -3,11 +3,11 @@ import { parseHash, formatRoute, type Route } from '../src/renderer/src/route'
 
 describe('route parse/format', () => {
   it('formats mode + view', () => {
-    expect(formatRoute({ mode: 'designer', view: 'canvas' })).toBe('#/m/designer/v/canvas')
+    expect(formatRoute({ mode: 'designer', view: 'all' })).toBe('#/m/designer/v/all')
   })
 
-  it('omits focus on canvas, includes it on a real view', () => {
-    expect(formatRoute({ mode: 'viewer', view: 'canvas', focus: 'n1' })).toBe('#/m/viewer/v/canvas')
+  it('omits focus on All elements, includes it on a real view', () => {
+    expect(formatRoute({ mode: 'viewer', view: 'all', focus: 'n1' })).toBe('#/m/viewer/v/all')
     expect(formatRoute({ mode: 'viewer', view: 'view-1', focus: 'n1' })).toBe(
       '#/m/viewer/v/view-1/f/n1',
     )
@@ -34,13 +34,13 @@ describe('route parse/format', () => {
 
   it('encodes presentation playback only when playing', () => {
     // play flag absent → pres/slide dropped
-    expect(formatRoute({ mode: 'presenter', view: 'canvas', pres: 'p1', slide: 2 })).toBe(
-      '#/m/presenter/v/canvas',
+    expect(formatRoute({ mode: 'presenter', view: 'all', pres: 'p1', slide: 2 })).toBe(
+      '#/m/presenter/v/all',
     )
     // playing → full presentation segment
-    const r: Route = { mode: 'presenter', view: 'canvas', pres: 'p1', play: true, slide: 2 }
-    expect(formatRoute(r)).toBe('#/m/presenter/v/canvas/p/p1/play/1/sl/2')
-    expect(parseHash('#/m/presenter/v/canvas/p/p1/play/1/sl/2')).toMatchObject({
+    const r: Route = { mode: 'presenter', view: 'all', pres: 'p1', play: true, slide: 2 }
+    expect(formatRoute(r)).toBe('#/m/presenter/v/all/p/p1/play/1/sl/2')
+    expect(parseHash('#/m/presenter/v/all/p/p1/play/1/sl/2')).toMatchObject({
       pres: 'p1',
       play: true,
       slide: 2,
@@ -67,12 +67,17 @@ describe('route parse/format', () => {
   })
 
   it('defaults an unknown mode to designer', () => {
-    expect(parseHash('#/m/bogus/v/canvas')).toEqual({
+    expect(parseHash('#/m/bogus/v/all')).toEqual({
       doc: undefined,
       mode: 'designer',
-      view: 'canvas',
+      view: 'all',
       focus: undefined,
     })
+  })
+
+  it('opens a link to the All elements canvas of before on All elements', () => {
+    expect(parseHash('#/m/designer/v/canvas')).toMatchObject({ view: 'all' })
+    expect(parseHash('#/m/designer')).toMatchObject({ view: 'all' })
   })
 
   it('parses doc + mode + view + focus', () => {

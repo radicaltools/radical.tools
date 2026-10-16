@@ -6,5 +6,5 @@ gherkin: "And the stored model has the new label"
 given: "the bookstore System Context view"
 tests: "apps/e2e/tests/studio/editing.spec.ts › rename an element in the properties panel"
 then: "the node on the canvas reads Card Gateway"
-when: "the user selects Payment Provider and changes its Label to \"Card Gateway\""
+when: "the user selects Payment Provider and changes its name in the properties card to \"Card Gateway\""
 ---

@@ -21,7 +21,7 @@ function largeRegister(): string {
   return JSON.stringify({ nodes, relations, views: [view], metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} } })
 }
 
-test('a long table draws the lines in sight, scrolls to the end, and to a row chosen elsewhere', async ({ page, studio }) => {
+test('a long table draws the lines in sight, scrolls to the end, and to a new row', async ({ page, studio }) => {
   await studio.seedDocument(largeRegister())
   await studio.open('v-register')
   const rows = page.locator('.tv-chain-row')
@@ -42,11 +42,4 @@ test('a long table draws the lines in sight, scrolls to the end, and to a row ch
   await page.getByRole('button', { name: 'Add at the top' }).click()
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(page.locator('.tv-chain-row', { hasText: 'New Need' })).toBeInViewport()
-
-  // An element chosen in the Structure panel is scrolled to.
-  await page.locator('.right-panel .rp-back-btn').click()
-  await wrap.evaluate((el) => { el.scrollTop = el.scrollHeight })
-  await expect(page.locator('.tv-chain-row', { hasText: 'Requirement 03.4' })).toHaveCount(0)
-  await page.locator('.structure-tree .tree-node', { hasText: 'Requirement 03.4' }).click()
-  await expect(page.locator('.tv-chain-row', { hasText: 'Requirement 03.4' })).toBeInViewport()
 })

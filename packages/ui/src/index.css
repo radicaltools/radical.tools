@@ -122,13 +122,6 @@ body {
   border-radius: var(--radius-sm);
 }
 
-/* Collapsed panel rails */
-.app-layout.rp-collapsed { grid-template-columns: var(--left-panel-w, 260px) 1fr 18px; }
-.app-layout.lp-collapsed.rp-collapsed { grid-template-columns: 18px 1fr 18px; }
-
-/* Presentation mode — same 3-column layout as modelling (left panel + canvas + right panel) */
-.app-layout.mode-presentation.rp-collapsed { grid-template-columns: var(--left-panel-w, 260px) 1fr 18px; }
-.app-layout.mode-presentation.lp-collapsed.rp-collapsed { grid-template-columns: 18px 1fr 18px; }
 
 /* ─── Time Travel Bar ─────────────────────────────────────────────── */
 .slidestrip-play-btn.active {
@@ -442,82 +435,63 @@ body {
 .canvas-controls .smart-layout-report-popover { top: auto; bottom: calc(100% + 8px); }
 
 .element-palette {
-  position: relative;
-  flex-shrink: 0;
-  /* Its tab hangs over the canvas below; the side panels' tabs (z-index 5)
-     lie over it. */
+  /* Down the canvas's left side, under the view's name chip, over the
+     canvas (as the properties card is on the right): the canvas keeps its
+     size. Always there in Designer. */
+  position: absolute;
+  top: 40px;
+  left: 12px;
   z-index: 4;
-  min-width: 0;
-  display: flex;
-  justify-content: center;
-  /* Clear of the side panels' collapse tabs, which overlap the column edges. */
-  padding: 6px 26px 0;
-  background: var(--bg-canvas);
-}
-/* Folded away: only its tab, at the top of the canvas. */
-.element-palette.collapsed { height: 0; padding: 0; }
-.element-palette.collapsed .panel-toggle-top { bottom: auto; top: 0; }
-/* A card like the canvas controls, centred, as wide as its chips need. */
-.element-palette-strip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  column-gap: 4px;
-  row-gap: 4px;
-  max-width: 100%;
-  padding: 3px 5px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-}
-/* Too narrow for one row: the groups wrap onto more. */
-.element-palette-strip.wrapped { flex-wrap: wrap; }
-.palette-group {
+  width: 168px;
+  height: max-content;
+  /* Clear of the selection bar at the canvas's bottom. */
+  max-height: calc(100% - 140px);
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  border-right: 1px solid var(--border-color);
-  padding-right: 4px;
+  gap: 4px;
+  padding: 5px 5px 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
 }
-.palette-group:last-child { border-right: 0; }
-.palette-group-items { display: flex; align-items: center; justify-content: center; gap: 1px; }
-/* The group's name, centred above its chips. */
+.palette-group { display: flex; flex-direction: column; flex-shrink: 0; }
+.palette-group + .palette-group { border-top: 1px solid var(--border-color); padding-top: 4px; }
+/* One type to a row: its icon, its name beside it. */
+.palette-group-items { display: flex; flex-direction: column; gap: 1px; }
+/* The group's name, above its types. */
 .palette-group-label {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   line-height: 12px;
-  letter-spacing: .06em;
+  letter-spacing: .07em;
   text-transform: uppercase;
-  text-align: center;
   white-space: nowrap;
   color: var(--text-muted);
-  padding: 1px 4px 0;
+  padding: 0 6px;
   margin-bottom: 2px;
 }
 
 .palette-item {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 1px;
-  min-width: 42px;
-  padding: 2px 3px;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 6px;
   border-radius: 6px;
   cursor: grab;
   transition: background 0.15s;
   border: 1px solid transparent;
   user-select: none;
-  white-space: nowrap;
   flex-shrink: 0;
 }
 .palette-item:hover { background: var(--hover-bg-subtle); border-color: var(--border-color); }
 .palette-item:active { cursor: grabbing; }
 
 .palette-badge {
-  width: 24px; height: 20px;
+  width: 22px; height: 18px;
   border-radius: 5px;
   flex-shrink: 0;
   display: flex;
@@ -525,7 +499,11 @@ body {
   justify-content: center;
 }
 
-.palette-label { font-size: 11px; line-height: 1.25; color: var(--text-secondary, var(--text-primary)); }
+.palette-label {
+  font-size: 11.5px; line-height: 1.2;
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
 
 .tree-node {
   display: flex;
@@ -747,34 +725,155 @@ body {
 
 
 
-/* ─── Right panel (horizontal slider: tree ↔ props) ─────────────────── */
+/* ─── Properties card (over the canvas's right side) ─────────────────── */
+/* It shares the canvas's grid cell and lies over it: opening or closing it
+   never resizes the canvas. Closed, it slides out and is hidden. */
 .right-panel {
-  grid-area: rightpanel;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--bg-panel) 100%, transparent) 0%, color-mix(in srgb, var(--bg-panel) 96%, transparent) 100%);
-  border-left: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow: visible;
+  grid-area: canvas;
+  justify-self: end;
+  align-self: stretch;
   position: relative;
-}
-.right-panel .panel-content {
+  z-index: 6;
+  margin: 10px 10px 10px 0;
+  max-width: calc(100% - 20px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  /* clip, not hidden: the slider inside is twice as wide, and a hidden
-     box still scrolls sideways when an input in it takes focus. */
-  overflow: clip;
-  transition: opacity 0.18s ease;
-}
-.right-panel.collapsed .panel-content {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 10px);
+  transform: translateX(calc(100% + 16px));
   opacity: 0;
-  pointer-events: none;
+  visibility: hidden;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease, visibility 0s linear 0.22s;
 }
+.right-panel.open {
+  transform: none;
+  opacity: 1;
+  visibility: visible;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.12s ease, visibility 0s;
+}
+.right-panel.resizing { transition: none; user-select: none; }
+.pp-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; border-radius: inherit; }
+.pp-resize {
+  /* Above the card's sticky head, which would take its inner half. */
+  position: absolute; top: 12px; bottom: 12px; left: -4px; width: 8px; z-index: 4;
+  cursor: col-resize; touch-action: none;
+}
+.pp-resize::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; border-radius: 1px;
+  background: transparent; transition: background 0.15s ease;
+}
+.pp-resize:hover::after, .right-panel.resizing .pp-resize::after { background: rgba(var(--accent-rgb), 0.6); }
+
+.pp-head {
+  position: sticky; top: 0; z-index: 3;
+  padding: 10px 12px 10px 16px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+}
+.pp-head-bar { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.pp-type {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--type-color, var(--text-muted));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pp-type-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.pp-head-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.pp-icon-btn {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 6px; background: transparent; color: var(--text-muted);
+  font-size: 14px; line-height: 1; cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.pp-icon-btn:hover, .pp-icon-btn[aria-expanded="true"] { background: var(--hover-bg); color: var(--text-primary); }
+.pp-wizard-btn {
+  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; margin-right: 2px;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--accent);
+  background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 6px; cursor: pointer; transition: border-color 0.12s, background 0.12s;
+}
+.pp-wizard-btn:hover { border-color: var(--accent); }
+.pp-menu-wrap { position: relative; }
+.pp-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 10; min-width: 220px;
+  display: flex; flex-direction: column; padding: 4px;
+  background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px;
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,0.18));
+}
+.pp-menu-item {
+  text-align: left; padding: 7px 10px; border: none; border-radius: 5px; background: transparent;
+  color: var(--text-primary); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.pp-menu-item:hover { background: var(--hover-bg); }
+.pp-menu-item.danger { color: var(--danger); }
+.pp-menu-item.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.pp-title {
+  display: block; box-sizing: border-box; width: calc(100% + 12px); margin: 6px -6px 0; padding: 3px 6px;
+  font: inherit; font-size: 17px; font-weight: 650; line-height: 1.3; color: var(--text-primary);
+  background: transparent; border: 1px solid transparent; border-radius: 6px; outline: none;
+  overflow-wrap: anywhere;
+}
+input.pp-title:hover { border-color: var(--border-color); }
+input.pp-title:focus { border-color: var(--accent); background: var(--input-bg); }
+.pp-title.empty, .pp-title::placeholder { color: var(--text-muted); font-weight: 500; }
+.pp-context { margin-top: 2px; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.pp-sep { color: var(--text-muted); }
+.pp-link {
+  padding: 0; border: none; background: none; font: inherit; color: var(--text-secondary);
+  cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 2px;
+}
+.pp-link:hover { color: var(--accent); text-decoration-color: currentColor; }
+
+.right-panel .props-content { padding: 0 0 14px; gap: 0; }
+.right-panel .props-content > .props-empty { margin: 24px 16px; }
+.pp-section { padding: 12px 16px; border-bottom: 1px solid var(--border-color-subtle, color-mix(in srgb, var(--border-color) 60%, transparent)); }
+.pp-section:last-child { border-bottom: none; }
+.pp-section-title {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);
+}
+.pp-grid { display: grid; grid-template-columns: minmax(84px, 34%) 1fr; column-gap: 10px; row-gap: 2px; padding-top: 8px; padding-bottom: 8px; }
+.pp-row { display: contents; }
+.pp-label {
+  display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 30px;
+  font-size: 12px; color: var(--text-muted);
+}
+.pp-label > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-missing { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); flex-shrink: 0; }
+.pp-value { min-width: 0; display: flex; align-items: center; min-height: 30px; }
+.pp-value .ref-picker { padding: 4px 0; width: 100%; }
+.pp-input {
+  width: 100%; min-width: 0; height: 28px; padding: 0 7px;
+  font: inherit; font-size: 13px; color: var(--text-primary);
+  background: transparent; border: 1px solid transparent; border-radius: 6px; outline: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+.pp-input::placeholder { color: var(--text-muted); opacity: 0.7; }
+.pp-input:not([readonly]):not(:disabled):hover { border-color: var(--border-color); }
+.pp-input:focus { border-color: var(--accent); background: var(--input-bg); }
+.pp-input[readonly], .pp-input:disabled { cursor: default; opacity: 1; color: var(--text-primary); }
+.pp-select { appearance: none; -webkit-appearance: none; padding-right: 22px; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%), linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
+  background-size: 4px 4px; background-repeat: no-repeat;
+}
+.pp-select:disabled { background-image: none; }
+.pp-check { display: inline-flex; align-items: center; height: 28px; padding: 0 7px; }
+.pp-check input { margin: 0; width: 14px; height: 14px; accent-color: var(--accent); }
+.pp-md {
+  margin: 0 -8px; padding: 6px 8px; border: 1px solid transparent; border-radius: 6px;
+  font-size: 13px; line-height: 1.55; color: var(--text-primary); overflow-wrap: anywhere;
+}
+.pp-md.editable { cursor: text; }
+.pp-md.editable:hover { border-color: var(--border-color); }
+.pp-md.editable:focus-visible { border-color: var(--accent); box-shadow: none; }
+.pp-md.empty { color: var(--text-muted); }
+.pp-placeholder { font-style: italic; opacity: 0.8; }
+.pp-section .props-textarea { font-size: 13px; line-height: 1.55; margin: 0 -8px; width: calc(100% + 16px); padding: 6px 8px; border-radius: 6px; border-color: var(--accent); }
+.pp-section .props-ears-sentence { margin: 0; }
 
 .rp-slider {
   width: 200%;
@@ -899,18 +998,7 @@ body {
   border-radius: 6px 0 0 6px;
   border-right: none;
 }
-.panel-toggle-top {
-  left: 50%;
-  top: auto;
-  bottom: -10px;
-  width: 36px;
-  height: 18px;
-  margin-left: -18px;
-  border-radius: 0 0 6px 6px;
-  border-top: none;
-}
-.left-panel.collapsed .panel-toggle-left,
-.right-panel.collapsed .panel-toggle-right {
+.left-panel.collapsed .panel-toggle-left {
   /* keep the tab visible inside the collapsed rail */
   top: 14px;
 }
@@ -922,18 +1010,39 @@ body {
 }
 
 /* ── Left panel accordion ─────────────────────────────────────────── */
-.lp-section { border-bottom: 1px solid var(--border-color); }
+/* The open section takes the free height and scrolls; folded ones are a
+   header each, with a line on what they hold. */
+.lp-sections { overflow: hidden; }
+.lp-section { border-bottom: 1px solid var(--border-color); flex: 0 0 auto; display: flex; flex-direction: column; min-height: 0; }
 .lp-section:last-child { border-bottom: none; }
+.lp-section.open { flex: 1 1 auto; }
 .lp-section-header {
-  width: 100%; display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px; background: none; border: none; cursor: pointer;
-  color: var(--text-secondary); font-size: 10px; font-weight: 700;
-  letter-spacing: 0.10em; text-transform: uppercase;
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 10px 24px 10px 14px; min-height: 44px;
+  background: none; border: none; cursor: pointer; text-align: left;
+  color: var(--text-primary); font: inherit;
   user-select: none;
-  transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+  transition: background 0.15s var(--ease-out);
 }
-.lp-section-header:hover { background: var(--hover-bg-faint); color: var(--text-primary); }
-.lp-section-title { display: flex; align-items: center; gap: 8px; }
+.lp-section-header:hover { background: var(--hover-bg-faint); }
+.lp-section { --sec-color: var(--accent); }
+.lp-section.open > .lp-section-header {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--sec-color) 10%, transparent), transparent 85%);
+  box-shadow: inset 3px 0 0 var(--sec-color);
+}
+.lp-section-icon {
+  width: 26px; height: 26px; flex-shrink: 0; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--sec-color) 14%, transparent); color: var(--sec-color);
+  transition: background 0.15s, color 0.15s;
+}
+.lp-section.open .lp-section-icon { background: var(--sec-color); color: #fff; }
+.lp-section-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lp-section-title { font-size: 13px; font-weight: 600; line-height: 1.25; }
+.lp-section-preview {
+  font-size: 11.5px; color: var(--text-muted); line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .lp-section-chevron {
   color: var(--text-muted);
   transition: transform 0.22s var(--ease-spring);
@@ -943,21 +1052,15 @@ body {
 .lp-section-chevron.open { transform: rotate(90deg); }
 .lp-section-count {
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 18px; height: 17px; padding: 0 6px;
-  font-size: 9.5px; font-weight: 600; letter-spacing: 0;
+  min-width: 20px; height: 18px; padding: 0 6px; flex-shrink: 0;
+  font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
   border-radius: 9px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  text-transform: none;
+  background: color-mix(in srgb, var(--sec-color) 14%, transparent);
+  color: var(--sec-color);
 }
-.lp-section-body {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.22s ease;
-}
-.lp-section-body.open { grid-template-rows: 1fr; }
-.lp-section-body > div { overflow: hidden; min-height: 0; }
-.lp-section-body-pad { padding: 4px 8px 12px; }
+.lp-section-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.lp-section-body[hidden] { display: none; }
+.lp-section-body-pad { padding: 2px 8px 12px; }
 
 /* ── Modern card primitives (snapshots + views) ───────────────────── */
 .lp-card {
@@ -1204,15 +1307,16 @@ body {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 26px; height: 26px; padding: 0 5px;
   border-radius: 6px;
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.18), rgba(var(--accent-rgb), 0.08));
-  color: var(--accent);
+  /* Milestones are amber, as their section (SECTION_COLORS). */
+  background: color-mix(in srgb, #f59e0b 16%, transparent);
+  color: #d97706;
   font-size: 10px; font-weight: 700;
   letter-spacing: 0.02em;
   flex-shrink: 0;
   border: 1px solid rgba(var(--accent-rgb), 0.2);
 }
 .lp-card.active .lp-snap-badge {
-  background: var(--accent); color: #fff; border-color: var(--accent);
+  background: #f59e0b; color: #fff; border-color: #f59e0b;
 }
 
 /* ── View list ───────────────────────────────────────────────────── */
@@ -1221,15 +1325,17 @@ body {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px;
   border-radius: 6px;
-  background: var(--hover-bg-faint);
-  color: var(--text-muted);
+  /* The view type's colour (VIEW_KIND_COLORS), else the accent. */
+  background: color-mix(in srgb, var(--kind-color, var(--accent)) 14%, transparent);
+  color: var(--kind-color, var(--accent));
   flex-shrink: 0;
   transition: background 0.15s ease, color 0.15s ease;
 }
 .lp-card.active .lp-view-icon {
-  background: rgba(var(--accent-rgb), 0.18);
-  color: var(--accent);
+  background: var(--kind-color, var(--accent));
+  color: #fff;
 }
+.lp-view-kind { color: var(--kind-color, var(--accent)); }
 
 /* Folders of views: a row that opens and closes, its views indented
    under a thin guide line. */
@@ -1515,21 +1621,6 @@ body {
   letter-spacing: 0.05em;
 }
 
-.props-wizard-btn {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  padding: 6px 8px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  border-radius: var(--radius-xs);
-  cursor: pointer;
-}
-.props-wizard-btn:hover { border-color: var(--accent); }
-
 .props-delete {
   margin-top: auto;
   padding: 7px;
@@ -1614,8 +1705,10 @@ body {
  * .wiki-nav-tree's overflow scroll (it never gets a bounded height to
  * scroll within, so long lists overflow the popup instead of scrolling). */
 .wiki-nav {
-  width: 248px;
-  flex: 0 0 248px;
+  /* The canvas's whole width is the wiki's (the properties card lies over
+     it and the wiki selects nothing), so the contents widen with it. */
+  width: clamp(260px, 22%, 380px);
+  flex: 0 0 auto;
   height: 100%;
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -1816,7 +1909,7 @@ span.wiki-nav-toggle { cursor: default; }
 .wiki-doc {
   --wiki-serif: 'Linux Libertine', Georgia, 'Times New Roman', Times, serif;
   width: 100%;
-  max-width: 980px;
+  max-width: 1240px;
   margin: 0;
   padding: 22px 48px 72px;
 }
@@ -3565,8 +3658,8 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 
 /* "Current (live)" pseudo-milestone entry */
 .lp-snap-current { border-style: dashed; }
-.lp-snap-badge-live {
-  background: #10b981;
+.lp-snap-badge-live, .lp-card.active .lp-snap-badge-live {
+  background: #10b981; border-color: #10b981;
   color: #fff;
   font-size: 14px;
   line-height: 1;
@@ -3947,16 +4040,6 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 
 /* The row's buttons, at its end: its properties and its wizard. Shown on
    the row under the pointer. */
-.tv-row-actions { margin-left: auto; display: flex; gap: 4px; flex-shrink: 0; opacity: 0; }
-.tv-row:hover .tv-row-actions, .tv-row-actions:focus-within { opacity: 1; }
-.tv-row-btn, .tv-row-btn-space { width: 22px; height: 22px; flex-shrink: 0; }
-.tv-row-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 0; border-radius: 4px;
-  border: 1px solid var(--border-color); background: var(--bg-panel);
-  color: var(--text-muted); cursor: pointer;
-}
-.tv-row-btn:hover { color: var(--accent); border-color: var(--accent); }
 /* Adds an element where it will show: after the rows under an element, or at the end. */
 .tv-add-row > .tv-td { border-bottom: none; }
 /* What a long table does not draw: the height of the lines it stands for. */
@@ -4012,6 +4095,11 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
   max-width: 0;        /* makes text-overflow work inside fixed cols */
 }
 
+/* Every row of a tree is as high as the others, whatever its cells hold:
+   a long table draws only the lines in sight and places them by one
+   measured height (TableView, useTableWindow). */
+.tv-chain-row { height: 36px; }
+.tv-add-row { height: 22px; }
 .tv-row {
   cursor: pointer;
   transition: background 0.08s;
@@ -4047,7 +4135,8 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
   display: block;
   padding: 8px 10px;
   color: var(--text);
-  cursor: text;
+  /* A click picks the row; a double-click on the name renames it. */
+  cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

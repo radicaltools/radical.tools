@@ -10,6 +10,18 @@ export function fixture(name: string): string {
   return readFileSync(fileURLToPath(new URL(`../fixtures/${name}.radical`, import.meta.url)), 'utf8')
 }
 
+/** A canvas of the whole model: a structure view that lists no elements.
+ *  All elements is a table, so a test that needs every element drawn adds
+ *  this view (withWhole) and opens it. */
+export const WHOLE = 'v-whole'
+
+/** `json` with a WHOLE view added after its own. */
+export function withWhole(json: string): string {
+  const doc = JSON.parse(json) as { views?: unknown[] }
+  doc.views = [...(doc.views ?? []), { id: WHOLE, name: 'Whole model', kind: 'static', nodeIds: [], positions: {} }]
+  return JSON.stringify(doc)
+}
+
 type Mode = 'designer' | 'viewer' | 'presenter' | 'metamodel'
 
 /** The slice of a saved `.radical` document the tests read back. */
@@ -67,6 +79,13 @@ export class Studio {
   get edges(): Locator { return this.page.locator('.react-flow__edge') }
   get pane(): Locator { return this.page.locator('.react-flow__pane') }
   get canvas(): Locator { return this.page.locator('.canvas-area') }
+  /** An element's row in a table view (All elements is one). */
+  row(id: string): Locator { return this.page.locator(`tr[data-node-id="${id}"]`) }
+  /** The properties card over the canvas: what is selected, its attributes. */
+  get properties(): Locator { return this.page.locator('.right-panel.open') }
+  /** An attribute's control in the properties card, by its name; `Name` is
+   *  the title (the element's or relation's label). */
+  attribute(name: string): Locator { return this.properties.getByLabel(name, { exact: true }) }
 
   node(id: string): Locator { return this.page.getByTestId(`rf__node-${id}`) }
 
@@ -81,6 +100,11 @@ export class Studio {
    */
   async seed(name = 'bookstore'): Promise<void> {
     await this.seedDocument(fixture(name))
+  }
+
+  /** Seed a fixture with a WHOLE view, a canvas of every element. */
+  async seedWhole(name = 'bookstore'): Promise<void> {
+    await this.seedDocument(withWhole(fixture(name)))
   }
 
   /** Seed raw `.radical` JSON (e.g. a document saved by another page). */
@@ -110,6 +134,22 @@ export class Studio {
     await expect(this.page).toHaveURL(/\/v\/view-ctx$/)
     await this.ready()
     if (view !== 'view-ctx') await this.open(view, 'designer', this.activeDocId())
+  }
+
+  /** Open the bundled sample on a WHOLE view, a canvas of every element:
+   *  the sample's All elements is a table. The view goes into the saved
+   *  document, which is read again. */
+  async openSampleWhole(): Promise<void> {
+    await this.openSample()
+    const docId = this.activeDocId()
+    const key = `radical-doc:${docId}`
+    await expect.poll(() => this.page.evaluate((k) => localStorage.getItem(k) !== null, key)).toBe(true)
+    const json = await this.page.evaluate((k) => localStorage.getItem(k)!, key)
+    await this.page.evaluate(([k, v]) => localStorage.setItem(k, v), [key, withWhole(json)] as const)
+    await this.page.reload()
+    await this.ready()
+    await this.open(WHOLE, 'designer', docId)
+    await expect(this.page.locator('.lp-view-card', { hasText: 'Whole model' })).toHaveClass(/active/)
   }
 
   /** The app has booted (no welcome splash, no crash) and the canvas is still. */

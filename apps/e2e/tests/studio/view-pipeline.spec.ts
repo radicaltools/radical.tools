@@ -24,7 +24,7 @@ async function openRegisterWithoutChain(page: Page): Promise<void> {
 // The table and the Structure tree show the tree; the steps stay with the view.
 
 test('needs → requirements → scenarios, built in the Filter panel, shown as a tree in the table', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSample()
   await openRegisterWithoutChain(page)
   const steps = page.locator('.rp-pipeline')
   await expect(page.locator('.tv-row').first()).toBeVisible()
@@ -47,10 +47,11 @@ test('needs → requirements → scenarios, built in the Filter panel, shown as 
   const card = page.locator('.lp-view-card', { hasText: 'Requirements Register' }).locator('.lp-card-meta')
   await expect(card).toContainText(/\d+ nodes/)
   await expect(card).not.toContainText('All nodes')
-  // Structure on the right shows the same tree; a click opens the element's properties.
-  await page.locator('.structure-tree .tree-node', { hasText: 'Same signatory cannot approve twice' }).click()
-  await expect(page.locator('.right-panel .props-type-badge')).toContainText(/scenario/i)
-  await page.locator('.right-panel .rp-back-btn').click()
+  // A click on a row opens the element's attributes over the table; ✕ closes them.
+  await row(2, 'Same signatory cannot approve twice').click()
+  await expect(studio.properties.locator('.pp-type')).toContainText(/scenario/i)
+  await studio.properties.getByRole('button', { name: 'Close properties' }).click()
+  await expect(studio.properties).toHaveCount(0)
 
   // A need folds what hangs under it.
   await row(0, 'Corporate treasurer feedback').getByRole('button', { name: /Fold what hangs under/ }).click()
@@ -82,7 +83,7 @@ test('needs → requirements → scenarios, built in the Filter panel, shown as 
 })
 
 test('the table adds an element under a row, on the next level of the chain as its filters ask, and one at the top', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSample()
   await openRegisterWithoutChain(page)
   const steps = page.locator('.rp-pipeline')
   await steps.getByRole('button', { name: '+ Start with' }).click()
@@ -153,16 +154,16 @@ test('a chain is built from the metamodel before its elements, and the table the
   await wizard.getByLabel('Name').fill('Redeem a gift card')
   await page.keyboard.press('ControlOrMeta+Enter')
   await expect(page.locator('.tv-chain-row.depth-1', { hasText: 'Redeem a gift card' })).toBeVisible()
-  // A row opens its element's wizard again.
-  await need.hover()
-  await need.getByRole('button', { name: 'Wizard for Gift cards' }).click()
+  // Its attributes open its element's wizard again.
+  await need.click()
+  await studio.properties.getByRole('button', { name: 'Wizard', exact: true }).click()
   await expect(page.getByRole('dialog', { name: /Gift cards/ })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
 test('a wiki view follows the same chain: needs on the overview, their requirements as chapters', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSample()
   await openFilter(page, 'Product Wiki')
   const steps = page.locator('.rp-pipeline')
   await steps.getByRole('button', { name: '+ Start with' }).click()
@@ -183,7 +184,7 @@ test('a wiki view follows the same chain: needs on the overview, their requireme
 })
 
 test('a level takes any of its ways: needs or requirements as roots, the scenarios verifying either under them', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSample()
   await openRegisterWithoutChain(page)
   const steps = page.locator('.rp-pipeline')
   await steps.getByRole('button', { name: '+ Start with' }).click()
@@ -205,7 +206,7 @@ test('a level takes any of its ways: needs or requirements as roots, the scenari
 })
 
 test('a canvas view draws what its chain gives, and the relations it follows unless asked for all', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSample()
   await openFilter(page, 'Requirements Traceability')
   await studio.settle()
   await expect(studio.nodes).toHaveCount(23)
@@ -235,7 +236,7 @@ test('a canvas view draws what its chain gives, and the relations it follows unl
 })
 
 test('a view shows every element again from its steps, and a chain can start from every element', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSample()
   await openFilter(page, 'Requirements Traceability')
   const steps = page.locator('.rp-pipeline')
   await expect(steps).toContainText("This view's elements")
@@ -251,7 +252,7 @@ test('a view shows every element again from its steps, and a chain can start fro
 })
 
 test('every kind of view follows its chain, again when the chain or the model changes', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSample()
   await openFilter(page, 'Requirements Traceability')
   const steps = page.locator('.rp-pipeline')
   const kind = (name: string) => page.locator('.props-content', { has: steps }).getByRole('button', { name, exact: true }).click()
@@ -276,13 +277,13 @@ test('every kind of view follows its chain, again when the chain or the model ch
   await expect(rowHead('Same signatory cannot approve twice')).toBeVisible()
   // A change to the model runs the chain again: renamed, the requirement no
   // longer passes the filter, and its scenario goes with it.
-  await page.locator('.structure-tree .tree-node', { hasText: 'Four-eyes approval' }).click()
-  const label = page.locator('.right-panel .props-field').filter({ has: page.getByText('Label', { exact: true }) }).locator('input')
+  await rowHead('Four-eyes approval').click()
+  const label = studio.attribute('Name')
   await label.fill('Four-eyes sign-off')
   await label.press('Tab')
   await expect(rowHead('Four-eyes')).toHaveCount(0)
   await expect(rowHead('Same signatory cannot approve twice')).toHaveCount(0)
-  await page.locator('.right-panel .rp-back-btn').click()
+  await studio.properties.getByRole('button', { name: 'Close properties' }).click()
 
   // The hierarchy: the chain's elements in the containers they sit in.
   await kind('Hierarchy')
@@ -303,7 +304,7 @@ test('every kind of view follows its chain, again when the chain or the model ch
 })
 
 test('a way and a filter are edited in place, and a level can follow any relation', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSample()
   await openRegisterWithoutChain(page)
   const steps = page.locator('.rp-pipeline')
   await steps.getByRole('button', { name: '+ Start with' }).click()

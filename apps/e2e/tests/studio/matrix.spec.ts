@@ -13,7 +13,7 @@ test('one click on a cell selects its relation, even when it was selected on ano
   // also when it had been selected on a canvas before the matrix opened.
   await studio.open('v-containers')
   await page.getByTestId('rf__edge-r2').locator('path').first().click({ force: true })
-  await expect(page.locator('.props-type-badge')).toHaveText(/relation/i)
+  await expect(studio.properties.locator('.pp-type')).toHaveText(/relation/i)
   await page.locator('.lp-view-card', { hasText: 'Matrix' }).click()
   const cell = page.locator('.mx-cell.mx-has-rel[title*="calls"]')
   await cell.click()

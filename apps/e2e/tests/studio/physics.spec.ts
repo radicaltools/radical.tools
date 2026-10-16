@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test'
-import { test, expect, fixture, type Studio, type StoredDoc } from '../../support/fixtures'
+import { test, expect, fixture, WHOLE, type Studio, type StoredDoc } from '../../support/fixtures'
 
 // The live WebCoLa layout (packages/ui/src/layout/liveColaLayout.ts) on a
 // real clock. Its own convergence test never passes once groups are
@@ -72,13 +72,13 @@ test('what the physics places inside a container is what a reload shows', async 
 })
 
 test('a layout started on one canvas does not land on another', async ({ page, studio }) => {
-  // Smart Layout takes about three seconds on the sample's All elements.
-  // Opening another view meanwhile used to put All elements' positions on
-  // that view's elements and save them there.
+  // Smart Layout takes a moment on the sample's Requirements Traceability.
+  // Opening another view meanwhile used to put the first canvas's positions
+  // on that view's elements and save them there.
   await studio.openSample('view-core')
   const docId = studio.activeDocId()
   const core = await studio.positions()
-  await studio.open('canvas', 'designer', docId)
+  await studio.open('view-trace', 'designer', docId)
   await page.waitForTimeout(800)
   const saved = (await studio.storedDoc(docId)).views!.find((v) => v.id === 'view-core')!.positions
 
@@ -173,7 +173,13 @@ function gridDocument(spacing = { x: 420, y: 300 }): string {
     if (c > 0) relations.push({ id: `h${r}_${c}`, sourceId: `n${r}_${c - 1}`, targetId: `n${r}_${c}` })
     if (r > 0) relations.push({ id: `v${r}_${c}`, sourceId: `n${r - 1}_${c}`, targetId: `n${r}_${c}` })
   }
-  return JSON.stringify({ nodes, relations, views: [] })
+  return JSON.stringify({ nodes, relations, views: [{ id: WHOLE, name: 'Whole model', kind: 'static', nodeIds: [], positions: {} }] })
+}
+
+/** The alignments and pins kept for the WHOLE view, as saved. */
+async function wholeConstraints(studio: Studio): Promise<Array<{ type: string; nodeIds: string[] }>> {
+  const doc = await studio.storedDoc() as { views?: Array<{ id: string; layoutConstraints?: Array<{ type: string; nodeIds: string[] }> }> }
+  return doc.views?.find((v) => v.id === WHOLE)?.layoutConstraints ?? []
 }
 
 /** Wait until no node moves for a second. */
@@ -205,29 +211,29 @@ async function dragBy(page: Page, target: Locator, dx: number, dy: number, modif
 
 test('a drag moves only the dragged node, and the drop pins it', async ({ page, studio }) => {
   await studio.seedDocument(gridDocument())
-  await studio.open('canvas')
+  await studio.open(WHOLE)
   const previous = await untilStill(page, studio)
   // The whole grid is in view, zoomed out: a short way, into no neighbour.
   await dragBy(page, studio.node('n7_7'), 16, 8)
   await page.waitForTimeout(1500)
   const after = await studio.positions()
   expect(Object.keys(after).filter((id) => after[id] !== previous[id])).toEqual(['n7_7'])
-  await expect.poll(async () => (await studio.storedDoc() as { defaultLayoutConstraints?: Array<{ type: string; nodeIds: string[] }> })
-    .defaultLayoutConstraints?.find((c) => c.type === 'pin')?.nodeIds).toEqual(['n7_7'])
+  await expect.poll(async () => (await wholeConstraints(studio)).find((c) => c.type === 'pin')?.nodeIds).toEqual(['n7_7'])
   // Selected, it offers to unpin.
   await studio.node('n7_7').click()
   await page.getByTestId('unpin-node').click()
-  await expect.poll(async () => (await studio.storedDoc() as { defaultLayoutConstraints?: unknown[] }).defaultLayoutConstraints ?? []).toEqual([])
+  await expect.poll(async () => wholeConstraints(studio)).toEqual([])
 })
 
 test('a drop onto a node pushes that node clear and nothing else', async ({ page, studio }) => {
   await studio.seedDocument(gridDocument())
-  await studio.open('canvas')
+  await studio.open(WHOLE)
   const previous = await untilStill(page, studio)
-  // Onto its right-hand neighbour, slightly offset.
+  // Onto its right-hand neighbour, slightly offset (by its size: the zoom
+  // the grid fits at depends on how wide the canvas is).
   const from = (await studio.node('n7_7').boundingBox())!
   const onto = (await studio.node('n7_8').boundingBox())!
-  await dragBy(page, studio.node('n7_7'), onto.x - from.x - 10, onto.y - from.y + 10)
+  await dragBy(page, studio.node('n7_7'), onto.x - from.x - from.width * 0.34, onto.y - from.y + from.height * 0.75)
   await page.waitForTimeout(1500)
   const after = await studio.positions()
   expect(Object.keys(after).filter((id) => after[id] !== previous[id]).sort()).toEqual(['n7_7', 'n7_8'])
@@ -236,7 +242,7 @@ test('a drop onto a node pushes that node clear and nothing else', async ({ page
 
 test('a drag with Cmd held lets the physics move the surroundings', async ({ page, studio }) => {
   await studio.seedDocument(gridDocument())
-  await studio.open('canvas')
+  await studio.open(WHOLE)
   const previous = await untilStill(page, studio)
   await dragBy(page, studio.node('n7_7'), 80, 40, 'Meta')
   await page.waitForTimeout(1500)
@@ -252,7 +258,7 @@ test('a large diagram keeps its positions on open and suggests Smart Layout when
   // The hint is a toast that dismisses itself: watch for it while opening.
   await Promise.all([
     expect(page.getByText(/This diagram is not laid out yet/)).toBeVisible({ timeout: 15_000 }),
-    studio.open('canvas'),
+    studio.open(WHOLE),
   ])
   const before = await studio.positions()
   await page.waitForTimeout(2000)
@@ -261,7 +267,7 @@ test('a large diagram keeps its positions on open and suggests Smart Layout when
 
 test('adding an element to a large diagram moves only its surroundings', async ({ page, studio }) => {
   await studio.seedDocument(gridDocument())
-  await studio.open('canvas')
+  await studio.open(WHOLE)
   const before = await studio.positions()
   // In the middle of the grid, in the gap between four containers (a drop on
   // one would put the system inside it, which is refused).
@@ -406,27 +412,27 @@ test('an expanded element grows around the centre of its collapsed box', async (
   expect(after.y + after.h / 2).toBeCloseTo(before.y + before.h / 2, -2)
 })
 
-test.describe('All elements keeps its own layout', () => {
-  test('a reload while a view is shown does not give All elements that view\'s layout', async ({ page, studio }) => {
+test.describe('a canvas of the whole model keeps its own layout', () => {
+  test('a reload while a view is shown does not give it that view\'s layout', async ({ page, studio }) => {
     // A document is saved with its nodes where the shown canvas has them.
     // After a reload the view in the address was opened again, and what
     // the nodes held (that view's layout) was stored as All elements'.
-    await studio.seed()
-    await studio.open('canvas')
+    await studio.seedWhole()
+    await studio.open(WHOLE)
     const all = await studio.positions()
     await studio.open('v-context')
     await page.waitForTimeout(1000) // the autosave
     await page.reload()
     await studio.ready()
     await expect(page.getByText('Structure: System Context')).toBeVisible()
-    await studio.open('canvas')
+    await studio.open(WHOLE)
     expect(await studio.positions()).toEqual(all)
     expect(await studio.layoutViolations()).toEqual([])
   })
 
   test('nor does a reload while a milestone is shown in a view', async ({ page, studio }) => {
-    await studio.seed()
-    await studio.open('canvas')
+    await studio.seedWhole()
+    await studio.open(WHOLE)
     const all = await studio.positions()
     await studio.open('v-context')
     await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
@@ -443,7 +449,7 @@ test.describe('All elements keeps its own layout', () => {
     await studio.ready()
     await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
     await page.locator('.lp-snap-current').click()
-    await studio.open('canvas')
+    await studio.open(WHOLE)
     expect(await studio.positions()).toEqual(all)
     expect(await studio.layoutViolations()).toEqual([])
   })
@@ -487,14 +493,13 @@ test.describe('Quick Search shows what it finds', () => {
     await studio.settle()
   }
 
-  test('a container collapsed on All elements and open in the view stays open', async ({ page, studio }) => {
+  test('a container folded in the model and open in the view stays open', async ({ page, studio }) => {
     // It looked at the element's own "collapsed", and collapse is per view:
     // the toggle meant to open the container closed it in the view, hid the
     // element it had found, and saved that.
-    await studio.seed()
-    await studio.open('canvas')
-    await studio.node('bookstore').locator('.c4-node-collapse-btn').first().click()
-    await expect(studio.node('db')).toHaveCount(0)
+    const doc = JSON.parse(fixture('bookstore')) as { nodes: Array<{ id: string; collapsed?: boolean }> }
+    doc.nodes.find((n) => n.id === 'bookstore')!.collapsed = true
+    await studio.seedDocument(JSON.stringify(doc))
     await studio.open('v-containers')
     await studio.node('bookstore').locator('.c4-node-collapse-btn').first().click()
     await expect(studio.node('db')).toBeVisible()
@@ -522,8 +527,8 @@ test('a milestone picked in Viewer is not the one Designer edits', async ({ page
   // Leaving Designer set aside the nodes but not which milestone is shown:
   // back in Designer the live model was on the canvas under the milestone's
   // name, and a drag followed by "Propagate" copied it over every milestone.
-  await studio.seed()
-  await studio.open('canvas')
+  await studio.seedWhole()
+  await studio.open(WHOLE)
   await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
   await page.getByRole('button', { name: 'New milestone' }).click()
   await page.getByPlaceholder('Milestone name…').fill('Before')

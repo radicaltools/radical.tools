@@ -46,17 +46,16 @@ test.describe('bookstore views', () => {
     // A + row where an element can go: inside Bookstore and its containers, and at the top.
     await expect(page.getByRole('button', { name: 'Add under Bookstore' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Add at the top' })).toBeVisible()
-    // Its name and its summary, by its type's template; its fields open from the end of its row.
+    // Its name and its summary, by its type's template; a click on its row opens its attributes.
     await expect(page.locator('thead th')).toHaveText(['Name', 'Summary'])
     const provider = rows.filter({ hasText: 'Payment Provider' })
     await expect(provider).toContainText('Card payments')
-    await provider.hover()
-    await provider.getByRole('button', { name: 'Properties of Payment Provider' }).click()
-    await expect(page.locator('.right-panel .props-content')).toBeVisible()
-    await expect(page.locator('.right-panel input[value="Payment Provider"]').first()).toBeVisible()
+    await provider.click()
+    await expect(studio.attribute('Name')).toHaveValue('Payment Provider')
+    // One click does not rename it: a double-click does (next test).
+    await expect(page.locator('.tv-cell-input')).toHaveCount(0)
     // A C4 type has no wizard.
-    await expect(provider.getByRole('button', { name: /^Wizard for/ })).toHaveCount(0)
-    await page.mouse.move(0, 0)
+    await expect(studio.properties.getByRole('button', { name: 'Wizard', exact: true })).toHaveCount(0)
     // The containment tree: Bookstore's containers under it, one guide line in.
     await expect(page.locator('.tv-chain-row.depth-1')).toHaveCount(3)
     await expect(page.locator('.tv-tabs')).toHaveCount(0)
@@ -65,7 +64,7 @@ test.describe('bookstore views', () => {
 
   test('a name is renamed in place in the table', async ({ page, studio }) => {
     await studio.open('v-table')
-    await page.locator('tr[data-node-id="payments"] .tv-chain-cell').click()
+    await page.locator('tr[data-node-id="payments"] .tv-chain-cell').dblclick()
     const input = page.locator('tr[data-node-id="payments"] input.tv-cell-input')
     await input.fill('Card Gateway')
     await input.press('Enter')
@@ -227,9 +226,11 @@ test.describe('perspectives', () => {
     await expect(page.locator('.palette-item')).toHaveCount(0)
     await studio.node('api').click()
     await studio.advance(500)
-    const label = page.locator('.props-field').filter({ has: page.getByText('Label', { exact: true }) }).locator('input')
-    await expect(label).toHaveValue('API')
-    await expect(label).not.toBeEditable()
+    // The name is text, and no attribute takes typing.
+    await expect(studio.properties.locator('.pp-title')).toHaveText('API')
+    await expect(studio.attribute('Name')).toHaveCount(0)
+    await expect(studio.properties.locator('input, select')).not.toHaveCount(0)
+    for (const control of await studio.properties.locator('input, select, textarea').all()) await expect(control).not.toBeEditable()
     await expect(page).toHaveScreenshot('viewer-containers.png')
   })
 

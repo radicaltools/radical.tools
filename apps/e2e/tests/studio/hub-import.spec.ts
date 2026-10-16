@@ -1,4 +1,4 @@
-import { test, expect, fixture, DOC_ID } from '../../support/fixtures'
+import { test, expect, fixture, DOC_ID, withWhole, WHOLE } from '../../support/fixtures'
 import { HUB_PORT } from '../../playwright.config'
 
 // Import from the Hub into an existing model. Studio reads the catalogue
@@ -75,8 +75,8 @@ test('a blueprint leaves no {{KEY}} placeholder in the model', async ({ page, st
   // listed themselves, and the flows' step notes were not filled in.
   const doc = JSON.parse(fixture('bookstore'))
   doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
-  await studio.seedDocument(JSON.stringify(doc))
-  await studio.open('canvas')
+  await studio.seedDocument(withWhole(JSON.stringify(doc)))
+  await studio.open(WHOLE)
   await page.getByTitle('Menu', { exact: true }).click()
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')

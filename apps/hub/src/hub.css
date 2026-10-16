@@ -136,10 +136,10 @@
 .hub-concept-panel {
   display: grid;
   grid-template-rows: 48px 1fr;
-  grid-template-columns: 1fr 260px;
+  grid-template-columns: 1fr;
   grid-template-areas:
-    "toolbar toolbar"
-    "canvas  rightpanel";
+    "toolbar"
+    "canvas";
   position: relative;
   width: 100%; height: 100%;
   max-width: 1440px;
@@ -150,7 +150,6 @@
   overflow: hidden;
   transition: grid-template-columns 0.22s var(--ease-out);
 }
-.hub-concept-panel.rp-collapsed { grid-template-columns: 1fr 18px; }
 
 .hub-concept-close {
   flex-shrink: 0;

@@ -18,7 +18,7 @@ function load() {
   useDiagramStore.setState({ appMode: 'designer' } as any)
 }
 
-it('each view keeps its own selection', () => {
+it('leaving a view clears its selection', () => {
   load()
   s().setActiveView('v1')
   s().selectNode('a')
@@ -30,23 +30,21 @@ it('each view keeps its own selection', () => {
   expect(ringed()).toEqual([])
   s().selectNode('c')
 
-  // Back on v1, its selection is there again, ring included.
+  // Back on v1, nothing is selected: it was cleared when the user left.
   s().setActiveView('v1')
-  expect(s().selectedNodeIds).toEqual(['a'])
-  expect(ringed()).toEqual(['a'])
-  s().setActiveView('v2')
-  expect(s().selectedNodeIds).toEqual(['c'])
+  expect(s().selectedNodeIds).toEqual([])
+  expect(ringed()).toEqual([])
 })
 
-it('a selected relation is kept per view too', () => {
+it('a selected relation is cleared too', () => {
   load()
   s().setActiveView('v1')
   s().selectEdge('r')
   s().setActiveView(null)
   expect(s().selectedEdgeId).toBeNull()
   s().setActiveView('v1')
-  expect(s().selectedEdgeId).toBe('r')
-  expect(s().rfEdges.find((e) => e.id === 'r')?.selected).toBe(true)
+  expect(s().selectedEdgeId).toBeNull()
+  expect(s().rfEdges.find((e) => e.id === 'r')?.selected ?? false).toBe(false)
 })
 
 it('a selection survives the canvas being rebuilt', () => {
@@ -57,9 +55,8 @@ it('a selection survives the canvas being rebuilt', () => {
   expect(ringed()).toEqual(['b'])
 })
 
-it('reading the same document again keeps every view\'s selection', () => {
+it('reading the same document again keeps the open view\'s selection', () => {
   load()
-  s().selectNode('c')
   s().setActiveView('v1')
   s().selectNode('a')
   // An outside change: the document is read again, the user stays on v1.
@@ -67,6 +64,9 @@ it('reading the same document again keeps every view\'s selection', () => {
   s().loadDiagram(data)
   s().setActiveView('v1')
   expect(s().selectedNodeIds).toEqual(['a'])
+  // Leaving it clears it, as any other switch does.
   s().setActiveView(null)
-  expect(s().selectedNodeIds).toEqual(['c'])
+  expect(s().selectedNodeIds).toEqual([])
+  s().setActiveView('v1')
+  expect(s().selectedNodeIds).toEqual([])
 })

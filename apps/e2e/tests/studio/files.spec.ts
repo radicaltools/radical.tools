@@ -19,9 +19,9 @@ async function openModels(page: Page): Promise<void> {
   await expect(page.getByRole('dialog', { name: 'Models' })).toBeVisible()
 }
 
-/** The properties-panel Label field of the selected element. */
+/** The properties card's name field of the selected element. */
 function labelField(page: Page) {
-  return page.locator('.props-field').filter({ has: page.getByText('Label', { exact: true }) }).locator('input')
+  return page.locator('.right-panel.open').getByLabel('Name', { exact: true })
 }
 
 test('Open → File… keeps the model in the file and saves changes to it', async ({ page, studio }) => {
@@ -30,7 +30,8 @@ test('Open → File… keeps the model in the file and saves changes to it', asy
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'File…' }).click()
   await studio.ready()
-  await studio.node('customer').click()
+  // It opens on All elements, the table of the whole model.
+  await studio.row('customer').click()
   await expect(labelField(page)).toHaveValue('Customer')
   await labelField(page).fill('Shopper')
   await labelField(page).press('Tab')
@@ -41,7 +42,7 @@ test('Open → File… keeps the model in the file and saves changes to it', asy
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.locator('.msteps-row').first().click()
   await studio.ready()
-  await expect(studio.node('customer')).toContainText('Shopper')
+  await expect(studio.row('customer')).toContainText('Shopper')
   await openModels(page)
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.fs')).toBeVisible()
 })

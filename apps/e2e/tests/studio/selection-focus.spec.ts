@@ -5,7 +5,7 @@ import { test, expect } from '../../support/fixtures'
 // rest of the canvas is dimmed, as in the metamodel diagram.
 
 test('a selected node brings its relations forward and dims the rest', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSampleWhole()
   const dimmedNodes = page.locator('.react-flow__node.focus-dim')
   const dimmedEdges = page.locator('.react-flow__edge g.focus-dim')
   await expect(page.locator('.react-flow__edge').first()).toBeAttached()
@@ -29,7 +29,7 @@ test('a selected node brings its relations forward and dims the rest', async ({ 
 })
 
 test('a selected relation brings forward itself and its two ends', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSampleWhole()
   await studio.nodeByLabel('Accounts Service').first().click()
   const undimmedEdges = page.locator('.react-flow__edge').filter({ hasNot: page.locator('g.focus-dim') })
   await expect.poll(() => undimmedEdges.count()).toBeGreaterThan(1)
@@ -39,26 +39,27 @@ test('a selected relation brings forward itself and its two ends', async ({ page
   await expect(page.locator('.react-flow__node:not(.focus-dim)').filter({ hasText: 'Accounts Service' }).first()).toBeVisible()
 })
 
-test('each view keeps its own selection', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+test('leaving a view clears its selection', async ({ page, studio }) => {
+  await studio.openSampleWhole()
   const selected = page.locator('.react-flow__node.selected')
   await studio.nodeByLabel('Accounts Service').first().click()
   await expect(selected).toHaveCount(1)
+  await expect(studio.properties).toBeVisible()
 
-  // Core Banking shows Accounts Service too, but nothing was selected there.
+  // Core Banking shows Accounts Service too, but nothing is selected there.
   await studio.open('view-core', 'designer', studio.activeDocId())
   await expect(selected).toHaveCount(0)
   await expect(page.locator('.react-flow__node.focus-dim')).toHaveCount(0)
+  await expect(studio.properties).toHaveCount(0)
 
-  // Back on All elements, its selection and focus are there again.
-  await studio.open('canvas', 'designer', studio.activeDocId())
-  await expect(selected).toHaveCount(1)
-  await expect(selected).toContainText('Accounts Service')
-  await expect.poll(() => page.locator('.react-flow__node.focus-dim').count()).toBeGreaterThan(0)
+  // Back on the whole model, nothing is selected either: it went when the user left.
+  await studio.open('v-whole', 'designer', studio.activeDocId())
+  await expect(selected).toHaveCount(0)
+  await expect(page.locator('.react-flow__node.focus-dim')).toHaveCount(0)
 })
 
 test('the camera frames a selection and goes back when it is cleared', async ({ page, studio }) => {
-  await studio.openSample('canvas')
+  await studio.openSampleWhole()
   const transform = () => page.locator('.react-flow__viewport').getAttribute('style')
   const before = await transform()
 

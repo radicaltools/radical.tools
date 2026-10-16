@@ -67,8 +67,10 @@ test.describe('first visit', () => {
     await page.getByRole('button', { name: 'New model' }).click()
     await page.getByRole('button', { name: 'Create model' }).click()
     await studio.ready()
-    await expect(studio.nodes).toHaveCount(0)
-    await expect(page.getByPlaceholder(/Search 0 nodes/)).toBeVisible()
+    // It opens on All elements, the table of the whole model: empty, with a + row.
+    await expect(page.locator('.lp-view-card.active')).toContainText('All elements')
+    await expect(page.locator('.tv-empty')).toHaveText('No nodes.')
+    await expect(page.getByRole('button', { name: 'Add at the top' })).toBeVisible()
   })
 })
 
@@ -92,7 +94,7 @@ test.describe('returning visit', () => {
     await expect(last).toBeFocused()
     await page.keyboard.press('Enter')
     await studio.ready()
-    await expect(studio.nodes.first()).toBeVisible()
+    await expect(page.locator('tr.tv-row').first()).toBeVisible()
   })
 })
 

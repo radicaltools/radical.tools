@@ -18,16 +18,34 @@ import ReactFlow, {
 import { zoomIdentity } from 'd3-zoom'
 import { lowDetailAt } from '../store/canvasDetail'
 import { useDiagramStore } from '../store/diagramStore'
+import { paletteCover, propertiesPanelCover } from './propertiesCover'
 import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
 import { edgeLabelDetail, edgeLabelsShownAt } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { AlignmentGuides } from './AlignmentGuides'
 import { selectCanvasFocus } from '../store/canvasFocus'
-import { ElementPalette, usePaletteCollapsed } from './ElementPalette'
+import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize } from '@radical/common/c4'
 import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
+
+/** The viewport that fits `bounds` in the part of the canvas (`rect`) the
+ *  elements palette on its left leaves free — and, framing a selection
+ *  (`card`), the properties card on its right — while that is at least half
+ *  of it; else in the whole canvas. A fit of the whole view leaves the card
+ *  out: it comes and goes with the selection. */
+function viewportInFree(
+  bounds: { x: number; y: number; width: number; height: number },
+  rect: { width: number; height: number },
+  minZoom: number, maxZoom: number, padding: number, card = false,
+): { x: number; y: number; zoom: number } {
+  const left = paletteCover()
+  const free = rect.width - left - (card ? propertiesPanelCover() : 0)
+  if (free < rect.width / 2) return getViewportForBounds(bounds, rect.width, rect.height, minZoom, maxZoom, padding)
+  const vp = getViewportForBounds(bounds, free, rect.height, minZoom, maxZoom, padding)
+  return { ...vp, x: vp.x + left }
+}
 
 // Node and edge type registrations: each draws a card, or a block when
 // zoomed out (withDetail, store/canvasDetail.ts).
@@ -379,7 +397,7 @@ function StructuralCanvas(): React.ReactElement {
       width: bounds.width + FIT_MARGIN * 2,
       height: bounds.height + FIT_MARGIN * 2,
     }
-    return getViewportForBounds(padded, rect.width, rect.height, 0.05, 4, 0.18)
+    return viewportInFree(padded, rect, 0.05, 4, 0.18)
   }, [])
 
   /**
@@ -419,7 +437,7 @@ function StructuralCanvas(): React.ReactElement {
         width: bounds.width + FIT_MARGIN * 2,
         height: bounds.height + FIT_MARGIN * 2,
       }
-      return getViewportForBounds(padded, rect.width, rect.height, 0.05, 4, 0.18)
+      return viewportInFree(padded, rect, 0.05, 4, 0.18)
     }
     const newlyVisible = visible.filter((n) => !prev.has(n.id))
     const removedCount = [...prev].filter((id) => !currentIds.has(id)).length
@@ -475,7 +493,7 @@ function StructuralCanvas(): React.ReactElement {
       width: bounds.width + FIT_MARGIN * 2,
       height: bounds.height + FIT_MARGIN * 2,
     }
-    return getViewportForBounds(padded, rect.width, rect.height, 0.05, 4, 0.18)
+    return viewportInFree(padded, rect, 0.05, 4, 0.18)
   }, [])
 
   /** Puts the camera on `target`, then refits it every frame while the live
@@ -730,9 +748,9 @@ function StructuralCanvas(): React.ReactElement {
       }
       const bounds = getNodesBounds(focus)
       const MARGIN = 60
-      const target = getViewportForBounds(
+      const target = viewportInFree(
         { x: bounds.x - MARGIN, y: bounds.y - MARGIN, width: bounds.width + MARGIN * 2, height: bounds.height + MARGIN * 2 },
-        rect.width, rect.height, 0.05, maxZoom, 0.08,
+        rect, 0.05, maxZoom, 0.08, true,
       )
       suppressAutoFit(duration + 1800)
       instance.setViewport(target, { duration })
@@ -778,7 +796,8 @@ function StructuralCanvas(): React.ReactElement {
         const b = getNodesBounds(shown)
         const left = b.x * now.zoom + now.x
         const top = b.y * now.zoom + now.y
-        if (left >= 0 && top >= 0 && left + b.width * now.zoom <= rect.width && top + b.height * now.zoom <= rect.height) return
+        const free = rect.width - propertiesPanelCover()
+        if (left >= paletteCover() && top >= 0 && left + b.width * now.zoom <= free && top + b.height * now.zoom <= rect.height) return
       }
       // Framing again from the framed camera keeps the one from before.
       if (!preFocusCameraRef.current || !framedCameraRef.current || !sameCamera(now, framedCameraRef.current)) {
@@ -825,7 +844,9 @@ function StructuralCanvas(): React.ReactElement {
       // the pan animation is running and for a couple of seconds after,
       // so the user actually has time to look at the focused node.
       suppressAutoFit(dur + 2500)
-      instance.setCenter(px, py, { zoom: opts?.zoom ?? 1.1, duration: dur })
+      // Centred in what the palette and the properties card leave free.
+      const zoom = opts?.zoom ?? 1.1
+      instance.setCenter(px + (propertiesPanelCover() - paletteCover()) / 2 / zoom, py, { zoom, duration: dur })
     }
     // A presentation slide with focus elements frames just those, once React
     // Flow has drawn them (the slide switch may have just swapped the view).
@@ -857,7 +878,8 @@ function StructuralCanvas(): React.ReactElement {
       if (stored || s.autoFitActive) {
         placeCamera(stored)
       } else {
-        instance.fitView({ padding: 0.12 })
+        const fit = computeFitTarget()
+        if (fit) instance.setViewport(fit)
       }
     }, 100)
 
@@ -868,7 +890,7 @@ function StructuralCanvas(): React.ReactElement {
       delete (window as any).__radicalZoomIn
       delete (window as any).__radicalZoomOut
     }
-  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, placeCamera, frameNodes])
+  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, placeCamera, frameNodes, computeFitTarget])
 
   // Double-click on the canvas background → add a new System at that position
   const onCanvasDoubleClick = useCallback(
@@ -1460,19 +1482,17 @@ function StructuralCanvas(): React.ReactElement {
   )
 }
 
-/** The canvas, with the elements palette above it in Designer and its
- *  controls centred at its bottom (neither while a presentation plays). The
- *  palette is folded away with its tab; that is remembered in this browser.
+/** The canvas, with the elements palette down its left side in Designer and
+ *  its controls centred at its bottom (neither while a presentation plays).
  *  `smartLayoutNote` goes to the Smart Layout button (CanvasControls). */
 export function Canvas({ smartLayoutNote }: { smartLayoutNote?: string } = {}): React.ReactElement {
   const presenting = useDiagramStore((s) => s.presentationActive)
   const showPalette = useDiagramStore((s) => s.appMode === 'designer') && !presenting
-  const [paletteCollapsed, togglePalette] = usePaletteCollapsed()
   // One element around both, whether the palette shows or not: switching
   // modes must not mount the canvas again.
   return (
     <div className="canvas-column">
-      {showPalette && <ElementPalette collapsed={paletteCollapsed} onToggleCollapsed={togglePalette} />}
+      {showPalette && <ElementPalette />}
       <StructuralCanvas />
       {!presenting && <CanvasControls smartLayoutNote={smartLayoutNote} />}
     </div>

@@ -1,5 +1,5 @@
 import { builtInC4Metamodel } from '@radical/common/metamodel'
-import { test, expect, fixture } from '../../support/fixtures'
+import { test, expect, fixture, withWhole, WHOLE } from '../../support/fixtures'
 
 // Bugs found by exploratory runs 13 to 24 that only a browser shows. Each
 // test fails without its fix (docs/IMPROVEMENTS.md, items 59 on).
@@ -13,11 +13,11 @@ const radicalBookstore = (): string => {
 test('Ctrl/Cmd+Z in an open wizard leaves the model behind it alone', async ({ page, studio }) => {
   // It took back the element the wizard was creating its child in; Create
   // then saved a child of nothing and the model could not be opened again.
-  await studio.seedDocument(radicalBookstore())
-  await studio.open('canvas')
+  await studio.seedDocument(withWhole(radicalBookstore()))
+  await studio.open(WHOLE)
   const pane = (await studio.pane.boundingBox())!
   // A system of its own, then an ADR into it: the wizard opens.
-  await studio.addFromPalette('Software System', { x: 300, y: pane.height - 200 })
+  await studio.addFromPalette('Software System', await studio.nearBottom())
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
   await page.waitForTimeout(800)
   const before = await studio.nodes.count()
@@ -141,7 +141,7 @@ test('a number property is a number field and saves a number, on elements and re
   const saved = async (): Promise<Saved> => JSON.parse(await studio.storedJson()) as Saved
 
   await studio.node('api').click()
-  const replicas = page.locator('.props-field', { hasText: 'Replicas' }).locator('input')
+  const replicas = studio.attribute('Replicas')
   await expect(replicas).toHaveAttribute('type', 'number')
   await replicas.fill('3')
   await expect.poll(async () => (await saved()).nodes.find((n) => n.id === 'api')!.replicas).toBe(3)
@@ -150,7 +150,7 @@ test('a number property is a number field and saves a number, on elements and re
 
   const edge = page.locator('[data-testid="rf__edge-r3"] path.react-flow__edge-interaction').first()
   await edge.click({ force: true })
-  const weight = page.locator('.props-field', { hasText: 'Weight' }).locator('input')
+  const weight = studio.attribute('Weight')
   await expect(weight).toHaveAttribute('type', 'number')
   await weight.fill('5')
   await expect.poll(async () => (await saved()).relations.find((r) => r.id === 'r3')!.weight).toBe(5)
@@ -184,8 +184,8 @@ test('expanding a container in a large nested model moves only what is around it
     seen.add(`${a}>${b}`)
     relations.push({ id: `r${relations.length}`, sourceId: a, targetId: b, label: 'uses' })
   }
-  await studio.seedDocument(JSON.stringify({ nodes, relations, sequences: [], views: [], snapshots: [], presentations: [] }))
-  await studio.open('canvas')
+  await studio.seedDocument(withWhole(JSON.stringify({ nodes, relations, sequences: [], views: [], snapshots: [], presentations: [] })))
+  await studio.open(WHOLE)
   await page.waitForTimeout(1500)
   const toggle = (): Promise<void> => studio.node('s0c0').locator('.c4-node-collapse-btn').first().dispatchEvent('click')
   await toggle()

@@ -1,7 +1,13 @@
-import { test, expect, type Studio } from '../../support/fixtures'
+import { test, expect, WHOLE, type Studio } from '../../support/fixtures'
 
 // Alignments: elements the user keeps in a row or a column on one canvas,
 // held by the live physics, Smart Layout and across a reload.
+
+/** The alignments and pins kept for the WHOLE view, as saved. */
+async function wholeConstraints(studio: Studio): Promise<Array<{ type: string; ordered?: boolean }> | undefined> {
+  const doc = await studio.storedDoc() as { views?: Array<{ id: string; layoutConstraints?: Array<{ type: string; ordered?: boolean }> }> }
+  return doc.views?.find((v) => v.id === WHOLE)?.layoutConstraints
+}
 
 /** Largest spread of the drawn centres of `ids` on one axis, in screen px. */
 async function spread(studio: Studio, ids: string[], axis: 'x' | 'y'): Promise<number> {
@@ -16,9 +22,9 @@ async function select(studio: Studio, ids: string[]): Promise<void> {
   await expect(studio.page.locator('.sel-bar-badge')).toHaveText(String(ids.length))
 }
 
-test('a row on All elements holds through a drag, Smart Layout and a reload', async ({ page, studio }) => {
-  await studio.seed()
-  await studio.open('canvas')
+test('a row on a canvas of the whole model holds through a drag, Smart Layout and a reload', async ({ page, studio }) => {
+  await studio.seedWhole()
+  await studio.open(WHOLE)
   // A person, a container inside a system, and another system.
   const row = ['customer', 'api', 'payments']
   await select(studio, row)
@@ -29,8 +35,14 @@ test('a row on All elements holds through a drag, Smart Layout and a reload', as
   // The guide shows only while a member is selected.
   await studio.node('db').click()
   await expect(page.getByTestId('alignment-guides').locator('line')).toHaveCount(0)
+  // The click framed the database: a click on the empty canvas brings back the camera.
+  await studio.canvas.click({ position: { x: 700, y: 20 } })
+  await studio.settle()
   await studio.node('customer').click()
   await expect(page.getByTestId('alignment-guides').locator('line').first()).toBeAttached()
+  // The properties card lies over the canvas's right side, where Payment Provider may be.
+  await studio.properties.getByRole('button', { name: 'Close properties' }).click()
+  await studio.settle()
 
   // Drag one member down: the others follow it onto its new line.
   const box = (await studio.node('payments').boundingBox())!
@@ -41,7 +53,7 @@ test('a row on All elements holds through a drag, Smart Layout and a reload', as
   await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
 
   // The row, and the pin on the dropped element.
-  const types = async (): Promise<string[] | undefined> => (await studio.storedDoc() as { defaultLayoutConstraints?: Array<{ type: string }> }).defaultLayoutConstraints?.map((c) => c.type)
+  const types = async (): Promise<string[] | undefined> => (await wholeConstraints(studio))?.map((c) => c.type)
   await expect.poll(types).toEqual(['align', 'pin'])
 
   // Smart Layout keeps a layout no worse than what it finds, so first send
@@ -55,7 +67,7 @@ test('a row on All elements holds through a drag, Smart Layout and a reload', as
   await studio.smartLayout()
   await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
   await expect.poll(types).toEqual(['align'])
-  await studio.open('canvas')
+  await studio.open(WHOLE)
   await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
 })
 
@@ -112,8 +124,8 @@ test('a column in a view stays in that view and can be removed from the canvas',
 })
 
 test('a row keeps the selection order through a drag past a neighbour and Smart Layout', async ({ page, studio }) => {
-  await studio.seed()
-  await studio.open('canvas')
+  await studio.seedWhole()
+  await studio.open(WHOLE)
   // Selected right to left: Payment Provider is drawn right of Customer.
   const row = ['payments', 'customer']
   await select(studio, row)
@@ -146,7 +158,7 @@ test('a row keeps the selection order through a drag past a neighbour and Smart 
   await studio.node(left).click()
   await page.getByRole('button', { name: 'Stop keeping row order' }).click()
   await expect(page.getByRole('button', { name: 'Keep row order' })).toHaveAttribute('aria-pressed', 'false')
-  await expect.poll(async () => (await studio.storedDoc() as { defaultLayoutConstraints?: Array<{ ordered?: boolean }> }).defaultLayoutConstraints?.[0]?.ordered, { timeout: 10_000 }).toBeUndefined()
+  await expect.poll(async () => (await wholeConstraints(studio))?.[0]?.ordered, { timeout: 10_000 }).toBeUndefined()
 })
 
 test('a grid fills in selection order and takes another column from the canvas', async ({ page, studio }) => {

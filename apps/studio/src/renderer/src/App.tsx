@@ -23,15 +23,15 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useRouteSync, useShownMode, parseHash } from './route'
 
 const LS_LEFT = 'radical-leftpanel-collapsed'
-const LS_RIGHT = 'radical-rightpanel-collapsed'
 
 function AppInner(): React.ReactElement {
   const runRadicalLayout = useDiagramStore((s) => s.runRadicalLayout)
   // A link still waiting for its document is drawn in its own perspective.
   const appMode = useShownMode()
   const presentationActive = useDiagramStore((s) => s.presentationActive)
+  // All elements (no active view) is the whole model as a table.
   const activeViewKind = useDiagramStore((s) =>
-    s.activeViewId ? (s.views[s.activeViewId]?.kind ?? 'static') : 'static'
+    s.activeViewId ? (s.views[s.activeViewId]?.kind ?? 'static') : 'table'
   )
   const isTreemapView  = activeViewKind === 'treemap'
   const isSequenceView = activeViewKind === 'dynamic'
@@ -49,7 +49,6 @@ function AppInner(): React.ReactElement {
   const isReadOnlyMode = !isDesigner && !isMetamodel && !isInspector
 
   const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() => localStorage.getItem(LS_LEFT) === '1')
-  const [rightCollapsed, setRightCollapsed] = useState<boolean>(() => localStorage.getItem(LS_RIGHT) === '1')
   // The welcome screen is a web-only landing splash. Skip it when the user
   // arrived via a deep link (the hash already encodes a destination) so the
   // pasted URL lands straight on its target instead of behind the splash.
@@ -64,26 +63,6 @@ function AppInner(): React.ReactElement {
   const toggleLeft = useCallback(() => {
     setLeftCollapsed((c) => { localStorage.setItem(LS_LEFT, c ? '0' : '1'); return !c })
   }, [])
-  const toggleRight = useCallback(() => {
-    setRightCollapsed((c) => { localStorage.setItem(LS_RIGHT, c ? '0' : '1'); return !c })
-  }, [])
-
-  // Expose a way for global features (e.g. Quick Search) to force the right
-  // panel open so the freshly-selected node's properties slide into view
-  // instead of being hidden behind a collapsed panel.
-  useEffect(() => {
-    ;(window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel = () => {
-      setRightCollapsed((c) => {
-        if (!c) return c
-        localStorage.setItem(LS_RIGHT, '0')
-        return false
-      })
-    }
-    return () => {
-      delete (window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel
-    }
-  }, [])
-
   // Run Radical layout automatically on first load — but only when nodes have
   // no saved positions yet (all at origin). Skip if positions were loaded from file.
   useEffect(() => {
@@ -102,7 +81,6 @@ function AppInner(): React.ReactElement {
     !isPresenting && isInspector ? 'mode-inspector' : '',
     !isPresenting && isReadOnlyMode ? 'mode-presentation' : '',
     !isPresenting && leftCollapsed ? 'lp-collapsed' : '',
-    !isPresenting && rightCollapsed ? 'rp-collapsed' : '',
   ].filter(Boolean).join(' ')
 
   return (
@@ -112,8 +90,8 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : <Canvas />}
-      {!isPresenting && isDesigner && <RightPanel collapsed={rightCollapsed} onToggleCollapsed={toggleRight} />}
-      {!isPresenting && isViewer && <RightPanel readOnly collapsed={rightCollapsed} onToggleCollapsed={toggleRight} />}
+      {!isPresenting && isDesigner && <RightPanel />}
+      {!isPresenting && isViewer && <RightPanel readOnly />}
       {!isPresenting && isPresenter && <PresenterDock />}
       <PresentationBar />
       {!isPresenting && !isInspector && isCanvasView && <SelectionActionBar />}

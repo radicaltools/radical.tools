@@ -371,8 +371,8 @@ export function QuickSearch(): React.ReactElement | null {
     setFocused(false)
     setQ('')
     inputRef.current?.blur()
-    // Make sure the right-side properties panel is visible so the user can
-    // see the freshly-selected object's details immediately after jumping.
+    // Bring back the properties card if ✕ hid it, so the freshly-selected
+    // object's details show right after jumping.
     const expandRight = (window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel
     expandRight?.()
     if (r.kind === 'view') {

@@ -477,6 +477,21 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     pane click that restores the camera may land while the fit to the
     selection still moves it; waiting for the camera to rest before the
     click would make it steady.
+33. **Renaming a test means hunting the scenarios that name it.** On
+    2026-10-16 eight e2e tests were renamed or moved onto other views (All
+    elements became a table). The scenarios and fitness functions naming them
+    were found with `LIST NODES WHERE tests ~ "…"` one title at a time and
+    each `tests` rewritten whole. A tool that renames a test id across the
+    model (`rename_test from to`), or `radical check` suggesting the closest
+    existing title for a missing one, would make this one call.
+34. **`delete_node` leaves the element's positions behind.** On 2026-10-16
+    an empty "New State Machine" was deleted from `architecture/` over MCP:
+    its file and relation went, but five views (Domain map, Domain model,
+    System context, Containers, Components) and `_layout.json` still hold a
+    position for its id. `add_node` also gives a new element a position in
+    every structure view, listed there or not. Deleting should drop the id
+    from every view's positions, and adding should place it only where it
+    is drawn.
 
 ### Reverse-engineered requirements (2026-10-06)
 
@@ -2191,7 +2206,8 @@ Found while doing it:
 3. **The selection bar squeezes its buttons** with *Align children…* in it:
    on a 1440 px window "1 node selected", *Wrap into…*, *Move to…* and *Hide
    from view* wrap onto two or three lines (the properties screenshot shows it).
-4. **Presenter leaves an empty strip** on the right where the right panel was.
+4. ~~**Presenter leaves an empty strip** on the right where the right panel was.~~
+   Gone with the right column (2026-10-16): the properties card lies over the view.
 5. **An old MCP server drops new metamodel fields.** A `radical-architecture`
    server built before #195 kept running and rewrote `architecture/`: the
    fitness function's `summary` template disappeared from metamodel.json. A
@@ -2202,3 +2218,29 @@ Found while doing it:
 7. **Undo / Redo look active in Viewer and Presenter** but do nothing there.
 8. ~~**README's demo.gif is from before the welcome screen and palette redesign.**~~
    Done: `npm run docs:screenshots` records it, and the social preview too.
+
+
+### Properties card, palette and All elements (2026-10-16)
+
+The right panel became a properties card over the view, the Elements palette
+a bar down the canvas's left side, and All elements a table. Left open:
+
+1. **MCP still arranges a layout Studio no longer shows.** `smart_layout`
+   and `align_nodes` / `grid_nodes` without a view work on the model's own
+   layout (`defaultPositions`, `defaultLayoutConstraints`), which used to be
+   the All elements canvas. Studio shows All elements as a table now, so that
+   layout only seeds new canvases. Either drop the no-view form (and say so in
+   the tool descriptions and the server instructions, which still speak of
+   the "All elements view"), or keep it as the seed and name it that.
+2. **No search on tables.** Quick Search sits only on canvas views, and a
+   model now opens on All elements, a table: a new user meets no search box.
+   The table could filter its rows by the same query.
+3. **The card covers the right of the canvas.** Shift-click selecting hides
+   it, and a click frames the selection beside it, but a drag to an element
+   under the card needs ✕ first. A card that steps aside while a drag is under
+   way (or turns translucent) would help.
+4. **The old sample opens on a table.** The Fintech sample's
+   `defaultPositions` (its All elements layout) are no longer shown; a
+   structure view of the whole sample ("Landscape") would show the demo model
+   drawn in one picture, if wanted.
+

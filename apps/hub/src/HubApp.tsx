@@ -38,7 +38,6 @@ import { SiteNav } from './SiteNav'
 
 const STUDIO_URL = import.meta.env.DEV ? '/' : 'https://studio.radical.tools'
 const LS_THEME = 'radical-theme'
-const LS_RIGHT = 'radical-hub-rp-collapsed'
 const TOP_TAGS_SHOWN = 16
 const SORT_LABELS: Record<HubSortKey, string> = { name: 'Name', category: 'Category', connections: 'Connections' }
 
@@ -258,7 +257,6 @@ function HubAppInner(): React.ReactElement {
   // Landing page vs catalogue. Any concept / filter implies the catalogue.
   const [browsing, setBrowsing] = useState<boolean>(() => !!parseHubHash(window.location.hash).browse)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
-  const [rightCollapsed, setRightCollapsed] = useState<boolean>(() => localStorage.getItem(LS_RIGHT) === '1')
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem(LS_THEME) as 'dark' | 'light') || 'dark')
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
   const [tagsExpanded, setTagsExpanded] = useState(false)
@@ -420,10 +418,6 @@ function HubAppInner(): React.ReactElement {
       pushNotification('Clipboard unavailable — use Download instead', 'error')
     }
   }, [pushNotification])
-
-  const toggleRight = useCallback(() => {
-    setRightCollapsed((c) => { localStorage.setItem(LS_RIGHT, c ? '0' : '1'); return !c })
-  }, [])
 
   const toggleGroup = useCallback((cat: string) => {
     setCollapsedGroups((prev) => toggleInSet(prev, cat))
@@ -671,7 +665,7 @@ function HubAppInner(): React.ReactElement {
       {conceptId && (
         <div className="hub-concept-overlay" onMouseDown={onBackdropMouseDown}>
           <div
-            className={`hub-concept-panel${rightCollapsed ? ' rp-collapsed' : ''}`}
+            className="hub-concept-panel"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
@@ -773,7 +767,7 @@ function HubAppInner(): React.ReactElement {
               </div>
             )}
 
-            <RightPanel readOnly collapsed={rightCollapsed} onToggleCollapsed={toggleRight} />
+            <RightPanel readOnly />
           </div>
         </div>
       )}
