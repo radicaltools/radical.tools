@@ -37,8 +37,11 @@ node apps/cli/dist/index.js hooks install path/to/model
 Adds one marked line to the repository's `post-checkout`, `post-commit` and
 `post-merge` hooks that runs `radical diff <folder> --save-base --quiet`, so
 the base Studio compares with follows the branch checked out. What the hooks
-already do stays, a second install adds nothing, and the line never fails
-the git command. It runs the CLI that installed it.
+already do stays, a second install adds nothing (or brings the line up to
+date when the CLI or node moved), and the line never fails the git command.
+It runs the CLI that installed it, with the `node` on the PATH, else the one
+that installed it. In this repository `npm run hooks` builds the CLI,
+installs the hooks for `architecture/` and saves its base once.
 
 ## radical check
 

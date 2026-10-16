@@ -11,7 +11,8 @@ export const HOOKS_USAGE = `Usage: radical hooks install [folder] [options]
 Adds a line to the repository's post-checkout, post-commit and post-merge git
 hooks that saves the model folder's base (radical diff --save-base), so
 Studio shows the changes of the branch checked out without anyone running
-it. What the hooks already do stays; running it again adds nothing.
+it. What the hooks already do stays; running it again adds nothing, but
+brings the line up to date when the CLI or node has moved.
 
   folder              the model folder (default: the working directory)
 
@@ -50,18 +51,29 @@ export async function hooksCommand(args: string[], io: Io): Promise<number> {
     // Git runs hooks at the top of the working tree.
     const line = `${io.command ?? 'radical'} diff ${quote(relative(top, root) || '.')} --save-base --quiet || true`
     const written: string[] = []
+    const updated: string[] = []
     for (const name of HOOK_NAMES) {
       const path = resolve(hooksDir, name)
       const old = await readFile(path, 'utf8').catch(() => null)
-      if (old?.includes(HOOK_MARKER)) continue
+      if (old?.includes(HOOK_MARKER)) {
+        // Installed before: the line after the marker becomes today's (the CLI or node moved).
+        const lines = old.split('\n')
+        const at = lines.indexOf(HOOK_MARKER)
+        if (lines[at + 1] === line) continue
+        lines[at + 1] = line
+        await writeFile(path, lines.join('\n'))
+        updated.push(name)
+        continue
+      }
       const head = old === null ? '#!/bin/sh\n' : old.endsWith('\n') ? old : `${old}\n`
       await writeFile(path, `${head}${HOOK_MARKER}\n${line}\n`)
       await chmod(path, 0o755)
       written.push(name)
     }
-    io.out(written.length
-      ? `Added to ${written.join(', ')} in ${relative(io.cwd, hooksDir) || hooksDir}: ${line}`
-      : 'The hooks already save the base; nothing changed.')
+    const where = relative(io.cwd, hooksDir) || hooksDir
+    io.out(written.length ? `Added to ${written.join(', ')} in ${where}: ${line}`
+      : updated.length ? `Updated in ${updated.join(', ')} in ${where}: ${line}`
+        : 'The hooks already save the base; nothing changed.')
     return 0
   } catch (error) {
     io.err(`radical hooks: ${folder}: ${(error as Error).message}`)

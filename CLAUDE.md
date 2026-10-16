@@ -11,7 +11,10 @@ with the rules, baselines and goals in `architecture/check.json`, and fails on a
 error. Claude Code reaches it through the project MCP server
 `radical-architecture` (`.mcp.json`), which needs
 `npm run build -w @radicaltools/mcp` once after cloning and after MCP changes.
-Studio can open the same folder.
+Studio can open the same folder. `npm run hooks` (once after cloning, and again
+after CLI changes) adds git hooks that save `architecture/.radical/base.json`
+after every checkout, commit and pull, so Studio's Changes on branch and the
+Inspector's Changes tab show the branch's model changes.
 
 - **Before a structural change** (a new or removed app or package, a new
   dependency between workspaces, a new external service, or going against a
