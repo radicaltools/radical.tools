@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./diskFolderStorage": "./src/diskFolderStorage.ts",
+    "./gitModel": "./src/gitModel.ts",
     "./selectionFile": "./src/selectionFile.ts"
   },
   "scripts": {

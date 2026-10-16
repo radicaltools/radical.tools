@@ -8,6 +8,7 @@
     "./c4": "./src/c4.ts",
     "./metamodel": "./src/metamodel/index.ts",
     "./model": "./src/model.ts",
+    "./modelChanges": "./src/modelChanges.ts",
     "./viewPipeline": "./src/viewPipeline.ts",
     "./viewpoints": "./src/viewpoints.ts",
     "./nodeSummary": "./src/nodeSummary.ts",

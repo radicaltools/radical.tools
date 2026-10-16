@@ -1,0 +1,11 @@
+---
+id: "b9ef9cb1-99f1-4b23-9b4b-97c0b56a072f"
+type: "adr"
+label: "Model changes come from git"
+alternatives: "A status (proposed, implemented) on requirements: a second record of what git already knows, and it goes stale. Milestones as the base: they model phases of the system, not the work on one branch. The raw git diff: layout noise and ids without labels. Compare with HEAD by default: an agent that commits along the way would lose what it had already done from the list."
+consequences: "An agent gets the change list in one call and can check it again before it reports done; radical check still says what is unverified. The list needs the folder in a git repository and git on the PATH; the tool is not in the shared catalogue, since Studio's chat has no git. Changes to views, the metamodel, sequences and milestones are not listed. A raw git diff stays the way to review layout changes."
+context: "The product owner adds or changes requirements, scenarios and components in the model, and a coding agent implements the change: the difference between the model the code follows and the edited one. The model describes the current implementation and is committed with the code (Model checked in CI), so its version in git is the one the code follows. The agent had only the raw git diff of the folder, which is mostly layout (_layout.json and views.json; PR #203 moved about 540 elements and changed 16 fields) and relations as bare ids."
+date: "2026-10-16"
+decision: "Compare the model folder on disk with the model at a git commit, both read as a model, and list only the model: elements and relations added, removed and changed, with each field's old and new value (compareModels' definition of a change, which leaves out positions, sizes and folding), and views not at all. Each element comes with its ancestors and relations, so the agent finds the component, the ADRs and the tests. The base is the ref given, else the merge base of the current branch with the default branch, so the whole branch counts and an agent's own commits do not hide what is left. One implementation in @radical/node-files (gitModel) over a pure report in @radical/common (modelChanges), served as get_changes by the MCP server and as radical diff by the CLI."
+status: "accepted"
+---

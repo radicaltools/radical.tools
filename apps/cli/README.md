@@ -2,6 +2,25 @@
 
 The `radical` command line for Radical Markdown model folders.
 
+## radical diff
+
+```sh
+node apps/cli/dist/index.js diff path/to/model [--since <ref>] [--format json]
+```
+
+Lists what changed in the model folder since its version in git: the
+elements and relations added, removed and changed, uncommitted edits
+included, with each changed field's old and new value and each element's
+place and relations (the component that satisfies a requirement, the
+scenarios that verify it, the ADRs that constrain it). Only the model is
+compared; views, positions, sizes and folding are left out. By default it
+compares with the merge base of the current branch and the default branch
+(`origin/main`, else `main`), so it shows every model change on the branch;
+`--since HEAD` shows what changed since the last commit. The MCP server's
+`get_changes` tool gives the same list to an agent that implements the
+change. Exit status: 0 the list was written, 2 it could not be made (not a
+git repository, an unknown ref).
+
 ## radical check
 
 ```sh

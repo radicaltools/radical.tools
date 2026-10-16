@@ -17,19 +17,27 @@ Studio can open the same folder.
   dependency between workspaces, a new external service, or going against a
   decision): call `get_model_summary`, then `search_model` for the elements
   involved and read the ADRs that constrain them (`GET NEIGHBORS OF <id>`).
-- **Along with the change**, update the model through the MCP tools rather
-  than by editing the files: add or move elements and relations, record a new
-  decision as an ADR (status, date, context, decision, consequences,
-  alternatives) linked with `constrains`, and an automated check as a fitness
-  function that `implements` it. Then run `smart_layout` on the views you
-  changed.
-- Scenarios and fitness functions name the tests that run them in `tests`
-  (one `file › title` per line). When you add a scenario, or rename, move or
-  delete a test one names, update `tests` with it.
+- **Model first, then the code.** A change starts in the model, on the
+  branch that will implement it: update the model through the MCP tools
+  rather than by editing the files (add or change requirements, scenarios
+  with the tests they will name, components, relations; record a new
+  decision as an ADR with status, date, context, decision, consequences and
+  alternatives, linked with `constrains`, and an automated check as a fitness
+  function that `implements` it; then run `smart_layout` on the views you
+  changed). Only then write the code. The model change and its
+  implementation go in the same branch and pull request: never push or merge
+  a model change to `main` ahead of its code.
+- **To implement the model change**, start with `get_changes` (or
+  `radical diff architecture`): it lists what changed in the model since the
+  branch left `main`, uncommitted and unpushed edits included, with old and
+  new values and the related elements. If the model change already reached
+  `main`, pass `since` with the commit before it. Call it again before you
+  report the work as done, and correct the model where the code turned out
+  different.
 - A change that adds behaviour adds its requirement (EARS, derived from a need,
   satisfied by the component that implements it), and a scenario naming the
   tests that check it. A change that alters behaviour updates the texts that
-  describe it. The model describes the current implementation.
+  describe it. On `main` the model describes the current implementation.
 - Before pushing, run what CI runs: `npm run test:reports` (plus `npm run e2e`
   for the e2e tests; both write to `reports/`), then
   `npm run check:architecture`. It must report no errors: a failing or missing

@@ -499,6 +499,16 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     the check. Tools `get_check` (the result with its metrics) and
     `set_check_config` (with the loosening warnings of compareCheckConfig)
     would let an agent keep the gate the way Studio's Settings do.
+36. ~~**An agent cannot see what changed in the model.**~~ Added on
+    2026-10-16: `get_changes` (MCP) and `radical diff` list the elements and
+    relations changed since the model's version in git, layout left out (the
+    raw diff of PR #203 was some 540 moved elements around 16 changed
+    fields). Still open: Studio does not show that list (the changes of the
+    branch highlighted on the canvas, as the milestone diff does, would let
+    the product owner see what they hand over); changes to views, the
+    metamodel and sequences are not listed; and the running
+    `radical-architecture` server offers the tool only after a rebuild and a
+    restart of the client.
 
 ### Reverse-engineered requirements (2026-10-06)
 
