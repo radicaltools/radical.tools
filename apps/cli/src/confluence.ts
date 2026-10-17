@@ -83,8 +83,9 @@ export function hasWikiMarker(storage: string, marker: string): boolean {
   return new RegExp(`<ac:parameter\\s+ac:name=["']{2}>${marker}</ac:parameter>`).test(storage)
 }
 
-/** One managed document, also used for a tree's landing page. */
-export async function publishWiki(document: WikiExport, options: PublishOptions, request: typeof fetch = fetch): Promise<{ id: string; url: string; action: 'created' | 'updated' }> {
+/** One managed document, also used for a tree's landing page. Preparing a
+ * tree creates its placeholder but leaves an existing landing body intact. */
+export async function publishWiki(document: WikiExport, options: PublishOptions, request: typeof fetch = fetch, mode: 'publish' | 'prepare' = 'publish'): Promise<{ id: string; url: string; action: 'created' | 'updated' }> {
   const { base, api } = confluenceClient(options, request)
   let pageId = options.pageId
   if (!pageId) {
@@ -105,6 +106,7 @@ export async function publishWiki(document: WikiExport, options: PublishOptions,
     if (!hasWikiMarker(current.body?.storage?.value ?? '', document.marker)) {
       throw new Error('The destination is not a managed export of this wiki. Choose a new title or the correct --page-id; no page was changed.')
     }
+    if (mode === 'prepare') return { id: pageId, url: `${base}/pages/viewpage.action?pageId=${pageId}`, action: 'updated' }
     saved = await api(`/pages/${encodeURIComponent(pageId)}`, 'PUT', {
       id: pageId, status: 'current', title: document.title, body,
       ...(options.parentId ? { parentId: options.parentId } : {}),

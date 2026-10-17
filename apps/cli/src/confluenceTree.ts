@@ -1,12 +1,15 @@
 import { createHash } from 'node:crypto'
 import { confluenceClient, hasWikiMarker, publishWiki, type Page, type PublishOptions } from './confluence'
-import { anchorOf, markerOf, xml, type WikiExport } from './wikiExport'
+import { anchor, anchorOf, markerOf, xml, type WikiExport } from './wikiExport'
 
 type Mapping = Record<string, { id: string; title: string; sourceHash?: string; version?: number }>
 interface Property { id: string; key: string; version: { number: number }; value: { schema: number; viewId: string; pages: Mapping } }
 const PREFIX = 'radical.wiki.pages.'
 const digest = (text: string) => createHash('sha256').update(text).digest('hex')
 const bucketOf = (id: string) => digest(id)[0]
+// Rewrite exports from the single-pass publisher once to resolve old forward links.
+const sourceHashOf = (storage: string) => digest(`resolved-page-links-v1\0${storage}`)
+const placeholder = (marker: string) => `${anchor(marker)}<p>Publication in progress. Radical is the source of truth. Rerun publication to finish this page.</p>`
 
 /** A canonical page for each element; shared scenarios link from every parent. */
 export function treePlan(document: WikiExport) {
@@ -34,7 +37,7 @@ export function treePlan(document: WikiExport) {
 export async function publishTree(document: WikiExport, options: PublishOptions, request: typeof fetch = fetch, progress: (message: string) => void = () => {}) {
   const plan = treePlan(document)
   const { api, base } = confluenceClient(options, request)
-  const landing = await publishWiki({ ...document, storage: plan.landingStorage }, options, request)
+  const landing = await publishWiki({ ...document, storage: placeholder(document.marker) }, options, request, 'prepare')
   progress(`Confluence tree: ${landing.url} (${document.elementCount} element pages).`)
   let spaceId = options.spaceId
   if (!spaceId) spaceId = ((await api(`/pages/${landing.id}`)) as Page).spaceId
@@ -78,6 +81,12 @@ export async function publishTree(document: WikiExport, options: PublishOptions,
     }
   }
   let created = 0, updated = 0, unchanged = 0, completed = 0
+  const createdNodes = new Set<string>(), changedNodes = new Set<string>()
+  const managedPage = async (id: string, page: typeof plan.pages[number]): Promise<Page> => {
+    const current = await api(`/pages/${encodeURIComponent(id)}?body-format=storage`) as Page
+    if (current.id !== id || current.status !== 'current' || current.spaceId !== spaceId || !Number.isInteger(current.version?.number) || !hasWikiMarker(current.body?.storage?.value ?? '', page.marker)) throw new Error(`Page "${page.title}" is not a managed export of this element. It was not changed.`)
+    return current
+  }
   const pageByNode = new Map(plan.pages.map((p) => [p.nodeId, p]))
   const depthOf = (id: string, trail = new Set<string>()): number => {
     if (trail.has(id)) throw new Error('The exported page hierarchy contains a cycle.')
@@ -91,6 +100,8 @@ export async function publishTree(document: WikiExport, options: PublishOptions,
     const pages = depths.get(depth) ?? []; pages.push(p); depths.set(depth, pages)
   }
   try {
+    // Prepare every destination before saving any body that links to it.
+    // Existing bodies stay intact; only new pages need a placeholder.
     for (const [, pages] of [...depths].sort(([a], [b]) => a - b)) {
       for (let at = 0; at < pages.length; at += 32) {
         const batch = pages.slice(at, at + 32)
@@ -107,35 +118,61 @@ export async function publishTree(document: WikiExport, options: PublishOptions,
               if (!Array.isArray(found.results) || found.results.length > 1 || found._links?.next) throw new Error(`Cannot unambiguously recover page "${page.title}".`)
               id = found.results[0]?.id
             }
-            const body = { representation: 'storage', value: page.storage }
-            const sourceHash = digest(page.storage)
-            let version: number
             if (id) {
-              const current = await api(`/pages/${encodeURIComponent(id)}?body-format=storage`) as Page
-              if (current.id !== id || current.status !== 'current' || current.spaceId !== spaceId || !Number.isInteger(current.version?.number) || !hasWikiMarker(current.body?.storage?.value ?? '', page.marker)) throw new Error(`Page "${page.title}" is not a managed export of this element. It was not changed.`)
-              version = current.version.number
-              if (current.title === page.title && current.parentId === parentId && (current.body?.storage?.value === page.storage || (mapping[page.nodeId]?.sourceHash === sourceHash && mapping[page.nodeId]?.version === version))) unchanged++
-              else {
-                await api(`/pages/${id}`, 'PUT', { id, status: 'current', title: page.title, parentId, body, version: { number: current.version.number + 1, message: 'Published from Radical.' } })
-                updated++; version++
+              const current = await managedPage(id, page)
+              if (current.title !== page.title || current.parentId !== parentId) {
+                await api(`/pages/${id}`, 'PUT', { id, status: 'current', title: page.title, parentId, body: { representation: 'storage', value: current.body!.storage!.value! }, version: { number: current.version.number + 1, message: 'Prepared for publication from Radical.' } })
+                changedNodes.add(page.nodeId)
               }
             } else {
-              const saved = await api('/pages', 'POST', { spaceId, parentId, title: page.title, status: 'current', body }) as Page
+              const saved = await api('/pages', 'POST', { spaceId, parentId, title: page.title, status: 'current', body: { representation: 'storage', value: placeholder(page.marker) } }) as Page
               if (typeof saved.id !== 'string' || !/^\d+$/.test(saved.id)) throw new Error('Confluence returned no element page ID. Rerun to recover the publication.')
-              id = saved.id; version = saved.version?.number ?? 1; created++
+              id = saved.id; createdNodes.add(page.nodeId); created++
             }
-            if (mapping[page.nodeId]?.id !== id || mapping[page.nodeId]?.title !== page.title || mapping[page.nodeId]?.version !== version || mapping[page.nodeId]?.sourceHash !== sourceHash) {
-              mapping[page.nodeId] = { id, title: page.title, version, sourceHash }; dirty.add(PREFIX + bucketOf(page.nodeId))
+            if (mapping[page.nodeId]?.id !== id || mapping[page.nodeId]?.title !== page.title) {
+              // Keep the last published hash/version until the linked body
+              // is confirmed; a prepared page is not a completed publication.
+              mapping[page.nodeId] = { ...mapping[page.nodeId], id, title: page.title }; dirty.add(PREFIX + bucketOf(page.nodeId))
             }
-            completed++
           }))
           const failure = outcomes.find((r) => r.status === 'rejected')
           if (failure?.status === 'rejected') throw failure.reason
         }
         await checkpoint()
-        progress(`Confluence tree: ${completed}/${plan.pages.length} element pages (${created} created, ${updated} updated, ${unchanged} unchanged).`)
+        progress(`Confluence tree: preparing destinations (${created} new element pages).`)
       }
     }
+    // All planned titles now exist, including children and crosslinked peers.
+    for (let at = 0; at < plan.pages.length; at += 32) {
+      const batch = plan.pages.slice(at, at + 32)
+      for (let start = 0; start < batch.length; start += 4) {
+        const outcomes = await Promise.allSettled(batch.slice(start, start + 4).map(async (page) => {
+          const entry = mapping[page.nodeId]
+          const current = await managedPage(entry.id, page)
+          const parentId = page.parentNodeId ? mapping[page.parentNodeId].id : landing.id
+          if (current.title !== page.title || current.parentId !== parentId) throw new Error(`Page "${page.title}" moved or was renamed during publication. Review it before retrying.`)
+          const sourceHash = sourceHashOf(page.storage)
+          let version = current.version.number
+          if (current.body?.storage?.value !== page.storage && !(entry.sourceHash === sourceHash && entry.version === version)) {
+            await api(`/pages/${entry.id}`, 'PUT', { id: entry.id, status: 'current', title: page.title, parentId, body: { representation: 'storage', value: page.storage }, version: { number: version + 1, message: 'Published from Radical.' } })
+            version++; changedNodes.add(page.nodeId)
+          }
+          if (!createdNodes.has(page.nodeId)) {
+            if (changedNodes.has(page.nodeId)) updated++
+            else unchanged++
+          }
+          if (entry.version !== version || entry.sourceHash !== sourceHash) {
+            mapping[page.nodeId] = { id: entry.id, title: page.title, version, sourceHash }; dirty.add(PREFIX + bucketOf(page.nodeId))
+          }
+          completed++
+        }))
+        const failure = outcomes.find((r) => r.status === 'rejected')
+        if (failure?.status === 'rejected') throw failure.reason
+      }
+      await checkpoint()
+      progress(`Confluence tree: ${completed}/${plan.pages.length} element pages (${created} created, ${updated} updated, ${unchanged} unchanged).`)
+    }
+    await publishWiki({ ...document, storage: plan.landingStorage }, { ...options, pageId: landing.id }, request)
   } catch (error) {
     // Keep successful sibling writes so a rerun can resume. Title+marker lookup
     // also recovers a create if the mapping write itself was interrupted.

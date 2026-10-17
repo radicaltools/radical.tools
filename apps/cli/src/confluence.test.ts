@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -6,7 +7,7 @@ import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import type { C4Node, DiagramData, DiagramView } from '@radical/common/c4'
 import { main } from './cli'
-import { anchorOf, exportWiki } from './wikiExport'
+import { anchorOf, exportWiki, xml } from './wikiExport'
 import { confluenceBase, publishWiki } from './confluence'
 import { publishTree, treePlan } from './confluenceTree'
 
@@ -86,6 +87,26 @@ describe('Confluence wiki projection', () => {
     expect(out.markdown).toContain('## Checkout')
     expect(out.markdown).toContain('### Pay & confirm')
     expect(out.markdown).not.toContain('Successful checkout')
+  })
+
+  it('exports repeated element types at the configured chain depth', () => {
+    const data: DiagramData = {
+      metamodel: builtInGovernanceMetamodel(),
+      nodes: ['a', 'b', 'c'].map((id) => node(id, 'component', id)),
+      relations: [
+        { id: 'ab', sourceId: 'a', targetId: 'b', relationType: 'interacts' },
+        { id: 'bc', sourceId: 'b', targetId: 'c', relationType: 'interacts' },
+      ],
+    }
+    const out = exportWiki(data, { ...view, pipeline: { levels: [
+      { ways: [{ types: ['component'] }] },
+      { ways: [{ types: ['component'], via: { relationType: 'interacts', direction: 'out' } }] },
+    ] } })
+
+    expect(out.markdown.match(/^#{2,} .+$/gm)).toEqual(['## Contents', '## a', '### b', '## b', '### c', '## c'])
+    expect(out.storage.match(/<h[2-6]>[^<]*<\/h[2-6]>/g)).toEqual(['<h2>a</h2>', '<h3>b</h3>', '<h2>b</h2>', '<h3>c</h3>', '<h2>c</h2>'])
+    expect(out.html).not.toContain('<h4>c</h4>')
+    expect(out.pages.map((p) => p.nodeId)).toEqual(['a', 'b', 'c'])
   })
 
   it('escapes raw HTML, rejects unsafe URLs and reports unavailable assets', () => {
@@ -224,14 +245,22 @@ describe('Confluence Cloud publisher', () => {
 function confluenceServer() {
   const pages = new Map<string, Record<string, any>>()
   const properties = new Map<string, Record<string, any>>()
+  const unresolvedLinks: { page: string; target: string }[] = []
   let counter = 1000
   let failTitle: string | undefined
+  let failMethod = 'POST'
+  const checkLinks = (body: Record<string, any>) => {
+    for (const [, target] of body.body.value.matchAll(/<ri:page ri:content-title="([^"]*)"/g)) {
+      if (![...pages.values()].some((p) => xml(p.title) === target)) unresolvedLinks.push({ page: body.title, target })
+    }
+  }
   const request = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input))
     const path = url.pathname.replace('/wiki/api/v2', '')
     const body = init?.body ? JSON.parse(init.body as string) : undefined
     if (path === '/pages' && init?.method === 'POST') {
-      if (body.title === failTitle) return json({}, 503)
+      if (body.title === failTitle && failMethod === 'POST') return json({}, 503)
+      checkLinks(body)
       const id = String(++counter)
       const page = { ...body, id, version: { number: 1 }, body: { storage: { value: body.body.value } } }
       pages.set(id, page); return json(page)
@@ -250,15 +279,85 @@ function confluenceServer() {
     if (init?.method === 'PUT') {
       const previous = pages.get(id)!
       if (previous.version.number + 1 !== body.version.number) return json({}, 409)
+      if (body.title === failTitle && failMethod === 'PUT') return json({}, 503)
+      checkLinks(body)
       const saved = { ...previous, ...body, body: { storage: { value: body.body.value } } }
       pages.set(id, saved); return json(saved)
     }
     return json(pages.get(id))
   })
-  return { request, pages, properties, fail: (title?: string) => { failTitle = title } }
+  return { request, pages, properties, unresolvedLinks, fail: (title?: string, method = 'POST') => { failTitle = title; failMethod = method } }
 }
 
 describe('Confluence page tree', () => {
+  it('creates every destination before saving linked bodies, including the landing page', async () => {
+    const server = confluenceServer(), document = exportWiki(model(), view)
+    const result = await publishTree(document, destination, server.request)
+
+    expect(server.unresolvedLinks).toEqual([])
+    expect(result).toMatchObject({ created: 3, updated: 0, unchanged: 0 })
+    for (const page of server.pages.values()) expect(page.body.storage.value).toContain('<ri:page ')
+  })
+
+  it('prepares new and renamed destinations before updating existing crosslinks', async () => {
+    const server = confluenceServer(), data = model()
+    const first = await publishTree(exportWiki(data, view), destination, server.request)
+    server.unresolvedLinks.length = 0
+    data.nodes[0].label = 'Payment approved'
+    data.nodes.push(node('new-scenario', 'scenario', 'Another checkout', { given: 'a saved card' }))
+    data.relations.push({ id: 'new-v', sourceId: 'new-scenario', targetId: 'req', relationType: 'verifies' })
+
+    const result = await publishTree(exportWiki(data, view), { ...destination, pageId: first.id }, server.request)
+    expect(server.unresolvedLinks).toEqual([])
+    expect(result.created).toBe(1)
+    expect(server.pages.size).toBe(5)
+    expect(server.pages.get(first.id)!.body.storage.value).toContain('Another checkout')
+  })
+
+  it('resumes an interrupted body update without duplicating prepared pages', async () => {
+    const server = confluenceServer(), document = exportWiki(model(), view)
+    server.fail('Tes confluence · Successful checkout', 'PUT')
+    await expect(publishTree(document, destination, server.request)).rejects.toThrow('rerun with --page-id')
+    expect(server.pages.size).toBe(4)
+    const ids = [...server.pages.keys()]
+    server.fail()
+
+    const resumed = await publishTree(document, destination, server.request)
+    expect(resumed.created).toBe(0)
+    expect([...server.pages.keys()]).toEqual(ids)
+    expect(server.unresolvedLinks).toEqual([])
+    for (const page of server.pages.values()) expect(page.body.storage.value).toContain('<ri:page ')
+  })
+
+  it('preserves the existing landing body when preparing a new destination fails', async () => {
+    const server = confluenceServer(), data = model()
+    const first = await publishTree(exportWiki(data, view), destination, server.request)
+    const landingBefore = structuredClone(server.pages.get(first.id))
+    data.nodes.push(node('new-scenario', 'scenario', 'Another checkout'))
+    data.relations.push({ id: 'new-v', sourceId: 'new-scenario', targetId: 'req', relationType: 'verifies' })
+    server.fail('Tes confluence · Another checkout')
+
+    await expect(publishTree(exportWiki(data, view), destination, server.request)).rejects.toThrow('rerun with --page-id')
+    expect(server.pages.get(first.id)).toEqual(landingBefore)
+  })
+
+  it('refreshes links from the single-pass publisher once before skipping unchanged pages', async () => {
+    const server = confluenceServer(), document = exportWiki(model(), view)
+    await publishTree(document, destination, server.request)
+    const plan = treePlan(document)
+    for (const property of server.properties.values()) {
+      for (const [nodeId, entry] of Object.entries(property.value.pages) as [string, Record<string, any>][]) {
+        entry.sourceHash = createHash('sha256').update(plan.pages.find((p) => p.nodeId === nodeId)!.storage).digest('hex')
+        // Confluence normalizes markup without changing the saved version.
+        server.pages.get(entry.id)!.body.storage.value += '\n'
+      }
+    }
+
+    expect((await publishTree(document, destination, server.request)).updated).toBe(3)
+    expect((await publishTree(document, destination, server.request)).unchanged).toBe(3)
+    expect(server.unresolvedLinks).toEqual([])
+  })
+
   it('plans one canonical page per element, native crosslinks and deterministic duplicate titles', () => {
     const data = model(); data.nodes[1].label = data.nodes[0].label
     const document = exportWiki(data, view)

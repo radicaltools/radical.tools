@@ -52,6 +52,23 @@ describe('shared wiki document', () => {
     expect(() => wiki.page('r1')).toThrow('outside this wiki')
   })
 
+  it('keeps repeated element types within their pipeline levels instead of walking every graph path', () => {
+    const nodes = Array.from({ length: 7 }, (_, i) => node(`c${i}`, 'component'))
+    const relations = nodes.flatMap((source) => nodes
+      .filter((target) => target.id !== source.id)
+      .map((target) => relation(`${source.id}-${target.id}`, source.id, target.id, 'interacts')))
+    const wiki = createWikiDocument(view({ pipeline: { levels: [
+      { ways: [{ types: ['component'] }] },
+      { ways: [{ types: ['component'], via: { relationType: 'interacts', direction: 'out' } }] },
+    ] } }), context(nodes, relations))
+
+    expect(wiki.rows).toHaveLength(49)
+    expect(wiki.rows.filter((r) => r.depth === 0)).toHaveLength(7)
+    expect(wiki.rows.filter((r) => r.depth === 1)).toHaveLength(42)
+    expect(wiki.rows.every((r) => r.alsoIn === 6)).toBe(true)
+    expect(wiki.rows.filter((r) => r.depth === 1).every((r) => !r.hasChildren)).toBe(true)
+  })
+
   it('uses hierarchy relations for chapters and suppresses the redundant parent link only in a chapter', () => {
     const derives = relation('d', 'child', 'parent', 'derives')
     const ctx = context([node('parent', 'requirement'), node('child', 'requirement'), node('other', 'requirement')], [derives, relation('d2', 'child', 'other', 'derives')])

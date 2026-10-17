@@ -70,7 +70,10 @@ The command creates a landing page with the wiki's name, then finds and
 refreshes it on subsequent runs. Every element page carries its own export
 marker. Stable element-to-page IDs live in small content-property buckets
 on the landing page, so renames preserve page IDs and publication can resume
-on another computer. Up to four writes run concurrently, with checkpoints
+on another computer. Publication first creates or recovers every destination,
+preserving existing bodies and marking new pages as publication in progress.
+Once all destinations exist, it fills their linked content and writes the
+landing page last. Up to four writes run concurrently, with checkpoints
 between batches. A failed run prints the landing page ID for resuming with
 `--page-id 789`. A title collision with a handwritten page fails without
 changing it. Updates verify ownership, use the current Confluence version
@@ -93,6 +96,8 @@ page's body, including edits made to that body in Confluence. It does not
 import Confluence changes, write source model files, or delete pages. A
 source-of-truth notice is included in every export. Unchanged element pages
 are skipped when their source hash and published Confluence version match.
+Exports made by the earlier single-pass publisher are refreshed once to resolve
+their forward links before unchanged pages can be skipped again.
 Switching from tree to document leaves previously published child pages in
 place. Absolute HTTP(S) image URLs are preserved; local
 images and interactive mockup wireframes are not uploaded, and the command

@@ -196,7 +196,9 @@ export function createWikiDocument(view: DiagramView | null | undefined, context
   }
   // Complete occurrences for documents/page trees; Studio chooses how deeply
   // to render these same children according to its interactive reading mode.
-  let documentRows: ChainRow[] | undefined
+  // A chain already defines the occurrences at each configured level.
+  // Walking its merged child index again would invent paths across levels.
+  let documentRows: ChainRow[] | undefined = chain?.rows ?? undefined
   const rowsOf = (): ChainRow[] => {
     if (documentRows) return documentRows
     const rows: ChainRow[] = []
