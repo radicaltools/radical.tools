@@ -6062,6 +6062,12 @@
     "targetId": "13e30c43-0968-4b59-9a73-b3fbac705a07"
   },
   {
+    "id": "818b346f-17f8-4725-8a67-d28aa74fcf90",
+    "relationType": "implements",
+    "sourceId": "3015c7f5-e82a-4a9a-b0fb-b9990a5ef6eb",
+    "targetId": "b45b8494-f00a-4384-a960-16180cf8ad99"
+  },
+  {
     "id": "81bb1909-03df-418a-937b-47ed592ec550",
     "relationType": "derives",
     "sourceId": "99af51ad-0e04-4bef-8ab1-45e61d867f57",
@@ -6351,6 +6357,13 @@
     "relationType": "traces-to",
     "sourceId": "b852859c-e339-4c2f-8334-d276a6a50365",
     "targetId": "65bcdbf7-5067-4f72-9527-af1e7ede68a8"
+  },
+  {
+    "description": "CLI npm releases use the shared npm-publish.yml workflow with package=cli.",
+    "id": "89518cce-27e1-45a7-b4c4-ff94ad6d20d5",
+    "relationType": "constrains",
+    "sourceId": "b45b8494-f00a-4384-a960-16180cf8ad99",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
     "id": "899ffe2f-43e3-432b-9270-21642a3fdefa",
@@ -8599,6 +8612,13 @@
     "relationType": "satisfies",
     "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
     "targetId": "9768f8de-c0bc-4b4a-8599-a97c1a96c41d"
+  },
+  {
+    "description": "MCP npm releases use the shared npm-publish.yml workflow with package=mcp.",
+    "id": "b78b31fa-ed36-43a1-97a8-66a17412326a",
+    "relationType": "constrains",
+    "sourceId": "b45b8494-f00a-4384-a960-16180cf8ad99",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "id": "b7a489db-2279-4f97-b0e1-32412cd1d4bb",
@@ -11481,6 +11501,12 @@
     "relationType": "derives",
     "sourceId": "6edf7637-1490-452b-a653-f12efcdeff87",
     "targetId": "fdd25640-6955-44fd-bb26-3440644f8614"
+  },
+  {
+    "id": "f71c5fc6-eab0-4a4b-8e8a-910dd0c4c3da",
+    "relationType": "implements",
+    "sourceId": "21964cbd-6238-43e1-a8a9-80bc13ccb696",
+    "targetId": "b45b8494-f00a-4384-a960-16180cf8ad99"
   },
   {
     "id": "f73f450f-6909-4221-8eeb-5a6c0b261709",

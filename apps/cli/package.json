@@ -1,27 +1,35 @@
 {
   "name": "@radicaltools/cli",
   "version": "0.1.0",
-  "private": true,
-  "description": "The radical command line: checks a Radical Markdown model folder in CI.",
+  "description": "Check, diff and track Radical Markdown architecture models from the command line.",
   "license": "MIT",
   "homepage": "https://radical.tools",
   "repository": {
     "type": "git",
-    "url": "https://github.com/radicaltools/radical.tools.git",
+    "url": "git+https://github.com/radicaltools/radical.tools.git",
     "directory": "apps/cli"
   },
+  "bugs": "https://github.com/radicaltools/radical.tools/issues",
+  "keywords": ["cli", "architecture", "c4", "radical", "model-validation"],
   "type": "module",
   "bin": {
     "radical": "dist/index.js"
   },
-  "files": ["dist"],
+  "files": ["dist", "LICENSE"],
   "engines": {
     "node": ">=20.11.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsup",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:package": "node scripts/test-package.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test && npm run test:package"
   },
   "devDependencies": {
     "@radical/common": "*",

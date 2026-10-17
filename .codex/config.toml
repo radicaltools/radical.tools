@@ -1,0 +1,3 @@
+[mcp_servers.radical-architecture]
+command = "node"
+args = ["apps/mcp/dist/index.js", "--folder", "architecture"]

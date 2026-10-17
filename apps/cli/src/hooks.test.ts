@@ -48,7 +48,9 @@ describe('radical hooks', () => {
       const text = await readFile(join(hooks, name), 'utf8')
       expect(text.split(HOOK_MARKER)).toHaveLength(2)
       expect(text).toContain(`${command} diff "my model" --save-base --quiet || true`)
-      expect((await stat(join(hooks, name))).mode & 0o111).toBeTruthy()
+      // Windows does not expose POSIX executable bits; the commit below
+      // verifies that Git runs the installed hook on every platform.
+      if (process.platform !== 'win32') expect((await stat(join(hooks, name))).mode & 0o111).toBeTruthy()
     }
     expect(await readFile(join(hooks, 'post-commit'), 'utf8')).toMatch(/^#!\/bin\/sh\necho own >> own\.txt\n# radical/)
     // The CLI moved: installing again brings the line up to date, once.
