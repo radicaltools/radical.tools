@@ -2,10 +2,26 @@
 
 The `radical` command line for Radical Markdown model folders.
 
+## Install
+
+Requires Node.js 20.11 or later and Git for `diff` and `hooks`.
+
+```sh
+npm install -g @radicaltools/cli
+radical --help
+radical check path/to/model
+```
+
+Or run it without a global install:
+
+```sh
+npx @radicaltools/cli check path/to/model
+```
+
 ## radical diff
 
 ```sh
-node apps/cli/dist/index.js diff path/to/model [--since <ref>] [--format json]
+radical diff path/to/model [--since <ref>] [--format json]
 ```
 
 Lists what changed in the model folder since its version in git: the
@@ -40,7 +56,7 @@ commit the base, to list only what is not committed.
 ## radical hooks
 
 ```sh
-node apps/cli/dist/index.js hooks install path/to/model
+radical hooks install path/to/model
 ```
 
 Adds one marked line to the repository's `post-checkout`, `post-commit`,
@@ -55,8 +71,7 @@ installs the hooks for `architecture/` and saves its base once.
 ## radical check
 
 ```sh
-npm run build -w @radicaltools/cli
-node apps/cli/dist/index.js check path/to/model
+radical check path/to/model
 ```
 
 Checks one model folder and prints what it finds:
@@ -181,4 +196,83 @@ folder's `.radical/test-results.json` (out of git, like the rest of
 quality and Implementation show the result by dimension, and Settings edit
 `check.json` (goals, severities, baselines), marking a change that loosens
 the gate.
+
+## Publishing (maintainers)
+
+The public npm package is `@radicaltools/cli`. Its private `@radical/*`
+workspace dependencies are bundled into the build. The package ships only
+`dist/`, this README, its manifest and the MIT license.
+
+From the repository root, install dependencies and validate the release:
+
+```sh
+npm ci --ignore-scripts
+npm run typecheck -w @radicaltools/cli
+npm run test -w @radicaltools/cli
+npm run test:package -w @radicaltools/cli -- --out-dir ../../release
+```
+
+The package check builds and packs the CLI, installs the tarball offline into
+a temporary project outside the monorepo, and runs the installed command to
+verify its version, help and model checks. Only after validation does it copy
+the verified tarball into `release/`. Temporary files are removed afterwards.
+
+Log in with an npm account authorized to publish in the `radicaltools`
+organization, then publish the verified first-release tarball:
+
+```sh
+npm login --auth-type=web
+npm whoami
+npm publish ./release/radicaltools-cli-0.1.0.tgz --access public
+```
+
+Complete npm's browser and 2FA prompts. When publishing directly from the
+workspace, `prepublishOnly` runs the type check, unit tests and package check;
+`prepack` builds fresh output and copies the root license. Publishing an
+already verified tarball uploads that exact archive. The monorepo root and
+the shared workspaces remain private.
+
+For later releases, bump the CLI version and lockfile before publishing:
+
+```sh
+npm version patch -w @radicaltools/cli --no-git-tag-version
+```
+
+Each package version can be published only once. After the first publish,
+the npm organization's team settings can grant the `developers` team
+read/write access to `@radicaltools/cli`.
+
+### GitHub Actions with Trusted Publishing
+
+The shared **Publish to npm** workflow (`.github/workflows/npm-publish.yml`)
+publishes either CLI or MCP. After `@radicaltools/cli` exists on npm,
+open its **Settings → Trusted publishing** and add GitHub Actions:
+
+| Field | Value |
+| --- | --- |
+| Organization or user | `radicaltools` |
+| Repository | `radical.tools` |
+| Workflow filename | `npm-publish.yml` |
+| Environment name | Leave empty |
+| Allowed actions | Enable direct publishing with `npm publish` |
+
+Configure this on each npm package that uses the workflow. If a trusted
+publisher points at `cli-publish.yml` or `mcp-publish.yml`, replace it with
+one using `npm-publish.yml` after merging this change. No npm token or GitHub
+secret is needed. The workflow uses Node 24 and npm 11, with `id-token: write`
+for its publish job.
+Configure a new publisher when a release is ready: its first successful
+publish must happen within two days; a dry run does not validate it.
+See [npm's Trusted Publishing instructions](https://docs.npmjs.com/trusted-publishers/).
+
+Push and merge these changes first. In GitHub **Actions → Publish to npm
+→ Run workflow**, select `main`, choose **package: cli**, and leave **dry-run**
+enabled to validate and upload the npm archive without releasing. After a reviewed version bump,
+run with **dry-run** disabled to publish. A package version can only be
+published once, so bump past any version already published locally.
+
+The workflow type-checks and tests the monorepo, installs and checks the CLI
+tarball outside the repository, uploads that archive as an artifact, and
+publishes the same archive with provenance. Publishing is refused outside
+`main`; branch pushes and desktop release tags do not publish the CLI.
 

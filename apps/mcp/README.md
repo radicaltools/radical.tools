@@ -120,9 +120,14 @@ and add GitHub Actions with these values:
 | --- | --- |
 | Organization or user | `radicaltools` |
 | Repository | `radical.tools` |
-| Workflow filename | `mcp-publish.yml` |
+| Workflow filename | `npm-publish.yml` |
 | Environment name | Leave empty |
 | Allowed actions | Enable direct publishing with `npm publish` |
+
+The shared workflow publishes either CLI or MCP. If the existing trusted
+publisher points at `mcp-publish.yml`, replace it with one using
+`npm-publish.yml` after merging this change. Trusted publishers are configured
+per npm package, even though both packages use the same workflow.
 
 No npm token or GitHub secret is needed. npm requires Node 22.14+ and npm 11.5.1+
 for Trusted Publishing; the workflow uses Node 24 and npm 11, and gives only the
@@ -135,8 +140,9 @@ before the deadline shown in npm. A dry run or a local `npm publish` does not
 validate the OIDC connection. The workflow needs direct `npm publish` permission;
 `npm stage publish` alone is insufficient, and managing dist-tags is not needed.
 
-In GitHub **Actions → Publish MCP to npm → Run workflow**, select `main` and leave
-**dry-run** enabled to verify and upload the package without publishing. For a
+In GitHub **Actions → Publish to npm → Run workflow**, select `main`, choose
+**package: mcp**, and leave **dry-run** enabled to verify and upload the package
+without publishing. For a
 reviewed version bump, run it with **dry-run** disabled. Actual publishing is
 refused on any branch other than `main`. The workflow type-checks and tests the
 monorepo, verifies the installable tarball, and publishes that same archive with
