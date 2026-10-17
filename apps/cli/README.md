@@ -94,7 +94,9 @@ Elements removed from the view are reported and their old pages are retained.
 **Radical remains the source of truth.** Publishing replaces the managed
 page's body, including edits made to that body in Confluence. It does not
 import Confluence changes, write source model files, or delete pages. A
-source-of-truth notice is included in every export. Unchanged element pages
+source-of-truth notice and optional source link sit at the bottom of every
+exported page, in a native Confluence Info panel (a note in HTML previews and
+a blockquote in Markdown). Unchanged element pages
 are skipped when their source hash and published Confluence version match.
 Exports made by the earlier single-pass publisher are refreshed once to resolve
 their forward links before unchanged pages can be skipped again.

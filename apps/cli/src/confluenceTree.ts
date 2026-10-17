@@ -28,7 +28,8 @@ export function treePlan(document: WikiExport) {
     pages: document.pages.map((p) => ({
       ...p, title: titles.get(p.nodeId)!,
       marker: markerOf(`${document.viewId}:${p.nodeId}`),
-      storage: nativeLinks(p.storage) + (p.childIds.length ? `<h2>Pages</h2><ul>${p.childIds.map((id) => `<li>${pageLink(id)}</li>`).join('')}</ul>` : ''),
+      // Insert child navigation before the shared footer so the Info panel stays last.
+      storage: nativeLinks(p.storage.slice(0, -document.footerStorage.length)) + (p.childIds.length ? `<h2>Pages</h2><ul>${p.childIds.map((id) => `<li>${pageLink(id)}</li>`).join('')}</ul>` : '') + document.footerStorage,
     })),
   }
 }

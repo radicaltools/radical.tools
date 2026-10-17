@@ -16,6 +16,7 @@ export interface WikiExport {
   warnings: string[]
   pages: WikiPage[]
   landingStorage: string
+  footerStorage: string
 }
 
 export interface WikiPage { nodeId: string; label: string; parentNodeId?: string; childIds: string[]; storage: string }
@@ -104,11 +105,12 @@ export function exportWiki(data: DiagramData, view: DiagramView, options: { titl
   }
   const title = options.title ?? view.name
   const marker = markerOf(view.id)
-  const notice = `Generated from Radical. Radical is the source of truth. Edit the model in Radical; publishing again replaces this page's generated content.`
-  const source = options.sourceUrl ? `[Open source](${options.sourceUrl})` : ''
-  const intro = `${notice}${source ? `\n\n${source}` : ''}`
-  const md = [`# ${escapeMarkdown(title)}`, intro, '## Contents']
-  const storage = [anchor(marker), renderMarkdown(intro, warnings, 1)]
+  const notice = `Radical is the source of truth. Make changes in the source model; republishing replaces this page's generated content.`
+  const source = options.sourceUrl ? `[Open source model](${options.sourceUrl})` : ''
+  const footer = `**Published from Radical.Tools**\n\n${notice}${source ? `\n\n${source}` : ''}`
+  const footerStorage = `<ac:structured-macro ac:name="info" ac:schema-version="1"><ac:rich-text-body>${renderMarkdown(footer, warnings, 1)}</ac:rich-text-body></ac:structured-macro>`
+  const md = [`# ${escapeMarkdown(title)}`, '## Contents']
+  const storage = [anchor(marker)]
   const firstRows: ChainRow[] = []
   const listed = new Set<string>()
   for (const row of rows) if (!listed.has(row.node.id)) { listed.add(row.node.id); firstRows.push(row) }
@@ -124,7 +126,7 @@ export function exportWiki(data: DiagramData, view: DiagramView, options: { titl
   const tocHtml = (items: TocItem[]): string => items.length ? `<ul>${items.map(({ row, children }) => `<li>${anchorLink(anchorOf(row.node.id), row.node.label)}${tocHtml(children)}</li>`).join('')}</ul>` : ''
   if (toc.length) storage.push(`<ac:structured-macro ac:name="expand" ac:schema-version="1"><ac:parameter ac:name="title">Contents (${included.size} elements)</ac:parameter><ac:rich-text-body>${tocHtml(toc)}</ac:rich-text-body></ac:structured-macro>`)
   if (!rows.length) { md.push('No elements in this wiki view.'); storage.push('<p>No elements in this wiki view.</p>') }
-  const landingStorage = storage.join('\n')
+  const landingStorage = [...storage, footerStorage].join('\n')
   const pages: WikiPage[] = [], ancestors: string[] = []
   const rendered = new Set<string>()
   for (const { node, depth } of rows) {
@@ -142,20 +144,23 @@ export function exportWiki(data: DiagramData, view: DiagramView, options: { titl
     storage.push(anchor(anchorOf(node.id)), `<h${level}>${xml(node.label)}</h${level}>`)
     const page = wiki.page(node.id)
     const body = pageMarkdown(wiki.page(node.id, parentNodeId))
-    pages.push({ nodeId: node.id, label: node.label, parentNodeId, childIds: [...new Set(page.children.map((n) => n.id))], storage: `${anchor(markerOf(`${view.id}:${node.id}`))}\n${renderMarkdown(intro, warnings, 1)}\n${renderMarkdown(pageMarkdown(page), warnings, 1)}` })
+    pages.push({ nodeId: node.id, label: node.label, parentNodeId, childIds: [...new Set(page.children.map((n) => n.id))], storage: `${anchor(markerOf(`${view.id}:${node.id}`))}\n${renderMarkdown(pageMarkdown(page), warnings, 1)}\n${footerStorage}` })
     md.push(body)
     storage.push(renderMarkdown(body, warnings, level))
   }
+  md.push(footer.split('\n').map((line) => line ? `> ${line}` : '>').join('\n'))
+  storage.push(footerStorage)
   const body = storage.join('\n')
   // The preview uses ordinary anchors/images instead of Confluence XML macros.
   const preview = body
+    .replace(/<ac:structured-macro ac:name="info"[^>]*><ac:rich-text-body>([\s\S]*?)<\/ac:rich-text-body><\/ac:structured-macro>/g, '<aside class="radical-info" role="note"><span class="radical-info-icon" aria-hidden="true">ⓘ</span><div>$1</div></aside>')
     .replace(/<ac:structured-macro ac:name="expand"[^>]*><ac:parameter ac:name="title">([^<]*)<\/ac:parameter><ac:rich-text-body>([\s\S]*?)<\/ac:rich-text-body><\/ac:structured-macro>/g, '<details><summary>$1</summary>$2</details>')
     .replace(/<ac:structured-macro ac:name="anchor"[^>]*><ac:parameter ac:name="">([^<]*)<\/ac:parameter><\/ac:structured-macro>/g, '<a id="$1"></a>')
     .replace(/<ac:link ac:anchor="([^"]*)"><ac:plain-text-link-body><!\[CDATA\[([\s\S]*?)\]\]><\/ac:plain-text-link-body><\/ac:link>/g, (_, id: string, label: string) => `<a href="#${id}">${xml(label.replace(/\]\]\]\]><!\[CDATA\[>/g, ']]>'))}</a>`)
     .replace(/<ac:image ac:alt="([^"]*)"><ri:url ri:value="([^"]*)" \/><\/ac:image>/g, '<img alt="$1" src="$2" />')
   return {
     title, viewId: view.id, marker, elementCount: included.size, markdown: md.join('\n\n') + '\n', storage: body,
-    html: `<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>${xml(title)}</title><style>body{max-width:960px;margin:48px auto;padding:0 24px;font:16px/1.65 system-ui;color:#172b4d}h1,h2,h3,h4{line-height:1.25;margin-top:2em}a{color:#075bcc}pre{overflow:auto;padding:16px;background:#f4f5f7}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px}img{max-width:100%}</style></head><body><h1>${xml(title)}</h1>${preview}</body></html>`,
-    warnings: [...warnings], pages, landingStorage,
+    html: `<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>${xml(title)}</title><style>body{max-width:960px;margin:48px auto;padding:0 24px;font:16px/1.65 system-ui;color:#172b4d}h1,h2,h3,h4{line-height:1.25;margin-top:2em}a{color:#075bcc}pre{overflow:auto;padding:16px;background:#f4f5f7}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px}img{max-width:100%}.radical-info{display:flex;gap:12px;margin-top:32px;padding:16px;background:#e9f2ff;border-radius:6px}.radical-info p{margin:0 0 8px}.radical-info p:last-child{margin-bottom:0}.radical-info-icon{color:#0c66e4;font-size:20px}</style></head><body><h1>${xml(title)}</h1>${preview}</body></html>`,
+    warnings: [...warnings], pages, landingStorage, footerStorage,
   }
 }

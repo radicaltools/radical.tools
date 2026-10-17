@@ -66,6 +66,14 @@ describe('Confluence wiki projection', () => {
     expect(out.html).toContain(`href="#${anchorOf('scenario')}"`)
     expect(out.html).not.toContain('<ac:')
     expect(out.html).not.toContain('<ri:')
+    expect(out.storage.endsWith(out.footerStorage)).toBe(true)
+    expect(out.landingStorage.endsWith(out.footerStorage)).toBe(true)
+    expect(out.footerStorage).toContain('<ac:structured-macro ac:name="info"')
+    expect(out.footerStorage).toContain('Open source model')
+    expect(out.storage.match(/Radical is the source of truth/g)).toHaveLength(1)
+    expect(out.markdown.lastIndexOf('> **Published from Radical.Tools**')).toBeGreaterThan(out.markdown.lastIndexOf('## Successful checkout'))
+    expect(out.html).toContain('<aside class="radical-info" role="note">')
+    expect(out.html).toMatch(/<\/aside><\/body><\/html>$/)
   })
 
   it('respects chain filters, explicit membership and emptied views', () => {
@@ -369,6 +377,11 @@ describe('Confluence page tree', () => {
     expect(plan.pages.find((p) => p.nodeId === 'req2')!.storage).toContain('Successful checkout')
     expect(scenario.storage).toContain('<ri:page ri:content-title=')
     expect(scenario.storage).not.toContain('ac:anchor=')
+    for (const page of plan.pages) {
+      expect(page.storage.endsWith(document.footerStorage)).toBe(true)
+      expect(page.storage.match(/ac:name="info"/g)).toHaveLength(1)
+      if (page.childIds.length) expect(page.storage.indexOf('<h2>Pages</h2>')).toBeLessThan(page.storage.indexOf('ac:name="info"'))
+    }
   })
 
   it('publishes the hierarchy, preserves IDs across renames, skips unchanged pages and moves the root', async () => {
