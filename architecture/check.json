@@ -5,7 +5,10 @@
     "requirement-incomplete": "error",
     "requirement-unsatisfied": "error",
     "requirement-without-origin": "error",
-    "need-without-requirement": "error",
+    "need-without-requirement": {
+      "severity": "error",
+      "max": 4
+    },
     "scenario-verifies-nothing": "error",
     "adr-incomplete": "error",
     "adr-superseded-unlinked": "error",
