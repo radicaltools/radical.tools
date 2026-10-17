@@ -3274,6 +3274,12 @@
     "targetId": "af07d058-b14d-4333-a89a-07de1732d1cb"
   },
   {
+    "id": "45317def-1af9-44ef-9240-f63b8b961cf5",
+    "relationType": "derives",
+    "sourceId": "91b50022-eace-4779-9f5d-44f6e186e62e",
+    "targetId": "aa74b56c-0232-4ccb-a005-ce4c67b719fa"
+  },
+  {
     "id": "459c9b3e-6ff6-494c-94ed-2a44750efeaf",
     "relationType": "satisfies",
     "sourceId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e",
@@ -4339,6 +4345,12 @@
     "targetId": "974cc763-a121-4f53-a92d-18a64562a0c9"
   },
   {
+    "id": "5cea9c9a-928d-46c1-896d-e78651dadd64",
+    "relationType": "satisfies",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "91b50022-eace-4779-9f5d-44f6e186e62e"
+  },
+  {
     "id": "5cebf461-a633-49c4-993f-01f6cb9cf3d0",
     "relationType": "verifies",
     "sourceId": "35d8f341-ebd5-45e9-bb39-53334de4940a",
@@ -5192,6 +5204,12 @@
     "targetId": "9088b38b-2284-455c-b777-0789be856629"
   },
   {
+    "id": "6ec8921d-9663-439d-b3a3-1b9a2050f60e",
+    "relationType": "constrains",
+    "sourceId": "2a971a45-5459-465f-8083-d39ca0103508",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
+  },
+  {
     "id": "6ecc674e-3b06-47cf-b144-548510aa6229",
     "relationType": "verifies",
     "sourceId": "fcb62022-4527-4fc2-9bd8-30ac8645361a",
@@ -5269,6 +5287,12 @@
     "relationType": "constrains",
     "sourceId": "d025a7f8-ed40-469c-b92b-324bfda399c4",
     "targetId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a"
+  },
+  {
+    "id": "704823c2-aaf8-4367-b29d-7ab2580d723b",
+    "relationType": "implements",
+    "sourceId": "94c18c56-18fe-4a49-94e8-f1f2004c6760",
+    "targetId": "2a971a45-5459-465f-8083-d39ca0103508"
   },
   {
     "id": "70740ecc-fc83-43cd-9670-1c92d74d5c45",
@@ -8364,6 +8388,12 @@
     "targetId": "6ab7f200-95d0-45c6-b482-113389c1a739"
   },
   {
+    "id": "b18edb09-87bd-47a7-b79e-abadab908663",
+    "relationType": "verifies",
+    "sourceId": "6a5747ff-77be-4b9d-9db0-d44c2bbebb62",
+    "targetId": "91b50022-eace-4779-9f5d-44f6e186e62e"
+  },
+  {
     "id": "b192ab8f-42ad-4a52-83d9-5abd3b227bbb",
     "relationType": "verifies",
     "sourceId": "cf8ebe65-f329-4766-b0b0-adebce8d17f9",
@@ -10909,6 +10939,14 @@
     "relationType": "verifies",
     "sourceId": "7b46a347-ae57-4d10-918d-1a92b26cad85",
     "targetId": "fd5442de-d28a-43ca-b0cf-cdbefc46981e"
+  },
+  {
+    "id": "e855efa1-38a5-4cc5-9bfe-4a742a94be87",
+    "label": "publishes a wiki projection",
+    "relationType": "interacts",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "e10e9643-1947-4007-8c96-40ba2dd3a773",
+    "technology": "HTTPS / Confluence Cloud REST v2"
   },
   {
     "id": "e8652192-4de2-4afb-87c0-82e2bb701203",

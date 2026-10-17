@@ -62,6 +62,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 - **Time travel**: milestones of the whole model, with a diff against the previous one and edits that propagate to later milestones
 - **Inspector**: what `radical check` says about the model — its quality on its own (consistency, completeness, traceability, decisions), how faithfully the implementation follows it by the tests, and its `check.json` goals and rules as settings — with links to each element
 - **radical check**: a CLI that checks a model folder's metamodel rules, completeness and the tests it names; CI runs it on this repository's own model ([architecture/](architecture))
+- **Confluence publication**: export a selected wiki view as Markdown or HTML, or publish a managed Confluence Cloud page tree with requirements, scenarios and links; Radical stays the source of truth ([CLI usage](apps/cli/README.md#radical-export-confluence))
 - **MCP server**: [@radicaltools/mcp](apps/mcp) lets Claude Code, Claude Desktop or Codex read and edit a Markdown model folder, with the same tools as the AI assistant
 - **Models**: kept in the browser, in one `.radical` file or in a folder of Markdown files (git-friendly); Structurizr DSL import
 - **Export**: PNG/SVG export and copy to clipboard of any view
@@ -160,7 +161,7 @@ apps/
   e2e/            End-to-end regression suite (Playwright) for the web builds
                   of Studio and Hub, with screenshot baselines
   mcp/            @radicaltools/mcp: local stdio MCP server for model folders
-  cli/            @radicaltools/cli: `radical check`, which checks a model folder
+  cli/            @radicaltools/cli: check, diff, hooks and Confluence wiki export
                   (metamodel, completeness, the tests it names)
   web/            Marketing site and manual (radical.tools)
 packages/

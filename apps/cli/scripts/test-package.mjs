@@ -51,6 +51,7 @@ try {
   assert((await readFile(join(installed, 'LICENSE'), 'utf8')).includes('MIT License'))
   assert.equal(radical('--version').trim(), manifest.version)
   assert.match(radical('--help'), /Usage: radical/)
+  assert.match(radical('export', 'confluence', '--help'), /--view/)
   assert.match(radical('check', '--list-rules'), /folder-manifest/)
 
   const model = join(project, 'model')
@@ -60,6 +61,11 @@ try {
   assert.equal(result.ok, true)
   assert.equal(result.errors, 0)
   assert.equal(result.nodeCount, 0)
+  await writeFile(join(model, 'views.json'), JSON.stringify([{ id: 'wiki', name: 'Package wiki', kind: 'wiki', nodeIds: [], positions: {} }]))
+  const exported = radical('export', 'confluence', 'model', '--view', 'wiki', '--format', 'html')
+  assert.match(exported, /<!doctype html>/)
+  assert.match(exported, /Radical is the source of truth/)
+  assert.match(exported, /No elements in this wiki view/)
   if (output) {
     await mkdir(output, { recursive: true })
     await copyFile(tarball, join(output, packed.filename))

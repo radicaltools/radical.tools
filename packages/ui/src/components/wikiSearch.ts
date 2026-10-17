@@ -9,11 +9,8 @@
 import { composeEarsSentence, resolveEarsSubject, type Metamodel } from '@radical/common/metamodel'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
-/** A property label as a heading: without the hint a form puts in brackets
- *  ("Source (who / where from)" → "Source"). */
-export function fieldTitle(label: string): string {
-  return label.replace(/\s*\([^)]*\)\s*$/, '') || label
-}
+import { wikiFieldTitle as fieldTitle } from '@radical/common/wikiDocument'
+export { fieldTitle }
 
 // The parts of a requirement that its sentence already says.
 const EARS_CLAUSE_KEYS: ReadonlySet<string> = new Set(['trigger', 'precondition', 'unwanted_condition', 'feature', 'action'])

@@ -11,6 +11,7 @@
     "./modelChanges": "./src/modelChanges.ts",
     "./branchChanges": "./src/branchChanges.ts",
     "./viewPipeline": "./src/viewPipeline.ts",
+    "./wikiDocument": "./src/wikiDocument.ts",
     "./viewpoints": "./src/viewpoints.ts",
     "./nodeSummary": "./src/nodeSummary.ts",
     "./markdown": "./src/markdown.ts",
