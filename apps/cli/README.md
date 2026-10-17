@@ -18,6 +18,97 @@ Or run it without a global install:
 npx @radicaltools/cli check path/to/model
 ```
 
+## radical export confluence
+
+Export a particular wiki view from a Radical Markdown model folder. The full
+view is exported, including its filter chain (for example, requirements with
+their verifying scenarios), readable requirement sentences, Markdown fields
+and links between elements. The last focused page and Single/Multi page reading
+mode do not truncate the export. Local exports are complete documents.
+Publishing defaults to a **page tree**: a landing page, requirement pages,
+then their verifying scenario pages (or the selected view's own hierarchy).
+A shared element has one page beneath its first parent and links from every
+other parent. `--structure document` publishes one document instead.
+
+Studio and the CLI use the same pure `@radical/common/wikiDocument` content
+builder for view scope, hierarchy, visible fields, requirement prose and
+relationships. React renders editors; the CLI serializes the document and
+publishes it through the Confluence adapter.
+
+Find a view and preview it without Confluence credentials:
+
+```sh
+radical export confluence architecture --list-views
+radical export confluence architecture --view "Tes confluence" --format html --output wiki-preview.html
+radical export confluence architecture --view "Tes confluence" --format markdown --output wiki.md
+```
+
+`--view` accepts an exact view ID or an unambiguous name. `--format storage`
+(the default) produces Confluence storage XHTML; `markdown` produces a portable
+document and `html` a standalone browser preview. Without `--output`, local
+exports go to stdout. Output files must be outside the model folder; existing
+files are never overwritten. `--source-url` adds a link back to the source
+model or Studio wiki, and `--title` overrides the document/page title.
+
+To publish to Confluence Cloud, set `CONFLUENCE_URL`, `CONFLUENCE_EMAIL` and
+`CONFLUENCE_API_TOKEN` in your shell or CI secret environment, then run:
+
+```sh
+radical export confluence architecture --view "Tes confluence" --publish --space-id 123 --parent-id 456
+```
+
+Use the numeric space ID, not its key. `--parent-id` is optional. `--url` can
+override `CONFLUENCE_URL`; use a site URL such as `https://company.atlassian.net`
+or `https://company.atlassian.net/wiki`. Use an Atlassian API token suitable
+for basic authentication at that site and an account that can read and
+create/update pages in the space.
+
+To use a token kept under another environment variable name, add
+`--token-env TEST_WORKSPACE_ATTLASIAN_KEY` (or your chosen variable name).
+
+The command creates a landing page with the wiki's name, then finds and
+refreshes it on subsequent runs. Every element page carries its own export
+marker. Stable element-to-page IDs live in small content-property buckets
+on the landing page, so renames preserve page IDs and publication can resume
+on another computer. Publication first creates or recovers every destination,
+preserving existing bodies and marking new pages as publication in progress.
+Once all destinations exist, it fills their linked content and writes the
+landing page last. Up to four writes run concurrently, with checkpoints
+between batches. A failed run prints the landing page ID for resuming with
+`--page-id 789`. A title collision with a handwritten page fails without
+changing it. Updates verify ownership, use the current Confluence version
+and report concurrent-edit conflicts. Rate-limit responses get bounded retries;
+uncertain network failures are not retried automatically.
+
+To move an existing managed export under another page, pass its root page
+ID with `--parent-id`; its children follow it:
+
+```sh
+radical export confluence architecture --view "Tes confluence" --publish --page-id 789 --parent-id 456
+```
+
+Use a destination parent in the same Confluence space. Changing the view's
+hierarchy also moves its managed element pages on the next publication.
+Elements removed from the view are reported and their old pages are retained.
+
+**Radical remains the source of truth.** Publishing replaces the managed
+page's body, including edits made to that body in Confluence. It does not
+import Confluence changes, write source model files, or delete pages. A
+source-of-truth notice and optional source link sit at the bottom of every
+exported page, in a native Confluence Info panel (a note in HTML previews and
+a blockquote in Markdown). Unchanged element pages
+are skipped when their source hash and published Confluence version match.
+Exports made by the earlier single-pass publisher are refreshed once to resolve
+their forward links before unchanged pages can be skipped again.
+Switching from tree to document leaves previously published child pages in
+place. Absolute HTTP(S) image URLs are preserved; local
+images and interactive mockup wireframes are not uploaded, and the command
+reports unsupported assets. Data Center is not supported in this version.
+
+Exit status: 0 exported/published, 2 could not export/publish. Credentials
+are not accepted as command-line arguments or included in error output.
+The transport follows Atlassian's [Cloud page API](https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page/).
+
 ## radical diff
 
 ```sh

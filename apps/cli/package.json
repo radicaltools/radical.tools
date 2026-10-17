@@ -1,7 +1,7 @@
 {
   "name": "@radicaltools/cli",
   "version": "0.1.0",
-  "description": "Check, diff and track Radical Markdown architecture models from the command line.",
+  "description": "Check, diff and export Radical Markdown architecture models from the command line.",
   "license": "MIT",
   "homepage": "https://radical.tools",
   "repository": {
@@ -35,6 +35,7 @@
     "@radical/common": "*",
     "@radical/node-files": "*",
     "@types/node": "^22.20.4",
+    "markdown-to-jsx": "^9.10.3",
     "tsup": "^8.5.1",
     "typescript": "^5.3.3",
     "vitest": "^4.1.11"

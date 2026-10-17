@@ -3,15 +3,12 @@ import { useDiagramStore } from '../store/diagramStore'
 import {
   GROUP_TYPE,
   isPlacementAllowed,
-  isPropertyVisible,
   resolveEarsSubject,
   composeEarsSentence,
   requirementStatePhrase,
   parseEarsSentence,
   earsActionIsClause,
   refLabels,
-  relationSentences,
-  relationDetails,
   relationTypeForProse,
   NODE_TYPE_CATEGORIES,
   CUSTOM_CATEGORY,
@@ -43,8 +40,8 @@ import {
   TYPE_LABELS,
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
-import { viewShowsEveryNode, wikiDepthOf } from '@radical/common/c4'
-import { pipelineOf, runPipeline, type PipelineContext } from '@radical/common/viewPipeline'
+import { wikiDepthOf } from '@radical/common/c4'
+import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
 type AddNode = ReturnType<typeof useDiagramStore.getState>['addNode']
@@ -216,10 +213,9 @@ interface WikiActions {
 
 const WikiActionsContext = createContext<WikiActions | null>(null)
 
-/** With a chain in the view's steps (viewPipeline.ts): the elements under
- *  each one in the chain, by its id, and the chain's roots under NAV_ROOT.
- *  The overview, the pages and the tree follow it instead of containment. */
-const WikiChainContext = createContext<Record<string, C4Node[]> | null>(null)
+/** One content projection for the navigation, pages and glossary, also
+ *  consumed by headless wiki exporters. Editing and presentation stay here. */
+const WikiDocumentContext = createContext<WikiDocument | null>(null)
 
 function useWikiActions(): WikiActions {
   const actions = useContext(WikiActionsContext)
@@ -284,7 +280,6 @@ interface RelationReading {
 // the whole model for its relations and children: an index per model
 // answers them, built once (frozen data: Studio's and the Hub's stores).
 const touchingIndex = new WeakMap<object, Map<string, C4Relation[]>>()
-const childrenIndex = new WeakMap<object, Map<string, C4Node[]>>()
 
 /** The relations with `id` at either end, in the model's order. */
 function relationsTouching(relations: Record<string, C4Relation>, id: string): C4Relation[] {
@@ -298,23 +293,6 @@ function relationsTouching(relations: Record<string, C4Relation>, id: string): C
       if (r.targetId !== r.sourceId) add(r.targetId, r)
     }
     touchingIndex.set(relations, index)
-  }
-  return index.get(id) ?? []
-}
-
-/** The elements whose parent is `id`, in the model's order. */
-function childrenIn(nodes: Record<string, C4Node>, id: string): C4Node[] {
-  if (!Object.isFrozen(nodes)) return Object.values(nodes).filter((n) => n.parentId === id)
-  let index = childrenIndex.get(nodes)
-  if (!index) {
-    index = new Map()
-    for (const n of Object.values(nodes)) {
-      if (!n.parentId) continue
-      const list = index.get(n.parentId)
-      if (list) list.push(n)
-      else index.set(n.parentId, [n])
-    }
-    childrenIndex.set(nodes, index)
   }
   return index.get(id) ?? []
 }
@@ -399,70 +377,16 @@ export function WikiView(): React.ReactElement {
   // in its properties.
   const multiPageDepth = wikiDepthOf(view)
 
-  // Respect the right-panel visibility filter: a view's nodeIds defines the
-  // visible set (empty = show all). Ancestors are included so the hierarchy
-  // stays navigable, mirroring the canvas/treemap behaviour.
-  const visibleSet = useMemo<Set<string> | null>(() => {
-    if (!view || viewShowsEveryNode(view)) return null
-    const result = new Set<string>()
-    for (const id of view.nodeIds) {
-      let cur: string | undefined = id
-      while (cur && c4Nodes[cur]) {
-        result.add(cur)
-        cur = c4Nodes[cur].parentId ?? undefined
-      }
-    }
-    return result
-  }, [view, c4Nodes])
-
-  // A chain in the view's steps: the article follows it — the overview
-  // lists its first level, each page has the elements under it in the
-  // chain as its children — and shows only what the chain gives.
-  const pipelineCtx = useMemo<PipelineContext>(() => ({ nodes: c4Nodes, relations: c4Relations, metamodel }), [c4Nodes, c4Relations, metamodel])
-  const chain = useMemo(
-    () => (view && pipelineOf(view)?.levels?.length ? runPipeline(view, pipelineCtx) : null),
-    [view, pipelineCtx],
+  const wikiDocument = useMemo(
+    () => createWikiDocument(view, { nodes: c4Nodes, relations: c4Relations, metamodel }),
+    [view, c4Nodes, c4Relations, metamodel],
   )
-  const chainChildren = useMemo<Record<string, C4Node[]> | null>(() => {
-    if (!chain?.rows) return null
-    const map: Record<string, C4Node[]> = { [NAV_ROOT]: chain.levels[0]?.shown ?? [] }
-    const listed = new Map<string, Set<string>>()
-    for (const row of chain.rows) {
-      if (row.depth === 0) continue
-      const ids = row.path.split('/')
-      const parentId = ids[ids.length - 2]
-      const seen = listed.get(parentId) ?? new Set<string>()
-      if (seen.has(row.node.id)) continue
-      seen.add(row.node.id)
-      listed.set(parentId, seen)
-      ;(map[parentId] ??= []).push(row.node)
-    }
-    return map
-  }, [chain])
-  const chainSet = useMemo(() => (chain ? new Set(chain.nodes.map((n) => n.id)) : null), [chain])
-  const shownSet = chainSet ?? visibleSet
-
+  const shownSet = wikiDocument.visibleSet
+  const nodeList = wikiDocument.nodeList
+  const childrenOf = wikiDocument.navigationChildren
   const glossary = focusId === GLOSSARY_FOCUS
   const focusNode = focusId && !glossary ? c4Nodes[focusId] : null
   const focus = focusNode && (!shownSet || shownSet.has(focusNode.id)) ? focusNode : null
-
-  const nodeList = useMemo(
-    () => Object.values(c4Nodes).filter((n) => !shownSet || shownSet.has(n.id)),
-    [c4Nodes, shownSet],
-  )
-
-  const containmentChildren = useMemo(() => {
-    const map: Record<string, C4Node[]> = {}
-    for (const n of nodeList) {
-      const key = n.parentId ?? '__root__'
-      ;(map[key] ??= []).push(n)
-    }
-    for (const k of Object.keys(map)) {
-      map[k].sort((a, b) => a.label.localeCompare(b.label))
-    }
-    return map
-  }, [nodeList])
-  const childrenOf = chainChildren ?? containmentChildren
 
   const goTo = (id: string | null) => {
     if (view) setWikiFocus(view.id, id)
@@ -666,7 +590,7 @@ export function WikiView(): React.ReactElement {
 
   return (
     <WikiActionsContext.Provider value={actions}>
-    <WikiChainContext.Provider value={chainChildren}>
+    <WikiDocumentContext.Provider value={wikiDocument}>
     <div className="wiki-view">
       <WikiNav
         filter={filter}
@@ -699,10 +623,6 @@ export function WikiView(): React.ReactElement {
         </div>
         {glossary ? (
           <WikiGlossary
-            nodeList={nodeList}
-            nodes={c4Nodes}
-            relations={c4Relations}
-            visibleSet={shownSet}
             metamodel={metamodel}
             typeMeta={typeMeta}
           />
@@ -754,7 +674,7 @@ export function WikiView(): React.ReactElement {
         />
       )}
     </div>
-    </WikiChainContext.Provider>
+    </WikiDocumentContext.Provider>
     </WikiActionsContext.Provider>
   )
 }
@@ -1645,36 +1565,17 @@ function useFirstMentions(rootRef: React.RefObject<HTMLElement | null>): void {
 // needs nothing but the wiki to read the model. It lists what this view
 // uses, and names the rest of the metamodel at its end.
 function WikiGlossary({
-  nodeList,
-  nodes,
-  relations,
-  visibleSet,
   metamodel,
   typeMeta,
 }: {
-  nodeList: C4Node[]
-  nodes: Record<string, C4Node>
-  relations: Record<string, C4Relation>
-  visibleSet: Set<string> | null
   metamodel: Metamodel
   typeMeta: TypeMeta
 }): React.ReactElement {
   const articleRef = useRef<HTMLElement | null>(null)
 
-  const typeCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const n of nodeList) counts.set(n.type, (counts.get(n.type) ?? 0) + 1)
-    return counts
-  }, [nodeList])
-  const relationCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const r of Object.values(relations)) {
-      if (visibleSet && !(visibleSet.has(r.sourceId) && visibleSet.has(r.targetId))) continue
-      const type = relationTypeForProse(r, nodes, metamodel ?? undefined)
-      if (type) counts.set(type, (counts.get(type) ?? 0) + 1)
-    }
-    return counts
-  }, [relations, nodes, visibleSet, metamodel])
+  const wikiDocument = useContext(WikiDocumentContext)
+  if (!wikiDocument) throw new Error('WikiDocumentContext is missing')
+  const { typeCounts, relationCounts } = wikiDocument.glossary
 
   // Element types by the sections of the palette, then custom ones.
   const typeIds = allNodeTypeIds(metamodel)
@@ -1848,45 +1749,6 @@ function WikiToc({ rootRef }: { rootRef: React.RefObject<HTMLElement | null> }):
 
 // ─── Element page ────────────────────────────────────────────────────────────
 
-const TECH_TYPES: ReadonlySet<string> = new Set([
-  'container',
-  'component',
-  'database',
-  'webapp',
-  'queue',
-])
-
-// Free-text fields that read as short, scannable metadata (e.g.
-// "Technology: React", "Date: 2024-01") and therefore belong in the
-// at-a-glance infobox rather than the main body. Every other `text` field is
-// treated as substantive content and rendered as a prose section so it does
-// not get buried in the sidebar (e.g. a Fitness Function's success criteria).
-const INFOBOX_TEXT_KEYS: ReadonlySet<string> = new Set([
-  'technology',
-  'date',
-  'version',
-  'owner',
-  'author',
-  'team',
-  'url',
-  'link',
-  'repo',
-  'repository',
-  'reference',
-  'ref',
-  'tags',
-  'tag',
-])
-
-// A property is an "infobox fact" when it is a short classifier — enums,
-// booleans, numbers, and the curated short-text metadata above. Substantive
-// text/textarea content stays in the main body.
-function isInfoboxFact(p: PropertyDef): boolean {
-  if (p.type === 'enum' || p.type === 'boolean' || p.type === 'number' || p.type === 'ref') return true
-  if (p.type === 'text') return INFOBOX_TEXT_KEYS.has(p.key)
-  return false
-}
-
 function WikiElementPage({
   node,
   nodes,
@@ -1937,104 +1799,13 @@ function WikiElementPage({
   const articleRef = useRef<HTMLElement | null>(null)
   // A chapter has no article of its own: `articleRef` is then never set.
   useFirstMentions(articleRef)
-  // Types that nest via a relation instead of canvas containment (e.g. a
-  // Requirement "derives" from the one it decomposes — allowedParents can't
-  // express that, since containment and this relation are different things).
-  const hierarchyRelationType = metamodel?.nodeTypes[node.type]?.hierarchyRelation
-
-  const breadcrumb = useMemo(() => {
-    const chain: C4Node[] = []
-    let cur: C4Node | undefined = node
-    const seen = new Set<string>()
-    while (cur && !seen.has(cur.id)) {
-      seen.add(cur.id)
-      chain.unshift(cur)
-      cur = cur.parentId ? nodes[cur.parentId] : undefined
-    }
-    return chain
-  }, [node, nodes])
-
-  const chainChildren = useContext(WikiChainContext)
-  const children = useMemo(
-    () =>
-      chainChildren
-        ? (chainChildren[node.id] ?? [])
-        : hierarchyRelationType
-        ? relationsTouching(relations, node.id)
-            .filter((r) => r.relationType === hierarchyRelationType && r.targetId === node.id)
-            .map((r) => nodes[r.sourceId])
-            .filter((n): n is C4Node => !!n && (!visibleSet || visibleSet.has(n.id)))
-            .sort((a, b) => a.label.localeCompare(b.label))
-        : childrenIn(nodes, node.id)
-            .filter((n) => !visibleSet || visibleSet.has(n.id))
-            .sort((a, b) => a.label.localeCompare(b.label)),
-    [chainChildren, nodes, relations, node.id, visibleSet, hierarchyRelationType],
-  )
-
-  // The relations the page writes about. The ones that make an element a
-  // child of this one are left out: the children paragraph already says so.
-  const ownRelations = useMemo(
-    () =>
-      relationsTouching(relations, node.id).filter((r) => {
-        if (r.sourceId === node.id) {
-          // Nor does a chapter repeat that it belongs to the page it is on.
-          if (chapterOf && r.targetId === chapterOf && r.relationType === hierarchyRelationType) return false
-          return !visibleSet || visibleSet.has(r.targetId)
-        }
-        if (r.targetId !== node.id) return false
-        if (hierarchyRelationType && r.relationType === hierarchyRelationType) return false
-        return !visibleSet || visibleSet.has(r.sourceId)
-      }),
-    [relations, node.id, visibleSet, hierarchyRelationType, chapterOf],
-  )
-
+  const wikiDocument = useContext(WikiDocumentContext)
+  if (!wikiDocument) throw new Error('WikiDocumentContext is missing')
+  const page = useMemo(() => wikiDocument.page(node.id, chapterOf), [wikiDocument, node.id, chapterOf])
+  const { breadcrumb, ownRelations, bylineFacts, parent } = page
   const nodeTypeDef = metamodel?.nodeTypes[node.type]
-  // For requirements, EARS sentence fields are edited inline in the sentence editor
-  const earsSentenceKeys = new Set(['trigger', 'precondition', 'unwanted_condition', 'feature', 'action'])
-  const allProps = useMemo(
-    () => (nodeTypeDef?.properties ?? []).filter(
-      (p) => p.key !== 'label'
-        && isPropertyVisible(p, node as unknown as Record<string, unknown>)
-        && !(node.type === 'requirement' && earsSentenceKeys.has(p.key))
-    ),
-    [nodeTypeDef, node],
-  )
-
-  // Split metamodel props so the page reads like a document:
-  //  • lead     — the primary description (textarea), shown under the title
-  //  • sections — substantive content (other textareas + long-form text
-  //               fields like "Success criteria") rendered as prose sections
-  //  • facts    — short classifiers (enum/boolean/number + short-text
-  //               metadata) written into the byline under the title
-  const { leadProp, sectionProps, factProps } = useMemo(() => {
-    let lead: PropertyDef | undefined
-    const sections: PropertyDef[] = []
-    const facts: PropertyDef[] = []
-    for (const p of allProps) {
-      if (isInfoboxFact(p)) {
-        facts.push(p)
-      } else if (!lead && p.type === 'textarea' && p.key === 'description') {
-        lead = p
-      } else {
-        sections.push(p)
-      }
-    }
-    return { leadProp: lead, sectionProps: sections, factProps: facts }
-  }, [allProps])
-
-  // Fallback fields when the document carries no metamodel for this type.
-  const hasMeta = !!nodeTypeDef
-  const fallbackLead: PropertyDef | undefined = hasMeta
-    ? leadProp
-    : { key: 'description', label: 'Description', type: 'textarea' }
-  const fallbackFacts: PropertyDef[] = hasMeta
-    ? factProps
-    : [
-        ...(TECH_TYPES.has(node.type)
-          ? [{ key: 'technology', label: 'Technology', type: 'text' as const }]
-          : []),
-        { key: 'external', label: 'External', type: 'boolean' as const },
-      ]
+  const facts = page.facts.map((field) => field.definition)
+  const earsStarted = page.requirement?.started ?? false
 
   // Only the page's own infobox edits the parent: not a chapter, nor a
   // read-only page (each chapter of Multi page went through the whole model).
@@ -2047,37 +1818,13 @@ function WikiElementPage({
   )
 
   const meta = typeMeta(node.type)
-  const parent = node.parentId ? nodes[node.parentId] : undefined
   const getVal = (key: string) => (node as unknown as Record<string, unknown>)[key]
-  const lead = fallbackLead
-  // A requirement that is only named so far has no sentence to read: its
-  // empty pattern ("The system shall ‹action›") is shown where it is filled
-  // in, on its own page, for a designer.
-  const earsStarted = [...earsSentenceKeys].some((key) => String(getVal(key) ?? '').trim())
-
-  // The facts that have something to say, as the byline writes them. The
-  // technology and a set boolean ("external") stand without their label.
-  const facts = hasMeta ? factProps : fallbackFacts
-  const bylineFacts = facts
-    // The pattern of a sentence that is not written yet says nothing.
-    .filter((p) => !(node.type === 'requirement' && p.key === 'ears_type' && !earsStarted))
-    .map((p) => ({
-      key: p.key,
-      label: p.type === 'boolean' || p.key === 'technology' ? '' : typeNoun(p.label),
-      text: propertyText(p, getVal(p.key), nodes),
-    }))
-    .filter((f) => f.text)
 
   const expandChildren = pageMode === 'multi' && remainingDepth > 0
 
   const headingId = `wiki-h-${node.id}`
   const Heading = `h${Math.min(level, 6)}` as 'h1'
   const SubHeading = `h${Math.min(level + 1, 6)}` as 'h2'
-  // A reader is not shown the long fields left empty, and a chapter never is:
-  // they are filled in on the element's own page.
-  const shownSections = (hasMeta ? sectionProps : []).filter(
-    (p) => (!readOnly && !embedded) || String(getVal(p.key) ?? '').trim(),
-  )
 
   const Root = embedded ? 'section' : 'article'
   // The byline says what the element is and where; of a group there is
@@ -2123,13 +1870,149 @@ function WikiElementPage({
   )
   // The box that takes a requirement typed as one sentence is for writing
   // it: once the sentence is whole, its parts are edited in place.
-  const earsSubject = node.type === 'requirement' ? resolveEarsSubject(node.id, relations, nodes) : undefined
-  // The state the requirement holds in, when it points at one: it takes the
-  // place of the precondition text, as on the canvas card (the wiki showed
-  // the text, so the two read differently).
-  const earsState = node.type === 'requirement' ? requirementStatePhrase(node, nodes, relations) || undefined : undefined
-  const earsComplete = node.type === 'requirement'
-    && composeEarsSentence(node as unknown as Record<string, unknown>, earsSubject, earsState).complete
+  const earsSubject = page.requirement?.subject
+  const earsState = page.requirement?.state
+  const earsComplete = page.requirement?.complete ?? false
+  const renderBlock = (block: WikiBlock): React.ReactNode => {
+    switch (block.kind) {
+      case 'lead': {
+        return (!readOnly || block.field.text) ? (
+          <InlineText
+            multiline
+            className="wiki-lead"
+            value={String(getVal(block.field.definition.key) ?? '')}
+            placeholder="Add a description…"
+            readOnly={readOnly}
+            onCommit={(v) =>
+              updateNode(node.id, { [block.field.definition.key]: v } as Parameters<UpdateNode>[1])
+            }
+          />
+        ) : null
+      }
+      case 'requirement': {
+        return (earsStarted || (!embedded && !readOnly)) ? (
+          <div className="wiki-ears-sentence">
+            <EarsSentenceEditor
+              node={node as unknown as Record<string, unknown>}
+              nodeId={node.id}
+              subject={earsSubject}
+              statePhrase={earsState}
+              readOnly={readOnly}
+              updateNode={(id, patch) => updateNode(id, patch as Parameters<UpdateNode>[1])}
+            />
+            {!embedded && !earsComplete && (
+              <EarsQuickEntry
+                nodeId={node.id}
+                subject={earsSubject}
+                readOnly={readOnly}
+                updateNode={(id, patch) => updateNode(id, patch as Parameters<UpdateNode>[1])}
+              />
+            )}
+          </div>
+        ) : null
+      }
+      case 'relations': {
+        return (
+          <WikiRelations
+            node={node}
+            relations={ownRelations}
+            sentences={block.groups}
+            nodes={nodes}
+            metamodel={metamodel}
+            readOnly={readOnly}
+            onNavigate={onNavigate}
+            updateRelation={updateRelation}
+            onDeleteRelation={onDeleteRelation}
+            typeMeta={typeMeta}
+          />
+        )
+      }
+      case 'contents': {
+        return !embedded ? <WikiToc rootRef={articleRef} /> : null
+      }
+      case 'wireframe': {
+        return (
+          <MockupWireframe
+            nodeId={node.id}
+            readOnly={readOnly}
+            className="wiki-block mockup-wf"
+            heading={embedded ? null : (
+              <SubHeading id={`${headingId}-wireframe`} className="wiki-heading" data-toc="Wireframe" data-level={level + 1}>
+                Wireframe
+              </SubHeading>
+            )}
+          />
+        )
+      }
+      case 'section': {
+        if ((readOnly || embedded) && !block.field.text) return null
+        const p = block.field.definition
+        const title = block.field.title
+        const value = String(getVal(p.key) ?? '')
+        const field = (
+          <InlineText
+            multiline={p.type === 'textarea'}
+            className="wiki-prose"
+            value={value}
+            placeholder={`Add ${title.toLowerCase()}…`}
+            readOnly={readOnly}
+            onCommit={(v) =>
+              updateNode(node.id, { [p.key]: v } as Parameters<UpdateNode>[1])
+            }
+          />
+        )
+        return embedded ? (
+          <div className="wiki-runin">
+            <span className="wiki-runin-label">{title}{/^[a-z]/.test(value.trim()) ? ' ' : '. '}</span>
+            {field}
+          </div>
+        ) : (
+          <section className="wiki-block">
+            <SubHeading id={`${headingId}-${p.key}`} className="wiki-heading" data-toc={title} data-level={level + 1}>
+              {title}
+            </SubHeading>
+            {field}
+          </section>
+        )
+      }
+      case 'children': {
+        return (block.nodes.length > 0 || !readOnly) ? (
+          <WikiChildren
+            parts={block.nodes}
+            level={level + 1}
+            idPrefix={headingId}
+            nodes={nodes}
+            relations={relations}
+            metamodel={metamodel}
+            typeMeta={typeMeta}
+            onNavigate={onNavigate}
+            writeUnder={node}
+            starters={embedded ? 'chapter' : 'page'}
+            renderChapter={expandChildren ? (c, chapterLevel) => (
+              <WikiElementPage
+                key={c.id}
+                node={c}
+                nodes={nodes}
+                relations={relations}
+                visibleSet={visibleSet}
+                metamodel={metamodel}
+                updateNode={updateNode}
+                updateRelation={updateRelation}
+                onNavigate={onNavigate}
+                onDeleteRelation={onDeleteRelation}
+                readOnly={readOnly}
+                typeMeta={typeMeta}
+                pageMode={pageMode}
+                level={chapterLevel}
+                chapterOf={node.id}
+                remainingDepth={remainingDepth - 1}
+              />
+            ) : undefined}
+          />
+        ) : null
+      }
+    }
+  }
   return (
     <Root
       className={embedded ? 'wiki-section' : 'wiki-doc'}
@@ -2228,137 +2111,11 @@ function WikiElementPage({
         />
       )}
 
-      {lead && (!readOnly || String(getVal(lead.key) ?? '').trim()) && (
-        <InlineText
-          multiline
-          className="wiki-lead"
-          value={String(getVal(lead.key) ?? '')}
-          placeholder="Add a description…"
-          readOnly={readOnly}
-          onCommit={(v) =>
-            updateNode(node.id, { [lead.key]: v } as Parameters<UpdateNode>[1])
-          }
-        />
-      )}
-      {node.type === 'requirement' && (earsStarted || (!embedded && !readOnly)) && (
-        <div className="wiki-ears-sentence">
-          <EarsSentenceEditor
-            node={node as unknown as Record<string, unknown>}
-            nodeId={node.id}
-            subject={earsSubject}
-            statePhrase={earsState}
-            readOnly={readOnly}
-            updateNode={(id, patch) => updateNode(id, patch as Parameters<UpdateNode>[1])}
-          />
-          {!embedded && !earsComplete && (
-            <EarsQuickEntry
-              nodeId={node.id}
-              subject={earsSubject}
-              readOnly={readOnly}
-              updateNode={(id, patch) => updateNode(id, patch as Parameters<UpdateNode>[1])}
-            />
-          )}
-        </div>
-      )}
-
-      <WikiRelations
-        node={node}
-        relations={ownRelations}
-        nodes={nodes}
-        metamodel={metamodel}
-        readOnly={readOnly}
-        onNavigate={onNavigate}
-        updateRelation={updateRelation}
-        onDeleteRelation={onDeleteRelation}
-        typeMeta={typeMeta}
-      />
-
-      {!embedded && <WikiToc rootRef={articleRef} />}
-
-      {node.type === 'mockup' && (
-        <MockupWireframe
-          nodeId={node.id}
-          readOnly={readOnly}
-          className="wiki-block mockup-wf"
-          heading={embedded ? null : (
-            <SubHeading id={`${headingId}-wireframe`} className="wiki-heading" data-toc="Wireframe" data-level={level + 1}>
-              Wireframe
-            </SubHeading>
-          )}
-        />
-      )}
-
-      {/* Long fields: sections of the element's own page, run-in paragraphs
-          ("Rationale. …") in a chapter, so that the headings of an article
-          stay the elements it is about. */}
-      {shownSections.map((p) => {
-        const title = fieldTitle(p.label)
-        const value = String(getVal(p.key) ?? '')
-        const field = (
-          <InlineText
-            multiline={p.type === 'textarea'}
-            className="wiki-prose"
-            value={value}
-            placeholder={`Add ${title.toLowerCase()}…`}
-            readOnly={readOnly}
-            onCommit={(v) =>
-              updateNode(node.id, { [p.key]: v } as Parameters<UpdateNode>[1])
-            }
-          />
-        )
-        return embedded ? (
-          <div className="wiki-runin" key={p.key}>
-            {/* "Given a model with…" reads on from its label; "Rationale.
-                Regulators ask…" starts a sentence of its own. */}
-            <span className="wiki-runin-label">{title}{/^[a-z]/.test(value.trim()) ? ' ' : '. '}</span>
-            {field}
-          </div>
-        ) : (
-          <section className="wiki-block" key={p.key}>
-            <SubHeading id={`${headingId}-${p.key}`} className="wiki-heading" data-toc={title} data-level={level + 1}>
-              {title}
-            </SubHeading>
-            {field}
-          </section>
-        )
-      })}
-
-      {/* Children, grouped by type: chapters of this article, or named
-          and linked. */}
-      {(children.length > 0 || !readOnly) && (
-        <WikiChildren
-          parts={children}
-          level={level + 1}
-          idPrefix={headingId}
-          nodes={nodes}
-          relations={relations}
-          metamodel={metamodel}
-          typeMeta={typeMeta}
-          onNavigate={onNavigate}
-          writeUnder={node}
-          starters={embedded ? 'chapter' : 'page'}
-          renderChapter={expandChildren ? (c, chapterLevel) => (
-            <WikiElementPage
-              key={c.id}
-              node={c}
-              nodes={nodes}
-              relations={relations}
-              visibleSet={visibleSet}
-              metamodel={metamodel}
-              updateNode={updateNode}
-              updateRelation={updateRelation}
-              onNavigate={onNavigate}
-              onDeleteRelation={onDeleteRelation}
-              readOnly={readOnly}
-              typeMeta={typeMeta}
-              pageMode={pageMode}
-              level={chapterLevel}
-              chapterOf={node.id}
-              remainingDepth={remainingDepth - 1}
-            />
-          ) : undefined}
-        />
-      )}
+      {page.blocks.map((block) => (
+        <React.Fragment key={block.kind === 'section' ? `section:${block.field.definition.key}` : block.kind}>
+          {renderBlock(block)}
+        </React.Fragment>
+      ))}
     </Root>
   )
 }
@@ -2471,6 +2228,7 @@ const LONG_SENTENCE = 6
 function WikiRelations({
   node,
   relations,
+  sentences,
   nodes,
   metamodel,
   readOnly,
@@ -2481,6 +2239,7 @@ function WikiRelations({
 }: {
   node: C4Node
   relations: C4Relation[]
+  sentences: WikiRelationGroup[]
   nodes: Record<string, C4Node>
   metamodel: Metamodel
   readOnly: boolean
@@ -2489,10 +2248,6 @@ function WikiRelations({
   onDeleteRelation: (id: string) => void
   typeMeta: TypeMeta
 }): React.ReactElement | null {
-  const sentences = useMemo(
-    () => relationSentences(node.id, relations, nodes, metamodel ?? undefined),
-    [node.id, relations, nodes, metamodel],
-  )
   const actions = useWikiActions()
   // The relation being edited in the line under this paragraph.
   const editingId = actions.editingRelation?.ownerId === node.id ? actions.editingRelation.relationId : null
@@ -2508,7 +2263,6 @@ function WikiRelations({
       <p className="wiki-text">
         {sentences.map((s) => {
           const def = s.typeId ? metamodel?.relationTypes[s.typeId] : undefined
-          const phrase = capitalise(s.phrase.text)
           const key = `${s.direction}:${s.typeId ?? ''}`
           // A sentence that would list more than a few elements says how
           // many there are instead ("Satisfies 24 requirements"), and
@@ -2528,13 +2282,11 @@ function WikiRelations({
               {/* A type with no inverse label cannot open a sentence from
                   this end: name it and point back at the sources instead. */}
               <span className={def?.description ? 'wiki-term' : undefined} title={def?.description}>
-                {s.phrase.reads ? phrase : `← ${phrase}:`}
+                {s.label}
               </span>
               {' '}
               {folded && countedNoun(s.relations.length, others.map((n) => typeMeta(n.type).label))}
-              {!folded && proseList(s.relations.map((r) => {
-                const other = nodes[s.direction === 'out' ? r.targetId : r.sourceId]
-                const details = relationDetails(r, def, nodes)
+              {!folded && proseList(s.entries.map(({ relation: r, other, details }) => {
                 const toggle = (): void => setEditingId(editingId === r.id ? null : r.id)
                 const target: MenuTarget = { nodeId: other?.id, relation: { id: r.id, ownerId: node.id } }
                 return (
