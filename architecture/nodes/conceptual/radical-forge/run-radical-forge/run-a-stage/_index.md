@@ -4,7 +4,7 @@ type: "step"
 label: "Run a stage"
 children: "sequence"
 condition: "for each of the eight stages, in order"
-order: 2
+order: 3
 repeat: "1..n"
 ---
 

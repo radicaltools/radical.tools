@@ -1,11 +1,13 @@
 import type { Page, Route } from '@playwright/test'
 import { test, expect, fixture } from '../../support/fixtures'
 
-// Radical Forge offers the Hub concepts the model picked from a stage's
-// candidates, files what each stage generates into the views Conceptual,
-// Logical & physical and Governance, places it beside what the view already
-// shows, and after the stage offers to keep it in a row, column or grid and
-// to run Smart Layout. The AI provider is scripted: no network, no key.
+// Radical Forge asks for the view structure first: the Radical one (views of
+// the viewpoints in folders, made as they fill) or the layer canvases. It
+// offers the Hub concepts the model picked from a stage's candidates; with
+// layer canvases it files what each stage generates into the views
+// Conceptual, Logical & physical and Governance, places it beside what the
+// view already shows, and after the stage offers to keep it in a row, column
+// or grid and to run Smart Layout. The AI provider is scripted: no network, no key.
 
 interface ToolUse { name: string; input: Record<string, unknown> }
 
@@ -71,6 +73,7 @@ test('Forge files each stage into its view and offers to arrange it', async ({ p
   await page.getByTitle('Menu').click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
+  await page.getByRole('group', { name: 'Views' }).getByLabel(/Layer canvases/).check()
   await page.getByRole('button', { name: 'Start →' }).click()
 
   // The need opens the Conceptual view.
@@ -158,6 +161,7 @@ test('Forge builds the domain model after the requirements and the state machine
   await page.getByTitle('Menu').click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
+  await page.getByRole('group', { name: 'Views' }).getByLabel(/Layer canvases/).check()
   await page.getByRole('button', { name: 'Start →' }).click()
 
   // Ten steps on one line: description, the eight stages, finish.
@@ -188,4 +192,55 @@ test('Forge builds the domain model after the requirements and the state machine
   expect(stagePrompts.find((p) => p.includes('real lifecycle'))).toContain('Given is the source state')
   await expect(page).toHaveURL(new RegExp(`/v/${data.views.find((v) => v.name === 'States')!.id}$`))
   await expect(page.locator('.relation-label', { hasText: 'BookCollected' })).toBeVisible()
+})
+
+test('Forge asks for the view structure and files the run into the Radical one', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await scriptAnthropic(page, [{ task: /extract its functional requirements/, calls: [1, 2].map(requirement) }])
+  await studio.open('v-context')
+  await page.getByTitle('Menu').click()
+  await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
+
+  // Radical by default, in the radical model's folders; any viewpoint can be left out.
+  const views = page.getByRole('group', { name: 'Views' })
+  await expect(views.getByLabel(/Radical structure/)).toBeChecked()
+  await expect(views).toContainText('in the folders Conceptual, Logical, Governance, made once something lands in it')
+  await views.getByRole('button', { name: 'Customise… (20 of 20 viewpoints)' }).click()
+  await expect(views.getByRole('group', { name: 'Logical' }).getByRole('checkbox')).toHaveCount(6)
+  await views.getByRole('group', { name: 'Conceptual' }).getByLabel('Specification').uncheck()
+  await expect(views.getByRole('button', { name: 'Hide the viewpoints' })).toBeVisible()
+  await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
+  await page.getByRole('button', { name: 'Start →' }).click()
+
+  type View = { id: string; name: string; folder?: string; viewpoint?: string; nodeIds: string[] }
+  const made = async () => ((await studio.storedDoc()) as unknown as { views: View[] }).views
+    .filter((v) => v.viewpoint).map((v) => [v.name, v.folder, v.nodeIds.length])
+  // The need: a Traceability view in Conceptual, on screen; the architecture
+  // already there: its views in Logical.
+  const logical = [
+    ['System context', 'Logical', 0], ['Containers', 'Logical', 0], ['Components', 'Logical', 0], ['Container dependencies', 'Logical', 0],
+  ]
+  await expect.poll(made).toEqual([['Traceability', 'Conceptual', 0], ...logical])
+  const traceability = ((await studio.storedDoc()) as unknown as { views: View[] }).views.find((v) => v.viewpoint === 'traceability')!
+  await expect(page).toHaveURL(new RegExp(`/v/${traceability.id}$`))
+
+  await page.getByRole('button', { name: 'Skip questions' }).click()
+  await page.getByRole('button', { name: 'Generate requirements' }).click()
+  await expect(page.getByRole('button', { name: 'Continue →' })).toBeVisible()
+  // The views of requirements in Governance; nothing for Specification, which
+  // was left out, or for viewpoints that show nothing yet.
+  await expect.poll(made).toEqual([
+    ['Traceability', 'Conceptual', 0],
+    ...logical,
+    ['Requirement coverage', 'Governance', 0],
+    ['Requirement gaps', 'Governance', 0],
+  ])
+  await expect(page).toHaveURL(new RegExp(`/v/${traceability.id}$`))
+  // No canvas shows the requirements: nothing to arrange.
+  await expect(page.locator('.forge-arrange')).toHaveCount(0)
+  // The structure is the run's: it cannot change once started.
+  await page.locator('.forge-step', { hasText: 'Description' }).click()
+  await expect(views.getByLabel(/Layer canvases/)).toBeDisabled()
 })

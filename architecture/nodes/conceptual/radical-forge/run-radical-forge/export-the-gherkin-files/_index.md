@@ -4,6 +4,6 @@ type: "step"
 label: "Export the Gherkin files"
 children: "sequence"
 condition: "if the user or the agent asks for them"
-order: 3
+order: 4
 repeat: "0..1"
 ---

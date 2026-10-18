@@ -673,6 +673,61 @@ label.app-menu-row { cursor: pointer; }
   color: var(--text-secondary, var(--text-primary));
   opacity: 0.8;
 }
+.forge-structure {
+  margin: 12px 0 0;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.forge-structure legend {
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary, var(--text-primary));
+}
+.forge-structure[disabled] { opacity: 0.6; }
+.forge-structure-option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.forge-structure-custom { margin: 2px 0 4px 22px; }
+.forge-link {
+  padding: 0;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--accent, #3b82f6);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.forge-link:hover { text-decoration: underline; }
+.forge-structure-folders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 16px;
+  margin-top: 6px;
+}
+.forge-structure-folder-name {
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, var(--text-primary));
+}
+.forge-structure-viewpoint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  cursor: pointer;
+}
 .forge-stage-card {
   padding: 2px 0;
 }

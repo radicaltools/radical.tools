@@ -220,8 +220,10 @@ test('ai-settings', async ({ page, shot }) => {
 })
 
 /**
- * Radical Forge on the Bookstore model after its Requirements stage, the
- * eight stages above. The AI provider is scripted, as in tests/studio/forge.spec.ts.
+ * Radical Forge on the Bookstore model: its Description step with the view
+ * structures (forge-views), then after its Requirements stage on the layer
+ * canvases, the eight stages above (forge). The AI provider is scripted, as
+ * in tests/studio/forge.spec.ts.
  */
 test('forge', async ({ page, shot }) => {
   await page.addInitScript(() => {
@@ -258,6 +260,12 @@ test('forge', async ({ page, shot }) => {
   await expect(page.locator('.app-layout')).toBeVisible()
   await menu(page, 'Radical Forge…')
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop within two days.')
+  // The view structure, with its viewpoints open, before the run starts.
+  const views = page.getByRole('group', { name: 'Views' })
+  await views.getByRole('button', { name: /^Customise…/ }).click()
+  await page.mouse.move(1380, 860)
+  await shot('forge-views')
+  await views.getByLabel(/Layer canvases/).check()
   await page.getByRole('button', { name: 'Start →' }).click()
   await page.getByRole('button', { name: 'Generate requirements' }).click()
   const arrange = page.locator('.forge-arrange')
