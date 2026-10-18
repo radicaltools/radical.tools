@@ -30165,5 +30165,28 @@
     "wikiDepth": 2,
     "wikiFocusId": "c0a91378-1742-435c-ba03-6ade61c096da",
     "wikiPageMode": "single"
+  },
+  {
+    "folder": "Conceptual",
+    "id": "086854f4-f3c7-40e6-808a-0c9a8347e189",
+    "kind": "warnier",
+    "name": "Processes",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "process",
+                "step"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "process-warnier"
   }
 ]
