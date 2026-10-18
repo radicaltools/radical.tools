@@ -1447,3 +1447,138 @@ export const EntityNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
 }, sameCard)
 
 EntityNode.displayName = 'EntityNode'
+
+// ─── Processes ───────────────────────────────────────────────────────────────
+// A process is a frame that holds its steps; a step a card that holds the
+// steps inside it, with how often it happens and for what under its name, in
+// Warnier–Orr notation: (1,n), (0,n), (0,1), and (0,1) under an alternative.
+// A choice among the children is marked ⊕ in the parent's header, children
+// that run at once +.
+
+const CHILDREN_SIGNS: Record<string, { sign: string; title: string }> = {
+  choice: { sign: '⊕', title: 'Exactly one of the steps inside happens' },
+  concurrent: { sign: '+', title: 'The steps inside happen at the same time' },
+}
+const REPEAT_MARKS: Record<string, string> = { '0..1': '(0,1)', '1..n': '(1,n)', '0..n': '(0,n)' }
+
+function ChildrenSign({ mode, color }: { mode: string; color: string }): React.ReactElement | null {
+  const sign = CHILDREN_SIGNS[mode]
+  if (!sign) return null
+  return <span className="proc-sign" title={sign.title} aria-label={sign.title} style={{ color }}>{sign.sign}</span>
+}
+
+function FoldButton({ c4id, collapsed, style }: { c4id: string; collapsed: boolean; style?: React.CSSProperties }): React.ReactElement | null {
+  const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
+  const canEdit = useDiagramStore((s) => s.appMode !== 'metamodel' && !s.presentationActive)
+  const onToggle = useCallback((e: React.MouseEvent) => { e.stopPropagation(); toggleCollapse(c4id) }, [c4id, toggleCollapse])
+  if (!canEdit) return null
+  return <button className="c4-node-collapse-btn" onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'} style={style}>{collapsed ? '+' : '−'}</button>
+}
+
+export const ProcessNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useNodeContent(data.c4id)
+  const accent = NODE_COLORS.process
+  const isExpanded = data.hasChildren && !data.collapsed
+  return (
+    <div
+      className={`c4-node${isExpanded ? ' c4-node-expanded' : ''}`}
+      style={{
+        position: 'relative', width: '100%', height: '100%',
+        background: isExpanded ? 'rgba(15,118,110,0.05)' : accent,
+        border: `2px solid ${selected ? 'var(--accent)' : accent}`,
+        borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+      <div className="c4-node-header" style={{ background: isExpanded ? 'transparent' : 'rgba(0,0,0,0.2)' }}>
+        <span style={isExpanded ? { color: accent } : undefined}>Process <ChildrenSign mode={prop(node, 'children')} color={isExpanded ? accent : '#fff'} /></span>
+        {data.hasChildren && <FoldButton c4id={data.c4id} collapsed={data.collapsed} />}
+      </div>
+      <div className="c4-node-label" style={isExpanded ? { color: accent } : undefined}>{data.label}</div>
+      {!isExpanded && data.description && <div className="c4-node-desc">{data.description}</div>}
+    </div>
+  )
+}, sameCard)
+
+ProcessNode.displayName = 'ProcessNode'
+
+export const StepNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const node = useNodeContent(data.c4id) as unknown as Record<string, unknown> | undefined
+  const parent = useNodeContent(data.parentId ?? '')
+  const accent = NODE_COLORS.step
+  const fg = NODE_FG.step
+  const isExpanded = data.hasChildren && !data.collapsed
+  // An alternative of a choice happens at most once.
+  const repeat = REPEAT_MARKS[String(node?.repeat ?? '')] ?? (prop(parent, 'children') === 'choice' ? '(0,1)' : '')
+  const condition = typeof node?.condition === 'string' ? node.condition.trim() : ''
+  const text = isExpanded ? accent : fg
+  return (
+    <div
+      className={`c4-node${isExpanded ? ' c4-node-expanded' : ''}`}
+      style={{
+        position: 'relative', width: '100%', height: '100%',
+        background: isExpanded ? 'rgba(20,184,166,0.06)' : accent,
+        border: `2px solid ${selected ? 'var(--accent)' : accent}`,
+        borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px 0' }}>
+        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: text, opacity: 0.75 }}>
+          Step
+        </span>
+        <ChildrenSign mode={String(node?.children ?? '')} color={text} />
+        {data.hasChildren && <FoldButton c4id={data.c4id} collapsed={data.collapsed} style={{ marginLeft: 'auto' }} />}
+      </div>
+      <div style={{ padding: '1px 10px 0', fontSize: 14, fontWeight: 700, color: text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {data.label}
+      </div>
+      {(repeat || condition) && (
+        <div style={{ padding: '1px 10px 4px', fontSize: 11, color: text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {repeat && <strong>{repeat}</strong>}{repeat && condition ? ' ' : ''}{condition && <em>{condition}</em>}
+        </div>
+      )}
+    </div>
+  )
+}, sameCard)
+
+StepNode.displayName = 'StepNode'
+
+// ─── Types with no drawing of their own ──────────────────────────────────────
+// A type made in the metamodel editor: a card in its colours with its type's
+// name, or a frame while it holds elements.
+
+export const GenericNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const def = useDiagramStore((s) => s.metamodel?.nodeTypes[data.type])
+  const color = def?.color || '#64748b'
+  const fg = def?.fg || '#fff'
+  const isExpanded = data.hasChildren && !data.collapsed
+  return (
+    <div
+      className={`c4-node c4-node-generic${isExpanded ? ' c4-node-expanded' : ''}`}
+      data-type={data.type}
+      style={{
+        position: 'relative', width: '100%', height: '100%',
+        background: isExpanded ? 'transparent' : color,
+        border: `2px ${isExpanded ? 'dashed' : 'solid'} ${selected ? 'var(--accent)' : color}`,
+        borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      }}
+    >
+      <AllHandles />
+      <DiffOverlay c4id={data.c4id} />
+      <div className="c4-node-header" style={{ background: isExpanded ? 'transparent' : 'rgba(0,0,0,0.18)', color: isExpanded ? color : fg }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          {def?.iconPath && <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden><path d={def.iconPath} /></svg>}
+          {def?.label ?? data.type}
+        </span>
+        {data.hasChildren && <FoldButton c4id={data.c4id} collapsed={data.collapsed} />}
+      </div>
+      <div className="c4-node-label" style={{ color: isExpanded ? color : fg }}>{data.label}</div>
+      {!isExpanded && data.description && <div className="c4-node-desc" style={{ color: fg, opacity: 0.85 }}>{data.description}</div>}
+    </div>
+  )
+}, sameCard)
+
+GenericNode.displayName = 'GenericNode'

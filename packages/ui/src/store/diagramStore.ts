@@ -50,6 +50,7 @@ import {
   type WizardLink,
   relationDisplayLabel,
 } from '@radical/common/metamodel'
+import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { newViewName, viewpointsOf } from '@radical/common/viewpoints'
 import { markdownToPlain } from '@radical/common/markdown'
@@ -1101,6 +1102,27 @@ function deriveRFEdges(
       },
     })
   }
+
+  // Steps that follow each other: an arrow from each to the next, both shown
+  // as themselves (not folded into a parent). No relation of the model.
+  for (const arrow of processFlow(nodes)) {
+    const shown = (id: string) => (!viewFilter || viewFilter.has(id))
+      && getViewVisibleAncestor(id, nodes, viewFilter, viewCollapsedSet, expandedSet) === id
+    if (!shown(arrow.sourceId) || !shown(arrow.targetId)) continue
+    rfEdges.push({
+      id: arrow.id,
+      source: arrow.sourceId,
+      target: arrow.targetId,
+      type: 'c4relation',
+      animated: false,
+      deletable: false,
+      focusable: false,
+      // No pointer: it is not there to click (index.css).
+      className: 'rf-edge-flow',
+      zIndex: Math.max(depthOf(arrow.sourceId), depthOf(arrow.targetId)) * 10 + 5,
+      data: { originalSourceId: arrow.sourceId, originalTargetId: arrow.targetId, isVirtual: true, flow: true },
+    })
+  }
   return rfEdges
 }
 
@@ -1271,6 +1293,10 @@ interface DiagramStore {
   removeNode: (id: string) => void
   /** Removes the elements (with what lies inside them) as one undo step. */
   removeNodes: (ids: string[]) => void
+  /** Runs `action`, whatever store actions it calls, as one undo step. */
+  runAsOneStep: (action: () => void) => void
+  /** Asks to delete the elements, as the Delete key on the canvas does. */
+  requestDelete: (nodeIds: string[]) => void
   toggleCollapse: (id: string) => void
   /** Opens every container around `nodeId` that the canvas shown has
    *  collapsed, outermost first, as one undo step. */
@@ -1321,7 +1347,8 @@ interface DiagramStore {
    * a new parent. Pass `null` to move them to the canvas root. Coordinates
    * are translated so on-screen position is preserved as closely as possible.
    */
-  reparentNodes: (ids: string[], newParentId: string | null) => void
+  /** `quiet`: no notice of the move (an outline edit, where it is seen). */
+  reparentNodes: (ids: string[], newParentId: string | null, options?: { quiet?: boolean }) => void
 
   // ── actions: views ──
   /** A new view listing no elements, of `kind` (a structure view when
@@ -1375,8 +1402,8 @@ interface DiagramStore {
   detachViewpoint: (viewId: string) => void
   /** How All elements and views without their own draw relations. One undo step. */
   setDefaultEdgeStyle: (style: EdgeStyle) => void
-  /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', and 'wiki'. */
-  setViewKind: (viewId: string, kind: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki') => void
+  /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', 'wiki' and 'warnier'. */
+  setViewKind: (viewId: string, kind: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki' | 'warnier') => void
   /** Persist treemap drill-down focus (null = top "All"). */
   setTreemapFocus: (viewId: string, focusId: string | null) => void
   /** Persist wiki page focus (null = Overview / table of contents). */
@@ -2339,6 +2366,15 @@ export const useDiagramStore = create<DiagramStore>()(
         _liveLayout?.invalidate()
       },
 
+      runAsOneStep(action) {
+        _asOneStep(action)
+      },
+
+      requestDelete(nodeIds) {
+        if (!nodeIds.length || get().appMode !== 'designer') return
+        set((state) => { state.pendingDelete = { nodeIds, edgeIds: [] } })
+      },
+
       removeNodes(ids) {
         _asOneStep(() => {
           for (const id of ids) if (get().c4Nodes[id]) get().removeNode(id)
@@ -2996,7 +3032,7 @@ export const useDiagramStore = create<DiagramStore>()(
         )
       },
 
-      reparentNodes(ids, newParentId) {
+      reparentNodes(ids, newParentId, options) {
         const state0 = get()
         const nodes = ids
           .map((id) => state0.c4Nodes[id])
@@ -3036,6 +3072,7 @@ export const useDiagramStore = create<DiagramStore>()(
         get().setSelectedNodeIds(ids)
         get()._sync()
         _liveLayout?.invalidate()
+        if (options?.quiet) return
         get().pushNotification(
           `Moved ${nodes.length} ${nodes.length === 1 ? 'node' : 'nodes'} into ${newParentLabel}.`,
           'info',
@@ -3924,6 +3961,12 @@ export const useDiagramStore = create<DiagramStore>()(
             ;(state.rfNodes[rfIdx] as any).height = newH
           }
         })
+        // A parent that grew (or shrank) changes its own parent: a step
+        // added to a process inside a system grew the process past the
+        // system's frame. Refit up the tree, as fitAncestors does headlessly.
+        if ((newW !== parent.width || newH !== parent.height) && parent.parentId && parent.parentId !== parentId) {
+          get().fitParentToChildren(parent.parentId, viewFilter, viewCollapsedSet, expandedSet)
+        }
       },
 
       // ── layout ───────────────────────────────────────────────────────────

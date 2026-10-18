@@ -76,8 +76,9 @@ interface GroupOrder {
 
 /** Walk parent chain to compute absolute top-left from relative positions. */
 /** Parent types that can hold other parents; every other parent is a flat group.
- *  A state machine holds compound states, and a compound state holds states. */
-const NESTING_TYPES: ReadonlySet<string> = new Set(['system', 'domain', 'group', 'state-machine', 'state'])
+ *  A state machine holds compound states, and a compound state holds states;
+ *  a process holds steps, and a step holds steps. */
+const NESTING_TYPES: ReadonlySet<string> = new Set(['system', 'domain', 'group', 'state-machine', 'state', 'process', 'step'])
 
 function toAbsoluteTopLeft(n: C4Node, all: Record<string, C4Node>): { x: number; y: number } {
   let x = n.x

@@ -52,6 +52,7 @@
             <li><a href="#mockups">Mockups &amp; screen flows</a></li>
             <li><a href="#domain-model">Domain model</a></li>
             <li><a href="#states">State machines</a></li>
+            <li><a href="#processes">Processes</a></li>
             <li><a href="#selection">Working with selections</a></li>
           </ul>
         </div>
@@ -67,6 +68,7 @@
             <li><a href="#view-table">Table</a></li>
             <li><a href="#view-matrix">Matrix</a></li>
             <li><a href="#view-wiki">Wiki</a></li>
+            <li><a href="#view-warnier">Warnier</a></li>
           </ul>
         </div>
         <div class="toc-group">
@@ -333,6 +335,19 @@
         </p>
       </section>
 
+      <section class="doc-section" id="processes">
+        <h2>Processes</h2>
+        <p>
+          A <strong>Process</strong> (palette group <em>Process</em>, in the Radical metamodel) is process logic: a procedure, a workflow, an algorithm — <em>Checkout</em>, <em>Month-end close</em>. It holds <strong>Steps</strong>, and a step can hold steps of its own, to any depth. A process reads best as a <a href="#view-warnier">Warnier–Orr diagram</a>: the viewpoint <em>Process (Warnier)</em> under <em>+ New view</em> draws every process with its steps.
+        </p>
+        <ul>
+          <li><strong>Order</strong> — where a step stands among its siblings (1, 2, 3, …). Steps run in this order; the model keeps no other order among them.</li>
+          <li><strong>Repeat</strong> — how often the step runs: <em>1</em> (once, the default), <em>0..1</em> (optional), <em>1..n</em> or <em>0..n</em> (repeated), drawn <code>(0,1)</code>, <code>(1,n)</code>, <code>(0,n)</code> under its name, with its <strong>Condition</strong>: <em>for each order line</em>, <em>while stock is short</em>, <em>if the customer is new</em>.</li>
+          <li><strong>Children run</strong> (on a process or a step) — <em>sequence</em>, one after the other (the default); <em>choice</em>, exactly one of them (<em>by card</em> ⊕ <em>by invoice</em>); <em>concurrent</em>, at the same time (+).</li>
+        </ul>
+        <p>On a canvas a process is a frame that holds its steps, and a step a card that holds the steps inside it, with its repetition and condition under its name; the header of either has ⊕ when its steps are a choice and + when they run at once, and each alternative of a choice is <code>(0,1)</code>, as in a Warnier–Orr diagram. Dashed arrows lead from each step to the next in their order; there are none between alternatives or parts that run at once. They are drawn from the order, not kept in the model, and nothing moves for them: arrange the process in its <a href="#view-warnier">Warnier view</a>. A step is <strong>Performed by</strong> the person, system, container, component or web app that does it; a process <strong>Satisfies</strong> the requirements it meets, and scenarios <strong>Verify</strong> it. Agents write processes over the <a href="#mcp">MCP server</a> the same way.</p>
+      </section>
+
       <section class="doc-section" id="selection">
         <h2>Working with selections</h2>
         <p>
@@ -380,11 +395,12 @@
               <tr><td><strong>Table</strong></td><td>The view's elements as a tree, one row each with name and summary</td><td>Requirement and ADR registers, adding elements along a chain</td></tr>
               <tr><td><strong>Matrix</strong></td><td>Dependency structure matrix</td><td>Coupling, cycles, who-depends-on-whom</td></tr>
               <tr><td><strong>Wiki</strong></td><td>One document page per element</td><td>Reading, reviewing, editing prose</td></tr>
+              <tr><td><strong>Warnier</strong></td><td>The view's hierarchy in braces, left to right (Warnier–Orr)</td><td>Process logic, any decomposition read as an outline</td></tr>
             </tbody>
           </table>
         </div>
         <h3 id="viewpoints">Viewpoints</h3>
-        <p>A metamodel can name viewpoints of its own: a <strong>viewpoint</strong> is one of the view types above with a <a href="#view-steps">filter</a>, under a name, for a question asked of the model again and again. Each belongs to a group, the concern it serves. The Radical metamodel comes with nineteen:</p>
+        <p>A metamodel can name viewpoints of its own: a <strong>viewpoint</strong> is one of the view types above with a <a href="#view-steps">filter</a>, under a name, for a question asked of the model again and again. Each belongs to a group, the concern it serves. The Radical metamodel comes with twenty:</p>
         <ul>
           <li><strong>C4</strong> — <em>System context</em>, <em>Containers</em> and <em>Components</em> (structure views of the people and systems, of the containers inside the systems, of the components inside the containers, each with every relation between them) and <em>Container dependencies</em> (a matrix of the containers, web apps, databases and queues). The C4 metamodel comes with these four.</li>
           <li><strong>Domain</strong> — <em>Domain map</em> (domains and how they depend on and partner with each other), <em>Domain model</em> (entities, what they are part of and reference) and <em>Domain realisation</em> (a table of domains, their entities and what realises each).</li>
@@ -392,6 +408,7 @@
           <li><strong>Decisions</strong> — <em>Decisions</em> (ADRs, the fitness functions that check each and what it constrains), <em>Decision log</em> (a wiki of the ADRs, the newest first, each with the ones it supersedes) and <em>Fitness functions</em> (by category, with what each checks and constrains).</li>
           <li><strong>UX</strong> — <em>Screen flow</em> (the screens and how users move between them) and <em>Screens</em> (a table of the screens with what they illustrate and what presents them).</li>
           <li><strong>States</strong> — <em>Entity lifecycles</em> (the entities with a state machine, what implements and verifies it) and <em>Event catalogue</em> (the events and what emits each).</li>
+          <li><strong>Process</strong> — <em>Process (Warnier)</em> (the processes and their steps as Warnier–Orr diagrams).</li>
         </ul>
         <p><em>+ New view</em> offers them by group, in two columns over the canvas, and so does the <strong>Viewpoint</strong> list in a view's properties, marked <em>from the metamodel</em>, with what the picked viewpoint shows under it; <em>None</em> keeps the view's type and filter for it alone. A view of a viewpoint has its view type and filter and follows it: change the viewpoint in the <a href="#metamodel">metamodel editor</a> and every view of it changes too. Its card and its properties name the viewpoint. Its filter is the viewpoint's, read-only (<em>Set by the viewpoint</em>); <em>Detach</em> beside it keeps the view type and the filter for the view alone, to edit there, and so does picking another <strong>View type</strong>. Any view's filter can be saved with <em>Save as viewpoint…</em> under a name: a new name adds a viewpoint, the name of one replaces its view type and filter, and its views follow. Agents use <code>create_view</code> and <code>update_view</code> with <code>viewpoint</code>, and <code>upsert_viewpoint</code> (with its <code>group</code>) and <code>delete_viewpoint</code>.</p>
         <h3 id="view-steps">Filter</h3>
@@ -500,6 +517,35 @@
         <p>
           The sentence of a requirement can be changed part by part, by clicking a part, or whole: <strong>[rewrite]</strong> above it opens it as text, and <kbd>Enter</kbd> reads it into its parts again, which is also how a <em>When</em> becomes a <em>While</em>. No word is dropped on the way: a subject other than the system (<em>“the mobile app shall…”</em>), a condition that opens with none of the EARS words (<em>“After three failed logins, …”</em>) and commas inside a condition stay in the sentence. <em>must</em>, <em>should</em> and <em>will</em> are read as <em>shall</em>, and <em>as soon as</em>, <em>as long as</em> or <em>in case</em> as the EARS word they stand for.
         </p>
+      </section>
+
+      <section class="doc-section" id="view-warnier">
+        <h2>Warnier views</h2>
+        <p>
+          A <strong>Warnier</strong> view draws what the view shows as a Warnier–Orr diagram: each element on the left of a brace that holds what is under it, read left to right like an outline. It draws the view's <a href="#view-steps">filter</a> as a tree — the chain's levels, or, with one level or none, the elements by containment — so any view can be switched to it under <em>View type</em>: a system with its containers and components, needs with their requirements, a <a href="#processes">process</a> with its steps. Steps stand in their <em>Order</em> (the rest after them, as the view orders them), a step that repeats or is optional has <code>(1,n)</code>, <code>(0,n)</code> or <code>(0,1)</code> and its condition under its name, ⊕ stands between alternatives (<em>Children run: choice</em>), each with <code>(0,1)</code> under it unless its <em>Repeat</em> says otherwise, and + between parts that run at once — the standard Warnier–Orr notation. A <a href="#states">state machine</a> reads the same way: a compound state's states are alternatives, a parallel state's regions run at once; pseudostates are left out. A click on an element opens its properties card; there is nothing to arrange. The viewpoint <em>Process (Warnier)</em> is a Warnier view of the processes and their steps.
+        </p>
+        <p>In the Designer a Warnier view is written where it is drawn, as rows are added in a <a href="#view-table">table</a>:</p>
+        <ul>
+          <li><strong>+ Step</strong>, faint under each brace, adds a step at its end; <strong>+</strong> beside a process or step with nothing in it adds its first; <strong>+ Process</strong> under the processes adds a process (in an empty view it is all there is). The new element's name is open to type; a + pressed while a name is typed keeps it first.</li>
+          <li>The selected card, or the one under the pointer, has its actions in its type line: set the repetition, move up, move down, outdent, indent and delete. The card keeps its size when they show.</li>
+          <li>The repetition (or a click on a step's <code>(1,n)</code>) opens its choices — <code>1</code>, <code>(0,1)</code>, <code>(1,n)</code>, <code>(0,n)</code> — and its condition (<em>for each order line</em>).</li>
+          <li>A click on a brace, or on its ⊕ or +, changes how the steps in it run: in sequence, a choice ⊕, or at once +.</li>
+        </ul>
+        <p>The keyboard does the same for the selected element:</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Key</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><kbd>Enter</kbd></td><td>Adds an element of the same type after it, its name open to type (<kbd>Enter</kbd> keeps it, <kbd>Esc</kbd> leaves the name as it was).</td></tr>
+              <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Indents it under the element before it / outdents it after its parent.</td></tr>
+              <tr><td><kbd>Alt</kbd>+<kbd>↑</kbd> / <kbd>Alt</kbd>+<kbd>↓</kbd></td><td>Moves it up or down among its siblings.</td></tr>
+              <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Selects the element above or below.</td></tr>
+              <tr><td><kbd>F2</kbd> or a double-click</td><td>Renames it in place.</td></tr>
+              <tr><td><kbd>Delete</kbd></td><td>Asks to delete it, as on the canvas.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Every edit is one undo step, with no notice and numbers the <em>Order</em> of the steps it touches 1, 2, 3, … as shown. The places the metamodel allows still hold: a step cannot be outdented to the top of the model. A view whose filter is a chain of relations (needs, then the requirements refined from each) is renamed only; add along a chain in its <a href="#view-table">table</a>.</p>
       </section>
 
       <!-- ═══════════════ WORK FASTER ═══════════════ -->
@@ -701,7 +747,7 @@
       <section class="doc-section" id="metamodel-radical">
         <h2>The Radical metamodel</h2>
         <p>
-          Radical is the default. It contains the whole <a href="#metamodel-c4">C4 metamodel</a> unchanged, except that a Software System may also sit inside a <strong>Domain</strong>, and adds thirteen element types in five layers. The types of the new layers can sit at the root, in a system, in a domain or in a group, unless noted. Needs, requirements, scenarios, mockups, ADRs and fitness functions open a <a href="#properties">wizard</a> when you create them, and the <a href="#view-table">Table view</a> sums each of them up in one line.
+          Radical is the default. It contains the whole <a href="#metamodel-c4">C4 metamodel</a> unchanged, except that a Software System may also sit inside a <strong>Domain</strong>, and adds fifteen element types in six layers. The types of the new layers can sit at the root, in a system, in a domain or in a group, unless noted. Needs, requirements, scenarios, mockups, ADRs and fitness functions open a <a href="#properties">wizard</a> when you create them, and the <a href="#view-table">Table view</a> sums each of them up in one line.
         </p>
 
         <h3>Domain layer</h3>
@@ -742,6 +788,16 @@
 
           <dt>Event</dt>
           <dd>Something that happens and can trigger a transition: <em>Source</em> is <em>external</em> (from outside the system), <em>internal</em> or a <em>timer</em>, with an optional <em>Payload</em>. Events live at the root, in a machine, a system, a domain or a group, so one event can be shared. A transition points at the event that triggers it and the events it raises; people, C4 elements other than databases, machines and states <strong>emit</strong> events.</dd>
+        </dl>
+
+        <h3>Process layer</h3>
+        <p>Process logic, drawn as Warnier–Orr diagrams; the <a href="#processes">Processes</a> chapter shows how to write one.</p>
+        <dl class="mm-types">
+          <dt>Process</dt>
+          <dd>A procedure made of steps. <em>Children run</em> says whether its steps run in <em>sequence</em>, are a <em>choice</em> (one of them) or are <em>concurrent</em>. It <strong>satisfies</strong> requirements and scenarios <strong>verify</strong> it.</dd>
+
+          <dt>Step</dt>
+          <dd>One part of a process, inside the process or another step. Its <em>Order</em> places it among its siblings, <em>Repeat</em> (1, 0..1, 1..n, 0..n) and <em>Condition</em> say how often and for what it runs, and <em>Children run</em> how the steps inside it run. It is <strong>performed by</strong> a person, system, container, component or web app.</dd>
         </dl>
 
         <h3>UX layer</h3>
@@ -803,6 +859,8 @@
           <dd><em>System, container, component or web app → state machine</em>: this element runs the machine.</dd>
           <dt>Transition</dt>
           <dd><em>State or pseudostate → state or pseudostate</em>, within one machine. It points at its trigger <em>Event</em> (none means a completion transition, taken when the source finishes), has a <em>Guard</em> and <em>Actions</em>, lists the events it <em>Raises</em>, and is <em>external</em> or <em>internal</em> (stays in the state without exiting it). The canvas labels it <code>event [guard] / actions ^raised</code>.</dd>
+          <dt>Performed by</dt>
+          <dd><em>Step → person, system, container, component or web app</em>: who does the step of a process.</dd>
           <dt>Emits</dt>
           <dd><em>Person, system, container, component, web app, queue, state machine or state → event</em>: this element raises the event; for a state, <em>On</em> says whether from its entry, exit or do activity. A transition raises events through its <em>Raises</em> field instead.</dd>
         </dl>
@@ -873,7 +931,7 @@
           <em>Radical menu → Metamodel editor…</em> edits the model's metamodel — <strong>Radical</strong> or <strong>C4</strong>, as chosen when the model was made — and you can rename it. <em>List</em> shows a card per node type and relation type; <em>Diagram</em> draws them (see <a href="#metamodels">Metamodels</a>): click a type or a relation to see where it may sit and what it joins, tick relations in the legend to show or hide them, and <em>Edit type</em> opens its card in the list. <em>Reset to C4 preset</em> goes back to plain C4, but only when the model holds nothing C4 has no type for.
         </p>
         <ul>
-          <li><strong>Node types</strong> — label, fill and text colour, <em>Description</em>, default width and height, min and max <em>instances</em>, <em>allowed parents</em> (and <em>At the root</em>), and <em>properties</em>: a key, a label and a kind — text, long text, number, boolean, enum with its options, or a <em>reference</em> to one or <em>many</em> elements of a type — and whether it is required. Icons, collapsed sizes, enum defaults and fields that show only when another one has a value come with the built-in types; for your own types set them in <code>metamodel.json</code>. Then the <strong>Summary in tables</strong>: how the <a href="#view-table">table</a> sums up an element of the type in one line, from the data it has. It is a template of tokens — <code>{key}</code> a property (or <code>{label}</code>, <code>{description}</code>, <code>{technology}</code>), <code>{type}</code> the type's name, <code>{ears}</code> a requirement's EARS sentence, <code>{obligation}</code> who shall do what (the action's first phrase) and <code>{condition}</code> the <em>when / while / if / where</em> it holds under, <code>{transitions}</code> where a state machine goes from a state or on an event, <code>{out:type}</code> / <code>{in:type}</code> the elements linked by relations of a type, <code>{key.sentence}</code> its first sentence, <code>{key.phrase}</code> its first phrase, <code>{key.cap}</code> capitalised, <code>{key.bold}</code> bold, <code>{a|b}</code> the first of them that has a value — where a part in <code>[ ]</code> is left out when a token in it is empty, and the template's own text may use Markdown (<code>**{status.cap}**</code>, or <code>{status.cap.bold}</code>). The built-in templates start with what matters, so that a cut-off line loses detail, not meaning: <code>[{obligation.bold}][ — {condition}]</code> for a requirement, <code>[{then.phrase.cap.bold}][ — when {when}]</code> for a scenario, <code>[{status.cap.bold}: ]{decision.sentence}</code> for an ADR. The field lists the type's tokens and shows how the template reads on one of its elements; left empty, the built-in template for the type applies, else the description's first sentence.</li>
+          <li><strong>Node types</strong> — on the canvas a type of your own is a card in its colours with its name and the element's, or a frame while it holds elements. Each has a label, fill and text colour, <em>Description</em>, default width and height, min and max <em>instances</em>, <em>allowed parents</em> (and <em>At the root</em>), and <em>properties</em>: a key, a label and a kind — text, long text, number, boolean, enum with its options, or a <em>reference</em> to one or <em>many</em> elements of a type — and whether it is required. Icons, collapsed sizes, enum defaults and fields that show only when another one has a value come with the built-in types; for your own types set them in <code>metamodel.json</code>. Then the <strong>Summary in tables</strong>: how the <a href="#view-table">table</a> sums up an element of the type in one line, from the data it has. It is a template of tokens — <code>{key}</code> a property (or <code>{label}</code>, <code>{description}</code>, <code>{technology}</code>), <code>{type}</code> the type's name, <code>{ears}</code> a requirement's EARS sentence, <code>{obligation}</code> who shall do what (the action's first phrase) and <code>{condition}</code> the <em>when / while / if / where</em> it holds under, <code>{transitions}</code> where a state machine goes from a state or on an event, <code>{out:type}</code> / <code>{in:type}</code> the elements linked by relations of a type, <code>{key.sentence}</code> its first sentence, <code>{key.phrase}</code> its first phrase, <code>{key.cap}</code> capitalised, <code>{key.bold}</code> bold, <code>{a|b}</code> the first of them that has a value — where a part in <code>[ ]</code> is left out when a token in it is empty, and the template's own text may use Markdown (<code>**{status.cap}**</code>, or <code>{status.cap.bold}</code>). The built-in templates start with what matters, so that a cut-off line loses detail, not meaning: <code>[{obligation.bold}][ — {condition}]</code> for a requirement, <code>[{then.phrase.cap.bold}][ — when {when}]</code> for a scenario, <code>[{status.cap.bold}: ]{decision.sentence}</code> for an ADR. The field lists the type's tokens and shows how the template reads on one of its elements; left empty, the built-in template for the type applies, else the description's first sentence.</li>
           <li><strong>Relation types</strong> — label, <em>Description</em>, the <em>allowed pairs</em> of source and target types (none means any pair), and their own properties (references included: that is how a transition points at its event). <em>Reads as</em> and <em>Reads back as</em> say how the relation reads in a sentence from its source and from its target (<em>Constrains</em> / <em>Constrained by</em>); the wiki writes its relation sentences with them, the canvas does not show them.</li>
           <li><strong>Viewpoints</strong> — a card per <a href="#viewpoints">viewpoint</a> with its view type, its filter in words and how many views are of it: its name, <em>Group</em> (none puts it under <em>Custom</em>), <em>View type</em> and <em>Description</em>, which <em>+ New view</em> shows. A change applies to every view of the viewpoint. The filter itself is set in a view: detach a view of the viewpoint, change its filter and save it as a viewpoint under the same name. Deleting a viewpoint leaves its views their view type and filter.</li>
           <li>Both kinds of type have a <strong>Description</strong>: what an element of the type is, or what the relation says about its two ends. The <a href="#view-wiki">wiki</a> shows it in its glossary and on its pages.</li>

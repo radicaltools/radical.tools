@@ -686,9 +686,92 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
+  // ── Process: procedures drawn as Warnier–Orr diagrams ─────────────────
+  //
+  // A process is a procedure; its steps nest by containment, each running
+  // once, optionally or repeatedly (repeat, condition), in their `order`
+  // (the Markdown folder keeps no order among siblings; processes have one
+  // too, among the processes beside them). How a process's or
+  // a step's children run is its `children`: in sequence, one of them
+  // (choice, ⊕) or at once (concurrent). The Warnier view draws them.
+
+  const childrenProperty: PropertyDef = {
+    key: 'children',
+    label: 'Children run',
+    type: 'enum',
+    options: ['sequence', 'choice', 'concurrent'],
+    default: 'sequence',
+  }
+
+  const process_: NodeTypeDef = {
+    id: 'process',
+    label: 'Process',
+    description: 'A procedure: the steps it is made of, what repeats and what is an alternative.',
+    color: '#0f766e',
+    fg: '#fff',
+    // A brace with three lines
+    iconPath: 'M5 2c-1.1 0-2 .9-2 2v2.2c0 .5-.3.8-.8.8H1.5v2h.7c.5 0 .8.3.8.8V12c0 1.1.9 2 2 2h.5v-1.5H5c-.3 0-.5-.2-.5-.5V9.5c0-.9-.4-1.6-1-2 .6-.4 1-1.1 1-2V4c0-.3.2-.5.5-.5h.5V2H5Zm3 1.5h7V5H8V3.5Zm0 3.75h7v1.5H8v-1.5ZM8 11h7v1.5H8V11Z',
+    width: 260,
+    height: 160,
+    collapsedWidth: 200,
+    collapsedHeight: 64,
+    allowedParents: ['system', 'domain', 'group'],
+    allowedAtRoot: true,
+    builtin: true,
+    properties: [
+      // Its place among the processes beside it, as a step's among steps.
+      { key: 'order', label: 'Order', type: 'number' },
+      childrenProperty,
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  }
+
+  const step: NodeTypeDef = {
+    id: 'step',
+    label: 'Step',
+    description: 'One part of a process, itself made of steps or not.',
+    color: '#14b8a6',
+    fg: '#042f2e',
+    // An arrow into a box
+    iconPath: 'M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v7a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5v-7Zm1.5 0v7h9v-7h-9Zm1 2.75h3.8V5.5L11 8l-2.7 2.5V8.75H4.5v-1.5Z',
+    width: 220,
+    height: 80,
+    collapsedWidth: 180,
+    collapsedHeight: 64,
+    allowedParents: ['process', 'step'],
+    allowedAtRoot: false,
+    builtin: true,
+    properties: [
+      { key: 'order', label: 'Order', type: 'number' },
+      {
+        key: 'repeat',
+        label: 'Repeat',
+        type: 'enum',
+        options: ['1', '0..1', '1..n', '0..n'],
+        default: '1',
+      },
+      { key: 'condition', label: 'Condition (for each…, while…, if…)', type: 'text' },
+      childrenProperty,
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  }
+
+  // step → the element that does it
+  const performedBy: RelationTypeDef = {
+    id: 'performed-by',
+    label: 'Performed by',
+    description: 'The person or part of the architecture that does the step.',
+    inverseLabel: 'Performs',
+    allowedPairs: (['person', 'system', 'container', 'component', 'webapp'] as const).map(to => ({ from: 'step', to })),
+    properties: [],
+    color: '#0d9488',
+    builtin: true,
+  }
+
   implements_.allowedPairs.push(...(['system', 'container', 'component', 'webapp'] as const).map(from => ({ from, to: 'state-machine' })))
   satisfies.allowedPairs.push({ from: 'state-machine', to: 'requirement' }, { from: 'entity', to: 'requirement' })
-  verifies.allowedPairs.push({ from: 'scenario', to: 'state-machine' })
+  verifies.allowedPairs.push({ from: 'scenario', to: 'state-machine' }, { from: 'scenario', to: 'process' })
+  satisfies.allowedPairs.push({ from: 'process', to: 'requirement' })
   illustrates.allowedPairs.push({ from: 'mockup', to: 'state' })
 
   return {
@@ -707,6 +790,8 @@ export function builtInGovernanceMetamodel(): Metamodel {
       state,
       pseudostate,
       event,
+      process: process_,
+      step,
     },
     relationTypes: {
       ...base.relationTypes,
@@ -723,6 +808,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
       transition,
       'lifecycle-of': lifecycleOf,
       emits,
+      'performed-by': performedBy,
     },
     viewpoints: radicalViewpoints(),
   }

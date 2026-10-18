@@ -697,6 +697,48 @@
       ],
       "width": 150
     },
+    "process": {
+      "allowedAtRoot": true,
+      "allowedParents": [
+        "system",
+        "domain",
+        "group"
+      ],
+      "builtin": true,
+      "collapsedHeight": 64,
+      "collapsedWidth": 200,
+      "color": "#0f766e",
+      "description": "A procedure: the steps it is made of, what repeats and what is an alternative.",
+      "fg": "#fff",
+      "height": 160,
+      "iconPath": "M5 2c-1.1 0-2 .9-2 2v2.2c0 .5-.3.8-.8.8H1.5v2h.7c.5 0 .8.3.8.8V12c0 1.1.9 2 2 2h.5v-1.5H5c-.3 0-.5-.2-.5-.5V9.5c0-.9-.4-1.6-1-2 .6-.4 1-1.1 1-2V4c0-.3.2-.5.5-.5h.5V2H5Zm3 1.5h7V5H8V3.5Zm0 3.75h7v1.5H8v-1.5ZM8 11h7v1.5H8V11Z",
+      "id": "process",
+      "label": "Process",
+      "properties": [
+        {
+          "key": "order",
+          "label": "Order",
+          "type": "number"
+        },
+        {
+          "default": "sequence",
+          "key": "children",
+          "label": "Children run",
+          "options": [
+            "sequence",
+            "choice",
+            "concurrent"
+          ],
+          "type": "enum"
+        },
+        {
+          "key": "description",
+          "label": "Description",
+          "type": "textarea"
+        }
+      ],
+      "width": 260
+    },
     "pseudostate": {
       "allowedAtRoot": false,
       "allowedParents": [
@@ -1118,6 +1160,64 @@
         }
       ],
       "width": 560
+    },
+    "step": {
+      "allowedAtRoot": false,
+      "allowedParents": [
+        "process",
+        "step"
+      ],
+      "builtin": true,
+      "collapsedHeight": 64,
+      "collapsedWidth": 180,
+      "color": "#14b8a6",
+      "description": "One part of a process, itself made of steps or not.",
+      "fg": "#042f2e",
+      "height": 80,
+      "iconPath": "M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v7a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5v-7Zm1.5 0v7h9v-7h-9Zm1 2.75h3.8V5.5L11 8l-2.7 2.5V8.75H4.5v-1.5Z",
+      "id": "step",
+      "label": "Step",
+      "properties": [
+        {
+          "key": "order",
+          "label": "Order",
+          "type": "number"
+        },
+        {
+          "default": "1",
+          "key": "repeat",
+          "label": "Repeat",
+          "options": [
+            "1",
+            "0..1",
+            "1..n",
+            "0..n"
+          ],
+          "type": "enum"
+        },
+        {
+          "key": "condition",
+          "label": "Condition (for each…, while…, if…)",
+          "type": "text"
+        },
+        {
+          "default": "sequence",
+          "key": "children",
+          "label": "Children run",
+          "options": [
+            "sequence",
+            "choice",
+            "concurrent"
+          ],
+          "type": "enum"
+        },
+        {
+          "key": "description",
+          "label": "Description",
+          "type": "textarea"
+        }
+      ],
+      "width": 220
     },
     "system": {
       "allowedAtRoot": true,
@@ -1685,6 +1785,37 @@
         }
       ]
     },
+    "performed-by": {
+      "allowedPairs": [
+        {
+          "from": "step",
+          "to": "person"
+        },
+        {
+          "from": "step",
+          "to": "system"
+        },
+        {
+          "from": "step",
+          "to": "container"
+        },
+        {
+          "from": "step",
+          "to": "component"
+        },
+        {
+          "from": "step",
+          "to": "webapp"
+        }
+      ],
+      "builtin": true,
+      "color": "#0d9488",
+      "description": "The person or part of the architecture that does the step.",
+      "id": "performed-by",
+      "inverseLabel": "Performs",
+      "label": "Performed by",
+      "properties": []
+    },
     "presented-by": {
       "allowedPairs": [
         {
@@ -1818,6 +1949,10 @@
         {
           "from": "entity",
           "to": "requirement"
+        },
+        {
+          "from": "process",
+          "to": "requirement"
         }
       ],
       "builtin": true,
@@ -1939,6 +2074,10 @@
         {
           "from": "scenario",
           "to": "state-machine"
+        },
+        {
+          "from": "scenario",
+          "to": "process"
         }
       ],
       "builtin": true,
@@ -2633,6 +2772,27 @@
                   "direction": "in",
                   "relationType": "emits"
                 }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "The processes and their steps as Warnier–Orr diagrams: what each is made of, what repeats, what is an alternative and what runs at once.",
+      "group": "Process",
+      "id": "process-warnier",
+      "kind": "warnier",
+      "label": "Process (Warnier)",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "process",
+                  "step"
+                ]
               }
             ]
           }

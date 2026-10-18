@@ -26,7 +26,7 @@ function stateWith(metamodel: Metamodel, views: DiagramView[] = []): model.Model
 describe('viewpoints', () => {
   it('come with both presets, grouped by concern: all of them with Radical, the C4 ones with C4', () => {
     const radical = viewpointsOf(builtInGovernanceMetamodel())
-    expect(viewpointGroups(radical).map((g) => [g.group, g.viewpoints.length])).toEqual([['C4', 4], ['Domain', 3], ['Requirements', 5], ['Decisions', 3], ['UX', 2], ['States', 2]])
+    expect(viewpointGroups(radical).map((g) => [g.group, g.viewpoints.length])).toEqual([['C4', 4], ['Domain', 3], ['Requirements', 5], ['Decisions', 3], ['UX', 2], ['States', 2], ['Process', 1]])
     expect(radical.find((v) => v.id === 'traceability')).toMatchObject({ kind: 'table', group: 'Requirements' })
     expect(viewpointsOf(builtInC4Metamodel()).map((v) => v.id)).toEqual(['system-context', 'containers', 'components', 'container-dependencies'])
   })

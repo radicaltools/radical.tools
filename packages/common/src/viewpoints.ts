@@ -12,11 +12,11 @@ import type { DiagramView, ViewPipeline } from './c4'
 import type { Metamodel, ViewpointDef, ViewpointKind } from './metamodel/types'
 import { levelLabel, readPipeline, sortLabel, type PipelineContext } from './viewPipeline'
 
-export const VIEWPOINT_KINDS: readonly ViewpointKind[] = ['static', 'table', 'treemap', 'matrix', 'wiki']
+export const VIEWPOINT_KINDS: readonly ViewpointKind[] = ['static', 'table', 'treemap', 'matrix', 'wiki', 'warnier']
 
 /** How each kind is called in Studio. */
 export const VIEW_KIND_LABELS: Record<ViewpointKind, string> = {
-  static: 'Structure', table: 'Table', treemap: 'Hierarchy', matrix: 'Matrix', wiki: 'Wiki',
+  static: 'Structure', table: 'Table', treemap: 'Hierarchy', matrix: 'Matrix', wiki: 'Wiki', warnier: 'Warnier',
 }
 
 export function isViewpointKind(kind: unknown): kind is ViewpointKind {

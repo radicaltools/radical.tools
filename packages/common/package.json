@@ -13,6 +13,7 @@
     "./viewPipeline": "./src/viewPipeline.ts",
     "./wikiDocument": "./src/wikiDocument.ts",
     "./viewpoints": "./src/viewpoints.ts",
+    "./warnier": "./src/warnier.ts",
     "./nodeSummary": "./src/nodeSummary.ts",
     "./markdown": "./src/markdown.ts",
     "./check": "./src/check/index.ts",

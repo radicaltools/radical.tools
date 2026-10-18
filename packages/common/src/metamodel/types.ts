@@ -164,7 +164,7 @@ export interface RelationTypeDef {
 
 /** The kinds of view a viewpoint of the metamodel can be built on (a flow
  *  view plays a sequence, which a viewpoint cannot name). */
-export type ViewpointKind = 'static' | 'table' | 'treemap' | 'matrix' | 'wiki'
+export type ViewpointKind = 'static' | 'table' | 'treemap' | 'matrix' | 'wiki' | 'warnier'
 
 /** A viewpoint of the metamodel: a kind of view and its filter chain under a
  *  name ("Traceability": a table of needs, the requirements refined from

@@ -17,6 +17,7 @@ export const NODE_TYPE_CATEGORIES: readonly NodeTypeCategory[] = [
   { id: 'governance', label: 'Governance', types: ['adr', 'fitness-fn', 'blueprint'] },
   { id: 'requirements', label: 'Requirements', types: ['need', 'requirement', 'scenario'] },
   { id: 'states', label: 'States', types: ['state-machine', 'state', 'pseudostate', 'event'] },
+  { id: 'process', label: 'Process', types: ['process', 'step'] },
   { id: 'ux', label: 'UX', types: ['mockup'] },
   { id: 'other', label: 'Other', types: ['group'] },
 ]

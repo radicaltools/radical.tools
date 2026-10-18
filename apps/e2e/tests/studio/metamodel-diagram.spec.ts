@@ -18,7 +18,7 @@ test('the Diagram tab draws every node type and its relations', async ({ page, s
   // The types show once Smart Layout has placed them: wait for it as the
   // other steps do (about 2.5 s here, twice that on a CI runner).
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 30_000 })
-  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(21, { timeout: 30_000 })
+  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(23, { timeout: 30_000 })
   await expect(diagram.locator('.react-flow__edge').first()).toBeVisible()
   // Smart Layout, then the physics settles it: no two type boxes overlap.
   const boxes = await diagram.locator('.react-flow__node-mmType').evaluateAll((els) =>
@@ -33,7 +33,7 @@ test('the Diagram tab draws every node type and its relations', async ({ page, s
   expect(overlaps).toEqual([])
 
   // Types sit in a frame per palette category.
-  await expect(diagram.locator('.mmd-category-label')).toHaveText(['C4', 'Domain', 'Governance', 'Requirements', 'States', 'UX', 'Other'])
+  await expect(diagram.locator('.mmd-category-label')).toHaveText(['C4', 'Domain', 'Governance', 'Requirements', 'States', 'Process', 'UX', 'Other'])
   // Relation names are on the lines without selecting anything.
   await expect(diagram.locator('.mmd-edge-label', { hasText: 'Verifies' }).first()).toBeVisible()
   // A relation from a type to itself is a chip, not a loop.
@@ -46,7 +46,7 @@ test('the Diagram tab draws every node type and its relations', async ({ page, s
   // By default every containment edge and every type's properties are shown.
   await expect(legend.getByRole('checkbox', { name: 'Show Contains' })).toBeChecked()
   await expect(legend.getByRole('checkbox', { name: 'Show properties on boxes' })).toBeChecked()
-  await expect(diagram.locator('.react-flow__edge[data-testid^="rf__edge-contains:"]')).toHaveCount(48)
+  await expect(diagram.locator('.react-flow__edge[data-testid^="rf__edge-contains:"]')).toHaveCount(52)
   await expect(diagram.getByTestId('rf__node-requirement').getByText('ears_type')).toBeVisible()
 
   // With Contains off, Blueprint and Group (no relation type reaches them)
@@ -91,8 +91,9 @@ test('selecting a type shows its rules; Edit opens it in the list', async ({ pag
     }, { intervals: [150] })
     .toBe(true)
 
-  // Selecting a type frames it with what it is connected to.
-  await diagram.getByTestId('rf__node-blueprint').click()
+  // Selecting a type frames it with what it is connected to (a pseudostate:
+  // the states and machines in its frame).
+  await diagram.getByTestId('rf__node-pseudostate').click()
   await expect.poll(zoom).toBeGreaterThan(overview * 1.5)
   await diagram.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } })
   await expect.poll(zoom).toBeCloseTo(overview, 2)
@@ -105,7 +106,7 @@ test('selecting a type shows its rules; Edit opens it in the list', async ({ pag
   await expect(diagram.locator('.mmd-category-label')).toHaveText(['C4', 'Domain', 'Governance', 'Requirements'])
   if (process.env.E2E_SHOTS) await page.screenshot({ path: `${process.env.E2E_SHOTS}/relation.png` })
   await page.keyboard.press('Escape')
-  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(21, { timeout: 30_000 })
+  await expect(diagram.locator('.react-flow__node-mmType')).toHaveCount(23, { timeout: 30_000 })
 
   await editor.locator('.mmd-canvas').getByTestId('rf__node-requirement').click()
   const inspector = editor.locator('.mm-editor-side')
@@ -134,7 +135,7 @@ test('the diagram stays drawn on a slow machine', async ({ page, studio }) => {
   await editor.getByRole('tab', { name: 'Diagram' }).click()
   const diagram = editor.locator('.mmd-canvas')
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 60_000 })
-  await expect(diagram.locator('.react-flow__edge')).toHaveCount(133)
+  await expect(diagram.locator('.react-flow__edge')).toHaveCount(144)
   await expect(diagram.getByTestId('rf__node-requirement')).toBeVisible()
 })
 

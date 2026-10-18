@@ -511,7 +511,12 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     model with many thousand elements would want a base that holds only what
     differs; and the running `radical-architecture` server offers new tools
     only after a rebuild and a restart of the client.
-37. **A flaky e2e test: the first one of a full run.** `alignment.spec.ts ›
+37. **A flaky e2e test: the first one of a full run.** On 2026-10-18 it
+    waits for Customer itself to rest (the live layout still placed it after
+    the camera stopped), not only the camera, but in a full local run it
+    still fails, now later: after the drag of Payment Provider the pin is
+    missing (it did on a clean main too, the same day). Under load the drag
+    seems to end before React Flow takes it as one. `alignment.spec.ts ›
     a row on a canvas of the whole model holds through a drag, Smart Layout
     and a reload` failed in two of three full local runs on 2026-10-16, each
     time as the run's first test: after the click on the empty canvas that
@@ -2290,3 +2295,21 @@ a bar down the canvas's left side, and All elements a table. Left open:
    structure view of the whole sample ("Landscape") would show the demo model
    drawn in one picture, if wanted.
 
+
+### Warnier–Orr diagrams, stage 1 (2026-10-18)
+
+Processes and steps in the Radical metamodel and the Warnier view type
+(read-only, a click opens the card). Left for stage 2:
+
+1. ~~**Edit in the view.**~~ Done (stage 2, same branch): the bar and the
+   keys add, indent, outdent, move, rename, set repeat and children, delete;
+   left: dragging to reorder, and editing a chain's tree beyond renaming.
+2. **Order by hand.** A step without `order` comes after those with one, by
+   name, until an edit in the view numbers its siblings.
+3. **Domain multiplicity.** `part-of` has no cardinality, so an aggregate's
+   parts read without (1,n).
+4. **Export.** SVG/PNG of the diagram, and the CLI export (the tree is pure,
+   in @radical/common/warnier).
+5. **Forge.** A Process stage that derives processes from scenarios.
+6. **Large trees.** Every row is drawn; a model with thousands of elements in
+   one Warnier view would want folding like the table's.

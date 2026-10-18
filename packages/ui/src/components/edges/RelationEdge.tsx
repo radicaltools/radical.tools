@@ -181,8 +181,9 @@ export const RelationEdge = memo(
     // an event is a completion transition and is drawn bare.
     const typeName = data?.relationType === 'transition' ? undefined : data?.relationType
 
-    const strokeColor = selected || focus === 'focus' ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'
-    const strokeDash  = data?.isVirtual ? '6 3' : undefined
+    // A step's arrow to the next is the steps' colour, finely dashed.
+    const strokeColor = data?.flow ? '#14b8a6' : selected || focus === 'focus' ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'
+    const strokeDash  = data?.flow ? '4 3' : data?.isVirtual ? '6 3' : undefined
 
     // Diff highlight
     const diffStroke =
