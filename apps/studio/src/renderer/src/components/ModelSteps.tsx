@@ -276,7 +276,7 @@ export function NewModelStep({ onDone }: { onDone: () => void }): React.ReactEle
 const SAMPLE_START_VIEW = 'view-ctx'
 
 /** Opens a copy of the Fintech sample on its System Context view rather than
- *  the default canvas, which holds all 65 elements at once and reads as noise
+ *  the default canvas, which holds all 78 elements at once and reads as noise
  *  on a first look. `onDone` runs once it is open. With `setRoute`, the view
  *  goes into the URL, for a route sync that has not started yet. */
 export function openSample(onDone: () => void, setRoute?: boolean): void {

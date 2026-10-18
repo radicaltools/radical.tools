@@ -81,7 +81,8 @@ test('New view offers the metamodel\'s viewpoints; a view of one follows the vie
 
 // Every built-in viewpoint opens in the sample: a view of its type, named
 // after it, showing what the sample has for it (it has no domains, entities
-// or state machines, so those show nothing — but still open).
+// or state machines, so those show nothing — but still open; it has one
+// process).
 test('every viewpoint of the Radical metamodel opens as a view of its type', async ({ page, studio }) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
@@ -95,7 +96,7 @@ test('every viewpoint of the Radical metamodel opens as a view of its type', asy
     ['Decisions', 'TABLE VIEW', true], ['Decision log', 'WIKI VIEW', true], ['Fitness functions', 'TABLE VIEW', true],
     ['Screen flow', 'STRUCTURE VIEW', true], ['Screens', 'TABLE VIEW', true],
     ['Entity lifecycles', 'TABLE VIEW', false], ['Event catalogue', 'TABLE VIEW', false],
-    ['Process (Warnier)', 'WARNIER VIEW', false],
+    ['Process (Warnier)', 'WARNIER VIEW', true],
   ]
   for (const [name, badge, shows] of expected) {
     const back = page.locator('.left-panel .rp-slider.show-props .rp-back-btn')

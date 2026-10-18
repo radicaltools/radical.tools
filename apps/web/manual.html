@@ -143,7 +143,7 @@
         <ul>
           <li><strong>New model</strong> — pick the metamodel (<em>Radical</em> is preselected, plain <em>C4</em> is the other choice, and the <a href="#metamodel">metamodel editor</a> changes it later) and where to keep the model: <em>in this browser</em>, <em>in a file</em> (one <code>.radical</code> file, every change saved to it) or <em>in a folder</em> (Markdown files, see <a href="#documents">Models &amp; files</a>). The choice of storage is remembered. Once an AI provider is set up, <em>Create with Radical Forge</em> starts the model from a description instead.</li>
           <li><strong>Open</strong> — a recent model, the ones kept in this browser, a file, a folder, a Structurizr DSL workspace or the sample.</li>
-          <li><strong>Try the sample model</strong> — the <em>Fintech Banking Platform</em> used throughout this guide: 65 elements — architecture, ADRs and fitness functions, the needs behind it (a regulation, a product brief and a client's feedback), the EARS requirements derived from them, Gherkin scenarios and 13 UI mockups with wireframes in three screen flows — 15 views of every kind (the <em>Requirements Register</em> with a <a href="#view-steps">filter</a>), four sequences, four milestones and a ready-made presentation. A first visit offers it right under the two choices.</li>
+          <li><strong>Try the sample model</strong> — the <em>Fintech Banking Platform</em> used throughout this guide: 78 elements — architecture, ADRs and fitness functions, the needs behind it (a regulation, a product brief and a client's feedback), the EARS requirements derived from them, Gherkin scenarios, 13 UI mockups with wireframes in three screen flows and the <a href="#processes">process</a> <em>Send a payment</em> — 17 views of every kind (the <em>Requirements Register</em> with a <a href="#view-steps">filter</a>, <em>Processes</em> as a <a href="#view-warnier">Warnier view</a>), four sequences, four milestones and a ready-made presentation. A first visit offers it right under the two choices.</li>
           <li><strong>Recent</strong> — your last three models, one click away; <em>Open</em> lists more.</li>
         </ul>
         <figure class="doc-shot">
@@ -346,6 +346,11 @@
           <li><strong>Children run</strong> (on a process or a step) — <em>sequence</em>, one after the other (the default); <em>choice</em>, exactly one of them (<em>by card</em> ⊕ <em>by invoice</em>); <em>concurrent</em>, at the same time (+).</li>
         </ul>
         <p>On a canvas a process is a frame that holds its steps, and a step a card that holds the steps inside it, with its repetition and condition under its name; the header of either has ⊕ when its steps are a choice and + when they run at once, and each alternative of a choice is <code>(0,1)</code>, as in a Warnier–Orr diagram. Dashed arrows lead from each step to the next in their order; there are none between alternatives or parts that run at once. They are drawn from the order, not kept in the model, and nothing moves for them: arrange the process in its <a href="#view-warnier">Warnier view</a>. A step is <strong>Performed by</strong> the person, system, container, component or web app that does it; a process <strong>Satisfies</strong> the requirements it meets, and scenarios <strong>Verify</strong> it. Agents write processes over the <a href="#mcp">MCP server</a> the same way.</p>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/processes-canvas-light.png?v=__BUILD__" alt="The sample's Send a payment process on a canvas: its steps in a frame with dashed arrows from each to the next, Validate running two checks at once, Approve a choice of two alternatives, and the two people who perform steps below" loading="lazy" />
+          <img class="shot-dark" src="screenshots/processes-canvas-dark.png?v=__BUILD__" alt="The sample's Send a payment process on a canvas: its steps in a frame with dashed arrows from each to the next, Validate running two checks at once, Approve a choice of two alternatives, and the two people who perform steps below" loading="lazy" />
+          <figcaption>The sample's <em>Payment Process</em> view: <em>Validate</em> runs its checks at once (+), <em>Approve</em> is a choice (⊕) of two <code>(0,1)</code> alternatives, and <em>Book the ledger</em> repeats <code>(1,n)</code> for each ledger entry.</figcaption>
+        </figure>
       </section>
 
       <section class="doc-section" id="selection">
@@ -531,6 +536,11 @@
           <li>The repetition (or a click on a step's <code>(1,n)</code>) opens its choices — <code>1</code>, <code>(0,1)</code>, <code>(1,n)</code>, <code>(0,n)</code> — and its condition (<em>for each order line</em>).</li>
           <li>A click on a brace, or on its ⊕ or +, changes how the steps in it run: in sequence, a choice ⊕, or at once +.</li>
         </ul>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/warnier-light.png?v=__BUILD__" alt="The sample's Processes view as a Warnier–Orr diagram: Send a payment with its steps in braces, the selected step Quote FX with its actions in its type line and its properties card on the right" loading="lazy" />
+          <img class="shot-dark" src="screenshots/warnier-dark.png?v=__BUILD__" alt="The sample's Processes view as a Warnier–Orr diagram: Send a payment with its steps in braces, the selected step Quote FX with its actions in its type line and its properties card on the right" loading="lazy" />
+          <figcaption>The sample's <em>Processes</em> view, <em>Quote FX</em> selected: its actions in its type line, + beside it for its first step, <em>+ Step</em> under each brace, and its properties card.</figcaption>
+        </figure>
         <p>The keyboard does the same for the selected element:</p>
         <div class="doc-table-wrap">
           <table class="doc-table">
@@ -989,6 +999,11 @@
         <p>
           <strong>Radical Forge</strong> (<em>New model → Create with Radical Forge</em> on the welcome screen, or <em>Radical menu → Radical Forge…</em>) turns a plain-language description of a system into a model, one reviewable stage at a time: <strong>Requirements</strong> (EARS) → <strong>Domain model</strong> → <strong>Fitness functions</strong> → <strong>Gherkin scenarios</strong> → <strong>State machines</strong> → <strong>Processes</strong> → <strong>Mockups</strong> → <strong>C4 model</strong>. Each stage may first ask a few clarifying questions, suggests matching Hub concepts, and can be regenerated before you continue.
         </p>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/forge-light.png?v=__BUILD__" alt="Radical Forge after its Requirements stage: the stages from Description to Finish on top, the stage's result and the Arrange questions, and the need with the four new requirements in a grid on the Conceptual view behind" loading="lazy" />
+          <img class="shot-dark" src="screenshots/forge-dark.png?v=__BUILD__" alt="Radical Forge after its Requirements stage: the stages from Description to Finish on top, the stage's result and the Arrange questions, and the need with the four new requirements in a grid on the Conceptual view behind" loading="lazy" />
+          <figcaption>Radical Forge after the Requirements stage, the four requirements kept in a grid beside the need on <em>Conceptual</em>.</figcaption>
+        </figure>
         <ul>
           <li><strong>The description is kept as a <a href="#properties">Need</a>.</strong> When you press <em>Start</em>, the text is saved in the model as a need (named after its first line), and the Requirements stage links every requirement it writes to it with <em>Derives from</em>. If the model already has needs, <em>Start from</em> on the Description step loads one instead, and your edits are saved back to it. Going back and starting again updates the same need instead of adding a second one.</li>
           <li><strong>Hub concepts that fit.</strong> For the Requirements, Fitness functions and C4 stages, Forge ranks the <a href="#hub">Hub</a> catalogue against your description (rarer words count more, and so do the concepts linked from a blueprint that fits), and the model picks at most five that fit, whatever language the description is in. They appear under <em>Picked from the Hub</em>, checked; untick the ones you do not want, or <em>Import</em> one as it is. When a blueprint fits the whole system, the C4 stage offers it first, to import as a skeleton. Without AI you see the best keyword matches instead.</li>
