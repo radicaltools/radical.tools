@@ -9,7 +9,7 @@ export default defineConfig({
   target: 'node20',
   outDir: 'dist',
   clean: true,
-  noExternal: ['@radical/common', '@radical/node-files'],
+  noExternal: ['@radical/common', '@radical/node-files', 'markdown-to-jsx'],
   onSuccess: async () => {
     await cp(fileURLToPath(new URL('../../LICENSE', import.meta.url)), 'LICENSE')
   },
