@@ -115,7 +115,7 @@ describe('Radical Forge over MCP', () => {
   it('files each stage into its view beside what is there, and arranges it as the user chooses', async () => {
     const { client, read } = await connect()
     try {
-      await call(client, 'forge_start', { description: BRIEF })
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
       let data = await read()
       const need = data.nodes.find((n) => n.type === 'need')!
       const conceptual = data.views!.find((v) => v.name === 'Conceptual')!
@@ -128,7 +128,7 @@ describe('Radical Forge over MCP', () => {
         await call(client, 'add_node', { tempId: `r${i}`, type: 'requirement', label, properties: { ears_type: 'ubiquitous', action: label } })
       }
       const done = await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'Three requirements.' })
-      expect(done).toContain(`Added to the views: Conceptual (view ${conceptual.id}) +3`)
+      expect(done).toContain(`Conceptual (${conceptual.id}) shows 3 new elements.`)
       expect(done).toContain('Keep its 3 new elements on Conceptual in a row, a column or a grid?')
       expect(done).toContain('Run Smart Layout on Conceptual?')
       expect(done).toContain('forge_arrange')
@@ -157,7 +157,7 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'add_relation', { sourceId: 'line', targetId: 'res', relationType: 'part-of' })
       expect(await call(client, 'get_issues', {})).toContain('No issues')
       const domainDone = await call(client, 'forge_complete_stage', { stage: 'domain', summary: 'One context, one aggregate.' })
-      expect(domainDone).toContain('Domain (view')
+      expect(domainDone).toContain('Made the view Domain (')
       data = await read()
       const modelIds = data.nodes.filter((n) => n.type === 'domain' || n.type === 'entity').map((n) => n.id)
       expect(data.views!.find((v) => v.name === 'Domain')!.nodeIds.sort()).toEqual([...modelIds].sort())
@@ -180,7 +180,7 @@ describe('Radical Forge over MCP', () => {
   it('runs the state machine stage after the scenarios, into a States view', async () => {
     const { client, read } = await connect()
     try {
-      await call(client, 'forge_start', { description: BRIEF })
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
       await call(client, 'forge_clarify', { stage: 'requirements' })
       await call(client, 'forge_generate', { stage: 'requirements' })
       await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
@@ -220,7 +220,7 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'add_relation', { sourceId: 'sc', targetId: 'm', relationType: 'verifies' })
       expect(await call(client, 'get_issues', {})).toContain('No issues')
       const done = await call(client, 'forge_complete_stage', { stage: 'states', summary: 'The order lifecycle.' })
-      expect(done).toContain('States (view')
+      expect(done).toContain('Made the view States (')
 
       const data = await read()
       const states = data.views!.find((v) => v.name === 'States')!
@@ -242,7 +242,7 @@ describe('Radical Forge over MCP', () => {
   it('runs the processes stage after the state machines', async () => {
     const { client, read } = await connect()
     try {
-      await call(client, 'forge_start', { description: BRIEF })
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
       await call(client, 'forge_clarify', { stage: 'requirements' })
       await call(client, 'forge_generate', { stage: 'requirements' })
       await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
@@ -276,7 +276,7 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'add_relation', { sourceId: 'p', targetId: 'req', relationType: 'satisfies' })
       expect(await call(client, 'get_issues', {})).toContain('No issues')
       const done = await call(client, 'forge_complete_stage', { stage: 'processes', summary: 'Click and collect.' })
-      expect(done).toContain('draws them as a Warnier diagram')
+      expect(done).toMatch(/Made the view Processes \(.+\); it lays itself out\./)
       expect(done).not.toContain('forge_arrange')
       expect(done).toContain('continue with Mockups')
 
@@ -285,7 +285,60 @@ describe('Radical Forge over MCP', () => {
       // Not on the canvases: the processes are drawn where they read.
       const listed = new Set(data.views!.flatMap((v) => v.nodeIds))
       expect(data.nodes.filter((n) => n.type === 'process' || n.type === 'step').some((n) => listed.has(n.id))).toBe(false)
-      expect(await refused(client, 'forge_arrange', { stage: 'processes', smartLayout: true })).toContain('added nothing that is on a Forge view')
+      expect(await refused(client, 'forge_arrange', { stage: 'processes', smartLayout: true })).toContain('added nothing that is on a canvas view of the run')
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
+  it('files a run into the Radical structure the user chose', async () => {
+    const { client, read } = await connect()
+    try {
+      expect(await refused(client, 'forge_start', { description: BRIEF, views: { structure: 'radical', viewpoints: ['nope'] } })).toContain('no viewpoint "nope"')
+      const started = await call(client, 'forge_start', {
+        description: BRIEF,
+        views: { structure: 'radical', viewpoints: ['containers', 'traceability', 'requirement-coverage', 'system-context'] },
+      })
+      expect(started).toContain('View structure: Radical: Conceptual (Traceability); Logical (System context, Containers); Governance (Requirement coverage).')
+      expect(started).toMatch(/Made the view Traceability \(.+\); shows 1 new element; it lays itself out\./)
+      expect(started).toContain('ask the user for the view structure')
+      let data = await read()
+      const need = data.nodes.find((n) => n.type === 'need')!
+      expect(data.views!.map((v) => [v.name, v.folder, v.viewpoint, v.kind, v.nodeIds])).toEqual([['Traceability', 'Conceptual', 'traceability', 'table', []]])
+
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      await call(client, 'forge_generate', { stage: 'requirements' })
+      await call(client, 'add_node', { tempId: 'r', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
+      await call(client, 'add_relation', { sourceId: 'r', targetId: need.id, relationType: 'derives' })
+      const requirements = await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement.' })
+      expect(requirements).toMatch(/Traceability \(.+\) shows 1 new element; it lays itself out\./)
+      expect(requirements).toMatch(/Made the view Requirement coverage \(.+\); shows 1 new element; it lays itself out\./)
+      expect(requirements).not.toContain('forge_arrange')
+      data = await read()
+      expect(data.views!.find((v) => v.name === 'Requirement coverage')).toMatchObject({ folder: 'Governance', viewpoint: 'requirement-coverage', nodeIds: [] })
+
+      for (const stage of ['domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups']) {
+        await call(client, 'forge_clarify', { stage })
+        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
+      }
+      await call(client, 'forge_clarify', { stage: 'c4' })
+      await call(client, 'forge_generate', { stage: 'c4', hubConcepts: [] })
+      await call(client, 'add_node', { tempId: 'shopper', type: 'person', label: 'Shopper' })
+      await call(client, 'add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+      await call(client, 'add_relation', { sourceId: 'shopper', targetId: 'shop', relationType: 'interacts', label: 'Reserves' })
+      const c4 = await call(client, 'forge_complete_stage', { stage: 'c4', summary: 'The shop.' })
+      expect(c4).toMatch(/Made the view System context \(.+\); shows 2 new elements\./)
+      expect(c4).toContain('Keep its 2 new elements on System context and 2 new elements on Containers in a row, a column or a grid?')
+      expect(c4).toContain('Run Smart Layout on System context and Containers?')
+      data = await read()
+      const context = data.views!.find((v) => v.name === 'System context')!
+      expect(context).toMatchObject({ folder: 'Logical', viewpoint: 'system-context', nodeIds: [] })
+      // Beside each other on the canvas, though the view lists nothing.
+      const [shopper, shop] = ['Shopper', 'Shop'].map((label) => data.nodes.find((n) => n.label === label)!.id)
+      expect(Math.abs(context.positions[shop].x - context.positions[shopper].x)).toBeGreaterThanOrEqual(360)
+      expect(await call(client, 'forge_arrange', { stage: 'c4', align: 'row' })).toContain('System context: 2 elements in a row.\nContainers: 2 elements in a row.')
+      expect(await call(client, 'forge_finish', {})).toContain("The elements are in the run's views (Radical:")
     } finally {
       await client.close()
     }

@@ -8,23 +8,27 @@ import { useDiagramFacade } from '../ai/useDiagramFacade'
 import {
   FORGE_ARRANGEMENTS,
   FORGE_STAGES,
-  FORGE_STAGE_VIEW,
+  FORGE_VIEW_NAMES,
   HUB_MATCHES_QUESTION_ID,
   PRIMARY_TYPE_IDS_FOR_STAGE,
   arrangeForgeGroup,
   buildForgeStagePrompt,
   buildPriorStagesBlock,
+  defaultForgeStructure,
   fileIntoForgeViews,
   findForgeView,
   forgeArrangeGroups,
   forgeHubCandidates,
+  forgeStageView,
   formatClarificationAnswers,
   needLabelFromDescription,
+  radicalViewpoints,
   type ClarifyStageQuestion,
   type ForgeArrangeGroup,
   type ForgeArrangement,
   type ForgeNeedRef,
   type ForgeStageId,
+  type ForgeStructure,
 } from '@radical/common/ai/forge'
 import { buildGherkinFiles } from '@radical/common/formats/exportGherkin'
 import { downloadGherkinFiles } from '../export/downloadGherkinFiles'
@@ -34,7 +38,7 @@ import { importHubConceptIntoDiagram } from '../hub/importConcept'
 import { askClarifyingQuestions } from '../ai/forgeClarify'
 import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
-import type { C4Node, C4Relation } from '@radical/common/c4'
+import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 import { generateWireframe } from '../ai/mockupWireframe'
 import { addedSince, currentModelIds, removeAdded, type ModelIds } from '../ai/forgeStageOutput'
 
@@ -141,6 +145,9 @@ function pickTextFile(): Promise<string | null> {
   })
 }
 
+/** A canvas: a stage runs on it, so its new elements are placed there. */
+const isCanvas = (view: DiagramView | undefined): boolean => !!view && (!view.kind || view.kind === 'static')
+
 const NO_NODES: Record<string, C4Node> = {}
 const NO_RELATIONS: Record<string, C4Relation> = {}
 
@@ -178,6 +185,11 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   /** Stage the user explicitly finished the run at ("Finish here"), or null
    *  when the run went through every stage / hasn't finished. */
   const [finishedAt, setFinishedAt] = useState<ForgeStageId | null>(null)
+  /** The view structure the run files into, picked on the Description step:
+   *  Radical with the viewpoints ticked under Customise, or Layer canvases. */
+  const [structureKind, setStructureKind] = useState<ForgeStructure['kind']>('radical')
+  const [chosenViewpoints, setChosenViewpoints] = useState<string[]>([])
+  const [customising, setCustomising] = useState(false)
   const progressIdRef = useRef(0)
   const progressListRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -198,6 +210,12 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   // Metamodels without the governance `need` type (plain C4, custom ones)
   // run Forge as before, without storing the description in the model.
   const hasNeedType = useDiagramStore((s) => !!s.metamodel?.nodeTypes.need)
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  const viewpointChoices = useMemo(() => radicalViewpoints(metamodel), [metamodel])
+  const structure = useMemo<ForgeStructure>(
+    () => (structureKind === 'radical' ? { kind: 'radical', viewpoints: chosenViewpoints } : { kind: 'layers' }),
+    [structureKind, chosenViewpoints],
+  )
 
   // Reset to a clean run every time the wizard is (re)opened.
   useEffect(() => {
@@ -221,6 +239,12 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setHubPicksByStage({})
     setReachedIndex(0)
     setFinishedAt(null)
+    // The structure the model already has, or Radical.
+    const { metamodel: mm, views } = useDiagramStore.getState()
+    const preset = defaultForgeStructure(mm, views)
+    setStructureKind(preset.kind)
+    setChosenViewpoints(preset.kind === 'radical' ? preset.viewpoints : radicalViewpoints(mm).filter((c) => c.chosen).map((c) => c.id))
+    setCustomising(false)
     clarifyStartedRef.current = new Set()
     stageAddedRef.current = {}
   }, [open])
@@ -377,11 +401,12 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     const previous = stageAddedRef.current[stageId]
     if (previous) removeAdded(previous)
     setArrangeByStage((a) => ({ ...a, [stageId]: undefined }))
-    // The stage builds on its view, so its elements land there as they come.
-    // A view it is the first to fill does not exist yet (an empty view shows
-    // the whole model): it is made from them afterwards, on All elements.
-    const stageView = findForgeView(useDiagramStore.getState().views, FORGE_STAGE_VIEW[stageId])
-    useDiagramStore.getState().setActiveView(stageView?.id ?? null)
+    // The stage builds on its canvas, so its elements land there as they
+    // come. A view it is the first to fill does not exist yet (an empty view
+    // shows the whole model), and a table or wiki has no places: the stage
+    // then runs on All elements, and its views are made afterwards.
+    const stageView = forgeStageView(useDiagramStore.getState().views, stageId, structure)
+    useDiagramStore.getState().setActiveView(isCanvas(stageView) ? stageView!.id : null)
     const before = currentModelIds()
     setProgressByStage((p) => ({ ...p, [stageId]: { round: 0, entries: [] } }))
     const ctl = new AbortController()
@@ -435,16 +460,17 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     } finally {
       const added = addedSince(before)
       stageAddedRef.current[stageId] = added
-      // Each element into its view (Conceptual, Logical & physical, Governance),
-      // and the stage's view on screen.
-      fileIntoForgeViews(diagram, added.nodes, stageId)
-      const target = findForgeView(useDiagramStore.getState().views, FORGE_STAGE_VIEW[stageId])
-      if (target) useDiagramStore.getState().setActiveView(target.id)
-      setArrangeByStage((a) => ({ ...a, [stageId]: { groups: forgeArrangeGroups(diagram, added.nodes, stageId) } }))
+      // Each element into the run's structure, and the stage's view on screen
+      // (or the first it filled).
+      const filed = fileIntoForgeViews(diagram, added.nodes, stageId, structure)
+      const target = forgeStageView(useDiagramStore.getState().views, stageId, structure)?.id
+        ?? filed.find((f) => f.nodeIds.length)?.viewId
+      if (target) useDiagramStore.getState().setActiveView(target)
+      setArrangeByStage((a) => ({ ...a, [stageId]: { groups: forgeArrangeGroups(diagram, added.nodes, stageId, structure) } }))
       abortRef.current = null
       setBusy(false)
     }
-  }, [busy, unavailableReason, description, needId, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries])
+  }, [busy, unavailableReason, description, needId, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries, structure])
 
   /** Keeps the stage's new elements in a row, column or grid on their view. */
   const arrangeStage = useCallback((stageId: ForgeStageId, arrangement: ForgeArrangement) => {
@@ -465,7 +491,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const layoutStage = useCallback(async (stageId: ForgeStageId) => {
     const current = arrangeByStage[stageId]
     if (!current || busy || layingOut || !diagram.runLayout) return
-    const own = findForgeView(useDiagramStore.getState().views, FORGE_STAGE_VIEW[stageId])?.id
+    const own = forgeStageView(useDiagramStore.getState().views, stageId, structure)?.id
     const viewIds = [...new Set(current.groups.map((g) => g.viewId))].sort((a, b) => Number(a === own) - Number(b === own))
     setLayingOut(true)
     try {
@@ -481,7 +507,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     } finally {
       setLayingOut(false)
     }
-  }, [arrangeByStage, busy, layingOut, diagram])
+  }, [arrangeByStage, busy, layingOut, diagram, structure])
 
   const cancelStage = useCallback(() => { abortRef.current?.abort() }, [])
 
@@ -563,18 +589,21 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     const { c4Nodes, addNode, updateNode, setActiveView } = useDiagramStore.getState()
     const text = description.trim()
     const existing = needId ? c4Nodes[needId] : undefined
-    // The run's views start with the need, on Conceptual.
+    // The run's views start with the need: Conceptual, or the views of the
+    // viewpoints that show it (Traceability first).
     const showNeed = (id: string): void => {
-      const [filed] = fileIntoForgeViews(diagram, [id])
-      if (filed) useDiagramStore.getState().setActiveView(filed.viewId)
+      const filed = fileIntoForgeViews(diagram, [id], undefined, structure)
+      const target = forgeStageView(useDiagramStore.getState().views, 'requirements', structure)?.id ?? filed[0]?.viewId
+      if (target) useDiagramStore.getState().setActiveView(target)
     }
     if (existing) {
       if ((existing.description ?? '').trim() !== text) updateNode(existing.id, { description: text })
       showNeed(existing.id)
       return
     }
-    // A new node joins the view on screen: make that Conceptual, or none yet.
-    setActiveView(findForgeView(useDiagramStore.getState().views, 'conceptual')?.id ?? null)
+    // A new node joins the canvas on screen: make that Conceptual, or All
+    // elements.
+    setActiveView(structure.kind === 'layers' ? findForgeView(useDiagramStore.getState().views, 'conceptual')?.id ?? null : null)
     const def = useDiagramStore.getState().metamodel?.nodeTypes.need
     const id = addNode({
       type: 'need',
@@ -591,7 +620,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (!id) return
     setNeedId(id)
     showNeed(id)
-  }, [hasNeedType, description, needId, diagram])
+  }, [hasNeedType, description, needId, diagram, structure])
   const startRun = useCallback(() => {
     ensureNeed()
     goNext()
@@ -778,7 +807,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                 placeholder="Describe the system in plain language — who uses it, what it does, the main flows and constraints…"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={10}
+                rows={customising ? 5 : 10}
                 autoFocus
               />
               <button type="button" className="forge-btn forge-btn-secondary forge-btn-sm" onClick={handleUpload} style={{ marginTop: 8 }}>
@@ -790,6 +819,51 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                     ? 'Edits are saved back to this need, and the generated requirements are linked to it.'
                     : 'Saved in the model as a Need when you start, so every generated requirement traces back to it.'}
                 </p>
+              )}
+              {viewpointChoices.length > 0 && (
+                <fieldset className="forge-structure" disabled={reachedIndex > 0}>
+                  <legend>Views</legend>
+                  <label className="forge-structure-option">
+                    <input type="radio" name="forge-structure" checked={structureKind === 'radical'} onChange={() => setStructureKind('radical')} />
+                    <span>
+                      <strong>Radical structure</strong> — a view of each viewpoint, in the folders {[...new Set(viewpointChoices.filter((c) => chosenViewpoints.includes(c.id)).map((c) => c.folder))].join(', ') || 'you pick'}, made once something lands in it
+                    </span>
+                  </label>
+                  {structureKind === 'radical' && (
+                    <div className="forge-structure-custom">
+                      <button type="button" className="forge-link" aria-expanded={customising} onClick={() => setCustomising((c) => !c)}>
+                        {customising ? 'Hide the viewpoints' : `Customise… (${chosenViewpoints.length} of ${viewpointChoices.length} viewpoints)`}
+                      </button>
+                      {customising && (
+                        <div className="forge-structure-folders">
+                          {[...new Set(viewpointChoices.map((c) => c.folder))].map((folder) => (
+                            <div key={folder} className="forge-structure-folder" role="group" aria-label={folder}>
+                              <div className="forge-structure-folder-name">{folder}</div>
+                              {viewpointChoices.filter((c) => c.folder === folder).map((c) => (
+                                <label key={c.id} className="forge-structure-viewpoint">
+                                  <input
+                                    type="checkbox"
+                                    checked={chosenViewpoints.includes(c.id)}
+                                    onChange={(e) => setChosenViewpoints((v) => (e.target.checked
+                                      ? viewpointChoices.map((x) => x.id).filter((id) => id === c.id || v.includes(id))
+                                      : v.filter((id) => id !== c.id)))}
+                                  />
+                                  {c.label}
+                                </label>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <label className="forge-structure-option">
+                    <input type="radio" name="forge-structure" checked={structureKind === 'layers'} onChange={() => setStructureKind('layers')} />
+                    <span>
+                      <strong>Layer canvases</strong> — {Object.values(FORGE_VIEW_NAMES).join(', ')}, listing what each stage adds
+                    </span>
+                  </label>
+                </fieldset>
               )}
             </>
           )}

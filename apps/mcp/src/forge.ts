@@ -11,9 +11,12 @@
 // after a restart, forge_start with the run's needId starts over from the
 // same need.
 //
-// Each stage's elements are filed into the run's views — Conceptual, Logical
-// & physical, Governance — with a place beside what the view already shows,
-// and the client is told to ask the user how to arrange them (forge_arrange).
+// Each stage's elements are filed into the run's view structure, which the
+// client asks the user for before forge_start: Radical (views of the
+// metamodel's viewpoints in the folders Conceptual, Logical and Governance,
+// made as they fill) or the layer canvases. On a canvas they get a place
+// beside what the view already shows, and the client is told to ask the user
+// how to arrange them (forge_arrange).
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -24,25 +27,29 @@ import {
   FORGE_STAGES,
   FORGE_VIEW_NAMES,
   PRIMARY_TYPE_IDS_FOR_STAGE,
+  RADICAL_FOLDERS,
   arrangeForgeGroup,
   buildClarifyPrompt,
   buildForgeStagePrompt,
   buildPriorStagesBlock,
   buildWireframePrompt,
+  defaultForgeStructure,
+  describeForgeStructure,
   fileIntoForgeViews,
   forgeArrangeGroups,
-  isForgeCanvas,
   forgeHubCandidates,
   formatClarificationAnswers,
   idsAddedSince,
   modelIdsOf,
   needLabelFromDescription,
   outermostNodes,
+  radicalViewpoints,
   type ClarifyStageQuestion,
   type FiledNodes,
   type ForgeHubCandidates,
   type ForgeArrangement,
   type ForgeStageId,
+  type ForgeStructure,
   type ModelIds,
 } from '@radical/common/ai/forge'
 import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
@@ -50,6 +57,8 @@ import type { ModelFacade } from '@radical/common/ai/modelFacade'
 import { AI_MODELLING_RULES, buildContextMessage } from '@radical/common/ai/systemPrompt'
 import type { ToolDef, ToolResult, ToolRunContext } from '@radical/common/ai/tools'
 import type { C4Node, DiagramData } from '@radical/common/c4'
+import type { Metamodel } from '@radical/common/metamodel'
+import { runPipeline } from '@radical/common/viewPipeline'
 import { buildGherkinFiles } from '@radical/common/formats/exportGherkin'
 import { docToConcept, type HubConceptSummary, type HubRadicalDoc } from '@radical/common/hubFormat'
 import { buildConceptInsert } from '@radical/common/hubImport'
@@ -65,8 +74,13 @@ export const FORGE_PROCEDURE = [
   'Radical Forge turns a free-text description into EARS requirements, a domain model, fitness functions,',
   'Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewed stage at a time, in this order:',
   FORGE_STAGES.map((stage) => `${stage.title} (${stage.id})`).join(' → ') + '.',
-  '1. forge_start with the description, or the id of an existing need. The description is kept in the model as a need.',
-  `   Every element a stage adds goes into one of ${Object.keys(FORGE_VIEW_NAMES).length} views: ${Object.values(FORGE_VIEW_NAMES).join(', ')}.`,
+  '1. Before anything is modelled, ask the user for the view structure of the run, and offer:',
+  '   - Radical (the default): a view of each of the metamodel\'s viewpoints, in the folders Conceptual, Logical and',
+  '     Governance as in radical.tools\' own model, each made once something lands in it. List the viewpoints by',
+  '     folder (radicalViewpoints below) and ask whether to leave any out.',
+  `   - Layer canvases: ${Object.values(FORGE_VIEW_NAMES).join(', ')}, which list the elements a stage adds.`,
+  '   Then forge_start with the description, or the id of an existing need, and views as the user chose. The',
+  '   description is kept in the model as a need.',
   '2. For each stage, in order:',
   '   a. forge_clarify: read it and ask the user the clarifying questions it calls for, if any, including which',
   '      Hub concepts you pick from its candidates to apply. Wait for the answers.',
@@ -94,6 +108,16 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
       properties: {
         description: { type: 'string', description: 'The system in plain language: who uses it, what it does, the main flows and constraints. With needId, replaces that need\'s text.' },
         needId: { type: 'string', description: 'Start from an existing `need` node instead (find them with search_model: LIST NODES WHERE type = "need").' },
+        views: {
+          type: 'object',
+          description: 'The view structure the user chose. Omit for the default: Radical when the metamodel has viewpoints, unless the model already has the layer canvases of a run.',
+          properties: {
+            structure: { type: 'string', enum: ['radical', 'layers'], description: `radical: a view of each viewpoint in the folder radical.tools' own model keeps it in (${[...new Set(Object.values(RADICAL_FOLDERS))].join(', ')}), made once it shows something; layers: the canvases ${Object.values(FORGE_VIEW_NAMES).join(', ')}.` },
+            viewpoints: { type: 'array', items: { type: 'string' }, description: 'With radical: the ids of the viewpoints to have views of. Omit for every viewpoint the radical model has a folder for.' },
+          },
+          required: ['structure'],
+          additionalProperties: false,
+        },
       },
       additionalProperties: false,
     },
@@ -151,7 +175,7 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'forge_arrange',
-    description: `After a completed Forge stage, as the user chose: keep the stage's new elements in a row, a column or a grid on their view (${Object.values(FORGE_VIEW_NAMES).join(', ')}), and/or run Smart Layout on that view. Ask the user first.`,
+    description: 'After a completed Forge stage, as the user chose: keep the stage\'s new elements in a row, a column or a grid on the canvas views of the run that show them, and/or run Smart Layout on those views. Ask the user first.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -232,6 +256,8 @@ interface ForgeRun {
   /** forge_finish was called. */
   finished?: boolean
   hub: ForgeHubCandidates
+  /** The view structure the user chose. */
+  structure: ForgeStructure
   clarified: Set<ForgeStageId>
   stages: Partial<Record<ForgeStageId, StageState>>
 }
@@ -267,18 +293,48 @@ function countByType(nodes: Record<string, C4Node>, ids: string[]): string {
   return [...counts].map(([type, n]) => `${type} ${n}`).join(', ')
 }
 
-/** Gives the nodes just filed into views a place there, since a view keeps
- *  its own positions: the outermost in a landscape block beside what the
- *  view already showed, the rest where they sit inside their parent.
- *  Mutates and returns `data`. */
-function placeInViews(data: DiagramData, filed: FiledNodes[]): DiagramData {
-  for (const { viewId, nodeIds } of filed) {
+/** The view structure forge_start was given, or the default; a string says
+ *  what is wrong with it. */
+function structureArg(raw: unknown, metamodel: Metamodel | undefined, facade: ModelFacade): ForgeStructure | string {
+  if (raw === undefined) return defaultForgeStructure(metamodel, facade.getViews?.())
+  const views = raw as { structure?: unknown; viewpoints?: unknown }
+  if (views.structure === 'layers') return { kind: 'layers' }
+  if (views.structure !== 'radical') return 'views.structure must be "radical" or "layers"'
+  const choices = radicalViewpoints(metamodel)
+  if (!choices.length) return 'this metamodel has no viewpoints; use views: { structure: "layers" }'
+  if (views.viewpoints === undefined) return { kind: 'radical', viewpoints: choices.filter((c) => c.chosen).map((c) => c.id) }
+  if (!Array.isArray(views.viewpoints)) return 'views.viewpoints must be a list of viewpoint ids'
+  const unknown = views.viewpoints.filter((v) => !choices.some((c) => c.id === v))
+  if (unknown.length) return `no viewpoint ${unknown.map((v) => `"${String(v)}"`).join(', ')}; the viewpoints are ${choices.map((c) => c.id).join(', ')}`
+  const wanted = new Set(views.viewpoints as string[])
+  return { kind: 'radical', viewpoints: choices.filter((c) => wanted.has(c.id)).map((c) => c.id) }
+}
+
+/** What filing did to the views, a line each for those it made or added to. */
+function viewLines(filed: FiledNodes[]): string[] {
+  return filed.filter((f) => f.made || f.nodeIds.length).map((f) => {
+    const what = f.made ? `Made the view ${f.viewName} (${f.viewId})` : `${f.viewName} (${f.viewId})`
+    const shows = f.nodeIds.length ? ` shows ${f.nodeIds.length} new element${f.nodeIds.length === 1 ? '' : 's'}` : ''
+    const laysOut = f.canvas ? '' : '; it lays itself out'
+    return `${what}${f.made && shows ? ';' : ''}${shows}${laysOut}.`
+  })
+}
+
+/** Gives the nodes just filed into canvases a place there, since a view
+ *  keeps its own positions: the outermost in a landscape block beside what
+ *  the view already showed (what it lists, or what its chain shows), the
+ *  rest where they sit inside their parent. Mutates and returns `data`. */
+function placeInViews(data: DiagramData, filed: FiledNodes[], metamodel: Metamodel | undefined): DiagramData {
+  for (const { viewId, nodeIds, canvas } of filed) {
     const view = data.views?.find((v) => v.id === viewId)
-    if (!view || !nodeIds.length) continue
+    if (!view || !canvas || !nodeIds.length) continue
     const nodes: Record<string, C4Node> = Object.fromEntries(data.nodes.map((n) => [n.id, { ...n, ...view.positions[n.id] }]))
     const fresh = new Set(nodeIds)
     const shown = new Set<string>()
-    for (const id of view.nodeIds) {
+    const before = view.nodeIds.length || !metamodel
+      ? view.nodeIds
+      : runPipeline(view, { nodes: Object.fromEntries(data.nodes.map((n) => [n.id, n])), relations: data.relations, metamodel }).nodes.map((n) => n.id)
+    for (const id of before) {
       if (fresh.has(id)) continue
       for (let cur: string | undefined = id; cur && nodes[cur] && !shown.has(cur); cur = nodes[cur].parentId) shown.add(cur)
     }
@@ -346,6 +402,8 @@ export class Forge {
     const typed = typeof args.description === 'string' ? args.description.trim() : ''
     const needId = typeof args.needId === 'string' && args.needId ? ctx.resolveId(args.needId) : undefined
     const metamodel = facade.getMetamodel?.()
+    const structure = structureArg(args.views, metamodel, facade)
+    if (typeof structure === 'string') return fail(`forge_start: ${structure}`)
     let description = typed
     let need: string | undefined
     let readOnly = true
@@ -380,12 +438,14 @@ export class Forge {
         readOnly = false
       }
     }
-    // The run's views start with the need, on Conceptual.
+    // The run's views start with the need: Conceptual, or the views of the
+    // viewpoints that show it (Traceability, Specification).
     let data: DiagramData | undefined
+    let filed: FiledNodes[] = []
     if (need) {
-      const filed = fileIntoForgeViews(facade, [need])
-      if (filed.some((f) => f.nodeIds.length)) {
-        data = placeInViews(facade.toDiagramData(), filed)
+      filed = fileIntoForgeViews(facade, [need], undefined, structure)
+      if (filed.some((f) => f.nodeIds.length || f.made)) {
+        data = placeInViews(facade.toDiagramData(), filed, metamodel)
         readOnly = false
       }
     }
@@ -395,11 +455,14 @@ export class Forge {
       needLabel: need ? facade.getNodes()[need]?.label : undefined,
       startedAt: new Date().toISOString(),
       hub: forgeHubCandidates(this.hub().summaries, description, metamodel?.id),
+      structure,
       clarified: new Set(),
       stages: {},
     }
     const lines = [
       need ? `Forge run started. The description is the need ${need}.` : 'Forge run started. This metamodel has no need type, so the description is not stored in the model.',
+      `View structure: ${describeForgeStructure(structure, metamodel)}`,
+      ...viewLines(filed),
       '',
       FORGE_PROCEDURE,
       '',
@@ -530,23 +593,13 @@ export class Forge {
     if (state?.status !== 'generating') return fail(`forge_complete_stage: the ${stageTitle(id)} stage is not open; begin it with forge_generate`)
     const summary = typeof args.summary === 'string' && args.summary.trim() ? args.summary.trim() : 'Done.'
     const added = idsAddedSince(state.before, this.ids(facade))
-    const viewsBefore = new Set(Object.keys(facade.getViews?.() ?? {}))
-    const filed = fileIntoForgeViews(facade, added.nodes, id)
-    // A view of a viewpoint lists nothing (it shows what its chain gives):
-    // made now, it is a change all the same.
-    const madeViews = Object.keys(facade.getViews?.() ?? {}).filter((viewId) => !viewsBefore.has(viewId))
+    const filed = fileIntoForgeViews(facade, added.nodes, id, run.structure)
     const nodes = facade.getNodes()
     const byType = countByType(nodes, added.nodes)
     const lines = [
       `${stageTitle(id)} done: +${added.nodes.length} nodes${byType ? ` (${byType})` : ''}, +${added.relations.length} relations, +${added.views.length} views.`,
     ]
-    const intoViews = filed.filter((f) => f.nodeIds.length)
-    if (intoViews.length) {
-      lines.push(`Added to the views: ${intoViews.map((f) => `${FORGE_VIEW_NAMES[f.key]} (view ${f.viewId}) +${f.nodeIds.length}`).join(', ')}.`)
-    }
-    for (const f of filed.filter((f) => !isForgeCanvas(f.key))) {
-      lines.push(`${FORGE_VIEW_NAMES[f.key]} (view ${f.viewId}) draws them as a Warnier diagram: it shows every process and step, and needs no layout.`)
-    }
+    lines.push(...viewLines(filed))
     if (id === 'mockups') {
       const mockups = Object.values(nodes).filter((n) => n.type === 'mockup')
       const missing = mockups.filter((n) => !(n as unknown as Record<string, unknown>).wireframe)
@@ -557,7 +610,7 @@ export class Forge {
         )
       }
     }
-    const groups = forgeArrangeGroups(facade, added.nodes, id)
+    const groups = forgeArrangeGroups(facade, added.nodes, id, run.structure)
     const alignable = groups.filter((g) => g.nodeIds.length >= 2)
     const viewNames = groups.map((g) => g.viewName).join(' and ')
     if (groups.length) {
@@ -568,10 +621,12 @@ export class Forge {
     lines.push(next
       ? `${groups.length ? 'Then' : 'Next: show the user what this stage added and'} ask whether to continue with ${stageTitle(next)} (forge_clarify with stage "${next}"), regenerate this stage (forge_generate with regenerate: true) or finish here (forge_finish).`
       : `This was the last stage. ${groups.length ? 'Then' : 'Show the user what it added and'} ask whether to regenerate it (forge_generate with regenerate: true) or finish (forge_finish).`)
-    const changed = filed.some((f) => f.nodeIds.length) || madeViews.length > 0
+    // A view of a viewpoint lists nothing (it shows what its chain gives):
+    // made now, it is a change all the same.
+    const changed = filed.some((f) => (f.canvas && f.nodeIds.length) || f.made)
     return ok(lines.join('\n'), {
       readOnly: !changed,
-      data: changed ? placeInViews(facade.toDiagramData(), filed) : undefined,
+      data: changed ? placeInViews(facade.toDiagramData(), filed, facade.getMetamodel?.()) : undefined,
       commit: () => { run.stages[id] = { ...state, status: 'done', added, summary } },
     })
   }
@@ -590,8 +645,8 @@ export class Forge {
     if (args.smartLayout !== undefined && typeof args.smartLayout !== 'boolean') return fail('forge_arrange: smartLayout must be true or false')
     const align = args.align as ForgeArrangement | undefined
     if (!align && args.smartLayout !== true) return fail('forge_arrange: pass align, smartLayout: true, or both')
-    const groups = forgeArrangeGroups(facade, state.added.nodes, id)
-    if (!groups.length) return fail(`forge_arrange: the ${stageTitle(id)} stage added nothing that is on a Forge view`)
+    const groups = forgeArrangeGroups(facade, state.added.nodes, id, run.structure)
+    if (!groups.length) return fail(`forge_arrange: the ${stageTitle(id)} stage added nothing that is on a canvas view of the run`)
     const lines: string[] = []
     if (align) {
       for (const group of groups) {
@@ -675,7 +730,7 @@ export class Forge {
       lines.push(`${files.length} .feature files (pass gherkinDir to write them):`)
       for (const file of files) lines.push('', `--- ${file.filename}`, file.content)
     }
-    lines.push('', `The elements are in the views ${Object.values(FORGE_VIEW_NAMES).join(', ')}; smart_layout with a viewId arranges one.`)
+    lines.push('', `The elements are in the run's views (${describeForgeStructure(run.structure, facade.getMetamodel?.())}); smart_layout with a viewId arranges a canvas.`)
     return ok(lines.join('\n'), { readOnly: true, commit: () => { run.finished = true } })
   }
 

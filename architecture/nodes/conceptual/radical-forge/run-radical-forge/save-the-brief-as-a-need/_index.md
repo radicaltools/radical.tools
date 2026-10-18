@@ -4,6 +4,6 @@ type: "step"
 label: "Save the brief as a need"
 children: "sequence"
 condition: "if the run starts from a new description"
-order: 1
+order: 2
 repeat: "0..1"
 ---

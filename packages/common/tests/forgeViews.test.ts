@@ -4,16 +4,25 @@ import { builtInGovernanceMetamodel } from '../src/metamodel'
 import { createModelFacade } from '../src/ai/modelFacade'
 import {
   arrangeForgeGroup,
+  defaultForgeStructure,
+  describeForgeStructure,
   fileIntoForgeViews,
   findForgeView,
   forgeArrangeGroups,
+  forgeStageView,
   forgeViewOf,
   forgeViewsOf,
   outermostNodes,
+  radicalViewpoints,
+  type FiledNodes,
+  type ForgeStructure,
 } from '../src/ai/forge'
 
 const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
   ({ id, type, label: id, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...extra }) as C4Node
+
+/** Where filed nodes went, without the view's name and kind. */
+const brief = (filed: FiledNodes[]) => filed.map(({ key, viewId, nodeIds }) => ({ key, viewId, nodeIds }))
 
 function facadeOf(nodes: C4Node[], views: DiagramData['views'] = [], relations: DiagramData['relations'] = []) {
   let next = 0
@@ -60,11 +69,11 @@ describe('Forge views', () => {
       [],
       [{ id: 'l', sourceId: 'm', targetId: 'order', relationType: 'lifecycle-of' }],
     )
-    expect(fileIntoForgeViews(facade, ['shop', 'order'], 'domain')).toEqual([
+    expect(brief(fileIntoForgeViews(facade, ['shop', 'order'], 'domain'))).toEqual([
       { key: 'domain', viewId: 'id1', nodeIds: ['shop', 'order'] },
       { key: 'conceptual', viewId: 'id2', nodeIds: ['shop', 'order'] },
     ])
-    expect(fileIntoForgeViews(facade, ['m'], 'states')).toEqual([{ key: 'states', viewId: 'id3', nodeIds: ['m', 'order'] }])
+    expect(brief(fileIntoForgeViews(facade, ['m'], 'states'))).toEqual([{ key: 'states', viewId: 'id3', nodeIds: ['m', 'order'] }])
     expect(forgeArrangeGroups(facade, ['shop', 'order'], 'domain').map((g) => [g.viewName, g.nodeIds])).toEqual([
       ['Conceptual', ['shop']], ['Domain', ['shop']],
     ])
@@ -76,7 +85,7 @@ describe('Forge views', () => {
       [{ id: 'mine', name: 'conceptual ', nodeIds: ['need'], positions: {} }],
     )
     const filed = fileIntoForgeViews(facade, ['need', 'r1', 'f1'], 'requirements')
-    expect(filed).toEqual([
+    expect(brief(filed)).toEqual([
       { key: 'conceptual', viewId: 'mine', nodeIds: ['r1'] },
       { key: 'governance', viewId: 'id1', nodeIds: ['f1'] },
     ])
@@ -85,7 +94,7 @@ describe('Forge views', () => {
     expect(views.id1).toMatchObject({ name: 'Governance', nodeIds: ['f1'] })
     expect(findForgeView(views, 'logical')).toBeUndefined()
     // Again: nothing new.
-    expect(fileIntoForgeViews(facade, ['r1'], 'requirements')).toEqual([{ key: 'conceptual', viewId: 'mine', nodeIds: [] }])
+    expect(brief(fileIntoForgeViews(facade, ['r1'], 'requirements'))).toEqual([{ key: 'conceptual', viewId: 'mine', nodeIds: [] }])
   })
 
   it('arranges only the outermost new elements of each view', () => {
@@ -124,12 +133,95 @@ describe('processes go into a Warnier view', () => {
     expect(forgeViewsOf('process')).toEqual(['processes'])
     expect(forgeViewsOf('step', 'c4')).toEqual(['processes'])
     const facade = facadeOf([node('checkout', 'process'), node('take', 'step', { parentId: 'checkout' }), node('r1', 'requirement')])
-    expect(fileIntoForgeViews(facade, ['checkout', 'take'], 'processes')).toEqual([{ key: 'processes', viewId: 'id1', nodeIds: [] }])
+    expect(brief(fileIntoForgeViews(facade, ['checkout', 'take'], 'processes'))).toEqual([{ key: 'processes', viewId: 'id1', nodeIds: [] }])
     const view = facade.getViews!().id1
     expect(view).toMatchObject({ name: 'Processes', kind: 'warnier', viewpoint: 'process-warnier', nodeIds: [] })
     expect(findForgeView(facade.getViews!(), 'processes')?.id).toBe('id1')
     // A second run reuses it; the canvas views are not mistaken for it.
-    expect(fileIntoForgeViews(facade, ['checkout'], 'processes')).toEqual([{ key: 'processes', viewId: 'id1', nodeIds: [] }])
+    expect(brief(fileIntoForgeViews(facade, ['checkout'], 'processes'))).toEqual([{ key: 'processes', viewId: 'id1', nodeIds: [] }])
     expect(forgeArrangeGroups(facade, ['checkout', 'take'], 'processes')).toEqual([])
+  })
+})
+
+describe('radical structure', () => {
+  const radical = (facade: ReturnType<typeof facadeOf>, without: string[] = []): ForgeStructure => {
+    const structure = defaultForgeStructure(facade.getMetamodel!(), facade.getViews!())
+    if (structure.kind !== 'radical') throw new Error('expected the Radical structure')
+    return { kind: 'radical', viewpoints: structure.viewpoints.filter((v) => !without.includes(v)) }
+  }
+
+  it('lists the viewpoints in the folders of the radical model, every one chosen', () => {
+    const choices = radicalViewpoints(builtInGovernanceMetamodel())
+    expect([...new Set(choices.map((c) => c.folder))]).toEqual(['Conceptual', 'Logical', 'Governance'])
+    expect(choices.filter((c) => c.folder === 'Logical').map((c) => c.label)).toEqual([
+      'System context', 'Containers', 'Components', 'Container dependencies', 'Domain realisation', 'Responsibilities',
+    ])
+    expect(choices.every((c) => c.chosen)).toBe(true)
+    expect(choices.find((c) => c.id === 'process-warnier')?.folder).toBe('Conceptual')
+    // Another metamodel's viewpoint: a folder after its group, not chosen.
+    const metamodel = builtInGovernanceMetamodel()
+    metamodel.viewpoints = [...metamodel.viewpoints!, { id: 'mine', label: 'Mine', group: 'Ops', kind: 'table', pipeline: { levels: [] } }]
+    expect(radicalViewpoints(metamodel).at(-1)).toEqual({ id: 'mine', label: 'Mine', folder: 'Ops', chosen: false })
+    expect(describeForgeStructure({ kind: 'radical', viewpoints: ['traceability', 'containers', 'mine'] }, metamodel))
+      .toBe('Radical: Conceptual (Traceability); Logical (Containers); Ops (Mine).')
+  })
+
+  it('is the default unless the model has the layer canvases of a run and no view of a viewpoint', () => {
+    const metamodel = builtInGovernanceMetamodel()
+    expect(defaultForgeStructure(metamodel, {}).kind).toBe('radical')
+    const layers = { c: { id: 'c', name: 'Conceptual', nodeIds: ['n'], positions: {} } }
+    expect(defaultForgeStructure(metamodel, layers)).toEqual({ kind: 'layers' })
+    expect(defaultForgeStructure(metamodel, { ...layers, t: { id: 't', name: 'T', nodeIds: [], positions: {}, viewpoint: 'traceability' } }).kind).toBe('radical')
+    expect(defaultForgeStructure({ ...metamodel, viewpoints: [] }, {})).toEqual({ kind: 'layers' })
+  })
+
+  it('makes a view of a chosen viewpoint in its folder once it shows something, and reuses the model\'s', () => {
+    const facade = facadeOf([node('need', 'need'), node('r1', 'requirement'), node('r2', 'requirement')], [
+      { id: 'mine', name: 'My coverage', nodeIds: [], positions: {}, viewpoint: 'requirement-coverage', kind: 'table' },
+    ])
+    const structure = radical(facade, ['specification'])
+    // The need: Traceability starts from needs.
+    const atStart = fileIntoForgeViews(facade, ['need'], undefined, structure)
+    expect(atStart.map((f) => [f.viewName, f.made, f.nodeIds])).toEqual([
+      ['Traceability', true, ['need']],
+      ['My coverage', false, []],
+      ['Requirement gaps', true, []],
+    ])
+    const traceability = facade.getViews!()[atStart[0].viewId]
+    expect(traceability).toMatchObject({ folder: 'Conceptual', kind: 'table', viewpoint: 'traceability', nodeIds: [] })
+    expect(facade.getViews!()[atStart[2].viewId].folder).toBe('Governance')
+    // Nothing is made for what shows nothing, or was left out.
+    expect(Object.values(facade.getViews!()).map((v) => v.name).sort()).toEqual(['My coverage', 'Requirement gaps', 'Traceability'])
+
+    // Requirements derived from the need: in Traceability under it, and in the views of requirements.
+    facade.addRelation({ sourceId: 'r1', targetId: 'need', relationType: 'derives', label: '' })
+    const filed = fileIntoForgeViews(facade, ['r1', 'r2'], 'requirements', structure)
+    expect(filed.map((f) => [f.viewName, f.made, f.canvas, f.nodeIds])).toEqual([
+      ['Traceability', false, false, ['r1']],
+      ['My coverage', false, false, ['r1', 'r2']],
+      ['Requirement gaps', false, false, ['r1', 'r2']],
+    ])
+    expect(forgeStageView(facade.getViews!(), 'requirements', structure)?.name).toBe('Traceability')
+    expect(forgeStageView(facade.getViews!(), 'c4', structure)).toBeUndefined()
+    // No canvas shows them: nothing to arrange.
+    expect(forgeArrangeGroups(facade, ['r1', 'r2'], 'requirements', structure)).toEqual([])
+  })
+
+  it('offers to arrange the new elements a canvas of a viewpoint shows', () => {
+    const facade = facadeOf([node('user', 'person'), node('sys', 'system'), node('api', 'container', { parentId: 'sys' })])
+    const structure = radical(facade)
+    const filed = fileIntoForgeViews(facade, ['user', 'sys', 'api'], 'c4', structure)
+    expect(filed.filter((f) => f.canvas).map((f) => [f.viewName, f.nodeIds])).toEqual([
+      ['System context', ['user', 'sys']],
+      ['Containers', ['user', 'sys', 'api']],
+      ['Components', ['api']],
+    ])
+    expect(facade.getViews!()[filed[0].viewId].folder).toBe('Logical')
+    expect(forgeStageView(facade.getViews!(), 'c4', structure)?.name).toBe('Containers')
+    expect(forgeArrangeGroups(facade, ['user', 'sys', 'api'], 'c4', structure).map((g) => [g.viewName, g.nodeIds])).toEqual([
+      ['System context', ['user', 'sys']],
+      ['Containers', ['user', 'sys']],
+      ['Components', ['api']],
+    ])
   })
 })

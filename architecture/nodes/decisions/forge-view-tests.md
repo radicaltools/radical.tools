@@ -12,4 +12,4 @@ tests: |
 threshold: "All suites pass in CI"
 ---
 
-apps/e2e/tests/studio/forge.spec.ts (scripted provider: the need opens Conceptual, five requirements beside it in a landscape block, grid and Smart Layout from the Arrange panel, fitness functions on a new Governance view), apps/mcp/src/forge.test.ts (views and view positions at forge_start and forge_complete_stage, the arrange questions, forge_arrange grid and Smart Layout), packages/common/tests/forgeViews.test.ts and the createBatchPlacer and runner placement tests.
+apps/e2e/tests/studio/forge.spec.ts (scripted provider: with Layer canvases the need opens Conceptual, five requirements beside it in a landscape block, grid and Smart Layout from the Arrange panel, fitness functions on a new Governance view; with the Radical structure, the viewpoint views made in their folders as they fill), apps/mcp/src/forge.test.ts (views and view positions at forge_start and forge_complete_stage in both structures, the arrange questions, forge_arrange grid and Smart Layout), packages/common/tests/forgeViews.test.ts and the createBatchPlacer and runner placement tests.
