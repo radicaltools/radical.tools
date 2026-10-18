@@ -39,7 +39,7 @@ describe('buildForgeStagePrompt — prior-stage summaries replace full transcrip
 
 describe('buildForgeStagePrompt — mockups stage', () => {
   it('runs before C4, as part of the spec the architecture follows from', () => {
-    expect(FORGE_STAGES.map((s) => s.id)).toEqual(['requirements', 'domain', 'fitness', 'scenarios', 'states', 'mockups', 'c4'])
+    expect(FORGE_STAGES.map((s) => s.id)).toEqual(['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4'])
     expect(PRIMARY_TYPE_IDS_FOR_STAGE.mockups).toEqual(['mockup'])
   })
 
@@ -101,7 +101,7 @@ describe('buildForgeStagePrompt — state machines stage', () => {
   it('runs between the scenarios and the mockups, creating the statechart types', () => {
     const ids = FORGE_STAGES.map((s) => s.id)
     expect(ids.indexOf('states')).toBe(ids.indexOf('scenarios') + 1)
-    expect(ids.indexOf('mockups')).toBe(ids.indexOf('states') + 1)
+    expect(ids.indexOf('processes')).toBe(ids.indexOf('states') + 1)
     expect(PRIMARY_TYPE_IDS_FOR_STAGE.states).toEqual(['entity', 'state-machine', 'state', 'pseudostate', 'event'])
   })
 
@@ -116,6 +116,33 @@ describe('buildForgeStagePrompt — state machines stage', () => {
     expect(prompt).toContain('Take its entity from the domain model')
     expect(prompt).toContain('link it to the entity with `lifecycle-of` (machine → entity; one machine\n   per entity)')
     expect(prompt).toContain('do not create any here')
+  })
+})
+
+describe('processes', () => {
+  it('runs after the state machines and before the mockups, creating processes and steps', () => {
+    const ids = FORGE_STAGES.map((s) => s.id)
+    expect(ids.indexOf('processes')).toBe(ids.indexOf('states') + 1)
+    expect(ids.indexOf('mockups')).toBe(ids.indexOf('processes') + 1)
+    expect(FORGE_STAGES.find((s) => s.id === 'processes')?.title).toBe('Processes')
+    expect(PRIMARY_TYPE_IDS_FOR_STAGE.processes).toEqual(['process', 'step'])
+  })
+
+  it('asks for ordered steps with repetition, choice and concurrency, verified and satisfied, without C4 elements', () => {
+    const prompt = buildForgeStagePrompt('processes', 'A web shop.')
+    expect(prompt).toContain('A web shop.')
+    expect(prompt).toContain('If none is described, create\nnothing')
+    expect(prompt).toContain('Give every step its `order`')
+    expect(prompt).toContain('"1..n" or "0..n" for a repetition')
+    expect(prompt).toContain('`children` "choice"')
+    expect(prompt).toContain('"concurrent"')
+    expect(prompt).toContain('(scenario → process)')
+    expect(prompt).toContain('(process → requirement)')
+    expect(prompt).toContain('do not create any here')
+  })
+
+  it('has the C4 stage link each step to who performs it', () => {
+    expect(buildForgeStagePrompt('c4', 'A web shop.')).toContain('`performed-by` (step → person, system,')
   })
 })
 

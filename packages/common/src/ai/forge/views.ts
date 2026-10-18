@@ -1,10 +1,12 @@
 // ─── Where a Radical Forge run puts what it generates ───────────────────────
-// A run splits its output into five views from the start, the layers of a
+// A run splits its output into six views from the start, the layers of a
 // Radical architecture model: Conceptual (the need, requirements, scenarios,
 // mockups, and for now the domain model too), Domain (the domains and their
 // entities), States (the state machines, their events and the entities they
-// are the lifecycle of), Logical & physical (the C4 elements) and Governance
-// (fitness functions and decisions). A type may go into several views. A view
+// are the lifecycle of), Processes (a Warnier view of the viewpoint Process
+// (Warnier): it shows every process and step, lists none and needs no
+// layout), Logical & physical (the C4 elements) and Governance (fitness
+// functions and decisions). A type may go into several views. A view
 // is created when its first element arrives, since an empty view shows the
 // whole model; a later run reuses the views by name.
 //
@@ -17,14 +19,21 @@ import { landscapeGridColumns, type C4Node, type DiagramView } from '../../c4'
 import type { DiagramFacade } from '../diagramFacade'
 import type { ForgeStageId } from './prompts'
 
-export type ForgeViewKey = 'conceptual' | 'domain' | 'states' | 'logical' | 'governance'
+export type ForgeViewKey = 'conceptual' | 'domain' | 'states' | 'processes' | 'logical' | 'governance'
 
 export const FORGE_VIEW_NAMES: Record<ForgeViewKey, string> = {
   conceptual: 'Conceptual',
   domain: 'Domain',
   states: 'States',
+  processes: 'Processes',
   logical: 'Logical & physical',
   governance: 'Governance',
+}
+
+/** The viewpoint a view of the run is of, when it is no canvas: it shows
+ *  what its viewpoint's chain gives, so nothing is listed in it. */
+const FORGE_VIEW_VIEWPOINT: Partial<Record<ForgeViewKey, { viewpoint: string; kind: NonNullable<DiagramView['kind']> }>> = {
+  processes: { viewpoint: 'process-warnier', kind: 'warnier' },
 }
 
 /** Node types with fixed views (the first is their own); any other type
@@ -40,6 +49,8 @@ const VIEW_OF_TYPE: Record<string, ForgeViewKey | ForgeViewKey[]> = {
   state: 'states',
   pseudostate: 'states',
   event: 'states',
+  process: 'processes',
+  step: 'processes',
   'fitness-fn': 'governance',
   adr: 'governance',
 }
@@ -50,6 +61,7 @@ export const FORGE_STAGE_VIEW: Record<ForgeStageId, ForgeViewKey> = {
   fitness: 'governance',
   scenarios: 'conceptual',
   states: 'states',
+  processes: 'processes',
   mockups: 'conceptual',
   c4: 'logical',
 }
@@ -68,18 +80,28 @@ export function forgeViewOf(type: string, stage?: ForgeStageId): ForgeViewKey {
 
 const isCanvas = (view: DiagramView): boolean => !view.kind || view.kind === 'static'
 
-/** The canvas view of that name in the model, if any. */
+/** Whether the run's view for `key` is a canvas (elements are listed in it,
+ *  and can be arranged). */
+export const isForgeCanvas = (key: ForgeViewKey): boolean => !FORGE_VIEW_VIEWPOINT[key]
+
+/** The run's view of that name in the model, if any: a canvas, or a view of
+ *  the kind its viewpoint has. */
 export function findForgeView(views: Record<string, DiagramView> | undefined, key: ForgeViewKey): DiagramView | undefined {
   const name = FORGE_VIEW_NAMES[key].toLowerCase()
-  return Object.values(views ?? {}).find((v) => isCanvas(v) && v.name.trim().toLowerCase() === name)
+  const of = FORGE_VIEW_VIEWPOINT[key]
+  return Object.values(views ?? {}).find((v) => (of ? v.kind === of.kind : isCanvas(v)) && v.name.trim().toLowerCase() === name)
 }
 
-/** The id of the run's view for `key`, created when missing; null when the
- *  facade cannot add views. */
+/** The id of the run's view for `key`, created when missing (of its
+ *  viewpoint, for a view that is no canvas); null when the facade cannot
+ *  add views. */
 export function ensureForgeView(facade: DiagramFacade, key: ForgeViewKey): string | null {
   const existing = findForgeView(facade.getViews?.(), key)
   if (existing) return existing.id
-  return facade.addView?.(FORGE_VIEW_NAMES[key]) ?? null
+  const id = facade.addView?.(FORGE_VIEW_NAMES[key]) ?? null
+  const of = FORGE_VIEW_VIEWPOINT[key]
+  if (id && of && !facade.applyViewpoint?.(id, of.viewpoint)) facade.setViewKind?.(id, of.kind)
+  return id
 }
 
 export interface FiledNodes {
@@ -114,6 +136,9 @@ export function fileIntoForgeViews(facade: DiagramFacade, nodeIds: string[], sta
     const viewId = ensureForgeView(facade, key)
     const view = viewId ? facade.getViews?.()[viewId] : undefined
     if (!viewId || !view) continue
+    // A view of a viewpoint shows what its chain gives: listing the elements
+    // would hide the ones a later run adds.
+    if (!isForgeCanvas(key)) { filed.push({ key, viewId, nodeIds: [] }); continue }
     const present = new Set(view.nodeIds)
     const missing = ids.filter((id) => !present.has(id))
     if (missing.length) facade.setViewNodes(viewId, [...view.nodeIds, ...missing])
@@ -152,6 +177,8 @@ export function forgeArrangeGroups(facade: DiagramFacade, addedNodeIds: string[]
   const views = facade.getViews?.() ?? {}
   const groups: ForgeArrangeGroup[] = []
   for (const key of Object.keys(FORGE_VIEW_NAMES) as ForgeViewKey[]) {
+    // Only a canvas is arranged; a Warnier view lays itself out.
+    if (!isForgeCanvas(key)) continue
     const view = findForgeView(views, key)
     if (!view) continue
     const inView = new Set(view.nodeIds)

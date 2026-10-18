@@ -98,7 +98,7 @@ function AppInner(): React.ReactElement {
       <PresentationBar />
       {!isPresenting && !isInspector && isCanvasView && <SelectionActionBar />}
       {!isPresenting && !isInspector && isCanvasView && <EdgeActionBar />}
-      {!isInspector && isCanvasView && <QuickSearch />}
+      {!isInspector && <QuickSearch />}
       {isDesigner && <NodeWizard />}
       <NotificationHost />
       <MilestoneEditOverlay />

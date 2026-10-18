@@ -118,3 +118,18 @@ describe('Forge views', () => {
     expect(facade.getLayoutConstraints!(group.viewId)[0]).toMatchObject({ type: 'grid', columns: 4, nodeIds: ids })
   })
 })
+
+describe('processes go into a Warnier view', () => {
+  it('files processes and steps into a Processes view of the viewpoint Process (Warnier), lists none of them and offers nothing to arrange', () => {
+    expect(forgeViewsOf('process')).toEqual(['processes'])
+    expect(forgeViewsOf('step', 'c4')).toEqual(['processes'])
+    const facade = facadeOf([node('checkout', 'process'), node('take', 'step', { parentId: 'checkout' }), node('r1', 'requirement')])
+    expect(fileIntoForgeViews(facade, ['checkout', 'take'], 'processes')).toEqual([{ key: 'processes', viewId: 'id1', nodeIds: [] }])
+    const view = facade.getViews!().id1
+    expect(view).toMatchObject({ name: 'Processes', kind: 'warnier', viewpoint: 'process-warnier', nodeIds: [] })
+    expect(findForgeView(facade.getViews!(), 'processes')?.id).toBe('id1')
+    // A second run reuses it; the canvas views are not mistaken for it.
+    expect(fileIntoForgeViews(facade, ['checkout'], 'processes')).toEqual([{ key: 'processes', viewId: 'id1', nodeIds: [] }])
+    expect(forgeArrangeGroups(facade, ['checkout', 'take'], 'processes')).toEqual([])
+  })
+})

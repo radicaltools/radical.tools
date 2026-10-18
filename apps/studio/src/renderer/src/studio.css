@@ -596,7 +596,7 @@ label.app-menu-row { cursor: pointer; }
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
-  gap: 4px;
+  gap: 3px;
   margin: 4px 0 10px;
 }
 .forge-step {
@@ -605,8 +605,8 @@ label.app-menu-row { cursor: pointer; }
   gap: 4px;
   font-size: 10.5px;
   font-weight: 600;
-  /* Nine steps (description, seven stages, finish) fit on one line. */
-  padding: 5px 6px;
+  /* Ten steps (description, eight stages, finish) fit on one line. */
+  padding: 5px 5px;
   flex-shrink: 0;
   border-radius: 999px;
   border: 1px solid var(--border-color);

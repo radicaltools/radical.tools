@@ -160,9 +160,9 @@ test('Forge builds the domain model after the requirements and the state machine
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
   await page.getByRole('button', { name: 'Start →' }).click()
 
-  // Nine steps on one line: description, the seven stages, finish.
+  // Ten steps on one line: description, the eight stages, finish.
   const steps = page.locator('.forge-step')
-  await expect(steps).toHaveText(['✓Description', 'Requirements', 'Domain', 'Fitness', 'Scenarios', 'States', 'Mockups', 'C4', 'Finish'])
+  await expect(steps).toHaveText(['✓Description', 'Requirements', 'Domain', 'Fitness', 'Scenarios', 'States', 'Processes', 'Mockups', 'C4', 'Finish'])
   const tops = await steps.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)))
   expect(new Set(tops).size).toBe(1)
   // …without scrolling.
