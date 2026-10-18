@@ -251,7 +251,9 @@ export function QuickSearch(): React.ReactElement | null {
   // if it already contains the node, the smallest view containing it
   // (most focused), else any view, else null (means "no view filter").
   const pickViewForNode = (nodeId: string): string | null => {
-    if (activeViewId && viewNodeSets[activeViewId]?.has(nodeId)) return activeViewId
+    // All elements (no active view) shows every element: stay on it.
+    if (!activeViewId) return null
+    if (viewNodeSets[activeViewId]?.has(nodeId)) return activeViewId
     let best: { id: string; size: number } | null = null
     for (const [vid, set] of Object.entries(viewNodeSets)) {
       if (!set.has(nodeId)) continue
