@@ -59,15 +59,15 @@ test('a process is drawn as a Warnier diagram and a click opens the step', async
   // Checkout on the left, its steps in a brace, in their order.
   const checkout = diagram.locator('.wn-roots > .wn-item')
   await expect(checkout).toHaveCount(1)
-  await expect(checkout.locator(':scope > .wn-label .wn-name')).toHaveText('Checkout')
+  await expect(checkout.locator(':scope > .wn-node > .wn-label .wn-name')).toHaveText('Checkout')
   await expect(checkout.locator(':scope > .wn-brace')).toBeVisible()
-  await expect(checkout.locator(':scope > .wn-children > .wn-item > .wn-label .wn-name')).toHaveText(['Take the order', 'Reserve stock', 'Pay'])
+  await expect(checkout.locator(':scope > .wn-children > .wn-item > .wn-node > .wn-label .wn-name')).toHaveText(['Take the order', 'Reserve stock', 'Pay'])
   const reserve = diagram.locator('.wn-label[data-node-id="reserve"]')
   await expect(reserve.locator('.wn-repeat')).toHaveText('(1,n)')
   await expect(reserve.locator('.wn-condition')).toHaveText('for each order line')
   // Pay by card or by invoice: ⊕ between them.
-  const pay = diagram.locator('.wn-item', { has: page.locator(':scope > .wn-label[data-node-id="pay"]') })
-  await expect(pay.locator(':scope > .wn-children > .wn-item > .wn-label .wn-name')).toHaveText(['By card', 'By invoice'])
+  const pay = diagram.locator('.wn-item', { has: page.locator(':scope > .wn-node > .wn-label[data-node-id="pay"]') })
+  await expect(pay.locator(':scope > .wn-children > .wn-item > .wn-node > .wn-label .wn-name')).toHaveText(['By card', 'By invoice'])
   await expect(pay.locator(':scope > .wn-children > .wn-operator')).toHaveText('⊕')
   // An alternative happens at most once: (0,1) under each (Warnier–Orr).
   await expect(diagram.locator('.wn-label[data-node-id="card"] .wn-repeat')).toHaveText('(0,1)')
@@ -85,16 +85,16 @@ test('a process is drawn as a Warnier diagram and a click opens the step', async
   await page.getByRole('group', { name: 'View type' }).getByRole('button', { name: 'Warnier' }).click()
   await expect(shopCard.locator('.lp-view-kind')).toHaveText('warnier')
   const shop = diagram.locator('.wn-roots > .wn-item')
-  await expect(shop.locator(':scope > .wn-label .wn-name')).toHaveText('Shop')
-  await expect(shop.locator(':scope > .wn-children > .wn-item > .wn-label .wn-name')).toHaveText(['Checkout API'])
+  await expect(shop.locator(':scope > .wn-node > .wn-label .wn-name')).toHaveText('Shop')
+  await expect(shop.locator(':scope > .wn-children > .wn-item > .wn-node > .wn-label .wn-name')).toHaveText(['Checkout API'])
 })
 
 test('a process is written in the Warnier view from the keyboard', async ({ page, studio }) => {
   const folder = await openModel(page, studio)
   const diagram = page.getByLabel('Warnier diagram')
   const label = (id: string) => diagram.locator(`.wn-label[data-node-id="${id}"]`)
-  const names = (parentId: string) => diagram.locator('.wn-item', { has: page.locator(`:scope > .wn-label[data-node-id="${parentId}"]`) })
-    .locator(':scope > .wn-children > .wn-item > .wn-label .wn-name')
+  const names = (parentId: string) => diagram.locator('.wn-item', { has: page.locator(`:scope > .wn-node > .wn-label[data-node-id="${parentId}"]`) })
+    .locator(':scope > .wn-children > .wn-item > .wn-node > .wn-label .wn-name')
   /** The steps of the model as saved: label → [parent label, order]. */
   const saved = async (): Promise<Record<string, [string, unknown]>> => {
     const data = deserializeFromMdFolder(await folder.files()).data
@@ -111,11 +111,12 @@ test('a process is written in the Warnier view from the keyboard', async ({ page
   await input.press('Enter')
   await expect(names('checkout')).toHaveText(['Take the order', 'Check stock', 'Reserve stock', 'Pay'])
 
-  // Tab: inside Take the order; 1..n from the bar.
+  // Tab: inside Take the order; (1,n) from its repetition mark.
   await page.keyboard.press('Tab')
   await expect(names('take')).toHaveText(['Check stock'])
   await expect(names('checkout')).toHaveText(['Take the order', 'Reserve stock', 'Pay'])
-  await page.getByRole('toolbar', { name: 'Edit outline' }).getByRole('combobox', { name: 'Repeat' }).selectOption('1..n')
+  await diagram.getByRole('button', { name: 'Set the repeat of Check stock' }).click()
+  await page.getByRole('dialog', { name: 'Repeat of Check stock' }).getByRole('button', { name: '(1,n)' }).click()
   const checkStock = diagram.locator('.wn-label', { hasText: 'Check stock' })
   await expect(checkStock.locator('.wn-repeat')).toHaveText('(1,n)')
 
@@ -227,4 +228,102 @@ test('a step dropped on a step goes inside it, and every frame holds what it hol
     return steps.length === 2 && inside(steps[0], steps[1]) && inside(steps[1], proc)
   }
   await expect.poll(nested).toBe(true)
+})
+
+test('an element added after another stays after it, whatever its name', async ({ page, studio }) => {
+  // Steps made elsewhere, with no order: they stand by name.
+  await openFolder(page, studio, {
+    metamodel: builtInGovernanceMetamodel(),
+    nodes: [node('p', 'process', 'Checkout'), node('z', 'step', 'Zeta', { parentId: 'p' }), node('a', 'step', 'Alpha', { parentId: 'p' })],
+    relations: [],
+    views: [{ id: 'w', name: 'Processes', kind: 'warnier', viewpoint: 'process-warnier', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['process', 'step'] }] }] } }],
+  })
+  await page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: 'Processes' }) }).click()
+  const diagram = page.getByLabel('Warnier diagram')
+  const names = diagram.locator('.wn-name')
+  const addAfter = async (after: string, name: string) => {
+    await diagram.locator('.wn-label', { hasText: after }).click()
+    await page.keyboard.press('Enter')
+    await diagram.locator('.wn-name-input').fill(name)
+    await diagram.locator('.wn-name-input').press('Enter')
+  }
+  await expect(names).toHaveText(['Checkout', 'Alpha', 'Zeta'])
+  await addAfter('Alpha', 'Beta')
+  await expect(names).toHaveText(['Checkout', 'Alpha', 'Beta', 'Zeta'])
+  // A process after Checkout, named to come first by name: it stays after.
+  await addAfter('Checkout', 'Billing')
+  await expect(names).toHaveText(['Checkout', 'Alpha', 'Beta', 'Zeta', 'Billing'])
+})
+
+test('a process is built by clicking where it is drawn, from an empty Warnier view', async ({ page, studio }) => {
+  await openFolder(page, studio, { metamodel: builtInGovernanceMetamodel(), nodes: [], relations: [] })
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: /^Process \(Warnier\)/ }).click()
+  const diagram = page.getByLabel('Warnier diagram')
+  const input = diagram.locator('.wn-name-input')
+  const name = async (text: string) => { await input.fill(text); await input.press('Enter') }
+  const card = (text: string) => diagram.locator('.wn-label', { has: page.locator('.wn-name', { hasText: new RegExp(`^${text}$`) }) })
+  const item = (text: string) => diagram.locator('.wn-item', { has: page.locator(':scope > .wn-node .wn-name', { hasText: new RegExp(`^${text}$`) }) })
+
+  // An empty view offers a process; + beside it adds its first step, + under the brace the next.
+  await diagram.getByRole('button', { name: '+ Process' }).click()
+  await name('Checkout')
+  await diagram.getByRole('button', { name: 'Add a step inside Checkout' }).click()
+  // Typed, not yet kept with Enter: the next + keeps it and adds the next.
+  await input.fill('Take the order')
+  await diagram.getByRole('button', { name: 'Add a step to Checkout' }).click()
+  await expect(input).toHaveValue('New step')
+  await input.fill('Reserve stock')
+  await diagram.getByRole('button', { name: 'Add a step to Checkout' }).click()
+  await name('Pay')
+  await expect(diagram.locator('.wn-name')).toHaveText(['Checkout', 'Take the order', 'Reserve stock', 'Pay'])
+  // Its controls show under the pointer without changing its size.
+  await page.mouse.click(1000, 800)
+  const before = await card('Take the order').boundingBox()
+  await card('Take the order').hover()
+  await expect(diagram.getByRole('group', { name: 'Actions of Take the order' })).toBeVisible()
+  expect(await card('Take the order').boundingBox()).toEqual(before)
+  // (1,n) for each order line, from the repetition mark.
+  await card('Reserve stock').click()
+  await diagram.getByRole('button', { name: 'Set the repeat of Reserve stock' }).click()
+  const repeat = page.getByRole('dialog', { name: 'Repeat of Reserve stock' })
+  await repeat.getByRole('button', { name: '(1,n)' }).click()
+  await repeat.getByRole('textbox', { name: 'Condition' }).fill('for each order line')
+  await repeat.getByRole('textbox', { name: 'Condition' }).press('Enter')
+  await expect(card('Reserve stock').locator('.wn-repeat')).toHaveText('(1,n)')
+  await expect(card('Reserve stock').locator('.wn-condition')).toHaveText('for each order line')
+  // Pay by card or by invoice: a click on Pay's brace makes them a choice.
+  await card('Pay').click()
+  await diagram.getByRole('button', { name: 'Add a step inside Pay' }).click()
+  // The + beside a step being named: kept, and its first step added.
+  await input.fill('By card')
+  await diagram.getByRole('button', { name: 'Add a step to Pay' }).click()
+  await expect(input).toHaveValue('New step')
+  await input.press('Escape')
+  await page.keyboard.press('Delete')
+  await page.locator('.milestone-modal-backdrop').getByRole('button', { name: /Remove from model/ }).click()
+  await expect(diagram.locator('.wn-name')).toHaveText(['Checkout', 'Take the order', 'Reserve stock', 'Pay', 'By card'])
+  await diagram.getByRole('button', { name: 'Add a step to Pay' }).click()
+  await name('By invoice')
+  await item('Pay').locator(':scope > .wn-brace').click()
+  await expect(diagram.locator('.wn-name')).toHaveText(['Checkout', 'Take the order', 'Reserve stock', 'Pay', 'By card', 'By invoice'])
+  await expect(diagram.locator('.wn-operator')).toHaveText(['⊕'])
+
+  // The card's actions: indent and outdent say nothing; Escape closes the delete prompt.
+  await card('Pay').click()
+  const actions = diagram.getByRole('group', { name: 'Actions of Pay' })
+  await actions.getByRole('button', { name: 'Indent' }).click()
+  await expect(item('Reserve stock').locator(':scope > .wn-children .wn-name').first()).toHaveText('Pay')
+  await diagram.getByRole('group', { name: 'Actions of Pay' }).getByRole('button', { name: 'Outdent' }).click()
+  await expect(page.getByRole('region', { name: 'Notifications' })).toHaveCount(0)
+  await diagram.getByRole('group', { name: 'Actions of Pay' }).getByRole('button', { name: 'Delete' }).click()
+  await expect(page.locator('.milestone-modal-backdrop')).toHaveCount(1)
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.milestone-modal-backdrop')).toHaveCount(0)
+  await expect(diagram.locator('.wn-name')).toHaveText(['Checkout', 'Take the order', 'Reserve stock', 'Pay', 'By card', 'By invoice'])
+
+  // + Process under the processes adds the next.
+  await diagram.getByRole('button', { name: '+ Process' }).click()
+  await name('Billing')
+  await expect(diagram.locator('.wn-roots > .wn-item > .wn-node > .wn-label .wn-name')).toHaveText(['Checkout', 'Billing'])
 })

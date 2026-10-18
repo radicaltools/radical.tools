@@ -38,6 +38,15 @@ test('a row on a canvas of the whole model holds through a drag, Smart Layout an
   // The click framed the database: a click on the empty canvas brings back the camera.
   await studio.canvas.click({ position: { x: 700, y: 20 } })
   await studio.settle()
+  // As the run's first test, the live layout may still be placing Customer
+  // after the camera stopped (IMPROVEMENTS #37): wait for it to rest too.
+  let last = ''
+  await expect.poll(async () => {
+    const now = JSON.stringify(await studio.node('customer').boundingBox())
+    const still = now === last
+    last = now
+    return still
+  }, { intervals: [200], timeout: 20_000 }).toBe(true)
   await studio.node('customer').click()
   await expect(page.getByTestId('alignment-guides').locator('line').first()).toBeAttached()
   // The properties card lies over the canvas's right side, where Payment Provider may be.

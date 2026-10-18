@@ -690,7 +690,8 @@ export function builtInGovernanceMetamodel(): Metamodel {
   //
   // A process is a procedure; its steps nest by containment, each running
   // once, optionally or repeatedly (repeat, condition), in their `order`
-  // (the Markdown folder keeps no order among siblings). How a process's or
+  // (the Markdown folder keeps no order among siblings; processes have one
+  // too, among the processes beside them). How a process's or
   // a step's children run is its `children`: in sequence, one of them
   // (choice, ⊕) or at once (concurrent). The Warnier view draws them.
 
@@ -718,6 +719,8 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedAtRoot: true,
     builtin: true,
     properties: [
+      // Its place among the processes beside it, as a step's among steps.
+      { key: 'order', label: 'Order', type: 'number' },
       childrenProperty,
       { key: 'description', label: 'Description', type: 'textarea' },
     ],

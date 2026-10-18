@@ -511,7 +511,10 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     model with many thousand elements would want a base that holds only what
     differs; and the running `radical-architecture` server offers new tools
     only after a rebuild and a restart of the client.
-37. **A flaky e2e test: the first one of a full run.** `alignment.spec.ts ›
+37. ~~**A flaky e2e test: the first one of a full run.**~~ Steadied on
+    2026-10-18: it now waits for Customer itself to rest (the live layout
+    still placed it after the camera stopped), not only the camera.
+    `alignment.spec.ts ›
     a row on a canvas of the whole model holds through a drag, Smart Layout
     and a reload` failed in two of three full local runs on 2026-10-16, each
     time as the run's first test: after the click on the empty canvas that

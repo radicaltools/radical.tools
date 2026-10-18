@@ -1347,7 +1347,8 @@ interface DiagramStore {
    * a new parent. Pass `null` to move them to the canvas root. Coordinates
    * are translated so on-screen position is preserved as closely as possible.
    */
-  reparentNodes: (ids: string[], newParentId: string | null) => void
+  /** `quiet`: no notice of the move (an outline edit, where it is seen). */
+  reparentNodes: (ids: string[], newParentId: string | null, options?: { quiet?: boolean }) => void
 
   // ── actions: views ──
   /** A new view listing no elements, of `kind` (a structure view when
@@ -3031,7 +3032,7 @@ export const useDiagramStore = create<DiagramStore>()(
         )
       },
 
-      reparentNodes(ids, newParentId) {
+      reparentNodes(ids, newParentId, options) {
         const state0 = get()
         const nodes = ids
           .map((id) => state0.c4Nodes[id])
@@ -3071,6 +3072,7 @@ export const useDiagramStore = create<DiagramStore>()(
         get().setSelectedNodeIds(ids)
         get()._sync()
         _liveLayout?.invalidate()
+        if (options?.quiet) return
         get().pushNotification(
           `Moved ${nodes.length} ${nodes.length === 1 ? 'node' : 'nodes'} into ${newParentLabel}.`,
           'info',

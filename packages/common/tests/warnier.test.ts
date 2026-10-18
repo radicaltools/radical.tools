@@ -128,7 +128,9 @@ describe('outline edits', () => {
   it('plans a step after another and inside one, numbering the siblings', () => {
     expect(insertPlan(tree, keyOf('take'), 'after', 'step', hasOrder)).toEqual({ parentId: 'checkout', order: 2, orders: { take: 1, reserve: 3, pay: 4, finish: 5 } })
     expect(insertPlan(tree, keyOf('pay'), 'inside', 'step', hasOrder)).toEqual({ parentId: 'pay', order: 3, orders: { card: 1, invoice: 2 } })
-    // A new process after the root process: at the top, no order.
+    // A new process after the root process: at the top, numbered with it.
+    expect(insertPlan(tree, keyOf('checkout'), 'after', 'process', (t) => t === 'step' || t === 'process')).toEqual({ parentId: null, order: 2, orders: { checkout: 1 } })
+    // A type with no order stays where its name puts it: no numbers.
     expect(insertPlan(tree, keyOf('checkout'), 'after', 'process', hasOrder)).toEqual({ parentId: null, orders: {} })
   })
 
