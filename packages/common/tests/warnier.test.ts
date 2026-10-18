@@ -3,7 +3,7 @@ import type { C4Node, C4Relation, DiagramView } from '../src/c4'
 import { builtInGovernanceMetamodel, validateModel } from '../src/metamodel/index'
 import { checkAddNode, checkAddRelation, insertNode, type ModelState } from '../src/model'
 import { viewpointsOf } from '../src/viewpoints'
-import { insertPlan, outlinePlan, warnierEditable, warnierRows, warnierTree, type WarnierNode } from '../src/warnier'
+import { insertPlan, outlinePlan, processFlow, warnierEditable, warnierRows, warnierTree, type WarnierNode } from '../src/warnier'
 
 const metamodel = builtInGovernanceMetamodel()
 
@@ -76,7 +76,7 @@ describe('warnierTree', () => {
       ['Checkout', 'sequence', [
         ['Take the order'],
         ['Reserve stock', '(1,n)', 'for each order line'],
-        ['Pay', 'choice', [['By card'], ['By invoice']]],
+        ['Pay', 'choice', [['By card', '(0,1)'], ['By invoice', '(0,1)']]],
         ['Finish', 'concurrent', [['Confirm'], ['Notify', '(0,1)']]],
       ]],
     ])
@@ -92,7 +92,8 @@ describe('warnierTree', () => {
       node('shipped', 'state', 'Shipping', { parentId: 'done' }),
     ]
     const tree = warnierTree(warnierRows(undefined, { nodes: byId(nodes), relations: [], metamodel }))
-    expect(shape(tree)).toEqual([['Order', 'choice', [['Done', 'concurrent', [['Payment'], ['Shipping']]], ['Open']]]])
+    // The machine's states are alternatives: (0,1) under each (Warnier–Orr).
+    expect(shape(tree)).toEqual([['Order', 'choice', [['Done', '(0,1)', 'concurrent', [['Payment'], ['Shipping']]], ['Open', '(0,1)']]]])
   })
 
   it('nests a chain as its levels say, and a one-level chain by containment', () => {
@@ -149,5 +150,15 @@ describe('outline edits', () => {
     expect(warnierEditable(view)).toBe(true)
     expect(warnierEditable(undefined)).toBe(true)
     expect(warnierEditable({ ...view, pipeline: { levels: [{ ways: [{ types: ['need'] }] }, { ways: [{ via: { relationType: 'derives', direction: 'in' } }] }] } })).toBe(false)
+  })
+})
+
+describe('processFlow', () => {
+  it('draws an arrow from each step to the next of a sequence, by order, and none among alternatives or concurrent parts', () => {
+    const nodes = byId([...CHECKOUT, node('wrap', 'step', 'Wrap up', { parentId: 'checkout' })])
+    expect(processFlow(nodes).map((a) => `${a.sourceId}>${a.targetId}`)).toEqual([
+      'take>reserve', 'reserve>pay', 'pay>finish', 'finish>wrap',
+    ])
+    expect(processFlow(nodes)[0].id).toBe('flow:take>reserve')
   })
 })

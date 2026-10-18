@@ -2,11 +2,11 @@
 
 import { builtInGovernanceMetamodel, type Metamodel, type NodeTypeDef } from './metamodel'
 
-export type C4ElementType = 'person' | 'system' | 'container' | 'component' | 'database' | 'webapp' | 'queue' | 'domain' | 'group' | 'adr' | 'fitness-fn' | 'need' | 'requirement' | 'scenario' | 'blueprint' | 'mockup' | 'state-machine' | 'state' | 'pseudostate' | 'event' | 'entity'
+export type C4ElementType = 'person' | 'system' | 'container' | 'component' | 'database' | 'webapp' | 'queue' | 'domain' | 'group' | 'adr' | 'fitness-fn' | 'need' | 'requirement' | 'scenario' | 'blueprint' | 'mockup' | 'state-machine' | 'state' | 'pseudostate' | 'event' | 'entity' | 'process' | 'step'
 
 /** Types that act as containers (can hold children, collapse, auto-resize). */
 export const CONTAINER_TYPES: ReadonlySet<string> = new Set([
-  'system', 'container', 'webapp', 'domain', 'group', 'blueprint', 'state-machine', 'state',
+  'system', 'container', 'webapp', 'domain', 'group', 'blueprint', 'state-machine', 'state', 'process', 'step',
 ])
 
 /** True when the given node-type id behaves as a parent container. */
@@ -477,6 +477,9 @@ export interface C4EdgeRFData {
   technology?: string
   relationType?: string
   isVirtual: boolean
+  /** An arrow from a step to the next (warnier.ts, processFlow): no
+   *  relation of the model, drawn dashed, never selected. */
+  flow?: boolean
   /** 1-based step indices when this edge is part of the active dynamic view sequence.
    *  Array because the same relation can appear multiple times in one sequence. */
   sequenceStep?: number[]

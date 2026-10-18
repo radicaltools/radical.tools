@@ -19,7 +19,7 @@ import { zoomIdentity } from 'd3-zoom'
 import { lowDetailAt } from '../store/canvasDetail'
 import { useDiagramStore } from '../store/diagramStore'
 import { paletteCover, propertiesPanelCover } from './propertiesCover'
-import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode } from './nodes/C4Nodes'
+import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode, ProcessNode, StepNode, GenericNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
 import { edgeLabelDetail, edgeLabelsShownAt } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
@@ -71,6 +71,11 @@ const nodeTypes: NodeTypes = {
   pseudostate: withDetail(PseudostateNode) as any,
   event: withDetail(EventNode) as any,
   entity: withDetail(EntityNode) as any,
+  process: withDetail(ProcessNode) as any,
+  step: withDetail(StepNode) as any,
+  // Any other type (one made in the metamodel editor): React Flow draws the
+  // nodes of a type it has no component for with its `default`.
+  default: withDetail(GenericNode) as any,
 }
 
 const edgeTypes: EdgeTypes = {
@@ -1037,6 +1042,8 @@ function StructuralCanvas(): React.ReactElement {
 
   const onEdgeClick = useCallback(
     (_e: React.MouseEvent, edge: { id: string }) => {
+      // A step's arrow to the next is no relation to select.
+      if (edge.id.startsWith('flow:')) return
       const state = useDiagramStore.getState()
       // If a sequence is being edited, toggle this relation and don't open properties
       if (state.activeSequenceId && !edge.id.startsWith('virtual-')) {

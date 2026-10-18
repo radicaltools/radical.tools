@@ -50,6 +50,7 @@ import {
   type WizardLink,
   relationDisplayLabel,
 } from '@radical/common/metamodel'
+import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { newViewName, viewpointsOf } from '@radical/common/viewpoints'
 import { markdownToPlain } from '@radical/common/markdown'
@@ -1099,6 +1100,27 @@ function deriveRFEdges(
         relationType: rel.relationType,
         isVirtual,
       },
+    })
+  }
+
+  // Steps that follow each other: an arrow from each to the next, both shown
+  // as themselves (not folded into a parent). No relation of the model.
+  for (const arrow of processFlow(nodes)) {
+    const shown = (id: string) => (!viewFilter || viewFilter.has(id))
+      && getViewVisibleAncestor(id, nodes, viewFilter, viewCollapsedSet, expandedSet) === id
+    if (!shown(arrow.sourceId) || !shown(arrow.targetId)) continue
+    rfEdges.push({
+      id: arrow.id,
+      source: arrow.sourceId,
+      target: arrow.targetId,
+      type: 'c4relation',
+      animated: false,
+      deletable: false,
+      focusable: false,
+      // No pointer: it is not there to click (index.css).
+      className: 'rf-edge-flow',
+      zIndex: Math.max(depthOf(arrow.sourceId), depthOf(arrow.targetId)) * 10 + 5,
+      data: { originalSourceId: arrow.sourceId, originalTargetId: arrow.targetId, isVirtual: true, flow: true },
     })
   }
   return rfEdges
@@ -3937,6 +3959,12 @@ export const useDiagramStore = create<DiagramStore>()(
             ;(state.rfNodes[rfIdx] as any).height = newH
           }
         })
+        // A parent that grew (or shrank) changes its own parent: a step
+        // added to a process inside a system grew the process past the
+        // system's frame. Refit up the tree, as fitAncestors does headlessly.
+        if ((newW !== parent.width || newH !== parent.height) && parent.parentId && parent.parentId !== parentId) {
+          get().fitParentToChildren(parent.parentId, viewFilter, viewCollapsedSet, expandedSet)
+        }
       },
 
       // ── layout ───────────────────────────────────────────────────────────

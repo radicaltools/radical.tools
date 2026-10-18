@@ -32,6 +32,8 @@ export interface WarnierNode {
 }
 
 const REPEAT_LABELS: Record<string, string> = { '0..1': '(0,1)', '1..n': '(1,n)', '0..n': '(0,n)' }
+/** How often an alternative happens. */
+export const ALTERNATIVE = '(0,1)'
 
 const field = (node: C4Node, key: string): unknown => (node as unknown as Record<string, unknown>)[key]
 
@@ -101,7 +103,13 @@ export function warnierTree(rows: ChainRow[]): WarnierNode[] {
     else roots.push(item)
     stack.push({ depth: row.depth, item })
   }
-  const sortAll = (items: WarnierNode[]): WarnierNode[] => inOrder(items).map((item) => ({ ...item, children: sortAll(item.children) }))
+  // An alternative happens at most once: (0,1) under each child of a choice
+  // that does not say how often it happens otherwise (Warnier–Orr notation).
+  const sortAll = (items: WarnierNode[], choice = false): WarnierNode[] => inOrder(items).map((item) => ({
+    ...item,
+    ...(choice && !item.repeat ? { repeat: ALTERNATIVE } : {}),
+    children: sortAll(item.children, item.mode === 'choice'),
+  }))
   return sortAll(roots)
 }
 
@@ -213,4 +221,39 @@ export function insertPlan(tree: WarnierNode[], key: string, where: 'after' | 'i
   landing.splice(where === 'after' ? at.index + 1 : landing.length, 0, placeholder)
   const { [NEW]: order, ...orders } = renumber(landing, hasOrder)
   return { parentId: where === 'after' ? parentIdOf(at) : at.item.node.id, ...(order !== undefined ? { order } : {}), orders }
+}
+
+// ─── The flow of steps on a canvas ───────────────────────────────────────────
+
+export interface FlowArrow {
+  id: string
+  sourceId: string
+  targetId: string
+}
+
+/** The arrows a canvas draws between steps that follow each other: among
+ *  the steps of each process or step whose children run in sequence, from
+ *  each to the next by order (the rest after them, by name). The children of
+ *  a choice or of a concurrent step have none: their parent's header says
+ *  how they run. Nothing of it is stored. */
+export function processFlow(nodes: Record<string, C4Node>): FlowArrow[] {
+  const byParent = new Map<string, C4Node[]>()
+  for (const node of Object.values(nodes)) {
+    if (node.type !== 'step' || !node.parentId || !nodes[node.parentId]) continue
+    const list = byParent.get(node.parentId)
+    if (list) list.push(node)
+    else byParent.set(node.parentId, [node])
+  }
+  const arrows: FlowArrow[] = []
+  for (const [parentId, steps] of byParent) {
+    if (warnierMode(nodes[parentId]) !== 'sequence') continue
+    const items = steps
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map((node, i) => ({ key: node.id, node, repeat: null, condition: null, mode: 'sequence', children: [], alsoIn: 0, i }) as WarnierNode)
+    const ordered = inOrder(items).map((item) => item.node)
+    for (let i = 1; i < ordered.length; i++) {
+      arrows.push({ id: `flow:${ordered[i - 1].id}>${ordered[i].id}`, sourceId: ordered[i - 1].id, targetId: ordered[i].id })
+    }
+  }
+  return arrows
 }

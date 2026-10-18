@@ -4012,6 +4012,11 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
   pointer-events: none;
 }
 .rf-node-ghost .react-flow__handle { display: none; }
+/* A step's arrow to the next: drawn, not clicked. */
+.react-flow__edge.rf-edge-flow { pointer-events: none; }
+/* ⊕ or + in a process's or step's header: how the steps inside it happen. */
+.proc-sign { font-size: 14px; font-weight: 700; line-height: 1; letter-spacing: 0; text-transform: none; }
+
 .milestone-diff-stat.added   { color: var(--success); }
 .milestone-diff-stat.changed { color: var(--warning, #d97706); }
 .milestone-diff-stat.removed { color: var(--danger); }
