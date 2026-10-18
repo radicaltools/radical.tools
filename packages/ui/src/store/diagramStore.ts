@@ -1271,6 +1271,10 @@ interface DiagramStore {
   removeNode: (id: string) => void
   /** Removes the elements (with what lies inside them) as one undo step. */
   removeNodes: (ids: string[]) => void
+  /** Runs `action`, whatever store actions it calls, as one undo step. */
+  runAsOneStep: (action: () => void) => void
+  /** Asks to delete the elements, as the Delete key on the canvas does. */
+  requestDelete: (nodeIds: string[]) => void
   toggleCollapse: (id: string) => void
   /** Opens every container around `nodeId` that the canvas shown has
    *  collapsed, outermost first, as one undo step. */
@@ -2337,6 +2341,15 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { model.deleteNode(state, id) })
         get()._sync()
         _liveLayout?.invalidate()
+      },
+
+      runAsOneStep(action) {
+        _asOneStep(action)
+      },
+
+      requestDelete(nodeIds) {
+        if (!nodeIds.length || get().appMode !== 'designer') return
+        set((state) => { state.pendingDelete = { nodeIds, edgeIds: [] } })
       },
 
       removeNodes(ids) {

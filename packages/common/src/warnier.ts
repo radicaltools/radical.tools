@@ -104,3 +104,113 @@ export function warnierTree(rows: ChainRow[]): WarnierNode[] {
   const sortAll = (items: WarnierNode[]): WarnierNode[] => inOrder(items).map((item) => ({ ...item, children: sortAll(item.children) }))
   return sortAll(roots)
 }
+
+// ─── Editing the outline ─────────────────────────────────────────────────────
+//
+// Where the tree is containment (warnierEditable), the view edits it like an
+// outline: add after or inside, indent under the element before, outdent
+// after the parent, move up or down. Each plan says where the element goes
+// and numbers the siblings it lands among, and the ones it left, 1, 2, 3, …
+// in the order shown (`order`, for the types that have one: the folder keeps
+// no order among siblings). The view applies a plan as one undo step.
+
+/** Whether the view's Warnier tree is containment, which the view edits; a
+ *  chain of two levels or more hangs elements by relations and is renamed only. */
+export function warnierEditable(view: DiagramView | undefined): boolean {
+  return (pipelineOf(view)?.levels?.length ?? 0) <= 1
+}
+
+export interface Located {
+  item: WarnierNode
+  /** Its parent in the tree; null for a root. */
+  parent: WarnierNode | null
+  siblings: WarnierNode[]
+  index: number
+}
+
+/** The item with `key`, with its parent and siblings. */
+export function locate(tree: WarnierNode[], key: string, parent: WarnierNode | null = null): Located | null {
+  for (let index = 0; index < tree.length; index++) {
+    const item = tree[index]
+    if (item.key === key) return { item, parent, siblings: tree, index }
+    const found = locate(item.children, key, item)
+    if (found) return found
+  }
+  return null
+}
+
+/** Every item, depth first, as the view shows them top to bottom. */
+export function flatten(tree: WarnierNode[]): WarnierNode[] {
+  return tree.flatMap((item) => [item, ...flatten(item.children)])
+}
+
+/** order 1, 2, 3, … for the elements of `nodes` whose type has one. */
+export function renumber(nodes: C4Node[], hasOrder: (type: string) => boolean): Record<string, number> {
+  const orders: Record<string, number> = {}
+  nodes.forEach((node, i) => { if (hasOrder(node.type)) orders[node.id] = i + 1 })
+  return orders
+}
+
+export interface OutlinePlan {
+  /** The element's new parent (null: the top of the model); absent when it stays. */
+  parentId?: string | null
+  /** The order of each element that gets one. */
+  orders: Record<string, number>
+}
+
+export type OutlineMove = 'up' | 'down' | 'indent' | 'outdent'
+
+const parentIdOf = (at: Located): string | null => (at.parent ? at.parent.node.id : at.item.node.parentId ?? null)
+const without = (list: WarnierNode[], index: number): C4Node[] => list.filter((_, i) => i !== index).map((s) => s.node)
+
+/** Where `move` takes the item with `key`, or null when it cannot go: the
+ *  first sibling up or indented, the last down, a root outdented. */
+export function outlinePlan(tree: WarnierNode[], key: string, move: OutlineMove, hasOrder: (type: string) => boolean): OutlinePlan | null {
+  const at = locate(tree, key)
+  if (!at) return null
+  const { item, siblings, index } = at
+  const nodes = siblings.map((s) => s.node)
+  if (move === 'up' || move === 'down') {
+    const to = move === 'up' ? index - 1 : index + 1
+    if (to < 0 || to >= siblings.length) return null
+    const reordered = [...nodes]
+    reordered.splice(index, 1)
+    reordered.splice(to, 0, item.node)
+    return { orders: renumber(reordered, hasOrder) }
+  }
+  if (move === 'indent') {
+    if (index === 0) return null
+    const into = siblings[index - 1]
+    return {
+      parentId: into.node.id,
+      orders: { ...renumber(without(siblings, index), hasOrder), ...renumber([...into.children.map((c) => c.node), item.node], hasOrder) },
+    }
+  }
+  if (!at.parent) return null
+  const parentAt = locate(tree, at.parent.key)!
+  const landing = [...parentAt.siblings.map((s) => s.node)]
+  landing.splice(parentAt.index + 1, 0, item.node)
+  return { parentId: parentIdOf(parentAt), orders: { ...renumber(without(siblings, index), hasOrder), ...renumber(landing, hasOrder) } }
+}
+
+export interface InsertPlan {
+  /** Where the new element goes (null: the top of the model). */
+  parentId: string | null
+  /** Its order, when its type has one. */
+  order?: number
+  /** The orders of the siblings it lands among. */
+  orders: Record<string, number>
+}
+
+/** Where a new element of `type` goes, after the item with `key` or inside
+ *  it at the end, and how its siblings are numbered then. */
+export function insertPlan(tree: WarnierNode[], key: string, where: 'after' | 'inside', type: string, hasOrder: (type: string) => boolean): InsertPlan | null {
+  const at = locate(tree, key)
+  if (!at) return null
+  const NEW = '\0new'
+  const placeholder = { id: NEW, type } as C4Node
+  const landing = where === 'after' ? at.siblings.map((s) => s.node) : at.item.children.map((c) => c.node)
+  landing.splice(where === 'after' ? at.index + 1 : landing.length, 0, placeholder)
+  const { [NEW]: order, ...orders } = renumber(landing, hasOrder)
+  return { parentId: where === 'after' ? parentIdOf(at) : at.item.node.id, ...(order !== undefined ? { order } : {}), orders }
+}

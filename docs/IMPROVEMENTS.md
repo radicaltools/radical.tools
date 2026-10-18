@@ -2296,10 +2296,11 @@ a bar down the canvas's left side, and All elements a table. Left open:
 Processes and steps in the Radical metamodel and the Warnier view type
 (read-only, a click opens the card). Left for stage 2:
 
-1. **Edit in the view.** Add a step before or after, indent and outdent,
-   drag to reorder (renumbering `order`), set repeat and ⊕ in place.
+1. ~~**Edit in the view.**~~ Done (stage 2, same branch): the bar and the
+   keys add, indent, outdent, move, rename, set repeat and children, delete;
+   left: dragging to reorder, and editing a chain's tree beyond renaming.
 2. **Order by hand.** A step without `order` comes after those with one, by
-   name; a new step could get the next number when it is added.
+   name, until an edit in the view numbers its siblings.
 3. **Domain multiplicity.** `part-of` has no cardinality, so an aggregate's
    parts read without (1,n).
 4. **Export.** SVG/PNG of the diagram, and the CLI export (the tree is pure,

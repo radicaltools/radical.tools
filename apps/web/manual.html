@@ -524,6 +524,21 @@
         <p>
           A <strong>Warnier</strong> view draws what the view shows as a Warnier–Orr diagram: each element on the left of a brace that holds what is under it, read left to right like an outline. It draws the view's <a href="#view-steps">filter</a> as a tree — the chain's levels, or, with one level or none, the elements by containment — so any view can be switched to it under <em>View type</em>: a system with its containers and components, needs with their requirements, a <a href="#processes">process</a> with its steps. Steps stand in their <em>Order</em> (the rest after them, as the view orders them), a step that repeats or is optional has <code>(1,n)</code>, <code>(0,n)</code> or <code>(0,1)</code> and its condition under its name, ⊕ stands between alternatives (<em>Children run: choice</em>) and + between parts that run at once. A <a href="#states">state machine</a> reads the same way: a compound state's states are alternatives, a parallel state's regions run at once; pseudostates are left out. A click on an element opens its properties card; there is nothing to arrange. The viewpoint <em>Process (Warnier)</em> is a Warnier view of the processes and their steps.
         </p>
+        <p>In the Designer a Warnier view is written like an outline. Select an element and use the bar over the diagram, or the keyboard:</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Key</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><kbd>Enter</kbd></td><td>Adds an element of the same type after it, its name open to type (<kbd>Enter</kbd> keeps it, <kbd>Esc</kbd> leaves the name as it was). <em>+ Inside</em> on the bar adds one at the end of what it holds.</td></tr>
+              <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Indents it under the element before it / outdents it after its parent.</td></tr>
+              <tr><td><kbd>Alt</kbd>+<kbd>↑</kbd> / <kbd>Alt</kbd>+<kbd>↓</kbd></td><td>Moves it up or down among its siblings.</td></tr>
+              <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Selects the element above or below.</td></tr>
+              <tr><td><kbd>F2</kbd> or a double-click</td><td>Renames it in place.</td></tr>
+              <tr><td><kbd>Delete</kbd></td><td>Asks to delete it, as on the canvas.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><em>Repeat</em> and <em>Children</em> on the bar set a step's repetition and whether its children run in sequence, as a choice or at once. Every edit is one undo step and numbers the <em>Order</em> of the steps it touches 1, 2, 3, … as shown. The places the metamodel allows still hold: a step cannot be outdented to the top of the model. A view whose filter is a chain of relations (needs, then the requirements refined from each) is renamed only; add along a chain in its <a href="#view-table">table</a>.</p>
       </section>
 
       <!-- ═══════════════ WORK FASTER ═══════════════ -->

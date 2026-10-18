@@ -3,7 +3,7 @@ import type { C4Node, C4Relation, DiagramView } from '../src/c4'
 import { builtInGovernanceMetamodel, validateModel } from '../src/metamodel/index'
 import { checkAddNode, checkAddRelation, insertNode, type ModelState } from '../src/model'
 import { viewpointsOf } from '../src/viewpoints'
-import { warnierRows, warnierTree, type WarnierNode } from '../src/warnier'
+import { insertPlan, outlinePlan, warnierEditable, warnierRows, warnierTree, type WarnierNode } from '../src/warnier'
 
 const metamodel = builtInGovernanceMetamodel()
 
@@ -112,5 +112,42 @@ describe('warnierTree', () => {
     expect(shape(warnierTree(warnierRows(chain, ctx)))).toEqual([['Pay online', 'sequence', [['Send invoice'], ['Take card']]]])
     const c4: DiagramView = { id: 's', name: 'Systems', kind: 'warnier', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['system', 'container'] }] }] } }
     expect(shape(warnierTree(warnierRows(c4, ctx)))).toEqual([['Shop', 'sequence', [['API']]]])
+  })
+})
+
+describe('outline edits', () => {
+  const view: DiagramView = { id: 'v', name: 'Checkout', kind: 'warnier', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['process', 'step'] }] }] } }
+  const tree = warnierTree(warnierRows(view, { nodes: byId(CHECKOUT), relations: [], metamodel }))
+  const keyOf = (id: string): string => {
+    const find = (items: WarnierNode[]): string | undefined => items.map((i) => (i.node.id === id ? i.key : find(i.children))).find(Boolean)
+    return find(tree)!
+  }
+  const hasOrder = (type: string) => type === 'step'
+
+  it('plans a step after another and inside one, numbering the siblings', () => {
+    expect(insertPlan(tree, keyOf('take'), 'after', 'step', hasOrder)).toEqual({ parentId: 'checkout', order: 2, orders: { take: 1, reserve: 3, pay: 4, finish: 5 } })
+    expect(insertPlan(tree, keyOf('pay'), 'inside', 'step', hasOrder)).toEqual({ parentId: 'pay', order: 3, orders: { card: 1, invoice: 2 } })
+    // A new process after the root process: at the top, no order.
+    expect(insertPlan(tree, keyOf('checkout'), 'after', 'process', hasOrder)).toEqual({ parentId: null, orders: {} })
+  })
+
+  it('moves up and down among the siblings, and not past either end', () => {
+    expect(outlinePlan(tree, keyOf('pay'), 'up', hasOrder)).toEqual({ orders: { take: 1, pay: 2, reserve: 3, finish: 4 } })
+    expect(outlinePlan(tree, keyOf('take'), 'down', hasOrder)).toEqual({ orders: { reserve: 1, take: 2, pay: 3, finish: 4 } })
+    expect(outlinePlan(tree, keyOf('take'), 'up', hasOrder)).toBeNull()
+    expect(outlinePlan(tree, keyOf('finish'), 'down', hasOrder)).toBeNull()
+  })
+
+  it('indents under the element before and outdents after the parent', () => {
+    expect(outlinePlan(tree, keyOf('reserve'), 'indent', hasOrder)).toEqual({ parentId: 'take', orders: { take: 1, pay: 2, finish: 3, reserve: 1 } })
+    expect(outlinePlan(tree, keyOf('invoice'), 'outdent', hasOrder)).toEqual({ parentId: 'checkout', orders: { card: 1, take: 1, reserve: 2, pay: 3, invoice: 4, finish: 5 } })
+    expect(outlinePlan(tree, keyOf('take'), 'indent', hasOrder)).toBeNull()
+    expect(outlinePlan(tree, keyOf('checkout'), 'outdent', hasOrder)).toBeNull()
+  })
+
+  it('edits a containment tree, and only renames a chain\'s', () => {
+    expect(warnierEditable(view)).toBe(true)
+    expect(warnierEditable(undefined)).toBe(true)
+    expect(warnierEditable({ ...view, pipeline: { levels: [{ ways: [{ types: ['need'] }] }, { ways: [{ via: { relationType: 'derives', direction: 'in' } }] }] } })).toBe(false)
   })
 })
