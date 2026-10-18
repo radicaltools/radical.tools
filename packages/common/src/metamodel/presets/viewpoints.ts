@@ -54,7 +54,7 @@ export function c4Viewpoints(): ViewpointDef[] {
 }
 
 /** The C4 viewpoints, then those for domains, requirements, decisions,
- *  screens and state machines. */
+ *  screens, state machines and processes. */
 export function radicalViewpoints(): ViewpointDef[] {
   return [
     ...c4Viewpoints(),
@@ -226,6 +226,14 @@ export function radicalViewpoints(): ViewpointDef[] {
         { ways: [{ types: ['event'] }] },
         { ways: [{ via: { relationType: 'emits', direction: 'in' } }] },
       ] },
+    },
+    {
+      id: 'process-warnier',
+      label: 'Process (Warnier)',
+      group: 'Process',
+      description: 'The processes and their steps as Warnier–Orr diagrams: what each is made of, what repeats, what is an alternative and what runs at once.',
+      kind: 'warnier',
+      pipeline: { levels: [{ ways: [{ types: ['process', 'step'] }] }] },
     },
   ]
 }

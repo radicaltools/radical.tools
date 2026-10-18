@@ -25,8 +25,8 @@ test('New view offers the metamodel\'s viewpoints; a view of one follows the vie
   await page.getByRole('button', { name: 'New view' }).click()
   const menu = page.getByRole('menu', { name: 'New view' })
   await expect(menu.getByRole('menuitem').first()).toHaveText(/Blank view/)
-  // By group, in two columns of about the same height: C4, Decisions and UX; Domain, Requirements and States.
-  await expect(menu.getByRole('group')).toHaveText([/^C4/, /^Decisions/, /^UX/, /^Domain/, /^Requirements/, /^States/])
+  // By group, in two columns of about the same height: C4, Decisions, UX and Process; Domain, Requirements and States.
+  await expect(menu.getByRole('group')).toHaveText([/^C4/, /^Decisions/, /^UX/, /^Process/, /^Domain/, /^Requirements/, /^States/])
   await expect(menu.getByRole('group', { name: 'Requirements' }).getByRole('menuitem')).toHaveText([/^Traceability/, /^Requirement coverage/, /^Requirement gaps/, /^Responsibilities/, /^Specification/])
   await menu.getByRole('menuitem', { name: /^Traceability/ }).click()
 
@@ -72,7 +72,7 @@ test('New view offers the metamodel\'s viewpoints; a view of one follows the vie
   const kinds = async () => (await storedViews()).filter((v) => v.viewpoint === 'sorted-trace').map((v) => v.kind)
   await expect.poll(kinds).toEqual(['wiki', 'wiki'])
   await editor.getByRole('button', { name: 'Delete viewpoint Sorted trace' }).click()
-  await expect(section.locator('.mm-card')).toHaveCount(19)
+  await expect(section.locator('.mm-card')).toHaveCount(20)
   await expect.poll(async () => (await storedViews()).filter((v) => v.name === 'Governance').map((v) => [v.kind, v.viewpoint ?? null])).toEqual([['wiki', null]])
 
   // Kept in the metamodel, which stays the Radical preset.
@@ -95,12 +95,13 @@ test('every viewpoint of the Radical metamodel opens as a view of its type', asy
     ['Decisions', 'TABLE VIEW', true], ['Decision log', 'WIKI VIEW', true], ['Fitness functions', 'TABLE VIEW', true],
     ['Screen flow', 'STRUCTURE VIEW', true], ['Screens', 'TABLE VIEW', true],
     ['Entity lifecycles', 'TABLE VIEW', false], ['Event catalogue', 'TABLE VIEW', false],
+    ['Process (Warnier)', 'WARNIER VIEW', false],
   ]
   for (const [name, badge, shows] of expected) {
     const back = page.locator('.left-panel .rp-slider.show-props .rp-back-btn')
     if (await back.isVisible()) await back.click()
     await page.getByRole('button', { name: 'New view' }).click()
-    await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: new RegExp(`^${name}`) }).click()
+    await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: new RegExp(`^${name.replace(/[()]/g, '\\$&')}`) }).click()
     await expect(page.locator('.props-type-badge'), name).toContainText(`${badge} · ${name.toUpperCase()}`)
     await expect(page.getByText('Runtime Error')).toHaveCount(0)
     await page.locator('.left-panel .rp-slider.show-props .rp-back-btn').click()

@@ -116,7 +116,7 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           label: { type: 'string' },
           description: { type: 'string', description: 'What a view of this viewpoint shows; New view shows it. "" clears it.' },
           group: { type: 'string', description: 'The concern it serves ("C4", "Requirements", …): New view lists the viewpoints by group. "" clears it.' },
-          kind: { type: 'string', enum: [...VIEWPOINT_KINDS], description: "How its views show the chain: 'table', 'wiki', 'treemap' (hierarchy), 'matrix' or 'static' (canvas)." },
+          kind: { type: 'string', enum: [...VIEWPOINT_KINDS], description: "How its views show the chain: 'table', 'wiki', 'treemap' (hierarchy), 'matrix', 'warnier' (a Warnier–Orr diagram of the hierarchy) or 'static' (canvas)." },
           pipeline: { ...PIPELINE_SCHEMA, type: 'object' },
           fromViewId: { type: 'string', description: 'A view whose kind and filter chain the viewpoint takes (kind and pipeline given here win).' },
         },

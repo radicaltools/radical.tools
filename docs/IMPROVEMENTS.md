@@ -2290,3 +2290,20 @@ a bar down the canvas's left side, and All elements a table. Left open:
    structure view of the whole sample ("Landscape") would show the demo model
    drawn in one picture, if wanted.
 
+
+### Warnier–Orr diagrams, stage 1 (2026-10-18)
+
+Processes and steps in the Radical metamodel and the Warnier view type
+(read-only, a click opens the card). Left for stage 2:
+
+1. **Edit in the view.** Add a step before or after, indent and outdent,
+   drag to reorder (renumbering `order`), set repeat and ⊕ in place.
+2. **Order by hand.** A step without `order` comes after those with one, by
+   name; a new step could get the next number when it is added.
+3. **Domain multiplicity.** `part-of` has no cardinality, so an aggregate's
+   parts read without (1,n).
+4. **Export.** SVG/PNG of the diagram, and the CLI export (the tree is pure,
+   in @radical/common/warnier).
+5. **Forge.** A Process stage that derives processes from scenarios.
+6. **Large trees.** Every row is drawn; a model with thousands of elements in
+   one Warnier view would want folding like the table's.

@@ -6,6 +6,7 @@ import { Canvas } from '@radical/ui/components/Canvas'
 import { TreemapView } from './components/TreemapView'
 import { SequenceView } from './components/SequenceView'
 import { TableView } from '@radical/ui/components/TableView'
+import { WarnierView } from '@radical/ui/components/WarnierView'
 import { MatrixView } from './components/MatrixView'
 import { WikiView } from '@radical/ui/components/WikiView'
 import { PresentationBar, PresenterDock } from './components/PresentationBar'
@@ -38,7 +39,8 @@ function AppInner(): React.ReactElement {
   const isTableView    = activeViewKind === 'table'
   const isMatrixView   = activeViewKind === 'matrix'
   const isWikiView     = activeViewKind === 'wiki'
-  const isCanvasView   = !isTreemapView && !isSequenceView && !isTableView && !isMatrixView && !isWikiView
+  const isWarnierView  = activeViewKind === 'warnier'
+  const isCanvasView   = !isTreemapView && !isSequenceView && !isTableView && !isMatrixView && !isWikiView && !isWarnierView
 
   const isPresenting = presentationActive
   const isDesigner = appMode === 'designer'
@@ -89,7 +91,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : <Canvas />}
+      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : isWarnierView ? <WarnierView /> : <Canvas />}
       {!isPresenting && isDesigner && <RightPanel />}
       {!isPresenting && isViewer && <RightPanel readOnly />}
       {!isPresenting && isPresenter && <PresenterDock />}

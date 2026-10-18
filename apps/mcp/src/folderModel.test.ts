@@ -262,6 +262,37 @@ describe('get_changes', () => {
   })
 })
 
+describe('warnier', () => {
+  it('an agent writes a process with its steps and a Warnier view of it', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const calls: Array<[string, Record<string, unknown>]> = [
+      ['add_node', { tempId: 'checkout', type: 'process', label: 'Checkout' }],
+      ['add_node', { tempId: 'take', type: 'step', label: 'Take the order', parentId: 'checkout', properties: { order: 1 } }],
+      ['add_node', { tempId: 'reserve', type: 'step', label: 'Reserve stock', parentId: 'checkout', properties: { order: 2, repeat: '1..n', condition: 'for each order line' } }],
+      ['add_node', { tempId: 'pay', type: 'step', label: 'Pay', parentId: 'checkout', properties: { order: 3, children: 'choice' } }],
+      ['add_node', { tempId: 'card', type: 'step', label: 'By card', parentId: 'pay' }],
+      ['add_node', { tempId: 'invoice', type: 'step', label: 'By invoice', parentId: 'pay' }],
+      ['add_node', { tempId: 'payments', type: 'system', label: 'Payments' }],
+      ['add_relation', { sourceId: 'card', targetId: 'payments', relationType: 'performed-by' }],
+      ['create_view', { tempId: 'v', name: 'Checkout', viewpoint: 'Process (Warnier)' }],
+    ]
+    for (const [name, args] of calls) {
+      const result = await model.call(name, args)
+      expect(result.ok, `${name}: ${result.text}`).toBe(true)
+    }
+    const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(saved.nodes.find((n) => n.label === 'Reserve stock')).toMatchObject({ type: 'step', order: 2, repeat: '1..n', condition: 'for each order line' })
+    expect(saved.nodes.find((n) => n.label === 'Pay')).toMatchObject({ children: 'choice' })
+    expect(saved.nodes.find((n) => n.label === 'By card')).toMatchObject({ repeat: '1', children: 'sequence' })
+    expect(saved.views?.find((v) => v.name === 'Checkout')).toMatchObject({ kind: 'warnier', viewpoint: 'process-warnier' })
+    expect((await model.call('get_issues', {})).text).toBe('No issues: the model follows its metamodel.')
+    const summary = (await model.call('get_model_summary', {})).text
+    expect(summary).toContain('Process (Warnier)')
+    expect(model.tools.find((tool) => tool.name === 'update_view')?.inputSchema).toMatchObject({ properties: { kind: { enum: expect.arrayContaining(['warnier']) } } })
+  })
+})
+
 describe('starting a model', () => {
   async function tempDir(): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'radical-new-'))

@@ -52,6 +52,7 @@
             <li><a href="#mockups">Mockups &amp; screen flows</a></li>
             <li><a href="#domain-model">Domain model</a></li>
             <li><a href="#states">State machines</a></li>
+            <li><a href="#processes">Processes</a></li>
             <li><a href="#selection">Working with selections</a></li>
           </ul>
         </div>
@@ -67,6 +68,7 @@
             <li><a href="#view-table">Table</a></li>
             <li><a href="#view-matrix">Matrix</a></li>
             <li><a href="#view-wiki">Wiki</a></li>
+            <li><a href="#view-warnier">Warnier</a></li>
           </ul>
         </div>
         <div class="toc-group">
@@ -333,6 +335,19 @@
         </p>
       </section>
 
+      <section class="doc-section" id="processes">
+        <h2>Processes</h2>
+        <p>
+          A <strong>Process</strong> (palette group <em>Process</em>, in the Radical metamodel) is process logic: a procedure, a workflow, an algorithm — <em>Checkout</em>, <em>Month-end close</em>. It holds <strong>Steps</strong>, and a step can hold steps of its own, to any depth. A process reads best as a <a href="#view-warnier">Warnier–Orr diagram</a>: the viewpoint <em>Process (Warnier)</em> under <em>+ New view</em> draws every process with its steps.
+        </p>
+        <ul>
+          <li><strong>Order</strong> — where a step stands among its siblings (1, 2, 3, …). Steps run in this order; the model keeps no other order among them.</li>
+          <li><strong>Repeat</strong> — how often the step runs: <em>1</em> (once, the default), <em>0..1</em> (optional), <em>1..n</em> or <em>0..n</em> (repeated), drawn <code>(0,1)</code>, <code>(1,n)</code>, <code>(0,n)</code> under its name, with its <strong>Condition</strong>: <em>for each order line</em>, <em>while stock is short</em>, <em>if the customer is new</em>.</li>
+          <li><strong>Children run</strong> (on a process or a step) — <em>sequence</em>, one after the other (the default); <em>choice</em>, exactly one of them (<em>by card</em> ⊕ <em>by invoice</em>); <em>concurrent</em>, at the same time (+).</li>
+        </ul>
+        <p>A step is <strong>Performed by</strong> the person, system, container, component or web app that does it; a process <strong>Satisfies</strong> the requirements it meets, and scenarios <strong>Verify</strong> it. Agents write processes over the <a href="#mcp">MCP server</a> the same way.</p>
+      </section>
+
       <section class="doc-section" id="selection">
         <h2>Working with selections</h2>
         <p>
@@ -380,11 +395,12 @@
               <tr><td><strong>Table</strong></td><td>The view's elements as a tree, one row each with name and summary</td><td>Requirement and ADR registers, adding elements along a chain</td></tr>
               <tr><td><strong>Matrix</strong></td><td>Dependency structure matrix</td><td>Coupling, cycles, who-depends-on-whom</td></tr>
               <tr><td><strong>Wiki</strong></td><td>One document page per element</td><td>Reading, reviewing, editing prose</td></tr>
+              <tr><td><strong>Warnier</strong></td><td>The view's hierarchy in braces, left to right (Warnier–Orr)</td><td>Process logic, any decomposition read as an outline</td></tr>
             </tbody>
           </table>
         </div>
         <h3 id="viewpoints">Viewpoints</h3>
-        <p>A metamodel can name viewpoints of its own: a <strong>viewpoint</strong> is one of the view types above with a <a href="#view-steps">filter</a>, under a name, for a question asked of the model again and again. Each belongs to a group, the concern it serves. The Radical metamodel comes with nineteen:</p>
+        <p>A metamodel can name viewpoints of its own: a <strong>viewpoint</strong> is one of the view types above with a <a href="#view-steps">filter</a>, under a name, for a question asked of the model again and again. Each belongs to a group, the concern it serves. The Radical metamodel comes with twenty:</p>
         <ul>
           <li><strong>C4</strong> — <em>System context</em>, <em>Containers</em> and <em>Components</em> (structure views of the people and systems, of the containers inside the systems, of the components inside the containers, each with every relation between them) and <em>Container dependencies</em> (a matrix of the containers, web apps, databases and queues). The C4 metamodel comes with these four.</li>
           <li><strong>Domain</strong> — <em>Domain map</em> (domains and how they depend on and partner with each other), <em>Domain model</em> (entities, what they are part of and reference) and <em>Domain realisation</em> (a table of domains, their entities and what realises each).</li>
@@ -392,6 +408,7 @@
           <li><strong>Decisions</strong> — <em>Decisions</em> (ADRs, the fitness functions that check each and what it constrains), <em>Decision log</em> (a wiki of the ADRs, the newest first, each with the ones it supersedes) and <em>Fitness functions</em> (by category, with what each checks and constrains).</li>
           <li><strong>UX</strong> — <em>Screen flow</em> (the screens and how users move between them) and <em>Screens</em> (a table of the screens with what they illustrate and what presents them).</li>
           <li><strong>States</strong> — <em>Entity lifecycles</em> (the entities with a state machine, what implements and verifies it) and <em>Event catalogue</em> (the events and what emits each).</li>
+          <li><strong>Process</strong> — <em>Process (Warnier)</em> (the processes and their steps as Warnier–Orr diagrams).</li>
         </ul>
         <p><em>+ New view</em> offers them by group, in two columns over the canvas, and so does the <strong>Viewpoint</strong> list in a view's properties, marked <em>from the metamodel</em>, with what the picked viewpoint shows under it; <em>None</em> keeps the view's type and filter for it alone. A view of a viewpoint has its view type and filter and follows it: change the viewpoint in the <a href="#metamodel">metamodel editor</a> and every view of it changes too. Its card and its properties name the viewpoint. Its filter is the viewpoint's, read-only (<em>Set by the viewpoint</em>); <em>Detach</em> beside it keeps the view type and the filter for the view alone, to edit there, and so does picking another <strong>View type</strong>. Any view's filter can be saved with <em>Save as viewpoint…</em> under a name: a new name adds a viewpoint, the name of one replaces its view type and filter, and its views follow. Agents use <code>create_view</code> and <code>update_view</code> with <code>viewpoint</code>, and <code>upsert_viewpoint</code> (with its <code>group</code>) and <code>delete_viewpoint</code>.</p>
         <h3 id="view-steps">Filter</h3>
@@ -499,6 +516,13 @@
         </p>
         <p>
           The sentence of a requirement can be changed part by part, by clicking a part, or whole: <strong>[rewrite]</strong> above it opens it as text, and <kbd>Enter</kbd> reads it into its parts again, which is also how a <em>When</em> becomes a <em>While</em>. No word is dropped on the way: a subject other than the system (<em>“the mobile app shall…”</em>), a condition that opens with none of the EARS words (<em>“After three failed logins, …”</em>) and commas inside a condition stay in the sentence. <em>must</em>, <em>should</em> and <em>will</em> are read as <em>shall</em>, and <em>as soon as</em>, <em>as long as</em> or <em>in case</em> as the EARS word they stand for.
+        </p>
+      </section>
+
+      <section class="doc-section" id="view-warnier">
+        <h2>Warnier views</h2>
+        <p>
+          A <strong>Warnier</strong> view draws what the view shows as a Warnier–Orr diagram: each element on the left of a brace that holds what is under it, read left to right like an outline. It draws the view's <a href="#view-steps">filter</a> as a tree — the chain's levels, or, with one level or none, the elements by containment — so any view can be switched to it under <em>View type</em>: a system with its containers and components, needs with their requirements, a <a href="#processes">process</a> with its steps. Steps stand in their <em>Order</em> (the rest after them, as the view orders them), a step that repeats or is optional has <code>(1,n)</code>, <code>(0,n)</code> or <code>(0,1)</code> and its condition under its name, ⊕ stands between alternatives (<em>Children run: choice</em>) and + between parts that run at once. A <a href="#states">state machine</a> reads the same way: a compound state's states are alternatives, a parallel state's regions run at once; pseudostates are left out. A click on an element opens its properties card; there is nothing to arrange. The viewpoint <em>Process (Warnier)</em> is a Warnier view of the processes and their steps.
         </p>
       </section>
 
@@ -701,7 +725,7 @@
       <section class="doc-section" id="metamodel-radical">
         <h2>The Radical metamodel</h2>
         <p>
-          Radical is the default. It contains the whole <a href="#metamodel-c4">C4 metamodel</a> unchanged, except that a Software System may also sit inside a <strong>Domain</strong>, and adds thirteen element types in five layers. The types of the new layers can sit at the root, in a system, in a domain or in a group, unless noted. Needs, requirements, scenarios, mockups, ADRs and fitness functions open a <a href="#properties">wizard</a> when you create them, and the <a href="#view-table">Table view</a> sums each of them up in one line.
+          Radical is the default. It contains the whole <a href="#metamodel-c4">C4 metamodel</a> unchanged, except that a Software System may also sit inside a <strong>Domain</strong>, and adds fifteen element types in six layers. The types of the new layers can sit at the root, in a system, in a domain or in a group, unless noted. Needs, requirements, scenarios, mockups, ADRs and fitness functions open a <a href="#properties">wizard</a> when you create them, and the <a href="#view-table">Table view</a> sums each of them up in one line.
         </p>
 
         <h3>Domain layer</h3>
@@ -742,6 +766,16 @@
 
           <dt>Event</dt>
           <dd>Something that happens and can trigger a transition: <em>Source</em> is <em>external</em> (from outside the system), <em>internal</em> or a <em>timer</em>, with an optional <em>Payload</em>. Events live at the root, in a machine, a system, a domain or a group, so one event can be shared. A transition points at the event that triggers it and the events it raises; people, C4 elements other than databases, machines and states <strong>emit</strong> events.</dd>
+        </dl>
+
+        <h3>Process layer</h3>
+        <p>Process logic, drawn as Warnier–Orr diagrams; the <a href="#processes">Processes</a> chapter shows how to write one.</p>
+        <dl class="mm-types">
+          <dt>Process</dt>
+          <dd>A procedure made of steps. <em>Children run</em> says whether its steps run in <em>sequence</em>, are a <em>choice</em> (one of them) or are <em>concurrent</em>. It <strong>satisfies</strong> requirements and scenarios <strong>verify</strong> it.</dd>
+
+          <dt>Step</dt>
+          <dd>One part of a process, inside the process or another step. Its <em>Order</em> places it among its siblings, <em>Repeat</em> (1, 0..1, 1..n, 0..n) and <em>Condition</em> say how often and for what it runs, and <em>Children run</em> how the steps inside it run. It is <strong>performed by</strong> a person, system, container, component or web app.</dd>
         </dl>
 
         <h3>UX layer</h3>
@@ -803,6 +837,8 @@
           <dd><em>System, container, component or web app → state machine</em>: this element runs the machine.</dd>
           <dt>Transition</dt>
           <dd><em>State or pseudostate → state or pseudostate</em>, within one machine. It points at its trigger <em>Event</em> (none means a completion transition, taken when the source finishes), has a <em>Guard</em> and <em>Actions</em>, lists the events it <em>Raises</em>, and is <em>external</em> or <em>internal</em> (stays in the state without exiting it). The canvas labels it <code>event [guard] / actions ^raised</code>.</dd>
+          <dt>Performed by</dt>
+          <dd><em>Step → person, system, container, component or web app</em>: who does the step of a process.</dd>
           <dt>Emits</dt>
           <dd><em>Person, system, container, component, web app, queue, state machine or state → event</em>: this element raises the event; for a state, <em>On</em> says whether from its entry, exit or do activity. A transition raises events through its <em>Raises</em> field instead.</dd>
         </dl>

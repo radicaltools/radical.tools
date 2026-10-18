@@ -111,6 +111,7 @@ const VIEW_KIND_COLORS: Record<string, string> = {
   table: '#22c55e',
   matrix: '#a855f7',
   wiki: '#ec4899',
+  warnier: '#0d9488',
 }
 
 function AccordionSection({
@@ -235,6 +236,12 @@ const Icon = {
       <circle cx="8.25" cy="3.75" r="1" fill="currentColor" stroke="none"/>
       <circle cx="3.75" cy="8.25" r="1" fill="currentColor" stroke="none"/>
       <circle cx="12.75" cy="12.75" r="1" fill="currentColor" stroke="none"/>
+    </svg>
+  ),
+  Warnier: () => (
+    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5.5 2.5 C4.5 2.5 4 3 4 4 V6.8 C4 7.4 3.6 8 3 8 C3.6 8 4 8.6 4 9.2 V12 C4 13 4.5 13.5 5.5 13.5"/>
+      <path d="M7.5 4 H13 M7.5 8 H13 M7.5 12 H13"/>
     </svg>
   ),
   Wiki: () => (
@@ -621,7 +628,8 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const isTable   = view.kind === 'table'
   const isMatrix  = view.kind === 'matrix'
   const isWiki    = view.kind === 'wiki'
-  const isStatic  = !isDynamic && !isTreemap && !isTable && !isMatrix && !isWiki
+  const isWarnier = view.kind === 'warnier'
+  const isStatic  = !isDynamic && !isTreemap && !isTable && !isMatrix && !isWiki && !isWarnier
 
   const commitName = () => {
     if (nameVal.trim()) renameView(view.id, nameVal.trim())
@@ -630,9 +638,9 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
 
   return (
     <div className="props-content">
-      <div className="props-type-badge" style={{ background: isDynamic ? 'var(--accent)' : isTreemap ? '#2a3a5a' : isTable ? '#1e3a2a' : isMatrix ? '#3a1e3a' : isWiki ? '#3a2e1e' : '#334155', color: '#fff' }}>
-        {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : <Icon.Layers />}
-        &nbsp;{isDynamic ? 'FLOW VIEW' : isTreemap ? 'HIERARCHY VIEW' : isTable ? 'TABLE VIEW' : isMatrix ? 'MATRIX VIEW' : isWiki ? 'WIKI VIEW' : 'STRUCTURE VIEW'}
+      <div className="props-type-badge" style={{ background: isDynamic ? 'var(--accent)' : isTreemap ? '#2a3a5a' : isTable ? '#1e3a2a' : isMatrix ? '#3a1e3a' : isWiki ? '#3a2e1e' : isWarnier ? '#123a36' : '#334155', color: '#fff' }}>
+        {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : isWarnier ? <Icon.Warnier /> : <Icon.Layers />}
+        &nbsp;{isDynamic ? 'FLOW VIEW' : isTreemap ? 'HIERARCHY VIEW' : isTable ? 'TABLE VIEW' : isMatrix ? 'MATRIX VIEW' : isWiki ? 'WIKI VIEW' : isWarnier ? 'WARNIER VIEW' : 'STRUCTURE VIEW'}
         {ofType && <>&nbsp;·&nbsp;{ofType.label.toUpperCase()}</>}
       </div>
       <div>
@@ -744,6 +752,9 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
             </button>
             <button className={`view-kind-btn${isWiki ? ' active' : ''}`} aria-pressed={isWiki} onClick={() => setViewKind(view.id, 'wiki')}>
               <Icon.Wiki /> Wiki
+            </button>
+            <button className={`view-kind-btn${isWarnier ? ' active' : ''}`} aria-pressed={isWarnier} onClick={() => setViewKind(view.id, 'warnier')}>
+              <Icon.Warnier /> Warnier
             </button>
           </div>
         </div>
@@ -1116,7 +1127,7 @@ function balancedColumns<T extends { viewpoints: unknown[] }>(groups: T[]): T[][
 
 /** The icon of each view type a viewpoint can have, as the view type buttons show it. */
 const VIEW_KIND_ICONS: Record<ViewpointKind, () => React.ReactElement> = {
-  static: Icon.Layers, table: Icon.TableGrid, treemap: Icon.TreemapGrid, matrix: Icon.MatrixGrid, wiki: Icon.Wiki,
+  static: Icon.Layers, table: Icon.TableGrid, treemap: Icon.TreemapGrid, matrix: Icon.MatrixGrid, wiki: Icon.Wiki, warnier: Icon.Warnier,
 }
 
 function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
@@ -1201,7 +1212,8 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     const isTable   = v.kind === 'table'
     const isMatrix  = v.kind === 'matrix'
     const isWiki    = v.kind === 'wiki'
-    const badge = isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : 'structure'
+    const isWarnier = v.kind === 'warnier'
+    const badge = isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : isWarnier ? 'warnier' : 'structure'
     // A view of a viewpoint names it too, after its view type.
     const viewpoint = viewpointOfView(v, metamodel)
     return (
@@ -1212,7 +1224,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
           onClick={() => setActiveView(v.id)}
         >
           <div className="lp-view-icon">
-            {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : <Icon.Layers />}
+            {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : isWarnier ? <Icon.Warnier /> : <Icon.Layers />}
           </div>
           <div className="lp-card-body">
             <div className="lp-card-title">{v.name}</div>

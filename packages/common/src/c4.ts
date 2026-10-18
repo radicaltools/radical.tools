@@ -141,8 +141,9 @@ export interface DiagramView {
    * 'treemap' = renders the element hierarchy as nested coloured rectangles.
    * 'table'   = governance-aware spreadsheet view of nodes and relations.
    * 'wiki'    = documentation-style pages per element with inline editing.
+   * 'warnier' = the hierarchy as a Warnier–Orr diagram (braces, left to right).
    */
-  kind?: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki'
+  kind?: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki' | 'warnier'
   /** The metamodel's viewpoint (ViewpointDef id) the view is of: its kind
    *  and chain are the viewpoint's, kept in step when the viewpoint changes. Set
    *  another kind or chain and the view is of no viewpoint any more. */

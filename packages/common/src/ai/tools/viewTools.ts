@@ -6,9 +6,9 @@ import { findViewpoint, viewpointsOf } from '../../viewpoints'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 
 // 'dynamic' needs a sequence (create_sequence) — the handlers refuse it without one.
-const VIEW_KIND_ENUM = ['static', 'table', 'treemap', 'matrix', 'wiki', 'dynamic'] as const
+const VIEW_KIND_ENUM = ['static', 'table', 'treemap', 'matrix', 'wiki', 'warnier', 'dynamic'] as const
 
-const KIND_DESCRIPTION = "'table' for governance record types (ADR/Fitness Function/Requirement), 'treemap' for hierarchy overviews, 'wiki' for docs, 'matrix' for relation grids, 'dynamic' to play a sequence (needs sequenceId), 'static' (default) otherwise."
+const KIND_DESCRIPTION = "'table' for governance record types (ADR/Fitness Function/Requirement), 'treemap' for hierarchy overviews, 'wiki' for docs, 'matrix' for relation grids, 'warnier' for processes and any hierarchy as a Warnier–Orr diagram (braces left to right), 'dynamic' to play a sequence (needs sequenceId), 'static' (default) otherwise."
 
 /** The real id of an existing sequence, or the reason there is none. */
 function sequenceFor(ctx: ToolRunContext, tool: string, raw: unknown): { id: string } | { error: string } {

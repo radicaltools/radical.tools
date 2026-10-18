@@ -1692,6 +1692,55 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   overflow: hidden;
   background: var(--bg-canvas);
 }
+/* ─── Warnier view: the hierarchy in braces, left to right ─────────────────── */
+.warnier-view {
+  grid-area: canvas;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg-canvas);
+  padding: 32px 40px;
+}
+.wn-roots { display: flex; flex-direction: column; gap: 28px; width: max-content; }
+.wn-item { display: flex; align-items: center; }
+.wn-children { display: flex; flex-direction: column; gap: 6px; padding: 2px 0; }
+.wn-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 120px;
+  max-width: 240px;
+  padding: 5px 10px 6px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--type-color);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.wn-label:hover { border-color: var(--text-muted); border-left-color: var(--type-color); }
+.wn-label.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wn-type { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.wn-name { font-size: 13px; font-weight: 600; line-height: 1.25; }
+.wn-repeat { font-size: 12px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+.wn-condition { font-size: 11px; color: var(--text-secondary, var(--text-muted)); font-style: italic; }
+.wn-also { font-size: 10px; color: var(--text-muted); }
+.wn-brace {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  width: 14px;
+  margin: 0 6px 0 8px;
+  color: var(--text-muted);
+}
+.wn-brace svg { flex: none; display: block; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.wn-brace-line { flex: 1; width: 0; margin-left: 6.25px; border-left: 1.5px solid currentColor; }
+.wn-operator { margin-left: 18px; font-size: 15px; line-height: 1; color: var(--text-muted); }
+.wn-empty { margin: 40px auto; color: var(--text-muted); font-size: 13px; text-align: center; }
+
 .wiki-empty {
   margin: auto;
   color: var(--text-muted);

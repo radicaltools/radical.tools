@@ -1375,8 +1375,8 @@ interface DiagramStore {
   detachViewpoint: (viewId: string) => void
   /** How All elements and views without their own draw relations. One undo step. */
   setDefaultEdgeStyle: (style: EdgeStyle) => void
-  /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', and 'wiki'. */
-  setViewKind: (viewId: string, kind: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki') => void
+  /** Switch a view between 'static', 'dynamic', 'treemap', 'table', 'matrix', 'wiki' and 'warnier'. */
+  setViewKind: (viewId: string, kind: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki' | 'warnier') => void
   /** Persist treemap drill-down focus (null = top "All"). */
   setTreemapFocus: (viewId: string, focusId: string | null) => void
   /** Persist wiki page focus (null = Overview / table of contents). */
