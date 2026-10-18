@@ -259,7 +259,7 @@ export function NewModelStep({ onDone }: { onDone: () => void }): React.ReactEle
           <button
             className="msteps-btn msteps-btn-forge"
             onClick={() => void handleCreate(true)}
-            title="Describe a system in plain language and let AI generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model for it"
+            title="Describe a system in plain language and let AI generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model for it"
           >
             <SparkleIcon />
             Create with Radical Forge

@@ -2310,6 +2310,7 @@ Processes and steps in the Radical metamodel and the Warnier view type
    parts read without (1,n).
 4. **Export.** SVG/PNG of the diagram, and the CLI export (the tree is pure,
    in @radical/common/warnier).
-5. **Forge.** A Process stage that derives processes from scenarios.
+5. ~~**Forge.**~~ Done (2026-10-18): a Processes stage after the state
+   machines, into a Warnier view; the C4 stage adds performed-by.
 6. **Large trees.** Every row is drawn; a model with thousands of elements in
    one Warnier view would want folding like the table's.

@@ -31,6 +31,7 @@ import {
   buildWireframePrompt,
   fileIntoForgeViews,
   forgeArrangeGroups,
+  isForgeCanvas,
   forgeHubCandidates,
   formatClarificationAnswers,
   idsAddedSince,
@@ -62,7 +63,7 @@ const STAGE_IDS = FORGE_STAGES.map((stage) => stage.id)
 /** The whole flow, for forge_start's answer and the `forge` prompt. */
 export const FORGE_PROCEDURE = [
   'Radical Forge turns a free-text description into EARS requirements, a domain model, fitness functions,',
-  'Gherkin scenarios, state machines, UI mockups and a C4 model, one reviewed stage at a time, in this order:',
+  'Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewed stage at a time, in this order:',
   FORGE_STAGES.map((stage) => `${stage.title} (${stage.id})`).join(' → ') + '.',
   '1. forge_start with the description, or the id of an existing need. The description is kept in the model as a need.',
   `   Every element a stage adds goes into one of ${Object.keys(FORGE_VIEW_NAMES).length} views: ${Object.values(FORGE_VIEW_NAMES).join(', ')}.`,
@@ -87,7 +88,7 @@ const stageEnum = { type: 'string', enum: STAGE_IDS }
 export const FORGE_TOOL_DEFS: ToolDef[] = [
   {
     name: 'forge_start',
-    description: 'Start a Radical Forge run (replacing any earlier run): turn a free-text system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, mockups and a C4 model in seven reviewed stages. Stores the description as a `need` node (or uses an existing need) and explains the steps.',
+    description: 'Start a Radical Forge run (replacing any earlier run): turn a free-text system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, mockups and a C4 model in eight reviewed stages. Stores the description as a `need` node (or uses an existing need) and explains the steps.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -529,7 +530,11 @@ export class Forge {
     if (state?.status !== 'generating') return fail(`forge_complete_stage: the ${stageTitle(id)} stage is not open; begin it with forge_generate`)
     const summary = typeof args.summary === 'string' && args.summary.trim() ? args.summary.trim() : 'Done.'
     const added = idsAddedSince(state.before, this.ids(facade))
+    const viewsBefore = new Set(Object.keys(facade.getViews?.() ?? {}))
     const filed = fileIntoForgeViews(facade, added.nodes, id)
+    // A view of a viewpoint lists nothing (it shows what its chain gives):
+    // made now, it is a change all the same.
+    const madeViews = Object.keys(facade.getViews?.() ?? {}).filter((viewId) => !viewsBefore.has(viewId))
     const nodes = facade.getNodes()
     const byType = countByType(nodes, added.nodes)
     const lines = [
@@ -538,6 +543,9 @@ export class Forge {
     const intoViews = filed.filter((f) => f.nodeIds.length)
     if (intoViews.length) {
       lines.push(`Added to the views: ${intoViews.map((f) => `${FORGE_VIEW_NAMES[f.key]} (view ${f.viewId}) +${f.nodeIds.length}`).join(', ')}.`)
+    }
+    for (const f of filed.filter((f) => !isForgeCanvas(f.key))) {
+      lines.push(`${FORGE_VIEW_NAMES[f.key]} (view ${f.viewId}) draws them as a Warnier diagram: it shows every process and step, and needs no layout.`)
     }
     if (id === 'mockups') {
       const mockups = Object.values(nodes).filter((n) => n.type === 'mockup')
@@ -560,7 +568,7 @@ export class Forge {
     lines.push(next
       ? `${groups.length ? 'Then' : 'Next: show the user what this stage added and'} ask whether to continue with ${stageTitle(next)} (forge_clarify with stage "${next}"), regenerate this stage (forge_generate with regenerate: true) or finish here (forge_finish).`
       : `This was the last stage. ${groups.length ? 'Then' : 'Show the user what it added and'} ask whether to regenerate it (forge_generate with regenerate: true) or finish (forge_finish).`)
-    const changed = filed.some((f) => f.nodeIds.length)
+    const changed = filed.some((f) => f.nodeIds.length) || madeViews.length > 0
     return ok(lines.join('\n'), {
       readOnly: !changed,
       data: changed ? placeInViews(facade.toDiagramData(), filed) : undefined,

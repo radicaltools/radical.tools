@@ -7,7 +7,7 @@ import { STEP_LABELS } from './RadicalForgeModal'
 
 // ─── An agent's Forge run, read only ─────────────────────────────────────────
 // What an agent running Radical Forge over MCP on this folder is doing: the
-// wizard's step bar, its seven stages only (the badge on the Forge button
+// wizard's step bar, its eight stages only (the badge on the Forge button
 // counts the same seven), with each stage's state, and one line on where the
 // run stands. Nothing here acts on the run; the agent's chat is where to answer.
 

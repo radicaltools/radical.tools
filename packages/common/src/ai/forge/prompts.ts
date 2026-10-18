@@ -1,7 +1,7 @@
 // ─── Radical Forge stage prompts ────────────────────────────────────────────
-// Radical Forge walks a free-text system description through seven sequential
+// Radical Forge walks a free-text system description through eight sequential
 // AI generation stages — requirements → domain model → fitness functions →
-// Gherkin scenarios → state machines → UI mockups → C4 model. In Studio each stage is a normal
+// Gherkin scenarios → state machines → processes → UI mockups → C4 model. In Studio each stage is a normal
 // `runAIPrompt` call, so a later stage sees everything an earlier stage
 // created (via buildContextMessage in ../systemPrompt.ts), same as any
 // multi-turn chat; over MCP the client's own model runs the stage with the
@@ -41,10 +41,17 @@
 // from the domain model (`lifecycle-of`), adding the entity if it is missing. Nothing runs it yet, so the C4 stage adds the
 // elements that implement the machine and own the entity (`implements`,
 // `realises`, and `emits` for the events elements publish).
+//
+// Processes follow the state machines: the scenarios are examples of a
+// procedure's paths (several with one When and different Thens are its
+// alternatives), the requirements say what repeats ("for each…"), and the
+// domain model and the machines give the names of what a step works on.
+// Often there is none. They are filed into a Warnier view, which needs no
+// layout. Nothing performs a step yet, so the C4 stage adds `performed-by`.
 
 import type { HubConceptSummary } from '../../hubFormat'
 
-export type ForgeStageId = 'requirements' | 'domain' | 'fitness' | 'scenarios' | 'states' | 'c4' | 'mockups'
+export type ForgeStageId = 'requirements' | 'domain' | 'fitness' | 'scenarios' | 'states' | 'processes' | 'c4' | 'mockups'
 
 export interface ForgeStage {
   id: ForgeStageId
@@ -63,6 +70,7 @@ export const PRIMARY_TYPE_IDS_FOR_STAGE: Record<ForgeStageId, string[]> = {
   fitness: ['fitness-fn'],
   scenarios: ['scenario'],
   states: ['entity', 'state-machine', 'state', 'pseudostate', 'event'],
+  processes: ['process', 'step'],
   mockups: ['mockup'],
   c4: ['person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group'],
 }
@@ -92,6 +100,11 @@ export const FORGE_STAGES: ForgeStage[] = [
     id: 'states',
     title: 'State machines',
     blurb: 'Model the lifecycle of the entities that have one as event-driven state machines, from the scenarios that move them.',
+  },
+  {
+    id: 'processes',
+    title: 'Processes',
+    blurb: 'Write the procedures the requirements and scenarios describe as processes of ordered steps: what repeats, what is an alternative, what runs at once.',
   },
   {
     id: 'mockups',
@@ -290,8 +303,10 @@ export function buildForgeStagePrompt(
         'element that runs each existing `state-machine` to it with `implements`',
         '(element → machine), the element that owns the data of each `entity` to it',
         'with `realises` (element → entity), each system or container that serves a',
-        '`domain` to it with `realises` (element → domain), and each element that publishes one of',
-        'the `event` nodes to it with `emits` (all only become possible now that',
+        '`domain` to it with `realises` (element → domain), each element that publishes one of',
+        'the `event` nodes to it with `emits`, and each `step` of a process to the',
+        'person or element that does it with `performed-by` (step → person, system,',
+        'container, component or web app) (all only become possible now that',
         'real elements exist to point at). Do not invent',
         'requirements at this stage; if the description implies something not yet',
         'covered by a requirement, model the C4 element anyway but leave it unlinked',
@@ -366,6 +381,38 @@ export function buildForgeStagePrompt(
         'Every state must be reachable from the initial state. No systems or',
         'containers exist yet: the C4 stage links each machine to the element that',
         'owns it, so do not create any here.',
+      ].join('\n')
+
+    case 'processes':
+      return [
+        descBlock,
+        '',
+        'Task: find the procedures the requirements and scenarios already in the',
+        'model describe — something done in steps, in an order, often by several',
+        'actors (placing an order, onboarding a customer, closing a month). Model',
+        'each as a `process` at the root (usually 1-4); a single action or plain',
+        'create/read/update/delete is no process. If none is described, create',
+        'nothing and say so in your summary.',
+        '',
+        'For each process:',
+        '1. Add its `step` nodes inside it (parentId), and steps inside a step where',
+        '   one is made of several. Give every step its `order` among its siblings',
+        '   (1, 2, 3, …): the model keeps no other order. Name steps with a verb, in',
+        '   the domain model\'s words (Reserve the stock, not Stock handling).',
+        '2. Where a step happens more than once or may not happen, set `repeat`:',
+        '   "1..n" or "0..n" for a repetition ("for each order line"), "0..1" for an',
+        '   optional step, with the `condition` it repeats or runs for. Leave "1" for',
+        '   a step that always happens once.',
+        '3. Where exactly one of a step\'s parts happens (paid by card or by',
+        '   invoice — scenarios with the same When and different Thens show it), set',
+        '   `children` "choice" on that step and put each alternative inside it with',
+        '   its `condition`; where parts happen at the same time, "concurrent".',
+        '4. Link each scenario that walks the process to it with `verifies`',
+        '   (scenario → process), and the process to the requirements it meets with',
+        '   `satisfies` (process → requirement).',
+        '',
+        'No systems or containers exist yet: the C4 stage links each step to the',
+        'element that performs it, so do not create any here.',
       ].join('\n')
 
     case 'mockups':
