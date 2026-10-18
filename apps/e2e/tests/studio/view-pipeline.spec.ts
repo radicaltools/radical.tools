@@ -248,7 +248,7 @@ test('a view shows every element again from its steps, and a chain can start fro
   await steps.getByRole('button', { name: 'Show every element' }).click()
   await expect(steps).toContainText('Every element')
   await expect(steps.getByRole('button', { name: 'Show every element' })).toHaveCount(0)
-  await expect(steps.locator('.rp-level-head')).toContainText('65')
+  await expect(steps.locator('.rp-level-head')).toContainText('78')
 })
 
 test('every kind of view follows its chain, again when the chain or the model changes', async ({ page, studio }) => {

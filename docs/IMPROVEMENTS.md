@@ -131,6 +131,14 @@ Status as of 2026-09-29, after the monorepo restructuring (branch
 7. **Stricter `tsconfig`**: `noUncheckedIndexedAccess`,
    `exactOptionalPropertyTypes`. Type-check the tests that `apps/studio` and
    `apps/hub` still leave out.
+8. **The sample's generator is behind its JSON.** `fintechSampleData.json`
+   was edited after `apps/studio/tools/generate-sample.js` last wrote it:
+   the needs and their `derives` links, the layers as groups instead of
+   domains, and the process *Send a payment* with its views (2026-10-18)
+   are only in the JSON. Running the generator drops them and moves every
+   element, which changes every figure in the manual. Either bring the
+   generator up to date (and make its ELK layout match the current one) or
+   retire it and treat the JSON as the source.
 
 ### Bugs found by the e2e suite (2026-09-29)
 

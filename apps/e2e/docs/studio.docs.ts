@@ -111,6 +111,22 @@ test('flow', async ({ page, shot }) => {
   await shot('flow')
 })
 
+/** The Processes view with a step selected: its actions in its type line and its properties card. */
+test('warnier', async ({ page, shot }) => {
+  await open(page, 'view-processes')
+  await page.getByLabel('Warnier diagram').getByLabel('step Quote FX').click()
+  await settle(page)
+  await shot('warnier')
+})
+
+/** The same process on a canvas, with the arrows from each step to the next. */
+test('processes-canvas', async ({ page, shot }) => {
+  await open(page, 'view-payment-process')
+  await page.getByTitle(/^Zoom in/).click()
+  await settle(page)
+  await shot('processes-canvas')
+})
+
 test('hierarchy', async ({ page, shot }) => {
   await open(page, 'view-treemap')
   await page.getByLabel('Levels:').selectOption('all')
@@ -201,6 +217,62 @@ test('ai-settings', async ({ page, shot }) => {
   await menu(page, 'AI providers…')
   await page.waitForTimeout(300)
   await shot('ai-settings')
+})
+
+/**
+ * Radical Forge on the Bookstore model after its Requirements stage, the
+ * eight stages above. The AI provider is scripted, as in tests/studio/forge.spec.ts.
+ */
+test('forge', async ({ page, shot }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('radical-ai-settings', JSON.stringify({
+      enabled: true, active: 'anthropic', providers: { anthropic: { apiKey: 'docs', baseUrl: '', model: '' } },
+    }))
+  })
+  const requirements: Array<[string, Record<string, string>]> = [
+    ['Reserve a book online', { ears_type: 'event-driven', trigger: 'a reader reserves an available book', action: 'hold one copy in the chosen shop for 48 hours' }],
+    ['Tell the reader it is ready', { ears_type: 'event-driven', trigger: 'the shop puts the copy aside', action: 'send the reader a pick-up code' }],
+    ['Release unclaimed copies', { ears_type: 'event-driven', trigger: 'a reservation is not collected within 48 hours', action: 'release the copy and tell the reader' }],
+    ['One reservation per copy', { ears_type: 'ubiquitous', action: 'never hold one copy for two readers' }],
+  ]
+  await page.route('https://api.anthropic.com/v1/messages', async (route) => {
+    const body = route.request().postDataJSON() as { tools?: unknown[]; messages: unknown[] }
+    const all = JSON.stringify(body.messages)
+    const content = !body.tools ? [{ type: 'text', text: '[]' }]
+      : all.includes('tool_result') || !/extract its functional requirements/.test(all) ? [{ type: 'text', text: 'Done.' }]
+      : requirements.map(([label, properties], i) => ({ type: 'tool_use', id: `t${i}`, name: 'add_node', input: { tempId: `r${i}`, type: 'requirement', label, properties } }))
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ model: 'claude-haiku-4-5', content, stop_reason: content[0].type === 'tool_use' ? 'tool_use' : 'end_turn', usage: { input_tokens: 10, output_tokens: 10 } }),
+    })
+  })
+  // Forge writes into the Radical metamodel, which the fixture does not name.
+  const bookstore = JSON.parse(fixture('bookstore'))
+  bookstore.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await page.addInitScript((doc) => {
+    if (sessionStorage.getItem('docs-forge')) return
+    sessionStorage.setItem('docs-forge', '1')
+    localStorage.setItem('radical-doc:docs-bookstore', doc)
+  }, JSON.stringify(bookstore))
+  await page.goto(`/#/d/${encodeURIComponent('ls:docs-bookstore')}/m/designer/v/v-context`)
+  await expect(page.locator('.app-layout')).toBeVisible()
+  await menu(page, 'Radical Forge…')
+  await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop within two days.')
+  await page.getByRole('button', { name: 'Start →' }).click()
+  await page.getByRole('button', { name: 'Generate requirements' }).click()
+  const arrange = page.locator('.forge-arrange')
+  await expect(arrange).toContainText('Keep the 4 new elements')
+  await arrange.getByRole('button', { name: 'Grid' }).click()
+  await expect(arrange.getByRole('button', { name: '✓ Grid' })).toBeDisabled()
+  // What the stage added, below the wizard rather than under it.
+  await page.getByRole('button', { name: 'Fit All' }).click()
+  await settle(page)
+  await page.mouse.move(1380, 480)
+  await page.mouse.down()
+  await page.mouse.move(1380, 650, { steps: 10 })
+  await page.mouse.up()
+  await settle(page)
+  await shot('forge')
 })
 
 /** The repository's own architecture model, with the test results `radical check` left beside it. */
