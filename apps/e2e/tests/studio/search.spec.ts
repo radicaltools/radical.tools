@@ -34,6 +34,7 @@ test('Quick Search is on every view, and a pick on a table selects the element',
   await page.getByRole('button', { name: 'Folder…' }).click()
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
+  await studio.designer()
 
   // All elements is a table: the bar and its Forge button are there.
   const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)

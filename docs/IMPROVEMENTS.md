@@ -531,7 +531,12 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     brings the camera back, Customer lay under the left panel and the click
     on it timed out. It passed 3 of 3 on its own and 6 of 6 with six workers.
     Waiting for the camera to rest after that click (as for item 32) would
-    make it steady.
+    make it steady. On 2026-10-19, with the machine busy (load average 7-10),
+    three full runs in a row failed it, once with `a collapsed container
+    aligns its children…` too (the click on the collapsed Bookstore did not
+    select it), and `metamodel-diagram.spec.ts › selecting a type shows its
+    rules` failed with the overview's zoom not yet settled (0.46 for 0.37);
+    a full run on a clean main failed the same two. Alone, 28 of 28 passed.
 38. **`search_model` cannot pick the fields it returns.** Looking up the
     Radical Forge elements of `architecture/` (2026-10-19) with
     `LIST NODES WHERE label ~ "forge" OR description ~ "forge"` returned

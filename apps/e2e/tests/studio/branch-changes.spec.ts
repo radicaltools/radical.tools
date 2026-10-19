@@ -21,7 +21,7 @@ const COMMIT = '534f32f0a1b2c3d4e5f60718293a4b5c6d7e8f90'
 const base = (nodes: C4Node[], relations: C4Relation[], savedAt = new Date(), branch = 'feat/payments'): string =>
   serializeModelBase({ commit: COMMIT, described: 'merge base with origin/main', branch, nodes, relations }, savedAt)
 
-async function openFolder(page: Page, studio: { ready(): Promise<void> }, model: DiagramData, extra: Record<string, string> = {}): Promise<ModelFolder> {
+async function openFolder(page: Page, studio: { ready(): Promise<void>; designer(): Promise<void> }, model: DiagramData, extra: Record<string, string> = {}): Promise<ModelFolder> {
   const folder = new ModelFolder(page)
   await folder.install()
   await page.goto('/')
@@ -30,6 +30,8 @@ async function openFolder(page: Page, studio: { ready(): Promise<void> }, model:
   await page.getByRole('button', { name: 'Folder…' }).click()
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
+  // Opened without a link, it starts in Viewer; these tests edit.
+  await studio.designer()
   return folder
 }
 

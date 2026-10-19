@@ -334,3 +334,27 @@ test.describe('what is arranged in Viewer and Presenter stays there', () => {
     })
   }
 })
+
+test('Studio opens a model in Viewer unless a link names a perspective, and a new model in Designer', async ({ page, studio }) => {
+  await studio.seed()
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.locator('.msteps-row').first().click()
+  await studio.ready()
+  // No route: Viewer, read-only, and the address says so.
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
+  await expect(page.locator('.palette-item')).toHaveCount(0)
+  await expect(page).toHaveURL(/\/m\/viewer\//)
+
+  // A link keeps the perspective it names.
+  await studio.open('v-containers')
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+
+  // A new model is there to be edited.
+  await page.goto('/')
+  await page.getByRole('button', { name: 'New model' }).click()
+  await page.getByRole('button', { name: 'Create model' }).click()
+  await studio.ready()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  await expect(page).toHaveURL(/\/m\/designer\//)
+})

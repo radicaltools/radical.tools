@@ -6,7 +6,7 @@ import React, { useState } from 'react'
 import { documents, StorageFullError, type DocumentMeta } from '../store/documentStore'
 import { buildFintechSampleRaw } from '../store/fintechSample'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { formatRoute } from '../route'
+import { formatRoute, openInDesigner } from '../route'
 import { availableMetamodels } from '@radical/common/metamodel'
 import { parseStructurizrDsl } from '@radical/common/formats/structurizrDsl'
 import type { DiagramData } from '@radical/common/c4'
@@ -212,6 +212,8 @@ export function NewModelStep({ onDone }: { onDone: () => void }): React.ReactEle
 
   async function handleCreate(withForge: boolean): Promise<void> {
     if (!(await createBlank())) return
+    // A new model is there to be edited.
+    openInDesigner()
     onDone()
     // Toolbar.tsx listens (same pattern as radical:open-ai-settings).
     if (withForge) window.dispatchEvent(new CustomEvent('radical:open-forge'))
@@ -285,6 +287,7 @@ export function openSample(onDone: () => void, setRoute?: boolean): void {
   const viewsBefore = useDiagramStore.getState().views
   const meta = createInBrowser('Fintech Banking Platform', buildFintechSampleRaw())
   if (!meta) return
+  openInDesigner()
   documents.setActiveId(meta.id)
   const loaded = (views: typeof viewsBefore): boolean =>
     views !== viewsBefore && !!views[SAMPLE_START_VIEW]
@@ -348,6 +351,7 @@ export function OpenSources({ onDone, before, setRoute, autoFocus }: {
           const result = parseStructurizrDsl(content)
           const name = result.name || file.name.replace(/\.(dsl|txt)$/i, '') || 'Imported DSL'
           documents.createLSDocument(name, { nodes: result.nodes, relations: result.relations } as DiagramData)
+          openInDesigner()
           onDone()
         } catch (err) {
           if (err instanceof StorageFullError) {
