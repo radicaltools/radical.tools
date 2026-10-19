@@ -10,6 +10,4 @@ configureDocumentBackend({
     return meta.source === 'ls' ? readLocalDocument(meta.id) : null
   },
   getActiveId: () => documents.getActiveId(),
-  hydrateNodeBody: (docId, nodeId) => documents.hydrateNodeBody(docId, nodeId),
-  getPendingBodyNodeIds: (docId) => documents.getPendingBodyNodeIds(docId),
 })

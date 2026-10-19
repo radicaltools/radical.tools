@@ -2243,9 +2243,11 @@ fixed yet:
 3. **The VS Code JSON schema is too strict.**
    apps/vscode/schemas/c4.schema.json refuses unknown top-level keys and does
    not list defaultLayoutConstraints or hubTemplates, which Studio writes.
-4. **Wiki and table may show empty descriptions in a folder model.**
-   Descriptions load lazily (on selection, the wizard, a search scan), and
-   nothing in WikiView or TableView loads them.
+4. ~~**Wiki and table may show empty descriptions in a folder model.**~~
+   Fixed on 2026-10-19 (fix/folder-descriptions-loaded): a folder model now
+   loads its descriptions with the rest of its files, as it read them all
+   anyway; the on-demand loading and the search of unopened descriptions are
+   gone.
 5. **"Structure view" is still in the UI.** The view card in the left panel
    says Structure view; the canvas caption, the tools and the manual say All
    elements.

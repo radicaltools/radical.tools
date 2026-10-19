@@ -19,7 +19,6 @@ import type { ModelCopy } from '@radical/common/model'
 import { useDiagramStore, type BranchOverlay } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from '../store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './autosave'
-import { withDescriptions } from './descriptions'
 
 const POLL_MS = 3000
 /** After the last change of the model, so a drag does not compare every frame. */
@@ -60,9 +59,7 @@ function recompute(): void {
   }
   // saveDiagram gives the live model also while a milestone is on screen.
   const data = useDiagramStore.getState().saveDiagram()
-  // Descriptions not loaded yet are as the files have them, not removed.
-  const nodes = withDescriptions(byId(data.nodes), documents.getPendingBodyNodeIds(id), documents.loadedFolderFiles(id))
-  const model = { nodes, relations: byId(data.relations) }
+  const model = { nodes: byId(data.nodes), relations: byId(data.relations) }
   useBranchStore.setState({ model, changes: branchChanges(baseModel, model.nodes, model.relations) })
   showOverlay()
 }
@@ -79,8 +76,7 @@ export async function saveForgeBase(): Promise<boolean> {
   const existing = await documents.readModelBase(id).catch(() => null)
   if (!mayReplaceWithForgeBase(existing)) return false
   const data = useDiagramStore.getState().saveDiagram()
-  const nodes = withDescriptions(byId(data.nodes), documents.getPendingBodyNodeIds(id), documents.loadedFolderFiles(id))
-  if (!(await documents.writeModelBase(id, forgeModelBase(Object.values(nodes), data.relations)))) return false
+  if (!(await documents.writeModelBase(id, forgeModelBase(data.nodes, data.relations)))) return false
   await pollNow()
   return true
 }

@@ -34,9 +34,6 @@ export function QuickSearch(): React.ReactElement | null {
   const selectEdge = useDiagramStore((s) => s.selectEdge)
   const setSelectedNodeIds = useDiagramStore((s) => s.setSelectedNodeIds)
   const presentationActive = useDiagramStore((s) => s.presentationActive)
-  const pendingBodyNodeIds = useDiagramStore((s) => s.pendingBodyNodeIds)
-  const scanDescriptions = useDiagramStore((s) => s.scanDescriptions)
-  const [descScanning, setDescScanning] = useState(false)
 
   // An agent's Forge run on this folder (over MCP): the Forge button pulses
   // while it works or waits for the user, and opens a read-only view of it.
@@ -118,17 +115,6 @@ export function QuickSearch(): React.ReactElement | null {
       setAiLast(null)
     }
   }, [aiSettings.active])
-
-  // Descriptions on unopened nodes of a lazily-loaded doc aren't in memory
-  // yet, so `results` below can't see them. This is an explicit opt-in scan
-  // over just those nodes; matches get merged into c4Nodes by the action, so
-  // they flow back into `results` automatically once it resolves.
-  const handleScanDescriptions = useCallback(() => {
-    const query = q.trim()
-    if (!query) return
-    setDescScanning(true)
-    scanDescriptions(query).finally(() => setDescScanning(false))
-  }, [q, scanDescriptions])
 
   const runAI = useCallback(async (text: string): Promise<void> => {
     const prompt = text.trim()
@@ -714,28 +700,6 @@ export function QuickSearch(): React.ReactElement | null {
                 )}
               </div>
             ))}
-
-            {/* Explicit opt-in scan of not-yet-opened node descriptions (lazy md-folder docs) */}
-            {!aiMode && q.trim() !== '' && Object.keys(pendingBodyNodeIds).length > 0 && (
-              <div
-                className="quick-search-item"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={handleScanDescriptions}
-                role="button"
-                tabIndex={-1}
-                aria-disabled={descScanning}
-                title={`Also search the ${Object.keys(pendingBodyNodeIds).length} node description(s) not yet opened`}
-              >
-                <span className="quick-search-kind">…</span>
-                <span className="quick-search-item-main">
-                  <span className="quick-search-item-label">
-                    {descScanning
-                      ? 'Searching descriptions…'
-                      : `Search ${Object.keys(pendingBodyNodeIds).length} unopened description(s)`}
-                  </span>
-                </span>
-              </div>
-            )}
 
             {/* Ask AI action — visible while typing in search mode (only when configured) */}
             {!aiMode && aiConfigured && q.trim() !== '' && !aiBusy && (

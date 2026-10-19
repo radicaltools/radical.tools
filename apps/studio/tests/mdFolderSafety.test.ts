@@ -61,19 +61,18 @@ const SAMPLE: DiagramData = {
   relations: [],
 }
 
-/** An md doc on the fake folder, loaded lazily: no description in memory. */
-async function lazyMdDoc(): Promise<{ id: string; data: DiagramData; disk: Record<string, string> }> {
+/** An md doc on the fake folder, loaded back from it. */
+async function folderDoc(): Promise<{ id: string; data: DiagramData; disk: Record<string, string> }> {
   const { disk } = installFolderApi()
   const ls = documents.createLSDocument('Draft', SAMPLE)
   const meta = await documents.saveAsFolder(ls.id, SAMPLE)
   const data = await documents.loadDocument(meta!.id)
-  expect(data!.nodes.every((n) => n.description === undefined)).toBe(true)
   return { id: meta!.id, data: data!, disk }
 }
 
+/** `nodeId`'s description as the folder holds it now. */
 async function bodyOnDisk(id: string, nodeId: string): Promise<string | undefined> {
-  await documents.loadDocument(id)
-  return documents.hydrateNodeBody(id, nodeId)
+  return (await documents.loadDocument(id))!.nodes.find((n) => n.id === nodeId)?.description
 }
 
 describe('md-folder persistence safety', () => {
@@ -85,17 +84,16 @@ describe('md-folder persistence safety', () => {
     delete (globalThis as any).window.electronAPI
   })
 
-  it('keeps an unopened node\'s description across repeated saves after a rename', async () => {
-    const { id, data } = await lazyMdDoc()
+  it('keeps a node\'s description across repeated saves after a rename', async () => {
+    const { id, data } = await folderDoc()
     const renamed = { ...data, nodes: data.nodes.map((n) => n.id === 'sys1' ? { ...n, label: 'Payments Hub' } : n) }
     await documents.saveDocument(id, renamed)
     await documents.saveDocument(id, renamed) // the old path no longer exists now
-    expect(await documents.hydrateNodeBody(id, 'sys1')).toBe('Money mover')
     expect(await bodyOnDisk(id, 'sys1')).toBe('Money mover')
   })
 
-  it('keeps an unopened node\'s description after it moves into a directory', async () => {
-    const { id, data } = await lazyMdDoc()
+  it('keeps a node\'s description after it moves into a directory', async () => {
+    const { id, data } = await folderDoc()
     // sys2 becomes a child of sys1, and sys1 (a system) is already a directory.
     const moved = { ...data, nodes: data.nodes.map((n) => n.id === 'sys2' ? { ...n, parentId: 'sys1' } : n) }
     await documents.saveDocument(id, moved)
@@ -104,7 +102,7 @@ describe('md-folder persistence safety', () => {
   })
 
   it('never deletes files the format does not own', async () => {
-    const { id, data, disk } = await lazyMdDoc()
+    const { id, data, disk } = await folderDoc()
     disk['package.json'] = '{}'
     disk['nodes/README.md'] = '# Notes\n'
     await documents.saveDocument(id, { ...data, nodes: data.nodes.filter((n) => n.id !== 'sys2') })
@@ -137,7 +135,7 @@ describe('md-folder persistence safety', () => {
   })
 
   it('overlapping saves do not prune each other\'s files', async () => {
-    const { id, disk } = await lazyMdDoc()
+    const { id, disk } = await folderDoc()
     const full = SAMPLE
     const renamed = { ...SAMPLE, nodes: SAMPLE.nodes.map((n) => n.id === 'sys1' ? { ...n, label: 'Payments Hub' } : n) }
     // The second save starts while the first is still writing.

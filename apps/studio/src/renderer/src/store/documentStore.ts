@@ -9,14 +9,12 @@
 // (plain functions + zustand store) so the diagram store can wire into it.
 
 import { create } from 'zustand'
-import type { DiagramData, C4Node } from '@radical/common/c4'
+import type { DiagramData } from '@radical/common/c4'
 import { host } from '../platform/host'
 import {
   serializeToMdFolder,
-  serializeToMdFolderWithPaths,
   deserializeFromMdFolder,
   MalformedFolderFileError,
-  extractNodeBody,
   isMdFolder,
   type FolderFiles,
 } from '@radical/common/formats/mdFolder'
@@ -30,7 +28,6 @@ import {
   readFileHandle,
   writeFileHandle,
   type FsFileHandle,
-  readOneFileFromHandle,
   handleFolderStorage,
   type FsDirHandle,
   verifyPermission,
@@ -61,16 +58,6 @@ const connectedWebHandles = new Set<string>()
  *  empty, i.e. a first visit. The welcome screen hides it from "recent" so a
  *  newcomer is not greeted by a model they never made. */
 let bootSeededId: string | null = null
-
-/** Md-folder docs (source==='md') loaded lazily: docId → nodeId → relative
- *  .md file path, for node bodies not read into memory at load time. Static
- *  once populated — "already hydrated" is tracked by the caller (diagramStore),
- *  not here; re-fetching a path here is idempotent, just redundant I/O. */
-const mdBodyPaths = new Map<string, Record<string, string>>()
-
-/** docId → the md-folder files as `loadDocument` last read them, bodies
- *  included, for the descriptions not yet hydrated (see changeFlash). */
-const mdLoadedFiles = new Map<string, Record<string, string>>()
 
 /** Per-document chain of disk writes (fs / md docs). A folder write is many
  *  files followed by a prune, so two overlapping writes can each prune what the
@@ -218,9 +205,7 @@ const mdUnreadable = new Map<string, { file: string; reason: string }>()
  *  that is there but does not parse is a DocumentUnreadableError. */
 function readFolderModel(id: string, files: FolderFiles): DiagramData | null {
   try {
-    const { data, bodyPaths } = deserializeFromMdFolder(files, { lazy: true })
-    mdBodyPaths.set(id, bodyPaths ?? {})
-    mdLoadedFiles.set(id, files)
+    const { data } = deserializeFromMdFolder(files)
     mdUnreadable.delete(id)
     return data
   } catch (e) {
@@ -303,64 +288,6 @@ function parseModel(content: string): DiagramData | null {
   } catch {
     return null
   }
-}
-
-/** Fetch one md-folder node's body from disk (Electron file or web handle),
- *  without caching it anywhere — the caller decides what to do with it. */
-async function fetchNodeBody(id: string, nodeId: string): Promise<string | undefined> {
-  const h = host()
-  const meta = readIndex().docs.find(d => d.id === id)
-  if (!meta) return undefined
-  const relPath = mdBodyPaths.get(id)?.[nodeId]
-  if (!relPath) return undefined
-  try {
-    if (meta.folderPath && h.readFile) {
-      const res = await h.readFile(`${meta.folderPath}/${relPath}`)
-      if (!res.success || res.content === undefined) return undefined
-      return extractNodeBody(res.content)
-    }
-    if (!h.readFile && webFolderSupported()) {
-      const handle = await loadHandle(id)
-      if (!handle) return undefined
-      const content = await readOneFileFromHandle(handle, relPath)
-      return extractNodeBody(content)
-    }
-  } catch { return undefined }
-  return undefined
-}
-
-/** For an md-folder save: return `data.nodes`, with any not-yet-hydrated
- *  node's `description` filled in by a transient re-read of its file. Never
- *  mutates `data` or caches into the live store — purely for serialization,
- *  so a node the user never opened can't have its saved content clobbered
- *  with an empty description. */
-async function nodesForMdSave(id: string, data: DiagramData): Promise<C4Node[]> {
-  const pending = mdBodyPaths.get(id)
-  if (!pending || Object.keys(pending).length === 0) return data.nodes
-  let patched: C4Node[] | null = null
-  for (let i = 0; i < data.nodes.length; i++) {
-    const node = data.nodes[i]
-    if (node.description !== undefined || !(node.id in pending)) continue
-    const body = await fetchNodeBody(id, node.id)
-    if (body === undefined) continue
-    if (!patched) patched = data.nodes.slice()
-    patched[i] = { ...node, description: body }
-  }
-  return patched ?? data.nodes
-}
-
-/** After an md-folder write, point each still-unhydrated node at the file it
- *  now lives in — a rename or re-parent moves the file and the prune deletes
- *  the old one — and forget nodes that no longer exist. The bodies moved with
- *  their nodes: `nodesForMdSave` put them into this write. */
-function retargetBodyPaths(id: string, nodePaths: Record<string, string>): void {
-  const pending = mdBodyPaths.get(id)
-  if (!pending) return
-  const next: Record<string, string> = {}
-  for (const nodeId of Object.keys(pending)) {
-    if (nodePaths[nodeId]) next[nodeId] = nodePaths[nodeId]
-  }
-  mdBodyPaths.set(id, next)
 }
 
 /** Resolves once every write queued for `id` so far has finished. */
@@ -505,8 +432,7 @@ async function writeDocument(id: string, data: DiagramData): Promise<void> {
       return
     }
   } else if (meta.source === 'md' && meta.folderPath && h.writeFolder) {
-    const nodes = await nodesForMdSave(id, data)
-    const { files, nodePaths } = serializeToMdFolderWithPaths({ ...data, nodes }, meta.name)
+    const files = serializeToMdFolder(data, meta.name)
     const res = await h.writeFolder(meta.folderPath, files)
     if (!res.success) {
       if (res.conflict) {
@@ -518,7 +444,6 @@ async function writeDocument(id: string, data: DiagramData): Promise<void> {
       }
       return
     }
-    retargetBodyPaths(id, nodePaths)
   } else if (meta.source === 'md' && !h.writeFolder && webFolderSupported()) {
     // Never write until the handle's permission is verified this session,
     // so a reload with a permission-pending handle can't overwrite files.
@@ -530,14 +455,11 @@ async function writeDocument(id: string, data: DiagramData): Promise<void> {
     const handle = await loadHandle(id)
     if (!handle) return
     try {
-      const nodes = await nodesForMdSave(id, data)
-      const { files, nodePaths } = serializeToMdFolderWithPaths({ ...data, nodes }, meta.name)
-      const res = await webSession(id, handle).write(files)
+      const res = await webSession(id, handle).write(serializeToMdFolder(data, meta.name))
       if (!res.ok) {
         console.warn('[documentStore] folder changed on disk, not overwriting:', res.conflict)
         return
       }
-      retargetBodyPaths(id, nodePaths)
     } catch (e) {
       console.warn('[documentStore] web folder write failed:', e)
       return
@@ -669,26 +591,11 @@ export interface DocumentsAPI {
    *  De-dupes by path. Content is NOT loaded here. */
   createMdDocument(folderPath: string): DocumentMeta
 
-  /** Read the payload for a document. Async because FS reads cross IPC.
-   *  For md-folder docs, node bodies (descriptions) are loaded lazily — see
-   *  `getPendingBodyNodeIds` / `hydrateNodeBody`. */
+  /** Read the payload for a document, an md folder's element descriptions
+   *  included. Async because FS reads cross IPC. */
   loadDocument(id: string): Promise<DiagramData | null>
 
-  /** Node ids whose body (.md file) was not read into `loadDocument`'s
-   *  result — empty for non-md docs or once nothing is pending. */
-  getPendingBodyNodeIds(id: string): string[]
-
-  /** The md-folder files as `loadDocument` last read them, bodies included. */
-  loadedFolderFiles(id: string): Record<string, string> | undefined
-
-  /** Fetch one node's body on demand (md-folder docs only). Pure fetch —
-   *  does not cache or mutate any store; the caller merges the result. */
-  hydrateNodeBody(id: string, nodeId: string): Promise<string | undefined>
-
-  /** Persist new payload under an existing document. For md-folder docs,
-   *  any node whose body was never hydrated is re-read from disk just for
-   *  serialization (never cached into the live model) so an unopened
-   *  node's saved content is never clobbered with an empty description.
+  /** Persist new payload under an existing document.
    *  localStorage docs are written synchronously (before this returns), so a
    *  page-hide flush lands; disk writes run one at a time per document.
    *  Rejects with StorageFullError when browser storage refuses the write. */
@@ -918,20 +825,6 @@ export const documents: DocumentsAPI = {
     return null
   },
 
-  getPendingBodyNodeIds(id) {
-    return Object.keys(mdBodyPaths.get(id) ?? {})
-  },
-
-  loadedFolderFiles(id) {
-    return mdLoadedFiles.get(id)
-  },
-
-  async hydrateNodeBody(id, nodeId) {
-    // A write in flight may be moving this node's file; read once it landed.
-    await saveSettled(id)
-    return fetchNodeBody(id, nodeId)
-  },
-
   async saveDocument(id, data) {
     const idx = readIndex()
     const meta = idx.docs.find(d => d.id === id)
@@ -965,7 +858,6 @@ export const documents: DocumentsAPI = {
     if (removed?.source === 'md') {
       connectedWebHandles.delete(id)
       mdUnreadable.delete(id)
-      mdBodyPaths.delete(id)
       webSessions.delete(id)
       void removeHandle(id)
     } else if (removed?.source === 'fs' && !removed.filePath) {

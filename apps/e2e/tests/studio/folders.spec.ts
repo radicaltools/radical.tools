@@ -102,15 +102,37 @@ test('a deep link into a folder-backed model survives a reload', async ({ page, 
   await expect(page).toHaveURL(/\/p\/pres-main\/play\/1\/sl\/1$/)
 })
 
-test('moving files keeps the descriptions of elements never opened', async ({ page, studio }) => {
+test('the table sums up elements by their descriptions at once, and after an outside edit', async ({ page, studio }) => {
   await saveAsFolder(page)
-  // After a reload, descriptions are read from the files only on demand.
+  await expect.poll(() => folder.paths()).toContain('nodes/customer.md')
+  // Read from the files, as a model opened from disk is.
+  await studio.open('v-table')
+  await page.reload()
+  await studio.ready()
+  const summary = (id: string) => studio.row(id).locator('.tv-cell-summary')
+  await expect(summary('customer')).toHaveText('Buys books online')
+  await expect(summary('payments')).toHaveText('Card payments')
+
+  // A tool rewrites one file: the reload brings every description along.
+  const file = (await folder.files())['nodes/customer.md']
+  await folder.write('nodes/customer.md', file.replace('Buys books online', 'Reads books on the go'))
+  await expect(summary('customer')).toHaveText('Reads books on the go', { timeout: 10_000 })
+  await expect(summary('payments')).toHaveText('Card payments')
+
+  // Quick Search finds an element by a word of its description.
+  await page.locator('.quick-search-bar').getByPlaceholder(/^Search/).click()
+  await page.keyboard.type('checkout UI')
+  await expect(page.locator('.quick-search-item', { hasText: 'Web App' })).toBeVisible()
+})
+
+test('moving files keeps the elements\' descriptions', async ({ page, studio }) => {
+  await saveAsFolder(page)
+  // Read back from the files.
   await page.reload()
   await studio.ready()
 
-  // Renaming the system moves its children's files, whose bodies were
-  // never loaded; a second save must not lose them. (Click Bookstore by its
-  // header.)
+  // Renaming the system moves its children's files; a second save must not
+  // lose their descriptions. (Click Bookstore by its header.)
   await studio.node('bookstore').click({ position: { x: 24, y: 12 } })
   await rename(page, 'Bookstore', 'Online Shop')
   await expect.poll(() => folder.paths()).toContain('nodes/online-shop/api/_index.md')
