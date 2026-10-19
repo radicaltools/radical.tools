@@ -6,13 +6,14 @@ import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
 import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
 import { MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
-import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
+import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { modelChangesSince } from '@radical/node-files/gitModel'
 import { readEditorStateFile, readSelectionFile, writeEditorStateFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
 import { MODEL_BASE_FILE, forgeModelBase, mayReplaceWithForgeBase } from '@radical/common/formats/modelBase'
 import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
+import { AGENT_ACTIVITY_FILE, serializeAgentActivity } from '@radical/common/formats/agentActivity'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
 import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
@@ -550,11 +551,27 @@ export class FolderModel {
         && (path in next || isOwnedMdFolderFile(path, before[path])))
       .sort()
     if (!paths.length) return { ok: true, text: `${resultText} No files changed.${warned}` }
-    const write = await session.write(next)
-    if (!write.ok) return { ok: false, text: `Folder changed before write; no files written. Conflicts: ${write.conflict.join(', ')}` }
+    // Studio (or an editor, git) may have written the folder since this call
+    // read it: the change is merged with that edit rather than written over it.
+    const write = await session.write(next, mergeMdFolderFiles)
+    if (!write.ok) return { ok: false, text: `The folder changed while this call ran and does not read as a model (${write.conflict.join(', ')}); no files written. Fix the file, then try again.` }
+    await this.markAgentWriting()
+    const merged = write.merged
+      ? ` Merged with edits made in the folder while the call ran (${write.merged.changed.join(', ')})${write.merged.conflicts.length ? `; where both changed the same value the folder's was kept: ${write.merged.conflicts.join('; ')}. Check them with search_model` : ''}.`
+      : ''
     const revision = createHash('sha256').update(paths.map((path) => `${path}\0${next[path] ?? ''}`).join('\0')).digest('hex').slice(0, 12)
     const createdRelation = changed.relations.find((relation) => !data.relations.some((old) => old.id === relation.id))?.id
-    return { ok: true, text: `${resultText}${createdRelation ? ` Relation ID: ${createdRelation}.` : ''} Changed: ${paths.join(', ')}. Revision: ${revision}.${warned}` }
+    return { ok: true, text: `${resultText}${createdRelation ? ` Relation ID: ${createdRelation}.` : ''} Changed: ${paths.join(', ')}. Revision: ${revision}.${merged}${warned}` }
+  }
+
+  /** Tell Studio, open on the folder, that an agent is writing it: it holds
+   *  its own saves until the agent pauses (agentActivity). */
+  private async markAgentWriting(): Promise<void> {
+    try {
+      await writeEditorStateFile(this.folder, AGENT_ACTIVITY_FILE, serializeAgentActivity(this.clientName()))
+    } catch {
+      // Only a courtesy to Studio; the model is written.
+    }
   }
 
   private restoreTempIds(previous: Map<string, string>): void {

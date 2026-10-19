@@ -1101,9 +1101,11 @@ codex mcp add radical-folder -- node /path/to/radical.tools/apps/mcp/dist/index.
           <li><strong>After the pull request is merged</strong>, switch to <code>main</code> and pull: the base becomes the new <code>main</code> and the list empties. On the old branch it stays, since a squash merge puts a new commit on <code>main</code> and the branch still left it where it did.</li>
           <li><strong>To see only what is not committed yet</strong>, save the last commit as the base: <code>radical diff &lt;folder&gt; --save-base --since HEAD</code>. Without the file (<code>.radical/base.json</code> deleted) there is no base, and Changes on branch offers the commands that save one.</li>
         </ul>
-        <div class="doc-tip">
-          <strong>Tip:</strong> while the agent writes, keep Studio in <a href="#presenting">Viewer</a>. A change spans several files and the two processes share no lock: the server refuses to write over a file that changed since it read it, but editing the same folder from both sides at once can still race.
-        </div>
+        <p><strong>Editing while the agent writes.</strong> You can keep working in Studio while an agent changes the same folder; neither overwrites the other.</p>
+        <ul>
+          <li><strong>Turns.</strong> After each write the server marks the folder as being written by an agent, for 15 seconds. Meanwhile Studio holds its saves and says so once (<em>An agent is editing this model…</em>). It takes in each change of the agent as before, keeping your edits on top, and saves them when the agent pauses.</li>
+          <li><strong>Merges.</strong> When one side writes after the other changed the folder, the two changes are merged element by element and field by field: a new element on each side, different fields of one element, a view renamed here and a relation added there all stay. Where both changed the same value, what is in the folder is kept, and a notice in Studio (or the agent's tool result) names it. Moves and sizes merge without a word. A file that does not read as a model, such as one git left with conflict markers, is never merged over: nothing is written until it is fixed.</li>
+        </ul>
         <h3>Tools</h3>
         <div class="doc-table-wrap">
           <table class="doc-table">
@@ -1195,9 +1197,10 @@ node apps/cli/dist/index.js check path/to/my-model --report reports</code></pre>
 └─ .radical/                  <span class="cm"># editor state, kept out of Git by its own .gitignore</span>
    ├─ selection.json          <span class="cm"># what is selected in Studio, for the MCP server</span>
    ├─ forge-run.json          <span class="cm"># where an agent's Forge run stands</span>
+   ├─ agent-activity.json     <span class="cm"># an agent is writing: Studio holds its saves until it pauses</span>
    └─ test-results.json       <span class="cm"># test cases from the last radical check --report</span></code></pre>
         <p>
-          Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the element's properties, sorted) and the description as body. Hierarchy is the directory tree. Output is deterministic — sorted keys, stable file names — so Git diffs show what changed and nothing else. Edit the files by hand, or let an agent edit them through the <a href="#mcp">MCP server</a>; the app picks them up.
+          Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the element's properties, sorted) and the description as body. Hierarchy is the directory tree. Output is deterministic — sorted keys, stable file names — so Git diffs show what changed and nothing else. Edit the files by hand, or let an agent edit them through the <a href="#mcp">MCP server</a>; the app picks them up, and merges what you have not saved yet into them.
         </p>
         <p>
           A JSON file that cannot be read (a trailing comma, Git conflict markers) is not taken for an empty one: Studio says which file it is, keeps the model that was on screen, and saves nothing to the folder until the file reads again. The MCP server refuses such a folder with the same message.

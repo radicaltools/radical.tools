@@ -7,5 +7,5 @@ consequences: "Studio shows edits made by the MCP server or an editor on the ope
 context: "People edit model files in other editors and through git while Studio or the MCP server has the folder open. Earlier versions lost descriptions, deleted foreign files and overwrote outside edits."
 date: "2026-09-30"
 decision: "MdFolderSession keeps a baseline of what it read, refuses a write when a file changed outside since then, and polls the folder for outside edits."
-status: "accepted"
+status: "superseded"
 ---

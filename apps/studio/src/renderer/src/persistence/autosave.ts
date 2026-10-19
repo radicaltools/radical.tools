@@ -13,6 +13,7 @@
 import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import { mergeModels } from '@radical/common/modelMerge'
 import { useDiagramStore, parkedLiveModel, type ParkedDesigner } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore, DocumentUnreadableError, StorageFullError, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
@@ -71,6 +72,14 @@ export function reloadActiveDocument(): void {
 if (typeof window !== 'undefined') {
   let _persistTimer: ReturnType<typeof setTimeout> | null = null
   let _suspended = false
+  /** Edits made since the last save was handed to the document store: what a
+   *  reload of an outside edit merges into the model it loads. */
+  let _unsaved = false
+  /** The user was told that saves wait for an agent writing the folder. */
+  let _agentNoticeShown = false
+  /** The active document's model as last loaded or handed to a save: what
+   *  the model in the store was edited from. */
+  let _baseModel: DiagramData | null = null
   // When a structural presentation edit (add/remove/rename/reorder/link a
   // slide) happens in viewer/presenter mode, we still must persist it — but
   // WITHOUT writing the ephemeral explored model layout to disk. This flag
@@ -118,21 +127,54 @@ if (typeof window !== 'undefined') {
     if (_suspended || presenting()) return
     const activeId = documents.getActiveId()
     if (!activeId) return
+    // An agent writing the folder over MCP has it to itself: Studio holds its
+    // saves until the agent pauses, merging its edits into each change of
+    // the agent it reloads meanwhile (loadActive).
+    if (documents.listDocuments().find((d) => d.id === activeId)?.source === 'md') {
+      const until = await documents.agentWritingUntil(activeId).catch(() => 0)
+      if (_suspended || presenting() || documents.getActiveId() !== activeId) return
+      if (until > Date.now()) {
+        holdForAgent(until)
+        return
+      }
+    }
     try {
       const data = buildPersistData()
       _layoutSafePending = false
+      _unsaved = false
+      _agentNoticeShown = false
+      _baseModel = data
       await documents.saveDocument(activeId, data)
       _storageFullShown = false
     } catch (e) {
       reportSaveError(e)
     }
   }
-  const schedulePersist = (): void => {
+  const schedulePersist = (delay = 400): void => {
+    _unsaved = true
     if (_persistTimer !== null) clearTimeout(_persistTimer)
     _persistTimer = setTimeout(() => {
       _persistTimer = null
       void flushPersist()
-    }, 400)
+    }, delay)
+  }
+  /** Try the save again once the agent's mark has passed; say why, once. */
+  const holdForAgent = (until: number): void => {
+    if (!_agentNoticeShown) {
+      _agentNoticeShown = true
+      useDiagramStore.getState().pushNotification('An agent is editing this model. Studio saves your changes when it pauses, merged with its edits.', 'info')
+    }
+    schedulePersist(Math.max(until - Date.now(), 0) + 250)
+  }
+  // A save merged with an edit made outside Studio: where both changed the
+  // same value the folder's was kept, and the user hears which.
+  documents.onSaveMerged((id, conflicts) => {
+    if (id === documents.getActiveId()) reportMergeConflicts(conflicts)
+  })
+  const reportMergeConflicts = (conflicts: string[]): void => {
+    if (!conflicts.length) return
+    const shown = conflicts.slice(0, 5).join('; ') + (conflicts.length > 5 ? ` and ${conflicts.length - 5} more` : '')
+    useDiagramStore.getState().pushNotification(`Your edits were merged with a change made outside Studio. Where both changed the same value, the folder's was kept: ${shown}.`, 'warning')
   }
 
   let prev = useDiagramStore.getState()
@@ -190,12 +232,20 @@ if (typeof window !== 'undefined') {
     opts?: { keepUi?: boolean },
   ): void => {
     const seq = ++_loadSeq
+    // Edits not saved yet when the folder changed outside Studio: merged
+    // into what is on disk now, from the model they were made on. Without
+    // them the disk's model is loaded as it is.
+    const unsaved = opts?.keepUi && _unsaved && _baseModel && !presenting()
+      ? { base: _baseModel, ours: buildPersistData() }
+      : null
+    if (!opts?.keepUi) _unsaved = false
     _suspended = true
     _loadingId = id
     if (_persistTimer !== null) {
       clearTimeout(_persistTimer)
       _persistTimer = null
     }
+    let mergedEdits = false
     if (_watchingId !== id) stopWatching()
     const live = useDiagramStore.getState()
     const camera = opts?.keepUi ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
@@ -207,7 +257,16 @@ if (typeof window !== 'undefined') {
       if (data) {
         const store = useDiagramStore.getState()
         const { activeViewId, selectedNodeId } = store
-        store.loadDiagram(data)
+        // Kept apart from the store, which may fill in what it loads.
+        _baseModel = structuredClone(data)
+        if (unsaved) {
+          const { merged, conflicts } = mergeModels(unsaved.base, unsaved.ours, data)
+          store.loadDiagram(structuredClone(merged))
+          mergedEdits = true
+          reportMergeConflicts(conflicts)
+        } else {
+          store.loadDiagram(data)
+        }
         // A reload of the same document keeps the user where they were.
         if (opts?.keepUi) {
           const next = useDiagramStore.getState()
@@ -225,6 +284,7 @@ if (typeof window !== 'undefined') {
         // New/empty file, or content that is missing: initialize with the
         // maximum built-in metamodel. Never keep the model on screen, which
         // belongs to the document just left.
+        _baseModel = null
         useDiagramStore.getState().loadDiagram({
           nodes: [],
           relations: [],
@@ -251,14 +311,17 @@ if (typeof window !== 'undefined') {
         if (seq !== _loadSeq) return
         _suspended = false
         _loadingId = null
+        // The merged edits are still to be saved.
+        if (mergedEdits) schedulePersist()
         if (documents.getActiveId() === id) for (const listener of [..._loadListeners]) listener(id)
       })
   }
 
   // ── Follow outside edits to the active md-folder document ────────────────
   // Once a folder is loaded, its storage is polled for edits made in another
-  // editor or by git; on one, the document is reloaded from disk. The disk
-  // wins: a save refused because of such an edit is dropped with the reload.
+  // editor, by git or by an agent; on one, the document is reloaded from
+  // disk, with the edits not saved yet merged in (a save made meanwhile is
+  // merged with it as it is written).
   let _watchingId: string | null = null
   let _stopWatch: () => void = () => {}
   function stopWatching(): void {
@@ -312,6 +375,7 @@ if (typeof window !== 'undefined') {
       _persistTimer = null
       const data = buildPersistData()
       _layoutSafePending = false
+      _unsaved = false
       documents.saveDocument(leaving, data).catch((e) => reportSaveError(e))
     }
     if (!s.activeId) {

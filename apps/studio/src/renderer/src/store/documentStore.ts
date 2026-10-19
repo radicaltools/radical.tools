@@ -18,7 +18,8 @@ import {
   isMdFolder,
   type FolderFiles,
 } from '@radical/common/formats/mdFolder'
-import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
+import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
+import { agentWritingUntil } from '@radical/common/formats/agentActivity'
 import {
   webFolderSupported,
   webFileSupported,
@@ -36,6 +37,7 @@ import {
   removeHandle,
   writeSelectionToHandle,
   readForgeRunFromHandle,
+  readAgentActivityFromHandle,
   readModelBaseFromHandle,
   writeModelBaseToHandle,
   readCheckFilesFromHandle,
@@ -80,6 +82,14 @@ const WEB_FOLDER_POLL_MS = 2000
 const externalChangeListeners = new Map<string, () => void>()
 /** Hosts whose folder-change events are already routed to the listeners. */
 const routedHosts = new WeakSet<object>()
+
+/** Who to tell when a save was merged with an edit made outside Studio. */
+const mergedSaveListeners = new Set<(id: string, conflicts: string[]) => void>()
+
+function notifyMergedSave(id: string, merged: { conflicts: string[] } | undefined): void {
+  if (!merged) return
+  for (const listener of [...mergedSaveListeners]) listener(id, merged.conflicts)
+}
 
 function notifyExternalChange(id: string): void {
   externalChangeListeners.get(id)?.()
@@ -433,17 +443,20 @@ async function writeDocument(id: string, data: DiagramData): Promise<void> {
     }
   } else if (meta.source === 'md' && meta.folderPath && h.writeFolder) {
     const files = serializeToMdFolder(data, meta.name)
+    // An edit made outside Studio since the last read is merged with this
+    // one (the host then reports the change, and the document reloads).
     const res = await h.writeFolder(meta.folderPath, files)
     if (!res.success) {
       if (res.conflict) {
-        // The folder changed outside Studio; the host reports it and the
-        // document is reloaded from disk — the outside edit wins.
+        // The folder changed outside Studio and does not read as a model; the
+        // host reports it and the reload says which file is broken.
         console.warn('[documentStore] folder changed on disk, not overwriting:', res.conflict)
       } else {
         console.warn('[documentStore] folder write failed for', meta.folderPath, res.error)
       }
       return
     }
+    notifyMergedSave(id, res.merged)
   } else if (meta.source === 'md' && !h.writeFolder && webFolderSupported()) {
     // Never write until the handle's permission is verified this session,
     // so a reload with a permission-pending handle can't overwrite files.
@@ -455,11 +468,12 @@ async function writeDocument(id: string, data: DiagramData): Promise<void> {
     const handle = await loadHandle(id)
     if (!handle) return
     try {
-      const res = await webSession(id, handle).write(serializeToMdFolder(data, meta.name))
+      const res = await webSession(id, handle).write(serializeToMdFolder(data, meta.name), mergeMdFolderFiles)
       if (!res.ok) {
         console.warn('[documentStore] folder changed on disk, not overwriting:', res.conflict)
         return
       }
+      notifyMergedSave(id, res.merged)
     } catch (e) {
       console.warn('[documentStore] web folder write failed:', e)
       return
@@ -686,6 +700,16 @@ export interface DocumentsAPI {
    *  document's folder, for AI clients working on the same folder. No-op for
    *  other documents and for a web folder not yet connected. */
   publishSelection(id: string, content: string): Promise<void>
+
+  /** Calls `listener` each time a save of an md-folder document was merged
+   *  with an edit made outside Studio since the last read, with the values
+   *  both changed, where the folder's was kept. Returns the unsubscribe. */
+  onSaveMerged(listener: (id: string, conflicts: string[]) => void): () => void
+
+  /** Until when (ms since the epoch) an agent writes an md-folder document's
+   *  folder over MCP (agentActivity); 0 when none does, or for other
+   *  documents. */
+  agentWritingUntil(id: string): Promise<number>
 
   /** The agent Forge run status file of an md-folder document (written by
    *  the MCP server), or null when there is none or it cannot be read. */
@@ -1158,6 +1182,24 @@ export const documents: DocumentsAPI = {
     if (!handle) return
     try { await writeSelectionToHandle(handle, content) }
     catch (e) { console.warn('[documentStore] selection write failed:', e) }
+  },
+
+  onSaveMerged(listener) {
+    mergedSaveListeners.add(listener)
+    return () => { mergedSaveListeners.delete(listener) }
+  },
+
+  async agentWritingUntil(id) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') return 0
+    const h = host()
+    if (meta.folderPath && h.readAgentActivity) {
+      const res = await h.readAgentActivity(meta.folderPath).catch(() => null)
+      return res?.success ? agentWritingUntil(res.content) : 0
+    }
+    if (h.readFolder || !connectedWebHandles.has(id)) return 0
+    const handle = await loadHandle(id)
+    return handle ? agentWritingUntil(await readAgentActivityFromHandle(handle)) : 0
   },
 
   async readForgeRun(id) {

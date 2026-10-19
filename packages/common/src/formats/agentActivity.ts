@@ -1,0 +1,55 @@
+// ─── Agent activity file ─────────────────────────────────────────────────────
+//
+// Turn-taking between an agent writing a model folder over MCP and Studio open
+// on the same folder. After each write the MCP server marks the folder as
+// being written by an agent until a moment a little later; while the mark
+// holds, Studio keeps the edits made on its canvas, merges them into each
+// change of the agent it reloads, and saves them once the agent pauses. Two
+// writers that take turns rarely meet in one file, and when they do the
+// three-way merge on write (mergeMdFolderFiles) keeps both.
+//
+// It lives under `.radical/` with the canvas selection, which the md-folder
+// format never lists or watches and `.radical/.gitignore` keeps out of
+// version control.
+
+import { SELECTION_DIR } from './canvasSelection'
+
+export const AGENT_ACTIVITY_FILE = `${SELECTION_DIR}/agent-activity.json`
+
+/** How long after its last write an agent counts as writing: long enough to
+ *  span the pause between two tool calls, short enough that Studio saves
+ *  soon after the agent has finished. */
+export const AGENT_ACTIVE_MS = 15_000
+
+export interface AgentActivity {
+  version: 1
+  /** The MCP client writing, as it named itself (claude-code, …). */
+  client?: string
+  /** Until when (ms since the epoch) the agent counts as writing. */
+  until: number
+}
+
+export function serializeAgentActivity(client: string | undefined, now = Date.now()): string {
+  const out: AgentActivity = { version: 1, ...(client ? { client } : {}), until: now + AGENT_ACTIVE_MS }
+  return `${JSON.stringify(out, null, 2)}\n`
+}
+
+/** The activity in `text`, or null when it is not one. */
+export function parseAgentActivity(text: string | null | undefined): AgentActivity | null {
+  if (!text) return null
+  let raw: unknown
+  try { raw = JSON.parse(text) } catch { return null }
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (r.version !== 1 || typeof r.until !== 'number' || !Number.isFinite(r.until)) return null
+  return { version: 1, ...(typeof r.client === 'string' ? { client: r.client } : {}), until: r.until }
+}
+
+/** Until when an agent writes the folder, per its activity file; 0 when it
+ *  does not (no file, a file that does not read, a mark that has passed). A
+ *  mark further ahead than one period (a clock that jumped) is cut to one. */
+export function agentWritingUntil(text: string | null | undefined, now = Date.now()): number {
+  const activity = parseAgentActivity(text)
+  if (!activity || activity.until <= now) return 0
+  return Math.min(activity.until, now + AGENT_ACTIVE_MS)
+}
