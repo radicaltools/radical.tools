@@ -386,3 +386,19 @@ test('Studio opens a model in Viewer unless a link names a perspective, and a ne
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
   await expect(page).toHaveURL(/\/m\/designer\//)
 })
+
+// Undoing a new view takes its properties with it: the list comes back,
+// not an empty properties pane with only ◀ Back.
+test('undoing a new view brings back the list of views, not its empty properties', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-context')
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByRole('menuitem', { name: /Blank view/ }).click()
+  await page.locator('.view-kind-btn', { hasText: 'Flow' }).click()
+  await expect(page.locator('.left-panel .rp-slider.show-props')).toBeVisible()
+  // The blank view and its kind are two steps.
+  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(page.locator('.left-panel .rp-slider.show-props')).toHaveCount(0)
+  await expect(page.locator('.lp-view-card', { hasText: 'System Context' })).toBeVisible()
+})

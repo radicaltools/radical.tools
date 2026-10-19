@@ -1468,6 +1468,7 @@ function StructuralCanvas(): React.ReactElement {
       {/* View name caption — bottom-left, same style as SequenceView */}
       {activeViewName && !activeSnapshotId && (
         <div
+          className="canvas-view-caption"
           style={{
             position: 'absolute',
             top: 8,

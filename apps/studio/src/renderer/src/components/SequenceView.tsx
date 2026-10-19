@@ -205,8 +205,9 @@ export function SequenceView(): React.ReactElement {
         <div style={emptyMsgStyle}>
           <strong>No sequence linked.</strong>
           <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75, maxWidth: 420, textAlign: 'center' }}>
-            This view is set to <em>Flow</em>. Open the right panel and link a
-            sequence (or create one) to render its steps as a UML sequence diagram.
+            This view is set to <em>Flow</em>. Pick a sequence under <em>Sequence</em> in
+            the view's properties (the gear on its card), or make one under <em>Sequences</em>,
+            to draw its steps as a UML sequence diagram.
           </div>
         </div>
       </main>
