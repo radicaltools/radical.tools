@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { MdFolderSession, type MdFolderStorage } from '../src/formats/mdFolderSync'
-import { isMdFolderModelPath } from '../src/formats/mdFolder'
+import { MdFolderSession, mergeMdFolderFiles, type MdFolderStorage } from '../src/formats/mdFolderSync'
+import { deserializeFromMdFolder, isMdFolderModelPath, serializeToMdFolder } from '../src/formats/mdFolder'
+import type { C4Node, DiagramData } from '../src/c4'
 
 /** In-memory folder. Every write bumps a file's stamp, like an mtime would. */
 function memStorage(initial: Record<string, string> = {}) {
@@ -132,6 +133,43 @@ describe('MdFolderSession', () => {
     const fs = memStorage(MODEL)
     const session = new MdFolderSession(fs.storage)
     expect(await session.write({ ...MODEL, 'nodes/a.md': node('a', 'new') })).toEqual({ ok: true })
+    expect(fs.storage.write).toHaveBeenCalledTimes(1)
+  })
+
+  it('merges a write with an outside edit when given a merge, and refuses a folder it cannot read', async () => {
+    const system = (id: string, label: string): C4Node =>
+      ({ id, type: 'system', label, x: 0, y: 0, width: 200, height: 100, collapsed: false }) as C4Node
+    const model: DiagramData = { nodes: [system('shop', 'Shop'), system('bank', 'Bank')], relations: [] }
+    const files = serializeToMdFolder(model, 'Books')
+    const fs = memStorage(files)
+    const session = new MdFolderSession(fs.storage)
+    const onChange = vi.fn()
+    session.onExternalChange = onChange
+    await session.readAll()
+    const shopPath = Object.keys(files).find((p) => files[p].includes('Shop'))!
+    // An agent describes the bank and adds a node; the app describes the shop.
+    const agent = deserializeFromMdFolder(files).data
+    agent.nodes.find((n) => n.id === 'bank')!.technology = 'Stripe'
+    agent.nodes.push(system('stock', 'Stock'))
+    const agentFiles = serializeToMdFolder(agent, 'Books')
+    for (const [path, content] of Object.entries(agentFiles)) if (files[path] !== content) fs.edit(path, content)
+    const bankPath = Object.keys(agentFiles).find((p) => agentFiles[p].includes('Stripe'))!
+    const ours = deserializeFromMdFolder(files).data
+    ours.nodes.find((n) => n.id === 'shop')!.description = 'Sells books'
+
+    const res = await session.write(serializeToMdFolder(ours, 'Books'), mergeMdFolderFiles)
+    expect(res.ok && res.merged).toEqual({ changed: expect.arrayContaining([bankPath]), conflicts: [] })
+    const onDisk = deserializeFromMdFolder(Object.fromEntries(fs.paths().map((p) => [p, fs.content(p)!]))).data
+    expect(onDisk.nodes.map((n) => [n.label, n.description ?? '', n.technology ?? '']).sort()).toEqual([['Bank', '', 'Stripe'], ['Shop', 'Sells books', ''], ['Stock', '', '']])
+    // The agent's files are left as it wrote them; the app is told to reload.
+    expect(fs.storage.write).toHaveBeenCalledTimes(1)
+    expect(fs.storage.write).toHaveBeenCalledWith(shopPath, expect.stringContaining('Sells books'))
+    expect(onChange).toHaveBeenCalledWith(expect.arrayContaining([bankPath]))
+
+    // A file broken outside the app is not merged over: nothing is written.
+    fs.edit(bankPath, '---\nid: [broken\n---\n')
+    const refused = await session.write(serializeToMdFolder(ours, 'Books'), mergeMdFolderFiles)
+    expect(refused).toEqual({ ok: false, conflict: [bankPath] })
     expect(fs.storage.write).toHaveBeenCalledTimes(1)
   })
 

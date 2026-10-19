@@ -29,8 +29,12 @@ export interface ReadFolderResult extends HostResult {
 
 export interface WriteFolderResult extends HostResult {
   /** Set when nothing was written because these files (relative paths)
-   *  changed on disk since the folder was last read. */
+   *  changed on disk since the folder was last read and could not be merged. */
   conflict?: string[]
+  /** Set when the write was merged with these files changed on disk since
+   *  the folder was last read; `conflicts` names the values both changed,
+   *  where the disk's was kept. */
+  merged?: { changed: string[]; conflicts: string[] }
 }
 
 export interface FileChange {
@@ -58,8 +62,9 @@ export interface HostCapabilities {
   pickFolder?(): Promise<HostResult & { folderPath?: string }>
   /** Read the md-folder model files in a folder. */
   readFolder?(folderPath: string): Promise<ReadFolderResult>
-  /** Write an md-folder model, unless the folder changed on disk since it was
-   *  last read (then `conflict` lists what changed and nothing is written). */
+  /** Write an md-folder model. When the folder changed on disk since it was
+   *  last read, the model is merged with that change (`merged`); when it
+   *  cannot be, `conflict` lists what changed and nothing is written. */
   writeFolder?(folderPath: string, files: Record<string, string>): Promise<WriteFolderResult>
   /** Watch one md-folder for edits made outside Studio (null stops). */
   watchFolder?(folderPath: string | null): Promise<void>
@@ -71,6 +76,10 @@ export interface HostCapabilities {
   /** Read the status of an agent's Forge run (`.radical/forge-run.json`) in an
    *  md-folder, written by the MCP server; content is null when there is none. */
   readForgeRun?(folderPath: string): Promise<HostResult & { content?: string | null }>
+  /** Read the agent activity file (`.radical/agent-activity.json`) in an
+   *  md-folder, written by the MCP server after each write; content is null
+   *  when there is none. */
+  readAgentActivity?(folderPath: string): Promise<HostResult & { content?: string | null }>
   /** Read the model's base (`.radical/base.json`) in an md-folder, written by
    *  the CLI or the MCP server; content is null when there is none. */
   readModelBase?(folderPath: string): Promise<HostResult & { content?: string | null }>

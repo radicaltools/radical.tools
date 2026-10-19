@@ -229,6 +229,17 @@ export async function readForgeRunFromHandle(root: FsDirHandle): Promise<string 
   }
 }
 
+/** The agent activity file (see agentActivity) under the model folder's
+ *  `.radical/`, or null when there is none. */
+export async function readAgentActivityFromHandle(root: FsDirHandle): Promise<string | null> {
+  try {
+    const dir = await root.getDirectoryHandle(SELECTION_DIR)
+    return await (await (await dir.getFileHandle('agent-activity.json')).getFile()).text()
+  } catch {
+    return null
+  }
+}
+
 /** The model's base (see modelBase) under the model folder's `.radical/`,
  *  or null when there is none. */
 export async function readModelBaseFromHandle(root: FsDirHandle): Promise<string | null> {

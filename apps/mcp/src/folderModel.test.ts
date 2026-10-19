@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -13,6 +13,7 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { writeSelectionFile } from '@radical/node-files/selectionFile'
 import { serializeSelection } from '@radical/common/formats/canvasSelection'
 import { parseModelBase } from '@radical/common/formats/modelBase'
+import { AGENT_ACTIVE_MS, AGENT_ACTIVITY_FILE, parseAgentActivity } from '@radical/common/formats/agentActivity'
 import { FolderModel } from './folderModel'
 
 const folders: string[] = []
@@ -155,6 +156,47 @@ describe('folder-backed MCP model', () => {
     const result = await session.write({ ...files, 'radical.md': files['radical.md'] + '\nMCP edit' })
     expect(result).toEqual({ ok: false, conflict: ['radical.md'] })
     expect(await readFile(join(folder, 'radical.md'), 'utf8')).toContain('Outside edit')
+  })
+
+  it('merges an edit made in the folder since the call started', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    await model.call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    const shop = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data.nodes.find((n) => n.label === 'Shop')!
+    // Studio saves a new system while the call runs: after it read the folder, before it writes.
+    const write = MdFolderSession.prototype.write
+    let bankPath = ''
+    const spy = vi.spyOn(MdFolderSession.prototype, 'write').mockImplementationOnce(async function (this: MdFolderSession, files, merge) {
+      const studio = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      studio.nodes.push({ id: 'bank', type: 'system', label: 'Bank', x: 400, y: 0, width: 200, height: 100, collapsed: false } as never)
+      const saved = serializeToMdFolder(studio)
+      bankPath = Object.keys(saved).find((path) => saved[path].includes('label: "Bank"'))!
+      await mkdir(dirname(join(folder, bankPath)), { recursive: true })
+      await writeFile(join(folder, bankPath), saved[bankPath])
+      return write.call(this, files, merge)
+    })
+    const result = await model.call('update_node', { id: shop.id, description: 'Sells books' })
+    spy.mockRestore()
+    expect(result.ok).toBe(true)
+    expect(result.text).toContain(`Merged with edits made in the folder while the call ran (${bankPath})`)
+    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(after.nodes.map((n) => [n.label, n.description ?? '']).sort()).toEqual([['Bank', ''], ['Shop', 'Sells books']])
+  })
+
+  it('marks the folder as written by an agent after each write', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    model.clientName = () => 'claude-code'
+    await expect(readFile(join(folder, AGENT_ACTIVITY_FILE), 'utf8')).rejects.toThrow()
+    await model.call('get_model_summary', {})
+    await expect(readFile(join(folder, AGENT_ACTIVITY_FILE), 'utf8')).rejects.toThrow() // reading is no write
+
+    const start = Date.now()
+    await model.call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    const activity = parseAgentActivity(await readFile(join(folder, AGENT_ACTIVITY_FILE), 'utf8'))
+    expect(activity?.client).toBe('claude-code')
+    expect(activity!.until).toBeGreaterThanOrEqual(start + AGENT_ACTIVE_MS)
+    expect(activity!.until).toBeLessThanOrEqual(Date.now() + AGENT_ACTIVE_MS)
   })
 
   it('rejects malformed sidecars and symlink escapes', async () => {

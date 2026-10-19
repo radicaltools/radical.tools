@@ -3,7 +3,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { documents, useDocumentsStore } from '../src/renderer/src/store/documentStore'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
+import { deserializeFromMdFolder, serializeToMdFolder } from '@radical/common/formats/mdFolder'
+import { serializeAgentActivity } from '@radical/common/formats/agentActivity'
 import type { FolderChange } from '@radical/host-bridge'
 import type { DiagramData } from '@radical/common/c4'
 
@@ -35,7 +36,12 @@ function installFolderApi(initial: Record<string, string>) {
   const api = {
     readFolder: vi.fn(async () => ({ success: true, files: { ...disk } })),
     readFile: vi.fn(async () => ({ success: false })),
-    writeFolder: vi.fn(async () => ({ success: true })),
+    writeFolder: vi.fn(async (_path: string, files: Record<string, string>) => {
+      for (const k of Object.keys(disk)) delete disk[k]
+      Object.assign(disk, files)
+      return { success: true }
+    }),
+    readAgentActivity: vi.fn(async () => ({ success: true, content: null as string | null })),
     watchFolder: vi.fn(async () => {}),
     onFolderChanged: vi.fn((l: (change: FolderChange) => void) => { listener = l }),
   }
@@ -48,8 +54,13 @@ function installFolderApi(initial: Record<string, string>) {
       Object.assign(disk, files)
     },
     emit(change: FolderChange) { listener?.(change) },
+    /** The model on disk now. */
+    model: () => deserializeFromMdFolder({ ...disk }).data,
   }
 }
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const labels = (data: DiagramData) => Object.fromEntries(data.nodes.map((n) => [n.id, n.label]))
 
 describe('md-folder documents follow outside edits', () => {
   beforeEach(() => {
@@ -126,6 +137,52 @@ describe('md-folder documents follow outside edits', () => {
     folder.emit({ folderPath: '/tmp/model', paths: ['nodes/payments/_index.md'] })
     await settle()
     expect(Object.keys(useDiagramStore.getState().c4Nodes)).toEqual(['only'])
+  })
+
+  it('merges edits not saved yet with an outside edit', async () => {
+    const folder = installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
+    documents.createMdDocument('/tmp/model')
+    await settle()
+    useDiagramStore.getState().updateNode('sys2', { label: 'General ledger' })
+
+    // Before the save runs, an agent renames the other system and adds one.
+    folder.setDisk(serializeToMdFolder({ ...SAMPLE, nodes: [sys('sys1', 'Payments hub'), sys('sys2', 'Ledger'), sys('sys3', 'Fraud')] }, 'model'))
+    folder.emit({ folderPath: '/tmp/model', paths: ['nodes/payments-hub/_index.md'] })
+    await settle()
+
+    const nodes = useDiagramStore.getState().c4Nodes
+    expect([nodes.sys1.label, nodes.sys2.label, nodes.sys3?.label]).toEqual(['Payments hub', 'General ledger', 'Fraud'])
+    // …and saves them, merged.
+    await wait(500)
+    expect(labels(folder.model())).toEqual({ sys1: 'Payments hub', sys2: 'General ledger', sys3: 'Fraud' })
+  })
+
+  it('holds its saves while an agent writes the folder, then saves them merged', async () => {
+    const folder = installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
+    documents.createMdDocument('/tmp/model')
+    await settle()
+    const notices = vi.spyOn(useDiagramStore.getState(), 'pushNotification')
+    // The agent is writing: its mark holds for a moment.
+    folder.api.readAgentActivity.mockResolvedValue({ success: true, content: serializeAgentActivity('claude-code', Date.now() - 15_000 + 600) })
+    useDiagramStore.getState().updateNode('sys2', { label: 'General ledger' })
+    await wait(450)
+    expect(folder.api.writeFolder).not.toHaveBeenCalled()
+    expect(notices).toHaveBeenCalledTimes(1)
+    expect(notices.mock.calls[0][0]).toMatch(/agent is editing this model/)
+
+    // The agent writes again meanwhile; Studio takes its change in, keeping its own edit.
+    folder.setDisk(serializeToMdFolder({ ...SAMPLE, nodes: [sys('sys1', 'Payments hub'), sys('sys2', 'Ledger')] }, 'model'))
+    folder.emit({ folderPath: '/tmp/model', paths: ['nodes/payments-hub/_index.md'] })
+    await settle()
+    expect(useDiagramStore.getState().c4Nodes.sys2.label).toBe('General ledger')
+    expect(folder.api.writeFolder).not.toHaveBeenCalled()
+
+    // Once the mark has passed, Studio saves, merged with the agent's change.
+    await wait(700)
+    expect(folder.api.writeFolder).toHaveBeenCalledTimes(1)
+    expect(labels(folder.model())).toEqual({ sys1: 'Payments hub', sys2: 'General ledger' })
+    expect(notices).toHaveBeenCalledTimes(1) // said once
+    notices.mockRestore()
   })
 
   it('keeps the document unchanged on disk when a save is refused as a conflict', async () => {
