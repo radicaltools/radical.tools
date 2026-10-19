@@ -83,8 +83,8 @@ export type ViewFilter = (
   | { kind: 'property'; key: string; op: 'is' | 'is-not' | 'set' | 'unset'; values?: string[] }
   /** The element has (`has`) or lacks a relation of this type, this way. */
   | { kind: 'relation'; relationType: string; direction: 'out' | 'in'; has: boolean }
-  /** The element lies inside this one, at any depth. */
-  | { kind: 'within'; nodeId: string }
+  /** The element lies inside this one, at any depth; with `self`, or is it. */
+  | { kind: 'within'; nodeId: string; self?: true }
   /** Its name, description or technology holds this text. */
   | { kind: 'text'; text: string }
 ) & { off?: true; join?: 'or' }
@@ -148,6 +148,14 @@ export interface DiagramView {
    *  and chain are the viewpoint's, kept in step when the viewpoint changes. Set
    *  another kind or chain and the view is of no viewpoint any more. */
   viewpoint?: string
+  /** The element a view of a viewpoint that draws one element is of
+   *  (ViewpointDef.subject): its chain is the viewpoint's kept to it and what
+   *  lies inside it (scopedChain). */
+  subject?: string
+  /** The group this view of one element is in: a view of a viewpoint that
+   *  draws one element holds a view of each such element (model.ts,
+   *  syncViewGroups), made and removed with the elements. */
+  partOf?: string
   /** Where the view sits in the list of views: a folder path such as
    *  "C4/Components" (segments split by "/"). No folder: at the top. */
   folder?: string
@@ -645,12 +653,17 @@ export function viewCanvasPositions<P>(
   view: Pick<DiagramView, 'kind' | 'nodeIds' | 'empty'>,
   nodes: Record<string, Pick<C4Node, 'parentId'>>,
   positions: Record<string, P>,
+  /** What the view draws when its filter chain decides it (viewDrawnIds in
+   *  viewPipeline.ts): a view that lists no nodes but has a chain draws only
+   *  what the chain gives, not every node. */
+  drawn?: Iterable<string>,
 ): Record<string, P> {
   if (view.kind && view.kind !== 'static') return {}
-  if (viewShowsEveryNode(view)) return positions
+  const ids = drawn ?? (viewShowsEveryNode(view) ? undefined : view.nodeIds)
+  if (!ids) return positions
   const kept: Record<string, P> = {}
   const seen = new Set<string>()
-  for (const id of view.nodeIds) {
+  for (const id of ids) {
     for (let cur: string | undefined = id; cur && nodes[cur] && !seen.has(cur); cur = nodes[cur].parentId) {
       seen.add(cur)
       if (cur in positions) kept[cur] = positions[cur]
@@ -659,11 +672,14 @@ export function viewCanvasPositions<P>(
   return kept
 }
 
-/** Views with only the positions they draw (viewCanvasPositions); a view
- *  that keeps no more than that is returned as it is. */
-export function withCanvasPositions<V extends DiagramView>(views: V[], nodes: Record<string, Pick<C4Node, 'parentId'>>): V[] {
+/** Views with only the positions they draw (viewCanvasPositions, `drawnOf`
+ *  what a view's chain draws); a view that keeps no more than that is
+ *  returned as it is. */
+export function withCanvasPositions<V extends DiagramView>(
+  views: V[], nodes: Record<string, Pick<C4Node, 'parentId'>>, drawnOf?: (view: V) => Iterable<string> | undefined,
+): V[] {
   return views.map((view) => {
-    const kept = viewCanvasPositions(view, nodes, view.positions ?? {})
+    const kept = viewCanvasPositions(view, nodes, view.positions ?? {}, drawnOf?.(view))
     return Object.keys(kept).length === Object.keys(view.positions ?? {}).length ? view : { ...view, positions: kept }
   })
 }

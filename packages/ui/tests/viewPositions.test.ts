@@ -31,6 +31,15 @@ describe('view positions', () => {
     expect(withCanvasPositions([trimmed], byId)[0]).toBe(trimmed)
   })
 
+  it('a view of a filter chain keeps those of what its chain draws, on load too', () => {
+    // A view of a viewpoint lists no nodes: its chain decides what it draws.
+    const chained: DiagramView = { ...view('chain', []), pipeline: { levels: [{ ways: [{ types: ['container'] }] }] } }
+    s().loadDiagram({ nodes, relations: [], views: [chained] })
+    expect(Object.keys(s().views.chain.positions).sort()).toEqual(['db', 'shop', 'web'])
+    const byId = Object.fromEntries(nodes.map((n) => [n.id, n]))
+    expect(Object.keys(viewCanvasPositions(chained, byId, all, ['web'])).sort()).toEqual(['shop', 'web'])
+  })
+
   it('a document that kept every position in each view drops the rest on load', () => {
     expect(Object.keys(s().views.ctx.positions).sort()).toEqual(['bank', 'shop', 'web'])
     expect(s().views.table.positions).toEqual({})

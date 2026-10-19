@@ -3,13 +3,13 @@ import { buildMetamodelMessage } from '../src/ai/metamodelContext'
 import { createModelFacade } from '../src/ai/modelFacade'
 import { runTool } from '../src/ai/tools/index'
 import type { ToolRunContext } from '../src/ai/tools/types'
-import type { DiagramView, ViewPipeline } from '../src/c4'
+import type { C4Node, C4Relation, DiagramView, ViewPipeline } from '../src/c4'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, type Metamodel } from '../src/metamodel/index'
 import * as model from '../src/model'
-import { pipelineOf } from '../src/viewPipeline'
+import { pipelineOf, runPipeline } from '../src/viewPipeline'
 import { radicalViewpoints } from '../src/metamodel/presets/viewpoints'
 import {
-  UNGROUPED_VIEWPOINTS, viewpointGroups, chainOfViewpoint, chainSummary, newViewName, newViewpointId, sameChain, saveAsViewpoint, viewpointsOf, withViewpoint, withoutViewpoint,
+  UNGROUPED_VIEWPOINTS, viewpointGroups, chainOfViewpoint, chainSummary, newViewName, newViewpointId, sameChain, saveAsViewpoint, subjectViewName, viewpointsOf, withViewpoint, withoutViewpoint,
 } from '../src/viewpoints'
 
 const needs: ViewPipeline = {
@@ -23,12 +23,31 @@ function stateWith(metamodel: Metamodel, views: DiagramView[] = []): model.Model
   return { c4Nodes: {}, c4Relations: {}, views: Object.fromEntries(views.map((v) => [v.id, v])), activeViewId: null, metamodel }
 }
 
+const el = (id: string, type: string, label: string, extra: Partial<C4Node> = {}): C4Node =>
+  ({ id, type, label, x: 0, y: 0, width: 160, height: 80, collapsed: false, ...extra }) as C4Node
+
+const rel = (id: string, sourceId: string, targetId: string, relationType: string): C4Relation =>
+  ({ id, sourceId, targetId, relationType }) as C4Relation
+
+/** A Radical model holding `nodes` and `relations`. */
+function modelOf(nodes: C4Node[], relations: C4Relation[] = []): model.ModelState {
+  const state = stateWith(builtInGovernanceMetamodel())
+  for (const n of nodes) state.c4Nodes[n.id] = n
+  for (const r of relations) state.c4Relations[r.id] = r
+  return state
+}
+
+/** The ids the view shows, sorted. */
+function shownIds(state: model.ModelState, viewId: string): string[] {
+  return runPipeline(state.views[viewId], { nodes: state.c4Nodes, relations: state.c4Relations, metamodel: state.metamodel! }).nodes.map((n) => n.id).sort()
+}
+
 describe('viewpoints', () => {
   it('come with both presets, grouped by concern: all of them with Radical, the C4 ones with C4', () => {
     const radical = viewpointsOf(builtInGovernanceMetamodel())
-    expect(viewpointGroups(radical).map((g) => [g.group, g.viewpoints.length])).toEqual([['C4', 4], ['Domain', 3], ['Requirements', 5], ['Decisions', 3], ['UX', 2], ['States', 2], ['Process', 1]])
+    expect(viewpointGroups(radical).map((g) => [g.group, g.viewpoints.length])).toEqual([['C4', 6], ['Domain', 4], ['Requirements', 5], ['Decisions', 3], ['UX', 2], ['States', 3], ['Process', 2]])
     expect(radical.find((v) => v.id === 'traceability')).toMatchObject({ kind: 'table', group: 'Requirements' })
-    expect(viewpointsOf(builtInC4Metamodel()).map((v) => v.id)).toEqual(['system-context', 'containers', 'components', 'container-dependencies'])
+    expect(viewpointsOf(builtInC4Metamodel()).map((v) => v.id)).toEqual(['system-context', 'containers', 'system-containers', 'components', 'container-components', 'container-dependencies'])
   })
 
   it('stay with a document on a preset when the preset is swapped in on load', () => {
@@ -116,6 +135,7 @@ describe('built-in viewpoints', () => {
           for (const f of level.filters ?? []) if (f.kind === 'relation') expect(metamodel.relationTypes[f.relationType], `${where}: ${f.relationType}`).toBeDefined()
         }
         if (v.pipeline.sort?.by === 'property') expect(properties.has(v.pipeline.sort.key!), `${where}: sort ${v.pipeline.sort.key}`).toBe(true)
+        for (const t of v.subject?.types ?? []) expect(metamodel.nodeTypes[t], `${where}: subject ${t}`).toBeDefined()
         // What a view of it holds is the chain as the view reads it.
         expect(sameChain(chainOfViewpoint(v), v.pipeline), where).toBe(true)
       }
@@ -123,9 +143,128 @@ describe('built-in viewpoints', () => {
   })
 })
 
+describe('built-in viewpoints of one element', () => {
+  it('draw one state machine, process, system, container and domain', () => {
+    const state = modelOf([
+      el('user', 'person', 'Customer'),
+      el('shop', 'system', 'Shop'), el('web', 'webapp', 'Web', { parentId: 'shop' }), el('api', 'container', 'API', { parentId: 'shop' }), el('db', 'database', 'DB', { parentId: 'shop' }),
+      el('c1', 'component', 'Orders', { parentId: 'api' }), el('c2', 'component', 'Prices', { parentId: 'api' }),
+      el('bank', 'system', 'Bank'), el('gateway', 'container', 'Gateway', { parentId: 'bank' }),
+      el('sales', 'domain', 'Sales'), el('ord', 'entity', 'Order', { parentId: 'sales' }),
+      el('billing', 'domain', 'Billing'), el('invoice', 'entity', 'Invoice', { parentId: 'billing' }),
+      el('m1', 'state-machine', 'Order lifecycle'), el('s1', 'state', 'Open', { parentId: 'm1' }), el('s2', 'state', 'Closed', { parentId: 'm1' }),
+      el('m2', 'state-machine', 'Invoice lifecycle'), el('s3', 'state', 'Due', { parentId: 'm2' }),
+      el('p1', 'process', 'Checkout'), el('a', 'step', 'Pay', { parentId: 'p1' }), el('b', 'step', 'Confirm', { parentId: 'a' }),
+      el('p2', 'process', 'Refund'), el('c', 'step', 'Return', { parentId: 'p2' }),
+    ], [
+      rel('r1', 'user', 'web', 'interacts'), rel('r2', 'web', 'api', 'interacts'), rel('r3', 'api', 'db', 'interacts'), rel('r4', 'api', 'gateway', 'interacts'),
+      rel('r5', 'c1', 'c2', 'interacts'), rel('r6', 'c1', 'db', 'interacts'),
+      rel('r7', 'invoice', 'ord', 'references'), rel('r8', 'm1', 'ord', 'lifecycle-of'), rel('r9', 's1', 's2', 'transition'),
+    ])
+    const of = (viewpoint: string, subject: string) => {
+      model.insertView(state, `${viewpoint}:${subject}`, subject)
+      expect(model.applyViewpoint(state, `${viewpoint}:${subject}`, viewpoint, subject)).toBe(true)
+      return shownIds(state, `${viewpoint}:${subject}`)
+    }
+    expect(of('state-machine', 'm1')).toEqual(['m1', 'ord', 's1', 's2'])
+    expect(of('process', 'p1')).toEqual(['a', 'b', 'p1'])
+    expect(of('system-containers', 'shop')).toEqual(['api', 'db', 'gateway', 'shop', 'user', 'web'])
+    expect(of('container-components', 'api')).toEqual(['api', 'c1', 'c2', 'db', 'gateway', 'web'])
+    expect(of('domain-entities', 'billing')).toEqual(['billing', 'invoice', 'ord'])
+  })
+})
+
+describe('viewpoint subjects', () => {
+  const machines = () => modelOf([
+    el('order', 'state-machine', 'Order'), el('placed', 'state', 'Placed', { parentId: 'order' }), el('paid', 'state', 'Paid', { parentId: 'order' }),
+    el('payment', 'state-machine', 'Payment'), el('pending', 'state', 'Pending', { parentId: 'payment' }),
+  ], [rel('t1', 'placed', 'paid', 'transition')])
+
+  it('keep a view to its element, in step with the viewpoint, and keep the chain on Detach', () => {
+    const state = machines()
+    model.insertView(state, 'v', 'Order')
+    // A state is not what the viewpoint draws.
+    expect(model.applyViewpoint(state, 'v', 'state-machine', 'placed')).toBe(false)
+    expect(model.applyViewpoint(state, 'v', 'state-machine', 'order')).toBe(true)
+    expect(state.views.v).toMatchObject({ viewpoint: 'state-machine', subject: 'order', kind: 'static' })
+    expect(shownIds(state, 'v')).toEqual(['order', 'paid', 'placed'])
+    // The viewpoint changes: the view follows, still of Order.
+    const def = viewpointsOf(state.metamodel).find((t) => t.id === 'state-machine')!
+    state.metamodel = withViewpoint(state.metamodel!, { ...def, kind: 'table' })
+    expect(model.syncViewpoints(state)).toEqual(['v'])
+    expect(state.views.v).toMatchObject({ kind: 'table', subject: 'order' })
+    expect(shownIds(state, 'v')).toEqual(['order', 'paid', 'placed'])
+    // Another element: the same chain, kept to it, and the element's name.
+    expect(model.applyViewpoint(state, 'v', 'state-machine', 'payment')).toBe(true)
+    expect(shownIds(state, 'v')).toEqual(['payment', 'pending'])
+    expect(state.views.v.name).toBe('Payment')
+    // Detach: what it shows stays, of no viewpoint and no element.
+    model.detachViewpoint(state, 'v')
+    expect(state.views.v.viewpoint).toBeUndefined()
+    expect(state.views.v.subject).toBeUndefined()
+    expect(shownIds(state, 'v')).toEqual(['payment', 'pending'])
+    expect(model.syncViewpoints(state)).toEqual([])
+    // A caller that syncs the views alone, with no elements, does not fail.
+    model.applyViewpoint(state, 'v', 'state-machine', 'order')
+    expect(() => model.syncViewpoints({ views: state.views, metamodel: state.metamodel } as unknown as model.ModelState)).not.toThrow()
+  })
+
+  it('make a group hold a view of each element that is not external, made and removed with the elements', () => {
+    let next = 0
+    const newId = () => `v${++next}`
+    const state = machines()
+    state.c4Nodes.ext = el('ext', 'state-machine', 'Theirs', { external: true })
+    model.insertView(state, 'g', 'Machines')
+    model.setViewFolder(state, 'g', 'States')
+    expect(model.applyViewpoint(state, 'g', 'state-machine', null)).toBe(true)
+    expect(model.isViewGroup(state.views.g, state.metamodel)).toBe(true)
+    expect(model.syncViewGroups(state, newId)).toBe(true)
+    const members = () => model.viewsOfGroup(state.views, 'g').map((v) => [v.name, v.subject, v.folder]).sort()
+    expect(members()).toEqual([['Order', 'order', 'States'], ['Payment', 'payment', 'States']])
+    // Each shows its element open, folded on the model or not.
+    expect(model.viewsOfGroup(state.views, 'g').map((v) => v.expandedNodeIds)).toEqual([['order'], ['payment']])
+    expect(model.planViewGroups(state)).toEqual({ add: [], remove: [], refolder: [] })
+    // A new machine: a new view; the group moves: its views follow.
+    state.c4Nodes.refund = el('refund', 'state-machine', 'Refund')
+    model.setViewFolder(state, 'g', 'Life')
+    model.syncViewGroups(state, newId)
+    expect(members()).toEqual([['Order', 'order', 'Life'], ['Payment', 'payment', 'Life'], ['Refund', 'refund', 'Life']])
+    // Deleted, or made external: its view goes.
+    model.deleteNode(state, 'payment')
+    state.c4Nodes.refund.external = true
+    model.syncViewGroups(state, newId)
+    expect(members()).toEqual([['Order', 'order', 'Life']])
+    // The group detached: its views go too.
+    model.detachViewpoint(state, 'g')
+    model.syncViewGroups(state, newId)
+    expect(Object.keys(state.views)).toEqual(['g'])
+  })
+
+  it('name a view after its element until it is renamed, and delete it with the element', () => {
+    const state = machines()
+    const def = viewpointsOf(state.metamodel).find((t) => t.id === 'state-machine')!
+    for (const id of ['order', 'payment']) {
+      model.insertView(state, `v-${id}`, subjectViewName(state.c4Nodes[id], def))
+      model.applyViewpoint(state, `v-${id}`, def.id, id)
+    }
+    expect(state.views['v-order'].name).toBe('Order')
+    model.patchNode(state, 'order', { label: 'Purchase' })
+    expect(state.views['v-order'].name).toBe('Purchase')
+    model.renameView(state, 'v-order', 'Buying')
+    model.patchNode(state, 'order', { label: 'Sale' })
+    expect(state.views['v-order'].name).toBe('Buying')
+    // Deleting Payment takes its view along, the one on screen too.
+    state.activeViewId = 'v-payment'
+    model.deleteNode(state, 'payment')
+    expect(state.views['v-payment']).toBeUndefined()
+    expect(state.activeViewId).toBeNull()
+    expect(state.views['v-order']).toBeDefined()
+  })
+})
+
 describe('viewpoint tools', () => {
-  function setup() {
-    const facade = createModelFacade({ nodes: [], relations: [], metamodel: builtInGovernanceMetamodel() })
+  function setup(nodes: C4Node[] = []) {
+    const facade = createModelFacade({ nodes, relations: [], metamodel: builtInGovernanceMetamodel() })
     const temps = new Map<string, string>()
     const ctx: ToolRunContext = {
       diagram: facade,
@@ -172,5 +311,34 @@ describe('viewpoint tools', () => {
     expect(view('Needs')).toMatchObject({ kind: 'table' })
     expect(view('Needs').viewpoint).toBeUndefined()
     expect((await call('delete_viewpoint', { id: 'needs' })).resultText).toContain('unknown viewpoint')
+  })
+
+  it('make a group of views of one element, kept in step with the model, and refuse to delete or change one of its views', async () => {
+    const { facade, view, call } = setup([el('order', 'state-machine', 'Order'), el('placed', 'state', 'Placed', { parentId: 'order' })])
+    const made = await call('create_view', { tempId: 'g', name: 'Machines', viewpoint: 'state-machine' })
+    expect(made.ok, made.resultText).toBe(true)
+    expect(made.resultText).toContain('a group holding a view of each state-machine (1 now: Order')
+    const group = view('Machines')
+    expect(view('Order')).toMatchObject({ viewpoint: 'state-machine', subject: 'order', partOf: group.id })
+    expect(pipelineOf(view('Order'))!.levels![0].filters).toContainEqual({ kind: 'within', nodeId: 'order', self: true })
+    // A new machine gets its view in the group; a deleted one takes it along.
+    expect((await call('add_node', { tempId: 'pay', type: 'state-machine', label: 'Payment' })).ok).toBe(true)
+    expect(view('Payment')).toMatchObject({ partOf: group.id })
+    expect((await call('delete_view', { id: view('Order').id })).resultText).toContain('goes with its element')
+    expect((await call('update_view', { id: view('Order').id, kind: 'table' })).resultText).toContain('one of the views of the group Machines')
+    // The group keeps its viewpoint: another kind or none would end it.
+    expect((await call('update_view', { id: 'g', kind: 'table' })).resultText).toContain('is a group of views per element')
+    expect((await call('update_view', { id: 'g', viewpoint: null })).resultText).toContain('is a group of views per element')
+    expect(view('Machines')).toMatchObject({ viewpoint: 'state-machine', kind: 'static' })
+    expect((await call('delete_node', { id: 'pay' })).ok).toBe(true)
+    expect(Object.values(facade.getViews!()).map((v) => v.name).sort()).toEqual(['Machines', 'Order'])
+    // Deleting the group deletes its views.
+    expect((await call('delete_view', { id: 'g' })).resultText).toContain('and the 1 views of the group')
+    expect(Object.keys(facade.getViews!())).toEqual([])
+    expect(buildMetamodelMessage(facade.getMetamodel!())).toContain('"subjectTypes":["state-machine"]')
+    // A viewpoint of one element made over MCP.
+    expect((await call('upsert_viewpoint', { id: 'domain-map', subjectTypes: ['domain'] })).ok).toBe(true)
+    expect(viewpointsOf(facade.getMetamodel!()).find((t) => t.id === 'domain-map')!.subject).toEqual({ types: ['domain'] })
+    expect((await call('upsert_viewpoint', { id: 'domain-map', subjectTypes: ['spaceship'] })).resultText).toContain('unknown node type')
   })
 })

@@ -39,8 +39,8 @@ Find a view and preview it without Confluence credentials:
 
 ```sh
 radical export confluence architecture --list-views
-radical export confluence architecture --view "Tes confluence" --format html --output wiki-preview.html
-radical export confluence architecture --view "Tes confluence" --format markdown --output wiki.md
+radical export confluence architecture --view "Specification" --format html --output wiki-preview.html
+radical export confluence architecture --view "Specification" --format markdown --output wiki.md
 ```
 
 `--view` accepts an exact view ID or an unambiguous name. `--format storage`
@@ -54,7 +54,7 @@ To publish to Confluence Cloud, set `CONFLUENCE_URL`, `CONFLUENCE_EMAIL` and
 `CONFLUENCE_API_TOKEN` in your shell or CI secret environment, then run:
 
 ```sh
-radical export confluence architecture --view "Tes confluence" --publish --space-id 123 --parent-id 456
+radical export confluence architecture --view "Specification" --publish --space-id 123 --parent-id 456
 ```
 
 Use the numeric space ID, not its key. `--parent-id` is optional. `--url` can
@@ -84,7 +84,7 @@ To move an existing managed export under another page, pass its root page
 ID with `--parent-id`; its children follow it:
 
 ```sh
-radical export confluence architecture --view "Tes confluence" --publish --page-id 789 --parent-id 456
+radical export confluence architecture --view "Specification" --publish --page-id 789 --parent-id 456
 ```
 
 Use a destination parent in the same Confluence space. Changing the view's

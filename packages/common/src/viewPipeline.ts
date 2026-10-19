@@ -152,7 +152,7 @@ export function matchesFilter(filter: ViewFilter, node: C4Node, ctx: PipelineCon
       const list = (filter.direction === 'out' ? index.out : index.in).get(node.id) ?? []
       return list.some((r) => r.relationType === filter.relationType) === filter.has
     }
-    case 'within': return ancestorsOf(node, ctx).includes(filter.nodeId)
+    case 'within': return (!!filter.self && node.id === filter.nodeId) || ancestorsOf(node, ctx).includes(filter.nodeId)
     case 'text': {
       const q = filter.text.trim().toLowerCase()
       return !q || `${node.label} ${node.description ?? ''} ${node.technology ?? ''}`.toLowerCase().includes(q)
@@ -212,7 +212,7 @@ export function filterLabel(filter: ViewFilter, ctx: PipelineContext): string {
       return `${name} is ${filter.op === 'is-not' ? 'not ' : ''}${shown}`
     }
     case 'relation': return `${filter.has ? 'Has' : 'Has no'} ${relationName(filter.relationType, filter.direction, ctx)}`
-    case 'within': return `Inside ${ctx.nodes[filter.nodeId]?.label ?? filter.nodeId}`
+    case 'within': return filter.self ? `${ctx.nodes[filter.nodeId]?.label ?? filter.nodeId} and what is inside it` : `Inside ${ctx.nodes[filter.nodeId]?.label ?? filter.nodeId}`
     case 'text': return `Text “${filter.text}”`
   }
 }
@@ -563,6 +563,14 @@ function computeShownNodes(view: DiagramView, nodes: Record<string, C4Node>, rel
   }
   if (viewShowsEveryNode(view)) return undefined
   return new Set(view.nodeIds.filter((id) => id in nodes))
+}
+
+/** What a view draws when its filter chain decides it (undefined when its
+ *  list does, or it shows every node): for viewCanvasPositions, so that it
+ *  keeps the positions of those elements only. */
+export function viewDrawnIds(view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Set<string> | undefined {
+  if (!view || !pipelineOf(view)?.levels?.length || view.kind === 'dynamic') return undefined
+  return viewShownNodes(view, nodes, relations)
 }
 
 /** `ids` and every container they sit in. */

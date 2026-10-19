@@ -2,7 +2,9 @@
 
 import type { DiagramView, ViewPipeline } from '../../c4'
 import { readPipeline } from '../../viewPipeline'
+import { isViewGroup } from '../../model'
 import { findViewpoint, viewpointsOf } from '../../viewpoints'
+import type { ViewpointDef } from '../../metamodel/types'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 
 // 'dynamic' needs a sequence (create_sequence) — the handlers refuse it without one.
@@ -78,17 +80,17 @@ export function pipelineFor(ctx: ToolRunContext, tool: string, raw: unknown): { 
 
 const VIEWPOINT_SCHEMA = {
   type: ['string', 'null'],
-  description: "One of the metamodel's viewpoints (its id or name, see get_model_summary): the view becomes one of that viewpoint, with the viewpoint's kind and filter chain, and follows the viewpoint when it changes. Not with kind or pipeline. null (update_view) keeps the view's kind and chain, of no viewpoint. Setting kind or pipeline also leaves the viewpoint.",
+  description: "One of the metamodel's viewpoints (its id or name, see get_model_summary): the view becomes one of that viewpoint, with the viewpoint's kind and filter chain, and follows the viewpoint when it changes; one that draws one element (subjectTypes in get_model_summary) makes the view a group holding a view of each such element, made and removed with the elements. Not with kind or pipeline. null (update_view) keeps the view's kind and chain, of no viewpoint. Setting kind or pipeline also leaves the viewpoint.",
 }
 
 /** The metamodel's viewpoint a tool names, or the reason there is none. */
-function viewpointFor(ctx: ToolRunContext, tool: string, input: { viewpoint?: unknown; kind?: unknown; pipeline?: unknown }): { id: string } | { error: string } {
+function viewpointFor(ctx: ToolRunContext, tool: string, input: { viewpoint?: unknown; kind?: unknown; pipeline?: unknown }): { id: string; def: ViewpointDef } | { error: string } {
   if (input.kind !== undefined || input.pipeline !== undefined) return { error: `${tool}: give viewpoint, or kind and pipeline, not both` }
   if (!ctx.diagram.applyViewpoint) return { error: `${tool}: viewpoints are not available in this context` }
   const types = viewpointsOf(ctx.diagram.getMetamodel?.())
   const type = findViewpoint(types, input.viewpoint)
   if (!type) return { error: `${tool}: unknown viewpoint "${String(input.viewpoint)}"${types.length ? ` (the metamodel has ${types.map((t) => `"${t.id}"`).join(', ')})` : ' (the metamodel has none)'}` }
-  return { id: type.id }
+  return { id: type.id, def: type }
 }
 
 /** Step endpoints of a sequence — what a new dynamic view shows by default. */
@@ -215,6 +217,7 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
       const input = rawInput as { tempId?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; nodeIds?: unknown; active?: unknown; folder?: unknown; edgeStyle?: unknown; pipeline?: unknown; viewpoint?: unknown }
       if (typeof input.tempId !== 'string' || !input.tempId) return fail('create_view: tempId is required')
       if (typeof input.name !== 'string' || !input.name.trim()) return fail('create_view: name is required')
+      const name = input.name.trim()
       if (!ctx.diagram.addView || !ctx.diagram.setViewNodes) return fail('create_view: views are not editable in this context')
 
       const sequence = input.kind === 'dynamic' ? sequenceFor(ctx, 'create_view', input.sequenceId) : undefined
@@ -225,8 +228,8 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
       if (chain && 'error' in chain) return fail(chain.error)
       if (chain && !ctx.diagram.setViewPipeline) return fail('create_view: filter chains are not available in this context')
 
-      const realId = ctx.diagram.addView(input.name.trim())
-      if (!realId) return fail(`create_view "${input.name}" was rejected by the store`)
+      const realId = ctx.diagram.addView(name)
+      if (!realId) return fail(`create_view "${name}" was rejected by the store`)
       ctx.registerTempId(input.tempId, realId)
 
       if (Array.isArray(input.nodeIds) && input.nodeIds.length > 0) {
@@ -249,10 +252,16 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         ctx.diagram.setViewFolder(realId, input.folder)
       }
       if (chain) ctx.diagram.setViewPipeline!(realId, chain.pipeline)
-      if (viewpoint) ctx.diagram.applyViewpoint!(realId, viewpoint.id)
+      if (viewpoint) ctx.diagram.applyViewpoint!(realId, viewpoint.id, null)
       if (input.active === true && ctx.diagram.setActiveView) ctx.diagram.setActiveView(realId)
 
-      return { ok: true, resultText: `Created view ${realId}.`, added: { views: 1 } }
+      // A viewpoint that draws one element: a group, with a view of each.
+      const members = viewpoint?.def.subject ? Object.values(ctx.diagram.getViews?.() ?? {}).filter((v) => v.partOf === realId) : []
+      return {
+        ok: true,
+        resultText: `Created view ${realId}.${viewpoint?.def.subject ? ` It is a group holding a view of each ${viewpoint.def.subject.types.join(' or ')} (${members.length} now: ${members.map((v) => `${v.name} ${v.id}`).join(', ') || 'none yet'}), kept in step with the model.` : ''}`,
+        added: { views: 1 + members.length },
+      }
     },
 
     update_view: (rawInput, ctx) => {
@@ -320,13 +329,21 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         if (unknown.length) return fail(`update_view: unknown element id(s) ${unknown.join(', ')}`)
         changes.push(() => ctx.diagram.setViewCollapsed!(vId, ids, collapsed))
       }
+      // One of a group's views follows the group: only its folding and lines are its own.
+      if (view.partOf && (input.viewpoint !== undefined || input.kind !== undefined || input.pipeline !== undefined || input.folder !== undefined || input.name !== undefined)) {
+        return fail(`update_view: ${view.name} is one of the views of the group ${ctx.diagram.getViews()[view.partOf]?.name ?? view.partOf}: its name follows its element, and its viewpoint, kind, filter and folder are the group's (move the group's folder instead)`)
+      }
+      // A group is one by its viewpoint: another kind, filter or viewpoint would end it.
+      if (isViewGroup(view, ctx.diagram.getMetamodel?.()) && (input.viewpoint !== undefined || input.kind !== undefined || input.pipeline !== undefined)) {
+        return fail(`update_view: ${view.name} is a group of views per element; its viewpoint sets its views. Delete it (delete_view) to make another kind of view`)
+      }
       if (input.viewpoint === null) {
         if (!ctx.diagram.detachViewpoint) return fail('update_view: viewpoints are not available in this context')
         changes.push(() => ctx.diagram.detachViewpoint!(vId))
       } else if (input.viewpoint !== undefined) {
         const viewpoint = viewpointFor(ctx, 'update_view', input)
         if ('error' in viewpoint) return fail(viewpoint.error)
-        changes.push(() => ctx.diagram.applyViewpoint!(vId, viewpoint.id))
+        changes.push(() => ctx.diagram.applyViewpoint!(vId, viewpoint.id, null))
       }
       const chain = input.pipeline === undefined ? undefined : pipelineFor(ctx, 'update_view', input.pipeline)
       if (chain) {
@@ -356,9 +373,12 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
       if (typeof input.id !== 'string' || !input.id) return fail('delete_view: id is required')
       if (!ctx.diagram.removeView || !ctx.diagram.getViews) return fail('delete_view: views are not editable in this context')
       const vId = ctx.resolveId(input.id)
-      if (!(vId in ctx.diagram.getViews())) return fail(`delete_view: unknown view id "${input.id}"`)
+      const view = ctx.diagram.getViews()[vId]
+      if (!view) return fail(`delete_view: unknown view id "${input.id}"`)
+      if (view.partOf) return fail(`delete_view: ${view.name} is one of the views of the group ${ctx.diagram.getViews()[view.partOf]?.name ?? view.partOf} and goes with its element; delete the element, or the group with all its views`)
+      const members = Object.values(ctx.diagram.getViews()).filter((v) => v.partOf === vId).length
       ctx.diagram.removeView(vId)
-      return { ok: true, resultText: `Deleted view ${vId}.`, deleted: { views: 1 } }
+      return { ok: true, resultText: `Deleted view ${vId}${members ? ` and the ${members} views of the group` : ''}.`, deleted: { views: 1 + members } }
     },
 
     order_views: (rawInput, ctx) => {

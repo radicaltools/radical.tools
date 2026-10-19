@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { estimateLabelSize, labelOverlaps, placeEdgeLabels, relationLabelLines, type LabelEdge, type RelationLabelText } from '../src/edgeLabels'
+import { estimateLabelSize, labelOverlaps, placeEdgeLabels, relationLabelLines, RELATION_LABEL_BOX, type LabelEdge, type RelationLabelText } from '../src/edgeLabels'
 import type { C4Node } from '@radical/common/c4'
 import { computeRoutedEdge, type RoutingObstacle } from '../src/edgeRouting'
 import { Position } from '../src/side'
@@ -24,6 +24,16 @@ describe('estimateLabelSize', () => {
 })
 
 describe('relationLabelLines', () => {
+  it('measures a long name as two lines and its technology as one', () => {
+    const long = 'reads and writes the Markdown folder, writes .radical/forge-run.json beside it and keeps the test results of radical check'
+    const lines = relationLabelLines({ label: long, technology: 'Node.js fs, chokidar, JSON over stdio' })
+    expect(lines.map((l) => l.maxRows)).toEqual([2, 1])
+    const size = estimateLabelSize(lines, RELATION_LABEL_BOX)
+    const { fontSize, techFontSize, lineHeight, padY, border, maxWidth } = RELATION_LABEL_BOX
+    expect(size.h).toBeCloseTo(2 * fontSize * lineHeight + techFontSize * lineHeight + 2 * padY + 2 * border)
+    expect(size.w).toBeLessThanOrEqual(maxWidth)
+  })
+
   it('gives a transition room for `event [guard] / actions ^raised`, by event name', () => {
     const nodes = {
       pay: { id: 'pay', type: 'event', label: 'Pay', collapsed: false, x: 0, y: 0, width: 1, height: 1 },

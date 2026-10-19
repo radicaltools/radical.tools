@@ -12,7 +12,7 @@
 
 import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
 import { readPipeline } from './viewPipeline'
-import { chainOfViewpoint, sameChain, viewpointsOf } from './viewpoints'
+import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
@@ -229,6 +229,12 @@ export function patchNode(state: ModelState, id: string, updates: Partial<Omit<C
   const node = state.c4Nodes[id] as NodeRecord | undefined
   if (!node) return
   const retyped = 'type' in updates && updates.type !== node.type
+  // A view of this element named after it is renamed with it; one renamed
+  // by hand keeps its name.
+  const label = typeof updates.label === 'string' ? updates.label.trim() : ''
+  if (label && label !== node.label.trim()) {
+    for (const view of Object.values(state.views)) if (view.subject === id && view.name === node.label.trim()) view.name = label
+  }
   Object.assign(node, updates)
   if ('type' in updates) materializeDefaults(node, state.metamodel)
   // Its relations keep a type that fits the new pair (checkNodeUpdate made
@@ -325,6 +331,11 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
   if (state.defaultLayoutConstraints?.length) {
     state.defaultLayoutConstraints = withoutNodes(state.defaultLayoutConstraints, removed)
   }
+  // A view of one element goes with it.
+  for (const view of Object.values(state.views)) {
+    if (view.subject && removed.has(view.subject)) delete state.views[view.id]
+  }
+  if (state.activeViewId && !state.views[state.activeViewId]) state.activeViewId = null
   return removed
 }
 
@@ -505,20 +516,121 @@ export function setViewKind(state: ModelState, viewId: string, kind: DiagramView
   if (!view) return
   view.kind = kind
   delete view.viewpoint
+  delete view.subject
 }
 
 /** Makes the view one of the metamodel's viewpoint `typeId`: the viewpoint's
- *  kind and a copy of its chain. False if there is no such view or type. */
-export function applyViewpoint(state: ModelState, viewId: string, typeId: string): boolean {
+ *  kind and a copy of its chain, kept to `subjectId` and what lies inside it
+ *  for a viewpoint that draws one element (undefined: the element the view
+ *  is of, if it still fits; null: none, the whole chain). False if there is
+ *  no such view or type, or the element cannot be what the viewpoint draws. */
+export function applyViewpoint(state: ModelState, viewId: string, typeId: string, subjectId?: string | null): boolean {
   const view = state.views[viewId]
   const type = viewpointsOf(state.metamodel).find((t) => t.id === typeId)
   if (!view || !type) return false
+  // A caller that only syncs views may hold no elements: nothing can be drawn then.
+  const nodes = state.c4Nodes ?? {}
+  if (subjectId && !canBeSubject(type, nodes[subjectId])) return false
+  const wanted = subjectId === undefined ? view.subject : subjectId ?? undefined
+  const subject = wanted && canBeSubject(type, nodes[wanted]) ? wanted : undefined
+  // A view named after the element it was of takes the new one's name.
+  const before = view.subject ? nodes[view.subject] : undefined
+  if (subject && subject !== view.subject && before && view.name === before.label.trim()) view.name = nodes[subject].label.trim() || view.name
   view.viewpoint = type.id
   view.kind = type.kind
-  const chain = chainOfViewpoint(type)
+  if (subject) view.subject = subject
+  else delete view.subject
+  const chain = scopedChain(type, subject)
   if (chain.levels?.length || chain.sort || chain.edges) view.pipeline = chain
   else delete view.pipeline
   return true
+}
+
+// ── Groups of views of one element ──────────────────────────────────────────
+// A view of a viewpoint that draws one element (ViewpointDef.subject) is a
+// group: it holds a view of each element of the viewpoint's types that is not
+// external (partOf, subject), named after it, made when the element is added
+// and removed with it. syncViewGroups keeps the groups in step with the model.
+
+/** Whether `view` is a group of views of one element. */
+export function isViewGroup(view: DiagramView | undefined, metamodel: Metamodel | undefined): boolean {
+  if (!view?.viewpoint || view.subject || view.partOf) return false
+  return !!viewpointsOf(metamodel).find((t) => t.id === view.viewpoint)?.subject
+}
+
+/** The views of group `groupId`, in the list's order. */
+export function viewsOfGroup(views: Record<string, DiagramView>, groupId: string): DiagramView[] {
+  return Object.values(views).filter((v) => v.partOf === groupId)
+}
+
+/** What syncViewGroups would do: the views to add (a group and an element),
+ *  the ids of the views to remove and of those to move into their group's
+ *  folder. All empty when the groups are in step. */
+export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'metamodel'>): { add: Array<{ groupId: string; subjectId: string }>; remove: string[]; refolder: string[] } {
+  const defs = new Map(viewpointsOf(state.metamodel).map((t) => [t.id, t]))
+  const add: Array<{ groupId: string; subjectId: string }> = []
+  const remove: string[] = []
+  const views = Object.values(state.views)
+  const groups = new Map(views.filter((v) => isViewGroup(v, state.metamodel)).map((v) => [v.id, v]))
+  const members = new Map<string, Set<string>>()
+  const refolder: string[] = []
+  for (const v of views) {
+    if (!v.partOf) continue
+    const group = groups.get(v.partOf)
+    const def = group && defs.get(group.viewpoint!)
+    const node = v.subject ? state.c4Nodes[v.subject] : undefined
+    // A member of no group, of another viewpoint, of an element gone,
+    // external or of another type now, or a second one of the same element.
+    const seen = members.get(v.partOf) ?? new Set<string>()
+    if (!group || !def || v.viewpoint !== group.viewpoint || !node || node.external || !canBeSubject(def, node) || seen.has(node.id)) { remove.push(v.id); continue }
+    seen.add(node.id)
+    members.set(v.partOf, seen)
+    if ((v.folder ?? '') !== (group.folder ?? '')) refolder.push(v.id)
+  }
+  for (const group of groups.values()) {
+    const def = defs.get(group.viewpoint!)!
+    const has = members.get(group.id) ?? new Set<string>()
+    for (const node of Object.values(state.c4Nodes)) {
+      if (!node.external && canBeSubject(def, node) && !has.has(node.id)) add.push({ groupId: group.id, subjectId: node.id })
+    }
+  }
+  return { add, remove, refolder }
+}
+
+/** Brings every group of views of one element in step with the model: a
+ *  view of each element it should hold (ids from `newId`), none of those it
+ *  should not, each in the group's folder. Whether it changed anything. */
+export function syncViewGroups(state: ModelState, newId: () => string): boolean {
+  const { add, remove, refolder } = planViewGroups(state)
+  for (const id of remove) delete state.views[id]
+  for (const { groupId, subjectId } of add) {
+    const group = state.views[groupId]
+    const def = viewpointsOf(state.metamodel).find((t) => t.id === group.viewpoint)!
+    const id = newId()
+    insertView(state, id, subjectViewName(state.c4Nodes[subjectId], def))
+    applyViewpoint(state, id, def.id, subjectId)
+    state.views[id].partOf = groupId
+    // A view of one element shows what lies inside it, folded on the model or not.
+    state.views[id].expandedNodeIds = [subjectId]
+    refolder.push(id)
+  }
+  for (const id of refolder) {
+    const view = state.views[id]
+    const folder = view.partOf ? state.views[view.partOf]?.folder : undefined
+    if (folder) view.folder = folder
+    else delete view.folder
+  }
+  if (state.activeViewId && !state.views[state.activeViewId]) state.activeViewId = null
+  return add.length > 0 || remove.length > 0 || refolder.length > 0
+}
+
+/** The view keeps its kind and chain for itself, of no viewpoint (and of no
+ *  element: a view of one element keeps the chain kept to it). */
+export function detachViewpoint(state: ModelState, viewId: string): void {
+  const view = state.views[viewId]
+  if (!view) return
+  delete view.viewpoint
+  delete view.subject
 }
 
 /** Brings every view of a viewpoint in step with the viewpoint as the
@@ -533,9 +645,12 @@ export function syncViewpoints(state: ModelState): string[] {
     if (!type) {
       delete view.viewpoint
       changed.push(view.id)
-    } else if ((view.kind ?? 'static') !== type.kind || !sameChain(view.pipeline, type.pipeline)) {
-      applyViewpoint(state, view.id, type.id)
-      changed.push(view.id)
+    } else {
+      const subject = view.subject && canBeSubject(type, state.c4Nodes?.[view.subject]) ? view.subject : undefined
+      if ((view.kind ?? 'static') !== type.kind || subject !== view.subject || !sameChain(view.pipeline, scopedChain(type, subject))) {
+        applyViewpoint(state, view.id, type.id)
+        changed.push(view.id)
+      }
     }
   }
   return changed
@@ -625,6 +740,7 @@ export function setViewPipeline(state: ModelState, viewId: string, raw: ViewPipe
   else delete view.pipeline
   // A chain of its own: the view is of no viewpoint any more.
   delete view.viewpoint
+  delete view.subject
 }
 
 /** How All elements and the views without their own draw relations. */

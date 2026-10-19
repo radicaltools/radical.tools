@@ -119,6 +119,7 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           kind: { type: 'string', enum: [...VIEWPOINT_KINDS], description: "How its views show the chain: 'table', 'wiki', 'treemap' (hierarchy), 'matrix', 'warnier' (a Warnier–Orr diagram of the hierarchy) or 'static' (canvas)." },
           pipeline: { ...PIPELINE_SCHEMA, type: 'object' },
           fromViewId: { type: 'string', description: 'A view whose kind and filter chain the viewpoint takes (kind and pipeline given here win).' },
+          subjectTypes: { type: 'array', items: { type: 'string' }, description: 'Node types it draws one element of: a view of it is of one such element (create_view subject), named after it, its first level kept to the element and what lies inside it. [] makes it draw the whole model again.' },
         },
         additionalProperties: false,
       },
@@ -313,7 +314,7 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
     // A built-in metamodel is not copied for a viewpoint: documentMetamodel
     // keeps a document's viewpoints when it swaps the preset in.
     upsert_viewpoint: (rawInput, ctx) => {
-      const input = rawInput as { id?: unknown; label?: unknown; description?: unknown; group?: unknown; kind?: unknown; pipeline?: unknown; fromViewId?: unknown }
+      const input = rawInput as { id?: unknown; label?: unknown; description?: unknown; group?: unknown; kind?: unknown; pipeline?: unknown; fromViewId?: unknown; subjectTypes?: unknown }
       const current = currentMetamodel('upsert_viewpoint', ctx)
       if (typeof current === 'string') return fail(current)
       const types = viewpointsOf(current)
@@ -324,6 +325,13 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       if (input.description !== undefined && typeof input.description !== 'string') return fail('upsert_viewpoint: description must be a string')
       if (input.group !== undefined && typeof input.group !== 'string') return fail('upsert_viewpoint: group must be a string')
       if (input.kind !== undefined && !isViewpointKind(input.kind)) return fail(`upsert_viewpoint: kind must be one of ${VIEWPOINT_KINDS.join(', ')}`)
+      let subject = existing?.subject
+      if (input.subjectTypes !== undefined) {
+        if (!Array.isArray(input.subjectTypes) || input.subjectTypes.some((t) => typeof t !== 'string')) return fail('upsert_viewpoint: subjectTypes must be a list of node type ids')
+        const unknownTypes = (input.subjectTypes as string[]).filter((t) => !current.nodeTypes[t])
+        if (unknownTypes.length) return fail(`upsert_viewpoint: unknown node type(s) ${unknownTypes.join(', ')} in subjectTypes`)
+        subject = input.subjectTypes.length ? { types: [...new Set(input.subjectTypes as string[])] } : undefined
+      }
       let kind = existing?.kind
       let pipeline = existing?.pipeline
       if (input.fromViewId !== undefined) {
@@ -348,7 +356,7 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       const description = input.description === undefined ? existing?.description : (input.description as string).trim() || undefined
       const group = input.group === undefined ? existing?.group : (input.group as string).trim() || undefined
       const id = existing?.id ?? newViewpointId(label, types)
-      const mm = withViewpoint(current, { id, label, ...(group ? { group } : {}), ...(description ? { description } : {}), kind, pipeline: JSON.parse(JSON.stringify(pipeline ?? {})) })
+      const mm = withViewpoint(current, { id, label, ...(group ? { group } : {}), ...(description ? { description } : {}), kind, pipeline: JSON.parse(JSON.stringify(pipeline ?? {})), ...(subject ? { subject } : {}) })
       const following = Object.values(ctx.diagram.getViews?.() ?? {}).filter((v) => v.viewpoint === id).length
       return save(ctx, mm, `${existing ? 'Updated' : 'Added'} viewpoint "${id}".${existing && following ? ` ${following} view(s) of it follow.` : ''}`)
     },

@@ -2139,6 +2139,53 @@
       }
     },
     {
+      "description": "One software system with the containers, web apps, databases and queues inside it, and the people, systems and containers they are related to: a view per system (C4 level 2).",
+      "group": "C4",
+      "id": "system-containers",
+      "kind": "static",
+      "label": "Containers of a system",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "system",
+                  "container",
+                  "webapp",
+                  "database",
+                  "queue"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "person",
+                  "system",
+                  "container",
+                  "webapp",
+                  "database",
+                  "queue"
+                ],
+                "via": {
+                  "anyRelation": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "subject": {
+        "types": [
+          "system"
+        ]
+      }
+    },
+    {
       "description": "The containers and web apps with the components inside them, the databases and queues they use, and every relation between them (C4 level 3).",
       "group": "C4",
       "id": "components",
@@ -2160,6 +2207,53 @@
               }
             ]
           }
+        ]
+      }
+    },
+    {
+      "description": "One container or web app with the components inside it, and the people, systems, containers and components they are related to: a view per container (C4 level 3).",
+      "group": "C4",
+      "id": "container-components",
+      "kind": "static",
+      "label": "Components of a container",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "container",
+                  "webapp",
+                  "component"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "person",
+                  "system",
+                  "container",
+                  "webapp",
+                  "database",
+                  "queue",
+                  "component"
+                ],
+                "via": {
+                  "anyRelation": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "subject": {
+        "types": [
+          "container",
+          "webapp"
         ]
       }
     },
@@ -2226,6 +2320,55 @@
               }
             ]
           }
+        ]
+      }
+    },
+    {
+      "description": "One domain with its subdomains and entities, and the entities of other domains they reference or are part of: a view per domain.",
+      "group": "Domain",
+      "id": "domain-entities",
+      "kind": "static",
+      "label": "Entities of a domain",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "domain",
+                  "entity"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "entity"
+                ],
+                "via": {
+                  "direction": "out",
+                  "relationType": "references"
+                }
+              },
+              {
+                "types": [
+                  "entity"
+                ],
+                "via": {
+                  "direction": "out",
+                  "relationType": "part-of"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "subject": {
+        "types": [
+          "domain"
         ]
       }
     },
@@ -2749,6 +2892,48 @@
       }
     },
     {
+      "description": "One state machine with its states, pseudostates, events and transitions, and the entity it is the lifecycle of: a view per machine.",
+      "group": "States",
+      "id": "state-machine",
+      "kind": "static",
+      "label": "State machine",
+      "pipeline": {
+        "edges": "all",
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "state-machine",
+                  "state",
+                  "pseudostate",
+                  "event"
+                ]
+              }
+            ]
+          },
+          {
+            "ways": [
+              {
+                "types": [
+                  "entity"
+                ],
+                "via": {
+                  "direction": "out",
+                  "relationType": "lifecycle-of"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "subject": {
+        "types": [
+          "state-machine"
+        ]
+      }
+    },
+    {
       "description": "A table of the events, each with what emits it.",
       "group": "States",
       "id": "event-catalogue",
@@ -2796,6 +2981,32 @@
               }
             ]
           }
+        ]
+      }
+    },
+    {
+      "description": "One process and its steps as a Warnier–Orr diagram: a view per process.",
+      "group": "Process",
+      "id": "process",
+      "kind": "warnier",
+      "label": "Process",
+      "pipeline": {
+        "levels": [
+          {
+            "ways": [
+              {
+                "types": [
+                  "process",
+                  "step"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "subject": {
+        "types": [
+          "process"
         ]
       }
     }

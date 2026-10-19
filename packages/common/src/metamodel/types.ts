@@ -180,6 +180,10 @@ export interface ViewpointDef {
   description?: string
   kind: ViewpointKind
   pipeline: ViewPipeline
+  /** A viewpoint that draws one element: a view of it is of one element of
+   *  these types (DiagramView.subject), its first level kept to that element
+   *  and what lies inside it. None: a view of the whole model. */
+  subject?: { types: string[] }
 }
 
 export interface Metamodel {

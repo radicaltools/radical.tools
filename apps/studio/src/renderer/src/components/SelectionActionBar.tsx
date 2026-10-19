@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
-import { activeLayoutConstraints, childrenInView, useDiagramStore } from '@radical/ui/store/diagramStore'
+import { activeLayoutConstraints, childrenInView, setByGroup, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, saveStudioSettings } from '@radical/ui/studioSettings'
 import { isParentAllowed, isPlacementAllowed } from '@radical/common/metamodel'
@@ -31,6 +31,8 @@ export function SelectionActionBar(): React.ReactElement | null {
   const appMode = useDiagramStore((s) => s.appMode)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const removeNodeFromView = useDiagramStore((s) => s.removeNodeFromView)
+  // A view per element shows what its element holds: nothing is hidden from it.
+  const perElement = useDiagramStore((s) => !!s.activeViewId && setByGroup(s, s.activeViewId))
   const constraints = useDiagramStore(activeLayoutConstraints)
   const addAlignment = useDiagramStore((s) => s.addAlignment)
   const addGrid = useDiagramStore((s) => s.addGrid)
@@ -443,7 +445,7 @@ export function SelectionActionBar(): React.ReactElement | null {
           <div className="sel-bar-divider" />
         </>
       )}
-      {activeViewId && (
+      {activeViewId && !perElement && (
         <>
           <button
             type="button"

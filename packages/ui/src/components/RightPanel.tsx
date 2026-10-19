@@ -15,6 +15,7 @@ import { viewShownNodes } from '@radical/common/viewPipeline'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
+import { isViewGroup, viewsOfGroup } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
@@ -53,6 +54,9 @@ function BranchCount({ n }: { n: number | undefined }): React.ReactElement | nul
   if (!n) return null
   return <span className="lp-branch-count" title={`${n} element${n === 1 ? '' : 's'} changed since the base`}>{n}</span>
 }
+
+/** Views by name, as a group lists its views. */
+const byName = (a: DiagramView, b: DiagramView): number => a.name.localeCompare(b.name)
 
 function viewNodeCount(view: DiagramView, shown: number | undefined): string {
   if (shown === undefined) return viewShowsEveryNode(view) ? 'All nodes' : ''
@@ -620,9 +624,16 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const applyViewpoint = useDiagramStore((s) => s.applyViewpoint)
   const detachViewpoint = useDiagramStore((s) => s.detachViewpoint)
   const viewpoints = useMemo(() => viewpointsOf(metamodel), [metamodel])
+  const allNodes = useDiagramStore((s) => s.c4Nodes)
 
   if (!view) return null
   const ofType = viewpointOfView(view, metamodel)
+  // One of a group's views: its viewpoint and view type are the group's.
+  const ofGroup = view.partOf ? allViews[view.partOf] : undefined
+  // A group of views per element: its viewpoint makes it one, so it keeps it.
+  const isGroup = isViewGroup(view, metamodel)
+  const groupViews = isGroup ? viewsOfGroup(allViews, view.id).sort(byName) : []
+  const subject = view.subject ? allNodes[view.subject] : undefined
   const isDynamic = view.kind === 'dynamic'
   const isTreemap = view.kind === 'treemap'
   const isTable   = view.kind === 'table'
@@ -658,7 +669,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ flex: 1, fontSize: 13, fontWeight: 600, padding: '3px 0' }}>{view.name}</div>
-              {!readOnly && (
+              {!readOnly && !ofGroup && (
                 <button className="lp-icon-btn" title="Rename view"
                   onClick={() => { setNameVal(view.name); setEditingName(true) }}><Icon.Pencil /></button>
               )}
@@ -673,22 +684,38 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
             <ViewFolderPicker
               current={normalizeViewFolder(view.folder)}
               folders={folderPaths}
-              onPick={(folder) => { setViewFolder(view.id, folder); setEditingFolder(false) }}
+              // One of a group's views sits in the group's folder: it moves the group.
+              onPick={(folder) => { setViewFolder(ofGroup?.id ?? view.id, folder); setEditingFolder(false) }}
               onCancel={() => setEditingFolder(false)}
             />
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ flex: 1, fontSize: 12, padding: '3px 0', color: view.folder ? undefined : 'var(--text-muted)' }}>
-                {view.folder || 'No folder'}
+                {view.folder || 'No folder'}{ofGroup && <span style={{ color: 'var(--text-muted)' }}> · with its group</span>}
               </div>
               {!readOnly && (
-                <button className="lp-icon-btn" title="Move to folder…"
+                <button className="lp-icon-btn" title={ofGroup ? `Move the group ${ofGroup.name} to folder…` : 'Move to folder…'}
+                  aria-label={ofGroup ? 'Move the group to folder' : 'Move to folder'}
                   onClick={() => setEditingFolder(true)}><Icon.Folder /></button>
               )}
             </div>
           )}
         </div>
       </div>
+      {isGroup && ofType && (
+        <div>
+          <div className="props-section-title">View per element <span className="props-section-note">{ofType.label}</span></div>
+          <div className="viewpoint-help">
+            One view per {(ofType.subject?.types ?? []).map((t) => metamodel.nodeTypes[t]?.label ?? t).join(' or ')}, each named after it, made and removed with the elements. Its viewpoint sets them; delete the group to make another kind of view.
+          </div>
+          <div className="props-group-views">
+            {groupViews.length
+              ? groupViews.map((v) => <button key={v.id} className="props-group-view" onClick={() => setActiveView(v.id)}>{v.name}</button>)
+              : <span className="viewpoint-help">No element of its types yet.</span>}
+          </div>
+        </div>
+      )}
+      {!isGroup && (<>
       {(!view.kind || view.kind === 'static') && (
         <div>
           <div className="props-section-title">Lines</div>
@@ -708,7 +735,15 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
       )}
       {/* The metamodel's viewpoints: a kind and a filter under a name; the
           view follows its viewpoint. A list, named for what it is. */}
-      {!readOnly && viewpoints.length > 0 && (
+      {ofGroup && (
+        <div>
+          <div className="props-section-title">Group</div>
+          <div className="viewpoint-help">
+            One of the views of <strong>{ofGroup.name}</strong>: {subject?.label ?? 'its element'} and what lies inside it. Its viewpoint is the group's; it is named after the element and goes with it.
+          </div>
+        </div>
+      )}
+      {!readOnly && viewpoints.length > 0 && !ofGroup && (
         <div>
           <div className="props-section-title">Viewpoint <span className="props-section-note">from the metamodel</span></div>
           <select
@@ -731,7 +766,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
           </div>
         </div>
       )}
-      {!readOnly && (
+      {!readOnly && !ofGroup && (
         <div>
           <div className="props-section-title">View type</div>
           <div className="view-kind-grid" role="group" aria-label="View type">
@@ -873,10 +908,12 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
       )}
       {/* What the view shows, step by step: Structure on the right shows the
           result. A flow view plays its sequence instead. */}
-      {view.kind !== 'dynamic' && <ViewPipelinePanel view={view} readOnly={readOnly} />}
-      {!readOnly && (
+      {view.kind !== 'dynamic' && <ViewPipelinePanel view={view} readOnly={readOnly || !!ofGroup} />}
+      </>)}
+      {/* A group's view goes with its element; deleting the group takes them all. */}
+      {!readOnly && !ofGroup && (
         <button className="props-delete" onClick={() => { removeView(view.id); setActiveView(null); onClose() }}>
-          🗑 Delete view
+          🗑 Delete {isViewGroup(view, metamodel) ? 'the group and its views' : 'view'}
         </button>
       )}
     </div>
@@ -1177,15 +1214,30 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
   const openNew = (id: string | null) => {
     setNewMenuOpen(false)
     if (!id) return
-    setActiveView(id)
-    if (onOpenProps) onOpenProps(id)
+    // A group of views of one element: open, on its first view.
+    const first = viewsOfGroup(useDiagramStore.getState().views, id).sort(byName)[0]
+    if (isViewGroup(useDiagramStore.getState().views[id], metamodel)) setOpenGroups((prev) => new Set(prev).add(id))
+    setActiveView(first?.id ?? id)
+    if (onOpenProps) onOpenProps(first?.id ?? id)
   }
   const totalNodes = useDiagramStore((s) => Object.keys(s.c4Nodes).length)
   const counts = useViewNodeCounts(views)
   const branchCounts = useBranchViewCounts(views)
   const branchTotal = useDiagramStore((s) => s.branch ? Object.keys(s.branch.nodes).length : undefined)
   const viewList = Object.values(views)
-  const tree = useMemo(() => viewFolderTree(viewList), [views])
+  // The views of a group of views of one element show under it, not in the tree.
+  const tree = useMemo(() => viewFolderTree(viewList.filter((v) => !v.partOf)), [views])
+  // Groups start closed; the one holding the active view opens.
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set())
+  const activeGroup = activeViewId ? views[activeViewId]?.partOf : undefined
+  useEffect(() => {
+    if (activeGroup) setOpenGroups((prev) => (prev.has(activeGroup) ? prev : new Set(prev).add(activeGroup)))
+  }, [activeGroup])
+  const toggleGroup = (id: string) => setOpenGroups((prev) => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
   // Folders start open; the one holding the active view opens again.
   const [closed, setClosed] = useState<Set<string>>(() => new Set())
   const activeFolder = activeViewId ? normalizeViewFolder(views[activeViewId]?.folder) : ''
@@ -1216,22 +1268,31 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     const badge = isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : isWarnier ? 'warnier' : 'structure'
     // A view of a viewpoint names it too, after its view type.
     const viewpoint = viewpointOfView(v, metamodel)
+    // A group of views of one element: a click shows or hides its views.
+    const group = isViewGroup(v, metamodel)
+    const members = group ? viewsOfGroup(views, v.id).sort(byName) : []
+    const groupOpen = group && openGroups.has(v.id)
     return (
       <div key={v.id}>
         <div
-          className={`lp-card lp-view-card${isActive ? ' active' : ''}`}
+          className={`lp-card lp-view-card${isActive ? ' active' : ''}${group ? ' lp-view-group' : ''}`}
           style={{ ['--kind-color' as string]: VIEW_KIND_COLORS[badge] }}
-          onClick={() => setActiveView(v.id)}
+          onClick={() => (group ? toggleGroup(v.id) : setActiveView(v.id))}
+          aria-expanded={group ? groupOpen : undefined}
         >
           <div className="lp-view-icon">
             {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : isWarnier ? <Icon.Warnier /> : <Icon.Layers />}
           </div>
           <div className="lp-card-body">
-            <div className="lp-card-title">{v.name}</div>
+            <div className="lp-card-title">
+              {group && <span className={`lp-group-chevron${groupOpen ? ' open' : ''}`}><Icon.ChevronRight /></span>}
+              {v.name}
+            </div>
             <div className="lp-card-meta">
-              <span>{viewNodeCount(v, counts[v.id])}</span>
+              <span>{group ? `${members.length} ${members.length === 1 ? 'view' : 'views'}` : viewNodeCount(v, counts[v.id])}</span>
+              {group && <span className="lp-view-kind lp-view-per" style={VIEW_BADGE_STYLE}>view per element</span>}
               <BranchCount n={branchCounts?.[v.id]} />
-              <span className="lp-view-kind" style={VIEW_BADGE_STYLE}>{badge}</span>
+              {!group && <span className="lp-view-kind" style={VIEW_BADGE_STYLE}>{badge}</span>}
             </div>
             {viewpoint && (
               <div className="lp-card-viewpoint" title={viewpoint.description ?? `Viewpoint ${viewpoint.label}`}>
@@ -1249,6 +1310,11 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
             </div>
           )}
         </div>
+        {groupOpen && (
+          <div className="lp-group-body" role="group" aria-label={v.name}>
+            {members.length ? members.map(renderView) : <div className="lp-group-empty">No element of its types yet.</div>}
+          </div>
+        )}
       </div>
     )
   }
@@ -1339,7 +1405,13 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
                           onClick={() => openNew(addViewOfViewpoint(t.id))}>
                           <span className="lp-add-view-icon"><KindIcon /></span>
                           <span className="lp-add-view-text">
-                            <span className="lp-add-view-name">{t.label}<span className="lp-add-view-kind">{VIEW_KIND_LABELS[t.kind]}</span></span>
+                            <span className="lp-add-view-name">
+                              {t.label}<span className="lp-add-view-kind">{VIEW_KIND_LABELS[t.kind]}</span>
+                              {t.subject && (
+                                <span className="lp-add-view-kind lp-add-view-per"
+                                  title={`A group with one view per ${t.subject.types.map((x) => metamodel.nodeTypes[x]?.label ?? x).join(' or ')}, kept in step with the model`}>View per element</span>
+                              )}
+                            </span>
                             {t.description && <span className="lp-add-view-desc">{t.description}</span>}
                           </span>
                         </button>

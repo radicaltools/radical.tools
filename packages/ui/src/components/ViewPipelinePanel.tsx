@@ -159,7 +159,7 @@ function FilterEditor({ filter, input, types, ctx, onChange, onDone }: {
     const places = placeChoices(input, ctx)
     body = (
       <select className="props-input" aria-label="Inside" value={filter.nodeId}
-        onChange={(e) => onChange({ kind: 'within', nodeId: e.target.value, ...keep })}>
+        onChange={(e) => onChange({ kind: 'within', nodeId: e.target.value, ...(filter.self ? { self: true as const } : {}), ...keep })}>
         {!places.some((p) => p.value === filter.nodeId) && <option value={filter.nodeId}>{ctx.nodes[filter.nodeId]?.label ?? filter.nodeId}</option>}
         {places.map((p) => <option key={p.value} value={p.value}>{p.label} ({p.count})</option>)}
       </select>
@@ -420,8 +420,11 @@ function ViewpointRow({ view, pipeline, ctx }: { view: DiagramView; pipeline: Vi
         <span className="rp-viewpoint-label" title={`${type.label}: ${type.description ? `${type.description}\n` : ''}${chainSummary(type.pipeline, ctx)}`}>
           Set by the viewpoint
         </span>
-        <button className="rp-step-btn rp-viewpoint-btn" onClick={() => detachViewpoint(view.id)}
-          title="Keep this chain, of no viewpoint, to edit it here">Detach</button>
+        {/* One of a group's views stays the group's. */}
+        {!view.partOf && (
+          <button className="rp-step-btn rp-viewpoint-btn" onClick={() => detachViewpoint(view.id)}
+            title="Keep this chain, of no viewpoint, to edit it here">Detach</button>
+        )}
       </div>
     )
   }

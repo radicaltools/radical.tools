@@ -5,7 +5,12 @@
 // radical.tools' own model: a view of each chosen viewpoint, in the folders
 // Conceptual, Logical and Governance. Such a view lists no elements; it shows
 // what its viewpoint's chain gives. It is made once its chain shows an
-// element, and a view of the viewpoint the model already has is reused.
+// element, and a view of the viewpoint the model already has is reused. A
+// viewpoint that draws one element (a state machine, a process, a system's
+// containers) gets a group, which holds a view of each such element and
+// keeps them in step with the model (model.ts, syncViewGroups); the
+// whole-model ones beside them (Containers, Components, Process (Warnier),
+// Domain model) are left out unless ticked.
 //
 // Layer canvases split the output into seven views, the layers of a
 // Radical architecture model: Conceptual (the need, requirements, scenarios,
@@ -25,7 +30,8 @@
 // facade here, so they file and arrange the same way.
 
 import { landscapeGridColumns, type C4Node, type DiagramView } from '../../c4'
-import type { Metamodel } from '../../metamodel'
+import type { Metamodel, ViewpointDef } from '../../metamodel'
+import { canBeSubject } from '../../viewpoints'
 import { runChain, runPipeline, type PipelineContext } from '../../viewPipeline'
 import type { DiagramFacade } from '../diagramFacade'
 import type { ForgeStageId } from './prompts'
@@ -128,16 +134,21 @@ export type ForgeStructure = { kind: 'radical'; viewpoints: string[] } | { kind:
 export const RADICAL_FOLDERS: Record<string, string> = {
   'domain-map': 'Conceptual',
   'domain-model': 'Conceptual',
+  'domain-entities': 'Conceptual',
   traceability: 'Conceptual',
   specification: 'Conceptual',
   'entity-lifecycles': 'Conceptual',
   'event-catalogue': 'Conceptual',
+  'state-machine': 'Conceptual',
   'process-warnier': 'Conceptual',
+  process: 'Conceptual',
   'screen-flow': 'Conceptual',
   screens: 'Conceptual',
   'system-context': 'Logical',
   containers: 'Logical',
+  'system-containers': 'Logical',
   components: 'Logical',
+  'container-components': 'Logical',
   'container-dependencies': 'Logical',
   'domain-realisation': 'Logical',
   responsibilities: 'Logical',
@@ -150,13 +161,18 @@ export const RADICAL_FOLDERS: Record<string, string> = {
 
 const RADICAL_FOLDER_ORDER = ['Conceptual', 'Logical', 'Governance']
 
+/** The whole-model viewpoints a view per element stands in for: offered,
+ *  but left out unless ticked. */
+const UNCHOSEN_BY_DEFAULT = new Set(['containers', 'components', 'process-warnier', 'domain-model'])
+
 /** A viewpoint the Radical structure can have a view of. */
 export interface ForgeViewpointChoice {
   id: string
   label: string
   folder: string
   /** Chosen unless the user unticks it: every viewpoint the radical model
-   *  has a folder for; another metamodel's only when ticked. */
+   *  has a folder for but the whole-model ones a view per element stands in
+   *  for; another metamodel's only when ticked. */
   chosen: boolean
 }
 
@@ -170,11 +186,13 @@ export function radicalViewpoints(metamodel: Metamodel | undefined): ForgeViewpo
     id: v.id,
     label: v.label,
     folder: RADICAL_FOLDERS[v.id] ?? v.group ?? 'Other',
-    chosen: v.id in RADICAL_FOLDERS,
+    chosen: v.id in RADICAL_FOLDERS && !UNCHOSEN_BY_DEFAULT.has(v.id),
   }))
-  const folders = [...RADICAL_FOLDER_ORDER, ...new Set(choices.map((c) => c.folder).filter((f) => !RADICAL_FOLDER_ORDER.includes(f)))]
+  // By the folder at the top (Conceptual/States sits under Conceptual).
+  const top = (c: ForgeViewpointChoice): string => c.folder.split('/')[0]
+  const folders = [...RADICAL_FOLDER_ORDER, ...new Set(choices.map(top).filter((f) => !RADICAL_FOLDER_ORDER.includes(f)))]
   const rank = (c: ForgeViewpointChoice): number => (c.id in RADICAL_FOLDERS ? known.indexOf(c.id) : known.length + defs.findIndex((v) => v.id === c.id))
-  return choices.sort((a, b) => folders.indexOf(a.folder) - folders.indexOf(b.folder) || rank(a) - rank(b))
+  return choices.sort((a, b) => folders.indexOf(top(a)) - folders.indexOf(top(b)) || rank(a) - rank(b))
 }
 
 /** Whether the model already has a layer canvas of a Forge run: a canvas
@@ -208,19 +226,27 @@ export function describeForgeStructure(structure: ForgeStructure, metamodel: Met
 /** The viewpoints whose view shows a stage's work best, first first. */
 const RADICAL_STAGE_VIEWPOINTS: Record<ForgeStageId, string[]> = {
   requirements: ['traceability', 'requirement-coverage', 'specification', 'requirement-gaps'],
-  domain: ['domain-model', 'domain-map', 'domain-realisation'],
+  domain: ['domain-model', 'domain-entities', 'domain-map', 'domain-realisation'],
   fitness: ['fitness-functions', 'decisions'],
   scenarios: ['traceability', 'requirement-coverage', 'specification'],
-  states: ['entity-lifecycles', 'event-catalogue'],
-  processes: ['process-warnier'],
+  states: ['state-machine', 'entity-lifecycles', 'event-catalogue'],
+  processes: ['process', 'process-warnier'],
   mockups: ['screen-flow', 'screens'],
-  c4: ['containers', 'system-context', 'components', 'responsibilities'],
+  c4: ['containers', 'system-containers', 'system-context', 'components', 'container-components', 'responsibilities'],
   review: ['requirement-gaps', 'requirement-coverage', 'traceability'],
 }
 
-/** The view of a viewpoint the model has, if any. */
-const viewOfViewpoint = (views: Record<string, DiagramView> | undefined, viewpoint: string): DiagramView | undefined =>
-  Object.values(views ?? {}).find((v) => v.viewpoint === viewpoint)
+/** The views of a viewpoint the model has, in the list's order. */
+const viewsOfViewpoint = (views: Record<string, DiagramView> | undefined, viewpoint: string): DiagramView[] =>
+  Object.values(views ?? {}).filter((v) => v.viewpoint === viewpoint)
+
+/** The view of a viewpoint the model has, if any: the first, and for a
+ *  group of views of one element the first of its views by name. */
+const viewOfViewpoint = (views: Record<string, DiagramView> | undefined, viewpoint: string): DiagramView | undefined => {
+  const all = viewsOfViewpoint(views, viewpoint)
+  const members = all.filter((v) => v.partOf).sort((a, b) => a.name.localeCompare(b.name))
+  return members[0] ?? all[0]
+}
 
 /** The view that shows a stage's work, if the model has it: the stage's
  *  layer canvas, or the first of its viewpoints' views. */
@@ -267,6 +293,7 @@ function fileIntoRadicalViews(facade: DiagramFacade, nodeIds: string[], viewpoin
     const def = defs.get(viewpoint)
     const choice = choices.get(viewpoint)
     if (!def || !choice) continue
+    if (def.subject) { filed.push(...fileIntoGroup(facade, def, choice.folder, nodeIds, metamodel)); continue }
     let view = viewOfViewpoint(facade.getViews?.(), viewpoint)
     let made = false
     if (!view) {
@@ -281,6 +308,33 @@ function fileIntoRadicalViews(facade: DiagramFacade, nodeIds: string[], viewpoin
     }
     const shown = shownBy(facade, view, metamodel).map((n) => n.id).filter((id) => fresh.has(id))
     filed.push({ key: viewpoint, viewId: view.id, viewName: view.name, canvas: isCanvas(view), made, nodeIds: nodeIds.filter((id) => shown.includes(id)) })
+  }
+  return filed
+}
+
+/** A viewpoint that draws one element: its group (named after it, in
+ *  `folder`), made once the model has an element of its types that is not
+ *  external, and what each of the group's views now shows of `nodeIds`
+ *  (those it made with it marked made). */
+function fileIntoGroup(facade: DiagramFacade, def: ViewpointDef, folder: string, nodeIds: string[], metamodel: Metamodel): FiledNodes[] {
+  const before = new Set(Object.keys(facade.getViews?.() ?? {}))
+  let group = viewsOfViewpoint(facade.getViews?.(), def.id).find((v) => !v.partOf)
+  if (!group) {
+    if (!Object.values(facade.getNodes()).some((n) => !n.external && canBeSubject(def, n))) return []
+    const groupId = facade.addView!(def.label)
+    if (!groupId) return []
+    facade.setViewFolder?.(groupId, folder)
+    if (!facade.applyViewpoint?.(groupId, def.id, null)) { facade.removeView?.(groupId); return [] }
+    group = facade.getViews?.()[groupId]
+    if (!group) return []
+  }
+  const fresh = new Set(nodeIds)
+  const filed: FiledNodes[] = []
+  for (const view of Object.values(facade.getViews?.() ?? {}).filter((v) => v.partOf === group!.id)) {
+    const shown = new Set(shownBy(facade, view, metamodel).map((n) => n.id))
+    const ids = nodeIds.filter((id) => fresh.has(id) && shown.has(id))
+    const made = !before.has(view.id)
+    if (made || ids.length) filed.push({ key: def.id, viewId: view.id, viewName: view.name, canvas: isCanvas(view), made, nodeIds: ids })
   }
   return filed
 }
@@ -361,11 +415,15 @@ export function forgeArrangeGroups(facade: DiagramFacade, addedNodeIds: string[]
     if (!metamodel) return []
     const added = new Set(addedNodeIds)
     for (const viewpoint of structure.viewpoints) {
-      const view = viewOfViewpoint(views, viewpoint)
-      if (!view || !isCanvas(view)) continue
-      const shown = new Set(shownBy(facade, view, metamodel).map((n) => n.id))
-      const nodeIds = outermostNodes(nodes, addedNodeIds.filter((id) => added.has(id) && shown.has(id)))
-      if (nodeIds.length) groups.push({ viewId: view.id, viewName: view.name, nodeIds })
+      for (const view of viewsOfViewpoint(views, viewpoint)) {
+        if (!isCanvas(view)) continue
+        // A group's views are arranged, each on its own; of a whole-model
+        // viewpoint only the first view, the one filed.
+        if (!view.partOf && view !== viewOfViewpoint(views, viewpoint)) continue
+        const shown = new Set(shownBy(facade, view, metamodel).map((n) => n.id))
+        const nodeIds = outermostNodes(nodes, addedNodeIds.filter((id) => added.has(id) && shown.has(id)))
+        if (nodeIds.length) groups.push({ viewId: view.id, viewName: view.name, nodeIds })
+      }
     }
     return groups
   }

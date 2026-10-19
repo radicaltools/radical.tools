@@ -2,7 +2,9 @@
 // The viewpoints the built-in metamodels bring (viewpoints.ts): each a view
 // type and a filter chain under a name, for a question asked of the model
 // again and again, grouped by the concern it serves. C4 brings the C4 ones;
-// Radical all of them, along the relations its types have.
+// Radical all of them, along the relations its types have. Some draw one
+// element (subject): a view of each system's containers, each container's
+// components, each domain, state machine and process.
 
 import type { ViewPipeline } from '../../c4'
 import type { ViewpointDef } from '../types'
@@ -13,6 +15,13 @@ const BUILDING_BLOCKS = ['system', 'container', 'webapp', 'component', 'database
 /** Every relation among the elements of `types`, on a canvas or matrix. */
 function among(types: string[]): ViewPipeline {
   return { levels: [{ ways: [{ types }] }], edges: 'all' }
+}
+
+/** For a view of one element: the elements of `types` (the element and what
+ *  lies inside it, once scoped), those of `around` related to them either
+ *  way, and every relation among them. */
+function aroundOne(types: string[], around: string[]): ViewPipeline {
+  return { levels: [{ ways: [{ types }] }, { ways: [{ via: { anyRelation: true }, types: around }] }], edges: 'all' }
 }
 
 /** System context, containers, components and how containers depend on each other. */
@@ -35,12 +44,30 @@ export function c4Viewpoints(): ViewpointDef[] {
       pipeline: among(['person', 'system', ...DEPLOYABLE]),
     },
     {
+      id: 'system-containers',
+      label: 'Containers of a system',
+      group: 'C4',
+      description: 'One software system with the containers, web apps, databases and queues inside it, and the people, systems and containers they are related to: a view per system (C4 level 2).',
+      kind: 'static',
+      subject: { types: ['system'] },
+      pipeline: aroundOne(['system', ...DEPLOYABLE], ['person', 'system', ...DEPLOYABLE]),
+    },
+    {
       id: 'components',
       label: 'Components',
       group: 'C4',
       description: 'The containers and web apps with the components inside them, the databases and queues they use, and every relation between them (C4 level 3).',
       kind: 'static',
       pipeline: among(['container', 'webapp', 'component', 'database', 'queue']),
+    },
+    {
+      id: 'container-components',
+      label: 'Components of a container',
+      group: 'C4',
+      description: 'One container or web app with the components inside it, and the people, systems, containers and components they are related to: a view per container (C4 level 3).',
+      kind: 'static',
+      subject: { types: ['container', 'webapp'] },
+      pipeline: aroundOne(['container', 'webapp', 'component'], ['person', 'system', ...DEPLOYABLE, 'component']),
     },
     {
       id: 'container-dependencies',
@@ -73,6 +100,21 @@ export function radicalViewpoints(): ViewpointDef[] {
       description: 'The entities and aggregates, what they are part of and what they reference.',
       kind: 'static',
       pipeline: among(['entity']),
+    },
+    {
+      id: 'domain-entities',
+      label: 'Entities of a domain',
+      group: 'Domain',
+      description: 'One domain with its subdomains and entities, and the entities of other domains they reference or are part of: a view per domain.',
+      kind: 'static',
+      subject: { types: ['domain'] },
+      pipeline: {
+        levels: [
+          { ways: [{ types: ['domain', 'entity'] }] },
+          { ways: [{ via: { relationType: 'references', direction: 'out' }, types: ['entity'] }, { via: { relationType: 'part-of', direction: 'out' }, types: ['entity'] }] },
+        ],
+        edges: 'all',
+      },
     },
     {
       id: 'domain-realisation',
@@ -217,6 +259,21 @@ export function radicalViewpoints(): ViewpointDef[] {
       ] },
     },
     {
+      id: 'state-machine',
+      label: 'State machine',
+      group: 'States',
+      description: 'One state machine with its states, pseudostates, events and transitions, and the entity it is the lifecycle of: a view per machine.',
+      kind: 'static',
+      subject: { types: ['state-machine'] },
+      pipeline: {
+        levels: [
+          { ways: [{ types: ['state-machine', 'state', 'pseudostate', 'event'] }] },
+          { ways: [{ via: { relationType: 'lifecycle-of', direction: 'out' }, types: ['entity'] }] },
+        ],
+        edges: 'all',
+      },
+    },
+    {
       id: 'event-catalogue',
       label: 'Event catalogue',
       group: 'States',
@@ -233,6 +290,15 @@ export function radicalViewpoints(): ViewpointDef[] {
       group: 'Process',
       description: 'The processes and their steps as Warnier–Orr diagrams: what each is made of, what repeats, what is an alternative and what runs at once.',
       kind: 'warnier',
+      pipeline: { levels: [{ ways: [{ types: ['process', 'step'] }] }] },
+    },
+    {
+      id: 'process',
+      label: 'Process',
+      group: 'Process',
+      description: 'One process and its steps as a Warnier–Orr diagram: a view per process.',
+      kind: 'warnier',
+      subject: { types: ['process'] },
       pipeline: { levels: [{ ways: [{ types: ['process', 'step'] }] }] },
     },
   ]

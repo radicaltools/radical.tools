@@ -174,13 +174,13 @@ describe('radical structure', () => {
     return { kind: 'radical', viewpoints: structure.viewpoints.filter((v) => !without.includes(v)) }
   }
 
-  it('lists the viewpoints in the folders of the radical model, every one chosen', () => {
+  it('lists the viewpoints in the folders of the radical model, all but the whole-model ones a view per element stands in for chosen', () => {
     const choices = radicalViewpoints(builtInGovernanceMetamodel())
     expect([...new Set(choices.map((c) => c.folder))]).toEqual(['Conceptual', 'Logical', 'Governance'])
     expect(choices.filter((c) => c.folder === 'Logical').map((c) => c.label)).toEqual([
-      'System context', 'Containers', 'Components', 'Container dependencies', 'Domain realisation', 'Responsibilities',
+      'System context', 'Containers', 'Containers of a system', 'Components', 'Components of a container', 'Container dependencies', 'Domain realisation', 'Responsibilities',
     ])
-    expect(choices.every((c) => c.chosen)).toBe(true)
+    expect(choices.filter((c) => !c.chosen).map((c) => c.id)).toEqual(['domain-model', 'process-warnier', 'containers', 'components'])
     expect(choices.find((c) => c.id === 'process-warnier')?.folder).toBe('Conceptual')
     // Another metamodel's viewpoint: a folder after its group, not chosen.
     const metamodel = builtInGovernanceMetamodel()
@@ -231,21 +231,54 @@ describe('radical structure', () => {
     expect(forgeArrangeGroups(facade, ['r1', 'r2'], 'requirements', structure)).toEqual([])
   })
 
+  it('makes a group of views of each state machine, process, system, container and domain, which a later element joins', () => {
+    const facade = facadeOf([
+      node('m1', 'state-machine', { label: 'Order' }), node('m2', 'state-machine', { label: 'Payment' }),
+      node('p1', 'process', { label: 'Booking' }), node('p2', 'process', { label: 'Cancelling' }),
+      node('sys', 'system', { label: 'Shop' }), node('api', 'container', { label: 'API', parentId: 'sys' }), node('web', 'webapp', { label: 'Web', parentId: 'sys' }),
+      node('d1', 'domain', { label: 'Sales' }), node('d2', 'domain', { label: 'Billing' }),
+      // No view of an external system.
+      node('bank', 'system', { label: 'Bank', external: true }),
+    ])
+    const structure = radical(facade)
+    fileIntoForgeViews(facade, Object.keys(facade.getNodes()), undefined, structure)
+    const views = () => Object.values(facade.getViews!())
+    const group = (viewpoint: string) => {
+      const g = views().find((v) => v.viewpoint === viewpoint && !v.partOf)!
+      return [g.name, g.folder, views().filter((v) => v.partOf === g.id).map((v) => v.name).sort()]
+    }
+    expect(group('state-machine')).toEqual(['State machine', 'Conceptual', ['Order', 'Payment']])
+    expect(group('process')).toEqual(['Process', 'Conceptual', ['Booking', 'Cancelling']])
+    expect(group('domain-entities')).toEqual(['Entities of a domain', 'Conceptual', ['Billing', 'Sales']])
+    expect(group('system-containers')).toEqual(['Containers of a system', 'Logical', ['Shop']])
+    expect(group('container-components')).toEqual(['Components of a container', 'Logical', ['API', 'Web']])
+    for (const whole of ['containers', 'components', 'process-warnier', 'domain-model']) expect(views().filter((v) => v.viewpoint === whole)).toEqual([])
+    // A later stage's machine joins the group as it is added, and the
+    // stage's filing finds it there; nothing is made twice.
+    const m3 = facade.addNode({ type: 'state-machine', label: 'Refund', x: 0, y: 0, width: 200, height: 100, collapsed: false })
+    const filed = fileIntoForgeViews(facade, [m3], 'states', structure)
+    expect(filed.filter((f) => f.nodeIds.length).map((f) => [f.viewName, f.nodeIds])).toEqual([['Refund', [m3]]])
+    expect(group('state-machine')[2]).toEqual(['Order', 'Payment', 'Refund'])
+    expect(forgeStageView(facade.getViews!(), 'states', structure)?.name).toBe('Order')
+  })
+
   it('offers to arrange the new elements a canvas of a viewpoint shows', () => {
     const facade = facadeOf([node('user', 'person'), node('sys', 'system'), node('api', 'container', { parentId: 'sys' })])
     const structure = radical(facade)
     const filed = fileIntoForgeViews(facade, ['user', 'sys', 'api'], 'c4', structure)
+    // The system's containers and the container's components: a view each,
+    // in a group, named after the element.
     expect(filed.filter((f) => f.canvas).map((f) => [f.viewName, f.nodeIds])).toEqual([
       ['System context', ['user', 'sys']],
-      ['Containers', ['user', 'sys', 'api']],
-      ['Components', ['api']],
+      ['sys', ['sys', 'api']],
+      ['api', ['api']],
     ])
     expect(facade.getViews!()[filed[0].viewId].folder).toBe('Logical')
-    expect(forgeStageView(facade.getViews!(), 'c4', structure)?.name).toBe('Containers')
+    expect(forgeStageView(facade.getViews!(), 'c4', structure)?.name).toBe('sys')
     expect(forgeArrangeGroups(facade, ['user', 'sys', 'api'], 'c4', structure).map((g) => [g.viewName, g.nodeIds])).toEqual([
       ['System context', ['user', 'sys']],
-      ['Containers', ['user', 'sys']],
-      ['Components', ['api']],
+      ['sys', ['sys']],
+      ['api', ['api']],
     ])
   })
 })

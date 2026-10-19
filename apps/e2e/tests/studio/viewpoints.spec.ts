@@ -72,7 +72,7 @@ test('New view offers the metamodel\'s viewpoints; a view of one follows the vie
   const kinds = async () => (await storedViews()).filter((v) => v.viewpoint === 'sorted-trace').map((v) => v.kind)
   await expect.poll(kinds).toEqual(['wiki', 'wiki'])
   await editor.getByRole('button', { name: 'Delete viewpoint Sorted trace' }).click()
-  await expect(section.locator('.mm-card')).toHaveCount(20)
+  await expect(section.locator('.mm-card')).toHaveCount(25)
   await expect.poll(async () => (await storedViews()).filter((v) => v.name === 'Governance').map((v) => [v.kind, v.viewpoint ?? null])).toEqual([['wiki', null]])
 
   // Kept in the metamodel, which stays the Radical preset.
@@ -87,30 +87,110 @@ test('every viewpoint of the Radical metamodel opens as a view of its type', asy
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
   await studio.openSample()
-  const expected: Array<[string, string, boolean]> = [
-    ['System context', 'STRUCTURE VIEW', true], ['Containers', 'STRUCTURE VIEW', true], ['Components', 'STRUCTURE VIEW', true],
+  // A viewpoint of one element makes a group and opens its first view, or
+  // the group when the sample has no such element.
+  const ONE = 'one'
+  const NONE = 'none'
+  const expected: Array<[string, string, boolean | typeof ONE | typeof NONE]> = [
+    ['System context', 'STRUCTURE VIEW', true], ['Containers', 'STRUCTURE VIEW', true], ['Containers of a system', 'STRUCTURE VIEW', ONE],
+    ['Components', 'STRUCTURE VIEW', true], ['Components of a container', 'STRUCTURE VIEW', ONE],
     ['Container dependencies', 'MATRIX VIEW', true],
-    ['Domain map', 'STRUCTURE VIEW', false], ['Domain model', 'STRUCTURE VIEW', false], ['Domain realisation', 'TABLE VIEW', false],
+    ['Domain map', 'STRUCTURE VIEW', false], ['Domain model', 'STRUCTURE VIEW', false], ['Entities of a domain', 'STRUCTURE VIEW', NONE],
+    ['Domain realisation', 'TABLE VIEW', false],
     ['Traceability', 'TABLE VIEW', true], ['Requirement coverage', 'TABLE VIEW', true], ['Requirement gaps', 'TABLE VIEW', true],
     ['Responsibilities', 'TABLE VIEW', true], ['Specification', 'WIKI VIEW', true],
     ['Decisions', 'TABLE VIEW', true], ['Decision log', 'WIKI VIEW', true], ['Fitness functions', 'TABLE VIEW', true],
     ['Screen flow', 'STRUCTURE VIEW', true], ['Screens', 'TABLE VIEW', true],
-    ['Entity lifecycles', 'TABLE VIEW', false], ['Event catalogue', 'TABLE VIEW', false],
-    ['Process (Warnier)', 'WARNIER VIEW', true],
+    ['Entity lifecycles', 'TABLE VIEW', false], ['State machine', 'STRUCTURE VIEW', NONE], ['Event catalogue', 'TABLE VIEW', false],
+    ['Process (Warnier)', 'WARNIER VIEW', true], ['Process', 'WARNIER VIEW', ONE],
   ]
   for (const [name, badge, shows] of expected) {
     const back = page.locator('.left-panel .rp-slider.show-props .rp-back-btn')
     if (await back.isVisible()) await back.click()
     await page.getByRole('button', { name: 'New view' }).click()
-    await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: new RegExp(`^${name.replace(/[()]/g, '\\$&')}`) }).click()
+    // The name, then the view type: "Containers" is not "Containers of a system".
+    const option = new RegExp(`^${name.replace(/[()]/g, '\\$&')}\\s*(Structure|Table|Matrix|Wiki|Warnier|Hierarchy)`)
+    await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: option }).click()
     await expect(page.locator('.props-type-badge'), name).toContainText(`${badge} · ${name.toUpperCase()}`)
     await expect(page.getByText('Runtime Error')).toHaveCount(0)
     await page.locator('.left-panel .rp-slider.show-props .rp-back-btn').click()
     const meta = page.locator('.lp-view-card.active .lp-card-meta')
-    if (shows) await expect(meta, `${name} shows elements`).toContainText(/\b[1-9]\d* nodes?/)
+    if (shows === NONE) await expect(meta, `${name} holds no view in the sample`).toContainText(/\b0 views/)
+    else if (shows) await expect(meta, `${name} shows elements`).toContainText(/\b[1-9]\d* nodes?/)
     else await expect(meta, `${name} shows nothing in the sample`).toContainText(/\b0 nodes/)
   }
   expect(errors).toEqual([])
+})
+
+// A viewpoint that draws one element (ViewpointDef.subject) makes one view
+// in the list, a group: a click shows a view of each such element, and a new
+// element gets its view there at once.
+test('a viewpoint that draws one element makes a group with a view of each, which a new element joins', async ({ page, studio }) => {
+  const at = (x: number) => ({ x, y: 0, width: 300, height: 200, collapsed: false })
+  const machine = (id: string, label: string, states: string[], x: number) => [
+    { id, type: 'state-machine', label, ...at(x) },
+    ...states.map((s, i) => ({ id: `${id}-${i}`, type: 'state', label: s, parentId: id, ...at(x + 20 + i * 120), y: 60, width: 100, height: 60 })),
+  ]
+  await studio.seedDocument(JSON.stringify({
+    nodes: [...machine('order', 'Order', ['Placed', 'Paid'], 0), ...machine('payment', 'Payment', ['Pending'], 400)],
+    relations: [], views: [],
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+  }))
+  await studio.open('all')
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: /^State machine\s*Structure/ }).click()
+
+  // One group in the list, open on its first view: Order with its states only.
+  const group = page.locator('.lp-view-group', { hasText: 'State machine' })
+  await expect(group).toContainText('2 views')
+  const members = page.getByRole('group', { name: 'State machine' }).locator('.lp-card-title')
+  await expect(members).toHaveText(['Order', 'Payment'])
+  await expect(page.locator('.props-type-badge')).toContainText('STRUCTURE VIEW · STATE MACHINE')
+  await expect(page.locator('.lp-view-card.active .lp-card-title')).toHaveText('Order')
+  await expect(page.locator('.lp-view-card.active .lp-card-meta')).toContainText('3 nodes')
+  // Opened for the first time, it is laid out by Smart Layout: positions of its own, no notice.
+  const positionsOf = async (name: string) => Object.keys(((await studio.storedDoc()) as unknown as { views: Array<{ name: string; positions?: object }> }).views.find((v) => v.name === name)?.positions ?? {}).length
+  await expect.poll(() => positionsOf('Order')).toBeGreaterThan(0)
+  await expect(page.getByText('This diagram is not laid out yet')).toHaveCount(0)
+  // Its viewpoint is the group's: no Viewpoint list, View type or Detach.
+  await expect(page.getByText('One of the views of')).toBeVisible()
+  await expect(page.getByLabel('Viewpoint', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Detach' })).toHaveCount(0)
+
+  // Moving one of its views to a folder moves the group, with all its views.
+  await page.getByRole('button', { name: 'Move the group to folder' }).click()
+  await page.getByLabel('Folder', { exact: true }).fill('States')
+  await page.getByLabel('Folder', { exact: true }).press('Enter')
+  await expect(page.locator('.props-field', { hasText: 'States · with its group' })).toBeVisible()
+  const stored = async () => ((await studio.storedDoc()) as unknown as { views: Array<{ name: string; folder?: string }> }).views.map((v) => [v.name, v.folder ?? ''])
+  await expect.poll(stored).toEqual([['State machine', 'States'], ['Order', 'States'], ['Payment', 'States']])
+  await expect(page.locator('.lp-folder', { hasText: 'States' }).locator('.lp-view-group')).toContainText('State machine')
+
+  // Nothing is hidden from a view per element by hand.
+  await studio.node('order-0').click()
+  await expect(page.locator('.sel-bar-btn', { hasText: 'Hide from view' })).toHaveCount(0)
+  await page.keyboard.press('Delete')
+  await expect(page.getByRole('button', { name: /Hide from current view/ })).toBeDisabled()
+  await page.getByRole('button', { name: /^Cancel/ }).click()
+
+  // The group keeps its viewpoint: no View type, Viewpoint list or Filter to change.
+  await page.locator('.left-panel .rp-slider.show-props .rp-back-btn').click()
+  await group.hover()
+  await group.getByTitle('View properties').click()
+  await expect(page.getByText('One view per State Machine')).toBeVisible()
+  await expect(page.getByRole('group', { name: 'View type' })).toHaveCount(0)
+  await expect(page.getByLabel('Viewpoint', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Delete the group and its views/ })).toBeVisible()
+
+  // A new state machine: the group gets its view at once.
+  await page.locator('.left-panel .rp-slider.show-props .rp-back-btn').click()
+  await studio.addFromPalette('State Machine', await studio.nearBottom())
+  await expect(group).toContainText('3 views')
+  await expect(members).toHaveText(['Order', 'Payment', 'State-machine'])
+
+  // A click on the group hides its views.
+  await group.click()
+  await expect(members).toHaveCount(0)
 })
 
 // In a new model the New view button is near the top: the menu opens below

@@ -67,6 +67,29 @@ describe('MCP document tools', () => {
     }
   })
 
+  it('lays out each view per element as it is made: with its group, and for an element added later', async () => {
+    const { client, read } = await connect()
+    try {
+      await call(client, 'add_node', { tempId: 'order', type: 'state-machine', label: 'Order' })
+      for (const [i, label] of ['Placed', 'Paid', 'Shipped'].entries()) {
+        await call(client, 'add_node', { tempId: `s${i}`, type: 'state', label, parentId: 'order' })
+      }
+      const made = await call(client, 'create_view', { tempId: 'g', name: 'Machines', viewpoint: 'state-machine' })
+      expect(made).toContain('Smart Layout arranged the new view Order')
+      const orderView = (await read()).views!.find((v) => v.name === 'Order')!
+      expect(orderView.partOf).toBeDefined()
+      expect(Object.keys(orderView.positions ?? {}).length).toBeGreaterThan(0)
+      // A machine added later: its view is made and laid out with it.
+      await call(client, 'add_node', { tempId: 'pay', type: 'state-machine', label: 'Payment' })
+      const added = await call(client, 'add_node', { tempId: 'p0', type: 'state', label: 'Pending', parentId: 'pay' })
+      expect(added).not.toContain('Smart Layout arranged')
+      const payView = (await read()).views!.find((v) => v.name === 'Payment')!
+      expect(payView.partOf).toBe(orderView.partOf)
+    } finally {
+      await client.close()
+    }
+  })
+
   it('lays out one view into its own positions and builds a presentation over it', async () => {
     const { client, read } = await connect()
     try {
