@@ -10,9 +10,9 @@ Use Node.js 20.11 or newer. Run the published server without cloning this reposi
 npx -y @radicaltools/mcp --folder /absolute/path/to/my-model
 ```
 
-For reproducible setups, pin a version, for example `@radicaltools/mcp@0.1.1`.
+For reproducible setups, pin a version, for example `@radicaltools/mcp@0.2.0`.
 To connect a coding agent, use `npx` as the command, with
-`["-y", "@radicaltools/mcp@0.1.1", "--folder", "/absolute/path/to/my-model"]`
+`["-y", "@radicaltools/mcp@0.2.0", "--folder", "/absolute/path/to/my-model"]`
 as its arguments. On Windows, use `npx.cmd` as the command and an absolute Windows
 folder path. The server waits for MCP messages on stdin and prints no banner to stdout.
 
@@ -100,7 +100,7 @@ publish the verified first-release archive, completing npm's 2FA challenge:
 ```sh
 npm login --auth-type=web
 npm whoami
-npm publish ./release/radicaltools-mcp-0.1.1.tgz --access public
+npm publish ./release/radicaltools-mcp-0.2.0.tgz --access public
 ```
 
 Do this after the pull request is merged, from the reviewed main commit. A name
