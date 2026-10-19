@@ -83,7 +83,7 @@ export function ChangesTab({ changes, base, baseModel, ctx }: {
   return (
     <section className="insp-changes" aria-label="Changes">
       <p className="insp-lede insp-tab-lede">
-        What changed in the model since main <code>{base.commit.slice(0, 7)}</code> ({base.described}{base.branch ? `, ${base.branch}` : ''}), uncommitted edits included; moving elements and editing views do not count. Base saved {ago(base.savedAt)} · {added + changed + removed} elements changed: {added} added, {changed} changed, {removed} removed.
+        What changed in the model since {base.source === 'forge' ? 'the start of the Forge run' : <>main <code>{base.commit.slice(0, 7)}</code> ({base.described}{base.branch ? `, ${base.branch}` : ''})</>}{base.source === 'forge' ? '' : ', uncommitted edits included'}; moving elements and editing views do not count. Base saved {ago(base.savedAt)} · {added + changed + removed} elements changed: {added} added, {changed} changed, {removed} removed.
       </p>
       {isBaseOld(base) && (
         <div className="insp-notice warn insp-change-old">

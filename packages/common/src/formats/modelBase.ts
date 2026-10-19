@@ -7,6 +7,11 @@
 // elements and relations; their positions place the ghosts of removed
 // elements and are no part of the comparison. It lives under `.radical/`,
 // out of version control like the rest of the editor state.
+//
+// A folder git does not track never gets one that way, so Radical Forge
+// saves the model as it is when a run starts (source "forge", no commit)
+// wherever there is no base from git: Studio then shows what the run
+// changes. A base from git is never replaced by one.
 
 import type { C4Node, C4Relation } from '../c4'
 import { SELECTION_DIR } from './canvasSelection'
@@ -18,7 +23,9 @@ export const BASE_OLD_MS = 24 * 60 * 60 * 1000
 
 export interface ModelBase {
   version: 1
-  /** The commit the base was read from. */
+  /** Where it came from: git (the default) or the start of a Forge run. */
+  source?: 'forge'
+  /** The commit the base was read from; "" for a Forge run's base. */
   commit: string
   /** How it was chosen: "merge base with origin/main", "HEAD", a ref. */
   described: string
@@ -31,7 +38,11 @@ export interface ModelBase {
 }
 
 export function serializeModelBase(base: Omit<ModelBase, 'version' | 'savedAt'>, now = new Date()): string {
-  const out: ModelBase = { version: 1, commit: base.commit, described: base.described, branch: base.branch, savedAt: now.toISOString(), nodes: base.nodes, relations: base.relations }
+  const out: ModelBase = {
+    version: 1,
+    ...(base.source ? { source: base.source } : {}),
+    commit: base.commit, described: base.described, branch: base.branch, savedAt: now.toISOString(), nodes: base.nodes, relations: base.relations,
+  }
   // One line: about a megabyte for a model of a thousand elements.
   return `${JSON.stringify(out)}\n`
 }
@@ -43,16 +54,42 @@ export function parseModelBase(text: string): ModelBase | null {
   let raw: unknown
   try { raw = JSON.parse(text) } catch { return null }
   if (!isRecord(raw)) return null
-  const { version, commit, described, branch, savedAt, nodes, relations } = raw
-  if (version !== 1 || typeof commit !== 'string' || !commit || typeof described !== 'string') return null
+  const { version, source, commit, described, branch, savedAt, nodes, relations } = raw
+  if (source !== undefined && source !== 'forge') return null
+  if (version !== 1 || typeof commit !== 'string' || (!commit && source !== 'forge') || typeof described !== 'string') return null
   if (typeof savedAt !== 'string' || Number.isNaN(Date.parse(savedAt))) return null
   if (branch !== null && typeof branch !== 'string') return null
   if (!Array.isArray(nodes) || !Array.isArray(relations)) return null
   const ok = nodes.every((n) => isRecord(n) && typeof n.id === 'string' && typeof n.type === 'string' && typeof n.label === 'string')
     && relations.every((r) => isRecord(r) && typeof r.id === 'string' && typeof r.sourceId === 'string' && typeof r.targetId === 'string')
   if (!ok) return null
-  return { version: 1, commit, described, branch: branch as string | null, savedAt, nodes: nodes as unknown as C4Node[], relations: relations as unknown as C4Relation[] }
+  return {
+    version: 1,
+    ...(source === 'forge' ? { source } : {}),
+    commit, described, branch: branch as string | null, savedAt, nodes: nodes as unknown as C4Node[], relations: relations as unknown as C4Relation[],
+  }
 }
 
-export const isBaseOld = (base: Pick<ModelBase, 'savedAt'>, now = Date.now()): boolean =>
-  now - Date.parse(base.savedAt) > BASE_OLD_MS
+/** A base from git may belong to another branch once it is old; a Forge
+ *  run's base stays the start of that run. */
+export const isBaseOld = (base: Pick<ModelBase, 'savedAt' | 'source'>, now = Date.now()): boolean =>
+  base.source !== 'forge' && now - Date.parse(base.savedAt) > BASE_OLD_MS
+
+/** What the changes are counted since, for a sentence: "main 534f32f" or
+ *  "the start of the Forge run". */
+export const baseSince = (base: Pick<ModelBase, 'source' | 'commit'>): string =>
+  base.source === 'forge' ? 'the start of the Forge run' : `main ${base.commit.slice(0, 7)}`
+
+/** The model as a Forge run starts on it, as a base file. */
+export function forgeModelBase(nodes: C4Node[], relations: C4Relation[], now = new Date()): string {
+  return serializeModelBase({ source: 'forge', commit: '', described: 'start of the Radical Forge run', branch: null, nodes, relations }, now)
+}
+
+/** Whether a Forge run may save its base over `existing` (the base file's
+ *  text, or null): when there is none, it is no base, or an earlier run
+ *  saved it. A base from git stays. */
+export function mayReplaceWithForgeBase(existing: string | null): boolean {
+  if (existing === null) return true
+  const base = parseModelBase(existing)
+  return !base || base.source === 'forge'
+}

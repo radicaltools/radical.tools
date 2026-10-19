@@ -20,6 +20,7 @@ const api = {
   writeSelection: (folderPath, content) => ipcRenderer.invoke('folder:write-selection', folderPath, content),
   readForgeRun: (folderPath) => ipcRenderer.invoke('folder:read-forge-run', folderPath),
   readModelBase: (folderPath) => ipcRenderer.invoke('folder:read-model-base', folderPath),
+  writeModelBase: (folderPath, content) => ipcRenderer.invoke('folder:write-model-base', folderPath, content),
   readCheckFiles: (folderPath) => ipcRenderer.invoke('folder:read-check-files', folderPath),
   writeCheckConfig: (folderPath, content) => ipcRenderer.invoke('folder:write-check-config', folderPath, content),
   getWatchedPath: () => ipcRenderer.invoke('file:getWatchedPath'),

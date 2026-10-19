@@ -20,7 +20,7 @@ Architecture diagrams go stale because they are pictures. In radical.tools they 
 
 - **No account, nothing to install.** Open it in the browser and start modelling. Your model stays in local storage or plain files you can commit.
 - **C4 without the busywork.** Smart Layout places nodes, minimises crossings and fits groups for you, and keeps the rows, columns and grids you pin.
-- **From a paragraph to a model.** Radical Forge turns a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model, one reviewable stage at a time.
+- **From a paragraph to a model.** Radical Forge turns a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewable stage at a time, each filling the gaps it finds in the ones before, and ends with a review of the whole model.
 - **Bring your own AI.** OpenAI, Anthropic, Gemini, or a local model through Ollama.
 - **Don't start from zero.** Import from 120+ curated requirements, patterns, ADRs, fitness functions and blueprints in the [Architecture Hub](https://hub.radical.tools).
 
@@ -54,7 +54,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 - **Calm drags**: a drag moves only what you drag and pushes clear only what you drop it on; dropped elements stay pinned where you put them (⌘/Ctrl-drag lets the live physics make room instead)
 - **Multiple layout engines**: ELK (hierarchical/layered/force), webcola (live physics), custom Smart Layout pipeline
 - **AI assistant**: chat with OpenAI / Anthropic / Gemini / Ollama to generate and modify diagrams
-- **Radical Forge**: turn a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, UI mockups and a C4 model, one reviewable stage at a time; the description is kept in the model as a Need the requirements derive from
+- **Radical Forge**: turn a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewable stage at a time, each filling gaps in the ones before (you keep or reject each such change), and a final review; the description is kept in the model as a Need the requirements derive from
 - **Architecture Hub**: browse and import 120+ curated architecture concepts (patterns, fitness functions, ADRs, requirements, blueprints) from [hub.radical.tools](https://hub.radical.tools); blueprints include per-actor screen flows and named views
 - **Six view kinds**: Structure, Flow, Hierarchy, Table, Matrix and Wiki, each filtered by a chain of levels (needs → requirements → scenarios) and kept in folders
 - **Presentation mode**: slides over views and milestones, played in the window with a navigation bar

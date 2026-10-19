@@ -78,7 +78,7 @@ export function ThisChange({ work, changes, base, baseModel, ctx, onAllChanges }
         <div>
           <h2>This change</h2>
           <p className="insp-muted">
-            Since main <code>{base.commit.slice(0, 7)}</code> ({base.described}{base.branch ? `, ${base.branch}` : ''}) · base saved {ago(base.savedAt)} · {added + changed + removed} elements changed: {added} added, {changed} changed, {removed} removed
+            Since {base.source === 'forge' ? 'the start of the Forge run' : <>main <code>{base.commit.slice(0, 7)}</code> ({base.described}{base.branch ? `, ${base.branch}` : ''})</>} · base saved {ago(base.savedAt)} · {added + changed + removed} elements changed: {added} added, {changed} changed, {removed} removed
           </p>
         </div>
         <button type="button" className="insp-all-link" onClick={onAllChanges}>All changes{isBaseOld(base) ? ' · old base' : ''} ›</button>

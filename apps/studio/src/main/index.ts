@@ -5,7 +5,7 @@ import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'f
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { readCheckFiles, readEditorStateFile, writeCheckConfig, writeSelectionFile } from '@radical/node-files/selectionFile'
+import { readCheckFiles, readEditorStateFile, writeCheckConfig, writeEditorStateFile, writeSelectionFile } from '@radical/node-files/selectionFile'
 import { FORGE_RUN_FILE } from '@radical/common/formats/forgeRunStatus'
 import { MODEL_BASE_FILE } from '@radical/common/formats/modelBase'
 
@@ -238,6 +238,16 @@ app.whenReady().then(() => {
   ipcMain.handle('folder:read-model-base', async (_event, folderPath: string) => {
     try {
       return { success: true, content: await readEditorStateFile(folderPath, MODEL_BASE_FILE) }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
+
+  // The model as a Forge run starts on it, where git saved no base.
+  ipcMain.handle('folder:write-model-base', async (_event, folderPath: string, content: string) => {
+    try {
+      await writeEditorStateFile(folderPath, MODEL_BASE_FILE, content)
+      return { success: true }
     } catch (e) {
       return { success: false, error: (e as Error).message }
     }

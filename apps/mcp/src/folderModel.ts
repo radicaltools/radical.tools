@@ -10,7 +10,8 @@ import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { modelChangesSince } from '@radical/node-files/gitModel'
-import { readSelectionFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
+import { readEditorStateFile, readSelectionFile, writeEditorStateFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
+import { MODEL_BASE_FILE, forgeModelBase, mayReplaceWithForgeBase } from '@radical/common/formats/modelBase'
 import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
 import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
@@ -234,6 +235,19 @@ export class FolderModel {
     }
   }
 
+  /** Saves `content` (the model before a Forge run) as the folder's base
+   *  unless git saved one; a line for the answer when it did. A failed write
+   *  never fails the call. */
+  private async saveForgeBase(content: string): Promise<string> {
+    try {
+      if (!mayReplaceWithForgeBase(await readEditorStateFile(this.folder, MODEL_BASE_FILE))) return ''
+      await writeEditorStateFile(this.folder, MODEL_BASE_FILE, content)
+      return '\n\nSaved the model as it was before this run to .radical/base.json (no base from git): Studio\'s Changes on branch shows what the run changes.'
+    } catch {
+      return ''
+    }
+  }
+
   /** The server is shutting down: an unfinished run shows as paused in
    *  Studio right away instead of after FORGE_RUN_STALE_MS. */
   async close(): Promise<void> {
@@ -384,10 +398,12 @@ export class FolderModel {
         this.restoreTempIds(priorTempIds)
         return { ok: false, text: facade.lastError ?? result.resultText }
       }
+      // A run starting on a folder git saved no base for: the model before it.
+      const forgeBase = name === 'forge_start' ? forgeModelBase(data.nodes, data.relations) : null
       if (READ_ONLY.has(name) || result.readOnly) {
         result.commit?.()
         if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
-        return { ok: true, text: result.resultText }
+        return { ok: true, text: result.resultText + (forgeBase ? await this.saveForgeBase(forgeBase) : '') }
       }
 
       const changed = result.data ?? facade.toDiagramData()
@@ -400,6 +416,7 @@ export class FolderModel {
       }
       result.commit?.()
       if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
+      if (forgeBase) outcome.text += await this.saveForgeBase(forgeBase)
       // A metamodel tool changed the types: re-advertise the schemas.
       if (this.refreshTools(metamodel)) return { ...outcome, toolsChanged: true }
       return outcome

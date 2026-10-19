@@ -202,10 +202,20 @@ async function writeText(dir: FsDirHandle, name: string, content: string): Promi
 /** Writes the canvas selection file (see canvasSelection) under the model
  *  folder's `.radical/`, with the `.gitignore` that keeps it out of git. */
 export async function writeSelectionToHandle(root: FsDirHandle, content: string): Promise<void> {
+  await writeEditorStateToHandle(root, 'selection.json', content)
+}
+
+/** Writes the model's base (see modelBase) under `.radical/`, as a Forge
+ *  run does where git saved none. */
+export async function writeModelBaseToHandle(root: FsDirHandle, content: string): Promise<void> {
+  await writeEditorStateToHandle(root, 'base.json', content)
+}
+
+async function writeEditorStateToHandle(root: FsDirHandle, name: string, content: string): Promise<void> {
   const dir = await root.getDirectoryHandle(SELECTION_DIR, { create: true })
   try { await dir.getFileHandle('.gitignore') }
   catch { await writeText(dir, '.gitignore', SELECTION_GITIGNORE_CONTENT) }
-  await writeText(dir, 'selection.json', content)
+  await writeText(dir, name, content)
 }
 
 /** The Forge run status file (see forgeRunStatus) under the model folder's

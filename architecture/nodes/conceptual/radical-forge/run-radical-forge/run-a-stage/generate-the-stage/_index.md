@@ -7,4 +7,4 @@ order: 2
 repeat: "1"
 ---
 
-The shared stage prompt with the Hub matches; the elements filed into the stage's views.
+The shared stage prompt with the Hub matches and the open gaps; the stage may close gaps in earlier stages within the brief. The elements filed into the stage's views.

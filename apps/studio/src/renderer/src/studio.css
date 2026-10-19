@@ -596,17 +596,18 @@ label.app-menu-row { cursor: pointer; }
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
-  gap: 3px;
+  gap: 2px;
   margin: 4px 0 10px;
 }
 .forge-step {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 10.5px;
+  gap: 3px;
+  font-size: 10px;
   font-weight: 600;
-  /* Ten steps (description, eight stages, finish) fit on one line. */
-  padding: 5px 5px;
+  /* Eleven steps (description, nine stages, finish) fit on one line; a
+     narrow panel, or a stage's refinement badge, scrolls them. */
+  padding: 5px 4px;
   flex-shrink: 0;
   border-radius: 999px;
   border: 1px solid var(--border-color);
@@ -617,6 +618,22 @@ label.app-menu-row { cursor: pointer; }
 }
 .forge-step:disabled { cursor: default; opacity: 0.4; }
 .forge-step-check { font-size: 9px; line-height: 1; }
+/* What a stage refined in earlier stages; amber until the user keeps or rejects it. */
+.forge-step-refined {
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #4c8dff) 18%, transparent);
+  color: var(--accent, #4c8dff);
+}
+.forge-step-refined.pending {
+  background: color-mix(in srgb, var(--warning, #ffb057) 22%, transparent);
+  color: var(--warning, #ffb057);
+}
+.forge-step.active .forge-step-refined { background: rgba(255, 255, 255, 0.28); color: inherit; }
+.forge-step.active .forge-step-refined.pending { background: var(--warning, #ffb057); color: #1a1a1a; }
 .forge-warning {
   font-size: 11.5px;
   color: #ffb057;
@@ -780,6 +797,20 @@ label.app-menu-row { cursor: pointer; }
   font-size: 12px;
   color: var(--text-secondary, var(--text-muted));
 }
+.forge-refinements-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.forge-refinements-list .forge-clarify-option { align-items: flex-start; }
+.forge-gaps { margin-top: 8px; font-size: 12px; color: var(--text-secondary, var(--text-muted)); }
+.forge-gaps summary { cursor: pointer; }
+.forge-gaps ul { margin: 6px 0 0; padding-left: 18px; max-height: 140px; overflow-y: auto; }
 .forge-arrange-message { font-size: 11px; color: var(--text-muted); }
 .forge-arrange-message-error { color: var(--danger, #e5484d); }
 .forge-stage-result { margin-top: 4px; }

@@ -3,7 +3,7 @@ import type { C4Node, C4Relation, DiagramView } from '../src/c4'
 import type { ModelCopy } from '../src/model'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import { baseCopy, branchChanges, changeWork, viewChangeCounts, wordDiff } from '../src/branchChanges'
-import { isBaseOld, parseModelBase, serializeModelBase } from '../src/formats/modelBase'
+import { baseSince, forgeModelBase, isBaseOld, mayReplaceWithForgeBase, parseModelBase, serializeModelBase } from '../src/formats/modelBase'
 import type { TestCase } from '../src/check'
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
@@ -110,5 +110,22 @@ describe('base file', () => {
     const savedAt = '2026-10-16T10:00:00.000Z'
     expect(isBaseOld({ savedAt }, Date.parse('2026-10-17T09:00:00Z'))).toBe(false)
     expect(isBaseOld({ savedAt }, Date.parse('2026-10-17T11:00:00Z'))).toBe(true)
+  })
+
+  it('a Forge run saves its own base where git has none', () => {
+    const git = serializeModelBase({ commit: 'abc1234def', described: 'merge base with origin/main', branch: 'feature', nodes, relations: [] })
+    const forge = forgeModelBase(nodes, [], new Date('2026-10-16T10:00:00Z'))
+    expect(mayReplaceWithForgeBase(null)).toBe(true)
+    expect(mayReplaceWithForgeBase('{ "version": 1 }')).toBe(true)
+    expect(mayReplaceWithForgeBase(forge)).toBe(true)
+    expect(mayReplaceWithForgeBase(git)).toBe(false)
+    const base = parseModelBase(forge)!
+    expect(base).toMatchObject({ source: 'forge', commit: '', branch: null, nodes })
+    expect(isBaseOld(base, Date.parse('2026-12-01T00:00:00Z'))).toBe(false)
+    expect(baseSince(base)).toBe('the start of the Forge run')
+    expect(baseSince(parseModelBase(git)!)).toBe('main abc1234')
+    // Only a Forge base may go without a commit.
+    expect(parseModelBase(JSON.stringify({ ...JSON.parse(git), commit: '' }))).toBeNull()
+    expect(parseModelBase(JSON.stringify({ ...JSON.parse(forge), source: 'svn' }))).toBeNull()
   })
 })

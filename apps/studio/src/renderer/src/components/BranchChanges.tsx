@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { branchBaseIsOld, setBranchChangesShown, useBranchStore } from '../persistence/branchChanges'
+import { baseSince } from '@radical/common/formats/modelBase'
 
 const SAVE_BASE = 'radical diff <model folder> --save-base'
 const INSTALL_HOOKS = 'radical hooks install <model folder>'
@@ -37,7 +38,7 @@ export function SaveBaseHelp({ old }: { old: boolean }): React.ReactElement {
       <Command text={INSTALL_HOOKS} />
       <p>{old ? 'Or save it again now:' : 'Or save it once:'}</p>
       <Command text={SAVE_BASE} />
-      <p className="branch-muted">An agent's get_changes saves it too.</p>
+      <p className="branch-muted">An agent's get_changes saves it too. Outside git, a Radical Forge run saves the model as it was before the run.</p>
     </>
   )
 }
@@ -65,7 +66,7 @@ export function BranchChangesButton(): React.ReactElement | null {
     ? 'No base yet: click to see how to save one'
     : milestone
       ? 'A milestone is shown, with its own diff'
-      : `${total} element${total === 1 ? '' : 's'} changed since main ${base.commit.slice(0, 7)}${old ? `; old base, saved ${ago(base.savedAt)}${base.branch ? ` on ${base.branch}` : ''}` : ''} · list in the Inspector`
+      : `${total} element${total === 1 ? '' : 's'} changed since ${baseSince(base)}${old ? `; old base, saved ${ago(base.savedAt)}${base.branch ? ` on ${base.branch}` : ''}` : ''} · list in the Inspector`
   return (
     <div className="branch-btn-wrap" ref={box}>
       <button

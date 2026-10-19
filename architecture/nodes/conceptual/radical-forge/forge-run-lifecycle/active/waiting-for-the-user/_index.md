@@ -5,4 +5,4 @@ label: "Waiting for the user"
 kind: "normal"
 ---
 
-No stage generating: the agent asks how to arrange a stage, whether to go on, or the stage's questions. Phase waiting.
+No stage generating: the agent asks which of a stage's refinements of earlier stages to keep, how to arrange the stage, whether to go on, or the stage's questions. Phase waiting.

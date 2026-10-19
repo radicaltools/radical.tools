@@ -532,6 +532,14 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     on it timed out. It passed 3 of 3 on its own and 6 of 6 with six workers.
     Waiting for the camera to rest after that click (as for item 32) would
     make it steady.
+38. **`search_model` cannot pick the fields it returns.** Looking up the
+    Radical Forge elements of `architecture/` (2026-10-19) with
+    `LIST NODES WHERE label ~ "forge" OR description ~ "forge"` returned
+    67 000 characters for 71 rows, because every row carries the full
+    description and properties of a component; the ids, types and labels
+    were all that was needed, and the result had to be cut up with a
+    script. A field list (`LIST NODES id, type, label WHERE …`) or a
+    compact mode would do.
 
 ### Reverse-engineered requirements (2026-10-06)
 

@@ -222,8 +222,9 @@ test('ai-settings', async ({ page, shot }) => {
 /**
  * Radical Forge on the Bookstore model: its Description step with the view
  * structures (forge-views), then after its Requirements stage on the layer
- * canvases, the eight stages above (forge). The AI provider is scripted, as
- * in tests/studio/forge.spec.ts.
+ * canvases, the stages above (forge), and after its Domain model stage, which
+ * filled a gap in the requirements and sharpened one (forge-refinements).
+ * The AI provider is scripted, as in tests/studio/forge.spec.ts.
  */
 test('forge', async ({ page, shot }) => {
   await page.addInitScript(() => {
@@ -237,12 +238,28 @@ test('forge', async ({ page, shot }) => {
     ['Release unclaimed copies', { ears_type: 'event-driven', trigger: 'a reservation is not collected within 48 hours', action: 'release the copy and tell the reader' }],
     ['One reservation per copy', { ears_type: 'ubiquitous', action: 'never hold one copy for two readers' }],
   ]
+  // The id of a node the stage's model context lists, by its type and label.
+  const idOf = (prompt: string, type: string, label: string): string =>
+    new RegExp(`\\\\"id\\\\":\\\\"([^\\\\"]+)\\\\",\\\\"type\\\\":\\\\"${type}\\\\",\\\\"label\\\\":\\\\"${label}\\\\"`).exec(prompt)![1]
+  // The domain model shows that a reservation can be cancelled, which no
+  // requirement says, and gives the reservation a number to collect it by.
+  const domain = (prompt: string): Array<{ name: string; input: Record<string, unknown> }> => [
+    { name: 'add_node', input: { tempId: 'd', type: 'domain', label: 'Lending', properties: { kind: 'core' } } },
+    { name: 'add_node', input: { tempId: 'e', type: 'entity', label: 'Reservation', parentId: 'd', properties: { kind: 'aggregate-root' } } },
+    { name: 'add_node', input: { tempId: 'c', type: 'requirement', label: 'Cancel a reservation', properties: { ears_type: 'event-driven', trigger: 'a reader cancels a reservation', action: 'release the copy at once' } } },
+    { name: 'add_relation', input: { sourceId: 'c', targetId: idOf(prompt, 'need', 'Click & collect'), relationType: 'derives' } },
+    { name: 'update_node', input: { id: idOf(prompt, 'requirement', 'Reserve a book online'), properties: { action: 'hold one copy in the chosen shop for 48 hours under a reservation number' } } },
+  ]
   await page.route('https://api.anthropic.com/v1/messages', async (route) => {
     const body = route.request().postDataJSON() as { tools?: unknown[]; messages: unknown[] }
     const all = JSON.stringify(body.messages)
+    const calls = !body.tools || all.includes('tool_result') ? []
+      : /extract its functional requirements/.test(all)
+        ? requirements.map(([label, properties], i) => ({ name: 'add_node', input: { tempId: `r${i}`, type: 'requirement', label, properties } }))
+        : /ubiquitous language/.test(all) ? domain(all) : []
     const content = !body.tools ? [{ type: 'text', text: '[]' }]
-      : all.includes('tool_result') || !/extract its functional requirements/.test(all) ? [{ type: 'text', text: 'Done.' }]
-      : requirements.map(([label, properties], i) => ({ type: 'tool_use', id: `t${i}`, name: 'add_node', input: { tempId: `r${i}`, type: 'requirement', label, properties } }))
+      : calls.length ? calls.map((call, i) => ({ type: 'tool_use', id: `t${i}`, ...call }))
+      : [{ type: 'text', text: 'Done.' }]
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({ model: 'claude-haiku-4-5', content, stop_reason: content[0].type === 'tool_use' ? 'tool_use' : 'end_turn', usage: { input_tokens: 10, output_tokens: 10 } }),
@@ -281,6 +298,15 @@ test('forge', async ({ page, shot }) => {
   await page.mouse.up()
   await settle(page)
   await shot('forge')
+
+  // The domain model refines the requirements: the user is asked to keep
+  // or reject that, and the step bar marks the stage.
+  await page.getByRole('button', { name: 'Continue →' }).click()
+  await page.getByRole('button', { name: 'Generate domain model' }).click()
+  await expect(page.getByTestId('forge-refinements').locator('li')).toHaveCount(2)
+  await page.mouse.move(1380, 860)
+  await settle(page)
+  await shot('forge-refinements')
 })
 
 /** The repository's own architecture model, with the test results `radical check` left beside it. */

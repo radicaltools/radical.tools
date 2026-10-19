@@ -9,6 +9,7 @@ import { serializeToMdFolder, deserializeFromMdFolder } from '@radical/common/fo
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { parseForgeRun } from '@radical/common/formats/forgeRunStatus'
+import { parseModelBase, serializeModelBase } from '@radical/common/formats/modelBase'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
@@ -70,7 +71,7 @@ describe('Radical Forge over MCP', () => {
       expect(clarify).not.toContain('JSON')
 
       const brief = await call(client, 'forge_generate', { stage: 'requirements', answers: [{ question: 'Which stores?', answer: 'All of them' }] })
-      expect(brief).toContain('stage 1 of 8: Requirements')
+      expect(brief).toContain('stage 1 of 9: Requirements')
       expect(brief).toContain('Keep labels short')
       expect(brief).toContain('Q: Which stores?\nA: All of them')
       expect(brief).toContain(`(id ${need.id})`)
@@ -98,7 +99,7 @@ describe('Radical Forge over MCP', () => {
       // The domain model comes next, before the fitness functions.
       expect(await refused(client, 'forge_clarify', { stage: 'fitness' })).toContain('Domain model')
       await call(client, 'forge_clarify', { stage: 'domain' })
-      expect(await call(client, 'forge_generate', { stage: 'domain' })).toContain('stage 2 of 8: Domain model')
+      expect(await call(client, 'forge_generate', { stage: 'domain' })).toContain('stage 2 of 9: Domain model')
       await call(client, 'forge_complete_stage', { stage: 'domain', summary: 'No domain model needed.' })
 
       await call(client, 'forge_clarify', { stage: 'fitness' })
@@ -203,7 +204,7 @@ describe('Radical Forge over MCP', () => {
 
       await call(client, 'forge_clarify', { stage: 'states' })
       const brief = await call(client, 'forge_generate', { stage: 'states' })
-      expect(brief).toContain('stage 5 of 8: State machines')
+      expect(brief).toContain('stage 5 of 9: State machines')
       expect(brief).toContain('real lifecycle')
       expect(brief).toContain('Given is the source state, When')
       expect(brief).toContain('"type":"ref","refType":"event"')
@@ -265,7 +266,7 @@ describe('Radical Forge over MCP', () => {
 
       await call(client, 'forge_clarify', { stage: 'processes' })
       const brief = await call(client, 'forge_generate', { stage: 'processes' })
-      expect(brief).toContain('stage 6 of 8: Processes')
+      expect(brief).toContain('stage 6 of 9: Processes')
       expect(brief).toContain('Give every step its `order`')
       expect(brief).toContain('"key":"repeat"')
       await call(client, 'add_node', { tempId: 'p', type: 'process', label: 'Click and collect' })
@@ -286,6 +287,141 @@ describe('Radical Forge over MCP', () => {
       const listed = new Set(data.views!.flatMap((v) => v.nodeIds))
       expect(data.nodes.filter((n) => n.type === 'process' || n.type === 'step').some((n) => listed.has(n.id))).toBe(false)
       expect(await refused(client, 'forge_arrange', { stage: 'processes', smartLayout: true })).toContain('added nothing that is on a canvas view of the run')
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
+  it('lists what a stage refined in earlier stages, rejects the chosen refinements, and regenerate undoes the rest', async () => {
+    const { client, read, folder } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
+      const need = (await read()).nodes.find((n) => n.type === 'need')!
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      await call(client, 'forge_generate', { stage: 'requirements' })
+      await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
+      await call(client, 'add_relation', { sourceId: 'req', targetId: need.id, relationType: 'derives' })
+      await call(client, 'add_node', { tempId: 'req2', type: 'requirement', label: 'Hand over', properties: { ears_type: 'ubiquitous', action: 'hand over reserved products' } })
+      await call(client, 'add_relation', { sourceId: 'req2', targetId: need.id, relationType: 'derives' })
+      await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'Two requirements.' })
+      for (const stage of ['domain', 'fitness']) {
+        await call(client, 'forge_clarify', { stage })
+        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
+      }
+      await call(client, 'forge_clarify', { stage: 'scenarios' })
+      expect(await call(client, 'forge_generate', { stage: 'scenarios' })).toContain('Refine the whole model as you go.')
+      await call(client, 'add_node', { tempId: 'sc', type: 'scenario', label: 'Reserve', properties: { given: 'a product in stock', when: 'a shopper reserves it', then: 'it is held for two hours' } })
+      await call(client, 'add_relation', { sourceId: 'sc', targetId: 'req', relationType: 'verifies' })
+      const scenarios = await call(client, 'forge_complete_stage', { stage: 'scenarios', summary: 'One scenario.' })
+      // The rules of the stages done find what the scenarios left out.
+      expect(scenarios).toContain('Gaps the model has now (1)')
+      expect(scenarios).toContain('No scenario verifies requirement "Hand over".')
+      expect(scenarios).not.toContain('refined earlier stages')
+      await call(client, 'forge_clarify', { stage: 'states' })
+      await call(client, 'forge_generate', { stage: 'states' })
+      await call(client, 'forge_complete_stage', { stage: 'states', summary: 'No lifecycle.' })
+
+      await call(client, 'forge_clarify', { stage: 'processes' })
+      const brief = await call(client, 'forge_generate', { stage: 'processes' })
+      expect(brief).toContain('Gaps the model has now')
+      expect(brief).toContain('No scenario verifies requirement "Hand over".')
+      await call(client, 'add_node', { tempId: 'p', type: 'process', label: 'Click and collect' })
+      await call(client, 'add_node', { tempId: 's1', type: 'step', label: 'Reserve the product', parentId: 'p', properties: { order: 1 } })
+      await call(client, 'add_node', { tempId: 's2', type: 'step', label: 'Notify the shopper', parentId: 'p', properties: { order: 2 } })
+      // The process shows a missing requirement and its scenario, and a vague action.
+      await call(client, 'add_node', { tempId: 'notify', type: 'requirement', label: 'Notify when ready', properties: { ears_type: 'event-driven', trigger: 'staff confirm an order is ready', action: 'notify the shopper' } })
+      await call(client, 'add_relation', { sourceId: 'notify', targetId: need.id, relationType: 'derives' })
+      await call(client, 'add_node', { tempId: 'scn', type: 'scenario', label: 'Shopper notified', properties: { given: 'a reserved order', when: 'staff confirm it is ready', then: 'the shopper gets a message' } })
+      await call(client, 'add_relation', { sourceId: 'scn', targetId: 'notify', relationType: 'verifies' })
+      const reqId = (await read()).nodes.find((n) => n.label === 'Reserve online')!.id
+      await call(client, 'update_node', { id: reqId, properties: { action: 'let shoppers reserve products for two hours' } })
+      const done = await call(client, 'forge_complete_stage', { stage: 'processes', summary: 'Click and collect; added the notification it needs.' })
+      expect(done).toContain('It refined earlier stages (3)')
+      expect(done).toContain(`- ${reqId}: changed requirement "Reserve online" (action)`)
+      expect(done).toContain('added requirement "Notify when ready"')
+      expect(done).toContain('added scenario "Shopper notified"')
+      expect(done).not.toContain('added process')
+      expect(done).toContain('forge_reject_refinements')
+
+      expect(await refused(client, 'forge_reject_refinements', { stage: 'processes', ids: ['nope'] })).toContain('not a refinement')
+      const rejected = await call(client, 'forge_reject_refinements', { stage: 'processes', ids: [reqId] })
+      expect(rejected).toContain('Rejected 1 of the Processes stage\'s refinements; 2 kept.')
+      let data = await read()
+      expect(data.nodes.find((n) => n.id === reqId)).toMatchObject({ action: 'let shoppers reserve products' })
+      expect(data.nodes.some((n) => n.label === 'Notify when ready')).toBe(true)
+      const status = parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
+      expect(status.stages.find((s) => s.id === 'processes')).toMatchObject({ status: 'done', refined: 2 })
+
+      // Regenerate takes back what the stage added and the refinements kept.
+      await call(client, 'forge_generate', { stage: 'processes', regenerate: true })
+      data = await read()
+      expect(data.nodes.some((n) => n.label === 'Notify when ready' || n.label === 'Shopper notified' || n.type === 'process')).toBe(false)
+      expect(data.nodes.find((n) => n.id === reqId)).toMatchObject({ action: 'let shoppers reserve products' })
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
+  it('saves the model before the run as the base when there is none from git, and leaves a git base alone', async () => {
+    const { client, folder, read } = await connect()
+    const baseFile = join(folder, '.radical/base.json')
+    try {
+      expect(await call(client, 'forge_start', { description: BRIEF })).toContain('Saved the model as it was before this run to .radical/base.json')
+      let base = parseModelBase(await readFile(baseFile, 'utf8'))!
+      expect(base).toMatchObject({ source: 'forge', commit: '', nodes: [], relations: [] })
+
+      // A second run replaces the base of the first with the model before it.
+      await call(client, 'add_node', { tempId: 'r', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
+      await call(client, 'forge_start', { description: `${BRIEF}\nAlso deliveries.` })
+      base = parseModelBase(await readFile(baseFile, 'utf8'))!
+      expect(base.source).toBe('forge')
+      expect(base.nodes.map((n) => n.type).sort()).toEqual(['need', 'requirement'])
+      expect((await read()).nodes).toHaveLength(3)
+
+      // A base from git stays.
+      const git = serializeModelBase({ commit: 'abc1234def', described: 'merge base with origin/main', branch: 'main', nodes: [], relations: [] })
+      await writeFile(baseFile, git)
+      expect(await call(client, 'forge_start', { description: BRIEF })).not.toContain('Saved the model')
+      expect(await readFile(baseFile, 'utf8')).toBe(git)
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
+  it('runs the review stage after C4', async () => {
+    const { client, read } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
+      const need = (await read()).nodes.find((n) => n.type === 'need')!
+      for (const stage of ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4']) {
+        await call(client, 'forge_clarify', { stage })
+        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' || stage === 'c4' ? { hubConcepts: [] } : {}) })
+        if (stage === 'requirements') {
+          await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
+          await call(client, 'add_relation', { sourceId: 'req', targetId: need.id, relationType: 'derives' })
+        }
+        if (stage === 'c4') await call(client, 'add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+        await call(client, 'forge_complete_stage', { stage, summary: 'Done.' })
+      }
+      expect(await refused(client, 'forge_generate', { stage: 'review' })).toContain('forge_clarify')
+      await call(client, 'forge_clarify', { stage: 'review' })
+      const brief = await call(client, 'forge_generate', { stage: 'review' })
+      expect(brief).toContain('stage 9 of 9: Review')
+      expect(brief).toContain('Read it as a whole against the')
+      expect(brief).toContain('No scenario verifies requirement "Reserve online".')
+      expect(brief).toContain('Nothing satisfies requirement "Reserve online".')
+      const data = await read()
+      const shop = data.nodes.find((n) => n.label === 'Shop')!
+      const req = data.nodes.find((n) => n.label === 'Reserve online')!
+      await call(client, 'add_relation', { sourceId: shop.id, targetId: req.id, relationType: 'satisfies' })
+      const done = await call(client, 'forge_complete_stage', { stage: 'review', summary: 'Linked the shop to its requirement.' })
+      expect(done).toContain('It refined earlier stages (1)')
+      expect(done).toContain('added satisfies Shop → Reserve online')
+      expect(done).toContain('tell the user which stay open')
+      expect(done).not.toContain('Nothing satisfies')
+      expect(done).toContain('This was the last stage.')
+      expect(await call(client, 'forge_finish', {})).toContain('- Review: +0 nodes · +1 relations · 1 refinements of earlier stages kept')
     } finally {
       await client.close()
     }
@@ -350,7 +486,7 @@ describe('Radical Forge over MCP', () => {
     try {
       await call(client, 'forge_start', { description: BRIEF })
       expect(await status()).toMatchObject({ client: 'radical-test', state: 'active', need: { label: 'Click & collect' } })
-      expect((await status()).stages.map((s) => s.status)).toEqual(Array(8).fill('pending'))
+      expect((await status()).stages.map((s) => s.status)).toEqual(Array(9).fill('pending'))
       expect(await readFile(join(folder, '.radical/.gitignore'), 'utf8')).toBe('*\n')
 
       await call(client, 'forge_clarify', { stage: 'requirements' })
