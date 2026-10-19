@@ -4985,6 +4985,9 @@ export const useDiagramStore = create<DiagramStore>()(
         // against that and keeps named views as stable as the "All
         // elements" view (which writes to defaultPositions instead).
         const W = window as any
+        // The view on screen when Designer is entered again: Designer stays
+        // on it (with its own layout) rather than going back to the one it left.
+        const shownViewId = get().activeViewId
         if (prevMode === 'designer' && mode !== 'designer') {
           // The canvas shown keeps its positions in the nodes until it is
           // left or saved: put them, and its camera, into its view (or All
@@ -5021,6 +5024,11 @@ export const useDiagramStore = create<DiagramStore>()(
           // snapshot we just restored. reset() drops that cache so the
           // next start() rebuilds against the restored c4Nodes.
           _liveLayout?.reset()
+          // Still in the explore mode, setActiveView loads the view's
+          // Designer positions and camera and saves nothing of the one left.
+          if (shownViewId !== get().activeViewId && (shownViewId === null || get().views[shownViewId])) {
+            get().setActiveView(shownViewId)
+          }
         }
         // Physics runs in *both* designer and viewer. In viewer the user
         // can drag/collapse to explore — mutations are sandboxed by the

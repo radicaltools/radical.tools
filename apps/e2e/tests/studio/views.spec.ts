@@ -309,6 +309,34 @@ test.describe('Viewer', () => {
   })
 })
 
+test('back in Designer, the view shown in Viewer stays, with Designer\'s layout', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  const designer = await studio.positions()
+  await page.locator('.lp-view-card').filter({ hasText: 'System Context' }).click()
+  await expect(page.getByText('Structure: System Context')).toBeVisible()
+  await studio.settle()
+  const saved = await studio.storedJson()
+
+  // In Viewer: another view, re-laid out.
+  await page.getByRole('button', { name: 'Viewer', exact: true }).click()
+  await page.locator('.lp-view-card').filter({ hasText: 'Containers' }).click()
+  await expect(page.getByText('Structure: Containers')).toBeVisible()
+  await studio.settle()
+  await studio.smartLayout()
+
+  // Designer stays on Containers, as Designer has it.
+  await page.getByRole('button', { name: 'Designer', exact: true }).click()
+  await studio.settle()
+  await expect(page.getByText('Structure: Containers')).toBeVisible()
+  await expect(page).toHaveURL(/\/m\/designer\/v\/v-containers$/)
+  expect(await studio.positions()).toEqual(designer)
+  // Nothing of Viewer was saved: the views are as Designer left them (the
+  // nodes' own positions follow the canvas shown).
+  const stored = JSON.parse(await studio.storedJson())
+  expect(stored.views).toEqual(JSON.parse(saved).views)
+})
+
 test.describe('what is arranged in Viewer and Presenter stays there', () => {
   for (const perspective of ['Viewer', 'Presenter']) {
     test(`Smart Layout in ${perspective} is not saved`, async ({ page, studio }) => {
