@@ -79,6 +79,30 @@ describe('Forge views', () => {
     ])
   })
 
+  it('mockups go onto a Screen flow canvas of their own', () => {
+    expect(forgeViewsOf('mockup')).toEqual(['conceptual', 'screens'])
+    const facade = facadeOf(
+      [node('need', 'need'), node('r1', 'requirement'), node('home', 'mockup'), node('cart', 'mockup')],
+      [{ id: 'c', name: 'Conceptual', nodeIds: ['need', 'r1'], positions: {} }],
+      [
+        { id: 'i1', sourceId: 'home', targetId: 'r1', relationType: 'illustrates' },
+        { id: 'i2', sourceId: 'cart', targetId: 'r1', relationType: 'illustrates' },
+        { id: 'nav', sourceId: 'home', targetId: 'cart', relationType: 'navigates-to', label: 'Add to cart' },
+      ],
+    )
+    expect(brief(fileIntoForgeViews(facade, ['home', 'cart'], 'mockups'))).toEqual([
+      { key: 'conceptual', viewId: 'c', nodeIds: ['home', 'cart'] },
+      { key: 'screens', viewId: 'id1', nodeIds: ['home', 'cart'] },
+    ])
+    const views = facade.getViews!()
+    // The screens alone: their flow, not the requirement they illustrate.
+    expect(views.id1).toMatchObject({ name: 'Screen flow', nodeIds: ['home', 'cart'] })
+    expect(forgeStageView(views, 'mockups', { kind: 'layers' })?.id).toBe('id1')
+    expect(forgeArrangeGroups(facade, ['home', 'cart'], 'mockups').map((g) => [g.viewName, g.nodeIds])).toEqual([
+      ['Conceptual', ['home', 'cart']], ['Screen flow', ['home', 'cart']],
+    ])
+  })
+
   it('files nodes into their views, creating a view only when it gets elements and reusing one by name', () => {
     const facade = facadeOf(
       [node('need', 'need'), node('r1', 'requirement'), node('f1', 'fitness-fn')],

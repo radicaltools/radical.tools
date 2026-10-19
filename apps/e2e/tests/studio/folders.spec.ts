@@ -251,7 +251,7 @@ test('New model on the welcome screen can keep the model in a folder', async ({ 
 test('an agent\'s Forge run on the folder makes the Forge button pulse and opens read only', async ({ page }) => {
   await saveAsFolder(page)
   const stages = ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4', 'review']
-  const write = (state: string, statuses: Record<string, string>): Promise<void> => folder.write('.radical/forge-run.json', JSON.stringify({
+  const write = (state: string, statuses: Record<string, string>, asking?: string): Promise<void> => folder.write('.radical/forge-run.json', JSON.stringify({
     version: 1,
     client: 'claude-code',
     need: { id: 'n1', label: 'Click & collect' },
@@ -259,7 +259,11 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
     updatedAt: new Date().toISOString(),
     state,
     // The domain model refined two elements of the requirements.
-    stages: stages.map((id) => ({ id, status: statuses[id] ?? 'pending', ...(statuses[id] === 'done' ? { summary: `${id} summary`, added: { nodes: 2, relations: 1 }, ...(id === 'domain' ? { refined: 2 } : {}) } : {}) })),
+    stages: stages.map((id) => ({
+      id, status: statuses[id] ?? 'pending',
+      ...(statuses[id] === 'done' ? { summary: `${id} summary`, added: { nodes: 2, relations: 1 }, ...(id === 'domain' ? { refined: 2 } : {}) } : {}),
+      ...(id === asking ? { asking: true } : {}),
+    })),
   }))
   const button = page.locator('.qs-forge-toggle')
   await expect(button).not.toHaveAttribute('data-agent-phase')
@@ -287,9 +291,15 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
   // Read only: nothing to press but Close.
   await expect(panel.getByRole('button')).toHaveCount(1)
 
+  // The domain model proposes a refinement of the requirements: amber, waiting for the answer.
+  await write('active', { requirements: 'done', domain: 'generating' }, 'domain')
+  await expect(button).toHaveAttribute('data-agent-phase', 'waiting', { timeout: 10_000 })
+  await expect(panel.locator('.forge-agent-line')).toHaveText('Claude Code proposes a refinement of an earlier stage in the Domain model stage; answer there.')
+  await expect(panel.locator('.forge-step', { hasText: 'Domain' }).getByTestId('forge-step-refined')).toHaveClass(/pending/)
+
   // Done and waiting for the user's choice: still at the Domain model.
   await write('active', { requirements: 'done', domain: 'done' })
-  await expect(panel.locator('.forge-agent-line')).toHaveText('Waiting for you in Claude Code: which of its 2 refinements of earlier stages to keep, how to arrange the Domain model stage, and whether to go on.', { timeout: 10_000 })
+  await expect(panel.locator('.forge-agent-line')).toHaveText('Waiting for you in Claude Code: how to arrange the Domain model stage, and whether to go on.', { timeout: 10_000 })
   await expect(panel.locator('.forge-step', { hasText: 'Domain' }).getByTestId('forge-step-refined')).toHaveText('✎2')
   await expect(panel.locator('.forge-step', { hasText: 'Domain' })).toHaveAttribute('title', /2 refinements of earlier stages/)
   await expect(button.locator('.qs-forge-badge')).toHaveText('2/9')

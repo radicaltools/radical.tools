@@ -25,8 +25,10 @@ export interface ForgeRunStageInfo {
   summary?: string
   /** How many elements and relations it added. */
   added?: { nodes: number; relations: number }
-  /** How many of its refinements of earlier stages the user kept. */
+  /** How many of its refinements of earlier stages the user accepted. */
   refined?: number
+  /** Generating: a proposed refinement waits for the user's answer. */
+  asking?: boolean
 }
 
 export interface ForgeRunStatus {
@@ -70,6 +72,7 @@ export function parseForgeRun(text: string): ForgeRunStatus | null {
       ...(typeof s.summary === 'string' ? { summary: s.summary } : {}),
       ...(added && typeof added.nodes === 'number' && typeof added.relations === 'number' ? { added: { nodes: added.nodes, relations: added.relations } } : {}),
       ...(typeof s.refined === 'number' ? { refined: s.refined } : {}),
+      ...(s.asking === true ? { asking: true } : {}),
     })
   }
   const need = r.need as { id?: unknown; label?: unknown } | undefined
@@ -85,16 +88,16 @@ export function parseForgeRun(text: string): ForgeRunStatus | null {
 }
 
 /** How Studio shows a run: `working` while the agent generates a stage,
- *  `waiting` while it talks to the user (questions, how to arrange, whether
- *  to go on), `done` once finished, `paused` when it ended early or went
- *  quiet for FORGE_RUN_STALE_MS. */
+ *  `waiting` while it talks to the user (questions, a proposed refinement,
+ *  how to arrange, whether to go on), `done` once finished, `paused` when it
+ *  ended early or went quiet for FORGE_RUN_STALE_MS. */
 export type ForgeRunPhase = 'working' | 'waiting' | 'done' | 'paused'
 
 export function forgeRunPhase(status: ForgeRunStatus, now = Date.now()): ForgeRunPhase {
   if (status.state === 'finished') return 'done'
   if (status.state === 'closed') return 'paused'
   if (now - Date.parse(status.updatedAt) > FORGE_RUN_STALE_MS) return 'paused'
-  return status.stages.some((s) => s.status === 'generating') ? 'working' : 'waiting'
+  return status.stages.some((s) => s.status === 'generating' && !s.asking) ? 'working' : 'waiting'
 }
 
 /** The stage the run is at: the one in progress (questions or generating);

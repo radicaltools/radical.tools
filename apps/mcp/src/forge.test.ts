@@ -292,7 +292,7 @@ describe('Radical Forge over MCP', () => {
     }
   }, 60_000)
 
-  it('lists what a stage refined in earlier stages, rejects the chosen refinements, and regenerate undoes the rest', async () => {
+  it('asks the user before each refinement, applies what they accept, and regenerate undoes it', async () => {
     const { client, read, folder } = await connect()
     try {
       await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
@@ -330,30 +330,74 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'add_node', { tempId: 's1', type: 'step', label: 'Reserve the product', parentId: 'p', properties: { order: 1 } })
       await call(client, 'add_node', { tempId: 's2', type: 'step', label: 'Notify the shopper', parentId: 'p', properties: { order: 2 } })
       // The process shows a missing requirement and its scenario, and a vague action.
-      await call(client, 'add_node', { tempId: 'notify', type: 'requirement', label: 'Notify when ready', properties: { ears_type: 'event-driven', trigger: 'staff confirm an order is ready', action: 'notify the shopper' } })
-      await call(client, 'add_relation', { sourceId: 'notify', targetId: need.id, relationType: 'derives' })
-      await call(client, 'add_node', { tempId: 'scn', type: 'scenario', label: 'Shopper notified', properties: { given: 'a reserved order', when: 'staff confirm it is ready', then: 'the shopper gets a message' } })
-      await call(client, 'add_relation', { sourceId: 'scn', targetId: 'notify', relationType: 'verifies' })
+      // Writing them directly is refused.
+      expect(await refused(client, 'add_node', { tempId: 'notify', type: 'requirement', label: 'Notify when ready', properties: { ears_type: 'ubiquitous', action: 'notify the shopper' } }))
+        .toContain('forge_propose_refinement')
       const reqId = (await read()).nodes.find((n) => n.label === 'Reserve online')!.id
-      await call(client, 'update_node', { id: reqId, properties: { action: 'let shoppers reserve products for two hours' } })
+      expect(await refused(client, 'update_node', { id: reqId, properties: { action: 'x' } })).toContain('"Reserve online" belongs to an earlier stage')
+      // Proposed instead: the user sees exactly what it writes, and nothing is written yet.
+      const proposed = await call(client, 'forge_propose_refinement', {
+        stage: 'processes',
+        reason: 'Step "Notify the shopper" needs a requirement and a scenario.',
+        changes: [
+          { tool: 'add_node', input: { tempId: 'notify', type: 'requirement', label: 'Notify when ready', properties: { ears_type: 'event-driven', trigger: 'staff confirm an order is ready', action: 'notify the shopper' } } },
+          { tool: 'add_relation', input: { sourceId: 'notify', targetId: need.id, relationType: 'derives' } },
+          { tool: 'add_node', input: { tempId: 'scn', type: 'scenario', label: 'Shopper notified', properties: { given: 'a reserved order', when: 'staff confirm it is ready', then: 'the shopper gets a message' } } },
+          { tool: 'add_relation', input: { sourceId: 'scn', targetId: 'notify', relationType: 'verifies' } },
+          { tool: 'update_node', input: { id: reqId, properties: { action: 'let shoppers reserve products for two hours' } } },
+        ],
+      })
+      expect(proposed).toContain('Proposal p1: nothing is written yet.')
+      expect(proposed).toContain('Found: Step "Notify the shopper" needs a requirement and a scenario.')
+      expect(proposed).toContain('1. Add requirement "Notify when ready"\n   ears_type: "event-driven"')
+      expect(proposed).toContain('   action: "notify the shopper"')
+      expect(proposed).toContain('2. Link requirement "Notify when ready" → need "Click & collect" (derives)')
+      expect(proposed).toContain('5. Change requirement "Reserve online"\n   action: "let shoppers reserve products" → "let shoppers reserve products for two hours"')
+      expect((await read()).nodes.some((n) => n.label === 'Notify when ready')).toBe(false)
+      // While it waits for the answer nothing is written, and the stage stays open.
+      expect(await refused(client, 'add_node', { tempId: 's3', type: 'step', label: 'Hand over', parentId: 'p' })).toContain('waits for the user\'s answer')
+      expect(await refused(client, 'forge_complete_stage', { stage: 'processes', summary: 'x' })).toContain('waits for the user\'s answer')
+      let status = parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
+      expect(status.stages.find((s) => s.id === 'processes')).toMatchObject({ status: 'generating', asking: true })
+      expect(await refused(client, 'forge_answer_refinement', { stage: 'processes', proposal: 'p9', accept: true })).toContain('the open proposal is p1')
+      const added = await call(client, 'forge_answer_refinement', { stage: 'processes', proposal: 'p1', accept: true, reply: 'Yes, and keep the two hours.' })
+      expect(added).toContain('Added p1.')
+      expect(added).toContain('The user replied: "Yes, and keep the two hours."')
+      let data = await read()
+      const notifyId = data.nodes.find((n) => n.label === 'Notify when ready')!.id
+      expect(data.nodes.some((n) => n.label === 'Shopper notified')).toBe(true)
+      expect(data.relations.some((r) => r.sourceId === notifyId && r.targetId === need.id && r.relationType === 'derives')).toBe(true)
+      expect(data.nodes.find((n) => n.id === reqId)).toMatchObject({ action: 'let shoppers reserve products for two hours' })
+      // What the proposal added belongs to the earlier stage too; the stage's own steps are written as usual.
+      expect(await refused(client, 'update_node', { id: notifyId, label: 'Notify' })).toContain('forge_propose_refinement')
+      await call(client, 'add_relation', { sourceId: 'p', targetId: notifyId, relationType: 'satisfies' })
+      // A proposal that would not apply is refused before the user is asked.
+      expect(await refused(client, 'forge_propose_refinement', { stage: 'processes', reason: 'x', changes: [{ tool: 'add_relation', input: { sourceId: 'nobody', targetId: need.id } }] }))
+        .toContain('Fix the proposal')
+      // A second proposal, declined with a reply.
+      await call(client, 'forge_propose_refinement', {
+        stage: 'processes',
+        reason: 'Shoppers may change their mind.',
+        changes: [{ tool: 'add_node', input: { tempId: 'cancel', type: 'requirement', label: 'Cancel a reservation', properties: { ears_type: 'ubiquitous', action: 'let shoppers cancel a reservation' } } }],
+      })
+      const declined = await call(client, 'forge_answer_refinement', { stage: 'processes', proposal: 'p2', accept: false, reply: 'Not in this release.' })
+      expect(declined).toContain('Not added; nothing was written.')
+      expect(declined).toContain('Not in this release.')
+      expect((await read()).nodes.some((n) => n.label === 'Cancel a reservation')).toBe(false)
+
       const done = await call(client, 'forge_complete_stage', { stage: 'processes', summary: 'Click and collect; added the notification it needs.' })
-      expect(done).toContain('It refined earlier stages (3)')
-      expect(done).toContain(`- ${reqId}: changed requirement "Reserve online" (action)`)
+      expect(done).toContain('It refined earlier stages as the user accepted (3)')
+      expect(done).toContain('- changed requirement "Reserve online" (action)')
       expect(done).toContain('added requirement "Notify when ready"')
       expect(done).toContain('added scenario "Shopper notified"')
       expect(done).not.toContain('added process')
-      expect(done).toContain('forge_reject_refinements')
+      expect(done).toContain('The user declined 1 of its 2 proposals.')
+      status = parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
+      expect(status.stages.find((s) => s.id === 'processes')).toMatchObject({ status: 'done', refined: 3 })
+      // The stage is closed: nothing guards the model any more.
+      await call(client, 'update_node', { id: notifyId, label: 'Notify when ready' })
 
-      expect(await refused(client, 'forge_reject_refinements', { stage: 'processes', ids: ['nope'] })).toContain('not a refinement')
-      const rejected = await call(client, 'forge_reject_refinements', { stage: 'processes', ids: [reqId] })
-      expect(rejected).toContain('Rejected 1 of the Processes stage\'s refinements; 2 kept.')
-      let data = await read()
-      expect(data.nodes.find((n) => n.id === reqId)).toMatchObject({ action: 'let shoppers reserve products' })
-      expect(data.nodes.some((n) => n.label === 'Notify when ready')).toBe(true)
-      const status = parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
-      expect(status.stages.find((s) => s.id === 'processes')).toMatchObject({ status: 'done', refined: 2 })
-
-      // Regenerate takes back what the stage added and the refinements kept.
+      // Regenerate takes back what the stage added and the refinements accepted.
       await call(client, 'forge_generate', { stage: 'processes', regenerate: true })
       data = await read()
       expect(data.nodes.some((n) => n.label === 'Notify when ready' || n.label === 'Shopper notified' || n.type === 'process')).toBe(false)
@@ -414,14 +458,16 @@ describe('Radical Forge over MCP', () => {
       const data = await read()
       const shop = data.nodes.find((n) => n.label === 'Shop')!
       const req = data.nodes.find((n) => n.label === 'Reserve online')!
-      await call(client, 'add_relation', { sourceId: shop.id, targetId: req.id, relationType: 'satisfies' })
+      expect(await refused(client, 'add_relation', { sourceId: shop.id, targetId: req.id, relationType: 'satisfies' })).toContain('both ends belong to earlier stages')
+      await call(client, 'forge_propose_refinement', { stage: 'review', reason: 'Nothing satisfies "Reserve online".', changes: [{ tool: 'add_relation', input: { sourceId: shop.id, targetId: req.id, relationType: 'satisfies' } }] })
+      await call(client, 'forge_answer_refinement', { stage: 'review', proposal: 'p1', accept: true })
       const done = await call(client, 'forge_complete_stage', { stage: 'review', summary: 'Linked the shop to its requirement.' })
-      expect(done).toContain('It refined earlier stages (1)')
+      expect(done).toContain('It refined earlier stages as the user accepted (1)')
       expect(done).toContain('added satisfies Shop → Reserve online')
       expect(done).toContain('tell the user which stay open')
       expect(done).not.toContain('Nothing satisfies')
       expect(done).toContain('This was the last stage.')
-      expect(await call(client, 'forge_finish', {})).toContain('- Review: +0 nodes · +1 relations · 1 refinements of earlier stages kept')
+      expect(await call(client, 'forge_finish', {})).toContain('- Review: +0 nodes · +1 relations · 1 refinements of earlier stages accepted')
     } finally {
       await client.close()
     }

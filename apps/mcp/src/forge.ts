@@ -19,10 +19,14 @@
 // how to arrange them (forge_arrange).
 //
 // A stage may close gaps in earlier stages (see the gaps block of the stage
-// prompts). The run keeps the model as it was before each stage, so
-// forge_complete_stage can list those refinements for the user to keep or
-// reject (forge_reject_refinements) beside the gaps left, and Regenerate
-// undoes the previous attempt's changes as well as its additions.
+// prompts), but only by proposing it: forge_propose_refinement checks the
+// proposal and returns exactly what it would write, the agent asks the user,
+// and forge_answer_refinement applies it if they accept. While a stage is
+// open, guard refuses the catalogue tools' direct writes to earlier stages
+// (and every write while a proposal waits for its answer). The run keeps the
+// model as it was before each stage, so forge_complete_stage reports what
+// the stage refined beside the gaps left, and Regenerate undoes the previous
+// attempt's refinements as well as its additions.
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -33,7 +37,9 @@ import {
   FORGE_STAGES,
   FORGE_VIEW_NAMES,
   PRIMARY_TYPE_IDS_FOR_STAGE,
+  PROPOSAL_INPUT_PROPERTIES,
   RADICAL_FOLDERS,
+  applyProposal,
   arrangeForgeGroup,
   buildClarifyPrompt,
   buildForgeStagePrompt,
@@ -41,6 +47,7 @@ import {
   buildWireframePrompt,
   defaultForgeStructure,
   describeForgeStructure,
+  describeProposal,
   describeRefinement,
   fileIntoForgeViews,
   forgeArrangeGroups,
@@ -48,12 +55,14 @@ import {
   forgeHubCandidates,
   formatClarificationAnswers,
   formatForgeGaps,
+  formatProposal,
   idsAddedSince,
-  isRejectable,
   modelIdsOf,
   needLabelFromDescription,
   outermostNodes,
+  parseProposal,
   radicalViewpoints,
+  refinementGuard,
   rejectRefinements,
   snapshotOf,
   stageRefinements,
@@ -61,6 +70,7 @@ import {
   type FiledNodes,
   type ForgeHubCandidates,
   type ForgeArrangement,
+  type ForgeProposal,
   type ForgeRefinement,
   type ForgeStageId,
   type ForgeStructure,
@@ -103,13 +113,13 @@ export const FORGE_PROCEDURE = [
   '   b. forge_generate with those answers and the Hub concepts the user kept. It returns the stage task:',
   '      carry it out with the model tools (add_node, add_relation, update_node, search_model, …).',
   '      A stage may also close gaps in earlier stages within the description (a requirement or scenario a',
-  '      process shows is missing, a wrong name): the task says how.',
+  '      process shows is missing, a wrong name), but only by proposing it: forge_propose_refinement returns',
+  '      exactly what it would write; show the user that, ask whether to add it (they may reply), wait for',
+  '      the answer and pass it to forge_answer_refinement. Writing to earlier stages directly is refused.',
   '   c. get_issues, and fix what the stage broke (a state machine without an initial state, an unreachable',
-  '      state, …). Then forge_complete_stage with a short summary of what you created, refined and why.',
-  '   d. If forge_complete_stage lists refinements of earlier stages, show them to the user and ask which to',
-  '      keep: all, all but some (forge_reject_refinements with their ids) or none (forge_reject_refinements',
-  '      without ids). It also lists the gaps the model has now; the next stage gets them.',
-  '   e. Show the user what the stage added and ask them: keep its new elements in a row, a column or a grid',
+  '      state, …). Then forge_complete_stage with a short summary of what you created, refined and why. It',
+  '      also lists the gaps the model has now; the next stage gets them.',
+  '   d. Show the user what the stage added and ask them: keep its new elements in a row, a column or a grid',
   '      on their view? Run Smart Layout on that view? Do what they choose with forge_arrange. Then ask whether',
   '      to continue, regenerate the stage (forge_generate with regenerate: true, which first removes what the',
   '      stage added) or finish here.',
@@ -195,15 +205,27 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
     },
   },
   {
-    name: 'forge_reject_refinements',
-    description: 'After a completed Forge stage, as the user chose: take back what the stage did to earlier stages (forge_complete_stage lists it). An added element or relation is removed, a changed one gets its old values back; a deletion cannot be taken back. Ask the user first.',
+    name: 'forge_propose_refinement',
+    description: 'While a Forge stage is open: propose adding to or correcting what an earlier stage made. Writes nothing: checks that the changes would apply and returns exactly what they write, for you to show the user and ask whether to add it. Then call forge_answer_refinement with their answer. One finding per proposal.',
+    inputSchema: {
+      type: 'object',
+      properties: { stage: { ...stageEnum, description: 'The open stage.' }, ...PROPOSAL_INPUT_PROPERTIES },
+      required: ['stage', 'reason', 'changes'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'forge_answer_refinement',
+    description: 'The user\'s answer to the proposal forge_propose_refinement returned: accept applies all of its changes, otherwise nothing is written. Pass their reply too, if they gave one; follow it.',
     inputSchema: {
       type: 'object',
       properties: {
         stage: stageEnum,
-        ids: { type: 'array', items: { type: 'string' }, description: 'The ids of the refinements to reject, as forge_complete_stage lists them. Omit to reject them all.' },
+        proposal: { type: 'string', description: 'The proposal\'s id, as forge_propose_refinement returned it.' },
+        accept: { type: 'boolean', description: 'true when the user wants it added.' },
+        reply: { type: 'string', description: 'What the user said about it, in their words, if anything.' },
       },
-      required: ['stage'],
+      required: ['stage', 'proposal', 'accept'],
       additionalProperties: false,
     },
   },
@@ -278,9 +300,16 @@ interface StageState {
   snapshot: ModelSnapshot
   /** What the stage added; set when it is completed. */
   added?: ModelIds
-  /** What it did to earlier stages and the user has not rejected; set when
-   *  it is completed. */
+  /** What it did to earlier stages, as the user accepted; set when it is
+   *  completed. */
   refinements?: ForgeRefinement[]
+  /** Ids of the nodes and relations its accepted proposals added. */
+  proposed: Set<string>
+  /** The proposal waiting for the user's answer. */
+  pending?: { id: string; proposal: ForgeProposal }
+  /** How many proposals it made, and how many the user declined. */
+  proposals: number
+  declined: number
   summary?: string
   clarifications?: string
   /** Ids of the Hub concepts applied; undefined = the suggested ones. */
@@ -412,7 +441,8 @@ export class Forge {
       case 'forge_clarify': return this.clarify(args)
       case 'forge_generate': return this.generate(args, facade)
       case 'forge_complete_stage': return this.complete(args, facade)
-      case 'forge_reject_refinements': return this.reject(args, facade)
+      case 'forge_propose_refinement': return this.propose(args, ctx, facade)
+      case 'forge_answer_refinement': return this.answer(args, ctx)
       case 'forge_arrange': return this.arrange(args, facade)
       case 'forge_wireframe': return this.wireframe(args, ctx, facade)
       case 'forge_import_hub_concept': return this.importConcept(args, facade)
@@ -599,7 +629,7 @@ export class Forge {
     const needNode = run.needId ? nodes[run.needId] : undefined
     const gaps = forgeGaps(STAGE_IDS.slice(0, stageIdx), nodes, facade.getRelations(), facade.getMetamodel?.())
     const prompt = buildForgeStagePrompt(id, run.description, effectiveMatches, clarifications, priorSummaries,
-      needNode ? { id: needNode.id, label: needNode.label } : undefined, formatForgeGaps(gaps))
+      needNode ? { id: needNode.id, label: needNode.label } : undefined, formatForgeGaps(gaps), 'forge_propose_refinement')
     const metamodelMessage = buildMetamodelMessage(facade.getMetamodel?.(), new Set(PRIMARY_TYPE_IDS_FOR_STAGE[id]), nodes)
     let context = buildContextMessage(nodes, facade.getRelations(), null, facade.getViews?.())
     if (context.length > MAX_CONTEXT_CHARS) {
@@ -611,6 +641,7 @@ export class Forge {
       '',
       'Carry out the task at the end with the model tools (add_node, add_relation, update_node, move_node, search_model, …).',
       'A Forge stage only builds the model: do not change the metamodel, presentations or milestones.',
+      ...(id === 'requirements' ? [] : [`What an earlier stage lacks you propose with forge_propose_refinement (stage "${id}"), show the user exactly what it returns, and pass their answer to forge_answer_refinement before you go on.`]),
       `When the stage is done, call forge_complete_stage with stage "${id}" and a 1-3 sentence summary of what you created, refined and why.`,
       '',
       'Rules:',
@@ -623,7 +654,10 @@ export class Forge {
       prompt,
     ].join('\n')
 
-    const state: StageState = { status: 'generating', before: this.ids(facade), snapshot: snapshotOf(facade), clarifications, hubConcepts }
+    const state: StageState = {
+      status: 'generating', before: this.ids(facade), snapshot: snapshotOf(facade), clarifications, hubConcepts,
+      proposed: new Set(), proposals: 0, declined: 0,
+    }
     return ok(brief, { readOnly, commit: () => { run.stages[id] = state } })
   }
 
@@ -635,6 +669,7 @@ export class Forge {
     const id = stage as ForgeStageId
     const state = run.stages[id]
     if (state?.status !== 'generating') return fail(`forge_complete_stage: the ${stageTitle(id)} stage is not open; begin it with forge_generate`)
+    if (state.pending) return fail(`forge_complete_stage: proposal ${state.pending.id} waits for the user's answer; ask them and call forge_answer_refinement first`)
     const summary = typeof args.summary === 'string' && args.summary.trim() ? args.summary.trim() : 'Done.'
     const added = idsAddedSince(state.before, this.ids(facade))
     const refinements = stageRefinements(id, state.snapshot, snapshotOf(facade))
@@ -646,11 +681,9 @@ export class Forge {
     ]
     lines.push(...viewLines(filed))
     if (refinements.length) {
-      lines.push(
-        `It refined earlier stages (${refinements.length}). Show the user this list and ask which to keep: all, all but some (forge_reject_refinements with stage "${id}" and their ids) or none (forge_reject_refinements without ids):`,
-        ...refinements.map((r) => `- ${r.id}: ${describeRefinement(r)}${isRejectable(r) ? '' : ' (cannot be taken back)'}`),
-      )
+      lines.push(`It refined earlier stages as the user accepted (${refinements.length}):`, ...refinements.map((r) => `- ${describeRefinement(r)}`))
     }
+    if (state.declined) lines.push(`The user declined ${state.declined} of its ${state.proposals} proposals.`)
     const gaps = forgeGaps(STAGE_IDS.slice(0, STAGE_IDS.indexOf(id) + 1), nodes, facade.getRelations(), facade.getMetamodel?.())
     if (gaps.length) {
       lines.push(`Gaps the model has now (${gaps.length}), by the rules of the stages done; ${id === 'review' ? 'tell the user which stay open' : 'the next stage gets them'}:`, ...formatForgeGaps(gaps))
@@ -686,28 +719,82 @@ export class Forge {
     })
   }
 
-  private reject(args: Record<string, unknown>, facade: ModelFacade): ForgeResult {
+  /** The open stage a proposal belongs to, or why there is none. */
+  private openStage(args: Record<string, unknown>, tool: string): { id: ForgeStageId; state: StageState } | string {
     const run = this.run
-    if (!run) return fail('forge_reject_refinements: no Forge run; call forge_start first')
-    const stage = this.stageArg(args, 'forge_reject_refinements')
-    if (!STAGE_IDS.includes(stage as ForgeStageId)) return fail(stage)
+    if (!run) return `${tool}: no Forge run; call forge_start first`
+    const stage = this.stageArg(args, tool)
+    if (!STAGE_IDS.includes(stage as ForgeStageId)) return stage
     const id = stage as ForgeStageId
     const state = run.stages[id]
-    if (state?.status !== 'done' || !state.refinements) return fail(`forge_reject_refinements: complete the ${stageTitle(id)} stage first (forge_complete_stage)`)
-    if (args.ids !== undefined && (!Array.isArray(args.ids) || args.ids.some((i) => typeof i !== 'string'))) {
-      return fail('forge_reject_refinements: ids must be a list of refinement ids')
+    if (state?.status !== 'generating') return `${tool}: the ${stageTitle(id)} stage is not open; a stage proposes refinements while it runs`
+    return { id, state }
+  }
+
+  private async propose(args: Record<string, unknown>, ctx: ToolRunContext, facade: ModelFacade): Promise<ForgeResult> {
+    const open = this.openStage(args, 'forge_propose_refinement')
+    if (typeof open === 'string') return fail(open)
+    const { id, state } = open
+    if (state.pending) return fail(`forge_propose_refinement: proposal ${state.pending.id} still waits for the user's answer; call forge_answer_refinement first`)
+    const proposal = parseProposal(args)
+    if (typeof proposal === 'string') return fail(`forge_propose_refinement: ${proposal}`)
+    const lines = describeProposal(proposal, facade.getNodes(), facade.getRelations(), ctx.resolveId)
+    // A trial on this call's copy of the model, which is not saved: the user
+    // is asked only about a proposal that applies. Its tempIds stay its own.
+    const trialIds = new Map<string, string>()
+    const trial = await applyProposal(proposal, {
+      ...ctx,
+      resolveId: (tempId) => trialIds.get(tempId) ?? ctx.resolveId(tempId),
+      registerTempId: (tempId, realId) => { trialIds.set(tempId, realId) },
+    })
+    if (!trial.ok) return fail(`forge_propose_refinement: ${trial.text} Fix the proposal before you ask the user.`)
+    const proposalId = `p${state.proposals + 1}`
+    const text = [
+      `Proposal ${proposalId}: nothing is written yet. Show the user exactly this, ask whether to add it, and wait for the answer; they may also reply.`,
+      '',
+      formatProposal(proposal, lines),
+      '',
+      `Then call forge_answer_refinement with stage "${id}", proposal "${proposalId}", accept true or false, and their reply if they gave one. Until then the model tools write nothing.`,
+    ].join('\n')
+    return ok(text, { readOnly: true, commit: () => { state.pending = { id: proposalId, proposal }; state.proposals++ } })
+  }
+
+  private async answer(args: Record<string, unknown>, ctx: ToolRunContext): Promise<ForgeResult> {
+    const open = this.openStage(args, 'forge_answer_refinement')
+    if (typeof open === 'string') return fail(open)
+    const { state } = open
+    const pending = state.pending
+    if (!pending) return fail('forge_answer_refinement: no proposal waits for an answer; propose one with forge_propose_refinement')
+    if (args.proposal !== pending.id) return fail(`forge_answer_refinement: the open proposal is ${pending.id}, not ${String(args.proposal)}`)
+    if (typeof args.accept !== 'boolean') return fail('forge_answer_refinement: accept must be true or false')
+    const reply = typeof args.reply === 'string' && args.reply.trim() ? ` The user replied: "${args.reply.trim()}". Follow it.` : ''
+    if (!args.accept) {
+      return ok(`Not added; nothing was written. Do not propose it again.${reply}`, {
+        readOnly: true,
+        commit: () => { state.pending = undefined; state.declined++ },
+      })
     }
-    const ids = args.ids as string[] | undefined
-    const unknown = (ids ?? []).filter((i) => !state.refinements!.some((r) => r.id === i))
-    if (unknown.length) return fail(`forge_reject_refinements: not a refinement of the ${stageTitle(id)} stage: ${unknown.join(', ')}`)
-    const chosen = state.refinements.filter((r) => !ids || ids.includes(r.id))
-    const fixed = chosen.filter((r) => !isRejectable(r))
-    if (ids && fixed.length) return fail(`forge_reject_refinements: a deletion cannot be taken back: ${fixed.map((r) => r.id).join(', ')}`)
-    const done = new Set(rejectRefinements(facade, chosen))
-    const lines = chosen.filter((r) => done.has(r.id)).map((r) => `- took back: ${describeRefinement(r)}`)
-    const kept = state.refinements.filter((r) => !done.has(r.id))
-    lines.unshift(`Rejected ${done.size} of the ${stageTitle(id)} stage's refinements; ${kept.length} kept.`)
-    return ok(lines.join('\n'), { readOnly: !done.size, commit: () => { state.refinements = kept } })
+    const outcome = await applyProposal(pending.proposal, ctx)
+    if (!outcome.ok) return fail(`forge_answer_refinement: ${outcome.text}`)
+    return ok(`Added ${pending.id}. ${outcome.text}${reply}`, {
+      commit: () => {
+        state.pending = undefined
+        for (const added of outcome.added) state.proposed.add(added)
+      },
+    })
+  }
+
+  /** Why a catalogue tool call may not run now, or null: while a stage is
+   *  open it may not write to earlier stages, and while a proposal waits
+   *  for its answer nothing is written. */
+  guard(name: string, input: unknown, ctx: ToolRunContext): string | null {
+    const run = this.run
+    if (!run) return null
+    const id = STAGE_IDS.find((stage) => run.stages[stage]?.status === 'generating')
+    const state = id ? run.stages[id] : undefined
+    if (!id || !state) return null
+    if (state.pending) return `${name}: proposal ${state.pending.id} waits for the user's answer; ask them and call forge_answer_refinement first.`
+    return refinementGuard({ stage: id, before: state.snapshot, proposed: state.proposed }, name, input, ctx.resolveId, 'forge_propose_refinement')
   }
 
   private async arrange(args: Record<string, unknown>, facade: ModelFacade): Promise<ForgeResult> {
@@ -794,7 +881,7 @@ export class Forge {
       const state = run.stages[stage.id]
       if (!state) return `- ${stage.title}: skipped`
       if (state.status === 'generating') return `- ${stage.title}: begun but not completed`
-      const refined = state.refinements?.length ? ` · ${state.refinements.length} refinements of earlier stages kept` : ''
+      const refined = state.refinements?.length ? ` · ${state.refinements.length} refinements of earlier stages accepted` : ''
       return `- ${stage.title}: +${state.added!.nodes.length} nodes · +${state.added!.relations.length} relations${refined}`
     })
     const files = buildGherkinFiles(facade.getNodes(), facade.getRelations())
@@ -834,7 +921,7 @@ export class Forge {
             ...(state.refinements?.length ? { refined: state.refinements.length } : {}),
           }
         }
-        if (state?.status === 'generating') return { id: stage.id, status: 'generating' as const }
+        if (state?.status === 'generating') return { id: stage.id, status: 'generating' as const, ...(state.pending ? { asking: true } : {}) }
         return { id: stage.id, status: run.clarified.has(stage.id) ? 'clarifying' as const : 'pending' as const }
       }),
     }

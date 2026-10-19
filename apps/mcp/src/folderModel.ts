@@ -391,6 +391,12 @@ export class FolderModel {
         resetTempIds: () => this.tempIds.clear(),
         placeNext: (parentId) => placeNewNode(facade.getNodes(), parentId),
       }
+      // While a Forge stage is open, its writes to earlier stages go through a proposal.
+      const refused = FORGE_TOOLS.has(name) || READ_ONLY.has(name) ? null : this.forge.guard(name, input, ctx)
+      if (refused) {
+        this.restoreTempIds(priorTempIds)
+        return { ok: false, text: refused }
+      }
       const result: ForgeResult = FORGE_TOOLS.has(name)
         ? await this.forge.call(name, input, ctx, facade)
         : await runTool(name, input, ctx)

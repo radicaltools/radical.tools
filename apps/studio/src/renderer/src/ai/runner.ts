@@ -9,7 +9,7 @@ import { emptyReport, mergeReport, type ApplyReport, type DiagramFacade } from '
 import { getAdapter } from './registry'
 import { buildSystemMessages } from './systemPrompt'
 import { buildContextMessage } from '@radical/common/ai/systemPrompt'
-import { buildToolDefs, runTool, type ToolGroup, type ToolRunContext } from '@radical/common/ai/tools'
+import { buildToolDefs, runTool, type ToolDef, type ToolGroup, type ToolResult, type ToolRunContext } from '@radical/common/ai/tools'
 import { createBatchPlacer } from '@radical/layout/geometry'
 import { addTokenUsage, textOf, toolCallsOf, type AISettings, type ChatContentBlock, type ChatMessage, type TokenUsage } from './types'
 import { viewShowsEveryNode } from '@radical/common/c4'
@@ -39,6 +39,13 @@ export type ForgeProgressEvent =
   | { type: 'action'; ok: boolean; label: string }
   | { type: 'usage'; usage: TokenUsage }
 
+/** A tool one caller adds to the catalogue for its run (Radical Forge's
+ *  propose_refinement). It may wait, e.g. for the user's answer. */
+export interface RunnerTool {
+  def: ToolDef
+  run(input: unknown, ctx: ToolRunContext): Promise<ToolResult>
+}
+
 export interface RunAIOptions {
   prompt: string
   settings: AISettings
@@ -57,6 +64,12 @@ export interface RunAIOptions {
    *  leaves out 'metamodel', 'presentation' and 'milestone'; QuickSearch's chat
    *  has all. */
   excludeToolGroups?: ToolGroup[]
+  /** Tools added for this run only. */
+  extraTools?: RunnerTool[]
+  /** Refuses a tool call before it runs: the reason, fed back to the model
+   *  as the call's error, or null to let it run. Radical Forge keeps a stage
+   *  from writing to earlier stages without asking. */
+  guard?: (name: string, input: unknown, ctx: ToolRunContext) => string | null
 }
 
 /** Appends a fresh text block to a turn's content ahead of sending it — used
@@ -112,12 +125,13 @@ function describeToolCall(name: string, input: unknown, ctx: ToolRunContext): st
     case 'search_model': return 'searched the model'
     case 'focus_node': return 'focused a node'
     case 'reset_diagram': return 'reset the diagram'
+    case 'propose_refinement': return '? asked you about a refinement'
     default: return name
   }
 }
 
 export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
-  const { settings, prompt, diagram, history = [], signal, onProgress, relevantTypeIds, excludeToolGroups } = opts
+  const { settings, prompt, diagram, history = [], signal, onProgress, relevantTypeIds, excludeToolGroups, extraTools = [], guard } = opts
   const maxIterations = opts.maxIterations ?? 12
   const cfg = settings.providers[settings.active]
   const adapter = getAdapter(settings.active)
@@ -126,7 +140,8 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
   // Rebuilt when a metamodel tool changes the types mid-run, so the next
   // round's schemas (node-type enums) and metamodel message match.
   let metamodel = diagram.getMetamodel?.()
-  let tools = buildToolDefs(metamodel, { exclude: excludeToolGroups })
+  const catalogue = (): ToolDef[] => [...buildToolDefs(metamodel, { exclude: excludeToolGroups }), ...extraTools.map((t) => t.def)]
+  let tools = catalogue()
 
   // Shared across the WHOLE run — a node created in round 1 must still be
   // resolvable by a relation created in round 3, and reset_diagram (any
@@ -180,7 +195,7 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
     const liveMetamodel = diagram.getMetamodel?.()
     if (liveMetamodel !== metamodel) {
       metamodel = liveMetamodel
-      tools = buildToolDefs(metamodel, { exclude: excludeToolGroups })
+      tools = catalogue()
     }
 
     // The prompt + metamodel prefix is byte-identical every round (see
@@ -247,7 +262,15 @@ export async function runAIPrompt(opts: RunAIOptions): Promise<RunAIResult> {
         onProgress?.({ type: 'action', ok: false, label: msg })
         continue
       }
-      const result = await runTool(call.name, call.input, ctx)
+      const refused = guard?.(call.name, call.input, ctx)
+      if (refused) {
+        // Not an error of the run: the model is told what to do instead.
+        resultBlocks.push({ type: 'tool_result', toolCallId: call.id, content: refused, isError: true })
+        onProgress?.({ type: 'action', ok: true, label: `↩ ${call.name} refused: ${refused}` })
+        continue
+      }
+      const extra = extraTools.find((t) => t.def.name === call.name)
+      const result = extra ? await extra.run(call.input, ctx) : await runTool(call.name, call.input, ctx)
       resultBlocks.push({ type: 'tool_result', toolCallId: call.id, content: result.resultText, isError: !result.ok })
       if (result.ok) mergeReport(report, result)
       else roundErrors.push(`${call.name}: ${result.resultText}`)

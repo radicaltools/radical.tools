@@ -4,7 +4,7 @@ type: "step"
 label: "Arrange the stage"
 children: "sequence"
 condition: "if the user chooses an arrangement"
-order: 4
+order: 3
 repeat: "0..1"
 ---
 

@@ -569,4 +569,29 @@ describe('runAIPrompt — tool groups and metamodel changes', () => {
     expect(result.report.added.nodes).toBe(1)
     expect(Object.values(facade.getNodes()).map((n) => n.type)).toEqual(['risk'])
   })
+
+  it('offers a caller\'s own tools, waits for them, and refuses what the guard refuses', async () => {
+    const fake = fakeAnthropicFetch([
+      { content: [toolUse('c1', 'add_node', { tempId: 'r', type: 'requirement', label: 'Refund' }), toolUse('c2', 'ask_me', { question: 'Refund?' })], stop_reason: 'tool_use' },
+      { content: [text('Asked.')], stop_reason: 'end_turn' },
+    ])
+    const facade = createModelFacade({ nodes: [], relations: [], metamodel: builtInGovernanceMetamodel() })
+    const asked: unknown[] = []
+    const result = await runAIPrompt({
+      prompt: 'Refine', settings: anthropicSettings(), diagram: facade,
+      extraTools: [{
+        def: { name: 'ask_me', description: 'Ask the user.', inputSchema: { type: 'object', properties: { question: { type: 'string' } } } },
+        run: async (input) => { asked.push(input); await new Promise((r) => setTimeout(r, 5)); return { ok: true, resultText: 'The user said no.' } },
+      }],
+      guard: (name, input) => (name === 'add_node' && (input as { type?: string }).type === 'requirement' ? 'Propose it instead.' : null),
+    })
+    expect(toolNames(fake.bodies()[0])).toContain('ask_me')
+    expect(asked).toEqual([{ question: 'Refund?' }])
+    expect(Object.keys(facade.getNodes())).toEqual([])
+    const fedBack = JSON.stringify(fake.bodies()[1].messages)
+    expect(fedBack).toContain('Propose it instead.')
+    expect(fedBack).toContain('The user said no.')
+    // A refusal tells the model what to do; it is no error of the run.
+    expect(result.report.errors).toEqual([])
+  })
 })
