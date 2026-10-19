@@ -1916,11 +1916,10 @@ function AttrRow({ label, missing = false, children }: { label: string; missing?
 
 /** A long field: rendered Markdown that a click turns into its editor; the
  *  editor goes back to the text when it loses focus or on Escape. */
-function MarkdownField({ label, value, readOnly, loading = false, onChange }: {
-  label: string; value: string; readOnly: boolean; loading?: boolean; onChange: (v: string) => void
+function MarkdownField({ label, value, readOnly, onChange }: {
+  label: string; value: string; readOnly: boolean; onChange: (v: string) => void
 }) {
   const [editing, setEditing] = useState(false)
-  if (loading) return <div className="pp-md empty">Loading…</div>
   if (editing && !readOnly) {
     return (
       <AutoResizeTextarea autoFocus aria-label={label} value={value} placeholder={MARKDOWN_HINT}
@@ -2088,7 +2087,6 @@ function BranchFieldChanges({ node, branch }: { node: C4Node; branch?: CardBranc
   const old = source?.baseNodes[node.id]
   const metamodel = useDiagramStore((s) => s.metamodel)
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
-  const pending = useDiagramStore((s) => !!s.pendingBodyNodeIds[node.id])
   if (!mark) return null
   if (mark === 'new') {
     return (
@@ -2100,7 +2098,7 @@ function BranchFieldChanges({ node, branch }: { node: C4Node; branch?: CardBranc
   }
   if (!old) return null
   // A description not loaded yet is no change.
-  const changes = modelFieldChanges(old, node).filter((c) => !(pending && c.field === 'description'))
+  const changes = modelFieldChanges(old, node)
   const props = metamodel?.nodeTypes[node.type]?.properties ?? []
   const nameOf = (field: string) => props.find((p) => p.key === field)?.label ?? FIELD_NAMES[field] ?? field
   const place = (id: unknown) => typeof id === 'string' && id ? (c4Nodes[id]?.label ?? id) : 'the top of the model'
@@ -2141,21 +2139,12 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
   const selectNode = useDiagramStore((s) => s.selectNode)
   const selectEdge = useDiagramStore((s) => s.selectEdge)
   const hubTemplates = useDiagramStore((s) => s.hubTemplates)
-  const pendingBodyNodeIds = useDiagramStore((s) => s.pendingBodyNodeIds)
-  const hydrateNode = useDiagramStore((s) => s.hydrateNode)
   const openNodeWizard = useDiagramStore((s) => s.openNodeWizard)
-
-  // Lazily-loaded md-folder docs don't have the description in memory until
-  // the node is opened — fetch it now.
-  useEffect(() => {
-    if (selectedNodeId) hydrateNode(selectedNodeId)
-  }, [selectedNodeId, hydrateNode])
 
   // ── Node ──────────────────────────────────────────────────────────────────
   if (selectedNodeId && c4Nodes[selectedNodeId]) {
     const node = c4Nodes[selectedNodeId]
     const record = node as unknown as Record<string, unknown>
-    const descriptionPending = !!pendingBodyNodeIds[node.id]
     const set = (key: string, v: unknown) => {
       if (!readOnly) updateNode(node.id, { [key]: v } as Parameters<typeof updateNode>[1])
     }
@@ -2257,7 +2246,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
               {missing(p) && <span className="pp-missing" title="Required, not set" aria-label="required, not set" />}
             </div>
             <MarkdownField label={p.label} value={String(record[p.key] ?? p.default ?? '')} readOnly={readOnly}
-              loading={p.key === 'description' && descriptionPending} onChange={(v) => set(p.key, v)} />
+              onChange={(v) => set(p.key, v)} />
           </section>
         ))}
         {node.type === 'mockup' && (

@@ -10,9 +10,7 @@
 
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { computeDiffGhosts, computeSnapDiff, useDiagramStore } from '@radical/ui/store/diagramStore'
-import { documents } from '../store/documentStore'
 import { onOutsideEditLoaded } from './autosave'
-import { withDescriptions } from './descriptions'
 
 type ChangeKind = 'new' | 'changed' | 'removed'
 
@@ -47,10 +45,9 @@ function end(): void {
 onOutsideEditLoaded((before) => {
   const s = useDiagramStore.getState()
   if (s.activeSnapshotId) return // a milestone being viewed has the overlay
-  const prevNodes = withDescriptions(before.nodes, before.pendingBodies, before.files)
-  const nodes = withDescriptions(s.c4Nodes, documents.getPendingBodyNodeIds(before.id), documents.loadedFolderFiles(before.id))
+  const nodes = s.c4Nodes as Record<string, C4Node>
   const relations = s.c4Relations as Record<string, C4Relation>
-  const diff = computeSnapDiff(prevNodes, nodes, before.relations, relations)
+  const diff = computeSnapDiff(before.nodes, nodes, before.relations, relations)
   if (!Object.keys(diff).length) return
 
   // Add up with what is still flashing: an element added and then changed is
@@ -58,7 +55,7 @@ onOutsideEditLoaded((before) => {
   const highlight: Record<string, ChangeKind> = { ...(flash?.highlight ?? {}) }
   const ghostNodes: Record<string, C4Node> = { ...(flash?.ghostNodes ?? {}) }
   const ghostRelations: Record<string, C4Relation> = { ...(flash?.ghostRelations ?? {}) }
-  const ghosts = computeDiffGhosts(prevNodes, nodes, before.relations, relations)
+  const ghosts = computeDiffGhosts(before.nodes, nodes, before.relations, relations)
   for (const [id, kind] of Object.entries(diff)) {
     if (kind === 'removed' && highlight[id] === 'new') {
       delete highlight[id]

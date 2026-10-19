@@ -42,14 +42,11 @@ export function onDocumentLoaded(listener: (id: string) => void): () => void {
 }
 
 /** The model as it was before a reload brought in an edit made outside
- *  Studio: its nodes and relations, and what `documents` had for the
- *  descriptions it had not read into memory yet. */
+ *  Studio: its nodes and relations. */
 export interface BeforeOutsideEdit {
   id: string
   nodes: Record<string, C4Node>
   relations: Record<string, C4Relation>
-  pendingBodies: string[]
-  files: Record<string, string> | undefined
 }
 
 const _outsideEditListeners = new Set<(before: BeforeOutsideEdit) => void>()
@@ -203,7 +200,7 @@ if (typeof window !== 'undefined') {
     const live = useDiagramStore.getState()
     const camera = opts?.keepUi ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
     const before: BeforeOutsideEdit | null = opts?.keepUi
-      ? { id, nodes: live.c4Nodes, relations: live.c4Relations, pendingBodies: documents.getPendingBodyNodeIds(id), files: documents.loadedFolderFiles(id) }
+      ? { id, nodes: live.c4Nodes, relations: live.c4Relations }
       : null
     documents.loadDocument(id).then((data) => {
       if (seq !== _loadSeq || documents.getActiveId() !== id) return

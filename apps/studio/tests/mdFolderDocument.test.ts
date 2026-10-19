@@ -71,8 +71,8 @@ describe('documents — md-folder backend', () => {
     expect(Object.keys(disk).some((p) => p.startsWith('nodes/event-sourcing'))).toBe(true)
   })
 
-  it('round-trips through save + load on the md backend, loading node bodies lazily', async () => {
-    installFolderApi()
+  it('loads every element\'s description with a folder model', async () => {
+    const { disk } = installFolderApi()
     const ls = documents.createLSDocument('Draft', SAMPLE)
     const meta = await documents.saveAsFolder(ls.id, SAMPLE)
     await documents.saveDocument(meta!.id, SAMPLE)
@@ -80,33 +80,13 @@ describe('documents — md-folder backend', () => {
     expect(loaded).not.toBeNull()
     const byId = Object.fromEntries(loaded!.nodes.map((n) => [n.id, n]))
     expect(byId.sys1.label).toBe('Payments')
+    expect(byId.sys1.description).toBe('Money mover')
     expect((byId.adr1 as unknown as Record<string, unknown>).status).toBe('accepted')
 
-    // The body isn't read into memory at load time...
-    expect(byId.sys1.description).toBeUndefined()
-    expect(documents.getPendingBodyNodeIds(meta!.id)).toContain('sys1')
-
-    // ...but can be fetched on demand.
-    const body = await documents.hydrateNodeBody(meta!.id, 'sys1')
-    expect(body).toBe('Money mover')
-  })
-
-  it('does not lose an unopened node\'s description on save (lazy round-trip safety)', async () => {
-    installFolderApi()
-    const ls = documents.createLSDocument('Draft', SAMPLE)
-    const meta = await documents.saveAsFolder(ls.id, SAMPLE)
-    await documents.saveDocument(meta!.id, SAMPLE)
-
-    // Load lazily and save straight back WITHOUT ever hydrating sys1's body —
-    // this is the scenario that would silently wipe unopened content if
-    // saveDocument didn't transiently re-read it first.
-    const loaded = await documents.loadDocument(meta!.id)
-    expect(loaded!.nodes.find((n) => n.id === 'sys1')!.description).toBeUndefined()
-    await documents.saveDocument(meta!.id, loaded!)
-
+    // Read again after a tool rewrote the folder: the descriptions come along.
+    const file = Object.keys(disk).find((p) => p.startsWith('nodes/payments'))!
+    disk[file] = disk[file].replace('Money mover', 'Moves money')
     const reloaded = await documents.loadDocument(meta!.id)
-    const body = await documents.hydrateNodeBody(meta!.id, 'sys1')
-    expect(body).toBe('Money mover')
-    expect(reloaded!.nodes.find((n) => n.id === 'adr1')).toBeDefined()
+    expect(reloaded!.nodes.find((n) => n.id === 'sys1')!.description).toBe('Moves money')
   })
 })

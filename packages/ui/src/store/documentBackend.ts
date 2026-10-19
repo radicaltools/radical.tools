@@ -17,9 +17,6 @@ export interface DocumentBackend {
    *  (for the first paint). Null when it has to be loaded asynchronously. */
   openActive(seed: () => DiagramData): DiagramData | null
   getActiveId(): string | null
-  /** Node descriptions of markdown-folder documents load on demand. */
-  hydrateNodeBody(docId: string, nodeId: string): Promise<string | undefined>
-  getPendingBodyNodeIds(docId: string): string[]
 }
 
 let backend: DocumentBackend | null = null
