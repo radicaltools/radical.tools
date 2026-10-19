@@ -25,6 +25,8 @@ export interface ForgeRunStageInfo {
   summary?: string
   /** How many elements and relations it added. */
   added?: { nodes: number; relations: number }
+  /** How many of its refinements of earlier stages the user kept. */
+  refined?: number
 }
 
 export interface ForgeRunStatus {
@@ -67,6 +69,7 @@ export function parseForgeRun(text: string): ForgeRunStatus | null {
       status: s.status as ForgeRunStageStatus,
       ...(typeof s.summary === 'string' ? { summary: s.summary } : {}),
       ...(added && typeof added.nodes === 'number' && typeof added.relations === 'number' ? { added: { nodes: added.nodes, relations: added.relations } } : {}),
+      ...(typeof s.refined === 'number' ? { refined: s.refined } : {}),
     })
   }
   const need = r.need as { id?: unknown; label?: unknown } | undefined

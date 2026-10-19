@@ -1,8 +1,8 @@
 // ─── What one Radical Forge stage run added to the model ────────────────────
 // Regenerate runs a stage again on top of the model, so the previous attempt's
 // additions are removed first; otherwise every regeneration stacks a copy.
-// Updates and deletions an attempt made are not reverted. Studio reads the ids
-// from its store, the MCP server from the folder.
+// Its changes to earlier elements are taken back with ./refinements.ts.
+// Studio reads the ids from its store, the MCP server from the folder.
 
 export interface ModelIds {
   nodes: string[]

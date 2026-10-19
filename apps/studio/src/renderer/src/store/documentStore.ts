@@ -40,6 +40,7 @@ import {
   writeSelectionToHandle,
   readForgeRunFromHandle,
   readModelBaseFromHandle,
+  writeModelBaseToHandle,
   readCheckFilesFromHandle,
   writeCheckConfigToHandle,
 } from '../persist/webFolder'
@@ -786,6 +787,9 @@ export interface DocumentsAPI {
    *  written by the CLI or the MCP server), or null when there is none, the
    *  document is no folder, or it cannot be read. */
   readModelBase(id: string): Promise<string | null>
+  /** Writes the model's base beside a folder model; false when it is no
+   *  folder model or the write failed. */
+  writeModelBase(id: string, content: string): Promise<boolean>
   /** What `radical check` keeps beside an md-folder model (test results,
    *  check.json), each null when it is not there; both null for a document
    *  that is no folder. Null when the folder cannot be read yet (a browser
@@ -1288,6 +1292,22 @@ export const documents: DocumentsAPI = {
     if (h.readFolder || !connectedWebHandles.has(id)) return null
     const handle = await loadHandle(id)
     return handle ? readModelBaseFromHandle(handle) : null
+  },
+
+  async writeModelBase(id, content) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') return false
+    const h = host()
+    if (meta.folderPath && h.writeModelBase) {
+      const res = await h.writeModelBase(meta.folderPath, content)
+      if (!res.success) console.warn('[documentStore] base write failed:', res.error)
+      return res.success
+    }
+    if (h.readFolder || !connectedWebHandles.has(id)) return false
+    const handle = await loadHandle(id)
+    if (!handle) return false
+    try { await writeModelBaseToHandle(handle, content); return true }
+    catch (e) { console.warn('[documentStore] base write failed:', e); return false }
   },
 
   async readCheckFiles(id) {

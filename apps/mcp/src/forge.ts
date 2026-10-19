@@ -17,6 +17,12 @@
 // made as they fill) or the layer canvases. On a canvas they get a place
 // beside what the view already shows, and the client is told to ask the user
 // how to arrange them (forge_arrange).
+//
+// A stage may close gaps in earlier stages (see the gaps block of the stage
+// prompts). The run keeps the model as it was before each stage, so
+// forge_complete_stage can list those refinements for the user to keep or
+// reject (forge_reject_refinements) beside the gaps left, and Regenerate
+// undoes the previous attempt's changes as well as its additions.
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -35,22 +41,31 @@ import {
   buildWireframePrompt,
   defaultForgeStructure,
   describeForgeStructure,
+  describeRefinement,
   fileIntoForgeViews,
   forgeArrangeGroups,
+  forgeGaps,
   forgeHubCandidates,
   formatClarificationAnswers,
+  formatForgeGaps,
   idsAddedSince,
+  isRejectable,
   modelIdsOf,
   needLabelFromDescription,
   outermostNodes,
   radicalViewpoints,
+  rejectRefinements,
+  snapshotOf,
+  stageRefinements,
   type ClarifyStageQuestion,
   type FiledNodes,
   type ForgeHubCandidates,
   type ForgeArrangement,
+  type ForgeRefinement,
   type ForgeStageId,
   type ForgeStructure,
   type ModelIds,
+  type ModelSnapshot,
 } from '@radical/common/ai/forge'
 import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
 import type { ModelFacade } from '@radical/common/ai/modelFacade'
@@ -72,7 +87,8 @@ const STAGE_IDS = FORGE_STAGES.map((stage) => stage.id)
 /** The whole flow, for forge_start's answer and the `forge` prompt. */
 export const FORGE_PROCEDURE = [
   'Radical Forge turns a free-text description into EARS requirements, a domain model, fitness functions,',
-  'Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewed stage at a time, in this order:',
+  'Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewed stage at a time, and',
+  'ends with a review of the whole model, in this order:',
   FORGE_STAGES.map((stage) => `${stage.title} (${stage.id})`).join(' → ') + '.',
   '1. Before anything is modelled, ask the user for the view structure of the run, and offer:',
   '   - Radical (the default): a view of each of the metamodel\'s viewpoints, in the folders Conceptual, Logical and',
@@ -86,9 +102,14 @@ export const FORGE_PROCEDURE = [
   '      Hub concepts you pick from its candidates to apply. Wait for the answers.',
   '   b. forge_generate with those answers and the Hub concepts the user kept. It returns the stage task:',
   '      carry it out with the model tools (add_node, add_relation, update_node, search_model, …).',
+  '      A stage may also close gaps in earlier stages within the description (a requirement or scenario a',
+  '      process shows is missing, a wrong name): the task says how.',
   '   c. get_issues, and fix what the stage broke (a state machine without an initial state, an unreachable',
-  '      state, …). Then forge_complete_stage with a short summary of what you created and why.',
-  '   d. Show the user what the stage added and ask them: keep its new elements in a row, a column or a grid',
+  '      state, …). Then forge_complete_stage with a short summary of what you created, refined and why.',
+  '   d. If forge_complete_stage lists refinements of earlier stages, show them to the user and ask which to',
+  '      keep: all, all but some (forge_reject_refinements with their ids) or none (forge_reject_refinements',
+  '      without ids). It also lists the gaps the model has now; the next stage gets them.',
+  '   e. Show the user what the stage added and ask them: keep its new elements in a row, a column or a grid',
   '      on their view? Run Smart Layout on that view? Do what they choose with forge_arrange. Then ask whether',
   '      to continue, regenerate the stage (forge_generate with regenerate: true, which first removes what the',
   '      stage added) or finish here.',
@@ -102,7 +123,7 @@ const stageEnum = { type: 'string', enum: STAGE_IDS }
 export const FORGE_TOOL_DEFS: ToolDef[] = [
   {
     name: 'forge_start',
-    description: 'Start a Radical Forge run (replacing any earlier run): turn a free-text system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, mockups and a C4 model in eight reviewed stages. Stores the description as a `need` node (or uses an existing need) and explains the steps.',
+    description: 'Start a Radical Forge run (replacing any earlier run): turn a free-text system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, mockups and a C4 model in reviewed stages that also fill gaps in the ones before, then a review of the whole model. Stores the description as a `need` node (or uses an existing need) and explains the steps.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -174,6 +195,19 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
     },
   },
   {
+    name: 'forge_reject_refinements',
+    description: 'After a completed Forge stage, as the user chose: take back what the stage did to earlier stages (forge_complete_stage lists it). An added element or relation is removed, a changed one gets its old values back; a deletion cannot be taken back. Ask the user first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        stage: stageEnum,
+        ids: { type: 'array', items: { type: 'string' }, description: 'The ids of the refinements to reject, as forge_complete_stage lists them. Omit to reject them all.' },
+      },
+      required: ['stage'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'forge_arrange',
     description: 'After a completed Forge stage, as the user chose: keep the stage\'s new elements in a row, a column or a grid on the canvas views of the run that show them, and/or run Smart Layout on those views. Ask the user first.',
     inputSchema: {
@@ -240,8 +274,13 @@ interface StageState {
   status: 'generating' | 'done'
   /** The model's ids when the stage began. */
   before: ModelIds
+  /** The model when the stage began, to find what it did to earlier stages. */
+  snapshot: ModelSnapshot
   /** What the stage added; set when it is completed. */
   added?: ModelIds
+  /** What it did to earlier stages and the user has not rejected; set when
+   *  it is completed. */
+  refinements?: ForgeRefinement[]
   summary?: string
   clarifications?: string
   /** Ids of the Hub concepts applied; undefined = the suggested ones. */
@@ -373,6 +412,7 @@ export class Forge {
       case 'forge_clarify': return this.clarify(args)
       case 'forge_generate': return this.generate(args, facade)
       case 'forge_complete_stage': return this.complete(args, facade)
+      case 'forge_reject_refinements': return this.reject(args, facade)
       case 'forge_arrange': return this.arrange(args, facade)
       case 'forge_wireframe': return this.wireframe(args, ctx, facade)
       case 'forge_import_hub_concept': return this.importConcept(args, facade)
@@ -539,6 +579,9 @@ export class Forge {
     // Regenerate replaces the previous attempt instead of adding a second copy.
     let readOnly = true
     if (previous) {
+      // Its changes to earlier stages first, while what it added is still there.
+      const refinements = previous.refinements ?? stageRefinements(id, previous.snapshot, snapshotOf(facade))
+      if (rejectRefinements(facade, refinements).length) readOnly = false
       const added = previous.added ?? idsAddedSince(previous.before, this.ids(facade))
       for (const viewId of added.views) if (facade.getViews?.()[viewId]) { facade.removeView?.(viewId); readOnly = false }
       for (const relId of added.relations) if (facade.getRelations()[relId]) { facade.removeRelation(relId); readOnly = false }
@@ -554,8 +597,9 @@ export class Forge {
       FORGE_STAGES.slice(0, stageIdx).map((s) => ({ title: s.title, summary: run.stages[s.id]?.summary ?? '' })),
     )
     const needNode = run.needId ? nodes[run.needId] : undefined
+    const gaps = forgeGaps(STAGE_IDS.slice(0, stageIdx), nodes, facade.getRelations(), facade.getMetamodel?.())
     const prompt = buildForgeStagePrompt(id, run.description, effectiveMatches, clarifications, priorSummaries,
-      needNode ? { id: needNode.id, label: needNode.label } : undefined)
+      needNode ? { id: needNode.id, label: needNode.label } : undefined, formatForgeGaps(gaps))
     const metamodelMessage = buildMetamodelMessage(facade.getMetamodel?.(), new Set(PRIMARY_TYPE_IDS_FOR_STAGE[id]), nodes)
     let context = buildContextMessage(nodes, facade.getRelations(), null, facade.getViews?.())
     if (context.length > MAX_CONTEXT_CHARS) {
@@ -567,7 +611,7 @@ export class Forge {
       '',
       'Carry out the task at the end with the model tools (add_node, add_relation, update_node, move_node, search_model, …).',
       'A Forge stage only builds the model: do not change the metamodel, presentations or milestones.',
-      `When the stage is done, call forge_complete_stage with stage "${id}" and a 1-3 sentence summary of what you created and why.`,
+      `When the stage is done, call forge_complete_stage with stage "${id}" and a 1-3 sentence summary of what you created, refined and why.`,
       '',
       'Rules:',
       ...AI_MODELLING_RULES.map((rule) => `- ${rule}`),
@@ -579,7 +623,7 @@ export class Forge {
       prompt,
     ].join('\n')
 
-    const state: StageState = { status: 'generating', before: this.ids(facade), clarifications, hubConcepts }
+    const state: StageState = { status: 'generating', before: this.ids(facade), snapshot: snapshotOf(facade), clarifications, hubConcepts }
     return ok(brief, { readOnly, commit: () => { run.stages[id] = state } })
   }
 
@@ -593,6 +637,7 @@ export class Forge {
     if (state?.status !== 'generating') return fail(`forge_complete_stage: the ${stageTitle(id)} stage is not open; begin it with forge_generate`)
     const summary = typeof args.summary === 'string' && args.summary.trim() ? args.summary.trim() : 'Done.'
     const added = idsAddedSince(state.before, this.ids(facade))
+    const refinements = stageRefinements(id, state.snapshot, snapshotOf(facade))
     const filed = fileIntoForgeViews(facade, added.nodes, id, run.structure)
     const nodes = facade.getNodes()
     const byType = countByType(nodes, added.nodes)
@@ -600,6 +645,16 @@ export class Forge {
       `${stageTitle(id)} done: +${added.nodes.length} nodes${byType ? ` (${byType})` : ''}, +${added.relations.length} relations, +${added.views.length} views.`,
     ]
     lines.push(...viewLines(filed))
+    if (refinements.length) {
+      lines.push(
+        `It refined earlier stages (${refinements.length}). Show the user this list and ask which to keep: all, all but some (forge_reject_refinements with stage "${id}" and their ids) or none (forge_reject_refinements without ids):`,
+        ...refinements.map((r) => `- ${r.id}: ${describeRefinement(r)}${isRejectable(r) ? '' : ' (cannot be taken back)'}`),
+      )
+    }
+    const gaps = forgeGaps(STAGE_IDS.slice(0, STAGE_IDS.indexOf(id) + 1), nodes, facade.getRelations(), facade.getMetamodel?.())
+    if (gaps.length) {
+      lines.push(`Gaps the model has now (${gaps.length}), by the rules of the stages done; ${id === 'review' ? 'tell the user which stay open' : 'the next stage gets them'}:`, ...formatForgeGaps(gaps))
+    }
     if (id === 'mockups') {
       const mockups = Object.values(nodes).filter((n) => n.type === 'mockup')
       const missing = mockups.filter((n) => !(n as unknown as Record<string, unknown>).wireframe)
@@ -627,8 +682,32 @@ export class Forge {
     return ok(lines.join('\n'), {
       readOnly: !changed,
       data: changed ? placeInViews(facade.toDiagramData(), filed, facade.getMetamodel?.()) : undefined,
-      commit: () => { run.stages[id] = { ...state, status: 'done', added, summary } },
+      commit: () => { run.stages[id] = { ...state, status: 'done', added, refinements, summary } },
     })
+  }
+
+  private reject(args: Record<string, unknown>, facade: ModelFacade): ForgeResult {
+    const run = this.run
+    if (!run) return fail('forge_reject_refinements: no Forge run; call forge_start first')
+    const stage = this.stageArg(args, 'forge_reject_refinements')
+    if (!STAGE_IDS.includes(stage as ForgeStageId)) return fail(stage)
+    const id = stage as ForgeStageId
+    const state = run.stages[id]
+    if (state?.status !== 'done' || !state.refinements) return fail(`forge_reject_refinements: complete the ${stageTitle(id)} stage first (forge_complete_stage)`)
+    if (args.ids !== undefined && (!Array.isArray(args.ids) || args.ids.some((i) => typeof i !== 'string'))) {
+      return fail('forge_reject_refinements: ids must be a list of refinement ids')
+    }
+    const ids = args.ids as string[] | undefined
+    const unknown = (ids ?? []).filter((i) => !state.refinements!.some((r) => r.id === i))
+    if (unknown.length) return fail(`forge_reject_refinements: not a refinement of the ${stageTitle(id)} stage: ${unknown.join(', ')}`)
+    const chosen = state.refinements.filter((r) => !ids || ids.includes(r.id))
+    const fixed = chosen.filter((r) => !isRejectable(r))
+    if (ids && fixed.length) return fail(`forge_reject_refinements: a deletion cannot be taken back: ${fixed.map((r) => r.id).join(', ')}`)
+    const done = new Set(rejectRefinements(facade, chosen))
+    const lines = chosen.filter((r) => done.has(r.id)).map((r) => `- took back: ${describeRefinement(r)}`)
+    const kept = state.refinements.filter((r) => !done.has(r.id))
+    lines.unshift(`Rejected ${done.size} of the ${stageTitle(id)} stage's refinements; ${kept.length} kept.`)
+    return ok(lines.join('\n'), { readOnly: !done.size, commit: () => { state.refinements = kept } })
   }
 
   private async arrange(args: Record<string, unknown>, facade: ModelFacade): Promise<ForgeResult> {
@@ -715,7 +794,8 @@ export class Forge {
       const state = run.stages[stage.id]
       if (!state) return `- ${stage.title}: skipped`
       if (state.status === 'generating') return `- ${stage.title}: begun but not completed`
-      return `- ${stage.title}: +${state.added!.nodes.length} nodes · +${state.added!.relations.length} relations`
+      const refined = state.refinements?.length ? ` · ${state.refinements.length} refinements of earlier stages kept` : ''
+      return `- ${stage.title}: +${state.added!.nodes.length} nodes · +${state.added!.relations.length} relations${refined}`
     })
     const files = buildGherkinFiles(facade.getNodes(), facade.getRelations())
     lines.push('')
@@ -751,6 +831,7 @@ export class Forge {
             status: 'done' as const,
             ...(state.summary ? { summary: state.summary } : {}),
             added: { nodes: state.added?.nodes.length ?? 0, relations: state.added?.relations.length ?? 0 },
+            ...(state.refinements?.length ? { refined: state.refinements.length } : {}),
           }
         }
         if (state?.status === 'generating') return { id: stage.id, status: 'generating' as const }

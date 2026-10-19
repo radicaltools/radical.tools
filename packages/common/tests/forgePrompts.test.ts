@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildForgeStagePrompt, buildPriorStagesBlock, needLabelFromDescription, FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE } from '../src/ai/forge/prompts'
+import { buildForgeStagePrompt, buildPriorStagesBlock, needLabelFromDescription, FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, REFINE_RULES } from '../src/ai/forge/prompts'
 
 describe('buildPriorStagesBlock', () => {
   it('returns "" when there are no prior stages with a summary yet', () => {
@@ -39,7 +39,7 @@ describe('buildForgeStagePrompt — prior-stage summaries replace full transcrip
 
 describe('buildForgeStagePrompt — mockups stage', () => {
   it('runs before C4, as part of the spec the architecture follows from', () => {
-    expect(FORGE_STAGES.map((s) => s.id)).toEqual(['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4'])
+    expect(FORGE_STAGES.map((s) => s.id)).toEqual(['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4', 'review'])
     expect(PRIMARY_TYPE_IDS_FOR_STAGE.mockups).toEqual(['mockup'])
   })
 
@@ -143,6 +143,53 @@ describe('processes', () => {
 
   it('has the C4 stage link each step to who performs it', () => {
     expect(buildForgeStagePrompt('c4', 'A web shop.')).toContain('`performed-by` (step → person, system,')
+  })
+})
+
+describe('review', () => {
+  it('comes last, after the C4 model, and makes nothing of its own', () => {
+    const ids = FORGE_STAGES.map((s) => s.id)
+    expect(ids.at(-1)).toBe('review')
+    expect(ids.indexOf('review')).toBe(ids.indexOf('c4') + 1)
+    expect(FORGE_STAGES.at(-1)?.title).toBe('Review')
+    expect(PRIMARY_TYPE_IDS_FOR_STAGE.review).toEqual([])
+  })
+
+  it('checks the whole model against the description, carries the open gaps and lists its changes for the user', () => {
+    const prompt = buildForgeStagePrompt('review', 'A web shop.', undefined, undefined, '', undefined, ['- No scenario verifies requirement "Pay".'])
+    expect(prompt).toContain('A web shop.')
+    expect(prompt).toContain('Read it as a whole against the\ndescription')
+    expect(prompt).toContain('one thing under two names')
+    expect(prompt).toContain('contradicts a transition or the order of a process')
+    expect(prompt).toContain('Gaps the model has now')
+    expect(prompt).toContain('- No scenario verifies requirement "Pay".')
+    expect(prompt).toContain('keeps or rejects it')
+    expect(prompt).toContain('change nothing and\nsay so')
+  })
+})
+
+describe('every stage after the requirements may close gaps in earlier stages', () => {
+  const later = FORGE_STAGES.map((s) => s.id).filter((id) => id !== 'requirements')
+
+  it('every stage after the requirements may close gaps in earlier stages', () => {
+    for (const id of later) {
+      const prompt = buildForgeStagePrompt(id, 'A web shop.')
+      expect(prompt, id).toContain(REFINE_RULES[0])
+      expect(prompt, id).toContain('Never delete an element of an earlier stage.')
+      expect(prompt, id).toContain('name it as an open question in')
+    }
+    expect(buildForgeStagePrompt('requirements', 'A web shop.')).not.toContain(REFINE_RULES[0])
+  })
+
+  it('lists the gaps it is given, and none when there are none', () => {
+    expect(buildForgeStagePrompt('processes', 'A web shop.', undefined, undefined, '', undefined, ['- Nobody performs step "Pack".'])).toContain('- Nobody performs step "Pack".')
+    expect(buildForgeStagePrompt('processes', 'A web shop.', undefined, undefined, '', undefined, [])).not.toContain('Gaps the model has now')
+  })
+
+  it('no longer has the C4 stage leave a needed requirement out', () => {
+    const prompt = buildForgeStagePrompt('c4', 'A web shop.')
+    expect(prompt).not.toContain('Do not invent')
+    expect(prompt).toContain('add the\nrequirement with its scenario when the description implies it')
   })
 })
 

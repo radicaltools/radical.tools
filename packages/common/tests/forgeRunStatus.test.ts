@@ -41,7 +41,7 @@ describe('agent Forge run status file', () => {
     // Done, and the agent asks the user how to arrange it and whether to go on.
     expect(forgeRunCurrentStage(run('active', { requirements: 'done' }))?.id).toBe('requirements')
     expect(forgeRunCurrentStage(run('active'))?.id).toBe('requirements')
-    expect(forgeRunCurrentStage(run('finished', Object.fromEntries(FORGE_STAGES.map((s) => [s.id, 'done']))))?.id).toBe('c4')
+    expect(forgeRunCurrentStage(run('finished', Object.fromEntries(FORGE_STAGES.map((s) => [s.id, 'done']))))?.id).toBe('review')
   })
 
   it('names the client for people', () => {

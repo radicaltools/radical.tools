@@ -7,12 +7,13 @@
 // and compares the model with it as it is edited (branchChanges from
 // @radical/common, the comparison the CLI runs). Changes on branch shows
 // them on the canvas through the store's diff overlay; the Inspector lists
-// the requirements and ADRs among them whether it is on or not. Nothing
-// here writes a file.
+// the requirements and ADRs among them whether it is on or not. The only
+// file written here is the base a Radical Forge run saves where git saved
+// none (saveForgeBase), so a folder outside git shows what the run changes.
 
 import { create } from 'zustand'
 import type { C4Node } from '@radical/common/c4'
-import { isBaseOld, parseModelBase, type ModelBase } from '@radical/common/formats/modelBase'
+import { forgeModelBase, isBaseOld, mayReplaceWithForgeBase, parseModelBase, type ModelBase } from '@radical/common/formats/modelBase'
 import { baseCopy, branchChanges, type BranchChanges } from '@radical/common/branchChanges'
 import type { ModelCopy } from '@radical/common/model'
 import { useDiagramStore, type BranchOverlay } from '@radical/ui/store/diagramStore'
@@ -64,6 +65,24 @@ function recompute(): void {
   const model = { nodes, relations: byId(data.relations) }
   useBranchStore.setState({ model, changes: branchChanges(baseModel, model.nodes, model.relations) })
   showOverlay()
+}
+
+/** Reads the base again at once (after saveForgeBase wrote one). */
+let pollNow: () => Promise<void> = async () => {}
+
+/** As a Forge run starts on a folder model: saves the model as it is now
+ *  as its base, unless git saved one (see mayReplaceWithForgeBase). True
+ *  when it did. */
+export async function saveForgeBase(): Promise<boolean> {
+  const id = documents.getActiveId()
+  if (!id) return false
+  const existing = await documents.readModelBase(id).catch(() => null)
+  if (!mayReplaceWithForgeBase(existing)) return false
+  const data = useDiagramStore.getState().saveDiagram()
+  const nodes = withDescriptions(byId(data.nodes), documents.getPendingBodyNodeIds(id), documents.loadedFolderFiles(id))
+  if (!(await documents.writeModelBase(id, forgeModelBase(Object.values(nodes), data.relations)))) return false
+  await pollNow()
+  return true
 }
 
 /** Puts the changes on the canvas, or takes them off. */
@@ -118,6 +137,7 @@ if (typeof window !== 'undefined') {
   // A (re)loaded model clears the overlay: compare again at once.
   onDocumentLoaded((id) => { if (id === documents.getActiveId()) { recompute(); void poll() } })
 
+  pollNow = poll
   setInterval(() => { void poll() }, POLL_MS)
   useDocumentsStore.subscribe((s) => { if (s.activeId !== polledFor) void poll() })
   void poll()

@@ -74,6 +74,9 @@ export interface HostCapabilities {
   /** Read the model's base (`.radical/base.json`) in an md-folder, written by
    *  the CLI or the MCP server; content is null when there is none. */
   readModelBase?(folderPath: string): Promise<HostResult & { content?: string | null }>
+  /** Write the model's base (`.radical/base.json`) in an md-folder, as a
+   *  Radical Forge run does where git saved none. */
+  writeModelBase?(folderPath: string, content: string): Promise<HostResult>
   /** Read what `radical check` keeps beside an md-folder model: the test
    *  results (`.radical/test-results.json`) and the rule settings
    *  (`check.json`); each is null when there is none. */

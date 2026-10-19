@@ -7,8 +7,8 @@ import { STEP_LABELS } from './RadicalForgeModal'
 
 // ─── An agent's Forge run, read only ─────────────────────────────────────────
 // What an agent running Radical Forge over MCP on this folder is doing: the
-// wizard's step bar, its eight stages only (the badge on the Forge button
-// counts the same seven), with each stage's state, and one line on where the
+// wizard's step bar, its stages only (the badge on the Forge button counts
+// the same), with each stage's state, and one line on where the
 // run stands. Nothing here acts on the run; the agent's chat is where to answer.
 
 interface Props {
@@ -21,7 +21,8 @@ const stageTitle = (id: string): string => FORGE_STAGES.find((s) => s.id === id)
 function stageTip(stage: ForgeRunStageInfo): string {
   const title = stageTitle(stage.id)
   if (stage.status === 'done') {
-    const added = stage.added ? ` (+${stage.added.nodes} elements, +${stage.added.relations} relations)` : ''
+    const refined = stage.refined ? `, ${stage.refined} refinement${stage.refined === 1 ? '' : 's'} of earlier stages` : ''
+    const added = stage.added ? ` (+${stage.added.nodes} elements, +${stage.added.relations} relations${refined})` : ''
     return `${title}: done${added}${stage.summary ? ` — ${stage.summary}` : ''}`
   }
   if (stage.status === 'generating') return `${title}: generating`
@@ -54,7 +55,7 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
     : phase === 'paused' ? (status.state === 'closed' ? `Stopped: ${client} closed before the run finished.` : 'Paused: nothing has changed for 30 minutes.')
     : current?.status === 'generating' ? `${client} is generating the ${stageTitle(current.id)} stage…`
     : current?.status === 'clarifying' ? `${client} is asking you about the ${stageTitle(current.id)} stage; answer there.`
-    : current?.status === 'done' ? `Waiting for you in ${client}: how to arrange the ${stageTitle(current.id)} stage, and whether to go on.`
+    : current?.status === 'done' ? `Waiting for you in ${client}: ${current.refined ? `which of its ${current.refined} refinements of earlier stages to keep, ` : ''}how to arrange the ${stageTitle(current.id)} stage, and whether to go on.`
     : current ? `${client} has started the run; the ${stageTitle(current.id)} stage is next.`
     : `Waiting for you in ${client}.`
 
@@ -87,6 +88,9 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
             >
               {stage.status === 'done' && <span className="forge-step-check" aria-hidden>✓</span>}
               {STEP_LABELS[stage.id]}
+              {!!stage.refined && (
+                <span className="forge-step-refined" data-testid="forge-step-refined" aria-label={`${stage.refined} refinements of earlier stages`}>✎{stage.refined}</span>
+              )}
             </span>
           )
         })}

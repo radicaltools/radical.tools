@@ -2,7 +2,7 @@ import { expect } from '../../support/fixtures'
 import { ModelFolder, test } from '../../support/folder'
 import type { Page } from '@playwright/test'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
-import { serializeModelBase } from '@radical/common/formats/modelBase'
+import { parseModelBase, serializeModelBase } from '@radical/common/formats/modelBase'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeTestResults, type TestCase } from '@radical/common/check'
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
@@ -261,4 +261,44 @@ test('without a base the button says how to save one, and an old base is marked'
   await expect(button.locator('.branch-count')).toHaveCount(0)
   // Neither a report nor a base: nothing to inspect.
   await expect(inspector).toBeDisabled()
+})
+
+test('a Forge run in a folder without a base from git saves one, and Changes on branch shows the run', async ({ page, studio }) => {
+  // A scripted AI provider: no questions, and the requirements stage adds one requirement.
+  await page.addInitScript(() => {
+    localStorage.setItem('radical-ai-settings', JSON.stringify({
+      enabled: true, active: 'anthropic', providers: { anthropic: { apiKey: 'e2e', baseUrl: '', model: '' } },
+    }))
+  })
+  await page.route('https://api.anthropic.com/v1/messages', async (route) => {
+    const body = route.request().postDataJSON() as { tools?: unknown[]; messages: unknown[] }
+    const all = JSON.stringify(body.messages)
+    const content = !body.tools ? [{ type: 'text', text: '[]' }]
+      : all.includes('tool_result') || !/extract its functional requirements/.test(all) ? [{ type: 'text', text: 'Done.' }]
+      : [{ type: 'tool_use', id: 't0', name: 'add_node', input: { tempId: 'r', type: 'requirement', label: 'Pay by card', properties: { ears_type: 'ubiquitous', action: 'take card payments' } } }]
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ model: 'claude-haiku-4-5', content, stop_reason: content[0].type === 'tool_use' ? 'tool_use' : 'end_turn', usage: { input_tokens: 10, output_tokens: 10 } }),
+    })
+  })
+  const folder = await openFolder(page, studio, ARCH)
+  const button = page.getByRole('button', { name: /^Changes on branch/ })
+  await expect(button).toHaveClass(/unavailable/)
+
+  await page.getByTitle('Menu').click()
+  await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
+  await page.locator('.forge-textarea').fill('# Card payments\n\nShoppers pay by card.')
+  await page.getByRole('button', { name: 'Start →' }).click()
+  await page.getByRole('button', { name: 'Generate requirements' }).click()
+  await expect(page.locator('.forge-stage-result')).toBeVisible()
+
+  // The model as it was before the run, as a Forge run's base.
+  const saved = parseModelBase((await folder.files())['.radical/base.json'])!
+  expect(saved).toMatchObject({ source: 'forge', commit: '' })
+  expect(saved.nodes.map((n) => n.id).sort()).toEqual(['api', 'fraud', 'need', 'shop'])
+  // The run's need and requirement are what changed.
+  await expect(button.locator('.branch-count')).toHaveText('2', { timeout: 10_000 })
+  await page.getByRole('button', { name: 'Close' }).first().click()
+  await button.hover()
+  await expect(page.getByRole('tooltip')).toContainText('2 elements changed since the start of the Forge run')
 })

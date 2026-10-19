@@ -74,6 +74,7 @@ export const FORGE_STAGE_VIEW: Record<ForgeStageId, ForgeViewKey> = {
   processes: 'processes',
   mockups: 'conceptual',
   c4: 'logical',
+  review: 'logical',
 }
 
 /** Every view a node of `type` goes into, its own first. */
@@ -212,6 +213,7 @@ const RADICAL_STAGE_VIEWPOINTS: Record<ForgeStageId, string[]> = {
   processes: ['process-warnier'],
   mockups: ['screen-flow', 'screens'],
   c4: ['containers', 'system-context', 'components', 'responsibilities'],
+  review: ['requirement-gaps', 'requirement-coverage', 'traceability'],
 }
 
 /** The view of a viewpoint the model has, if any. */

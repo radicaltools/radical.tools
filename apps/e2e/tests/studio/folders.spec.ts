@@ -250,7 +250,7 @@ test('New model on the welcome screen can keep the model in a folder', async ({ 
 
 test('an agent\'s Forge run on the folder makes the Forge button pulse and opens read only', async ({ page }) => {
   await saveAsFolder(page)
-  const stages = ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4']
+  const stages = ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4', 'review']
   const write = (state: string, statuses: Record<string, string>): Promise<void> => folder.write('.radical/forge-run.json', JSON.stringify({
     version: 1,
     client: 'claude-code',
@@ -258,28 +258,29 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
     startedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     state,
-    stages: stages.map((id) => ({ id, status: statuses[id] ?? 'pending', ...(statuses[id] === 'done' ? { summary: `${id} summary`, added: { nodes: 2, relations: 1 } } : {}) })),
+    // The domain model refined two elements of the requirements.
+    stages: stages.map((id) => ({ id, status: statuses[id] ?? 'pending', ...(statuses[id] === 'done' ? { summary: `${id} summary`, added: { nodes: 2, relations: 1 }, ...(id === 'domain' ? { refined: 2 } : {}) } : {}) })),
   }))
   const button = page.locator('.qs-forge-toggle')
   await expect(button).not.toHaveAttribute('data-agent-phase')
 
   // Requirements done: the agent asks how to arrange them and whether to go
-  // on, so the run is still at stage 1 of 8.
+  // on, so the run is still at stage 1 of 9.
   await write('active', { requirements: 'done' })
   await expect(button).toHaveAttribute('data-agent-phase', 'waiting', { timeout: 10_000 })
-  await expect(button.locator('.qs-forge-badge')).toHaveText('1/8')
+  await expect(button.locator('.qs-forge-badge')).toHaveText('1/9')
 
-  // Working on the domain model: blue pulse, stage 2 of 7.
+  // Working on the domain model: blue pulse, stage 2 of 9.
   await write('active', { requirements: 'done', domain: 'generating' })
   await expect(button).toHaveAttribute('data-agent-phase', 'working', { timeout: 10_000 })
-  await expect(button.locator('.qs-forge-badge')).toHaveText('2/8')
+  await expect(button.locator('.qs-forge-badge')).toHaveText('2/9')
 
   await button.click()
   const panel = page.getByRole('dialog', { name: 'Radical Forge — agent run' })
   await expect(panel).toContainText('Radical Forge — run by Claude Code')
   await expect(panel).toContainText('Click & collect')
-  // The eight stages and nothing else, as the badge counts them.
-  await expect(panel.locator('.forge-step')).toHaveCount(8)
+  // The nine stages and nothing else, as the badge counts them.
+  await expect(panel.locator('.forge-step')).toHaveCount(9)
   await expect(panel.locator('.forge-step[data-status="done"]')).toHaveAttribute('title', /requirements summary/)
   await expect(panel.locator('.forge-step.active')).toHaveText('Domain')
   await expect(panel.locator('.forge-agent-line')).toHaveText('Claude Code is generating the Domain model stage…')
@@ -288,8 +289,10 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
 
   // Done and waiting for the user's choice: still at the Domain model.
   await write('active', { requirements: 'done', domain: 'done' })
-  await expect(panel.locator('.forge-agent-line')).toHaveText('Waiting for you in Claude Code: how to arrange the Domain model stage, and whether to go on.', { timeout: 10_000 })
-  await expect(button.locator('.qs-forge-badge')).toHaveText('2/8')
+  await expect(panel.locator('.forge-agent-line')).toHaveText('Waiting for you in Claude Code: which of its 2 refinements of earlier stages to keep, how to arrange the Domain model stage, and whether to go on.', { timeout: 10_000 })
+  await expect(panel.locator('.forge-step', { hasText: 'Domain' }).getByTestId('forge-step-refined')).toHaveText('✎2')
+  await expect(panel.locator('.forge-step', { hasText: 'Domain' })).toHaveAttribute('title', /2 refinements of earlier stages/)
+  await expect(button.locator('.qs-forge-badge')).toHaveText('2/9')
 
   // Asking the user: amber, and the view follows the file.
   await write('active', { requirements: 'done', domain: 'done', fitness: 'clarifying' })

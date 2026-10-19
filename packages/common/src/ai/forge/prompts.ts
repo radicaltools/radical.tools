@@ -1,7 +1,8 @@
 // ─── Radical Forge stage prompts ────────────────────────────────────────────
-// Radical Forge walks a free-text system description through eight sequential
+// Radical Forge walks a free-text system description through nine sequential
 // AI generation stages — requirements → domain model → fitness functions →
-// Gherkin scenarios → state machines → processes → UI mockups → C4 model. In Studio each stage is a normal
+// Gherkin scenarios → state machines → processes → UI mockups → C4 model →
+// review. In Studio each stage is a normal
 // `runAIPrompt` call, so a later stage sees everything an earlier stage
 // created (via buildContextMessage in ../systemPrompt.ts), same as any
 // multi-turn chat; over MCP the client's own model runs the stage with the
@@ -48,10 +49,18 @@
 // domain model and the machines give the names of what a step works on.
 // Often there is none. They are filed into a Warnier view, which needs no
 // layout. Nothing performs a step yet, so the C4 stage adds `performed-by`.
+//
+// Each stage looks at the model from another side, so it finds what earlier
+// stages left out: a process step no requirement asks for, a timeout no
+// scenario covers. Every stage from the domain model on may close such a gap
+// in an earlier stage within the brief (REFINE_RULES below); the user keeps
+// or rejects those refinements afterwards (./refinements.ts). The stage task
+// also lists the gaps radical check's rules find for the stages done. The
+// Review stage comes last: with every part there, it makes them agree.
 
 import type { HubConceptSummary } from '../../hubFormat'
 
-export type ForgeStageId = 'requirements' | 'domain' | 'fitness' | 'scenarios' | 'states' | 'processes' | 'c4' | 'mockups'
+export type ForgeStageId = 'requirements' | 'domain' | 'fitness' | 'scenarios' | 'states' | 'processes' | 'c4' | 'mockups' | 'review'
 
 export interface ForgeStage {
   id: ForgeStageId
@@ -73,6 +82,8 @@ export const PRIMARY_TYPE_IDS_FOR_STAGE: Record<ForgeStageId, string[]> = {
   processes: ['process', 'step'],
   mockups: ['mockup'],
   c4: ['person', 'system', 'container', 'component', 'database', 'webapp', 'queue', 'domain', 'group'],
+  // Everything the review adds is a refinement of an earlier stage.
+  review: [],
 }
 
 export const FORGE_STAGES: ForgeStage[] = [
@@ -115,6 +126,11 @@ export const FORGE_STAGES: ForgeStage[] = [
     id: 'c4',
     title: 'C4 model',
     blurb: 'Derive the system/container/component structure that satisfies the spec above.',
+  },
+  {
+    id: 'review',
+    title: 'Review',
+    blurb: 'Read the whole model against the description: close the gaps left and make its parts agree. You keep or reject each change.',
   },
 ]
 
@@ -207,7 +223,9 @@ export function needLabelFromDescription(description: string): string {
  *  `clarifications` is the formatted Q&A from the pre-stage clarify step
  *  (./clarify.ts), when the user answered any. `priorStageSummaries`
  *  is the pre-formatted output of `buildPriorStagesBlock` above. `need` is
- *  the node the description is stored in, when the metamodel has that type. */
+ *  the node the description is stored in, when the metamodel has that type.
+ *  `gaps` are the lines of ./refinements.ts' formatForgeGaps for the stages
+ *  done: every stage after the requirements gets them with REFINE_RULES. */
 export function buildForgeStagePrompt(
   stageId: ForgeStageId,
   description: string,
@@ -215,6 +233,7 @@ export function buildForgeStagePrompt(
   clarifications?: string,
   priorStageSummaries?: string,
   need?: ForgeNeedRef,
+  gaps?: string[],
 ): string {
   const descBlock = [
     'Original system description (provided by the user in the Radical Forge wizard):',
@@ -226,6 +245,41 @@ export function buildForgeStagePrompt(
     buildClarificationsBlock(clarifications),
   ].filter(Boolean).join('\n')
 
+  const task = stageTask(stageId, descBlock, need)
+  return stageId === 'requirements' ? task : [task, buildRefineBlock(gaps)].join('\n')
+}
+
+/** How a stage after the requirements closes gaps in earlier stages. The
+ *  user sees every refinement afterwards and keeps or rejects it. */
+export const REFINE_RULES: readonly string[] = [
+  'Refine the whole model as you go. This stage looks at the model from a new side, so it',
+  'may show what an earlier stage left out or got wrong: a step no requirement asks for, a',
+  'timeout or a decline no scenario covers, a field no entity holds, an event nothing',
+  'raises, two names for one thing. Where the description, the user\'s answers or the',
+  'model already imply the missing piece:',
+  '- add it now, with the type of its own stage and the links that stage would give it:',
+  '  a requirement derives from the need or from a requirement and gets a scenario that',
+  '  verifies it; a scenario verifies its requirement; an entity sits in its domain and',
+  '  satisfies the requirements about it;',
+  '- or correct the element that is wrong with update_node (a rename to the domain',
+  '  model\'s term, a missing EARS field, a Then that contradicts a transition).',
+  'Never delete an element of an earlier stage. Do not add what goes beyond the',
+  'description (a new feature, an actor nobody mentioned): name it as an open question in',
+  'your summary instead. The user is shown everything you add to or change in earlier',
+  'stages and keeps or rejects it, so say in your summary what you refined and why.',
+]
+
+function buildRefineBlock(gaps: string[] | undefined): string {
+  return [
+    '',
+    ...REFINE_RULES,
+    ...(gaps?.length
+      ? ['', 'Gaps the model has now, by the completeness rules of the stages done (close those within the description):', ...gaps]
+      : []),
+  ].join('\n')
+}
+
+function stageTask(stageId: ForgeStageId, descBlock: string, need: ForgeNeedRef | undefined): string {
   switch (stageId) {
     case 'requirements':
       return [
@@ -307,10 +361,11 @@ export function buildForgeStagePrompt(
         'the `event` nodes to it with `emits`, and each `step` of a process to the',
         'person or element that does it with `performed-by` (step → person, system,',
         'container, component or web app) (all only become possible now that',
-        'real elements exist to point at). Do not invent',
-        'requirements at this stage; if the description implies something not yet',
-        'covered by a requirement, model the C4 element anyway but leave it unlinked',
-        'rather than fabricating a requirement here.',
+        'real elements exist to point at). Where the architecture needs something no',
+        'requirement asks for (a queue for an asynchronous flow the scenarios imply, an',
+        'identity provider for a login), follow the refinement rule below: add the',
+        'requirement with its scenario when the description implies it; otherwise model',
+        'the element, leave it unlinked and name it as an open question in your summary.',
       ].join('\n')
 
     case 'fitness':
@@ -435,6 +490,31 @@ export function buildForgeStagePrompt(
         'that renders it), so do not create any here. Do not draw wireframes here —',
         'they are generated separately from these nodes. If the system has no user',
         'interface at all, create no mockups and say so in your summary.',
+      ].join('\n')
+
+    case 'review':
+      return [
+        descBlock,
+        '',
+        'Task: this is the last stage. Every part of the model is there now: the',
+        'requirements, the domain model, fitness functions, scenarios, state machines,',
+        'processes, screens and the C4 elements. Read it as a whole against the',
+        'description above and make its parts agree. Create no new stage output of your',
+        'own: change only what closing a gap or an inconsistency needs.',
+        '1. Close the gaps listed below that the description implies: link the element',
+        '   that satisfies a requirement, performs a step, presents a screen, implements',
+        '   a machine or owns an entity\'s data; add the scenario a requirement lacks.',
+        '2. Look for what the rules cannot see: one thing under two names (use the',
+        '   domain model\'s term everywhere), a scenario whose Given/When/Then',
+        '   contradicts a transition or the order of a process, a step, screen or',
+        '   element no requirement asks for, a requirement that no process, machine,',
+        '   screen or element carries out, a fitness function whose threshold',
+        '   contradicts a requirement, a relation that points the wrong way.',
+        '3. Fix each with the smallest change, following the refinement rule below.',
+        '',
+        'If the model already agrees with itself and the description, change nothing and',
+        'say so. In your summary, list what you changed and what stays open: the',
+        'questions that go beyond the description, for the user to answer.',
       ].join('\n')
   }
 }
