@@ -145,7 +145,10 @@ body {
   gap: 8px;
   padding: 0 12px;
   position: relative;
-  z-index: 10;
+  /* Its menus (History, Radical, search) open over the canvas and its
+     overlays (the view's name, the palette, the cards: up to 60), not over
+     modals (400 and up). */
+  z-index: 100;
   -webkit-app-region: drag;
 }
 .toolbar::after {
@@ -828,6 +831,8 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 .pp-link:hover { color: var(--accent); text-decoration-color: currentColor; }
 
 .right-panel .props-content { padding: 0 0 14px; gap: 0; }
+/* A sequence's fields, under the card's head: the card's own margins. */
+.right-panel .props-content.props-sequence { padding: 12px 16px 14px; gap: 12px; }
 .right-panel .props-content > .props-empty { margin: 24px 16px; }
 .pp-section { padding: 12px 16px; border-bottom: 1px solid var(--border-color-subtle, color-mix(in srgb, var(--border-color) 60%, transparent)); }
 .pp-section:last-child { border-bottom: none; }

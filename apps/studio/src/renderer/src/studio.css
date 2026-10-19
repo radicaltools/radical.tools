@@ -592,11 +592,10 @@ label.app-menu-row { cursor: pointer; }
 }
 .forge-steps {
   display: flex;
-  /* One line; scrolls sideways rather than wrapping on a narrow window. */
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-  gap: 2px;
+  /* Every step in sight: a second line when they do not fit on one (a
+     narrow panel, a stage's refinement badge). */
+  flex-wrap: wrap;
+  gap: 4px 2px;
   margin: 4px 0 10px;
 }
 .forge-step {
@@ -605,8 +604,8 @@ label.app-menu-row { cursor: pointer; }
   gap: 3px;
   font-size: 10px;
   font-weight: 600;
-  /* Eleven steps (description, nine stages, finish) fit on one line; a
-     narrow panel, or a stage's refinement badge, scrolls them. */
+  /* Eleven steps (description, nine stages, finish) fit on one line in a
+     wide panel; they wrap otherwise. */
   padding: 5px 4px;
   flex-shrink: 0;
   border-radius: 999px;
@@ -1078,9 +1077,13 @@ label.app-menu-row { cursor: pointer; }
   animation: forge-progress-in 0.22s ease-out;
 }
 .forge-progress-entry-text-inner {
+  /* A change, or why it was refused, reads in full: it wraps, up to three
+     lines, the rest in its tooltip. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   min-width: 0;
 }
 .forge-progress-dot {
@@ -2069,7 +2072,8 @@ label.app-menu-row { cursor: pointer; }
   left: 50%;
   transform: translateX(-50%);
   width: min(420px, 38vw);
-  z-index: 60;
+  /* Over the toolbar (100), whose middle it sits in; under modals (400). */
+  z-index: 110;
   -webkit-app-region: no-drag;
   background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
   border: 1px solid var(--border-color);

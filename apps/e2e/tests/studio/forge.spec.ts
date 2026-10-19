@@ -334,6 +334,13 @@ test('Forge asks before it refines an earlier stage and applies only what the us
   await expect(proposal.locator('.forge-proposal-change > span')).toHaveText(['Add requirement "Return books"', 'Change requirement "Requirement 1"'])
   await expect(proposal.locator('.forge-proposal-change').first().locator('li')).toHaveText(['ears_type: "ubiquitous"', 'action: "take back a lent book"'])
   await expect(proposal.locator('.forge-proposal-change').nth(1).locator('li')).toHaveText(['action: "do thing 1" → "lend a book to a reader"'])
+  // What the round did reads in full (the refused write wraps, no ellipsis),
+  // and every step is in sight, the ✎ of the Domain step included.
+  const refused = page.locator('.forge-progress-entry-text-inner', { hasText: 'refused' }).first()
+  expect(await refused.evaluate((el) => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1)).toBe(true)
+  const steps = (await page.locator('.forge-steps').boundingBox())!
+  const finish = (await page.locator('.forge-step').last().boundingBox())!
+  expect(finish.x + finish.width).toBeLessThanOrEqual(steps.x + steps.width + 1)
   // The step bar shows that the stage waits for the answer.
   const badge = page.locator('.forge-step', { hasText: 'Domain' }).getByTestId('forge-step-refined')
   await expect(badge).toHaveClass(/pending/)

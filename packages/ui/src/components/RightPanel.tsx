@@ -1548,6 +1548,15 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
   type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string }
   const [paneContent, setPaneContent] = useState<PaneContent | null>(null)
   const hasPaneContent = !!paneContent
+  // What the pane shows went away (an undo, a delete, an outside edit): back to the list.
+  const paneGone = useDiagramStore((s) => {
+    if (!paneContent) return false
+    if (paneContent.kind === 'view') return !s.views[paneContent.id]
+    if (paneContent.kind === 'milestone') return !s.snapshots.some((m) => m.id === paneContent.id)
+    const folder = paneContent.id
+    return !Object.values(s.views).some((v) => v.folder === folder || v.folder?.startsWith(`${folder}/`))
+  })
+  useEffect(() => { if (paneGone) setPaneContent(null) }, [paneGone])
 
   const toggle = onToggleCollapsed && (
     <PanelToggle side="left" collapsed={collapsed} onToggle={onToggleCollapsed} />
@@ -1646,10 +1655,8 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
   }
 
   return (
-    <div className="props-content">
-      <div className="props-type-badge" style={{ background: 'var(--accent)', color: '#fff' }}>
-        <Icon.Bolt /> &nbsp;SEQUENCE
-      </div>
+    // In the card, whose head already says Sequence.
+    <div className="props-content props-sequence">
       <div>
         <div className="props-section-title">Name</div>
         <div className="props-field">

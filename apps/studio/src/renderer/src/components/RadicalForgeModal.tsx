@@ -1137,7 +1137,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                           className={`forge-progress-entry forge-progress-entry-${entry.kind === 'text' ? 'text' : entry.ok === false ? 'error' : 'action'}`}
                         >
                           <span className="forge-progress-dot" />
-                          <span className="forge-progress-entry-text-inner">{entry.text}</span>
+                          <span className="forge-progress-entry-text-inner" title={entry.text}>{entry.text}</span>
                         </div>
                       ))}
                     </div>
