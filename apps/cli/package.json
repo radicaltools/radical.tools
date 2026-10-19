@@ -1,6 +1,6 @@
 {
   "name": "@radicaltools/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Check, diff and export Radical Markdown architecture models from the command line.",
   "license": "MIT",
   "homepage": "https://radical.tools",

@@ -314,7 +314,7 @@ organization, then publish the verified first-release tarball:
 ```sh
 npm login --auth-type=web
 npm whoami
-npm publish ./release/radicaltools-cli-0.1.0.tgz --access public
+npm publish ./release/radicaltools-cli-0.2.0.tgz --access public
 ```
 
 Complete npm's browser and 2FA prompts. When publishing directly from the
