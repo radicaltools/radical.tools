@@ -3814,3 +3814,12 @@ label.app-menu-row { cursor: pointer; }
 .nav-chip { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 0 8px 0 2px; border: 1px solid var(--border-color); border-radius: 999px; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
 .nav-chip i { font-style: normal; font-size: 9.5px; font-weight: 600; color: #fff; border-radius: 999px; padding: 1px 6px; }
 .nav-menu-foot { padding: 8px 8px 2px; margin-top: 4px; border-top: 1px solid var(--border-color); font-size: 11.5px; color: var(--text-muted); }
+
+/* A viewpoint's "View per element": the node types it makes a view of each of. */
+.mm-subject-types { display: flex; flex-wrap: wrap; gap: 4px; }
+.mm-subject-type {
+  padding: 2px 8px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--border-color); background: var(--bg-panel);
+  color: var(--text-secondary); font-size: 11px;
+}
+.mm-subject-type.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }

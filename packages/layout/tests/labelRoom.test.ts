@@ -32,7 +32,8 @@ describe('labelGaps', () => {
     const gaps = labelGaps(nodes, relations)
     const big = labelNeed(labelSizeOf(relations.r2, nodes)!)
     expect(gaps.get(pairKey('a', 'b'))).toEqual(big)
-    expect(big.y).toBeGreaterThan(3 * 17 * 1.4)
+    // Two rows of the name and one of the technology (RELATION_LABEL_BOX).
+    expect(big.y).toBeGreaterThan(2 * 12 * 1.3 + 10 * 1.3)
   })
 
   it('puts a relation between descendants on their ancestors that are siblings', () => {

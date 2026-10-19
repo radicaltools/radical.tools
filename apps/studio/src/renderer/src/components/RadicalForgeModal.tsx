@@ -977,7 +977,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                   <label className="forge-structure-option">
                     <input type="radio" name="forge-structure" checked={structureKind === 'radical'} onChange={() => setStructureKind('radical')} />
                     <span>
-                      <strong>Radical structure</strong> — a view of each viewpoint, in the folders {[...new Set(viewpointChoices.filter((c) => chosenViewpoints.includes(c.id)).map((c) => c.folder))].join(', ') || 'you pick'}, made once something lands in it
+                      <strong>Radical structure</strong> — a view of each viewpoint, in the folders {[...new Set(viewpointChoices.filter((c) => chosenViewpoints.includes(c.id)).map((c) => c.folder.split('/')[0]))].join(', ') || 'you pick'}, made once something lands in it
                     </span>
                   </label>
                   {structureKind === 'radical' && (

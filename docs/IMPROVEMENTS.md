@@ -537,6 +537,9 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     select it), and `metamodel-diagram.spec.ts › selecting a type shows its
     rules` failed with the overview's zoom not yet settled (0.46 for 0.37);
     a full run on a clean main failed the same two. Alone, 28 of 28 passed.
+    Later on 2026-10-19 it failed alone too: with `--repeat-each=4` two of
+    four failed on a clean main (the pin missing after the drag, and the
+    click on Customer under the left panel), as on feat/viewpoint-subjects.
 38. **`search_model` cannot pick the fields it returns.** Looking up the
     Radical Forge elements of `architecture/` (2026-10-19) with
     `LIST NODES WHERE label ~ "forge" OR description ~ "forge"` returned
@@ -551,6 +554,13 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     string") and `""` leaves `trigger: ""` in the file. `null` should remove
     the key, as it does for `parentId` in `move_node`. (The flaky first test
     of item 37 failed again that day in a full run, and passed 3 of 3 alone.)
+40. **An agent cannot take back a Smart Layout.** Reviewing the views of
+    `architecture/` (2026-10-19), `smart_layout` on System context kept 0
+    crossings but went from 0 to 3 overdraws (item 31 again), and no tool
+    puts a view's previous positions back: Studio has Undo, an agent has to
+    restore views.json from git by hand. `smart_layout` could refuse a
+    result worse on any count, or a `restore_layout` could take a view's
+    positions from git or from before the last call.
 
 ### Reverse-engineered requirements (2026-10-06)
 

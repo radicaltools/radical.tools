@@ -1,4 +1,4 @@
-import { test, expect, withWhole, WHOLE } from '../../support/fixtures'
+import { test, expect, fixture, withWhole, WHOLE } from '../../support/fixtures'
 
 // Zoomed out, the canvas draws each element as a block of its type's colour
 // with its name (store/canvasDetail.ts, withDetail): a card's text would be a
@@ -50,4 +50,31 @@ test('zoomed out the canvas draws blocks with names, zoomed in cards, and a bloc
   await expect(block).toHaveCount(0)
   await expect(studio.node('s0c1').locator('.c4-node-label')).toHaveText('Container 0.1')
   await expect(studio.node('s0c1').locator('.react-flow__handle')).toHaveCount(8)
+})
+
+// A card lower than its text keeps its name and technology whole and shows
+// only the lines of its description that fit, the last cut with an ellipsis.
+test('a low card keeps its name whole and cuts its description at the last line that fits', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('bookstore'))
+  const long = 'Takes the orders and the catalogue requests of the web app, checks the stock, reserves the books, charges the card through the payment provider and keeps an audit trail of every change it makes.'
+    .repeat(3)
+  doc.nodes = doc.nodes.map((n: { id: string }) => (n.id === 'api' ? { ...n, height: 120, label: 'Orders and catalogue API', technology: 'Node.js, TypeScript, Fastify, Prisma', description: long } : n))
+  for (const v of doc.views) if (v.positions?.api) v.positions.api.height = 120
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-containers')
+  const card = studio.node('api')
+  await expect(card.locator('.c4-node-desc')).toBeVisible()
+  // Measured in CSS pixels, as the card's styles are.
+  const box = (selector: string) => card.locator(selector).evaluate((el) => {
+    const e = el as HTMLElement
+    return { height: e.offsetHeight, scroll: e.scrollHeight, line: parseFloat(getComputedStyle(e).lineHeight), padding: parseFloat(getComputedStyle(e).paddingTop) + parseFloat(getComputedStyle(e).paddingBottom), clamp: getComputedStyle(e).getPropertyValue('-webkit-line-clamp') }
+  })
+  const label = await box('.c4-node-label')
+  expect(label.scroll).toBeLessThanOrEqual(label.height + 1)
+  const tech = await box('.c4-node-tech')
+  expect(tech.height).toBeGreaterThan(0)
+  await expect.poll(async () => {
+    const desc = await box('.c4-node-desc')
+    return Number(desc.clamp) * desc.line <= desc.height - desc.padding + 1 && desc.scroll > desc.height
+  }).toBe(true)
 })

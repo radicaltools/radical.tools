@@ -57,8 +57,11 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     state.sequences = byId(sequences)
     state.metamodel = model.documentMetamodel(doc.metamodel, doc.nodes)
     model.syncViewpoints(state)
+    model.syncViewGroups(state, newId)
     keepSequences = sequences !== undefined
   }
+  // A group of views of one element holds a view of each such element.
+  const syncGroups = (): void => { model.syncViewGroups(state, newId) }
   load(data)
   const toDiagramData = (): DiagramData => clone({
     ...carried,
@@ -88,6 +91,7 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       if (refused) { refuse(refused); return '' }
       const id = newId()
       model.insertNode(state, id, node)
+      syncGroups()
       return id
     },
     updateNode(id: string, updates: Partial<Omit<C4Node, 'id'>>) {
@@ -95,9 +99,11 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       const refused = model.checkNodeUpdate(state, id, updates)
       if (refused) { refuse(refused); return }
       model.patchNode(state, id, updates)
+      syncGroups()
     },
     removeNode(id: string) {
       model.deleteNode(state, id)
+      syncGroups()
     },
     moveNodes(ids: string[], parentId: string | null) {
       const refused = model.checkReparent(state, ids, parentId)
@@ -130,12 +136,14 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     removeView(id: string) {
       delete state.views[id]
       if (state.activeViewId === id) state.activeViewId = null
+      syncGroups()
     },
     setActiveView(id: string | null) {
       state.activeViewId = id
     },
     setViewKind(id: string, kind: DiagramView['kind']) {
       model.setViewKind(state, id, kind)
+      syncGroups()
     },
     renameView(id: string, name: string) {
       model.renameView(state, id, name)
@@ -151,6 +159,7 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     },
     setViewFolder(id: string, folder: string | null) {
       model.setViewFolder(state, id, folder)
+      syncGroups()
     },
     orderViews(ids: string[]) {
       model.orderViews(state, ids)
@@ -158,14 +167,18 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     setViewEdgeStyle(id: string, style: EdgeStyle | null) {
       model.setViewEdgeStyle(state, id, style)
     },
-    applyViewpoint(id: string, typeId: string) {
-      return model.applyViewpoint(state, id, typeId)
+    applyViewpoint(id: string, typeId: string, subjectId?: string | null) {
+      const done = model.applyViewpoint(state, id, typeId, subjectId)
+      syncGroups()
+      return done
     },
     detachViewpoint(id: string) {
-      delete state.views[id]?.viewpoint
+      model.detachViewpoint(state, id)
+      syncGroups()
     },
     setViewPipeline(id: string, pipeline: ViewPipeline) {
       model.setViewPipeline(state, id, pipeline)
+      syncGroups()
     },
     getLayoutConstraints: (viewId: string | null) => model.layoutConstraintsOf(state, viewId),
     addAlignment(viewId: string | null, axis: AlignConstraint['axis'], nodeIds: string[], ordered = false) {
@@ -206,6 +219,7 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       state.metamodel = clone(metamodel)
       carried.metamodel = clone(metamodel)
       model.syncViewpoints(state)
+      syncGroups()
     },
 
     getMilestones: () => carried.snapshots ?? [],

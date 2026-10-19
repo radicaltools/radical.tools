@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react'
+import React, { memo, useCallback, useLayoutEffect, useRef } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { C4NodeRFData, NODE_COLORS, NODE_FG, TYPE_ICON_PATHS } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
@@ -214,9 +214,9 @@ export const PersonNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
         </div>
 
         {data.description && (
-          <div className="c4-node-desc" style={{ textAlign: 'center' }}>
+          <NodeDesc style={{ textAlign: 'center' }}>
             {data.description}
-          </div>
+          </NodeDesc>
         )}
       </div>
     </div>
@@ -275,7 +275,7 @@ export const SystemNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
         <div className="c4-node-tech">[{data.technology}]</div>
       )}
       {!isExpanded && data.description && (
-        <div className="c4-node-desc">{data.description}</div>
+        <NodeDesc>{data.description}</NodeDesc>
       )}
 
       {/* Children are rendered by React Flow as separate nodes */}
@@ -334,13 +334,37 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
         <div className="c4-node-tech">[{data.technology}]</div>
       )}
       {!isExpanded && data.description && (
-        <div className="c4-node-desc" style={{ fontSize: 10 }}>{data.description}</div>
+        <NodeDesc style={{ fontSize: 10 }}>{data.description}</NodeDesc>
       )}
     </div>
   )
 }, sameCard)
 
 ContainerNode.displayName = 'ContainerNode'
+
+/** A card's description: as many whole lines as the room under its name
+ *  and technology leaves, the last cut with an ellipsis, and none when not
+ *  even one fits. The card's height decides the room, so it is measured. */
+function NodeDesc({ style, children }: { style?: React.CSSProperties; children: React.ReactNode }): React.ReactElement {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const fit = (): void => {
+      const cs = getComputedStyle(el)
+      const line = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.35
+      const room = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+      const lines = Math.floor(room / line + 0.1)
+      el.style.setProperty('-webkit-line-clamp', String(Math.max(1, lines)))
+      el.style.visibility = lines < 1 ? 'hidden' : ''
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  return <div ref={ref} className="c4-node-desc" style={style}>{children}</div>
+}
 
 // ─── Component Node ────────────────────────────────────────────────────────────
 
@@ -378,9 +402,9 @@ export const ComponentNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
         </div>
       )}
       {data.description && (
-        <div className="c4-node-desc" style={{ color: 'rgba(0,0,0,0.75)', fontSize: 10 }}>
+        <NodeDesc style={{ color: 'rgba(0,0,0,0.75)', fontSize: 10 }}>
           {data.description}
-        </div>
+        </NodeDesc>
       )}
     </div>
   )
@@ -455,9 +479,9 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) =
           <div className="c4-node-tech">[{data.technology}]</div>
         )}
         {data.description && (
-          <div className="c4-node-desc" style={{ textAlign: 'center' }}>
+          <NodeDesc style={{ textAlign: 'center' }}>
             {data.description}
-          </div>
+          </NodeDesc>
         )}
       </div>
     </div>
@@ -553,7 +577,7 @@ export const WebAppNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
             <div className="c4-node-tech">[{data.technology}]</div>
           )}
           {data.description && (
-            <div className="c4-node-desc">{data.description}</div>
+            <NodeDesc>{data.description}</NodeDesc>
           )}
         </div>
       )}
@@ -629,7 +653,7 @@ export const QueueNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
           <div className="c4-node-tech">[{data.technology}]</div>
         )}
         {data.description && (
-          <div className="c4-node-desc">{data.description}</div>
+          <NodeDesc>{data.description}</NodeDesc>
         )}
       </div>
     </div>
@@ -687,7 +711,7 @@ export const DomainNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
 
       <div className="c4-node-label" style={isExpanded ? { color: accent } : undefined}>{data.label}</div>
       {!isExpanded && data.description && (
-        <div className="c4-node-desc">{data.description}</div>
+        <NodeDesc>{data.description}</NodeDesc>
       )}
     </div>
   )
@@ -741,7 +765,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
 
       <div className="c4-node-label" style={isExpanded ? { color: accent } : undefined}>{data.label}</div>
       {!isExpanded && data.description && (
-        <div className="c4-node-desc">{data.description}</div>
+        <NodeDesc>{data.description}</NodeDesc>
       )}
     </div>
   )
@@ -1229,7 +1253,7 @@ export const StateMachineNode = memo(({ data, selected }: NodeProps<C4NodeRFData
 
       <div className="c4-node-label" style={isExpanded ? { color: accent } : undefined}>{data.label}</div>
       {!isExpanded && data.description && (
-        <div className="c4-node-desc">{data.description}</div>
+        <NodeDesc>{data.description}</NodeDesc>
       )}
     </div>
   )
@@ -1496,7 +1520,7 @@ export const ProcessNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) =>
         {data.hasChildren && <FoldButton c4id={data.c4id} collapsed={data.collapsed} />}
       </div>
       <div className="c4-node-label" style={isExpanded ? { color: accent } : undefined}>{data.label}</div>
-      {!isExpanded && data.description && <div className="c4-node-desc">{data.description}</div>}
+      {!isExpanded && data.description && <NodeDesc>{data.description}</NodeDesc>}
     </div>
   )
 }, sameCard)
@@ -1576,7 +1600,7 @@ export const GenericNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) =>
         {data.hasChildren && <FoldButton c4id={data.c4id} collapsed={data.collapsed} />}
       </div>
       <div className="c4-node-label" style={{ color: isExpanded ? color : fg }}>{data.label}</div>
-      {!isExpanded && data.description && <div className="c4-node-desc" style={{ color: fg, opacity: 0.85 }}>{data.description}</div>}
+      {!isExpanded && data.description && <NodeDesc style={{ color: fg, opacity: 0.85 }}>{data.description}</NodeDesc>}
     </div>
   )
 }, sameCard)

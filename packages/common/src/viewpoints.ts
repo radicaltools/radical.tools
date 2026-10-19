@@ -7,8 +7,15 @@
 // a view whose type or chain is changed by hand is of no viewpoint any more.
 // A view's chain can be saved as a viewpoint (under a viewpoint's name it
 // replaces that one's).
+//
+// A viewpoint may draw one element (ViewpointDef.subject: a state machine, a
+// process, a system's containers): a view of it names the element
+// (DiagramView.subject) and holds the viewpoint's chain with the first level
+// kept to that element and what lies inside it (scopedChain). It is named
+// after the element and follows its name until renamed, and goes with it
+// (model.ts).
 
-import type { DiagramView, ViewPipeline } from './c4'
+import type { C4Node, DiagramView, ViewPipeline } from './c4'
 import type { Metamodel, ViewpointDef, ViewpointKind } from './metamodel/types'
 import { levelLabel, readPipeline, sortLabel, type PipelineContext } from './viewPipeline'
 
@@ -31,9 +38,42 @@ export function viewpointsOf(mm: Metamodel | null | undefined): ViewpointDef[] {
   const out: ViewpointDef[] = []
   for (const t of raw as Array<Partial<ViewpointDef> | null>) {
     if (!t || typeof t.id !== 'string' || typeof t.label !== 'string' || !t.label.trim() || !isViewpointKind(t.kind)) continue
-    out.push({ id: t.id, label: t.label, ...(t.group?.trim() ? { group: t.group.trim() } : {}), ...(t.description ? { description: t.description } : {}), kind: t.kind, pipeline: readPipeline(t.pipeline) ?? {} })
+    const subject = readSubject(t.subject)
+    out.push({ id: t.id, label: t.label, ...(t.group?.trim() ? { group: t.group.trim() } : {}), ...(t.description ? { description: t.description } : {}), kind: t.kind, pipeline: readPipeline(t.pipeline) ?? {}, ...(subject ? { subject } : {}) })
   }
   return out
+}
+
+/** A viewpoint's subject as a file may hold it: types, at least one. */
+function readSubject(raw: unknown): ViewpointDef['subject'] | undefined {
+  const types = (raw as { types?: unknown } | undefined)?.types
+  const list = Array.isArray(types) ? types.filter((t): t is string => typeof t === 'string' && !!t) : []
+  return list.length ? { types: list } : undefined
+}
+
+/** Whether `node` can be the element a view of `type` draws. */
+export function canBeSubject(type: ViewpointDef, node: C4Node | undefined): boolean {
+  return !!node && !!type.subject?.types.includes(node.type)
+}
+
+/** The elements of `nodes` a view of `type` can draw, by name. */
+export function subjectsOf(type: ViewpointDef, nodes: Record<string, C4Node>): C4Node[] {
+  return Object.values(nodes).filter((n) => canBeSubject(type, n)).sort((a, b) => a.label.localeCompare(b.label))
+}
+
+/** The chain of a view of `type` that draws `subjectId`: the viewpoint's,
+ *  its first level kept to that element and what lies inside it. Without a
+ *  subject (or for a viewpoint that draws none), the viewpoint's own. */
+export function scopedChain(type: ViewpointDef, subjectId?: string): ViewPipeline {
+  const chain = chainOfViewpoint(type)
+  if (!subjectId || !type.subject) return chain
+  const [first, ...rest] = chain.levels?.length ? chain.levels : [{ ways: [{}] }]
+  return { ...chain, levels: [{ ...first, filters: [...(first.filters ?? []), { kind: 'within', nodeId: subjectId, self: true }] }, ...rest] }
+}
+
+/** The name of a view of one element: the element's. */
+export function subjectViewName(subject: C4Node | undefined, type: ViewpointDef): string {
+  return subject?.label.trim() || type.label
 }
 
 /** The name viewpoints without a group are listed under. */
@@ -125,6 +165,7 @@ export function saveAsViewpoint(mm: Metamodel, label: string, kind: ViewpointKin
     ...(desc ? { description: desc } : {}),
     kind,
     pipeline: JSON.parse(JSON.stringify(readPipeline(pipeline) ?? {})) as ViewPipeline,
+    ...(existing?.subject ? { subject: existing.subject } : {}),
   }
   return { metamodel: withViewpoint(mm, type), type }
 }

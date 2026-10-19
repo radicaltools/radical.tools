@@ -627,12 +627,15 @@ function ViewpointCard({
   def,
   summary,
   viewCount,
+  nodeTypes,
   onChange,
   onDelete,
 }: {
   def: ViewpointDef
   summary: string
   viewCount: number
+  /** The metamodel's node types, for what a viewpoint draws one of. */
+  nodeTypes: Array<{ id: string; label: string }>
   onChange: (next: ViewpointDef) => void
   onDelete: () => void
 }): React.ReactElement {
@@ -654,6 +657,7 @@ function ViewpointCard({
         <span className="mm-type-label">{def.label}</span>
         <span className="mm-type-id">{VIEW_KIND_LABELS[def.kind]}</span>
         {def.group && <span className="mm-builtin-tag">{def.group}</span>}
+        {def.subject && <span className="mm-builtin-tag" title={`View per element: a group with one view per ${def.subject.types.map((t) => nodeTypes.find((n) => n.id === t)?.label ?? t).join(' or ')}`}>View per element</span>}
         <span className="mm-viewpoint-summary" title={summary}>{summary}</span>
         <div style={{ flex: 1 }} />
         <span className="mm-pair-count">{viewCount} view(s)</span>
@@ -720,6 +724,25 @@ function ViewpointCard({
                 }}
               />
             </label>
+          </div>
+          <div className="mm-field">
+            <span>View per element</span>
+            <div className="mm-subject-types" role="group" aria-label="View per element">
+              {nodeTypes.map((t) => {
+                const on = !!def.subject?.types.includes(t.id)
+                return (
+                  <button key={t.id} type="button" className={`mm-subject-type${on ? ' on' : ''}`} aria-pressed={on}
+                    onClick={() => {
+                      const types = on ? (def.subject?.types ?? []).filter((x) => x !== t.id) : [...(def.subject?.types ?? []), t.id]
+                      const { subject: _old, ...rest } = def
+                      onChange(types.length ? { ...rest, subject: { types } } : rest)
+                    }}>
+                    {t.label}
+                  </button>
+                )
+              })}
+            </div>
+            <span className="mm-hint">None: a view of it shows the whole model. Some: a view of it is a group with one view per element of these types, named after it, showing it and what lies inside it, made and removed with the elements.</span>
           </div>
           <div className="mm-footer-note">
             Filter: {summary}. To change it, detach a view of this viewpoint in its Filter, edit the
@@ -1000,6 +1023,7 @@ export function MetamodelEditor(): React.ReactElement {
                 def={t}
                 summary={chainSummary(t.pipeline, viewpointCtx)}
                 viewCount={Object.values(views).filter((v) => v.viewpoint === t.id).length}
+                nodeTypes={Object.entries(metamodel.nodeTypes).map(([id, n]) => ({ id, label: n.label }))}
                 onChange={(next) => setMetamodel(withViewpoint(metamodel, next))}
                 onDelete={() => setMetamodel(withoutViewpoint(metamodel, t.id))}
               />

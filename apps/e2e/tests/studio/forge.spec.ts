@@ -224,9 +224,11 @@ test('Forge asks for the view structure and files the run into the Radical one',
   const views = page.getByRole('group', { name: 'Views' })
   await expect(views.getByLabel(/Radical structure/)).toBeChecked()
   await expect(views).toContainText('in the folders Conceptual, Logical, Governance, made once something lands in it')
-  await views.getByRole('button', { name: 'Customise… (20 of 20 viewpoints)' }).click()
-  await expect(views.getByRole('group', { name: 'Logical' }).getByRole('checkbox')).toHaveCount(6)
-  await views.getByRole('group', { name: 'Conceptual' }).getByLabel('Specification').uncheck()
+  // The whole-model viewpoints a view per element stands in for are left out.
+  await views.getByRole('button', { name: 'Customise… (21 of 25 viewpoints)' }).click()
+  await expect(views.getByRole('group', { name: 'Logical', exact: true }).getByLabel('Containers', { exact: true })).not.toBeChecked()
+  await expect(views.getByRole('group', { name: 'Logical', exact: true }).getByRole('checkbox')).toHaveCount(8)
+  await views.getByRole('group', { name: 'Conceptual', exact: true }).getByLabel('Specification').uncheck()
   await expect(views.getByRole('button', { name: 'Hide the viewpoints' })).toBeVisible()
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
   await page.getByRole('button', { name: 'Start →' }).click()
@@ -235,9 +237,14 @@ test('Forge asks for the view structure and files the run into the Radical one',
   const made = async () => ((await studio.storedDoc()) as unknown as { views: View[] }).views
     .filter((v) => v.viewpoint).map((v) => [v.name, v.folder, v.nodeIds.length])
   // The need: a Traceability view in Conceptual, on screen; the architecture
-  // already there: its views in Logical.
+  // already there: its views in Logical, the groups with a view of the
+  // Bookstore system (none of the external Payment Provider) and of each of
+  // its containers.
   const logical = [
-    ['System context', 'Logical', 0], ['Containers', 'Logical', 0], ['Components', 'Logical', 0], ['Container dependencies', 'Logical', 0],
+    ['System context', 'Logical', 0],
+    ['Containers of a system', 'Logical', 0], ['Bookstore', 'Logical', 0],
+    ['Components of a container', 'Logical', 0], ['Web App', 'Logical', 0], ['API', 'Logical', 0],
+    ['Container dependencies', 'Logical', 0],
   ]
   await expect.poll(made).toEqual([['Traceability', 'Conceptual', 0], ...logical])
   const traceability = ((await studio.storedDoc()) as unknown as { views: View[] }).views.find((v) => v.viewpoint === 'traceability')!

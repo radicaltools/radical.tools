@@ -253,8 +253,8 @@ export const RelationEdge = memo(
               ].join(' ')}
             >
               {data.label
-                ? <div>{data.label}</div>
-                : typeName && <div style={{ opacity: 0.85, fontStyle: 'italic' }}>{typeName}</div>
+                ? <div className="relation-label-name">{data.label}</div>
+                : typeName && <div className="relation-label-name" style={{ opacity: 0.85, fontStyle: 'italic' }}>{typeName}</div>
               }
               {data.technology && (
                 <div className="relation-label-tech" style={{ fontStyle: 'italic', opacity: 0.85, fontSize: LABEL_BOX.techFontSize }}>

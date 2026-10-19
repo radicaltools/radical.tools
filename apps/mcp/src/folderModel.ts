@@ -20,6 +20,7 @@ import { viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateB
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
+import { viewDrawnIds } from '@radical/common/viewPipeline'
 import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
 
 /** The shared AI catalogue minus its Studio-only tools: set_active_view and
@@ -281,7 +282,11 @@ export class FolderModel {
       checkData(data)
       // Older folders kept every node's position in each view; a view keeps
       // those it draws, so the first write trims views.json.
-      if (data.views) data.views = withCanvasPositions(data.views, Object.fromEntries(data.nodes.map((n) => [n.id, n])))
+      if (data.views) {
+        const nodes = byId(data.nodes)
+        const relations = byId(data.relations)
+        data.views = withCanvasPositions(data.views, nodes, (view) => viewDrawnIds(view, nodes, relations))
+      }
       const facade = createModelFacade(data, {
         runLayout: async (doc, viewId) => {
           const layout = await this.smartLayout(doc, documentMetamodel(doc.metamodel, doc.nodes), viewId, options)
@@ -412,10 +417,19 @@ export class FolderModel {
         return { ok: true, text: result.resultText + (forgeBase ? await this.saveForgeBase(forgeBase) : '') }
       }
 
-      const changed = result.data ?? facade.toDiagramData()
+      let changed = result.data ?? facade.toDiagramData()
       settleGeometry(data, changed)
       const metamodel = facade.getMetamodel?.()
-      const outcome = await this.commit(session, before, data, changed, metamodel, result.resultText)
+      // A view per element this call made (an element added, a group made)
+      // is laid out at once, as Studio does when it is first opened.
+      const known = new Set((data.views ?? []).map((v) => v.id))
+      const fresh = (changed.views ?? []).filter((v) => v.partOf && !known.has(v.id) && (v.kind ?? 'static') === 'static' && !Object.keys(v.positions ?? {}).length)
+      for (const view of fresh) {
+        const laidOut = await this.smartLayout(changed, metamodel, view.id)
+        if (laidOut.changed) changed = laidOut.changed
+      }
+      const note = fresh.length ? ` Smart Layout arranged ${fresh.length === 1 ? `the new view ${fresh[0].name}` : `the ${fresh.length} new views per element`}.` : ''
+      const outcome = await this.commit(session, before, data, changed, metamodel, result.resultText + note)
       if (!outcome.ok) {
         this.restoreTempIds(priorTempIds)
         return outcome
@@ -479,7 +493,7 @@ export class FolderModel {
     applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
     // All elements writes the nodes themselves (settleGeometry then syncs
     // defaultPositions); a view keeps its own positions.
-    if (view) view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes))
+    if (view) view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes), viewDrawnIds(view, nodes, byId(changed.relations)))
     const before = result.baseline
     const after = result.winner.metrics
     return {
@@ -501,7 +515,7 @@ export class FolderModel {
     const unpinned = pinnedNodeIds(constraints).length
     view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
     applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
-    view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes))
+    view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes), viewDrawnIds(view, nodes, byId(changed.relations)))
     return {
       ok: true,
       changed,

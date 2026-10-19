@@ -3108,8 +3108,10 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
      is no dead empty area under short descriptions. The flex child grows
      to fill its parent (.c4-node uses flex column), and the inner clamp
      limits the rendered text to fit. */
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-height: 0;
   display: -webkit-box;
+  /* NodeDesc sets the number of lines that fit the room left. */
   -webkit-line-clamp: 8;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -3117,6 +3119,12 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
   white-space: normal;
   word-break: break-word;
 }
+
+/* The name, the technology and the type bar keep their size in a card the
+   description cannot fill: it is the description that gives way. */
+.c4-node > .c4-node-header,
+.c4-node > .c4-node-label,
+.c4-node > .c4-node-tech { flex: 0 0 auto; }
 
 /* Cylinder shapes (Database, Queue) — content is centered between the
    elliptical caps, so we must NOT let the description stretch with flex:1
@@ -4549,3 +4557,33 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
    the page, as over a canvas, so opening it moves nothing beneath. */
 .right-panel.element-card { position: absolute; top: 0; right: 0; bottom: 0; margin: 10px; transform: none; z-index: 6; }
 .element-card-actions { display: flex; gap: 6px; padding: 10px 14px 0; }
+
+/* A group of views of one element: a chevron in its title, its views under it. */
+.lp-group-chevron { display: inline-flex; margin-right: 4px; vertical-align: -2px; transition: transform .12s; }
+.lp-group-chevron svg { width: 11px; height: 11px; }
+.lp-group-chevron.open { transform: rotate(90deg); }
+.lp-group-body { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 0 14px; padding-left: 8px; border-left: 1px solid var(--border-color); }
+.lp-group-empty { padding: 4px 6px; font-size: 11.5px; color: var(--text-muted); }
+
+/* "View per element": a viewpoint, or a view, that is a group with one view per element. */
+.lp-add-view-kind.lp-add-view-per { background: var(--accent-soft); color: var(--accent); }
+.lp-view-kind.lp-view-per { color: var(--accent); }
+
+/* A group's views, in its properties. */
+.props-group-views { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.props-group-view {
+  padding: 2px 8px; border-radius: 10px; cursor: pointer; font-size: 11.5px;
+  border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-primary);
+}
+.props-group-view:hover { border-color: var(--accent); color: var(--accent); }
+
+/* A relation's label: its name on at most two lines, its technology on one,
+   cut with an ellipsis (edgeLabels.ts measures them so); whole while the
+   relation is hovered or selected, or an element at its end is. */
+.relation-label .relation-label-name {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; overflow-wrap: anywhere;
+}
+.relation-label .relation-label-tech { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.relation-label.relation-label-active .relation-label-name { display: block; -webkit-line-clamp: unset; }
+.relation-label.relation-label-active .relation-label-tech { white-space: normal; }

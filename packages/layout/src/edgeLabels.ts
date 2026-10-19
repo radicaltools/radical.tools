@@ -26,6 +26,8 @@ export interface LabelSize {
 export interface LabelTextLine {
   text: string
   fontSize: number
+  /** The rows it may take; longer text is cut with an ellipsis. */
+  maxRows?: number
 }
 
 /** The box a label is drawn in (border-box sizing). */
@@ -69,6 +71,7 @@ export function estimateLabelSize(lines: LabelTextLine[], style: LabelBoxStyle):
       width = Math.max(width, row)
       rows++
     }
+    if (line.maxRows) rows = Math.min(rows, line.maxRows)
     height += rows * line.fontSize * style.lineHeight
   }
   return {
@@ -78,8 +81,8 @@ export function estimateLabelSize(lines: LabelTextLine[], style: LabelBoxStyle):
 }
 
 /** The box the canvas draws a relation's label in (RelationEdge). */
-export const RELATION_LABEL_BOX: LabelBoxStyle & { fontSize: number; techFontSize: number } = {
-  maxWidth: 200, padX: 8, padY: 3, border: 1, lineHeight: 1.4, fontSize: 17, techFontSize: 14,
+export const RELATION_LABEL_BOX: LabelBoxStyle & { fontSize: number; techFontSize: number; nameRows: number } = {
+  maxWidth: 160, padX: 6, padY: 2, border: 1, lineHeight: 1.3, fontSize: 12, techFontSize: 10, nameRows: 2,
 }
 
 /** What a relation shows in its label: its name (or type), then its technology. */
@@ -89,7 +92,9 @@ export interface RelationLabelText {
   technology?: string
 }
 
-/** The lines of a relation's label; none when it has no label. With the
+/** The lines of a relation's label, the name on at most two rows and the
+ *  technology on one (cut with an ellipsis, whole while the relation is
+ *  active on the canvas); none when it has no label. With the
  *  model's nodes, a transition without a label shows `event [guard] /
  *  actions ^raised` (its events by name), and nothing when it is a
  *  completion transition. */
@@ -97,8 +102,8 @@ export function relationLabelLines(r: RelationLabelText, nodes?: Record<string, 
   const lines: LabelTextLine[] = []
   const name = r.label
     || (r.relationType === 'transition' ? (nodes ? transitionLabel(r as C4Relation, nodes) : '') : r.relationType)
-  if (name) lines.push({ text: name, fontSize: RELATION_LABEL_BOX.fontSize })
-  if (r.technology) lines.push({ text: `[${r.technology}]`, fontSize: RELATION_LABEL_BOX.techFontSize })
+  if (name) lines.push({ text: name, fontSize: RELATION_LABEL_BOX.fontSize, maxRows: RELATION_LABEL_BOX.nameRows })
+  if (r.technology) lines.push({ text: `[${r.technology}]`, fontSize: RELATION_LABEL_BOX.techFontSize, maxRows: 1 })
   return lines
 }
 

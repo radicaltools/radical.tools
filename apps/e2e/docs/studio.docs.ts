@@ -152,6 +152,24 @@ test('view-filter', async ({ page, shot }) => {
   await shot('view-filter')
 })
 
+/** A view per element: New view → Components of a container makes one group in
+ *  the list, open on a view of each container; Payments Service on the canvas. */
+test('viewpoint-group', async ({ page, shot }) => {
+  await open(page, 'view-ctx')
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: /^Components of a container\s*Structure/ }).click()
+  const back = page.locator('.left-panel .rp-slider.show-props .rp-back-btn')
+  await back.click()
+  const group = page.locator('.lp-view-group', { hasText: 'Components of a container' })
+  await expect(group).toContainText('view per element')
+  // Payments Service holds components; the group at the top of the list, its views under it.
+  await page.getByRole('group', { name: 'Components of a container' }).locator('.lp-view-card', { hasText: 'Payments Service' }).click()
+  await group.evaluate((el) => el.scrollIntoView({ block: 'start' }))
+  await settle(page)
+  await page.mouse.move(1300, 860)
+  await shot('viewpoint-group')
+})
+
 test('matrix', async ({ page, shot }) => {
   await open(page, 'view-matrix')
   await shot('matrix')

@@ -52,7 +52,8 @@ import {
 } from '@radical/common/metamodel'
 import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
-import { newViewName, viewpointsOf } from '@radical/common/viewpoints'
+import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
+import { viewDrawnIds } from '@radical/common/viewPipeline'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
@@ -376,6 +377,19 @@ function suggestSmartLayoutIfUnarranged(loaded = false): void {
   _layoutHintPending = false
   if (!looksUnarranged(s.c4Nodes, s.activeViewId, s.activeViewId ? s.views[s.activeViewId] : undefined)) return
   s.pushNotification('This diagram is not laid out yet. The live layout only moves what you drag or add: use Smart Layout to arrange it.', 'info')
+}
+
+/** On opening a view: one of a group of views per element never laid out
+ *  (no positions of its own) gets Smart Layout at once, in the designer;
+ *  another canvas that looks unarranged gets the notice. */
+function arrangeOnFirstOpen(): void {
+  const s = useDiagramStore.getState()
+  const view = s.activeViewId ? s.views[s.activeViewId] : undefined
+  if (view?.partOf && s.appMode === 'designer' && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) {
+    void s.runSmartLayout()
+    return
+  }
+  suggestSmartLayoutIfUnarranged()
 }
 
 /** Snapshot all node positions from c4Nodes into a positions map */
@@ -1379,11 +1393,14 @@ interface DiagramStore {
   setViewEdgeStyle: (viewId: string, style: EdgeStyle | null) => void
   /** A view's pipeline (viewPipeline.ts): source, filters, grouping, order; one undo step, saved. */
   setViewPipeline: (viewId: string, pipeline: ViewPipeline) => void
-  /** Makes the view one of the metamodel's viewpoint (its kind and chain); one undo step. */
-  applyViewpoint: (viewId: string, typeId: string) => boolean
-  /** A new view of the metamodel's viewpoint, named after it; one undo step. */
+  /** Makes the view one of the metamodel's viewpoint (its kind and chain,
+   *  kept to `subjectId` for a viewpoint that draws one element: undefined
+   *  keeps the element the view is of); one undo step. */
+  applyViewpoint: (viewId: string, typeId: string, subjectId?: string | null) => boolean
+  /** A new view of the metamodel's viewpoint, named after it (for one that
+   *  draws one element, a group holding a view of each); one undo step. */
   addViewOfViewpoint: (typeId: string) => string | null
-  /** The view keeps its kind and chain, of no viewpoint; one undo step. */
+  /** The view keeps its kind and chain (kept to its element), of no viewpoint; one undo step. */
   detachViewpoint: (viewId: string) => void
   /** How All elements and views without their own draw relations. One undo step. */
   setDefaultEdgeStyle: (style: EdgeStyle) => void
@@ -1804,6 +1821,14 @@ function setSlideCamera(vp: { x: number; y: number; zoom: number }, duration: nu
 
 // ─── Store implementation ────────────────────────────────────────────────────
 
+/** Whether the view's viewpoint, kind and chain are set by a group of views
+ *  per element: the group's by its viewpoint, its views' by the group. They
+ *  change only with the group's viewpoint, so the group stays one. */
+export function setByGroup(s: { views: Record<string, DiagramView>; metamodel: Metamodel }, viewId: string): boolean {
+  const view = s.views[viewId]
+  return !!view && (!!view.partOf || model.isViewGroup(view, s.metamodel))
+}
+
 export const useDiagramStore = create<DiagramStore>()(
   immer((set, get) => {
     /** Opening canvas `to`: nothing stays selected, on the view left or the
@@ -1854,7 +1879,7 @@ export const useDiagramStore = create<DiagramStore>()(
       initViews = {}
       for (const r of persisted.relations) initRelations[r.id] = r
       // Older documents kept every node's position in each view.
-      if (persisted.views) for (const v of withCanvasPositions(persisted.views, initNodes)) initViews[v.id] = v
+      if (persisted.views) for (const v of withCanvasPositions(persisted.views, initNodes, (view) => viewDrawnIds(view, initNodes, initRelations))) initViews[v.id] = v
       const initSequences: Record<string, DiagramSequence> = {}
       if (persisted.sequences) for (const s of persisted.sequences) initSequences[s.id] = s
       initDefaultPositions = persisted.defaultPositions ?? snapshotPositions(initNodes)
@@ -1885,7 +1910,7 @@ export const useDiagramStore = create<DiagramStore>()(
       initMetamodel = builtInC4Metamodel()
     }
     // Views of a viewpoint follow the viewpoint as the metamodel has it now.
-    model.syncViewpoints({ views: initViews, metamodel: initMetamodel } as unknown as model.ModelState)
+    model.syncViewpoints({ c4Nodes: initNodes, views: initViews, metamodel: initMetamodel } as unknown as model.ModelState)
 
     // Puts the model back as a history entry has it, on the canvas the
     // entry was taken on (undo and redo).
@@ -2035,6 +2060,14 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // ── sync helper ──────────────────────────────────────────────────────
       _sync() {
+        // A group of views of one element holds a view of each such element
+        // (not while a milestone, with its own elements, is on screen).
+        if (!get().activeSnapshotId) {
+          const plan = model.planViewGroups(get() as unknown as model.ModelState)
+          if (plan.add.length || plan.remove.length || plan.refolder.length) {
+            set((state) => { model.syncViewGroups(state as unknown as model.ModelState, uid) })
+          }
+        }
         set((state) => {
           const view = state.activeViewId ? state.views[state.activeViewId] : undefined
           // Merge diff ghosts (items removed in the active milestone but
@@ -2299,10 +2332,20 @@ export const useDiagramStore = create<DiagramStore>()(
       removeNode(id) {
         get()._pushUndo()
         get()._markMilestoneEdit()
-        // The node, its descendants, their relations and every view reference
-        set((state) => { model.deleteNode(state, id) })
+        // The node, its descendants, their relations, every view reference,
+        // and the views of one element that it is.
+        let placed: string[] | null = null
+        set((state) => {
+          const active = state.activeViewId
+          model.deleteNode(state, id)
+          if (active && !state.views[active]) {
+            // Its view was on screen: back to All elements' positions.
+            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, state.defaultPositions as Record<string, NodePosition>, undefined, state.c4Relations as Record<string, C4Relation>)
+          }
+        })
         get()._sync()
-        _liveLayout?.invalidate()
+        if (placed) _liveLayout?.reset(placed)
+        else _liveLayout?.invalidate()
       },
 
       runAsOneStep(action) {
@@ -3083,7 +3126,7 @@ export const useDiagramStore = create<DiagramStore>()(
           })
           get()._sync()
           clearViewSelection(newId)
-          suggestSmartLayoutIfUnarranged()
+          arrangeOnFirstOpen()
           const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
           ;(window as any).__rfPlaceCamera?.(incomingViewport, shown)
           _liveLayout?.reset(placed)
@@ -3112,7 +3155,7 @@ export const useDiagramStore = create<DiagramStore>()(
             if (currentViewport) state.defaultViewport = currentViewport
           } else if (state.views[activeViewId]) {
             const view = state.views[activeViewId]
-            view.positions = viewCanvasPositions(view, c4Nodes, currentPos) as any
+            view.positions = viewCanvasPositions(view, c4Nodes, currentPos, viewDrawnIds(view as DiagramView, c4Nodes as Record<string, C4Node>, state.c4Relations as Record<string, C4Relation>)) as any
             if (currentViewport) view.viewport = currentViewport
           }
 
@@ -3144,7 +3187,7 @@ export const useDiagramStore = create<DiagramStore>()(
         })
         get()._sync()
         clearViewSelection(newId)
-        suggestSmartLayoutIfUnarranged()
+        arrangeOnFirstOpen()
         // The camera for the incoming view, in one step: no flight from the
         // outgoing view's camera (see Canvas placeCamera).
         const pending = (get() as any).__pendingViewport as
@@ -3173,7 +3216,8 @@ export const useDiagramStore = create<DiagramStore>()(
       },
       removeNodeFromView(viewId, nodeIds) {
         const ids = typeof nodeIds === 'string' ? [nodeIds] : nodeIds
-        if (!get().views[viewId] || ids.length === 0) return
+        // A group's views show what their element holds: nothing is hidden by hand.
+        if (!get().views[viewId] || ids.length === 0 || setByGroup(get(), viewId)) return
         get()._pushUndo()
         set((state) => {
           const view = state.views[viewId]
@@ -3252,7 +3296,7 @@ export const useDiagramStore = create<DiagramStore>()(
             if (camera) state.defaultViewport = camera
           } else if (state.views[viewId]) {
             const view = state.views[viewId]
-            view.positions = viewCanvasPositions(view, get().c4Nodes, currentPos) as any
+            view.positions = viewCanvasPositions(view, get().c4Nodes, currentPos, viewDrawnIds(view as DiagramView, get().c4Nodes, get().c4Relations)) as any
             if (camera) view.viewport = camera
           }
         })
@@ -3266,13 +3310,15 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
       },
 
-      applyViewpoint(viewId, typeId) {
+      applyViewpoint(viewId, typeId, subjectId) {
+        if (setByGroup(get(), viewId)) return false
         const view = get().views[viewId]
         const type = viewpointsOf(get().metamodel).find((t) => t.id === typeId)
         if (!view || !type) return false
-        if (view.viewpoint === typeId) return true
+        if (subjectId && !canBeSubject(type, get().c4Nodes[subjectId])) return false
+        if (view.viewpoint === typeId && (subjectId === undefined || (subjectId ?? undefined) === view.subject)) return true
         get()._pushUndo()
-        set((state) => { model.applyViewpoint(state as unknown as model.ModelState, viewId, typeId) })
+        set((state) => { model.applyViewpoint(state as unknown as model.ModelState, viewId, typeId, subjectId) })
         get()._sync()
         return true
       },
@@ -3283,18 +3329,20 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._pushUndo()
         set((state) => {
           model.insertView(state as unknown as model.ModelState, id, newViewName(type, state.views as Record<string, DiagramView>))
-          model.applyViewpoint(state as unknown as model.ModelState, id, typeId)
+          model.applyViewpoint(state as unknown as model.ModelState, id, typeId, null)
         })
+        // A group gets its views at once.
+        get()._sync()
         return id
       },
       detachViewpoint(viewId) {
-        if (!get().views[viewId]?.viewpoint) return
+        if (!get().views[viewId]?.viewpoint || setByGroup(get(), viewId)) return
         get()._pushUndo()
-        set((state) => { delete state.views[viewId].viewpoint })
+        set((state) => { model.detachViewpoint(state as unknown as model.ModelState, viewId) })
       },
       setViewPipeline(viewId, pipeline) {
         const view = get().views[viewId]
-        if (!view) return
+        if (!view || setByGroup(get(), viewId)) return
         // Nothing changes: no undo step.
         const probe = { views: { [viewId]: { ...view } } } as unknown as model.ModelState
         model.setViewPipeline(probe, viewId, pipeline)
@@ -3355,6 +3403,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       setViewKind(viewId, kind) {
+        if (setByGroup(get(), viewId)) return
         set((state) => { model.setViewKind(state, viewId, kind) })
         get()._sync()
       },
@@ -5531,7 +5580,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const sequences: Record<string, DiagramSequence> = {}
         for (const r of data.relations) relations[r.id] = r
         // Older documents kept every node's position in each view.
-        if (data.views) for (const v of withCanvasPositions(data.views, nodes)) views[v.id] = v
+        if (data.views) for (const v of withCanvasPositions(data.views, nodes, (view) => viewDrawnIds(view, nodes, relations))) views[v.id] = v
         if (data.sequences) for (const s of data.sequences) sequences[s.id] = s
 
         // Restore snapshots (backward compat: old files won't have them)
@@ -5655,7 +5704,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const savedDefaultVP = activeViewId === null ? (currentVP ?? defaultViewport) : defaultViewport
         const savedViews = Object.values(views).map(v => ({
           ...v,
-          positions: v.id === activeViewId && currentPos ? viewCanvasPositions(v, liveNodes, currentPos) : v.positions,
+          positions: v.id === activeViewId && currentPos ? viewCanvasPositions(v, liveNodes, currentPos, viewDrawnIds(v, liveNodes, liveRelations)) : v.positions,
           viewport: v.id === activeViewId ? (currentVP ?? v.viewport) : v.viewport,
         }))
 

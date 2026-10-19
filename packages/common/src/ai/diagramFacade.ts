@@ -92,9 +92,12 @@ export interface DiagramFacade {
   setViewEdgeStyle?(id: string, style: EdgeStyle | null): void
   /** Optional — what a view does with its elements: its filter chain (viewPipeline.ts); {} removes it. */
   setViewPipeline?(id: string, pipeline: ViewPipeline): void
-  /** Makes the view one of the metamodel's viewpoint `typeId` (its kind and chain); false if there is none. */
-  applyViewpoint?(id: string, typeId: string): boolean
-  /** The view keeps its kind and chain, of no viewpoint. */
+  /** Makes the view one of the metamodel's viewpoint `typeId` (its kind and
+   *  chain, kept to `subjectId` for a viewpoint that draws one element;
+   *  undefined keeps the view's element); false if there is none, or the
+   *  element cannot be what it draws. */
+  applyViewpoint?(id: string, typeId: string, subjectId?: string | null): boolean
+  /** The view keeps its kind and chain (kept to its element), of no viewpoint. */
   detachViewpoint?(id: string): void
   /** Optional layout constraints of a canvas: a view, or All elements (null). */
   getLayoutConstraints?(viewId: string | null): LayoutConstraint[]

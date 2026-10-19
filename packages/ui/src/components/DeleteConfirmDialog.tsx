@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { setByGroup, useDiagramStore } from '../store/diagramStore'
 
 /**
  * Confirmation modal that appears when the user presses Delete on the canvas.
@@ -12,6 +12,8 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const c4Relations = useDiagramStore((s) => s.c4Relations)
   const resolve = useDiagramStore((s) => s.resolvePendingDelete)
+  // A view per element shows what its element holds: nothing is hidden from it.
+  const perElement = useDiagramStore((s) => !!s.activeViewId && setByGroup(s, s.activeViewId))
 
   // Esc → cancel
   useEffect(() => {
@@ -34,7 +36,7 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
     ? (firstNode ? `"${firstNode.label}"` : firstEdge ? `relation "${firstEdge.label || '(unnamed)'}"` : '1 element')
     : `${nodeCount} node(s)${edgeCount ? ` + ${edgeCount} relation(s)` : ''}`
 
-  const canHide = !!activeViewId && nodeCount > 0
+  const canHide = !!activeViewId && nodeCount > 0 && !perElement
 
   return (
     <div className="milestone-modal-backdrop" onClick={() => resolve('cancel')}>
@@ -63,7 +65,9 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
             <div className="milestone-option-desc">
               {canHide
                 ? 'Keep the element in the model — just remove it from the active view.'
-                : 'Activate a view to be able to hide elements from it without deleting them.'}
+                : perElement
+                  ? 'A view per element shows everything its element holds; nothing can be hidden from it.'
+                  : 'Activate a view to be able to hide elements from it without deleting them.'}
             </div>
           </button>
           <button className="milestone-option ghost" onClick={() => resolve('cancel')}>
