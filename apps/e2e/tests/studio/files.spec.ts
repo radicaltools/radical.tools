@@ -30,6 +30,7 @@ test('Open → File… keeps the model in the file and saves changes to it', asy
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'File…' }).click()
   await studio.ready()
+  await studio.designer()
   // It opens on All elements, the table of the whole model.
   await studio.row('customer').click()
   await expect(labelField(page)).toHaveValue('Customer')

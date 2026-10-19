@@ -91,6 +91,19 @@ describe('setAppMode designer ↔ viewer', () => {
     expect((window as any).__preModeLayout).toBeUndefined()
   })
 
+  it('viewer → designer stays on the view viewer showed', () => {
+    const a = useDiagramStore.getState().addView('Designer view')
+    const b = useDiagramStore.getState().addView('Viewer view')
+    useDiagramStore.getState().setActiveView(a)
+    useDiagramStore.getState().setAppMode('viewer')
+    useDiagramStore.getState().setActiveView(b)
+    useDiagramStore.setState((s: any) => { s.c4Nodes['ctn1'].label = 'EXPLORED'; return s })
+    useDiagramStore.getState().setAppMode('designer')
+    expect(useDiagramStore.getState().activeViewId).toBe(b)
+    // The model is still Designer's.
+    expect(useDiagramStore.getState().c4Nodes['ctn1'].label).toBe(initial.c4Nodes['ctn1'].label)
+  })
+
   it('viewer → designer restores views map (positions cannot leak)', () => {
     useDiagramStore.getState().setAppMode('viewer')
     useDiagramStore.setState((s: any) => {

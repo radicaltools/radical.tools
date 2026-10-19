@@ -309,6 +309,34 @@ test.describe('Viewer', () => {
   })
 })
 
+test('back in Designer, the view shown in Viewer stays, with Designer\'s layout', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  const designer = await studio.positions()
+  await page.locator('.lp-view-card').filter({ hasText: 'System Context' }).click()
+  await expect(page.getByText('Structure: System Context')).toBeVisible()
+  await studio.settle()
+  const saved = await studio.storedJson()
+
+  // In Viewer: another view, re-laid out.
+  await page.getByRole('button', { name: 'Viewer', exact: true }).click()
+  await page.locator('.lp-view-card').filter({ hasText: 'Containers' }).click()
+  await expect(page.getByText('Structure: Containers')).toBeVisible()
+  await studio.settle()
+  await studio.smartLayout()
+
+  // Designer stays on Containers, as Designer has it.
+  await page.getByRole('button', { name: 'Designer', exact: true }).click()
+  await studio.settle()
+  await expect(page.getByText('Structure: Containers')).toBeVisible()
+  await expect(page).toHaveURL(/\/m\/designer\/v\/v-containers$/)
+  expect(await studio.positions()).toEqual(designer)
+  // Nothing of Viewer was saved: the views are as Designer left them (the
+  // nodes' own positions follow the canvas shown).
+  const stored = JSON.parse(await studio.storedJson())
+  expect(stored.views).toEqual(JSON.parse(saved).views)
+})
+
 test.describe('what is arranged in Viewer and Presenter stays there', () => {
   for (const perspective of ['Viewer', 'Presenter']) {
     test(`Smart Layout in ${perspective} is not saved`, async ({ page, studio }) => {
@@ -333,4 +361,28 @@ test.describe('what is arranged in Viewer and Presenter stays there', () => {
       expect(await studio.positions()).toEqual(designer)
     })
   }
+})
+
+test('Studio opens a model in Viewer unless a link names a perspective, and a new model in Designer', async ({ page, studio }) => {
+  await studio.seed()
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.locator('.msteps-row').first().click()
+  await studio.ready()
+  // No route: Viewer, read-only, and the address says so.
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
+  await expect(page.locator('.palette-item')).toHaveCount(0)
+  await expect(page).toHaveURL(/\/m\/viewer\//)
+
+  // A link keeps the perspective it names.
+  await studio.open('v-containers')
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+
+  // A new model is there to be edited.
+  await page.goto('/')
+  await page.getByRole('button', { name: 'New model' }).click()
+  await page.getByRole('button', { name: 'Create model' }).click()
+  await studio.ready()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  await expect(page).toHaveURL(/\/m\/designer\//)
 })

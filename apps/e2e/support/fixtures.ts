@@ -159,6 +159,12 @@ export class Studio {
     await expect(this.page.getByText('Runtime Error')).toHaveCount(0)
   }
 
+  /** Switches to Designer: a model opened without a link starts in Viewer. */
+  async designer(): Promise<void> {
+    await this.page.locator('.toolbar-mode-btn', { hasText: 'Designer' }).click()
+    await expect(this.page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  }
+
   /**
    * Wait until the canvas camera stops moving (auto-fit and view switches
    * animate the viewport in JS, which `animations: 'disabled'` cannot stop).

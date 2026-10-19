@@ -12,6 +12,10 @@
 //   #/d/<docId>/m/<mode>/v/<viewId>...[/p/<presId>/play/1/sl/<n>]
 //
 //   <mode>    designer | viewer | presenter | metamodel   (default: designer)
+//
+// Without a route Studio starts in Viewer: most openings are to look at a
+// model, and Viewer cannot change it. A model the user has just created is
+// there to be edited, so it starts in Designer (openInDesigner).
 //   <viewId>  a view id, or `canvas` for the default Canvas (activeViewId null)
 //   <tab>     the Inspector's tab (inspector mode only): changes | model |
 //             implementation | settings
@@ -82,12 +86,24 @@ let applying = false
 // keeps waiting until Reconnect loads it. While a route waits, the URL keeps it.
 let pending: { route: Route; docId: string } | null = null
 
+/** The perspective Studio starts in without a route. */
+let startMode: Mode = 'viewer'
+
+/** For a model the user has just created: Designer, now and when the route
+ *  sync starts (the web welcome screen holds it back until a model is picked). */
+export function openInDesigner(): void {
+  startMode = 'designer'
+  usePendingMode.setState({ mode: null })
+  if (useDiagramStore.getState().appMode !== 'designer') useDiagramStore.getState().setAppMode('designer')
+}
+
 /** The perspective a link asks for while its document still loads, so the
  *  app shows that one from its first paint, not Designer's canvas for a
  *  moment (the store switches only once the route is applied). Read from
  *  the address when the module loads, before the first render. */
 export const usePendingMode = create<{ mode: Mode | null }>(() => ({
-  mode: typeof window !== 'undefined' && window.location ? parseHash(window.location.hash)?.mode ?? null : null,
+  // Without a route, Viewer from the first paint (startRouteSync switches to it).
+  mode: typeof window !== 'undefined' && window.location ? parseHash(window.location.hash)?.mode ?? 'viewer' : null,
 }))
 
 /** The perspective to draw: the one a pending link asks for, else the store's. */
@@ -367,6 +383,9 @@ export function startRouteSync(): () => void {
 
   const initial = parseHash(location.hash)
   if (initial) applyRoute(initial)
+  // No route: the start perspective, through setAppMode so that Viewer
+  // parks Designer's model as a switch by hand does.
+  else if (useDiagramStore.getState().appMode !== startMode) useDiagramStore.getState().setAppMode(startMode)
   // The history starts at the place opened: one entry, ours. A link still
   // waiting for its document keeps its address until it is applied.
   // After a reload the window's history is still there, and the list kept

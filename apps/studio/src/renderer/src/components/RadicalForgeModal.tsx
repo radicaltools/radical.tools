@@ -694,6 +694,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     showNeed(id)
   }, [hasNeedType, description, needId, diagram, structure])
   const startRun = useCallback(async () => {
+    // Forge builds and lays out the model: that is Designer's work.
+    if (useDiagramStore.getState().appMode !== 'designer') useDiagramStore.getState().setAppMode('designer')
     // A folder git saved no base for gets the model as it is now, so
     // Changes on branch shows what the run changes.
     await saveForgeBase().catch(() => false)

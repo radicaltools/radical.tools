@@ -30,7 +30,7 @@ const MODEL: DiagramData = {
   views: [{ id: 'v-shop', name: 'Shop', nodeIds: ['shop', 'api'], positions: {} }],
 }
 
-async function openFolder(page: Page, studio: { ready(): Promise<void> }, model: DiagramData): Promise<ModelFolder> {
+async function openFolder(page: Page, studio: { ready(): Promise<void>; designer(): Promise<void> }, model: DiagramData): Promise<ModelFolder> {
   const folder = new ModelFolder(page)
   await folder.install()
   await page.goto('/')
@@ -39,10 +39,12 @@ async function openFolder(page: Page, studio: { ready(): Promise<void> }, model:
   await page.getByRole('button', { name: 'Folder…' }).click()
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
+  // Opened without a link, it starts in Viewer; these tests edit.
+  await studio.designer()
   return folder
 }
 
-async function openModel(page: Page, studio: { ready(): Promise<void> }): Promise<ModelFolder> {
+async function openModel(page: Page, studio: { ready(): Promise<void>; designer(): Promise<void> }): Promise<ModelFolder> {
   const folder = await openFolder(page, studio, MODEL)
   // New view → Process (Warnier).
   await page.getByRole('button', { name: 'New view' }).click()
