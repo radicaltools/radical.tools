@@ -155,7 +155,7 @@ describe('review', () => {
     expect(PRIMARY_TYPE_IDS_FOR_STAGE.review).toEqual([])
   })
 
-  it('checks the whole model against the description, carries the open gaps and lists its changes for the user', () => {
+  it('checks the whole model against the description, carries the open gaps and proposes its changes to the user', () => {
     const prompt = buildForgeStagePrompt('review', 'A web shop.', undefined, undefined, '', undefined, ['- No scenario verifies requirement "Pay".'])
     expect(prompt).toContain('A web shop.')
     expect(prompt).toContain('Read it as a whole against the\ndescription')
@@ -163,7 +163,8 @@ describe('review', () => {
     expect(prompt).toContain('contradicts a transition or the order of a process')
     expect(prompt).toContain('Gaps the model has now')
     expect(prompt).toContain('- No scenario verifies requirement "Pay".')
-    expect(prompt).toContain('keeps or rejects it')
+    expect(prompt).toContain('Everything you change goes to the user first.')
+    expect(prompt).toContain('propose it with propose_refinement')
     expect(prompt).toContain('change nothing and\nsay so')
   })
 })
@@ -176,9 +177,17 @@ describe('every stage after the requirements may close gaps in earlier stages', 
       const prompt = buildForgeStagePrompt(id, 'A web shop.')
       expect(prompt, id).toContain(REFINE_RULES[0])
       expect(prompt, id).toContain('Never delete an element of an earlier stage.')
-      expect(prompt, id).toContain('name it as an open question in')
+      expect(prompt, id).toContain('name it as an open')
+      expect(prompt, id).toContain('propose it with propose_refinement')
+      expect(prompt, id).toContain('linking two such elements is\nrefused')
     }
     expect(buildForgeStagePrompt('requirements', 'A web shop.')).not.toContain(REFINE_RULES[0])
+  })
+
+  it('names the proposal tool it is given', () => {
+    const prompt = buildForgeStagePrompt('processes', 'A web shop.', undefined, undefined, '', undefined, [], 'forge_propose_refinement')
+    expect(prompt).toContain('propose it with forge_propose_refinement')
+    expect(prompt).not.toContain('propose it with propose_refinement')
   })
 
   it('lists the gaps it is given, and none when there are none', () => {
@@ -189,7 +198,7 @@ describe('every stage after the requirements may close gaps in earlier stages', 
   it('no longer has the C4 stage leave a needed requirement out', () => {
     const prompt = buildForgeStagePrompt('c4', 'A web shop.')
     expect(prompt).not.toContain('Do not invent')
-    expect(prompt).toContain('add the\nrequirement with its scenario when the description implies it')
+    expect(prompt).toContain('propose the\nrequirement with its scenario when the description implies it')
   })
 })
 

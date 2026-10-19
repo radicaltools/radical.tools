@@ -222,8 +222,9 @@ test('ai-settings', async ({ page, shot }) => {
 /**
  * Radical Forge on the Bookstore model: its Description step with the view
  * structures (forge-views), then after its Requirements stage on the layer
- * canvases, the stages above (forge), and after its Domain model stage, which
- * filled a gap in the requirements and sharpened one (forge-refinements).
+ * canvases, the stages above (forge), and during its Domain model stage, which
+ * asks before it fills a gap in the requirements and sharpens one
+ * (forge-refinements).
  * The AI provider is scripted, as in tests/studio/forge.spec.ts.
  */
 test('forge', async ({ page, shot }) => {
@@ -246,9 +247,14 @@ test('forge', async ({ page, shot }) => {
   const domain = (prompt: string): Array<{ name: string; input: Record<string, unknown> }> => [
     { name: 'add_node', input: { tempId: 'd', type: 'domain', label: 'Lending', properties: { kind: 'core' } } },
     { name: 'add_node', input: { tempId: 'e', type: 'entity', label: 'Reservation', parentId: 'd', properties: { kind: 'aggregate-root' } } },
-    { name: 'add_node', input: { tempId: 'c', type: 'requirement', label: 'Cancel a reservation', properties: { ears_type: 'event-driven', trigger: 'a reader cancels a reservation', action: 'release the copy at once' } } },
-    { name: 'add_relation', input: { sourceId: 'c', targetId: idOf(prompt, 'need', 'Click & collect'), relationType: 'derives' } },
-    { name: 'update_node', input: { id: idOf(prompt, 'requirement', 'Reserve a book online'), properties: { action: 'hold one copy in the chosen shop for 48 hours under a reservation number' } } },
+    { name: 'propose_refinement', input: {
+      reason: 'A reservation can be cancelled, which no requirement says, and it needs a number to be collected by.',
+      changes: [
+        { tool: 'add_node', input: { tempId: 'c', type: 'requirement', label: 'Cancel a reservation', properties: { ears_type: 'event-driven', trigger: 'a reader cancels a reservation', action: 'release the copy at once' } } },
+        { tool: 'add_relation', input: { sourceId: 'c', targetId: idOf(prompt, 'need', 'Click & collect'), relationType: 'derives' } },
+        { tool: 'update_node', input: { id: idOf(prompt, 'requirement', 'Reserve a book online'), properties: { action: 'hold one copy in the chosen shop for 48 hours under a reservation number' } } },
+      ],
+    } },
   ]
   await page.route('https://api.anthropic.com/v1/messages', async (route) => {
     const body = route.request().postDataJSON() as { tools?: unknown[]; messages: unknown[] }
@@ -299,14 +305,16 @@ test('forge', async ({ page, shot }) => {
   await settle(page)
   await shot('forge')
 
-  // The domain model refines the requirements: the user is asked to keep
-  // or reject that, and the step bar marks the stage.
+  // The domain model would refine the requirements: it asks first, and the
+  // step bar marks the stage while it waits.
   await page.getByRole('button', { name: 'Continue →' }).click()
   await page.getByRole('button', { name: 'Generate domain model' }).click()
-  await expect(page.getByTestId('forge-refinements').locator('li')).toHaveCount(2)
+  await expect(page.getByTestId('forge-proposal').locator('.forge-proposal-change')).toHaveCount(3)
   await page.mouse.move(1380, 860)
   await settle(page)
   await shot('forge-refinements')
+  await page.getByTestId('forge-proposal').getByRole('button', { name: 'Add it' }).click()
+  await expect(page.getByTestId('forge-refinements')).toContainText('Refined 2 elements of earlier stages')
 })
 
 /** The repository's own architecture model, with the test results `radical check` left beside it. */

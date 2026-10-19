@@ -5,4 +5,4 @@ label: "Generating"
 kind: "normal"
 ---
 
-A stage generating. Phase working.
+A stage generating. Phase working, or waiting while a proposed refinement waits for the user's answer (asking in .radical/forge-run.json).

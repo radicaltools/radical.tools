@@ -11,10 +11,18 @@ import { test, expect, fixture } from '../../support/fixtures'
 
 interface ToolUse { name: string; input: Record<string, unknown> }
 
+interface ScriptedStage {
+  task: RegExp
+  calls: ToolUse[] | ((prompt: string) => ToolUse[])
+  /** Later rounds, each made from the whole conversation so far (the tool
+   *  results included); none left, or an empty one, ends the stage. */
+  followUps?: Array<(conversation: string) => ToolUse[]>
+}
+
 /** Answers Anthropic Messages calls: no clarifying questions, and per stage
- *  one round of tool calls (or calls made from the stage's prompt), then a
- *  summary. */
-async function scriptAnthropic(page: Page, stages: Array<{ task: RegExp; calls: ToolUse[] | ((prompt: string) => ToolUse[]) }>): Promise<string[]> {
+ *  one round of tool calls (or calls made from the stage's prompt), its
+ *  follow-up rounds, then a summary. */
+async function scriptAnthropic(page: Page, stages: ScriptedStage[]): Promise<string[]> {
   const stagePrompts: string[] = []
   await page.addInitScript(() => {
     localStorage.setItem('radical-ai-settings', JSON.stringify({
@@ -38,7 +46,14 @@ async function scriptAnthropic(page: Page, stages: Array<{ task: RegExp; calls: 
       return reply([{ type: 'text', text: JSON.stringify(pick) }], 'end_turn')
     }
     const all = JSON.stringify(body.messages)
-    if (all.includes('tool_result')) return reply([{ type: 'text', text: 'Done.' }], 'end_turn')
+    if (all.includes('tool_result')) {
+      // The stage by its task; a round is an assistant turn and the tool results after it.
+      const stage = stages.find((s) => s.task.test(JSON.stringify(body.messages[0])))
+      const followUp = stage?.followUps?.[(body.messages.length - 1) / 2 - 1]
+      const calls = followUp?.(all) ?? []
+      if (!calls.length) return reply([{ type: 'text', text: 'Done.' }], 'end_turn')
+      return reply(calls.map((call, i) => ({ type: 'tool_use', id: `f${body.messages.length}-${i}`, name: call.name, input: call.input })), 'tool_use')
+    }
     stagePrompts.push(all)
     const stage = stages.find((s) => s.task.test(all))
     if (!stage) return reply([{ type: 'text', text: 'Nothing to do.' }], 'end_turn')
@@ -247,7 +262,7 @@ test('Forge asks for the view structure and files the run into the Radical one',
   await expect(views.getByLabel(/Layer canvases/)).toBeDisabled()
 })
 
-test('Forge lists what a stage refined in earlier stages and rejects the unticked ones', async ({ page, studio }) => {
+test('Forge asks before it refines an earlier stage and applies only what the user accepts', async ({ page, studio }) => {
   const doc = JSON.parse(fixture('bookstore'))
   doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
   await studio.seedDocument(JSON.stringify(doc))
@@ -257,15 +272,36 @@ test('Forge lists what a stage refined in earlier stages and rejects the unticke
     if (!match) throw new Error(`no ${label} in the prompt`)
     return match[1]
   }
+  const conversations: string[] = []
   const stagePrompts = await scriptAnthropic(page, [
     { task: /extract its functional requirements/, calls: [requirement(1)] },
-    { task: /ubiquitous language/, calls: (prompt) => [
-      { name: 'add_node', input: { tempId: 'lib', type: 'domain', label: 'Lending', properties: { kind: 'core' } } },
-      { name: 'add_node', input: { tempId: 'loan', type: 'entity', label: 'Loan', parentId: 'lib', properties: { kind: 'aggregate-root' } } },
-      // A gap the domain model shows, and a vague requirement made precise.
-      { name: 'add_node', input: { tempId: 'ret', type: 'requirement', label: 'Return books', properties: { ears_type: 'ubiquitous', action: 'take back a lent book' } } },
-      { name: 'update_node', input: { id: idOf(prompt, 'Requirement 1'), properties: { action: 'lend a book to a reader' } } },
-    ] },
+    {
+      task: /ubiquitous language/,
+      calls: (prompt) => [
+        { name: 'add_node', input: { tempId: 'lib', type: 'domain', label: 'Lending', properties: { kind: 'core' } } },
+        { name: 'add_node', input: { tempId: 'loan', type: 'entity', label: 'Loan', parentId: 'lib', properties: { kind: 'aggregate-root' } } },
+        // Written directly, an earlier stage's element is refused.
+        { name: 'add_node', input: { tempId: 'sneak', type: 'requirement', label: 'Sneaked in', properties: { ears_type: 'ubiquitous', action: 'appear unasked' } } },
+        // A gap the domain model shows, and a vague requirement made precise: proposed.
+        { name: 'propose_refinement', input: {
+          reason: 'A loan ends with a return, which no requirement asks for.',
+          changes: [
+            { tool: 'add_node', input: { tempId: 'ret', type: 'requirement', label: 'Return books', properties: { ears_type: 'ubiquitous', action: 'take back a lent book' } } },
+            { tool: 'update_node', input: { id: idOf(prompt, 'Requirement 1'), properties: { action: 'lend a book to a reader' } } },
+          ],
+        } },
+      ],
+      followUps: [
+        (conversation) => {
+          conversations.push(conversation)
+          return [{ name: 'propose_refinement', input: {
+            reason: 'Readers may want to keep a book longer.',
+            changes: [{ tool: 'add_node', input: { tempId: 'renew', type: 'requirement', label: 'Renew loans', properties: { ears_type: 'ubiquitous', action: 'renew a loan' } } }],
+          } }]
+        },
+        (conversation) => { conversations.push(conversation); return [] },
+      ],
+    },
   ])
   await studio.open('v-context')
   await page.getByTitle('Menu').click()
@@ -282,30 +318,53 @@ test('Forge lists what a stage refined in earlier stages and rejects the unticke
   // The stage was told how to refine, with the gaps the requirements left.
   const domainPrompt = stagePrompts.find((p) => p.includes('ubiquitous language'))!
   expect(domainPrompt).toContain('Refine the whole model as you go.')
+  expect(domainPrompt).toContain('propose it with propose_refinement')
   expect(domainPrompt).toMatch(/Requirement 1[\\"]+ derives from no need/)
 
-  const refinements = page.getByTestId('forge-refinements')
-  await expect(refinements).toContainText('Refinements of earlier stages')
-  await expect(refinements.locator('li')).toHaveText(['added requirement "Return books"', 'changed requirement "Requirement 1" (action)'])
-  await expect(page.getByTestId('forge-gaps')).toContainText('open gaps in the model — the next stage gets them')
-  // The step bar reports it too: amber until the user chooses.
+  // The stage pauses on exactly what it would write.
+  const proposal = page.getByTestId('forge-proposal')
+  await expect(proposal).toContainText('A loan ends with a return, which no requirement asks for.')
+  await expect(proposal.locator('.forge-proposal-change > span')).toHaveText(['Add requirement "Return books"', 'Change requirement "Requirement 1"'])
+  await expect(proposal.locator('.forge-proposal-change').first().locator('li')).toHaveText(['ears_type: "ubiquitous"', 'action: "take back a lent book"'])
+  await expect(proposal.locator('.forge-proposal-change').nth(1).locator('li')).toHaveText(['action: "do thing 1" → "lend a book to a reader"'])
+  // The step bar shows that the stage waits for the answer.
   const badge = page.locator('.forge-step', { hasText: 'Domain' }).getByTestId('forge-step-refined')
-  await expect(badge).toHaveText('✎2')
   await expect(badge).toHaveClass(/pending/)
-  await expect(page.locator('.forge-step', { hasText: 'Domain' })).toHaveAttribute('title', /refined 2 elements of earlier stages \(requirement 2\), waiting for you/)
-  await page.locator('.forge-panel').screenshot({ path: test.info().outputPath('refinements.png') })
-
-  await refinements.getByLabel('changed requirement "Requirement 1" (action)').uncheck()
-  await refinements.getByRole('button', { name: 'Reject 1 unticked' }).click()
-  await expect(refinements).toContainText('✓ Kept 1, rejected 1.')
-  await expect(refinements.locator('li')).toHaveText(['added requirement "Return books"'])
-  await expect(badge).toHaveText('✎1')
-  await expect(badge).not.toHaveClass(/pending/)
-
+  await expect(page.locator('.forge-step', { hasText: 'Domain' })).toHaveAttribute('title', /waiting for your answer to a proposed refinement/)
   const stored = async () => await studio.storedDoc() as unknown as { nodes: Array<Record<string, unknown>> }
-  await expect.poll(async () => (await stored()).nodes.find((n) => n.label === 'Requirement 1')?.action).toBe('do thing 1')
-  expect((await stored()).nodes.some((n) => n.label === 'Return books')).toBe(true)
-  await page.getByRole('button', { name: 'Continue →' }).click()
-  await page.getByRole('button', { name: '← Back' }).click()
-  await page.locator('.forge-panel').screenshot({ path: test.info().outputPath('refinements-decided.png') })
+  expect((await stored()).nodes.some((n) => n.label === 'Return books')).toBe(false)
+  await page.locator('.forge-panel').screenshot({ path: test.info().outputPath('proposal.png') })
+  await proposal.getByRole('button', { name: 'Add it' }).click()
+
+  // The next one is declined, with a reply.
+  await expect(proposal).toContainText('Readers may want to keep a book longer.')
+  await expect(badge).toHaveText('✎2')
+  await proposal.getByLabel('Reply to the proposal').fill('Not for now: renewals come later.')
+  await proposal.getByRole('button', { name: "Don't add" }).click()
+  await expect(proposal).toHaveCount(0)
+
+  // The AI was told: the direct write refused, the first proposal added, the second not, with the reply.
+  await expect.poll(() => conversations.length).toBe(2)
+  expect(conversations[0]).toContain('a requirement belongs to an earlier stage')
+  expect(conversations[0]).toContain('The user added it.')
+  expect(conversations[1]).toContain('The user did not add it')
+  expect(conversations[1]).toContain('Not for now: renewals come later.')
+
+  await expect.poll(async () => (await stored()).nodes.find((n) => n.label === 'Requirement 1')?.action).toBe('lend a book to a reader')
+  const labels = (await stored()).nodes.map((n) => n.label)
+  expect(labels).toContain('Return books')
+  expect(labels).not.toContain('Renew loans')
+  expect(labels).not.toContain('Sneaked in')
+
+  // After the stage: no list to decide on, the refinements told as accepted.
+  const refinements = page.getByTestId('forge-refinements')
+  await expect(refinements).toContainText('Refined 2 elements of earlier stages, as you accepted (1 proposal declined)')
+  await refinements.locator('summary').click()
+  await expect(refinements.locator('li')).toHaveText(['added requirement "Return books"', 'changed requirement "Requirement 1" (action)'])
+  await expect(page.locator('.forge-panel').getByRole('button', { name: /Reject/ })).toHaveCount(0)
+  await expect(badge).toHaveText('✎2')
+  await expect(badge).not.toHaveClass(/pending/)
+  await expect(page.locator('.forge-step', { hasText: 'Domain' })).toHaveAttribute('title', /refined 2 elements of earlier stages \(requirement 2\)$/)
+  await expect(page.getByTestId('forge-gaps')).toContainText('open gaps in the model — the next stage gets them')
+  await page.locator('.forge-panel').screenshot({ path: test.info().outputPath('refinements-accepted.png') })
 })

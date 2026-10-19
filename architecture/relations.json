@@ -920,6 +920,12 @@
     "targetId": "637e5f54-27f5-4e22-bf73-380d9f4f772a"
   },
   {
+    "id": "127f3429-bda3-43b5-adf4-b76efc503bd0",
+    "relationType": "constrains",
+    "sourceId": "c2b1af21-c12d-4a2c-8975-9cbf4dd84e8e",
+    "targetId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e"
+  },
+  {
     "id": "129104aa-1d48-4573-8acb-4a041b7507a1",
     "relationType": "implements",
     "sourceId": "3015c7f5-e82a-4a9a-b0fb-b9990a5ef6eb",
@@ -1430,6 +1436,12 @@
     "relationType": "verifies",
     "sourceId": "d8b001e0-47ab-4397-a986-157a4e0601e9",
     "targetId": "488d1114-fb39-4ec0-8f4f-f3ec67af5862"
+  },
+  {
+    "id": "1d190615-d015-4823-b280-d09e1931e90b",
+    "relationType": "traces-to",
+    "sourceId": "fb5bb3c5-a833-4561-9d3c-a0e297b6cc18",
+    "targetId": "d6498d93-94a3-4abc-b5e5-377fe38e846b"
   },
   {
     "id": "1d1f0b3f-3e00-4dda-95c9-2b622b07b9c6",
@@ -2001,6 +2013,13 @@
     "targetId": "558fefc4-e625-43c6-b2cc-ba6d5e939c99"
   },
   {
+    "description": "Continues from 0.2.0; Marketplace pre-releases with vsce --pre-release on an odd minor, releases on an even minor.",
+    "id": "294abd03-0966-49b9-a942-c1f0e3f9122a",
+    "relationType": "constrains",
+    "sourceId": "8833743d-283a-4407-92ea-462788b37c8b",
+    "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
+  },
+  {
     "id": "294ac76e-5318-4bcd-9032-468fbefa19ec",
     "relationType": "satisfies",
     "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
@@ -2427,6 +2446,13 @@
     "targetId": "95e6ea21-9c69-4270-9e5f-85f775018c17"
   },
   {
+    "description": "SemVer against tool names, input schemas and result shapes; the version is also the MCP handshake version; pre-releases on the npm dist-tag next.",
+    "id": "310bcc26-27b0-400c-961e-5eef3fe03272",
+    "relationType": "constrains",
+    "sourceId": "8833743d-283a-4407-92ea-462788b37c8b",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
+  },
+  {
     "id": "313cb69f-05f6-4a5a-9d5d-978a20b19fde",
     "relationType": "derives",
     "sourceId": "3d4b4291-63ea-42be-9d64-5ef5ea787c21",
@@ -2559,6 +2585,12 @@
     "relationType": "satisfies",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
     "targetId": "c6fccca5-a488-4ef6-9e1b-045998930d00"
+  },
+  {
+    "id": "33a41c4e-b4fd-49ac-970d-ba8feff86ef6",
+    "relationType": "satisfies",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "fb5bb3c5-a833-4561-9d3c-a0e297b6cc18"
   },
   {
     "id": "33c1530f-3120-4c71-a8dd-410e61d58a11",
@@ -3328,6 +3360,12 @@
     "relationType": "derives",
     "sourceId": "20097bd3-752a-4904-a7be-04a9059bfa0b",
     "targetId": "83ee4096-d1a1-4876-948b-2cc58afc28db"
+  },
+  {
+    "id": "41842877-6970-4244-bf1a-af260ba36d39",
+    "relationType": "traces-to",
+    "sourceId": "22418a18-7acd-45b7-a7de-790d90cda253",
+    "targetId": "c2b1af21-c12d-4a2c-8975-9cbf4dd84e8e"
   },
   {
     "id": "418d4c04-8609-44ec-8951-188a62818656",
@@ -5006,6 +5044,12 @@
     "targetId": "565a5084-b620-44e1-960a-7e3fd59cc0f2"
   },
   {
+    "id": "61ce7253-3262-407c-b29e-9264c67aafe3",
+    "relationType": "traces-to",
+    "sourceId": "edeed462-51eb-4468-86e0-fdd29f88d70f",
+    "targetId": "c2b1af21-c12d-4a2c-8975-9cbf4dd84e8e"
+  },
+  {
     "id": "61f0228e-5f40-4237-8111-bddb754839e9",
     "relationType": "derives",
     "sourceId": "bb877051-d43a-49bd-970c-d0f18e8589f6",
@@ -5103,6 +5147,13 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "dfd3d90a-48d7-401b-9279-2ba37d3e1380"
+  },
+  {
+    "id": "63c17d0a-52a2-4cee-a2a0-dadd8ae609da",
+    "label": "in part: the consent after the stage",
+    "relationType": "supersedes",
+    "sourceId": "c2b1af21-c12d-4a2c-8975-9cbf4dd84e8e",
+    "targetId": "b1b433f8-2c80-4c8b-b0fd-b11c3610544d"
   },
   {
     "id": "63db4d69-c634-4f12-99c0-26c3256b6cb2",
@@ -5425,6 +5476,12 @@
     "targetId": "85479b13-52cc-4281-bab4-944f8e113d61"
   },
   {
+    "id": "6b09819e-b942-4a70-a91d-de45b0d6c95a",
+    "relationType": "satisfies",
+    "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
+    "targetId": "fb5bb3c5-a833-4561-9d3c-a0e297b6cc18"
+  },
+  {
     "id": "6b5dbf3c-24c4-4abd-ae60-3c2915d9ab3c",
     "relationType": "verifies",
     "sourceId": "658a2ad4-4716-492d-b281-44356a1c54ee",
@@ -5447,6 +5504,12 @@
     "relationType": "derives",
     "sourceId": "21c84dc3-e1c2-4c3f-a624-05ea462175ac",
     "targetId": "d8c06b7a-97f4-4e61-a9e5-5145b56c1e64"
+  },
+  {
+    "id": "6ba10dc9-9f14-4474-b763-74814267c6f6",
+    "relationType": "satisfies",
+    "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
+    "targetId": "edeed462-51eb-4468-86e0-fdd29f88d70f"
   },
   {
     "id": "6bb80160-bb21-4855-a66c-08dfdf64746a",
@@ -5629,6 +5692,12 @@
     "relationType": "verifies",
     "sourceId": "4ae9de15-ef14-4092-bcac-a3a6dd9b5b74",
     "targetId": "85daf72a-7014-48d9-bbbd-e240ac96e940"
+  },
+  {
+    "id": "6e91f977-5469-4296-9f8f-ef2904062b84",
+    "relationType": "constrains",
+    "sourceId": "c2b1af21-c12d-4a2c-8975-9cbf4dd84e8e",
+    "targetId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f"
   },
   {
     "id": "6ebe04b2-3c53-4771-94f6-dec28f181b56",
@@ -5859,6 +5928,13 @@
     "relationType": "satisfies",
     "sourceId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5",
     "targetId": "1a18617c-855c-44a9-96b9-ad5dd4bfcc16"
+  },
+  {
+    "description": "SemVer against commands, options, exit codes, JSON output and the check.json schema; continues in 0.x; releases tagged @radicaltools/cli@<version>.",
+    "id": "72bea679-7bf4-40a3-9442-6e3ae5729334",
+    "relationType": "constrains",
+    "sourceId": "8833743d-283a-4407-92ea-462788b37c8b",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
     "id": "72c33b67-0e2d-4eaf-aa8a-0974258253d4",
@@ -6404,6 +6480,12 @@
     "relationType": "derives",
     "sourceId": "e81279dc-b55b-4e18-b449-9ed917821dbf",
     "targetId": "ed9cf496-4559-4eed-bbac-8ba6d7d76300"
+  },
+  {
+    "id": "7d19dd18-a721-4a10-9b6c-110f15baa177",
+    "relationType": "verifies",
+    "sourceId": "bd08e9b1-6e67-4e9e-b547-d64f8f2c61ed",
+    "targetId": "edeed462-51eb-4468-86e0-fdd29f88d70f"
   },
   {
     "id": "7d4b655c-d0e3-4865-a20f-54c99a95c91e",
@@ -8594,6 +8676,12 @@
     "targetId": "a13661f2-cd94-4f81-89a1-6f2e7b1cfd19"
   },
   {
+    "id": "a7e97529-bffd-41ce-b582-ff555a40b0f4",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "edeed462-51eb-4468-86e0-fdd29f88d70f"
+  },
+  {
     "id": "a81c4627-b1cf-4fb1-88a7-12112e5af4b8",
     "relationType": "derives",
     "sourceId": "69b1b75c-083e-486b-8b41-4743788845a6",
@@ -8764,6 +8852,12 @@
     "relationType": "verifies",
     "sourceId": "902b5e8f-929b-4240-826c-e67ca67690ad",
     "targetId": "685e5a06-ef77-4146-b553-bb39f42b3562"
+  },
+  {
+    "id": "aad39800-172f-4ec6-96d2-621b67b4b399",
+    "relationType": "derives",
+    "sourceId": "fb5bb3c5-a833-4561-9d3c-a0e297b6cc18",
+    "targetId": "fedd8273-e51f-4a60-b044-685f192008c7"
   },
   {
     "description": "edits the model through the shared tool catalogue",
@@ -8939,6 +9033,12 @@
     "targetId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1"
   },
   {
+    "id": "ae14fc6d-18e2-42f7-a8e2-fbbd45eb2168",
+    "relationType": "verifies",
+    "sourceId": "f6b82d22-6341-4eb0-8f3a-a95faa19852f",
+    "targetId": "edeed462-51eb-4468-86e0-fdd29f88d70f"
+  },
+  {
     "id": "ae44d537-264e-4aff-b7eb-f01b4fbdc247",
     "relationType": "satisfies",
     "sourceId": "524d63c4-9a7b-4a79-b14f-11c2c2475a1e",
@@ -9034,6 +9134,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "9c2be760-a7bc-4e6c-a6db-bc0a48de5e91"
+  },
+  {
+    "id": "af55e709-b3d7-4724-a8a3-1228ca1c45a7",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "fb5bb3c5-a833-4561-9d3c-a0e297b6cc18"
   },
   {
     "id": "af769610-4d62-4b19-a6e2-8bcf7df36003",
@@ -9469,6 +9575,13 @@
     "targetId": "565a5084-b620-44e1-960a-7e3fd59cc0f2"
   },
   {
+    "description": "The Markdown-folder sync reads formats N and N-1, writes N, and refuses a newer format without rewriting it.",
+    "id": "b8b172ef-dd70-4616-abd0-67458dc287cf",
+    "relationType": "constrains",
+    "sourceId": "8833743d-283a-4407-92ea-462788b37c8b",
+    "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  {
     "id": "b8df031d-e47a-4700-a308-3a6e332c0a56",
     "relationType": "satisfies",
     "sourceId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e",
@@ -9515,6 +9628,12 @@
     "relationType": "satisfies",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
     "targetId": "c50054d8-2ca1-447d-bb06-fa3936cace38"
+  },
+  {
+    "id": "b9f7288c-0fb8-4a35-9f59-2abe954ac4b5",
+    "relationType": "satisfies",
+    "sourceId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e",
+    "targetId": "edeed462-51eb-4468-86e0-fdd29f88d70f"
   },
   {
     "id": "b9fc9366-53d6-448d-8529-a1d55db723d1",
@@ -10185,6 +10304,12 @@
     "targetId": "8276f09e-3606-4d74-ae94-0dc674ed6d4c"
   },
   {
+    "id": "c620c99e-88ca-4e94-849d-e7da35d23090",
+    "relationType": "verifies",
+    "sourceId": "51b11ee7-e80c-469e-970c-95670b36f70f",
+    "targetId": "fb5bb3c5-a833-4561-9d3c-a0e297b6cc18"
+  },
+  {
     "id": "c621df8f-c5c2-4fbd-9136-e59e1d4030bf",
     "label": "registers",
     "relationType": "interacts",
@@ -10618,6 +10743,13 @@
     "targetId": "b88cec32-1d57-464a-ae51-a1d5399b08bd"
   },
   {
+    "description": "Goes down to 0.x before its first release; pre-releases as GitHub pre-releases on the beta update channel; release.yml starts on its package's tag instead of v*.",
+    "id": "cd8f1a79-0246-4c67-aa90-ba0f70754015",
+    "relationType": "constrains",
+    "sourceId": "8833743d-283a-4407-92ea-462788b37c8b",
+    "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  {
     "id": "cd96082e-6a7a-4a2a-b22c-338ead3cdf20",
     "relationType": "satisfies",
     "sourceId": "8c78dee7-eb8a-4d4f-bc18-187edbb4f172",
@@ -10770,6 +10902,12 @@
     "targetId": "978944b2-a4b7-4fa3-8bd0-b64b7d243771"
   },
   {
+    "id": "d071d767-e116-4d64-9806-4eb59906c420",
+    "relationType": "verifies",
+    "sourceId": "6b7adfb3-3525-48b7-833b-980a731db1c6",
+    "targetId": "22418a18-7acd-45b7-a7de-790d90cda253"
+  },
+  {
     "id": "d081fab5-c4f2-464e-a6fa-22ee78ea738d",
     "relationType": "derives",
     "sourceId": "f5b72a9c-6238-446b-bc89-37d98d5e162c",
@@ -10824,6 +10962,12 @@
     "relationType": "derives",
     "sourceId": "fd5442de-d28a-43ca-b0cf-cdbefc46981e",
     "targetId": "7ef5cf61-e50b-4455-b7be-80ee13afafc2"
+  },
+  {
+    "id": "d19609f9-17fe-45e5-a2e5-82e6fd05bb65",
+    "relationType": "derives",
+    "sourceId": "22418a18-7acd-45b7-a7de-790d90cda253",
+    "targetId": "fedd8273-e51f-4a60-b044-685f192008c7"
   },
   {
     "id": "d1be3cd6-a550-4c36-b017-8a360545648d",
@@ -11453,6 +11597,12 @@
     "targetId": "55cd24b4-b12b-4508-994b-de05fd43ce69"
   },
   {
+    "id": "dd15e365-f1f8-438e-a1eb-73ee2c44b339",
+    "relationType": "implements",
+    "sourceId": "9de03d6d-407f-45c9-b2d8-9ceab31dc074",
+    "targetId": "c2b1af21-c12d-4a2c-8975-9cbf4dd84e8e"
+  },
+  {
     "id": "dd465f85-4580-4954-a326-77b5d1a37b51",
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
@@ -11912,6 +12062,12 @@
     "technology": "HTTPS / Confluence Cloud REST v2"
   },
   {
+    "id": "e8587793-b51f-49ae-82f5-5fda1e68db0f",
+    "relationType": "derives",
+    "sourceId": "5c2f7df2-9042-4d25-ae20-0bee0371ef0c",
+    "targetId": "fedd8273-e51f-4a60-b044-685f192008c7"
+  },
+  {
     "id": "e8652192-4de2-4afb-87c0-82e2bb701203",
     "relationType": "verifies",
     "sourceId": "ccce21b9-f79d-42c9-9abf-c21611577a46",
@@ -12338,6 +12494,12 @@
     "relationType": "satisfies",
     "sourceId": "8c78dee7-eb8a-4d4f-bc18-187edbb4f172",
     "targetId": "685e5a06-ef77-4146-b553-bb39f42b3562"
+  },
+  {
+    "id": "f2da1eed-207a-4528-9200-6d6a7ca41794",
+    "relationType": "derives",
+    "sourceId": "edeed462-51eb-4468-86e0-fdd29f88d70f",
+    "targetId": "fedd8273-e51f-4a60-b044-685f192008c7"
   },
   {
     "id": "f3051c35-f153-4f34-9338-bf205bb55446",
@@ -12953,6 +13115,12 @@
     "relationType": "constrains",
     "sourceId": "f8795ea9-0fbb-4b75-8c3f-eb289e880567",
     "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
+  },
+  {
+    "id": "ffe5f1b1-fbea-4ed9-9038-8b20e23415a3",
+    "relationType": "constrains",
+    "sourceId": "c2b1af21-c12d-4a2c-8975-9cbf4dd84e8e",
+    "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
   },
   {
     "id": "fffeb6d2-0495-498d-99ac-fe11028f7d9b",

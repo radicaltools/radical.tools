@@ -34,6 +34,12 @@ describe('agent Forge run status file', () => {
     expect(forgeRunPhase(run('finished'), now)).toBe('done')
     expect(forgeRunPhase(run('closed'), now)).toBe('paused')
     expect(forgeRunPhase(run('active', { domain: 'generating' }), at.getTime() + FORGE_RUN_STALE_MS + 1)).toBe('paused')
+    // A proposed refinement waits for the user's answer.
+    const asking = run('active', { requirements: 'done', domain: 'generating' })
+    asking.stages[1] = { ...asking.stages[1], asking: true }
+    const parsed = parseForgeRun(serializeForgeRun(asking, at))!
+    expect(parsed.stages[1]).toMatchObject({ id: 'domain', status: 'generating', asking: true })
+    expect(forgeRunPhase(parsed, now)).toBe('waiting')
   })
 
   it('is at the stage in progress, else the last one done until the next begins', () => {

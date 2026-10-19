@@ -25,7 +25,7 @@ function stageTip(stage: ForgeRunStageInfo): string {
     const added = stage.added ? ` (+${stage.added.nodes} elements, +${stage.added.relations} relations${refined})` : ''
     return `${title}: done${added}${stage.summary ? ` — ${stage.summary}` : ''}`
   }
-  if (stage.status === 'generating') return `${title}: generating`
+  if (stage.status === 'generating') return stage.asking ? `${title}: waiting for your answer to a proposed refinement` : `${title}: generating`
   if (stage.status === 'clarifying') return `${title}: asking you a few questions`
   return `${title}: not started`
 }
@@ -53,9 +53,10 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
   const line =
     phase === 'done' ? 'Finished.'
     : phase === 'paused' ? (status.state === 'closed' ? `Stopped: ${client} closed before the run finished.` : 'Paused: nothing has changed for 30 minutes.')
+    : current?.status === 'generating' && current.asking ? `${client} proposes a refinement of an earlier stage in the ${stageTitle(current.id)} stage; answer there.`
     : current?.status === 'generating' ? `${client} is generating the ${stageTitle(current.id)} stage…`
     : current?.status === 'clarifying' ? `${client} is asking you about the ${stageTitle(current.id)} stage; answer there.`
-    : current?.status === 'done' ? `Waiting for you in ${client}: ${current.refined ? `which of its ${current.refined} refinements of earlier stages to keep, ` : ''}how to arrange the ${stageTitle(current.id)} stage, and whether to go on.`
+    : current?.status === 'done' ? `Waiting for you in ${client}: how to arrange the ${stageTitle(current.id)} stage, and whether to go on.`
     : current ? `${client} has started the run; the ${stageTitle(current.id)} stage is next.`
     : `Waiting for you in ${client}.`
 
@@ -83,13 +84,19 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
               key={stage.id}
               role="listitem"
               data-status={stage.status}
-              className={`forge-step${stage.status === 'done' ? ' done' : ''}${active ? ' active' : ''}${stage.status === 'clarifying' ? ' waiting' : ''}`}
+              className={`forge-step${stage.status === 'done' ? ' done' : ''}${active ? ' active' : ''}${stage.status === 'clarifying' || stage.asking ? ' waiting' : ''}`}
               title={stageTip(stage)}
             >
               {stage.status === 'done' && <span className="forge-step-check" aria-hidden>✓</span>}
               {STEP_LABELS[stage.id]}
-              {!!stage.refined && (
-                <span className="forge-step-refined" data-testid="forge-step-refined" aria-label={`${stage.refined} refinements of earlier stages`}>✎{stage.refined}</span>
+              {(!!stage.refined || stage.asking) && (
+                <span
+                  className={`forge-step-refined${stage.asking ? ' pending' : ''}`}
+                  data-testid="forge-step-refined"
+                  aria-label={stage.asking ? 'a proposed refinement waits for your answer' : `${stage.refined} refinements of earlier stages`}
+                >
+                  ✎{stage.refined || ''}
+                </span>
               )}
             </span>
           )

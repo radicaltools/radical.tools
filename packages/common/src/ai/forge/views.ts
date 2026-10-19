@@ -7,9 +7,10 @@
 // what its viewpoint's chain gives. It is made once its chain shows an
 // element, and a view of the viewpoint the model already has is reused.
 //
-// Layer canvases split the output into six views, the layers of a
+// Layer canvases split the output into seven views, the layers of a
 // Radical architecture model: Conceptual (the need, requirements, scenarios,
-// mockups, and for now the domain model too), Domain (the domains and their
+// mockups, and for now the domain model too), Screen flow (the mockups alone,
+// so it shows how one screen leads to the next), Domain (the domains and their
 // entities), States (the state machines, their events and the entities they
 // are the lifecycle of), Processes (a Warnier view of the viewpoint Process
 // (Warnier): it shows every process and step, lists none and needs no
@@ -29,10 +30,11 @@ import { runChain, runPipeline, type PipelineContext } from '../../viewPipeline'
 import type { DiagramFacade } from '../diagramFacade'
 import type { ForgeStageId } from './prompts'
 
-export type ForgeViewKey = 'conceptual' | 'domain' | 'states' | 'processes' | 'logical' | 'governance'
+export type ForgeViewKey = 'conceptual' | 'screens' | 'domain' | 'states' | 'processes' | 'logical' | 'governance'
 
 export const FORGE_VIEW_NAMES: Record<ForgeViewKey, string> = {
   conceptual: 'Conceptual',
+  screens: 'Screen flow',
   domain: 'Domain',
   states: 'States',
   processes: 'Processes',
@@ -52,7 +54,7 @@ const VIEW_OF_TYPE: Record<string, ForgeViewKey | ForgeViewKey[]> = {
   need: 'conceptual',
   requirement: 'conceptual',
   scenario: 'conceptual',
-  mockup: 'conceptual',
+  mockup: ['conceptual', 'screens'],
   domain: ['domain', 'conceptual'],
   entity: ['domain', 'conceptual'],
   'state-machine': 'states',
@@ -72,7 +74,7 @@ export const FORGE_STAGE_VIEW: Record<ForgeStageId, ForgeViewKey> = {
   scenarios: 'conceptual',
   states: 'states',
   processes: 'processes',
-  mockups: 'conceptual',
+  mockups: 'screens',
   c4: 'logical',
   review: 'logical',
 }
@@ -118,7 +120,7 @@ export function ensureForgeView(facade: DiagramFacade, key: ForgeViewKey): strin
 // ─── The structures ─────────────────────────────────────────────────────────
 
 /** The view structure of a run: Radical, the chosen viewpoints (ids, in the
- *  order of radicalViewpoints), or the six layer canvases. */
+ *  order of radicalViewpoints), or the seven layer canvases. */
 export type ForgeStructure = { kind: 'radical'; viewpoints: string[] } | { kind: 'layers' }
 
 /** The folder each built-in viewpoint's view goes into, as in radical.tools'

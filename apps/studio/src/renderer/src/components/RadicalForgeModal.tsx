@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { runAIPrompt, type ForgeProgressEvent } from '../ai/runner'
+import { runAIPrompt, type ForgeProgressEvent, type RunnerTool } from '../ai/runner'
 import { activeProviderNeedsKey, loadAISettings } from '../ai/settings'
 import { getAdapter } from '../ai/registry'
 import { useDiagramFacade } from '../ai/useDiagramFacade'
@@ -11,10 +11,13 @@ import {
   FORGE_VIEW_NAMES,
   HUB_MATCHES_QUESTION_ID,
   PRIMARY_TYPE_IDS_FOR_STAGE,
+  PROPOSE_REFINEMENT_TOOL,
+  applyProposal,
   arrangeForgeGroup,
   buildForgeStagePrompt,
   buildPriorStagesBlock,
   defaultForgeStructure,
+  describeProposal,
   describeRefinement,
   fileIntoForgeViews,
   findForgeView,
@@ -24,9 +27,11 @@ import {
   forgeStageView,
   formatClarificationAnswers,
   formatForgeGaps,
-  isRejectable,
+  formatProposal,
   needLabelFromDescription,
+  parseProposal,
   radicalViewpoints,
+  refinementGuard,
   rejectRefinements,
   snapshotOf,
   stageRefinements,
@@ -35,7 +40,10 @@ import {
   type ForgeArrangement,
   type ForgeGap,
   type ForgeNeedRef,
+  type ForgeProposal,
   type ForgeRefinement,
+  type ProposalLine,
+  type RefinementGuardState,
   type ForgeStageId,
   type ForgeStructure,
 } from '@radical/common/ai/forge'
@@ -86,13 +94,26 @@ function refinedSummary(items: ForgeRefinement[]): string {
   return [...counts].map(([type, n]) => `${type} ${n}`).join(', ')
 }
 
-/** After a stage: what it did to earlier stages, for the user to keep or
- *  reject. `items` are those not rejected; `keep` the ticked ids. */
+/** What a stage did to earlier stages: what the user accepted of its
+ *  proposals so far, and after the stage what it refined, as
+ *  stageRefinements lists it. `declined` counts the proposals turned down. */
 interface StageRefinements {
   items: ForgeRefinement[]
-  keep: Set<string>
-  /** Set once the user chose: how many were kept and rejected. */
-  decided?: { kept: number; rejected: number }
+  declined: number
+}
+
+/** A proposal the running stage waits on: what it found, exactly what it
+ *  would write, and the answer the user is typing. */
+interface PendingProposal {
+  stageId: ForgeStageId
+  proposal: ForgeProposal
+  lines: ProposalLine[]
+  reply: string
+}
+
+interface ProposalAnswer {
+  accept: boolean
+  reply: string
 }
 
 interface ProgressEntry {
@@ -202,6 +223,9 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const [wireframeRun, setWireframeRun] = useState<WireframeRun | null>(null)
   const [arrangeByStage, setArrangeByStage] = useState<Partial<Record<ForgeStageId, StageArrange>>>({})
   const [refinementsByStage, setRefinementsByStage] = useState<Partial<Record<ForgeStageId, StageRefinements>>>({})
+  const [pendingProposal, setPendingProposal] = useState<PendingProposal | null>(null)
+  // Settles the proposal the stage waits on with the user's answer.
+  const answerRef = useRef<((answer: ProposalAnswer) => void) | null>(null)
   /** The gaps the model had right after each stage, by the rules of the stages done. */
   const [gapsByStage, setGapsByStage] = useState<Partial<Record<ForgeStageId, ForgeGap[]>>>({})
   /** The Hub concepts the model picked from each stage's candidates. */
@@ -267,6 +291,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setWireframeRun(null)
     setArrangeByStage({})
     setRefinementsByStage({})
+    setPendingProposal(null)
     setGapsByStage({})
     setHubPicksByStage({})
     setReachedIndex(0)
@@ -425,6 +450,25 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setClarifyStatusByStage((s) => ({ ...s, [stageId]: 'form' }))
   }, [])
 
+  /** Shows a stage's proposal and waits for the user's answer; Cancel stops
+   *  the stage instead. */
+  const askUser = useCallback((stageId: ForgeStageId, proposal: ForgeProposal, lines: ProposalLine[], signal: AbortSignal): Promise<ProposalAnswer> => {
+    return new Promise<ProposalAnswer>((resolve, reject) => {
+      if (signal.aborted) { reject(new Error('Aborted')); return }
+      const onAbort = (): void => {
+        answerRef.current = null
+        setPendingProposal(null)
+        reject(new Error('Aborted'))
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+      answerRef.current = (answer) => {
+        signal.removeEventListener('abort', onAbort)
+        resolve(answer)
+      }
+      setPendingProposal({ stageId, proposal, lines, reply: '' })
+    })
+  }, [])
+
   const runStage = useCallback(async (stageId: ForgeStageId) => {
     if (busy || unavailableReason) return
     setBusy(true)
@@ -485,10 +529,36 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       const gaps = formatForgeGaps(forgeGaps(done, diagram.getNodes(), diagram.getRelations(), diagram.getMetamodel?.()))
       const prompt = buildForgeStagePrompt(stageId, description, effectiveMatches, clarifications, priorStageSummaries, needRef, gaps)
       const relevantTypeIds = new Set(PRIMARY_TYPE_IDS_FOR_STAGE[stageId])
+      // The stage writes its own elements; what it would add to or change in
+      // earlier stages it proposes, and waits for the user's answer.
+      const guardState: RefinementGuardState = { stage: stageId, before: snapshot, proposed: new Set() }
+      const propose: RunnerTool = {
+        def: PROPOSE_REFINEMENT_TOOL,
+        run: async (input, ctx) => {
+          const proposal = parseProposal(input)
+          if (typeof proposal === 'string') return { ok: false, resultText: `propose_refinement: ${proposal}` }
+          const lines = describeProposal(proposal, diagram.getNodes(), diagram.getRelations(), ctx.resolveId)
+          const answer = await askUser(stageId, proposal, lines, ctl.signal)
+          const said = answer.reply.trim() ? ` They replied: "${answer.reply.trim()}"` : ''
+          if (!answer.accept) {
+            setRefinementsByStage((r) => ({ ...r, [stageId]: { items: r[stageId]?.items ?? [], declined: (r[stageId]?.declined ?? 0) + 1 } }))
+            return { ok: true, resultText: `The user did not add it; nothing was written. Do not propose it again.${said}` }
+          }
+          const outcome = await applyProposal(proposal, ctx)
+          if (!outcome.ok) return { ok: false, resultText: `The user added it, but ${outcome.text}` }
+          for (const id of outcome.added) guardState.proposed.add(id)
+          setRefinementsByStage((r) => ({ ...r, [stageId]: { items: [...(r[stageId]?.items ?? []), ...outcome.refinements], declined: r[stageId]?.declined ?? 0 } }))
+          return { ok: true, resultText: `The user added it. ${outcome.text}${said}\n${formatProposal(proposal, lines)}` }
+        },
+      }
       const result = await runAIPrompt({
         prompt, settings: aiSettings, diagram, signal: ctl.signal, onProgress, relevantTypeIds,
         // Forge builds the model; editing types or slides is out of scope and costs schema tokens every stage.
         excludeToolGroups: ['metamodel', 'presentation', 'milestone'],
+        extraTools: [propose],
+        guard: (name, input, ctx) => refinementGuard(guardState, name, input, ctx.resolveId),
+        // Each proposal takes a round of its own.
+        maxIterations: 20,
       })
       setStageReports((r) => ({ ...r, [stageId]: result.report }))
       setStageSummaries((s) => ({ ...s, [stageId]: result.summary || 'Done.' }))
@@ -499,10 +569,12 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     } catch (err) {
       setError((err as Error).message || String(err))
     } finally {
+      answerRef.current = null
+      setPendingProposal(null)
       const added = addedSince(before)
       stageAddedRef.current[stageId] = added
       const refinements = stageRefinements(stageId, snapshot, snapshotOf(diagram))
-      setRefinementsByStage((r) => ({ ...r, [stageId]: { items: refinements, keep: new Set(refinements.filter(isRejectable).map((x) => x.id)) } }))
+      setRefinementsByStage((r) => ({ ...r, [stageId]: { items: refinements, declined: r[stageId]?.declined ?? 0 } }))
       setGapsByStage((g) => ({ ...g, [stageId]: forgeGaps([...done, stageId], diagram.getNodes(), diagram.getRelations(), diagram.getMetamodel?.()) }))
       // Each element into the run's structure, and the stage's view on screen
       // (or the first it filled).
@@ -514,28 +586,16 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       abortRef.current = null
       setBusy(false)
     }
-  }, [busy, unavailableReason, description, needId, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries, structure, refinementsByStage, stageReports])
+  }, [busy, unavailableReason, description, needId, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries, structure, refinementsByStage, stageReports, askUser])
 
-  const toggleRefinement = useCallback((stageId: ForgeStageId, id: string) => {
-    setRefinementsByStage((r) => {
-      const current = r[stageId]
-      if (!current || current.decided) return r
-      const keep = new Set(current.keep)
-      if (keep.has(id)) keep.delete(id)
-      else keep.add(id)
-      return { ...r, [stageId]: { ...current, keep } }
-    })
-  }, [])
-
-  /** Keeps the ticked refinements and takes back the rest (`all`: every one). */
-  const decideRefinements = useCallback((stageId: ForgeStageId, rejectAll: boolean) => {
-    const current = refinementsByStage[stageId]
-    if (!current || current.decided || busy) return
-    const rejected = current.items.filter((r) => isRejectable(r) && (rejectAll || !current.keep.has(r.id)))
-    const taken = new Set(rejectRefinements(diagram, rejected))
-    const items = current.items.filter((r) => !taken.has(r.id))
-    setRefinementsByStage((r) => ({ ...r, [stageId]: { items, keep: current.keep, decided: { kept: items.length, rejected: taken.size } } }))
-  }, [refinementsByStage, busy, diagram])
+  /** The user's answer to the proposal the stage waits on. */
+  const answerProposal = useCallback((accept: boolean) => {
+    const settle = answerRef.current
+    if (!settle || !pendingProposal) return
+    answerRef.current = null
+    setPendingProposal(null)
+    settle({ accept, reply: pendingProposal.reply })
+  }, [pendingProposal])
 
   /** Keeps the stage's new elements in a row, column or grid on their view. */
   const arrangeStage = useCallback((stageId: ForgeStageId, arrangement: ForgeArrangement) => {
@@ -621,7 +681,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     if (!open) return
     const el = document.querySelector<HTMLElement>('.forge-panel .forge-step.active')
     el?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
-  }, [open, step, refinementsByStage])
+  }, [open, step, refinementsByStage, pendingProposal])
 
   // Keep the live progress feed scrolled to its newest entry.
   useEffect(() => {
@@ -838,13 +898,14 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
             // Only meaningful once the run has ended: a stage that never
             // produced anything was skipped by finishing early.
             const skipped = step === 'export' && isStage && !done
-            // What the stage did to earlier stages: still to decide (amber) or kept.
+            // What the stage refined in earlier stages; amber while a proposal waits for the answer.
             const refined = isStage ? refinementsByStage[s as ForgeStageId] : undefined
             const refinedCount = refined?.items.length ?? 0
-            const undecided = !!refined && !refined.decided && refined.items.some(isRejectable)
-            const refinedTip = refinedCount
-              ? ` — refined ${refinedCount} element${refinedCount === 1 ? '' : 's'} of earlier stages (${refinedSummary(refined!.items)})${undecided ? ', waiting for you to keep or reject them' : ''}`
-              : ''
+            const undecided = pendingProposal?.stageId === s
+            const refinedTip = [
+              refinedCount ? ` — refined ${refinedCount} element${refinedCount === 1 ? '' : 's'} of earlier stages (${refinedSummary(refined!.items)})` : '',
+              undecided ? `${refinedCount ? ',' : ' —'} waiting for your answer to a proposed refinement` : '',
+            ].join('')
             return (
               <button
                 key={s}
@@ -858,9 +919,9 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
               >
                 {done && step !== s && <span className="forge-step-check" aria-hidden>✓</span>}
                 {STEP_LABELS[s]}
-                {refinedCount > 0 && (
-                  <span className={`forge-step-refined${undecided ? ' pending' : ''}`} data-testid="forge-step-refined" aria-label={`${refinedCount} refinements of earlier stages`}>
-                    ✎{refinedCount}
+                {(refinedCount > 0 || undecided) && (
+                  <span className={`forge-step-refined${undecided ? ' pending' : ''}`} data-testid="forge-step-refined" aria-label={`${refinedCount} refinements of earlier stages${undecided ? ', one waiting for your answer' : ''}`}>
+                    ✎{refinedCount || ''}
                   </span>
                 )}
               </button>
@@ -1083,6 +1144,34 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                   </div>
                 )
               })()}
+              {pendingProposal?.stageId === currentStage.id && (
+                <div className="forge-arrange forge-proposal" data-testid="forge-proposal" role="group" aria-label="Proposed refinement">
+                  <div className="forge-arrange-title">Add this to earlier stages?</div>
+                  <div className="forge-proposal-reason">{pendingProposal.proposal.reason}</div>
+                  <ol className="forge-proposal-changes">
+                    {pendingProposal.lines.map((line, i) => (
+                      <li key={i} className={`forge-proposal-change forge-proposal-${line.change}`}>
+                        <span>{line.text}</span>
+                        {line.details.length > 0 && (
+                          <ul>{line.details.map((d, j) => <li key={j}>{d}</li>)}</ul>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                  <input
+                    type="text"
+                    className="forge-clarify-input"
+                    placeholder="Reply (optional): another name, what to leave out, why not…"
+                    aria-label="Reply to the proposal"
+                    value={pendingProposal.reply}
+                    onChange={(e) => { const reply = e.target.value; setPendingProposal((p) => (p ? { ...p, reply } : p)) }}
+                  />
+                  <div className="forge-arrange-row">
+                    <button type="button" className="forge-btn forge-btn-sm forge-btn-primary" onClick={() => answerProposal(true)}>Add it</button>
+                    <button type="button" className="forge-btn forge-btn-sm forge-btn-secondary" onClick={() => answerProposal(false)}>Don't add</button>
+                  </div>
+                </div>
+              )}
               {error && <div className="qs-ai-error">Error: {error}</div>}
               {clarifyStatusByStage[currentStage.id] !== 'form' && stageReports[currentStage.id] && !busy && (
                 <div className="forge-stage-result">
@@ -1104,52 +1193,14 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
               )}
               {stageReports[currentStage.id] && !busy && !!refinementsByStage[currentStage.id]?.items.length && (() => {
                 const refined = refinementsByStage[currentStage.id]!
-                const rejectable = refined.items.filter(isRejectable)
-                const unticked = rejectable.filter((r) => !refined.keep.has(r.id)).length
                 return (
-                  <div className="forge-arrange forge-refinements" data-testid="forge-refinements">
-                    <div className="forge-arrange-title">Refinements of earlier stages</div>
-                    <div className="forge-arrange-row">
-                      {refined.decided
-                        ? `✓ Kept ${refined.decided.kept}, rejected ${refined.decided.rejected}.`
-                        : 'This stage also filled gaps in earlier stages. Untick what you do not want.'}
-                    </div>
-                    <ul className="forge-refinements-list">
-                      {refined.items.map((r) => (
-                        <li key={r.id}>
-                          <label className="forge-clarify-option">
-                            <input
-                              type="checkbox"
-                              checked={!isRejectable(r) || refined.keep.has(r.id)}
-                              disabled={!!refined.decided || !isRejectable(r)}
-                              onChange={() => toggleRefinement(currentStage.id, r.id)}
-                            />
-                            <span>{describeRefinement(r)}{isRejectable(r) ? '' : ' (Undo restores it)'}</span>
-                          </label>
-                        </li>
-                      ))}
-                    </ul>
-                    {!refined.decided && rejectable.length > 0 && (
-                      <div className="forge-arrange-row">
-                        <button
-                          type="button"
-                          className="forge-btn forge-btn-sm forge-btn-primary"
-                          disabled={layingOut}
-                          onClick={() => decideRefinements(currentStage.id, false)}
-                        >
-                          {unticked ? `Reject ${unticked} unticked` : 'Keep all'}
-                        </button>
-                        <button
-                          type="button"
-                          className="forge-btn forge-btn-sm forge-btn-secondary"
-                          disabled={layingOut}
-                          onClick={() => decideRefinements(currentStage.id, true)}
-                        >
-                          Reject all
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <details className="forge-gaps forge-refinements" data-testid="forge-refinements">
+                    <summary>
+                      Refined {refined.items.length} element{refined.items.length === 1 ? '' : 's'} of earlier stages, as you accepted
+                      {refined.declined ? ` (${refined.declined} proposal${refined.declined === 1 ? '' : 's'} declined)` : ''}
+                    </summary>
+                    <ul>{refined.items.map((r) => <li key={r.id}>{describeRefinement(r)}</li>)}</ul>
+                  </details>
                 )
               })()}
               {stageReports[currentStage.id] && !busy && !!gapsByStage[currentStage.id]?.length && (() => {

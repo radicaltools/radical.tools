@@ -545,6 +545,12 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     were all that was needed, and the result had to be cut up with a
     script. A field list (`LIST NODES id, type, label WHERE …`) or a
     compact mode would do.
+39. **`update_node` cannot clear a property.** Turning the requirement "No
+    refinement without asking" from event-driven into unwanted-behaviour
+    (2026-10-19) needed its `trigger` gone: `null` is refused ("must be a
+    string") and `""` leaves `trigger: ""` in the file. `null` should remove
+    the key, as it does for `parentId` in `move_node`. (The flaky first test
+    of item 37 failed again that day in a full run, and passed 3 of 3 alone.)
 
 ### Reverse-engineered requirements (2026-10-06)
 
