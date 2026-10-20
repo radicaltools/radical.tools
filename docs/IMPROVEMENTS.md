@@ -2499,6 +2499,282 @@ view shows the view where Undo was pressed; a hierarchy view's Size by and
 Max depth are saved with the view but are no undo step (as Multi page and
 Depth were, item 119).
 
+**Runs 35 to 44, 2026-10-21, commit 5015056** (main with the fixes of runs
+25 to 34, PR #227), ten at the same time. 37 findings, each reproduced
+again by hand; item 158 is a question of run 43 the maintainer answered
+(typing a name is one step).
+
+*Run 35.* Covered: Undo after an agent's write (item 109) across drags on
+two views, New view, view type, Viewer, a second write and Redo;
+milestones with a rebased history; Multi page and Depth after an outside
+change; Undo of a drag on an element the agent deleted; Undo then a reload
+while saves are held. Not covered: Presenter and the Inspector with a
+rebased history, sequences, Save as viewpoint next to an outside change.
+
+125. **After an agent's write, Undo of an add leaves the element in the
+     model, on no view, and blames the agent.** Bookstore folder: drop a
+     Software System, the agent edits Customer, Ctrl+Z: 7 nodes,
+     `nodes/system` stays, and "Undo kept what was changed outside Studio
+     since that step: System". A New view stays the same way. A guess: the
+     folder writes no empty value (item 113), so the element read back has
+     no `description: ''`, and the merge takes that for an outside change.
+126. **An agent's write closes the milestone shown and loses its edits.**
+     Open a milestone, rename an element, "Continue editing"; any agent
+     write brings Studio back to Current (live) and the rename is gone, with
+     no question; the live element gets the agent's highlight. `loadDiagram`
+     resets `activeSnapshotId`, `liveBackup` and `milestoneDirty`.
+127. **Undo after an agent's delete brings back a relation to the deleted
+     element, or a child outside its deleted container.** Delete Payment
+     Provider, the agent deletes API, Ctrl+Z: "charges card" comes back from
+     the missing API (`get_issues`: points at "api", which is no element);
+     Orders DB comes back at the top level when the agent deleted Bookstore.
+     No notice. `_rebasedEntry` merges by id and checks nothing.
+
+*Run 36.* Covered: the expand of item 107 next to grids, rows, columns and
+pinned elements, filter-chain views, Viewer and the injury model; moves
+(item 102) through Move to…, the Parent field, Warnier, the wiki and MCP
+`move_node`, on every canvas, with undo, redo and reload. Not covered:
+expand or move in a milestone, several hundred elements, folder models.
+
+128. **A container collapsed and expanded again in a view hangs out of its
+     parent.** Sample, Core Banking, Banking Services collapsed and expanded:
+     Core Banking Platform keeps its collapsed-time size (855 px high) and
+     Banking Services ends 530 px below it; saved. `toggleCollapse` refits
+     the parents with `loopVcs`, which still holds the container.
+129. **An element moved out of its container is still drawn on it.** Move
+     to… the parent's parent or the root, the Parent field, the wiki,
+     Shift+Tab in Warnier and `move_node` keep its place, inside the old
+     container's frame (Check the balance on Validate), on every canvas.
+130. **Move to… a container lays it out wrongly.** Quote FX → Approve: drawn
+     left of Approve, outside it; an element right of or below the target
+     stretches the target over everything between them; on other views the
+     container widens over a neighbour. The refit grows only right and down
+     and makes no room.
+
+*Run 37.* Covered: the first opening of views (items 97, 118) in Designer,
+Viewer, Presenter, milestones, deep links, Tree Layout, Undo of the first
+layout, and MCP `create_view` against Studio. Not covered: a view switch
+during a long first layout, matrix, hierarchy and wiki viewpoints in
+milestones.
+
+131. **A slide of a view never laid out is drawn over itself.** A view of
+     six elements with no positions (as `create_view` makes it) on a slide:
+     in Presenter API and Orders DB lie outside Bookstore and over Payment
+     Provider; Viewer opens it at All elements' places. The slide code uses
+     the view's positions only when it has some.
+132. **A view's layout is lost when its type goes to Table and back with a
+     reload or a view switch in between.** System Context → Table → reload
+     → Structure: All elements' places, saved. `viewCanvasPositions` keeps
+     no positions for a view that is not a structure view.
+133. **A view whose filter leaves out a folded system draws nothing.**
+     Bookstore folded on the model, + New view → Components: the card says 3
+     nodes, the canvas is empty, Smart Layout says it already scores best
+     (injury: 11 nodes, none drawn). `isNodeHidden` hides an element under
+     any folded ancestor, also one the view does not draw.
+
+*Run 38.* Covered: the slide dock, F5, ← →, Esc, the sample's slides,
+rule 7 in Presenter, Back and Forward while playing, deep links and
+reloads, MCP `create_presentation` with `focus`, agent writes during play.
+Not covered: `update_presentation` while a slide shows, Flow and Hierarchy
+slides stepping, several tabs.
+
+134. **A slide made with `focus` shows its whole view after a table slide,
+     from a deep link or after a reload.** Zoom 0.68 instead of 1.5;
+     canvas to canvas it works. `goToSlide` / `previewSlide` call
+     `__rfFocusNodes` before the canvas has mounted (item 41 fixed only the
+     captured camera).
+135. **A view per element opened first in Viewer or Presenter is never laid
+     out.** Back in Designer it shows All elements' places (API Gateway far
+     below the rest), the next switch saves them. `setAppMode` opens the
+     view before `appMode` is Designer, so `arrangeOnFirstOpen` skips it.
+136. **An agent's write ends the presentation playing in Studio.** Slide 3
+     of "Agent deck" plays; any agent write: no HUD, Presenter on the first
+     presentation; after F5 from Designer, Esc no longer returns to the
+     view. `loadDiagram` resets the presentation state.
+137. **Link view and Link milestone on a slide card cannot be used.** The
+     picker is clipped by the dock: only the nearest item shows, a click on
+     the others reaches the canvas. `.pres-dock` / `.pres-dock-track`
+     overflow.
+
+*Run 39.* Covered: the filter editors in place (+ Filter, + or, Sort,
+ways, a filter off) with six undos and redos and a reload; the same chain
+as table, matrix, wiki, Warnier and hierarchy; views turned into
+Structure; Save as viewpoint from a matrix; a `.radical` round trip. Not
+covered: milestones next to filter edits, Presenter slides of these views,
+folder models.
+
+138. **In a matrix whose filter is a chain, a click on an empty cell adds a
+     relation the matrix does not draw, and each click adds another.**
+     Requirements Register as a Matrix, one cell clicked three times:
+     "Added relation" each time, three `derives` between the same pair, the
+     cell stays empty. `MatrixView` sees only the chain's relations.
+139. **In a Warnier or wiki view whose filter leaves the new element out, an
+     add is lost from sight without a word.** Processes with the text filter
+     "Payment": + Step adds "New step", no name field opens and the typing
+     is lost; a requirement written on a wiki page with an "event-driven"
+     filter is added and not shown. The table warns and fills the level's
+     filters; Warnier and the wiki do neither.
+140. **A hierarchy drilled into an element its filter then leaves out shows
+     the top level while the breadcrumb names the element; ↑ Up then shows a
+     blank tile.** `TreemapView` keeps a focus the model has but the view
+     does not draw.
+
+*Run 40.* Covered: step notes, moves, removals and a repeated step with
+undo; milestones holding sequences; Studio and an agent editing one
+sequence; Viewer and Presenter; MCP `create_sequence`; the layout tools
+refusing flow views; a deleted relation in `radical check`. Not covered:
+linking a view to a sequence with undo, deleting an element whose
+relations are steps, Presenter slides playing a flow.
+
+141. **Propagate after one note change makes every later milestone and the
+     live model a copy of the milestone's sequence.** One note changed in
+     As-is, Propagate: the live Place Order goes from 5 steps to 2, Target
+     loses a step. `commitMilestoneChanges` copies the whole sequence.
+142. **Studio and an agent editing one sequence: every note ends one step
+     off.** Studio removes step 1 while the agent changes note 3: the merged
+     save pairs Studio's steps with the agent's notes. `merge3` merges
+     `relationIds` and `stepDescriptions` apart.
+143. **A step note field keeps a stale text, and leaving it writes it
+     back.** After Undo, and after switching to a milestone with the card
+     open; a click in and out writes the old text again (in a milestone,
+     with the prompt). The note is an uncontrolled input.
+144. **Clicking into a step note and out without typing is an undo step,**
+     and in a milestone opens "Editing milestone". `updateStepDescription`
+     does not check for a change.
+145. **In Viewer and Presenter, picking a sequence turns on Editing, and a
+     click on a relation adds a step.** Not saved, and gone in Designer.
+     `onEdgeClick` checks no perspective.
+
+*Run 41.* Covered: the Hub itself (catalogue, search, every category in
+canvas, wiki and table, downloads, the basket and Open in Studio); imports
+in a milestone with Propagate and Discard; imports in Viewer; blueprint
+imports with undo, redo and reload; Studio's import against
+`forge_import_hub_concept` on a folder (the same model). Not covered: Forge's
+Hub cards, the desktop and VS Code hosts.
+
+146. **Apply in the Hub template section while a milestone is shown is lost
+     without a question.** p95 450, Apply: no prompt, no unsaved; Current
+     (live) keeps 300 ms while `hubTemplates` says 450, so the live card
+     shows 450 under Hub Template beside a sentence that says 300.
+     `applyHubTemplate` does not mark a milestone edit.
+147. **A blueprint's Containers view, opened after a reload, draws elements
+     on each other.** Fintech imported on bookstore, its System context
+     opened, reload, its Containers opened: the Ledger Platform frame covers
+     root elements. The import gives its elements no All elements' places
+     (1 of 39), and drops the views' own Hub positions.
+148. **Import from Hub in Viewer with a container selected promises "↳
+     Bookstore" and lands at the root.** The switch to Designer (item 120)
+     drops the selection before the import reads it.
+
+*Run 42.* Covered: the wiki in Viewer, page-title renames with undo, the
+element menu, EARS next to states, Multi page and Depth on the 1148-element
+model (0.37 s at Depth 5), the wiki in a milestone, Presenter and deep
+links, a folder model while an agent writes. Not covered: a wiki viewpoint
+per element, wiki export.
+
+149. **The wiki search reads a requirement's sentence without its state.**
+     With `precondition_state: confirmed` and the old text "the order is
+     waiting", the page says "While the Order is Confirmed"; the search finds
+     "waiting", not "Order is Confirmed". `searchableTexts` in
+     `wikiSearch.ts`.
+150. **On a requirement's wiki page the EARS sentence covers the facts box**
+     (94 px on Strong customer authentication, at any width).
+     `.ears-editable` is positioned and paints over the floated infobox.
+151. **A slide added on a wiki page does not keep the page.** Shown or
+     played, it shows the page the view is on now (Overview after a reload).
+     A slide keeps the hierarchy's level but nothing for a wiki.
+152. **‹ Back from the first wiki page read does nothing.** The tooltip
+     names the wiki, the page and the address stay, and the Overview's
+     history entry is overwritten. A route without `/f/` does not clear the
+     wiki's page.
+
+*Run 43.* Covered: `.radical` and folder round trips of the sample; Open →
+File… of an old file; hand-edited folders; empty values (item 113); kept
+edits (item 108); one folder in two tabs; PNG, SVG and clipboard exports
+of the sample's 17 views; the Models dialog; the welcome screen; the
+Structurizr DSL import. Not covered: the storage quota, the desktop app,
+folders missing a file.
+
+153. **A `.radical` file that does not parse opens as an empty model and is
+     overwritten with it.** A trailing comma added by hand: after a reload or
+     from Recent, 0 nodes, no message, and the file is rewritten empty, in
+     Viewer with no edit. A file deleted outside Studio is recreated empty
+     the same way. `loadDocument` returns null on a parse error.
+154. **A Structurizr DSL import drops what follows an `enterprise` block or a
+     relationship with a `{ … }` block, and turns `#` comments into
+     elements.** Big Bank plc: 18 elements and 0 relationships (26
+     expected); "# the person who buys" adds a Person "person".
+155. **An edit undone while an agent writes the folder comes back after a
+     reload.** Drag, switch tabs and back, Undo, reload: the drag is back and
+     saved. The tab switch kept it in `radical-unsaved-edits:<id>`, and
+     `keepEdits` never clears an empty change.
+156. **A node file with a byte-order mark is missing for the MCP server and
+     the CLI.** Studio shows 6 elements, `get_model_summary` and `radical
+     check` 5 with a dangling relation; the agent's next write drops its
+     places. `parseMarkdown` does not skip U+FEFF.
+157. **A node file moved by hand into another container is drawn far outside
+     it.** `orders-db.md` moved into `payment-provider/`: Orders DB at 1600,
+     right of its parent (960–1260), also after a reload.
+158. **Each letter typed into the Name field is an undo step of its own.**
+     "Card Gateway" typed, Undo: "Card Gatewa", "Card Gatew"… Typing a name
+     is one step (the maintainer, 2026-10-21).
+
+*Run 44.* Covered: `radical hooks install` in a worktree and with
+`core.hooksPath`; `radical diff` edge cases; `--ratchet` against Studio;
+`remove_alignment`; `compare_milestones` (by code against Studio's diff);
+presentations over MCP; two servers on one folder; tool descriptions. Not
+covered: `remove_alignment` against real drags, Presenter playing MCP focus
+slides in a browser, husky.
+
+159. **`radical hooks install` for a second model folder takes the first
+     one's line out.** The marker is shared, so the second install "updates"
+     it, and the first folder's base is never saved again.
+160. **`radical hooks install` appends a sh line to any hook.** A Python hook
+     then fails with a SyntaxError and stops running; after a hook ending in
+     `exit` or `exec` the line never runs.
+161. **`--ratchet` without a test report lowers the test rules' baselines to
+     0** (CLI and Inspector › Settings): rules that did not run count 0 and
+     show ✓, and the next run with reports fails.
+162. **Two MCP servers on one folder lose one of two writes made within
+     ~30 ms,** while both report success: the check for outside edits and
+     the write are not atomic (`MdFolderSession.write`).
+
+To decide (runs 35 to 44): an agent's write while the metamodel editor is
+open clears Designer's undo history; an Undo conflict notice can name an id
+(a pin left by a milestone drag); a New view of a viewpoint is two undo
+steps (the view, its first layout); a reload within ~100 ms of New view
+saves the view at All elements' places for good; after Undo of the first
+layout the view is not laid out again; whether a move keeps the element's
+place at all (decided 2026-10-21: only where it lies inside its new parent
+and clear of its siblings, rule 4); a slide with no view shows the All
+elements table, so its `focus` does nothing; a click in the middle of an
+inactive slide card hits Capture, with no undo; Designer's camera moves
+40 px coming back from Presenter; a hierarchy with a chain draws ancestors
+the filter does not give; after an add in a table or wiki view the card
+count and the save wait ~21 s (a hidden live layout keeps moving
+`nodes[].x/y`); the wiki's Pages list stays A–Z under a descending sort; a
+model opened from a downloaded file lands on All elements; an agent write
+closes the sequence card; a flow view's zoom is lost on a reload; positions
+can reach a dynamic view through `update_view` kind changes; a discarded
+milestone import leaves its `hubTemplates` record; MCP and Studio fill a
+template parameter differently (hint vs empty); a `?hub=` model lands on
+All elements; after Undo of Add child or an agent's delete of the page's
+element the wiki shows Overview while the address keeps `/f/<gone>`;
+[rewrite] then Enter with no change overwrites a stale precondition text;
+a sentence rewritten to the state phrase does not point at the state;
+Multi page switched in a milestone stays live but its undo step goes with
+the milestone; Edit facts offers external systems as a parent; Move to a
+folder renames the model; a folder model's rename reaches `radical.md`
+only at the next save; no way back from a file or folder to the browser;
+the VS Code demo has a relation to a missing element; the DSL import drops
+descriptions and technologies given inside a block and marks no external
+system; `compare_milestones` ignores sequences; `radical diff | head` exits
+with EPIPE; a renamed model folder makes `radical diff` report everything
+added; a slide's focus keeps a deleted element; `create_presentation`
+accepts focus on a table; `move_node` says it keeps the canvas position but
+the element leaves `views.json`; hooks installed from a worktree fail
+silently once it is gone.
+
 ### Radical Forge over MCP (2026-10-07)
 
 Added in `feat/forge-mcp`: the MCP server runs Radical Forge with the
