@@ -3,7 +3,7 @@ import type { C4Node, C4Relation, DiagramView } from '../src/c4'
 import type { ModelCopy } from '../src/model'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import { baseCopy, branchChanges, changeWork, viewChangeCounts, wordDiff } from '../src/branchChanges'
-import { baseSince, forgeModelBase, isBaseOld, mayReplaceWithForgeBase, parseModelBase, serializeModelBase } from '../src/formats/modelBase'
+import { baseName, baseSince, forgeModelBase, isBaseOld, mayReplaceWithForgeBase, parseModelBase, serializeModelBase } from '../src/formats/modelBase'
 import type { TestCase } from '../src/check'
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
@@ -31,7 +31,21 @@ describe('branch changes', () => {
       { id: 'list', name: 'Listed', nodeIds: ['a', 'e', 'c'] },
       { id: 'people', name: 'People', nodeIds: ['e'] },
     ] as unknown as DiagramView[]
-    expect(viewChangeCounts(views, nodes, {}, { a: 'changed', c: 'removed', d: 'new' })).toEqual({ all: 3, list: 2, people: 0 })
+    const removed = { nodes: byId([node('c', 'system', 'Old')]), relations: {} }
+    expect(viewChangeCounts(views, nodes, {}, { a: 'changed', c: 'removed', d: 'new' }, removed)).toEqual({ all: 3, list: 2, people: 0 })
+  })
+
+  it('counts a removed element in every view that draws its ghost, a view with a chain too', () => {
+    const nodes = byId([node('shop', 'system', 'Shop'), node('api', 'container', 'API', { parentId: 'shop' })])
+    // Removed from the Shop: a container the base had, gone from every list.
+    const removed = { nodes: byId([node('jobs', 'container', 'Jobs', { parentId: 'shop' })]), relations: {} }
+    const views = [
+      { id: 'all', name: 'All', nodeIds: [] },
+      { id: 'containers', name: 'Containers', nodeIds: [], pipeline: { levels: [{ ways: [{ types: ['container'] }] }] } },
+      { id: 'systems', name: 'Systems', nodeIds: [], pipeline: { levels: [{ ways: [{ types: ['system'] }] }] } },
+      { id: 'list', name: 'Listed', nodeIds: ['shop', 'api'] },
+    ] as unknown as DiagramView[]
+    expect(viewChangeCounts(views, nodes, {}, { api: 'changed', jobs: 'removed' }, removed)).toEqual({ all: 2, containers: 2, systems: 0, list: 1 })
   })
 
   it('names the words removed and added', () => {
@@ -127,5 +141,18 @@ describe('base file', () => {
     // Only a Forge base may go without a commit.
     expect(parseModelBase(JSON.stringify({ ...JSON.parse(git), commit: '' }))).toBeNull()
     expect(parseModelBase(JSON.stringify({ ...JSON.parse(forge), source: 'svn' }))).toBeNull()
+  })
+
+  it('says what a base from git is counted since, as it was chosen', () => {
+    const since = (described: string, commit = 'abc1234def') => baseSince({ commit, described })
+    expect(since('merge base with origin/main')).toBe('main abc1234')
+    expect(since('merge base with master')).toBe('master abc1234')
+    // radical diff --since HEAD, a tag, a branch, a commit.
+    expect(since('HEAD')).toBe('HEAD abc1234')
+    expect(since('v1.2')).toBe('v1.2 abc1234')
+    expect(since('origin/release')).toBe('origin/release abc1234')
+    expect(since('abc12')).toBe('abc1234')
+    expect(baseName({ commit: 'abc1234def', described: 'HEAD' })).toBe('HEAD')
+    expect(baseName({ commit: 'abc1234def', described: 'abc1234' })).toBeNull()
   })
 })

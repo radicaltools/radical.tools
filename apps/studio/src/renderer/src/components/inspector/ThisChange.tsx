@@ -12,7 +12,7 @@ import type { ModelBase } from '@radical/common/formats/modelBase'
 import type { ModelCopy } from '@radical/common/model'
 import { isBaseOld } from '@radical/common/formats/modelBase'
 import { Bar, Chip, SHORT_TYPE, type Ctx } from './shared'
-import { ago } from '../BranchChanges'
+import { ago, BaseSince } from '../BranchChanges'
 
 const STATUS: Record<ChangeWorkStatus, [tone: string, text: string]> = {
   verified: ['ok', '✓ verified'],
@@ -78,7 +78,7 @@ export function ThisChange({ work, changes, base, baseModel, ctx, onAllChanges }
         <div>
           <h2>This change</h2>
           <p className="insp-muted">
-            Since {base.source === 'forge' ? 'the start of the Forge run' : <>main <code>{base.commit.slice(0, 7)}</code> ({base.described}{base.branch ? `, ${base.branch}` : ''})</>} · base saved {ago(base.savedAt)} · {added + changed + removed} elements changed: {added} added, {changed} changed, {removed} removed
+            Since <BaseSince base={base} /> · base saved {ago(base.savedAt)} · {added + changed + removed} elements changed: {added} added, {changed} changed, {removed} removed
           </p>
         </div>
         <button type="button" className="insp-all-link" onClick={onAllChanges}>All changes{isBaseOld(base) ? ' · old base' : ''} ›</button>

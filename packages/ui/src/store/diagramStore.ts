@@ -60,7 +60,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { compoundPadding, createBatchPlacer, fittedParentSize, isFixedSizeType, placeBesideSiblings, placeUnplaced, projectToVisibleGraph } from '@radical/layout/geometry'
+import { compoundPadding, createBatchPlacer, fittedParentSize, isFixedSizeType, placeBesideSiblings, placeGhosts, placeUnplaced, projectToVisibleGraph } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
@@ -2094,6 +2094,9 @@ export const useDiagramStore = create<DiagramStore>()(
             ? new Set(view.expandedNodeIds)
             : undefined
           const ghostIdSet = hasGhosts ? new Set(Object.keys(ghostNodes)) : undefined
+          // A ghost has the base's place, laid out for All elements: on this
+          // canvas it goes inside its container's frame, clear of the rest.
+          const drawnNodes = ghostIdSet ? placeGhosts(mergedNodes, ghostIdSet, filter) : mergedNodes
           // "locked" disables drag + selection. Metamodel mode is the only
           // truly read-only mode; designer is always editable; viewer and
           // presenter are "explore" modes (drag + collapse allowed,
@@ -2102,14 +2105,14 @@ export const useDiagramStore = create<DiagramStore>()(
           // static and must not drift from accidental drags.
           const locked = state.appMode === 'metamodel' || state.presentationActive
           const frames = viewFrames(view as DiagramView | undefined, mergedNodes, mergedRels)
-          state.rfNodes = deriveRFNodes(mergedNodes, filter, vcs, ghostIdSet, locked, expandedSet, frames) as any
+          state.rfNodes = deriveRFNodes(drawnNodes, filter, vcs, ghostIdSet, locked, expandedSet, frames) as any
           const chainHidden = chainHiddenRelations(view as DiagramView | undefined, mergedNodes, mergedRels)
           const hiddenRels = view?.hiddenRelationIds?.length || chainHidden.length
             ? new Set([...(view?.hiddenRelationIds ?? []), ...chainHidden])
             : undefined
           // Lines end only at elements the view shows, not at its frames.
           const lineEnds = filter && frames.size ? new Set([...filter].filter((id) => !frames.has(id))) : filter
-          const derivedEdges = deriveRFEdges(mergedNodes, mergedRels, lineEnds, vcs, hiddenRels, expandedSet)
+          const derivedEdges = deriveRFEdges(drawnNodes, mergedRels, lineEnds, vcs, hiddenRels, expandedSet)
           // Annotate edges with step numbers:
           // 1. When actively editing a sequence (activeSequenceId set) — always show numbers
           // 2. When view is dynamic and linked to a sequence — show numbers in view mode

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BATCH_CELL, createBatchPlacer, fitAncestors, fittedParentSize, freeSpotNear, placeNewNode, placeUnplaced } from '../src/geometry'
+import { BATCH_CELL, createBatchPlacer, fitAncestors, fittedParentSize, freeSpotNear, placeGhosts, placeNewNode, placeUnplaced } from '../src/geometry'
 import { NODE_SIZES, type C4Node } from '@radical/common/c4'
 
 const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
@@ -157,5 +157,65 @@ describe('freeSpotNear', () => {
       expect(clear(spot, boxes)).toBe(true)
       boxes.push({ ...spot, ...size })
     }
+  })
+})
+
+describe('placeGhosts', () => {
+  const n = (id: string, type: string, x: number, y: number, width: number, height: number, parentId?: string): C4Node =>
+    ({ id, type, label: id, collapsed: false, x, y, width, height, ...(parentId ? { parentId } : {}) } as C4Node)
+  // A view where CLI is narrower than on All elements: the hole Hooks left is
+  // right of Check, inside the frame.
+  const canvas = (hooks: { x: number; y: number }): Record<string, C4Node> => ({
+    cli: n('cli', 'container', 0, 0, 700, 300, undefined),
+    diff: n('diff', 'component', 30, 120, 200, 120, 'cli'),
+    check: n('check', 'component', 260, 120, 200, 120, 'cli'),
+    hooks: n('hooks', 'component', hooks.x, hooks.y, 200, 120, 'cli'),
+    part: n('part', 'component', 30, 120, 100, 60, 'hooks'),
+    web: n('web', 'container', 900, 0, 240, 150),
+  })
+  const inside = (nodes: Record<string, C4Node>, id: string): boolean => {
+    const g = nodes[id]
+    const parent = nodes[g.parentId!]
+    return g.x >= 0 && g.y >= 0 && g.x + g.width <= parent.width && g.y + g.height <= parent.height
+  }
+  const clear = (nodes: Record<string, C4Node>, id: string, of: string[]): boolean => of.every((o) => {
+    const a = nodes[id], b = nodes[o]
+    return a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y
+  })
+
+  it('moves a ghost outside its parent\'s frame, or on a sibling, to the nearest free place inside the frame', () => {
+    // All elements had it at x 720: right of the frame here.
+    let nodes = placeGhosts(canvas({ x: 720, y: 120 }), new Set(['hooks', 'part']))
+    expect(inside(nodes, 'hooks')).toBe(true)
+    expect(clear(nodes, 'hooks', ['diff', 'check'])).toBe(true)
+    expect(nodes.hooks).toMatchObject({ x: 480, y: 120 })
+    // What is inside it moves with it.
+    expect(nodes.part).toMatchObject({ x: 30, y: 120 })
+    // On Check.
+    nodes = placeGhosts(canvas({ x: 280, y: 130 }), new Set(['hooks']))
+    expect(inside(nodes, 'hooks')).toBe(true)
+    expect(clear(nodes, 'hooks', ['diff', 'check'])).toBe(true)
+  })
+
+  it('leaves a ghost where it is when that is free, and the live elements alone', () => {
+    const before = canvas({ x: 480, y: 130 })
+    const nodes = placeGhosts(before, new Set(['hooks']))
+    expect(nodes).toBe(before)
+    expect(nodes.hooks).toMatchObject({ x: 480, y: 130 })
+  })
+
+  it('counts only the siblings the view shows, and keeps a root ghost clear of the other roots', () => {
+    const nodes = placeGhosts({ ...canvas({ x: 480, y: 130 }), old: n('old', 'container', 950, 40, 240, 150) }, new Set(['old']))
+    expect(clear(nodes, 'old', ['cli', 'web'])).toBe(true)
+    // Check is not on this view: the ghost may take its place.
+    const shown = new Set(['cli', 'diff', 'hooks'])
+    expect(placeGhosts(canvas({ x: 280, y: 130 }), new Set(['hooks']), shown).hooks).toMatchObject({ x: 280, y: 130 })
+  })
+
+  it('goes below the siblings when the frame has no room', () => {
+    const nodes = placeGhosts({ ...canvas({ x: 720, y: 120 }), fill: n('fill', 'component', 490, 120, 180, 120, 'cli') }, new Set(['hooks']))
+    expect(clear(nodes, 'hooks', ['diff', 'check', 'fill'])).toBe(true)
+    expect(nodes.hooks.x).toBe(30)
+    expect(nodes.hooks.y).toBeGreaterThanOrEqual(240)
   })
 })
