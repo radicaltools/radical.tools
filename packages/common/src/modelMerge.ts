@@ -103,8 +103,9 @@ function mergeById(base: Plain[], ours: Plain[], theirs: Plain[], where: string[
   const ids = mergeOrder([...b.keys()], [...o.keys()], [...t.keys()], where, layout ? null : ctx)
   const out: Plain[] = []
   for (const id of ids) {
-    const name = entryName(o.get(id) ?? t.get(id) ?? b.get(id), id)
-    // A list of entries is named by its parent; an entry by its name.
+    const name = entryName(t.get(id) ?? o.get(id) ?? b.get(id), id)
+    // A list of entries is named by its parent; an entry by its name, the
+    // folder's where both renamed it (the one the screen shows then).
     const value = merge3(b.get(id), o.get(id), t.get(id), [...where.slice(0, -1), name], ctx, layout)
     if (value !== undefined) out.push(value as Plain)
   }
@@ -166,4 +167,66 @@ export function mergeModels(base: DiagramData, ours: DiagramData, theirs: Diagra
   const ctx: Ctx = { conflicts: [] }
   const merged = merge3(base, ours, theirs, [], ctx, false) as DiagramData
   return { merged, conflicts: [...new Set(ctx.conflicts)] }
+}
+
+// ─── Edits kept apart ────────────────────────────────────────────────────────
+// Edits not written yet when the page goes away (Studio holding its saves for
+// an agent) are kept in browser storage and merged into the folder's model
+// when it is opened again. A model may be megabytes, browser storage holds a
+// few: what is kept is only what `ours` changed from `base`.
+
+/** What `ours` changed from `base`, per key of the model: of a list of
+ *  entries with ids, the entries that differ (null where one is absent) and
+ *  the order of each side's ids; of anything else, both values. */
+export type ModelEdits = Record<string,
+  | { entries: true; baseOrder: string[]; oursOrder: string[]; base: Record<string, Plain | null>; ours: Record<string, Plain | null> }
+  | { entries?: undefined; base: unknown; ours: unknown }>
+
+/** What `ours` changed from `base` (ModelEdits); empty when nothing. */
+export function modelEdits(base: DiagramData, ours: DiagramData): ModelEdits {
+  const b = base as unknown as Plain
+  const o = ours as unknown as Plain
+  const edits: ModelEdits = {}
+  for (const key of new Set([...Object.keys(b), ...Object.keys(o)])) {
+    if (same(b[key], o[key])) continue
+    const lists = [b[key], o[key]].filter((v) => v !== undefined)
+    if (lists.every((v) => Array.isArray(v) && (v.length === 0 || byIdArray(v))) && lists.some(byIdArray)) {
+      const bl = (b[key] ?? []) as Plain[]
+      const ol = (o[key] ?? []) as Plain[]
+      const bi = new Map(bl.map((e) => [e.id as string, e]))
+      const oi = new Map(ol.map((e) => [e.id as string, e]))
+      const entry = { entries: true as const, baseOrder: [...bi.keys()], oursOrder: [...oi.keys()], base: {} as Record<string, Plain | null>, ours: {} as Record<string, Plain | null> }
+      for (const id of new Set([...bi.keys(), ...oi.keys()])) {
+        if (same(bi.get(id), oi.get(id))) continue
+        entry.base[id] = bi.get(id) ?? null
+        entry.ours[id] = oi.get(id) ?? null
+      }
+      edits[key] = entry
+    } else {
+      edits[key] = { base: b[key], ours: o[key] }
+    }
+  }
+  return edits
+}
+
+/** `edits` (modelEdits) merged into `theirs` as mergeModels merges: the
+ *  model they were made on and the one they made are `theirs` with only
+ *  the edited parts as they were and became. */
+export function mergeModelEdits(edits: ModelEdits, theirs: DiagramData): ModelMergeResult {
+  const t = theirs as unknown as Plain
+  const base: Plain = { ...t }
+  const ours: Plain = { ...t }
+  for (const [key, edit] of Object.entries(edits)) {
+    if (!edit.entries) {
+      base[key] = edit.base
+      ours[key] = edit.ours
+      continue
+    }
+    const now = new Map(((Array.isArray(t[key]) ? t[key] : []) as Plain[]).map((e) => [e.id as string, e]))
+    const side = (order: string[], changed: Record<string, Plain | null>): Plain[] =>
+      order.flatMap((id) => (id in changed ? (changed[id] ? [changed[id]!] : []) : now.has(id) ? [now.get(id)!] : []))
+    base[key] = side(edit.baseOrder, edit.base)
+    ours[key] = side(edit.oursOrder, edit.ours)
+  }
+  return mergeModels(base as unknown as DiagramData, ours as unknown as DiagramData, theirs)
 }

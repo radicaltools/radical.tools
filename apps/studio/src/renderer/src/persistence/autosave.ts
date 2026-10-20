@@ -13,7 +13,7 @@
 import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
-import { mergeModels } from '@radical/common/modelMerge'
+import { mergeModelEdits, mergeModels, modelEdits, type ModelEdits } from '@radical/common/modelMerge'
 import { useDiagramStore, parkedLiveModel, type ParkedDesigner } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore, DocumentUnreadableError, StorageFullError, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
@@ -123,14 +123,17 @@ if (typeof window !== 'undefined') {
    *  kept the perspective at Designer, and a slide of a milestone was saved
    *  as the live model. What was edited before it is saved when it stops. */
   const presenting = (): boolean => useDiagramStore.getState().presentationActive
-  const flushPersist = async (): Promise<void> => {
+  /** `leaving`: the page is going away, and a save held for an agent would
+   *  never run. The folder is written at once then, merged with the agent's
+   *  edits as any write is. */
+  const flushPersist = async (leaving = false): Promise<void> => {
     if (_suspended || presenting()) return
     const activeId = documents.getActiveId()
     if (!activeId) return
     // An agent writing the folder over MCP has it to itself: Studio holds its
     // saves until the agent pauses, merging its edits into each change of
     // the agent it reloads meanwhile (loadActive).
-    if (documents.listDocuments().find((d) => d.id === activeId)?.source === 'md') {
+    if (!leaving && documents.listDocuments().find((d) => d.id === activeId)?.source === 'md') {
       const until = await documents.agentWritingUntil(activeId).catch(() => 0)
       if (_suspended || presenting() || documents.getActiveId() !== activeId) return
       if (until > Date.now()) {
@@ -145,9 +148,10 @@ if (typeof window !== 'undefined') {
       _agentNoticeShown = false
       _baseModel = data
       await documents.saveDocument(activeId, data)
+      forgetKeptEdits(activeId)
       _storageFullShown = false
     } catch (e) {
-      reportSaveError(e)
+      reportSaveError(e, !leaving)
     }
   }
   const schedulePersist = (delay = 400): void => {
@@ -158,6 +162,34 @@ if (typeof window !== 'undefined') {
       void flushPersist()
     }, delay)
   }
+  // ── Edits kept for the next visit ─────────────────────────────────────────
+  // A folder is written asynchronously, and a page that goes away (a reload,
+  // a closed tab) may not see the write land. What was edited since the last
+  // save is kept in localStorage then, as the change it makes (modelEdits),
+  // and merged into the folder's model when the document is opened again.
+  const KEPT_EDITS = 'radical-unsaved-edits:'
+  const keepEdits = (id: string): void => {
+    if (!_baseModel) return
+    try {
+      const edits = modelEdits(_baseModel, buildPersistData())
+      if (Object.keys(edits).length) localStorage.setItem(KEPT_EDITS + id, JSON.stringify(edits))
+    } catch (e) {
+      console.warn('[diagramStore] could not keep the unsaved edits:', e)
+    }
+  }
+  const takeKeptEdits = (id: string): ModelEdits | null => {
+    try {
+      const text = localStorage.getItem(KEPT_EDITS + id)
+      localStorage.removeItem(KEPT_EDITS + id)
+      return text ? JSON.parse(text) as ModelEdits : null
+    } catch {
+      return null
+    }
+  }
+  function forgetKeptEdits(id: string): void {
+    try { localStorage.removeItem(KEPT_EDITS + id) } catch { /* nothing kept */ }
+  }
+
   /** Try the save again once the agent's mark has passed; say why, once. */
   const holdForAgent = (until: number): void => {
     if (!_agentNoticeShown) {
@@ -259,13 +291,23 @@ if (typeof window !== 'undefined') {
         const { activeViewId, selectedNodeId } = store
         // Kept apart from the store, which may fill in what it loads.
         _baseModel = structuredClone(data)
+        // An outside change to the model shown keeps the user's undo steps,
+        // which then make their change on the model with it.
+        const outsideChange = !!opts?.keepUi
+        // Edits the page had not written when it went away (keepEdits).
+        const kept = !opts?.keepUi && source === 'md' ? takeKeptEdits(id) : null
         if (unsaved) {
           const { merged, conflicts } = mergeModels(unsaved.base, unsaved.ours, data)
+          store.loadDiagram(structuredClone(merged), { outsideChange })
+          mergedEdits = true
+          reportMergeConflicts(conflicts)
+        } else if (kept) {
+          const { merged, conflicts } = mergeModelEdits(kept, data)
           store.loadDiagram(structuredClone(merged))
           mergedEdits = true
           reportMergeConflicts(conflicts)
         } else {
-          store.loadDiagram(data)
+          store.loadDiagram(data, { outsideChange })
         }
         // A reload of the same document keeps the user where they were.
         if (opts?.keepUi) {
@@ -376,7 +418,7 @@ if (typeof window !== 'undefined') {
       const data = buildPersistData()
       _layoutSafePending = false
       _unsaved = false
-      documents.saveDocument(leaving, data).catch((e) => reportSaveError(e))
+      documents.saveDocument(leaving, data).then(() => forgetKeptEdits(leaving), (e) => reportSaveError(e))
     }
     if (!s.activeId) {
       // The only model was deleted. It stayed on screen with nowhere to save
@@ -401,14 +443,27 @@ if (typeof window !== 'undefined') {
   // changes during pagehide / visibilitychange. This prevents a quick
   // reload (within the 400 ms debounce) from losing the most recent edit
   // (e.g. a freshly-applied smart layout).
-  const flushSync = (): void => {
+  const flushSync = (leaving: boolean): void => {
     if (_suspended || presenting()) return
-    if (_persistTimer === null) return // nothing pending
-    clearTimeout(_persistTimer)
-    _persistTimer = null
     const activeId = documents.getActiveId()
     if (!activeId) return
     const meta = documents.listDocuments().find(d => d.id === activeId)
+    // A folder: what is not written yet is kept for the next visit, and
+    // written now when the page goes, also while an agent writes the folder
+    // (Studio held its saves until it pauses, and a reload lost them). The
+    // write merges with the agent's edits; it may not land before the page
+    // is gone, the kept edits do.
+    if (meta?.source === 'md') {
+      if (!_unsaved) return
+      if (_persistTimer !== null) clearTimeout(_persistTimer)
+      _persistTimer = null
+      keepEdits(activeId)
+      void flushPersist(leaving)
+      return
+    }
+    if (_persistTimer === null) return // nothing pending
+    clearTimeout(_persistTimer)
+    _persistTimer = null
     // FS writes go through the async host bridge and won't reliably complete
     // on pagehide; LS writes are synchronous and always make it to disk.
     if (meta?.source !== 'ls') {
@@ -428,12 +483,12 @@ if (typeof window !== 'undefined') {
     }
   }
   if (typeof window.addEventListener === 'function') {
-    window.addEventListener('pagehide', flushSync)
-    window.addEventListener('beforeunload', flushSync)
+    window.addEventListener('pagehide', () => flushSync(true))
+    window.addEventListener('beforeunload', () => flushSync(true))
   }
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') flushSync()
+      if (document.visibilityState === 'hidden') flushSync(false)
     })
   }
 

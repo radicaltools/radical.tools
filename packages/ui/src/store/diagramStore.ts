@@ -54,6 +54,7 @@ import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
+import { mergeModels } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
@@ -142,9 +143,25 @@ interface HistoryEntry {
   hubTemplates: Record<string, HubImportRecord>
 }
 
+/**
+ * A step made before an outside change arrived (an agent's write, an editor,
+ * git). Its model is not one to go back to: restoring it took that change
+ * back with the step. It is kept as what the step changes, from the model
+ * `from` to the model `to`, and Undo or Redo makes that change on the model
+ * as it is now (_rebasedEntry).
+ */
+interface StepChange {
+  from: HistoryEntry
+  to: HistoryEntry
+}
+
+type HistoryItem = HistoryEntry | StepChange
+
+const isStepChange = (item: HistoryItem): item is StepChange => 'from' in item
+
 const MAX_HISTORY = 100
-const _undoStack: HistoryEntry[] = []
-const _redoStack: HistoryEntry[] = []
+const _undoStack: HistoryItem[] = []
+const _redoStack: HistoryItem[] = []
 /**
  * The live model's history, parked while a milestone is shown. A step
  * belongs to the model it was made on: steps made on the live model undone
@@ -152,7 +169,7 @@ const _redoStack: HistoryEntry[] = []
  * (and "propagate" then copied it over every milestone), and steps made in a
  * milestone undone after leaving it made the milestone the live model.
  */
-let _liveHistory: { undo: HistoryEntry[]; redo: HistoryEntry[] } | null = null
+let _liveHistory: { undo: HistoryItem[]; redo: HistoryItem[] } | null = null
 
 /** A milestone is about to be shown: its steps start from nothing. The
  *  live model's are kept for the way back. */
@@ -183,15 +200,92 @@ function _historyForgotten(): void {
   _beforeDrag = null
 }
 
+/** The model shown (`now`) is about to be read again with a change made
+ *  outside Studio in it: every step, of Undo's and of Redo's, becomes the
+ *  change it makes (StepChange); each stack is a chain that starts at
+ *  `now`. The copy a drag in progress keeps goes, as on any load: its step
+ *  would take the outside change back. */
+function _historyRebased(now: HistoryEntry): void {
+  for (const stack of [_undoStack, _redoStack]) {
+    let next = now
+    for (let i = stack.length - 1; i >= 0; i--) {
+      const item = stack[i]
+      if (isStepChange(item)) { next = item.to; continue }
+      stack[i] = { from: next, to: item }
+      next = item
+    }
+  }
+  _beforeDrag = null
+}
+
+/** A model of a history entry as a document holds it: All elements'
+ *  positions on the nodes and in `defaultPositions`, each view's in the
+ *  view, whichever canvas was shown. Steps taken on different canvases
+ *  merge then (their nodes hold the positions of the canvas shown). */
+function _entryModel(entry: HistoryEntry): DiagramData {
+  const shown = snapshotPositions(entry.c4Nodes)
+  const view = entry.activeViewId ? entry.views[entry.activeViewId] : undefined
+  const defaultPositions = entry.activeViewId === null ? shown : entry.defaultPositions
+  return {
+    nodes: Object.values(atDefaultPositions(Object.values(entry.c4Nodes), defaultPositions)),
+    relations: Object.values(entry.c4Relations),
+    sequences: Object.values(entry.sequences),
+    views: Object.values(entry.views).map((v) => v !== view ? v : {
+      ...v,
+      positions: viewCanvasPositions(v, entry.c4Nodes, shown, viewDrawnIds(v, entry.c4Nodes, entry.c4Relations)),
+    }),
+    defaultPositions,
+    defaultLayoutConstraints: entry.defaultLayoutConstraints,
+    defaultEdgeStyle: entry.defaultEdgeStyle,
+    hubTemplates: entry.hubTemplates,
+  }
+}
+
+/** What the step `change` makes, made on the model `now`: a three-way merge
+ *  from `change.from` (mergeModels). Where the model changed since in a
+ *  value the step changes too, it stays as it is now (`conflicts`). Shown
+ *  on the canvas of `change.to`, as Undo goes back to its step's canvas. */
+function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[] } {
+  const { merged, conflicts } = mergeModels(_entryModel(change.from), _entryModel(change.to), _entryModel(now))
+  const c4Nodes: Record<string, C4Node> = {}
+  for (const n of merged.nodes) c4Nodes[n.id] = { ...n }
+  const c4Relations: Record<string, C4Relation> = {}
+  for (const r of merged.relations) c4Relations[r.id] = r
+  const views: Record<string, DiagramView> = {}
+  for (const v of merged.views ?? []) views[v.id] = v
+  const sequences: Record<string, DiagramSequence> = {}
+  for (const q of merged.sequences ?? []) sequences[q.id] = q
+  const defaultPositions = merged.defaultPositions ?? {}
+  const activeViewId = change.to.activeViewId && views[change.to.activeViewId] ? change.to.activeViewId : null
+  const view = activeViewId ? views[activeViewId] : undefined
+  const positions = view ? view.positions : defaultPositions
+  if (Object.keys(positions).length > 0) showCanvasPositions(c4Nodes, positions, view, c4Relations)
+  return {
+    entry: {
+      c4Nodes,
+      c4Relations,
+      views,
+      defaultLayoutConstraints: merged.defaultLayoutConstraints ?? [],
+      defaultEdgeStyle: merged.defaultEdgeStyle ?? 'curved',
+      activeViewId,
+      defaultPositions,
+      sequences,
+      hubTemplates: (merged.hubTemplates ?? {}) as Record<string, HubImportRecord>,
+    },
+    conflicts,
+  }
+}
+
 /** The metamodel lost types: a step that holds elements or relations of a
  *  type it no longer has cannot be gone back to (Undo brought back an
  *  element whose type had been deleted since, as an unknown type). That
  *  step and every one beyond it go; the nearer ones stay. */
 function _historyKeepsTypes(metamodel: Metamodel): void {
-  const fits = (entry: HistoryEntry): boolean =>
+  const fitsEntry = (entry: HistoryEntry): boolean =>
     Object.values(entry.c4Nodes).every((n) => !!metamodel.nodeTypes[n.type]) &&
     Object.values(entry.c4Relations).every((r) => !r.relationType || !!metamodel.relationTypes[r.relationType])
-  const trim = (stack: HistoryEntry[]): void => {
+  const fits = (item: HistoryItem): boolean => isStepChange(item) ? fitsEntry(item.from) && fitsEntry(item.to) : fitsEntry(item)
+  const trim = (stack: HistoryItem[]): void => {
     // Both stacks are taken from their end: the nearest step is the last.
     for (let i = stack.length - 1; i >= 0; i--) {
       if (!fits(stack[i])) { stack.splice(0, i + 1); return }
@@ -1504,7 +1598,11 @@ interface DiagramStore {
 
   // ── actions: diagram I/O ──
   newDiagram: () => void
-  loadDiagram: (data: DiagramData) => void
+  /** Show `data`, a model of its own: the history goes. With
+   *  `outsideChange`, it is the model shown with a change made outside
+   *  Studio (its folder reloaded): the history stays, and its steps are
+   *  made on the model with that change (_historyRebased). */
+  loadDiagram: (data: DiagramData, opts?: { outsideChange?: boolean }) => void
   saveDiagram: () => DiagramData
   resetDiagram: () => void
   /** Erase nodes, relations, views and sequences as one undo step; milestones,
@@ -1954,6 +2052,18 @@ export const useDiagramStore = create<DiagramStore>()(
         ;(window as any).__rfPlaceCamera?.(camera, shown)
       }
       _liveLayout?.reset()
+    }
+
+    // An entry is put back as it is; a step from before an outside change
+    // is made on the model as it is now (`now`), keeping that change.
+    const _restoreHistoryItem = (item: HistoryItem, now: HistoryEntry, action: 'Undo' | 'Redo'): void => {
+      if (!isStepChange(item)) { _restoreHistoryEntry(item); return }
+      const { entry, conflicts } = _rebasedEntry(item, now)
+      _restoreHistoryEntry(entry)
+      if (conflicts.length) {
+        const shown = conflicts.slice(0, 5).join('; ') + (conflicts.length > 5 ? ` and ${conflicts.length - 5} more` : '')
+        get().pushNotification(`${action} kept what was changed outside Studio since that step: ${shown}.`, 'info')
+      }
     }
 
     // addNode plus its wizard links, as one undo step.
@@ -4369,10 +4479,11 @@ export const useDiagramStore = create<DiagramStore>()(
         // Designer's steps, unseen (the canvas there is put back on return).
         if (get().appMode !== 'designer') return
         if (_undoStack.length === 0) return
-        const entry = _undoStack.pop()!
+        const item = _undoStack.pop()!
         // push current state to redo
-        _redoStack.push(_captureState(get()))
-        _restoreHistoryEntry(entry)
+        const now = _captureState(get())
+        _redoStack.push(isStepChange(item) ? { from: item.to, to: item.from } : now)
+        _restoreHistoryItem(item, now, 'Undo')
       },
 
       clearModel() {
@@ -4399,10 +4510,11 @@ export const useDiagramStore = create<DiagramStore>()(
       redo() {
         if (get().appMode !== 'designer') return
         if (_redoStack.length === 0) return
-        const entry = _redoStack.pop()!
+        const item = _redoStack.pop()!
         // push current state to undo
-        _undoStack.push(_captureState(get()))
-        _restoreHistoryEntry(entry)
+        const now = _captureState(get())
+        _undoStack.push(isStepChange(item) ? { from: item.to, to: item.from } : now)
+        _restoreHistoryItem(item, now, 'Redo')
       },
 
       // ── snapshots (versions) ────────────────────────────────────────────
@@ -5564,10 +5676,17 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       // ── I/O ─────────────────────────────────────────────────────────────
-      loadDiagram(data) {
+      loadDiagram(data, opts) {
         _modelLoads++
         get().stopLiveLayout()
-        _historyForgotten()
+        // The history is Designer's live model's: a milestone shown, a slide
+        // played or Viewer's model in the store is not the one it rebases on.
+        const st = get()
+        if (opts?.outsideChange && st.appMode === 'designer' && !st.activeSnapshotId && !st.presentationActive) {
+          _historyRebased(_captureState(st))
+        } else {
+          _historyForgotten()
+        }
         let nodes = atDefaultPositions(data.nodes, data.defaultPositions)
         // What was added on a view since All elements was last shown has no
         // place there yet (on copies: `data` may hold the store's own nodes).
@@ -5617,8 +5736,8 @@ export const useDiagramStore = create<DiagramStore>()(
           state.selectedNodeId = null
           state.selectedEdgeId = null
           state.nodeWizard = null
-          state.canUndo = false
-          state.canRedo = false
+          state.canUndo = _undoStack.length > 0
+          state.canRedo = _redoStack.length > 0
           state.snapshots = snapshots as any
           state.activeSnapshotId = null
           // A milestone viewed before the load belongs to the model it left:
