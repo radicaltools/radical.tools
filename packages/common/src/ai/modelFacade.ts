@@ -164,6 +164,9 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     orderViews(ids: string[]) {
       model.orderViews(state, ids)
     },
+    setWikiPages(id: string, mode: 'single' | 'multi', depth: number) {
+      model.setWikiPages(state, id, mode, depth)
+    },
     setViewEdgeStyle(id: string, style: EdgeStyle | null) {
       model.setViewEdgeStyle(state, id, style)
     },
