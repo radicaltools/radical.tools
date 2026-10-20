@@ -90,6 +90,9 @@ export interface DiagramFacade {
   orderViews?(ids: string[]): void
   /** Optional — how a view draws relations ('curved' | 'orthogonal'); null for the model's. */
   setViewEdgeStyle?(id: string, style: EdgeStyle | null): void
+  /** Optional — how a wiki view writes its pages: one element per page
+   *  ('single') or its children as chapters ('multi'), `depth` levels deep. */
+  setWikiPages?(id: string, mode: 'single' | 'multi', depth: number): void
   /** Optional — what a view does with its elements: its filter chain (viewPipeline.ts); {} removes it. */
   setViewPipeline?(id: string, pipeline: ViewPipeline): void
   /** Makes the view one of the metamodel's viewpoint `typeId` (its kind and

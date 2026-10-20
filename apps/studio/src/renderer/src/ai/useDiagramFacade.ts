@@ -62,6 +62,10 @@ export function createStoreFacade(): DiagramFacade {
       useDiagramStore.getState().setViewFolder(id, folder),
     orderViews: (ids: string[]) =>
       useDiagramStore.getState().orderViews(ids),
+    setWikiPages: (id: string, mode: 'single' | 'multi', depth: number) => {
+      useDiagramStore.getState().setWikiPageMode(id, mode)
+      useDiagramStore.getState().setWikiDepth(id, depth)
+    },
     setViewEdgeStyle: (id: string, style: 'curved' | 'orthogonal' | null) =>
       useDiagramStore.getState().setViewEdgeStyle(id, style),
     setViewPipeline: (id: string, pipeline: ViewPipeline) =>
