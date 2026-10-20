@@ -3800,13 +3800,24 @@ export const useDiagramStore = create<DiagramStore>()(
         if ((view.kind ?? 'static') === kind && !view.viewpoint && !view.subject) return
         get()._pushUndo()
         let placed: string[] | null = null
+        const wasCanvas = (view.kind ?? 'static') === 'static'
         set((state) => {
+          const shown = state.activeViewId === viewId
+          // Shown as a table (or another kind with no canvas), the view keeps
+          // the layout its canvas had until now, for when it is a canvas again.
+          if (shown && wasCanvas && kind !== 'static' && !state.activeSnapshotId) {
+            const view = state.views[viewId] as DiagramView
+            const nodes = state.c4Nodes as Record<string, C4Node>
+            view.positions = viewCanvasPositions(view, nodes, snapshotPositions(nodes), viewDrawnIds(view, nodes, state.c4Relations as Record<string, C4Relation>))
+          }
           model.setViewKind(state, viewId, kind)
-          // Turned into a canvas, a view with no positions of its own shows
-          // All elements' places, not the canvas shown before it.
-          if (state.activeViewId !== viewId) return
+          if (!shown) return
+          // Turned into a canvas, a view shows the positions it kept; one
+          // with none of its own shows All elements' places, not the canvas
+          // shown before it.
           const view = state.views[viewId] as DiagramView
           const first = firstCanvasPositions(view, state.defaultPositions as Record<string, NodePosition>, state.activeSnapshotId ? _milestoneAllPositions : null)
+            ?? (!wasCanvas && kind === 'static' ? view.positions : undefined)
           if (first) placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, first, view, state.c4Relations as Record<string, C4Relation>)
         })
         get()._sync()
