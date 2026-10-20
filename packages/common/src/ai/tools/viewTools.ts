@@ -2,7 +2,7 @@
 
 import type { DiagramView, ViewPipeline } from '../../c4'
 import { readPipeline } from '../../viewPipeline'
-import { isViewGroup } from '../../model'
+import { groupViewNodesRefusal, isViewGroup } from '../../model'
 import { findViewpoint, viewpointsOf } from '../../viewpoints'
 import type { ViewpointDef } from '../../metamodel/types'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
@@ -167,7 +167,7 @@ export function buildViewToolDefs(): ToolDef[] {
     },
     {
       name: 'set_view_nodes',
-      description: "Replace a view's visible-node set; [] shows every element (a view's filter chain then works among all of them).",
+      description: "Replace a view's visible-node set; [] shows every element (a view's filter chain then works among all of them). Not for a group of views per element or one of its views: each shows what its element holds.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -227,6 +227,9 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
       const chain = input.pipeline === undefined ? undefined : pipelineFor(ctx, 'create_view', input.pipeline)
       if (chain && 'error' in chain) return fail(chain.error)
       if (chain && !ctx.diagram.setViewPipeline) return fail('create_view: filter chains are not available in this context')
+      if (viewpoint?.def.subject && Array.isArray(input.nodeIds) && input.nodeIds.length > 0) {
+        return fail(`create_view: viewpoint ${viewpoint.def.label} draws one element: its view is a group of views per element, each showing what its element holds, and lists no elements (leave out nodeIds)`)
+      }
 
       const realId = ctx.diagram.addView(name)
       if (!realId) return fail(`create_view "${name}" was rejected by the store`)
@@ -363,6 +366,8 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
       if (!ctx.diagram.setViewNodes || !ctx.diagram.getViews) return fail('set_view_nodes: views are not editable in this context')
       const vId = ctx.resolveId(input.id)
       if (!(vId in ctx.diagram.getViews())) return fail(`set_view_nodes: unknown view id "${input.id}"`)
+      const refused = groupViewNodesRefusal({ views: ctx.diagram.getViews(), metamodel: ctx.diagram.getMetamodel?.() }, vId)
+      if (refused) return fail(`set_view_nodes: ${refused}`)
       const resolved = input.nodeIds.filter((x): x is string => typeof x === 'string').map((id) => ctx.resolveId(id))
       ctx.diagram.setViewNodes(vId, resolved)
       return { ok: true, resultText: `Updated view ${vId}.`, updated: { views: 1 } }

@@ -570,15 +570,28 @@ export function isViewGroup(view: DiagramView | undefined, metamodel: Metamodel 
   return !!viewpointsOf(metamodel).find((t) => t.id === view.viewpoint)?.subject
 }
 
+/** Why the elements of view `viewId` cannot be picked by hand, or null: a
+ *  view of a group shows what its element holds, and the group shows its
+ *  views. A list of their own hid an element added later, and nothing in
+ *  Studio takes one away. */
+export function groupViewNodesRefusal(state: Pick<ModelState, 'views' | 'metamodel'>, viewId: string): string | null {
+  const view = state.views[viewId]
+  if (view?.partOf) return `${view.name} is one of the views of the group ${state.views[view.partOf]?.name ?? view.partOf}: it shows what its element holds, and no element is picked by hand`
+  if (isViewGroup(view, state.metamodel)) return `${view!.name} is a group of views per element: each of its views shows what its element holds, and it lists no elements itself`
+  return null
+}
+
 /** The views of group `groupId`, in the list's order. */
 export function viewsOfGroup(views: Record<string, DiagramView>, groupId: string): DiagramView[] {
   return Object.values(views).filter((v) => v.partOf === groupId)
 }
 
 /** What syncViewGroups would do: the views to add (a group and an element),
- *  the ids of the views to remove and of those to move into their group's
- *  folder. All empty when the groups are in step. */
-export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'metamodel'>): { add: Array<{ groupId: string; subjectId: string }>; remove: string[]; refolder: string[] } {
+ *  the ids of the views to remove, of those to move into their group's
+ *  folder, and of the groups and views of one that list elements of their
+ *  own (groupViewNodesRefusal), to show what they hold again. All empty
+ *  when the groups are in step. */
+export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'metamodel'>): { add: Array<{ groupId: string; subjectId: string }>; remove: string[]; refolder: string[]; unlist: string[] } {
   const defs = new Map(viewpointsOf(state.metamodel).map((t) => [t.id, t]))
   const add: Array<{ groupId: string; subjectId: string }> = []
   const remove: string[] = []
@@ -599,6 +612,7 @@ export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'me
     members.set(v.partOf, seen)
     if ((v.folder ?? '') !== (group.folder ?? '')) refolder.push(v.id)
   }
+  const unlist = views.filter((v) => (v.partOf ? !remove.includes(v.id) : groups.has(v.id)) && (v.nodeIds.length > 0 || v.empty)).map((v) => v.id)
   for (const group of groups.values()) {
     const def = defs.get(group.viewpoint!)!
     const has = members.get(group.id) ?? new Set<string>()
@@ -606,15 +620,19 @@ export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'me
       if (!node.external && canBeSubject(def, node) && !has.has(node.id)) add.push({ groupId: group.id, subjectId: node.id })
     }
   }
-  return { add, remove, refolder }
+  return { add, remove, refolder, unlist }
 }
 
 /** Brings every group of views of one element in step with the model: a
  *  view of each element it should hold (ids from `newId`), none of those it
  *  should not, each in the group's folder. Whether it changed anything. */
 export function syncViewGroups(state: ModelState, newId: () => string): boolean {
-  const { add, remove, refolder } = planViewGroups(state)
+  const { add, remove, refolder, unlist } = planViewGroups(state)
   for (const id of remove) delete state.views[id]
+  for (const id of unlist) {
+    state.views[id].nodeIds = []
+    delete state.views[id].empty
+  }
   for (const { groupId, subjectId } of add) {
     const group = state.views[groupId]
     const def = viewpointsOf(state.metamodel).find((t) => t.id === group.viewpoint)!
@@ -633,7 +651,7 @@ export function syncViewGroups(state: ModelState, newId: () => string): boolean 
     else delete view.folder
   }
   if (state.activeViewId && !state.views[state.activeViewId]) state.activeViewId = null
-  return add.length > 0 || remove.length > 0 || refolder.length > 0
+  return add.length > 0 || remove.length > 0 || refolder.length > 0 || unlist.length > 0
 }
 
 /** The view keeps its kind and chain for itself, of no viewpoint (and of no
