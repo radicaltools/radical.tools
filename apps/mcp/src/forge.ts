@@ -39,6 +39,7 @@ import {
   PRIMARY_TYPE_IDS_FOR_STAGE,
   PROPOSAL_INPUT_PROPERTIES,
   RADICAL_FOLDERS,
+  acceptedRefinements,
   applyProposal,
   arrangeForgeGroup,
   buildClarifyPrompt,
@@ -326,6 +327,10 @@ interface StageState {
   refinements?: ForgeRefinement[]
   /** Ids of the nodes and relations its accepted proposals added. */
   proposed: Set<string>
+  /** What its accepted proposals wrote, as applyProposal lists it: only
+   *  that is the stage's refinement, not an edit someone else made in the
+   *  meantime. */
+  accepted: ForgeRefinement[]
   /** The proposal waiting for the user's answer. */
   pending?: { id: string; proposal: ForgeProposal }
   /** How many proposals it made, and how many the user declined. */
@@ -425,16 +430,19 @@ function viewLines(filed: FiledNodes[]): string[] {
   })
 }
 
-/** Gives the nodes just filed into canvases a place there, since a view
- *  keeps its own positions: the outermost in a landscape block beside what
- *  the view already showed (what it lists, or what its chain shows), the
- *  rest where they sit inside their parent. Mutates and returns `data`. */
+/** Gives the nodes just filed into canvases that have no place there yet a
+ *  place, since a view keeps its own positions: the outermost in a landscape
+ *  block beside what the view already showed (what it lists, or what its
+ *  chain shows), the rest where they sit inside their parent. A node the
+ *  view already has a place for (it showed while the stage ran, and was
+ *  laid out there) keeps it. Mutates and returns `data`. */
 function placeInViews(data: DiagramData, filed: FiledNodes[], metamodel: Metamodel | undefined): DiagramData {
   for (const { viewId, nodeIds, canvas } of filed) {
     const view = data.views?.find((v) => v.id === viewId)
-    if (!view || !canvas || !nodeIds.length) continue
+    if (!view || !canvas) continue
+    const fresh = new Set(nodeIds.filter((id) => !view.positions[id]))
+    if (!fresh.size) continue
     const nodes: Record<string, C4Node> = Object.fromEntries(data.nodes.map((n) => [n.id, { ...n, ...view.positions[n.id] }]))
-    const fresh = new Set(nodeIds)
     const shown = new Set<string>()
     const before = view.nodeIds.length || !metamodel
       ? view.nodeIds
@@ -444,11 +452,11 @@ function placeInViews(data: DiagramData, filed: FiledNodes[], metamodel: Metamod
       for (let cur: string | undefined = id; cur && nodes[cur] && !shown.has(cur); cur = nodes[cur].parentId) shown.add(cur)
     }
     const place = createBatchPlacer(() => nodes, () => shown)
-    for (const id of outermostNodes(nodes, nodeIds)) {
+    for (const id of outermostNodes(nodes, [...fresh])) {
       const { x, y } = place(nodes[id].parentId)
       nodes[id] = { ...nodes[id], x, y }
     }
-    for (const id of nodeIds) {
+    for (const id of fresh) {
       const { x, y, width, height } = nodes[id]
       view.positions[id] = { x, y, width, height }
     }
@@ -651,7 +659,7 @@ export class Forge {
     let readOnly = true
     if (previous) {
       // Its changes to earlier stages first, while what it added is still there.
-      const refinements = previous.refinements ?? stageRefinements(id, previous.snapshot, snapshotOf(facade))
+      const refinements = previous.refinements ?? acceptedRefinements(stageRefinements(id, previous.snapshot, snapshotOf(facade)), previous.accepted)
       if (rejectRefinements(facade, refinements).length) readOnly = false
       const added = previous.added ?? idsAddedSince(previous.before, this.ids(facade))
       for (const viewId of added.views) if (facade.getViews?.()[viewId]) { facade.removeView?.(viewId); readOnly = false }
@@ -706,7 +714,7 @@ export class Forge {
 
     const state: StageState = {
       status: 'generating', before, opened, snapshot: snapshotOf(facade), clarifications, hubConcepts,
-      proposed: new Set(), proposals: 0, declined: 0,
+      proposed: new Set(), accepted: [], proposals: 0, declined: 0,
     }
     return ok(brief, { readOnly, commit: () => { run.stages[id] = state } })
   }
@@ -722,7 +730,7 @@ export class Forge {
     if (state.pending) return fail(`forge_complete_stage: proposal ${state.pending.id} waits for the user's answer; ask them and call forge_answer_refinement first`)
     const summary = typeof args.summary === 'string' && args.summary.trim() ? args.summary.trim() : 'Done.'
     const added = idsAddedSince(state.before, this.ids(facade))
-    const refinements = stageRefinements(id, state.snapshot, snapshotOf(facade))
+    const refinements = acceptedRefinements(stageRefinements(id, state.snapshot, snapshotOf(facade)), state.accepted)
     const filed = fileIntoForgeViews(facade, added.nodes, id, run.structure)
     // The views made for the stage that it left empty go again.
     const dropped = dropEmptyForgeViews(facade, state.opened)
@@ -833,6 +841,7 @@ export class Forge {
       commit: () => {
         state.pending = undefined
         for (const added of outcome.added) state.proposed.add(added)
+        state.accepted.push(...outcome.refinements)
       },
     })
   }

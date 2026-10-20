@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { branchBaseIsOld, setBranchChangesShown, useBranchStore } from '../persistence/branchChanges'
-import { baseSince } from '@radical/common/formats/modelBase'
+import { baseName, baseSince, type ModelBase } from '@radical/common/formats/modelBase'
 
 const SAVE_BASE = 'radical diff <model folder> --save-base'
 const INSTALL_HOOKS = 'radical hooks install <model folder>'
@@ -15,6 +15,17 @@ export function ago(iso: string, now = Date.now()): string {
   if (hours < 24) return `${hours} h ago`
   const days = Math.round(hours / 24)
   return `${days} day${days === 1 ? '' : 's'} ago`
+}
+
+/** What the changes are counted since, for the Inspector: "main <code>534f32f</code>
+ *  (merge base with origin/main, feat/x)", "HEAD <code>473d593</code> (main)",
+ *  or the start of the Forge run. */
+export function BaseSince({ base }: { base: ModelBase }): React.ReactElement {
+  if (base.source === 'forge') return <>the start of the Forge run</>
+  const name = baseName(base)
+  // How it was chosen, unless its name says it already ("HEAD"), and the branch.
+  const chosen = [...(base.described !== name ? [base.described] : []), ...(base.branch ? [base.branch] : [])]
+  return <>{name ? `${name} ` : ''}<code>{base.commit.slice(0, 7)}</code>{chosen.length ? ` (${chosen.join(', ')})` : ''}</>
 }
 
 export function Command({ text }: { text: string }): React.ReactElement {

@@ -3,11 +3,13 @@
 // process shows a step no requirement asks for, a state machine a timeout no
 // scenario covers. It adds the missing element right away, as its own stage
 // would have, or corrects a wrong one (see the gaps block in ./prompts.ts).
-// The user consents afterwards: stageRefinements compares the model before
-// and after the stage and lists what it did outside its own output, and
-// rejectRefinements takes the chosen ones back (an addition is removed, a
-// change gets its old values). A deletion is only reported: the prompt
-// forbids it, and Studio's Undo restores it.
+// stageRefinements compares the model before and after the stage and lists
+// what changed outside its own output; acceptedRefinements keeps of that what
+// the proposals the user accepted wrote (./proposals.ts), since the user may
+// edit the model while the stage runs; and rejectRefinements takes them back
+// on Regenerate (an addition is removed, a change gets its old values). A
+// deletion is only reported: the prompt forbids it, and Studio's Undo
+// restores it.
 //
 // forgeGaps runs radical check's completeness rules, and a few of Forge's
 // own, for the stages that are done only: a requirement has no scenario
@@ -17,6 +19,7 @@
 import type { C4Node, C4Relation } from '../../c4'
 import { CHECK_RULES, type CheckModel } from '../../check/rules'
 import type { Metamodel } from '../../metamodel'
+import { sameModelValue } from '../../model'
 import type { DiagramFacade } from '../diagramFacade'
 import { PRIMARY_TYPE_IDS_FOR_STAGE, type ForgeStageId } from './prompts'
 
@@ -54,8 +57,8 @@ const LAYOUT_FIELDS = new Set(['x', 'y', 'width', 'height', 'collapsed'])
 /** The fields whose values differ, layout left out, in a stable order. */
 function changedFields(before: object, after: object): string[] {
   const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((k) => !LAYOUT_FIELDS.has(k))
-  const value = (o: object, k: string): string => JSON.stringify((o as Record<string, unknown>)[k] ?? null)
-  return keys.filter((k) => value(before, k) !== value(after, k)).sort()
+  const value = (o: object, k: string): unknown => (o as Record<string, unknown>)[k]
+  return keys.filter((k) => !sameModelValue(value(before, k), value(after, k))).sort()
 }
 
 function relationLabel(rel: C4Relation, ...models: ModelSnapshot[]): string {
@@ -102,6 +105,28 @@ export function stageRefinements(stage: ForgeStageId, before: ModelSnapshot, aft
   // Additions first, then changes, then deletions; nodes before relations.
   const rank = { added: 0, changed: 1, removed: 2 }
   return out.sort((a, b) => rank[a.change] - rank[b.change] || Number(a.element === 'relation') - Number(b.element === 'relation'))
+}
+
+/** Of `refinements` (stageRefinements over the whole stage), what the
+ *  stage's `accepted` proposals wrote (applyProposal's refinements, in any
+ *  number): an edit made meanwhile by someone else (the user in Studio,
+ *  another program on the folder) is not the stage's, so it is neither
+ *  reported nor taken back by Regenerate. A change keeps only the fields a
+ *  proposal changed. */
+export function acceptedRefinements(refinements: ForgeRefinement[], accepted: ForgeRefinement[]): ForgeRefinement[] {
+  const fields = new Map<string, Set<string>>()
+  for (const r of accepted) {
+    const own = fields.get(r.id) ?? new Set<string>()
+    for (const field of r.fields ?? []) own.add(field)
+    fields.set(r.id, own)
+  }
+  return refinements.flatMap((r) => {
+    const own = fields.get(r.id)
+    if (!own) return []
+    if (r.change !== 'changed') return [r]
+    const kept = (r.fields ?? []).filter((field) => own.has(field))
+    return kept.length ? [{ ...r, fields: kept }] : []
+  })
 }
 
 /** Whether a refinement can be taken back: a deletion cannot. */

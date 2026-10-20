@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { C4Node, C4Relation } from '../src/c4'
 import type { ModelCopy } from '../src/model'
-import { countModelChanges, formatModelChanges, modelChangeReport } from '../src/modelChanges'
+import { compareModels } from '../src/model'
+import { countModelChanges, formatModelChanges, modelChangeReport, modelFieldChanges } from '../src/modelChanges'
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
@@ -30,6 +31,22 @@ describe('model changes', () => {
     const moved = base().map((n) => ({ ...n, x: n.x + 500, y: 40, width: 320, height: 180, collapsed: true }))
     const report = modelChangeReport(before, copy(moved, baseRelations()))
     expect(countModelChanges(report)).toBe(0)
+  })
+
+  it('counts an empty text, an unticked box or an empty list as no value, as a reload of the folder does', () => {
+    const before = copy(base(), baseRelations())
+    // External ticked and unticked, a letter typed into an empty description and deleted.
+    const undone = base().map((n) => (n.id === 'svc' ? { ...n, external: false, technology: '' } : n.id === 'req' ? { ...n, description: '', tags: [] } : n))
+    const relations = baseRelations().map((r) => (r.id === 'd1' ? { ...r, label: '' } : r))
+    const after = copy(undone, relations)
+    expect(modelChangeReport(before, after).elements.changed).toEqual([])
+    expect(countModelChanges(modelChangeReport(before, after))).toBe(0)
+    expect(compareModels(before, after)).toEqual({ nodes: { added: [], removed: [], changed: [] }, relations: { added: [], removed: [], changed: [] } })
+    expect(modelFieldChanges(before.nodes.svc, after.nodes.svc)).toEqual([])
+    // A value is still a change, either way.
+    const ticked = copy(base().map((n) => (n.id === 'svc' ? { ...n, external: true } : n)), baseRelations())
+    expect(modelFieldChanges(before.nodes.svc, ticked.nodes.svc)).toEqual([{ field: 'external', before: null, after: true }])
+    expect(compareModels(ticked, before).nodes.changed).toEqual([{ id: 'svc', fields: ['external'] }])
   })
 
   it('names each change with its old and new value, its place and its relations', () => {

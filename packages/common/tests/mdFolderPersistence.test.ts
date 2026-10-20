@@ -9,6 +9,7 @@ import {
   MD_MANIFEST_FILE,
 } from '../src/formats/mdFolder'
 import type { DiagramData, C4Node } from '../src/c4'
+import { builtInC4Metamodel } from '../src/metamodel'
 
 function node(partial: Partial<C4Node> & Pick<C4Node, 'id' | 'type' | 'label'>): C4Node {
   return {
@@ -113,6 +114,24 @@ describe('md-folder persistence', () => {
     expect(back.sequences).toEqual(sample.sequences)
     expect(back.defaultPositions).toEqual(sample.defaultPositions)
     expect(back.defaultViewport).toEqual(sample.defaultViewport)
+  })
+
+  it('writes no empty text, unticked box or empty list, unless the property\'s default would show instead', () => {
+    const metamodel = builtInC4Metamodel()
+    metamodel.nodeTypes.system.properties = [
+      ...(metamodel.nodeTypes.system.properties ?? []),
+      { key: 'supported', label: 'Supported', type: 'boolean', default: true },
+      { key: 'owner', label: 'Owner', type: 'text', default: 'Platform team' },
+    ]
+    const shop = node({ id: 'shop', type: 'system', label: 'Shop', description: '', external: false, technology: '', ...({ tags: [], supported: false, owner: '' } as Record<string, unknown>) })
+    const files = serializeToMdFolder({ nodes: [shop], relations: [], metamodel }, 'Empty values')
+    const md = Object.entries(files).find(([path]) => path.endsWith('.md') && path !== MD_MANIFEST_FILE)![1]
+    expect(md).not.toMatch(/external|technology|tags|description/)
+    expect(md).toContain('supported: false')
+    expect(md).toContain('owner: ""')
+    const back = deserializeFromMdFolder(files).data.nodes[0] as unknown as Record<string, unknown>
+    expect(back).toMatchObject({ supported: false, owner: '' })
+    expect('external' in back).toBe(false)
   })
 
   it('preserves custom metamodel property types and multiline prose', () => {

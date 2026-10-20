@@ -47,7 +47,9 @@ function useBranchViewCounts(views: Record<string, DiagramView>): Record<string,
   const branch = useDiagramStore((s) => s.branch)
   const nodes = useDiagramStore((s) => s.c4Nodes)
   const relations = useDiagramStore((s) => s.c4Relations)
-  return useMemo(() => branch ? viewChangeCounts(Object.values(views), nodes, relations, branch.nodes) : null, [branch, views, nodes, relations])
+  return useMemo(() => branch
+    ? viewChangeCounts(Object.values(views), nodes, relations, branch.nodes, { nodes: branch.ghostNodes, relations: branch.ghostRelations })
+    : null, [branch, views, nodes, relations])
 }
 
 function BranchCount({ n }: { n: number | undefined }): React.ReactElement | null {

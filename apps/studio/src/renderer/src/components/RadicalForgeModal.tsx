@@ -12,6 +12,7 @@ import {
   HUB_MATCHES_QUESTION_ID,
   PRIMARY_TYPE_IDS_FOR_STAGE,
   PROPOSE_REFINEMENT_TOOL,
+  acceptedRefinements,
   applyProposal,
   arrangeForgeGroup,
   buildForgeStagePrompt,
@@ -97,8 +98,8 @@ function refinedSummary(items: ForgeRefinement[]): string {
 }
 
 /** What a stage did to earlier stages: what the user accepted of its
- *  proposals so far, and after the stage what it refined, as
- *  stageRefinements lists it. `declined` counts the proposals turned down. */
+ *  proposals so far, and after the stage what of that it still refines, as
+ *  acceptedRefinements lists it. `declined` counts the proposals turned down. */
 interface StageRefinements {
   items: ForgeRefinement[]
   declined: number
@@ -495,6 +496,9 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     const stageView = forgeStageView(useDiagramStore.getState().views, stageId, structure)
     useDiagramStore.getState().setActiveView(isCanvas(stageView) ? stageView!.id : null)
     const snapshot = snapshotOf(diagram)
+    // What the accepted proposals wrote: only that is the stage's refinement,
+    // not an edit made meanwhile in the folder or by another program.
+    const accepted: ForgeRefinement[] = []
     setProgressByStage((p) => ({ ...p, [stageId]: { round: 0, entries: [] } }))
     const ctl = new AbortController()
     abortRef.current = ctl
@@ -549,6 +553,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
           const outcome = await applyProposal(proposal, ctx)
           if (!outcome.ok) return { ok: false, resultText: `The user added it, but ${outcome.text}` }
           for (const id of outcome.added) guardState.proposed.add(id)
+          accepted.push(...outcome.refinements)
           setRefinementsByStage((r) => ({ ...r, [stageId]: { items: [...(r[stageId]?.items ?? []), ...outcome.refinements], declined: r[stageId]?.declined ?? 0 } }))
           return { ok: true, resultText: `The user added it. ${outcome.text}${said}\n${formatProposal(proposal, lines)}` }
         },
@@ -575,7 +580,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       setPendingProposal(null)
       const added = addedSince(before)
       stageAddedRef.current[stageId] = added
-      const refinements = stageRefinements(stageId, snapshot, snapshotOf(diagram))
+      const refinements = acceptedRefinements(stageRefinements(stageId, snapshot, snapshotOf(diagram)), accepted)
       setRefinementsByStage((r) => ({ ...r, [stageId]: { items: refinements, declined: r[stageId]?.declined ?? 0 } }))
       setGapsByStage((g) => ({ ...g, [stageId]: forgeGaps([...done, stageId], diagram.getNodes(), diagram.getRelations(), diagram.getMetamodel?.()) }))
       // Each element into the run's structure, and the stage's view on screen
