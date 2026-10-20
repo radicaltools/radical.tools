@@ -5032,7 +5032,13 @@ export const useDiagramStore = create<DiagramStore>()(
         // The view on screen when Designer is entered again: Designer stays
         // on it (with its own layout) rather than going back to the one it left.
         const shownViewId = get().activeViewId
-        if (prevMode === 'designer' && mode !== 'designer') {
+        // The metamodel editor edits Designer's model, as Designer does: from
+        // Viewer or Presenter it gets Designer's back first. Parked there as
+        // well, a drag made in Viewer was saved by the first metamodel edit
+        // (autosave saves in the editor), and what a metamodel edit made of
+        // the views was put back as it had been on the way to Designer.
+        const editing = (m: DiagramStore['appMode']): boolean => m === 'designer' || m === 'metamodel'
+        if (editing(prevMode) && !editing(mode)) {
           // The canvas shown keeps its positions in the nodes until it is
           // left or saved: put them, and its camera, into its view (or All
           // elements') first. Parked without them, the save a slide asks for
@@ -5042,7 +5048,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // Edits of a milestone not yet kept or dropped stay Designer's
           // question: Viewer and Presenter browse without being asked.
           set((state) => { state.milestoneDirty = false; state.milestonePromptOpen = false })
-        } else if (prevMode !== 'designer' && mode === 'designer' && W.__preModeLayout) {
+        } else if (!editing(prevMode) && editing(mode) && W.__preModeLayout) {
           const pre = W.__preModeLayout as ParkedDesigner
           set((state) => {
             state.c4Nodes = pre.c4Nodes as any
