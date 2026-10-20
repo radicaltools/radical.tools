@@ -59,6 +59,10 @@ import {
   idsAddedSince,
   modelIdsOf,
   needLabelFromDescription,
+  describeForgeLanguages,
+  forgeLanguageRules,
+  FORGE_MODEL_LANGUAGE,
+  type ForgeLanguages,
   outermostNodes,
   parseProposal,
   radicalViewpoints,
@@ -100,13 +104,17 @@ export const FORGE_PROCEDURE = [
   'Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewed stage at a time, and',
   'ends with a review of the whole model, in this order:',
   FORGE_STAGES.map((stage) => `${stage.title} (${stage.id})`).join(' → ') + '.',
-  '1. Before anything is modelled, ask the user for the view structure of the run, and offer:',
+  '1. Before anything is modelled, ask the user, first:',
+  '   - Which language to talk in, and which language to write the model in. Offer the language the description is',
+  `     written in for the talk and ${FORGE_MODEL_LANGUAGE} for the model as the defaults.`,
+  '   Then ask for the view structure of the run, and offer:',
   '   - Radical (the default): a view of each of the metamodel\'s viewpoints, in the folders Conceptual, Logical and',
   '     Governance as in radical.tools\' own model, each made once something lands in it. List the viewpoints by',
   '     folder (radicalViewpoints below) and ask whether to leave any out.',
   `   - Layer canvases: ${Object.values(FORGE_VIEW_NAMES).join(', ')}, which list the elements a stage adds.`,
-  '   Then forge_start with the description, or the id of an existing need, and views as the user chose. The',
-  '   description is kept in the model as a need.',
+  '   Then forge_start with the description, or the id of an existing need, and the languages and views as the',
+  '   user chose. The description is kept in the model as a need. From then on talk to the user in the one language',
+  '   and write the model in the other.',
   '2. For each stage, in order:',
   '   a. forge_clarify: read it and ask the user the clarifying questions it calls for, if any, including which',
   '      Hub concepts you pick from its candidates to apply. Wait for the answers.',
@@ -133,12 +141,21 @@ const stageEnum = { type: 'string', enum: STAGE_IDS }
 export const FORGE_TOOL_DEFS: ToolDef[] = [
   {
     name: 'forge_start',
-    description: 'Start a Radical Forge run (replacing any earlier run): turn a free-text system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, mockups and a C4 model in reviewed stages that also fill gaps in the ones before, then a review of the whole model. Stores the description as a `need` node (or uses an existing need) and explains the steps.',
+    description: 'Start a Radical Forge run (replacing any earlier run): turn a free-text system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, mockups and a C4 model in reviewed stages that also fill gaps in the ones before, then a review of the whole model. Stores the description as a `need` node (or uses an existing need) and explains the steps. Ask the user first which languages to talk and model in (languages), then for the view structure (views).',
     inputSchema: {
       type: 'object',
       properties: {
         description: { type: 'string', description: 'The system in plain language: who uses it, what it does, the main flows and constraints. With needId, replaces that need\'s text.' },
         needId: { type: 'string', description: 'Start from an existing `need` node instead (find them with search_model: LIST NODES WHERE type = "need").' },
+        languages: {
+          type: 'object',
+          description: 'The languages the user chose for the run.',
+          properties: {
+            conversation: { type: 'string', description: 'The language to talk to the user in, e.g. "Polish". Omit for the language the description is written in.' },
+            model: { type: 'string', description: `The language to write the model's labels, descriptions and texts in, e.g. "English". Omit for ${FORGE_MODEL_LANGUAGE}.` },
+          },
+          additionalProperties: false,
+        },
         views: {
           type: 'object',
           description: 'The view structure the user chose. Omit for the default: Radical when the metamodel has viewpoints, unless the model already has the layer canvases of a run.',
@@ -326,6 +343,8 @@ interface ForgeRun {
   hub: ForgeHubCandidates
   /** The view structure the user chose. */
   structure: ForgeStructure
+  /** The languages the user chose: to talk in, and to write the model in. */
+  languages: ForgeLanguages
   clarified: Set<ForgeStageId>
   stages: Partial<Record<ForgeStageId, StageState>>
 }
@@ -359,6 +378,20 @@ function countByType(nodes: Record<string, C4Node>, ids: string[]): string {
     if (type) counts.set(type, (counts.get(type) ?? 0) + 1)
   }
   return [...counts].map(([type, n]) => `${type} ${n}`).join(', ')
+}
+
+/** The languages forge_start was given; a string says what is wrong with them. */
+function languagesArg(raw: unknown): ForgeLanguages | string {
+  if (raw === undefined) return {}
+  if (!raw || typeof raw !== 'object') return 'languages must be an object with conversation and/or model'
+  const languages: ForgeLanguages = {}
+  for (const key of ['conversation', 'model'] as const) {
+    const value = (raw as Record<string, unknown>)[key]
+    if (value === undefined) continue
+    if (typeof value !== 'string') return `languages.${key} must be the name of a language`
+    if (value.trim()) languages[key] = value.trim()
+  }
+  return languages
 }
 
 /** The view structure forge_start was given, or the default; a string says
@@ -474,6 +507,8 @@ export class Forge {
     const metamodel = facade.getMetamodel?.()
     const structure = structureArg(args.views, metamodel, facade)
     if (typeof structure === 'string') return fail(`forge_start: ${structure}`)
+    const languages = languagesArg(args.languages)
+    if (typeof languages === 'string') return fail(`forge_start: ${languages}`)
     let description = typed
     let need: string | undefined
     let readOnly = true
@@ -526,11 +561,13 @@ export class Forge {
       startedAt: new Date().toISOString(),
       hub: forgeHubCandidates(this.hub().summaries, description, metamodel?.id),
       structure,
+      languages,
       clarified: new Set(),
       stages: {},
     }
     const lines = [
       need ? `Forge run started. The description is the need ${need}.` : 'Forge run started. This metamodel has no need type, so the description is not stored in the model.',
+      `Languages: ${describeForgeLanguages(languages)}.`,
       `View structure: ${describeForgeStructure(structure, metamodel)}`,
       ...viewLines(filed),
       '',
@@ -557,7 +594,7 @@ export class Forge {
       .map((prior) => run.stages[prior]?.clarifications ?? '')
       .filter(Boolean)
       .join('\n\n')
-    const lines = [buildClarifyPrompt(stageTitle(id), run.description, candidates, priorQA, 'ask')]
+    const lines = [buildClarifyPrompt(stageTitle(id), run.description, candidates, priorQA, 'ask'), '', ...forgeLanguageRules(run.languages)]
     if (id === 'c4' && run.hub.blueprint) {
       lines.push('', `The blueprint ${run.hub.blueprint.id} fits the whole description; offering it to import as a skeleton (forge_import_hub_concept) is a good first pick.`)
     }
@@ -645,7 +682,7 @@ export class Forge {
       `When the stage is done, call forge_complete_stage with stage "${id}" and a 1-3 sentence summary of what you created, refined and why.`,
       '',
       'Rules:',
-      ...AI_MODELLING_RULES.map((rule) => `- ${rule}`),
+      ...[...forgeLanguageRules(run.languages), ...AI_MODELLING_RULES].map((rule) => `- ${rule}`),
       '',
       metamodelMessage,
       '',
@@ -840,7 +877,8 @@ export class Forge {
     if (!node || node.type !== 'mockup') return fail(`forge_wireframe: "${args.mockupId}" is not a mockup node`)
     if (args.svg === undefined) {
       const brief = buildWireframePrompt(id, facade.getNodes(), facade.getRelations())
-      return ok(`${brief}\n\nThen call forge_wireframe again with mockupId "${id}" and the svg.`, { readOnly: true })
+      const language = this.run ? `\n\nWrite the wireframe's texts in ${this.run.languages.model ?? FORGE_MODEL_LANGUAGE}.` : ''
+      return ok(`${brief}${language}\n\nThen call forge_wireframe again with mockupId "${id}" and the svg.`, { readOnly: true })
     }
     const svg = typeof args.svg === 'string' ? sanitizeWireframeSvg(args.svg) : null
     if (!svg) return fail('forge_wireframe: not a usable SVG wireframe; follow the output rules of the brief (one <svg> element, allowed elements only, compact)')

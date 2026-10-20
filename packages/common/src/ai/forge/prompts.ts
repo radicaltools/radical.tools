@@ -215,6 +215,32 @@ export function needLabelFromDescription(description: string): string {
   return `${(space > NEED_LABEL_MAX / 2 ? cut.slice(0, space) : cut).replace(/[.:;,]+$/, '')}…`
 }
 
+/** The languages of a Forge run: the one the user is talked to in, and the
+ *  one the model is written in. Unset, the description's language and
+ *  FORGE_MODEL_LANGUAGE. */
+export interface ForgeLanguages {
+  conversation?: string
+  model?: string
+}
+
+export const FORGE_MODEL_LANGUAGE = 'English'
+
+/** A run's languages in a line: "talk in Polish, write the model in English". */
+export function describeForgeLanguages(languages: ForgeLanguages = {}): string {
+  const talk = languages.conversation?.trim() || 'the language of the description'
+  return `talk in ${talk}, write the model in ${languages.model?.trim() || FORGE_MODEL_LANGUAGE}`
+}
+
+/** What every brief of a run says about its languages: two rules, one line each. */
+export function forgeLanguageRules(languages: ForgeLanguages = {}): string[] {
+  const talk = languages.conversation?.trim() || 'the language the description is written in'
+  const model = languages.model?.trim() || FORGE_MODEL_LANGUAGE
+  return [
+    `Talk to the user in ${talk}: the questions you ask, the proposals you show and what you report.`,
+    `Write the model in ${model}, whatever language the description and the answers are in: the labels, descriptions and other texts of the elements, relations and views you add or change. Ids, type ids, property keys, enum values and technology names stay as they are.`,
+  ]
+}
+
 /** Builds the task instruction for one stage. `description` is the original
  *  free-text system description the user provided in the Input step — later
  *  stages still get it for grounding, even though the requirements/model it
