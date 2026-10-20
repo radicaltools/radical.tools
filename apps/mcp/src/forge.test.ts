@@ -531,6 +531,46 @@ describe('Radical Forge over MCP', () => {
     }
   }, 60_000)
 
+  it('keeps the places a view gave the stage\'s elements while it ran, and places only the rest', async () => {
+    const { client, read } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'radical', viewpoints: ['system-context'] } })
+      for (const stage of ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups']) {
+        await call(client, 'forge_clarify', { stage })
+        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
+      }
+      await call(client, 'forge_clarify', { stage: 'c4' })
+      await call(client, 'forge_generate', { stage: 'c4', hubConcepts: [] })
+      await call(client, 'add_node', { tempId: 'shopper', type: 'person', label: 'Shopper' })
+      await call(client, 'add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+      await call(client, 'add_relation', { sourceId: 'shopper', targetId: 'shop', relationType: 'interacts', label: 'Reserves' })
+      const contextId = (await read()).views!.find((v) => v.name === 'System context')!.id
+      // The view laid out while the stage runs, as Studio follows it there.
+      await call(client, 'smart_layout', { viewId: contextId })
+      const laidOut = (await read()).views!.find((v) => v.id === contextId)!.positions
+      let data = await read()
+      const ids = ['Shopper', 'Shop'].map((label) => data.nodes.find((n) => n.label === label)!.id)
+      expect(ids.every((id) => laidOut[id])).toBe(true)
+      // One more added after the layout, which the view has no place for.
+      await call(client, 'add_node', { tempId: 'store', type: 'system', label: 'Store system', properties: { external: true } })
+      await call(client, 'forge_complete_stage', { stage: 'c4', summary: 'The shop.' })
+      data = await read()
+      const positions = data.views!.find((v) => v.id === contextId)!.positions
+      for (const id of ids) expect({ x: positions[id].x, y: positions[id].y }).toEqual({ x: laidOut[id].x, y: laidOut[id].y })
+      const store = data.nodes.find((n) => n.label === 'Store system')!.id
+      expect(positions[store]).toBeDefined()
+      // Beside what the view showed, not over it.
+      for (const id of ids) {
+        const a = positions[id], b = positions[store]
+        const apart = a.x + a.width! <= b.x || b.x + b.width! <= a.x || a.y + a.height! <= b.y || b.y + b.height! <= a.y
+        expect(apart).toBe(true)
+      }
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
   it('tells Studio where the run stands through .radical/forge-run.json', async () => {
     const { client, folder } = await connect()
     const status = async () => parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!

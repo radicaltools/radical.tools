@@ -425,16 +425,19 @@ function viewLines(filed: FiledNodes[]): string[] {
   })
 }
 
-/** Gives the nodes just filed into canvases a place there, since a view
- *  keeps its own positions: the outermost in a landscape block beside what
- *  the view already showed (what it lists, or what its chain shows), the
- *  rest where they sit inside their parent. Mutates and returns `data`. */
+/** Gives the nodes just filed into canvases that have no place there yet a
+ *  place, since a view keeps its own positions: the outermost in a landscape
+ *  block beside what the view already showed (what it lists, or what its
+ *  chain shows), the rest where they sit inside their parent. A node the
+ *  view already has a place for (it showed while the stage ran, and was
+ *  laid out there) keeps it. Mutates and returns `data`. */
 function placeInViews(data: DiagramData, filed: FiledNodes[], metamodel: Metamodel | undefined): DiagramData {
   for (const { viewId, nodeIds, canvas } of filed) {
     const view = data.views?.find((v) => v.id === viewId)
-    if (!view || !canvas || !nodeIds.length) continue
+    if (!view || !canvas) continue
+    const fresh = new Set(nodeIds.filter((id) => !view.positions[id]))
+    if (!fresh.size) continue
     const nodes: Record<string, C4Node> = Object.fromEntries(data.nodes.map((n) => [n.id, { ...n, ...view.positions[n.id] }]))
-    const fresh = new Set(nodeIds)
     const shown = new Set<string>()
     const before = view.nodeIds.length || !metamodel
       ? view.nodeIds
@@ -444,11 +447,11 @@ function placeInViews(data: DiagramData, filed: FiledNodes[], metamodel: Metamod
       for (let cur: string | undefined = id; cur && nodes[cur] && !shown.has(cur); cur = nodes[cur].parentId) shown.add(cur)
     }
     const place = createBatchPlacer(() => nodes, () => shown)
-    for (const id of outermostNodes(nodes, nodeIds)) {
+    for (const id of outermostNodes(nodes, [...fresh])) {
       const { x, y } = place(nodes[id].parentId)
       nodes[id] = { ...nodes[id], x, y }
     }
-    for (const id of nodeIds) {
+    for (const id of fresh) {
       const { x, y, width, height } = nodes[id]
       view.positions[id] = { x, y, width, height }
     }
