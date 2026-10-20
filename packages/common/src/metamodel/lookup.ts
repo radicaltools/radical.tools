@@ -187,3 +187,30 @@ export function propertyKeyProblem(key: string, of: 'node' | 'relation'): string
   if (!isReservedPropertyKey(key, of)) return null
   return `"${key}" is a field every ${of === 'node' ? 'element' : 'relation'} has (${[...RESERVED_PROPERTY_KEYS[of]].join(', ')}): give the property another key.`
 }
+
+/** The node types and relation types a view's or viewpoint's filter chain
+ *  names: in its ways (types, the relation followed) and its filters (of
+ *  type, of relation). Read from any data, as readPipeline reads a chain
+ *  (a level written before levels had ways is one way). */
+export function chainTypeNames(raw: unknown): { nodeTypes: string[]; relationTypes: string[] } {
+  const nodeTypes = new Set<string>()
+  const relationTypes = new Set<string>()
+  const strings = (v: unknown): string[] => Array.isArray(v) ? v.filter((t): t is string => typeof t === 'string') : []
+  const levels = raw && typeof raw === 'object' ? (raw as { levels?: unknown }).levels : undefined
+  for (const level of Array.isArray(levels) ? levels : []) {
+    if (!level || typeof level !== 'object') continue
+    const l = level as Record<string, unknown>
+    for (const way of Array.isArray(l.ways) ? l.ways : [l]) {
+      if (!way || typeof way !== 'object') continue
+      const w = way as { types?: unknown; via?: { relationType?: unknown } }
+      for (const t of strings(w.types)) nodeTypes.add(t)
+      if (typeof w.via?.relationType === 'string') relationTypes.add(w.via.relationType)
+    }
+    for (const filter of Array.isArray(l.filters) ? l.filters : []) {
+      const f = (filter ?? {}) as { kind?: unknown; types?: unknown; relationType?: unknown }
+      if (f.kind === 'type') for (const t of strings(f.types)) nodeTypes.add(t)
+      if (f.kind === 'relation' && typeof f.relationType === 'string') relationTypes.add(f.relationType)
+    }
+  }
+  return { nodeTypes: [...nodeTypes], relationTypes: [...relationTypes] }
+}

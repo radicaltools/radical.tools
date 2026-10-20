@@ -37,6 +37,31 @@ describe('Deleting a type from the metamodel', () => {
     expect(lastNotice()).toMatch(/1 relation is still of type "Feeds"/)
   })
 
+  it('is refused while a milestone holds an element or a relation of that type', () => {
+    // Restore to live brought the element back, of an unknown type.
+    useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, g: node('g', 'gadget') } }))
+    s().addRelation({ sourceId: 'a', targetId: 'b', relationType: 'feeds' })
+    s().createSnapshot('As-is')
+    s().removeNode('g')
+    for (const id of Object.keys(s().c4Relations)) s().removeRelation(id)
+    s().removeNodeType('gadget')
+    expect(s().metamodel.nodeTypes.gadget).toBeDefined()
+    expect(lastNotice()).toMatch(/the milestone "As-is" holds 1 element of type Gadget/)
+    s().removeRelationType('feeds')
+    expect(s().metamodel.relationTypes.feeds).toBeDefined()
+    expect(lastNotice()).toMatch(/the milestone "As-is" holds 1 relation of type "Feeds"/)
+  })
+
+  it('counts the live model while a milestone is open', () => {
+    s().createSnapshot('Empty')
+    useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, g: node('g', 'gadget') } }))
+    s().selectMilestone(s().snapshots[0].id)
+    expect(s().c4Nodes.g).toBeUndefined()
+    s().removeNodeType('gadget')
+    expect(s().metamodel.nodeTypes.gadget).toBeDefined()
+    expect(lastNotice()).toMatch(/1 element is still of type Gadget/)
+  })
+
   it('goes through when nothing uses the type', () => {
     s().removeNodeType('gadget')
     s().removeRelationType('feeds')

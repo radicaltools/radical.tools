@@ -10,13 +10,14 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
+import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
 import { readPipeline } from './viewPipeline'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
   canAddMoreOfType,
+  chainTypeNames,
   GROUP_TYPE,
   hasPlaceUnder,
   inferRelationType,
@@ -360,12 +361,60 @@ function withoutNodes(constraints: LayoutConstraint[], removed: Set<string>): La
 
 // ── Types in use ─────────────────────────────────────────────────────────────
 
+/** What a milestone holds of the model's types. */
+export type MilestoneContent = Pick<DiagramSnapshot, 'name' | 'nodes' | 'relations'>
+
 /** Why a node type cannot be deleted from the metamodel: elements are still
- *  of it. Null when none is (built-in types are the caller's to refuse). */
-export function checkRemoveNodeType(state: ModelState, typeId: string): string | null {
+ *  of it, in the model or in one of its `milestones` (opened, or restored to
+ *  live, it brought back elements of an unknown type), or the metamodel or
+ *  a view names it. Null when none does (built-in types are the caller's to
+ *  refuse). */
+export function checkRemoveNodeType(state: ModelState, typeId: string, milestones: MilestoneContent[] = []): string | null {
   const used = Object.values(state.c4Nodes).filter((n) => n.type === typeId).length
   if (used) return `${used} ${used === 1 ? 'element is' : 'elements are'} still of type ${typeLabel(state.metamodel, typeId)}: retype or delete ${used === 1 ? 'it' : 'them'} first.`
-  return state.metamodel ? checkRemoveNodeTypeFromMetamodel(state.metamodel, typeId) : null
+  return milestoneHoldsType(milestones, typeId, 'node', state.metamodel)
+    ?? (state.metamodel ? checkRemoveNodeTypeFromMetamodel(state.metamodel, typeId) : null)
+    ?? viewNamesType(state.views, typeId, 'node', state.metamodel)
+}
+
+/** Why a type cannot go while a milestone holds elements (or relations) of
+ *  it: a milestone keeps what it saved, and its types with it. */
+export function milestoneHoldsType(milestones: MilestoneContent[], typeId: string, of: 'node' | 'relation', mm: Metamodel | undefined): string | null {
+  for (const m of milestones) {
+    const count = of === 'node'
+      ? Object.values(m.nodes ?? {}).filter((n) => n.type === typeId).length
+      : Object.values(m.relations ?? {}).filter((r) => r.relationType === typeId).length
+    if (!count) continue
+    const what = of === 'node' ? `${count === 1 ? 'element' : 'elements'} of type ${typeLabel(mm, typeId)}` : `${count === 1 ? 'relation' : 'relations'} of type ${relationTypeName(mm, typeId)}`
+    return `the milestone "${m.name}" holds ${count} ${what}: delete the milestone first.`
+  }
+  return null
+}
+
+const relationTypeName = (mm: Metamodel | undefined, typeId: string): string => `"${mm?.relationTypes[typeId]?.label ?? typeId}"`
+
+/** Why a type cannot go while a viewpoint names it: one that makes a view
+ *  per element of it, or whose filter chain names it. Left behind, the
+ *  viewpoint kept the type, its views were empty, and nothing in Studio
+ *  took it out. */
+function viewpointNamesType(mm: Metamodel, typeId: string, of: 'node' | 'relation'): string | null {
+  const name = of === 'node' ? typeLabel(mm, typeId) : relationTypeName(mm, typeId)
+  for (const vp of viewpointsOf(mm)) {
+    if (of === 'node' && vp.subject?.types.includes(typeId)) return `the viewpoint "${vp.label}" makes a view per ${name}: change or delete it first.`
+    const named = chainTypeNames(vp.pipeline)
+    if ((of === 'node' ? named.nodeTypes : named.relationTypes).includes(typeId)) return `the filter of the viewpoint "${vp.label}" names ${name}: change or delete the viewpoint first.`
+  }
+  return null
+}
+
+/** Why a type cannot go while a view's own filter chain names it. */
+export function viewNamesType(views: Record<string, DiagramView>, typeId: string, of: 'node' | 'relation', mm: Metamodel | undefined): string | null {
+  const name = of === 'node' ? typeLabel(mm, typeId) : relationTypeName(mm, typeId)
+  for (const view of Object.values(views ?? {})) {
+    const named = chainTypeNames(view.pipeline)
+    if ((of === 'node' ? named.nodeTypes : named.relationTypes).includes(typeId)) return `the filter of the view "${view.name}" names ${name}: change it first.`
+  }
+  return null
 }
 
 /**
@@ -386,7 +435,13 @@ export function checkRemoveNodeTypeFromMetamodel(mm: Metamodel, typeId: string):
     const ref = (def.properties ?? []).find((p) => p.type === 'ref' && p.refType === typeId)
     if (ref) return `the property "${ref.label}" of "${def.label}" points at ${label}: change or remove it first.`
   }
-  return null
+  return viewpointNamesType(mm, typeId, 'node')
+}
+
+/** Why the metamodel cannot lose relation type `typeId`: a viewpoint's
+ *  filter chain follows it or tests for it. */
+export function checkRemoveRelationTypeFromMetamodel(mm: Metamodel, typeId: string): string | null {
+  return viewpointNamesType(mm, typeId, 'relation')
 }
 
 /** The metamodel without node type `typeId`, and without what names it: it
@@ -425,12 +480,14 @@ export function checkReplaceMetamodel(state: ModelState, next: Metamodel): strin
 }
 
 /** Why a relation type cannot be deleted from the metamodel: relations are
- *  still of it. */
-export function checkRemoveRelationType(state: ModelState, typeId: string): string | null {
+ *  still of it, in the model or one of its `milestones`, or a viewpoint or
+ *  a view names it. */
+export function checkRemoveRelationType(state: ModelState, typeId: string, milestones: MilestoneContent[] = []): string | null {
   const used = Object.values(state.c4Relations).filter((r) => r.relationType === typeId).length
-  if (!used) return null
-  const label = state.metamodel?.relationTypes[typeId]?.label ?? typeId
-  return `${used} ${used === 1 ? 'relation is' : 'relations are'} still of type "${label}": change or delete ${used === 1 ? 'it' : 'them'} first.`
+  if (used) return `${used} ${used === 1 ? 'relation is' : 'relations are'} still of type ${relationTypeName(state.metamodel, typeId)}: change or delete ${used === 1 ? 'it' : 'them'} first.`
+  return milestoneHoldsType(milestones, typeId, 'relation', state.metamodel)
+    ?? (state.metamodel ? checkRemoveRelationTypeFromMetamodel(state.metamodel, typeId) : null)
+    ?? viewNamesType(state.views, typeId, 'relation', state.metamodel)
 }
 
 // ── Relations ────────────────────────────────────────────────────────────────
