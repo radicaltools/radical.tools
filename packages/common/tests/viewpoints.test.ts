@@ -223,7 +223,17 @@ describe('viewpoint subjects', () => {
     expect(members()).toEqual([['Order', 'order', 'States'], ['Payment', 'payment', 'States']])
     // Each shows its element open, folded on the model or not.
     expect(model.viewsOfGroup(state.views, 'g').map((v) => v.expandedNodeIds)).toEqual([['order'], ['payment']])
-    expect(model.planViewGroups(state)).toEqual({ add: [], remove: [], refolder: [], unlist: [] })
+    expect(model.planViewGroups(state)).toEqual({ add: [], remove: [], refolder: [], unlist: [], rename: [] })
+    // A group's view is named after its element, also after the name was
+    // emptied on the way (the properties card writes each keystroke).
+    model.patchNode(state, 'order', { label: '' })
+    model.syncViewGroups(state, newId)
+    model.patchNode(state, 'order', { label: 'Purchase' })
+    expect(model.planViewGroups(state).rename).toEqual(['v1'])
+    expect(model.syncViewGroups(state, newId)).toBe(true)
+    expect(state.views.v1.name).toBe('Purchase')
+    model.patchNode(state, 'order', { label: 'Order' })
+    model.syncViewGroups(state, newId)
     // A list of elements of its own, in a group's view or the group (a
     // model written before they were refused), goes: it hid what the
     // element holds.

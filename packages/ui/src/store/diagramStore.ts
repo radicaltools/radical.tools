@@ -2105,7 +2105,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // (not while a milestone, with its own elements, is on screen).
         if (!get().activeSnapshotId) {
           const plan = model.planViewGroups(get() as unknown as model.ModelState)
-          if (plan.add.length || plan.remove.length || plan.refolder.length || plan.unlist.length) {
+          if (plan.add.length || plan.remove.length || plan.refolder.length || plan.unlist.length || plan.rename.length) {
             set((state) => { model.syncViewGroups(state as unknown as model.ModelState, uid) })
           }
         }
