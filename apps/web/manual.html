@@ -622,7 +622,7 @@
           <figcaption>Viewer: everything you can do in Designer to <em>look</em>, nothing that changes the saved model.</figcaption>
         </figure>
         <p>
-          <strong>Viewer</strong> is a sandbox. Every view opens with the layout it has in Designer; drag, collapse, re-layout, switch views and milestones — all of it is thrown away when you return to Designer (which shows the milestone, or the live model, it showed before, on the view you were looking at, laid out as Designer has it), so you can explore freely in front of others. It is also the perspective the <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a> uses to show concepts.
+          <strong>Viewer</strong> is a sandbox. Every view opens with the layout it has in Designer; drag, collapse, re-layout, switch views and milestones — all of it is thrown away when you return to Designer (which shows the milestone, or the live model, it showed before, on the view you were looking at, laid out as Designer has it), so you can explore freely in front of others. The metamodel editor, opened from Viewer or Presenter, edits Designer's model: what was explored is thrown away first. Adding to the model, with <a href="#hub">Import from Hub</a> or <a href="#forge">Radical Forge</a>, switches to Designer. It is also the perspective the <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a> uses to show concepts.
         </p>
         <figure class="doc-shot">
           <img class="shot-light" src="screenshots/presenter-light.png?v=__BUILD__" alt="Presenter perspective: the slide dock along the bottom lists the Architecture Walkthrough slides with Present and Add slide buttons" loading="lazy" />
@@ -975,6 +975,7 @@
           <li><strong>Templates</strong> — concepts with parameters (a latency budget, an endpoint, a data class) ask for values on import; the <em>Hub template</em> section in the element's properties lets you change them later.</li>
           <li><strong>Blueprints</strong> — pick which elements and which referenced concepts to bring in. Every blueprint ships one <a href="#mockups">screen flow</a> per actor (mockups with wireframes) and named views: on the canvas <em>System context</em>, <em>Containers</em>, <em>Governance map</em>, <em>Mockups</em> (every screen flow with its wireframes), its technical flow and one Flow view per screen flow; in the wiki <em>Governance</em> and <em>Requirements</em>. In the Hub, the view selector next to <em>Canvas / Wiki / Table</em> lists the views of the current mode; on import they arrive as views of your model, limited to the elements you picked.</li>
           <li><strong>Drop target</strong> — with a compatible container selected, imported elements become its children. Otherwise they land in free room nearest the middle of the screen.</li>
+          <li><strong>Into Designer</strong> — <em>Add to Model</em> in Viewer, where the Hub's link opens a model, switches to Designer first, and the concept is saved with the model.</li>
           <li><strong>One step</strong> — whatever one <em>Add to Model</em> brings in (the concept, its related concepts, a blueprint's parts) is taken back by one Undo.</li>
         </ul>
       </section>
