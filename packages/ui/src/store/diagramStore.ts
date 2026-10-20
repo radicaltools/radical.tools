@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { produce } from 'immer'
 import { immer } from 'zustand/middleware/immer'
 import {
   Node,
@@ -241,18 +242,58 @@ function _entryModel(entry: HistoryEntry): DiagramData {
   }
 }
 
+/** What a merged model holds that it cannot: an element whose container
+ *  is gone (with what it holds and their relations) and a relation to an
+ *  element that is gone. A step brought them back on a model an outside
+ *  change had taken their container or other end from (Undo of a delete
+ *  after the agent deleted the API: "charges card" from no element). Taken
+ *  out; returns the names of what was. */
+function _withoutStrays(parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' | 'views' | 'defaultLayoutConstraints'>): { parts: typeof parts; dropped: string[] } {
+  const dropped: string[] = []
+  const next = produce(parts, (draft) => {
+    const state = { ...draft, activeViewId: null } as unknown as model.ModelState
+    for (const node of Object.values(parts.c4Nodes)) {
+      if (!node.parentId || parts.c4Nodes[node.parentId] || !state.c4Nodes[node.id]) continue
+      dropped.push(node.label || node.id)
+      model.deleteNode(state, node.id)
+    }
+    for (const [id, rel] of Object.entries(state.c4Relations)) {
+      const ends = [state.c4Nodes[rel.sourceId], state.c4Nodes[rel.targetId]]
+      if (ends.every(Boolean)) continue
+      const end = ends.find(Boolean)
+      dropped.push(rel.label || (end ? `a relation of ${end.label}` : 'a relation'))
+      delete state.c4Relations[id]
+    }
+    // Set anew, not changed in place (forgetNodesInViews).
+    draft.defaultLayoutConstraints = state.defaultLayoutConstraints ?? []
+  })
+  return { parts: next, dropped }
+}
+
 /** What the step `change` makes, made on the model `now`: a three-way merge
  *  from `change.from` (mergeModels). Where the model changed since in a
- *  value the step changes too, it stays as it is now (`conflicts`). Shown
- *  on the canvas of `change.to`, as Undo goes back to its step's canvas. */
-function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[] } {
+ *  value the step changes too, it stays as it is now (`conflicts`); what
+ *  the step brings back that has no place left in it does not come back
+ *  (`dropped`, _withoutStrays). Shown on the canvas of `change.to`, as Undo
+ *  goes back to its step's canvas. */
+function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[]; dropped: string[] } {
   const { merged, conflicts } = mergeModels(_entryModel(change.from), _entryModel(change.to), _entryModel(now))
+  const mergedNodes: Record<string, C4Node> = {}
+  for (const n of merged.nodes) mergedNodes[n.id] = n
+  const mergedRelations: Record<string, C4Relation> = {}
+  for (const r of merged.relations) mergedRelations[r.id] = r
+  const mergedViews: Record<string, DiagramView> = {}
+  for (const v of merged.views ?? []) mergedViews[v.id] = v
+  const { parts, dropped } = _withoutStrays({
+    c4Nodes: mergedNodes,
+    c4Relations: mergedRelations,
+    views: mergedViews,
+    defaultLayoutConstraints: merged.defaultLayoutConstraints ?? [],
+  })
   const c4Nodes: Record<string, C4Node> = {}
-  for (const n of merged.nodes) c4Nodes[n.id] = { ...n }
-  const c4Relations: Record<string, C4Relation> = {}
-  for (const r of merged.relations) c4Relations[r.id] = r
-  const views: Record<string, DiagramView> = {}
-  for (const v of merged.views ?? []) views[v.id] = v
+  for (const n of Object.values(parts.c4Nodes)) c4Nodes[n.id] = { ...n }
+  const c4Relations = parts.c4Relations
+  const views = parts.views
   const sequences: Record<string, DiagramSequence> = {}
   for (const q of merged.sequences ?? []) sequences[q.id] = q
   const defaultPositions = merged.defaultPositions ?? {}
@@ -265,7 +306,7 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
       c4Nodes,
       c4Relations,
       views,
-      defaultLayoutConstraints: merged.defaultLayoutConstraints ?? [],
+      defaultLayoutConstraints: parts.defaultLayoutConstraints ?? [],
       defaultEdgeStyle: merged.defaultEdgeStyle ?? 'curved',
       activeViewId,
       defaultPositions,
@@ -273,6 +314,7 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
       hubTemplates: (merged.hubTemplates ?? {}) as Record<string, HubImportRecord>,
     },
     conflicts,
+    dropped,
   }
 }
 
@@ -2280,11 +2322,14 @@ export const useDiagramStore = create<DiagramStore>()(
     // is made on the model as it is now (`now`), keeping that change.
     const _restoreHistoryItem = (item: HistoryItem, now: HistoryEntry, action: 'Undo' | 'Redo'): void => {
       if (!isStepChange(item)) { _restoreHistoryEntry(item); return }
-      const { entry, conflicts } = _rebasedEntry(item, now)
+      const { entry, conflicts, dropped } = _rebasedEntry(item, now)
       _restoreHistoryEntry(entry)
+      const list = (names: string[]): string => names.slice(0, 5).join('; ') + (names.length > 5 ? ` and ${names.length - 5} more` : '')
       if (conflicts.length) {
-        const shown = conflicts.slice(0, 5).join('; ') + (conflicts.length > 5 ? ` and ${conflicts.length - 5} more` : '')
-        get().pushNotification(`${action} kept what was changed outside Studio since that step: ${shown}.`, 'info')
+        get().pushNotification(`${action} kept what was changed outside Studio since that step: ${list(conflicts)}.`, 'info')
+      }
+      if (dropped.length) {
+        get().pushNotification(`${action} left out what needs an element removed outside Studio since that step: ${list(dropped)}.`, 'info')
       }
     }
 

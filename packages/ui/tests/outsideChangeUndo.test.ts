@@ -151,6 +151,33 @@ describe('Undo after an outside change', () => {
     expect(s().notifications.length).toBe(notices)
   })
 
+  it('brings back no relation to an element removed outside Studio, and says so (item 127)', () => {
+    s().addRelation({ sourceId: 'a', targetId: 'b', label: 'charges card' })
+    s().removeNode('b')
+    expect(Object.keys(s().c4Relations)).toEqual([])
+    outsideChange((d) => { d.nodes = d.nodes.filter((n) => n.id !== 'a') })
+    s().undo()
+    expect(s().c4Nodes.b).toBeDefined()
+    expect(s().c4Nodes.a).toBeUndefined()
+    expect(Object.values(s().c4Relations)).toEqual([])
+    expect(lastNotice()).toMatch(/outside Studio.*charges card/)
+  })
+
+  it('brings back no element whose container was removed outside Studio, and says so (item 127)', () => {
+    const db = s().addNode({ type: 'container', label: 'Orders DB', parentId: 'a', x: 40, y: 80, ...NODE_SIZES.container, collapsed: false } as Omit<C4Node, 'id'>)
+    s().addRelation({ sourceId: 'b', targetId: db, label: 'reads' })
+    s().removeNode(db)
+    outsideChange((d) => {
+      d.nodes = d.nodes.filter((n) => n.id !== 'a')
+      for (const v of d.views ?? []) v.nodeIds = v.nodeIds.filter((id) => id !== 'a')
+    })
+    s().undo()
+    expect(s().c4Nodes[db]).toBeUndefined()
+    expect(Object.values(s().c4Relations)).toEqual([])
+    expect(s().views.one.nodeIds).not.toContain(db)
+    expect(lastNotice()).toMatch(/outside Studio.*Orders DB/)
+  })
+
   it('another model loaded still forgets the history', () => {
     s().updateNode('a', { label: 'Shop' })
     s().loadDiagram(model())
