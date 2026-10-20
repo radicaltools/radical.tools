@@ -21,6 +21,7 @@ import {
   hasPlaceUnder,
   inferRelationType,
   isParentAllowed,
+  isFinalState,
   isPlacementAllowed,
   isRelationAllowed,
   placeOf,
@@ -115,9 +116,14 @@ function typeLabel(mm: Metamodel | undefined, type: string): string {
 /** Where a node of `type` was refused, and what it may sit in: the end of
  *  "Cannot place Component inside …". A group that the type may sit in
  *  refuses it for where the group stands. */
+const FINAL_HOLDS_NOTHING = 'a final state cannot contain other states.'
+
 function placementError(mm: Metamodel | undefined, type: string, parent: C4Node | undefined, nodes: Record<string, C4Node>): string {
   const allowed = mm?.nodeTypes[type]?.allowedParents
   const parentLabel = parent ? typeLabel(mm, parent.type) : 'the canvas root'
+  if (parent && isParentAllowed(mm, type, parent.type) && isFinalState(parent)) {
+    return `Final ${parentLabel.toLowerCase()} "${parent.label}": ${FINAL_HOLDS_NOTHING}`
+  }
   if (parent && isParentAllowed(mm, type, parent.type)) {
     const place = placeOf(parent, nodes)
     const where = place ? `inside ${typeLabel(mm, place.type)} "${place.label}"` : 'at the top of the model'
@@ -192,7 +198,7 @@ export function insertNode(state: ModelState, id: string, node: Omit<C4Node, 'id
 export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<Omit<C4Node, 'id'>>): string | null {
   const existing = state.c4Nodes[id]
   if (!existing) return null
-  if (!('parentId' in updates) && !('type' in updates)) return null
+  if (!('parentId' in updates) && !('type' in updates) && !('kind' in updates)) return null
   const newType = (updates.type as string | undefined) ?? existing.type
   const newParentId = ('parentId' in updates ? (updates.parentId as string | null | undefined) : existing.parentId) ?? undefined
   const parent = newParentId ? state.c4Nodes[newParentId] : undefined
@@ -207,6 +213,11 @@ export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<
   }
   const misplaced = 'parentId' in updates ? misplacedInGroup(state, { ...existing, type: newType } as C4Node, parent) : undefined
   if (misplaced) return groupContentsError(state.metamodel, existing, misplaced)
+  // A state made final keeps its children: it would hold them.
+  if (isFinalState({ ...existing, ...updates } as C4Node) && !isFinalState(existing)) {
+    const held = Object.values(state.c4Nodes).filter((n) => n.parentId === id).length
+    if (held > 0) return `Cannot make ${typeLabel(state.metamodel, newType)} "${existing.label}" final: it holds ${held} element${held === 1 ? '' : 's'}, and ${FINAL_HOLDS_NOTHING}`
+  }
   // A retyped element keeps its relations: each must be one the metamodel
   // has between the new type and the other end.
   if (newType !== existing.type) {

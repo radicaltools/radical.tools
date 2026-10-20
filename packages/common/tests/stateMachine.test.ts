@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation } from '../src/c4'
 import { isContainerType } from '../src/c4'
-import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, composeEarsSentence, relationDisplayLabel, requirementStatePhrase, validateModel } from '../src/metamodel'
+import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, composeEarsSentence, isPlacementAllowed, relationDisplayLabel, requirementStatePhrase, validateModel } from '../src/metamodel'
+import { checkAddNode, checkNodeUpdate, checkReparent, type ModelState } from '../src/model'
+import { addChoices } from '../src/viewPipeline'
 
 const mm = builtInGovernanceMetamodel()
 const pairsOf = (rel: string) => mm.relationTypes[rel].allowedPairs.map((p) => `${p.from}->${p.to}`)
@@ -192,6 +194,42 @@ describe('state machine rules', () => {
     const cancel = node('event', 'Cancel', m.machine.id)
     const relations = [...m.relations, transition(m.paid, cancelled, { event: cancel.id })]
     expect(issuesOf([...m.nodes, cancelled, cancel], relations)).toEqual([])
+  })
+})
+
+// The validation flags a final state that holds anything; every way of
+// putting something there refuses it first, with the reason.
+describe('a final state holds nothing', () => {
+  const stateOf = (nodes: C4Node[]): ModelState => ({
+    c4Nodes: byId(nodes), c4Relations: {}, sequences: {}, views: {}, activeViewId: null, metamodel: mm,
+  } as unknown as ModelState)
+  const draft = (type: string, parentId: string) =>
+    ({ type, label: 'New', parentId, collapsed: false, x: 0, y: 0, width: 160, height: 60 }) as unknown as Omit<C4Node, 'id'>
+
+  it('refuses a state or pseudostate added, moved or placed inside it', () => {
+    const m = orderMachine()
+    const s = stateOf(m.nodes)
+    expect(isPlacementAllowed(mm, 'state', m.shipped, s.c4Nodes)).toBe(false)
+    expect(isPlacementAllowed(mm, 'state', m.pending, s.c4Nodes)).toBe(true)
+    expect(checkAddNode(s, draft('state', m.shipped.id))).toBe('Cannot place State inside Final state "Shipped": a final state cannot contain other states.')
+    expect(checkAddNode(s, draft('pseudostate', m.shipped.id))).toMatch(/final state cannot contain other states/)
+    expect(checkAddNode(s, draft('state', m.pending.id))).toBeNull()
+    expect(checkReparent(s, [m.pending.id], m.shipped.id)).toMatch(/Cannot place State "Pending" inside Final state "Shipped"/)
+    expect(checkNodeUpdate(s, m.pending.id, { parentId: m.shipped.id })).toMatch(/final state cannot contain other states/)
+  })
+
+  it('refuses making a state that holds states final', () => {
+    const m = orderMachine()
+    const s = stateOf(m.nodes)
+    expect(checkNodeUpdate(s, m.packing.id, { kind: 'final' } as Partial<C4Node>)).toBe('Cannot make State "Packing" final: it holds 2 elements, and a final state cannot contain other states.')
+    expect(checkNodeUpdate(s, m.pending.id, { kind: 'final' } as Partial<C4Node>)).toBeNull()
+  })
+
+  it('offers nothing to add under it in a table', () => {
+    const m = orderMachine()
+    const ctx = { nodes: byId(m.nodes), relations: m.relations, metamodel: mm }
+    expect(addChoices(undefined, ctx, { node: m.shipped, depth: 0 })).toEqual([])
+    expect(addChoices(undefined, ctx, { node: m.pending, depth: 0 }).map((c) => c.type)).toEqual(expect.arrayContaining(['state', 'pseudostate']))
   })
 })
 

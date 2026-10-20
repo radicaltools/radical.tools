@@ -117,11 +117,20 @@ export function hasPlaceUnder(metamodel: Metamodel | undefined, childType: strin
   return false
 }
 
+/** A final state of a state machine: the machine (or its region) ends
+ *  there, and it holds nothing (SCXML). Its type lists itself among the
+ *  allowed parents of states, for compound ones, so allowedParents alone
+ *  lets a state go into it. */
+export function isFinalState(node: PlacedNode | undefined): boolean {
+  return node?.type === 'state' && (node as { kind?: unknown }).kind === 'final'
+}
+
 /**
  * Returns true when a node of `childType` may be placed inside `parent` (or
  * at the root, when undefined) of a model with these `nodes`.
  *
- * It is `isParentAllowed`, and one thing more: a group gives no place that
+ * It is `isParentAllowed`, and two things more: a final state holds
+ * nothing (`isFinalState`), and a group gives no place that
  * the element could not have without it. A type that lists the group among
  * its allowedParents may sit in a group only where the group stands (see
  * `placeOf`) has a place for it (`hasPlaceUnder`). So a group at the top of
@@ -135,6 +144,7 @@ export function isPlacementAllowed<N extends PlacedNode>(
   nodes: Record<string, N>,
 ): boolean {
   if (!isParentAllowed(metamodel, childType, parent?.type)) return false
+  if (isFinalState(parent)) return false
   if (!parent || parent.type !== GROUP_TYPE) return true
   return hasPlaceUnder(metamodel, childType, placeOf(parent, nodes)?.type)
 }
