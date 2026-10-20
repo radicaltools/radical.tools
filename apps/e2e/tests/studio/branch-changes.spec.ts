@@ -142,17 +142,21 @@ test('a removed element is drawn inside its container on a view laid out its own
   await card('Containers').click()
   const ghost = studio.node('legacy')
   await expect(ghost).toHaveClass(/rf-node-ghost/)
+  await studio.settle()
   const box = async (id: string) => (await studio.node(id).boundingBox())!
-  const [g, shop, api, fraud] = [await box('legacy'), await box('shop'), await box('api'), await box('fraud')]
-  // Inside the shop's frame, over neither of the containers it holds.
-  expect(g.x).toBeGreaterThanOrEqual(shop.x)
-  expect(g.y).toBeGreaterThanOrEqual(shop.y)
-  expect(g.x + g.width).toBeLessThanOrEqual(shop.x + shop.width + 0.5)
-  expect(g.y + g.height).toBeLessThanOrEqual(shop.y + shop.height + 0.5)
-  for (const other of [api, fraud]) {
-    const apart = g.x + g.width <= other.x || other.x + other.width <= g.x || g.y + g.height <= other.y || other.y + other.height <= g.y
-    expect(apart).toBe(true)
-  }
+  // Inside the shop's frame, over neither of the containers it holds. Read
+  // again until the camera has come to rest: boxes taken while it still
+  // moves belong to different frames.
+  await expect.poll(async () => {
+    const [g, shop, api, fraud] = [await box('legacy'), await box('shop'), await box('api'), await box('fraud')]
+    const problems: string[] = []
+    if (g.x < shop.x || g.y < shop.y || g.x + g.width > shop.x + shop.width + 0.5 || g.y + g.height > shop.y + shop.height + 0.5) problems.push('outside the shop')
+    for (const [name, other] of [['api', api], ['fraud', fraud]] as const) {
+      const apart = g.x + g.width <= other.x || other.x + other.width <= g.x || g.y + g.height <= other.y || other.y + other.height <= g.y
+      if (!apart) problems.push(`over ${name}`)
+    }
+    return problems
+  }, { timeout: 10_000 }).toEqual([])
 })
 
 test('a base saved since HEAD says so', async ({ page, studio }) => {
