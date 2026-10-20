@@ -59,7 +59,10 @@ const SIDECAR_FILES = new Set([
   HUB_TEMPLATES_FILE,
 ])
 
-const FORMAT_VERSION = 1
+/** The version of the Markdown-folder format this code reads and writes
+ *  (`version` in radical.md), independent of the product's version. */
+export const MD_FOLDER_FORMAT_VERSION = 1
+const FORMAT_VERSION = MD_FOLDER_FORMAT_VERSION
 
 /** Node keys that are layout/state, not semantic — kept out of the `.md`. */
 const NODE_LAYOUT_KEYS = new Set(['x', 'y', 'width', 'height', 'collapsed'])

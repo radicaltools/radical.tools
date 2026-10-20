@@ -1,6 +1,16 @@
 name: Publish to npm
 
+# Triggers:
+#   • Push a release tag "v*" (npm run release:tag on main, then git push origin v<version>)
+#     → verifies and publishes the CLI and the MCP server, on the dist-tag next
+#       for a pre-release (v1.0.0-rc.1); a version npm already has is skipped,
+#       so a rerun publishes what is left
+#   • Manual run from the GitHub UI for one package, a dry run by default;
+#     a real publish only from main
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       package:
@@ -19,22 +29,27 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: npm-publish-${{ inputs.package }}
-  cancel-in-progress: false
-
 jobs:
   publish:
-    name: Publish ${{ inputs.package }}
+    name: Publish ${{ matrix.package }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # A release tag publishes both; a manual run the package chosen.
+        package: ${{ github.event_name == 'push' && fromJSON('["cli","mcp"]') || fromJSON(format('["{0}"]', inputs.package)) }}
+    concurrency:
+      group: npm-publish-${{ matrix.package }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
     env:
-      PACKAGE: ${{ inputs.package }}
+      PACKAGE: ${{ matrix.package }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
     steps:
       - name: Publish only from main
-        if: ${{ !inputs.dry-run && github.ref != 'refs/heads/main' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.dry-run && github.ref != 'refs/heads/main' }}
         run: |
           echo '::error::Publish npm releases from main after the pull request is merged.'
           exit 1
@@ -45,6 +60,19 @@ jobs:
             *) echo '::error::Select cli or mcp.'; exit 1 ;;
           esac
       - uses: actions/checkout@v4
+        with:
+          # The build shows the bare version only on the commit tagged
+          # v<version>; the whole history tells whether that commit is on main.
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Release tag is on main and matches the product version
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME is not on main. Tag a release on main after its pull request is merged."
+            exit 1
+          fi
+          node tools/release.mjs check "$GITHUB_REF_NAME"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -52,20 +80,39 @@ jobs:
           package-manager-cache: false
       - name: Install npm with trusted publishing support
         run: npm install --global npm@11
-      - run: npm ci --ignore-scripts
-      - run: npm run check:workspaces
-      - run: npm run typecheck
-      - run: npm test
+      - name: Skip a version npm already has
+        run: |
+          VERSION="$(node -p "require('./apps/$PACKAGE/package.json').version")"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          if npm view "@radicaltools/$PACKAGE@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::@radicaltools/$PACKAGE@$VERSION is on npm already; nothing to publish."
+            echo "PUBLISHED=true" >> "$GITHUB_ENV"
+          fi
+      - if: ${{ env.PUBLISHED != 'true' }}
+        run: npm ci --ignore-scripts
+      - if: ${{ env.PUBLISHED != 'true' }}
+        run: npm run check:workspaces
+      - if: ${{ env.PUBLISHED != 'true' }}
+        run: npm run typecheck
+      - if: ${{ env.PUBLISHED != 'true' }}
+        run: npm test
       - name: Verify the installable tarball
+        if: ${{ env.PUBLISHED != 'true' }}
         run: npm run test:package -w "@radicaltools/$PACKAGE" -- --out-dir ../../release
       - uses: actions/upload-artifact@v4
+        if: ${{ env.PUBLISHED != 'true' }}
         with:
-          name: radical-tools-${{ inputs.package }}-npm
-          path: release/radicaltools-${{ inputs.package }}-*.tgz
+          name: radical-tools-${{ matrix.package }}-npm
+          path: release/radicaltools-${{ matrix.package }}-*.tgz
           if-no-files-found: error
+      # A pre-release (1.0.0-rc.1) goes to the dist-tag next, so npx and ^
+      # ranges keep the stable version.
+      - name: Choose the dist-tag
+        if: ${{ env.PUBLISHED != 'true' }}
+        run: echo "DIST_TAG=$(case "$VERSION" in *-*) echo next ;; *) echo latest ;; esac)" >> "$GITHUB_ENV"
       - name: Check the publish command without releasing
-        if: ${{ inputs.dry-run }}
-        run: npm publish ./release/radicaltools-"$PACKAGE"-*.tgz --access public --provenance --dry-run
+        if: ${{ env.PUBLISHED != 'true' && env.DRY_RUN == 'true' }}
+        run: npm publish ./release/radicaltools-"$PACKAGE"-*.tgz --access public --provenance --tag "$DIST_TAG" --dry-run
       - name: Publish the verified tarball with OIDC
-        if: ${{ !inputs.dry-run }}
-        run: npm publish ./release/radicaltools-"$PACKAGE"-*.tgz --access public --provenance
+        if: ${{ env.PUBLISHED != 'true' && env.DRY_RUN != 'true' }}
+        run: npm publish ./release/radicaltools-"$PACKAGE"-*.tgz --access public --provenance --tag "$DIST_TAG"

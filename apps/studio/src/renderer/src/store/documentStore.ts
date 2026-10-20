@@ -19,7 +19,7 @@ import {
   type FolderFiles,
 } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
-import { agentWritingUntil } from '@radical/common/formats/agentActivity'
+import { agentWritingUntil, parseAgentActivity, type AgentActivity } from '@radical/common/formats/agentActivity'
 import {
   webFolderSupported,
   webFileSupported,
@@ -710,6 +710,10 @@ export interface DocumentsAPI {
    *  folder over MCP (agentActivity); 0 when none does, or for other
    *  documents. */
   agentWritingUntil(id: string): Promise<number>
+  /** The activity file an agent's MCP server last wrote into an md-folder
+   *  document's folder (which client, which product version), or null when
+   *  there is none, it does not read, or the document is no folder. */
+  readAgentActivity(id: string): Promise<AgentActivity | null>
 
   /** The agent Forge run status file of an md-folder document (written by
    *  the MCP server), or null when there is none or it cannot be read. */
@@ -736,6 +740,22 @@ export interface DocumentsAPI {
 
   /** True for the document ensureActive() seeded on this boot (first visit). */
   isBootSeeded(id: string): boolean
+}
+
+/** The text of an md-folder document's agent activity file (agentActivity),
+ *  or null when there is none, it cannot be read, or the document is no
+ *  folder (or a browser folder not yet connected). */
+async function readAgentActivityText(id: string): Promise<string | null> {
+  const meta = readIndex().docs.find((d) => d.id === id)
+  if (meta?.source !== 'md') return null
+  const h = host()
+  if (meta.folderPath && h.readAgentActivity) {
+    const res = await h.readAgentActivity(meta.folderPath).catch(() => null)
+    return res?.success ? res.content ?? null : null
+  }
+  if (h.readFolder || !connectedWebHandles.has(id)) return null
+  const handle = await loadHandle(id)
+  return handle ? readAgentActivityFromHandle(handle) : null
 }
 
 export const documents: DocumentsAPI = {
@@ -1190,16 +1210,11 @@ export const documents: DocumentsAPI = {
   },
 
   async agentWritingUntil(id) {
-    const meta = readIndex().docs.find((d) => d.id === id)
-    if (meta?.source !== 'md') return 0
-    const h = host()
-    if (meta.folderPath && h.readAgentActivity) {
-      const res = await h.readAgentActivity(meta.folderPath).catch(() => null)
-      return res?.success ? agentWritingUntil(res.content) : 0
-    }
-    if (h.readFolder || !connectedWebHandles.has(id)) return 0
-    const handle = await loadHandle(id)
-    return handle ? agentWritingUntil(await readAgentActivityFromHandle(handle)) : 0
+    return agentWritingUntil(await readAgentActivityText(id))
+  },
+
+  async readAgentActivity(id) {
+    return parseAgentActivity(await readAgentActivityText(id))
   },
 
   async readForgeRun(id) {

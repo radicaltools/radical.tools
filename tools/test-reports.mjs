@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Runs every workspace's tests as `npm test` does and keeps a Vitest JSON
-// report of each in reports/<workspace>.json, for `radical check --report
-// reports`. Run with `npm run test:reports`. Unlike `npm test` it goes on
+// report of each in reports/<workspace>.json, and of tools/ in
+// reports/tools.json, for `radical check --report reports`. Run with
+// `npm run test:reports`. Unlike `npm test` it goes on
 // after a failing workspace, so every report is there; it exits 1 when any
 // workspace failed. The e2e suite writes reports/e2e.json itself.
 
@@ -35,6 +36,16 @@ for (const dir of workspaces) {
   })
   if (run.status !== 0) failed.push(pkg.name)
 }
+
+// The repository's own scripts in tools/ (the release script), run from the
+// root as `npm run test:tools` does.
+console.log('\n▶ tools')
+const tools = spawnSync(npm, ['run', 'test:tools', '--', '--reporter=default', '--reporter=json', `--outputFile.json=${join(REPORTS, 'tools.json')}`], {
+  cwd: ROOT,
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+})
+if (tools.status !== 0) failed.push('tools')
 
 if (failed.length) {
   console.error(`\nTests failed in ${failed.join(', ')}; the reports are in reports/.`)

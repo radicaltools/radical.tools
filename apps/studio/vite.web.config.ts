@@ -18,12 +18,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { hubCataloguePlugin } from '@radical/hub-catalogue/vite'
+import { buildDefine } from '@radical/node-files/buildInfo'
 import { RENDERER_MINIFY } from './rendererMinify'
 
 const root = resolve(__dirname, 'src/renderer')
 
 export default defineConfig({
   plugins: [react(), hubCataloguePlugin()],
+  // The product version, commit and day of this build (@radical/common/version).
+  define: buildDefine(__dirname),
   root,
   base: './',
   build: {

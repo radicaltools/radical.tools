@@ -3832,3 +3832,41 @@ label.app-menu-row { cursor: pointer; }
   color: var(--text-secondary); font-size: 11px;
 }
 .mm-subject-type.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+/* ── About Radical Studio (components/AboutDialog.tsx) ───────────────────── */
+.about-dialog {
+  position: relative;
+  width: min(420px, 92vw);
+}
+.about-rows {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 10px 0 18px;
+  font-size: 12.5px;
+}
+.about-rows dt { color: var(--text-secondary, var(--text-primary)); }
+.about-rows dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+.about-rows a, .about-link { color: var(--accent, #3b82f6); text-decoration: none; }
+.about-rows a:hover, .about-link:hover { text-decoration: underline; }
+.about-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+}
+.about-copy {
+  padding: 6px 14px;
+  background: var(--bg-toolbar);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.about-copy:hover { border-color: var(--accent, #3b82f6); }

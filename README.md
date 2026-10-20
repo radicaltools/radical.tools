@@ -122,17 +122,30 @@ npm run test:reports
 npm run check:architecture
 ```
 
-### Releasing the desktop app (maintainers)
+### Releasing (maintainers)
 
-Bump the version and push the tag:
+radical.tools has one product version: the CLI, the MCP server, the Desktop app and the VS Code extension always carry the same one (see the ADR *Product and format versioning* in `architecture/`). Write each user-visible change under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) as you make it; a release moves those entries under its version.
 
 ```bash
-npm version 1.1.0 -w radical-model   # bumps apps/studio/package.json
-git commit -am "release: v1.1.0" && git tag v1.1.0
-git push --follow-tags
+npm run release -- minor          # or major, patch, or a version such as 0.3.0 or 1.0.0-rc.1
 ```
 
-The [Release Desktop App](.github/workflows/release.yml) workflow builds the macOS, Windows and Linux installers and drafts a GitHub Release with them. Review the notes, then publish.
+On `main` it switches to a branch `release/v<version>`, sets the version in the four `package.json` files and the lockfile, cuts the changelog and commits. Push the branch and open a pull request; merging it is the release decision. Then, on an up-to-date `main`:
+
+```bash
+npm run release:tag               # tags the merge commit v<version>
+git push origin v<version>
+```
+
+The tag releases everything at once:
+
+- [Release Desktop App](.github/workflows/release.yml) builds the macOS, Windows and Linux installers and drafts a GitHub Release with the version's changelog section; review it, then publish.
+- [Publish VS Code Extension](.github/workflows/vscode-publish.yml) publishes the extension to the Marketplace (not for a pre-release, which the Marketplace does not take).
+- [Publish to npm](.github/workflows/npm-publish.yml) verifies and publishes `@radicaltools/cli` and `@radicaltools/mcp`, on the dist-tag `next` for a pre-release. It refuses a tag whose commit is not on `main` and skips a version npm already has, so re-running it after a failure publishes what is left.
+
+Each first checks that all four packages carry the tag's version and the changelog has its section. Since pushing a `v*` tag publishes, keep tag creation to maintainers (a tag ruleset in the repository settings).
+
+Every build carries its version, commit and build day: `radical --version`, `radical-mcp --version` and Studio's *About Radical Studio* show them, a build that is not the tagged release as `<version>+<commit>`.
 
 ## Project structure
 

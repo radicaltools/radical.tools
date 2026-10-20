@@ -42,7 +42,8 @@ async function connect() {
       args: [npmCli, 'exec', '--offline', '--workspaces=false', '--', 'radical-mcp', '--folder', folder],
       cwd: project, env,
     }))
-    assert.equal(client.getServerVersion()?.version, manifest.version)
+    // The bare version when built from the commit tagged v<version>, with the commit otherwise.
+    assert.match(client.getServerVersion()?.version ?? '', new RegExp(`^${manifest.version.replace(/\./g, '\\.')}(\\+[0-9a-f]{7,})?$`))
     return client
   } catch (error) {
     await client.close()

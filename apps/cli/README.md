@@ -323,11 +323,11 @@ workspace, `prepublishOnly` runs the type check, unit tests and package check;
 already verified tarball uploads that exact archive. The monorepo root and
 the shared workspaces remain private.
 
-For later releases, bump the CLI version and lockfile before publishing:
-
-```sh
-npm version patch -w @radicaltools/cli --no-git-tag-version
-```
+The CLI shares one product version with the MCP server, the Desktop app and
+the VS Code extension: set it for all of them with `npm run release` (see
+*Releasing* in the root README), never in this workspace alone. `radical
+--version` prints it, with the commit it was built from unless the build is the
+release tagged `v<version>`.
 
 Each package version can be published only once. After the first publish,
 the npm organization's team settings can grant the `developers` team
@@ -356,14 +356,16 @@ Configure a new publisher when a release is ready: its first successful
 publish must happen within two days; a dry run does not validate it.
 See [npm's Trusted Publishing instructions](https://docs.npmjs.com/trusted-publishers/).
 
-Push and merge these changes first. In GitHub **Actions → Publish to npm
-→ Run workflow**, select `main`, choose **package: cli**, and leave **dry-run**
-enabled to validate and upload the npm archive without releasing. After a reviewed version bump,
-run with **dry-run** disabled to publish. A package version can only be
-published once, so bump past any version already published locally.
-
-The workflow type-checks and tests the monorepo, installs and checks the CLI
+A release tag `v<version>` (see *Releasing* in the root README) starts the
+workflow for the CLI and the MCP server together. It checks that the tagged
+commit is on `main` and that the four released packages carry the tag's
+version, type-checks and tests the monorepo, installs and checks the CLI
 tarball outside the repository, uploads that archive as an artifact, and
-publishes the same archive with provenance. Publishing is refused outside
-`main`; branch pushes and desktop release tags do not publish the CLI.
+publishes the same archive with provenance, on the dist-tag `next` for a
+pre-release. A package version can only be published once; a version npm
+already has is skipped, so a rerun publishes what is left.
+
+To validate the archive without a release, use **Actions → Publish to npm →
+Run workflow**, select `main`, choose **package: cli**, and leave **dry-run**
+enabled. With **dry-run** disabled it publishes, but only from `main`.
 

@@ -9,6 +9,7 @@ import { useBranchStore } from '../persistence/branchChanges'
 import { dropPendingMode, useShownMode } from '../route'
 import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
+import { AboutDialog } from './AboutDialog'
 import { HubImportModal } from './HubImportModal'
 import { RadicalForgeModal } from './RadicalForgeModal'
 import { AgentForgeModal } from './AgentForgeModal'
@@ -186,6 +187,14 @@ const IconAI = () => (
   </svg>
 )
 
+const IconInfo = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round">
+    <circle cx="8" cy="8" r="6.2" />
+    <path d="M8 7.2v4" />
+    <circle cx="8" cy="4.9" r="0.4" fill="currentColor" />
+  </svg>
+)
+
 const IconHub = () => (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="2" width="5" height="5" rx="1" />
@@ -238,6 +247,7 @@ function AppMenu({
   onExportPNG,
   onExportSVG,
   onCopyToClipboard,
+  onOpenAbout,
   exportBusy,
 }: {
   onManage: () => void
@@ -257,6 +267,7 @@ function AppMenu({
   onExportPNG: () => void
   onExportSVG: () => void
   onCopyToClipboard: () => void
+  onOpenAbout: () => void
   exportBusy: boolean
 }) {
   const [open, setOpen] = useState(false)
@@ -478,6 +489,15 @@ function AppMenu({
               <span className="app-menu-text">Copy to clipboard</span>
             </button>
           </div>
+
+          <div className="app-menu-divider" />
+
+          <div className="app-menu-section">
+            <button className="app-menu-item" role="menuitem" onClick={run(onOpenAbout)}>
+              <span className="app-menu-icon"><IconInfo /></span>
+              <span className="app-menu-text">About Radical Studio</span>
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -636,6 +656,9 @@ export function Toolbar(): React.ReactElement {
   const [aiSettingsOpen, setAISettingsOpen] = useState(false)
   const handleOpenAISettings = useCallback(() => { setAISettingsOpen(true) }, [])
   const handleCloseAISettings = useCallback(() => { setAISettingsOpen(false) }, [])
+  const [aboutOpen, setAboutOpen] = useState(false)
+  const handleOpenAbout = useCallback(() => { setAboutOpen(true) }, [])
+  const handleCloseAbout = useCallback(() => { setAboutOpen(false) }, [])
 
   const [forgeOpen, setForgeOpen] = useState(false)
   const handleOpenForge = useCallback(() => { setForgeOpen(true) }, [])
@@ -701,6 +724,7 @@ export function Toolbar(): React.ReactElement {
   return (
     <div className="toolbar">
       <AISettingsModal open={aiSettingsOpen} onClose={handleCloseAISettings} />
+      <AboutDialog open={aboutOpen} onClose={handleCloseAbout} />
       <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} />
       <RadicalForgeModal open={forgeOpen} onClose={handleCloseForge} />
       <AgentForgeModal open={agentForgeOpen && !forgeOpen} onClose={closeAgentForge} />
@@ -717,6 +741,7 @@ export function Toolbar(): React.ReactElement {
         metamodelActive={appMode === 'metamodel'}
         onToggleMetamodel={() => setAppMode(appMode === 'metamodel' ? 'designer' : 'metamodel')}
         onOpenAISettings={handleOpenAISettings}
+        onOpenAbout={handleOpenAbout}
         onOpenHub={handleOpenHub}
         onOpenForge={handleOpenForge}
         onExportPNG={handleExportPNG}

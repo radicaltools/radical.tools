@@ -98,8 +98,9 @@ Branch naming: `feature/<name>`, `hotfix/<name>`, `docs/<name>`.
 2. **Write or update tests** for changed behaviour (run `npm test`).
 3. **Type-check** — `npm run typecheck` must pass with no errors.
 4. **Keep PRs focused** — one feature or fix per PR.
-5. **Describe what and why** in the PR description.
-6. A maintainer will review and merge or request changes.
+5. **Add a changelog entry** under `## [Unreleased]` in `CHANGELOG.md` for a change users can see; a release moves those entries under its version (see *Releasing* in the README).
+6. **Describe what and why** in the PR description.
+7. A maintainer will review and merge or request changes.
 
 ## Coding conventions
 
