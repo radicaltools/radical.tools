@@ -1932,8 +1932,6 @@ export const useDiagramStore = create<DiagramStore>()(
           views[id] = { ...v, treemapFocusId: now.treemapFocusId, wikiFocusId: now.wikiFocusId, tableActiveTab: now.tableActiveTab } as DiagramView
         }
         state.views = views as any
-        // The metamodel is in no step: a view of a viewpoint follows it as it is now.
-        model.syncViewpoints(state as unknown as model.ModelState)
         state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
         state.defaultEdgeStyle = entry.defaultEdgeStyle
         state.defaultPositions = entry.defaultPositions as any
@@ -1946,6 +1944,11 @@ export const useDiagramStore = create<DiagramStore>()(
         state.canUndo = _undoStack.length > 0
         state.canRedo = _redoStack.length > 0
       })
+      // The metamodel is in no step: a view of a viewpoint follows it as it
+      // is now. On drafts of the views: in the pass above they are the
+      // entry's own, frozen, and changing them threw once the step was off
+      // the stack (Undo after "Save as viewpoint… → Replace").
+      set((state) => { model.syncViewpoints(state as unknown as model.ModelState) })
       get()._sync()
       if (canvasChanged && typeof window !== 'undefined') {
         const viewId = get().activeViewId
@@ -2135,6 +2138,15 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           }
           state.rfEdges = derivedEdges as any
+          // What is selected and gone (taken back by an undo, not in the
+          // milestone opened) is selected no more: it left an empty
+          // properties card and "1 node selected".
+          if (state.selectedNodeIds.some((id) => !mergedNodes[id]) || (state.selectedNodeId && !mergedNodes[state.selectedNodeId])) {
+            state.selectedNodeIds = state.selectedNodeIds.filter((id) => !!mergedNodes[id])
+            state.selectedNodeId = state.selectedNodeIds[0] ?? null
+          }
+          const edgeId = state.selectedEdgeId
+          if (edgeId && !mergedRels[edgeId] && !derivedEdges.some((e) => e.id === edgeId)) state.selectedEdgeId = null
           // The nodes and edges are rebuilt: keep the selection painted.
           mirrorSelection(state as DiagramStore)
         })
@@ -3216,31 +3228,39 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
       },
       removeNodeFromView(viewId, nodeIds) {
-        const ids = typeof nodeIds === 'string' ? [nodeIds] : nodeIds
+        const { c4Nodes } = get()
+        const ids = (typeof nodeIds === 'string' ? [nodeIds] : nodeIds).filter((id) => !!c4Nodes[id])
+        const view = get().views[viewId]
         // A group's views show what their element holds: nothing is hidden by hand.
-        if (!get().views[viewId] || ids.length === 0 || setByGroup(get(), viewId)) return
-        get()._pushUndo()
-        set((state) => {
-          const view = state.views[viewId]
-          // Remove the nodes AND all their descendants as one unit.
-          // Without cascading, children remaining in nodeIds cause
-          // computeViewNodeSet to re-include the parent (ancestor walk),
-          // so the parent would keep appearing even after its eye was toggled off.
-          const toRemove = new Set(ids.flatMap((id) => [id, ...getDescendants(id, state.c4Nodes)]))
-          if (viewShowsEveryNode(view as DiagramView)) {
+        if (!view || ids.length === 0 || setByGroup(get(), viewId)) return
+        // Remove the nodes AND all their descendants as one unit.
+        // Without cascading, children remaining in nodeIds cause
+        // computeViewNodeSet to re-include the parent (ancestor walk),
+        // so the parent would keep appearing even after its eye was toggled off.
+        const toRemove = new Set(ids.flatMap((id) => [id, ...getDescendants(id, c4Nodes)]))
+        const hide = (v: DiagramView): void => {
+          if (viewShowsEveryNode(v)) {
             // Empty nodeIds means "show all". First removal transitions to
             // "show all except this subtree" by explicitly listing every other node.
-            view.nodeIds = Object.keys(state.c4Nodes).filter(id => !toRemove.has(id))
-            if (view.nodeIds.length === 0) view.empty = true
+            v.nodeIds = Object.keys(c4Nodes).filter(id => !toRemove.has(id))
+            if (v.nodeIds.length === 0) v.empty = true
           } else {
-            removeFromViewList(view as DiagramView, toRemove)
+            removeFromViewList(v, toRemove)
           }
           // Also clean up per-view collapse state for all removed nodes
-          if (view.collapsedNodeIds?.length)
-            view.collapsedNodeIds = view.collapsedNodeIds.filter((nid) => !toRemove.has(nid))
-          if (view.expandedNodeIds?.length)
-            view.expandedNodeIds = view.expandedNodeIds.filter((nid) => !toRemove.has(nid))
-        })
+          if (v.collapsedNodeIds?.length)
+            v.collapsedNodeIds = v.collapsedNodeIds.filter((nid) => !toRemove.has(nid))
+          if (v.expandedNodeIds?.length)
+            v.expandedNodeIds = v.expandedNodeIds.filter((nid) => !toRemove.has(nid))
+        }
+        // Nothing it would take out of the view (an element it does not
+        // list): no undo step. One that changed nothing dropped the redo.
+        const probe = { ...view } as DiagramView
+        hide(probe)
+        const fields = (v: DiagramView) => JSON.stringify([v.nodeIds, v.empty ?? false, v.collapsedNodeIds ?? [], v.expandedNodeIds ?? []])
+        if (fields(probe) === fields(view)) return
+        get()._pushUndo()
+        set((state) => { hide(state.views[viewId] as DiagramView) })
         get()._sync()
       },
       setViewNodes(viewId, nodeIds) {
@@ -3404,7 +3424,11 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       setViewKind(viewId, kind) {
-        if (setByGroup(get(), viewId)) return
+        const view = get().views[viewId]
+        if (!view || setByGroup(get(), viewId)) return
+        // Nothing changes: no undo step.
+        if ((view.kind ?? 'static') === kind && !view.viewpoint && !view.subject) return
+        get()._pushUndo()
         set((state) => { model.setViewKind(state, viewId, kind) })
         get()._sync()
       },
@@ -3428,6 +3452,10 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       setWikiPageMode(viewId, mode) {
+        // Kept with the view: a step of its own, as the Depth.
+        const view = get().views[viewId]
+        if (!view || (view.wikiPageMode ?? 'single') === mode) return
+        get()._pushUndo()
         set((state) => {
           const view = state.views[viewId]
           if (!view) return
@@ -3437,6 +3465,9 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       setWikiDepth(viewId, depth) {
+        const view = get().views[viewId]
+        if (!view || wikiDepthOf(view) === wikiDepthOf({ wikiDepth: depth })) return
+        get()._pushUndo()
         set((state) => {
           const view = state.views[viewId]
           if (!view) return
