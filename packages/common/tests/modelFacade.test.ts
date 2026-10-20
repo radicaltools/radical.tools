@@ -72,6 +72,29 @@ describe('createModelFacade', () => {
     expect(f.getNodes()[api]).toMatchObject({ parentId: b, x: -480, y: 180 })
   })
 
+  it('moves a node in every view that keeps a place for it: inside the new parent there, or placed afresh', () => {
+    const at = (x: number, y: number, width = 200, height = 100) => ({ x, y, width, height })
+    const f = facade({
+      nodes: [
+        { id: 'a', ...node('system', 'A', { x: 0, y: 0, width: 600, height: 400 }) },
+        { id: 'b', ...node('system', 'B', { x: 700, y: 0, width: 600, height: 400 }) },
+        { id: 'api', ...node('container', 'API', { parentId: 'a', x: 30, y: 130 }) },
+      ] as C4Node[],
+      views: [
+        // B lies round API here: moved into B, API keeps its place on it.
+        { id: 'over', name: 'Over', nodeIds: [], positions: { a: at(0, 0, 600, 400), b: at(-100, 100, 600, 400), api: at(30, 130) } },
+        // B is far away: API's place here is dropped, for the canvas to give it one inside B.
+        { id: 'apart', name: 'Apart', nodeIds: [], positions: { a: at(0, 0, 600, 400), b: at(0, 900, 600, 400), api: at(30, 130) } },
+      ],
+    })
+    f.moveNodes!(['api'], 'b')
+    expect(f.lastError).toBeNull()
+    const views = f.getViews!()
+    expect(views.over.positions.api).toEqual(at(130, 30))
+    expect(views.apart.positions.api).toBeUndefined()
+    expect(views.apart.positions.b).toEqual(at(0, 900, 600, 400))
+  })
+
   it('refuses moves into a descendant or a forbidden parent, leaving the node unchanged', () => {
     const f = facade()
     const a = f.addNode(node('system', 'A'))

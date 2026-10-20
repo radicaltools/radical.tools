@@ -109,6 +109,7 @@ describe('folder-backed MCP model', () => {
     try {
       await client.connect(transport)
       for (const args of [
+        { tempId: 'erp', type: 'system', label: 'ERP' },
         { tempId: 'shop', type: 'domain', label: 'Shop' },
         { tempId: 'orders', type: 'system', label: 'Orders', parentId: 'shop' },
         { tempId: 'billing', type: 'system', label: 'Billing', parentId: 'shop' },
@@ -132,6 +133,20 @@ describe('folder-backed MCP model', () => {
       const crm = byLabel('CRM')
       expect(crm.parentId).toBe(shop.id)
       expect(data.defaultPositions?.[crm.id]).toEqual({ x: crm.x, y: crm.y, width: crm.width, height: crm.height })
+
+      // ERP lies left of Shop: moved in, it keeps no place outside Shop's
+      // frame (x < 0) but is placed inside it, beside the others, and Shop
+      // grows for it.
+      const erpMoved = await client.callTool({ name: 'move_node', arguments: { id: 'erp', parentId: 'shop' } })
+      expect(erpMoved.isError, JSON.stringify(erpMoved.content)).not.toBe(true)
+      data = await read()
+      const [erp, shopNow] = [byLabel('ERP'), byLabel('Shop')]
+      expect(erp.parentId).toBe(shop.id)
+      expect(erp.x).toBeGreaterThanOrEqual(0)
+      expect(erp.y).toBeGreaterThanOrEqual(0)
+      expect(erp.x + erp.width).toBeLessThanOrEqual(shopNow.width)
+      expect(erp.y + erp.height).toBeLessThanOrEqual(shopNow.height)
+      expect(data.defaultPositions?.[erp.id]).toEqual({ x: erp.x, y: erp.y, width: erp.width, height: erp.height })
 
       const user = await client.callTool({ name: 'add_node', arguments: { tempId: 'user', type: 'person', label: 'Buyer' } })
       expect(user.isError).not.toBe(true)

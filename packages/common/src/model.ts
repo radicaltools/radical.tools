@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
+import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition } from './c4'
 import { readPipeline } from './viewPipeline'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
@@ -41,6 +41,9 @@ export interface ModelState {
   defaultLayoutConstraints?: LayoutConstraint[]
   /** How All elements and views without their own draw relations. */
   defaultEdgeStyle?: EdgeStyle
+  /** Where All elements has the nodes while another canvas is shown
+   *  (Studio's store; DiagramData.defaultPositions). */
+  defaultPositions?: Record<string, NodePosition>
 }
 
 type NodeRecord = C4Node & Record<string, unknown>
@@ -284,28 +287,53 @@ export function checkReparent(state: ModelState, ids: string[], newParentId: str
 
 /** Moves the nodes under `newParentId` (null = the root), keeping each one
  *  where it is on the canvas: positions are relative to the parent, so they
- *  are rebased onto the new parent's absolute position. */
+ *  are rebased onto the new parent's absolute position. The other canvases
+ *  that keep a place for a moved node (the views' positions, and All
+ *  elements' while a view is shown) are rebased the same way where the node
+ *  then lies inside its new parent's frame there; where it does not, its
+ *  place there is dropped, and that canvas gives it one inside the parent
+ *  (placeUnplaced) when it shows. */
 export function reparentNodes(state: ModelState, ids: string[], newParentId: string | null): void {
-  const absOf = (id: string | null): { x: number; y: number } => {
+  const absOf = (id: string | null, positions?: Record<string, NodePosition>): { x: number; y: number } => {
     let x = 0, y = 0
     let cur: C4Node | undefined = id ? state.c4Nodes[id] : undefined
     const seen = new Set<string>()
     while (cur && !seen.has(cur.id)) {
       seen.add(cur.id)
-      x += cur.x
-      y += cur.y
+      const at = positions?.[cur.id] ?? cur
+      x += at.x
+      y += at.y
       cur = cur.parentId ? state.c4Nodes[cur.parentId] : undefined
     }
     return { x, y }
   }
-  const target = absOf(newParentId)
+  const moving = ids.filter((id) => state.c4Nodes[id] && (state.c4Nodes[id].parentId ?? null) !== newParentId)
   // Measure every node against the original tree before changing any parent.
+  const canvases = [state.defaultPositions, ...Object.values(state.views).map((view) => view.positions)]
+    .filter((positions): positions is Record<string, NodePosition> => !!positions && moving.some((id) => id in positions))
+  const rebased = canvases.map((positions) => {
+    const parent = newParentId ? positions[newParentId] : undefined
+    const target = absOf(newParentId, positions)
+    return moving.filter((id) => id in positions).map((id) => {
+      const abs = absOf(id, positions)
+      const box = { ...positions[id], x: abs.x - target.x, y: abs.y - target.y }
+      // At the root, anywhere is inside; in a parent the canvas has no place
+      // for, or outside its frame, the node is placed afresh.
+      const inside = !newParentId || (!!parent && box.x >= 0 && box.y >= 0 && box.x + box.width <= parent.width && box.y + box.height <= parent.height)
+      return { positions, id, box: inside ? box : null }
+    })
+  }).flat()
+  const target = absOf(newParentId)
   const placed = ids.filter((id) => state.c4Nodes[id]).map((id) => ({ id, abs: absOf(id) }))
   for (const { id, abs } of placed) {
     const node = state.c4Nodes[id]
     node.parentId = newParentId ?? undefined
     node.x = abs.x - target.x
     node.y = abs.y - target.y
+  }
+  for (const { positions, id, box } of rebased) {
+    if (box) positions[id] = box
+    else delete positions[id]
   }
 }
 
