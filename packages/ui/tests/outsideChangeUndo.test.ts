@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
+import { deserializeFromMdFolder, serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { useDiagramStore } from '../src/store/diagramStore'
 
 const s = useDiagramStore.getState
@@ -43,6 +44,21 @@ function outsideChange(change: (data: DiagramData) => void): void {
   s().loadDiagram(data, { outsideChange: true })
   if (viewId) s().setActiveView(viewId)
 }
+
+/** The model as the folder gives it back: what the store saves, written
+ *  and read again (an empty text, an unticked box are written as nothing). */
+const throughFolder = (data: DiagramData): DiagramData => deserializeFromMdFolder(serializeToMdFolder(data)).data
+
+/** An outside change as Studio reads it from a folder. */
+function outsideFolderChange(change: (data: DiagramData) => void): void {
+  const viewId = s().activeViewId
+  const data = throughFolder(structuredClone(s().saveDiagram()))
+  change(data)
+  s().loadDiagram(data, { outsideChange: true })
+  if (viewId && s().views[viewId]) s().setActiveView(viewId)
+}
+
+const lastNotice = () => s().notifications[s().notifications.length - 1]?.message ?? ''
 
 describe('Undo after an outside change', () => {
   beforeEach(() => {
@@ -101,6 +117,38 @@ describe('Undo after an outside change', () => {
     expect(at('b')).toEqual({ x: 900, y: 100 })
     expect(s().views.one.nodeIds).toContain('c')
     expect(s().c4Nodes.c).toBeDefined()
+  })
+
+  it('takes back an add after a folder round trip, with no notice (item 125)', () => {
+    s().loadDiagram(throughFolder(s().saveDiagram()))
+    const notices = s().notifications.length
+    const id = s().addNode({ type: 'system', label: 'System', description: '', x: 1200, y: 0, ...NODE_SIZES.system, collapsed: false } as Omit<C4Node, 'id'>)
+    outsideFolderChange((d) => { d.nodes.find((n) => n.id === 'b')!.description = 'agent wrote' })
+    expect(s().c4Nodes[id]).toBeDefined()
+    s().undo()
+    expect(s().c4Nodes[id]).toBeUndefined()
+    expect(s().c4Nodes.b.description).toBe('agent wrote')
+    expect(s().notifications.length).toBe(notices)
+  })
+
+  it('takes back a new view after a folder round trip, with no notice (item 125)', () => {
+    s().loadDiagram(throughFolder(s().saveDiagram()))
+    const notices = s().notifications.length
+    const id = s().addView('Fresh')
+    s().addNodeToView(id, 'a')
+    s().setActiveView(id)
+    // The camera in use is saved with the view shown, not kept in the store.
+    ;(window as any).__rfCurrentViewport = { x: 40, y: 20, zoom: 0.8 }
+    try {
+      outsideFolderChange((d) => { d.nodes.find((n) => n.id === 'b')!.description = 'agent wrote' })
+    } finally {
+      delete (window as any).__rfCurrentViewport
+    }
+    expect(s().views[id]).toBeDefined()
+    s().undo()
+    s().undo()
+    expect(s().views[id]).toBeUndefined()
+    expect(s().notifications.length).toBe(notices)
   })
 
   it('another model loaded still forgets the history', () => {
