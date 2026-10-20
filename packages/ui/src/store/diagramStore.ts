@@ -379,17 +379,43 @@ function suggestSmartLayoutIfUnarranged(loaded = false): void {
   s.pushNotification('This diagram is not laid out yet. The live layout only moves what you drag or add: use Smart Layout to arrange it.', 'info')
 }
 
+/** Off while restoreSnapshot leaves the milestone shown on its way to
+ *  replacing the live model: it lays out the view on screen itself, after. */
+let _arrangeOnLeavingMilestone = true
+
 /** On opening a view: one of a group of views per element never laid out
- *  (no positions of its own) gets Smart Layout at once, in the designer;
- *  another canvas that looks unarranged gets the notice. */
+ *  (no positions of its own) gets Smart Layout at once, in the designer on
+ *  the live model; another canvas that looks unarranged gets the notice.
+ *  With a milestone shown the layout would be an edit of the milestone and
+ *  is not kept in the view: the view is laid out back on live (called again
+ *  when the milestone is left with it on screen). */
 function arrangeOnFirstOpen(): void {
   const s = useDiagramStore.getState()
   const view = s.activeViewId ? s.views[s.activeViewId] : undefined
-  if (view?.partOf && s.appMode === 'designer' && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) {
+  if (view?.partOf && s.appMode === 'designer' && !s.activeSnapshotId && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) {
     void s.runSmartLayout()
     return
   }
   suggestSmartLayoutIfUnarranged()
+}
+
+/** Runs `edit`, a rename or delete, on the model in `state` (a draft). In a
+ *  milestone it changes the milestone's elements only: the views are the
+ *  live model's and every milestone's, so what the edit does to them (a view
+ *  named after the element renamed with it, the element taken out of the
+ *  views, its view per element deleted) waits until the edit reaches the
+ *  live model (Propagate, commitMilestoneChanges). Done at once, Discard
+ *  kept it, and the view of an element deleted came back as a new one. */
+function keepingSharedViews(state: DiagramStore, edit: () => void): void {
+  if (!state.activeSnapshotId) {
+    edit()
+    return
+  }
+  const { views, activeViewId, defaultLayoutConstraints } = useDiagramStore.getState()
+  edit()
+  state.views = views
+  state.activeViewId = activeViewId
+  state.defaultLayoutConstraints = defaultLayoutConstraints
 }
 
 /** Snapshot all node positions from c4Nodes into a positions map */
@@ -2278,7 +2304,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get()._pushUndo()
           get()._markMilestoneEdit()
           set((state) => {
-            model.patchNode(state, id, patch)
+            keepingSharedViews(state as DiagramStore, () => model.patchNode(state, id, patch))
             for (const r of removed) model.deleteRelation(state, r.relationId)
             _insertWizardLinks(state, id, added)
           })
@@ -2317,7 +2343,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         get()._pushUndo()
         get()._markMilestoneEdit()
-        set((state) => { model.patchNode(state, id, updates) })
+        set((state) => { keepingSharedViews(state as DiagramStore, () => model.patchNode(state, id, updates)) })
         get()._sync()
         // Only wake the live layout if the change actually affects geometry
         // or graph topology. Editing label / description / technology must
@@ -2338,7 +2364,7 @@ export const useDiagramStore = create<DiagramStore>()(
         let placed: string[] | null = null
         set((state) => {
           const active = state.activeViewId
-          model.deleteNode(state, id)
+          keepingSharedViews(state as DiagramStore, () => model.deleteNode(state, id))
           if (active && !state.views[active]) {
             // Its view was on screen: back to All elements' positions.
             placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, state.defaultPositions as Record<string, NodePosition>, undefined, state.c4Relations as Record<string, C4Relation>)
@@ -2986,9 +3012,12 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           }
           // Remove the node from every view; its children stay in views they
-          // were already part of.
-          for (const view of Object.values(state.views)) {
-            removeFromViewList(view as DiagramView, new Set([id]))
+          // were already part of. In a milestone the views wait for
+          // Propagate (keepingSharedViews).
+          if (!state.activeSnapshotId) {
+            for (const view of Object.values(state.views)) {
+              removeFromViewList(view as DiagramView, new Set([id]))
+            }
           }
         })
 
@@ -4439,7 +4468,13 @@ export const useDiagramStore = create<DiagramStore>()(
         // used to mark the milestone as the one shown instead: the next edit
         // of the live model asked about "editing a milestone", and with
         // another milestone shown the live model did not change at all.
-        if (get().activeSnapshotId) get().discardMilestoneChanges()
+        const fromMilestone = !!get().activeSnapshotId
+        if (fromMilestone) {
+          // The view on screen is laid out (arrangeOnFirstOpen) on the model
+          // restored, not on the one it replaces.
+          _arrangeOnLeavingMilestone = false
+          try { get().discardMilestoneChanges() } finally { _arrangeOnLeavingMilestone = true }
+        }
         _pushUndo(get())
         set((state) => {
           state.c4Nodes = snap.nodes as any
@@ -4456,6 +4491,7 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._showLiveCanvasPositions()
         get()._sync()
         _liveLayout?.reset()
+        if (fromMilestone) arrangeOnFirstOpen()
       },
 
       removeSnapshot(id) {
@@ -4491,6 +4527,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         get()._sync()
         _liveLayout?.reset()
+        if (wasShown) arrangeOnFirstOpen()
       },
 
       renameSnapshot(id, name) {
@@ -4658,6 +4695,8 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._showLiveCanvasPositions()
         get()._sync()
         _liveLayout?.reset()
+        // A view per element first opened in the milestone is laid out now.
+        if (_arrangeOnLeavingMilestone) arrangeOnFirstOpen()
       },
 
       commitMilestoneChanges(mode, newName) {
@@ -4813,6 +4852,8 @@ export const useDiagramStore = create<DiagramStore>()(
           for (const id of removedSeqIds) delete targetSeqs[id]
         }
 
+        // The view on screen was the view of an element the edits deleted.
+        let lostShownView = false
         set((state) => {
           // Apply to active milestone (overwrite to be exact) and to all later milestones (diff).
           for (let i = idx; i < state.snapshots.length; i++) {
@@ -4831,7 +4872,20 @@ export const useDiagramStore = create<DiagramStore>()(
           // user just edited (otherwise the canvas appears to "jump back" to current).
           if (state.liveBackup) {
             if (!(state.liveBackup as any).sequences) (state.liveBackup as any).sequences = {}
+            // The views are the live model's: what the edits do to them
+            // (keepingSharedViews left it out) happens now, with the edits.
+            const live = { c4Nodes: state.liveBackup.nodes, c4Relations: state.liveBackup.relations, views: state.views, activeViewId: null } as unknown as model.ModelState
+            for (const { id, updates } of updatedNodes) {
+              if (typeof updates.label === 'string') model.renameViewsOf(live, id, updates.label)
+            }
+            const before = Object.keys(state.liveBackup.nodes)
             applyDiff(state.liveBackup.nodes as any, state.liveBackup.relations as any, (state.liveBackup as any).sequences)
+            const gone = new Set(before.filter((id) => !state.liveBackup!.nodes[id]))
+            if (gone.size) {
+              const shown = state.activeViewId
+              model.forgetNodesInViews(state as unknown as model.ModelState, gone)
+              if (shown && !state.activeViewId) lostShownView = true
+            }
           }
           state.milestoneDirty = false
           state.milestonePromptOpen = false
@@ -4844,6 +4898,7 @@ export const useDiagramStore = create<DiagramStore>()(
         _undoStack.length = 0
         _redoStack.length = 0
         _liveHistory = null
+        if (lostShownView) get()._showLiveCanvasPositions()
         get()._sync()
         _liveLayout?.reset()
       },
