@@ -880,6 +880,168 @@ function separateSiblings(
   return result
 }
 
+/** The gap an expand leaves between what it pushed and what pushed it. */
+const EXPAND_GAP = 20
+/** What a push counts for each sibling it would put the pushed one on (px). */
+const HIT_COST = 200
+
+/**
+ * Room for `grownId`, which an expand made larger, among its siblings on
+ * the canvas: the siblings it now lies on move out of its way, and what
+ * they then lie on moves on, as a wave from it outwards. The siblings are
+ * taken nearest first; each moves the least way out of what was placed
+ * before it (never back towards the grown one, and rather not onto
+ * another), so a sibling moves only when something moved into it, and the
+ * arrangement around the grown one is kept. Pairs a push did not reach are
+ * left as they were, and siblings keep the room they had between them, up
+ * to EXPAND_GAP. Only what the canvas draws counts (`viewFilter`, the
+ * collapsed sets), at the size it draws it. Returns id → new {x, y} for
+ * the siblings that moved.
+ *
+ * Pairwise pushes (separateSiblings) left overlaps behind among many
+ * siblings: each pass pushed both of a pair half way, into others, and 20
+ * passes did not settle a grid of 48 root systems round an opened one.
+ */
+function makeRoomAround(
+  grownId: string,
+  nodes: Record<string, C4Node>,
+  viewFilter?: Set<string>,
+  viewCollapsedSet?: Set<string>,
+  expandedSet?: Set<string>,
+): Record<string, { x: number; y: number }> {
+  const grown = nodes[grownId]
+  if (!grown) return {}
+  const { shown, boxOf } = canvasBoxes(nodes, viewFilter, viewCollapsedSet, expandedSet)
+  const siblings = Object.values(nodes).filter((n) => (n.parentId ?? undefined) === (grown.parentId ?? undefined) && shown(n))
+  if (siblings.length < 2) return {}
+  const box = new Map(siblings.map((n) => [n.id, boxOf(n)]))
+  const before = new Map(siblings.map((n) => [n.id, boxOf(n)]))
+  const g = box.get(grownId)!
+  const gx = g.x + g.w / 2
+  const gy = g.y + g.h / 2
+  const gapTo = (b: CanvasBox): number =>
+    Math.max(g.x - (b.x + b.w), b.x - (g.x + g.w), g.y - (b.y + b.h), b.y - (g.y + g.h), 0)
+  const order = siblings.filter((n) => n.id !== grownId)
+    .map((n) => ({ id: n.id, gap: gapTo(box.get(n.id)!), centre: Math.hypot(box.get(n.id)!.x + box.get(n.id)!.w / 2 - gx, box.get(n.id)!.y + box.get(n.id)!.h / 2 - gy) }))
+    .sort((a, b) => a.gap - b.gap || a.centre - b.centre || (a.id < b.id ? -1 : 1))
+  const placed: string[] = [grownId]
+  const moved = new Set<string>([grownId])
+  const hits = (a: CanvasBox, b: CanvasBox, gap: number): boolean =>
+    a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap
+  // Two siblings keep the room they had, up to EXPAND_GAP: one pushed does
+  // not push on what was closer to it than that.
+  const gapOf = (a: string, b: string): number => {
+    if (a === grownId || b === grownId) return EXPAND_GAP
+    const [p, q] = [before.get(a)!, before.get(b)!]
+    return Math.min(EXPAND_GAP, Math.max(0, p.x - (q.x + q.w), q.x - (p.x + p.w), p.y - (q.y + q.h), q.y - (p.y + p.h)))
+  }
+  for (const { id } of order) {
+    const b = box.get(id)!
+    const cx = b.x + b.w / 2 - gx
+    const cy = b.y + b.h / 2 - gy
+    for (let step = 0; step < placed.length * 4 + 8; step++) {
+      // Only what moved can be in the way: two siblings the expand did not
+      // reach stay as they were, close or not.
+      const at = placed.findIndex((pid) => (moved.has(pid) || moved.has(id)) && hits(b, box.get(pid)!, gapOf(id, pid)))
+      if (at < 0) break
+      const blocker = box.get(placed[at])!
+      const gap = gapOf(id, placed[at])
+      // Out of its way, away from the grown one on each axis.
+      const ways = [
+        { dx: blocker.x + blocker.w + gap - b.x, dy: 0, ok: cx >= 0 },
+        { dx: blocker.x - gap - (b.x + b.w), dy: 0, ok: cx <= 0 },
+        { dx: 0, dy: blocker.y + blocker.h + gap - b.y, ok: cy >= 0 },
+        { dx: 0, dy: blocker.y - gap - (b.y + b.h), ok: cy <= 0 },
+      ].filter((w) => w.ok)
+      // The least way out, counting what it would then lie on: each such
+      // sibling would have to move on in turn.
+      const cost = (w: { dx: number; dy: number }): number => {
+        const to = { x: b.x + w.dx, y: b.y + w.dy, w: b.w, h: b.h }
+        let hit = 0
+        for (const n of siblings) if (n.id !== id && n.id !== grownId && hits(to, box.get(n.id)!, 0)) hit++
+        return Math.abs(w.dx) + Math.abs(w.dy) + HIT_COST * hit
+      }
+      const way = ways.reduce((best, w) => (cost(w) < cost(best) ? w : best))
+      b.x += way.dx
+      b.y += way.dy
+      moved.add(id)
+    }
+    placed.push(id)
+  }
+  const result: Record<string, { x: number; y: number }> = {}
+  for (const n of siblings) {
+    const b = box.get(n.id)!
+    if (n.id !== grownId && (b.x !== n.x || b.y !== n.y)) result[n.id] = { x: b.x, y: b.y }
+  }
+  return result
+}
+
+type CanvasBox = { x: number; y: number; w: number; h: number }
+
+/** What a canvas draws (`viewFilter`, the collapsed sets) and at what
+ *  size, as deriveRFNodes draws it. */
+function canvasBoxes(
+  nodes: Record<string, C4Node>,
+  viewFilter?: Set<string>,
+  viewCollapsedSet?: Set<string>,
+  expandedSet?: Set<string>,
+): { shown: (n: C4Node) => boolean; boxOf: (n: C4Node) => CanvasBox } {
+  const shown = (n: C4Node): boolean => (!viewFilter || viewFilter.has(n.id)) && !isNodeHidden(n.id, nodes, viewCollapsedSet, expandedSet)
+  const parents = new Set(Object.values(nodes).filter(shown).map((n) => n.parentId).filter(Boolean))
+  const boxOf = (n: C4Node): CanvasBox => {
+    if (isFixedSizeType(n.type)) return { x: n.x, y: n.y, w: NODE_SIZES[n.type].width, h: NODE_SIZES[n.type].height }
+    const small = isContainerType(n.type) && (isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet) || (!parents.has(n.id) && !n.collapsed))
+    return { x: n.x, y: n.y, w: small ? COLLAPSED_WIDTH[n.type] : n.width, h: small ? COLLAPSED_HEIGHT[n.type] : n.height }
+  }
+  return { shown, boxOf }
+}
+
+/**
+ * What an expand shows inside `parentId`, clear of each other: children
+ * saved on top of one another (a layout made while they were drawn at
+ * another size) would be drawn so. In reading order, each child that lies
+ * on one before it moves the least way right or down, and what it then
+ * lies on moves on; the others keep their saved places. Returns id → new
+ * {x, y} for the children that moved.
+ */
+function untangleChildren(
+  parentId: string,
+  nodes: Record<string, C4Node>,
+  viewFilter?: Set<string>,
+  viewCollapsedSet?: Set<string>,
+  expandedSet?: Set<string>,
+): Record<string, { x: number; y: number }> {
+  const { shown, boxOf } = canvasBoxes(nodes, viewFilter, viewCollapsedSet, expandedSet)
+  const children = Object.values(nodes).filter((n) => n.parentId === parentId && shown(n))
+    .sort((a, b) => a.y - b.y || a.x - b.x || (a.id < b.id ? -1 : 1))
+  if (children.length < 2) return {}
+  const box = new Map(children.map((n) => [n.id, boxOf(n)]))
+  const moved = new Set<string>()
+  const overlaps = (a: CanvasBox, b: CanvasBox, gap: number): boolean =>
+    a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap
+  const placed: CanvasBox[] = []
+  for (const child of children) {
+    const b = box.get(child.id)!
+    for (let step = 0; step < placed.length * 2 + 4; step++) {
+      // Lying on one placed before it, or come close to one that moved.
+      const blocker = placed.find((p) => overlaps(b, p, 0) || (moved.has(child.id) && overlaps(b, p, EXPAND_GAP)))
+      if (!blocker) break
+      const right = blocker.x + blocker.w + EXPAND_GAP - b.x
+      const down = blocker.y + blocker.h + EXPAND_GAP - b.y
+      if (right <= down) b.x += right
+      else b.y += down
+      moved.add(child.id)
+    }
+    placed.push(b)
+  }
+  const result: Record<string, { x: number; y: number }> = {}
+  for (const n of children) {
+    const b = box.get(n.id)!
+    if (b.x !== n.x || b.y !== n.y) result[n.id] = { x: b.x, y: b.y }
+  }
+  return result
+}
+
 // ─── RF state derivation ─────────────────────────────────────────────────────
 
 // A description as a card shows it (markdownToPlain), once per text: cards
@@ -2605,6 +2767,15 @@ export const useDiagramStore = create<DiagramStore>()(
         // keeps its size) and lay outside the frame it came back with.
         if (prevCollapsed) {
           const openVcs = loopVcs ? new Set([...loopVcs].filter((nid) => nid !== id)) : undefined
+          const untangled = untangleChildren(id, get().c4Nodes, loopViewFilter, openVcs, loopExpandedSet)
+          if (Object.keys(untangled).length > 0) {
+            set((state) => {
+              for (const [cid, at] of Object.entries(untangled)) {
+                const c = state.c4Nodes[cid]
+                if (c) { c.x = at.x; c.y = at.y }
+              }
+            })
+          }
           get().fitParentToChildren(id, loopViewFilter, openVcs, loopExpandedSet)
         }
         const growFrameLeftUp = (parentId: string, viewFilter?: Set<string>): void => {
@@ -2630,9 +2801,13 @@ export const useDiagramStore = create<DiagramStore>()(
             }
           })
         }
+        // An expand makes room round what grew, level by level up the tree.
+        const roomVcs = loopVcs ? new Set([...loopVcs].filter((nid) => nid !== id)) : undefined
         let currentId: string | undefined = id
         while (currentId) {
-          const overlapUpdates = separate ? separateSiblings(currentId, get().c4Nodes) : {}
+          const overlapUpdates = prevCollapsed
+            ? makeRoomAround(currentId, get().c4Nodes, loopViewFilter, roomVcs, loopExpandedSet)
+            : separate ? separateSiblings(currentId, get().c4Nodes) : {}
           if (Object.keys(overlapUpdates).length > 0) {
             set((state) => {
               for (const [sid, pos] of Object.entries(overlapUpdates)) {
