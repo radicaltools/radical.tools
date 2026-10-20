@@ -117,8 +117,9 @@ export function findForgeView(views: Record<string, DiagramView> | undefined, ke
 export function ensureForgeView(facade: DiagramFacade, key: ForgeViewKey): string | null {
   const existing = findForgeView(facade.getViews?.(), key)
   if (existing) return existing.id
-  const id = facade.addView?.(FORGE_VIEW_NAMES[key]) ?? null
   const of = FORGE_VIEW_VIEWPOINT[key]
+  // A canvas lists what is filed into it: until then it shows nothing, not the whole model.
+  const id = facade.addView?.(FORGE_VIEW_NAMES[key], of ? undefined : { empty: true }) ?? null
   if (id && of && !facade.applyViewpoint?.(id, of.viewpoint)) facade.setViewKind?.(id, of.kind)
   return id
 }
@@ -280,6 +281,81 @@ function shownBy(facade: DiagramFacade, view: DiagramView, metamodel: Metamodel)
   return runPipeline(view, { nodes: facade.getNodes(), relations: facade.getRelations(), metamodel }).nodes
 }
 
+/** A view of the viewpoint `def` in `folder`; null when the facade cannot make one. */
+function makeViewpointView(facade: DiagramFacade, def: ViewpointDef, folder: string): string | null {
+  const viewId = facade.addView?.(def.label)
+  if (!viewId || !facade.applyViewpoint?.(viewId, def.id)) return null
+  facade.setViewFolder?.(viewId, folder)
+  return viewId
+}
+
+/** The group of views of the viewpoint `def`, which draws one element, in
+ *  `folder`: a view of each of its elements joins it as the element is added.
+ *  Null when the facade cannot make one. */
+function makeGroup(facade: DiagramFacade, def: ViewpointDef, folder: string): string | null {
+  const groupId = facade.addView?.(def.label)
+  if (!groupId) return null
+  facade.setViewFolder?.(groupId, folder)
+  if (!facade.applyViewpoint?.(groupId, def.id, null)) { facade.removeView?.(groupId); return null }
+  return groupId
+}
+
+/** The views a stage's elements will show in, made before the stage adds
+ *  them, so that each element shows up in its view as it is added: the
+ *  stage's layer canvas (listing nothing yet), or in the Radical structure
+ *  a view of each chosen viewpoint of the stage, and the group of a
+ *  viewpoint that draws one element. Views the model has are kept. Returns
+ *  the ids of those made; dropEmptyForgeViews takes back the ones the stage
+ *  left empty. */
+export function openForgeStageViews(facade: DiagramFacade, stage: ForgeStageId, structure: ForgeStructure): string[] {
+  if (!facade.addView) return []
+  if (structure.kind === 'layers') {
+    const key = FORGE_STAGE_VIEW[stage]
+    if (findForgeView(facade.getViews?.(), key)) return []
+    const id = ensureForgeView(facade, key)
+    return id ? [id] : []
+  }
+  const metamodel = facade.getMetamodel?.()
+  if (!metamodel) return []
+  const choices = new Map(radicalViewpoints(metamodel).map((c) => [c.id, c]))
+  const defs = new Map((metamodel.viewpoints ?? []).map((v) => [v.id, v]))
+  const chosen = new Set(structure.viewpoints)
+  const made: string[] = []
+  for (const viewpoint of RADICAL_STAGE_VIEWPOINTS[stage]) {
+    const def = defs.get(viewpoint)
+    const choice = choices.get(viewpoint)
+    if (!def || !choice || !chosen.has(viewpoint)) continue
+    const views = viewsOfViewpoint(facade.getViews?.(), viewpoint)
+    if (def.subject ? views.some((v) => !v.partOf) : views.length) continue
+    const id = def.subject ? makeGroup(facade, def, choice.folder) : makeViewpointView(facade, def, choice.folder)
+    if (id) made.push(id)
+  }
+  return made
+}
+
+/** Takes back the views of `viewIds` (openForgeStageViews') that show
+ *  nothing: a canvas listing no element, a view whose chain gives none, a
+ *  group with no view in it. Returns the ids removed. */
+export function dropEmptyForgeViews(facade: DiagramFacade, viewIds: string[]): string[] {
+  const metamodel = facade.getMetamodel?.()
+  const removed: string[] = []
+  for (const id of viewIds) {
+    const views = facade.getViews?.() ?? {}
+    const view = views[id]
+    if (!view || !facade.removeView) continue
+    const def = view.viewpoint ? metamodel?.viewpoints?.find((d) => d.id === view.viewpoint) : undefined
+    const empty = def?.subject && !view.partOf
+      ? !Object.values(views).some((v) => v.partOf === id)
+      : def && metamodel
+        ? !shownBy(facade, view, metamodel).length
+        : view.nodeIds.length === 0 && !!view.empty
+    if (!empty) continue
+    facade.removeView(id)
+    removed.push(id)
+  }
+  return removed
+}
+
 /** The Radical structure: a view of each chosen viewpoint that shows
  *  something, made in its folder when the model has none. */
 function fileIntoRadicalViews(facade: DiagramFacade, nodeIds: string[], viewpoints: string[]): FiledNodes[] {
@@ -299,10 +375,8 @@ function fileIntoRadicalViews(facade: DiagramFacade, nodeIds: string[], viewpoin
     if (!view) {
       const ctx: PipelineContext = { nodes: facade.getNodes(), relations: facade.getRelations(), metamodel }
       if (!runChain(Object.values(ctx.nodes), def.pipeline, ctx).nodes.length) continue
-      const viewId = facade.addView(def.label)
-      if (!viewId || !facade.applyViewpoint?.(viewId, viewpoint)) continue
-      facade.setViewFolder?.(viewId, choice.folder)
-      view = facade.getViews?.()[viewId]
+      const viewId = makeViewpointView(facade, def, choice.folder)
+      view = viewId ? facade.getViews?.()[viewId] : undefined
       if (!view) continue
       made = true
     }
@@ -321,11 +395,8 @@ function fileIntoGroup(facade: DiagramFacade, def: ViewpointDef, folder: string,
   let group = viewsOfViewpoint(facade.getViews?.(), def.id).find((v) => !v.partOf)
   if (!group) {
     if (!Object.values(facade.getNodes()).some((n) => !n.external && canBeSubject(def, n))) return []
-    const groupId = facade.addView!(def.label)
-    if (!groupId) return []
-    facade.setViewFolder?.(groupId, folder)
-    if (!facade.applyViewpoint?.(groupId, def.id, null)) { facade.removeView?.(groupId); return [] }
-    group = facade.getViews?.()[groupId]
+    const groupId = makeGroup(facade, def, folder)
+    group = groupId ? facade.getViews?.()[groupId] : undefined
     if (!group) return []
   }
   const fresh = new Set(nodeIds)

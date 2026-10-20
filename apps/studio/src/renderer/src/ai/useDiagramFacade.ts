@@ -44,7 +44,7 @@ export function createStoreFacade(): DiagramFacade {
     removeRelation: (id: string) => useDiagramStore.getState().removeRelation(id),
     // ── views ──
     getViews: () => useDiagramStore.getState().views,
-    addView: (name: string) => useDiagramStore.getState().addView(name),
+    addView: (name: string, opts?: { empty?: boolean }) => useDiagramStore.getState().addView(name, undefined, opts?.empty),
     setViewNodes: (viewId: string, nodeIds: string[]) =>
       useDiagramStore.getState().setViewNodes(viewId, nodeIds),
     removeView: (id: string) => useDiagramStore.getState().removeView(id),

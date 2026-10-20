@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { FORGE_STAGES } from '@radical/common/ai/forge'
 import { forgeRunClientName, forgeRunCurrentStage, forgeRunPhase, type ForgeRunStageInfo } from '@radical/common/formats/forgeRunStatus'
 import { useAgentForgeStore } from '../persistence/agentForge'
+import { setFollowAgent, useFollowAgentStore } from '../persistence/followAgent'
 import { STEP_LABELS } from './RadicalForgeModal'
 
 // ─── An agent's Forge run, read only ─────────────────────────────────────────
@@ -10,6 +11,8 @@ import { STEP_LABELS } from './RadicalForgeModal'
 // wizard's step bar, its stages only (the badge on the Forge button counts
 // the same), with each stage's state, and one line on where the
 // run stands. Nothing here acts on the run; the agent's chat is where to answer.
+// While the run goes on, Follow on the canvas has Studio show what the agent
+// adds as it adds it (persistence/followAgent.ts).
 
 interface Props {
   open: boolean
@@ -32,6 +35,7 @@ function stageTip(stage: ForgeRunStageInfo): string {
 
 export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | null {
   const status = useAgentForgeStore((s) => s.status)
+  const following = useFollowAgentStore((s) => s.on)
   // Re-render now and then so a run that goes quiet shows as paused.
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -103,6 +107,25 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
         })}
       </div>
       <p className="milestone-modal-text forge-agent-line" data-phase={phase}>{line}</p>
+      {(phase === 'working' || phase === 'waiting') && (
+        <div className="forge-agent-follow">
+          <button
+            type="button"
+            className={`forge-btn forge-btn-sm ${following ? 'forge-btn-secondary' : 'forge-btn-primary'}`}
+            aria-pressed={following}
+            onClick={() => {
+              setFollowAgent(!following)
+              // The canvas is where to look now.
+              if (!following) onClose()
+            }}
+          >
+            {following ? 'Stop following' : 'Follow on the canvas'}
+          </button>
+          <span className="forge-agent-follow-hint">
+            Opens the view {client} writes to and frames what it adds. Move the camera or open another view yourself and it waits for {client}'s next turn.
+          </span>
+        </div>
+      )}
     </div>,
     document.body,
   )

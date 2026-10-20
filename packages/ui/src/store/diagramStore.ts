@@ -1351,8 +1351,9 @@ interface DiagramStore {
 
   // ── actions: views ──
   /** A new view listing no elements, of `kind` (a structure view when
-   *  none is given); returns its id. */
-  addView: (name: string, kind?: DiagramView['kind']) => string
+   *  none is given); returns its id. It shows every element, or with
+   *  `empty` none until elements are listed in it. */
+  addView: (name: string, kind?: DiagramView['kind'], empty?: boolean) => string
   removeView: (id: string) => void
   renameView: (id: string, name: string) => void
   setActiveView: (id: string | null) => void
@@ -3066,11 +3067,11 @@ export const useDiagramStore = create<DiagramStore>()(
       // yet a history entry carries the views: Undo of the step before
       // removed a new view (or brought back a deleted one) along with it,
       // and Redo was still offered after a view was added.
-      addView(name, kind) {
+      addView(name, kind, empty) {
         const id = uid()
         get()._pushUndo()
         set((state) => {
-          model.insertView(state, id, name)
+          model.insertView(state, id, name, empty)
           if (kind && kind !== 'static') state.views[id].kind = kind
         })
         return id

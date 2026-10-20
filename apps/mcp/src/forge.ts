@@ -47,6 +47,8 @@ import {
   buildWireframePrompt,
   defaultForgeStructure,
   describeForgeStructure,
+  dropEmptyForgeViews,
+  openForgeStageViews,
   describeProposal,
   describeRefinement,
   fileIntoForgeViews,
@@ -298,6 +300,8 @@ interface StageState {
   before: ModelIds
   /** The model when the stage began, to find what it did to earlier stages. */
   snapshot: ModelSnapshot
+  /** The views made for the stage before it began (openForgeStageViews). */
+  opened: string[]
   /** What the stage added; set when it is completed. */
   added?: ModelIds
   /** What it did to earlier stages, as the user accepted; set when it is
@@ -618,6 +622,14 @@ export class Forge {
       for (const nodeId of added.nodes) if (facade.getNodes()[nodeId]) { facade.removeNode(nodeId); readOnly = false }
     }
 
+    // The stage's views first, so that its elements show up in them as
+    // they are added (Studio, open on the folder, can follow them there).
+    const before = this.ids(facade)
+    const opened = openForgeStageViews(facade, id, run.structure)
+    if (opened.length) readOnly = false
+    const views = facade.getViews?.() ?? {}
+    const openedNames = opened.map((v) => views[v]?.name).filter(Boolean)
+
     const nodes = facade.getNodes()
     const effectiveMatches = hubConcepts
       ? hubConcepts.map((c) => candidates.find((m) => m.id === c)!).filter(Boolean)
@@ -638,6 +650,7 @@ export class Forge {
     const brief = [
       `Radical Forge — stage ${stageIdx + 1} of ${STAGE_IDS.length}: ${stageTitle(id)}${previous ? ' (regenerating; what it added before has been removed)' : ''}`,
       FORGE_STAGES[stageIdx].blurb,
+      ...(openedNames.length ? [`Made the stage's views before it begins: ${openedNames.join(', ')}. What you add shows up in them as you add it.`] : []),
       '',
       'Carry out the task at the end with the model tools (add_node, add_relation, update_node, move_node, search_model, …).',
       'A Forge stage only builds the model: do not change the metamodel, presentations or milestones.',
@@ -655,7 +668,7 @@ export class Forge {
     ].join('\n')
 
     const state: StageState = {
-      status: 'generating', before: this.ids(facade), snapshot: snapshotOf(facade), clarifications, hubConcepts,
+      status: 'generating', before, opened, snapshot: snapshotOf(facade), clarifications, hubConcepts,
       proposed: new Set(), proposals: 0, declined: 0,
     }
     return ok(brief, { readOnly, commit: () => { run.stages[id] = state } })
@@ -674,6 +687,9 @@ export class Forge {
     const added = idsAddedSince(state.before, this.ids(facade))
     const refinements = stageRefinements(id, state.snapshot, snapshotOf(facade))
     const filed = fileIntoForgeViews(facade, added.nodes, id, run.structure)
+    // The views made for the stage that it left empty go again.
+    const dropped = dropEmptyForgeViews(facade, state.opened)
+    added.views = added.views.filter((v) => !dropped.includes(v))
     const nodes = facade.getNodes()
     const byType = countByType(nodes, added.nodes)
     const lines = [
@@ -711,7 +727,7 @@ export class Forge {
       : `This was the last stage. ${groups.length ? 'Then' : 'Show the user what it added and'} ask whether to regenerate it (forge_generate with regenerate: true) or finish (forge_finish).`)
     // A view of a viewpoint lists nothing (it shows what its chain gives):
     // made now, it is a change all the same.
-    const changed = filed.some((f) => (f.canvas && f.nodeIds.length) || f.made)
+    const changed = dropped.length > 0 || filed.some((f) => (f.canvas && f.nodeIds.length) || f.made)
     return ok(lines.join('\n'), {
       readOnly: !changed,
       data: changed ? placeInViews(facade.toDiagramData(), filed, facade.getMetamodel?.()) : undefined,

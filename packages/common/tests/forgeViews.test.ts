@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { landscapeGridColumns, landscapeSlot, type C4Node, type DiagramData } from '../src/c4'
+import { landscapeGridColumns, landscapeSlot, viewShowsEveryNode, type C4Node, type DiagramData } from '../src/c4'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import { createModelFacade } from '../src/ai/modelFacade'
 import {
   arrangeForgeGroup,
   defaultForgeStructure,
+  dropEmptyForgeViews,
+  openForgeStageViews,
   describeForgeStructure,
   fileIntoForgeViews,
   findForgeView,
@@ -164,6 +166,50 @@ describe('processes go into a Warnier view', () => {
     // A second run reuses it; the canvas views are not mistaken for it.
     expect(brief(fileIntoForgeViews(facade, ['checkout'], 'processes'))).toEqual([{ key: 'processes', viewId: 'id1', nodeIds: [] }])
     expect(forgeArrangeGroups(facade, ['checkout', 'take'], 'processes')).toEqual([])
+  })
+})
+
+describe('stage views before the stage', () => {
+  const fresh = (type: string, label: string): Omit<C4Node, 'id'> => ({ type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false }) as Omit<C4Node, 'id'>
+
+  it('makes a layer canvas that lists nothing yet, which keeps what is filed and goes when left empty', () => {
+    const facade = facadeOf([node('need', 'need')])
+    const [domain] = openForgeStageViews(facade, 'domain', { kind: 'layers' })
+    const view = facade.getViews!()[domain]
+    expect(view).toMatchObject({ name: 'Domain', nodeIds: [] })
+    expect(viewShowsEveryNode(view)).toBe(false)
+    // Made once: a second stage that files there finds it.
+    expect(openForgeStageViews(facade, 'domain', { kind: 'layers' })).toEqual([])
+    facade.addNode(fresh('domain', 'Shop'))
+    const shop = Object.values(facade.getNodes()).find((n) => n.type === 'domain')!.id
+    fileIntoForgeViews(facade, [shop], 'domain')
+    expect(dropEmptyForgeViews(facade, [domain])).toEqual([])
+    expect(facade.getViews!()[domain].nodeIds).toEqual([shop])
+
+    const [states] = openForgeStageViews(facade, 'states', { kind: 'layers' })
+    expect(dropEmptyForgeViews(facade, [states])).toEqual([states])
+    expect(facade.getViews!()[states]).toBeUndefined()
+  })
+
+  it('makes the views and groups of the stage\'s chosen viewpoints, which fill as elements come, and takes back the empty ones', () => {
+    const facade = facadeOf([node('need', 'need')])
+    const structure: ForgeStructure = { kind: 'radical', viewpoints: ['state-machine', 'entity-lifecycles', 'traceability'] }
+    const opened = openForgeStageViews(facade, 'states', structure)
+    const views = () => Object.values(facade.getViews!())
+    expect(opened.map((id) => facade.getViews!()[id].name)).toEqual(['State machine', 'Entity lifecycles'])
+    expect(facade.getViews!()[opened[0]]).toMatchObject({ folder: 'Conceptual', viewpoint: 'state-machine' })
+    // A machine added during the stage gets its view in the group at once.
+    facade.addNode(fresh('state-machine', 'Order lifecycle'))
+    expect(views().filter((v) => v.partOf === opened[0]).map((v) => v.name)).toEqual(['Order lifecycle'])
+    // No entity has a lifecycle: Entity lifecycles shows nothing and goes.
+    expect(dropEmptyForgeViews(facade, opened)).toEqual([opened[1]])
+    expect(views().map((v) => v.name).sort()).toEqual(['Order lifecycle', 'State machine'])
+
+    // A group no element joined goes too.
+    const empty = facadeOf([node('need', 'need')])
+    const group = openForgeStageViews(empty, 'states', { kind: 'radical', viewpoints: ['state-machine'] })
+    expect(dropEmptyForgeViews(empty, group)).toEqual(group)
+    expect(Object.keys(empty.getViews!())).toEqual([])
   })
 })
 

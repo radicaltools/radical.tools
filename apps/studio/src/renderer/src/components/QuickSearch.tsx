@@ -11,6 +11,7 @@ import type { AISettings, ChatMessage, TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
 import { forgeRunClientName, forgeRunCurrentStage } from '@radical/common/formats/forgeRunStatus'
 import { agentForgePhase, useAgentForgeStore } from '../persistence/agentForge'
+import { useFollowAgentStore } from '../persistence/followAgent'
 import { viewNodeSets as viewNodeSetsOf } from '../navigation'
 
 /**
@@ -38,6 +39,7 @@ export function QuickSearch(): React.ReactElement | null {
   // An agent's Forge run on this folder (over MCP): the Forge button pulses
   // while it works or waits for the user, and opens a read-only view of it.
   const agentStatus = useAgentForgeStore((s) => s.status)
+  const followingAgent = useFollowAgentStore((s) => s.on)
   const [agentNow, setAgentNow] = useState(() => Date.now())
   useEffect(() => {
     if (!agentStatus) return
@@ -56,6 +58,7 @@ export function QuickSearch(): React.ReactElement | null {
     : agentPhase === 'waiting' ? `${agentClient}'s Radical Forge run is waiting for you — click to see where it stands`
     : agentPhase === 'done' ? `${agentClient} finished a Radical Forge run — click to see it`
     : `${agentClient}'s Radical Forge run stopped — click to see where it stands`
+  const agentTitle = followingAgent ? `${agentForgeTitle}. Following it on the canvas.` : agentForgeTitle
 
   const [q, setQ] = useState('')
   const [hover, setHover] = useState(0)
@@ -514,9 +517,10 @@ export function QuickSearch(): React.ReactElement | null {
         <button
           type="button"
           className={`qs-forge-toggle${agentPhase ? ` qs-forge-agent qs-forge-${agentPhase}` : ''}`}
-          title={agentPhase ? agentForgeTitle : 'Open Radical Forge — generate a model from a description'}
+          title={agentPhase ? agentTitle : 'Open Radical Forge — generate a model from a description'}
           aria-label={agentPhase ? 'Show the agent\'s Radical Forge run' : 'Open Radical Forge'}
           data-agent-phase={agentPhase ?? undefined}
+          data-following={followingAgent || undefined}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             closeDropdown()

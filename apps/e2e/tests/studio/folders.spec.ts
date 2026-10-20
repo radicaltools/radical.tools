@@ -310,8 +310,17 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
   await expect(panel.locator('.forge-step[data-status="done"]')).toHaveAttribute('title', /requirements summary/)
   await expect(panel.locator('.forge-step.active')).toHaveText('Domain')
   await expect(panel.locator('.forge-agent-line')).toHaveText('Claude Code is generating the Domain model stage…')
-  // Read only: nothing to press but Close.
-  await expect(panel.getByRole('button')).toHaveCount(1)
+  // Nothing acts on the run: Close, and following it on the canvas.
+  await expect(panel.getByRole('button')).toHaveCount(2)
+  const follow = panel.getByRole('button', { name: 'Follow on the canvas' })
+  await expect(follow).toHaveAttribute('aria-pressed', 'false')
+  // Following hands the screen to the canvas, and the Forge button says so.
+  await follow.click()
+  await expect(panel).toHaveCount(0)
+  await expect(button).toHaveAttribute('data-following', 'true')
+  await expect(button).toHaveAttribute('title', /Following it on the canvas\./)
+  await button.click()
+  await expect(panel.getByRole('button', { name: 'Stop following' })).toHaveAttribute('aria-pressed', 'true')
 
   // The domain model proposes a refinement of the requirements: amber, waiting for the answer.
   await write('active', { requirements: 'done', domain: 'generating' }, 'domain')
@@ -335,6 +344,9 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
   await write('closed', { requirements: 'done', domain: 'done' })
   await expect(button).toHaveAttribute('data-agent-phase', 'paused', { timeout: 10_000 })
   await expect(panel.locator('.forge-agent-line')).toHaveText('Stopped: Claude Code closed before the run finished.')
+  // Nothing more to follow.
+  await expect(panel.getByRole('button')).toHaveCount(1)
+  await expect(button).not.toHaveAttribute('data-following')
   await page.keyboard.press('Escape')
   await expect(panel).toHaveCount(0)
 })

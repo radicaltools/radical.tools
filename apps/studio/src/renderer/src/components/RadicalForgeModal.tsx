@@ -20,6 +20,8 @@ import {
   describeProposal,
   describeRefinement,
   fileIntoForgeViews,
+  dropEmptyForgeViews,
+  openForgeStageViews,
   findForgeView,
   forgeArrangeGroups,
   forgeGaps,
@@ -485,13 +487,13 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     // The stages done before this one: their rules find the gaps it gets.
     const stageIdx = FORGE_STAGES.findIndex((s) => s.id === stageId)
     const done = FORGE_STAGES.slice(0, stageIdx).filter((s) => stageReports[s.id]).map((s) => s.id)
-    // The stage builds on its canvas, so its elements land there as they
-    // come. A view it is the first to fill does not exist yet (an empty view
-    // shows the whole model), and a table or wiki has no places: the stage
-    // then runs on All elements, and its views are made afterwards.
+    // The stage's views are made before it begins, and it builds on its
+    // canvas, so its elements land there as they come. A table or wiki has
+    // no places: the stage then runs on All elements.
+    const before = currentModelIds()
+    const opened = openForgeStageViews(diagram, stageId, structure)
     const stageView = forgeStageView(useDiagramStore.getState().views, stageId, structure)
     useDiagramStore.getState().setActiveView(isCanvas(stageView) ? stageView!.id : null)
-    const before = currentModelIds()
     const snapshot = snapshotOf(diagram)
     setProgressByStage((p) => ({ ...p, [stageId]: { round: 0, entries: [] } }))
     const ctl = new AbortController()
@@ -579,6 +581,9 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       // Each element into the run's structure, and the stage's view on screen
       // (or the first it filled).
       const filed = fileIntoForgeViews(diagram, added.nodes, stageId, structure)
+      // The views made for the stage that it left empty go again.
+      const dropped = dropEmptyForgeViews(diagram, opened)
+      added.views = added.views.filter((v) => !dropped.includes(v))
       const target = forgeStageView(useDiagramStore.getState().views, stageId, structure)?.id
         ?? filed.find((f) => f.nodeIds.length)?.viewId
       if (target) useDiagramStore.getState().setActiveView(target)

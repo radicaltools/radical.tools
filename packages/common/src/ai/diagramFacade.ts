@@ -70,7 +70,8 @@ export interface DiagramFacade {
   updateRelation?(id: string, updates: Partial<Omit<C4Relation, 'id'>>): void
   removeRelation(id: string): void
   /** Optional view actions — omitted = AI view tools report a clear error. */
-  addView?(name: string): string
+  /** `empty`: the view lists no element yet, instead of showing every one. */
+  addView?(name: string, opts?: { empty?: boolean }): string
   setViewNodes?(viewId: string, nodeIds: string[]): void
   removeView?(id: string): void
   setActiveView?(id: string | null): void

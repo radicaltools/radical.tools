@@ -10,6 +10,7 @@
     "./store/diagramStore": "./src/store/diagramStore.ts",
     "./store/hubStore": "./src/store/hubStore.ts",
     "./store/documentBackend": "./src/store/documentBackend.ts",
+    "./store/userCamera": "./src/store/userCamera.ts",
     "./components/Canvas": "./src/components/Canvas.tsx",
     "./components/WikiView": "./src/components/WikiView.tsx",
     "./components/TableView": "./src/components/TableView.tsx",
