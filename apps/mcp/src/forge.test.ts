@@ -483,7 +483,7 @@ describe('Radical Forge over MCP', () => {
       })
       expect(started).toContain('View structure: Radical: Conceptual (Traceability); Logical (System context, Containers); Governance (Requirement coverage).')
       expect(started).toMatch(/Made the view Traceability \(.+\); shows 1 new element; it lays itself out\./)
-      expect(started).toContain('ask the user for the view structure')
+      expect(started).toContain('ask for the view structure')
       let data = await read()
       const need = data.nodes.find((n) => n.type === 'need')!
       expect(data.views!.map((v) => [v.name, v.folder, v.viewpoint, v.kind, v.nodeIds])).toEqual([['Traceability', 'Conceptual', 'traceability', 'table', []]])
@@ -597,6 +597,35 @@ describe('Radical Forge over MCP', () => {
       expect(await call(client, 'forge_finish', { gherkinDir: dir })).toContain('Wrote 1 .feature files')
       const [file] = await readdir(dir)
       expect(await readFile(join(dir, file), 'utf8')).toContain('Scenario: Reserve a product')
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
+  it('asks for the languages first and keeps them for the run', async () => {
+    const { client } = await connect()
+    try {
+      const { tools } = await client.listTools()
+      expect(tools.find((t) => t.name === 'forge_start')!.description).toContain('Ask the user first which languages')
+      expect(await refused(client, 'forge_start', { description: BRIEF, languages: { model: 7 } })).toMatch(/languages/)
+
+      const started = await call(client, 'forge_start', { description: BRIEF, languages: { conversation: 'Polish', model: 'German' } })
+      expect(started).toContain('Languages: talk in Polish, write the model in German.')
+      // The languages are asked before the view structure.
+      expect(started.indexOf('Which language to talk in')).toBeGreaterThan(-1)
+      expect(started.indexOf('Which language to talk in')).toBeLessThan(started.indexOf('ask for the view structure'))
+      const clarify = await call(client, 'forge_clarify', { stage: 'requirements' })
+      expect(clarify).toContain('Talk to the user in Polish')
+      expect(clarify).toContain('Write the model in German')
+      const brief = await call(client, 'forge_generate', { stage: 'requirements' })
+      expect(brief).toContain('- Talk to the user in Polish')
+      expect(brief).toContain('- Write the model in German, whatever language the description and the answers are in')
+
+      const restarted = await call(client, 'forge_start', { description: BRIEF })
+      expect(restarted).toContain('Languages: talk in the language of the description, write the model in English.')
+      const defaults = await call(client, 'forge_clarify', { stage: 'requirements' })
+      expect(defaults).toContain('Talk to the user in the language the description is written in')
+      expect(defaults).toContain('Write the model in English')
     } finally {
       await client.close()
     }
