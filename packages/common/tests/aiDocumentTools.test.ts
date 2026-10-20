@@ -382,6 +382,27 @@ describe('smart_layout', () => {
     expect((await call('smart_layout', { viewId: 't' })).resultText).toContain('table view')
   })
 
+  it('refuses a flow (dynamic) view: Studio plays its sequence and draws no canvas there', async () => {
+    // It reported a better layout and wrote nothing, every time; align_nodes
+    // and grid_nodes wrote alignments into a view no canvas shows.
+    const seen: Array<string | undefined> = []
+    const { facade, call } = setup({ runLayout: async (doc: DiagramData, viewId?: string) => { seen.push(viewId); return { ok: true, text: 'laid out', data: doc } } })
+    await call('add_node', { tempId: 'a', type: 'system', label: 'Shop' })
+    await call('add_node', { tempId: 'b', type: 'system', label: 'Bank' })
+    await call('add_relation', { sourceId: 'a', targetId: 'b', label: 'pays' })
+    const seq = await call('create_sequence', { tempId: 'seq', name: 'Pay', steps: [{ relationId: Object.keys(facade.getRelations())[0] }] })
+    expect(seq.ok, seq.resultText).toBe(true)
+    expect((await call('create_view', { tempId: 'f', name: 'Place Order Flow', kind: 'dynamic', sequenceId: 'seq' })).ok).toBe(true)
+    const flow = Object.values(facade.getViews!()).find((v) => v.name === 'Place Order Flow')!
+    for (const [tool, input] of [['smart_layout', {}], ['align_nodes', { nodeIds: ['a', 'b'], axis: 'horizontal' }], ['grid_nodes', { nodeIds: ['a', 'b'] }]] as const) {
+      const res = await call(tool, { ...input, viewId: 'f' })
+      expect(res.ok, tool).toBe(false)
+      expect(res.resultText).toContain(`${tool}: "Place Order Flow" is a dynamic view; only static views have a canvas layout`)
+    }
+    expect(seen).toEqual([])
+    expect(facade.getViews!()[flow.id].layoutConstraints ?? []).toEqual([])
+  })
+
   it('reports when the context cannot lay out', async () => {
     const { call } = setup()
     expect((await call('smart_layout', {})).resultText).toContain('not available')

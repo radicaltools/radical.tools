@@ -1,7 +1,7 @@
 import { mkdir, readdir, realpath, stat } from 'node:fs/promises'
 import { basename, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { buildToolDefs, runTool, type ToolDef, type ToolRunContext } from '@radical/common/ai/tools'
+import { buildToolDefs, noCanvasLayout, runTool, type ToolDef, type ToolRunContext } from '@radical/common/ai/tools'
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
 import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
@@ -460,9 +460,8 @@ export class FolderModel {
     const changed = JSON.parse(JSON.stringify(data)) as DiagramData
     const view = viewId === undefined ? undefined : changed.views?.find((v) => v.id === viewId)
     if (viewId !== undefined && !view) return { ok: false, text: `smart_layout: unknown view id "${viewId}"` }
-    if (view?.kind && view.kind !== 'static' && view.kind !== 'dynamic') {
-      return { ok: false, text: `smart_layout: "${view.name}" is a ${view.kind} view; only static and dynamic views have a canvas layout.` }
-    }
+    const refused = view ? noCanvasLayout('smart_layout', view) : null
+    if (refused) return { ok: false, text: `${refused}.` }
     // The canvas the view shows: its saved positions over the model's.
     const nodes = byId(view ? (JSON.parse(JSON.stringify(changed.nodes)) as C4Node[]) : changed.nodes)
     for (const [id, pos] of Object.entries(view?.positions ?? {})) {
