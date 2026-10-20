@@ -29,7 +29,7 @@
 // Studio's wizard and the MCP server's forge_* tools both go through the
 // facade here, so they file and arrange the same way.
 
-import { landscapeGridColumns, type C4Node, type DiagramView } from '../../c4'
+import { landscapeGridColumns, WIKI_DEPTH_MAX, type C4Node, type DiagramView } from '../../c4'
 import type { Metamodel, ViewpointDef } from '../../metamodel'
 import { canBeSubject } from '../../viewpoints'
 import { runChain, runPipeline, type PipelineContext } from '../../viewPipeline'
@@ -302,6 +302,8 @@ function fileIntoRadicalViews(facade: DiagramFacade, nodeIds: string[], viewpoin
       const viewId = facade.addView(def.label)
       if (!viewId || !facade.applyViewpoint?.(viewId, viewpoint)) continue
       facade.setViewFolder?.(viewId, choice.folder)
+      // A wiki the run makes reads as one article, every level of its chain.
+      if (def.kind === 'wiki') facade.setWikiPages?.(viewId, 'multi', WIKI_DEPTH_MAX)
       view = facade.getViews?.()[viewId]
       if (!view) continue
       made = true
