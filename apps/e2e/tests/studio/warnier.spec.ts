@@ -329,3 +329,24 @@ test('a process is built by clicking where it is drawn, from an empty Warnier vi
   await name('Billing')
   await expect(diagram.locator('.wn-roots > .wn-item > .wn-node > .wn-label .wn-name')).toHaveText(['Checkout', 'Billing'])
 })
+
+test('in a milestone, the name of the first element added stays open through the question how to save it', async ({ page, studio }) => {
+  // The question opens on the first edit of a milestone; a click on it took
+  // the focus from the new process's name, which closed: what was typed
+  // then was lost, and Enter added a second "New process".
+  await studio.openSample('view-processes')
+  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v4' }).click()
+  await expect(page).toHaveURL(/\/s\//)
+  const diagram = page.getByLabel('Warnier diagram')
+  const before = await diagram.locator('.wn-name').count()
+  await diagram.getByRole('button', { name: '+ Process' }).first().click()
+  await page.locator('.milestone-modal').getByRole('button', { name: 'Continue editing (decide later)' }).click()
+  const input = diagram.locator('.wn-name-input')
+  await expect(input).toBeFocused()
+  await page.keyboard.type('Onboard a customer')
+  await page.keyboard.press('Enter')
+  await expect(input).toHaveCount(0)
+  await expect(diagram.locator('.wn-name')).toHaveCount(before + 1)
+  await expect(diagram.locator('.wn-name', { hasText: /^Onboard a customer$/ })).toHaveCount(1)
+})

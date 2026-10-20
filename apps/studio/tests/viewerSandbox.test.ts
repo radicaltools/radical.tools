@@ -22,6 +22,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { documents } from '../src/renderer/src/store/documentStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
+import type { ViewpointDef } from '@radical/common/metamodel'
+import { withViewpoint } from '@radical/common/viewpoints'
 
 // The default node test env has no localStorage, so the document-persistence
 // layer is otherwise a no-op. Provide a minimal in-memory implementation so
@@ -428,4 +430,50 @@ describe('a layout made while exploring is not saved', () => {
       documents.deleteDocument(meta.id, { wipePayload: true })
     }, 120_000)
   }
+})
+
+describe('the metamodel editor opened while exploring', () => {
+  // It edits Designer's model: Viewer and Presenter had the explored model
+  // in the store, autosave saves in the metamodel editor, and the first
+  // metamodel edit wrote a drag made in Viewer (and a reload showed it in
+  // Designer).
+  for (const mode of ['viewer', 'presenter'] as const) {
+    it(`saves Designer's layout, not a drag made in ${mode}`, async () => {
+      const meta = documents.createLSDocument(`metamodel-from-${mode}`, useDiagramStore.getState().saveDiagram())
+      documents.setActiveId(meta.id)
+      await new Promise((r) => setTimeout(r, 100))
+      const store = useDiagramStore.getState
+      store().setAppMode('designer')
+      const x = store().c4Nodes['ctn1'].x
+      store().setAppMode(mode)
+      useDiagramStore.setState((s: any) => { s.c4Nodes['ctn1'].x = 9999; return s })
+      store().setAppMode('metamodel')
+      expect(store().c4Nodes['ctn1'].x).toBe(x)
+      store().setMetamodel({ ...store().metamodel!, name: 'Renamed' })
+      await new Promise((r) => setTimeout(r, 600))
+      const doc = (await documents.loadDocument(meta.id))!
+      expect(doc.metamodel?.name).toBe('Renamed')
+      expect(doc.nodes.find((n) => n.id === 'ctn1')!.x).toBe(x)
+      // Back in Designer: its model, with the metamodel edit.
+      store().setAppMode('designer')
+      expect(store().c4Nodes['ctn1'].x).toBe(x)
+      expect(store().metamodel?.name).toBe('Renamed')
+      documents.deleteDocument(meta.id, { wipePayload: true })
+    })
+  }
+
+  it('keeps what a metamodel edit made of the views on the way back to Designer', () => {
+    // A viewpoint edited there changes its views; Designer parked on the
+    // way in put the views from before back on return.
+    const store = useDiagramStore.getState
+    const viewpoint: ViewpointDef = { id: 'vp-sandbox', label: 'Sandbox', kind: 'static', pipeline: {} }
+    store().setMetamodel(withViewpoint(store().metamodel!, viewpoint))
+    const viewId = store().addView('Of a viewpoint')
+    expect(store().applyViewpoint(viewId, viewpoint.id)).toBe(true)
+    store().setAppMode('metamodel')
+    store().setMetamodel(withViewpoint(store().metamodel!, { ...viewpoint, kind: 'table' }))
+    expect(store().views[viewId].kind).toBe('table')
+    store().setAppMode('designer')
+    expect(store().views[viewId].kind).toBe('table')
+  })
 })

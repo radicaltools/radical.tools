@@ -182,7 +182,11 @@ function Item(props: ItemProps): React.ReactElement {
               onChange={(e) => onDraft(e.target.value)}
               onClick={(e) => e.stopPropagation()}
               onFocus={(e) => e.currentTarget.select()}
-              onBlur={onCommit}
+              // The question how to save a milestone, opened by its first
+              // edit (this element added), takes the focus while it is
+              // answered and gives it back: the name stays open. Kept on
+              // that blur, it closed, and what was typed next was lost.
+              onBlur={() => { if (!useDiagramStore.getState().milestonePromptOpen) onCommit() }}
               onKeyDown={(e) => {
                 e.stopPropagation()
                 if (e.key === 'Enter') { e.preventDefault(); onCommit() }

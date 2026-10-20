@@ -241,17 +241,21 @@ export function patchNode(state: ModelState, id: string, updates: Partial<Omit<C
   const node = state.c4Nodes[id] as NodeRecord | undefined
   if (!node) return
   const retyped = 'type' in updates && updates.type !== node.type
-  // A view of this element named after it is renamed with it; one renamed
-  // by hand keeps its name.
-  const label = typeof updates.label === 'string' ? updates.label.trim() : ''
-  if (label && label !== node.label.trim()) {
-    for (const view of Object.values(state.views)) if (view.subject === id && view.name === node.label.trim()) view.name = label
-  }
+  if (typeof updates.label === 'string') renameViewsOf(state, id, updates.label)
   Object.assign(node, updates)
   if ('type' in updates) materializeDefaults(node, state.metamodel)
   // Its relations keep a type that fits the new pair (checkNodeUpdate made
   // sure there is one).
   if (retyped) for (const rel of Object.values(state.c4Relations)) if (rel.sourceId === id || rel.targetId === id) refitRelationType(state, rel)
+}
+
+/** A view of element `id` named after it is renamed with it to `label`;
+ *  one renamed by hand keeps its name. Call before the element takes it. */
+export function renameViewsOf(state: ModelState, id: string, label: string): void {
+  const before = state.c4Nodes[id]?.label.trim()
+  const after = label.trim()
+  if (!before || !after || after === before) return
+  for (const view of Object.values(state.views)) if (view.subject === id && view.name === before) view.name = after
 }
 
 /** Why `ids` cannot move under `newParentId` (null = the root), or null.
@@ -334,6 +338,14 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
   for (const [rid, rel] of Object.entries(state.c4Relations)) {
     if (removed.has(rel.sourceId) || removed.has(rel.targetId)) delete state.c4Relations[rid]
   }
+  forgetNodesInViews(state, removed)
+  return removed
+}
+
+/** Takes the `removed` elements out of every view (its list, folds and
+ *  alignments) and out of All elements' alignments; a view of one of them
+ *  goes with it. */
+export function forgetNodesInViews(state: ModelState, removed: Set<string>): void {
   for (const view of Object.values(state.views)) {
     removeFromViewList(view, removed)
     if (view.collapsedNodeIds?.length) view.collapsedNodeIds = view.collapsedNodeIds.filter((nid) => !removed.has(nid))
@@ -348,7 +360,6 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
     if (view.subject && removed.has(view.subject)) delete state.views[view.id]
   }
   if (state.activeViewId && !state.views[state.activeViewId]) state.activeViewId = null
-  return removed
 }
 
 /** Constraints without the removed nodes; a rule left with one member goes

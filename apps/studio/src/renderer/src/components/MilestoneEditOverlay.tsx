@@ -25,7 +25,16 @@ export function MilestoneEditOverlay(): React.ReactElement | null {
     if (active) setNewName(`${active.name} (edited)`)
   }, [active?.id])
 
-  if (!active || appMode !== 'designer' || !promptOpen || !milestoneDirty) return null
+  const shown = !!active && appMode === 'designer' && promptOpen && milestoneDirty
+  // What had the focus when the question opened (the name of an element
+  // just added, being typed) has it again once it is answered.
+  useEffect(() => {
+    if (!shown) return
+    const before = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null
+    return () => { if (before?.isConnected) before.focus() }
+  }, [shown])
+
+  if (!shown) return null
 
   return (
     <div className="milestone-modal-backdrop" onClick={dismiss}>
