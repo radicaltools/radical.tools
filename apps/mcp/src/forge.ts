@@ -39,6 +39,7 @@ import {
   PRIMARY_TYPE_IDS_FOR_STAGE,
   PROPOSAL_INPUT_PROPERTIES,
   RADICAL_FOLDERS,
+  acceptedRefinements,
   applyProposal,
   arrangeForgeGroup,
   buildClarifyPrompt,
@@ -326,6 +327,10 @@ interface StageState {
   refinements?: ForgeRefinement[]
   /** Ids of the nodes and relations its accepted proposals added. */
   proposed: Set<string>
+  /** What its accepted proposals wrote, as applyProposal lists it: only
+   *  that is the stage's refinement, not an edit someone else made in the
+   *  meantime. */
+  accepted: ForgeRefinement[]
   /** The proposal waiting for the user's answer. */
   pending?: { id: string; proposal: ForgeProposal }
   /** How many proposals it made, and how many the user declined. */
@@ -654,7 +659,7 @@ export class Forge {
     let readOnly = true
     if (previous) {
       // Its changes to earlier stages first, while what it added is still there.
-      const refinements = previous.refinements ?? stageRefinements(id, previous.snapshot, snapshotOf(facade))
+      const refinements = previous.refinements ?? acceptedRefinements(stageRefinements(id, previous.snapshot, snapshotOf(facade)), previous.accepted)
       if (rejectRefinements(facade, refinements).length) readOnly = false
       const added = previous.added ?? idsAddedSince(previous.before, this.ids(facade))
       for (const viewId of added.views) if (facade.getViews?.()[viewId]) { facade.removeView?.(viewId); readOnly = false }
@@ -709,7 +714,7 @@ export class Forge {
 
     const state: StageState = {
       status: 'generating', before, opened, snapshot: snapshotOf(facade), clarifications, hubConcepts,
-      proposed: new Set(), proposals: 0, declined: 0,
+      proposed: new Set(), accepted: [], proposals: 0, declined: 0,
     }
     return ok(brief, { readOnly, commit: () => { run.stages[id] = state } })
   }
@@ -725,7 +730,7 @@ export class Forge {
     if (state.pending) return fail(`forge_complete_stage: proposal ${state.pending.id} waits for the user's answer; ask them and call forge_answer_refinement first`)
     const summary = typeof args.summary === 'string' && args.summary.trim() ? args.summary.trim() : 'Done.'
     const added = idsAddedSince(state.before, this.ids(facade))
-    const refinements = stageRefinements(id, state.snapshot, snapshotOf(facade))
+    const refinements = acceptedRefinements(stageRefinements(id, state.snapshot, snapshotOf(facade)), state.accepted)
     const filed = fileIntoForgeViews(facade, added.nodes, id, run.structure)
     // The views made for the stage that it left empty go again.
     const dropped = dropEmptyForgeViews(facade, state.opened)
@@ -836,6 +841,7 @@ export class Forge {
       commit: () => {
         state.pending = undefined
         for (const added of outcome.added) state.proposed.add(added)
+        state.accepted.push(...outcome.refinements)
       },
     })
   }

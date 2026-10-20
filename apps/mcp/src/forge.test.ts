@@ -411,6 +411,51 @@ describe('Radical Forge over MCP', () => {
     }
   }, 60_000)
 
+  it('leaves out of the stage\'s refinements what someone else changed while it ran', async () => {
+    const { client, read, folder } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
+      const need = (await read()).nodes.find((n) => n.type === 'need')!
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      await call(client, 'forge_generate', { stage: 'requirements' })
+      await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
+      await call(client, 'add_relation', { sourceId: 'req', targetId: need.id, relationType: 'derives' })
+      await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement.' })
+      for (const stage of ['domain', 'fitness']) {
+        await call(client, 'forge_clarify', { stage })
+        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
+      }
+      await call(client, 'forge_clarify', { stage: 'scenarios' })
+      await call(client, 'forge_generate', { stage: 'scenarios' })
+      const reqId = (await read()).nodes.find((n) => n.label === 'Reserve online')!.id
+      // The user renames the requirement in Studio while the stage runs.
+      const files = (await readdir(folder, { recursive: true })).filter((f) => f.endsWith('.md'))
+      let renamed = false
+      for (const file of files) {
+        const text = await readFile(join(folder, file), 'utf8')
+        if (!text.includes('Reserve online')) continue
+        await writeFile(join(folder, file), text.split('Reserve online').join('Reserve in the app'))
+        renamed = true
+      }
+      expect(renamed).toBe(true)
+      expect((await read()).nodes.find((n) => n.id === reqId)!.label).toBe('Reserve in the app')
+      await call(client, 'add_node', { tempId: 'sc', type: 'scenario', label: 'Reserve', properties: { given: 'a product in stock', when: 'a shopper reserves it', then: 'it is held for two hours' } })
+      await call(client, 'add_relation', { sourceId: 'sc', targetId: reqId, relationType: 'verifies' })
+      const done = await call(client, 'forge_complete_stage', { stage: 'scenarios', summary: 'One scenario.' })
+      expect(done).not.toContain('refined earlier stages')
+      const status = parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
+      expect(status.stages.find((s) => s.id === 'scenarios')?.refined ?? 0).toBe(0)
+      // Regenerate takes back the stage's scenario, not the user's rename.
+      await call(client, 'forge_generate', { stage: 'scenarios', regenerate: true })
+      const data = await read()
+      expect(data.nodes.some((n) => n.type === 'scenario')).toBe(false)
+      expect(data.nodes.find((n) => n.id === reqId)!.label).toBe('Reserve in the app')
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
   it('saves the model before the run as the base when there is none from git, and leaves a git base alone', async () => {
     const { client, folder, read } = await connect()
     const baseFile = join(folder, '.radical/base.json')
