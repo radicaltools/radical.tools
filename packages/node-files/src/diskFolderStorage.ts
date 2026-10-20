@@ -1,7 +1,7 @@
 import type { Stats } from 'node:fs'
 import { lstat, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, resolve, sep } from 'node:path'
-import { isMdFolderModelPath } from '@radical/common/formats/mdFolder'
+import { isMdFolderModelPath, stripBom } from '@radical/common/formats/mdFolder'
 import type { MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 
 /** Node-only folder adapter shared by Electron and the local MCP server. */
@@ -56,7 +56,8 @@ export function diskFolderStorage(root: string): MdFolderStorage {
       }
       return stamps
     },
-    read: async (rel) => readFile(await inside(rel), 'utf-8'),
+    // Decoded as the browser decodes a file: without a byte-order mark.
+    read: async (rel) => stripBom(await readFile(await inside(rel), 'utf-8')),
     async write(rel, content) {
       const abs = await inside(rel)
       await mkdir(dirname(abs), { recursive: true })

@@ -163,10 +163,18 @@ function parseScalar(raw: string): Scalar {
   return raw
 }
 
+/** `content` without a leading UTF-8 byte-order mark. Notepad, PowerShell 5
+ *  and Visual Studio may save one; the browser drops it when it decodes a
+ *  file, Node's fs keeps it, so a node file read by the MCP server or the
+ *  CLI had no frontmatter and was no element. */
+export function stripBom(content: string): string {
+  return content.charCodeAt(0) === 0xfeff ? content.slice(1) : content
+}
+
 /** Parse a Markdown file into its frontmatter object and body text. */
 function parseMarkdown(content: string): { front: Record<string, Scalar>; body: string } {
   const front: Record<string, Scalar> = {}
-  const normalized = content.replace(/\r\n/g, '\n')
+  const normalized = stripBom(content).replace(/\r\n/g, '\n')
   if (!normalized.startsWith('---\n')) {
     return { front, body: normalized.trim() }
   }
@@ -515,7 +523,7 @@ export function mdFolderNodeFiles(files: FolderFiles): MdFolderNodeFile[] {
         path,
         ...(front.id ? { id: String(front.id) } : {}),
         ...(front.type ? { type: String(front.type) } : {}),
-        frontmatter: content.replace(/\r\n/g, '\n').startsWith('---\n'),
+        frontmatter: stripBom(content).replace(/\r\n/g, '\n').startsWith('---\n'),
         conflict: CONFLICT_MARKER.test(content),
       }
     })
@@ -549,7 +557,7 @@ function readJson<T>(files: FolderFiles, path: string): T | undefined {
   const content = files[path]
   if (content === undefined) return undefined
   try {
-    return JSON.parse(content) as T
+    return JSON.parse(stripBom(content)) as T
   } catch {
     throw new MalformedFolderFileError(path)
   }
