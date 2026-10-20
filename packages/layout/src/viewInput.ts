@@ -45,6 +45,22 @@ export function viewFrames(view: DiagramView | undefined, nodes: Record<string, 
   return frames
 }
 
+/** The containers a view draws open over their fold (`expandedSet` of
+ *  isEffectivelyCollapsed): those opened in it (`expandedNodeIds`), and its
+ *  frames, which it draws only to hold what it shows. A frame folded on the
+ *  model (or in the view, from when the view showed it) hid all it holds:
+ *  the view drew nothing of what its filter gives. `frames` when the caller
+ *  has them (viewFrames). Undefined: none. */
+export function viewExpandedSet(
+  view: DiagramView | undefined,
+  nodes: Record<string, C4Node>,
+  relations: Record<string, C4Relation>,
+  frames: Set<string> = viewFrames(view, nodes, relations),
+): Set<string> | undefined {
+  if (!view?.expandedNodeIds?.length && !frames.size) return undefined
+  return new Set([...(view?.expandedNodeIds ?? []), ...frames])
+}
+
 /**
  * Compute which nodes should be treated as collapsed in a view.
  * A parent (system/container) is view-collapsed if:
@@ -166,12 +182,12 @@ export function viewLayoutInput(
   const viewFilter = computeViewNodeSet(view, allNodes, allRelations)
   const viewCollapsedSet = computeViewCollapsedSet(viewFilter, allNodes)
   for (const id of view?.collapsedNodeIds ?? []) viewCollapsedSet.add(id)
-  const expandedSet = view?.expandedNodeIds?.length ? new Set(view.expandedNodeIds) : undefined
+  const frames = viewFrames(view, allNodes, allRelations)
+  const expandedSet = viewExpandedSet(view, allNodes, allRelations, frames)
 
   const filtered = filterForView(allNodes, allRelations, viewFilter)
   // Lines end only at elements the view shows, never at a frame drawn
   // invisible to hold them.
-  const frames = viewFrames(view, allNodes, allRelations)
   const lines = frames.size ? filterForView(allNodes, allRelations, new Set([...viewFilter!].filter((id) => !frames.has(id)))).relations : filtered.relations
   const nodes: Record<string, C4Node> = {}
   for (const [id, n] of Object.entries(filtered.nodes)) {

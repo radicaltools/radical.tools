@@ -70,6 +70,7 @@ import {
   chainHiddenRelations,
   computeViewNodeSet,
   viewFrames,
+  viewExpandedSet,
   fitAndSeparateBottomUp,
   isEffectivelyCollapsed,
   viewLayoutInput,
@@ -2432,10 +2433,11 @@ export const useDiagramStore = create<DiagramStore>()(
           if (view?.collapsedNodeIds?.length) {
             for (const nid of view.collapsedNodeIds) vcs.add(nid)
           }
-          // Nodes explicitly expanded in this view override model-level collapse
-          const expandedSet = view?.expandedNodeIds?.length
-            ? new Set(view.expandedNodeIds)
-            : undefined
+          // Nodes explicitly expanded in this view override model-level
+          // collapse, and so do its frames: it draws them only to hold what
+          // it shows.
+          const frames = viewFrames(view as DiagramView | undefined, mergedNodes, mergedRels)
+          const expandedSet = viewExpandedSet(view as DiagramView | undefined, mergedNodes, mergedRels, frames)
           const ghostIdSet = hasGhosts ? new Set(Object.keys(ghostNodes)) : undefined
           // A ghost has the base's place, laid out for All elements: on this
           // canvas it goes inside its container's frame, clear of the rest.
@@ -2447,7 +2449,6 @@ export const useDiagramStore = create<DiagramStore>()(
           // While a presentation is active we also lock — slides are
           // static and must not drift from accidental drags.
           const locked = state.appMode === 'metamodel' || state.presentationActive
-          const frames = viewFrames(view as DiagramView | undefined, mergedNodes, mergedRels)
           state.rfNodes = deriveRFNodes(drawnNodes, filter, vcs, ghostIdSet, locked, expandedSet, frames) as any
           const chainHidden = chainHiddenRelations(view as DiagramView | undefined, mergedNodes, mergedRels)
           const hiddenRels = view?.hiddenRelationIds?.length || chainHidden.length
@@ -2904,8 +2905,8 @@ export const useDiagramStore = create<DiagramStore>()(
             // collapsing), it must be excluded from the expanded set even if it was
             // previously in view.expandedNodeIds — otherwise fitParentToChildren
             // would still measure it at full height (stale override).
-            if (view.expandedNodeIds?.length) {
-              loopExpandedSet = new Set(view.expandedNodeIds)
+            loopExpandedSet = viewExpandedSet(view as DiagramView, get().c4Nodes, get().c4Relations)
+            if (loopExpandedSet) {
               if (!prevCollapsed) loopExpandedSet.delete(id) // we are collapsing `id`
               if (loopExpandedSet.size === 0) loopExpandedSet = undefined
             }
