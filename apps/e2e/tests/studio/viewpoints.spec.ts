@@ -216,3 +216,22 @@ test('a blank view is a table of every element', async ({ page, studio }) => {
   // The bookstore's six elements, as the containment tree.
   await expect(page.locator('tr.tv-row')).toHaveCount(6)
 })
+
+test('a new view draws its elements inside their containers and clear of each other', async ({ page, studio }) => {
+  // From System Context, where Bookstore is a small box beside Payment
+  // Provider: the new view did not keep those places for its containers.
+  await studio.seed()
+  await studio.open('v-context')
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: /^Containers(?! of)/ }).click()
+  await expect(page.locator('.props-type-badge')).toContainText('STRUCTURE VIEW')
+  await expect(studio.node('bookstore')).toBeVisible()
+  await expect.poll(() => studio.layoutViolations()).toEqual([])
+  // A blank view turned into a structure view, the same.
+  await studio.open('v-context')
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: /^Blank view/ }).click()
+  await page.getByRole('group', { name: 'View type' }).getByRole('button', { name: 'Structure' }).click()
+  await expect(studio.node('bookstore')).toBeVisible()
+  await expect.poll(() => studio.layoutViolations()).toEqual([])
+})

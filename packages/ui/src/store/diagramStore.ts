@@ -379,13 +379,15 @@ function suggestSmartLayoutIfUnarranged(loaded = false): void {
   s.pushNotification('This diagram is not laid out yet. The live layout only moves what you drag or add: use Smart Layout to arrange it.', 'info')
 }
 
-/** On opening a view: one of a group of views per element never laid out
- *  (no positions of its own) gets Smart Layout at once, in the designer;
- *  another canvas that looks unarranged gets the notice. */
+/** On opening a view: a view of a viewpoint never laid out (no positions
+ *  of its own), one of a group of views per element among them, gets Smart
+ *  Layout at once, in the designer and outside a milestone; another canvas
+ *  that looks unarranged gets the notice. Until then it shows All
+ *  elements' places (firstCanvasPositions). */
 function arrangeOnFirstOpen(): void {
   const s = useDiagramStore.getState()
   const view = s.activeViewId ? s.views[s.activeViewId] : undefined
-  if (view?.partOf && s.appMode === 'designer' && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) {
+  if ((view?.partOf || view?.viewpoint) && s.appMode === 'designer' && !s.activeSnapshotId && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) {
     void s.runSmartLayout()
     return
   }
@@ -428,6 +430,22 @@ function showCanvasPositions(
   // view keeps what it was given.
   if (view && view.kind && view.kind !== 'static') return []
   return placeUnplaced(nodes, positions, view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined)
+}
+
+/** The positions a canvas view opens with when it has none of its own (a
+ *  new view, a table turned into a structure view): All elements' (the
+ *  milestone's own, in a milestone), one layout in which every child lies
+ *  in its parent. Not the canvas shown before it: that one's places, and
+ *  the places other canvases left on the nodes it does not draw, put the
+ *  view's elements over each other and outside their containers. Undefined
+ *  for a view that has positions, or is not a canvas. */
+function firstCanvasPositions(
+  view: DiagramView | undefined,
+  defaultPositions: Record<string, NodePosition>,
+  milestoneAllPositions: Record<string, NodePosition> | null,
+): Record<string, NodePosition> | undefined {
+  if (!view || (view.kind ?? 'static') !== 'static' || Object.keys(view.positions ?? {}).length > 0) return undefined
+  return milestoneAllPositions ?? defaultPositions
 }
 
 /**
@@ -3131,7 +3149,8 @@ export const useDiagramStore = create<DiagramStore>()(
           set((state) => {
             const incoming = newId === null
               ? state.defaultPositions as Record<string, NodePosition>
-              : state.views[newId]?.positions as Record<string, NodePosition> | undefined
+              : firstCanvasPositions(state.views[newId] as DiagramView | undefined, state.defaultPositions as Record<string, NodePosition>, null)
+                ?? state.views[newId]?.positions as Record<string, NodePosition> | undefined
             if (incoming && Object.keys(incoming).length > 0) {
               placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView, state.c4Relations as Record<string, C4Relation>)
             }
@@ -3185,7 +3204,8 @@ export const useDiagramStore = create<DiagramStore>()(
               incoming = view.positions as Record<string, NodePosition>
             }
             if (view?.viewport) incomingViewport = view.viewport
-            // New view with no positions yet → keep current positions
+            // A canvas with no positions yet opens on All elements' places.
+            incoming ??= firstCanvasPositions(view as DiagramView | undefined, state.defaultPositions as Record<string, NodePosition>, inMilestone ? _milestoneAllPositions : null)
           }
 
           if (incoming) {
@@ -3419,8 +3439,19 @@ export const useDiagramStore = create<DiagramStore>()(
 
       setViewKind(viewId, kind) {
         if (setByGroup(get(), viewId)) return
-        set((state) => { model.setViewKind(state, viewId, kind) })
+        let placed: string[] | null = null
+        set((state) => {
+          model.setViewKind(state, viewId, kind)
+          // Turned into a canvas, a view with no positions of its own shows
+          // All elements' places, not the canvas shown before it.
+          if (state.activeViewId !== viewId) return
+          const view = state.views[viewId] as DiagramView
+          const first = firstCanvasPositions(view, state.defaultPositions as Record<string, NodePosition>, state.activeSnapshotId ? _milestoneAllPositions : null)
+          if (first) placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, first, view, state.c4Relations as Record<string, C4Relation>)
+        })
         get()._sync()
+        // The live layout drops what it had of the canvas shown before.
+        if (placed) _liveLayout?.reset(placed)
       },
 
       setTreemapFocus(viewId, focusId) {
