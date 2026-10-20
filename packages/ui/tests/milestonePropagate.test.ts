@@ -82,3 +82,33 @@ describe('A click on an element in a milestone', () => {
     expect(s().milestonePromptOpen).toBe(false)
   })
 })
+
+describe('Propagate a change of a sequence', () => {
+  // The whole sequence of the edited milestone was copied into every later
+  // milestone and the live model: one note changed in As-is, and the live
+  // flow lost the steps added since.
+  it('carries forward only the steps and notes the milestone changed', () => {
+    s().loadDiagram({
+      nodes: [node('a', 'system', 0, 0), node('b', 'system', 400, 0), node('c', 'system', 800, 0)],
+      relations: [{ id: 'r1', sourceId: 'a', targetId: 'b' }, { id: 'r2', sourceId: 'b', targetId: 'c' }, { id: 'r3', sourceId: 'c', targetId: 'a' }],
+      views: [],
+      sequences: [{ id: 'order', name: 'Place Order', relationIds: ['r1', 'r2'], stepDescriptions: ['submits', 'posts'] }],
+    } as DiagramData)
+    const asIs = s().createSnapshot('as-is')
+    s().toggleRelationInSequence('order', 'r3')
+    s().updateStepDescription('order', 2, 'returns')
+    s().createSnapshot('target')
+    s().toggleRelationInSequence('order', 'r1')
+    s().selectMilestone(asIs)
+    s().updateStepDescription('order', 1, 'POSTS')
+    s().removeFromSequence('order', 0)
+    s().commitMilestoneChanges('propagate')
+    const steps = (seqs: unknown) => {
+      const q = (seqs as Record<string, { relationIds: string[]; stepDescriptions?: (string | undefined)[] }>).order
+      return q.relationIds.map((r, i) => `${r}:${q.stepDescriptions?.[i] ?? '-'}`)
+    }
+    expect(steps(s().snapshots[0].sequences)).toEqual(['r2:POSTS'])
+    expect(steps(s().snapshots[1].sequences)).toEqual(['r2:POSTS', 'r3:returns'])
+    expect(steps(s().liveBackup!.sequences)).toEqual(['r2:POSTS', 'r3:returns', 'r1:-'])
+  })
+})

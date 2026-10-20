@@ -54,7 +54,7 @@ import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
 import { pipelineOf, viewDrawnIds } from '@radical/common/viewPipeline'
-import { mergeModels } from '@radical/common/modelMerge'
+import { mergeModels, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
@@ -5186,15 +5186,28 @@ export const useDiagramStore = create<DiagramStore>()(
           if (!editedRels[id]) removedRelIds.push(id)
         }
 
-        // Sequence diff for propagation.
+        // Sequence diff for propagation: the fields changed, and the steps
+        // as they were and became. A later model may have steps the edited
+        // milestone never had: the whole sequence copied took them out.
         const addedSeqs: DiagramSequence[] = []
-        const updatedSeqs: { id: string; seq: DiagramSequence }[] = []
+        const updatedSeqs: { id: string; updates: Partial<DiagramSequence>; steps?: { before: DiagramSequence; after: DiagramSequence } }[] = []
         const removedSeqIds: string[] = []
         for (const id of Object.keys(editedSeqs)) {
           if (!baseSeqs[id]) {
             addedSeqs.push(editedSeqs[id])
-          } else if (JSON.stringify(editedSeqs[id]) !== JSON.stringify(baseSeqs[id])) {
-            updatedSeqs.push({ id, seq: editedSeqs[id] })
+          } else {
+            const before = baseSeqs[id]
+            const after = editedSeqs[id]
+            const updates: Partial<DiagramSequence> = {}
+            let steps = false
+            for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) {
+              if (k === 'id') continue
+              const a = (before as any)[k], b = (after as any)[k]
+              if (a === b || JSON.stringify(a) === JSON.stringify(b)) continue
+              if (k === 'relationIds' || k === 'stepDescriptions') steps = true
+              else (updates as any)[k] = b
+            }
+            if (steps || Object.keys(updates).length > 0) updatedSeqs.push({ id, updates, ...(steps ? { steps: { before, after } } : {}) })
           }
         }
         for (const id of Object.keys(baseSeqs)) {
@@ -5231,7 +5244,18 @@ export const useDiagramStore = create<DiagramStore>()(
             if (!targetNodes[r.sourceId] || !targetNodes[r.targetId]) delete targetRels[rid]
           }
           for (const seq of addedSeqs) targetSeqs[seq.id] = JSON.parse(JSON.stringify(seq))
-          for (const { id, seq } of updatedSeqs) targetSeqs[id] = JSON.parse(JSON.stringify(seq))
+          for (const { id, updates, steps } of updatedSeqs) {
+            const target = targetSeqs[id]
+            if (!target) continue
+            Object.assign(target, JSON.parse(JSON.stringify(updates)))
+            if (!steps) continue
+            // The edited milestone's own changes of the steps and notes, made
+            // to the steps this model has (the edit wins where both changed).
+            const merged = mergeSteps(steps.before, target, steps.after).steps
+            target.relationIds = merged.relationIds
+            if (merged.stepDescriptions) target.stepDescriptions = merged.stepDescriptions
+            else delete target.stepDescriptions
+          }
           for (const id of removedSeqIds) delete targetSeqs[id]
         }
 
