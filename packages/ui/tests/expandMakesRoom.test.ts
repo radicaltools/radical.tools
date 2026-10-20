@@ -110,3 +110,32 @@ describe('expanding a container among many root elements', () => {
     expect(violations()).toEqual([])
   })
 })
+
+describe('a container collapsed and expanded again in a view', () => {
+  /** A system holding two containers side by side, each with components,
+   *  all listed in a view. */
+  const nested = (): DiagramData => ({
+    nodes: [
+      { id: 'sys', type: 'system', label: 'Platform', x: 0, y: 0, width: 1200, height: 640, collapsed: false },
+      { id: 'a', type: 'container', label: 'Services', parentId: 'sys', x: 40, y: 120, width: 600, height: 480, collapsed: false },
+      { id: 'a1', type: 'component', label: 'One', parentId: 'a', x: 30, y: 110, width: 220, height: 140, collapsed: false },
+      { id: 'a2', type: 'component', label: 'Two', parentId: 'a', x: 330, y: 110, width: 220, height: 140, collapsed: false },
+      { id: 'a3', type: 'component', label: 'Three', parentId: 'a', x: 30, y: 300, width: 220, height: 140, collapsed: false },
+      { id: 'b', type: 'container', label: 'Store', parentId: 'sys', x: 700, y: 120, width: 440, height: 300, collapsed: false },
+      { id: 'b1', type: 'component', label: 'Four', parentId: 'b', x: 30, y: 110, width: 220, height: 140, collapsed: false },
+    ] as C4Node[],
+    relations: [],
+    views: [{ id: 'v', name: 'Core', nodeIds: ['sys', 'a', 'a1', 'a2', 'a3', 'b', 'b1'], positions: {} }],
+  })
+
+  it('lies inside its parent, which fits it at its full size', () => {
+    s().loadDiagram(nested())
+    s().setActiveView('v')
+    expect(violations()).toEqual([])
+    s().toggleCollapse('a')
+    expect(s().rfNodes.find((n) => n.id === 'a1')?.hidden).toBe(true)
+    s().toggleCollapse('a')
+    expect(s().rfNodes.find((n) => n.id === 'a1')?.hidden).toBe(false)
+    expect(violations()).toEqual([])
+  })
+})

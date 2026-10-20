@@ -2985,7 +2985,9 @@ export const useDiagramStore = create<DiagramStore>()(
             // past its parent's left or top edge, where a refit (which grows
             // right and down) does not follow: the frame grows that way.
             if (prevCollapsed) growFrameLeftUp(current.parentId, loopViewFilter)
-            get().fitParentToChildren(current.parentId, loopViewFilter, loopVcs, loopExpandedSet)
+            // Opened, it counts at its full size: the view's collapsed list
+            // still names it until the end of the toggle.
+            get().fitParentToChildren(current.parentId, loopViewFilter, prevCollapsed ? roomVcs : loopVcs, loopExpandedSet)
             currentId = current.parentId
           } else {
             break
