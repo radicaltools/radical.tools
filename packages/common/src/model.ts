@@ -1103,7 +1103,22 @@ export function sequenceNodeIds(state: ModelState, id: string): string[] {
 /** Layout fields, which a copy also keeps but which are not changes to the system. */
 const LAYOUT_KEYS = new Set(['id', 'x', 'y', 'width', 'height', 'collapsed'])
 
-const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+/** A field's value as a comparison sees it: an empty text, an unticked box
+ *  and an empty list are no value, as an absent field is. The folder writes
+ *  none of them (serializeToMdFolder), so a change undone by hand is no change in
+ *  Studio, in `radical diff` and in get_changes alike. A property with a
+ *  default has it written on the element (materializeDefaults), so absent
+ *  is its unset value too. */
+export function modelValue(value: unknown): unknown {
+  if (value === undefined || value === '' || value === false) return null
+  if (Array.isArray(value) && !value.length) return null
+  return value
+}
+
+/** Whether two values of a field are the same to a comparison (modelValue). */
+export const sameModelValue = (a: unknown, b: unknown): boolean => JSON.stringify(modelValue(a)) === JSON.stringify(modelValue(b))
+
+const sameValue = sameModelValue
 
 /** Fields that differ between two versions of an element or relation, layout left out. */
 function changedFields(before: object, after: object): string[] {

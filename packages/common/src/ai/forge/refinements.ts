@@ -19,6 +19,7 @@
 import type { C4Node, C4Relation } from '../../c4'
 import { CHECK_RULES, type CheckModel } from '../../check/rules'
 import type { Metamodel } from '../../metamodel'
+import { sameModelValue } from '../../model'
 import type { DiagramFacade } from '../diagramFacade'
 import { PRIMARY_TYPE_IDS_FOR_STAGE, type ForgeStageId } from './prompts'
 
@@ -56,8 +57,8 @@ const LAYOUT_FIELDS = new Set(['x', 'y', 'width', 'height', 'collapsed'])
 /** The fields whose values differ, layout left out, in a stable order. */
 function changedFields(before: object, after: object): string[] {
   const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((k) => !LAYOUT_FIELDS.has(k))
-  const value = (o: object, k: string): string => JSON.stringify((o as Record<string, unknown>)[k] ?? null)
-  return keys.filter((k) => value(before, k) !== value(after, k)).sort()
+  const value = (o: object, k: string): unknown => (o as Record<string, unknown>)[k]
+  return keys.filter((k) => !sameModelValue(value(before, k), value(after, k))).sort()
 }
 
 function relationLabel(rel: C4Relation, ...models: ModelSnapshot[]): string {
