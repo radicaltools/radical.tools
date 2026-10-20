@@ -110,6 +110,53 @@ describe('mergeModels: order and id lists', () => {
   })
 })
 
+describe('mergeModels: a sequence\'s steps and notes', () => {
+  // The steps (relationIds) and their notes (stepDescriptions) merged apart:
+  // Studio removed step 1 while an agent changed note 3, and the merge put
+  // Studio's steps beside the agent's notes, every note one step off.
+  const withSteps = (relationIds: string[], stepDescriptions?: (string | undefined)[]): DiagramData =>
+    ({ ...clone(base), sequences: [{ id: 's', name: 'Place Order', relationIds, ...(stepDescriptions ? { stepDescriptions } : {}) }] })
+  const pairs = (d: DiagramData) => {
+    const q = d.sequences![0]
+    return q.relationIds.map((r, i) => `${r}:${q.stepDescriptions?.[i] ?? '-'}`)
+  }
+  const b = withSteps(['r1', 'r2', 'r3', 'r4'], ['submits', 'posts', 'stores', 'charges'])
+
+  it('keeps each note on its step when one side removes a step and the other changes a note', () => {
+    const ours = withSteps(['r2', 'r3', 'r4'], ['posts', 'stores', 'charges'])
+    const theirs = withSteps(['r1', 'r2', 'r3', 'r4'], ['submits', 'posts', 'STORES', 'charges'])
+    for (const [o, t] of [[ours, theirs], [theirs, ours]]) {
+      const { merged, conflicts } = mergeModels(b, o, t)
+      expect(pairs(merged)).toEqual(['r2:posts', 'r3:STORES', 'r4:charges'])
+      expect(conflicts).toEqual([])
+    }
+  })
+
+  it('keeps each note on its step when one side moves a step and the other changes a note', () => {
+    const ours = withSteps(['r2', 'r1', 'r3', 'r4'], ['posts', 'submits', 'stores', 'charges'])
+    const theirs = withSteps(['r1', 'r2', 'r3', 'r4'], ['submits', 'posts', 'STORES', 'charges'])
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(pairs(merged)).toEqual(['r2:posts', 'r1:submits', 'r3:STORES', 'r4:charges'])
+    expect(conflicts).toEqual([])
+  })
+
+  it('keeps the steps both sides added, each with its note, and the steps a side repeats', () => {
+    const ours = withSteps(['r1', 'r2', 'r9', 'r3', 'r4'], ['submits', 'posts', 'checks', 'stores', 'charges'])
+    const theirs = withSteps(['r1', 'r2', 'r3', 'r4', 'r1'], ['submits', 'posts', 'stores', 'charges', 'again'])
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(pairs(merged)).toEqual(['r1:submits', 'r2:posts', 'r9:checks', 'r3:stores', 'r4:charges', 'r1:again'])
+    expect(conflicts).toEqual([])
+  })
+
+  it('keeps theirs where both changed one note, and says so', () => {
+    const ours = withSteps(['r1', 'r2', 'r3', 'r4'], ['submits', 'ours', 'stores', 'charges'])
+    const theirs = withSteps(['r1', 'r2', 'r3'], ['submits', 'theirs', 'stores'])
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(pairs(merged)).toEqual(['r1:submits', 'r2:theirs', 'r3:stores'])
+    expect(conflicts).toEqual(['Place Order: steps'])
+  })
+})
+
 describe('modelEdits and mergeModelEdits', () => {
   it('keep only what ours changed, and merge it into theirs as mergeModels would', () => {
     const ours = clone(base)
