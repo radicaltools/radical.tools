@@ -525,6 +525,41 @@ export function chainCanvas(view: DiagramView | undefined, ctx: PipelineContext)
   return { nodeIds, relationIds: drawn.relationIds }
 }
 
+/** The type a new relation from `sourceId` to `targetId` takes so that
+ *  `view`, which draws a chain (chainDrawn), shows it: the type the
+ *  metamodel infers when the chain follows that, else the first relation
+ *  type the chain follows that connects the two. `relationType` is
+ *  undefined where the inferred relation has no type. Null when no relation
+ *  between the two would be drawn: the view only draws the relations its
+ *  chain follows, and a relation added there would be lost from sight. */
+export function chainRelationFor(
+  view: DiagramView | undefined,
+  sourceId: string,
+  targetId: string,
+  ctx: PipelineContext,
+): { relationType?: string } | null {
+  const source = ctx.nodes[sourceId], target = ctx.nodes[targetId]
+  if (!source || !target) return null
+  const inferred = inferRelationType(ctx.metamodel, source.type, target.type)
+  const candidates: (string | undefined)[] = [inferred]
+  for (const level of pipelineOf(view)?.levels ?? []) {
+    for (const way of level.ways) {
+      const type = way.via && 'relationType' in way.via ? way.via.relationType : undefined
+      if (!type || candidates.includes(type)) continue
+      const def = ctx.metamodel?.relationTypes[type]
+      if (def && (!def.allowedPairs.length || def.allowedPairs.some((p) => p.from === source.type && p.to === target.type))) candidates.push(type)
+    }
+  }
+  const relations = Array.isArray(ctx.relations) ? Object.fromEntries(ctx.relations.map((r) => [r.id, r])) : ctx.relations
+  const id = '\u0000new'
+  for (const relationType of candidates) {
+    const drawn = chainDrawn(view, { ...ctx, relations: { ...relations, [id]: { id, sourceId, targetId, ...(relationType ? { relationType } : {}) } } })
+    if (!drawn) return relationType ? { relationType } : {}
+    if (drawn.nodeIds.has(sourceId) && drawn.nodeIds.has(targetId) && (!drawn.relationIds || drawn.relationIds.has(id))) return relationType ? { relationType } : {}
+  }
+  return null
+}
+
 const NO_METAMODEL: Metamodel = { id: '', name: '', nodeTypes: {}, relationTypes: {} }
 
 /** The elements a view shows, or undefined when it shows every element:

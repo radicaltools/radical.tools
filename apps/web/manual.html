@@ -496,7 +496,7 @@
           <figcaption>The <em>Dependency Matrix</em>: rows depend on columns. Symmetric pairs reveal cycles at a glance.</figcaption>
         </figure>
         <p>
-          A design structure matrix of the view's elements. A filled cell means at least one relation from the row element to the column element. Click it to select the relation, or pick one from the list when there are several. In Designer, click an empty cell to add a relation (where the metamodel allows it) and click a selected cell again to remove it. Rows and columns follow containment, and relations of hidden children count for their container. Because the matrix is just another view, it stays in sync with every diagram — add a relation on a Structure view and the cell lights up.
+          A design structure matrix of the view's elements. A filled cell means at least one relation from the row element to the column element. Click it to select the relation, or pick one from the list when there are several. In Designer, click an empty cell to add a relation (where the metamodel allows it) and click a selected cell again to remove it. With a <a href="#view-steps">filter</a> chain the matrix draws only the relations the chain follows, so a new relation is of a type the chain follows between the two (a requirement added to a need is refined from it), or none is added; an empty cell over a relation the matrix does not draw adds no second one. Rows and columns follow containment, and relations of hidden children count for their container. Because the matrix is just another view, it stays in sync with every diagram — add a relation on a Structure view and the cell lights up.
         </p>
       </section>
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation, DiagramView, ViewPipeline } from '../src/c4'
 import { builtInGovernanceMetamodel } from '../src/metamodel/presets/governance'
 import {
-  applyFilters, chainDrawn, filterLabel, levelLabel, runChain, runPipeline, sortNodes, suggestFilters,
+  applyFilters, chainDrawn, chainRelationFor, filterLabel, levelLabel, runChain, runPipeline, sortNodes, suggestFilters,
   suggestNextWays, suggestStartWays, viewShownNodes, readPipeline,
   typeChoices, propertyChoices, relationChoices, placeChoices, viaChoices, addChoices, levelTypes, type ChainRow, type PipelineContext,
 } from '../src/viewPipeline'
@@ -193,6 +193,16 @@ describe('view pipeline: every view kind follows the chain', () => {
     expect(viewShownNodes(view('dynamic'), nodes, rels)).toBeUndefined()
     expect(viewShownNodes(view('static', null), nodes, rels)).toBeUndefined()
     expect(sorted(viewShownNodes({ ...view('static', null), nodeIds: ['r4'] }, nodes, rels))).toEqual(['r4'])
+  })
+
+  it('a relation added between two of the chain\'s elements gets a type the chain follows, or none is added', () => {
+    const c = { nodes, relations: rels, metamodel: ctx.metamodel }
+    // A requirement refined from another need: the derives the chain follows.
+    expect(chainRelationFor(view('matrix'), 'r1', 'n-audit', c)).toEqual({ relationType: 'derives' })
+    // Between two requirements the chain follows nothing: it would not be drawn.
+    expect(chainRelationFor(view('matrix'), 'r1', 'r3', c)).toBeNull()
+    // A chain that draws every relation between its elements draws that one too.
+    expect(chainRelationFor(view('matrix', { ...twoLevels, edges: 'all' }), 'r1', 'r3', c)).not.toBeNull()
   })
 
   it('follows a change to the model: a requirement refined from a need joins the chain', () => {

@@ -251,6 +251,35 @@ test('a view shows every element again from its steps, and a chain can start fro
   await expect(steps.locator('.rp-level-head')).toContainText('78')
 })
 
+test('a matrix with a chain adds only a relation its cell shows, and never a copy', async ({ page, studio }) => {
+  await studio.openSample()
+  await openFilter(page, 'Requirements Register')
+  await page.locator('.props-content').getByRole('button', { name: 'Matrix', exact: true }).click()
+  const cell = async (from: string, to: string) => {
+    const heads = await page.locator('.mx-rowhead').evaluateAll((els) => els.map((e) => e.textContent?.trim()))
+    return page.locator('tbody tr').nth(heads.indexOf(from)).locator('td').nth(heads.indexOf(to))
+  }
+  const doc = studio.activeDocId()
+  const count = async () => (await studio.storedDoc(doc)).relations.length
+  const before = await count()
+
+  // Between two requirements the chain follows nothing: clicks add nothing.
+  for (let i = 0; i < 3; i++) await (await cell('PSD2-compliant payments', 'Hold high-risk payments')).click()
+  await expect(page.locator('.toast-message').last()).toContainText('Not added')
+  // A relation the matrix does not draw is not added again.
+  await (await cell('Strong customer authentication', 'PSD2-compliant payments')).click()
+  await expect(page.locator('.toast-message').last()).toContainText('that this matrix does not show')
+  await page.waitForTimeout(800)
+  expect(await count()).toBe(before)
+
+  // A requirement refined from another need: the derives the chain follows, drawn.
+  await (await cell('Hold high-risk payments', 'PSD2 & AMLD6 obligations')).click()
+  await expect.poll(count).toBe(before + 1)
+  await expect(await cell('Hold high-risk payments', 'PSD2 & AMLD6 obligations')).toHaveClass(/mx-has-rel/)
+  const added = (await studio.storedDoc(doc)).relations.find((r) => r.sourceId === 'req-fraud-hold' && r.targetId === 'need-regulation')
+  expect(added?.relationType).toBe('derives')
+})
+
 test('every kind of view follows its chain, again when the chain or the model changes', async ({ page, studio }) => {
   await studio.openSample()
   await openFilter(page, 'Requirements Traceability')
