@@ -4,7 +4,11 @@ type: "scenario"
 label: "Agent placement and layout"
 gherkin: ""
 given: "an MCP server bound to a model folder"
-tests: "apps/mcp/src/folderModel.test.ts › places children inside their parent, keeps defaultPositions in step and runs Smart Layout"
-then: "the children sit inside the domain, the domain grows to wrap them and the All elements positions match the node geometry after the layout"
-when: "the agent adds two systems inside a domain, moves a third into it and then calls smart_layout"
+tests: |
+  apps/mcp/src/folderModel.test.ts › places children inside their parent, keeps defaultPositions in step and runs Smart Layout
+  apps/mcp/src/folderModel.test.ts › long Smart Layout runs › lays out no flow (dynamic) view: Studio draws no canvas there
+  packages/common/tests/aiDocumentTools.test.ts › smart_layout › refuses a flow (dynamic) view: Studio plays its sequence and draws no canvas there
+  packages/common/tests/modelFacade.test.ts › createModelFacade › moves a node in every view that keeps a place for it: inside the new parent there, or placed afresh
+then: "the children sit inside the domain, the domain grows to wrap them and the All elements positions match the node geometry after the layout; the moved node lies inside its new parent on every view that keeps a place for it; smart_layout, align_nodes and grid_nodes refuse a flow view and write nothing"
+when: "the agent adds two systems inside a domain, moves a third into it and then calls smart_layout; and calls smart_layout on a flow view"
 ---
