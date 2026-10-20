@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
-import { mergeModels } from '../src/modelMerge'
+import { mergeModelEdits, mergeModels, modelEdits } from '../src/modelMerge'
 
 const node = (id: string, label: string, extra: Partial<C4Node> = {}): C4Node =>
   ({ id, type: 'system', label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...extra }) as C4Node
@@ -68,5 +68,80 @@ describe('mergeModels', () => {
     theirs.nodes[0].label = 'Bookshop'
     expect(mergeModels(base, clone(base), theirs).merged).toEqual(theirs)
     expect(mergeModels(base, theirs, clone(base)).merged).toEqual(theirs)
+  })
+})
+
+describe('mergeModels: order and id lists', () => {
+  const views = (...names: string[]) => names.map((n) => ({ id: n, name: n, nodeIds: [], positions: {} }))
+  const withViews = (list: DiagramData['views']): DiagramData => ({ ...clone(base), views: list })
+
+  it('keeps a reorder made on one side, with the other side\'s changes', () => {
+    const b = withViews(views('A', 'B', 'C'))
+    const ours = withViews(views('B', 'A', 'C'))
+    const theirs = withViews(views('A', 'B', 'C', 'D'))
+    theirs.views![2].name = 'Third'
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(merged.views!.map((v) => v.id)).toEqual(['B', 'A', 'C', 'D'])
+    expect(byId(merged.views, 'C')!.name).toBe('Third')
+    expect(conflicts).toEqual([])
+    // And the other way round.
+    expect(mergeModels(b, theirs, ours).merged.views!.map((v) => v.id)).toEqual(['B', 'A', 'C', 'D'])
+  })
+
+  it('keeps theirs where both reordered differently, and says so', () => {
+    const b = withViews(views('A', 'B', 'C'))
+    const { merged, conflicts } = mergeModels(b, withViews(views('C', 'A', 'B')), withViews(views('B', 'A', 'C')))
+    expect(merged.views!.map((v) => v.id)).toEqual(['B', 'A', 'C'])
+    expect(conflicts).toEqual(['order of views'])
+  })
+
+  it('merges a view\'s element and hidden relation lists as sets: what either side added stays, what either removed goes', () => {
+    const b = withViews([{ id: 'v', name: 'Containers', nodeIds: ['shop', 'bank'], hiddenRelationIds: ['r1'], positions: {} }])
+    const ours = clone(b)
+    ours.views![0].nodeIds = ['shop', 'bank', 'user']
+    ours.views![0].hiddenRelationIds = []
+    const theirs = clone(b)
+    theirs.views![0].nodeIds = ['shop', 'stock']
+    theirs.views![0].hiddenRelationIds = ['r1', 'r2']
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(merged.views![0].nodeIds).toEqual(['shop', 'user', 'stock'])
+    expect(merged.views![0].hiddenRelationIds).toEqual(['r2'])
+    expect(conflicts).toEqual([])
+  })
+})
+
+describe('modelEdits and mergeModelEdits', () => {
+  it('keep only what ours changed, and merge it into theirs as mergeModels would', () => {
+    const ours = clone(base)
+    ours.nodes.find((n) => n.id === 'shop')!.description = 'Sells and lends books'
+    ours.nodes = ours.nodes.filter((n) => n.id !== 'bank')
+    ours.nodes.push(node('stock', 'Stock'))
+    ours.views = [...ours.views!, { id: 'v0', name: 'First', nodeIds: [], positions: {} }].reverse()
+    ours.defaultEdgeStyle = 'orthogonal'
+    const edits = modelEdits(base, ours)
+    // Only the entries that changed, and the ids' order.
+    expect(Object.keys(edits).sort()).toEqual(['defaultEdgeStyle', 'nodes', 'views'])
+    const nodes = edits.nodes as { base: Record<string, unknown>; ours: Record<string, unknown> }
+    expect(Object.keys(nodes.ours).sort()).toEqual(['bank', 'shop', 'stock'])
+    expect(nodes.ours.bank).toBeNull()
+    expect(nodes.base.stock).toBeNull()
+
+    const theirs = clone(base)
+    theirs.nodes.find((n) => n.id === 'shop')!.technology = 'Node.js'
+    theirs.nodes.find((n) => n.id === 'user')!.label = 'Reader'
+    theirs.nodes.push(node('courier', 'Courier'))
+    const viaEdits = mergeModelEdits(JSON.parse(JSON.stringify(edits)), theirs)
+    expect(viaEdits).toEqual(mergeModels(base, ours, theirs))
+    expect(viaEdits.merged.nodes.map((n) => n.id)).toEqual(['shop', 'user', 'stock', 'courier'])
+    expect(byId(viaEdits.merged.nodes, 'shop')).toMatchObject({ description: 'Sells and lends books', technology: 'Node.js' })
+    expect(viaEdits.merged.views!.map((v) => v.id)).toEqual(['v0', 'v1'])
+    expect(viaEdits.merged.defaultEdgeStyle).toBe('orthogonal')
+  })
+
+  it('change nothing when theirs already has them', () => {
+    const ours = clone(base)
+    ours.nodes[0].label = 'Bookshop'
+    expect(mergeModelEdits(modelEdits(base, ours), ours)).toEqual({ merged: ours, conflicts: [] })
+    expect(modelEdits(base, clone(base))).toEqual({})
   })
 })
