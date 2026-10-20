@@ -167,6 +167,13 @@ Do not walk the same path twice in a row. Each run, choose differently.
   count from the search bar ("N nodes · M relations"), not the edges.
   The MCP server does not start on a folder with malformed JSON, and
   Studio names the file and saves nothing until it reads again.
+- Each MCP write marks `.radical/agent-activity.json`, and Studio holds
+  its own saves for 15 s after it ("An agent is editing this model").
+  Wait it out before reading Studio's save from the folder, and do not
+  carry a fresh mark into a new page. Writing the mark by hand stands in
+  for an agent when no server is needed.
+- Run as a subagent, a run may not be allowed to write a report file:
+  then the report is its final message.
 - The toolbar's Undo and Redo are covered by the search bar at 1440 px (a
   known issue): use the keyboard or a wider window. In headless Chromium
   on macOS, Meta+Z does not reach Studio's undo: press Control+Z.
@@ -176,8 +183,10 @@ Do not walk the same path twice in a row. Each run, choose differently.
   `fill` sets a value in one go and `selectOption` fires a change for
   the option already shown, and each has hidden a bug.
 - Shortcuts follow the platform: Quick Search is ⌘P on macOS and Ctrl+P
-  elsewhere, and exists on structure views only. F5 starts the
-  presentation.
+  elsewhere, on every view. F5 starts the presentation.
+- With no route in the address Studio opens a model in Viewer, so does
+  the Hub's Open in Studio link (`?hub=…`). A deep link names the
+  perspective; e2e tests switch with `studio.designer()`.
 - After an add, the save comes only when the physics is still, seconds
   later: wait for the change you expect in the saved document, not for
   the document to stop changing.

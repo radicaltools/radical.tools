@@ -891,7 +891,12 @@ and import, Forge, a model of exactly 150 elements.
    root elements by up to 134 px), and the server replaces Studio's with
    its own, which Studio then calls best. Not found why; Studio runs a
    separation pass over the root elements after the layout that the
-   server does not (a guess).
+   server does not (a guess). Run 34 (2026-10-20, 2007738): the same
+   winner on all 8 views compared, identical positions on 3 (sample Core
+   Banking and Screen Map, SaaS Mockups), and up to 326 to 1 420 px apart
+   on the other 5 (SaaS Containers: the server reports "overdraws 1 -> 0"
+   on Studio's best). Run 28 found the positions identical on four views
+   of a generated model and the injury model.
 5. ~~**A reload while a view is shown writes that view's layout onto All
    elements.**~~ Fixed 2026-10-13. Found with a milestone selected, but any
    reload with a view in the address did it: a document is saved with its
@@ -2014,6 +2019,364 @@ below 1; a fresh profile lists an "Untitled" model nobody made, and
 "Download as file…" names the file `.c4.json`; a propagated delete
 rewrites `views.json` and `_layout.json`; the milestone diff is not
 recomputed after an edit.
+
+**Runs 25 to 34, 2026-10-20, commit 2007738**, ten at the same time, each
+in the areas changed since 2825bee. 33 findings, of which three were found
+twice (each is listed once, under the first run, naming the other).
+
+*Run 25.* Covered: view folders (set, nested, rename, Move up and down,
+with undo, redo and reload; through Download as file and Open → File…; in
+a folder model while the MCP server writes it); viewpoints (New view from
+the C4 and Radical metamodels, Detach, Save as viewpoint with Save and
+Replace, View type, undo, MCP `update_view` kind); the filter chain on the
+Requirements Register (levels removed, Show every element, undo, redo,
+reload, an edit while a milestone is shown); view card counts against what
+is drawn, live and in a milestone. Not covered: the filter editors in
+place (+ Filter, + or, Sort), a chain next to collapsed containers and
+Smart Layout, folders in Viewer and Presenter, two tabs.
+
+95. **Changing a view's type is not an undo step, so Undo takes back the
+    step before it.** On a new view of the viewpoint Containers, View type
+    → Table, then Ctrl+Z: the view is deleted (Undo took back the New
+    view), and Redo brings it back as a table. Detach is a step, but a
+    type change, which also detaches, is not. `setViewKind` in
+    `diagramStore.ts` pushes no step.
+96. **Undo after "Save as viewpoint… → Replace" throws, and two steps are
+    lost.** View A of System context, view B of Containers, B detached and
+    saved as "System context" (Replace): the 2nd and 3rd Ctrl+Z change
+    nothing and throw `Cannot assign to read only property 'viewpoint'`,
+    and the 4th removes both views. `_restoreHistoryEntry` runs
+    `syncViewpoints` on the history entry's frozen views, and `undo()` has
+    already popped the step.
+97. **A new view of a viewpoint draws its elements over each other and
+    outside their containers.** Bookstore, from System Context, + New view
+    → Containers: Bookstore keeps its 360×260 System Context frame, and
+    API and Orders DB lie outside it and over Payment Provider; on the
+    sample, from Core Banking, 21 violations among 19 elements. No notice,
+    and a reload keeps it; a blank view turned into Structure does the
+    same. `setActiveView` keeps the outgoing canvas's positions for a view
+    with none, and only a group's views get Smart Layout on first opening.
+98. **A view folder moved in Studio while an agent writes the folder model
+    moves back, with no notice.** Move up on folder B while the agent's
+    mark holds Studio's saves, then the agent renames another view: both
+    renames stay, the folders go back to A, B in Studio and `views.json`.
+    `mergeById` in `modelMerge.ts` keeps theirs' order, so a reorder on our
+    side is dropped and not reported.
+
+*Run 26.* Covered: the properties card and its ✕ next to selection and
+view switches; Viewer (every control of the card and table: the document
+stayed as it was); EARS slots and Markdown fields with Ctrl+Z in them; the
+Parent field's refusals; Fit All against the card and the palette; the
+palette on a 600 px window; the table's + rows on a chained register, All
+elements, a blank view and a 260-row table, through wizards, with a
+milestone shown, with undo and redo from another view, after a reload;
+every + row choice over the sample, the fixtures and the Hub catalogue
+checked against the validation. Not covered: folder models, a relation's
+card, Summary in tables, Presenter.
+
+99. **After ✕, an element's properties card never opens again, even after
+    another element was selected.** Bookstore, System Context: Customer, ✕,
+    Payment Provider (card), Customer: selected, no card; the same after a
+    view switch. The manual says ✕ hides it "until you select something
+    else". `RightPanel` keeps the dismissed subject (`node:<id>`) until
+    another ✕.
+100. **The table's + row and the palette put a state inside a final state,
+     which the validation then flags.** order-machine, "+ State" under
+     Cancelled: Validation 0 → 2 ("Final state "Cancelled" cannot contain
+     other states."). A palette drop does the same, and MCP `add_node`
+     accepts it with that warning. `addChoices` and `checkAddNode` follow
+     allowedParents only; the rule is only in `validateStateMachines`.
+101. **Undoing the add of the selected element leaves an empty properties
+     card and "1 node selected" for an element that is gone.** On a canvas
+     (drop, click, Ctrl+Z), in a table (+ row, name, Ctrl+Z twice), and
+     when a milestone without the selected element is opened. The empty
+     card has no ✕; Hide from view on that selection makes an undo step
+     that changes nothing and drops the redo of the add.
+     `_restoreHistoryEntry` does not prune the selection, and
+     `removeNodeFromView` pushes its step before it checks the ids.
+
+*Run 27.* Covered: the Warnier view's outline edits (Enter, Tab,
+Shift+Tab, Alt+Up/Down, F2, Delete, repeat and condition, a brace click)
+with undo, redo and an undo from another view; the same on a folder model
+with reload and a `.radical` round trip; refused moves; Viewer, Presenter
+and a presented Warnier slide; milestones; Hide and Remove from model; a
+canvas view switched to Warnier and back; the viewpoint Process; Quick
+Search on every view type; the MCP server's process and step rules against
+Studio's. Not covered: Forge's Processes stage, processes inside systems
+and groups, large process trees.
+
+102. **A step indented or outdented in the Warnier view lies outside its
+     new parent on the process canvas.** Sample, Processes: Tab on Quote FX
+     (now in Validate); on Payment Process it is drawn at its old offset
+     (500, 140) read from Validate, which puts it in Approve under Hold for
+     review. `reparentNodes` in `model.ts` rebases `node.x/y` only, not
+     `views[].positions` of the views that draw the element, and does not
+     refit the parent there. Probably the cause of Logical item 12
+     (`move_node`) too.
+103. **In a view of one process, + Process and Enter add a process the view
+     does not draw.** New view → Process (a view per element): + Process,
+     or Enter on Send a payment, adds "New process", which only its own new
+     view draws; no name opens and what is typed is lost. `canAddProcess`
+     and `insert` in `WarnierView.tsx` ignore views per element.
+104. **In a milestone, the first Warnier add asks how to save the milestone
+     and the new element's name closes.** v4, Processes, + Process,
+     "Continue editing": no name field; typing is lost and Enter adds a
+     second "New process". The prompt blurs the name input, which commits
+     and closes on blur.
+105. **Hide from current view freezes a view that lists nothing.** Hiding
+     Validate in Processes writes the other 75 elements (65 neither process
+     nor step) into the view's list; a step added on Payment Process later
+     no longer shows in Processes. `removeNodeFromView` on a view whose
+     filter is a chain.
+
+*Run 28.* Covered: Smart Layout run, rerun and reload on the bookstore,
+six sample views, the seven structure views of the user's injury model
+and generated models of 1 to 584 elements, with curved and orthogonal
+lines; the same file in two fresh pages; Studio against MCP `smart_layout`
+on the same folder (same winner, same positions); line style per view
+through reload, Smart Layout, undo, SVG export and MCP `edgeStyle`; Smart
+Layout in milestones with Propagate, Discard and Save as new; zoomed-out
+blocks; a collapse during a 10 s Smart Layout. Not covered: compact
+relation labels, a view switch during Smart Layout on a large model,
+alignments and pins with orthogonal lines, Tree Layout views. Its first
+finding is item 118.
+
+106. **MCP `smart_layout` on a flow view reports a better layout, writes
+     nothing, and reports it again on every call.** Bookstore, Place Order
+     Flow: "Force-directed (Eades); crossings 0 -> 0, overdraws 1 -> 0. No
+     files changed." each time. Since #189 a flow view keeps no positions
+     (`viewCanvasPositions` returns `{}`), but `FolderModel.smartLayout`
+     still accepts dynamic views, and the tool's description says it
+     arranges them. Run 34 saw `align_nodes` and `grid_nodes` write
+     positions and alignments into a flow view that Studio never draws.
+107. **Expanding a container among many root elements leaves elements on
+     top of each other.** A tidy grid of 48 root systems with a collapsed
+     system of 20 containers in the middle: Expand moves 22 elements and
+     leaves 2 pairs overlapping (100 roots: 8 pairs). On the injury model,
+     View 7, expanding Pain Assessment App moves 39 of 76 root elements and
+     leaves 20 pairs overlapping, up to 220×101 px; it is saved so.
+     `separateSiblings` (20 passes of pairwise pushes) in `toggleCollapse`
+     is the likely cause (a guess).
+
+*Run 29.* Covered: Studio and an MCP server writing one folder (#222):
+edits on different and on the same element, typing while an agent write
+arrives, a delete against an edit, a drag against `grid_nodes` and
+`smart_layout`, milestones on both sides, hand edits just before Studio's
+save, the server's merge during a 2 s `smart_layout` on `architecture/`,
+and which files a merged save writes (only the changed ones, also on the
+1148-element `architecture/`). Not covered: the desktop watcher, two
+servers on one folder, milestones shown in Studio while the agent writes,
+sequences and presentations on both sides.
+
+108. **An edit made while an agent writes the folder is lost by a page
+     reload.** Studio holds its saves while `.radical/agent-activity.json`
+     is fresh ("Studio saves your changes when it pauses"); a reload in
+     those 15 s drops a rename or a drag without a word, and the folder
+     never gets it (also run 30). `flushSync` on pagehide calls
+     `flushPersist`, which holds for the agent again; there is no
+     beforeunload warning.
+109. **After an outside change arrives, Undo cannot take back the user's
+     own edits.** Any reload of an outside edit (an agent's write, an
+     editor) disables Undo: `loadDiagram` forgets the history on the
+     keepUi reload. It always did (item 36), but since #222 every agent
+     write reloads Studio, so Undo stays grey for an agent's whole run,
+     also for the user's edits merged into it.
+110. **An element dropped on a view leaves it when the agent adds another
+     element to that view.** `merge3` treats a view's `nodeIds` (and
+     `hiddenRelationIds`) as one value, so two additions conflict and the
+     folder's list wins; the user's element stays in the model but on no
+     view, and the notice says "Containers: nodeIds". The manual says a
+     new element on each side stays.
+
+*Run 30.* Covered: an agent's Forge run over MCP on a folder open in
+Studio, all nine stages, with Radical views and with layer canvases:
+languages and view structure, stage views before their elements,
+refinement proposals (guard, accept, decline, reply, regenerate), the
+Review stage, the Specification in Multi page, the Forge button and the
+read-only run view, Follow on the canvas; the user acting during the run;
+a client closed halfway and a second run; Studio's own Forge with AI
+disabled. Not covered: the desktop build, `forge_wireframe` and
+`forge_import_hub_concept` in Studio, Studio's own Forge with a key.
+
+111. **Completing a Forge stage throws away the layout its views got while
+     it ran.** The C4 stage's elements show in System context as the agent
+     adds them (#225); Smart Layout there, saved, then
+     `forge_complete_stage`: all four roots go to a 2×2 grid at x 0/360,
+     y 0/280 (Library System 518,−8 → 0,280), and the view is "not laid
+     out yet" again. `Forge.complete` in `apps/mcp/src/forge.ts` hands
+     every filed node to `placeInViews`, which places the outermost again
+     even where the view has a position for it.
+112. **An edit the user makes in Studio while a Forge stage is open counts
+     as the stage's refinement, and Regenerate takes it back.** A
+     requirement renamed in Studio during Scenarios:
+     `forge_complete_stage` reports it as refined "as the user accepted",
+     Studio marks the stage ✎1, and Regenerate renames it back.
+     `stageRefinements` diffs the whole model across the stage; only what
+     `forge_answer_refinement` applied should count.
+
+*Run 31.* Covered: `radical check` against the Inspector's counts, also
+with broken references written by hand; Inspector Settings (a goal
+lowered, a baseline raised, a severity lowered); `radical diff` against
+`get_changes` after MCP edits and a hand edit (identical text); Changes on
+branch and Inspector › Changes against both; the git hooks across
+checkout, a new branch and a commit; a base saved `--since HEAD`; ghosts
+of removed elements; Back and Forward through Inspector › Changes. Not
+covered: `--ratchet` against Studio's Ratchet, hooks with `core.hooksPath`
+or worktrees, milestones next to Changes on branch.
+
+113. **A change undone by hand still counts as a change, and Studio and the
+     CLI disagree on it.** External ticked and unticked leaves `external:
+     false` in the file, and Studio, `radical diff` and `get_changes` list
+     `external: (none) → false`. A letter typed into an empty description
+     and deleted counts as a changed element in Studio, while `radical
+     diff` says "No model changes" and a reload says 0. `sameValue` in
+     `model.ts` and `modelFieldChanges` in `modelChanges.ts` treat `""` and
+     `false` unlike an absent field.
+114. **An element removed on the branch is drawn outside its container and
+     over another element, and the view does not count it.** Hooks command
+     deleted from CLI: on Components its ghost lies 29 px right of the CLI
+     frame and covers Diff command; the Components card counts nothing.
+     The ghost takes All elements' position from `base.json` on every view
+     (`showOverlay`), and `viewChangeCounts` counts a removal only in views
+     whose `nodeIds` list it, so a view with a filter chain never does.
+115. **Studio says "since main" for a base saved `--since HEAD`.** The CLI
+     says "since HEAD (473d593)"; the tooltip says "since main 473d593"
+     with main elsewhere. `baseSince` in `modelBase.ts` and `ChangesTab.tsx`
+     always write "main".
+
+*Run 32.* Covered: groups of views per element (#220) with undo, redo,
+reload, milestones, the wiki and the MCP server; writing, renaming and
+deleting in the wiki while a group exists; Multi page five levels deep
+(#223) with writing in the deepest chapters; Depth in view properties; the
+CLI's Confluence export offline. Not covered: Presenter slides of a
+group's views, a wiki viewpoint marked View per element, Multi page speed
+on a large model.
+
+116. **A rename or delete in a milestone changes the live view of that
+     element, and Discard keeps it.** Sample, group Components of a
+     container; in v4 Payments Service renamed to "Payments Service v4",
+     Discard: the element is "Payments Service" again, its view "Payments
+     Service v4", and a later rename on live no longer reaches it. Deleted
+     in v4 and discarded: the view comes back as a new view with 0 of its
+     12 positions. `patchNode` and the delete path change the views live
+     and milestones share; `liveBackup` holds no views.
+117. **MCP `set_view_nodes` picks the elements of a view per element, and
+     nothing in Studio brings them back.** Accepted on a group's view
+     (also run 34): the API view draws 1 of its 4 elements and not a
+     component added to API later, the Shop view 0 of 6. Studio hides
+     nothing from such a view by hand, its filter is read-only with no
+     Show every element and no Detach; only deleting the group repairs it.
+     `update_view` and `delete_view` refuse a group's views;
+     `set_view_nodes` and the store's `setViewNodes` / `addNodeToView` do
+     not.
+118. **Opening a view per element in a milestone counts as a milestone
+     edit, and back on live that view is never laid out.** v1 shown, the
+     never-opened Web Banking opened: Smart Layout runs, the "Editing
+     milestone" prompt opens and the chip says unsaved (also run 28, where
+     the layout is not kept and runs again on every opening). Back on
+     live, API Gateway is 927 px from the rest (368 px when first opened
+     on live). `arrangeOnFirstOpen` does not check `activeSnapshotId`.
+119. **Undo of an element written in the wiki also undoes Multi page and
+     Depth.** Write a container, switch to Multi page and Depth 3, Undo:
+     the container goes and the wiki is back in Single page at Depth 1,
+     saved. `_restoreHistoryEntry` keeps the wiki's page but not
+     `wikiPageMode` and `wikiDepth`, and neither switch is an undo step.
+
+*Run 33.* Covered: About Radical Studio in each perspective (the version
+matches `radical --version` and `radical-mcp --version`); the welcome
+screen and `?hub=` links; the Models dialog from Viewer; Back and Forward
+through perspectives, a Viewer drag, two models and milestones; slides
+with `focus`; the selection camera with a reload; eleven odd deep links;
+the Radical menu at 600 to 720 px. Not covered: toolbar menus over the
+card and the Forge panel, desktop and VS Code hosts, Quick Search in
+Viewer, folder models.
+
+120. **Import from Hub in Viewer says "imported", then the concept is
+     gone.** Since #216 the Hub's Open in Studio link (`?hub=req-mfa`)
+     lands in Viewer; Add to Model says "All 1 concept imported!" and draws
+     the requirement, but the saved bookstore keeps 6 elements, and the
+     switch to Designer drops it with no notice. The Radical menu's Import
+     from Hub… in Viewer does the same. `handleImport` in
+     `HubImportModal.tsx` writes into Viewer's sandbox; a Forge run
+     switches to Designer first, the import does not.
+121. **The Radical menu runs off a window lower than 732 px.** It is 685 px
+     tall from y 47, with no maximum height or scroll: at 1280×690 About
+     Radical Studio is below the window, at 1280×650 Copy to clipboard too;
+     only Tab reaches them. At 1280×720 the last 12 px are cut.
+     `.app-menu-popover` in `studio.css`.
+122. **A drag made in Viewer or Presenter is saved by a metamodel edit made
+     from there.** Bookstore, Containers: in Viewer Payment Provider
+     dragged 250 px down, then Metamodel editor… and a rename: the save
+     writes the drag too (y 355 → 741.55; from Presenter 752.68), and a
+     reload shows it in Designer. `setAppMode` parks and restores Designer
+     only on the way out of and into Designer; autosave saves in metamodel
+     mode, and `buildPersistData` writes the parked model only while
+     exploring.
+
+*Run 34.* Covered: `get_issues` against Studio's Validation on the
+bookstore, order-machine, the 7 Hub blueprints and the sample (identical);
+`smart_layout` against Studio's on 8 views (see item 4); the view tools
+(`create_view` from viewpoints, `update_view` on groups, `order_views`,
+`upsert_viewpoint` and `delete_viewpoint`, also live in an open Studio);
+milestones with a group; the metamodel tools on types in use. Not covered:
+the Hub app itself, `remove_alignment` against Studio's pins,
+`compare_milestones`, presentations, sequences, relation types against
+viewpoint chains (read in the code only). Its first finding is item 117.
+
+123. **A deleted element type stays in the viewpoints that name it.** A
+     custom type Service and a viewpoint "Service map" (a view per
+     Service): Delete type is accepted, in Studio and over MCP. The
+     viewpoint keeps `subject: service` and a chain of `service`; its card
+     still says View per element while no type chip is on, nothing in the
+     editor clears it, and a new view of it is an empty group, yet
+     `upsert_viewpoint` refuses that subject as an unknown type. Validation
+     and `get_issues` say nothing. `metamodelWithoutNodeType` cleans
+     parents and pairs (item 92), not viewpoints or view chains.
+124. **A type that only a milestone still uses can be deleted, and Restore
+     to live brings back an element of an unknown type.** A Service saved
+     in milestone As-is and deleted from the live model: Delete type is
+     accepted (`delete_node_type` too); Restore to live puts the element
+     back, and Validation and `get_issues` report "Node "Legacy Billing
+     Service" has unknown type "service"". `checkRemoveNodeType` counts
+     live elements only; item 31 dropped undo steps that hold a lost type,
+     but not milestones.
+
+To decide (runs 25 to 34): a view card of a view that shows every element
+says "All nodes", not a count; a blank view is named "View N+1" (the
+manual says View 1, View 2…); a filter edited while a milestone is shown
+goes into the live document with no Editing milestone prompt; Fit All
+leaves out the properties card; an image in a Markdown field
+(`![x](http://…)`) is fetched, a request that leaves localhost; the card's
+Parent field lists parents it then refuses; a Pseudostate added by a +
+row under a machine with an initial one is initial too; the automatic
+first-open layout of a view per element is an undo step of its own (three
+Ctrl+Z to remove a group after opening two of its views); a delete in
+Studio against the agent's edit of the same element brings the element
+back without its relations and off every view; a component added into a
+container the agent deletes meanwhile becomes a root on no view, without a
+word; milestones made on both sides renumber the user's; a merged reload
+writes the view's camera into `_layout.json` as `defaultViewport`; opening
+a view on a folder rewrites `radical.md`'s name and the `_layout.json`
+mirror; Follow on the canvas keeps the far end of a relation the view does
+not show and, at a stage's end, jumps to a table where nothing of the
+stage is framed; after an agent's run the Forge button opens only that run
+for 30 minutes; with AI disabled Studio's Forge still saves the need and
+makes its views, and opening it fetches `hub.radical.tools/hub/index.json`;
+`forge_finish` counts an accepted proposal's elements as added and as
+refined; Inspector Settings edits are a draft lost without a word on
+another tab or Back; Show on canvas from an Inspector card makes two
+history steps; "1 elements changed"; the toolbar counts elements only, so
+a branch that only adds relations shows 0; Back from a milestone keeps it
+and rewrites the history entries to open it; the Models dialog stays open
+after a model is picked in its list; a `within` filter keeps a deleted
+element (the view then shows 0) and `upsert_viewpoint fromViewId` copies
+that chain, which `create_view` refuses; `upsert_viewpoint`'s description
+names a `create_view` `subject` parameter that does not exist; Export as
+PNG or SVG on a Warnier view says "There is nothing on screen to export";
+the manual says Quick Search is on every view (line 170) and only on
+canvases (line 590), and names a `radical check` rule "a step nobody
+performs" that exists only in Forge; Redo after an undo made from another
+view shows the view where Undo was pressed.
 
 ### Radical Forge over MCP (2026-10-07)
 
