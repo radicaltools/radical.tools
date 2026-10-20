@@ -2482,6 +2482,11 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
   const [dismissed, setDismissed] = useState<string | null>(null)
   const open = !!subject && dismissed !== subject
   const close = useCallback(() => setDismissed(subject), [subject])
+  // Anything else selected, or nothing, ends it: the element picked again
+  // has its card. Kept until another ✕, the card never opened for it again.
+  useEffect(() => {
+    if (dismissed !== null && dismissed !== subject) setDismissed(null)
+  }, [dismissed, subject])
 
   // An explicit "show its properties" (Quick Search, a table row's button)
   // brings back a card that ✕ hid.
