@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
+import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
 import { readPipeline } from './viewPipeline'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
@@ -672,6 +672,15 @@ export function setViewSequence(state: ModelState, viewId: string, sequenceId: s
 export function setViewHiddenRelations(state: ModelState, viewId: string, relationIds: string[]): void {
   const view = state.views[viewId]
   if (view) view.hiddenRelationIds = [...new Set(relationIds.filter((id) => id in state.c4Relations))]
+}
+
+/** How a wiki view writes its pages: Single or Multi page, and how many
+ *  levels Multi page writes out as chapters (kept within the view's range). */
+export function setWikiPages(state: ModelState, viewId: string, mode: 'single' | 'multi', depth: number): void {
+  const view = state.views[viewId]
+  if (!view) return
+  view.wikiPageMode = mode
+  view.wikiDepth = wikiDepthOf({ wikiDepth: depth })
 }
 
 export { normalizeViewFolder }

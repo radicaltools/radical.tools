@@ -277,6 +277,19 @@ describe('radical structure', () => {
     expect(forgeArrangeGroups(facade, ['r1', 'r2'], 'requirements', structure)).toEqual([])
   })
 
+  it('makes its wiki views Multi page, five levels deep, and leaves the model\'s as they are', () => {
+    const facade = facadeOf([node('need', 'need'), node('adr', 'adr')], [
+      { id: 'mine', name: 'My decisions', nodeIds: [], positions: {}, viewpoint: 'decision-log', kind: 'wiki', wikiPageMode: 'single' },
+    ])
+    const filed = fileIntoForgeViews(facade, ['need', 'adr'], undefined, radical(facade))
+    const specification = filed.find((f) => f.key === 'specification')!
+    expect(specification.made).toBe(true)
+    expect(facade.getViews!()[specification.viewId]).toMatchObject({ kind: 'wiki', wikiPageMode: 'multi', wikiDepth: 5 })
+    expect(filed.find((f) => f.key === 'decision-log')).toMatchObject({ viewId: 'mine', made: false })
+    expect(facade.getViews!().mine.wikiPageMode).toBe('single')
+    expect(facade.getViews!().mine.wikiDepth).toBeUndefined()
+  })
+
   it('makes a group of views of each state machine, process, system, container and domain, which a later element joins', () => {
     const facade = facadeOf([
       node('m1', 'state-machine', { label: 'Order' }), node('m2', 'state-machine', { label: 'Payment' }),

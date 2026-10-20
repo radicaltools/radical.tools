@@ -29,7 +29,7 @@
 // Studio's wizard and the MCP server's forge_* tools both go through the
 // facade here, so they file and arrange the same way.
 
-import { landscapeGridColumns, type C4Node, type DiagramView } from '../../c4'
+import { landscapeGridColumns, WIKI_DEPTH_MAX, type C4Node, type DiagramView } from '../../c4'
 import type { Metamodel, ViewpointDef } from '../../metamodel'
 import { canBeSubject } from '../../viewpoints'
 import { runChain, runPipeline, type PipelineContext } from '../../viewPipeline'
@@ -286,6 +286,8 @@ function makeViewpointView(facade: DiagramFacade, def: ViewpointDef, folder: str
   const viewId = facade.addView?.(def.label)
   if (!viewId || !facade.applyViewpoint?.(viewId, def.id)) return null
   facade.setViewFolder?.(viewId, folder)
+  // A wiki the run makes reads as one article, every level of its chain.
+  if (def.kind === 'wiki') facade.setWikiPages?.(viewId, 'multi', WIKI_DEPTH_MAX)
   return viewId
 }
 
