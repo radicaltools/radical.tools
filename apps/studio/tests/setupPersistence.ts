@@ -4,3 +4,4 @@
 import '../src/renderer/src/persistence/autosave'
 import '../src/renderer/src/persistence/selection'
 import '../src/renderer/src/persistence/changeFlash'
+import '../src/renderer/src/persistence/followAgent'

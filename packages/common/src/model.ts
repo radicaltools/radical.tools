@@ -492,8 +492,9 @@ export function deleteRelation(state: ModelState, id: string): void {
 
 // ── Views ────────────────────────────────────────────────────────────────────
 
-export function insertView(state: ModelState, id: string, name: string): void {
-  state.views[id] = { id, name, nodeIds: [], positions: {} }
+/** A new view of every element, or with `empty` one that lists none yet. */
+export function insertView(state: ModelState, id: string, name: string, empty = false): void {
+  state.views[id] = { id, name, nodeIds: [], positions: {}, ...(empty ? { empty: true as const } : {}) }
 }
 
 /** Keeps known node ids only, deduplicated in order. False if there is no such view. */

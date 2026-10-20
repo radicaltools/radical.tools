@@ -25,6 +25,7 @@ import { edgeLabelDetail, edgeLabelsShownAt } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { AlignmentGuides } from './AlignmentGuides'
 import { selectCanvasFocus } from '../store/canvasFocus'
+import { noteUserCamera } from '../store/userCamera'
 import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize } from '@radical/common/c4'
@@ -652,6 +653,7 @@ function StructuralCanvas(): React.ReactElement {
   // setting); it reacts again to the next expand or collapse.
   const takeCamera = useCallback(() => {
     lastUserCameraRef.current = performance.now()
+    noteUserCamera()
     stopFit()
     fitWindowUntilRef.current = 0
   }, [stopFit])

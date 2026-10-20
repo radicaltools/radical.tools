@@ -125,9 +125,9 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       model.deleteRelation(state, id)
     },
 
-    addView(name: string) {
+    addView(name: string, opts?: { empty?: boolean }) {
       const id = newId()
-      model.insertView(state, id, name)
+      model.insertView(state, id, name, opts?.empty)
       return id
     },
     setViewNodes(viewId: string, nodeIds: string[]) {
