@@ -227,7 +227,10 @@ test('a new view draws its elements inside their containers and clear of each ot
   await expect(page.locator('.props-type-badge')).toContainText('STRUCTURE VIEW')
   await expect(studio.node('bookstore')).toBeVisible()
   await expect.poll(() => studio.layoutViolations()).toEqual([])
-  // A blank view turned into a structure view, the same.
+})
+
+test('a blank view turned into a structure view draws its elements inside their containers', async ({ page, studio }) => {
+  await studio.seed()
   await studio.open('v-context')
   await page.getByRole('button', { name: 'New view' }).click()
   await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: /^Blank view/ }).click()
