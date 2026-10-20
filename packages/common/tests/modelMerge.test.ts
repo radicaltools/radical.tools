@@ -70,3 +70,42 @@ describe('mergeModels', () => {
     expect(mergeModels(base, theirs, clone(base)).merged).toEqual(theirs)
   })
 })
+
+describe('mergeModels: order and id lists', () => {
+  const views = (...names: string[]) => names.map((n) => ({ id: n, name: n, nodeIds: [], positions: {} }))
+  const withViews = (list: DiagramData['views']): DiagramData => ({ ...clone(base), views: list })
+
+  it('keeps a reorder made on one side, with the other side\'s changes', () => {
+    const b = withViews(views('A', 'B', 'C'))
+    const ours = withViews(views('B', 'A', 'C'))
+    const theirs = withViews(views('A', 'B', 'C', 'D'))
+    theirs.views![2].name = 'Third'
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(merged.views!.map((v) => v.id)).toEqual(['B', 'A', 'C', 'D'])
+    expect(byId(merged.views, 'C')!.name).toBe('Third')
+    expect(conflicts).toEqual([])
+    // And the other way round.
+    expect(mergeModels(b, theirs, ours).merged.views!.map((v) => v.id)).toEqual(['B', 'A', 'C', 'D'])
+  })
+
+  it('keeps theirs where both reordered differently, and says so', () => {
+    const b = withViews(views('A', 'B', 'C'))
+    const { merged, conflicts } = mergeModels(b, withViews(views('C', 'A', 'B')), withViews(views('B', 'A', 'C')))
+    expect(merged.views!.map((v) => v.id)).toEqual(['B', 'A', 'C'])
+    expect(conflicts).toEqual(['order of views'])
+  })
+
+  it('merges a view\'s element and hidden relation lists as sets: what either side added stays, what either removed goes', () => {
+    const b = withViews([{ id: 'v', name: 'Containers', nodeIds: ['shop', 'bank'], hiddenRelationIds: ['r1'], positions: {} }])
+    const ours = clone(b)
+    ours.views![0].nodeIds = ['shop', 'bank', 'user']
+    ours.views![0].hiddenRelationIds = []
+    const theirs = clone(b)
+    theirs.views![0].nodeIds = ['shop', 'stock']
+    theirs.views![0].hiddenRelationIds = ['r1', 'r2']
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(merged.views![0].nodeIds).toEqual(['shop', 'user', 'stock'])
+    expect(merged.views![0].hiddenRelationIds).toEqual(['r2'])
+    expect(conflicts).toEqual([])
+  })
+})
