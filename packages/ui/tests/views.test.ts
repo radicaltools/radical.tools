@@ -16,7 +16,8 @@
  *   - addViewFromSequence creates a dynamic view with nodes from the sequence
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useDiagramStore } from '../src/store/diagramStore'
+import { hideRefusal, useDiagramStore } from '../src/store/diagramStore'
+import { viewShownNodes } from '@radical/common/viewPipeline'
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 
 const initial = (() => {
@@ -131,6 +132,47 @@ describe('addView / addNodeToView / removeNodeFromView', () => {
     }
     // Other nodes should still be present
     expect(nodeIds.length).toBeGreaterThan(0)
+  })
+})
+
+describe('hiding from a view whose filter decides what it shows', () => {
+  // Hidden from the sample's Processes view (it lists nothing; its chain
+  // takes processes and steps), Validate left it listing the 75 other
+  // elements, and a step added to the process later never showed there.
+  const filtered = (): string => {
+    const vid = useDiagramStore.getState().addView('Containers')
+    useDiagramStore.setState((s) => { s.views[vid].pipeline = { levels: [{ ways: [{ types: ['container'] }] }] } })
+    return vid
+  }
+
+  it('is refused, and the view keeps showing what its filter gives', () => {
+    const vid = filtered()
+    const { c4Nodes, c4Relations } = useDiagramStore.getState()
+    const shown = viewShownNodes(useDiagramStore.getState().views[vid], c4Nodes, c4Relations)!
+    const container = [...shown][0]
+    expect(container).toBeTruthy()
+    expect(hideRefusal(useDiagramStore.getState(), vid)).toBe('filter')
+    useDiagramStore.getState().removeNodeFromView(vid, container)
+    expect(useDiagramStore.getState().views[vid].nodeIds).toEqual([])
+    expect(useDiagramStore.getState().views[vid].empty).toBeUndefined()
+
+    // What is added later shows there.
+    const parentId = Object.values(useDiagramStore.getState().c4Nodes).find((n) => n.type === 'system')!.id
+    const added = useDiagramStore.getState().addNode({
+      type: 'container', label: 'Later', collapsed: false, parentId, x: 0, y: 0, width: 200, height: 100,
+    } as Omit<C4Node, 'id'>)
+    const now = useDiagramStore.getState()
+    expect(viewShownNodes(now.views[vid], now.c4Nodes, now.c4Relations)!.has(added)).toBe(true)
+  })
+
+  it('is allowed where the view lists its elements', () => {
+    const vid = filtered()
+    const { c4Nodes, c4Relations } = useDiagramStore.getState()
+    const shown = [...viewShownNodes(useDiagramStore.getState().views[vid], c4Nodes, c4Relations)!]
+    useDiagramStore.getState().setViewNodes(vid, shown)
+    expect(hideRefusal(useDiagramStore.getState(), vid)).toBeNull()
+    useDiagramStore.getState().removeNodeFromView(vid, shown[0])
+    expect(useDiagramStore.getState().views[vid].nodeIds).not.toContain(shown[0])
   })
 })
 

@@ -53,7 +53,7 @@ import {
 import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
-import { viewDrawnIds } from '@radical/common/viewPipeline'
+import { pipelineOf, viewDrawnIds } from '@radical/common/viewPipeline'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
@@ -1830,6 +1830,19 @@ export function setByGroup(s: { views: Record<string, DiagramView>; metamodel: M
   return !!view && (!!view.partOf || model.isViewGroup(view, s.metamodel))
 }
 
+/** Why no element can be hidden from the view by hand, or null when one
+ *  can: a view per element shows what its element holds (`group`), and a
+ *  view that lists nothing shows what its filter chain gives (`filter`).
+ *  Hidden from that, an element left the view listing every other one, and
+ *  what was added to the model later never showed there. */
+export function hideRefusal(s: { views: Record<string, DiagramView>; metamodel: Metamodel }, viewId: string): 'group' | 'filter' | null {
+  const view = s.views[viewId]
+  if (!view) return null
+  if (setByGroup(s, viewId)) return 'group'
+  if (viewShowsEveryNode(view) && view.kind !== 'dynamic' && pipelineOf(view)?.levels?.length) return 'filter'
+  return null
+}
+
 export const useDiagramStore = create<DiagramStore>()(
   immer((set, get) => {
     /** Opening canvas `to`: nothing stays selected, on the view left or the
@@ -3217,8 +3230,9 @@ export const useDiagramStore = create<DiagramStore>()(
       },
       removeNodeFromView(viewId, nodeIds) {
         const ids = typeof nodeIds === 'string' ? [nodeIds] : nodeIds
-        // A group's views show what their element holds: nothing is hidden by hand.
-        if (!get().views[viewId] || ids.length === 0 || setByGroup(get(), viewId)) return
+        // A group's views show what their element holds, a view listing
+        // nothing what its filter gives: nothing is hidden from them by hand.
+        if (!get().views[viewId] || ids.length === 0 || hideRefusal(get(), viewId)) return
         get()._pushUndo()
         set((state) => {
           const view = state.views[viewId]
