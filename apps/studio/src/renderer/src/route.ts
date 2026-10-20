@@ -266,10 +266,13 @@ function applyViewModeFocus(route: Route): void {
     if (useDiagramStore.getState().activeViewId !== targetView) {
       useDiagramStore.getState().setActiveView(targetView)
     }
-    if (route.focus && targetView) {
+    // A wiki's page is the route's focus; a route with none is the
+    // Overview (Back from the first page read leads there).
+    if (targetView) {
       const v = useDiagramStore.getState().views[targetView]
-      if (v && v.kind === 'wiki' && v.wikiFocusId !== route.focus) {
-        useDiagramStore.getState().setWikiFocus(targetView, route.focus)
+      const page = route.focus ?? null
+      if (v && v.kind === 'wiki' && (v.wikiFocusId ?? null) !== page) {
+        useDiagramStore.getState().setWikiFocus(targetView, page)
       }
     }
     // Milestone (snapshot). Apply-only: we view the requested milestone but
