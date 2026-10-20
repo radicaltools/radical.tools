@@ -82,7 +82,9 @@ The package contains only its ESM build, the Hub catalogue, this README, its
 manifest and the MIT license. The four private `@radical/*` workspaces are build
 dependencies bundled by tsup; users install only the MCP SDK and ELK.js as runtime
 dependencies. `prepack` builds from source, clears old build output and copies
-the catalogue and root license. The MCP handshake reports the package version.
+the catalogue and root license. The MCP handshake, `get_model_summary` and
+`radical-mcp --version` report the product version, with the commit it was built
+from unless the build is the release tagged `v<version>` (`0.3.0+1a2b3c4`).
 
 Before the first release, from the repository root:
 
@@ -111,12 +113,10 @@ npm publish ./release/radicaltools-mcp-0.2.0.tgz --access public
 ```
 
 Do this after the pull request is merged, from the reviewed main commit. A name
-and version can only be published once. For later releases, bump only this
-workspace's version (and the lockfile) in a pull request:
-
-```sh
-npm version patch -w ./apps/mcp --no-git-tag-version
-```
+and version can only be published once. The MCP server shares one product
+version with the CLI, the Desktop app and the VS Code extension: set it for all
+of them with `npm run release` (see *Releasing* in the root README), never in
+this workspace alone.
 
 ### GitHub Actions with Trusted Publishing
 
@@ -147,10 +147,14 @@ before the deadline shown in npm. A dry run or a local `npm publish` does not
 validate the OIDC connection. The workflow needs direct `npm publish` permission;
 `npm stage publish` alone is insufficient, and managing dist-tags is not needed.
 
-In GitHub **Actions → Publish to npm → Run workflow**, select `main`, choose
-**package: mcp**, and leave **dry-run** enabled to verify and upload the package
-without publishing. For a
-reviewed version bump, run it with **dry-run** disabled. Actual publishing is
-refused on any branch other than `main`. The workflow type-checks and tests the
-monorepo, verifies the installable tarball, and publishes that same archive with
-provenance. Pushing a branch or a desktop `v*` tag does not publish the MCP package.
+A release tag `v<version>` (see *Releasing* in the root README) starts the
+workflow for the CLI and the MCP server together: it checks that the tagged
+commit is on `main` and that the four released packages carry the tag's
+version, type-checks and tests the monorepo, verifies the installable tarball,
+and publishes that same archive with provenance, on the dist-tag `next` for a
+pre-release. A version npm already has is skipped, so a rerun publishes what
+is left.
+
+To check the package without a release, use **Actions → Publish to npm → Run
+workflow**, select `main`, choose **package: mcp**, and leave **dry-run**
+enabled. With **dry-run** disabled it publishes, but only from `main`.

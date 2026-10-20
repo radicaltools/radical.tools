@@ -5,7 +5,7 @@ import { buildToolDefs, runTool, type ToolDef, type ToolRunContext } from '@radi
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
 import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
-import { MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
+import { MD_FOLDER_FORMAT_VERSION, MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
@@ -14,6 +14,7 @@ import { readEditorStateFile, readSelectionFile, writeEditorStateFile, writeForg
 import { MODEL_BASE_FILE, forgeModelBase, mayReplaceWithForgeBase } from '@radical/common/formats/modelBase'
 import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE, serializeAgentActivity } from '@radical/common/formats/agentActivity'
+import { displayVersion } from '@radical/common/version'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
 import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
@@ -33,7 +34,7 @@ const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', '
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
     name: 'get_model_summary',
-    description: "Call this first. Shows counts, the views, sequences, milestones and presentations in the bound Radical model folder, the modelling rules (how to build requirements, needs, state machines, …), plus the metamodel context message: each type's valid properties keys and enum options, allowed parents, cardinality and relation allowedPairs.",
+    description: "Call this first. Shows the product version of this radical-mcp server (radicalVersion) and the model folder format it reads and writes (modelFormat), counts, the views, sequences, milestones and presentations in the bound Radical model folder, the modelling rules (how to build requirements, needs, state machines, …), plus the metamodel context message: each type's valid properties keys and enum options, allowed parents, cardinality and relation allowedPairs.",
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -345,6 +346,8 @@ export class FolderModel {
       if (name === 'get_model_summary') {
         const metamodel = facade.getMetamodel?.()
         const summary = JSON.stringify({
+          radicalVersion: displayVersion(),
+          modelFormat: MD_FOLDER_FORMAT_VERSION,
           folder: this.folder,
           nodes: data.nodes.length,
           relations: data.relations.length,
@@ -568,7 +571,7 @@ export class FolderModel {
    *  its own saves until the agent pauses (agentActivity). */
   private async markAgentWriting(): Promise<void> {
     try {
-      await writeEditorStateFile(this.folder, AGENT_ACTIVITY_FILE, serializeAgentActivity(this.clientName()))
+      await writeEditorStateFile(this.folder, AGENT_ACTIVITY_FILE, serializeAgentActivity(this.clientName(), Date.now(), displayVersion()))
     } catch {
       // Only a courtesy to Studio; the model is written.
     }

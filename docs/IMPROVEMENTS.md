@@ -561,6 +561,16 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     restore views.json from git by hand. `smart_layout` could refuse a
     result worse on any count, or a `restore_layout` could take a view's
     positions from git or from before the last call.
+41. **`get_changes` is too long for the agent that asked for it.** On the
+    product-version branch (2026-10-20: 14 elements added, 10 changed, 28
+    relations) it returned 72 000 characters, past what Claude Code takes
+    from one tool call, so the list landed in a file to read in pieces. Most
+    of it was the old and new text of eight long component descriptions
+    that each gained one sentence. The words changed (as Studio's card
+    shows them) instead of both whole values, or a summary mode with
+    `get_changes` for one element on request, would do. Item 24 again too:
+    adding that sentence meant sending each description (up to 3 000
+    characters) back whole.
 
 ### Reverse-engineered requirements (2026-10-06)
 

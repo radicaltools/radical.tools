@@ -1,12 +1,14 @@
 name: Publish VS Code Extension
 
 # Triggers:
-#   • Push a tag matching "vscode-v*"  (e.g. git tag vscode-v0.2.0 && git push --tags)
+#   • Push a release tag "v*" (npm run release:tag on main, then git push origin v<version>);
+#     a pre-release tag (v1.0.0-rc.1) publishes nothing: the Marketplace takes
+#     only major.minor.patch
 #   • Manual run from the GitHub UI   (Actions → Publish VS Code Extension → Run workflow)
 on:
   push:
     tags:
-      - 'vscode-v*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -20,6 +22,7 @@ permissions:
 jobs:
   publish:
     name: Build & Publish
+    if: ${{ !(startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-')) }}
     runs-on: ubuntu-latest
 
     steps:
@@ -37,6 +40,10 @@ jobs:
       # ── Quality gate ────────────────────────────────────────────────────────
       - name: Install dependencies (all workspaces)
         run: npm ci
+
+      - name: Tag matches the product version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node tools/release.mjs check "$GITHUB_REF_NAME"
 
       - name: Type-check
         run: npm run typecheck

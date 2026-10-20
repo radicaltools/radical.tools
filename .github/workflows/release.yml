@@ -1,8 +1,9 @@
 name: Release Desktop App
 
 # Triggers:
-#   • Push a tag matching "v*" (e.g. npm version 1.1.0 && git push --follow-tags)
+#   • Push a tag matching "v*" (npm run release:tag on main, then git push origin v<version>)
 #     → builds macOS / Windows / Linux installers and drafts a GitHub Release
+#       with the version's changelog section
 #   • Pull requests touching packaging → builds only, to catch breakage early
 #   • Manual run from the GitHub UI → builds only; installers land in the run's artifacts
 on:
@@ -35,14 +36,11 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-      - name: Tag matches package.json version
+      # One product version: the CLI, the MCP server, the Desktop app and the
+      # VS Code extension all carry the tag's, and the changelog has its section.
+      - name: Tag matches the product version
         if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          PKG="v$(node -p "require('./apps/studio/package.json').version")"
-          if [ "$PKG" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $PKG"
-            exit 1
-          fi
+        run: node tools/release.mjs check "$GITHUB_REF_NAME"
 
   # ── Installers (one runner per OS; targets come from electron-builder.yml) ─
   build:
@@ -87,6 +85,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      - name: Release notes from the changelog
+        run: node tools/release.mjs notes "$GITHUB_REF_NAME" > release-notes.md
       - uses: actions/download-artifact@v4
         with:
           pattern: installers-*
@@ -97,8 +98,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # A pre-release (v1.0.0-rc.1) is marked as one.
+          PRERELEASE=""
+          case "$GITHUB_REF_NAME" in *-*) PRERELEASE="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" installers/* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "radical.studio $GITHUB_REF_NAME" \
-            --generate-notes \
-            --draft
+            --title "radical $GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --draft $PRERELEASE

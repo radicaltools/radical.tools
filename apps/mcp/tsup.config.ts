@@ -2,6 +2,7 @@ import { cp } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { defineConfig } from 'tsup'
+import { buildDefine } from '@radical/node-files/buildInfo'
 
 // Forge reads the Hub catalogue at runtime (src/forge.ts), so the build ships a
 // copy beside the bundle. Located the way @radical/hub-catalogue's CATALOGUE_DIR
@@ -15,6 +16,8 @@ export default defineConfig({
   target: 'node20',
   outDir: 'dist',
   clean: true,
+  // The product version, commit and day of this build (@radical/common/version).
+  define: buildDefine(fileURLToPath(new URL('.', import.meta.url))),
   noExternal: ['@radical/common', '@radical/hub-catalogue', '@radical/layout', '@radical/node-files'],
   onSuccess: async () => {
     await cp(catalogue, 'dist/hub-catalogue', { recursive: true })

@@ -160,10 +160,20 @@ describe('radical check', () => {
 })
 
 describe('radical', () => {
-  it('prints usage and its version, and refuses an unknown command', async () => {
+  it('prints the product version with --version', async () => {
+    const cwd = await workspace()
+    const { version } = JSON.parse(await readFile(join(import.meta.dirname, '../package.json'), 'utf8')) as { version: string }
+    for (const flag of ['--version', '-v']) {
+      const { code, out } = await run(cwd, flag)
+      expect(code).toBe(0)
+      // The bare version on the commit tagged v<version>, with the commit otherwise.
+      expect(out.trim()).toMatch(new RegExp(`^${version.replace(/\./g, '\\.')}(\\+[0-9a-f]{7,})?$`))
+    }
+  })
+
+  it('prints usage, and refuses an unknown command', async () => {
     const cwd = await workspace()
     expect((await run(cwd)).out).toContain('Usage: radical <command>')
-    expect((await run(cwd, '--version')).out.trim()).toMatch(/^\d+\.\d+\.\d+$/)
     const unknown = await run(cwd, 'lint')
     expect(unknown.code).toBe(2)
     expect(unknown.err).toContain('Unknown command: lint')

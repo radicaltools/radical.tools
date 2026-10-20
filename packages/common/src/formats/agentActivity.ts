@@ -25,12 +25,15 @@ export interface AgentActivity {
   version: 1
   /** The MCP client writing, as it named itself (claude-code, …). */
   client?: string
+  /** The product version of the MCP server writing (displayVersion), for
+   *  Studio to tell a server of another version. */
+  radical?: string
   /** Until when (ms since the epoch) the agent counts as writing. */
   until: number
 }
 
-export function serializeAgentActivity(client: string | undefined, now = Date.now()): string {
-  const out: AgentActivity = { version: 1, ...(client ? { client } : {}), until: now + AGENT_ACTIVE_MS }
+export function serializeAgentActivity(client: string | undefined, now = Date.now(), radical?: string): string {
+  const out: AgentActivity = { version: 1, ...(client ? { client } : {}), ...(radical ? { radical } : {}), until: now + AGENT_ACTIVE_MS }
   return `${JSON.stringify(out, null, 2)}\n`
 }
 
@@ -42,7 +45,12 @@ export function parseAgentActivity(text: string | null | undefined): AgentActivi
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
   if (r.version !== 1 || typeof r.until !== 'number' || !Number.isFinite(r.until)) return null
-  return { version: 1, ...(typeof r.client === 'string' ? { client: r.client } : {}), until: r.until }
+  return {
+    version: 1,
+    ...(typeof r.client === 'string' ? { client: r.client } : {}),
+    ...(typeof r.radical === 'string' && r.radical ? { radical: r.radical } : {}),
+    until: r.until,
+  }
 }
 
 /** Until when an agent writes the folder, per its activity file; 0 when it

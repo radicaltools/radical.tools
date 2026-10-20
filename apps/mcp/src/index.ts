@@ -3,12 +3,13 @@ import { McpServer, fromJsonSchema, type RegisteredTool } from '@modelcontextpro
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import { FolderModel, PRESETS, READ_ONLY_TOOLS, type OpenOptions } from './folderModel'
 import { FORGE_PROCEDURE } from './forge'
-import { version } from '../package.json'
+import { displayVersion } from '@radical/common/version'
 
 const USAGE = `Usage: radical-mcp --folder <model-folder> [--metamodel ${Object.keys(PRESETS).join('|')}]
   --folder     the Markdown model folder, absolute or relative to the working directory;
                a missing or empty folder becomes a new model
-  --metamodel  the metamodel of a new model (default: radical)`
+  --metamodel  the metamodel of a new model (default: radical)
+  --version    print the version`
 
 function parseArgs(args: string[]): { folder: string } & OpenOptions {
   const values = new Map<string, string>()
@@ -90,9 +91,14 @@ function toolSchema(inputSchema: Record<string, unknown>): ReturnType<typeof fro
 }
 
 async function main(): Promise<void> {
-  const { folder, metamodel } = parseArgs(process.argv.slice(2))
+  const args = process.argv.slice(2)
+  if (args.length === 1 && (args[0] === '--version' || args[0] === '-v')) {
+    process.stdout.write(`${displayVersion()}\n`)
+    return
+  }
+  const { folder, metamodel } = parseArgs(args)
   const model = await FolderModel.open(folder, { metamodel })
-  const server = new McpServer({ name: 'radical-folder', version }, { instructions: INSTRUCTIONS })
+  const server = new McpServer({ name: 'radical-folder', version: displayVersion() }, { instructions: INSTRUCTIONS })
   const registered = new Map<string, RegisteredTool>()
   const gone = new AbortController()
   const advertise = (): void => {

@@ -49,7 +49,8 @@ try {
   assert.equal(Object.keys(published.dependencies ?? {}).length, 0, 'Runtime dependencies must be bundled')
   assert((await readFile(join(installed, 'dist/index.js'), 'utf8')).startsWith('#!/usr/bin/env node'))
   assert((await readFile(join(installed, 'LICENSE'), 'utf8')).includes('MIT License'))
-  assert.equal(radical('--version').trim(), manifest.version)
+  // The bare version when built from the commit tagged v<version>, with the commit otherwise.
+  assert.match(radical('--version').trim(), new RegExp(`^${manifest.version.replace(/\./g, '\\.')}(\\+[0-9a-f]{7,})?$`))
   assert.match(radical('--help'), /Usage: radical/)
   assert.match(radical('export', 'confluence', '--help'), /--view/)
   assert.match(radical('check', '--list-rules'), /folder-manifest/)

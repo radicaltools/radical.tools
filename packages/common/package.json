@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./c4": "./src/c4.ts",
+    "./version": "./src/version.ts",
     "./metamodel": "./src/metamodel/index.ts",
     "./model": "./src/model.ts",
     "./modelChanges": "./src/modelChanges.ts",
