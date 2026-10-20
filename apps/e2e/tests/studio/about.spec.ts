@@ -29,4 +29,21 @@ test.describe('About Radical Studio', () => {
     await page.keyboard.press('Escape')
     await expect(about).toBeHidden()
   })
+
+  test('the Radical menu scrolls in a window lower than it is tall, so About is reached', async ({ page, studio }) => {
+    await studio.seed()
+    await studio.open('v-context')
+    await page.setViewportSize({ width: 1280, height: 650 })
+    await page.getByTitle('Menu', { exact: true }).click()
+    const menu = page.locator('.app-menu-popover')
+    await expect(menu).toBeVisible()
+    const box = (await menu.boundingBox())!
+    expect(box.y + box.height).toBeLessThanOrEqual(650)
+    const about = page.getByRole('menuitem', { name: 'About Radical Studio' })
+    await about.scrollIntoViewIfNeeded()
+    const item = (await about.boundingBox())!
+    expect(item.y + item.height).toBeLessThanOrEqual(650)
+    await about.click()
+    await expect(page.getByRole('dialog', { name: 'About Radical Studio' })).toBeVisible()
+  })
 })
