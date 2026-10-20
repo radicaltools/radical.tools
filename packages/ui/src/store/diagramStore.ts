@@ -1983,6 +1983,17 @@ export const useDiagramStore = create<DiagramStore>()(
       return { ...node, x: Math.max(node.x, pad.side), y: Math.max(node.y, pad.top) }
     }
 
+    /** The arguments of checkRemoveNodeType / checkRemoveRelationType: the
+     *  live model (parked in liveBackup while a milestone is open), and
+     *  every milestone, with the one open as it is on screen. */
+    const _typeHolders = (typeId: string): [model.ModelState, string, model.MilestoneContent[]] => {
+      const s = get()
+      const open = s.activeSnapshotId && s.liveBackup ? s.snapshots.find((m) => m.id === s.activeSnapshotId) : undefined
+      const live = open ? { ...s, c4Nodes: s.liveBackup!.nodes, c4Relations: s.liveBackup!.relations } : s
+      const milestones: model.MilestoneContent[] = [...s.snapshots, ...(open ? [{ name: open.name, nodes: s.c4Nodes, relations: s.c4Relations }] : [])]
+      return [live as unknown as model.ModelState, typeId, milestones]
+    }
+
     const _createNodeWithLinks = (draft: Omit<C4Node, 'id'>, links: WizardLink[]): string => {
       const node = _placeNewChild(draft)
       const refused = model.checkAddNode(get(), node)
@@ -2068,7 +2079,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // (not while a milestone, with its own elements, is on screen).
         if (!get().activeSnapshotId) {
           const plan = model.planViewGroups(get() as unknown as model.ModelState)
-          if (plan.add.length || plan.remove.length || plan.refolder.length) {
+          if (plan.add.length || plan.remove.length || plan.refolder.length || plan.unlist.length) {
             set((state) => { model.syncViewGroups(state as unknown as model.ModelState, uid) })
           }
         }
@@ -3219,7 +3230,8 @@ export const useDiagramStore = create<DiagramStore>()(
       },
       addNodeToView(viewId, nodeId) {
         const view = get().views[viewId]
-        if (!view || view.nodeIds.includes(nodeId)) return
+        // A group's views show what their element holds: nothing is picked by hand.
+        if (!view || view.nodeIds.includes(nodeId) || setByGroup(get(), viewId)) return
         get()._pushUndo()
         set((state) => {
           state.views[viewId].nodeIds.push(nodeId)
@@ -3265,6 +3277,11 @@ export const useDiagramStore = create<DiagramStore>()(
       },
       setViewNodes(viewId, nodeIds) {
         if (!get().views[viewId]) return
+        const refused = model.groupViewNodesRefusal(get(), viewId)
+        if (refused) {
+          get().pushNotification(`${refused}.`, 'error')
+          return
+        }
         get()._pushUndo()
         // Unknown ids are dropped (the AI may emit a stale one) and the rest deduplicated
         set((state) => { model.setViewNodeIds(state, viewId, nodeIds) })
@@ -5116,7 +5133,7 @@ export const useDiagramStore = create<DiagramStore>()(
       removeNodeType(id) {
         // Elements of a type the metamodel no longer has would be left
         // behind as "unknown type"; the MCP server refuses this too.
-        const refused = model.checkRemoveNodeType(get(), id)
+        const refused = model.checkRemoveNodeType(..._typeHolders(id))
         if (refused) {
           get().pushNotification(`Cannot delete this type: ${refused}`, 'error')
           return
@@ -5135,7 +5152,7 @@ export const useDiagramStore = create<DiagramStore>()(
         })
       },
       removeRelationType(id) {
-        const refused = model.checkRemoveRelationType(get(), id)
+        const refused = model.checkRemoveRelationType(..._typeHolders(id))
         if (refused) {
           get().pushNotification(`Cannot delete this type: ${refused}`, 'error')
           return

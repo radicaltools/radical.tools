@@ -8,16 +8,25 @@ import { fail, type AsyncToolHandler, type ToolDef, type ToolHandler, type ToolR
 
 const AXIS_ENUM = ['horizontal', 'vertical'] as const
 
-/** The canvas a layout tool targets: a static or dynamic view, or All elements (null). */
-function canvasFor(ctx: ToolRunContext, tool: string, raw: unknown): { viewId: string | null } | { error: string } {
+/** Why `view` has no canvas layout, or null: only a static view is drawn
+ *  on a canvas. A dynamic (flow) view plays its sequence, and keeps no
+ *  positions (viewCanvasPositions); a table, wiki and the rest draw none. */
+export function noCanvasLayout(tool: string, view: { name: string; kind?: string }): string | null {
+  if (!view.kind || view.kind === 'static') return null
+  return `${tool}: "${view.name}" is a ${view.kind} view; only static views have a canvas layout${view.kind === 'dynamic' ? ' (a dynamic view plays its sequence, drawn in order, with no positions of its own)' : ''}`
+}
+
+/** The canvas a layout tool targets: a static view, or All elements
+ *  (null). `removing`: also a view of another kind, to take back what was
+ *  written there before it was refused. */
+function canvasFor(ctx: ToolRunContext, tool: string, raw: unknown, removing = false): { viewId: string | null } | { error: string } {
   if (raw === undefined) return { viewId: null }
   if (typeof raw !== 'string' || !raw) return { error: `${tool}: viewId must be a view id` }
   const viewId = ctx.resolveId(raw)
   const view = ctx.diagram.getViews?.()[viewId]
   if (!view) return { error: `${tool}: unknown view id "${raw}"` }
-  if (view.kind && view.kind !== 'static' && view.kind !== 'dynamic') {
-    return { error: `${tool}: "${view.name}" is a ${view.kind} view; only static and dynamic views have a canvas layout` }
-  }
+  const refused = removing ? null : noCanvasLayout(tool, view)
+  if (refused) return { error: refused }
   return { viewId }
 }
 
@@ -31,23 +40,23 @@ export function buildLayoutToolDefs(): ToolDef[] {
   return [
     {
       name: 'smart_layout',
-      description: "Run Smart Layout and keep the new positions and container sizes. Without viewId it arranges the All elements canvas; with the id of a static or dynamic view it arranges that view's own positions; a view whose layout mode is a hierarchical nested tree is laid out as a tree, as Studio does. Alignments and grids hold; the canvas's pins (elements a Studio user dropped after a drag) are removed, since every element gets a new place. Call it after adding or moving several nodes.",
+      description: "Run Smart Layout and keep the new positions and container sizes. Without viewId it arranges the All elements canvas; with the id of a static view it arranges that view's own positions (a dynamic view plays its sequence and has no canvas layout, nor has a table, wiki or other kind); a view whose layout mode is a hierarchical nested tree is laid out as a tree, as Studio does. Alignments and grids hold; the canvas's pins (elements a Studio user dropped after a drag) are removed, since every element gets a new place. Call it after adding or moving several nodes.",
       inputSchema: {
         type: 'object',
-        properties: { viewId: { type: 'string', description: 'A static or dynamic view (real id or tempId); omit for All elements.' } },
+        properties: { viewId: { type: 'string', description: 'A static view (real id or tempId); omit for All elements.' } },
         additionalProperties: false,
       },
     },
     {
       name: 'align_nodes',
-      description: "Keep two or more elements on one line on a canvas: a row (axis 'horizontal', equal centre y) or a column (axis 'vertical', equal centre x). Every later layout keeps it: drags and the live physics in Studio, Smart Layout. Without viewId it applies to the All elements canvas; with the id of a static or dynamic view, to that view only. Elements hidden on the canvas are skipped until shown. Studio lines them up when it shows the canvas; smart_layout does too.",
+      description: "Keep two or more elements on one line on a canvas: a row (axis 'horizontal', equal centre y) or a column (axis 'vertical', equal centre x). Every later layout keeps it: drags and the live physics in Studio, Smart Layout. Without viewId it applies to the All elements canvas; with the id of a static view, to that view only (other kinds have no canvas). Elements hidden on the canvas are skipped until shown. Studio lines them up when it shows the canvas; smart_layout does too.",
       inputSchema: {
         type: 'object',
         properties: {
           nodeIds: { type: 'array', items: { type: 'string' }, description: 'Two or more node ids or tempIds; none inside another. With keepOrder, listed left to right (row) or top to bottom (column).' },
           axis: { type: 'string', enum: [...AXIS_ENUM], description: "'horizontal' = a row, 'vertical' = a column." },
           keepOrder: { type: 'boolean', description: 'Also keep the elements in the order of nodeIds along the line; no layout may swap them.' },
-          viewId: { type: 'string', description: 'A static or dynamic view (real id or tempId); omit for All elements.' },
+          viewId: { type: 'string', description: 'A static view (real id or tempId); omit for All elements.' },
         },
         required: ['nodeIds', 'axis'],
         additionalProperties: false,
@@ -55,13 +64,13 @@ export function buildLayoutToolDefs(): ToolDef[] {
     },
     {
       name: 'grid_nodes',
-      description: "Keep elements in a grid on a canvas: `columns` columns, filled row by row in the order of nodeIds (left to right, then the next row). Every row stays a row and every column a column, in that order, through every later layout. Without viewId it applies to the All elements canvas; with the id of a static or dynamic view, to that view only. Studio arranges them when it shows the canvas; smart_layout keeps the grid. Remove it with remove_alignment.",
+      description: "Keep elements in a grid on a canvas: `columns` columns, filled row by row in the order of nodeIds (left to right, then the next row). Every row stays a row and every column a column, in that order, through every later layout. Without viewId it applies to the All elements canvas; with the id of a static view, to that view only (other kinds have no canvas). Studio arranges them when it shows the canvas; smart_layout keeps the grid. Remove it with remove_alignment.",
       inputSchema: {
         type: 'object',
         properties: {
           nodeIds: { type: 'array', items: { type: 'string' }, description: 'Two or more node ids or tempIds, in reading order; none inside another.' },
           columns: { type: 'number', description: 'Columns of the grid. Defaults to the smallest that makes it about square (ceil of the square root of the count).' },
-          viewId: { type: 'string', description: 'A static or dynamic view (real id or tempId); omit for All elements.' },
+          viewId: { type: 'string', description: 'A static view (real id or tempId); omit for All elements.' },
         },
         required: ['nodeIds'],
         additionalProperties: false,
@@ -75,7 +84,7 @@ export function buildLayoutToolDefs(): ToolDef[] {
         properties: {
           id: { type: 'string', description: 'Alignment id, as align_nodes returned it.' },
           nodeIds: { type: 'array', items: { type: 'string' }, description: 'Removes the alignments made only of these elements.' },
-          viewId: { type: 'string', description: 'A static or dynamic view (real id or tempId); omit for All elements.' },
+          viewId: { type: 'string', description: 'The view (real id or tempId); omit for All elements. Also a view of another kind than static, to remove what was written there before.' },
         },
         additionalProperties: false,
       },
@@ -118,7 +127,7 @@ export function buildAlignmentToolHandlers(): Record<string, ToolHandler> {
       if (input.id === undefined && input.nodeIds === undefined) return fail('remove_alignment: pass id or nodeIds')
       if (input.id !== undefined && (typeof input.id !== 'string' || !input.id)) return fail('remove_alignment: id must be an alignment id')
       if (input.nodeIds !== undefined && (!Array.isArray(input.nodeIds) || input.nodeIds.some((id) => typeof id !== 'string'))) return fail('remove_alignment: nodeIds must be an array of node ids')
-      const canvas = canvasFor(ctx, 'remove_alignment', input.viewId)
+      const canvas = canvasFor(ctx, 'remove_alignment', input.viewId, true)
       if ('error' in canvas) return fail(canvas.error)
       const among = input.nodeIds ? new Set((input.nodeIds as string[]).map((id) => ctx.resolveId(id))) : null
       // Pins (elements dropped after a drag in Studio) go only by id.
@@ -145,9 +154,8 @@ export function buildLayoutToolHandlers(): Record<string, AsyncToolHandler> {
         viewId = ctx.resolveId(input.viewId)
         const view = ctx.diagram.getViews?.()[viewId]
         if (!view) return fail(`smart_layout: unknown view id "${input.viewId}"`)
-        if (view.kind && view.kind !== 'static' && view.kind !== 'dynamic') {
-          return fail(`smart_layout: "${view.name}" is a ${view.kind} view; only static and dynamic views have a canvas layout`)
-        }
+        const refused = noCanvasLayout('smart_layout', view)
+        if (refused) return fail(refused)
       }
       const outcome = await ctx.diagram.runLayout(viewId)
       return { ok: outcome.ok, resultText: outcome.text }

@@ -18,6 +18,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useDiagramStore } from '../src/store/diagramStore'
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
+import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 
 const initial = (() => {
   const s = useDiagramStore.getState()
@@ -87,6 +88,26 @@ describe('addView / addNodeToView / removeNodeFromView', () => {
     expect(useDiagramStore.getState().views[vid].nodeIds.filter(x => x === nid).length).toBe(1)
     useDiagramStore.getState().removeNodeFromView(vid, nid)
     expect(useDiagramStore.getState().views[vid].nodeIds).not.toContain(nid)
+  })
+
+  it('a group of views per element and its views take no elements by hand', () => {
+    const machine = { id: 'order', type: 'state-machine', label: 'Order', collapsed: false, x: 0, y: 0, width: 300, height: 200 } as unknown as C4Node
+    const state = { id: 'placed', type: 'state', label: 'Placed', parentId: 'order', collapsed: false, x: 20, y: 40, width: 160, height: 60 } as unknown as C4Node
+    const metamodel = builtInGovernanceMetamodel()
+    useDiagramStore.setState((s: any) => {
+      s.metamodel = metamodel
+      s.c4Nodes = { order: machine, placed: state }
+      s.c4Relations = {}
+      s.views = { g: { id: 'g', name: 'Machines', nodeIds: [], positions: {}, viewpoint: 'state-machine', kind: 'static' } }
+    })
+    useDiagramStore.getState()._sync()
+    const member = Object.values(useDiagramStore.getState().views).find((v) => v.partOf === 'g')!
+    expect(member.subject).toBe('order')
+    for (const id of ['g', member.id]) {
+      useDiagramStore.getState().setViewNodes(id, ['placed'])
+      useDiagramStore.getState().addNodeToView(id, 'order')
+      expect(useDiagramStore.getState().views[id].nodeIds).toEqual([])
+    }
   })
 
   it('removeNodeFromView cascades to all descendants', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkAddNode, checkAddRelation, checkRemoveNodeTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, patchNode, patchRelation, type ModelState } from '../src/model'
+import { checkAddNode, checkAddRelation, checkRemoveNodeType, checkRemoveNodeTypeFromMetamodel, checkRemoveRelationType, checkRemoveRelationTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, patchNode, patchRelation, type ModelState } from '../src/model'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel } from '../src/metamodel'
 import { viewShowsEveryNode, type C4Node } from '../src/c4'
 
@@ -260,6 +260,65 @@ describe('deleting a node type that others name', () => {
     expect(next.nodeTypes.badge).toBeUndefined()
     expect(next.nodeTypes.card.allowedParents).toEqual(['group'])
     expect(next.relationTypes.links.allowedPairs).toEqual([{ from: 'card', to: 'card' }])
+  })
+})
+
+// A viewpoint or a view that names a type lost it in silence: the
+// viewpoint kept `subject: badge`, a view of it was an empty group, and
+// nothing in Studio cleared it.
+describe('deleting a type a viewpoint or a view names', () => {
+  const withViewpoint = (viewpoint: Record<string, unknown>) => {
+    const mm = builtInGovernanceMetamodel()
+    mm.nodeTypes.badge = { ...mm.nodeTypes.system, id: 'badge', label: 'Badge', builtin: false, properties: [] }
+    mm.relationTypes.awards = { id: 'awards', label: 'Awards', allowedPairs: [{ from: 'person', to: 'badge' }, { from: 'person', to: 'person' }], builtin: false } as never
+    mm.viewpoints = [{ id: 'badges', label: 'Badge map', kind: 'static', pipeline: {}, ...viewpoint } as never]
+    return mm
+  }
+
+  it('is refused while a viewpoint makes a view per element of it', () => {
+    expect(checkRemoveNodeTypeFromMetamodel(withViewpoint({ subject: { types: ['badge', 'system'] } }), 'badge'))
+      .toBe('the viewpoint "Badge map" makes a view per Badge: change or delete it first.')
+  })
+
+  it('is refused while a viewpoint\'s filter names it, as a node type or a relation type', () => {
+    expect(checkRemoveNodeTypeFromMetamodel(withViewpoint({ pipeline: { levels: [{ ways: [{ types: ['person'] }] }, { ways: [{ types: ['badge'], via: { relationType: 'awards', direction: 'out' } }] }] } }), 'badge'))
+      .toBe('the filter of the viewpoint "Badge map" names Badge: change or delete the viewpoint first.')
+    expect(checkRemoveNodeTypeFromMetamodel(withViewpoint({ pipeline: { levels: [{ ways: [{}], filters: [{ kind: 'type', types: ['badge'] }] }] } }), 'badge')).toMatch(/names Badge/)
+    const follows = withViewpoint({ pipeline: { levels: [{ ways: [{ types: ['person'] }] }, { ways: [{ via: { relationType: 'awards', direction: 'out' } }] }] } })
+    expect(checkRemoveRelationTypeFromMetamodel(follows, 'awards')).toBe('the filter of the viewpoint "Badge map" names "Awards": change or delete the viewpoint first.')
+    const tests = withViewpoint({ pipeline: { levels: [{ ways: [{}], filters: [{ kind: 'relation', relationType: 'awards', direction: 'in', has: true }] }] } })
+    expect(checkRemoveRelationTypeFromMetamodel(tests, 'awards')).toMatch(/names "Awards"/)
+    expect(checkRemoveRelationTypeFromMetamodel(withViewpoint({}), 'awards')).toBeNull()
+    expect(checkRemoveNodeTypeFromMetamodel(withViewpoint({}), 'badge')).toBeNull()
+  })
+
+  it('is refused while a view\'s own filter names it', () => {
+    const s = state()
+    s.metamodel = withViewpoint({})
+    s.views = { v: { id: 'v', name: 'Badges', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['badge'] }] }, { ways: [{ via: { relationType: 'awards', direction: 'in' } }] }] } } as never }
+    expect(checkRemoveNodeType(s, 'badge')).toBe('the filter of the view "Badges" names Badge: change it first.')
+    expect(checkRemoveRelationType(s, 'awards')).toBe('the filter of the view "Badges" names "Awards": change it first.')
+  })
+
+  it('is refused while a milestone holds an element or a relation of it', () => {
+    // Restore to live, or opening the milestone, brought back an element of
+    // an unknown type.
+    const s = state()
+    s.metamodel = withViewpoint({})
+    const legacy = { id: 'legacy', type: 'badge', label: 'Legacy', collapsed: false, x: 0, y: 0, width: 100, height: 60 } as unknown as C4Node
+    const milestone = { id: 'm1', name: 'As-is', timestamp: 0, nodes: { legacy }, relations: { aw: { id: 'aw', sourceId: 'legacy', targetId: 'legacy', relationType: 'awards' } } }
+    expect(checkRemoveNodeType(s, 'badge', [milestone])).toBe('the milestone "As-is" holds 1 element of type Badge: delete the milestone first.')
+    expect(checkRemoveRelationType(s, 'awards', [milestone])).toBe('the milestone "As-is" holds 1 relation of type "Awards": delete the milestone first.')
+    expect(checkRemoveNodeType(s, 'badge', [{ ...milestone, nodes: {}, relations: {} }])).toBeNull()
+  })
+
+  it('is listed by the validation when a viewpoint names a type the metamodel lacks', () => {
+    const mm = withViewpoint({ subject: { types: ['service'] }, pipeline: { levels: [{ ways: [{ types: ['service'] }] }, { ways: [{ via: { relationType: 'calls', direction: 'out' } }] }] } })
+    const issues = validateModel({}, {}, mm).filter((i) => i.id.startsWith('viewpoint-'))
+    expect(issues.map((i) => i.message)).toEqual([
+      'Viewpoint "Badge map" names node type "service", which the metamodel does not have.',
+      'Viewpoint "Badge map" names relation type "calls", which the metamodel does not have.',
+    ])
   })
 })
 

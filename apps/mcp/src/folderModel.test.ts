@@ -461,6 +461,28 @@ describe('long Smart Layout runs', () => {
     expect(pos.db.y).toBeGreaterThan(pos.api.y)
   }, 60_000)
 
+  it('lays out no flow (dynamic) view: Studio draws no canvas there', async () => {
+    // It reported "crossings 0 -> 0, overdraws 1 -> 0. No files changed."
+    // on every call: a flow view keeps no positions.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = ['a', 'b'].map((id, i) => ({ id, type: 'system', label: id.toUpperCase(), x: i * 10, y: 0, width: 240, height: 160, collapsed: false }))
+    data.relations = [{ id: 'r1', sourceId: 'a', targetId: 'b' }]
+    data.sequences = [{ id: 's', name: 'Flow', relationIds: ['r1'] } as never]
+    data.views = [{ id: 'v', name: 'Place Order Flow', nodeIds: ['a', 'b'], positions: {}, kind: 'dynamic', sequenceId: 's' } as never]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const outcome = await model.call('smart_layout', { viewId: 'v' })
+    expect(outcome.ok).toBe(false)
+    expect(outcome.text).toContain('"Place Order Flow" is a dynamic view; only static views have a canvas layout')
+    expect((await model.call('align_nodes', { nodeIds: ['a', 'b'], axis: 'vertical', viewId: 'v' })).ok).toBe(false)
+    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(after.views!.find((v) => v.id === 'v')!.layoutConstraints ?? []).toEqual([])
+  }, 60_000)
+
   it('takes a type that another writer added to the metamodel since its last call', async () => {
     // The client checks a call against the tool schema, whose list of types
     // is the metamodel the server saw last: a type added by Studio, another

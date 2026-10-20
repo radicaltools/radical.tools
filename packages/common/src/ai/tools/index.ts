@@ -6,6 +6,7 @@
 
 import type { Metamodel } from '../../metamodel'
 import { buildAlignmentToolHandlers, buildLayoutToolDefs, buildLayoutToolHandlers } from './layoutTools'
+export { noCanvasLayout } from './layoutTools'
 import { buildMetamodelToolDefs, buildMetamodelToolHandlers } from './metamodelTools'
 import { buildMilestoneToolDefs, buildMilestoneToolHandlers } from './milestoneTools'
 import { buildModelToolDefs, buildModelToolHandlers } from './modelTools'
