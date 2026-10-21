@@ -206,8 +206,8 @@ function _historyForgotten(): void {
  *  change it makes (StepChange); each stack is a chain that starts at
  *  `now`. The copy a drag in progress keeps goes, as on any load: its step
  *  would take the outside change back. */
-function _historyRebased(now: HistoryEntry): void {
-  for (const stack of [_undoStack, _redoStack]) {
+function _historyRebased(now: HistoryEntry, stacks: HistoryItem[][] = [_undoStack, _redoStack]): void {
+  for (const stack of stacks) {
     let next = now
     for (let i = stack.length - 1; i >= 0; i--) {
       const item = stack[i]
@@ -315,6 +315,54 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
     },
     conflicts,
     dropped,
+  }
+}
+
+/** A milestone shown when the folder changed outside Studio (an agent's
+ *  write): the change is the live model's, and the milestone stays shown
+ *  with the edits not decided yet. Closing it lost them, with no word. */
+interface ShownMilestone {
+  id: string
+  /** The milestone as Studio had it, before the change was read. */
+  before: DiagramSnapshot
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  sequences: Record<string, DiagramSequence>
+  dirty: boolean
+  promptOpen: boolean
+  activeViewId: string | null
+  diffHighlight: DiagramStore['diffHighlight']
+  diffBaseSnapshotId: string | null
+  diffGhostNodes: DiagramStore['diffGhostNodes']
+  diffGhostRelations: DiagramStore['diffGhostRelations']
+}
+
+/** The milestone `shown` on top of the snapshots read again (`after`): its
+ *  elements as shown, with what was changed outside Studio in the milestone
+ *  itself merged in (mergeModels; `conflicts` where both changed a value,
+ *  the folder's kept). Null when the milestone is gone. */
+function _milestoneAfterOutsideChange(shown: ShownMilestone, after: DiagramSnapshot[]): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; sequences: Record<string, DiagramSequence>; changed: boolean; conflicts: string[] } | null {
+  const now = after.find((m) => m.id === shown.id)
+  if (!now) return null
+  const changes = model.compareModels(
+    { nodes: shown.before.nodes as Record<string, C4Node>, relations: shown.before.relations as Record<string, C4Relation> },
+    { nodes: now.nodes as Record<string, C4Node>, relations: now.relations as Record<string, C4Relation> },
+  )
+  const changed = [changes.nodes, changes.relations].some((c) => c.added.length || c.removed.length || c.changed.length)
+  if (!changed) return { nodes: shown.nodes, relations: shown.relations, sequences: shown.sequences, changed, conflicts: [] }
+  const asData = (m: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; sequences?: Record<string, DiagramSequence> }): DiagramData =>
+    ({ nodes: Object.values(m.nodes), relations: Object.values(m.relations), sequences: Object.values(m.sequences ?? {}) })
+  const { merged, conflicts } = mergeModels(
+    asData(shown.before),
+    asData(shown),
+    asData(now),
+  )
+  return {
+    nodes: Object.fromEntries(merged.nodes.map((n) => [n.id, n])),
+    relations: Object.fromEntries(merged.relations.map((r) => [r.id, r])),
+    sequences: now.sequences ? Object.fromEntries((merged.sequences ?? []).map((q) => [q.id, q])) : shown.sequences,
+    changed,
+    conflicts,
   }
 }
 
@@ -6085,8 +6133,48 @@ export const useDiagramStore = create<DiagramStore>()(
         // The history is Designer's live model's: a milestone shown, a slide
         // played or Viewer's model in the store is not the one it rebases on.
         const st = get()
+        // A milestone shown stays shown, with its edits (ShownMilestone).
+        const shownBefore = opts?.outsideChange && st.activeSnapshotId && st.liveBackup ? st.snapshots.find((m) => m.id === st.activeSnapshotId) : undefined
+        const shownMilestone: ShownMilestone | null = shownBefore ? {
+          id: shownBefore.id,
+          before: shownBefore,
+          nodes: st.c4Nodes,
+          relations: st.c4Relations,
+          sequences: st.sequences,
+          dirty: st.milestoneDirty,
+          promptOpen: st.milestonePromptOpen,
+          activeViewId: st.activeViewId,
+          diffHighlight: st.diffHighlight,
+          diffBaseSnapshotId: st.diffBaseSnapshotId,
+          diffGhostNodes: st.diffGhostNodes,
+          diffGhostRelations: st.diffGhostRelations,
+        } : null
+        const milestone = shownMilestone ? _milestoneAfterOutsideChange(shownMilestone, data.snapshots ?? []) : null
+        /** Says that the milestone with edits not saved is gone. */
+        const lostMilestone = (id: string): void => {
+          const name = st.snapshots.find((m) => m.id === id)?.name ?? id
+          get().pushNotification(`The milestone "${name}" was deleted outside Studio: the edits made in it and not saved are gone.`, 'warning')
+        }
         if (opts?.outsideChange && st.appMode === 'designer' && !st.activeSnapshotId && !st.presentationActive) {
           _historyRebased(_captureState(st))
+        } else if (opts?.outsideChange && st.appMode === 'designer' && milestone && !st.presentationActive) {
+          // The milestone's steps stay, unless it was changed too; the live
+          // model's, parked, make their change on it as it is now.
+          if (milestone.changed) { _undoStack.length = 0; _redoStack.length = 0 }
+          if (_liveHistory) {
+            const live = st.liveBackup!
+            _historyRebased({
+              c4Nodes: atDefaultPositions(Object.values(live.nodes), st.defaultPositions),
+              c4Relations: live.relations,
+              views: st.views,
+              defaultLayoutConstraints: st.defaultLayoutConstraints,
+              defaultEdgeStyle: st.defaultEdgeStyle,
+              activeViewId: null,
+              defaultPositions: st.defaultPositions,
+              sequences: live.sequences ?? st.sequences,
+              hubTemplates: st.hubTemplates,
+            }, [_liveHistory.undo, _liveHistory.redo])
+          }
         } else {
           _historyForgotten()
         }
@@ -6172,20 +6260,78 @@ export const useDiagramStore = create<DiagramStore>()(
         const W = window as any
         _beforeSlidePreview = null
         if (W.__preModeLayout) {
-          const parked = (W.__preModeLayout as ParkedDesigner).activeViewId
-          const parkedViewId = parked && views[parked] ? parked : null
+          const pre = W.__preModeLayout as ParkedDesigner
+          const parkedViewId = pre.activeViewId && views[pre.activeViewId] ? pre.activeViewId : null
           // The nodes just loaded are where All elements has them. Parked
           // under a view's id as they are, the return to Designer drew the
           // view with All elements' layout and the next edit saved it as the
           // view's: they go back where that view has them.
           const viewPositions = parkedViewId ? views[parkedViewId].positions as Record<string, NodePosition> : undefined
-          W.__preModeLayout = {
-            ...parkDesigner(get()),
-            c4Nodes: viewPositions && Object.keys(viewPositions).length > 0
-              ? atDefaultPositions(Object.values(get().c4Nodes), viewPositions)
-              : get().c4Nodes,
+          const liveNodes = viewPositions && Object.keys(viewPositions).length > 0
+            ? atDefaultPositions(Object.values(get().c4Nodes), viewPositions)
+            : get().c4Nodes
+          const loaded = parkDesigner(get())
+          // Designer's milestone stays too, over the live model as it is now.
+          const parkedShown = pre.activeSnapshotId && pre.liveBackup ? snapshots.find((m) => m.id === pre.activeSnapshotId) : undefined
+          const parkedMilestone = opts?.outsideChange && parkedShown ? _milestoneAfterOutsideChange({
+            id: parkedShown.id,
+            before: st.snapshots.find((m) => m.id === parkedShown.id) ?? parkedShown,
+            nodes: pre.c4Nodes,
+            relations: pre.c4Relations,
+            sequences: pre.sequences,
+            dirty: pre.milestoneDirty,
+            promptOpen: false,
+            activeViewId: pre.activeViewId,
+            diffHighlight: pre.diffHighlight,
+            diffBaseSnapshotId: pre.diffBaseSnapshotId,
+            diffGhostNodes: pre.diffGhostNodes,
+            diffGhostRelations: pre.diffGhostRelations,
+          }, snapshots) : null
+          W.__preModeLayout = (parkedMilestone ? {
+            ...pre,
+            c4Nodes: parkedMilestone.nodes,
+            c4Relations: parkedMilestone.relations,
+            sequences: parkedMilestone.sequences,
+            views,
+            defaultPositions: defaultPos,
             activeViewId: parkedViewId,
-          } satisfies ParkedDesigner
+            liveBackup: { nodes: liveNodes, relations, sequences },
+          } : {
+            ...loaded,
+            c4Nodes: liveNodes,
+            activeViewId: parkedViewId,
+          }) satisfies ParkedDesigner
+          if (opts?.outsideChange && pre.activeSnapshotId && pre.milestoneDirty && !parkedMilestone) lostMilestone(pre.activeSnapshotId)
+        }
+        // The milestone shown stays, over the live model just read. Its
+        // elements are where the canvas shown has them; on All elements when
+        // that view is gone.
+        if (shownMilestone && milestone) {
+          const viewId = shownMilestone.activeViewId && views[shownMilestone.activeViewId] ? shownMilestone.activeViewId : null
+          const shownNodes = shownMilestone.activeViewId && !viewId && _milestoneAllPositions
+            ? atDefaultPositions(Object.values(milestone.nodes), _milestoneAllPositions)
+            : milestone.nodes
+          set((state) => {
+            state.liveBackup = { nodes: state.c4Nodes, relations: state.c4Relations, sequences: state.sequences } as any
+            state.c4Nodes = shownNodes as any
+            state.c4Relations = milestone.relations as any
+            if (snapshots.find((m) => m.id === shownMilestone.id)?.sequences) state.sequences = milestone.sequences as any
+            state.activeSnapshotId = shownMilestone.id
+            state.milestoneDirty = shownMilestone.dirty
+            state.milestonePromptOpen = shownMilestone.promptOpen
+            state.diffHighlight = shownMilestone.diffHighlight as any
+            state.diffBaseSnapshotId = shownMilestone.diffBaseSnapshotId
+            state.diffGhostNodes = shownMilestone.diffGhostNodes as any
+            state.diffGhostRelations = shownMilestone.diffGhostRelations as any
+            state.activeViewId = viewId
+            state.canUndo = _undoStack.length > 0
+            state.canRedo = _redoStack.length > 0
+          })
+          if (milestone.conflicts.length) {
+            get().pushNotification(`The milestone "${shownMilestone.before.name}" was changed outside Studio too. Where both changed the same value, the folder's was kept: ${milestone.conflicts.slice(0, 5).join('; ')}.`, 'warning')
+          }
+        } else if (shownMilestone?.dirty) {
+          lostMilestone(shownMilestone.id)
         }
         get()._sync()
         // The document opens on All elements, with what was selected there.

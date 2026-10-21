@@ -184,3 +184,55 @@ describe('Undo after an outside change', () => {
     expect(s().canUndo).toBe(false)
   })
 })
+
+describe('an outside change while a milestone is shown (item 126)', () => {
+  beforeEach(() => {
+    s().setAppMode('designer')
+    s().loadDiagram(model())
+  })
+  afterEach(() => s().stopLiveLayout())
+
+  it('keeps the milestone shown and its edits, and brings the change into the live model', () => {
+    s().updateNode('a', { label: 'Shop' })
+    const m = s().createSnapshot('As-is')
+    s().selectMilestone(m)
+    s().updateNode('b', { label: 'Bank (as-is)' })
+    expect(s().milestoneDirty).toBe(true)
+
+    outsideChange((d) => { d.nodes.push(sys('c', 0, 600, { label: 'Courier' })) })
+    expect(s().activeSnapshotId).toBe(m)
+    expect(s().milestoneDirty).toBe(true)
+    expect(label('b')).toBe('Bank (as-is)')
+    expect(s().c4Nodes.c).toBeUndefined()
+    expect(s().liveBackup?.nodes.c?.label).toBe('Courier')
+    expect(s().saveDiagram().nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c'])
+
+    // The milestone's steps stay its own.
+    s().undo()
+    expect(label('b')).toBe('b')
+    s().redo()
+    expect(label('b')).toBe('Bank (as-is)')
+
+    // Its edits saved as a new milestone; the live model has the change, and
+    // its own steps take back the user's, not the agent's.
+    s().commitMilestoneChanges('new', 'As-is 2')
+    s().discardMilestoneChanges()
+    expect(s().activeSnapshotId).toBeNull()
+    expect(label('c')).toBe('Courier')
+    expect(label('b')).toBe('b')
+    expect(s().snapshots.find((x) => x.name === 'As-is 2')?.nodes.b.label).toBe('Bank (as-is)')
+    s().undo()
+    expect(label('a')).toBe('a')
+    expect(label('c')).toBe('Courier')
+  })
+
+  it('says so when the milestone with edits was deleted outside Studio', () => {
+    const m = s().createSnapshot('As-is')
+    s().selectMilestone(m)
+    s().updateNode('b', { label: 'Bank (as-is)' })
+    outsideChange((d) => { d.snapshots = [] })
+    expect(s().activeSnapshotId).toBeNull()
+    expect(label('b')).toBe('b')
+    expect(lastNotice()).toMatch(/As-is.*deleted outside Studio/)
+  })
+})
