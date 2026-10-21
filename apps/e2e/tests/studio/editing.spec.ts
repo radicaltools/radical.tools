@@ -136,6 +136,33 @@ test('undo and redo', async ({ page, studio }) => {
   await expect(studio.nodes).toHaveCount(4)
 })
 
+// Runs 65 to 69 (decided 2026-10-21): Viewer and Presenter showed Undo and
+// Redo enabled, and they did nothing. Undo belongs to Designer.
+test('Undo and Redo are Designer\'s: Viewer, Presenter and the metamodel editor show none', async ({ page, studio }) => {
+  await studio.addFromPalette('Software System', await studio.nearBottom())
+  await expect(studio.nodes).toHaveCount(4)
+  const toolbar = page.locator('.toolbar')
+  const undo = toolbar.getByRole('button', { name: 'Undo', exact: true })
+  const redo = toolbar.getByRole('button', { name: 'Redo', exact: true })
+  await expect(undo).toBeEnabled()
+  for (const mode of ['Viewer', 'Presenter']) {
+    await toolbar.getByRole('button', { name: mode, exact: true }).click()
+    await expect(undo).toHaveCount(0)
+    await expect(redo).toHaveCount(0)
+    // Nor do the keys take Designer's step behind the user's back.
+    await page.keyboard.press('ControlOrMeta+z')
+  }
+  await toolbar.getByRole('button', { name: 'Designer', exact: true }).click()
+  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByText(/Metamodel editor/).first().click()
+  await expect(page.getByRole('button', { name: 'Close metamodel editor' })).toBeVisible()
+  await expect(undo).toHaveCount(0)
+  await expect(redo).toHaveCount(0)
+  await page.getByRole('button', { name: 'Close metamodel editor' }).click()
+  await expect(undo).toBeEnabled()
+  await expect(studio.nodes).toHaveCount(4)
+})
+
 test('undoing the add of the selected element leaves no card and no selection', async ({ page, studio }) => {
   // The card stayed, empty, with "1 node selected" for an element that was gone.
   await studio.addFromPalette('Software System', await studio.nearBottom())
