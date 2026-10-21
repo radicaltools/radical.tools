@@ -6,6 +6,6 @@ given: "an exploration of API in the bookstore model"
 tests: |
   packages/ui/tests/exploreView.test.ts › choosing the relations of a +
   apps/e2e/tests/studio/explore.spec.ts › the + of an element adds the relations of the types and direction chosen
-then: "the menu counts each type in the direction chosen; Show adds only the neighbours joined by the checked type in that direction, a level below API, with only those relations drawn; All then adds the rest; nothing is saved"
-when: "the user clicks API's +, sees All and the relation types with their counts, switches the direction to outgoing, checks one type and clicks Show; then opens the + again and chooses All"
+then: "the outgoing column lists reads/writes 1 and charges card 1, the incoming column calls 1 and contained in 1; contained in adds Bookstore a level below API with a dashed contains arrow from Bookstore to API; Show checked adds Orders DB and Web App with only their relations drawn; nothing is saved"
+when: "the user clicks API's +, reads the two columns, clicks contained in, then opens the + again, checks reads/writes and calls and clicks Show checked"
 ---
