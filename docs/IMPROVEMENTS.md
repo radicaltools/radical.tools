@@ -4355,6 +4355,31 @@ now pushes what the grown container covers clear). Every fix has a test of
 its own, and its KNOWN entry is gone: the fuzzer checks the rule wherever it
 applies.
 
+**Found while the fuzzer's fixes were merged, 2026-10-22:** the merge was
+fuzzed with new seeds. Fixed then: an element moved or added on one view
+gets its place on the other canvases with their rows and columns held there,
+so a reload no longer snaps a row and refits every container (a regression
+of the fix of item 248); opening on a view a container folded in the model,
+whose children the view does not show, makes room for the size it is drawn
+at instead of opening over its neighbour; a drop leaves a row or column it
+did not touch as it was (one a milestone shows off its line), and what a
+line through a container moved along with the drag is pushed clear of what
+it would cover (regressions of the fix of item 247); an element moved into
+another parent on a view while a milestone is shown is drawn inside its new
+parent, beside its siblings, when the milestone's All elements is opened.
+Still open:
+
+282. **Undo or Redo in a milestone after an agent's write drops or refits
+     All elements' places of live elements in the live document.** Nested
+     model; before the fixes only the agent's new element lost its place.
+     Next to items 262 and 275. (KM1)
+283. **A merge of an agent's write with unsaved edits leaves two siblings
+     over each other.** Nested model, seen on the code before the fixes too.
+     Next to item 264. (KM2)
+284. **After an add and a fold, a move into another parent lets the live
+     physics move the old parent over its neighbours.** Sample model, seen
+     on the code before the fixes too. Next to item 281. (KM3)
+
 ### Radical Forge over MCP (2026-10-07)
 
 Added in `feat/forge-mcp`: the MCP server runs Radical Forge with the
