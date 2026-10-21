@@ -632,34 +632,6 @@ const KNOWN: Known[] = [
     note: 'K2: a container the physics framed is framed anew on a reload, 60 → 120 px over its children (the leftover of item 1 of "Found by exploratory runs")',
   },
   {
-    // Payment Provider moved into Bookstore on All elements: the Containers
-    // view, which lists it, has no place for it any more; opening the view
-    // places it and the physics moves Customer by (−179, −82), Bookstore
-    // grows 860 → 1360 wide, its children shift.
-    // The same for an add: nested, a container added into System 0 on the
-    // System 0 view gets no place on Systems and containers (a filter
-    // chain that draws it); opening that view shrinks System 0 2440 → 1380
-    // and moves it 588 px right, System 1 210 px.
-    rule: 'nothingMovesByItself',
-    match: (t) => lastAction(t) === 'view' && t.some((a) => a.a === 'reparent' || a.a === 'add'),
-    note: 'K3: a move into another parent, or an add, leaves other views that draw it without a place for it; opening one moves its neighbours (new)',
-  },
-  {
-    // Nested, a new view of the System context viewpoint: System 0 moved
-    // into System 1, which grows 280 × 180 → 360 × 330 over Operator.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'reparent' && !!v.facts?.overlap,
-    note: 'K3c: a move into another parent grows it over a neighbour on the canvas shown (new)',
-  },
-  {
-    // K3 on the geometry: Orders DB deleted, API moved into Payment
-    // Provider on All elements, Containers opened: there Payment Provider
-    // has grown to 360 × 350 at (738, 333), 370 px over Bookstore.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'view' && !!v.facts?.overlap && t.some((a) => a.a === 'reparent'),
-    note: 'K3b: a move into another parent grows the parent over its neighbour on a view it was not made on (new)',
-  },
-  {
     // A group dropped on the bookstore's All elements at (310, 136): drawn
     // 360 × 220 at (50, −41), 55 px over Customer; a system dropped there
     // moves clear.
@@ -816,18 +788,6 @@ const KNOWN: Known[] = [
     note: 'K17: Undo in a milestone after an agent\'s write takes back part of the write in the live views (new; sibling of item 36)',
   },
   {
-    // Nested: Component 1.1.1 moved into Container 2.0, a view of the
-    // Components viewpoint laid out, the milestone Early opened (there it
-    // is still in Container 1.1): on that view it is drawn exactly on
-    // Component 1.1.2 (both at 359.3, 809.3).
-    rule: 'geometry',
-    // The same for a fold: Container 0.0 folded on live, a Components view
-    // laid out, Early opened (there it is open): it is drawn 760 wide at
-    // (30, 120), over Container 0.1 and 0.2.
-    match: (t, v) => /^on (?!live\|)/.test(v.detail) && t.some((a) => a.a === 'reparent' || a.a === 'collapse' || (a.a === 'agent' && a.kind === 'move')),
-    note: 'K18: in a milestone, an element moved or folded since on live is drawn on a view by the live layout, onto its siblings (new)',
-  },
-  {
     // A queue dropped into Payment Provider, not saved yet, while the agent
     // moves Orders DB into it: the merge puts both at (1140, 464.8).
     rule: 'geometry',
@@ -870,6 +830,34 @@ const KNOWN: Known[] = [
       return !!dragged && !(v.keys ?? []).some((k) => k.includes(dragged))
     },
     note: 'K22: an expand on a view that does not draw the children leaves seeds that move them out of their container later, also after a reload (new)',
+  },
+  {
+    // Nested, on All elements: Container 0.2 folded, Containers 1.0 and 1.1
+    // kept in a row, Component 0.2.0 moved into Container 0.0. The move
+    // places it right (Component 0.1.0 inside Container 0.1); then the live
+    // physics grows Container 0.0 1020 → 1152 px wide and moves it 296 px
+    // left, and Container 0.1 moves 20 px right of its child, which is left
+    // 56 px outside it. Without the row in System 1 it does not happen.
+    // Also on the base (d04b081), found by group C.
+    rule: 'geometry',
+    match: (t, v) => lastAction(t) === 'reparent' && !!v.facts?.outside && t.some((a) => a.a === 'align'),
+    note: 'C1: after a move into another parent, with a row elsewhere, the live physics leaves a neighbour\'s child outside it (new)',
+  },
+  {
+    // Nested: milestone Early opened, a group added at the root, the view
+    // Systems and containers (no places of its own yet) opened, Undo, Redo:
+    // the live view now has the places its first opening in the milestone
+    // gave it (System 0, its containers, System 1). With the Table view
+    // opened instead, Redo does not give back the state after the add.
+    // Also on the base (d04b081), found by group C.
+    rule: 'milestoneKeepsLive',
+    match: (t) => ['undo', 'redo'].includes(lastAction(t) ?? '') && t.some((a) => a.a === 'openMilestone') && t.some((a) => a.a === 'view'),
+    note: 'C2: Undo and Redo in a milestone after a view was first opened there put the layout it was opened with into the live view (new)',
+  },
+  {
+    rule: 'redoRestores',
+    match: (t) => lastAction(t) === 'redo' && t.some((a) => a.a === 'openMilestone') && t.some((a) => a.a === 'view'),
+    note: 'C2: the same, seen as Redo not giving back the state after its step (new)',
   },
 ]
 
