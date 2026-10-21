@@ -1,4 +1,4 @@
-import { test, expect, WHOLE } from '../../support/fixtures'
+import { test, expect, WHOLE, fixture } from '../../support/fixtures'
 
 // The list side of the metamodel editor (the Diagram tab has its own spec).
 
@@ -138,4 +138,51 @@ test('Reset to C4 preset is refused while the model holds what C4 has no type fo
   await expect(page.locator('.mm-issues-count')).toHaveText('0')
   await closeEditor(page)
   await expect(studio.nodes).toHaveCount(before)
+})
+
+// D3: narrowing the metamodel below what the model holds was done without a
+// word (only Validation said so). It is done after a confirmation that lists
+// what it breaks.
+test('narrowing a type\'s parents below what the model holds asks first, listing what it breaks', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await openEditor(page)
+  const card = page.locator('.mm-card', { has: page.locator('.mm-type-id', { hasText: /^container$/ }) })
+  await card.locator('.mm-card-header').click()
+  const system = card.locator('.mm-parent-grid label', { hasText: /^Software System$/ }).locator('input')
+  await expect(system).toBeChecked()
+  let asked = ''
+  page.once('dialog', (d) => { asked = d.message(); void d.dismiss() })
+  await system.uncheck().catch(() => {})
+  await expect.poll(() => asked).toContain('Container "API" cannot be inside Software System')
+  await expect(system).toBeChecked()
+  page.once('dialog', (d) => { void d.accept() })
+  await system.uncheck()
+  await expect(system).not.toBeChecked()
+})
+
+// Item 208: an enum option removed while an element held it showed as
+// another option in the card, and nothing flagged it.
+test('a value that is no option any more shows as it is in the card', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.nodes = doc.nodes.map((n: { id: string }) => (n.id === 'api' ? { ...n, tier: 'silver' } : n))
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-containers')
+  await openEditor(page)
+  const row = await newPropertyRow(page, 'container')
+  await row.locator('.mm-prop-key').fill('tier')
+  await row.locator('.mm-prop-label').fill('Tier')
+  await row.locator('.mm-prop-type').selectOption('enum')
+  // API's "silver" is no option: the editor asks first (D3).
+  let asked = ''
+  page.once('dialog', (d) => { asked = d.message(); void d.accept() })
+  await row.locator('.mm-prop-options').fill('gold, bronze')
+  await row.locator('.mm-prop-label').click()
+  await expect.poll(() => asked).toContain('"Tier" is "silver"')
+  await expect(page.locator('.mm-editor-side')).toContainText('"Tier" is "silver", which is not one of its options (gold, bronze)')
+  await closeEditor(page)
+  await studio.node('api').click()
+  const tier = studio.attribute('Tier')
+  await expect(tier).toHaveValue('silver')
+  await expect(tier.locator('option:checked')).toHaveText('silver (not an option)')
 })
