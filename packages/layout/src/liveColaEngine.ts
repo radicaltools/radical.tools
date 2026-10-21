@@ -196,6 +196,18 @@ const PINNED = 16
 
 type Box = { x: number; X: number; y: number; Y: number }
 
+/**
+ * How far `b` moves along `axis` to stand CALM_GAP clear of `a`: away from
+ * `a`'s centre, past `a`'s far edge. Not by the overlap alone: a container
+ * a drag grew past the whole of `b` (or one dropped inside it) still
+ * covered it after that much.
+ */
+function clearing(a: Box, b: Box, axis: 'x' | 'y'): number {
+  const ahead = (axis === 'x' ? a.X - b.x : a.Y - b.y) + CALM_GAP
+  const behind = (axis === 'x' ? b.X - a.x : b.Y - a.y) + CALM_GAP
+  return ahead <= behind ? ahead : -behind
+}
+
 /** A calm drag in progress (DragMode). */
 interface CalmDrag {
   id: string
@@ -872,7 +884,9 @@ export class LiveColaEngine {
    * too and stays pinned where it lands: the pin keeps the physics off it,
    * not the user's drop. An aligned one moves only along its line; one a
    * line holds on both axes stays, and the element that covers it moves off
-   * it instead.
+   * it instead. What still covers another when the pushes run out
+   * (CALM_MAX_PUSHES) goes beside the rest (clearLeftovers): a drop leaves
+   * nothing overlapping.
    */
   private clearOverlaps(seeds: string[]): void {
     this.refreshBounds()
@@ -890,41 +904,47 @@ export class LiveColaEngine {
       return d
     }
     let budget = CALM_MAX_PUSHES
-    while (pending.size && budget > 0) {
+    while (pending.size) {
       const level = [...pending.keys()].sort((a, b) => depth(b) - depth(a))[0]
       const movers = pending.get(level)!
       pending.delete(level)
       const queue = [...movers]
+      const moved = new Set(movers)
       while (queue.length && budget > 0) {
         const a = queue.shift()!
         const A = this.boxOf(a)
         if (!A) continue
         for (const b of this.childrenOf.get(level) ?? []) {
-          if (b === a || movers.has(b)) continue
+          if (b === a || (movers.has(a) && movers.has(b))) continue
           const B = this.boxOf(b)
           if (!B) continue
           const ox = Math.min(A.X, B.X) - Math.max(A.x, B.x) + CALM_GAP
           const oy = Math.min(A.Y, B.Y) - Math.max(A.y, B.y) + CALM_GAP
           if (ox <= 0 || oy <= 0) continue
-          const preferred = ox <= oy ? 'x' : 'y'
-          const axis = this.pushAxis(b, preferred)
+          const sx = clearing(A, B, 'x')
+          const sy = clearing(A, B, 'y')
+          const preferred = Math.abs(sx) <= Math.abs(sy) ? 'x' : 'y'
+          // One pushed onto a dropped one moves off it again.
+          const axis = movers.has(b) ? null : this.pushAxis(b, preferred)
           if (axis) {
-            const away = axis === 'x' ? (B.x + B.X) - (A.x + A.X) : (B.y + B.Y) - (A.y + A.Y)
-            this.translate(b, axis, (away >= 0 ? 1 : -1) * (axis === 'x' ? ox : oy))
+            this.translate(b, axis, axis === 'x' ? sx : sy)
             queue.push(b)
+            moved.add(b)
           } else {
-            // Lines hold b on both axes: a moves off it, then looks again.
+            // Lines hold b on both axes, or b was dropped: a moves off it,
+            // then looks again.
             const back = this.pushAxis(a, preferred)
             if (!back) continue
-            const away = back === 'x' ? (A.x + A.X) - (B.x + B.X) : (A.y + A.Y) - (B.y + B.Y)
-            this.translate(a, back, (away >= 0 ? 1 : -1) * (back === 'x' ? ox : oy))
+            this.translate(a, back, -(back === 'x' ? sx : sy))
             queue.push(a)
+            moved.add(a)
             budget--
             break
           }
           if (--budget <= 0) break
         }
       }
+      this.clearLeftovers(level, movers, moved)
       // The group grew or moved with what is in it: it pushes its neighbours.
       if (level) {
         this.refreshBounds()
@@ -932,6 +952,43 @@ export class LiveColaEngine {
       }
     }
     this.refreshBounds()
+  }
+
+  /**
+   * The end of a calm drop's pushes at one level: an element that moved
+   * there and still covers a sibling (the pushes ran out, or went round in
+   * circles) goes below all of them, or to their right when a line holds
+   * it up and down; of a dropped one and another, the other goes. One that
+   * lines hold on both axes stays.
+   */
+  private clearLeftovers(level: string, movers: Set<string>, moved: Set<string>): void {
+    const kids = this.childrenOf.get(level) ?? []
+    const covers = (a: Box, b: Box): boolean =>
+      Math.min(a.X, b.X) - Math.max(a.x, b.x) > REPORT_PX && Math.min(a.Y, b.Y) - Math.max(a.y, b.y) > REPORT_PX
+    const stuck = new Set<string>()
+    for (let round = 0; round <= kids.length; round++) {
+      let stray: string | undefined
+      for (const t of moved) {
+        const T = this.boxOf(t)
+        if (!T) continue
+        for (const k of kids) {
+          if (k === t || (movers.has(k) && movers.has(t))) continue
+          const K = this.boxOf(k)
+          if (!K || !covers(T, K)) continue
+          const which = movers.has(t) ? k : t
+          if (!stuck.has(which)) { stray = which; break }
+        }
+        if (stray) break
+      }
+      if (!stray) return
+      const S = this.boxOf(stray)!
+      const others = kids.filter((k) => k !== stray).map((k) => this.boxOf(k)).filter((b): b is Box => !!b)
+      const axis = this.pushAxis(stray, 'y')
+      if (axis === 'y') this.translate(stray, 'y', Math.max(...others.map((b) => b.Y)) + CALM_GAP - S.y)
+      else if (axis === 'x') this.translate(stray, 'x', Math.max(...others.map((b) => b.X)) + CALM_GAP - S.x)
+      else stuck.add(stray)
+      moved.add(stray)
+    }
   }
 
   /** The axis `id` may be pushed along, `preferred` if it can, or none. */
