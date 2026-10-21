@@ -109,3 +109,65 @@ test('opening a milestone and going back to the live model writes nothing', asyn
   await page.waitForTimeout(1500)
   expect(await stored()).toBe(before)
 })
+
+test('a name typed in a milestone before and after the question is one undo step', async ({ page, studio }) => {
+  // The question took the focus from the field and gave it back: what was
+  // typed before it and after it were two steps.
+  await studio.openSample('view-core')
+  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v3' }).first().click()
+  await expect(page).toHaveURL(/\/s\//)
+  await studio.settle()
+  await page.locator('.react-flow__node[data-id="ctn-fraud"]').first().click({ position: { x: 30, y: 10 } })
+  const name = page.getByLabel('Name', { exact: true }).first()
+  const was = await name.inputValue()
+  await name.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' XYZ')
+  await page.locator('.milestone-modal').getByRole('button', { name: 'Continue editing (decide later)' }).click()
+  await expect(page.locator('.milestone-modal')).toHaveCount(0)
+  await expect(name).toBeFocused()
+  await page.keyboard.type('Q')
+  await expect(name).toHaveValue(`${was} XYZQ`)
+  await name.press('Enter')
+  await expect(page.getByText('· unsaved')).toBeVisible()
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(name).toHaveValue(was)
+  await expect(page.getByText('· unsaved')).toHaveCount(0)
+})
+
+test('leaving the page with a milestone shown and nothing edited in it asks nothing', async ({ page, studio }) => {
+  // A reload dropped them without a word (a reload saves nothing).
+  await studio.openSample('view-core')
+  const asked: string[] = []
+  page.on('dialog', (d) => { asked.push(d.type()); void d.dismiss() })
+  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v3' }).first().click()
+  await expect(page).toHaveURL(/\/s\//)
+  await studio.settle()
+  // Nothing edited: nothing to ask.
+  await page.close({ runBeforeUnload: true })
+  await expect.poll(() => page.isClosed()).toBe(true)
+  expect(asked).toEqual([])
+})
+
+test('leaving the page with unsaved edits of a milestone asks, and staying keeps them', async ({ page, studio }) => {
+  await studio.openSample('view-core')
+  const asked: string[] = []
+  page.on('dialog', (d) => { asked.push(d.type()); void d.dismiss() })
+  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v3' }).first().click()
+  await expect(page).toHaveURL(/\/s\//)
+  await studio.settle()
+  await page.locator('.react-flow__node[data-id="ctn-fraud"]').first().click({ position: { x: 30, y: 10 } })
+  const name = page.getByLabel('Name', { exact: true }).first()
+  await name.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' v2')
+  await page.locator('.milestone-modal').getByRole('button', { name: 'Continue editing (decide later)' }).click()
+  await name.press('Enter')
+  await page.close({ runBeforeUnload: true })
+  await expect.poll(() => asked).toEqual(['beforeunload'])
+  expect(page.isClosed()).toBe(false)
+  await expect(page.getByText('· unsaved')).toBeVisible()
+})

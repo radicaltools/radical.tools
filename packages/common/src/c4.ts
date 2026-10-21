@@ -389,6 +389,12 @@ export interface DiagramSnapshot {
   relations: Record<string, C4Relation>
   /** Sequences captured at this point in time (optional for backward compat). */
   sequences?: Record<string, DiagramSequence>
+  /** The views this milestone shows its own way (by view id): what was done
+   *  on them in it (a fold, Hide from view, an alignment, a filter) and
+   *  kept by Save as new. Without their places, camera and name: those are
+   *  the view's for every milestone. Every other view is shown as the live
+   *  model has it. */
+  views?: Record<string, DiagramView>
 }
 
 /** Saved positions + collapsed state for every node on the canvas */

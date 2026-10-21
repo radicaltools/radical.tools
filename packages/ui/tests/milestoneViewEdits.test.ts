@@ -145,6 +145,37 @@ describe('Move to… in a milestone', () => {
 })
 
 describe('Undo in a milestone', () => {
+  // The question took the focus from the field typed into, and gave it back
+  // once answered: what was typed before and after it were two steps
+  // (decided 2026-10-21: one).
+  it('what is typed into one field before and after the question is one step', () => {
+    s().beginTyping()
+    s().updateNode('api', { label: 'api ' })
+    expect(s().milestonePromptOpen).toBe(true)
+    s().updateNode('api', { label: 'api X' })
+    s().endTyping()
+    s().dismissMilestonePrompt()
+    s().beginTyping()
+    s().updateNode('api', { label: 'api XQ' })
+    s().endTyping()
+    s().undo()
+    expect(s().c4Nodes.api.label).toBe('api')
+    expect(s().milestoneDirty).toBe(false)
+  })
+
+  it('another field typed into after the question is a step of its own', () => {
+    s().beginTyping()
+    s().updateNode('api', { label: 'API' })
+    s().endTyping()
+    s().dismissMilestonePrompt()
+    s().beginTyping()
+    s().updateNode('api', { description: 'Takes orders' })
+    s().endTyping()
+    s().undo()
+    expect(s().c4Nodes.api).toMatchObject({ label: 'API' })
+    expect(s().c4Nodes.api.description).toBeUndefined()
+  })
+
   it('undoing every edit of the milestone leaves it with nothing unsaved; Redo makes it unsaved again', () => {
     s().toggleCollapse('shop')
     s().updateNode('api', { label: 'API' })
@@ -198,5 +229,100 @@ describe('A view property set in a milestone', () => {
     expect(json(savedView('v'))).toBe(live)
     s().discardMilestoneChanges()
     expect(s().views.v.viewpoint).toBe('containers')
+  })
+})
+
+// Views are the live model's and every milestone's. What was done on them in
+// a milestone kept by Save as new was shown on the canvas but kept nowhere:
+// reopening the new milestone showed the live views (decided 2026-10-21:
+// the new milestone keeps them).
+describe('Save as new and the view edits made in the milestone', () => {
+  /** What the view shows, apart from where it is looked at. */
+  const look = (id: string) => {
+    const { positions: _p, viewport: _v, ...rest } = s().views[id]
+    return json(rest)
+  }
+
+  function savedAsNew(): string {
+    s().removeNodeFromView('v', 'bank')
+    s().toggleCollapse('shop')
+    s().commitMilestoneChanges('new', 'early (edited)')
+    return s().activeSnapshotId!
+  }
+
+  it('keeps them in the new milestone: reopening it shows them, and the live views stay as they were', () => {
+    const live = json(savedView('v'))
+    const liveLook = look('v')
+    const made = savedAsNew()
+    const edited = look('v')
+    expect(edited).not.toBe(liveLook)
+    s().discardMilestoneChanges()
+    expect(look('v')).toBe(liveLook)
+    expect(json(savedView('v'))).toBe(live)
+    s().selectMilestone(made)
+    expect(look('v')).toBe(edited)
+    expect(s().milestoneDirty).toBe(false)
+    expect(json(savedView('v'))).toBe(live)
+    // Another milestone shows the live views.
+    s().selectMilestone(early)
+    expect(look('v')).toBe(liveLook)
+    s().selectMilestone(made)
+    expect(look('v')).toBe(edited)
+    s().discardMilestoneChanges()
+    expect(look('v')).toBe(liveLook)
+    expect(json(savedView('v'))).toBe(live)
+  })
+
+  it('are saved with the milestone, and shown after a reload', () => {
+    const made = savedAsNew()
+    const edited = look('v')
+    s().discardMilestoneChanges()
+    s().loadDiagram(s().saveDiagram())
+    s().setActiveView('v')
+    s().selectMilestone(made)
+    expect(look('v')).toBe(edited)
+  })
+
+  it('are shown still after a change made outside Studio is read', () => {
+    const made = savedAsNew()
+    const edited = look('v')
+    s().discardMilestoneChanges()
+    s().selectMilestone(made)
+    s().loadDiagram(structuredClone(s().saveDiagram()), { outsideChange: true })
+    expect(s().activeSnapshotId).toBe(made)
+    expect(look('v')).toBe(edited)
+    s().discardMilestoneChanges()
+    expect(s().views.v.collapsedNodeIds ?? []).not.toContain('shop')
+  })
+
+  it('keep the view\'s name, folder and layout as the live model has them now', () => {
+    const made = savedAsNew()
+    s().discardMilestoneChanges()
+    s().renameView('v', 'Shop view')
+    s().setViewFolder('v', 'Shop')
+    s().selectMilestone(made)
+    expect(s().views.v).toMatchObject({ name: 'Shop view', folder: 'Shop' })
+    expect(s().views.v.collapsedNodeIds).toContain('shop')
+    expect(json(s().views.v.positions)).toBe(json(savedView('v').positions))
+  })
+
+  it('Propagate from that milestone carries only what was edited in it now', () => {
+    const made = savedAsNew()
+    s().discardMilestoneChanges()
+    s().selectMilestone(made)
+    s().updateNode('api', { label: 'API' })
+    s().setViewEdgeStyle('v', 'orthogonal')
+    s().commitMilestoneChanges('propagate')
+    // The milestone shows its own views with the edit.
+    expect(s().views.v.collapsedNodeIds).toContain('shop')
+    expect(s().views.v.edgeStyle).toBe('orthogonal')
+    s().discardMilestoneChanges()
+    expect(s().c4Nodes.api.label).toBe('API')
+    expect(s().views.v.edgeStyle).toBe('orthogonal')
+    expect(s().views.v.collapsedNodeIds ?? []).not.toContain('shop')
+    expect(savedView('v').nodeIds).toEqual([])
+    s().selectMilestone(made)
+    expect(s().views.v.collapsedNodeIds).toContain('shop')
+    expect(s().views.v.edgeStyle).toBe('orthogonal')
   })
 })
