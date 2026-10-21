@@ -7,6 +7,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { goBack, goForward, goTo, sinceText, useNavHistory, type NavEntry } from '../navHistory'
+import { keysTakenByDialog } from './dialogKeys'
 
 const placeText = (e: NavEntry | undefined): string =>
   !e ? '' : `${e.mode === 'Inspector' || e.mode === 'Metamodel' ? e.where : `${e.mode} › ${e.where}`}${e.element ? ` · ${e.element.label}` : ''}`
@@ -23,7 +24,7 @@ function useNavKeys(): void {
   useEffect(() => {
     const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
     const onKey = (e: KeyboardEvent): void => {
-      if (isTextField(e.target)) return
+      if (isTextField(e.target) || keysTakenByDialog(e.target)) return
       const back = (e.altKey && !e.metaKey && !e.ctrlKey && e.key === 'ArrowLeft') || (mac && e.metaKey && e.key === '[')
       const forward = (e.altKey && !e.metaKey && !e.ctrlKey && e.key === 'ArrowRight') || (mac && e.metaKey && e.key === ']')
       if (!back && !forward) return

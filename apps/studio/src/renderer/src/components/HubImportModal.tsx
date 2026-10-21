@@ -11,6 +11,7 @@ import { applyTemplateParams, templateKeysUsed } from '@radical/common/hubImport
 import { freeSpotNear, placeBesideSiblings } from '@radical/layout/geometry'
 import { computeViewNodeSet } from '@radical/layout/viewInput'
 import { addToViewList } from '@radical/common/c4'
+import { useDialogFocus } from './dialogKeys'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -444,6 +445,8 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
 
   // Where the undo history stood when "Add to Model" was clicked.
   const batchMark = useRef<number | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef, open)
 
   const handleImport = useCallback(
     (
@@ -807,9 +810,11 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
     >
       <div
         style={S.modal}
+        ref={dialogRef}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
+        aria-modal="true"
         aria-label="Import from Hub"
       >
         {/* ── Header ─────────────────────────────────────────────────── */}

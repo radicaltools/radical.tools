@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { isRelationAllowed } from '@radical/common/metamodel'
+import { useMenuKeys } from './menuKeys'
 
 /**
  * Floating action bar that appears over the canvas whenever a single
@@ -34,6 +35,8 @@ export function EdgeActionBar(): React.ReactElement | null {
   const [targetMenuOpen, setTargetMenuOpen] = useState(false)
   const sourceRef = useRef<HTMLDivElement | null>(null)
   const targetRef = useRef<HTMLDivElement | null>(null)
+  useMenuKeys(sourceRef, sourceMenuOpen, () => setSourceMenuOpen(false))
+  useMenuKeys(targetRef, targetMenuOpen, () => setTargetMenuOpen(false))
 
   useEffect(() => {
     if (!sourceMenuOpen && !targetMenuOpen) return

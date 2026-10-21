@@ -7,6 +7,7 @@ import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { host } from '../platform/host'
 import { reloadActiveDocument } from '../persistence/autosave'
 import { NewModelStep, OpenSources, SourceIcon, fileSupported, folderSupported, shortDate } from './ModelSteps'
+import { useDialogFocus } from './dialogKeys'
 
 interface Props {
   open: boolean
@@ -120,6 +121,8 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   const [query, setQuery] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef, open)
 
   // Each opening starts on the list.
   useEffect(() => {
@@ -319,9 +322,11 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
     >
       <div
         className="docmgr-modal"
+        ref={dialogRef}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
+        aria-modal="true"
         aria-label="Models"
       >
         <div className="docmgr-header">
