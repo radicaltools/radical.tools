@@ -78,3 +78,39 @@ test('a low card keeps its name whole and cuts its description at the last line 
     return Number(desc.clamp) * desc.line <= desc.height - desc.padding + 1 && desc.scroll > desc.height
   }).toBe(true)
 })
+
+// Edges between elements of different containers are drawn above the
+// containers, and one could run over a container's −/+: zoomed out, across
+// the dashed frame's corner, it hid it. A copy of each button is drawn
+// above the relations, where the button is.
+test('zoomed out a relation never covers a container\'s −/+', async ({ page, studio }) => {
+  const model = JSON.parse(systems())
+  // From far above and right of System 0 down into its right-hand
+  // container: the line runs over System 0's top-right corner.
+  model.nodes.push({ id: 'far', type: 'system', label: 'Far', x: 2400, y: -1400, width: 300, height: 180, collapsed: false })
+  model.relations.push({ id: 'r-far', sourceId: 'far', targetId: 's0c1', label: 'calls' })
+  await studio.seedDocument(withWhole(JSON.stringify(model)))
+  await studio.open(WHOLE)
+  await expect.poll(() => zoom(page)).toBeLessThan(0.27)
+  const button = studio.node('s0').locator('.c4-node-collapse-btn')
+  await expect(button).toHaveCount(1)
+  await studio.settle()
+  const box = (await button.boundingBox())!
+  const mirror = page.locator('.c4-collapse-mirror')
+  // One copy per button, at the button's place, in a layer above the
+  // relations, and the pointer passes through it to the button.
+  await expect.poll(() => mirror.evaluateAll((els, b) => els.filter((e) => {
+    const r = e.getBoundingClientRect()
+    return Math.abs(r.x - b.x) < 2 && Math.abs(r.y - b.y) < 2 && Math.abs(r.width - b.width) < 2
+  }).length, box)).toBe(1)
+  const above = await page.evaluate(() => {
+    const layer = document.querySelector('.c4-collapse-mirror-layer') as HTMLElement
+    const renderer = document.querySelector('.react-flow__renderer') as HTMLElement
+    return Number(getComputedStyle(layer).zIndex) > Number(getComputedStyle(renderer).zIndex) && getComputedStyle(layer).pointerEvents === 'none'
+  })
+  expect(above).toBe(true)
+  await expect(mirror.first()).toHaveText('−')
+  await button.dispatchEvent('click')
+  await expect(studio.node('s0c1')).toHaveCount(0)
+  await expect(page.locator('.c4-collapse-mirror', { hasText: '+' })).toHaveCount(1)
+})

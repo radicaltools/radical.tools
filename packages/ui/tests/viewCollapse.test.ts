@@ -424,7 +424,7 @@ describe('a container a view shows without its children', () => {
         },
       }],
     }
-    const view = doc.views[0]
+    const view = doc.views[0] as { positions: Record<string, { x: number; y: number }> }
     s().loadDiagram(structuredClone(doc) as any)
     s().setActiveView('v')
     for (const id of ['bank', 'web', 'api']) {

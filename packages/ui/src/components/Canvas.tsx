@@ -24,6 +24,7 @@ import { RelationEdge } from './edges/RelationEdge'
 import { edgeLabelDetail, edgeLabelsShownAt } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { AlignmentGuides } from './AlignmentGuides'
+import { CollapseToggleMirror } from './CollapseToggleMirror'
 import { selectCanvasFocus } from '../store/canvasFocus'
 import { noteUserCamera } from '../store/userCamera'
 import { ElementPalette } from './ElementPalette'
@@ -1463,6 +1464,7 @@ function StructuralCanvas(): React.ReactElement {
           color="var(--canvas-dots)"
         />
         <AlignmentGuides />
+        <CollapseToggleMirror />
       </ReactFlow>
 
       {connectSource && connectMouse && (
