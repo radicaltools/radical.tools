@@ -11,6 +11,9 @@
  *   - a run of the physics comes to rest, on the sample too (K20)
  *   - an unfold on a view that does not draw the children leaves nothing
  *     that moves them later on another canvas (K22)
+ *   - a drop leaves a row a milestone shows off its line as it is, and
+ *     pushes clear what a line through a group moved onto (the fuzzer, on
+ *     the merge of groups A to E)
  *
  * The physics' timer is stepped by hand on a 16 ms frame clock, as the
  * fuzzer steps it, so every run is the same on every machine.
@@ -265,6 +268,31 @@ describe('a row of containers, one of them holding what is dragged', () => {
     expect(s().saveDiagram().defaultPositions).toEqual(saved.defaultPositions)
   })
 
+  it('pushes clear what the line moved onto (fuzzer, on the merge of A to E)', async () => {
+    // Payment Provider and Bookstore in a column, Smart Layout, Orders DB
+    // dragged 249 px left: Bookstore shrank, Payment Provider followed its
+    // middle onto Customer, at the drop or already during the drag, and
+    // nothing pushed Customer out of its way.
+    for (const [dx, dy] of [[-249, 0], [-269, 43]]) {
+      s().loadDiagram(bookstore())
+      rest()
+      s().addAlignment('vertical', ['payments', 'bookstore'])
+      rest()
+      await s().runSmartLayout()
+      rest()
+      drag('db', dx, dy)
+      const after = drawn()
+      const apart = (p: string, q: string): boolean => {
+        const [a, b] = [after[p], after[q]]
+        return a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y
+      }
+      expect(Math.abs((after.payments.x + after.payments.width / 2) - (after.bookstore.x + after.bookstore.width / 2))).toBeLessThan(0.5)
+      expect(apart('customer', 'payments'), `${dx}, ${dy}`).toBe(true)
+      expect(apart('customer', 'bookstore'), `${dx}, ${dy}`).toBe(true)
+      expect(apart('payments', 'bookstore'), `${dx}, ${dy}`).toBe(true)
+    }
+  })
+
   it('moves nothing when something else is dropped', () => {
     // The lines are held as drawn after a drop, nothing is pushed along
     // them (that moved a nested model's first system 60 px, onto the next).
@@ -288,6 +316,26 @@ describe('a row of containers, one of them holding what is dragged', () => {
     drag('buyer', 0, 1)
     const after = drawn()
     for (const id of ['shop', 'web', 'orders', 'k0', 'api']) expect(after[id], id).toEqual(before[id])
+  })
+})
+
+describe('a row a milestone shows off its line', () => {
+  it('is left as it is by a drop of something else', () => {
+    // The row was made after the milestone, which keeps the places from
+    // before it: a 1 px drop of Payment Provider there put Customer and
+    // Bookstore on the row's line, between where they stood, and Customer
+    // came to lie on what is below it (nested: Customer onto System 0).
+    s().loadDiagram(bookstore())
+    rest()
+    const early = s().createSnapshot('Early')
+    s().addAlignment('horizontal', ['bookstore', 'customer'])
+    rest()
+    s().selectMilestone(early)
+    rest()
+    const before = drawn()
+    drag('payments', 0, 1)
+    const after = drawn()
+    for (const id of ['customer', 'bookstore', 'web', 'api', 'db']) expect(after[id], id).toEqual(before[id])
   })
 })
 

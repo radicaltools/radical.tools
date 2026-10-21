@@ -510,3 +510,51 @@ describe('folding a container drawn without its children', () => {
     expect(at(['api', 'orders', 'pay'])).toEqual(before)
   })
 })
+
+describe('opening on a view a container folded in the model, whose children the view does not draw', () => {
+  // The view draws it at its open size then (it keeps its open size and the
+  // view opens it over the model's fold), yet the room was made for it as
+  // for a container drawn without children, at its folded size: it opened
+  // over the container beside it (fuzzer, nested: Container 0.1 folded on
+  // All elements, opened on System 0, over Container 0.2).
+  const shop = () => ({
+    nodes: [
+      { id: 'sys', type: 'system', label: 'Shop', x: 0, y: 0, width: 1300, height: 450, collapsed: false },
+      { id: 'api', type: 'container', label: 'API', parentId: 'sys', x: 30, y: 120, width: 300, height: 200, collapsed: false },
+      { id: 'orders', type: 'container', label: 'Orders', parentId: 'sys', x: 400, y: 120, width: 970, height: 300, collapsed: true },
+      { id: 'k1', type: 'component', label: 'Checkout', parentId: 'orders', x: 20, y: 120, width: 220, height: 140, collapsed: false },
+      { id: 'k2', type: 'component', label: 'Billing', parentId: 'orders', x: 730, y: 120, width: 220, height: 140, collapsed: false },
+      { id: 'cart', type: 'container', label: 'Cart', parentId: 'sys', x: 700, y: 120, width: 300, height: 200, collapsed: false },
+    ] as C4Node[],
+    relations: [],
+    views: [{ id: 'v', name: 'Containers', nodeIds: ['sys', 'api', 'orders', 'cart'], positions: {} }],
+  })
+  /** The boxes the canvas draws, at their absolute places. */
+  const drawnBoxes = () => {
+    const rf = useDiagramStore.getState().rfNodes
+    const byId = Object.fromEntries(rf.map((n) => [n.id, n]))
+    return Object.fromEntries(rf.filter((n) => !n.hidden).map((n) => {
+      let { x, y } = n.position
+      for (let p = n.parentNode; p && byId[p]; p = byId[p].parentNode) { x += byId[p].position.x; y += byId[p].position.y }
+      return [n.id, { x, y, width: Number(n.width ?? n.style?.width), height: Number(n.height ?? n.style?.height) }]
+    }))
+  }
+
+  it('makes room for the size it is drawn at', () => {
+    const s = useDiagramStore.getState
+    s().loadDiagram(shop() as any)
+    s().stopLiveLayout()
+    s().setActiveView('v')
+    s().toggleCollapse('orders')
+    expect(s().views.v.expandedNodeIds).toEqual(['orders'])
+    const b = drawnBoxes()
+    expect(b.orders.width).toBe(970)
+    const apart = (p: string, q: string) => b[p].x + b[p].width <= b[q].x || b[q].x + b[q].width <= b[p].x || b[p].y + b[p].height <= b[q].y || b[q].y + b[q].height <= b[p].y
+    expect(apart('orders', 'cart')).toBe(true)
+    expect(apart('orders', 'api')).toBe(true)
+    for (const id of ['api', 'orders', 'cart']) {
+      expect(b[id].x + b[id].width, id).toBeLessThanOrEqual(b.sys.x + b.sys.width)
+      expect(b[id].y + b[id].height, id).toBeLessThanOrEqual(b.sys.y + b.sys.height)
+    }
+  })
+})

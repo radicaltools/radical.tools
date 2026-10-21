@@ -1310,7 +1310,7 @@ const liveWhileInMilestone = (state: Pick<DiagramStore, 'activeSnapshotId' | 'li
  * elements).
  */
 function placesOnOtherCanvases(
-  state: Pick<DiagramStore, 'c4Nodes' | 'c4Relations' | 'views' | 'activeViewId' | 'activeSnapshotId' | 'defaultPositions'>,
+  state: Pick<DiagramStore, 'c4Nodes' | 'c4Relations' | 'views' | 'activeViewId' | 'activeSnapshotId' | 'defaultPositions' | 'defaultLayoutConstraints'>,
   ids: readonly string[],
   added: boolean,
 ): Map<string, Record<string, NodePosition>> {
@@ -1340,6 +1340,12 @@ function placesOnOtherCanvases(
       }
     }
     if (!showCanvasPositions(copy, known, view, relations).length && known === positions) return
+    // A row or column of that canvas holds there, as opening it (or a
+    // reload) holds it (_enforceLayoutConstraints): the room made for the
+    // place could put one of its members off the line, and a reload then
+    // snapped it and refit every container.
+    const constraints = (view ? view.layoutConstraints : state.defaultLayoutConstraints) ?? []
+    if (constraints.length) applyAlignments(copy, viewLayoutInput(view, copy, relations, constraints))
     const next: Record<string, NodePosition> = {}
     for (const n of Object.values(copy)) {
       if (!(n.id in positions) && shown && !shown.has(n.id)) continue
@@ -3888,12 +3894,21 @@ export const useDiagramStore = create<DiagramStore>()(
         // got and threw (item 259).
         const viewShown = activeViewId ? get().views[activeViewId] : undefined
         const drawnHere = computeViewNodeSet(viewShown as any, get().c4Nodes, get().c4Relations)?.has(id) ?? true
+        // Folded in the model and opened on a view that draws none of its
+        // children, it is drawn there at its open size all the same (the
+        // view opens it over the model's fold: deriveRFNodes). Measured
+        // below as it will be drawn: opened in the model for the toggle, it
+        // counted as a container drawn without children, at its folded size,
+        // no room was made, and it opened over the container beside it.
+        const shownWhere = drawnHere && viewShown ? computeViewNodeSet(viewShown as any, get().c4Nodes, get().c4Relations) : undefined
+        const openedEmpty = !!shownWhere && modelCollapsed && prevCollapsed
+          && !Object.values(get().c4Nodes).some((c) => c.parentId === id && shownWhere.has(c.id))
         // Apply to model temporarily — layout helpers below (separateSiblings /
         // fitParentToChildren) query node.collapsed to compute effective sizes.
         set((state) => {
           const node = state.c4Nodes[id]
           if (!node) return
-          node.collapsed = !prevCollapsed
+          node.collapsed = openedEmpty ? true : !prevCollapsed
         })
 
         // ── Expand origin: ensure children appear at their saved positions ─
@@ -4042,6 +4057,7 @@ export const useDiagramStore = create<DiagramStore>()(
             // previously in view.expandedNodeIds — otherwise fitParentToChildren
             // would still measure it at full height (stale override).
             loopExpandedSet = viewExpandedSet(view as DiagramView, get().c4Nodes, get().c4Relations)
+            if (openedEmpty) loopExpandedSet = new Set([...(loopExpandedSet ?? []), id])
             if (loopExpandedSet) {
               if (!prevCollapsed) loopExpandedSet.delete(id) // we are collapsing `id`
               if (loopExpandedSet.size === 0) loopExpandedSet = undefined
@@ -4572,6 +4588,13 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { writeGeometry(state, shownNodes) })
         // And on the others, where it lost its place.
         _placeOnOtherCanvases(ids, false)
+        // In a milestone, its own All elements (kept aside while a view is
+        // shown) had the place relative to the old parent: read against the
+        // new one, it lay on a sibling there. Without one, it is placed
+        // beside its siblings when All elements opens (placeUnplaced).
+        if (get().activeSnapshotId && get().activeViewId !== null && _milestoneAllPositions) {
+          for (const id of ids) delete _milestoneAllPositions[id]
+        }
 
         get().setSelectedNodeIds(ids)
         get()._sync()

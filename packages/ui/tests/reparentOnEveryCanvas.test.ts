@@ -11,6 +11,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramData, NodePosition } from '@radical/common/c4'
 import { useDiagramStore } from '../src/store/diagramStore'
+import bookstoreText from '../../../apps/e2e/fixtures/bookstore.radical?raw'
 
 const s = useDiagramStore.getState
 const pos = (x: number, y: number, width: number, height: number): NodePosition => ({ x, y, width, height })
@@ -237,6 +238,61 @@ describe('Move to… a container the view draws with nothing in it', () => {
     expect(s().c4Nodes.s1.parentId).toBe('s2')
     expect(inside('s1')).toBe(true)
     expect(overlap(abs('s2'), abs('s3'))).toBe(false)
+  })
+})
+
+describe('Move to… a container in a row, on a view that does not draw it', () => {
+  // System 0's containers are kept in a row on All elements. A component
+  // moved into Container 0.0 on a view of systems and containers got its
+  // place on All elements: Container 0.0 grew, and the room made for it put
+  // Container 0.1 below it, off the row; read again, the row was snapped
+  // and every container refit (Container 0.1 (840, 400) → (990, 120)).
+  it('keeps the row on All elements, so a reload moves nothing there', () => {
+    const comp = (x: number): NodePosition => pos(x, 120, 200, 120)
+    const all: Record<string, NodePosition> = {
+      s0: pos(0, 400, 2440, 440),
+      c0: pos(40, 120, 760, 280), c0k0: comp(40), c0k1: comp(280), c0k2: comp(520),
+      c1: pos(840, 120, 520, 280), c1k0: comp(40), c1k1: comp(280),
+      c2: pos(1400, 120, 1000, 280), c2k0: comp(40), c2k1: comp(280), c2k2: comp(520), c2k3: comp(760),
+      s1: pos(2560, 400, 1240, 440),
+      d0: pos(40, 120, 520, 280), d0k0: comp(40), d0k1: comp(280),
+    }
+    const parents: Record<string, string> = { c0: 's0', c1: 's0', c2: 's0', d0: 's1' }
+    const nodes = Object.entries(all).map(([id, p]) => {
+      const parentId = parents[id] ?? (id.includes('k') ? id.slice(0, 2) : undefined)
+      const type = id.startsWith('s') ? 'system' : id.includes('k') ? 'component' : 'container'
+      return node(id, type, parentId, p)
+    })
+    s().loadDiagram({
+      nodes,
+      relations: [],
+      views: [{ id: 'chain', name: 'Systems and containers', nodeIds: ['s0', 'c0', 'c1', 'c2', 's1', 'd0'], positions: {} }],
+      defaultPositions: JSON.parse(JSON.stringify(all)),
+      defaultLayoutConstraints: [{ id: 'row', type: 'align', axis: 'horizontal', nodeIds: ['c0', 'c1', 'c2'] }],
+    })
+    s().setActiveView('chain')
+    s().reparentNodes(['d0k0'], 'c0', { quiet: true })
+    const saved = JSON.parse(JSON.stringify(s().saveDiagram())) as DiagramData
+    s().loadDiagram(JSON.parse(JSON.stringify(saved)) as DiagramData)
+    s().setActiveView('chain')
+    expect(s().saveDiagram().defaultPositions).toEqual(saved.defaultPositions)
+    s().setActiveView(null)
+    expect(violations()).toEqual([])
+  })
+
+  // Bookstore: API and Orders DB kept in a row, API moved into Payment
+  // Provider on Containers: on All elements Payment Provider grew for it
+  // and pushed Bookstore down, Orders DB with it, off the row; read again,
+  // the row was snapped (Orders DB 37.5 px lower, Bookstore 17.5 px shorter).
+  it('keeps a row through what moved, on All elements', () => {
+    s().loadDiagram(JSON.parse(bookstoreText) as DiagramData)
+    s().addAlignment('horizontal', ['api', 'db'])
+    s().setActiveView('v-containers')
+    s().reparentNodes(['api'], 'payments', { quiet: true })
+    const saved = JSON.parse(JSON.stringify(s().saveDiagram())) as DiagramData
+    s().loadDiagram(JSON.parse(JSON.stringify(saved)) as DiagramData)
+    s().setActiveView('v-containers')
+    expect(s().saveDiagram().defaultPositions).toEqual(saved.defaultPositions)
   })
 })
 
