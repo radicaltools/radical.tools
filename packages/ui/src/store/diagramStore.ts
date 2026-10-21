@@ -5695,7 +5695,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // On a model with governance elements this left them as unknown
         // types, and the editor has nothing to bring the types back with.
         const preset = builtInC4Metamodel()
-        const refused = model.checkReplaceMetamodel(get(), preset)
+        const [live, , milestones] = _typeHolders('')
+        const refused = model.checkReplaceMetamodel(live, preset, milestones)
         if (refused) {
           get().pushNotification(`Cannot reset the metamodel: ${refused}`, 'error')
           return

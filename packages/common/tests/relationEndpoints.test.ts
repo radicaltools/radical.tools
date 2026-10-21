@@ -160,6 +160,19 @@ describe('replacing the metamodel', () => {
     delete s.c4Relations.rule
     expect(checkReplaceMetamodel(s, builtInC4Metamodel())).toBeNull()
   })
+
+  // Item 209: Reset to C4 while a milestone held an ADR; Restore to live
+  // then brought back an unknown type.
+  it('is refused while a milestone holds what the new one has no type for, or a view names it', () => {
+    const s = state()
+    delete s.c4Nodes.adrOld
+    delete s.c4Nodes.adrNew
+    delete s.c4Relations.rule
+    const v1 = { name: 'v1', nodes: { adr: node('adr', 'adr') }, relations: {} }
+    expect(checkReplaceMetamodel(s, builtInC4Metamodel(), [v1])).toBe('C4 (built-in) has no type ADR, and the milestone "v1" holds 1 element of type ADR: delete the milestone first.')
+    s.views = { req: { id: 'req', name: 'Requirements', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['requirement'] }] }] } } as never }
+    expect(checkReplaceMetamodel(s, builtInC4Metamodel())).toMatch(/has no type Requirement, and the filter of the view "Requirements" names Requirement/)
+  })
 })
 
 describe('a property keyed like a field of every element', () => {

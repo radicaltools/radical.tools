@@ -552,8 +552,10 @@ export function metamodelWithoutNodeType(mm: Metamodel, typeId: string): Metamod
 
 /** Why the model's metamodel cannot be replaced by `next`: elements or
  *  relations are of types it does not have (they would be left behind as
- *  unknown types, with nothing in the editor to bring the types back). */
-export function checkReplaceMetamodel(state: ModelState, next: Metamodel): string | null {
+ *  unknown types, with nothing in the editor to bring the types back), in
+ *  the model or in one of its `milestones` (restored to live, it brought
+ *  them back), or a view's filter names such a type, as for Delete type. */
+export function checkReplaceMetamodel(state: ModelState, next: Metamodel, milestones: MilestoneContent[] = []): string | null {
   const count = (items: string[]): Map<string, number> => {
     const out = new Map<string, number>()
     for (const t of items) out.set(t, (out.get(t) ?? 0) + 1)
@@ -561,7 +563,21 @@ export function checkReplaceMetamodel(state: ModelState, next: Metamodel): strin
   }
   const nodeTypes = count(Object.values(state.c4Nodes).map((n) => n.type).filter((t) => !next.nodeTypes[t]))
   const relationTypes = count(Object.values(state.c4Relations).flatMap((r) => r.relationType && !next.relationTypes[r.relationType] ? [r.relationType] : []))
-  if (nodeTypes.size === 0 && relationTypes.size === 0) return null
+  if (nodeTypes.size === 0 && relationTypes.size === 0) {
+    const lostNodeTypes = new Set(milestones.flatMap((m) => Object.values(m.nodes ?? {}).map((n) => n.type)).filter((t) => !next.nodeTypes[t]))
+    const lostRelationTypes = new Set(milestones.flatMap((m) => Object.values(m.relations ?? {}).flatMap((r) => r.relationType && !next.relationTypes[r.relationType] ? [r.relationType] : [])))
+    for (const t of Object.keys(state.metamodel?.nodeTypes ?? {})) if (!next.nodeTypes[t]) lostNodeTypes.add(t)
+    for (const t of Object.keys(state.metamodel?.relationTypes ?? {})) if (!next.relationTypes[t]) lostRelationTypes.add(t)
+    for (const t of lostNodeTypes) {
+      const why = milestoneHoldsType(milestones, t, 'node', state.metamodel) ?? viewNamesType(state.views, t, 'node', state.metamodel)
+      if (why) return `${next.name} has no type ${typeLabel(state.metamodel, t)}, and ${why}`
+    }
+    for (const t of lostRelationTypes) {
+      const why = milestoneHoldsType(milestones, t, 'relation', state.metamodel) ?? viewNamesType(state.views, t, 'relation', state.metamodel)
+      if (why) return `${next.name} has no type ${relationTypeName(state.metamodel, t)}, and ${why}`
+    }
+    return null
+  }
   const parts = [
     ...[...nodeTypes].map(([t, n]) => `${n} ${typeLabel(state.metamodel, t)}`),
     ...[...relationTypes].map(([t, n]) => `${n} "${state.metamodel?.relationTypes[t]?.label ?? t}" ${n === 1 ? 'relation' : 'relations'}`),
