@@ -147,8 +147,12 @@ test('"At the root" shows and sets whether a type may sit at the top level', asy
   const atRoot = system.getByRole('checkbox', { name: 'At the root' })
   // A Software System may sit inside a System, Domain or Group, and at the root.
   await expect(atRoot).toBeChecked()
+  // The model has systems at the root: the editor says so and asks first (D3).
+  let asked = ''
+  page.once('dialog', (d) => { asked = d.message(); void d.accept() })
   await atRoot.uncheck()
   await expect(atRoot).not.toBeChecked()
+  expect(asked).toContain('must be inside')
   await expect.poll(() => page.evaluate(() => {
     const docs = JSON.parse(localStorage.getItem('radical-docs-index') ?? '{}')
     const doc = JSON.parse(localStorage.getItem(`radical-doc:${docs.activeId}`) ?? '{}')
