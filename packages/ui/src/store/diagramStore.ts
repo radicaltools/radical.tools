@@ -62,7 +62,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, fittedParentSize, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
+import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
@@ -651,6 +651,47 @@ function snapshotPositions(nodes: Record<string, C4Node>): Record<string, NodePo
     result[id] = { x: n.x, y: n.y, width: n.width, height: n.height }
   }
   return result
+}
+
+/**
+ * Places the elements `added` while Smart Layout ran, once its layout is
+ * on the canvas (D11): inside its parent beside its siblings, the parent
+ * grown with room made (placeUnplaced); at the top level, as near the
+ * elements it is related to as there is room. Mutates `state` (inside
+ * immer set).
+ */
+function placeAddedDuringLayout(state: DiagramStore, added: string[]): void {
+  const nodes = state.c4Nodes as Record<string, C4Node>
+  const relations = state.c4Relations as Record<string, C4Relation>
+  const fresh = new Set(added)
+  const known = Object.fromEntries(Object.keys(nodes).filter((id) => !fresh.has(id)).map((id) => [id, true]))
+  const view = state.activeViewId ? state.views[state.activeViewId] as DiagramView | undefined : undefined
+  const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
+  placeUnplaced(nodes, known, shown)
+  const rootOf = (id: string): C4Node => {
+    let n = nodes[id]
+    while (n.parentId && nodes[n.parentId]) n = nodes[n.parentId]
+    return n
+  }
+  const parents = new Set(Object.values(nodes).filter((n) => n.parentId).map((n) => n.parentId!))
+  const box = (n: C4Node) => ({ x: n.x, y: n.y, ...drawnSize(n, parents.has(n.id)) })
+  for (const id of added) {
+    const node = nodes[id]
+    if (!node || node.parentId || (shown && !shown.has(id))) continue
+    const ends = Object.values(relations)
+      .map((r) => (r.sourceId === id ? r.targetId : r.targetId === id ? r.sourceId : null))
+      .filter((other): other is string => !!other && !!nodes[other] && !fresh.has(other) && (!shown || shown.has(other)))
+      .map((other) => box(rootOf(other)))
+    if (!ends.length) continue
+    const centre = {
+      x: ends.reduce((sum, b) => sum + b.x + b.width / 2, 0) / ends.length,
+      y: ends.reduce((sum, b) => sum + b.y + b.height / 2, 0) / ends.length,
+    }
+    const taken = Object.values(nodes).filter((n) => !n.parentId && n.id !== id && (!shown || shown.has(n.id))).map(box)
+    const at = freeSpotNear(taken, drawnSize(node, parents.has(id)), centre)
+    node.x = at.x
+    node.y = at.y
+  }
 }
 
 /** Apply a positions map onto c4Nodes (mutates in-place, use inside immer set) */
@@ -4724,6 +4765,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const target = layoutTarget(get())
+          const present = new Set(Object.keys(get().c4Nodes))
           const result = await runSmartLayout(input.nodes, input.relations, get().metamodel as Metamodel | undefined, (progress) => {
             set((s) => { s.smartLayoutProgress = progress })
           }, { alignments: input.alignments, edgeStyle: model.edgeStyleOf(get(), get().activeViewId) })
@@ -4746,6 +4788,12 @@ export const useDiagramStore = create<DiagramStore>()(
             applyLayoutPositions(state.c4Nodes, result.winner.positions, input)
             unpinLaidOut(state, get().appMode)
           })
+          // Added while the layout ran: its drop point was a place in the
+          // layout this one replaces (893 px from anything on 300
+          // elements). It is placed as a new element here, in the layout's
+          // undo step (D11).
+          const added = Object.keys(get().c4Nodes).filter((id) => !present.has(id))
+          if (added.length) set((state) => { placeAddedDuringLayout(state, added) })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level (same as ELK/Radical paths).
