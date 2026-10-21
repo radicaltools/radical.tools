@@ -812,8 +812,11 @@ const KNOWN: Known[] = [
     // is still in Container 1.1): on that view it is drawn exactly on
     // Component 1.1.2 (both at 359.3, 809.3).
     rule: 'geometry',
-    match: (t, v) => /^on (?!live\|)/.test(v.detail) && t.some((a) => a.a === 'reparent' || (a.a === 'agent' && a.kind === 'move')),
-    note: 'K18: in a milestone, an element moved since is drawn on a view by its place in its new parent, onto a sibling (new)',
+    // The same for a fold: Container 0.0 folded on live, a Components view
+    // laid out, Early opened (there it is open): it is drawn 760 wide at
+    // (30, 120), over Container 0.1 and 0.2.
+    match: (t, v) => /^on (?!live\|)/.test(v.detail) && t.some((a) => a.a === 'reparent' || a.a === 'collapse' || (a.a === 'agent' && a.kind === 'move')),
+    note: 'K18: in a milestone, an element moved or folded since on live is drawn on a view by the live layout, onto its siblings (new)',
   },
   {
     // A queue dropped into Payment Provider, not saved yet, while the agent
@@ -834,6 +837,15 @@ const KNOWN: Known[] = [
     rule: 'nothingMovesByItself',
     match: (_t, v) => v.detail.includes('still moving'),
     note: 'K20: after an add on the sample\'s All elements the live physics never comes to rest (new)',
+  },
+  {
+    // Sample: milestone v1 opened, Web Banking deleted there, Propagate:
+    // the live model loses Web Banking and its relations, but the live
+    // sequence Payment Processing keeps steps 1 and 2 (r-cust-web,
+    // r-web-apigw), saved so.
+    rule: 'references',
+    match: (t, v) => t.some((a) => a.a === 'propagate') && /names missing relation/.test(v.detail),
+    note: 'K21: Propagate of a delete leaves the live sequences\' steps of the relations it deletes (new)',
   },
 ]
 
@@ -1649,6 +1661,6 @@ describe('the rules hold over random sequences of actions', () => {
         if (!(e instanceof RuleBroken)) break
         surveySkip.add(signature(e.violation, e.actions))
       }
-    }, 3_600_000)
+    }, RUNS ? 24 * 3_600_000 : 600_000)
   }
 })
