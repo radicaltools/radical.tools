@@ -93,6 +93,8 @@ test('a model file that does not parse, or is gone, is named and left as it is',
   await studio.ready()
   await expect(studio.row('customer')).toBeVisible()
 
+  // Deleted outside Studio once its saves are done, then opened again.
+  await page.waitForTimeout(1500)
   await file.remove()
   await page.reload()
   await expect(toasts).toContainText('model.radical cannot be read (it is not there')
