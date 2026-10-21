@@ -47,6 +47,9 @@ test('a row on a canvas of the whole model holds through a drag, Smart Layout an
     last = now
     return still
   }, { intervals: [200], timeout: 20_000 }).toBe(true)
+  // Where it came to rest can lie under the left panel's edge: fit it in.
+  await page.getByRole('button', { name: 'Fit All' }).click()
+  await studio.settle()
   await studio.node('customer').click()
   await expect(page.getByTestId('alignment-guides').locator('line').first()).toBeAttached()
   // The properties card lies over the canvas's right side, where Payment Provider may be.
