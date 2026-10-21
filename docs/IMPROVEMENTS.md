@@ -4138,15 +4138,18 @@ below 0.25).
 
 **Found by the invariant fuzzer, 2026-10-21, on fix/exploratory-runs-65-69** (`packages/ui/tests/invariants.test.ts`, ADR "Rules checked as invariants"): random action sequences on the bookstore, the sample and a nested model, the rules checked after every step; 22 distinct violations in about 140 000 steps, each reproduced by a plain test that fails, all listed in the test's KNOWN (K1 is the leftover of item 1 and of "Calm drags and pins" item 2, not repeated). Not checked in the browser. Siblings again: 252 after 234, 254 after 127, 257 after 230, 262 after 36, 251 after the fix of "Calm drags and pins" item 3.
 
-247. **A container the physics framed is framed anew on a reload.**
+247. ~~**A container the physics framed is framed anew on a reload.**~~
      Bookstore: a container dropped into Payment Provider, then Payment
      Provider and Bookstore kept in a row; read again, Bookstore's frame
      moves top 333.5 → 273.8, left −42.1 → −12.3, width 980 → 920, children
      unmoved. Nested: Container 0.0 saved (84, 84) 696 × 376 comes back (30,
      120) 624 × 404. Most frequent (113× in a nested round). Guess: physics
      keeps 60 px over children, load refits with 120 (leftover of item 1).
-248. **A move or an add leaves other views without a place for the element;
-     opening one moves its neighbours.** Payment Provider moved into
+     Fixed 2026-10-21: A row or column through containers holds as drawn
+     after the physics runs, a drop, a fold, a delete or a hide, so a reload
+     no longer snaps it and refits every container.
+248. ~~**A move or an add leaves other views without a place for the element;
+     opening one moves its neighbours.**~~ Payment Provider moved into
      Bookstore on All elements, Containers opened: Customer moves (−179,
      −82), Bookstore 860 → 1360. Delete Orders DB, move API into Payment
      Provider: on Containers Payment Provider 360 × 350 overlaps Bookstore
@@ -4155,81 +4158,202 @@ below 0.25).
      210. System-context view: System 0 into System 1 grows System 1 280 ×
      180 → 360 × 330 over Operator. Guess: placing on every canvas skips
      views that draw through a filter chain.
-249. **An element dropped where there is no room stays over its
-     neighbours.** Person dropped at (359.6, 179.8) ends (284.6, 101) on
+     Fixed 2026-10-21: An element added or moved into another parent gets
+     its place at once on every view laid out before that draws it
+     (filter-chain and viewpoint views too), inside its parent beside its
+     siblings with room made, so opening such a view later moves nothing;
+     and a parent the canvas drew empty grows from its drawn size and makes
+     room, instead of growing over its neighbour.
+249. ~~**An element dropped where there is no room stays over its
+     neighbours.**~~ Person dropped at (359.6, 179.8) ends (284.6, 101) on
      Customer and Bookstore; group at (310, 136) 55 px over Customer. 390×
      in 2000 sample runs.
-250. **A container drawn without its children is shifted by its next
-     rebuild.** API (model 300 × 200, drawn 240 × 160) dragged 81 px: drawn
+     Fixed 2026-10-21: An element you add stays where you drop it, and what
+     it covers, or what the container it grew covers, is pushed just clear,
+     pinned elements too; nothing else moves (decided 2026-10-21). An add
+     into a container inside a pinned one pushes what the grown container
+     covers clear.
+250. ~~**A container drawn without its children is shifted by its next
+     rebuild.**~~ API (model 300 × 200, drawn 240 × 160) dragged 81 px: drawn
      x 371, saved 401; a fold draws it 30 right 20 lower, 1 px over Orders
      DB. Filter-chain view: fold Container 2.0 (1000 × 280) jumps (380, 60)
      onto 2.1. Viewpoint view: fold Container 0.2 grows System 0 681 → 1061
      over System 2. Row with API: drag Bookstore 1 px moves Orders DB 55 px
      out of Bookstore. Guess: toggleCollapse shifts by half (model −
      collapsed size) even when already drawn collapsed.
-251. **A calm drop onto an element of the same row leaves them
-     overlapping.** API and Orders DB in a row, API dragged 196 px right: 56
+     Fixed 2026-10-21: Folding a container that is drawn without its
+     children moves nothing, and rebuilding the layout no longer spreads a
+     row's members unseen, so a later drag no longer shows them out of their
+     container.
+251. ~~**A calm drop onto an element of the same row leaves them
+     overlapping.**~~ API and Orders DB in a row, API dragged 196 px right: 56
      px overlap, also after a view switch.
-252. **A merge keeps an alignment, a fold or a view list entry of an element
-     the other side deleted.** Row API–Orders DB, fold of API, or Element
+     Fixed 2026-10-21: A calm drop onto a member of the same row pushes that
+     member along the row, clear of the dropped one.
+252. ~~**A merge keeps an alignment, a fold or a view list entry of an element
+     the other side deleted.**~~ Row API–Orders DB, fold of API, or Element
      Table list, unsaved, agent deletes API or Bookstore: merge keeps the
      row, `collapsedNodeIds: ["api"]`, list entries. Sibling of item 234.
-253. **Smart Layout logs ELK errors for a relation to an element's own
-     container.** API moved into Payment Provider: 11 "[ELK] Layout error …
+     Fixed 2026-10-21: A merge takes out of the views and layout rules what
+     one side gave an element, relation or sequence the other side deleted
+     (a row, a pin, a fold, a list entry, a hidden relation, a flow's
+     sequence); a view's places stay.
+253. ~~**Smart Layout logs ELK errors for a relation to an element's own
+     container.**~~ API moved into Payment Provider: 11 "[ELK] Layout error …
      UnsupportedGraphException"; applied anyway.
-254. **Undo after an outside change brings back a step whose relation it
-     drops.** Delete "browses and orders", agent deletes Bookstore, Undo:
+     Fixed 2026-10-21: Smart Layout leaves a relation between an element and
+     its own container out of ELK's graph, so it logs no error and the ELK
+     candidates take part again.
+254. ~~**Undo after an outside change brings back a step whose relation it
+     drops.**~~ Delete "browses and orders", agent deletes Bookstore, Undo:
      relations [], Place Order steps ["r1"]. Guess: _withoutStrays does not
      clean sequences. Sibling of 127/234.
-255. **Keeping elements already in a row in a row moves their container away
-     from them.** Nested Component 0.0.0–0.0.2: System 0 2440 → 3040, moves
+     Fixed 2026-10-21: Undo or Redo after an outside change brings back no
+     sequence step, row, fold, view entry or hidden relation of what it
+     leaves out or what was deleted outside Studio.
+255. ~~**Keeping elements already in a row in a row moves their container away
+     from them.**~~ Nested Component 0.0.0–0.0.2: System 0 2440 → 3040, moves
      814 left, Component 0.0.2 40 px outside Container 0.0. Row in a
      milestone, Propagate, reload: Container 0.0 at x −703, components at
      80–760.
-256. **An add on the sample's All elements moves unrelated elements and
-     breaks containment.** Component into Fraud Detection: 43 elements move;
+     Fixed 2026-10-21: Keeping elements in a row or column puts them on the
+     line and pushes only what they then cover; elements already on a line
+     stay where they are, with their container, also after a reload.
+256. ~~**An add on the sample's All elements moves unrelated elements and
+     breaks containment.**~~ Component into Fraud Detection: 43 elements move;
      Validate (270, 5696) → (−289, 5887), 220 → 556 wide; child Screen for
      fraud stays outside at (290, 5856).
-257. **An element added in a milestone is listed in the live view.**
+     Fixed 2026-10-21: An add moves nothing but what the new element, or the
+     container it grew, covers.
+257. ~~**An element added in a milestone is listed in the live view.**~~
      Context, milestone Early, group dropped: saved live Context lists its
      id, also after Discard. Sibling of 230.
-258. **Propagate throws after an agent write while a milestone is shown.**
+     Fixed 2026-10-21: An element added on a view while a milestone is shown
+     is listed only in the view shown; the saved live view does not list it,
+     Discard takes it out and Propagate keeps it. The same holds for a
+     sequence deleted, and for a flow view made from a sequence of the
+     milestone.
+258. ~~**Propagate throws after an agent write while a milestone is shown.**~~
      "Cannot perform 'ownKeys' on a proxy that has been revoked" in
      propagatedHubTemplates (diagramStore.ts:945).
-259. **Folding a system an agent added throws on a view that does not draw
-     it.** "reading 'x'" in makeRoomAround (geometry.ts:329). UI
+     Fixed 2026-10-21: Propagate after an agent's write was reloaded with a
+     milestone shown carries the edits into the live model instead of
+     throwing.
+259. ~~**Folding a system an agent added throws on a view that does not draw
+     it.**~~ "reading 'x'" in makeRoomAround (geometry.ts:329). UI
      reachability unchecked.
-260. **Undo or Redo in a milestone strips a view of its element.** Views of
+     Fixed 2026-10-21: Folding or opening an element the view shown does not
+     draw (an agent's new system, folded by the assistant or from search)
+     only changes the view's fold and moves nothing.
+260. ~~**Undo or Redo in a milestone strips a view of its element.**~~ Views of
      "System › containers", Early (no System 2), delete Customer, Undo: view
      of System 2 loses subject and within filter, saved live too. Redo of
      delete of API in a milestone same.
-261. **After an agent deletes a child, the next local layout breaks an
-     unrelated container.** Agent deletes Component 1.0.0; fold Container
+     Fixed 2026-10-21: Undo and Redo in a milestone leave a view of one
+     element its element and its filter, also when the milestone lacks that
+     element or deleted it.
+261. ~~**After an agent deletes a child, the next local layout breaks an
+     unrelated container.**~~ Agent deletes Component 1.0.0; fold Container
      2.2; move 2.2.0 into 0.1: System 1 moves (−325, −476), Container 1.0
      520 × 280 → 300 × 260, Component 1.0.1 50 px outside.
-262. **Undo in a milestone after an agent's write takes part of the write
-     back in the live views.** Agent moves Web App into another system;
+     Fixed 2026-10-21: An element the store moved or refitted keeps that
+     place when the physics next runs, inside its container.
+262. ~~**Undo in a milestone after an agent's write takes part of the write
+     back in the live views.**~~ Agent moves Web App into another system;
      group added in milestone; Undo: live Containers has Web App at (30,
      120) again. Sibling of item 36.
-263. **In a milestone, an element moved or folded on live since is drawn
-     onto its sibling.** Component 1.1.1 moved into Container 2.0,
+     Fixed 2026-10-21: Undo and Redo in a milestone after an agent's write
+     take back only the user's steps; the views stay as the agent left them.
+263. ~~**In a milestone, an element moved or folded on live since is drawn
+     onto its sibling.**~~ Component 1.1.1 moved into Container 2.0,
      Components view laid out, Early opened: 1.1.1 drawn on 1.1.2 at (359.3,
      809.3). Container 0.0 folded on live: in Early drawn 760 wide over 0.1
      and 0.2.
-264. **A merge puts Studio's and the agent's placements on top of each
-     other.** Queue dropped into Payment Provider (unsaved) while agent
+     Fixed 2026-10-21: In a milestone, an element that has another parent
+     there than on live, or is open there but folded on live, is drawn
+     beside its siblings in its parent (as an added element is) instead of
+     at the view's shared place, and the view's layout is not changed
+     (decided 2026-10-21).
+264. ~~**A merge puts Studio's and the agent's placements on top of each
+     other.**~~ Queue dropped into Payment Provider (unsaved) while agent
      moves Orders DB into it: both at (1140, 464.8).
-265. **The live physics can go on moving for good.** Sample: Auth Service
+     Fixed 2026-10-21: Where an element the agent placed lands on one placed
+     in Studio (a merge of unsaved edits, or Undo after the agent's write),
+     it goes beside it in its container, and one the agent grew gets room
+     made round it.
+265. ~~**The live physics can go on moving for good.**~~ Sample: Auth Service
      folded, component dropped into Accounts Service: after 2500 frames 19
      elements still move, ADR-000 at 21 px/s.
-266. **Propagate of a delete leaves live sequence steps of the deleted
-     relations.** Sample v1: Web Banking deleted, Propagate: Payment
+     Fixed 2026-10-21: The live physics stops at the latest 8 seconds after
+     it starts (4 with a row or column of containers) and the diagram stands
+     as it is then.
+266. ~~**Propagate of a delete leaves live sequence steps of the deleted
+     relations.**~~ Sample v1: Web Banking deleted, Propagate: Payment
      Processing keeps r-cust-web, r-web-apigw.
-267. **An expand on a view that does not draw the children leaves seeds that
-     move them later.** Container 2.1 folded/unfolded on Systems and
+     Fixed 2026-10-21: Propagate of a delete takes out the steps of the
+     later milestones' and the live sequences that went through the deleted
+     relations, with their notes.
+267. ~~**An expand on a view that does not draw the children leaves seeds that
+     move them later.**~~ Container 2.1 folded/unfolded on Systems and
      containers, then drag Component 0.0.1 on All elements: Component 2.1.0
      jumps (140, 60) out of 2.1, also after reload. Guess: forget() does not
      clear seedPositions.
+     Fixed 2026-10-21: Unfolding a container on a view that does not draw
+     its children leaves nothing in the physics, so its children no longer
+     jump later on another canvas or after a reload.
+
+**Found by the invariant fuzzer while its findings were fixed, 2026-10-21:** with the fuzzer's earlier entries removed and the physics now coming to rest, it reached further. Each is a KNOWN entry of `packages/ui/tests/invariants.test.ts` (the name in brackets), all but K23 seen on the code before the fixes too.
+
+268. **A child an add left outside its parent is placed afresh on a reload,
+     and what is near it moves.** The reload side of item 256: a stray child
+     from before that fix is placed beside its siblings on load (Core
+     Banking 1802 → 1706 px high, Customer (550, 0) → (450, 30) on the
+     sample). (K23)
+269. **An element added in a milestone and propagated has no place on the
+     live view it was added on.** A reload places it. Sibling of item 257.
+     (K24)
+270. **A row or column of a container and another element is not held when
+     the physics stops.** A reload snaps it and refits every container. Next
+     to item 255. (K25)
+271. **A view of a viewpoint made while a milestone is shown is saved
+     without its views per element.** A reload makes them. (K26)
+272. **A drag of a container leaves a row or column through an element in it
+     off its line.** A reload snaps it. (K27)
+273. **Undo or Redo in a milestone after a view switch writes the
+     milestone's places into the live view.** Sibling of item 262. The same
+     as C2: Undo and Redo in a milestone after a view was first opened there
+     put the layout it was opened with into the live view. (K28)
+274. **After an agent's write the live model is framed otherwise than a
+     reload frames it.** With a milestone shown or not. (K29)
+275. **A row or column made in a milestone and propagated does not hold in
+     the live model.** A reload snaps it. Next to item 255. (K30)
+276. **An add of an element the view shown does not draw grows its parent
+     there, off a row or column.** A reload snaps it. Next to item 248.
+     (K31)
+277. **A table view turned into a canvas draws containers over each other.**
+     Also after a move or an add (KB2). (K32)
+278. **Undo after an agent's write puts an element back under one the write
+     grew.** Next to items 261 and 262; KE1 is the same with Redo: an agent
+     adds into a system, Undo and Redo leave it grown over its neighbour.
+     (K33)
+279. **After a merge with unsaved edits, the next drag shows a container the
+     agent grew over its neighbour.** Next to item 264. KB1 is its other
+     side: a merge keeps the parent the agent's write refitted around the
+     folder's places and the children where Studio has moved them since, one
+     outside it. (K34)
+280. **A move into another parent, with a row elsewhere, leaves a child of a
+     neighbouring container outside it.** Nested model: Container 0.2 folded
+     and unfolded, Containers 1.0 and 1.1 in a row, Component 0.2.0 moved
+     into Container 0.0: the physics grows Container 0.0 and leaves
+     Component 0.1.0 56 px outside Container 0.1 (also C1). (KE2)
+281. **A move made where no canvas is shown, then All elements opened: a
+     group is framed short of its children.** Sample; not analysed. (KB3)
+
+Fixed 2026-10-21 with the items above: K1, the leftover of item 1 and of
+"Calm drags and pins" item 2 (an add into a container inside a pinned one
+now pushes what the grown container covers clear). Every fix has a test of
+its own, and its KNOWN entry is gone: the fuzzer checks the rule wherever it
+applies.
 
 ### Radical Forge over MCP (2026-10-07)
 
