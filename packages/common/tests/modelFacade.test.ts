@@ -202,20 +202,20 @@ describe('a move into another member of a row, column or grid', () => {
       defaultPositions: at,
       defaultLayoutConstraints: [grid],
     })
-    f.moveNodes(['s4'], 's2')
+    f.moveNodes!(['s4'], 's2')
     expect(f.lastError ?? '').toBe('')
     expect(f.getNodes().s4.parentId).toBe('s2')
-    expect(f.getLayoutConstraints('v1')).toEqual([{ ...grid, nodeIds: ['s1', 's2', 's3'] }, pin])
+    expect(f.getLayoutConstraints!('v1')).toEqual([{ ...grid, nodeIds: ['s1', 's2', 's3'] }, pin])
     // A row left with one member goes.
-    expect(f.getLayoutConstraints('v2')).toEqual([])
-    expect(f.getLayoutConstraints(null)).toEqual([{ ...grid, nodeIds: ['s1', 's2', 's3'] }])
+    expect(f.getLayoutConstraints!('v2')).toEqual([])
+    expect(f.getLayoutConstraints!(null)).toEqual([{ ...grid, nodeIds: ['s1', 's2', 's3'] }])
   })
 
   it('keeps it in an alignment with its new siblings', () => {
     const nodes = [box('s1', 0, 0), box('s2', 400, 0), { ...box('c', 30, 120), parentId: 's1' } as C4Node]
     const line = { id: 'l', type: 'align' as const, axis: 'vertical' as const, nodeIds: ['c', 's2'] }
     const f = createModelFacade({ nodes, relations: [], metamodel: BOXES, views: [{ id: 'v', name: 'V', nodeIds: [], positions: {}, layoutConstraints: [line] }] })
-    f.moveNodes(['c'], null)
-    expect(f.getLayoutConstraints('v')).toEqual([line])
+    f.moveNodes!(['c'], null)
+    expect(f.getLayoutConstraints!('v')).toEqual([line])
   })
 })
