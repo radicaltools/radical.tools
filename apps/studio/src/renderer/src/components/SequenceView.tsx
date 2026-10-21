@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { computeStepDiff, useDiagramStore } from '@radical/ui/store/diagramStore'
-import { NODE_COLORS, NODE_FG, TYPE_LABELS } from '@radical/common/c4'
+import { NODE_COLORS, NODE_FG, TYPE_LABELS, isBackwardStep } from '@radical/common/c4'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { keysTakenByDialog } from './dialogKeys'
 
@@ -22,8 +22,13 @@ const SELF_W       = 70    // width of self-call loop
 
 interface Step {
   relationId: string
+  /** Where the step starts and ends: the relation's ends, swapped for a
+   *  backward step. */
   sourceId:   string
   targetId:   string
+  /** Runs along the relation backward, as a response: drawn dashed (UML's
+   *  reply message). */
+  backward?:  boolean
   label:      string
   description?: string     // per-occurrence override (from stepDescriptions)
   index:      number       // 1-based step number
@@ -73,7 +78,7 @@ export function SequenceView(): React.ReactElement {
     // steps (computeStepDiff). Without one, as the canvas colours it.
     const baseSnap = effectiveDiffBaseId ? snapshots.find(s => s.id === effectiveDiffBaseId) : undefined
     const baseSeq  = baseSnap && view?.sequenceId
-      ? (baseSnap.sequences as any)?.[view.sequenceId] as { relationIds: string[]; stepDescriptions?: (string | undefined)[] } | undefined
+      ? (baseSnap.sequences as any)?.[view.sequenceId] as { relationIds: string[]; stepDescriptions?: (string | undefined)[]; stepBackward?: boolean[] } | undefined
       : undefined
     const stepDiff = baseSnap ? computeStepDiff(baseSeq, sequence) : null
     const stepKind = (rid: string, i: number): Step['diff'] => {
@@ -86,8 +91,12 @@ export function SequenceView(): React.ReactElement {
     sequence.relationIds.forEach((rid, i) => {
       const r = relations[rid] ?? effectiveGhostRelations[rid]
       if (!r) return
-      const src = nodes[r.sourceId] ?? effectiveGhostNodes[r.sourceId]
-      const tgt = nodes[r.targetId] ?? effectiveGhostNodes[r.targetId]
+      // A backward step (a response) runs from the relation's target.
+      const backward = isBackwardStep(sequence, i)
+      const from = backward ? r.targetId : r.sourceId
+      const to   = backward ? r.sourceId : r.targetId
+      const src = nodes[from] ?? effectiveGhostNodes[from]
+      const tgt = nodes[to] ?? effectiveGhostNodes[to]
       if (!src || !tgt) return
       if (!seen.has(src.id)) seen.set(src.id, src)
       if (!seen.has(tgt.id)) seen.set(tgt.id, tgt)
@@ -95,6 +104,7 @@ export function SequenceView(): React.ReactElement {
         relationId: rid,
         sourceId:   src.id,
         targetId:   tgt.id,
+        ...(backward ? { backward } : {}),
         label:      r.label || r.technology || '',
         description: sequence.stepDescriptions?.[i] || undefined,
         index:      i + 1,
@@ -108,8 +118,11 @@ export function SequenceView(): React.ReactElement {
         // Prefer live relation data (still in model) → ghost (model-deleted)
         const r = relations[rid] ?? effectiveGhostRelations[rid] ?? (baseSnap?.relations as any)?.[rid]
         if (!r) continue
-        const src = nodes[r.sourceId] ?? effectiveGhostNodes[r.sourceId] ?? (baseSnap?.nodes as any)?.[r.sourceId]
-        const tgt = nodes[r.targetId] ?? effectiveGhostNodes[r.targetId] ?? (baseSnap?.nodes as any)?.[r.targetId]
+        const backward = isBackwardStep(baseSeq, i)
+        const from = backward ? r.targetId : r.sourceId
+        const to   = backward ? r.sourceId : r.targetId
+        const src = nodes[from] ?? effectiveGhostNodes[from] ?? (baseSnap?.nodes as any)?.[from]
+        const tgt = nodes[to] ?? effectiveGhostNodes[to] ?? (baseSnap?.nodes as any)?.[to]
         if (!src || !tgt) continue
         if (!seen.has(src.id)) seen.set(src.id, src)
         if (!seen.has(tgt.id)) seen.set(tgt.id, tgt)
@@ -117,6 +130,7 @@ export function SequenceView(): React.ReactElement {
           relationId: rid,
           sourceId:   src.id,
           targetId:   tgt.id,
+          ...(backward ? { backward } : {}),
           label:      r.label || r.technology || '',
           description: baseSeq.stepDescriptions?.[i] || undefined,
           index:      i + 1,
@@ -412,7 +426,7 @@ export function SequenceView(): React.ReactElement {
           const diffColor = diffDk === 'new' ? '#4ade80' : diffDk === 'removed' ? '#f87171' : diffDk === 'changed' ? '#fb923c' : null
           const stroke = isSel ? '#ffd84d' : diffColor ?? (isHov ? 'var(--accent)' : 'currentColor')
           const sw     = isSel || diffColor ? 2 : isHov ? 1.6 : 1.2
-          const strokeDash = diffDk === 'removed' ? '6 4' : undefined
+          const strokeDash = diffDk === 'removed' ? '6 4' : s.backward ? '5 3' : undefined
           const stepOpacity = diffDk === 'removed' ? 0.65 : 1
           const marker = isSel ? 'url(#seq-arrow-hl)'
             : diffDk === 'new' ? 'url(#seq-arrow-new)'
@@ -431,6 +445,7 @@ export function SequenceView(): React.ReactElement {
               key={`step-${s.relationId}-${idx}`}
               className="seq-diagram-step"
               data-diff={diffDk}
+              data-backward={s.backward ? 'true' : undefined}
               style={{ cursor: 'pointer', opacity: stepOpacity }}
               onMouseEnter={() => setHoveredStep(idx)}
               onMouseLeave={() => setHoveredStep((h) => (h === idx ? null : h))}

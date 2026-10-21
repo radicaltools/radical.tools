@@ -87,7 +87,7 @@ import { documentBackend } from './documentBackend'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
 import { lowDetailAt } from './canvasDetail'
-import { type EdgeStyle, type ViewPipeline, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, withCanvasPositions } from '@radical/common/c4'
+import { type EdgeStyle, type ViewPipeline, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -1212,7 +1212,7 @@ function computeSeqDiff(
         if (result[rid]) continue                     // already 'new' or 'removed'
         const prevDesc = prevSeq.stepDescriptions?.[i] ?? ''
         const currDesc = currSeq.stepDescriptions?.[i] ?? ''
-        if (prevDesc !== currDesc) result[rid] = 'changed'
+        if (prevDesc !== currDesc || isBackwardStep(prevSeq, i) !== isBackwardStep(currSeq, i)) result[rid] = 'changed'
       }
     }
   }
@@ -1226,11 +1226,12 @@ function computeSeqDiff(
  * added, and a note changed on one coloured the other. The steps are
  * paired in order (longest common subsequence of relation ids): `steps[i]`
  * is 'new' for a step of `curr` with no pair, 'changed' for one whose note
- * changed; `removed` lists the steps of `prev` with no pair (their index).
+ * changed or that runs the other way; `removed` lists the steps of `prev`
+ * with no pair (their index).
  */
 export function computeStepDiff(
-  prev: Pick<DiagramSequence, 'relationIds' | 'stepDescriptions'> | undefined,
-  curr: Pick<DiagramSequence, 'relationIds' | 'stepDescriptions'>,
+  prev: Pick<DiagramSequence, 'relationIds' | 'stepDescriptions' | 'stepBackward'> | undefined,
+  curr: Pick<DiagramSequence, 'relationIds' | 'stepDescriptions' | 'stepBackward'>,
 ): { steps: Array<'new' | 'changed' | undefined>; removed: number[] } {
   const a = prev?.relationIds ?? []
   const b = curr.relationIds
@@ -1247,7 +1248,7 @@ export function computeStepDiff(
   let j = 0
   while (i < a.length && j < b.length) {
     if (a[i] === b[j]) {
-      steps[j] = (prev?.stepDescriptions?.[i] ?? '') !== (curr.stepDescriptions?.[j] ?? '') ? 'changed' : undefined
+      steps[j] = (prev?.stepDescriptions?.[i] ?? '') !== (curr.stepDescriptions?.[j] ?? '') || isBackwardStep(prev, i) !== isBackwardStep(curr, j) ? 'changed' : undefined
       i++
       j++
     } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
@@ -2293,6 +2294,9 @@ interface DiagramStore {
   clearSequence: (sequenceId: string) => void
   /** Set (or clear) the description for a specific step by index. */
   updateStepDescription: (sequenceId: string, idx: number, description: string) => void
+  /** Make the step at `idx` run along its relation backward, from the
+   *  relation's target to its source (a response), or forward again. */
+  setStepBackward: (sequenceId: string, idx: number, backward: boolean) => void
 
   // ── actions: React Flow sync ──
   onNodesChange: (changes: NodeChange[]) => void
@@ -3086,15 +3090,21 @@ export const useDiagramStore = create<DiagramStore>()(
           if (annotateSeq && annotateSeq.relationIds.length > 0) {
             // Build a map from relationId → all 1-based step indices (same
             // relation can appear multiple times in one sequence).
+            // A backward step (a response) is numbered apart, at the
+            // relation's target end, where it starts.
             const seqIndex = new Map<string, number[]>()
+            const backIndex = new Map<string, number[]>()
             annotateSeq.relationIds.forEach((id, i) => {
-              const arr = seqIndex.get(id)
+              const index = isBackwardStep(annotateSeq, i) ? backIndex : seqIndex
+              const arr = index.get(id)
               if (arr) arr.push(i + 1)
-              else seqIndex.set(id, [i + 1])
+              else index.set(id, [i + 1])
             })
             for (const edge of derivedEdges) {
               const steps = seqIndex.get(edge.id)
+              const back = backIndex.get(edge.id)
               if (steps !== undefined && edge.data) edge.data.sequenceStep = steps
+              if (back !== undefined && edge.data) edge.data.sequenceStepBack = back
             }
           }
           state.rfEdges = derivedEdges as any
@@ -4871,6 +4881,12 @@ export const useDiagramStore = create<DiagramStore>()(
           if (!seq) return
           seq.relationIds.splice(idx, 1)
           if (seq.stepDescriptions) seq.stepDescriptions.splice(idx, 1)
+          if (seq.stepBackward) {
+            seq.stepBackward.splice(idx, 1)
+            const back = trimStepBackward(seq.stepBackward)
+            if (back) seq.stepBackward = back
+            else delete seq.stepBackward
+          }
         })
         get()._markMilestoneEdit()
         get()._sync()
@@ -4896,6 +4912,15 @@ export const useDiagramStore = create<DiagramStore>()(
             notes.splice(toIdx, 0, desc)
             while (notes.length > 0 && notes[notes.length - 1] === undefined) notes.pop()
           }
+          if (seq.stepBackward) {
+            // Each step keeps its way, as its note.
+            const ways = arr.map((_, i) => isBackwardStep(seq, i))
+            const [way] = ways.splice(fromIdx, 1)
+            ways.splice(toIdx, 0, way)
+            const back = trimStepBackward(ways)
+            if (back) seq.stepBackward = back
+            else delete seq.stepBackward
+          }
         })
         get()._markMilestoneEdit()
         get()._sync()
@@ -4909,6 +4934,7 @@ export const useDiagramStore = create<DiagramStore>()(
           if (!seq) return
           seq.relationIds = []
           seq.stepDescriptions = []
+          delete seq.stepBackward
         })
         get()._markMilestoneEdit()
         get()._sync()
@@ -4928,6 +4954,23 @@ export const useDiagramStore = create<DiagramStore>()(
           // Pad with undefined if necessary
           while (seq.stepDescriptions.length <= idx) seq.stepDescriptions.push(undefined)
           seq.stepDescriptions[idx] = description || undefined
+        })
+        get()._markMilestoneEdit()
+        get()._sync()
+      },
+
+      setStepBackward(sequenceId, idx, backward) {
+        const current = get().sequences[sequenceId]
+        if (!current || idx < 0 || idx >= current.relationIds.length) return
+        if (isBackwardStep(current, idx) === backward) return
+        get()._pushUndo()
+        set((state) => {
+          const seq = state.sequences[sequenceId]
+          if (!seq) return
+          const ways = seq.relationIds.map((_, i) => (i === idx ? backward : isBackwardStep(seq, i)))
+          const back = trimStepBackward(ways)
+          if (back) seq.stepBackward = back
+          else delete seq.stepBackward
         })
         get()._markMilestoneEdit()
         get()._sync()
@@ -6013,7 +6056,7 @@ export const useDiagramStore = create<DiagramStore>()(
               if (k === 'id') continue
               const a = (before as any)[k], b = (after as any)[k]
               if (a === b || JSON.stringify(a) === JSON.stringify(b)) continue
-              if (k === 'relationIds' || k === 'stepDescriptions') steps = true
+              if (k === 'relationIds' || k === 'stepDescriptions' || k === 'stepBackward') steps = true
               else (updates as any)[k] = b
             }
             if (steps || Object.keys(updates).length > 0) updatedSeqs.push({ id, updates, ...(steps ? { steps: { before, after } } : {}) })
@@ -6081,6 +6124,8 @@ export const useDiagramStore = create<DiagramStore>()(
             target.relationIds = merged.relationIds
             if (merged.stepDescriptions) target.stepDescriptions = merged.stepDescriptions
             else delete target.stepDescriptions
+            if (merged.stepBackward) target.stepBackward = merged.stepBackward
+            else delete target.stepBackward
           }
           for (const id of removedSeqIds) delete targetSeqs[id]
         }
