@@ -2917,21 +2917,25 @@ export const useDiagramStore = create<DiagramStore>()(
                 cur = p
               }
 
-              // Grow around the collapsed box's centre: the children's
-              // bounds (which the group's box is drawn around) are centred
-              // on it. From the box's top-left corner the group ran right
-              // and down, and pushed the diagram below and beside it away.
-              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-              for (const c of children) {
-                if (Math.abs(c.x) < 1 && Math.abs(c.y) < 1) continue // placed below
-                const w = c.collapsed ? COLLAPSED_WIDTH[c.type] : (c.width ?? 0)
-                const h = c.collapsed ? COLLAPSED_HEIGHT[c.type] : (c.height ?? 0)
-                minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x + w)
-                minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y + h)
-              }
-              if (minX <= maxX) {
-                const dx = COLLAPSED_WIDTH[parent.type] / 2 - (minX + maxX) / 2
-                const dy = COLLAPSED_HEIGHT[parent.type] / 2 - (minY + maxY) / 2
+              // Grow around the collapsed box's centre: the frame the
+              // children open to (the one fitParentToChildren gives them,
+              // header and margins included) is centred on it, the reverse
+              // of a collapse, which shrinks to the frame's centre. From
+              // the box's top-left corner the group ran right and down, and
+              // pushed the diagram below and beside it away; centring the
+              // children's bounds instead (lower than the frame's middle by
+              // the header) walked the frame up on every cycle.
+              const shownView = activeViewId ? get().views[activeViewId] : undefined
+              const shownHere = shownView ? computeViewNodeSet(shownView as any, allNodes, get().c4Relations) : undefined
+              const placedKids = children.filter((c) => (!shownHere || shownHere.has(c.id)) && (Math.abs(c.x) >= 1 || Math.abs(c.y) >= 1)) // the rest placed below
+              if (placedKids.length > 0) {
+                const frame = fittedParentSize(parent, placedKids.map((c) => ({
+                  x: c.x, y: c.y,
+                  width: c.collapsed ? COLLAPSED_WIDTH[c.type] : (c.width ?? 0),
+                  height: c.collapsed ? COLLAPSED_HEIGHT[c.type] : (c.height ?? 0),
+                })))
+                const dx = COLLAPSED_WIDTH[parent.type] / 2 - frame.width / 2
+                const dy = COLLAPSED_HEIGHT[parent.type] / 2 - frame.height / 2
                 set((state) => {
                   const p = state.c4Nodes[id]
                   if (p) { p.x += dx; p.y += dy }

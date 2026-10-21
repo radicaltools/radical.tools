@@ -139,3 +139,37 @@ describe('a container collapsed and expanded again in a view', () => {
     expect(violations()).toEqual([])
   })
 })
+
+describe('a container collapsed and expanded again, over and over', () => {
+  /** A system holding two containers side by side, the left one with
+   *  components laid out as fitParentToChildren leaves them. */
+  const nested = (): DiagramData => ({
+    nodes: [
+      { id: 'sys', type: 'system', label: 'Platform', x: 0, y: 0, width: 1200, height: 690, collapsed: false },
+      { id: 'a', type: 'container', label: 'Services', parentId: 'sys', x: 40, y: 120, width: 570, height: 450, collapsed: false },
+      { id: 'a1', type: 'component', label: 'One', parentId: 'a', x: 20, y: 120, width: 220, height: 140, collapsed: false },
+      { id: 'a2', type: 'component', label: 'Two', parentId: 'a', x: 330, y: 120, width: 220, height: 140, collapsed: false },
+      { id: 'a3', type: 'component', label: 'Three', parentId: 'a', x: 20, y: 290, width: 220, height: 140, collapsed: false },
+      { id: 'b', type: 'container', label: 'Store', parentId: 'sys', x: 700, y: 120, width: 440, height: 300, collapsed: false },
+      { id: 'b1', type: 'component', label: 'Four', parentId: 'b', x: 20, y: 120, width: 220, height: 140, collapsed: false },
+    ] as C4Node[],
+    relations: [],
+    views: [{ id: 'v', name: 'Core', nodeIds: ['sys', 'a', 'a1', 'a2', 'a3', 'b', 'b1'], positions: {} }],
+  })
+
+  it('comes back where it was each time (item 169)', () => {
+    s().loadDiagram(nested())
+    s().setActiveView('v')
+    const start = drawn()
+    for (let cycle = 0; cycle < 4; cycle++) {
+      s().toggleCollapse('a')
+      s().toggleCollapse('a')
+    }
+    const end = drawn()
+    for (const id of ['sys', 'a', 'a1', 'b']) {
+      expect(Math.round(end[id].x - start[id].x), id).toBe(0)
+      expect(Math.round(end[id].y - start[id].y), id).toBe(0)
+    }
+    expect(violations()).toEqual([])
+  })
+})
