@@ -88,6 +88,15 @@ describe('mergeModels', () => {
     expect(merged.views![0].positions).toEqual({ shop: { x: 99, y: 10, width: 200, height: 100 }, bank: { x: 300, y: 0, width: 200, height: 100 } })
   })
 
+  it('takes a coordinate moved by less than a pixel for one nobody moved (item 165)', () => {
+    const ours = clone(base)
+    ours.views![0].positions = { shop: { x: 300, y: 400, width: 200, height: 100 } }
+    const theirs = clone(base)
+    theirs.views![0].positions = { shop: { x: 0, y: 0.04, width: 200, height: 100 } }
+    expect(mergeModels(base, ours, theirs).merged.views![0].positions).toEqual(ours.views![0].positions)
+    expect(mergeModels(base, theirs, ours).merged.views![0].positions).toEqual(ours.views![0].positions)
+  })
+
   it('takes the other side whole when only one changed', () => {
     const theirs = clone(base)
     theirs.nodes[0].label = 'Bookshop'

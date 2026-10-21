@@ -69,6 +69,10 @@ function same(a: unknown, b: unknown): boolean {
   return ka.length === keys(b).length && ka.every((k) => same(a[k], b[k]))
 }
 
+/** Two layout numbers less than a pixel apart. */
+const nudged = (a: unknown, b: unknown): boolean =>
+  typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) < 0.5
+
 /** Two entries that differ in their layout only (LAYOUT_KEYS). */
 function sameApartFromLayout(a: unknown, b: unknown): boolean {
   if (!isPlain(a) || !isPlain(b)) return false
@@ -95,6 +99,12 @@ function merge3(base: unknown, ours: unknown, theirs: unknown, where: string[], 
   if (same(ours, base)) return theirs
   if (same(theirs, base)) return ours
   if (same(ours, theirs)) return ours
+  // A coordinate or size moved by less than a pixel on one side was moved by
+  // nobody: the physics settled, or a row was enforced again on a reload.
+  // Taken as a change, it kept Undo of "Keep in a row" from putting the row
+  // back (the members went back sideways only).
+  if (layout && nudged(theirs, base)) return ours
+  if (layout && nudged(ours, base)) return theirs
   // An array of entries with ids on either side merges by id.
   const arrays = [base, ours, theirs].filter((v) => v !== undefined)
   if (arrays.every((v) => Array.isArray(v)) && arrays.some(byIdArray) && arrays.every((v) => (v as unknown[]).length === 0 || byIdArray(v))) {
