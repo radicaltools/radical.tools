@@ -446,9 +446,9 @@ let _typing: { key: string; step: HistoryItem | null } | null = null
 
 /** The undo step of an edit of `key` ("node:<id>:label"), unless it goes on
  *  what is being typed into a focused field (_typing). */
-function _pushTextEdit(state: DiagramStore, key: string): void {
+function _pushTextEdit(store: DiagramStore, key: string): void {
   if (_typing && _typing.key === key && _typing.step && _undoStack[_undoStack.length - 1] === _typing.step) return
-  _pushUndo(state)
+  store._pushUndo()
   if (_typing) _typing = { key, step: _undoStack[_undoStack.length - 1] ?? null }
 }
 

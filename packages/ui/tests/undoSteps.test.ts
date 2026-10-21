@@ -513,12 +513,16 @@ describe('typing into a text field is one undo step (item 158)', () => {
   }
 
   it('a name typed letter by letter is taken back at once', () => {
+    s().undo()
+    expect(s().canUndo).toBe(false)
     s().beginTyping()
     type('Card Gateway', (v) => s().updateNode('bank', { label: v }))
     s().endTyping()
     expect(s().c4Nodes.bank.label).toBe('Card Gateway')
+    expect(s().canUndo).toBe(true)
     s().undo()
     expect(s().c4Nodes.bank.label).toBe('bank')
+    expect(s().canUndo).toBe(false)
     s().redo()
     expect(s().c4Nodes.bank.label).toBe('Card Gateway')
   })
