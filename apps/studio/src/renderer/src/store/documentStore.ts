@@ -20,6 +20,7 @@ import {
   type FolderFiles,
 } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
+import type { MergeDrop } from '@radical/common/modelMerge'
 import { agentWritingUntil, parseAgentActivity, type AgentActivity } from '@radical/common/formats/agentActivity'
 import {
   webFolderSupported,
@@ -85,11 +86,18 @@ const externalChangeListeners = new Map<string, () => void>()
 const routedHosts = new WeakSet<object>()
 
 /** Who to tell when a save was merged with an edit made outside Studio. */
-const mergedSaveListeners = new Set<(id: string, conflicts: string[]) => void>()
+const mergedSaveListeners = new Set<(id: string, merged: SaveMerge) => void>()
 
-function notifyMergedSave(id: string, merged: { conflicts: string[] } | undefined): void {
+/** What a save merged with an edit made outside Studio did (mergeModels). */
+export interface SaveMerge {
+  conflicts: string[]
+  dropped?: MergeDrop[]
+  restored?: string[]
+}
+
+function notifyMergedSave(id: string, merged: SaveMerge | undefined): void {
   if (!merged) return
-  for (const listener of [...mergedSaveListeners]) listener(id, merged.conflicts)
+  for (const listener of [...mergedSaveListeners]) listener(id, merged)
 }
 
 function notifyExternalChange(id: string): void {
@@ -742,8 +750,9 @@ export interface DocumentsAPI {
 
   /** Calls `listener` each time a save of an md-folder document was merged
    *  with an edit made outside Studio since the last read, with the values
-   *  both changed, where the folder's was kept. Returns the unsubscribe. */
-  onSaveMerged(listener: (id: string, conflicts: string[]) => void): () => void
+   *  both changed, where the folder's was kept, and the deletes that won
+   *  over an edit. Returns the unsubscribe. */
+  onSaveMerged(listener: (id: string, merged: SaveMerge) => void): () => void
 
   /** Until when (ms since the epoch) an agent writes an md-folder document's
    *  folder over MCP (agentActivity); 0 when none does, or for other

@@ -7,6 +7,7 @@ import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
 import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
 import { MD_FOLDER_FORMAT_VERSION, MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
+import { mergeNotices } from '@radical/common/modelMerge'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { modelChangesSince } from '@radical/node-files/gitModel'
@@ -569,8 +570,9 @@ export class FolderModel {
     const write = await session.write(next, mergeMdFolderFiles)
     if (!write.ok) return { ok: false, text: `The folder changed while this call ran and does not read as a model (${write.conflict.join(', ')}); no files written. Fix the file, then try again.` }
     await this.markAgentWriting()
+    const notices = write.merged ? mergeNotices(write.merged, { ours: 'by this call', theirs: 'in the folder meanwhile' }) : []
     const merged = write.merged
-      ? ` Merged with edits made in the folder while the call ran (${write.merged.changed.join(', ')})${write.merged.conflicts.length ? `; where both changed the same value the folder's was kept: ${write.merged.conflicts.join('; ')}. Check them with search_model` : ''}.`
+      ? ` Merged with edits made in the folder while the call ran (${write.merged.changed.join(', ')})${write.merged.conflicts.length ? `; where both changed the same value the folder's was kept: ${write.merged.conflicts.join('; ')}. Check them with search_model` : ''}${notices.length ? `; ${notices.join('; ')}` : ''}.`
       : ''
     const revision = createHash('sha256').update(paths.map((path) => `${path}\0${next[path] ?? ''}`).join('\0')).digest('hex').slice(0, 12)
     const createdRelation = changed.relations.find((relation) => !data.relations.some((old) => old.id === relation.id))?.id
