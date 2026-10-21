@@ -40,8 +40,8 @@ import {
   TYPE_LABELS,
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
-import { wikiDepthOf } from '@radical/common/c4'
-import { newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
+import { wikiDepthOf, type ViewSort } from '@radical/common/c4'
+import { newElementFilters, pipelineOf, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
@@ -413,6 +413,17 @@ export function WikiView(): React.ReactElement {
     setWikiFocus(view.id, id)
   }
 
+  // The page being read went (an Undo of Add child, an agent's delete):
+  // the Overview shows, and the address says so too (it kept /f/<gone>).
+  const readFocus = useRef<string | null>(null)
+  useEffect(() => {
+    if (focus) { readFocus.current = focus.id; return }
+    if (view && focusId && !glossary && readFocus.current === focusId) {
+      readFocus.current = null
+      setWikiFocus(view.id, null)
+    }
+  }, [focus, focusId, glossary, view, setWikiFocus])
+
   const typeOrder = useMemo(() => allNodeTypeIds(metamodel), [metamodel])
 
   // The one menu of the view, and the editors a menu opens in a page.
@@ -635,6 +646,7 @@ export function WikiView(): React.ReactElement {
         focusId={focusId}
         onSelect={goTo}
         typeMeta={typeMeta}
+        sort={pipelineOf(view)?.sort}
       />
       <div className="wiki-page">
         <div className="wiki-page-mode-toggle">
@@ -689,7 +701,7 @@ export function WikiView(): React.ReactElement {
             onDeleteRelation={deleteRelation}
             readOnly={readOnly}
             totalNodes={nodeList.length}
-            totalRelations={Object.keys(c4Relations).length}
+            totalRelations={wikiDocument.relationCount}
             typeMeta={typeMeta}
             pageMode={pageMode}
             remainingDepth={multiPageDepth}
@@ -747,6 +759,7 @@ function WikiNav({
   focusId,
   onSelect,
   typeMeta,
+  sort,
 }: {
   filter: string
   setFilter: (v: string) => void
@@ -759,6 +772,8 @@ function WikiNav({
   focusId: string | null
   onSelect: (id: string | null) => void
   typeMeta: TypeMeta
+  /** The view's order (its filter's Sort): the pages list in it. */
+  sort?: ViewSort
 }): React.ReactElement {
   const actions = useWikiActions()
   // What is open in the tree: a branch, by the id of its element, or a group
@@ -802,23 +817,29 @@ function WikiNav({
     const i = typeOrder.indexOf(type)
     return i < 0 ? typeOrder.length : i
   }
-  const byName = (a: C4Node, b: C4Node): number => a.label.localeCompare(b.label)
+  // In the view's order, by name when it has none (it stayed A–Z under a
+  // descending sort).
+  const ordered = (list: C4Node[]): C4Node[] => sortNodes(list, sort, { nodes, relations, metamodel })
 
   // The pages under `parentId`, as the articles list them: groups first,
   // under their own names, then the other elements under a row for each
   // type with its count. The rows are left out where they would only add a
   // level: under an element whose few children are all of one type.
-  const renderChildren = (parentId: string, depth: number): React.ReactNode[] => {
-    const kids = childrenOf[parentId] ?? []
-    const out: React.ReactNode[] = kids.filter((n) => n.type === GROUP_TYPE).sort(byName).map((n) => renderNode(n, depth))
+  // `above` holds the pages the branch is under: a chain whose relations
+  // loop (API › Orders DB › API…) leads back to them, and walking on
+  // overflowed the stack.
+  const renderChildren = (parentId: string, depth: number, above: ReadonlySet<string> = new Set()): React.ReactNode[] => {
+    const kids = (childrenOf[parentId] ?? []).filter((n) => !above.has(n.id))
+    const renderNode = (n: C4Node, d: number) => renderNodeUnder(n, d, above)
+    const out: React.ReactNode[] = ordered(kids.filter((n) => n.type === GROUP_TYPE)).map((n) => renderNode(n, depth))
     const typed = kids.filter((n) => n.type !== GROUP_TYPE)
     const types = [...new Set(typed.map((n) => n.type))].sort((a, b) => rank(a) - rank(b))
     const atRoot = parentId === NAV_ROOT
     if (!atRoot && types.length < 2 && typed.length <= NAV_PLAIN_LIST) {
-      return [...out, ...typed.sort(byName).map((n) => renderNode(n, depth))]
+      return [...out, ...ordered(typed).map((n) => renderNode(n, depth))]
     }
     for (const type of types) {
-      const items = typed.filter((n) => n.type === type).sort(byName)
+      const items = ordered(typed.filter((n) => n.type === type))
       const key = typeGroupKey(parentId, type)
       // A short list is open to begin with; a long one waits to be opened.
       const byDefault = atRoot || typed.length <= NAV_PLAIN_LIST
@@ -845,13 +866,14 @@ function WikiNav({
     return out
   }
 
-  const renderNode = (n: C4Node, depth: number): React.ReactNode => {
+  const renderNodeUnder = (n: C4Node, depth: number, above: ReadonlySet<string>): React.ReactNode => {
     const hit = hits.get(n.id)
     const matches = !lower || !!hit
-    const hasKids = (childrenOf[n.id]?.length ?? 0) > 0
+    const under = new Set(above).add(n.id)
+    const hasKids = (childrenOf[n.id] ?? []).some((c) => !under.has(c.id))
     // While searching, every branch with a match in it is shown open.
     const open = lower ? true : isOpen(n.id)
-    const childNodes = open && hasKids ? renderChildren(n.id, depth + 1) : []
+    const childNodes = open && hasKids ? renderChildren(n.id, depth + 1, under) : []
     if (lower && !matches && !childNodes.some(Boolean)) return null
     const meta = typeMeta(n.type)
     return (
@@ -1797,6 +1819,7 @@ function WikiElementPage({
   level = 1,
   chapterOf,
   remainingDepth = 1,
+  above = [],
 }: {
   node: C4Node
   nodes: Record<string, C4Node>
@@ -1825,6 +1848,10 @@ function WikiElementPage({
    *  node's own children as preview cards even in 'multi' mode (the depth
    *  budget is spent). Defaults to 1 for any caller that doesn't pass it. */
   remainingDepth?: number
+  /** The elements whose chapters this one is written in: a chain whose
+   *  relations loop leads back to them (API › Orders DB › API…), and they
+   *  are not written again under it. */
+  above?: string[]
 }): React.ReactElement {
   const embedded = level > 1
   const actions = useWikiActions()
@@ -2010,7 +2037,7 @@ function WikiElementPage({
       case 'children': {
         return (block.nodes.length > 0 || !readOnly) ? (
           <WikiChildren
-            parts={block.nodes}
+            parts={expandChildren ? block.nodes.filter((c) => c.id !== node.id && !above.includes(c.id)) : block.nodes}
             level={level + 1}
             idPrefix={headingId}
             nodes={nodes}
@@ -2038,6 +2065,7 @@ function WikiElementPage({
                 level={chapterLevel}
                 chapterOf={node.id}
                 remainingDepth={remainingDepth - 1}
+                above={[...above, node.id]}
               />
             ) : undefined}
           />
@@ -2883,9 +2911,19 @@ function InlineText({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
+  // The text the field was opened on (or last took from the model): while
+  // nothing is typed, a change from elsewhere (an agent's) comes into the
+  // field, and leaving it writes nothing. Committed as it was, the old text
+  // went back over the agent's edit.
+  const base = useRef(value)
 
   useEffect(() => {
-    if (!editing) setDraft(value)
+    if (!editing) { setDraft(value); base.current = value; return }
+    setDraft((cur) => {
+      if (cur !== base.current) return cur
+      base.current = value
+      return value
+    })
   }, [value, editing])
 
   useLayoutEffect(() => {
@@ -2900,7 +2938,7 @@ function InlineText({
 
   const commit = () => {
     setEditing(false)
-    if (draft !== value) onCommit(draft)
+    if (draft !== base.current && draft !== value) onCommit(draft)
   }
   const cancel = () => {
     setDraft(value)

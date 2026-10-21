@@ -1,4 +1,6 @@
-import { test, expect } from '../../support/fixtures'
+import { test, expect, fixture } from '../../support/fixtures'
+import { ModelFolder, test as folderTest } from '../../support/folder'
+import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 
 // The wiki view on the bundled Fintech sample: its Architecture Wiki (the C4
 // elements of the Core Banking Platform). A page reads as an article, the
@@ -254,4 +256,93 @@ test.describe('writing in the wiki', () => {
     await expect(offer.getByRole('button', { name: 'Components', exact: true })).toHaveCount(0)
     await expect(offer.getByRole('button', { name: 'Containers', exact: true })).toHaveCount(0)
   })
+})
+
+// Open points and items of runs 35 to 64 on a wiki of the bookstore.
+test.describe('a wiki of the bookstore', () => {
+  const T = ['container', 'webapp', 'database']
+  const seedWiki = async (studio: { seedDocument(json: string): Promise<void> }, view: Record<string, unknown>) => {
+    const doc = JSON.parse(fixture('bookstore'))
+    doc.views.push({ id: 'v-wiki', name: 'Wiki', kind: 'wiki', nodeIds: [], positions: {}, ...view })
+    await studio.seedDocument(JSON.stringify(doc))
+  }
+
+  // Item 187: a chain whose relations loop (web → API → DB, back by "any
+  // relation") crashed Studio at the first letter of Search pages, and Multi
+  // page wrote API › Orders DB › API…
+  test('a chain that loops is searched and written once along each path', async ({ page, studio }) => {
+    await seedWiki(studio, { wikiPageMode: 'multi', wikiDepth: 5, pipeline: { levels: [{ ways: [{ types: T }] }, { ways: [{ types: T, via: { anyRelation: true } }] }] } })
+    const errors: string[] = []
+    page.on('pageerror', (e) => errors.push(e.message))
+    await studio.open('v-wiki/f/api')
+    await page.getByLabel('Search pages').fill('a')
+    await expect(page.locator('.wiki-nav-item', { hasText: 'API' }).first()).toBeVisible()
+    await expect(page.getByText('Something went wrong')).toHaveCount(0)
+    // API's page: Orders DB and Web App are chapters; API is not written again under them.
+    await expect(page.getByRole('heading', { name: 'Orders DB' })).toHaveCount(1)
+    await expect(page.locator('.wiki-page').getByRole('heading', { name: 'API', exact: true })).toHaveCount(1)
+    expect(errors).toEqual([])
+  })
+
+  // Open point (35–44): the Pages list stayed A–Z under a descending sort.
+  test('the pages list in the view\'s order', async ({ page, studio }) => {
+    await seedWiki(studio, { pipeline: { levels: [{ ways: [{ types: ['person', 'system'] }] }], sort: { by: 'label', desc: true } } })
+    await studio.open('v-wiki')
+    await expect(page.locator('.wiki-nav-item')).toHaveText(['Overview', 'Customer', 'Payment Provider', 'Bookstore', 'Glossary'])
+  })
+
+  // Open point (35–44): after Undo of Add child the wiki showed the
+  // Overview while the address kept /f/<gone>.
+  test('Undo of Add child goes back to the Overview, and so does the address', async ({ page, studio }) => {
+    await seedWiki(studio, {})
+    await studio.open('v-wiki/f/bookstore')
+    await page.getByRole('button', { name: 'Edit Bookstore' }).click()
+    await page.getByRole('menuitem', { name: 'Add child' }).click()
+    await page.getByRole('menuitem', { name: 'Container' }).click()
+    await expect(page).not.toHaveURL(/\/f\/bookstore$/)
+    await expect(page).toHaveURL(/\/v\/v-wiki\/f\/[^/]+$/)
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect(page).toHaveURL(/\/v\/v-wiki$/)
+    await expect(page.locator('.wiki-title')).toHaveText('Overview')
+  })
+})
+
+// Item 186: the Overview counted the whole model's relations (125 for 8).
+test('the wiki Overview counts the relations between its pages', async ({ page, studio }) => {
+  await studio.openSample('view-wiki')
+  await expect(page.locator('.wiki-page')).toContainText('14 elements · 8 relations')
+})
+
+// Item 185: text clicked into before an agent's edit wrote the old text
+// back when left.
+folderTest('wiki text opened before an agent\'s edit takes the edit, and leaving it writes nothing', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.views.push({ id: 'v-wiki', name: 'Wiki', kind: 'wiki', nodeIds: [], positions: {} })
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(doc, 'Shop'))) await folder.write(path, content)
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await studio.designer()
+  await page.locator('.lp-view-card', { hasText: 'Wiki' }).click()
+  await page.getByLabel('Search pages').fill('Web App')
+  await page.locator('.wiki-nav-item', { hasText: 'Web App' }).click()
+  await expect(page.locator('.wiki-title')).toHaveText('Web App')
+  await page.locator('.wiki-title .wiki-heading-text').click()
+  const title = page.locator('.wiki-title input')
+  await expect(title).toBeFocused()
+  const path = Object.keys(await folder.files()).find((p) => p.includes('web-app'))!
+  const file = (await folder.files())[path]
+  await folder.write(path, file.replace('label: "Web App"', 'label: "Storefront"'))
+  await expect(title).toHaveValue('Storefront', { timeout: 10_000 })
+  await page.locator('.wiki-page').click({ position: { x: 5, y: 650 } })
+  await expect(page.locator('.wiki-title')).toHaveText('Storefront')
+  await page.waitForTimeout(3000)
+  const files = await folder.files()
+  expect(Object.values(files).some((c) => c.includes('label: "Web App"'))).toBe(false)
+  expect(Object.values(files).some((c) => c.includes('label: "Storefront"'))).toBe(true)
 })

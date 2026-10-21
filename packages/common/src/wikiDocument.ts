@@ -219,12 +219,15 @@ export function createWikiDocument(view: DiagramView | null | undefined, context
   }
   const typeCounts = new Map<string, number>(), relationCounts = new Map<string, number>()
   for (const node of nodeList) typeCounts.set(node.type, (typeCounts.get(node.type) ?? 0) + 1)
+  // The relations between the wiki's pages (the Overview's count).
+  let relationCount = 0
   for (const r of allRelations) {
     if (visibleSet && !(visibleSet.has(r.sourceId) && visibleSet.has(r.targetId))) continue
+    if (nodes[r.sourceId] && nodes[r.targetId]) relationCount++
     const type = relationTypeForProse(r, nodes, metamodel ?? undefined)
     if (type) relationCounts.set(type, (relationCounts.get(type) ?? 0) + 1)
   }
-  return { visibleSet, nodeList, roots, navigationChildren, childrenOf, get rows() { return rowsOf() }, page, glossary: { typeCounts, relationCounts } }
+  return { visibleSet, nodeList, roots, navigationChildren, childrenOf, get rows() { return rowsOf() }, page, relationCount, glossary: { typeCounts, relationCounts } }
 }
 
 export type WikiDocument = ReturnType<typeof createWikiDocument>
