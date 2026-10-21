@@ -6353,6 +6353,11 @@ export const useDiagramStore = create<DiagramStore>()(
             else delete target.stepBackward
           }
           for (const id of removedSeqIds) delete targetSeqs[id]
+          // The steps of the relations gone here go with them, as a delete
+          // takes them: a later model can step through relations the edited
+          // milestone deleted with an element while it had no such sequence.
+          const missing = new Set(Object.values(targetSeqs).flatMap((q) => q.relationIds.filter((rid) => !targetRels[rid])))
+          model.forgetRelationsInSequences({ sequences: targetSeqs } as unknown as model.ModelState, missing)
         }
 
         // The views the milestone keeps its own way stay its own: what was

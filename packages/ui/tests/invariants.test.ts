@@ -839,15 +839,6 @@ const KNOWN: Known[] = [
     note: 'K20: after an add the live physics can go on moving for good (seen on the sample\'s and the bookstore\'s All elements; new)',
   },
   {
-    // Sample: milestone v1 opened, Web Banking deleted there, Propagate:
-    // the live model loses Web Banking and its relations, but the live
-    // sequence Payment Processing keeps steps 1 and 2 (r-cust-web,
-    // r-web-apigw), saved so.
-    rule: 'references',
-    match: (t, v) => t.some((a) => a.a === 'propagate') && /names missing relation/.test(v.detail),
-    note: 'K21: Propagate of a delete leaves the live sequences\' steps of the relations it deletes (new)',
-  },
-  {
     // Nested: Container 2.1 folded and unfolded on Systems and containers
     // (which does not draw its components), All elements opened, Component
     // 0.0.1 dragged: Component 2.1.0 jumps (140, 60), out of Container 2.1.
