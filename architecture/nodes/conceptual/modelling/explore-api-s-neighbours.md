@@ -5,7 +5,7 @@ label: "Explore API's neighbours"
 given: "the bookstore model in Designer with API selected"
 tests: |
   packages/ui/tests/exploreView.test.ts › an explore view
-  apps/e2e/tests/studio/explore.spec.ts › Explore from here grows by + and by a level
-then: "a view \"Explore: API\" opens first in the list with API alone, no frame drawn; the + adds Web App, Orders DB and Payment Provider a layer below API, each with its relation to API and no frame round them, and its count goes to none; + 1 level adds Customer a layer below with its relation to Web App; no relation within a layer is drawn; nothing overlaps; the saved document and the undo history are unchanged"
-when: "the user chooses Explore from here, clicks API's +, then + 1 level"
+  apps/e2e/tests/studio/explore.spec.ts › Explore from here grows level by level from each +
+then: "a view \"Explore: API\" opens first in the list with API alone, no frame drawn; API's + adds Web App, Orders DB and Payment Provider a level below API, each with its relation to API, and its count goes to none; Web App's + adds Customer a level below with its relation to Web App; no relation within a level is drawn; nothing overlaps; the saved document and the undo history are unchanged"
+when: "the user chooses Explore from here, clicks API's +, then Web App's +"
 ---

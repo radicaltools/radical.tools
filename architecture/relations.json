@@ -315,12 +315,6 @@
     "targetId": "5d8ffddf-95d1-49ff-a154-98cf9737a094"
   },
   {
-    "id": "061f6748-bdce-42ac-bc16-73a4ec2ffde8",
-    "relationType": "verifies",
-    "sourceId": "8b5f67dc-9162-4c9a-af8e-f6c5787ed043",
-    "targetId": "bccc1620-efed-4c03-9c80-3ddef3ed3279"
-  },
-  {
     "id": "0631f58b-e80d-48c1-bc99-a6603de11ff7",
     "relationType": "derives",
     "sourceId": "edbf0f54-0ada-45e8-b351-d745ad125928",
@@ -8511,12 +8505,6 @@
     "targetId": "05608e72-b286-4d06-8760-b6b4e9d966a2"
   },
   {
-    "id": "95191ec6-ec68-476a-b843-614b817c62c1",
-    "relationType": "satisfies",
-    "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
-    "targetId": "bccc1620-efed-4c03-9c80-3ddef3ed3279"
-  },
-  {
     "id": "9532a388-a1fa-48b2-add4-23f61ac0bdee",
     "relationType": "satisfies",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
@@ -9336,12 +9324,6 @@
     "relationType": "derives",
     "sourceId": "f6f13282-9773-4a5c-bd57-2b72d05eae76",
     "targetId": "ef68b905-45d2-4f6c-bce7-a2d20802f7b5"
-  },
-  {
-    "id": "a447cd4b-4fb8-4648-b2a2-af305d609f2e",
-    "relationType": "derives",
-    "sourceId": "bccc1620-efed-4c03-9c80-3ddef3ed3279",
-    "targetId": "12e61bef-e093-4b42-9611-6a1b28196120"
   },
   {
     "id": "a44c1142-0761-4993-a715-b6e41f60d366",
