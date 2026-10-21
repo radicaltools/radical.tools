@@ -94,7 +94,8 @@ test('a model file that does not parse, or is gone, is named and left as it is',
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.locator('.msteps-row').first().click()
   await studio.ready()
-  await expect(studio.row('customer')).toBeVisible()
+  // On its first view (decided 2026-10-21).
+  await expect(studio.node('customer')).toBeVisible()
 
   // Deleted outside Studio once its saves are done, then opened again.
   await page.waitForTimeout(1500)
