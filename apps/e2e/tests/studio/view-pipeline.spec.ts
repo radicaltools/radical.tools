@@ -512,3 +512,18 @@ test('a relation drawn between two entities asks for its type', async ({ page, s
   const type = page.locator('.right-panel.open').getByLabel('Type', { exact: true })
   await expect(type.locator('option')).toHaveText(['Part of', 'References'])
 })
+
+// Open point of runs 45 to 64: a level reached both ways along derives
+// offered "+ Requirement / Need / Requirement…".
+test('the table\'s + row names each type it adds once', async ({ page, studio }) => {
+  const node = (id: string, type: string) => ({ id, type, label: id, x: 0, y: 0, width: 220, height: 90, collapsed: false })
+  const both = { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }, { via: { relationType: 'derives', direction: 'out' }, types: ['need', 'requirement'] }] }
+  await studio.seedDocument(JSON.stringify({
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+    nodes: [node('need', 'need'), node('req', 'requirement'), node('sub', 'requirement')],
+    relations: [{ id: 'd1', sourceId: 'req', targetId: 'need', relationType: 'derives' }, { id: 'd2', sourceId: 'sub', targetId: 'req', relationType: 'derives' }],
+    views: [{ id: 'both', name: 'Both ways', kind: 'table', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['requirement'] }] }, both] } }],
+  }))
+  await studio.open('both')
+  await expect(page.getByRole('button', { name: 'Add under req' }).first()).toHaveText(/Requirement \/ Need…/)
+})

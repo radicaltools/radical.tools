@@ -248,6 +248,11 @@ export function TableView(): React.ReactElement {
 
   const cancelEdit = useCallback(() => setEditCell(null), [])
 
+  /** Gives the keyboard to the row of `id` once its name field is gone. */
+  const focusRow = (id: string) => {
+    requestAnimationFrame(() => bodyRef.current?.querySelector<HTMLElement>(`tr[data-node-id="${CSS.escape(id)}"]`)?.focus())
+  }
+
   const startEdit = useCallback((rowId: string, current: string) => {
     if (readOnly) return
     setEditCell({ rowId, draft: current, initial: current })
@@ -284,9 +289,10 @@ export function TableView(): React.ReactElement {
           onChange={(e) => setEditCell({ ...editCell, draft: e.target.value })}
           onBlur={commitEdit}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') cancelEdit()
-            if (e.key === 'Enter') commitEdit()
-            if (e.key === 'Tab') { e.preventDefault(); commitEdit() }
+            // The keyboard stays on the row (it went to the page body).
+            if (e.key === 'Escape') { cancelEdit(); focusRow(node.id) }
+            if (e.key === 'Enter') { commitEdit(); focusRow(node.id) }
+            if (e.key === 'Tab') { e.preventDefault(); commitEdit(); focusRow(node.id) }
           }}
           onClick={(e) => e.stopPropagation()}
           onFocus={(e) => e.currentTarget.select()}
@@ -340,7 +346,10 @@ export function TableView(): React.ReactElement {
                 key={line.row.path}
                 data-node-id={line.row.node.id}
                 className={`tv-row tv-chain-row depth-${Math.min(line.row.depth, 3)}${selectedNodeId === line.row.node.id ? ' tv-row-selected' : ''}`}
+                tabIndex={-1}
                 onClick={(e) => { e.stopPropagation(); openProperties(line.row.node.id) }}
+                // Enter on the row (where a rename leaves the keyboard) renames it again.
+                onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) { e.preventDefault(); startEdit(line.row.node.id, line.row.node.label) } }}
               >
                 <td className="tv-td">{renderName(line.row)}</td>
                 <td className="tv-td">{renderSummary(line.row.node)}</td>
@@ -361,7 +370,7 @@ export function TableView(): React.ReactElement {
                           .filter(Boolean).map((h) => <span key={h} className="tv-add-hint">· {h}</span>)}
                       </>
                     ) : (
-                      <span>{line.choices.length <= 3 ? line.choices.map((c) => typeName(c.type)).join(' / ') : 'Add element'}…</span>
+                      <span>{addLabel(line.choices.map((c) => typeName(c.type)))}…</span>
                     )}
                   </button>
                 </td>
@@ -379,4 +388,11 @@ export function TableView(): React.ReactElement {
       )}
     </div>
   )
+}
+
+/** The + row's text: the types it adds, each once (a level reached both
+ *  ways listed "Requirement / Need / Requirement"), or "Add element". */
+export function addLabel(names: string[]): string {
+  const once = [...new Set(names)]
+  return once.length <= 3 ? once.join(' / ') : 'Add element'
 }

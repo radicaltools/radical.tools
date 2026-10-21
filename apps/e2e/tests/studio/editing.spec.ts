@@ -346,3 +346,18 @@ for (const mode of ['viewer', 'presenter'] as const) {
     await expect(badges.getByText('3', { exact: true })).toBeVisible()
   })
 }
+
+// Open point of runs 45 to 64: after Enter or Tab in a table cell the
+// keyboard went to the page body; Enter on the row renames it again.
+test('a name written in the table leaves the keyboard on its row', async ({ page, studio }) => {
+  await studio.open('v-table')
+  const row = page.locator('tr.tv-row[data-node-id="api"]')
+  await row.locator('.tv-chain-cell').dblclick()
+  await page.locator('.tv-cell-input').fill('Orders API')
+  await page.keyboard.press('Enter')
+  await expect(row).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.tv-cell-input')).toHaveValue('Orders API')
+  await page.keyboard.press('Tab')
+  await expect(row).toBeFocused()
+})
