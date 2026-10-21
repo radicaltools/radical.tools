@@ -158,3 +158,32 @@ test('a concept imported into a selected container lands beside what it holds', 
   // The container grew; its neighbour made room, as after a drop.
   expect(overlaps(await studio.boxes(), ['bookstore', 'payments', 'customer'])).toEqual([])
 })
+
+test('a concept added in Viewer with a container selected goes into it, as the card says', async ({ page, studio }) => {
+  // The switch to Designer dropped the selection before the import read it:
+  // the card said "↳ Bookstore" and the concept landed at the top.
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-containers', 'viewer')
+  await studio.node('bookstore').click({ position: { x: 30, y: 12 } })
+  await expect(studio.node('bookstore')).toHaveClass(/selected/)
+  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByText(/Import from Hub/).first().click()
+  const dialog = page.locator('[aria-label="Import from Hub"]')
+  await dialog.getByPlaceholder('Search concepts…').pressSequentially('API Versioning')
+  const card = dialog.locator('div', { has: page.getByRole('heading', { name: /API Versioning/ }) })
+    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
+  await expect(card).toContainText('↳ Bookstore')
+  await card.getByRole('button', { name: 'Add to Model' }).click()
+  await page.waitForTimeout(800)
+  const skip = dialog.getByRole('button', { name: 'Skip', exact: true })
+  if (await skip.count()) await skip.click()
+  await page.waitForTimeout(300)
+  const importButton = dialog.getByRole('button', { name: 'Import', exact: true })
+  if (await importButton.count()) await importButton.click()
+  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  const added = (await studio.storedDoc()).nodes.filter((n) => !JSON.parse(fixture('bookstore')).nodes.some((m: { id: string }) => m.id === n.id))
+  expect(added.map((n) => n.parentId)).toEqual(['bookstore'])
+})
