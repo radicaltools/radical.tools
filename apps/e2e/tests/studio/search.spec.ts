@@ -86,9 +86,11 @@ test('a pick on a wiki opens the element\'s page, and the highlighted result sta
   for (let i = 0; i < 20; i++) await page.keyboard.press('ArrowDown')
   const list = page.locator('.quick-search-results')
   const active = page.locator('.quick-search-item.active')
-  const [l, a] = [(await list.boundingBox())!, (await active.boundingBox())!]
-  expect(a.y).toBeGreaterThanOrEqual(l.y - 1)
-  expect(a.y + a.height).toBeLessThanOrEqual(l.y + l.height + 1)
+  // Measured once the list has scrolled (it scrolls after the highlight moves).
+  await expect.poll(async () => {
+    const [l, a] = [(await list.boundingBox())!, (await active.boundingBox())!]
+    return a.y >= l.y - 1 && a.y + a.height <= l.y + l.height + 1
+  }).toBe(true)
 })
 
 // Item 245: Enter on a relation opened the smallest view with its source
