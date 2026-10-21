@@ -22,12 +22,17 @@
 //   value: the side that changed it wins.
 // - Both sides changed the same value: theirs (the folder) wins, and the
 //   conflict is reported, unless it is layout (positions, sizes, camera,
-//   folding), where the last writer winning is expected.
+//   folding), where the last writer winning is expected. An entry one side
+//   removed and the other changed only in its layout goes.
+// - An empty text, an unticked box and an empty list are no value, as an
+//   absent one is (modelValue): the folder writes none of them, so a model
+//   read back from it is the same model.
 //
 // The merged model may break a rule each side kept on its own (a relation to
 // an element the other side deleted); validation shows it.
 
 import type { DiagramData } from './c4'
+import { modelValue } from './model'
 
 export interface ModelMergeResult {
   merged: DiagramData
@@ -49,14 +54,26 @@ type Plain = Record<string, unknown>
 
 const isPlain = (v: unknown): v is Plain => !!v && typeof v === 'object' && !Array.isArray(v)
 
-/** Two values hold the same (a key whose value is undefined is no key). */
+/** Two values hold the same: a key with no value (modelValue: undefined,
+ *  null, an empty text, false, an empty list) is no key. Read back from a
+ *  folder, an element added with an empty description has none, and Undo
+ *  of the add took that for a change made outside Studio and kept it. */
 function same(a: unknown, b: unknown): boolean {
   if (a === b) return true
+  const none = (v: unknown): boolean => modelValue(v) === null
+  if (none(a) || none(b)) return none(a) && none(b)
   if (Array.isArray(a)) return Array.isArray(b) && a.length === b.length && a.every((v, i) => same(v, b[i]))
   if (!isPlain(a) || !isPlain(b)) return false
-  const keys = (o: Plain) => Object.keys(o).filter((k) => o[k] !== undefined)
+  const keys = (o: Plain) => Object.keys(o).filter((k) => !none(o[k]))
   const ka = keys(a)
   return ka.length === keys(b).length && ka.every((k) => same(a[k], b[k]))
+}
+
+/** Two entries that differ in their layout only (LAYOUT_KEYS). */
+function sameApartFromLayout(a: unknown, b: unknown): boolean {
+  if (!isPlain(a) || !isPlain(b)) return false
+  const strip = (o: Plain): Plain => Object.fromEntries(Object.entries(o).filter(([k]) => !LAYOUT_KEYS.has(k)))
+  return same(strip(a), strip(b))
 }
 
 /** An array that merges by id: one whose items all are objects with an `id`. */
@@ -106,6 +123,10 @@ function merge3(base: unknown, ours: unknown, theirs: unknown, where: string[], 
     }
     return out
   }
+  // Removed on one side, moved or framed anew on the other: it goes. A view
+  // whose camera was saved with the folder came back on Undo of its New view.
+  if (ours === undefined && sameApartFromLayout(base, theirs)) return undefined
+  if (theirs === undefined && sameApartFromLayout(base, ours)) return undefined
   if (!layout) ctx.conflicts.push(where.join(': '))
   return theirs
 }

@@ -20,6 +20,11 @@ import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
+/** A text field got or lost focus: what is typed into it in between (each
+ *  letter an edit of the model) is one undo step. */
+const beginTyping = (): void => useDiagramStore.getState().beginTyping()
+const endTyping = (): void => useDiagramStore.getState().endTyping()
+
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 
 /** How many elements each view shows (viewShownNodes: its filter's chain,
@@ -2024,8 +2029,8 @@ function MarkdownField({ label, value, readOnly, onChange }: {
     return (
       <AutoResizeTextarea autoFocus aria-label={label} value={value} placeholder={MARKDOWN_HINT}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={(e) => { const t = e.currentTarget; t.setSelectionRange(t.value.length, t.value.length) }}
-        onBlur={() => setEditing(false)}
+        onFocus={(e) => { const t = e.currentTarget; t.setSelectionRange(t.value.length, t.value.length); beginTyping() }}
+        onBlur={() => { endTyping(); setEditing(false) }}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); e.currentTarget.blur() } }} />
     )
   }
@@ -2078,6 +2083,7 @@ function AttrValue({ def, value, readOnly, onChange }: {
     <input className="pp-input" aria-label={def.label} placeholder="—"
       type={def.type === 'number' ? 'number' : undefined}
       value={String(shown ?? '')} readOnly={readOnly}
+      onFocus={beginTyping} onBlur={endTyping}
       onChange={(e) => {
         if (readOnly) return
         // An emptied number clears the value (Number('') saved 0).
@@ -2146,6 +2152,7 @@ function PanelHeader({ typeLabel, color, iconPath, title, titlePlaceholder, read
       {(title || titlePlaceholder) && (onTitle && !readOnly
         ? <input className="pp-title" aria-label="Name" value={title} placeholder={titlePlaceholder}
             onChange={(e) => onTitle(e.target.value)}
+            onFocus={beginTyping} onBlur={endTyping}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }} />
         : <div className={`pp-title${title ? '' : ' empty'}`}>{title || titlePlaceholder}</div>)}
       {context && <div className="pp-context">{context}</div>}

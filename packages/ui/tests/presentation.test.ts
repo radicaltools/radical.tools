@@ -283,3 +283,33 @@ describe('previewSlide', () => {
     expect(useDiagramStore.getState().presentationActive).toBe(true)
   })
 })
+
+describe('the document read again after an outside change (item 136)', () => {
+  const slide = (id: string) => ({ id, name: id, snapshotId: null, viewport: { x: 0, y: 0, zoom: 1 } })
+  beforeEach(() => {
+    useDiagramStore.setState({
+      presentations: [
+        { id: 'p-test', name: 'P', slides: [slide('s1')] },
+        { id: 'p-agent', name: 'Agent deck', slides: [slide('a1'), slide('a2'), slide('a3')] },
+      ],
+      activePresentationId: 'p-agent',
+      presentationSlideIndex: 2,
+    } as any)
+    useDiagramStore.setState((st) => ({ presentationSlides: st.presentations[1].slides }))
+  })
+
+  it('keeps the presentation picked and its slide', () => {
+    const s = useDiagramStore.getState
+    s().loadDiagram(structuredClone(s().saveDiagram()), { outsideChange: true })
+    expect(s().activePresentationId).toBe('p-agent')
+    expect(s().presentationSlides.map((x) => x.id)).toEqual(['a1', 'a2', 'a3'])
+    expect(s().presentationSlideIndex).toBe(2)
+  })
+
+  it('another document opens on its first presentation', () => {
+    const s = useDiagramStore.getState
+    s().loadDiagram(structuredClone(s().saveDiagram()))
+    expect(s().activePresentationId).toBe('p-test')
+    expect(s().presentationSlideIndex).toBe(0)
+  })
+})

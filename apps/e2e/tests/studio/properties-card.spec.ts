@@ -71,6 +71,27 @@ test('a long field reads as Markdown and edits on a click', async ({ page, studi
   await expect(studio.node('payments')).toHaveCount(0)
 })
 
+test('a name or a description typed letter by letter is one undo step', async ({ page, studio }) => {
+  const undo = page.getByRole('button', { name: 'Undo', exact: true })
+  await studio.node('payments').click()
+  const name = studio.attribute('Name')
+  await name.click()
+  await page.keyboard.press('ControlOrMeta+A')
+  await page.keyboard.type('Card Gateway')
+  await page.keyboard.press('Tab')
+  await studio.properties.getByRole('button', { name: 'Edit Description' }).click()
+  await page.keyboard.type(' by card')
+  await page.keyboard.press('Escape')
+  await expect(studio.node('payments')).toContainText('Card Gateway')
+
+  await undo.click()
+  await expect(studio.properties.getByRole('button', { name: 'Edit Description' })).toHaveText('Card payments')
+  await expect(name).toHaveValue('Card Gateway')
+  await undo.click()
+  await expect(name).toHaveValue('Payment Provider')
+  await expect(studio.node('payments')).toContainText('Payment Provider')
+})
+
 test('the card is as wide as it was dragged, also after a reload', async ({ page, studio }) => {
   await studio.node('payments').click()
   const card = studio.properties

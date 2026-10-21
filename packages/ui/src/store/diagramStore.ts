@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { produce } from 'immer'
 import { immer } from 'zustand/middleware/immer'
 import {
   Node,
@@ -205,8 +206,8 @@ function _historyForgotten(): void {
  *  change it makes (StepChange); each stack is a chain that starts at
  *  `now`. The copy a drag in progress keeps goes, as on any load: its step
  *  would take the outside change back. */
-function _historyRebased(now: HistoryEntry): void {
-  for (const stack of [_undoStack, _redoStack]) {
+function _historyRebased(now: HistoryEntry, stacks: HistoryItem[][] = [_undoStack, _redoStack]): void {
+  for (const stack of stacks) {
     let next = now
     for (let i = stack.length - 1; i >= 0; i--) {
       const item = stack[i]
@@ -241,18 +242,58 @@ function _entryModel(entry: HistoryEntry): DiagramData {
   }
 }
 
+/** What a merged model holds that it cannot: an element whose container
+ *  is gone (with what it holds and their relations) and a relation to an
+ *  element that is gone. A step brought them back on a model an outside
+ *  change had taken their container or other end from (Undo of a delete
+ *  after the agent deleted the API: "charges card" from no element). Taken
+ *  out; returns the names of what was. */
+function _withoutStrays(parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' | 'views' | 'defaultLayoutConstraints'>): { parts: typeof parts; dropped: string[] } {
+  const dropped: string[] = []
+  const next = produce(parts, (draft) => {
+    const state = { ...draft, activeViewId: null } as unknown as model.ModelState
+    for (const node of Object.values(parts.c4Nodes)) {
+      if (!node.parentId || parts.c4Nodes[node.parentId] || !state.c4Nodes[node.id]) continue
+      dropped.push(node.label || node.id)
+      model.deleteNode(state, node.id)
+    }
+    for (const [id, rel] of Object.entries(state.c4Relations)) {
+      const ends = [state.c4Nodes[rel.sourceId], state.c4Nodes[rel.targetId]]
+      if (ends.every(Boolean)) continue
+      const end = ends.find(Boolean)
+      dropped.push(rel.label || (end ? `a relation of ${end.label}` : 'a relation'))
+      delete state.c4Relations[id]
+    }
+    // Set anew, not changed in place (forgetNodesInViews).
+    draft.defaultLayoutConstraints = state.defaultLayoutConstraints ?? []
+  })
+  return { parts: next, dropped }
+}
+
 /** What the step `change` makes, made on the model `now`: a three-way merge
  *  from `change.from` (mergeModels). Where the model changed since in a
- *  value the step changes too, it stays as it is now (`conflicts`). Shown
- *  on the canvas of `change.to`, as Undo goes back to its step's canvas. */
-function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[] } {
+ *  value the step changes too, it stays as it is now (`conflicts`); what
+ *  the step brings back that has no place left in it does not come back
+ *  (`dropped`, _withoutStrays). Shown on the canvas of `change.to`, as Undo
+ *  goes back to its step's canvas. */
+function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[]; dropped: string[] } {
   const { merged, conflicts } = mergeModels(_entryModel(change.from), _entryModel(change.to), _entryModel(now))
+  const mergedNodes: Record<string, C4Node> = {}
+  for (const n of merged.nodes) mergedNodes[n.id] = n
+  const mergedRelations: Record<string, C4Relation> = {}
+  for (const r of merged.relations) mergedRelations[r.id] = r
+  const mergedViews: Record<string, DiagramView> = {}
+  for (const v of merged.views ?? []) mergedViews[v.id] = v
+  const { parts, dropped } = _withoutStrays({
+    c4Nodes: mergedNodes,
+    c4Relations: mergedRelations,
+    views: mergedViews,
+    defaultLayoutConstraints: merged.defaultLayoutConstraints ?? [],
+  })
   const c4Nodes: Record<string, C4Node> = {}
-  for (const n of merged.nodes) c4Nodes[n.id] = { ...n }
-  const c4Relations: Record<string, C4Relation> = {}
-  for (const r of merged.relations) c4Relations[r.id] = r
-  const views: Record<string, DiagramView> = {}
-  for (const v of merged.views ?? []) views[v.id] = v
+  for (const n of Object.values(parts.c4Nodes)) c4Nodes[n.id] = { ...n }
+  const c4Relations = parts.c4Relations
+  const views = parts.views
   const sequences: Record<string, DiagramSequence> = {}
   for (const q of merged.sequences ?? []) sequences[q.id] = q
   const defaultPositions = merged.defaultPositions ?? {}
@@ -265,13 +306,62 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
       c4Nodes,
       c4Relations,
       views,
-      defaultLayoutConstraints: merged.defaultLayoutConstraints ?? [],
+      defaultLayoutConstraints: parts.defaultLayoutConstraints ?? [],
       defaultEdgeStyle: merged.defaultEdgeStyle ?? 'curved',
       activeViewId,
       defaultPositions,
       sequences,
       hubTemplates: (merged.hubTemplates ?? {}) as Record<string, HubImportRecord>,
     },
+    conflicts,
+    dropped,
+  }
+}
+
+/** A milestone shown when the folder changed outside Studio (an agent's
+ *  write): the change is the live model's, and the milestone stays shown
+ *  with the edits not decided yet. Closing it lost them, with no word. */
+interface ShownMilestone {
+  id: string
+  /** The milestone as Studio had it, before the change was read. */
+  before: DiagramSnapshot
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  sequences: Record<string, DiagramSequence>
+  dirty: boolean
+  promptOpen: boolean
+  activeViewId: string | null
+  diffHighlight: DiagramStore['diffHighlight']
+  diffBaseSnapshotId: string | null
+  diffGhostNodes: DiagramStore['diffGhostNodes']
+  diffGhostRelations: DiagramStore['diffGhostRelations']
+}
+
+/** The milestone `shown` on top of the snapshots read again (`after`): its
+ *  elements as shown, with what was changed outside Studio in the milestone
+ *  itself merged in (mergeModels; `conflicts` where both changed a value,
+ *  the folder's kept). Null when the milestone is gone. */
+function _milestoneAfterOutsideChange(shown: ShownMilestone, after: DiagramSnapshot[]): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; sequences: Record<string, DiagramSequence>; changed: boolean; conflicts: string[] } | null {
+  const now = after.find((m) => m.id === shown.id)
+  if (!now) return null
+  const changes = model.compareModels(
+    { nodes: shown.before.nodes as Record<string, C4Node>, relations: shown.before.relations as Record<string, C4Relation> },
+    { nodes: now.nodes as Record<string, C4Node>, relations: now.relations as Record<string, C4Relation> },
+  )
+  const changed = [changes.nodes, changes.relations].some((c) => c.added.length || c.removed.length || c.changed.length)
+  if (!changed) return { nodes: shown.nodes, relations: shown.relations, sequences: shown.sequences, changed, conflicts: [] }
+  const asData = (m: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; sequences?: Record<string, DiagramSequence> }): DiagramData =>
+    ({ nodes: Object.values(m.nodes), relations: Object.values(m.relations), sequences: Object.values(m.sequences ?? {}) })
+  const { merged, conflicts } = mergeModels(
+    asData(shown.before),
+    asData(shown),
+    asData(now),
+  )
+  return {
+    nodes: Object.fromEntries(merged.nodes.map((n) => [n.id, n])),
+    relations: Object.fromEntries(merged.relations.map((r) => [r.id, r])),
+    sequences: now.sequences ? Object.fromEntries((merged.sequences ?? []).map((q) => [q.id, q])) : shown.sequences,
+    changed,
     conflicts,
   }
 }
@@ -345,6 +435,21 @@ function _pushUndoEntry(entry: HistoryEntry): void {
   _undoStack.push(entry)
   if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
   _redoStack.length = 0 // clear redo on new change
+}
+
+/** A text field has focus (beginTyping): what is typed into it until it
+ *  loses focus (endTyping) is one undo step, the one its first letter
+ *  pushed (`step`), as long as that step is still the last and the edits
+ *  are to the same fields of the same element (`key`). Each letter typed
+ *  into the Name field was a step of its own. */
+let _typing: { key: string; step: HistoryItem | null } | null = null
+
+/** The undo step of an edit of `key` ("node:<id>:label"), unless it goes on
+ *  what is being typed into a focused field (_typing). */
+function _pushTextEdit(store: DiagramStore, key: string): void {
+  if (_typing && _typing.key === key && _typing.step && _undoStack[_undoStack.length - 1] === _typing.step) return
+  store._pushUndo()
+  if (_typing) _typing = { key, step: _undoStack[_undoStack.length - 1] ?? null }
 }
 
 /** The model as it was when the drag in progress began (liveGrab). A drag
@@ -1636,6 +1741,11 @@ interface DiagramStore {
   removeNodes: (ids: string[]) => void
   /** Runs `action`, whatever store actions it calls, as one undo step. */
   runAsOneStep: (action: () => void) => void
+  /** A text field got focus: what is typed into it (updateNode,
+   *  updateRelation) until endTyping is one undo step. */
+  beginTyping: () => void
+  /** The text field lost focus: the next edit is a step of its own. */
+  endTyping: () => void
   /** Asks to delete the elements, as the Delete key on the canvas does. */
   requestDelete: (nodeIds: string[]) => void
   toggleCollapse: (id: string) => void
@@ -2357,11 +2467,14 @@ export const useDiagramStore = create<DiagramStore>()(
     // is made on the model as it is now (`now`), keeping that change.
     const _restoreHistoryItem = (item: HistoryItem, now: HistoryEntry, action: 'Undo' | 'Redo'): void => {
       if (!isStepChange(item)) { _restoreHistoryEntry(item); return }
-      const { entry, conflicts } = _rebasedEntry(item, now)
+      const { entry, conflicts, dropped } = _rebasedEntry(item, now)
       _restoreHistoryEntry(entry)
+      const list = (names: string[]): string => names.slice(0, 5).join('; ') + (names.length > 5 ? ` and ${names.length - 5} more` : '')
       if (conflicts.length) {
-        const shown = conflicts.slice(0, 5).join('; ') + (conflicts.length > 5 ? ` and ${conflicts.length - 5} more` : '')
-        get().pushNotification(`${action} kept what was changed outside Studio since that step: ${shown}.`, 'info')
+        get().pushNotification(`${action} kept what was changed outside Studio since that step: ${list(conflicts)}.`, 'info')
+      }
+      if (dropped.length) {
+        get().pushNotification(`${action} left out what needs an element removed outside Studio since that step: ${list(dropped)}.`, 'info')
       }
     }
 
@@ -2748,7 +2861,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(refused, 'error')
           return
         }
-        get()._pushUndo()
+        _pushTextEdit(get(), `node:${id}:${keys.sort().join(',')}`)
         get()._markMilestoneEdit()
         set((state) => { keepingSharedViews(state as DiagramStore, () => model.patchNode(state, id, updates)) })
         get()._sync()
@@ -2784,6 +2897,12 @@ export const useDiagramStore = create<DiagramStore>()(
 
       runAsOneStep(action) {
         _asOneStep(action)
+      },
+      beginTyping() {
+        _typing = { key: '', step: null }
+      },
+      endTyping() {
+        _typing = null
       },
 
       requestDelete(nodeIds) {
@@ -3158,7 +3277,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(refused, 'error')
           return
         }
-        get()._pushUndo()
+        _pushTextEdit(get(), `relation:${id}:${Object.keys(updates).sort().join(',')}`)
         get()._markMilestoneEdit()
         set((state) => { model.patchRelation(state, id, updates) })
         get()._sync()
@@ -6137,8 +6256,48 @@ export const useDiagramStore = create<DiagramStore>()(
         // The history is Designer's live model's: a milestone shown, a slide
         // played or Viewer's model in the store is not the one it rebases on.
         const st = get()
+        // A milestone shown stays shown, with its edits (ShownMilestone).
+        const shownBefore = opts?.outsideChange && st.activeSnapshotId && st.liveBackup ? st.snapshots.find((m) => m.id === st.activeSnapshotId) : undefined
+        const shownMilestone: ShownMilestone | null = shownBefore ? {
+          id: shownBefore.id,
+          before: shownBefore,
+          nodes: st.c4Nodes,
+          relations: st.c4Relations,
+          sequences: st.sequences,
+          dirty: st.milestoneDirty,
+          promptOpen: st.milestonePromptOpen,
+          activeViewId: st.activeViewId,
+          diffHighlight: st.diffHighlight,
+          diffBaseSnapshotId: st.diffBaseSnapshotId,
+          diffGhostNodes: st.diffGhostNodes,
+          diffGhostRelations: st.diffGhostRelations,
+        } : null
+        const milestone = shownMilestone ? _milestoneAfterOutsideChange(shownMilestone, data.snapshots ?? []) : null
+        /** Says that the milestone with edits not saved is gone. */
+        const lostMilestone = (id: string): void => {
+          const name = st.snapshots.find((m) => m.id === id)?.name ?? id
+          get().pushNotification(`The milestone "${name}" was deleted outside Studio: the edits made in it and not saved are gone.`, 'warning')
+        }
         if (opts?.outsideChange && st.appMode === 'designer' && !st.activeSnapshotId && !st.presentationActive) {
           _historyRebased(_captureState(st))
+        } else if (opts?.outsideChange && st.appMode === 'designer' && milestone && !st.presentationActive) {
+          // The milestone's steps stay, unless it was changed too; the live
+          // model's, parked, make their change on it as it is now.
+          if (milestone.changed) { _undoStack.length = 0; _redoStack.length = 0 }
+          if (_liveHistory) {
+            const live = st.liveBackup!
+            _historyRebased({
+              c4Nodes: atDefaultPositions(Object.values(live.nodes), st.defaultPositions),
+              c4Relations: live.relations,
+              views: st.views,
+              defaultLayoutConstraints: st.defaultLayoutConstraints,
+              defaultEdgeStyle: st.defaultEdgeStyle,
+              activeViewId: null,
+              defaultPositions: st.defaultPositions,
+              sequences: live.sequences ?? st.sequences,
+              hubTemplates: st.hubTemplates,
+            }, [_liveHistory.undo, _liveHistory.redo])
+          }
         } else {
           _historyForgotten()
         }
@@ -6208,10 +6367,14 @@ export const useDiagramStore = create<DiagramStore>()(
           // Studio shows the loaded model's branch changes again once it has them.
           if (state.branch) { state.branch = null; state.showDiff = false }
           state.presentations = presInit.presentations as any
-          state.activePresentationId = presInit.activeId
-          state.presentationSlides = presInit.presentations[0].slides as any
+          // The same document read again keeps the presentation picked and
+          // its slide (Presenter went back to the first presentation).
+          const keptPres = opts?.outsideChange ? presInit.presentations.find((p) => p.id === st.activePresentationId) : undefined
+          const pres = keptPres ?? presInit.presentations[0]
+          state.activePresentationId = pres.id
+          state.presentationSlides = pres.slides as any
           state.presentationActive = false
-          state.presentationSlideIndex = 0
+          state.presentationSlideIndex = keptPres ? Math.max(0, Math.min(st.presentationSlideIndex, pres.slides.length - 1)) : 0
           state.metamodel = model.documentMetamodel(data.metamodel, data.nodes) as any
           model.syncViewpoints(state as unknown as model.ModelState)
           state.hubTemplates = (data.hubTemplates ?? {}) as any
@@ -6224,20 +6387,78 @@ export const useDiagramStore = create<DiagramStore>()(
         const W = window as any
         _beforeSlidePreview = null
         if (W.__preModeLayout) {
-          const parked = (W.__preModeLayout as ParkedDesigner).activeViewId
-          const parkedViewId = parked && views[parked] ? parked : null
+          const pre = W.__preModeLayout as ParkedDesigner
+          const parkedViewId = pre.activeViewId && views[pre.activeViewId] ? pre.activeViewId : null
           // The nodes just loaded are where All elements has them. Parked
           // under a view's id as they are, the return to Designer drew the
           // view with All elements' layout and the next edit saved it as the
           // view's: they go back where that view has them.
           const viewPositions = parkedViewId ? views[parkedViewId].positions as Record<string, NodePosition> : undefined
-          W.__preModeLayout = {
-            ...parkDesigner(get()),
-            c4Nodes: viewPositions && Object.keys(viewPositions).length > 0
-              ? atDefaultPositions(Object.values(get().c4Nodes), viewPositions)
-              : get().c4Nodes,
+          const liveNodes = viewPositions && Object.keys(viewPositions).length > 0
+            ? atDefaultPositions(Object.values(get().c4Nodes), viewPositions)
+            : get().c4Nodes
+          const loaded = parkDesigner(get())
+          // Designer's milestone stays too, over the live model as it is now.
+          const parkedShown = pre.activeSnapshotId && pre.liveBackup ? snapshots.find((m) => m.id === pre.activeSnapshotId) : undefined
+          const parkedMilestone = opts?.outsideChange && parkedShown ? _milestoneAfterOutsideChange({
+            id: parkedShown.id,
+            before: st.snapshots.find((m) => m.id === parkedShown.id) ?? parkedShown,
+            nodes: pre.c4Nodes,
+            relations: pre.c4Relations,
+            sequences: pre.sequences,
+            dirty: pre.milestoneDirty,
+            promptOpen: false,
+            activeViewId: pre.activeViewId,
+            diffHighlight: pre.diffHighlight,
+            diffBaseSnapshotId: pre.diffBaseSnapshotId,
+            diffGhostNodes: pre.diffGhostNodes,
+            diffGhostRelations: pre.diffGhostRelations,
+          }, snapshots) : null
+          W.__preModeLayout = (parkedMilestone ? {
+            ...pre,
+            c4Nodes: parkedMilestone.nodes,
+            c4Relations: parkedMilestone.relations,
+            sequences: parkedMilestone.sequences,
+            views,
+            defaultPositions: defaultPos,
             activeViewId: parkedViewId,
-          } satisfies ParkedDesigner
+            liveBackup: { nodes: liveNodes, relations, sequences },
+          } : {
+            ...loaded,
+            c4Nodes: liveNodes,
+            activeViewId: parkedViewId,
+          }) satisfies ParkedDesigner
+          if (opts?.outsideChange && pre.activeSnapshotId && pre.milestoneDirty && !parkedMilestone) lostMilestone(pre.activeSnapshotId)
+        }
+        // The milestone shown stays, over the live model just read. Its
+        // elements are where the canvas shown has them; on All elements when
+        // that view is gone.
+        if (shownMilestone && milestone) {
+          const viewId = shownMilestone.activeViewId && views[shownMilestone.activeViewId] ? shownMilestone.activeViewId : null
+          const shownNodes = shownMilestone.activeViewId && !viewId && _milestoneAllPositions
+            ? atDefaultPositions(Object.values(milestone.nodes), _milestoneAllPositions)
+            : milestone.nodes
+          set((state) => {
+            state.liveBackup = { nodes: state.c4Nodes, relations: state.c4Relations, sequences: state.sequences } as any
+            state.c4Nodes = shownNodes as any
+            state.c4Relations = milestone.relations as any
+            if (snapshots.find((m) => m.id === shownMilestone.id)?.sequences) state.sequences = milestone.sequences as any
+            state.activeSnapshotId = shownMilestone.id
+            state.milestoneDirty = shownMilestone.dirty
+            state.milestonePromptOpen = shownMilestone.promptOpen
+            state.diffHighlight = shownMilestone.diffHighlight as any
+            state.diffBaseSnapshotId = shownMilestone.diffBaseSnapshotId
+            state.diffGhostNodes = shownMilestone.diffGhostNodes as any
+            state.diffGhostRelations = shownMilestone.diffGhostRelations as any
+            state.activeViewId = viewId
+            state.canUndo = _undoStack.length > 0
+            state.canRedo = _redoStack.length > 0
+          })
+          if (milestone.conflicts.length) {
+            get().pushNotification(`The milestone "${shownMilestone.before.name}" was changed outside Studio too. Where both changed the same value, the folder's was kept: ${milestone.conflicts.slice(0, 5).join('; ')}.`, 'warning')
+          }
+        } else if (shownMilestone?.dirty) {
+          lostMilestone(shownMilestone.id)
         }
         get()._sync()
         // The document opens on All elements, with what was selected there.

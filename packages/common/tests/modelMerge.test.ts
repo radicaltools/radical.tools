@@ -46,6 +46,31 @@ describe('mergeModels', () => {
     expect(conflicts).toEqual(['orders'])
   })
 
+  it('takes an empty text, an unticked box or an empty list for no value, as the folder writes them', () => {
+    const b = clone(base)
+    b.nodes.push(node('new', 'New', { description: '', external: false, tags: [] } as Partial<C4Node>))
+    const ours = clone(base) // the add taken back
+    const theirs = clone(base) // the folder read back: the element, its empty fields not written
+    theirs.nodes.push(node('new', 'New'))
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(conflicts).toEqual([])
+    expect(byId(merged.nodes, 'new')).toBeUndefined()
+  })
+
+  it('removes what one side removed and the other only moved or framed anew', () => {
+    const ours = clone(base)
+    ours.views = []
+    ours.nodes = ours.nodes.filter((n) => n.id !== 'bank')
+    const theirs = clone(base)
+    theirs.views![0].viewport = { x: 10, y: 20, zoom: 0.5 }
+    theirs.views![0].positions = { shop: { x: 99, y: 0, width: 200, height: 100 } }
+    Object.assign(theirs.nodes.find((n) => n.id === 'bank')!, { x: 400, y: 30 })
+    const { merged, conflicts } = mergeModels(base, ours, theirs)
+    expect(conflicts).toEqual([])
+    expect(merged.views).toEqual([])
+    expect(byId(merged.nodes, 'bank')).toBeUndefined()
+  })
+
   it('keeps theirs where both changed the same field, and says so; positions merge without a word', () => {
     const ours = clone(base)
     ours.nodes.find((n) => n.id === 'shop')!.description = 'Ours'

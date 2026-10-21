@@ -80,6 +80,12 @@ if (typeof window !== 'undefined') {
   /** The active document's model as last loaded or handed to a save: what
    *  the model in the store was edited from. */
   let _baseModel: DiagramData | null = null
+  /** The store's model as a save writes it, when it last was the active
+   *  document's (loaded with nothing merged in, or handed to a save); null
+   *  when unknown. A save writes more than a document holds (the metamodel
+   *  in use, positions, a first presentation): the store's model compared
+   *  with `_baseModel` always differed, also once every edit was undone. */
+  let _savedShape: DiagramData | null = null
   // When a structural presentation edit (add/remove/rename/reorder/link a
   // slide) happens in viewer/presenter mode, we still must persist it — but
   // WITHOUT writing the ephemeral explored model layout to disk. This flag
@@ -147,6 +153,7 @@ if (typeof window !== 'undefined') {
       _unsaved = false
       _agentNoticeShown = false
       _baseModel = data
+      _savedShape = data
       await documents.saveDocument(activeId, data)
       forgetKeptEdits(activeId)
       _storageFullShown = false
@@ -171,8 +178,17 @@ if (typeof window !== 'undefined') {
   const keepEdits = (id: string): void => {
     if (!_baseModel) return
     try {
-      const edits = modelEdits(_baseModel, buildPersistData())
+      const now = buildPersistData()
+      // Nothing differs from the document (an edit undone since a hidden
+      // tab kept it): what was kept goes, or the next visit brought the
+      // undone edit back.
+      if (_savedShape && !Object.keys(modelEdits(_savedShape, now)).length) {
+        localStorage.removeItem(KEPT_EDITS + id)
+        return
+      }
+      const edits = modelEdits(_baseModel, now)
       if (Object.keys(edits).length) localStorage.setItem(KEPT_EDITS + id, JSON.stringify(edits))
+      else localStorage.removeItem(KEPT_EDITS + id)
     } catch (e) {
       console.warn('[diagramStore] could not keep the unsaved edits:', e)
     }
@@ -209,8 +225,21 @@ if (typeof window !== 'undefined') {
     useDiagramStore.getState().pushNotification(`Your edits were merged with a change made outside Studio. Where both changed the same value, the folder's was kept: ${shown}.`, 'warning')
   }
 
+  /** The folder changed outside Studio while a presentation played: read
+   *  once it stops. Read at once, it ended the presentation (the store holds
+   *  a slide, not the document) and lost the edits held for an agent. */
+  let _changedWhilePresenting: string | null = null
+
   let prev = useDiagramStore.getState()
   useDiagramStore.subscribe((s) => {
+    if (prev.presentationActive && !s.presentationActive && _changedWhilePresenting) {
+      const id = _changedWhilePresenting
+      _changedWhilePresenting = null
+      // After the stop has put the document's model back.
+      setTimeout(() => {
+        if (documents.getActiveId() === id && !presenting()) loadActive(id, 'md', { keepUi: true })
+      }, 0)
+    }
     // Loading an outside edit replaces the model in memory. Treat that state
     // as the new baseline instead of queueing an autosave of the reload.
     if (_suspended) { prev = s; return }
@@ -264,6 +293,7 @@ if (typeof window !== 'undefined') {
     opts?: { keepUi?: boolean },
   ): void => {
     const seq = ++_loadSeq
+    _changedWhilePresenting = null
     // Edits not saved yet when the folder changed outside Studio: merged
     // into what is on disk now, from the model they were made on. Without
     // them the disk's model is loaded as it is.
@@ -320,6 +350,8 @@ if (typeof window !== 'undefined') {
             ;(window as any).__rfPlaceCamera?.({ ...camera }, shown, { keep: true })
           }
         }
+        // The model on screen is the document's, unless edits were merged in.
+        _savedShape = mergedEdits ? null : buildPersistData()
         if (before) for (const listener of [..._outsideEditListeners]) listener(before)
         if (source === 'md') watchActive(id)
       } else {
@@ -327,6 +359,7 @@ if (typeof window !== 'undefined') {
         // maximum built-in metamodel. Never keep the model on screen, which
         // belongs to the document just left.
         _baseModel = null
+        _savedShape = null
         useDiagramStore.getState().loadDiagram({
           nodes: [],
           relations: [],
@@ -377,6 +410,7 @@ if (typeof window !== 'undefined') {
     _watchingId = id
     _stopWatch = documents.watchDocument(id, () => {
       if (documents.getActiveId() !== id) return
+      if (presenting()) { _changedWhilePresenting = id; return }
       console.info('[diagramStore] document changed on disk — reloading')
       loadActive(id, 'md', { keepUi: true })
     })
