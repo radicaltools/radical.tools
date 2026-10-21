@@ -112,3 +112,30 @@ describe('Propagate a change of a sequence', () => {
     expect(steps(s().liveBackup!.sequences)).toEqual(['r2:POSTS', 'r3:returns', 'r1:-'])
   })
 })
+
+describe('Propagate a move into a parent the later models lack', () => {
+  // The step went under its new parent in every later model, where that
+  // parent had been deleted: an element under a parent that does not exist
+  // (a Warnier step drawn at the top level, Parent "—").
+  it('leaves the element where it is in a model without that parent', () => {
+    s().loadDiagram({
+      nodes: [
+        { ...node('shop', 'system', 0, 0), width: 700, height: 400 }, node('api', 'container', 40, 120, 'shop'),
+        { ...node('vault', 'system', 900, 0), width: 700, height: 400 },
+      ],
+      relations: [],
+      views: [],
+    } as DiagramData)
+    const before = s().createSnapshot('before')
+    s().removeNode('vault')
+    s().createSnapshot('after')
+    s().selectMilestone(before)
+    s().reparentNodes(['api'], 'vault')
+    s().commitMilestoneChanges('propagate')
+    expect(s().snapshots[0].nodes.api.parentId).toBe('vault')
+    for (const m of everyModel().slice(1)) {
+      for (const n of Object.values(m.nodes)) expect(!n.parentId || !!m.nodes[n.parentId], `${m.name}: ${n.label}'s parent`).toBe(true)
+      expect(m.nodes.api.parentId, m.name).toBe('shop')
+    }
+  })
+})

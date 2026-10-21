@@ -166,6 +166,20 @@ describe('restoreSnapshot', () => {
     // v1 had only sys1 + ctn1 + ctn2 + usr1
     expect(Object.keys(s.c4Nodes).sort()).toEqual(['ctn1', 'ctn2', 'sys1', 'usr1'])
   })
+
+  // The views kept the ids of elements the restored model lacks (a view
+  // listing 23 drew 3), with their folds and alignments.
+  it('takes the elements the milestone lacks out of the views, in the same undo step', () => {
+    useDiagramStore.setState({
+      views: { v: { id: 'v', name: 'v', nodeIds: ['sys1', 'ctn4'], positions: {}, collapsedNodeIds: ['ctn4'] } },
+    } as any)
+    useDiagramStore.getState().restoreSnapshot('snap-1')
+    expect(useDiagramStore.getState().views.v.nodeIds).toEqual(['sys1'])
+    expect(useDiagramStore.getState().views.v.collapsedNodeIds).toEqual([])
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().views.v.nodeIds).toEqual(['sys1', 'ctn4'])
+    expect(useDiagramStore.getState().c4Nodes.ctn4).toBeDefined()
+  })
 })
 
 describe('renameSnapshot', () => {
@@ -201,6 +215,41 @@ describe('removeSnapshot', () => {
     expect(s.snapshots.find((x: any) => x.id === 'snap-2')).toBeUndefined()
   })
 
+  // It asked nothing, could not be undone, and the slides that showed it
+  // kept its id: a "?" tag, "Milestone: undefined", and the live model.
+  it('is an undo step, and unlinks the slides that showed it until it is undone', () => {
+    useDiagramStore.setState({
+      presentations: [{ id: 'p', name: 'P', slides: [{ id: 's1', name: 'S1', snapshotId: 'snap-2', viewport: { x: 0, y: 0, zoom: 1 } }, { id: 's2', name: 'S2', snapshotId: null, viewport: { x: 0, y: 0, zoom: 1 } }] }],
+      activePresentationId: 'p',
+    } as any)
+    useDiagramStore.setState((s: any) => { s.presentationSlides = s.presentations[0].slides; return s })
+    const names = () => useDiagramStore.getState().snapshots.map((m) => m.name)
+    const before = names()
+    useDiagramStore.getState().removeSnapshot('snap-2')
+    expect(useDiagramStore.getState().canUndo).toBe(true)
+    expect(useDiagramStore.getState().presentations[0].slides[0].snapshotId).toBeNull()
+    expect(useDiagramStore.getState().presentationSlides[0].snapshotId).toBeNull()
+    useDiagramStore.getState().undo()
+    expect(names()).toEqual(before)
+    expect(useDiagramStore.getState().presentations[0].slides[0].snapshotId).toBe('snap-2')
+    expect(useDiagramStore.getState().presentationSlides[0].snapshotId).toBe('snap-2')
+    useDiagramStore.getState().redo()
+    expect(useDiagramStore.getState().snapshots.find((m) => m.id === 'snap-2')).toBeUndefined()
+    expect(useDiagramStore.getState().presentations[0].slides[0].snapshotId).toBeNull()
+  })
+
+  it('a milestone made or renamed is an undo step too, so Undo of an earlier edit does not take it away', () => {
+    const first = Object.keys(useDiagramStore.getState().c4Nodes)[0]
+    useDiagramStore.getState().updateNode(first, { label: 'Edited' })
+    const id = useDiagramStore.getState().createSnapshot('M')
+    useDiagramStore.getState().renameSnapshot(id, 'M2')
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().snapshots.find((m) => m.id === id)?.name).toBe('M')
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().snapshots.find((m) => m.id === id)).toBeUndefined()
+    expect(useDiagramStore.getState().c4Nodes[first].label).toBe('Edited')
+  })
+
   it('does not affect activeSnapshotId when a different snapshot is removed', () => {
     useDiagramStore.getState().selectMilestone('snap-1')
     useDiagramStore.getState().removeSnapshot('snap-2')
@@ -234,11 +283,21 @@ describe('sequence versioning in milestones', () => {
     expect(useDiagramStore.getState().sequences['seqA']).toBeDefined()
   })
 
-  it('selectMilestone keeps live sequences when snapshot has none (backward compat)', () => {
+  it('selectMilestone shows no sequences when the snapshot has none, and Save as new and Propagate store none', () => {
     useDiagramStore.setState({ sequences: { seqA: { ...seqA } } } as any)
     // snap-2 has no sequences field — simulating an old file format
     useDiagramStore.getState().selectMilestone('snap-2')
-    expect(useDiagramStore.getState().sequences['seqA']).toBeDefined()
+    expect(useDiagramStore.getState().sequences).toEqual({})
+    const first = Object.keys(useDiagramStore.getState().c4Nodes)[0]
+    useDiagramStore.getState().updateNode(first, { label: 'Renamed' })
+    useDiagramStore.getState().commitMilestoneChanges('new', 'copy')
+    const copy = useDiagramStore.getState().snapshots.find((m) => m.name === 'copy')!
+    expect(copy.sequences ?? {}).toEqual({})
+    useDiagramStore.getState().updateNode(first, { label: 'Renamed again' })
+    useDiagramStore.getState().commitMilestoneChanges('propagate')
+    for (const m of useDiagramStore.getState().snapshots) expect(Object.keys(m.sequences ?? {})).toEqual([])
+    // The live model keeps its own.
+    expect(useDiagramStore.getState().liveBackup!.sequences.seqA).toBeDefined()
   })
 
   it('liveBackup captures sequences when first entering a milestone', () => {
@@ -340,9 +399,14 @@ describe('sequence versioning in milestones', () => {
 describe('sequence mutations mark milestone dirty', () => {
   const seqA: DiagramSequence = { id: 'seqA', name: 'Login Flow', relationIds: ['r00', 'r01'] }
 
-  // Helper: enter milestone snap-1 in designer mode.
+  // Helper: enter milestone snap-1 in designer mode, with the sequences the
+  // live model has (a milestone saved without them has none).
   function enterMilestone() {
-    useDiagramStore.setState({ appMode: 'designer' } as any)
+    useDiagramStore.setState((s: any) => {
+      s.snapshots.find((x: any) => x.id === 'snap-1').sequences = JSON.parse(JSON.stringify(s.sequences))
+      s.appMode = 'designer'
+      return s
+    })
     useDiagramStore.getState().selectMilestone('snap-1')
     expect(useDiagramStore.getState().activeSnapshotId).toBe('snap-1')
   }

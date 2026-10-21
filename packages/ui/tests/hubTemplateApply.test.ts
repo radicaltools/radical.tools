@@ -61,3 +61,35 @@ it('in a milestone, asks how to keep it, and the record goes the way of the edit
   expect(action()).toBe('investigate within 7 days')
   expect(s().hubTemplates.imp.paramValues.DAYS).toBe('7')
 })
+
+it('in a milestone, shows the values the milestone has, and a Propagate of another edit leaves the live record', () => {
+  // The record was the live model's: the card said 10, the Hub Template
+  // section 15.
+  const snap = s().createSnapshot('As-is')
+  s().applyHubTemplate('imp', { DAYS: '15' })
+  s().selectMilestone(snap)
+  expect(s().hubTemplates.imp.paramValues.DAYS).toBe('10')
+  s().updateNode('api', { label: 'Posting API v1' })
+  s().commitMilestoneChanges('propagate')
+  expect(s().hubTemplates.imp.paramValues.DAYS).toBe('10')
+  s().discardMilestoneChanges()
+  expect(s().hubTemplates.imp.paramValues.DAYS).toBe('15')
+  // An Apply in it goes forward with its text.
+  s().selectMilestone(snap)
+  s().applyHubTemplate('imp', { DAYS: '5' })
+  s().commitMilestoneChanges('propagate')
+  s().discardMilestoneChanges()
+  expect((s().c4Nodes.req as unknown as Record<string, unknown>).action).toBe('investigate within 5 days')
+  expect(s().hubTemplates.imp.paramValues.DAYS).toBe('5')
+})
+
+it('a milestone looked at in Viewer leaves Designer the live record', () => {
+  const snap = s().createSnapshot('As-is')
+  s().applyHubTemplate('imp', { DAYS: '15' })
+  s().setAppMode('viewer')
+  s().selectMilestone(snap)
+  expect(s().hubTemplates.imp.paramValues.DAYS).toBe('10')
+  s().setAppMode('designer')
+  expect(s().hubTemplates.imp.paramValues.DAYS).toBe('15')
+  expect(s().saveDiagram().hubTemplates?.imp.paramValues.DAYS).toBe('15')
+})

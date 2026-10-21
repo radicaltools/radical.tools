@@ -110,8 +110,11 @@ if (typeof window !== 'undefined') {
       data.nodes = Object.values(live.nodes)
       data.relations = Object.values(live.relations)
       data.sequences = Object.values(live.sequences)
-      data.views = Object.values(pre.views)
-      data.defaultPositions = pre.defaultPositions
+      // A view an edit of Designer's milestone changed is saved as the live
+      // model has it (liveBackup.views).
+      const parked = pre.activeSnapshotId ? pre.liveBackup : null
+      data.views = Object.values(pre.views).map((v) => parked?.views?.[v.id] ?? v)
+      data.defaultPositions = parked?.defaultPositions ?? pre.defaultPositions
     }
     return data
   }
@@ -311,8 +314,13 @@ if (typeof window !== 'undefined') {
     if (_watchingId !== id) stopWatching()
     const live = useDiagramStore.getState()
     const camera = opts?.keepUi ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
+    // The live model, also while a milestone is shown: an outside change is
+    // the live model's. Compared with the milestone, a milestone deleted
+    // outside lit up what it and its edits had otherwise.
     const before: BeforeOutsideEdit | null = opts?.keepUi
-      ? { id, nodes: live.c4Nodes, relations: live.c4Relations }
+      ? live.activeSnapshotId && live.liveBackup
+        ? { id, nodes: live.liveBackup.nodes, relations: live.liveBackup.relations }
+        : { id, nodes: live.c4Nodes, relations: live.c4Relations }
       : null
     documents.loadDocument(id).then((data) => {
       if (seq !== _loadSeq || documents.getActiveId() !== id) return

@@ -157,7 +157,7 @@ function mergeById(base: Plain[], ours: Plain[], theirs: Plain[], where: string[
   const b = index(base)
   const o = index(ours)
   const t = index(theirs)
-  const ids = mergeOrder([...b.keys()], [...o.keys()], [...t.keys()], where, layout ? null : ctx)
+  const ids = byTime(mergeOrder([...b.keys()], [...o.keys()], [...t.keys()], where, layout ? null : ctx), b, (id) => o.get(id) ?? t.get(id))
   const out: Plain[] = []
   for (const id of ids) {
     const name = entryName(t.get(id) ?? o.get(id) ?? b.get(id), id, ctx)
@@ -165,6 +165,29 @@ function mergeById(base: Plain[], ours: Plain[], theirs: Plain[], where: string[
     // folder's where both renamed it (the one the screen shows then).
     const value = merge3(b.get(id), o.get(id), t.get(id), [...where.slice(0, -1), name], ctx, layout)
     if (value !== undefined) out.push(value as Plain)
+  }
+  return out
+}
+
+/** Entries with a time (milestones) that both sides added at one place in
+ *  the list stand in the order they were made: the side that was not the
+ *  folder's went first, and the user's milestone made before the agent's
+ *  came after it. Each run of entries `base` lacks is sorted by `timestamp`
+ *  (stable); other lists stay as they are. */
+function byTime(ids: string[], base: Map<string, Plain>, entry: (id: string) => Plain | undefined): string[] {
+  const time = (id: string): number | null => {
+    const t = entry(id)?.timestamp
+    return typeof t === 'number' ? t : null
+  }
+  const out = [...ids]
+  for (let i = 0; i < out.length;) {
+    let j = i
+    while (j < out.length && !base.has(out[j]) && time(out[j]) !== null) j++
+    if (j - i > 1) {
+      const run = out.slice(i, j).sort((a, c) => time(a)! - time(c)!)
+      out.splice(i, j - i, ...run)
+    }
+    i = Math.max(j, i + 1)
   }
   return out
 }

@@ -14,6 +14,7 @@ import { RightPanel, LeftPanel } from '@radical/ui/components/RightPanel'
 import { MetamodelEditor } from './components/MetamodelEditor'
 import { Inspector } from './components/Inspector'
 import { NotificationHost } from '@radical/ui/components/NotificationHost'
+import { MilestoneChip } from '@radical/ui/components/MilestoneChip'
 import { NodeWizard } from '@radical/ui/components/NodeWizard'
 import { SelectionActionBar } from './components/SelectionActionBar'
 import { EdgeActionBar } from './components/EdgeActionBar'
@@ -92,6 +93,11 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : isWarnierView ? <WarnierView /> : <Canvas />}
+      {/* The canvas and the flow view name the milestone in their own
+          corner; the other views have it at the bottom left of theirs. */}
+      {!isPresenting && !isInspector && !isCanvasView && !isSequenceView && (
+        <MilestoneChip style={{ gridArea: 'canvas', justifySelf: 'start', alignSelf: 'end', margin: 10, position: 'relative', zIndex: 7 }} />
+      )}
       {!isPresenting && isDesigner && <RightPanel />}
       {!isPresenting && isViewer && <RightPanel readOnly />}
       {!isPresenting && isPresenter && <PresenterDock />}

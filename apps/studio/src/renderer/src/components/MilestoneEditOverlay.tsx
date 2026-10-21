@@ -51,20 +51,29 @@ export function MilestoneEditOverlay(): React.ReactElement | null {
               <strong>{laterCount}</strong> milestone(s) that come after.
             </div>
           </button>
-          <button className="milestone-option" onClick={() => commit('new', newName)}>
-            <div className="milestone-option-title">Save as new milestone</div>
-            <div className="milestone-option-desc">
-              Insert a new milestone right after <strong>{active.name}</strong>. Later
-              milestones stay unchanged.
-            </div>
+          {/* The name field is beside the button, not in it: in it, a space
+              typed into the name pressed the button ("Target 2027" saved as
+              "Target", and "2027" went to the canvas). */}
+          <div className="milestone-option">
+            <button type="button" className="milestone-option-main" onClick={() => commit('new', newName)}>
+              <div className="milestone-option-title">Save as new milestone</div>
+              <div className="milestone-option-desc">
+                Insert a new milestone right after <strong>{active.name}</strong>. Later
+                milestones stay unchanged.
+              </div>
+            </button>
             <input
               className="milestone-option-input"
+              aria-label="New milestone name"
               value={newName}
               onChange={e => setNewName(e.target.value)}
-              onClick={e => e.stopPropagation()}
+              onKeyDown={e => {
+                e.stopPropagation()
+                if (e.key === 'Enter') { e.preventDefault(); commit('new', newName) }
+              }}
               placeholder="New milestone name"
             />
-          </button>
+          </div>
           <button className="milestone-option ghost" onClick={discard}>
             <div className="milestone-option-title">Discard changes</div>
             <div className="milestone-option-desc">

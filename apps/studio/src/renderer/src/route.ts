@@ -277,15 +277,23 @@ function applyViewModeFocus(route: Route): void {
         useDiagramStore.getState().setWikiFocus(targetView, page)
       }
     }
-    // Milestone (snapshot). Apply-only: we view the requested milestone but
-    // never auto-discard on back-nav (discarding can drop unsaved edits). The
-    // forward direction — exiting a milestone in-app — still updates the URL.
-    // View it with selectMilestone, which parks the live model in liveBackup
-    // so autosave keeps saving it; restoreSnapshot would replace it.
+    // Milestone (snapshot). View it with selectMilestone, which parks the
+    // live model in liveBackup so autosave keeps saving it; restoreSnapshot
+    // would replace it. A route with none (Back from a milestone) leaves
+    // the one shown, as Current (live) does; with unsaved edits it asks
+    // first, as picking another milestone does (discarding them unasked
+    // would lose them). Back used to keep the milestone, and the address
+    // written then put it into the entry Back had gone to.
     if (route.snap) {
       const s = useDiagramStore.getState()
       if (s.activeSnapshotId !== route.snap && s.snapshots.some((sn) => sn.id === route.snap)) {
         s.selectMilestone(route.snap)
+      }
+    } else if (!route.play) {
+      const s = useDiagramStore.getState()
+      if (s.activeSnapshotId) {
+        if (s.milestoneDirty && s.appMode === 'designer') useDiagramStore.setState({ milestonePromptOpen: true })
+        else s.discardMilestoneChanges()
       }
     }
     // The Inspector's tab and card, or the selection: the route is the whole place.

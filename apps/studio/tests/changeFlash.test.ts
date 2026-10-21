@@ -83,6 +83,23 @@ describe('outside changes flash', () => {
     expect(s.showDiff).toBe(false)
   })
 
+  it('compares with the live model when the milestone shown with unsaved edits was deleted outside', async () => {
+    // It compared with the milestone on screen: the elements the milestone
+    // and its edits had otherwise lit up, though the agent changed none.
+    const milestone = { id: 'm1', name: 'As-is', timestamp: 1, nodes: Object.fromEntries(SAMPLE.nodes.map((n) => [n.id, n.id === 'sys1' ? { ...n, label: 'Old payments' } : n])), relations: {} }
+    const edit = await openFolder()
+    await edit({ ...SAMPLE, snapshots: [milestone] } as DiagramData)
+    await wait(300)
+    useDiagramStore.getState().setAppMode('designer')
+    useDiagramStore.getState().selectMilestone('m1')
+    useDiagramStore.getState().updateNode('sys2', { label: 'Ledger (as-is)' })
+    expect(useDiagramStore.getState().milestoneDirty).toBe(true)
+    await edit({ ...SAMPLE, snapshots: [] } as DiagramData)
+    const s = useDiagramStore.getState()
+    expect(s.activeSnapshotId).toBeNull()
+    expect(s.diffHighlight).toEqual({})
+  })
+
   it('shows nothing for a layout change', async () => {
     const edit = await openFolder()
     await edit({ ...SAMPLE, nodes: SAMPLE.nodes.map((n) => ({ ...n, x: n.x + 300 })) })
