@@ -9,7 +9,7 @@
 // mutations beyond `setActiveView`.
 
 import type { C4Node, C4Relation, C4ElementType, DiagramData, DiagramSequence, DiagramView } from '@radical/common/c4'
-import { NODE_SIZES } from '@radical/common/c4'
+import { NODE_SIZES, trimStepBackward } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import type { HubConcept, TemplateParam } from '@radical/common/hubFormat'
 import { conceptViewsToDiagram } from '@radical/ui/viewer'
@@ -113,6 +113,7 @@ export function conceptToDiagramData(concept: HubConcept, opts: { layoutFrom?: s
       name: typeof s.name === 'string' ? s.name : concept.name,
       relationIds: s.relationIds as string[],
       stepDescriptions: Array.isArray(s.stepDescriptions) ? (s.stepDescriptions as (string | undefined)[]) : undefined,
+      stepBackward: trimStepBackward(Array.isArray(s.stepBackward) ? s.stepBackward : undefined),
     }))
 
   const allIds = nodes.map((n) => n.id)

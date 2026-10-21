@@ -1,6 +1,7 @@
 // ─── Sequence tools: create_sequence / update_sequence / delete_sequence ────
 // A sequence is an ordered list of existing relations (the steps of a flow,
-// e.g. "Checkout"). A view of kind 'dynamic' plays one — see create_view.
+// e.g. "Checkout"). A step may run along its relation the other way, as a
+// response (backward). A view of kind 'dynamic' plays one — see create_view.
 
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 
@@ -12,6 +13,7 @@ const STEPS_SCHEMA = {
     properties: {
       relationId: { type: 'string' },
       description: { type: 'string', description: 'What happens in this step, shown instead of the relation label.' },
+      backward: { type: 'boolean', description: "True when the step runs along the relation the other way, from its target back to its source: a response, such as the answer to a call (the relation \"API → DB\" as the step \"DB returns the rows to the API\"). Default false." },
     },
     required: ['relationId'],
     additionalProperties: false,
@@ -61,7 +63,7 @@ export function buildSequenceToolDefs(): ToolDef[] {
   ]
 }
 
-type Steps = Array<{ relationId: string; description?: string }>
+type Steps = Array<{ relationId: string; description?: string; backward?: boolean }>
 
 /** Validated steps with real relation ids, or the reason they are invalid. */
 function parseSteps(tool: string, raw: unknown, ctx: ToolRunContext): { steps: Steps } | { error: string } {
@@ -69,11 +71,16 @@ function parseSteps(tool: string, raw: unknown, ctx: ToolRunContext): { steps: S
   const relations = ctx.diagram.getRelations()
   const steps: Steps = []
   for (const [i, step] of raw.entries()) {
-    const s = step as { relationId?: unknown; description?: unknown }
+    const s = step as { relationId?: unknown; description?: unknown; backward?: unknown }
     if (typeof s?.relationId !== 'string' || !s.relationId) return { error: `${tool}: step ${i + 1} needs a relationId` }
     const relationId = ctx.resolveId(s.relationId)
     if (!(relationId in relations)) return { error: `${tool}: step ${i + 1} has unknown relationId "${s.relationId}"` }
-    steps.push({ relationId, ...(typeof s.description === 'string' && s.description ? { description: s.description } : {}) })
+    if (s.backward !== undefined && typeof s.backward !== 'boolean') return { error: `${tool}: step ${i + 1}: backward must be true or false` }
+    steps.push({
+      relationId,
+      ...(typeof s.description === 'string' && s.description ? { description: s.description } : {}),
+      ...(s.backward ? { backward: true } : {}),
+    })
   }
   return { steps }
 }

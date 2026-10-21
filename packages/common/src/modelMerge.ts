@@ -13,9 +13,10 @@
 // - A list of ids that is a set (a view's elements, its hidden relations)
 //   merges as one: what either side added is in, what either removed is out.
 // - A sequence's steps (its relations in order, which may repeat, and the
-//   note of each) merge as one list of steps, along the steps both sides
-//   kept from base: what either side removed is out, what either added is in
-//   where it added it, and a note changed on one side stays on its step.
+//   note and the way of each) merge as one list of steps, along the steps
+//   both sides kept from base: what either side removed is out, what either
+//   added is in where it added it, and a note changed or a step turned to
+//   run the other way on one side stays on its step.
 // - An entry's fields merge key by key; a nested object (positions, a view's
 //   positions map, a property bag) key by key again.
 // - Anything else (a string, another list of ids, a list without ids) is one
@@ -31,7 +32,7 @@
 // The merged model may break a rule each side kept on its own (a relation to
 // an element the other side deleted); validation shows it.
 
-import type { DiagramData } from './c4'
+import { trimStepBackward, type DiagramData } from './c4'
 import { modelValue } from './model'
 
 export interface ModelMergeResult {
@@ -64,7 +65,7 @@ const ID_SET_KEYS = new Set(['nodeIds', 'hiddenRelationIds', 'collapsedNodeIds',
 const ALL_WHEN_EMPTY_KEYS = new Set(['allowedParents'])
 
 /** A sequence's keys merged together, as its steps (mergeSteps). */
-const STEP_KEYS = new Set(['relationIds', 'stepDescriptions'])
+const STEP_KEYS = new Set(['relationIds', 'stepDescriptions', 'stepBackward'])
 
 type Plain = Record<string, unknown>
 
@@ -285,25 +286,29 @@ function mergeIdSet(base: string[] | undefined, ours: string[] | undefined, thei
 export interface SequenceSteps {
   relationIds: string[]
   stepDescriptions?: (string | undefined)[]
+  stepBackward?: boolean[]
 }
 
-type Step = { rel: string; note: string | undefined }
+/** A step: its relation, its note, and whether it runs the relation backward. */
+type Step = { rel: string; note: string | undefined; back: boolean }
 
 const stepsOf = (seq: Partial<SequenceSteps> | Plain | undefined): Step[] => {
   const rels = Array.isArray(seq?.relationIds) ? (seq!.relationIds as string[]) : []
   const notes = Array.isArray(seq?.stepDescriptions) ? (seq!.stepDescriptions as unknown[]) : []
-  return rels.map((rel, i) => ({ rel, note: typeof notes[i] === 'string' && notes[i] ? (notes[i] as string) : undefined }))
+  const back = Array.isArray(seq?.stepBackward) ? (seq!.stepBackward as unknown[]) : []
+  return rels.map((rel, i) => ({ rel, note: typeof notes[i] === 'string' && notes[i] ? (notes[i] as string) : undefined, back: back[i] === true }))
 }
 
 /** For each step of `a`, the index of the step of `b` it is (-1: none), along
  *  the longest run of relations both have in the same order; of the runs as
- *  long, the one whose steps keep the most notes (a relation used by two
- *  steps: the step removed is the one whose note went, not the first). */
+ *  long, the one whose steps keep the most notes and ways (a relation used
+ *  by two steps: the step removed is the one whose note went, not the
+ *  first). */
 function alignSteps(a: Step[], b: Step[]): number[] {
   const n = a.length, m = b.length
-  // A step paired weighs more than every note kept together.
-  const pair = n + m + 1
-  const weight = (i: number, j: number) => (a[i].rel !== b[j].rel ? 0 : pair + (a[i].note === b[j].note ? 1 : 0))
+  // A step paired weighs more than every note and way kept together.
+  const pair = 2 * (n + m) + 1
+  const weight = (i: number, j: number) => (a[i].rel !== b[j].rel ? 0 : pair + (a[i].note === b[j].note ? 1 : 0) + (a[i].back === b[j].back ? 1 : 0))
   const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0))
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
@@ -322,11 +327,11 @@ function alignSteps(a: Step[], b: Step[]): number[] {
 }
 
 /** The steps `ours` and `theirs` made of `base`'s merged: the steps of base
- *  that both kept, in base's order, with the note the side that changed it
- *  gave it (theirs where both did: a conflict); a step one side removed is
- *  out (a conflict where the other changed its note); the steps each side
- *  added sit after the step of base they follow there, theirs first. A step
- *  moved is one removed and one added. */
+ *  that both kept, in base's order, with the note and the way the side that
+ *  changed it gave it (theirs where both did: a conflict); a step one side
+ *  removed is out (a conflict where the other changed its note or turned
+ *  it); the steps each side added sit after the step of base they follow
+ *  there, theirs first. A step moved is one removed and one added. */
 export function mergeSteps(
   base: Partial<SequenceSteps> | Plain | undefined,
   ours: Partial<SequenceSteps> | Plain | undefined,
@@ -361,8 +366,9 @@ export function mergeSteps(
     if (so && st) {
       const note = so.note === step.note ? st.note : st.note === step.note ? so.note : st.note
       if (so.note !== step.note && st.note !== step.note && so.note !== st.note) conflict = true
-      out.push({ rel: step.rel, note })
-    } else if ((so && so.note !== step.note) || (st && st.note !== step.note)) {
+      // A flag: where both changed it, they changed it alike.
+      out.push({ rel: step.rel, note, back: so.back === step.back ? st.back : so.back })
+    } else if ((so && (so.note !== step.note || so.back !== step.back)) || (st && (st.note !== step.note || st.back !== step.back))) {
       conflict = true
     }
     insert(i)
@@ -370,7 +376,8 @@ export function mergeSteps(
   const notes = out.map((s) => s.note)
   while (notes.length > 0 && notes[notes.length - 1] === undefined) notes.pop()
   const keepsNotes = notes.length > 0 || [ours, theirs].some((s) => Array.isArray(s?.stepDescriptions))
-  return { steps: { relationIds: out.map((s) => s.rel), ...(keepsNotes ? { stepDescriptions: notes } : {}) }, conflict }
+  const back = trimStepBackward(out.map((s) => s.back))
+  return { steps: { relationIds: out.map((s) => s.rel), ...(keepsNotes ? { stepDescriptions: notes } : {}), ...(back ? { stepBackward: back } : {}) }, conflict }
 }
 
 /** Whether `side` puts the ids it shares with `base` in another order. */

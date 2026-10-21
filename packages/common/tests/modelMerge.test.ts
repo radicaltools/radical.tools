@@ -364,6 +364,44 @@ describe('mergeModels: a sequence\'s steps and notes', () => {
     expect(pairs(merged)).toEqual(['r1:submits', 'r2:theirs', 'r3:stores'])
     expect(conflicts).toEqual(['Place Order: steps'])
   })
+
+  // A step's direction (stepBackward) is the step's, as its note is.
+  const withFlags = (relationIds: string[], stepBackward?: boolean[]): DiagramData =>
+    ({ ...clone(base), sequences: [{ id: 's', name: 'Place Order', relationIds, ...(stepBackward ? { stepBackward } : {}) }] })
+  const ways = (d: DiagramData) => {
+    const q = d.sequences![0]
+    return q.relationIds.map((r, i) => `${r}${q.stepBackward?.[i] ? '<' : '>'}`)
+  }
+
+  it('keeps a step turned backward on one side on its step when the other removes a step before it', () => {
+    const b3 = withFlags(['r1', 'r2', 'r2'])
+    const ours = withFlags(['r1', 'r2', 'r2'], [false, false, true])
+    const theirs = withFlags(['r2', 'r2'])
+    for (const [o, t] of [[ours, theirs], [theirs, ours]]) {
+      const { merged, conflicts } = mergeModels(b3, o, t)
+      expect(ways(merged)).toEqual(['r2>', 'r2<'])
+      expect(merged.sequences![0].stepBackward).toEqual([false, true])
+      expect(conflicts).toEqual([])
+    }
+  })
+
+  it('keeps the backward steps each side added, and none when a side turns the last one forward', () => {
+    const b3 = withFlags(['r1', 'r2'], [false, true])
+    const ours = withFlags(['r1', 'r2', 'r1'], [false, true, true])
+    const theirs = withFlags(['r1', 'r2'])
+    const { merged, conflicts } = mergeModels(b3, ours, theirs)
+    expect(ways(merged)).toEqual(['r1>', 'r2>', 'r1<'])
+    expect(conflicts).toEqual([])
+    const back = mergeModels(b3, withFlags(['r1', 'r2']), withFlags(['r1', 'r2'], [false, true]))
+    expect(back.merged.sequences![0].stepBackward).toBeUndefined()
+  })
+
+  it('says so when a side removes a step the other turned', () => {
+    const b3 = withFlags(['r1', 'r2'])
+    const { merged, conflicts } = mergeModels(b3, withFlags(['r1']), withFlags(['r1', 'r2'], [false, true]))
+    expect(ways(merged)).toEqual(['r1>'])
+    expect(conflicts).toEqual(['Place Order: steps'])
+  })
 })
 
 describe('modelEdits and mergeModelEdits', () => {

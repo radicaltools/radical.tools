@@ -312,3 +312,65 @@ describe('deleting what a sequence steps along (D4)', () => {
     expect(seq.relationIds.every((r) => useDiagramStore.getState().c4Relations[r])).toBe(true)
   })
 })
+
+describe('backward steps (a response along the relation)', () => {
+  const withSteps = () => {
+    const seqId = useDiagramStore.getState().addSequence('S')
+    const relIds = Object.keys(useDiagramStore.getState().c4Relations).slice(0, 3)
+    for (const r of relIds) useDiagramStore.getState().toggleRelationInSequence(seqId, r)
+    return { seqId, relIds, seq: () => useDiagramStore.getState().sequences[seqId] }
+  }
+
+  it('setStepBackward turns one step, as one undo step; turned forward again it leaves no flags', () => {
+    const { seqId, seq } = withSteps()
+    useDiagramStore.getState().setStepBackward(seqId, 1, true)
+    expect(seq().stepBackward).toEqual([false, true])
+    useDiagramStore.getState().setStepBackward(seqId, 1, false)
+    expect(seq().stepBackward).toBeUndefined()
+    useDiagramStore.getState().undo()
+    expect(seq().stepBackward).toEqual([false, true])
+    useDiagramStore.getState().undo()
+    expect(seq().stepBackward).toBeUndefined()
+    expect(seq().relationIds).toHaveLength(3)
+  })
+
+  it('is no edit when the step already runs that way, or is not there', () => {
+    const { seqId, seq } = withSteps()
+    const before = seq()
+    useDiagramStore.getState().setStepBackward(seqId, 0, false)
+    useDiagramStore.getState().setStepBackward(seqId, 7, true)
+    expect(seq()).toBe(before)
+  })
+
+  it('keeps the flag on its step when steps are removed, moved, cleared or their relation deleted', () => {
+    const { seqId, relIds, seq } = withSteps()
+    useDiagramStore.getState().setStepBackward(seqId, 2, true)
+    useDiagramStore.getState().removeFromSequence(seqId, 0)
+    expect(seq().stepBackward).toEqual([false, true])
+    useDiagramStore.getState().reorderSequence(seqId, 1, 0)
+    expect(seq().relationIds).toEqual([relIds[2], relIds[1]])
+    expect(seq().stepBackward).toEqual([true])
+    useDiagramStore.getState().reorderSequence(seqId, 0, 1)
+    expect(seq().stepBackward).toEqual([false, true])
+    useDiagramStore.getState().removeRelation(relIds[1])
+    expect(seq().relationIds).toEqual([relIds[2]])
+    expect(seq().stepBackward).toEqual([true])
+    useDiagramStore.getState().clearSequence(seqId)
+    expect(seq().stepBackward).toBeUndefined()
+  })
+
+  it('numbers a backward step on the canvas apart from the forward ones of its relation', () => {
+    const { seqId, relIds } = withSteps()
+    useDiagramStore.getState().toggleRelationInSequence(seqId, relIds[0])
+    useDiagramStore.getState().setStepBackward(seqId, 3, true)
+    useDiagramStore.getState().setActiveSequence(seqId)
+    const edge = (id: string) => useDiagramStore.getState().rfEdges.find((e) => e.id === id)?.data as { sequenceStep?: number[]; sequenceStepBack?: number[] } | undefined
+    expect(edge(relIds[0])).toMatchObject({ sequenceStep: [1], sequenceStepBack: [4] })
+    expect(edge(relIds[1])?.sequenceStepBack).toBeUndefined()
+  })
+
+  it('computeStepDiff marks a step turned the other way as changed', () => {
+    const d = computeStepDiff({ relationIds: ['r1', 'r2'] }, { relationIds: ['r1', 'r2'], stepBackward: [false, true] })
+    expect(d.steps).toEqual([undefined, 'changed'])
+  })
+})
