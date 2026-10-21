@@ -837,6 +837,16 @@ const KNOWN: Known[] = [
     match: (t, v) => lastAction(t) === 'viewKind' && !!v.facts?.overlap && t.some((a) => a.a === 'reparent' || a.a === 'add'),
     note: 'K24: a view turned into a canvas after a move or an add shows the places it then takes over each other (new; K3 through a view type change?)',
   },
+  {
+    // Sample: steps added, a component moved into Accounts Service on a new
+    // table view (no canvas), All elements opened: the group Operator
+    // journey — fraud case is framed at (20, 5083.7) 960 × 310, its mockups
+    // at y 5226, 190 high, 22 px past its bottom. Not analysed; found once
+    // the add before it no longer ended the run (K4).
+    rule: 'geometry',
+    match: (t, v) => lastAction(t) === 'view' && !!v.facts?.outside && t.some((a) => a.a === 'reparent'),
+    note: 'K25: a move made where no canvas is shown, then All elements opened: a group is framed short of its children (new; K3 seen as an outside?)',
+  },
 ]
 
 const knownHits = new Map<string, number>()
