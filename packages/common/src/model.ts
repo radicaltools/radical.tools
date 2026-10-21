@@ -353,6 +353,38 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
     if (box) positions[id] = box
     else delete positions[id]
   }
+  leaveAncestorAlignments(state, moving)
+}
+
+/** Takes the `moved` elements (and what they hold) out of the rows, columns
+ *  and grids they now share with one of their ancestors, on every canvas:
+ *  an element cannot be aligned with its own container (checkMembers), and
+ *  a grid holding one of its members inside another drew them on top of
+ *  each other. A rule left with one member goes. Mutates `state`. */
+function leaveAncestorAlignments(state: ModelState, moved: string[]): void {
+  if (!moved.length) return
+  const inMoved = new Set(moved.flatMap((id) => [id, ...descendantIds(id, state.c4Nodes)]))
+  const ancestorsOf = (id: string): string[] => {
+    const out: string[] = []
+    for (let cur = state.c4Nodes[id]?.parentId; cur && state.c4Nodes[cur] && !out.includes(cur); cur = state.c4Nodes[cur].parentId) out.push(cur)
+    return out
+  }
+  const leave = (constraints: LayoutConstraint[]): LayoutConstraint[] => {
+    const out: LayoutConstraint[] = []
+    let changed = false
+    for (const c of constraints) {
+      const members = new Set(c.nodeIds)
+      const kept = c.type === 'pin' ? c.nodeIds : c.nodeIds.filter((id) => !inMoved.has(id) || !ancestorsOf(id).some((a) => members.has(a)))
+      if (kept.length === c.nodeIds.length) { out.push(c); continue }
+      changed = true
+      if (kept.length >= 2) out.push({ ...c, nodeIds: kept })
+    }
+    return changed ? out : constraints
+  }
+  for (const view of Object.values(state.views)) {
+    if (view.layoutConstraints?.length) view.layoutConstraints = leave(view.layoutConstraints)
+  }
+  if (state.defaultLayoutConstraints?.length) state.defaultLayoutConstraints = leave(state.defaultLayoutConstraints)
 }
 
 /** Why a node cannot be removed with its children kept (they move one level
