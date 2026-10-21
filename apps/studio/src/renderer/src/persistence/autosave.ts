@@ -71,6 +71,8 @@ export function reloadActiveDocument(): void {
 // active document is (LS or FS, resolved fresh on every flush).
 if (typeof window !== 'undefined') {
   let _persistTimer: ReturnType<typeof setTimeout> | null = null
+  /** The longest a save waits while the model goes on changing. */
+  const MAX_SAVE_WAIT_MS = 2000
   let _suspended = false
   /** Edits made since the last save was handed to the document store: what a
    *  reload of an outside edit merges into the model it loads. */
@@ -161,9 +163,19 @@ if (typeof window !== 'undefined') {
       reportSaveError(e, !leaving)
     }
   }
+  /** When the save waiting now was first asked for. */
+  let _pendingSince = 0
   const schedulePersist = (delay = 400): void => {
     _unsaved = true
-    if (_persistTimer !== null) clearTimeout(_persistTimer)
+    if (_persistTimer !== null) {
+      // Changes that keep coming (a layout settling on a large canvas) hold
+      // the save back no longer than this: each one put it off again, and
+      // a Warnier process of 150 steps was never saved.
+      if (Date.now() - _pendingSince >= MAX_SAVE_WAIT_MS) return
+      clearTimeout(_persistTimer)
+    } else {
+      _pendingSince = Date.now()
+    }
     _persistTimer = setTimeout(() => {
       _persistTimer = null
       void flushPersist()

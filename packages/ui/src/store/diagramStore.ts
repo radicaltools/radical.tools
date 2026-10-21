@@ -3989,8 +3989,10 @@ export const useDiagramStore = create<DiagramStore>()(
           if (first) placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, first, view, state.c4Relations as Record<string, C4Relation>)
         })
         get()._sync()
-        // The live layout drops what it had of the canvas shown before.
+        // The live layout drops what it had of the canvas shown before (and,
+        // shown as no canvas, lays nothing out).
         if (placed) _liveLayout?.reset(placed)
+        else if (get().activeViewId === viewId) _liveLayout?.reset()
       },
 
       setTreemapFocus(viewId, focusId) {
@@ -4849,6 +4851,11 @@ export const useDiagramStore = create<DiagramStore>()(
           // collapsed/expanded overrides included, so a node collapsed on All
           // elements but expanded in this view is a group here, not a leaf.
           getModel: () => {
+            // Only a canvas is laid out. Behind a table, wiki, Warnier,
+            // matrix or treemap view nobody sees the layout: it moved
+            // nodes[].x/y for many seconds after an add, holding the save.
+            const shown = get().activeViewId ? get().views[get().activeViewId!] : undefined
+            if (shown && (shown.kind ?? 'static') !== 'static') return { nodes: {}, relations: {}, alignments: [], pinned: [] }
             const { nodes, relations, alignments } = layoutInputForView(get())
             return { nodes, relations, alignments, pinned: pinnedNodeIds(activeLayoutConstraints(get())) }
           },

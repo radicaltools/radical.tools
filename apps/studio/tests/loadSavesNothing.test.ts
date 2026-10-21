@@ -68,3 +68,17 @@ describe('a model just opened', () => {
     expect(saved()).not.toBe(before)
   })
 })
+
+describe('a save after an edit', () => {
+  it('does not wait for the model to stop changing', async () => {
+    const before = saved()
+    useDiagramStore.getState().updateNode('b', { label: 'Edited' })
+    // A layout settling on a large canvas: a move every 100 ms, for 3 s.
+    for (let i = 0; i < 30 && saved() === before; i++) {
+      useDiagramStore.getState()._pushUndo()
+      settleLayout()
+      await wait(100)
+    }
+    expect(saved()).not.toBe(before)
+  })
+})
