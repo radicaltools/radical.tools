@@ -277,6 +277,11 @@ export async function applyElkLayout(
   // layer assignment at the root level is handled by crossingOpt post-process.
   for (const rel of Object.values(c4Relations)) {
     if (!c4Nodes[rel.sourceId] || !c4Nodes[rel.targetId]) continue
+    // A relation between an element and its own container (or one further
+    // up) has no place in ELK's graph: ELK rejects the whole graph
+    // (UnsupportedGraphException). Its line is inside the container
+    // whatever the layout, so the layout leaves it out.
+    if (ancestorChain(rel.sourceId, c4Nodes).includes(rel.targetId) || ancestorChain(rel.targetId, c4Nodes).includes(rel.sourceId)) continue
     const lca = lcaContainerId(rel.sourceId, rel.targetId, c4Nodes)
     const container: ElkNode = (lca ? elkNodeMap[lca] : root) ?? root
     const edge: ElkExtendedEdge = { id: rel.id, sources: [rel.sourceId], targets: [rel.targetId] }

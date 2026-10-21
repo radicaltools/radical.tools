@@ -713,15 +713,6 @@ const KNOWN: Known[] = [
     note: 'K7: a merge keeps an alignment, pin, view fold or view list entry of an element the other side deleted (new; sibling of item 234)',
   },
   {
-    // API moved into Payment Provider (API → Payment Provider "charges
-    // card", now a relation to its own container), then Smart Layout: 11
-    // "[ELK] Layout error … UnsupportedGraphException" on the console; the
-    // layout is applied all the same.
-    rule: 'noErrors',
-    match: (_t, v) => v.detail.includes('UnsupportedGraphException'),
-    note: 'K8: Smart Layout logs ELK errors for a relation between an element and its container (new)',
-  },
-  {
     // "browses and orders" (step 1 of Place Order) deleted, the agent
     // deletes Bookstore with Web App, Undo: no relation comes back (its end
     // is gone) but the sequence has the step ["r1"] again, saved so.
