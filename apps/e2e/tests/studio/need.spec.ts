@@ -38,6 +38,14 @@ test.describe('on the governance bookstore', () => {
   })
 
   test('Radical Forge stores its description as a Need and offers existing Needs as input', async ({ page, studio }) => {
+    // Radical Forge is offered with an AI provider only (decided 2026-10-21).
+    await page.addInitScript(() => {
+      localStorage.setItem('radical-ai-settings', JSON.stringify({
+        enabled: true,
+        active: 'anthropic',
+        providers: { anthropic: { apiKey: 'e2e', baseUrl: '', model: '' } },
+      }))
+    })
     await studio.open('v-context')
     const openForge = async () => {
       await page.getByTitle('Menu').click()

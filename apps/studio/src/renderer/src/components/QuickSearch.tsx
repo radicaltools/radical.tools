@@ -14,6 +14,7 @@ import { agentForgePhase, useAgentForgeStore } from '../persistence/agentForge'
 import { useFollowAgentStore } from '../persistence/followAgent'
 import { pickViewFor, showOnPage, viewNodeSets as viewNodeSetsOf } from '../navigation'
 import { keysTakenByDialog } from './dialogKeys'
+import { FORGE_NEEDS_AI } from '../ai/settings'
 
 /**
  * Cmd/Ctrl+P quick-search palette.
@@ -518,7 +519,10 @@ export function QuickSearch(): React.ReactElement | null {
         <button
           type="button"
           className={`qs-forge-toggle${agentPhase ? ` qs-forge-agent qs-forge-${agentPhase}` : ''}`}
-          title={agentPhase ? agentTitle : 'Open Radical Forge — generate a model from a description'}
+          // Studio's own Forge runs on an AI provider: without one the
+          // button says how to get one (an agent's run is shown anyway).
+          disabled={!agentPhase && !aiConfigured}
+          title={agentPhase ? agentTitle : aiConfigured ? 'Open Radical Forge — generate a model from a description' : FORGE_NEEDS_AI}
           aria-label={agentPhase ? 'Show the agent\'s Radical Forge run' : 'Open Radical Forge'}
           data-agent-phase={agentPhase ?? undefined}
           data-following={followingAgent || undefined}

@@ -16,6 +16,7 @@ import { AgentForgeModal } from './AgentForgeModal'
 import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { useExport } from '../hooks/useExport'
 import { keysTakenByDialog } from './dialogKeys'
+import { FORGE_NEEDS_AI, aiReady, loadAISettings } from '../ai/settings'
 import { useMenuKeys } from './menuKeys'
 import {
   loadStudioSettings,
@@ -274,6 +275,10 @@ function AppMenu({
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // Radical Forge talks to an AI provider: without one it is offered
+  // disabled (it saved the description, made its views and fetched the
+  // Hub's index before saying so). Read each time the menu opens.
+  const forgeReady = open && aiReady(loadAISettings())
   const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac')
   // How the model's canvases draw relations (All elements, and the views
   // that do not choose their own in their properties).
@@ -453,10 +458,17 @@ function AppMenu({
               className="app-menu-item"
               role="menuitem"
               onClick={run(onOpenForge)}
-              title="Generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model from a description"
+              disabled={!forgeReady}
+              aria-describedby={forgeReady ? undefined : 'app-menu-forge-hint'}
+              title={forgeReady
+                ? 'Generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model from a description'
+                : FORGE_NEEDS_AI}
             >
               <span className="app-menu-icon"><IconAI /></span>
-              <span className="app-menu-text">Radical Forge…</span>
+              <span className="app-menu-text">
+                Radical Forge…
+                {!forgeReady && <span id="app-menu-forge-hint" className="app-menu-hint">Needs an AI provider: AI providers… above</span>}
+              </span>
             </button>
           </div>
 
@@ -655,7 +667,13 @@ export function Toolbar(): React.ReactElement {
   const handleCloseAbout = useCallback(() => { setAboutOpen(false) }, [])
 
   const [forgeOpen, setForgeOpen] = useState(false)
-  const handleOpenForge = useCallback(() => { setForgeOpen(true) }, [])
+  const handleOpenForge = useCallback(() => {
+    if (!aiReady(loadAISettings())) {
+      useDiagramStore.getState().pushNotification(FORGE_NEEDS_AI, 'info')
+      return
+    }
+    setForgeOpen(true)
+  }, [])
   const handleCloseForge = useCallback(() => { setForgeOpen(false) }, [])
 
   const [hubOpen, setHubOpen] = useState(false)
@@ -700,10 +718,10 @@ export function Toolbar(): React.ReactElement {
   // open) launch Radical Forge right after creating the blank model it opens
   // into — same window-event pattern as the AI settings modal above.
   useEffect(() => {
-    const onOpen = () => setForgeOpen(true)
+    const onOpen = () => handleOpenForge()
     window.addEventListener('radical:open-forge', onOpen as EventListener)
     return () => window.removeEventListener('radical:open-forge', onOpen as EventListener)
-  }, [])
+  },[handleOpenForge])
 
   // The Forge button opens a read-only view instead while an agent runs
   // Forge on this folder over MCP (see persistence/agentForge).

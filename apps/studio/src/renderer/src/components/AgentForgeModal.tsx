@@ -126,6 +126,23 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
           </span>
         </div>
       )}
+      {(phase === 'done' || phase === 'paused') && (
+        <div className="forge-agent-follow">
+          {/* The run is over: the Forge button showed only it for half an
+              hour, and Studio's own Forge could not be opened. */}
+          <button
+            type="button"
+            className="forge-btn forge-btn-sm forge-btn-primary"
+            onClick={() => {
+              onClose()
+              window.dispatchEvent(new CustomEvent('radical:open-forge'))
+            }}
+          >
+            Start a new run
+          </button>
+          <span className="forge-agent-follow-hint">Radical Forge in Studio, on this model, with your AI provider.</span>
+        </div>
+      )}
     </div>,
     document.body,
   )

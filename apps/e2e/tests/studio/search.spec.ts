@@ -35,6 +35,9 @@ test('Quick Search is on every view, and a pick on a table selects the element',
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
   await studio.designer()
+  // The model opens on its first view (decided 2026-10-21), the wiki.
+  await expect(page).toHaveURL(/\/v\/v-docs$/)
+  await page.locator('.lp-view-card', { hasText: 'All elements' }).click()
 
   // All elements is a table: the bar and its Forge button are there.
   const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)

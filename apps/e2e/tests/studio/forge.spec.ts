@@ -382,3 +382,18 @@ test('Forge asks before it refines an earlier stage and applies only what the us
   await expect(page.getByTestId('forge-gaps')).toContainText('open gaps in the model — the next stage gets them')
   await page.locator('.forge-panel').screenshot({ path: test.info().outputPath('refinements-accepted.png') })
 })
+
+test('without an AI provider Radical Forge is offered disabled, with how to set one up, and asks nothing', async ({ page, studio }) => {
+  await studio.seed()
+  const asked: string[] = []
+  page.on('request', (r) => { if (/index\.json|api\.anthropic\.com/.test(r.url())) asked.push(r.url()) })
+  await studio.open('v-context')
+  await page.getByTitle('Menu', { exact: true }).click()
+  const item = page.getByRole('menuitem', { name: /Radical Forge…/ })
+  await expect(item).toBeDisabled()
+  await expect(item).toContainText('Needs an AI provider')
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: 'Open Radical Forge' })).toBeDisabled()
+  await expect(page.locator('.forge-panel')).toHaveCount(0)
+  expect(asked).toEqual([])
+})
