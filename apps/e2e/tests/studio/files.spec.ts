@@ -118,7 +118,7 @@ test('Move to browser keeps a file model in this browser and leaves the file as 
   await models.getByRole('button', { name: /^Actions for / }).first().click()
   page.once('dialog', (d) => void d.accept())
   await models.getByRole('menuitem', { name: 'Move to browser' }).click()
-  await expect(models.locator('.docmgr-badge.ls')).toBeVisible()
+  await expect(models.locator('.docmgr-item.active .docmgr-badge.ls')).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(models).toBeHidden()
   const onDisk = await file.read()

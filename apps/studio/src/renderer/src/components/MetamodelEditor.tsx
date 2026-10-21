@@ -293,7 +293,7 @@ function NodeTypeCard({
 
   return (
     <div ref={ref} className={`mm-card${focusToken !== undefined ? ' focused' : ''}`}>
-      <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open}>
+      <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open} aria-label={def.label}>
         <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
           <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -492,7 +492,7 @@ function RelationTypeCard({
 
   return (
     <div ref={ref} className={`mm-card${focusToken !== undefined ? ' focused' : ''}`}>
-      <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open}>
+      <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open} aria-label={def.label}>
         <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
           <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -664,7 +664,7 @@ function ViewpointCard({
 
   return (
     <div className="mm-card">
-      <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open}>
+      <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open} aria-label={def.label}>
         <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
           <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
