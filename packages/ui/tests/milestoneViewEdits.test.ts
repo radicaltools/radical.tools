@@ -121,6 +121,87 @@ describe('A view edited while a milestone is shown', () => {
   })
 })
 
+describe('An element added on a view that lists its elements, in a milestone', () => {
+  // The add listed the new id in the live view at once: saved so, it named
+  // an element no model had, and stayed after Discard (sibling of item 230).
+  beforeEach(() => {
+    s().discardMilestoneChanges()
+    const data = model()
+    data.views!.push({ id: 'listed', name: 'listed', nodeIds: ['shop', 'bank'], positions: {} } as DiagramView)
+    s().loadDiagram(data)
+    early = s().createSnapshot('early')
+    s().setActiveView('listed')
+    s().selectMilestone(early)
+  })
+
+  it('is listed in the view shown only, and Discard takes it out', () => {
+    const live = json(savedView('listed'))
+    const { id: _x, ...added } = node('x', 'system', 1500, 0)
+    const id = s().addNode(added)
+    expect(s().milestoneDirty).toBe(true)
+    expect(s().views.listed.nodeIds).toContain(id)
+    expect(json(savedView('listed'))).toBe(live)
+    s().discardMilestoneChanges()
+    expect(s().views.listed.nodeIds).toEqual(['shop', 'bank'])
+  })
+
+  it('is listed in the live view by Propagate', () => {
+    const { id: _x, ...added } = node('x', 'system', 1500, 0)
+    const id = s().addNode(added)
+    s().commitMilestoneChanges('propagate')
+    s().discardMilestoneChanges()
+    expect(savedView('listed').nodeIds).toEqual(['shop', 'bank', id])
+    expect(s().c4Nodes[id]).toBeDefined()
+  })
+})
+
+describe('A sequence of the milestone and the live flow views', () => {
+  // Views are the live model's: a sequence deleted in a milestone unlinked
+  // the live flow view for good (also after Discard), and a flow view made
+  // from a sequence added there was saved naming a sequence, and elements,
+  // the live model did not have.
+  beforeEach(() => {
+    s().discardMilestoneChanges()
+    const data = model()
+    data.sequences = [{ id: 'pay', name: 'Pay', relationIds: ['r1'] }]
+    data.views!.push({ id: 'flow', name: 'flow', kind: 'dynamic', sequenceId: 'pay', nodeIds: [], positions: {} } as DiagramView)
+    s().loadDiagram(data)
+    early = s().createSnapshot('early')
+    s().selectMilestone(early)
+  })
+
+  it('a sequence deleted: the live flow view keeps it, also after Discard; Propagate unlinks it', () => {
+    s().removeSequence('pay')
+    expect(s().views.flow.sequenceId).toBeUndefined()
+    expect(savedView('flow').sequenceId).toBe('pay')
+    s().discardMilestoneChanges()
+    expect(s().views.flow.sequenceId).toBe('pay')
+    s().selectMilestone(early)
+    s().removeSequence('pay')
+    s().commitMilestoneChanges('propagate')
+    s().discardMilestoneChanges()
+    expect(savedView('flow').sequenceId).toBeUndefined()
+    expect(s().sequences.pay).toBeUndefined()
+  })
+
+  it('a flow view made from a sequence added there names nothing the live model lacks; Propagate links it', () => {
+    const { id: _x, ...added } = node('x', 'system', 1500, 0)
+    const x = s().addNode(added)
+    s().addRelation({ sourceId: 'bank', targetId: x })
+    const rel = Object.values(s().c4Relations).find((r) => r.targetId === x)!.id
+    const q = s().addSequence('Refund')
+    s().toggleRelationInSequence(q, rel)
+    const viewId = s().addViewFromSequence(q)
+    expect(s().views[viewId].sequenceId).toBe(q)
+    expect(savedView(viewId).sequenceId).toBeUndefined()
+    expect(savedView(viewId).nodeIds).toEqual(['bank'])
+    s().commitMilestoneChanges('propagate')
+    s().discardMilestoneChanges()
+    expect(savedView(viewId).sequenceId).toBe(q)
+    expect(savedView(viewId).nodeIds).toEqual(['bank', x])
+  })
+})
+
 describe('Move to… in a milestone', () => {
   it('leaves the live views and All elements as they were after Discard and after Save as new', () => {
     const before = { v: json(s().views.v.positions), other: json(s().views.other.positions), all: json(s().defaultPositions) }

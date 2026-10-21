@@ -901,6 +901,16 @@ function keepingSharedViews(state: DiagramStore, edit: () => void): void {
   state.defaultLayoutConstraints = defaultLayoutConstraints
 }
 
+/** model.syncViewpoints on the views, which are the live model's: their
+ *  elements are looked up there, not in the milestone shown. Checked
+ *  against a milestone without it (or with it deleted there), a view of
+ *  one element lost its element and its "within" filter, in the live views
+ *  too (Undo and Redo in a milestone). Use inside immer set. */
+function syncViewpointsOfLive(state: DiagramStore): string[] {
+  const nodes = state.activeSnapshotId && state.liveBackup ? state.liveBackup.nodes : state.c4Nodes
+  return model.syncViewpoints({ c4Nodes: nodes, views: state.views, metamodel: state.metamodel } as unknown as model.ModelState)
+}
+
 /** The Hub template records as a milestone has them: its texts hold the
  *  values (read from them through the Hub's originals), the records keep
  *  the live model's. Shown so, the section said 250 where the card said
@@ -3060,7 +3070,7 @@ export const useDiagramStore = create<DiagramStore>()(
       // drafts of the views: in the pass above they are the entry's own,
       // frozen, and changing them threw once the step was off the stack
       // (Undo after "Save as viewpoint… → Replace").
-      set((state) => { model.syncViewpoints(state as unknown as model.ModelState) })
+      set((state) => { syncViewpointsOfLive(state as DiagramStore) })
       get()._sync()
       if (canvasChanged && typeof window !== 'undefined') {
         const viewId = get().activeViewId
@@ -3148,7 +3158,11 @@ export const useDiagramStore = create<DiagramStore>()(
         }
       }
       get()._pushUndo()
-      get()._markMilestoneEdit()
+      // In a milestone, an edit of the view it is listed in too (its list is
+      // the live view's): it went into the saved live view, and stayed
+      // after Discard.
+      if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
+      else get()._markMilestoneEdit()
       set((state) => {
         model.insertNode(state, id, node)
         _insertWizardLinks(state, id, links)
@@ -3369,7 +3383,9 @@ export const useDiagramStore = create<DiagramStore>()(
           return ''
         }
         get()._pushUndo()
-        get()._markMilestoneEdit()
+        // In a milestone, an edit of the view it is listed in too.
+        if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
+        else get()._markMilestoneEdit()
         const id = uid()
         node = _placeNewChild(node)
         set((state) => { model.insertNode(state, id, node) })
@@ -3395,7 +3411,9 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           if (ids.length === 0) {
             get()._pushUndo()
-            get()._markMilestoneEdit()
+            // In a milestone, an edit of the view they are listed in too.
+            if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
+            else get()._markMilestoneEdit()
           }
           const id = uid()
           set((state) => {
@@ -4987,15 +5005,21 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         const name = seq ? `${seq.name} view` : 'Sequence view'
         get()._pushUndo()
+        const view: DiagramView = { id: viewId, name, kind: 'dynamic', sequenceId, nodeIds: Array.from(nodeSet), positions: {} }
+        // Made in a milestone, the view is made (views are the live model's),
+        // but what it names of the milestone only (a sequence added there,
+        // its elements) is not the live view's: that is parked without it,
+        // as Propagate would find it. It was saved naming what the live
+        // model lacks, also after Discard.
+        const { activeSnapshotId, liveBackup } = get()
+        const liveIds = liveBackup ? view.nodeIds.filter((id) => liveBackup.nodes[id]) : view.nodeIds
+        const liveSequence = !liveBackup || !!liveBackup.sequences?.[sequenceId]
+        const parked = activeSnapshotId && liveBackup && (!liveSequence || liveIds.length < view.nodeIds.length)
+          ? { ...view, nodeIds: liveIds, sequenceId: liveSequence ? sequenceId : undefined }
+          : null
         set((state) => {
-          state.views[viewId] = {
-            id: viewId,
-            name,
-            kind: 'dynamic',
-            sequenceId,
-            nodeIds: Array.from(nodeSet),
-            positions: {},
-          }
+          state.views[viewId] = view as any
+          if (parked) state.liveBackup!.views = { ...state.liveBackup!.views, [viewId]: parked } as any
         })
         get().setActiveView(viewId)
         return viewId
@@ -5017,6 +5041,12 @@ export const useDiagramStore = create<DiagramStore>()(
       removeSequence(id) {
         if (!get().sequences[id]) return
         get()._pushUndo()
+        // In a milestone, an edit of the views it unlinks too (they are the
+        // live model's): a flow view lost its sequence for good, also after
+        // Discard.
+        for (const view of Object.values(get().views)) {
+          if (view.sequenceId === id) get()._milestoneViewEdit(view.id)
+        }
         set((state) => {
           delete state.sequences[id]
           // Unlink views that referenced this sequence
@@ -6070,7 +6100,9 @@ export const useDiagramStore = create<DiagramStore>()(
           state.sequences = (snap.sequences ?? {}) as any
           if (state.activeSequenceId && !state.sequences[state.activeSequenceId]) state.activeSequenceId = null
           // The Hub template values its texts hold, not the live model's.
-          _milestoneHubBase = milestoneHubTemplates((backup?.hubTemplates ?? state.hubTemplates) as Record<string, HubImportRecord>, snap.nodes as Record<string, C4Node>)
+          // Read from the store, not the draft: _milestoneHubBase outlives
+          // this set, and a draft kept is revoked (Propagate threw).
+          _milestoneHubBase = milestoneHubTemplates((backup?.hubTemplates ?? get().hubTemplates) as Record<string, HubImportRecord>, snap.nodes as Record<string, C4Node>)
           state.hubTemplates = _milestoneHubBase as any
           state.activeSnapshotId = id
           // Coming from another milestone: its views (its own, or edits
@@ -6198,7 +6230,7 @@ export const useDiagramStore = create<DiagramStore>()(
             state.snapshots.splice(idx + 1, 0, newSnap as any)
             // The live model is as it was: so are its Hub template records.
             // The new milestone shown has the values its texts hold.
-            _milestoneHubBase = milestoneHubTemplates((liveBackup?.hubTemplates ?? state.hubTemplates) as Record<string, HubImportRecord>, editedNodes)
+            _milestoneHubBase = milestoneHubTemplates((liveBackup?.hubTemplates ?? get().hubTemplates) as Record<string, HubImportRecord>, editedNodes)
             state.hubTemplates = _milestoneHubBase as any
             // Stay viewing the freshly-created milestone (canvas already shows its content).
             // liveBackup is preserved so the user can still discard back to live HEAD.
@@ -6353,6 +6385,11 @@ export const useDiagramStore = create<DiagramStore>()(
             else delete target.stepBackward
           }
           for (const id of removedSeqIds) delete targetSeqs[id]
+          // The steps of the relations gone here go with them, as a delete
+          // takes them: a later model can step through relations the edited
+          // milestone deleted with an element while it had no such sequence.
+          const missing = new Set(Object.values(targetSeqs).flatMap((q) => q.relationIds.filter((rid) => !targetRels[rid])))
+          model.forgetRelationsInSequences({ sequences: targetSeqs } as unknown as model.ModelState, missing)
         }
 
         // The views the milestone keeps its own way stay its own: what was
@@ -6683,7 +6720,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
       _syncViewpoints() {
         let changed: string[] = []
-        set((state) => { changed = model.syncViewpoints(state as unknown as model.ModelState) })
+        set((state) => { changed = syncViewpointsOfLive(state as DiagramStore) })
         if (changed.length) get()._sync()
       },
       resetMetamodelToC4(confirm) {
@@ -7475,7 +7512,9 @@ export const useDiagramStore = create<DiagramStore>()(
           set((state) => {
             state.liveBackup = { nodes: state.c4Nodes, relations: state.c4Relations, sequences: state.sequences, hubTemplates: state.hubTemplates } as any
             showMilestoneViews(state as DiagramStore, snapshots.find((m) => m.id === shownMilestone.id))
-            _milestoneHubBase = milestoneHubTemplates(state.hubTemplates as Record<string, HubImportRecord>, shownNodes as Record<string, C4Node>)
+            // From the store, not the draft: a draft kept past this set is
+            // revoked, and Propagate threw on it.
+            _milestoneHubBase = milestoneHubTemplates(get().hubTemplates as Record<string, HubImportRecord>, shownNodes as Record<string, C4Node>)
             state.hubTemplates = _milestoneHubBase as any
             state.c4Nodes = shownNodes as any
             state.c4Relations = milestone.relations as any

@@ -101,6 +101,42 @@ describe('an element of a view per element, edited in a milestone', () => {
   })
 })
 
+describe('Undo and Redo in a milestone and the views of one element (item 260)', () => {
+  // The views of a viewpoint were synced with the milestone's elements
+  // after a step was taken back: a view of an element the milestone lacks
+  // (added since, or deleted there) lost its element and its "within"
+  // filter, shown and in the saved live views.
+  const within = (view: DiagramView | undefined) => JSON.stringify(view?.pipeline).includes('"within"')
+  const saved = (id: string) => s().saveDiagram().views!.find((v) => v.id === id)
+
+  it('an element added since: its view keeps its element after Undo of an edit in the milestone', () => {
+    s().addNode({ type: 'container', label: 'Search', parentId: 'shop', x: 600, y: 0, width: 200, height: 120 } as Omit<C4Node, 'id'>)
+    const search = Object.values(s().c4Nodes).find((n) => n.label === 'Search')!.id
+    const viewId = viewOf(search)!.id
+    expect(within(s().views[viewId])).toBe(true)
+    s().selectMilestone(s().snapshots[0].id)
+    s().updateNode('web', { label: 'Web shop' })
+    s().undo()
+    expect(s().views[viewId].subject).toBe(search)
+    expect(within(s().views[viewId])).toBe(true)
+    expect(saved(viewId)?.subject).toBe(search)
+    expect(within(saved(viewId))).toBe(true)
+  })
+
+  it('deleted in the milestone: Undo and Redo leave its view as the delete left it', () => {
+    const viewId = viewOf('api')!.id
+    s().selectMilestone(s().snapshots[0].id)
+    s().removeNode('api')
+    const afterDelete = JSON.stringify(s().views[viewId])
+    expect(s().views[viewId].subject).toBe('api')
+    s().undo()
+    expect(JSON.stringify(s().views[viewId])).toBe(afterDelete)
+    s().redo()
+    expect(JSON.stringify(s().views[viewId])).toBe(afterDelete)
+    expect(saved(viewId)?.subject).toBe('api')
+  })
+})
+
 describe('a view per element opened for the first time in a milestone', () => {
   it('is not laid out as an edit of the milestone, and is laid out back on live', () => {
     const viewId = viewOf('web')!.id

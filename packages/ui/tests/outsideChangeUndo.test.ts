@@ -341,6 +341,20 @@ describe('an outside change while a milestone is shown (item 126)', () => {
     expect(label('c')).toBe('Courier')
   })
 
+  it('Propagate after the change carries the milestone\'s edits into the live model (item 258)', () => {
+    // The milestone's Hub template records kept after the reload were
+    // immer's draft of them: Propagate threw "Cannot perform 'ownKeys' on a
+    // proxy that has been revoked" (propagatedHubTemplates).
+    const m = s().createSnapshot('As-is')
+    s().selectMilestone(m)
+    outsideChange((d) => { d.nodes.push(sys('c', 0, 600, { label: 'Courier' })) })
+    s().updateNode('b', { label: 'Bank' })
+    expect(() => s().commitMilestoneChanges('propagate')).not.toThrow()
+    s().discardMilestoneChanges()
+    expect(label('b')).toBe('Bank')
+    expect(label('c')).toBe('Courier')
+  })
+
   it('says so when the milestone with edits was deleted outside Studio', () => {
     const m = s().createSnapshot('As-is')
     s().selectMilestone(m)

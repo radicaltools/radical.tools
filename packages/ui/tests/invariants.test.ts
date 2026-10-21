@@ -713,15 +713,6 @@ const KNOWN: Known[] = [
     note: 'K7: a merge keeps an alignment, pin, view fold or view list entry of an element the other side deleted (new; sibling of item 234)',
   },
   {
-    // API moved into Payment Provider (API → Payment Provider "charges
-    // card", now a relation to its own container), then Smart Layout: 11
-    // "[ELK] Layout error … UnsupportedGraphException" on the console; the
-    // layout is applied all the same.
-    rule: 'noErrors',
-    match: (_t, v) => v.detail.includes('UnsupportedGraphException'),
-    note: 'K8: Smart Layout logs ELK errors for a relation between an element and its container (new)',
-  },
-  {
     // "browses and orders" (step 1 of Place Order) deleted, the agent
     // deletes Bookstore with Web App, Undo: no relation comes back (its end
     // is gone) but the sequence has the step ["r1"] again, saved so.
@@ -755,23 +746,6 @@ const KNOWN: Known[] = [
     note: 'K11: an add moves elements with nothing in common with it and leaves a child outside its moved parent (new)',
   },
   {
-    // Nested: Context open, milestone Early shown, a group dropped on the
-    // canvas: the saved live Context lists the new id (no such element in
-    // the live model or any milestone), and still does after Discard.
-    rule: 'references',
-    match: (t, v) => t.some((a) => a.a === 'openMilestone') && /nodeIds has missing/.test(v.detail),
-    note: 'K12: an element added in a milestone is listed in the live view it was added on, also after Discard (new; sibling of item 230)',
-  },
-  {
-    // A milestone shown, the agent adds a system (reloaded with the
-    // milestone kept), a group added in the milestone, Propagate: TypeError
-    // "Cannot perform 'ownKeys' on a proxy that has been revoked" in
-    // propagatedHubTemplates (diagramStore.ts).
-    rule: 'noErrors',
-    match: (_t, v) => v.detail.includes('propagatedHubTemplates'),
-    note: 'K13: Propagate throws after an agent write reloaded the milestone shown (new)',
-  },
-  {
     // An agent adds a system Studio reloads; with a view that does not draw
     // it shown (Place Order Flow, Containers), folding it and unfolding it
     // throws "Cannot read properties of undefined (reading 'x')" in
@@ -779,23 +753,6 @@ const KNOWN: Known[] = [
     rule: 'noErrors',
     match: (_t, v) => v.detail.includes('makeRoomAround'),
     note: 'K14: folding and unfolding a system an agent added, with a view shown that does not draw it, throws (new)',
-  },
-  {
-    // Views of the viewpoint System › containers made (one is of System 2),
-    // the milestone Early (no System 2) opened, Customer deleted, Undo: the
-    // view of System 2 loses its subject and its "within System 2" filter,
-    // shown and in the saved live views.
-    rule: 'undoRestores',
-    match: (_t, v) => /\.subject: /.test(v.detail),
-    note: 'K15: Undo in a milestone that lacks a view\'s element strips the view of its element and filter, in the live views too (new)',
-  },
-  {
-    // K15 the other way: a view of API's (Container › components), a
-    // milestone with API opened, API deleted there; Undo, then Redo: the
-    // view has lost its subject and its "within API" filter.
-    rule: 'redoRestores',
-    match: (_t, v) => /\.subject: /.test(v.detail),
-    note: 'K15b: Undo and Redo of a delete in a milestone strip a view of that element of its element and filter (new)',
   },
   {
     // Nested: the agent deletes Component 1.0.0; Container 2.2 folded;
@@ -848,15 +805,6 @@ const KNOWN: Known[] = [
     note: 'K20: after an add the live physics can go on moving for good (seen on the sample\'s and the bookstore\'s All elements; new)',
   },
   {
-    // Sample: milestone v1 opened, Web Banking deleted there, Propagate:
-    // the live model loses Web Banking and its relations, but the live
-    // sequence Payment Processing keeps steps 1 and 2 (r-cust-web,
-    // r-web-apigw), saved so.
-    rule: 'references',
-    match: (t, v) => t.some((a) => a.a === 'propagate') && /names missing relation/.test(v.detail),
-    note: 'K21: Propagate of a delete leaves the live sequences\' steps of the relations it deletes (new)',
-  },
-  {
     // Nested: Container 2.1 folded and unfolded on Systems and containers
     // (which does not draw its components), All elements opened, Component
     // 0.0.1 dragged: Component 2.1.0 jumps (140, 60), out of Container 2.1.
@@ -870,6 +818,26 @@ const KNOWN: Known[] = [
       return !!dragged && !(v.keys ?? []).some((k) => k.includes(dragged))
     },
     note: 'K22: an expand on a view that does not draw the children leaves seeds that move them out of their container later, also after a reload (new)',
+  },
+  {
+    // Found by group E's runs (2026-10-21, also on d04b081): bookstore,
+    // Smart Layout, Containers opened, the agent adds a container into
+    // Payment Provider (merged with unsaved edits), Undo, Redo: on All
+    // elements Payment Provider (260, 40) 360 × 350 overlaps Bookstore (30,
+    // 300). FUZZ_SEED=13 FUZZ_PATH=542:3:4:6:7:17:13:16:17.
+    rule: 'geometry',
+    match: (t, v) => !!v.facts?.overlap && (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent' && a.kind === 'add'),
+    note: 'KE1: Undo and Redo after an agent added into a system leave it grown over its neighbour (new)',
+  },
+  {
+    // Found by group E's runs (2026-10-21, also on d04b081): nested,
+    // Container 0.2 folded and unfolded, Container 1.0 and 1.1 kept in a
+    // row, Component 0.2.0 moved into Container 0.0: Component 0.1.0 lies
+    // outside Container 0.1 (971.7 against 1027.7). FUZZ_SEED=11
+    // FUZZ_PATH=71:8:8:14:13:17:23:22:22:22:26:26:31:36:19:18:21:26:29:17:10:11:10:10:16:12:12:12:12.
+    rule: 'geometry',
+    match: (t, v) => lastAction(t) === 'reparent' && !!v.facts?.outside && !!v.facts.aligned,
+    note: 'KE2: a move into another parent, with a row elsewhere, leaves a child of a neighbouring container outside it (new)',
   },
 ]
 
