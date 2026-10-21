@@ -211,6 +211,50 @@ describe('ordered alignments', () => {
   })
 })
 
+describe('an ordered column across groups', () => {
+  // The sample's Core Banking: API Gateway in Access & Security, on top;
+  // Accounts Service in Banking Services, below it. The column keeps
+  // Accounts Service first (top to bottom).
+  const core = () => byId(
+    node('sys', 'system', { x: 30, y: 120, width: 1230, height: 1440 }),
+    node('access', 'group', { parentId: 'sys', x: 20, y: 110, width: 690, height: 330 }),
+    node('apigw', 'container', { parentId: 'access', x: 20, y: 110, width: 300, height: 200 }),
+    node('auth', 'container', { parentId: 'access', x: 370, y: 110, width: 300, height: 200 }),
+    node('banking', 'group', { parentId: 'sys', x: 20, y: 650, width: 610, height: 770 }),
+    node('payments', 'container', { parentId: 'banking', x: 110, y: 340, width: 240, height: 410 }),
+    node('validator', 'component', { parentId: 'payments', x: 20, y: 110, width: 200, height: 120 }),
+    node('fx', 'component', { parentId: 'payments', x: 20, y: 270, width: 200, height: 120 }),
+    node('accounts', 'container', { parentId: 'banking', x: 20, y: 110, width: 300, height: 200 }),
+    node('bus', 'queue', { parentId: 'banking', x: 370, y: 178, width: 220, height: 95 }),
+    node('risk', 'group', { parentId: 'sys', x: 750, y: 110, width: 460, height: 500 }),
+    node('fraud', 'container', { parentId: 'risk', x: 20, y: 280, width: 300, height: 200 }),
+    node('dbacc', 'database', { parentId: 'risk', x: 20, y: 110, width: 190, height: 130 }),
+    node('dbtx', 'database', { parentId: 'risk', x: 250, y: 110, width: 190, height: 130 }),
+  )
+
+  it('puts the groups in the order the column asks for, and stands (item 219)', () => {
+    const nodes = core()
+    const alignments = resolveAlignments([ordered('vertical', 'accounts', 'apigw')], nodes)
+    const out = enforceAlignments(nodes, {}, alignments)
+    expect(alignmentError(nodes, out, alignments)).toBeLessThanOrEqual(0.5)
+    const abs = absolute(nodes, out)
+    expect(abs.accounts.y + abs.accounts.height / 2).toBeLessThan(abs.apigw.y + abs.apigw.height / 2)
+    // Siblings clear of each other, children inside their parents.
+    expect(overlapping([abs.access, abs.banking, abs.risk])).toBe(false)
+    for (const [child, parent] of [['apigw', 'access'], ['accounts', 'banking'], ['access', 'sys'], ['banking', 'sys']]) {
+      const c = abs[child]; const f = abs[parent]
+      expect(c.x >= f.x && c.y >= f.y && c.x + c.width <= f.x + f.width && c.y + c.height <= f.y + f.height, `${child} in ${parent}`).toBe(true)
+    }
+    // Enforced again (a reload), nothing moves.
+    const laid = byId(...Object.values(nodes).map((n) => ({ ...n, ...out[n.id] }) as C4Node))
+    const again = enforceAlignments(laid, {}, resolveAlignments([ordered('vertical', 'accounts', 'apigw')], laid))
+    for (const id of Object.keys(nodes)) {
+      expect(Math.round(again[id].x - out[id].x), id).toBe(0)
+      expect(Math.round(again[id].y - out[id].y), id).toBe(0)
+    }
+  })
+})
+
 describe('grids', () => {
   const cells = ['a', 'b', 'c', 'd', 'e']
   const five = (): Record<string, C4Node> => byId(...cells.map((id, i) => node(id, 'component', { x: (4 - i) * 300, y: (i % 2) * 700 })))
