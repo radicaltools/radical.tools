@@ -433,3 +433,49 @@ describe('a container a view shows without its children', () => {
     }
   })
 })
+
+describe('folding a container drawn without its children', () => {
+  // It is drawn at the folded size already: a fold shrank it from its model
+  // size round the middle, and moved it by half the difference, onto its
+  // neighbour (fuzzer K5, K5b).
+  const shop = () => ({
+    nodes: [
+      { id: 'sys', type: 'system', label: 'Shop', x: 0, y: 0, width: 1400, height: 450, collapsed: false },
+      { id: 'api', type: 'container', label: 'API', parentId: 'sys', x: 30, y: 120, width: 300, height: 200, collapsed: false },
+      { id: 'orders', type: 'container', label: 'Orders', parentId: 'sys', x: 400, y: 120, width: 970, height: 300, collapsed: false },
+      { id: 'k1', type: 'component', label: 'Checkout', parentId: 'orders', x: 20, y: 120, width: 220, height: 140, collapsed: false },
+      { id: 'k2', type: 'component', label: 'Billing', parentId: 'orders', x: 730, y: 120, width: 220, height: 140, collapsed: false },
+      { id: 'pay', type: 'system', label: 'Payments', x: 1500, y: 0, width: 300, height: 180, collapsed: false },
+    ] as C4Node[],
+    relations: [],
+    views: [{ id: 'v', name: 'Containers', nodeIds: ['sys', 'api', 'orders', 'pay'], positions: {} }],
+  })
+  const at = (ids: string[]) => Object.fromEntries(ids.map((id) => {
+    const n = useDiagramStore.getState().c4Nodes[id]
+    return [id, { x: n.x, y: n.y, width: n.width, height: n.height }]
+  }))
+
+  it('moves nothing when it has no children (All elements)', () => {
+    const s = useDiagramStore.getState
+    s().loadDiagram(shop() as any)
+    s().stopLiveLayout()
+    const before = at(['sys', 'api', 'orders', 'pay'])
+    s().toggleCollapse('api')
+    expect(s().c4Nodes.api.collapsed).toBe(true)
+    expect(at(['sys', 'api', 'orders', 'pay'])).toEqual(before)
+    s().toggleCollapse('api')
+    expect(at(['sys', 'api', 'orders', 'pay'])).toEqual(before)
+  })
+
+  it('moves nothing when the view shown draws none of its children', () => {
+    const s = useDiagramStore.getState
+    s().loadDiagram(shop() as any)
+    s().stopLiveLayout()
+    s().setActiveView('v')
+    const before = at(['api', 'orders', 'pay'])
+    s().toggleCollapse('orders')
+    expect(s().views.v.collapsedNodeIds).toEqual(['orders'])
+    // The system may fit what it shows; nothing in it or beside it moves.
+    expect(at(['api', 'orders', 'pay'])).toEqual(before)
+  })
+})

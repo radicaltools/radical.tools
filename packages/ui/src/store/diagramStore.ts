@@ -3717,8 +3717,15 @@ export const useDiagramStore = create<DiagramStore>()(
           const allNodes = get().c4Nodes
           const node = allNodes[id]
           if (node && isContainerType(node.type)) {
-            const dx = Math.max(0, ((node.width ?? 0) - COLLAPSED_WIDTH[node.type]) / 2)
-            const dy = Math.max(0, ((node.height ?? 0) - COLLAPSED_HEIGHT[node.type]) / 2)
+            // One the canvas shows without children (it has none, or the
+            // view draws none of them) is drawn at the folded size already:
+            // it stays where it is. Shrunk from its model size, it moved by
+            // half the difference on every fold.
+            const shownView = activeViewId ? get().views[activeViewId] : undefined
+            const shownHere = shownView ? computeViewNodeSet(shownView as any, allNodes, get().c4Relations) : undefined
+            const drawnOpen = Object.values(allNodes).some((c) => c.parentId === id && (!shownHere || shownHere.has(c.id)))
+            const dx = drawnOpen ? Math.max(0, ((node.width ?? 0) - COLLAPSED_WIDTH[node.type]) / 2) : 0
+            const dy = drawnOpen ? Math.max(0, ((node.height ?? 0) - COLLAPSED_HEIGHT[node.type]) / 2) : 0
             if (dx > 0 || dy > 0) {
               set((state) => {
                 const n = state.c4Nodes[id]
