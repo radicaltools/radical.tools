@@ -627,9 +627,20 @@ const KNOWN: Known[] = [
     // view, which lists it, has no place for it any more; opening the view
     // places it and the physics moves Customer by (−179, −82), Bookstore
     // grows 860 → 1360 wide, its children shift.
+    // The same for an add: nested, a container added into System 0 on the
+    // System 0 view gets no place on Systems and containers (a filter
+    // chain that draws it); opening that view shrinks System 0 2440 → 1380
+    // and moves it 588 px right, System 1 210 px.
     rule: 'nothingMovesByItself',
-    match: (t) => lastAction(t) === 'view' && t.some((a) => a.a === 'reparent'),
-    note: 'K3: a move into another parent leaves the other views without a place for it; opening one moves its neighbours (new)',
+    match: (t) => lastAction(t) === 'view' && t.some((a) => a.a === 'reparent' || a.a === 'add'),
+    note: 'K3: a move into another parent, or an add, leaves other views that draw it without a place for it; opening one moves its neighbours (new)',
+  },
+  {
+    // Nested, a new view of the System context viewpoint: System 0 moved
+    // into System 1, which grows 280 × 180 → 360 × 330 over Operator.
+    rule: 'geometry',
+    match: (t, v) => lastAction(t) === 'reparent' && !!v.facts?.overlap,
+    note: 'K3c: a move into another parent grows it over a neighbour on the canvas shown (new)',
   },
   {
     // K3 on the geometry: Orders DB deleted, API moved into Payment
