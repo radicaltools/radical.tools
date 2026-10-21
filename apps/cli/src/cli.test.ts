@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { spawn } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -207,6 +209,21 @@ describe('radical', () => {
       expect(out.trim()).toMatch(new RegExp(`^${version.replace(/\./g, '\\.')}(\\+[0-9a-f]{7,})?$`))
     }
   })
+
+  it('stops quietly when the reader of its output goes away (radical … | head)', async () => {
+    // Node threw on the unhandled EPIPE: a stack trace and exit 1.
+    const many = Array.from({ length: 2000 }, (_, i) => node(`r${i}`, 'requirement', `Requirement number ${i} of many`, { action: 'act' }))
+    const cwd = await workspace({ nodes: many, relations: [] })
+    const child = spawn(process.execPath, ['--import', createRequire(import.meta.url).resolve('tsx'), join(import.meta.dirname, 'index.ts'), 'check', 'model', '--verbose'],
+      { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    let err = ''
+    child.stderr.on('data', (chunk: Buffer) => { err += chunk.toString() })
+    // As head does: read the first lines, then close the pipe.
+    child.stdout.once('data', () => child.stdout.destroy())
+    const code = await new Promise<number | null>((done) => child.on('close', done))
+    expect(err).toBe('')
+    expect(code).toBe(0)
+  }, 30_000)
 
   it('prints usage, and refuses an unknown command', async () => {
     const cwd = await workspace()

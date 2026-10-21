@@ -1,4 +1,6 @@
 import { execFile, spawn } from 'node:child_process'
+import { readFile, stat } from 'node:fs/promises'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { deserializeFromMdFolder, isMdFolderModelPath, stripBom, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { countModelChanges, formatModelChanges, modelChangeReport, type ModelChangeReport } from '@radical/common/modelChanges'
@@ -54,16 +56,20 @@ export async function resolveGitBase(folder: string, since?: string): Promise<Gi
 
 /** The model files of `folder` as they are at `commit`: the same files
  *  diskFolderStorage reads (radical.md, the JSON sidecars, nodes/**.md, no
- *  dot entries, no symbolic links). Empty when the folder held no model then. */
-export async function readModelAtCommit(folder: string, commit: string): Promise<FolderFiles> {
-  // Paths come relative to the folder (the working directory), NUL-separated.
-  const listing = await git(folder, ['ls-tree', '-r', '-z', commit, '--', '.'])
+ *  dot entries, no symbolic links). Empty when the folder held no model then.
+ *  `from`: the folder's path in the repository then, when it was elsewhere. */
+export async function readModelAtCommit(folder: string, commit: string, from?: string): Promise<FolderFiles> {
+  // Paths come relative to the folder (the working directory), or to the
+  // top with `from`, NUL-separated.
+  const listing = await git(folder, from === undefined ? ['ls-tree', '-r', '-z', commit, '--', '.'] : ['ls-tree', '-r', '-z', '--full-name', commit, '--', `:(top)${from}`])
   const blobs: Array<{ sha: string; path: string }> = []
   for (const entry of listing.split('\0')) {
     const tab = entry.indexOf('\t')
     if (tab < 0) continue
     const [mode, type, sha] = entry.slice(0, tab).split(' ')
-    const path = entry.slice(tab + 1)
+    const full = entry.slice(tab + 1)
+    if (from !== undefined && !full.startsWith(`${from}/`)) continue
+    const path = from === undefined ? full : full.slice(from.length + 1)
     if (type !== 'blob' || mode === '120000' || !isMdFolderModelPath(path)) continue
     if (path.split('/').some((part) => part.startsWith('.'))) continue
     blobs.push({ sha, path })
@@ -101,6 +107,33 @@ function catFiles(cwd: string, shas: string[]): Promise<string[]> {
   })
 }
 
+/** Where the model now in `folder` was at `commit`, when the folder held
+ *  none then: the folder it was renamed or moved from, as git's rename
+ *  detection finds it (committed or staged), else the one folder whose
+ *  manifest is gone from the working tree and reads as the folder's does
+ *  now (a move git has not seen yet). A path from the top; null when the
+ *  model is new. */
+async function renamedFrom(folder: string, commit: string): Promise<string | null> {
+  const prefix = (await git(folder, ['rev-parse', '--show-prefix'])).replace(/\/$/, '')
+  const manifest = prefix ? `${prefix}/radical.md` : 'radical.md'
+  const renames = (await gitOk(folder, ['diff', '-M', '--name-status', '-z', '--diff-filter=R', commit, '--', ':/'])) ?? ''
+  const fields = renames.split('\0')
+  for (let i = 0; i + 2 < fields.length; i += 3) {
+    if (fields[i].startsWith('R') && fields[i + 2] === manifest && fields[i + 1].endsWith('/radical.md')) return fields[i + 1].slice(0, -'/radical.md'.length)
+  }
+  const top = await git(folder, ['rev-parse', '--show-toplevel'])
+  const now = await readFile(join(folder, 'radical.md'), 'utf8').catch(() => null)
+  if (now === null) return null
+  const then = (await git(folder, ['ls-tree', '-r', '-z', '--name-only', '--full-name', commit, '--', ':/'])).split('\0')
+    .filter((path) => path.endsWith('/radical.md') && path !== manifest)
+  const gone: string[] = []
+  for (const path of then) {
+    if (await stat(join(top, path)).then(() => true, () => false)) continue
+    if (stripBom((await gitOk(folder, ['show', `${commit}:${path}`])) ?? '') === stripBom(now).trim()) gone.push(path.slice(0, -'/radical.md'.length))
+  }
+  return gone.length === 1 ? gone[0] : null
+}
+
 export interface ModelChangesSince {
   base: GitBase
   report: ModelChangeReport
@@ -124,7 +157,10 @@ const byId = <T extends { id: string }>(items: T[]): Record<string, T> => Object
  *  relations with their fields, views and layout left out. */
 export async function modelChangesSince(folder: string, current: Pick<DiagramData, 'nodes' | 'relations'>, since?: string, options: ChangesOptions = {}): Promise<ModelChangesSince> {
   const base = await resolveGitBase(folder, since)
-  const files = await readModelAtCommit(folder, base.commit)
+  let files = await readModelAtCommit(folder, base.commit)
+  // A renamed folder is compared with the folder it was, not as all new.
+  const from = Object.keys(files).length ? null : await renamedFrom(folder, base.commit)
+  if (from) files = await readModelAtCommit(folder, base.commit, from)
   const old = Object.keys(files).length ? deserializeFromMdFolder(files).data : { nodes: [], relations: [] }
   if (options.saveBase) {
     const content = serializeModelBase({ commit: base.commit, described: base.described, branch: await currentBranch(folder), nodes: old.nodes, relations: old.relations })
@@ -141,7 +177,7 @@ export async function modelChangesSince(folder: string, current: Pick<DiagramDat
     ? `No model changes since ${where}: the elements and relations are as they were (views and layout are not compared).`
     : [
       `Model changes since ${where}, uncommitted edits included; elements and relations only, views and layout left out.`,
-      `${count(report.elements, 'Elements')}. ${count(report.relations, 'Relations')}.${Object.keys(files).length ? '' : ' The folder held no model then.'}`,
+      `${count(report.elements, 'Elements')}. ${count(report.relations, 'Relations')}.${!Object.keys(files).length ? ' The folder held no model then.' : from ? ` The folder was ${from} then.` : ''}`,
       '',
       formatModelChanges(report, before, after),
     ].join('\n')

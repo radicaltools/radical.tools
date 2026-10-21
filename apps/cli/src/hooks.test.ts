@@ -133,6 +133,34 @@ describe('radical hooks', () => {
     expect(await readFile(join(hooks, 'post-checkout'), 'utf8')).toBe(`#!/bin/sh\n${HOOK_MARKER}\n${line}\nexit 0\n`)
   })
 
+  it('runs the CLI of the working tree the hook runs in, and says when it is not there', async () => {
+    // Installed from a worktree, the hooks (one set for every worktree)
+    // named that worktree's CLI, and failed without a word once it was gone.
+    const cwd = await mkdtemp(join(tmpdir(), 'radical-hooks-'))
+    dirs.push(cwd)
+    const repo = join(cwd, 'repo')
+    await mkdir(join(repo, 'model'), { recursive: true })
+    await git(repo, 'init', '-q', '-b', 'main')
+    await mkdir(join(repo, 'tools'))
+    await writeFile(join(repo, 'tools/record.mjs'), "import { appendFileSync } from 'node:fs'\nappendFileSync('ran.txt', process.argv.slice(2).join(' ') + '\\n')\n")
+    await writeFile(join(repo, '.gitignore'), 'ran.txt\n')
+    await git(repo, 'add', '.')
+    await git(repo, 'commit', '-q', '-m', 'cli')
+    const tree = join(cwd, 'tree')
+    await git(repo, 'worktree', 'add', '-q', tree, '-b', 'feature')
+    await mkdir(join(tree, 'model'))
+    const code = await main(['hooks', 'install', 'model'], { cwd: tree, cli: { node: `"${process.execPath}"`, script: join(tree, 'tools/record.mjs') }, out: () => {}, err: () => {} })
+    expect(code).toBe(0)
+    expect(await readFile(join(repo, '.git/hooks/post-commit'), 'utf8')).toContain('"tools/record.mjs" diff "model" --save-base')
+    await git(repo, 'worktree', 'remove', tree)
+
+    await git(repo, 'commit', '-q', '--allow-empty', '-m', 'x')
+    expect(await readFile(join(repo, 'ran.txt'), 'utf8')).toBe('diff model --save-base --quiet\n')
+    await git(repo, 'rm', '-q', 'tools/record.mjs')
+    const { stderr } = await git(repo, 'commit', '-q', '-m', 'no cli')
+    expect(stderr).toContain('tools/record.mjs is not in this working tree, so the base of model was not saved')
+  })
+
   it('exits 2 outside git and on a wrong action', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'radical-hooks-'))
     dirs.push(cwd)

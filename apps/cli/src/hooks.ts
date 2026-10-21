@@ -1,6 +1,6 @@
 import { chmod, mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
-import { relative, resolve } from 'node:path'
+import { isAbsolute, relative, resolve } from 'node:path'
 import { parseArgs, promisify } from 'node:util'
 import type { Io } from './check'
 
@@ -17,7 +17,8 @@ exec further down cannot skip it, and what the hooks already do stays. Each
 model folder has a line of its own; running it again adds nothing, but
 brings the line up to date when the CLI or node has moved. A hook written
 in another language than sh is left alone: the message says what to call
-from it.
+from it. A CLI inside the repository is named by its path from the top,
+so each worktree runs its own, and the hook says when it is not built there.
 
   folder              the model folder (default: the working directory)
 
@@ -77,7 +78,17 @@ export async function hooksCommand(args: string[], io: Io): Promise<number> {
     // Git runs hooks at the top of the working tree. The hook's stdin
     // (post-rewrite's list of commits) is for the hook's own commands.
     const folderArg = quote(relative(top, root) || '.')
-    const line = `${io.command ?? 'radical'} diff ${folderArg} --save-base --quiet </dev/null || true`
+    // A CLI inside the repository (npm run hooks) by its path from the top:
+    // the hooks are one set for every worktree, and the worktree they were
+    // installed from may be gone. Where it is not built, the hook says so.
+    const script = io.cli ? await realpath(io.cli.script).catch(() => io.cli!.script) : null
+    const fromTop = script ? relative(top, script) : null
+    const inRepo = fromTop !== null && fromTop !== '' && !fromTop.startsWith('..') && !isAbsolute(fromTop)
+    const command = io.cli ? `${io.cli.node} ${quote(inRepo ? fromTop : script!)}` : io.command ?? 'radical'
+    const run = `${command} diff ${folderArg} --save-base --quiet </dev/null || true`
+    const line = inRepo
+      ? `if [ -f ${quote(fromTop)} ]; then ${run}; else echo ${quote(`radical hooks: ${fromTop} is not in this working tree, so the base of ${relative(top, root) || '.'} was not saved; build the CLI there, or install the hooks again.`)} >&2; fi`
+      : run
     const written: string[] = []
     const updated: string[] = []
     const foreign: string[] = []
@@ -116,7 +127,7 @@ export async function hooksCommand(args: string[], io: Io): Promise<number> {
     if (foreign.length) {
       io.err(`radical hooks: ${foreign.join(', ')} in ${where} ${foreign.length > 1 ? 'are' : 'is'} not a sh script, so no line was added. `
         + `Make ${foreign.length > 1 ? 'each' : 'it'} run this sh command from the top of the repository, ignoring its exit status: `
-        + `${io.command ?? 'radical'} diff ${folderArg} --save-base --quiet`)
+        + `${command} diff ${folderArg} --save-base --quiet`)
       return 2
     }
     if (!written.length && !updated.length) io.out('The hooks already save the base; nothing changed.')
