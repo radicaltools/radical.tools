@@ -746,14 +746,6 @@ const KNOWN: Known[] = [
     note: 'K11: an add moves elements with nothing in common with it and leaves a child outside its moved parent (new)',
   },
   {
-    // Nested: Context open, milestone Early shown, a group dropped on the
-    // canvas: the saved live Context lists the new id (no such element in
-    // the live model or any milestone), and still does after Discard.
-    rule: 'references',
-    match: (t, v) => t.some((a) => a.a === 'openMilestone') && /nodeIds has missing/.test(v.detail),
-    note: 'K12: an element added in a milestone is listed in the live view it was added on, also after Discard (new; sibling of item 230)',
-  },
-  {
     // An agent adds a system Studio reloads; with a view that does not draw
     // it shown (Place Order Flow, Containers), folding it and unfolding it
     // throws "Cannot read properties of undefined (reading 'x')" in

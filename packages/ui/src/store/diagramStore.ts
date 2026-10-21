@@ -3148,7 +3148,11 @@ export const useDiagramStore = create<DiagramStore>()(
         }
       }
       get()._pushUndo()
-      get()._markMilestoneEdit()
+      // In a milestone, an edit of the view it is listed in too (its list is
+      // the live view's): it went into the saved live view, and stayed
+      // after Discard.
+      if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
+      else get()._markMilestoneEdit()
       set((state) => {
         model.insertNode(state, id, node)
         _insertWizardLinks(state, id, links)
@@ -3369,7 +3373,9 @@ export const useDiagramStore = create<DiagramStore>()(
           return ''
         }
         get()._pushUndo()
-        get()._markMilestoneEdit()
+        // In a milestone, an edit of the view it is listed in too.
+        if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
+        else get()._markMilestoneEdit()
         const id = uid()
         node = _placeNewChild(node)
         set((state) => { model.insertNode(state, id, node) })
@@ -3395,7 +3401,9 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           if (ids.length === 0) {
             get()._pushUndo()
-            get()._markMilestoneEdit()
+            // In a milestone, an edit of the view they are listed in too.
+            if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
+            else get()._markMilestoneEdit()
           }
           const id = uid()
           set((state) => {
@@ -4987,15 +4995,21 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         const name = seq ? `${seq.name} view` : 'Sequence view'
         get()._pushUndo()
+        const view: DiagramView = { id: viewId, name, kind: 'dynamic', sequenceId, nodeIds: Array.from(nodeSet), positions: {} }
+        // Made in a milestone, the view is made (views are the live model's),
+        // but what it names of the milestone only (a sequence added there,
+        // its elements) is not the live view's: that is parked without it,
+        // as Propagate would find it. It was saved naming what the live
+        // model lacks, also after Discard.
+        const { activeSnapshotId, liveBackup } = get()
+        const liveIds = liveBackup ? view.nodeIds.filter((id) => liveBackup.nodes[id]) : view.nodeIds
+        const liveSequence = !liveBackup || !!liveBackup.sequences?.[sequenceId]
+        const parked = activeSnapshotId && liveBackup && (!liveSequence || liveIds.length < view.nodeIds.length)
+          ? { ...view, nodeIds: liveIds, sequenceId: liveSequence ? sequenceId : undefined }
+          : null
         set((state) => {
-          state.views[viewId] = {
-            id: viewId,
-            name,
-            kind: 'dynamic',
-            sequenceId,
-            nodeIds: Array.from(nodeSet),
-            positions: {},
-          }
+          state.views[viewId] = view as any
+          if (parked) state.liveBackup!.views = { ...state.liveBackup!.views, [viewId]: parked } as any
         })
         get().setActiveView(viewId)
         return viewId
@@ -5017,6 +5031,12 @@ export const useDiagramStore = create<DiagramStore>()(
       removeSequence(id) {
         if (!get().sequences[id]) return
         get()._pushUndo()
+        // In a milestone, an edit of the views it unlinks too (they are the
+        // live model's): a flow view lost its sequence for good, also after
+        // Discard.
+        for (const view of Object.values(get().views)) {
+          if (view.sequenceId === id) get()._milestoneViewEdit(view.id)
+        }
         set((state) => {
           delete state.sequences[id]
           // Unlink views that referenced this sequence
