@@ -143,6 +143,9 @@ interface HistoryEntry {
   sequences: Record<string, DiagramSequence>
   /** The Hub templates' values: changing them is a step of its own. */
   hubTemplates: Record<string, HubImportRecord>
+  /** The metamodel: its edits, Save as viewpoint and Reset to C4 are steps
+   *  too. Undo after Save as viewpoint left the viewpoint in it. */
+  metamodel: Metamodel
 }
 
 /**
@@ -242,6 +245,7 @@ function _entryModel(entry: HistoryEntry): DiagramData {
     defaultLayoutConstraints: entry.defaultLayoutConstraints,
     defaultEdgeStyle: entry.defaultEdgeStyle,
     hubTemplates: entry.hubTemplates,
+    metamodel: entry.metamodel,
   }
 }
 
@@ -389,6 +393,7 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
       defaultPositions,
       sequences,
       hubTemplates: (merged.hubTemplates ?? {}) as Record<string, HubImportRecord>,
+      metamodel: (merged.metamodel ?? now.metamodel) as Metamodel,
     },
     conflicts,
     kept,
@@ -444,10 +449,12 @@ function _milestoneAfterOutsideChange(shown: ShownMilestone, after: DiagramSnaps
   }
 }
 
-/** The metamodel lost types: a step that holds elements or relations of a
- *  type it no longer has cannot be gone back to (Undo brought back an
- *  element whose type had been deleted since, as an unknown type). That
- *  step and every one beyond it go; the nearer ones stay. */
+/** The metamodel lost types outside Studio (an agent's delete_node_type):
+ *  a step that holds elements or relations of a type it no longer has
+ *  cannot be gone back to (Undo brought back an element whose type had been
+ *  deleted since, as an unknown type). That step and every one beyond it
+ *  go; the nearer ones stay. A type deleted in Studio is a step of its own,
+ *  and Undo brings it back. */
 function _historyKeepsTypes(metamodel: Metamodel): void {
   const fitsEntry = (entry: HistoryEntry): boolean =>
     Object.values(entry.c4Nodes).every((n) => !!metamodel.nodeTypes[n.type]) &&
@@ -479,6 +486,7 @@ function _captureState(state: DiagramStore): HistoryEntry {
     defaultPositions: state.defaultPositions,
     sequences: state.sequences,
     hubTemplates: state.hubTemplates,
+    metamodel: state.metamodel as Metamodel,
   }
 }
 
@@ -542,9 +550,7 @@ function _pushTextEdit(store: DiagramStore, key: string, edit: (state: model.Mod
   if (_typing && _typing.key === key && _typing.step && _undoStack[_undoStack.length - 1] === _typing.step) {
     const step = _typing.step
     if (isStepChange(step)) {
-      step.from = produce(step.from, (draft) => {
-        edit({ c4Nodes: draft.c4Nodes, c4Relations: draft.c4Relations, views: draft.views, metamodel: store.metamodel } as unknown as model.ModelState)
-      })
+      step.from = produce(step.from, (draft) => { edit(draft as unknown as model.ModelState) })
     }
     return
   }
@@ -2465,14 +2471,15 @@ export const useDiagramStore = create<DiagramStore>()(
         state.activeViewId = entry.activeViewId && entry.views[entry.activeViewId] ? entry.activeViewId : null
         state.sequences = entry.sequences as any
         if (entry.hubTemplates) state.hubTemplates = entry.hubTemplates as any
+        if (entry.metamodel) state.metamodel = entry.metamodel as any
         if (state.activeSequenceId && !entry.sequences[state.activeSequenceId]) state.activeSequenceId = null
         state.canUndo = _undoStack.length > 0
         state.canRedo = _redoStack.length > 0
       })
-      // The metamodel is in no step: a view of a viewpoint follows it as it
-      // is now. On drafts of the views: in the pass above they are the
-      // entry's own, frozen, and changing them threw once the step was off
-      // the stack (Undo after "Save as viewpoint… → Replace").
+      // A view of a viewpoint follows the metamodel as the step has it. On
+      // drafts of the views: in the pass above they are the entry's own,
+      // frozen, and changing them threw once the step was off the stack
+      // (Undo after "Save as viewpoint… → Replace").
       set((state) => { model.syncViewpoints(state as unknown as model.ModelState) })
       get()._sync()
       if (canvasChanged && typeof window !== 'undefined') {
@@ -5782,8 +5789,14 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // ── Metamodel ──────────────────────────────────────────────────────
       setMetamodel(m) {
+        const before = get().metamodel as unknown as Record<string, unknown>
+        const changed = Object.keys({ ...before, ...m }).filter((k) => before[k] !== (m as unknown as Record<string, unknown>)[k]).sort()
+        if (changed.length === 0) return
+        // A step of its own (typed into a field: one for what is typed).
+        _pushTextEdit(get(), `metamodel:${changed.join(',')}`, (state) => {
+          state.metamodel = { ...state.metamodel, ...Object.fromEntries(changed.map((k) => [k, (m as unknown as Record<string, unknown>)[k]])) } as Metamodel
+        })
         set((state) => { state.metamodel = m as any })
-        get()._forgetStepsOfLostTypes()
         get()._syncViewpoints()
       },
       _syncViewpoints() {
@@ -5800,12 +5813,10 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(`Cannot reset the metamodel: ${refused}`, 'error')
           return
         }
+        get()._pushUndo()
         set((state) => { state.metamodel = preset as any })
-        get()._forgetStepsOfLostTypes()
         get()._syncViewpoints()
       },
-      /** The metamodel is not part of an undo step, so a step that holds
-       *  elements of a type it has lost cannot be gone back to. */
       _historyMark() {
         return _undoStack.length
       },
@@ -5822,6 +5833,13 @@ export const useDiagramStore = create<DiagramStore>()(
       // documentMetamodel swaps a preset id back to the preset, which would
       // silently drop the edit.
       upsertNodeType(def) {
+        const now = get().metamodel.nodeTypes[def.id] as unknown as Record<string, unknown> | undefined
+        const keys = Object.keys({ ...now, ...def }).filter((k) => !now || JSON.stringify(now[k]) !== JSON.stringify((def as unknown as Record<string, unknown>)[k])).sort()
+        if (now && keys.length === 0) return
+        _pushTextEdit(get(), `nodeType:${def.id}:${keys.join(',')}`, (state) => {
+          const mm = state.metamodel as Metamodel
+          state.metamodel = { ...mm, nodeTypes: { ...mm.nodeTypes, [def.id]: def } }
+        })
         set((state) => {
           state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
           ;(state.metamodel as Metamodel).nodeTypes[def.id] = def
@@ -5835,14 +5853,21 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(`Cannot delete this type: ${refused}`, 'error')
           return
         }
+        if (!get().metamodel.nodeTypes[id] || get().metamodel.nodeTypes[id].builtin) return
+        get()._pushUndo()
         set((state) => {
-          if ((state.metamodel as Metamodel).nodeTypes[id]?.builtin) return
           const forked = model.forkPresetMetamodel(state.metamodel as Metamodel) ?? (state.metamodel as Metamodel)
           state.metamodel = model.metamodelWithoutNodeType(forked, id) as any
         })
-        get()._forgetStepsOfLostTypes()
       },
       upsertRelationType(def) {
+        const now = get().metamodel.relationTypes[def.id] as unknown as Record<string, unknown> | undefined
+        const keys = Object.keys({ ...now, ...def }).filter((k) => !now || JSON.stringify(now[k]) !== JSON.stringify((def as unknown as Record<string, unknown>)[k])).sort()
+        if (now && keys.length === 0) return
+        _pushTextEdit(get(), `relationType:${def.id}:${keys.join(',')}`, (state) => {
+          const mm = state.metamodel as Metamodel
+          state.metamodel = { ...mm, relationTypes: { ...mm.relationTypes, [def.id]: def } }
+        })
         set((state) => {
           state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
           ;(state.metamodel as Metamodel).relationTypes[def.id] = def
@@ -5854,12 +5879,12 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(`Cannot delete this type: ${refused}`, 'error')
           return
         }
+        if (!get().metamodel.relationTypes[id] || get().metamodel.relationTypes[id].builtin) return
+        get()._pushUndo()
         set((state) => {
-          if ((state.metamodel as Metamodel).relationTypes[id]?.builtin) return
           state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any
           delete (state.metamodel as Metamodel).relationTypes[id]
         })
-        get()._forgetStepsOfLostTypes()
       },
 
       // ── Hub import templates ────────────────────────────────────────────
@@ -6361,6 +6386,7 @@ export const useDiagramStore = create<DiagramStore>()(
             defaultPositions: parked.defaultPositions,
             sequences: live ? live.sequences ?? parked.sequences : parked.sequences,
             hubTemplates: st.hubTemplates,
+            metamodel: st.metamodel as Metamodel,
           }
           // A milestone shown in Designer: its own steps start again, the
           // live model's make their change on it as it is now.
@@ -6386,6 +6412,7 @@ export const useDiagramStore = create<DiagramStore>()(
               defaultPositions: st.defaultPositions,
               sequences: live.sequences ?? st.sequences,
               hubTemplates: st.hubTemplates,
+              metamodel: st.metamodel as Metamodel,
             }, [_liveHistory.undo, _liveHistory.redo])
           }
         } else {
@@ -6472,6 +6499,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.hubTemplates = (data.hubTemplates ?? {}) as any
           state.hubMeta = data.hub ?? null
         })
+        if (opts?.outsideChange) get()._forgetStepsOfLostTypes()
         // Outside designer, setAppMode parked the model to put back on return.
         // A load (an outside edit reloaded from disk, a document switch) is the
         // new baseline: park it instead, or returning to designer would bring

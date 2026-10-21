@@ -436,8 +436,11 @@ function ViewpointRow({ view, pipeline, ctx }: { view: DiagramView; pipeline: Vi
     const label = naming?.trim()
     if (!label) return
     const saved = saveAsViewpoint(metamodel, label, kind, pipeline)
-    setMetamodel(saved.metamodel)
-    applyViewpoint(view.id, saved.type.id)
+    // One undo step, the metamodel's edit with it.
+    useDiagramStore.getState().runAsOneStep(() => {
+      setMetamodel(saved.metamodel)
+      applyViewpoint(view.id, saved.type.id)
+    })
     setNaming(null)
   }
   return (

@@ -806,6 +806,10 @@ function readTab(): EditorTab {
   }
 }
 
+/** A field typed into: a text input or a text area. */
+const isTextField = (el: EventTarget): boolean =>
+  el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && ['text', 'number', 'search', ''].includes(el.type))
+
 export function MetamodelEditor(): React.ReactElement {
   const metamodel = useDiagramStore((s) => s.metamodel)
   const upsertNodeType = useDiagramStore((s) => s.upsertNodeType)
@@ -904,6 +908,10 @@ export function MetamodelEditor(): React.ReactElement {
         className={`milestone-modal mm-editor-modal${tab === 'diagram' ? ' is-diagram' : ''}`}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
+        // What is typed into a field until it loses focus is one undo step
+        // (each letter of a type's name was one).
+        onFocus={(e) => { if (isTextField(e.target)) useDiagramStore.getState().beginTyping() }}
+        onBlur={(e) => { if (isTextField(e.target)) useDiagramStore.getState().endTyping() }}
         role="dialog"
         aria-label="Metamodel editor"
       >

@@ -256,6 +256,21 @@ describe('Undo after an outside change', () => {
     })
   }
 
+  it('never brings back an element of a type deleted outside Studio', () => {
+    s().upsertNodeType({ ...s().metamodel.nodeTypes.system, id: 'gizmo', label: 'Gizmo', builtin: false, properties: [] })
+    const id = s().addNode({ type: 'gizmo', label: 'G', x: 0, y: 700, width: 200, height: 100, collapsed: false } as unknown as Omit<C4Node, 'id'>)
+    s().removeNode(id)
+    outsideChange((d) => {
+      const { gizmo: _, ...nodeTypes } = d.metamodel!.nodeTypes
+      d.metamodel = { ...d.metamodel!, id: 'custom', nodeTypes }
+    })
+    expect(s().metamodel.nodeTypes.gizmo).toBeUndefined()
+    for (let i = 0; i < 4; i++) {
+      s().undo()
+      expect(Object.values(s().c4Nodes).some((n) => (n.type as string) === 'gizmo')).toBe(false)
+    }
+  })
+
   it('another model loaded still forgets the history', () => {
     s().updateNode('a', { label: 'Shop' })
     s().loadDiagram(model())
