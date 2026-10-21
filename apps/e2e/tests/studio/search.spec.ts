@@ -1,4 +1,4 @@
-import { expect } from '../../support/fixtures'
+import { expect, fixture } from '../../support/fixtures'
 import { ModelFolder, test } from '../../support/folder'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
@@ -89,4 +89,22 @@ test('a pick on a wiki opens the element\'s page, and the highlighted result sta
   const [l, a] = [(await list.boundingBox())!, (await active.boundingBox())!]
   expect(a.y).toBeGreaterThanOrEqual(l.y - 1)
   expect(a.y + a.height).toBeLessThanOrEqual(l.y + l.height + 1)
+})
+
+// Item 245: Enter on a relation opened the smallest view with its source
+// (System Context), which draws only the folded line customer → bookstore:
+// nothing was selected, while the result's chips listed Containers.
+test('a pick of a relation opens a view that draws it, with it selected', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.views.push({ id: 'v-pay', name: 'Payments only', kind: 'static', nodeIds: ['payments'], positions: { payments: { x: 0, y: 0 } } })
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-pay')
+  const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)
+  await search.click()
+  await page.keyboard.type('browses')
+  await expect(page.locator('.quick-search-item').first()).toContainText('browses and orders')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/v\/v-containers$/)
+  await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1)
+  await expect(page.locator('.react-flow__edge.selected')).toHaveAttribute('data-testid', 'rf__edge-r1')
 })

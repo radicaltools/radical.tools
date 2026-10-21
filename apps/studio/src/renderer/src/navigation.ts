@@ -94,15 +94,19 @@ export function pickRank(view: DiagramView): number {
 
 /** The view a Quick Search pick of `nodeId` opens: the active one when it
  *  shows it, else the first by pickRank, the smallest within a rank; null
- *  (All elements) when no view shows it or All elements is shown. */
-export function pickViewFor(nodeId: string, activeViewId: string | null, views: Record<string, DiagramView>, sets: Record<string, Set<string>>): string | null {
+ *  (All elements) when no view shows it or All elements is shown. For a
+ *  relation, `nodeId` is both its ends: a view that shows only one does not
+ *  draw it (item 245 opened one by its source alone). */
+export function pickViewFor(nodeId: string | readonly string[], activeViewId: string | null, views: Record<string, DiagramView>, sets: Record<string, Set<string>>): string | null {
   // All elements (no active view) shows every element: stay on it.
   if (!activeViewId) return null
-  if (sets[activeViewId]?.has(nodeId)) return activeViewId
+  const ids = typeof nodeId === 'string' ? [nodeId] : nodeId
+  const shows = (set: Set<string> | undefined): boolean => !!set && ids.every((id) => set.has(id))
+  if (shows(sets[activeViewId])) return activeViewId
   let best: { id: string; rank: number; size: number } | null = null
   for (const v of Object.values(views)) {
     const set = sets[v.id]
-    if (!set?.has(nodeId)) continue
+    if (!shows(set)) continue
     const rank = pickRank(v)
     if (!best || rank < best.rank || (rank === best.rank && set.size < best.size)) best = { id: v.id, rank, size: set.size }
   }
