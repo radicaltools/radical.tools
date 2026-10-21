@@ -66,6 +66,28 @@ export interface DiagramSequence {
    * Optional for backwards compat with persisted sequences.
    */
   stepDescriptions?: (string | undefined)[]
+  /**
+   * Per step, parallel to relationIds: true where the step runs along its
+   * relation the other way, from the relation's target to its source (a
+   * response, as a call's return). Kept up to the last backward step and
+   * absent when there is none, so a sequence without one is stored as it
+   * always was, and one stored before is all forward.
+   */
+  stepBackward?: boolean[]
+}
+
+/** Whether step `i` of the sequence runs from its relation's target to its
+ *  source (a response). */
+export function isBackwardStep(sequence: Pick<DiagramSequence, 'stepBackward'> | undefined, i: number): boolean {
+  return sequence?.stepBackward?.[i] === true
+}
+
+/** Per-step backward flags as a sequence keeps them: up to the last true,
+ *  undefined when none is. */
+export function trimStepBackward(flags: readonly unknown[] | undefined): boolean[] | undefined {
+  const out = Array.from(flags ?? [], (flag) => flag === true)
+  while (out.length > 0 && !out[out.length - 1]) out.pop()
+  return out.length ? out : undefined
 }
 
 /** How a canvas draws relations: smooth curves, or horizontal and vertical
@@ -389,6 +411,12 @@ export interface DiagramSnapshot {
   relations: Record<string, C4Relation>
   /** Sequences captured at this point in time (optional for backward compat). */
   sequences?: Record<string, DiagramSequence>
+  /** The views this milestone shows its own way (by view id): what was done
+   *  on them in it (a fold, Hide from view, an alignment, a filter) and
+   *  kept by Save as new. Without their places, camera and name: those are
+   *  the view's for every milestone. Every other view is shown as the live
+   *  model has it. */
+  views?: Record<string, DiagramView>
 }
 
 /** Saved positions + collapsed state for every node on the canvas */
@@ -404,7 +432,8 @@ export interface SlideCanvasState {
 export interface PresentationSlide {
   id: string
   name: string
-  /** null = use whatever is currently on canvas (no snapshot restore) */
+  /** The milestone the slide shows; null: its own copy of the model
+   *  (`modelSnapshot`), else the live model, whatever milestone is open. */
   snapshotId: string | null
   /** null = show all nodes; string = activate this view when navigating to slide */
   viewId?: string | null
@@ -426,7 +455,8 @@ export interface PresentationSlide {
    * Inline snapshot of the full model (nodes + relations) at slide-creation time.
    * Used as the source of truth on goToSlide — guarantees the slide shows
    * exactly what was on screen when "Add slide" was pressed, regardless of
-   * later edits to the live model. Takes precedence over `snapshotId`.
+   * later edits to the live model. A linked milestone (`snapshotId`) wins
+   * over it. A slide added on a milestone is linked to it and has none.
    */
   modelSnapshot?: {
     nodes: Record<string, C4Node>
@@ -439,6 +469,15 @@ export interface Presentation {
   id: string
   name: string
   slides: PresentationSlide[]
+}
+
+/** A slide whose milestone is deleted: it shows the live model. What was
+ *  captured with it (the camera, the canvas, the focus, the drill level or
+ *  wiki page and the copy of the model) was the milestone's, and kept, the
+ *  slide went on drawing the milestone; it fits its view instead, as a slide
+ *  moved to another milestone does. */
+export function slideWithoutMilestone(slide: PresentationSlide): PresentationSlide {
+  return { id: slide.id, name: slide.name, snapshotId: null, viewId: slide.viewId ?? null, viewport: { x: 0, y: 0, zoom: 0 } }
 }
 
 export interface DiagramData {
@@ -499,6 +538,9 @@ export interface C4EdgeRFData {
   /** 1-based step indices when this edge is part of the active dynamic view sequence.
    *  Array because the same relation can appear multiple times in one sequence. */
   sequenceStep?: number[]
+  /** The steps that run this relation backward (responses), numbered at its
+   *  target end. */
+  sequenceStepBack?: number[]
 }
 
 // ─── Layout position map ─────────────────────────────────────────────────────

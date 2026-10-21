@@ -379,8 +379,11 @@ describe('milestone tools', () => {
     expect(moved.ok, moved.resultText).toBe(true)
     expect(facade.getPresentations!()[0].slides[0]).toEqual({ id: 's1', name: 'Later', snapshotId: target, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } })
 
+    // Captured on Target in Studio: once Target is deleted, nothing of it
+    // stays (its copy of the model drew Target still).
+    facade.setPresentations!([{ id: 'p1', name: 'Roadmap', slides: [{ ...captured, name: 'Later', snapshotId: target }] }])
     expect((await call('delete_milestone', { id: target })).ok).toBe(true)
-    expect(facade.getPresentations!()[0].slides[0].snapshotId).toBeNull()
+    expect(facade.getPresentations!()[0].slides[0]).toEqual({ id: 's1', name: 'Later', snapshotId: null, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } })
     expect(facade.getMilestones!().map((m) => m.id)).toEqual([asIs])
   })
 

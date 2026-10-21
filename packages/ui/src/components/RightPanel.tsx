@@ -2,7 +2,7 @@ import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useR
 import { createPortal } from 'react-dom'
 import { useDiagramStore, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
-import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } from '@radical/common/c4'
+import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isBackwardStep } from '@radical/common/c4'
 import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeKeepsAggregates, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { ViewPipelinePanel } from './ViewPipelinePanel'
@@ -283,6 +283,12 @@ const Icon = {
       <path d="M8 4 V12 M4.5 8.5 L8 12 L11.5 8.5"/>
     </svg>
   ),
+  /** A step's way: along its relation, or back (a response). */
+  Swap: () => (
+    <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 5 H11 M8.5 2.5 L11 5 L8.5 7.5 M14 11 H5 M7.5 8.5 L5 11 L7.5 13.5"/>
+    </svg>
+  ),
   Folder: () => (
     <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
       <path d="M1.75 4.25 a1 1 0 0 1 1 -1 h3.2 l1.5 1.5 h5.8 a1 1 0 0 1 1 1 v6.5 a1 1 0 0 1 -1 1 h-10.5 a1 1 0 0 1 -1 -1 z"/>
@@ -488,6 +494,25 @@ function StepNoteInput({ value, placeholder, onCommit, style }: {
   )
 }
 
+/** Where a step runs: along its relation, or back from its target (a response). */
+function StepWay({ src, tgt, back }: { src?: string; tgt?: string; back: boolean }) {
+  return back
+    ? <>{tgt ?? '?'} → {src ?? '?'} <span className="seq-step-way" style={{ color: 'var(--text-muted)', fontSize: 10 }}>(response)</span></>
+    : <>{src ?? '?'} → {tgt ?? '?'}</>
+}
+
+/** Turns a step to run the other way along its relation. */
+function StepWayButton({ back, style, onClick }: { back: boolean; style: React.CSSProperties; onClick: () => void }) {
+  return (
+    <button
+      style={{ ...style, color: back ? 'var(--accent)' : style.color }}
+      aria-pressed={back}
+      onClick={onClick}
+      title={back ? 'Run along the relation again' : 'Run the other way, as a response'}
+    ><Icon.Swap /></button>
+  )
+}
+
 function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolean; compact?: boolean }) {
   const sequences = useDiagramStore((s) => s.sequences)
   const activeSequenceId = useDiagramStore((s) => s.activeSequenceId)
@@ -497,6 +522,7 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
   const reorderSequence = useDiagramStore((s) => s.reorderSequence)
   const clearSequence = useDiagramStore((s) => s.clearSequence)
   const updateStepDescription = useDiagramStore((s) => s.updateStepDescription)
+  const setStepBackward = useDiagramStore((s) => s.setStepBackward)
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const c4Relations = useDiagramStore((s) => s.c4Relations)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -553,6 +579,7 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
                     const src = rel ? c4Nodes[rel.sourceId] : null
                     const tgt = rel ? c4Nodes[rel.targetId] : null
                     const stepDesc = seq.stepDescriptions?.[idx]
+                    const back = isBackwardStep(seq, idx)
                     return (
                       <div key={`${relId}-${idx}`} className="seq-step" style={{ display: 'flex', alignItems: 'flex-start', gap: 5, background: 'var(--surface-2,rgba(255,255,255,0.04))', borderRadius: 5, padding: '4px 6px' }}>
                         <span style={{
@@ -564,7 +591,7 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
                         }}>{idx + 1}</span>
                         <div style={{ flex: 1, minWidth: 0, fontSize: 11, lineHeight: 1.35 }}>
                           <div style={{ color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {src?.label ?? '?'} → {tgt?.label ?? '?'}
+                            <StepWay src={src?.label} tgt={tgt?.label} back={back} />
                           </div>
                           {rel?.label && (
                             <div style={{ color: 'var(--text-muted)', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -599,6 +626,7 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
                               onClick={() => reorderSequence(seq.id, idx, idx + 1)}
                               title="Move down"
                             ><Icon.ArrowDown /></button>
+                            <StepWayButton back={back} style={btnStyle} onClick={() => setStepBackward(seq.id, idx, !back)} />
                             <button
                               style={{ ...btnStyle, color: 'var(--danger, #ef4444)' }}
                               onClick={() => removeFromSequence(seq.id, idx)}
@@ -1701,6 +1729,7 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
   const reorderSequence = useDiagramStore((s) => s.reorderSequence)
   const clearSequence = useDiagramStore((s) => s.clearSequence)
   const updateStepDescription = useDiagramStore((s) => s.updateStepDescription)
+  const setStepBackward = useDiagramStore((s) => s.setStepBackward)
   const setActiveSequence = useDiagramStore((s) => s.setActiveSequence)
   const addViewFromSequence = useDiagramStore((s) => s.addViewFromSequence)
   const views = useDiagramStore((s) => s.views)
@@ -1772,6 +1801,7 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
               const src = rel ? c4Nodes[rel.sourceId] : null
               const tgt = rel ? c4Nodes[rel.targetId] : null
               const stepDesc = seq.stepDescriptions?.[idx]
+              const back = isBackwardStep(seq, idx)
               return (
                 <div key={`${relId}-${idx}`} className="seq-step" style={{ display: 'flex', alignItems: 'flex-start', gap: 5, background: 'var(--surface-2,rgba(255,255,255,0.04))', borderRadius: 5, padding: '5px 7px' }}>
                   <span style={{
@@ -1783,7 +1813,7 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
                   }}>{idx + 1}</span>
                   <div style={{ flex: 1, minWidth: 0, fontSize: 11, lineHeight: 1.35 }}>
                     <div style={{ color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {src?.label ?? '?'} → {tgt?.label ?? '?'}
+                      <StepWay src={src?.label} tgt={tgt?.label} back={back} />
                     </div>
                     {rel?.label && (
                       <div style={{ color: 'var(--text-muted)', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1811,6 +1841,7 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
                       <button style={{ ...btnStyle, opacity: idx === seq.relationIds.length - 1 ? 0.3 : 1 }}
                         disabled={idx === seq.relationIds.length - 1}
                         onClick={() => reorderSequence(seq.id, idx, idx + 1)} title="Move down"><Icon.ArrowDown /></button>
+                      <StepWayButton back={back} style={btnStyle} onClick={() => setStepBackward(seq.id, idx, !back)} />
                       <button
                         style={{ ...btnStyle, color: 'var(--danger, #ef4444)' }}
                         onClick={() => removeFromSequence(seq.id, idx)}
@@ -2079,7 +2110,9 @@ function MarkdownField({ label, value, readOnly, onChange }: {
       <AutoResizeTextarea autoFocus aria-label={label} value={value} placeholder={MARKDOWN_HINT}
         onChange={(e) => onChange(e.target.value)}
         onFocus={(e) => { const t = e.currentTarget; t.setSelectionRange(t.value.length, t.value.length); beginTyping() }}
-        onBlur={() => { endTyping(); setEditing(false) }}
+        // The milestone question takes the focus and gives it back once
+        // answered: the editor stays open for it.
+        onBlur={() => { endTyping(); if (!useDiagramStore.getState().milestonePromptOpen) setEditing(false) }}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); e.currentTarget.blur() } }} />
     )
   }

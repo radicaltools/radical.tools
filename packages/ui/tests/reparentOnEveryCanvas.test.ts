@@ -215,3 +215,77 @@ describe('Move to… the root', () => {
     expect(violations()).toEqual([])
   })
 })
+
+/** Root systems S1, S3; S2 holds Q0 and Q1. The view "folded" folds S2. */
+function folds(modelFold: boolean): DiagramData {
+  const all = {
+    s1: pos(0, 400, 300, 180),
+    s2: pos(400, 0, 600, 330),
+    q0: pos(30, 120, 240, 150),
+    q1: pos(330, 120, 240, 150),
+    s3: pos(1100, 400, 300, 180),
+  }
+  const ids = Object.keys(all) as Array<keyof typeof all>
+  return {
+    nodes: [
+      node('s1', 'system', undefined, all.s1),
+      { ...node('s2', 'system', undefined, all.s2), collapsed: modelFold },
+      node('q0', 'container', 's2', all.q0),
+      node('q1', 'container', 's2', all.q1),
+      node('s3', 'system', undefined, all.s3),
+    ],
+    relations: [],
+    views: [{ id: 'folded', name: 'Folded', nodeIds: [...ids], positions: JSON.parse(JSON.stringify(all)), collapsedNodeIds: ['s2'] }],
+    defaultPositions: JSON.parse(JSON.stringify(all)),
+  }
+}
+
+describe('Move to… a folded container', () => {
+  // S1 lay left of S2, outside its frame: its place, rebased onto S2, is no
+  // place in it. Not drawn while S2 is folded, it kept it, and the expand
+  // drew it left of S2, outside its parent.
+  it('places it inside, beside what it holds, when the view folds it', () => {
+    s().loadDiagram(folds(false))
+    s().setActiveView('folded')
+    s().reparentNodes(['s1'], 's2', { quiet: true })
+    s().toggleCollapse('s2')
+    expect(violations()).toEqual([])
+  })
+
+  it('places it inside, beside what it holds, when the model folds it', () => {
+    s().loadDiagram(folds(true))
+    s().setActiveView(null)
+    s().reparentNodes(['s1'], 's2', { quiet: true })
+    s().toggleCollapse('s2')
+    expect(violations()).toEqual([])
+  })
+})
+
+describe('Move to… with a row', () => {
+  // A row [S1, S3] at the root; S1 moved into S2 stays in it (S3 is none
+  // of its ancestors) but the row was not held until a reload, which then
+  // moved six elements, the file unchanged.
+  const rowModel = (): DiagramData => {
+    const data = folds(false)
+    const row = [{ id: 'row', type: 'align' as const, axis: 'horizontal' as const, nodeIds: ['s1', 's3'] }]
+    data.views = [{ ...data.views![0], id: 'v', name: 'Row', collapsedNodeIds: [], layoutConstraints: row }]
+    data.defaultLayoutConstraints = row
+    return data
+  }
+  const centreY = (id: string): number => abs(id).y + abs(id).height / 2
+
+  for (const canvas of ['v', null]) {
+    it(`holds the row at once, as a reload draws it (${canvas ?? 'All elements'})`, () => {
+      s().loadDiagram(rowModel())
+      s().setActiveView(canvas)
+      s().reparentNodes(['s1'], 's2', { quiet: true })
+      expect(s().c4Nodes.s1.parentId).toBe('s2')
+      expect(Math.abs(centreY('s1') - centreY('s3'))).toBeLessThanOrEqual(1)
+      expect(violations()).toEqual([])
+      const after = Object.fromEntries(Object.keys(s().c4Nodes).map((id) => [id, abs(id)]))
+      s().loadDiagram(JSON.parse(JSON.stringify(s().saveDiagram())) as DiagramData)
+      s().setActiveView(canvas)
+      for (const id of Object.keys(after)) expect(abs(id), id).toEqual(after[id])
+    })
+  }
+})

@@ -48,6 +48,25 @@ export function markdownToPlain(text: string): string {
   )
 }
 
+/** Whether the address `src`, as the page at `base` resolves it, is on
+ *  another host: fetching it would send a request off the machine (D13).
+ *  The browser resolves more than `//host` and `http(s)://host` to another
+ *  host: `https:host`, `https:/host`, `\\host` and `/\host` too. An address
+ *  in the text itself (data:, blob:) or beside the app is not remote; one
+ *  that does not resolve is taken for remote. */
+export function isRemoteUrl(src: string, base: string): boolean {
+  let url: URL
+  let page: URL
+  try {
+    url = new URL(src.trim(), base)
+    page = new URL(base)
+  } catch {
+    return true
+  }
+  if (url.protocol === 'data:' || url.protocol === 'blob:') return false
+  return url.protocol !== page.protocol || url.host !== page.host
+}
+
 /** `text` with each line break kept as one, as a comment on GitHub keeps
  *  them: a single newline in a paragraph becomes a hard break (two spaces
  *  before it). Code fences are left as they are. */

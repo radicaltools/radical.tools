@@ -267,18 +267,20 @@ export const RelationEdge = memo(
             </div>
           </EdgeLabelRenderer>
         )}
-        {data?.sequenceStep !== undefined && data.sequenceStep.length > 0 && (
-          <EdgeLabelRenderer>
+        {/* Step numbers: a forward step's near the source, a backward one's
+            (a response, which starts at the target) near the target. */}
+        {([[data?.sequenceStep, 0.18, false], [data?.sequenceStepBack, 0.82, true]] as const).map(([steps, at, back]) => steps && steps.length > 0 && (
+          <EdgeLabelRenderer key={back ? 'back' : 'fwd'}>
             <div
               style={{
                 position:      'absolute',
-                transform:     `translate(-50%, -50%) translate(${sp.x + (tp.x - sp.x) * 0.18}px,${sp.y + (tp.y - sp.y) * 0.18}px)`,
+                transform:     `translate(-50%, -50%) translate(${sp.x + (tp.x - sp.x) * at}px,${sp.y + (tp.y - sp.y) * at}px)`,
                 background:    'var(--accent)',
                 color:         '#fff',
-                borderRadius:  data.sequenceStep.length === 1 ? '50%' : 8,
+                borderRadius:  steps.length === 1 && !back ? '50%' : 8,
                 minWidth:      20,
                 height:        20,
-                padding:       data.sequenceStep.length === 1 ? 0 : '0 5px',
+                padding:       steps.length === 1 && !back ? 0 : '0 5px',
                 display:       'flex',
                 alignItems:    'center',
                 justifyContent:'center',
@@ -290,12 +292,12 @@ export const RelationEdge = memo(
                 lineHeight:    1,
                 whiteSpace:    'nowrap',
               }}
-              className="nodrag nopan"
+              className={`nodrag nopan sequence-step-badge${back ? ' sequence-step-back' : ''}`}
             >
-              {data.sequenceStep.join(',')}
+              {back ? `↩ ${steps.join(',')}` : steps.join(',')}
             </div>
           </EdgeLabelRenderer>
-        )}
+        ))}
       </g>
     )
   }

@@ -56,8 +56,15 @@ const OVERLAP_TOLERANCE = 0.01
  *  `distinct`, each layout counts once in the means and deviations (see
  *  bestIndexKeepingCurrent). */
 export function aggregatedQuality(scores: readonly CompositeScore[], distinct = false): number[] {
-  const total = scores.map(() => 0)
-  if (scores.length < 2) return total
+  return standardised(scores, distinct).map((values) => values.reduce((sum, v) => sum + v, 0))
+}
+
+/** Each score's standardised value per criterion of RANK_CRITERIA: how far
+ *  it is from the mean of `scores`, in their standard deviations (or the
+ *  criterion's floor). All zero for fewer than two scores. */
+function standardised(scores: readonly CompositeScore[], distinct: boolean): number[][] {
+  const values = scores.map(() => RANK_CRITERIA.map(() => 0))
+  if (scores.length < 2) return values
   const seen = new Set<string>()
   const counted = !distinct ? scores : scores.filter((s) => {
     const key = RANK_CRITERIA.map(({ key }) => Number(s[key]) || 0).join('|')
@@ -65,14 +72,14 @@ export function aggregatedQuality(scores: readonly CompositeScore[], distinct = 
     seen.add(key)
     return true
   })
-  for (const { key, floor } of RANK_CRITERIA) {
+  RANK_CRITERIA.forEach(({ key, floor }, c) => {
     const pool = counted.map((s) => Number(s[key]) || 0)
     const mean = pool.reduce((sum, v) => sum + v, 0) / pool.length
     const sd = Math.sqrt(pool.reduce((sum, v) => sum + (v - mean) ** 2, 0) / pool.length)
     const scale = Math.max(sd, floor)
-    scores.forEach((s, i) => { total[i] += ((Number(s[key]) || 0) - mean) / scale })
-  }
-  return total
+    scores.forEach((s, i) => { values[i][c] = ((Number(s[key]) || 0) - mean) / scale })
+  })
+  return values
 }
 
 /** The index of the best of `scores`: the best aggregated quality among the
@@ -101,10 +108,21 @@ export function bestIndex(scores: readonly CompositeScore[], distinct = false): 
  */
 export const KEEP_CURRENT_MARGIN = 0.25
 
+/**
+ * And how much more it has to gain than it loses, criterion by criterion
+ * (the standardised values it is better in, against those it is worse in).
+ * Ahead by the margin alone, a layout that traded about as much as it
+ * gained replaced the one on screen: Smart Layout run again after one
+ * element of 63 was deleted moved all 62 others for 216 → 221 crossings
+ * and 125 → 117 overdraws.
+ */
+export const KEEP_CURRENT_RATIO = 2
+
 /** Like bestIndex, with the last score the layout on screen: it is kept
- *  (its index returned) unless the best of the others is better by
- *  KEEP_CURRENT_MARGIN. That best is the best among the others alone: with
- *  the layout on screen in the ranking, how bad it was moved the means and
+ *  (its index returned) unless the best of the others is clearly better:
+ *  by KEEP_CURRENT_MARGIN, gaining KEEP_CURRENT_RATIO times what it loses.
+ *  That best is the best among the others alone: with the layout on
+ *  screen in the ranking, how bad it was moved the means and
  *  deviations, so the winner depended on where the run started, and a run
  *  from the layout it had just made picked another one (MCP smart_layout
  *  called twice rewrote the view twice). Each layout counts once in the
@@ -118,9 +136,19 @@ export function bestIndexKeepingCurrent(scores: readonly CompositeScore[]): numb
   if (current <= 0) return current
   if (bestIndex(scores, true) === current) return current
   const best = bestIndex(scores.slice(0, current), true)
-  const quality = aggregatedQuality(scores, true)
+  const values = standardised(scores, true)
+  const quality = values.map((v) => v.reduce((sum, x) => sum + x, 0))
   const currentClean = scores[current].nodeOverlap <= OVERLAP_TOLERANCE || scores[current].nodeOverlap <= scores[best].nodeOverlap
-  return currentClean && quality[current] - quality[best] < KEEP_CURRENT_MARGIN ? current : best
+  if (!currentClean) return best
+  if (quality[current] - quality[best] < KEEP_CURRENT_MARGIN) return current
+  let gains = 0
+  let losses = 0
+  values[best].forEach((v, c) => {
+    const d = values[current][c] - v
+    if (d > 0) gains += d
+    else losses -= d
+  })
+  return gains >= KEEP_CURRENT_RATIO * losses ? best : current
 }
 
 /** `items` ordered best first by aggregated quality among them (overlapping

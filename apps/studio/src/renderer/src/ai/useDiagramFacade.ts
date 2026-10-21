@@ -98,12 +98,13 @@ export function createStoreFacade(): DiagramFacade {
     getSequences: () => useDiagramStore.getState().sequences,
     addSequence: (name: string) => useDiagramStore.getState().addSequence(name),
     renameSequence: (id: string, name: string) => useDiagramStore.getState().renameSequence(id, name),
-    setSequenceSteps: (id: string, steps: Array<{ relationId: string; description?: string }>) => {
+    setSequenceSteps: (id: string, steps: Array<{ relationId: string; description?: string; backward?: boolean }>) => {
       const s = useDiagramStore.getState()
       s.clearSequence(id)
       steps.forEach((step, i) => {
         s.toggleRelationInSequence(id, step.relationId)
         if (step.description) s.updateStepDescription(id, i, step.description)
+        if (step.backward) s.setStepBackward(id, i, true)
       })
     },
     removeSequence: (id: string) => useDiagramStore.getState().removeSequence(id),

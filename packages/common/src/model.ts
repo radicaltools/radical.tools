@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType } from './c4'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, trimStepBackward } from './c4'
 import { readPipeline } from './viewPipeline'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
@@ -490,11 +490,14 @@ export function forgetRelationsInSequences(state: ModelState, removed: Set<strin
     if (!sequence.relationIds.some((rid) => removed.has(rid))) continue
     const keep = sequence.relationIds.map((rid) => !removed.has(rid))
     const notes = sequence.stepDescriptions?.filter((_, i) => keep[i] ?? true)
+    const backward = sequence.stepBackward && trimStepBackward(sequence.stepBackward.filter((_, i) => keep[i] ?? true))
     sequence.relationIds = sequence.relationIds.filter((_, i) => keep[i])
     if (notes) {
       while (notes.length > 0 && !notes[notes.length - 1]) notes.pop()
       sequence.stepDescriptions = notes
     }
+    if (backward) sequence.stepBackward = backward
+    else delete sequence.stepBackward
   }
 }
 
@@ -1377,6 +1380,8 @@ export function deleteLayoutConstraint(state: ModelState, viewId: string | null,
 export interface SequenceStep {
   relationId: string
   description?: string
+  /** The step runs from the relation's target to its source (a response). */
+  backward?: boolean
 }
 
 export function insertSequence(state: ModelState, id: string, name: string): void {
@@ -1398,6 +1403,9 @@ export function setSequenceSteps(state: ModelState, id: string, steps: SequenceS
   // Like Studio's step list: descriptions run up to the last described step.
   const last = steps.reduce((end, step, i) => (step.description ? i + 1 : end), 0)
   sequence.stepDescriptions = steps.slice(0, last).map((step) => step.description || undefined)
+  const backward = trimStepBackward(steps.map((step) => step.backward === true))
+  if (backward) sequence.stepBackward = backward
+  else delete sequence.stepBackward
 }
 
 /** Removes the sequence and unlinks the views that showed it. */

@@ -424,3 +424,137 @@ describe('views', () => {
     expect(r.notRead.join(' ')).toMatch(/Filtered views are not imported/)
   })
 })
+
+// Decided 2026-10-21 (runs 65 to 69): the import named every model
+// "Imported diagram" when the workspace had no name after its keyword, and
+// read no `name` in its block.
+describe('the name the model gets', () => {
+  it('is the workspace\'s, after its keyword or in its block, else none (the file\'s)', () => {
+    expect(parseStructurizrDsl('workspace "Shop" { model { a = person "A" } }').name).toBe('Shop')
+    expect(parseStructurizrDsl('workspace {\n  name "Orders"\n  model { a = person "A" }\n}').name).toBe('Orders')
+    expect(parseStructurizrDsl('workspace { model { a = person "A" } }').name).toBe('')
+  })
+})
+
+// Decided 2026-10-21 (runs 65 to 69): the views left the workspace's groups
+// out, which Structurizr draws as boundaries round what they hold.
+describe('groups on the views', () => {
+  const r = parseStructurizrDsl(`workspace "Groups" {
+  model {
+    u = person "User"
+    group "Core" {
+      a = softwareSystem "Alpha" {
+        group "Front" {
+          web = container "Web"
+        }
+        api = container "API"
+      }
+      b = softwareSystem "Beta"
+    }
+    u -> web "Uses"
+    web -> api "Calls"
+    api -> b "Reads"
+  }
+  views {
+    systemLandscape "L" {
+      include *
+    }
+    container a "C" {
+      include *
+    }
+    dynamic a "D" {
+      u -> web "Opens"
+      web -> api "Calls"
+    }
+  }
+}`)
+  const labels = (name: string) => r.views.find((v) => v.name === name)?.nodeIds.map((id) => r.nodes.find((n) => n.id === id)?.label)
+
+  it('come in as groups holding their members', () => {
+    expect(byLabel(r, 'Alpha')?.parentId).toBe(byLabel(r, 'Core')?.id)
+    expect(byLabel(r, 'Web')?.parentId).toBe(byLabel(r, 'Front')?.id)
+    expect(byLabel(r, 'Front')?.type).toBe('group')
+  })
+
+  it('are drawn round the elements a view shows, up to the element that holds them', () => {
+    expect(labels('L')).toEqual(['User', 'Core', 'Alpha', 'Beta'])
+    expect(labels('C')).toEqual(['User', 'Core', 'Alpha', 'Front', 'Web', 'API', 'Beta'])
+    // A flow draws its participants, no boundaries.
+    expect(labels('D')).toEqual(['User', 'Web', 'API'])
+    // A group with a member shown is not folded.
+    expect(r.views.find((v) => v.name === 'C')?.collapsedNodeIds).toBeUndefined()
+  })
+})
+
+// Item 246: a step named the second of two relationships between the same
+// elements, and the flow played the first, with the step's description as
+// its note.
+describe('a dynamic step between a pair with two relationships', () => {
+  it('plays the relationship its description names', () => {
+    const r = parseStructurizrDsl(`workspace "Orders" {
+  model {
+    shopper = person "Shopper"
+    shop = softwareSystem "Shop" {
+      api = container "Order API" "" "Java"
+      db = container "Order DB" "" "PostgreSQL" "Database"
+    }
+    shopper -> api "Places orders using" "HTTPS"
+    api -> db "Reads orders from" "JDBC"
+    api -> db "Writes orders to" "JDBC"
+  }
+  views {
+    dynamic shop "PlaceOrder" {
+      shopper -> api "Places orders using"
+      api -> db "Writes orders to"
+      api -> db "Checks stock"
+    }
+  }
+}`)
+    const seq = r.sequences[0]
+    expect(seq.relationIds.map((id) => r.relations.find((x) => x.id === id)?.label)).toEqual(['Places orders using', 'Writes orders to', 'Reads orders from'])
+    // A description that names neither plays the first, with it as the note.
+    expect(seq.stepDescriptions).toEqual([undefined, undefined, 'Checks stock'])
+  })
+})
+
+describe('a dynamic step against its relationship', () => {
+  // Structurizr's Big Bank "SignIn": the answers run back along the calls'
+  // relationships (database -> securityComponent). They were left out with
+  // "no relationship between their elements"; they are backward steps.
+  const r = parseStructurizrDsl(`workspace {
+    model {
+        bank = softwareSystem "Internet Banking" {
+            spa = container "Single-Page Application"
+            api = container "API Application" {
+                signin = component "Sign In Controller"
+                security = component "Security Component"
+            }
+            database = container "Database" "" "" "Database"
+        }
+        spa -> signin "Makes API calls to"
+        signin -> security "Uses"
+        security -> database "Reads from and writes to"
+    }
+    views {
+        dynamic api "SignIn" {
+            spa -> signin "Submits credentials to"
+            signin -> security "Validates credentials using"
+            security -> database "select * from users where username = ?"
+            database -> security "Returns user data to"
+            security -> signin "Returns true if the hashed password matches"
+            signin -> spa "Sends back an authentication token to"
+        }
+    }
+}`)
+
+  it('imports it as a backward step along that relationship, with its description', () => {
+    const v = r.views.find((x) => x.name === 'SignIn')!
+    const seq = r.sequences.find((s) => s.id === v.sequenceId)!
+    expect(seq.relationIds.map((id) => r.relations.find((x) => x.id === id)?.label)).toEqual([
+      'Makes API calls to', 'Uses', 'Reads from and writes to', 'Reads from and writes to', 'Uses', 'Makes API calls to',
+    ])
+    expect(seq.stepBackward).toEqual([false, false, false, true, true, true])
+    expect(seq.stepDescriptions?.[3]).toBe('Returns user data to')
+    expect(r.notRead.join(' ')).not.toMatch(/SignIn/)
+  })
+})

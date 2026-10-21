@@ -7,7 +7,7 @@
 // The tools never load a milestone over the current model: that is Studio's
 // milestone timeline, where the user sees what they are switching to.
 
-import type { DiagramSequence, DiagramSnapshot } from '../../c4'
+import { slideWithoutMilestone, type DiagramSequence, type DiagramSnapshot } from '../../c4'
 import { compareModels, type ModelChanges, type ModelCopy } from '../../model'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 
@@ -40,7 +40,7 @@ export function buildMilestoneToolDefs(): ToolDef[] {
     },
     {
       name: 'delete_milestone',
-      description: 'Delete a milestone. The current model does not change; slides that showed it are unlinked from it.',
+      description: 'Delete a milestone. The current model does not change; slides that showed it show the current model, fitted to their view.',
       inputSchema: {
         type: 'object',
         properties: { id: { type: 'string' } },
@@ -97,8 +97,8 @@ function describeChanges(changes: ModelChanges, before: ModelCopy, after: ModelC
   return lines.join('\n')
 }
 
-/** The sequences added, removed and changed (name, steps, notes) from
- *  `before` to `after`, as lines for describeChanges' sections. */
+/** The sequences added, removed and changed (name, steps and their ways,
+ *  notes) from `before` to `after`, as lines for describeChanges' sections. */
 function describeSequenceChanges(before: Record<string, DiagramSequence>, after: Record<string, DiagramSequence>): string {
   const name = (q: DiagramSequence) => `${q.name} (${q.id})`
   const same = (a: unknown, b: unknown) => JSON.stringify(a ?? []) === JSON.stringify(b ?? [])
@@ -108,7 +108,8 @@ function describeSequenceChanges(before: Record<string, DiagramSequence>, after:
     const was = before[q.id]
     const fields = [
       ...(was.name !== q.name ? ['name'] : []),
-      ...(!same(was.relationIds, q.relationIds) ? ['steps'] : []),
+      // A step turned to run the other way is a change of the steps.
+      ...(!same(was.relationIds, q.relationIds) || !same(was.stepBackward, q.stepBackward) ? ['steps'] : []),
       ...(!same(was.stepDescriptions, q.stepDescriptions) ? ['notes'] : []),
     ]
     return fields.length ? `${name(q)}: ${fields.join(', ')}` : null
@@ -193,12 +194,13 @@ export function buildMilestoneToolHandlers(): Record<string, ToolHandler> {
       const milestone = list.find((m) => m.id === input.id)
       if (!milestone) return fail(`delete_milestone: unknown milestone id "${String(input.id)}"`)
       ctx.diagram.removeMilestone(milestone.id)
-      // Unlink the slides that showed it.
+      // The slides that showed it show the current model, with nothing
+      // captured on the milestone (a copy of it drew it still).
       const presentations = ctx.diagram.getPresentations?.() ?? []
       if (ctx.diagram.setPresentations && presentations.some((p) => p.slides.some((slide) => slide.snapshotId === milestone.id))) {
         ctx.diagram.setPresentations(presentations.map((p) => ({
           ...p,
-          slides: p.slides.map((slide) => (slide.snapshotId === milestone.id ? { ...slide, snapshotId: null } : slide)),
+          slides: p.slides.map((slide) => (slide.snapshotId === milestone.id ? slideWithoutMilestone(slide) : slide)),
         })))
       }
       return { ok: true, resultText: `Deleted milestone "${milestone.name}" (${milestone.id}).` }

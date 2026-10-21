@@ -1,6 +1,6 @@
 import React from 'react'
 import Markdown, { type MarkdownToJSX } from 'markdown-to-jsx/react'
-import { keepLineBreaks } from '@radical/common/markdown'
+import { isRemoteUrl, keepLineBreaks } from '@radical/common/markdown'
 
 // ─── Markdown text ───────────────────────────────────────────────────────────
 // An element's long field (markdown.ts) rendered: its paragraphs, lists,
@@ -28,10 +28,11 @@ function Link({ href, children, title }: { href?: string; children?: React.React
 
 /** An image of the text: one on another host is not loaded (the request
  *  would leave the machine, D13); it is a link with its address. One in
- *  the text itself (data:) or beside the app is drawn. */
+ *  the text itself (data:) or beside the app is drawn. Remote is what the
+ *  browser would resolve to another host, not only `//` and `http(s)://`. */
 function Image({ src, alt, title }: { src?: string; alt?: string; title?: string }): React.ReactElement | null {
   if (!src) return alt ? <span>{alt}</span> : null
-  if (/^(https?:)?\/\//i.test(src)) {
+  if (isRemoteUrl(src, window.location.href)) {
     return (
       <a href={src} className="md-remote-image" title={title ?? 'An image on another site, not loaded'} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
         {alt ? `${alt} (${src})` : src}

@@ -52,6 +52,23 @@ describe('aggregated quality', () => {
     expect(KEEP_CURRENT_MARGIN).toBeGreaterThan(0)
   })
 
+  it('keeps the layout on screen against one that loses about as much as it gains', () => {
+    // g60 after Smart Layout and one delete: the next run traded crossings
+    // and sides for overdraws (216 → 221 crossings, 125 → 117 overdraws),
+    // better overall by more than the margin, and moved all 62 elements.
+    // Here: fewer crossings and overdraws, more on one side; ahead by 0.38,
+    // it gains 2.5 standard deviations and loses 2.1.
+    const challenger = score({ renderedCrossings: 4, renderedOverdraws: 0, sideLoad: 3 })
+    const other = score({ renderedCrossings: 40 })
+    const current = score({ renderedCrossings: 10, renderedOverdraws: 6 })
+    const q = aggregatedQuality([challenger, other, current], true)
+    expect(q[2] - q[0]).toBeGreaterThan(KEEP_CURRENT_MARGIN)
+    expect(bestIndexKeepingCurrent([challenger, other, current])).toBe(2)
+    // One that gains twice what it loses replaces it.
+    const clearly = score({ renderedCrossings: 4, renderedOverdraws: 0, sideLoad: 1 })
+    expect(bestIndexKeepingCurrent([clearly, other, current])).toBe(0)
+  })
+
   it('counts a layout several candidates came out as once, when it picks the winner', () => {
     // Three ELK variants giving one Layered TB weighed it three times in the
     // means and deviations, and so decided between two other near equals.

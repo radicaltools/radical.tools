@@ -374,16 +374,47 @@ function enqueueSave(id: string, data: DiagramData): Promise<void> {
   return chain
 }
 
-/** Whether "Save as folder" may write into a folder that already holds these
- *  files: always for an empty folder or an existing Radical model, otherwise
- *  only when the user confirms. */
+/** Asks before a model is written into a folder that holds files: `model`
+ *  names the Radical model the folder holds, which the write replaces. */
+export type ConfirmFolder = (folderName: string, model?: string) => boolean | Promise<boolean>
+
+/** Whether "Move to a folder…" or New model may write into a folder that
+ *  already holds these files: always for an empty folder, otherwise only when
+ *  the user confirms, also for a Radical model, which the write replaces.
+ *  Another model's folder was replaced without a question (item 235). */
 async function mayWriteInto(
   files: FolderFiles,
   folderName: string,
-  confirmForeign?: (folderName: string) => boolean | Promise<boolean>,
+  confirmForeign?: ConfirmFolder,
 ): Promise<boolean> {
-  if (Object.keys(files).length === 0 || isMdFolder(files)) return true
-  return confirmForeign ? await confirmForeign(folderName) : false
+  if (Object.keys(files).length === 0) return true
+  if (!confirmForeign) return false
+  if (!isMdFolder(files)) return await confirmForeign(folderName)
+  let model = folderName
+  try {
+    model = deserializeFromMdFolder(files).name || folderName
+  } catch {
+    // A model that does not read is still a model: it is named after its folder.
+  }
+  return await confirmForeign(folderName, model)
+}
+
+/** The other entries of the list kept in the folder just `written` (a model
+ *  it replaced): they would open the model written there, so they go. */
+async function forgetReplaced(written: WrittenFolder, keepId: string): Promise<void> {
+  const ids: string[] = []
+  for (const doc of readIndex().docs) {
+    if (doc.id === keepId || doc.source !== 'md') continue
+    if ('folderPath' in written) {
+      if (doc.folderPath === written.folderPath) ids.push(doc.id)
+      continue
+    }
+    if (doc.folderPath) continue
+    const handle = await loadHandle(doc.id).catch(() => null)
+    const same = handle && (written.handle as FsDirHandle & { isSameEntry?: (h: FsDirHandle) => Promise<boolean> }).isSameEntry
+    if (handle && same && (await same.call(written.handle, handle).catch(() => false))) ids.push(doc.id)
+  }
+  for (const id of ids) documents.deleteDocument(id)
 }
 
 /** A folder `pickAndWriteFolder` wrote: a path on disk (Electron), or a
@@ -400,7 +431,7 @@ type WrittenFolder =
 async function pickAndWriteFolder(
   data: DiagramData,
   fallbackName: string,
-  confirmForeign?: (folderName: string) => boolean | Promise<boolean>,
+  confirmForeign?: ConfirmFolder,
   modelName?: string,
 ): Promise<WrittenFolder | null> {
   const h = host()
@@ -722,13 +753,13 @@ export interface DocumentsAPI {
 
   /** Pick a destination folder (Electron or web), write the current payload as
    *  a Markdown folder, and convert the doc to md-backed. A folder that already
-   *  holds `.md` / `.json` files but is not a Radical model is written into
-   *  only if `confirmForeignFolder` returns true. Returns the mutated meta, or
-   *  null on cancel / failure. */
+   *  holds files, another Radical model among them, is written into only if
+   *  `confirmForeignFolder` returns true; the entries of a model it replaces
+   *  leave the list. Returns the mutated meta, or null on cancel / failure. */
   saveAsFolder(
     id: string,
     data: DiagramData,
-    confirmForeignFolder?: (folderName: string) => boolean | Promise<boolean>,
+    confirmForeignFolder?: ConfirmFolder,
   ): Promise<DocumentMeta | null>
 
   /** Pick a file to save into (Electron Save dialog, or the browser's file
@@ -742,7 +773,7 @@ export interface DocumentsAPI {
    *  foreign-folder rule as `saveAsFolder`. Returns null on cancel / failure. */
   createFolderDocument(
     data: DiagramData,
-    confirmForeignFolder?: (folderName: string) => boolean | Promise<boolean>,
+    confirmForeignFolder?: ConfirmFolder,
   ): Promise<DocumentMeta | null>
 
   /** Re-request read/write permission for a web folder or file document's
@@ -814,6 +845,9 @@ export interface DocumentsAPI {
 /** The text of an md-folder document's agent activity file (agentActivity),
  *  or null when there is none, it cannot be read, or the document is no
  *  folder (or a browser folder not yet connected). */
+/** Each document's agent mark as last read, and when it was first read. */
+const agentMarksSeen = new Map<string, { text: string; at: number }>()
+
 async function readAgentActivityText(id: string): Promise<string | null> {
   const meta = readIndex().docs.find((d) => d.id === id)
   if (meta?.source !== 'md') return null
@@ -1205,6 +1239,7 @@ export const documents: DocumentsAPI = {
     // A model moved keeps its name; it was renamed after the folder.
     const written = await pickAndWriteFolder(data, current.name, confirmForeignFolder, current.name)
     if (!written) return null
+    await forgetReplaced(written, id)
     const idx = readIndex()
     const meta = idx.docs.find((d) => d.id === id)
     if (!meta) return null
@@ -1272,11 +1307,11 @@ export const documents: DocumentsAPI = {
   async createFolderDocument(data, confirmForeignFolder) {
     const written = await pickAndWriteFolder(data, 'model', confirmForeignFolder)
     if (!written) return null
+    // This folder was in the list before: keep one entry for it.
+    await forgetReplaced(written, '')
     const idx = readIndex()
     const meta: DocumentMeta = { id: uid(), name: written.name, source: 'md', lastModified: Date.now() }
     await bindFolder(meta, written)
-    // Electron opened this folder before: keep one entry for it.
-    idx.docs = idx.docs.filter((d) => !(meta.folderPath && d.source === 'md' && d.folderPath === meta.folderPath))
     idx.docs.push(meta)
     idx.activeId = meta.id
     writeIndex(idx)
@@ -1324,7 +1359,12 @@ export const documents: DocumentsAPI = {
   },
 
   async agentWritingUntil(id) {
-    return agentWritingUntil(await readAgentActivityText(id))
+    const text = await readAgentActivityText(id)
+    // A mark is cut to one period from when it was first seen, not from each check.
+    const seen = agentMarksSeen.get(id)
+    const now = Date.now()
+    if (!text || seen?.text !== text) agentMarksSeen.set(id, { text: text ?? '', at: now })
+    return agentWritingUntil(text, now, agentMarksSeen.get(id)!.at)
   },
 
   async readAgentActivity(id) {

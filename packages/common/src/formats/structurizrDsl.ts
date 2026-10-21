@@ -4,7 +4,8 @@
  * Handles a practical subset of the Structurizr DSL:
  *   • person, softwareSystem, container, component elements, and elements
  *     of an archetype (`archetypes { application = container { … } }`)
- *   • group blocks  →  mapped to the 'group' node type
+ *   • group blocks  →  mapped to the 'group' node type, drawn on the views
+ *     around what they hold, as Structurizr draws group boundaries
  *   • variable assignment:  varName = keyword "label" ...
  *   • flat and hierarchical identifiers (`!identifiers hierarchical`):
  *     `sys.container -> sys2.ctn`, a name relative to the block it is in,
@@ -32,7 +33,7 @@
  */
 
 import type { C4Node, C4Relation, C4ElementType, DiagramSequence, DiagramView } from '../c4'
-import { NODE_SIZES } from '../c4'
+import { NODE_SIZES, trimStepBackward } from '../c4'
 import type { Metamodel } from '../metamodel/types'
 import { isPlacementAllowed, isRelationAllowed } from '../metamodel/lookup'
 import { builtInC4Metamodel } from '../metamodel/presets/c4'
@@ -46,7 +47,9 @@ export interface StructurizrDslResult {
   sequences: DiagramSequence[]
   /** The workspace's views, in its order, with no places yet. */
   views: DiagramView[]
-  /** Workspace name from the DSL, used as the document display name. */
+  /** Workspace name from the DSL (`workspace "Name"`, or `name "Name"` in
+   *  its block), used as the document display name; empty when it gives
+   *  none, for the caller to name the model after the file. */
   name: string
   /** What the import could not read or left out, one sentence each. */
   notRead: string[]
@@ -246,7 +249,7 @@ export function parseStructurizrDsl(src: string, options: StructurizrDslOptions 
   const peek = (off = 0): Tok => toks[Math.min(p + off, toks.length - 1)]
   const eat  = (): Tok => { const t = toks[p]; if (p < toks.length - 1) p++; return t }
 
-  let workspaceName = 'Imported diagram'
+  let workspaceName = ''
   const nodes: C4Node[]     = []
   const relations: C4Relation[] = []
   const pending: PendingRel[] = []
@@ -703,6 +706,9 @@ export function parseStructurizrDsl(src: string, options: StructurizrDslOptions 
         if (t.kind === 'DIRECTIVE') { directive(); continue }
         if (t.kind === 'IDENT' && lc(t.val) === 'model' && peek(1).kind === 'LBRACE')  { eat(); parseModel(root); continue }
         if (t.kind === 'IDENT' && lc(t.val) === 'views' && peek(1).kind === 'LBRACE')  { eat(); parseViews(); continue }
+        // name "…": the block's name, like the one after the keyword, was
+        // ignored.
+        if (t.kind === 'IDENT' && lc(t.val) === 'name' && peek(1).kind === 'STR') { eat(); workspaceName = eat().val; continue }
         // configuration, etc. — skip the whole block
         if (t.kind === 'IDENT' && namedBlockAhead()) { eat(); restOfLine(t.line); skipBlock(); continue }
         eat()
@@ -912,19 +918,32 @@ export function parseStructurizrDsl(src: string, options: StructurizrDslOptions 
       if (spec.kind === 'dynamic') {
         const relationIds: string[] = []
         const notes: (string | undefined)[] = []
+        const backward: boolean[] = []
         const missing: string[] = []
         for (const step of spec.steps) {
           const a = resolveId(step.src, [], null), b = resolveId(step.tgt, [], null)
-          const found = a && b ? relations.find((r) => r.sourceId === a && r.targetId === b) : undefined
-          if (!found) { missing.push(`${step.src} -> ${step.tgt}`); continue }
-          relationIds.push(found.id)
-          notes.push(step.description && step.description !== found.label ? step.description : undefined)
-          ids.add(found.sourceId); ids.add(found.targetId)
+          // Of two relationships between the pair, the one the step's
+          // description names, as Structurizr picks it; else the first.
+          const named = (from: string, to: string) => {
+            const between = relations.filter((r) => r.sourceId === from && r.targetId === to)
+            return between.find((r) => step.description !== undefined && r.label === step.description) ?? between[0]
+          }
+          const found = a && b ? named(a, b) : undefined
+          // A step against a relationship (a response) runs along it backward.
+          const back = !found && a && b ? named(b, a) : undefined
+          const rel = found ?? back
+          if (!rel) { missing.push(`${step.src} -> ${step.tgt}`); continue }
+          relationIds.push(rel.id)
+          notes.push(step.description && step.description !== rel.label ? step.description : undefined)
+          backward.push(!!back)
+          ids.add(rel.sourceId); ids.add(rel.targetId)
         }
         if (missing.length) skipped(`View "${name}": ${missing.length} step${missing.length === 1 ? '' : 's'} with no relationship between ${missing.length === 1 ? 'its' : 'their'} elements left out (${missing.join('; ')}).`)
         if (relationIds.length) {
           const seq: DiagramSequence = { id: `seq-${sequences.length + 1}`, name, relationIds }
           if (notes.some((d) => d)) seq.stepDescriptions = notes
+          const back = trimStepBackward(backward)
+          if (back) seq.stepBackward = back
           sequences.push(seq)
           view.kind = 'dynamic'
           view.sequenceId = seq.id
@@ -935,6 +954,14 @@ export function parseStructurizrDsl(src: string, options: StructurizrDslOptions 
         takenNames.delete(name)
         skipped(`View "${name}" was not imported: it shows no element.`)
         continue
+      }
+      // The groups an element shown is in (up to the element that holds
+      // them), as Structurizr draws a boundary round them: the views left
+      // the workspace's groups out. A flow draws its participants only.
+      if (view.kind !== 'dynamic') {
+        for (const id of [...ids]) {
+          for (let up = index[id]?.parentId; up && index[up]?.type === 'group'; up = index[up].parentId) ids.add(up)
+        }
       }
       // Listed in model order; an element shown without any of what it
       // holds is drawn folded, as Structurizr draws a box.

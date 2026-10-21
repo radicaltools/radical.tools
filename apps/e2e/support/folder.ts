@@ -55,7 +55,19 @@ export class ModelFolder {
             const rel = prefix ? `${prefix}/${entryName}` : entryName
             try {
               if (entry.kind === 'directory') await walk(entry as FileSystemDirectoryHandle, rel)
-              else out[rel] = await (await (entry as FileSystemFileHandle).getFile()).text()
+              else {
+                // A save that rewrites the file between getFile() and text()
+                // makes the File unreadable: read it again, as it is now.
+                for (let tries = 0; ; tries++) {
+                  try {
+                    out[rel] = await (await (entry as FileSystemFileHandle).getFile()).text()
+                    break
+                  } catch (error) {
+                    if ((error as DOMException).name !== 'NotReadableError' || tries >= 4) throw error
+                    await new Promise((resolve) => setTimeout(resolve, 50))
+                  }
+                }
+              }
             } catch (error) {
               // Folder saves can rename an entry between iteration and read.
               if ((error as DOMException).name !== 'NotFoundError') throw error

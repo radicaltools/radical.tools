@@ -204,3 +204,40 @@ describe('deleting what a sequence steps along (D4)', () => {
     expect(seq().relationIds).toEqual([])
   })
 })
+
+describe('backward steps', () => {
+  // A step can run along its relation the other way, as a response: the
+  // shop's answer to the user's order comes back over "Orders".
+  it('create_sequence and update_sequence take a backward step, and GET SEQUENCE says so', () => {
+    const { facade, call, ctx, rel } = setup()
+    const created = call('create_sequence', {
+      tempId: 's', name: 'Order',
+      steps: [{ relationId: rel('Orders') }, { relationId: rel('Charges') }, { relationId: rel('Orders'), backward: true, description: 'Order confirmed' }],
+    })
+    expect(created.ok, created.resultText).toBe(true)
+    const id = ctx.resolveId('s')
+    expect(facade.getSequences!()[id]).toMatchObject({ relationIds: [rel('Orders'), rel('Charges'), rel('Orders')], stepBackward: [false, false, true] })
+    expect(facade.toDiagramData().sequences![0].stepBackward).toEqual([false, false, true])
+
+    const got = runModelQuery(`GET SEQUENCE ${id}`, {
+      nodes: facade.getNodes(), relations: facade.getRelations(), views: facade.getViews!(), sequences: facade.getSequences!(),
+    }).result as { steps: Array<Record<string, unknown>> }
+    expect(got.steps[0].backward).toBeUndefined()
+    expect(got.steps[2]).toMatchObject({ step: 3, backward: true, stepDescription: 'Order confirmed' })
+
+    // Steps without one are stored as before: no flags at all.
+    expect(call('update_sequence', { id: 's', steps: [{ relationId: rel('Orders') }] }).ok).toBe(true)
+    expect(facade.getSequences!()[id].stepBackward).toBeUndefined()
+    expect(call('update_sequence', { id: 's', steps: [{ relationId: rel('Orders'), backward: 'yes' }] }).resultText).toContain('backward must be true or false')
+  })
+
+  it('keeps each flag on its step when a relation and its steps are deleted', () => {
+    const { facade, call, ctx, rel } = setup()
+    call('create_sequence', {
+      tempId: 's', name: 'Order',
+      steps: [{ relationId: rel('Charges') }, { relationId: rel('Orders') }, { relationId: rel('Orders'), backward: true }],
+    })
+    expect(call('delete_relation', { id: rel('Charges') }).ok).toBe(true)
+    expect(facade.getSequences!()[ctx.resolveId('s')]).toMatchObject({ relationIds: [rel('Orders'), rel('Orders')], stepBackward: [false, true] })
+  })
+})

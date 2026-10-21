@@ -329,7 +329,11 @@ if (typeof window !== 'undefined') {
     // explored model layout is not written alongside them.
     const presChangedInExplore =
       isExploreMode && s.presentations !== prev.presentations
-    if (_loadedAt !== null && modelChanged && historyMark() === _loadedAt && placesOnlyChange(s, prev)) {
+    // A milestone shown, or the live model shown again, is no edit: the
+    // store holds the milestone's model meanwhile, and the live document is
+    // as it was. Opening one saved the document as the store had it.
+    const milestoneSwitched = s.activeSnapshotId !== prev.activeSnapshotId
+    if (_loadedAt !== null && modelChanged && historyMark() === _loadedAt && (milestoneSwitched || placesOnlyChange(s, prev))) {
       // The load settling: kept from disk until the user edits.
       prev = s
       return
@@ -560,6 +564,15 @@ if (typeof window !== 'undefined') {
   // Expose hooks for other modules / future use.
   ;(window as any).__radicalFlushPersist = flushPersist
 
+  /** Designer shows a milestone with edits not kept or dropped yet (also
+   *  while Viewer or Presenter has Designer parked). */
+  const milestoneUnsaved = (): boolean => {
+    const st = useDiagramStore.getState()
+    if (st.appMode === 'designer' || st.appMode === 'metamodel') return !!st.activeSnapshotId && !!st.milestoneDirty
+    const pre = (window as any).__preModeLayout as ParkedDesigner | undefined
+    return !!pre?.activeSnapshotId && !!pre.milestoneDirty
+  }
+
   // ── Synchronous flush on tab close / reload / hide ───────────────────────
   // LocalStorage writes are synchronous, so we can safely persist pending
   // changes during pagehide / visibilitychange. This prevents a quick
@@ -607,6 +620,15 @@ if (typeof window !== 'undefined') {
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('pagehide', () => flushSync(true))
     window.addEventListener('beforeunload', () => flushSync(true))
+    // A milestone with edits neither kept nor dropped: leaving or reloading
+    // the page loses them (a reload saves nothing), so the browser asks
+    // first. Not in Electron or VS Code, where a cancelled unload asks
+    // nothing and leaves the window that cannot be closed.
+    window.addEventListener('beforeunload', (e) => {
+      if (host().kind !== 'web' || !milestoneUnsaved()) return
+      e.preventDefault()
+      e.returnValue = ''
+    })
   }
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('visibilitychange', () => {

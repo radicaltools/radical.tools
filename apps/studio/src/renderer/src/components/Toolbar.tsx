@@ -769,9 +769,11 @@ export function Toolbar(): React.ReactElement {
         <div className="toolbar-sep" />
         <BranchChangesButton />
       </>)}
-      {/* Undo: the Inspector changes nothing. Fit, zoom and Smart Layout are
-          on the canvas (CanvasControls). */}
-      {appMode !== 'inspector' && (<>
+      {/* Undo belongs to Designer: Viewer, Presenter and the Inspector change
+          nothing of the model, and the metamodel editor's steps are undone
+          back in Designer (shown there, enabled, they did nothing). Fit, zoom
+          and Smart Layout are on the canvas (CanvasControls). */}
+      {appMode === 'designer' && (<>
         <div className="toolbar-sep" />
 
         <button

@@ -190,7 +190,11 @@ export function liesClearInParent(
  * (placeBesideSiblings). The parents then fit what they hold, and where
  * one grew its siblings make room for it (makeRoomAround), level by level
  * up the tree, as an expand does. `fit` refits one parent to its children
- * (the store's, which knows the view's folds); headless, fitShown. Mutates
+ * (the store's, which knows the view's folds); headless, fitShown. A moved
+ * node the canvas does not draw, under a folded container, goes by the same
+ * rule on `opened`, the canvas with its folded ancestors open (an expand
+ * draws it where it lies: it kept a place outside the frame it opened to);
+ * `fit` leaves a folded parent as it is, and its expand fits it. Mutates
  * `nodes`; returns the ids it placed or pushed.
  */
 export function settleMovedNodes(
@@ -198,23 +202,26 @@ export function settleMovedNodes(
   ids: readonly string[],
   canvas: CanvasShape,
   fit: (parentId: string) => void = (parentId) => fitShown(nodes, parentId, canvas),
+  opened?: CanvasShape,
 ): string[] {
-  const moved = ids.filter((id) => nodes[id] && canvas.shown(nodes[id]))
-  if (!moved.length) return []
   const touched: string[] = []
-  const waiting = new Set(moved)
-  for (const id of moved) {
-    const node = nodes[id]
-    if (!liesClearInParent(node, nodes, canvas, (s) => waiting.has(s.id))) {
-      const at = placeBesideSiblings(nodes, node.parentId, (s) => s.id !== id && !waiting.has(s.id) && canvas.shown(s))
-      node.x = at.x
-      node.y = at.y
-      touched.push(id)
+  const settle = (moved: string[], on: CanvasShape): void => {
+    const waiting = new Set(moved)
+    for (const id of moved) {
+      const node = nodes[id]
+      if (!liesClearInParent(node, nodes, on, (s) => waiting.has(s.id))) {
+        const at = placeBesideSiblings(nodes, node.parentId, (s) => s.id !== id && !waiting.has(s.id) && on.shown(s))
+        node.x = at.x
+        node.y = at.y
+        touched.push(id)
+      }
+      waiting.delete(id)
     }
-    waiting.delete(id)
+    const parents = [...new Set(moved.map((id) => nodes[id].parentId).filter((p): p is string => !!p && !!nodes[p]))]
+    for (const parentId of parents) touched.push(...growWithRoom(nodes, parentId, on, fit))
   }
-  const parents = [...new Set(moved.map((id) => nodes[id].parentId).filter((p): p is string => !!p && !!nodes[p]))]
-  for (const parentId of parents) touched.push(...growWithRoom(nodes, parentId, canvas, fit))
+  settle(ids.filter((id) => nodes[id] && canvas.shown(nodes[id])), canvas)
+  if (opened) settle(ids.filter((id) => nodes[id] && !canvas.shown(nodes[id]) && opened.shown(nodes[id])), opened)
   return touched
 }
 

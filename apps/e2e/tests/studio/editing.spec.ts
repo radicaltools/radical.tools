@@ -136,6 +136,33 @@ test('undo and redo', async ({ page, studio }) => {
   await expect(studio.nodes).toHaveCount(4)
 })
 
+// Runs 65 to 69 (decided 2026-10-21): Viewer and Presenter showed Undo and
+// Redo enabled, and they did nothing. Undo belongs to Designer.
+test('Undo and Redo are Designer\'s: Viewer, Presenter and the metamodel editor show none', async ({ page, studio }) => {
+  await studio.addFromPalette('Software System', await studio.nearBottom())
+  await expect(studio.nodes).toHaveCount(4)
+  const toolbar = page.locator('.toolbar')
+  const undo = toolbar.getByRole('button', { name: 'Undo', exact: true })
+  const redo = toolbar.getByRole('button', { name: 'Redo', exact: true })
+  await expect(undo).toBeEnabled()
+  for (const mode of ['Viewer', 'Presenter']) {
+    await toolbar.getByRole('button', { name: mode, exact: true }).click()
+    await expect(undo).toHaveCount(0)
+    await expect(redo).toHaveCount(0)
+    // Nor do the keys take Designer's step behind the user's back.
+    await page.keyboard.press('ControlOrMeta+z')
+  }
+  await toolbar.getByRole('button', { name: 'Designer', exact: true }).click()
+  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByText(/Metamodel editor/).first().click()
+  await expect(page.getByRole('button', { name: 'Close metamodel editor' })).toBeVisible()
+  await expect(undo).toHaveCount(0)
+  await expect(redo).toHaveCount(0)
+  await page.getByRole('button', { name: 'Close metamodel editor' }).click()
+  await expect(undo).toBeEnabled()
+  await expect(studio.nodes).toHaveCount(4)
+})
+
 test('undoing the add of the selected element leaves no card and no selection', async ({ page, studio }) => {
   // The card stayed, empty, with "1 node selected" for an element that was gone.
   await studio.addFromPalette('Software System', await studio.nearBottom())
@@ -338,6 +365,38 @@ test('a step note shows the note after Undo, and leaving it unchanged writes not
   // the first Redo puts the edited note back.
   await page.keyboard.press('ControlOrMeta+Shift+z')
   await expect.poll(firstNote).toBe('EDITED NOTE')
+})
+
+test('a step turned to run the other way is drawn back as a response, kept, and undone', async ({ page, studio }) => {
+  // A step could only run along its relation: an answer (the payment
+  // provider's reply to the API) had no way to be a step of a flow.
+  await page.locator('.lp-view-card', { hasText: 'Place Order Flow' }).click()
+  await expect(page.locator('.seq-diagram-step')).toHaveCount(4)
+  await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+  await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
+  const step = page.locator('.seq-step').nth(3)
+  await expect(step).toContainText('API → Payment Provider')
+  await step.hover()
+  await step.getByTitle('Run the other way, as a response').click()
+  await expect(step).toContainText('Payment Provider → API (response)')
+  const stored = async () => (JSON.parse(await studio.storedJson()) as { sequences: Array<{ stepBackward?: boolean[] }> }).sequences[0].stepBackward
+  await expect.poll(stored).toEqual([false, false, false, true])
+  // The flow draws it from the provider's lifeline back to the API's, dashed.
+  const back = page.locator('.seq-diagram-step[data-backward="true"]')
+  await expect(back).toHaveCount(1)
+  const line = back.locator('line')
+  expect(Number(await line.getAttribute('x1'))).toBeGreaterThan(Number(await line.getAttribute('x2')))
+  await expect(line).toHaveAttribute('stroke-dasharray', '5 3')
+  // One undo step each way.
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(stored).toBeUndefined()
+  await expect(back).toHaveCount(0)
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await expect.poll(stored).toEqual([false, false, false, true])
+  // Kept: the reload draws it back again.
+  await page.reload()
+  await expect(page.locator('.seq-diagram-step')).toHaveCount(4)
+  await expect(page.locator('.seq-diagram-step[data-backward="true"]')).toHaveCount(1)
 })
 
 for (const mode of ['viewer', 'presenter'] as const) {

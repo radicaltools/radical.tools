@@ -126,12 +126,23 @@ describe('md-folder persistence safety', () => {
     expect(disk['radical.md']).toContain('radicalFormat')
   })
 
-  it('saves into an existing model folder without asking', async () => {
-    installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
+  it('asks before replacing the model a folder holds, and its entry leaves the list on a yes', async () => {
+    // Another model's folder was replaced without a question, and both list
+    // entries then opened the model written last (item 235).
+    const existing = serializeToMdFolder({ nodes: [sys('old', 'Old system')], relations: [] }, 'Bookstore')
+    const { disk } = installFolderApi(existing)
+    const bookstore = documents.createMdDocument('/tmp/model')
     const ls = documents.createLSDocument('Draft', SAMPLE)
     const confirm = vi.fn(() => false)
-    expect(await documents.saveAsFolder(ls.id, SAMPLE, confirm)).not.toBeNull()
-    expect(confirm).not.toHaveBeenCalled()
+    expect(await documents.saveAsFolder(ls.id, SAMPLE, confirm)).toBeNull()
+    expect(confirm).toHaveBeenCalledWith('model', 'Bookstore')
+    expect(disk).toEqual(existing)
+    expect(documents.listDocuments().map((d) => d.id).sort()).toEqual([bookstore.id, ls.id].sort())
+
+    const meta = await documents.saveAsFolder(ls.id, SAMPLE, () => true)
+    expect(meta!.source).toBe('md')
+    expect(documents.listDocuments().map((d) => d.id)).toEqual([ls.id])
+    expect(Object.keys(disk).some((p) => p.startsWith('nodes/old'))).toBe(false)
   })
 
   it('overlapping saves do not prune each other\'s files', async () => {
