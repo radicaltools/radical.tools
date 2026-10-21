@@ -72,6 +72,9 @@ interface GroupOrder {
   members: AlignedMember[]
 }
 
+/** A line through a group, by its axis and members: the same across rebuilds. */
+const groupLineKey = (a: GroupAlignment): string => `${a.axis}:${a.members.map((m) => m.id).sort().join(',')}`
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Walk parent chain to compute absolute top-left from relative positions. */
@@ -277,6 +280,11 @@ export class LiveColaEngine {
   private alignedWith = new Map<string, Set<string>>()
   private groupAlignments: GroupAlignment[] = []
   private groupOrders: GroupOrder[] = []
+  /** Lines through a group that were off their line when a calm drag
+   *  started (groupLineKey): its drop leaves them so. */
+  private offLinesAtGrab = new Set<string>()
+  /** What lines through a group moved along with a calm drag (followCarriers). */
+  private followedInDrag = new Set<string>()
   /**
    * Open groups still drawn with the frame the model has, and where their
    * leaves stood when the layout was built. A layout leaves more room
@@ -527,6 +535,8 @@ export class LiveColaEngine {
       // Held while the physics may still run, until it moves (calmDrag).
       for (const leaf of this.leavesOf(nodeId)) Layout.dragStart(leaf)
       this.calm = this.calmDrag(nodeId, withIds, abs ?? { x: rfX, y: rfY }, { x: 0, y: 0 })
+      this.offLinesAtGrab = new Set(this.groupAlignments.filter((a) => this.offLine(a)).map(groupLineKey))
+      this.followedInDrag = new Set()
       return
     }
     // The physics starts when it moves (pushStart): a ⌘/Ctrl-click, which
@@ -658,7 +668,14 @@ export class LiveColaEngine {
         // 2.5 px off its row, and the next load snapped the row and refit
         // every container).
         this.followCarriers(moved)
-        this.projectGroupAlignments(false)
+        // What followed a carrier during the drag or the drop, or was put
+        // on its line, and the group that grew with it, may now cover a
+        // neighbour: it is pushed clear, as the drop's own pushes were (a
+        // component dropped in Container 0.2 moved the containers of its
+        // row down, and System 0, grown with them, lay on System 1).
+        const shifted = this.projectGroupAlignments(false, this.offLinesAtGrab)
+        const lined = new Set([...this.followedInDrag, ...shifted])
+        if (lined.size) this.clearOverlaps([...lined])
       }
       this.emitPositions(true)
       this.callbacks.onSettled?.()
@@ -772,7 +789,8 @@ export class LiveColaEngine {
    * Lines through a group that holds a dragged element: the group's box
    * grows and shrinks with it, so its centre moves, and the rest of the line
    * keeps to it as it would if the group itself were dragged. Without this a
-   * child's drag pulled its container off the line.
+   * child's drag pulled its container off the line. What it moves is noted
+   * for the drop (followedInDrag).
    */
   private followCarriers(moved: string[]): void {
     const inside = (id: string, ancestor: string): boolean => {
@@ -800,6 +818,7 @@ export class LiveColaEngine {
         if (c === undefined || Math.abs(line - c) < 0.01) continue
         this.translate(other, a.axis, line - c)
         shifted = true
+        this.followedInDrag.add(other)
       }
     }
     if (shifted) this.refreshBounds()
@@ -1769,6 +1788,16 @@ export class LiveColaEngine {
     return axis === 'x' ? (b.x + b.X) / 2 : (b.y + b.Y) / 2
   }
 
+  /** True when the members of a line through a group are off it by more
+   *  than half a pixel, as drawn: a line a milestone shows with the places
+   *  it kept from before the line was made. A drop elsewhere leaves it so:
+   *  put on its line, its members moved onto what lay beside them. */
+  private offLine(a: GroupAlignment): boolean {
+    const centres = a.members.map((m) => this.memberCentre(m, a.axis, true))
+    if (centres.some((c) => c === undefined)) return false
+    return Math.max(...(centres as number[])) - Math.min(...(centres as number[])) > 0.5
+  }
+
   /** True when the grabbed node is this member or inside it. */
   private holdsGrabbed(id: string): boolean {
     for (let cur: string | undefined = this._grabbedId ?? undefined; cur; cur = this.allNodes[cur]?.parentId) {
@@ -1870,14 +1899,17 @@ export class LiveColaEngine {
    * every member moves onto the members' mean line, or onto the line of the
    * member being dragged, which the others then follow. `apart`: and they
    * are kept clear of each other along it, as overlap removal sees them
-   * (not after a calm drop, which moves nothing to make room).
+   * (not after a calm drop, which moves nothing to make room). `skip`: lines
+   * left as they are (groupLineKey). Returns the members it moved.
    */
-  private projectGroupAlignments(apart = true): void {
+  private projectGroupAlignments(apart = true, skip?: Set<string>): string[] {
+    const shifted: string[] = []
     // Frozen leaves where they are held first (the step just taken pulled
     // them on their springs): a group's frame is read from its leaves, and
     // one read off a pulled leaf is no longer the frame the layout gave it.
     if (this.groupAlignments.length) this.pinFrozen()
     for (const a of this.groupAlignments) {
+      if (skip?.has(groupLineKey(a))) continue
       // The line runs through the frames as drawn: through the groups'
       // boxes here, it showed and saved them off it, and the next load
       // snapped them onto it and refit every container.
@@ -1895,6 +1927,7 @@ export class LiveColaEngine {
         const d = target - centres[i]!
         if (i === held || Math.abs(d) < 0.01) return
         this.shiftMember(m, a.axis, d)
+        shifted.push(m.id)
       })
       // Keep the members clear of each other along the line, in the order
       // they stand: left to themselves, WebCoLa would separate two that
@@ -1909,6 +1942,7 @@ export class LiveColaEngine {
     }
     // Ordered lines: the same, in the order asked for.
     if (apart) for (const o of this.groupOrders) this.pushApart(o.members, o.along)
+    return shifted
   }
 
   /** Pushes each member clear of the previous one along `along`; when the
