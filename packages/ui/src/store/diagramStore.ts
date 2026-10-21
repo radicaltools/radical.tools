@@ -959,6 +959,61 @@ function placeAddedDuringLayout(state: DiagramStore, added: string[]): void {
   }
 }
 
+/**
+ * The canvas shown after a move of `ids` out of `oldParentIds` into another
+ * parent (model.reparentNodes saw to the other canvases): the old parents
+ * fit what they still hold; a moved node keeps its place only where it lies
+ * inside its new parent, clear of its new siblings, else it goes beside
+ * them; the new parent fits it and, where it grew, its siblings make room,
+ * level by level up the tree. One moved under a folded container is
+ * measured as its expand opens it. Returns the nodes, settled (a copy).
+ */
+function settleMoveOnShownCanvas(
+  state: Pick<DiagramStore, 'activeViewId' | 'views' | 'c4Nodes' | 'c4Relations'>,
+  ids: readonly string[],
+  oldParentIds: readonly string[],
+): Record<string, C4Node> {
+  const { viewFilter, viewCollapsedSet, expandedSet } = activeCanvasSets(state)
+  const shownNodes: Record<string, C4Node> = Object.fromEntries(Object.entries(state.c4Nodes).map(([id, n]) => [id, { ...n }]))
+  // Fit as fitParentToChildren does, on the copy.
+  const fit = (parentId: string): void => {
+    const parent = shownNodes[parentId]
+    if (!parent || !isContainerType(parent.type) || isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet)) return
+    const children = Object.values(shownNodes).filter((c) => c.parentId === parentId && (!viewFilter || viewFilter.has(c.id)))
+    if (!children.length) return
+    Object.assign(parent, fittedParentSize(parent, children.map((c) => ({
+      x: c.x, y: c.y, width: effectiveNodeWidth(c, viewCollapsedSet, expandedSet), height: effectiveNodeHeight(c, viewCollapsedSet, expandedSet),
+    }))))
+  }
+  const canvas = canvasBoxes(shownNodes, viewFilter, viewCollapsedSet, expandedSet)
+  // A refit can grow the old parent too (to its type's least size).
+  for (const oldParentId of oldParentIds) if (shownNodes[oldParentId]) growWithRoom(shownNodes, oldParentId, canvas, fit)
+  // Measured with the folds above it open.
+  const foldsAbove = new Set(ids.flatMap((id) => {
+    const out: string[] = []
+    for (let p = shownNodes[id]?.parentId; p && shownNodes[p] && !out.includes(p); p = shownNodes[p].parentId) out.push(p)
+    return out
+  }))
+  const opened = canvasBoxes(shownNodes, viewFilter,
+    viewCollapsedSet && new Set([...viewCollapsedSet].filter((id) => !foldsAbove.has(id))),
+    new Set([...(expandedSet ?? []), ...foldsAbove]))
+  settleMovedNodes(shownNodes, ids, canvas, fit, opened)
+  return shownNodes
+}
+
+/** Writes the places and sizes of `nodes` that differ onto the model.
+ *  Mutates `state` (inside immer set). */
+function writeGeometry(state: DiagramStore, nodes: Record<string, C4Node>): void {
+  for (const [id, n] of Object.entries(nodes)) {
+    const live = state.c4Nodes[id]
+    if (!live || (live.x === n.x && live.y === n.y && live.width === n.width && live.height === n.height)) continue
+    live.x = n.x
+    live.y = n.y
+    live.width = n.width
+    live.height = n.height
+  }
+}
+
 /** Apply a positions map onto c4Nodes (mutates in-place, use inside immer set) */
 function applyPositions(nodes: Record<string, C4Node>, positions: Record<string, NodePosition>): void {
   for (const [id, pos] of Object.entries(positions)) {
@@ -4152,40 +4207,15 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._milestoneViewEdit('every')
         set((state) => { model.reparentNodes(state, ids, newParentId) })
 
-        // On the canvas shown (model.reparentNodes saw to the others): the
-        // old parent fits what it still holds; a moved node keeps its place
-        // only where it lies inside its new parent, clear of its new
-        // siblings, else it goes beside them; the new parent fits it and,
-        // where it grew, its siblings make room, level by level up the tree.
-        const { viewFilter, viewCollapsedSet, expandedSet } = activeCanvasSets(get())
-        const shownNodes = Object.fromEntries(Object.entries(get().c4Nodes).map(([id, n]) => [id, { ...n }]))
-        // Fit as fitParentToChildren does, on the copy.
-        const fit = (parentId: string): void => {
-          const parent = shownNodes[parentId]
-          if (!parent || !isContainerType(parent.type) || isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet)) return
-          const children = Object.values(shownNodes).filter((c) => c.parentId === parentId && (!viewFilter || viewFilter.has(c.id)))
-          if (!children.length) return
-          Object.assign(parent, fittedParentSize(parent, children.map((c) => ({
-            x: c.x, y: c.y, width: effectiveNodeWidth(c, viewCollapsedSet, expandedSet), height: effectiveNodeHeight(c, viewCollapsedSet, expandedSet),
-          }))))
-        }
-        const canvas = canvasBoxes(shownNodes, viewFilter, viewCollapsedSet, expandedSet)
-        // A refit can grow the old parent too (to its type's least size).
-        if (oldParentId) growWithRoom(shownNodes, oldParentId, canvas, fit)
-        settleMovedNodes(shownNodes, ids, canvas, fit)
-        set((state) => {
-          for (const [id, n] of Object.entries(shownNodes)) {
-            const live = state.c4Nodes[id]
-            if (!live || (live.x === n.x && live.y === n.y && live.width === n.width && live.height === n.height)) continue
-            live.x = n.x
-            live.y = n.y
-            live.width = n.width
-            live.height = n.height
-          }
-        })
+        // On the canvas shown (model.reparentNodes saw to the others).
+        const shownNodes = settleMoveOnShownCanvas(get(), ids, oldParentId ? [oldParentId] : [])
+        set((state) => { writeGeometry(state, shownNodes) })
 
         get().setSelectedNodeIds(ids)
         get()._sync()
+        // A row or column it stays in (with what is no ancestor of it)
+        // holds now, as a reload would draw it.
+        get()._enforceLayoutConstraints()
         _liveLayout?.invalidate()
         if (options?.quiet) return
         get().pushNotification(
@@ -5429,14 +5459,22 @@ export const useDiagramStore = create<DiagramStore>()(
           // Added while the layout ran: its drop point was a place in the
           // layout this one replaces (893 px from anything on 300
           // elements). It is placed as a new element here, in the layout's
-          // undo step (D11); so is one an outside write moved into another
-          // parent meanwhile.
-          const added = layoutChangedMeanwhile(present, get().c4Nodes)
+          // undo step (D11). One moved into another parent meanwhile, here
+          // or by an outside write, has a place in the old parent in the
+          // layout: it keeps the one the move gave it, by the rule for moves.
+          const changed = layoutChangedMeanwhile(present, get().c4Nodes)
+          const added = changed.filter((id) => !present.has(id))
+          const reparented = changed.filter((id) => present.has(id))
           set((state) => {
-            applyLayoutPositions(state.c4Nodes, positionsWithout(result.winner.positions, added), input)
+            applyLayoutPositions(state.c4Nodes, positionsWithout(result.winner.positions, changed), input)
             unpinLaidOut(state, get().appMode)
           })
           if (added.length) set((state) => { placeAddedDuringLayout(state, added) })
+          if (reparented.length) {
+            const oldParents = [...new Set(reparented.map((id) => present.get(id)).filter((p): p is string => !!p))]
+            const settled = settleMoveOnShownCanvas(get(), reparented, oldParents)
+            set((state) => { writeGeometry(state, settled) })
+          }
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level (same as ELK/Radical paths).
