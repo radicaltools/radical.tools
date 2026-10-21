@@ -4086,7 +4086,12 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
       },
 
+      // Size and Levels are steps of their own, as Multi page and Depth
+      // are: Undo of an earlier step gave back the old ones with it (saved).
       setTreemapSizeBy(viewId, mode) {
+        const view = get().views[viewId]
+        if (!view || (view.treemapSizeBy ?? 'leaves') === mode) return
+        get()._pushUndo()
         set((state) => {
           const view = state.views[viewId]
           if (!view) return
@@ -4096,6 +4101,11 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       setTreemapMaxDepth(viewId, depth) {
+        const view = get().views[viewId]
+        // Unset is 2 levels (TreemapView); null is all of them.
+        const levels = (d: number | null | undefined): number | null => d === null ? null : typeof d === 'number' && d > 0 ? d : 2
+        if (!view || levels(view.treemapMaxDepth) === levels(depth)) return
+        get()._pushUndo()
         set((state) => {
           const view = state.views[viewId]
           if (!view) return

@@ -507,6 +507,39 @@ describe('Multi page and Depth of a wiki', () => {
   })
 })
 
+describe('Size and Levels of a hierarchy', () => {
+  // Neither was a step, and Undo of an element added before them gave back
+  // the old Size and Levels with it (saved).
+  it('are undo steps of their own', () => {
+    s().setViewKind('v1', 'treemap')
+    const id = add('system', 'Added')
+    s().setTreemapSizeBy('v1', 'uniform')
+    s().setTreemapMaxDepth('v1', 3)
+    s().undo()
+    expect(s().views.v1.treemapSizeBy).toBe('uniform')
+    expect(s().views.v1.treemapMaxDepth).toBeUndefined()
+    expect(s().c4Nodes[id]).toBeDefined()
+    s().undo()
+    expect(s().views.v1.treemapSizeBy).toBeUndefined()
+    expect(s().c4Nodes[id]).toBeDefined()
+    s().undo()
+    expect(s().c4Nodes[id]).toBeUndefined()
+    s().redo()
+    s().redo()
+    s().redo()
+    expect(s().views.v1).toMatchObject({ treemapSizeBy: 'uniform', treemapMaxDepth: 3 })
+  })
+
+  it('set to what they are is no step', () => {
+    s().setViewKind('v1', 'treemap')
+    s().undo()
+    s().setTreemapSizeBy('v1', 'leaves')
+    s().setTreemapMaxDepth('v1', 2)
+    s().undo()
+    expect(s().c4Nodes.bank.description).toBeUndefined()
+  })
+})
+
 describe('typing into a text field is one undo step (item 158)', () => {
   const type = (text: string, edit: (v: string) => void) => {
     for (let i = 1; i <= text.length; i++) edit(text.slice(0, i))
