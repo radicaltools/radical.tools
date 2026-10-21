@@ -17,6 +17,7 @@
     "./components/WarnierView": "./src/components/WarnierView.tsx",
     "./components/MarkdownText": "./src/components/MarkdownText.tsx",
     "./components/RightPanel": "./src/components/RightPanel.tsx",
+    "./components/propertiesCover": "./src/components/propertiesCover.ts",
     "./components/NotificationHost": "./src/components/NotificationHost.tsx",
     "./components/NodeWizard": "./src/components/NodeWizard.tsx",
     "./components/SmartLayoutButton": "./src/components/SmartLayoutButton.tsx",

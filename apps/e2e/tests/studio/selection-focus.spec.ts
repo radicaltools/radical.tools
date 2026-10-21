@@ -87,3 +87,25 @@ test('the camera frames a selection and goes back when it is cleared', async ({ 
   await studio.settle()
   expect(await transform()).toBe(chosen)
 })
+
+// Item 224: on a hierarchy view the properties card covered Size, Levels and
+// ↑ Up: a click on Levels reached the card, and Levels stayed 2.
+test('the hierarchy\'s Size, Levels and Up stay clear of the properties card', async ({ page, studio }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await studio.openSample('view-treemap')
+  const at = await page.evaluate(() => {
+    const t = Array.from(document.querySelectorAll('.treemap-wrap svg text'))
+      .find((el) => (el as SVGTextElement).style.display !== 'none' && el.textContent === 'Core Banking Platform')
+    const r = t!.getBoundingClientRect()
+    return { x: r.x + Math.min(10, r.width / 2), y: r.y + r.height / 2 }
+  })
+  await page.mouse.click(at.x, at.y)
+  await expect(studio.properties).toBeVisible()
+  await expect.poll(async () => {
+    const card = (await studio.properties.boundingBox())!
+    const levels = (await page.locator('.tm-bc-sizeby', { hasText: 'Levels' }).boundingBox())!
+    return levels.x + levels.width <= card.x
+  }).toBe(true)
+  await page.locator('.tm-bc-sizeby', { hasText: 'Levels' }).locator('select').selectOption('3')
+  await expect(page.locator('.tm-bc-sizeby', { hasText: 'Levels' }).locator('select')).toHaveValue('3')
+})

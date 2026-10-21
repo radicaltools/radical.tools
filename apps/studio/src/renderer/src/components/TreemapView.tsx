@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallba
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { computeViewNodeSet } from '@radical/layout/viewInput'
+import { propertiesPanelCover } from '@radical/ui/components/propertiesCover'
 
 // ─── Color palette per C4 type ──────────────────────────────────────────────
 const TYPE_COLORS_LIGHT: Record<string, readonly [string, string, string]> = {
@@ -209,6 +210,21 @@ export function TreemapView(): React.ReactElement {
   const views           = useDiagramStore(s => s.views)
   const selectNode      = useDiagramStore(s => s.selectNode)
   const selectedNodeId  = useDiagramStore(s => s.selectedNodeId)
+  const selectedEdgeId  = useDiagramStore(s => s.selectedEdgeId)
+  // The properties card lies over the right of the view: the controls at
+  // the right of the bar (Size, Levels, ↑ Up) move left of it, or a click
+  // on them reached the card.
+  const [cardCover, setCardCover] = useState(0)
+  useLayoutEffect(() => {
+    const measure = () => setCardCover(propertiesPanelCover())
+    measure()
+    const panel = document.querySelector('.right-panel')
+    const resize = typeof ResizeObserver !== 'undefined' && panel ? new ResizeObserver(measure) : null
+    if (resize && panel) resize.observe(panel)
+    panel?.addEventListener('transitionend', measure)
+    window.addEventListener('resize', measure)
+    return () => { resize?.disconnect(); panel?.removeEventListener('transitionend', measure); window.removeEventListener('resize', measure) }
+  }, [selectedNodeId, selectedEdgeId])
   const setTreemapFocus = useDiagramStore(s => s.setTreemapFocus)
   const setTreemapSizeBy = useDiagramStore(s => s.setTreemapSizeBy)
   const setTreemapMaxDepth = useDiagramStore(s => s.setTreemapMaxDepth)
@@ -479,7 +495,7 @@ export function TreemapView(): React.ReactElement {
   return (
     <div className="treemap-wrap-outer">
       {/* Breadcrumb + controls bar */}
-      <div className="treemap-breadcrumb">
+      <div className="treemap-breadcrumb" style={cardCover ? { paddingRight: 12 + cardCover } : undefined}>
         {breadcrumb.map((b, i) => {
           const isLast = i === breadcrumb.length - 1
           return (
