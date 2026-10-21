@@ -22,8 +22,8 @@ type Model = LiveColaModel
  *  come from. */
 export type LiveColaMessage =
   | { type: 'start'; skipBulk: boolean; model: Model; gen: number }
-  | { type: 'invalidate' | 'relax'; model: Model; gen: number }
-  | { type: 'reset'; model: Model; gen: number; free?: string[] }
+  | { type: 'invalidate' | 'relax'; model: Model; gen: number; added?: string[] }
+  | { type: 'reset'; model: Model; gen: number; free?: string[]; aligned?: string[] }
   | { type: 'stop' }
   | { type: 'seed'; id: string; x: number; y: number }
   | { type: 'grab'; id: string; x: number; y: number; mode: DragMode; abs?: { x: number; y: number }; withIds?: string[] }
@@ -138,15 +138,16 @@ export class LiveColaLayout {
     else this.post({ type: 'stop' })
   }
 
-  invalidate(): void {
-    if (this.engine) this.engine.invalidate()
-    else if (this._running) this.post({ type: 'invalidate', model: this.callbacks.getModel(), gen: this.nextGen() })
+  /** See LiveColaEngine.invalidate. */
+  invalidate(added?: string[]): void {
+    if (this.engine) this.engine.invalidate(added)
+    else if (this._running) this.post({ type: 'invalidate', model: this.callbacks.getModel(), gen: this.nextGen(), added })
   }
 
   /** See LiveColaEngine.reset. */
-  reset(free?: string[]): void {
-    if (this.engine) this.engine.reset(free)
-    else this.post({ type: 'reset', model: this.callbacks.getModel(), gen: this.nextGen(), free })
+  reset(free?: string[], aligned?: string[]): void {
+    if (this.engine) this.engine.reset(free, aligned)
+    else this.post({ type: 'reset', model: this.callbacks.getModel(), gen: this.nextGen(), free, aligned })
   }
 
   /** Starts the layout relaxing the whole diagram (LiveColaEngine.relaxLive). */

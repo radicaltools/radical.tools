@@ -5,8 +5,8 @@
  *
  * Protocol
  * ─────────
- * Main → Worker  { type: 'start', skipBulk, model, gen } | { type: 'invalidate' | 'relax', model, gen }
- *              | { type: 'reset', model, gen, free? }
+ * Main → Worker  { type: 'start', skipBulk, model, gen } | { type: 'invalidate' | 'relax', model, gen, added? }
+ *              | { type: 'reset', model, gen, free?, aligned? }
  *              | { type: 'stop' } | { type: 'seed', id, x, y }
  *              | { type: 'grab', id, x, y, mode, abs?, withIds? } | { type: 'drag', id, x, y, abs? }
  *              | { type: 'release', id }
@@ -36,8 +36,8 @@ self.onmessage = (e: MessageEvent<LiveColaMessage>) => {
   if ('model' in m) { model = m.model; gen = m.gen }
   switch (m.type) {
     case 'start': engine.start(m.skipBulk); break
-    case 'invalidate': engine.invalidate(); break
-    case 'reset': engine.reset(m.free); break
+    case 'invalidate': engine.invalidate(m.added); break
+    case 'reset': engine.reset(m.free, m.aligned); break
     case 'relax': engine.relaxLive(); break
     case 'stop': engine.stop(); break
     case 'seed': engine.seedPosition(m.id, m.x, m.y); break

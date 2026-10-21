@@ -610,233 +610,6 @@ interface Known { rule: string; match: (trace: Action[], v: Violation, resolved:
 const lastAction = (trace: Action[]): Action['a'] | undefined => trace[trace.length - 1]?.a
 const KNOWN: Known[] = [
   {
-    // Bookstore dragged by a pixel (pinned), then a component dropped into
-    // Web App near its right edge: Web App grows 210 → 260.7 px wide, onto
-    // API 80 px to its right; a pin holds what is in the container, so the
-    // physics moves nothing. Without the pin the add makes room.
-    rule: 'geometry',
-    // The same for a move into a container that grows next to a pinned one.
-    match: (t, v) => !!v.facts?.pinned && !!v.facts.overlap && ['add', 'reparent', 'collapse', 'redo', 'undo'].includes(lastAction(t) ?? ''),
-    note: 'K1: what grows next to or inside a pinned element is left over its neighbour (IMPROVEMENTS "Calm drags and pins" item 2)',
-  },
-  {
-    // A container dropped into Payment Provider, then Payment Provider and
-    // Bookstore kept in a row: the physics frames Bookstore with 60 px over
-    // its children; read again, the frame is refitted with 120 (top 333.5 →
-    // 273.8, left −42.1 → −12.3, 980 → 920 wide), its children where they were.
-    // The same after any add, expand or drag the physics framed a
-    // container for (nested: Container 0.0 saved at (84, 84) 696 × 376,
-    // read again at (30, 120) 624 × 404).
-    rule: 'reloadKeeps',
-    match: (_t, v) => v.detail.split('\n').slice(1).every((line) => /positions|^\s+[\w-]+\.(x|y|width|height):/i.test(line)),
-    note: 'K2: a container the physics framed is framed anew on a reload, 60 → 120 px over its children (the leftover of item 1 of "Found by exploratory runs")',
-  },
-  {
-    // Payment Provider moved into Bookstore on All elements: the Containers
-    // view, which lists it, has no place for it any more; opening the view
-    // places it and the physics moves Customer by (−179, −82), Bookstore
-    // grows 860 → 1360 wide, its children shift.
-    // The same for an add: nested, a container added into System 0 on the
-    // System 0 view gets no place on Systems and containers (a filter
-    // chain that draws it); opening that view shrinks System 0 2440 → 1380
-    // and moves it 588 px right, System 1 210 px.
-    rule: 'nothingMovesByItself',
-    match: (t) => lastAction(t) === 'view' && t.some((a) => a.a === 'reparent' || a.a === 'add'),
-    note: 'K3: a move into another parent, or an add, leaves other views that draw it without a place for it; opening one moves its neighbours (new)',
-  },
-  {
-    // Nested, a new view of the System context viewpoint: System 0 moved
-    // into System 1, which grows 280 × 180 → 360 × 330 over Operator.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'reparent' && !!v.facts?.overlap,
-    note: 'K3c: a move into another parent grows it over a neighbour on the canvas shown (new)',
-  },
-  {
-    // K3 on the geometry: Orders DB deleted, API moved into Payment
-    // Provider on All elements, Containers opened: there Payment Provider
-    // has grown to 360 × 350 at (738, 333), 370 px over Bookstore.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'view' && !!v.facts?.overlap && t.some((a) => a.a === 'reparent'),
-    note: 'K3b: a move into another parent grows the parent over its neighbour on a view it was not made on (new)',
-  },
-  {
-    // A group dropped on the bookstore's All elements at (310, 136): drawn
-    // 360 × 220 at (50, −41), 55 px over Customer; a system dropped there
-    // moves clear.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'add' && !!v.facts?.overlap && !v.facts.pinned,
-    note: 'K4: an element dropped where there is no room for it stays over its neighbours (new)',
-  },
-  {
-    // API and Orders DB in a row, API dragged 196 px right onto Orders DB:
-    // they stay 56 px over each other, also after a view switch.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'drag' && !!v.facts?.overlap && !!v.facts.aligned,
-    note: 'K6: a calm drop onto an element of the same row leaves them overlapping (new; after the fix of "Calm drags and pins" item 3)',
-  },
-  {
-    // API and Orders DB kept in a row, not saved yet, while the agent
-    // deletes API: the merge keeps the row holding API; it is saved so.
-    rule: 'references',
-    // The same for a view's fold of it (collapsedNodeIds ["api"]).
-    // And a view's list (Element Table listing all but API, the agent
-    // deletes Bookstore: the merged list keeps bookstore, web, db).
-    match: (t, v) => t.some((a) => a.a === 'agent') && /(: (align|grid|pin) .* holds missing|(collapsed|expanded)?NodeIds has missing|nodeIds has missing)/.test(v.detail),
-    note: 'K7: a merge keeps an alignment, pin, view fold or view list entry of an element the other side deleted (new; sibling of item 234)',
-  },
-  {
-    // "browses and orders" (step 1 of Place Order) deleted, the agent
-    // deletes Bookstore with Web App, Undo: no relation comes back (its end
-    // is gone) but the sequence has the step ["r1"] again, saved so.
-    rule: 'references',
-    match: (t, v) => t.some((a) => a.a === 'agent') && (lastAction(t) === 'undo' || lastAction(t) === 'redo') && /names missing relation/.test(v.detail),
-    note: 'K9: Undo after an outside change brings back a sequence step whose relation it drops as a stray (new; sibling of items 127 and 234)',
-  },
-  {
-    // API moved into Payment Provider (API → Payment Provider "charges
-    // card", now a relation to its own container), then Smart Layout: 11
-    // "[ELK] Layout error … UnsupportedGraphException" on the console; the
-    // layout is applied all the same.
-    rule: 'noErrors',
-    match: (_t, v) => v.detail.includes('UnsupportedGraphException'),
-    note: 'K8: Smart Layout logs ELK errors for a relation between an element and its container (new)',
-  },
-  {
-    // Nested model: Component 0.0.0, 0.0.1, 0.0.2, one row already, kept in
-    // a row: System 0 grows 2440 → 3040 and moves 814 px left, Container
-    // 0.0 754 px left, Component 0.0.2 ends 40 px outside Container 0.0.
-    rule: 'geometry',
-    match: (t) => lastAction(t) === 'align',
-    note: 'K10: keeping elements in a row moves their container far and leaves one outside it (new)',
-  },
-  {
-    // K10 seen later: in the milestone Early a row of Component 0.0.0 and
-    // 0.0.1 made, Propagate, reload: Container 0.0 is drawn at x −703, its
-    // components at 80 to 760, outside it.
-    rule: 'geometry',
-    match: (t, v) => !!v.facts?.outside && t.some((a) => a.a === 'align') && ['reload', 'propagate', 'discard', 'view', 'openMilestone', 'undo', 'redo'].includes(lastAction(t) ?? ''),
-    note: 'K10b: a row of components, read again or shown again, puts their container away from them (new)',
-  },
-  {
-    // Sample, All elements: a component dropped into Fraud Detection moves
-    // 43 elements (ADRs, needs, mockups, a process); the step Validate goes
-    // from (270, 5696) to (−289, 5887), 220 → 556 wide, and its child
-    // Screen for fraud stays at (290, 5856), outside it.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'add' && !!v.facts?.outside,
-    note: 'K11: an add moves elements with nothing in common with it and leaves a child outside its moved parent (new)',
-  },
-  {
-    // An agent adds a system Studio reloads; with a view that does not draw
-    // it shown (Place Order Flow, Containers), folding it and unfolding it
-    // throws "Cannot read properties of undefined (reading 'x')" in
-    // makeRoomAround (packages/layout/src/geometry.ts).
-    rule: 'noErrors',
-    match: (_t, v) => v.detail.includes('makeRoomAround'),
-    note: 'K14: folding and unfolding a system an agent added, with a view shown that does not draw it, throws (new)',
-  },
-  {
-    // Nested: Context open, milestone Early shown, a group dropped on the
-    // canvas: the saved live Context lists the new id (no such element in
-    // the live model or any milestone), and still does after Discard.
-    rule: 'references',
-    match: (t, v) => t.some((a) => a.a === 'openMilestone') && /nodeIds has missing/.test(v.detail),
-    note: 'K12: an element added in a milestone is listed in the live view it was added on, also after Discard (new; sibling of item 230)',
-  },
-  {
-    // A milestone shown, the agent adds a system (reloaded with the
-    // milestone kept), a group added in the milestone, Propagate: TypeError
-    // "Cannot perform 'ownKeys' on a proxy that has been revoked" in
-    // propagatedHubTemplates (diagramStore.ts).
-    rule: 'noErrors',
-    match: (_t, v) => v.detail.includes('propagatedHubTemplates'),
-    note: 'K13: Propagate throws after an agent write reloaded the milestone shown (new)',
-  },
-  {
-    // Views of the viewpoint System › containers made (one is of System 2),
-    // the milestone Early (no System 2) opened, Customer deleted, Undo: the
-    // view of System 2 loses its subject and its "within System 2" filter,
-    // shown and in the saved live views.
-    rule: 'undoRestores',
-    match: (_t, v) => /\.subject: /.test(v.detail),
-    note: 'K15: Undo in a milestone that lacks a view\'s element strips the view of its element and filter, in the live views too (new)',
-  },
-  {
-    // K15 the other way: a view of API's (Container › components), a
-    // milestone with API opened, API deleted there; Undo, then Redo: the
-    // view has lost its subject and its "within API" filter.
-    rule: 'redoRestores',
-    match: (_t, v) => /\.subject: /.test(v.detail),
-    note: 'K15b: Undo and Redo of a delete in a milestone strip a view of that element of its element and filter (new)',
-  },
-  {
-    // Nested: the agent deletes Component 1.0.0; Container 2.2 folded;
-    // Component 2.2.0 moved into Container 0.1: System 1 (nothing to do
-    // with the move) moves (−325, −476), Container 1.0 shrinks 520 × 280 →
-    // 300 × 260 and Component 1.0.1 lies 50 px left of it.
-    rule: 'geometry',
-    match: (t, v) => t.some((a) => a.a === 'agent') && !!v.facts?.outside,
-    note: 'K16: after an agent deletes a child, the next local layout moves its container and leaves a sibling outside it (new; next to "Calm drags and pins" item 6, agent adds)',
-  },
-  {
-    // Nested: Component 1.1.1 moved into Container 2.0, a view of the
-    // Components viewpoint laid out, the milestone Early opened (there it
-    // is still in Container 1.1): on that view it is drawn exactly on
-    // Component 1.1.2 (both at 359.3, 809.3).
-    rule: 'geometry',
-    // The same for a fold: Container 0.0 folded on live, a Components view
-    // laid out, Early opened (there it is open): it is drawn 760 wide at
-    // (30, 120), over Container 0.1 and 0.2.
-    match: (t, v) => /^on (?!live\|)/.test(v.detail) && t.some((a) => a.a === 'reparent' || a.a === 'collapse' || (a.a === 'agent' && a.kind === 'move')),
-    note: 'K18: in a milestone, an element moved or folded since on live is drawn on a view by the live layout, onto its siblings (new)',
-  },
-  {
-    // Bookstore: a milestone shown with edits; the agent moves Web App into
-    // another system (the facade drops its place on Containers); a group
-    // added in the milestone, Undo: the live Containers view has Web App's
-    // old place (30, 120) again.
-    rule: 'milestoneKeepsLive',
-    match: (t) => (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent'),
-    note: 'K17: Undo in a milestone after an agent\'s write takes back part of the write in the live views (new; sibling of item 36)',
-  },
-  {
-    // A queue dropped into Payment Provider, not saved yet, while the agent
-    // moves Orders DB into it: the merge puts both at (1140, 464.8).
-    rule: 'geometry',
-    // Also when it shows only later: a component of System 0 dragged (System
-    // 0 grows, System 1 moves 21 px right), a milestone opened, the agent
-    // adds a container into System 1 (the server grows it and moves System 2
-    // from where System 1 was); back on live, System 1 overlaps System 2.
-    match: (t, v, resolved) => !!v.facts?.overlap && (/merged with unsaved edits/.test(resolved[resolved.length - 1] ?? '') ||
-      (['discard', 'view', 'reload', 'openMilestone'].includes(lastAction(t) ?? '') && resolved.some((r) => /merged with unsaved edits/.test(r)))),
-    note: 'K19: a merge puts what Studio and the agent each placed or moved on top of each other (new)',
-  },
-  {
-    // Sample, All elements: Auth Service folded, a component dropped into
-    // Accounts Service: after 2500 frames (40 s at 60 fps) the physics
-    // still runs and 19 elements still move (ADR-000 by 21 px a second).
-    rule: 'nothingMovesByItself',
-    match: (_t, v) => v.detail.includes('still moving'),
-    note: 'K20: after an add the live physics can go on moving for good (seen on the sample\'s and the bookstore\'s All elements; new)',
-  },
-  {
-    // Nested: Container 2.1 folded and unfolded on Systems and containers
-    // (which does not draw its components), All elements opened, Component
-    // 0.0.1 dragged: Component 2.1.0 jumps (140, 60), out of Container 2.1.
-    // Also after the model is loaded again: the expand's seeds stay in the
-    // physics until the children are next laid out, so a run of this test
-    // can depend on the run before it.
-  },
-  {
-    // Sample: milestone v1 opened, Web Banking deleted there, Propagate:
-    // the live model loses Web Banking and its relations, but the live
-    // sequence Payment Processing keeps steps 1 and 2 (r-cust-web,
-    // r-web-apigw), saved so.
-    rule: 'references',
-    match: (t, v) => t.some((a) => a.a === 'propagate') && /names missing relation/.test(v.detail),
-    note: 'K21: Propagate of a delete leaves the live sequences\' steps of the relations it deletes (new)',
-  },
-  {
     // Sample, All elements: Auth Service folded, a component dropped into
     // Accounts Service. The add leaves Check balance outside the step
     // Validate it is in (K11); read again, it is placed afresh (a stray)
@@ -1003,6 +776,41 @@ const KNOWN: Known[] = [
     rule: 'redoRestores',
     match: (t) => lastAction(t) === 'redo' && t.some((a) => a.a === 'openMilestone') && t.some((a) => a.a === 'view'),
     note: 'C2: the same, seen as Redo not giving back the state after its step (new)',
+  },
+  {
+    // Bookstore: API dragged, saved, Smart Layout (not saved yet), the agent
+    // deletes API: the server refits Bookstore around Orders DB where the
+    // folder has it (890 wide), the merge keeps Orders DB where Smart Layout
+    // put it (x 785.8), 86 px past Bookstore's right edge. Also when it
+    // shows only later: a component added into API, Bookstore folded, the
+    // agent deletes API (the merge keeps it for its new child, and Bookstore
+    // refitted without it, 315 high), Undo opens Bookstore: API, 260 high,
+    // lies 65 px below it. Before the fixes of items 249 to 261 K16 took
+    // these in.
+    rule: 'geometry',
+    match: (t, v, resolved) => !!v.facts?.outside && (/merged with unsaved edits/.test(resolved[resolved.length - 1] ?? '') ||
+      (['undo', 'redo', 'collapse', 'view', 'reload', 'discard', 'openMilestone'].includes(lastAction(t) ?? '') && resolved.some((r) => /merged with unsaved edits/.test(r)))),
+    note: 'KB1: a merge keeps the parent the agent\'s write refitted around the folder\'s places and the children where Studio has moved them since, one outside it (new; next to K19)',
+  },
+  {
+    // Nested: groups added, Component 0.0.0 moved into Container 2.0,
+    // Component 0.0.2 deleted, then the view Table turned into a canvas: it
+    // shows Container 0.0 at x −406.9, 760 wide, over Container 0.1 at
+    // 257.1. The same before the fixes of items 249 to 261 (no entry took
+    // it in: it was not found then).
+    rule: 'geometry',
+    match: (t, v) => lastAction(t) === 'viewKind' && !!v.facts?.overlap && t.some((a) => a.a === 'reparent' || a.a === 'add'),
+    note: 'KB2: a view turned into a canvas after a move or an add shows the places it then takes over each other (new; K3 through a view type change?)',
+  },
+  {
+    // Sample: steps added, a component moved into Accounts Service on a new
+    // table view (no canvas), All elements opened: the group Operator
+    // journey — fraud case is framed at (20, 5083.7) 960 × 310, its mockups
+    // at y 5226, 190 high, 22 px past its bottom. Not analysed; found once
+    // the add before it no longer ended the run (K4).
+    rule: 'geometry',
+    match: (t, v) => lastAction(t) === 'view' && !!v.facts?.outside && t.some((a) => a.a === 'reparent'),
+    note: 'KB3: a move made where no canvas is shown, then All elements opened: a group is framed short of its children (new; K3 seen as an outside?)',
   },
 ]
 

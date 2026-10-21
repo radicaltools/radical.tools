@@ -18,6 +18,12 @@
  *     dropped element moves off it
  *   - the store records the pin on the canvas, unpins as one undo step and
  *     drops deleted elements from it
+ *   - an element added stays where it was dropped and pushes what it, or
+ *     the container it grew, covers past its far edge, pinned elements
+ *     too; nothing else moves (items 249, 256 and "Calm drags and pins"
+ *     item 2)
+ *   - a rebuild takes the place of an element the store moved since from
+ *     the model (item 261)
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { LIVE_CHILD_TOP_MIN, LiveColaEngine, relaxLayout } from '@radical/layout/liveColaEngine'
@@ -189,6 +195,31 @@ describe('Calm drag', () => {
     expect(cx('a')).toBeLessThan(cx('b'))
     expect(cx('b')).toBeLessThan(cx('c'))
     expect(absOf(nodes, 'b').y).toBe(0)
+  })
+
+  it('pushes a member of its row along the line when dropped onto it (item 251)', () => {
+    // API and Orders DB in a row, API dropped onto Orders DB: the row's
+    // members moved with the drag across the line and were taken for
+    // dropped ones, which push nothing, so the two stayed 56 px over each
+    // other.
+    const nodes: Nodes = {
+      a: node('a', 'system', { x: 0, y: 0 }),
+      b: node('b', 'system', { x: 500, y: 0 }),
+      c: node('c', 'system', { x: 0, y: 600 }),
+    }
+    const relations: Record<string, C4Relation> = {}
+    withFillers(nodes, relations)
+    const engine = engineFor(nodes, relations, [{ axis: 'y', ids: ['a', 'b'], orders: [] }])
+    engine.start(true)
+
+    calmDrag(engine, nodes, 'a', { x: 400, y: 30 })
+    engine.release('a')
+    engine.stop()
+    expect(absOf(nodes, 'a')).toEqual({ x: 400, y: 30 })
+    expect(overlaps(nodes, 'a', 'b')).toBe(false)
+    // Along the line, and still on it.
+    expect(absOf(nodes, 'b').y).toBe(30)
+    expect(absOf(nodes, 'c')).toEqual({ x: 0, y: 600 })
   })
 
   it('leaves everything as it was on a click', () => {
@@ -476,6 +507,160 @@ describe('A drag and the open containers it does not touch', () => {
     engine.stop()
     // It grew down to hold the element where it was dropped.
     expect(nodes.shop.y + nodes.shop.height).toBeGreaterThan(700 + nodes.api.height)
+  })
+})
+
+describe('An element added', () => {
+  // The bookstore: Customer above Bookstore, its containers in a row.
+  const bookstore = (): Nodes => ({
+    customer: node('customer', 'person', { x: 355, y: 0 }),
+    shop: node('shop', 'system', { x: 0, y: 270, width: 860, height: 350 }),
+    web: node('web', 'webapp', { parentId: 'shop', x: 30, y: 120, width: 210, height: 140 }),
+    api: node('api', 'container', { parentId: 'shop', x: 290, y: 120, width: 300, height: 200 }),
+    db: node('db', 'database', { parentId: 'shop', x: 640, y: 155 }),
+    bank: node('bank', 'system', { x: 960, y: 355, external: true }),
+  })
+  const relations: Record<string, C4Relation> = {
+    r1: { id: 'r1', sourceId: 'customer', targetId: 'web' } as C4Relation,
+    r2: { id: 'r2', sourceId: 'web', targetId: 'api' } as C4Relation,
+    r3: { id: 'r3', sourceId: 'api', targetId: 'db' } as C4Relation,
+    r4: { id: 'r4', sourceId: 'api', targetId: 'bank' } as C4Relation,
+  }
+
+  it('stays where it was dropped and pushes what it covers past its far edge (item 249)', () => {
+    // A person dropped between Customer and Bookstore, where there is no
+    // room: it stayed over both, the physics holding them where they were.
+    const nodes = bookstore()
+    const engine = engineFor(nodes, relations)
+    engine.start(true)
+    const before = snapshot(nodes)
+    nodes.guest = node('guest', 'person', { x: 284.6, y: 94.8 })
+    engine.invalidate(['guest'])
+    engine.stop()
+
+    expect(absOf(nodes, 'guest').x).toBeCloseTo(284.6, 6)
+    expect(absOf(nodes, 'guest').y).toBeCloseTo(94.8, 6)
+    expect(overlaps(nodes, 'guest', 'customer')).toBe(false)
+    expect(overlaps(nodes, 'guest', 'shop')).toBe(false)
+    // Customer up, Bookstore down, whole; nothing else.
+    expect(absOf(nodes, 'customer').x).toBe(355)
+    expect(absOf(nodes, 'customer').y).toBeLessThan(0)
+    expect(absOf(nodes, 'shop').x).toBe(0)
+    expect(absOf(nodes, 'shop').y).toBeGreaterThan(270)
+    const after = snapshot(nodes)
+    expect(after.bank).toBe(before.bank)
+    for (const id of ['web', 'api', 'db']) expect(nodes[id], id).toMatchObject({ x: bookstore()[id].x, y: bookstore()[id].y })
+  })
+
+  it('pushes the neighbour of the container it grew, also inside a pinned one ("Calm drags and pins" item 2)', () => {
+    // Bookstore dragged (pinned, which holds what is in it), a component
+    // dropped into Web App near its right edge: the store grew Web App onto
+    // API, and the physics could move neither.
+    const nodes = bookstore()
+    const pinned = ['shop']
+    const engine = engineFor(nodes, relations, [], pinned)
+    engine.start(true)
+    nodes.comp = node('comp', 'component', { parentId: 'web', x: 40.7, y: 120 })
+    // As the store fits a parent to a new child.
+    Object.assign(nodes.web, { width: 260.7, height: 260 })
+    engine.invalidate(['comp', 'web'])
+    engine.stop()
+
+    expect(absOf(nodes, 'comp').x).toBeCloseTo(70.7, 6)
+    expect(absOf(nodes, 'comp').y).toBeCloseTo(510, 6)
+    expect(overlaps(nodes, 'web', 'api')).toBe(false)
+    expect(overlaps(nodes, 'api', 'db')).toBe(false)
+    expect(absOf(nodes, 'api').y).toBe(390)
+  })
+
+  it('moves nothing else where there is room for it (item 256)', async () => {
+    // The sample's All elements: a component dropped into Fraud Detection
+    // freed the 40 elements nearest to it by relation and containment for
+    // the physics, which moved 43 elements, a process 560 px, and left a
+    // step's child outside it.
+    const nodes: Nodes = {
+      risk: node('risk', 'group', { x: 780, y: 1036, width: 460, height: 500 }),
+      fraud: node('fraud', 'container', { parentId: 'risk', x: 20, y: 280, width: 300, height: 200 }),
+      db: node('db', 'database', { parentId: 'risk', x: 20, y: 110 }),
+      proc: node('proc', 'process', { x: 30, y: 5646, width: 1440, height: 330 }),
+      validate: node('validate', 'step', { parentId: 'proc', x: 240, y: 50, width: 220, height: 260 }),
+      screen: node('screen', 'step', { parentId: 'validate', x: 20, y: 160, width: 180, height: 80 }),
+      post: node('post', 'step', { parentId: 'proc', x: 600, y: 50, width: 220, height: 160 }),
+      ops: node('ops', 'person', { x: 0, y: 0 }),
+      core: node('core', 'system', { x: 1600, y: 0 }),
+    }
+    const links: Record<string, C4Relation> = Object.fromEntries([
+      ['fraud', 'db'], ['screen', 'fraud'], ['validate', 'post'], ['ops', 'fraud'], ['core', 'fraud'], ['ops', 'core'],
+    ].map(([sourceId, targetId], i) => [`r${i}`, { id: `r${i}`, sourceId, targetId } as C4Relation]))
+    const engine = engineFor(nodes, links)
+    engine.start(true)
+    const before = snapshot(nodes)
+    nodes.comp = node('comp', 'component', { parentId: 'fraud', x: 20, y: 120 })
+    engine.invalidate(['comp', 'fraud'])
+    await wait(400)
+    engine.stop()
+    expect({ ...snapshot(nodes), comp: undefined }).toEqual({ ...before, comp: undefined })
+    expect(absOf(nodes, 'comp')).toEqual({ x: 820, y: 1436 })
+  })
+})
+
+describe('An element added in the store', () => {
+  it('stays where it was dropped, and what it covers is pushed clear (item 249)', () => {
+    useDiagramStore.setState({
+      c4Nodes: {
+        customer: node('customer', 'person', { x: 355, y: 0 }),
+        shop: node('shop', 'system', { x: 0, y: 270, width: 860, height: 350 }),
+        web: node('web', 'webapp', { parentId: 'shop', x: 30, y: 120, width: 210, height: 140 }),
+      },
+      c4Relations: {},
+      views: {} as Record<string, DiagramView>,
+      activeViewId: null,
+      defaultLayoutConstraints: [],
+      notifications: [],
+      appMode: 'designer',
+    } as any)
+    const s = useDiagramStore.getState
+    s()._sync()
+    s().startLiveLayout({ skipBulk: true })
+    const id = s().addNode({ type: 'person', label: 'Guest', description: '', collapsed: false, x: 284.6, y: 94.8, ...NODE_SIZES.person } as Omit<C4Node, 'id'>)
+    const nodes = s().c4Nodes as Nodes
+    s().stopLiveLayout()
+    expect(nodes[id].x).toBeCloseTo(284.6, 6)
+    expect(nodes[id].y).toBeCloseTo(94.8, 6)
+    expect(overlaps(nodes, id, 'customer')).toBe(false)
+    expect(overlaps(nodes, id, 'shop')).toBe(false)
+  })
+})
+
+describe('A rebuild after the store moved an element', () => {
+  it('takes the element\'s place from the model (item 261)', async () => {
+    // An agent deleted one of Container 1.0's two components; a move
+    // elsewhere then refitted Container 1.0 round the other one, which the
+    // physics still held where it was before: reported from there, it lay
+    // 50 px outside its container.
+    const nodes: Nodes = {
+      sys: node('sys', 'system', { x: 0, y: 0, width: 600, height: 400 }),
+      box: node('box', 'container', { parentId: 'sys', x: 40, y: 120, width: 500, height: 260 }),
+      kid: node('kid', 'component', { parentId: 'box', x: 280, y: 120 }),
+      other: node('other', 'system', { x: 1000, y: 0 }),
+    }
+    const relations: Record<string, C4Relation> = { r1: { id: 'r1', sourceId: 'kid', targetId: 'other' } as C4Relation }
+    const engine = engineFor(nodes, relations)
+    engine.start(true)
+    // The store refits the container round its child, and moves the system.
+    Object.assign(nodes.sys, { x: 300 })
+    Object.assign(nodes.box, { x: 30, width: 240 })
+    Object.assign(nodes.kid, { x: 20 })
+    // Something new elsewhere sets the physics going.
+    nodes.guest = node('guest', 'person', { x: 1600, y: 600 })
+    relations.r2 = { id: 'r2', sourceId: 'guest', targetId: 'other' } as C4Relation
+    engine.invalidate()
+    await wait(600)
+    engine.stop()
+    const box = absOf(nodes, 'box')
+    const kid = absOf(nodes, 'kid')
+    expect(kid.x).toBeGreaterThanOrEqual(box.x)
+    expect(kid.x + nodes.kid.width).toBeLessThanOrEqual(box.x + nodes.box.width)
   })
 })
 
