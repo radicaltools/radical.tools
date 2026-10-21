@@ -1594,6 +1594,15 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
   type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string }
   const [paneContent, setPaneContent] = useState<PaneContent | null>(null)
   const hasPaneContent = !!paneContent
+  // The pane slid out of sight takes no Tab stop: the hidden "◀ Back" (and,
+  // with properties open, the cards behind them) were stops the user could
+  // not see. `inert` is not in React 18's attributes: set on the element.
+  const listPane = useRef<HTMLDivElement>(null)
+  const propsPane = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    listPane.current?.toggleAttribute('inert', hasPaneContent)
+    propsPane.current?.toggleAttribute('inert', !hasPaneContent)
+  }, [hasPaneContent])
   // What the pane shows went away (an undo, a delete, an outside edit): back to the list.
   const paneGone = useDiagramStore((s) => {
     if (!paneContent) return false
@@ -1614,7 +1623,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
         <div className={`rp-slider${hasPaneContent ? ' show-props' : ''}`}>
 
           {/* Pane 1 — accordion */}
-          <div className="rp-pane lp-sections">
+          <div className="rp-pane lp-sections" ref={listPane}>
             <AccordionSection title="Views" icon="views" count={viewsCount} preview={`Open: ${activeViewName ?? 'All elements'}`}
               open={openSection === 'views'} onToggle={() => setOpenSection((o) => (o === 'views' ? null : 'views'))}>
               <ViewList
@@ -1636,7 +1645,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
           </div>
 
           {/* Pane 2 — view / milestone properties */}
-          <div className="rp-pane">
+          <div className="rp-pane" ref={propsPane}>
             <button className="rp-back-btn" onClick={() => setPaneContent(null)}>◀ Back</button>
             {paneContent?.kind === 'view' && (
               <ViewPropertiesContent

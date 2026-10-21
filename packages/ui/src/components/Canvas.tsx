@@ -1193,14 +1193,25 @@ function StructuralCanvas(): React.ReactElement {
     event.dataTransfer.dropEffect = 'copy'
   }, [])
 
-  // Cancel connection on Escape
+  // Cancel connection on Escape; otherwise Escape clears the selection, as
+  // a click on the background does (it did nothing). Not while a field, a
+  // dialog or a menu has it, nor while a presentation plays (Esc ends it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && connectSource) cancelConnection()
+      if (e.key !== 'Escape') return
+      if (connectSource) { cancelConnection(); return }
+      if (e.defaultPrevented) return
+      const el = e.target as HTMLElement | null
+      if (el && typeof el.closest === 'function'
+        && (el.isContentEditable || el.closest('input, textarea, select, [role="dialog"], [role="menu"]'))) return
+      const s = useDiagramStore.getState()
+      if (s.presentationActive || (!s.selectedNodeId && !s.selectedEdgeId && !s.selectedNodeIds.length)) return
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      onPaneClick()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [connectSource, cancelConnection])
+  }, [connectSource, cancelConnection, onPaneClick])
 
   // Cola-driven drag handlers
   const dragRafRef = useRef<number | null>(null)
