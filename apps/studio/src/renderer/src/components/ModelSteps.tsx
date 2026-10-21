@@ -375,7 +375,8 @@ export function OpenSources({ onDone, before, setRoute, autoFocus }: {
         if (!content) return
         try {
           const result = parseStructurizrDsl(content)
-          const name = result.name || file.name.replace(/\.(dsl|txt)$/i, '') || 'Imported DSL'
+          // Named after the workspace, else the file without its extension.
+          const name = result.name || file.name.replace(/\.[^.]+$/, '') || 'Imported DSL'
           const viewsBefore = useDiagramStore.getState().views
           const meta = documents.createLSDocument(name, {
             nodes: result.nodes, relations: result.relations, sequences: result.sequences, views: result.views,

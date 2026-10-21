@@ -157,6 +157,49 @@ test('Open → Structurizr DSL… brings the views, opens the first, and says wh
   await expect.poll(() => studio.layoutViolations(studio.activeDocId())).toEqual([])
 })
 
+// Decided 2026-10-21 (runs 65 to 69): a workspace with no name came in as
+// "Imported diagram", and its views left its groups out.
+test('Open → Structurizr DSL… names the model after the file, and draws the workspace\'s groups', async ({ page, studio }) => {
+  const dsl = `workspace {
+    model {
+        user = person "User"
+        group "Core" {
+            shop = softwareSystem "Shop"
+            bank = softwareSystem "Bank"
+        }
+        user -> shop "Buys"
+        shop -> bank "Pays"
+    }
+    views {
+        systemLandscape "Landscape" {
+            include *
+        }
+    }
+}`
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Structurizr DSL…' }).click()
+  await (await chooser).setFiles({ name: 'orders.workspace.dsl', mimeType: 'text/plain', buffer: Buffer.from(dsl) })
+  await studio.ready()
+  await expect(page).toHaveURL(/\/v\/view-1/)
+  const names = await page.evaluate(() => (JSON.parse(localStorage.getItem('radical-docs-index') ?? '{}') as { docs: { name: string }[] }).docs.map((d) => d.name))
+  expect(names).toContain('orders.workspace')
+  expect(names).not.toContain('Imported diagram')
+  // The group is drawn round the two systems.
+  await expect(studio.nodes).toHaveCount(4)
+  await expect(studio.node('core')).toBeVisible()
+  await studio.settle()
+  await expect.poll(() => studio.layoutViolations(studio.activeDocId())).toEqual([])
+  const [core, shop, bank] = await Promise.all(['core', 'shop', 'bank'].map(async (id) => (await studio.node(id).boundingBox())!))
+  for (const inner of [shop, bank]) {
+    expect(inner.x).toBeGreaterThanOrEqual(core.x)
+    expect(inner.y).toBeGreaterThanOrEqual(core.y)
+    expect(inner.x + inner.width).toBeLessThanOrEqual(core.x + core.width)
+    expect(inner.y + inner.height).toBeLessThanOrEqual(core.y + core.height)
+  }
+})
+
 test('Move to browser keeps a file model in this browser and leaves the file as it is', async ({ page, studio }) => {
   // Decided 2026-10-21: there was no way back from a file or folder.
   await page.goto('/')
