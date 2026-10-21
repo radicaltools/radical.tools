@@ -1598,6 +1598,11 @@ interface DiagramStore {
   /** Puts the positions of the canvas shown onto the nodes: its view's, or
    *  All elements' (a milestone's own while one is shown). */
   _showLiveCanvasPositions: () => void
+  /** While a view is shown, gives the elements All elements has no place
+   *  for (added on the view: an import from the Hub) one there, beside
+   *  their siblings (placeUnplaced), so that a view opened on All
+   *  elements' places draws them where they belong. Not in a milestone. */
+  _placeOnAllElements: () => void
   /** Rename a folder of the list of views; its views and subfolders move
    *  along, as one undo step. Returns the new path, or null when refused
    *  (empty name, "/" in it, no such folder). */
@@ -3589,6 +3594,22 @@ export const useDiagramStore = create<DiagramStore>()(
           const view = state.activeViewId ? state.views[state.activeViewId] as DiagramView | undefined : undefined
           const positions = view ? view.positions : (_milestoneAllPositions ?? state.defaultPositions)
           if (positions && Object.keys(positions).length > 0) showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions as Record<string, NodePosition>, view, state.c4Relations as Record<string, C4Relation>)
+        })
+      },
+
+      _placeOnAllElements() {
+        const { activeViewId, activeSnapshotId, defaultPositions, c4Nodes } = get()
+        if (activeViewId === null || activeSnapshotId || !defaultPositions || !Object.keys(defaultPositions).length) return
+        if (Object.keys(c4Nodes).every((id) => id in defaultPositions)) return
+        const all = Object.fromEntries(Object.entries(c4Nodes).map(([id, n]) => [id, { ...n, ...(defaultPositions[id] ?? {}) }]))
+        placeUnplaced(all, defaultPositions)
+        set((state) => {
+          const kept = state.defaultPositions as Record<string, NodePosition>
+          for (const n of Object.values(all)) {
+            const was = kept[n.id]
+            if (was && was.x === n.x && was.y === n.y && was.width === n.width && was.height === n.height) continue
+            kept[n.id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+          }
         })
       },
 

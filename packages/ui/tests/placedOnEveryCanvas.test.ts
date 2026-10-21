@@ -190,3 +190,24 @@ describe('an element whose file was moved into another container by hand', () =>
     expect(inside('db')).toBe(true)
   })
 })
+
+describe('elements imported on a view', () => {
+  // A blueprint imported from the Hub on a view had places on that view
+  // only: All elements had 1 of its 39, and a view of it opened on All
+  // elements' places drew it over the model's root elements.
+  it('get places on All elements at once', () => {
+    s().loadDiagram(model())
+    s().setActiveView('wide')
+    useDiagramStore.setState((st: any) => {
+      st.c4Nodes.ledger = { id: 'ledger', type: 'system', label: 'Ledger', collapsed: false, ...pos(0, 0, 600, 400) }
+      st.c4Nodes.journal = { id: 'journal', type: 'container', label: 'Journal', collapsed: false, parentId: 'ledger', x: 30, y: 120, ...size }
+    })
+    s()._placeOnAllElements()
+    const all = s().defaultPositions
+    expect(all.ledger).toBeDefined()
+    expect(all.journal).toMatchObject({ x: 30, y: 120 })
+    for (const other of ['shop', 'bank']) expect(overlap(all.ledger, all[other]), other).toBe(false)
+    // The view shown keeps its own.
+    expect(s().c4Nodes.ledger).toMatchObject({ x: 0, y: 0 })
+  })
+})

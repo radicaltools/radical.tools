@@ -165,7 +165,7 @@ export function buildConceptInsert(concept: HubConcept, options: ConceptInsertOp
   const views = conceptViewsToDiagram(
     templated.views,
     { node: (id) => idMap.get(id), relation: (id) => relIdMap.get(id), sequence: (id) => seqIdMap.get(id) },
-    { newId, namePrefix: concept.name },
+    { newId, namePrefix: concept.name, keepPositions: true },
   )
 
   const insert: ConceptInsert = { nodes, relations, sequences, views }
