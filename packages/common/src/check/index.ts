@@ -10,7 +10,7 @@
 // Pure: it takes the folder's files and a config, and returns findings. The
 // `radical` CLI (apps/cli) reads the files and prints the result.
 
-import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramView, Presentation } from '../c4'
+import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramSnapshot, DiagramView, Presentation } from '../c4'
 import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isValidMdFolderManifest, mdFolderNodeFiles, type FolderFiles } from '../formats/mdFolder'
 import { documentMetamodel } from '../model'
 import { CHECK_RULES, type CheckSeverity, type RuleFinding } from './rules'
@@ -179,7 +179,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
   const found: Array<RuleFinding & { rule: string }> = []
   const nodes = byId(data.nodes)
   const relations = byId(data.relations)
-  staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations)
+  staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations, data.snapshots ?? [])
     .forEach((finding) => found.push({ rule: STALE_REFERENCE, ...finding }))
   const model = {
     nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), settings: config.rules ?? {},
@@ -216,6 +216,7 @@ function staleReferences(
   presentations: Presentation[],
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
+  milestones: DiagramSnapshot[] = [],
 ): RuleFinding[] {
   const findings: RuleFinding[] = []
   const sequenceIds = new Set(sequences.map((s) => s.id))
@@ -232,6 +233,11 @@ function staleReferences(
   for (const presentation of presentations) {
     for (const slide of presentation.slides) {
       if (slide.viewId && !viewIds.has(slide.viewId)) findings.push({ path: 'presentations.json', message: `Slide "${slide.name}" of "${presentation.name}" shows view ${slide.viewId}, which the model does not have.` })
+      // The model the slide shows: its milestone's, the copy taken when it
+      // was added in Studio, else the current one.
+      const shown = (slide.snapshotId ? milestones.find((m) => m.id === slide.snapshotId)?.nodes : undefined) ?? slide.modelSnapshot?.nodes ?? nodes
+      const lost = (slide.focusNodeIds ?? []).filter((id) => !shown[id])
+      if (lost.length) findings.push({ path: 'presentations.json', message: `Slide "${slide.name}" of "${presentation.name}" focuses on ${lost.length} element(s) the model it shows does not have: ${lost.join(', ')}.` })
     }
   }
   return findings

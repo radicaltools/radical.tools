@@ -367,3 +367,101 @@ for (const mode of ['viewer', 'presenter'] as const) {
     await expect(badges.getByText('3', { exact: true })).toBeVisible()
   })
 }
+
+test('a dialog keeps the keys: Tab stays in it, Ctrl+Z and F5 leave the model behind it alone', async ({ page, studio }) => {
+  // Item 213: Ctrl+Z on the Models dialog undid a drag; F5 started a
+  // presentation; the first Tab left for the toolbar behind.
+  await studio.addFromPalette('Software System', await studio.nearBottom())
+  await expect(studio.nodes).toHaveCount(4)
+  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByRole('menuitem', { name: /Manage models/ }).click()
+  const models = page.getByRole('dialog', { name: 'Models' })
+  await expect(models).toBeVisible()
+  for (let i = 0; i < 12; i++) {
+    await page.keyboard.press('Tab')
+    expect(await models.evaluate((el) => el.contains(document.activeElement))).toBe(true)
+  }
+  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press('F5')
+  await expect(page.locator('.pres-hud')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(models).toBeHidden()
+  await expect(studio.nodes).toHaveCount(4)
+})
+
+test('the Radical menu answers ↑ and ↓ and closes when Tab leaves it', async ({ page }) => {
+  await page.getByTitle('Menu', { exact: true }).click()
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('menuitem', { name: /Manage models/ })).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('menuitem', { name: /Import from Hub/ })).toBeFocused()
+  await page.keyboard.press('ArrowUp')
+  await expect(page.getByRole('menuitem', { name: /Manage models/ })).toBeFocused()
+  await page.keyboard.press('End')
+  for (let i = 0; i < 3 && await page.locator('.app-menu-popover').count(); i++) await page.keyboard.press('Tab')
+  await expect(page.locator('.app-menu-popover')).toHaveCount(0)
+})
+
+test('Escape clears the selection on the canvas', async ({ page, studio }) => {
+  await studio.node('customer').click()
+  await expect(studio.attribute('Name')).toHaveValue('Customer')
+  await studio.node('customer').focus()
+  await page.keyboard.press('Escape')
+  await expect(studio.properties).toHaveCount(0)
+  await expect(studio.node('customer')).not.toHaveClass(/selected/)
+})
+
+test('a relation\'s ends are rewired in Designer only', async ({ page, studio }) => {
+  // Item 190: in Viewer and Presenter its end handles rewired it, unsaved.
+  await studio.open('v-containers')
+  const edge = page.locator('[data-testid="rf__edge-r2"] path.react-flow__edge-interaction').first()
+  await edge.click({ force: true })
+  await expect(page.getByTestId('rf__edge-r2').locator('circle.nodrag')).toHaveCount(2)
+  await studio.open('v-containers', 'viewer')
+  await page.locator('[data-testid="rf__edge-r2"] path.react-flow__edge-interaction').first().click({ force: true })
+  await expect(page.getByTestId('rf__edge-r2')).toHaveClass(/selected/)
+  await expect(page.locator('.react-flow__edge circle.nodrag')).toHaveCount(0)
+})
+
+test('⌘+ on a table leaves the browser its zoom, and the canvas after it draws without errors', async ({ page, studio }) => {
+  // Item 217: the gone canvas's zoom wrote NaN (console errors, which the
+  // guard fails on).
+  await page.locator('.lp-view-card', { hasText: 'Element Table' }).click()
+  await expect(page.locator('.tv-wrap')).toBeVisible()
+  expect(await page.evaluate(() => typeof (window as unknown as { __radicalZoomIn?: unknown }).__radicalZoomIn)).toBe('undefined')
+  await page.keyboard.press('ControlOrMeta+=')
+  await page.locator('.lp-view-card', { hasText: 'System Context' }).click()
+  await studio.settle()
+  await expect(studio.nodes).toHaveCount(3)
+  const scale = await page.locator('.react-flow__viewport').evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a)
+  expect(Number.isFinite(scale)).toBe(true)
+})
+
+test('view, milestone and sequence cards open from the keyboard', async ({ page }) => {
+  // Item 215: only View properties' button was a Tab stop.
+  const card = page.locator('.lp-view-card', { hasText: 'Containers' }).first()
+  await card.focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/v\/v-containers$/)
+  const all = page.locator('.lp-view-card', { hasText: 'All elements' })
+  await all.focus()
+  await page.keyboard.press(' ')
+  await expect(page).toHaveURL(/\/v\/all$/)
+  await expect(page.locator('.lp-snap-current')).toHaveAttribute('tabindex', '0')
+})
+
+test('Move to… with many parents stays in the window and scrolls', async ({ page, studio }) => {
+  // Item 168: at 1280×720 its first item stood above the window.
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await studio.openSample('view-payment-process')
+  await studio.nodeByLabel('Book the ledger').first().click()
+  await page.getByRole('button', { name: /Move to…/ }).click()
+  const menu = page.locator('.sel-bar-menu')
+  const box = (await menu.boundingBox())!
+  expect(box.y).toBeGreaterThanOrEqual(48)
+  await page.keyboard.press('ArrowDown')
+  await expect(menu.getByRole('menuitem').first()).toBeFocused()
+  await page.keyboard.press('End')
+  await expect(menu.getByRole('menuitem').last()).toBeFocused()
+  await expect(menu.getByRole('menuitem').last()).toBeInViewport()
+})

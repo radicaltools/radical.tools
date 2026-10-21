@@ -331,6 +331,21 @@ function formatRelative(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+/** A card a click opens (a view, a milestone, a sequence) opens from the
+ *  keyboard as well: a Tab stop that Enter or Space opens. Only View
+ *  properties' button could be reached, and in Viewer and Presenter nothing. */
+export function cardKeys(open: () => void): { role: 'button'; tabIndex: number; onKeyDown: (e: React.KeyboardEvent) => void } {
+  return {
+    role: 'button',
+    tabIndex: 0,
+    onKeyDown: (e) => {
+      if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+      e.preventDefault()
+      open()
+    },
+  }
+}
+
 // ── Milestone list (left panel) ──────────────────────────────────────────────
 // Milestones are saved snapshots of the architecture used to track how the
 // model evolves over time. Clicking a milestone does NOT restore — it is
@@ -389,6 +404,7 @@ function SnapshotList({ readOnly = false, onOpenProps }: { readOnly?: boolean; o
       <div
         className={`lp-card lp-snap-card lp-snap-current${!activeSnapshotId ? ' active' : ''}`}
         onClick={() => { if (activeSnapshotId) clearMilestoneView() }}
+        {...cardKeys(() => { if (activeSnapshotId) clearMilestoneView() })}
         title="Current working state (live HEAD) — not yet saved as a milestone"
       >
         <div className="lp-snap-badge lp-snap-badge-live">●</div>
@@ -410,6 +426,7 @@ function SnapshotList({ readOnly = false, onOpenProps }: { readOnly?: boolean; o
             key={snap.id}
             className={`lp-card lp-snap-card${isActive ? ' active' : ''}`}
             onClick={() => viewMilestoneDiff(snap.id)}
+            {...cardKeys(() => viewMilestoneDiff(snap.id))}
             title={`${new Date(snap.timestamp).toLocaleString()}\nClick to load this milestone onto the canvas`}
           >
             <div className="lp-snap-badge">v{versionNum}</div>
@@ -500,6 +517,7 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
               className={`lp-card lp-view-card${isActive ? ' active' : ''}`}
               style={{ ['--kind-color' as string]: SECTION_COLORS.sequences }}
               onClick={() => setActiveSequence(isActive ? null : seq.id)}
+              {...cardKeys(() => setActiveSequence(isActive ? null : seq.id))}
             >
               <div className="lp-view-icon">
                 <Icon.Bolt />
@@ -1304,6 +1322,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
           className={`lp-card lp-view-card${isActive ? ' active' : ''}${group ? ' lp-view-group' : ''}`}
           style={{ ['--kind-color' as string]: VIEW_KIND_COLORS[badge] }}
           onClick={() => (group ? toggleGroup(v.id) : setActiveView(v.id))}
+          {...cardKeys(() => (group ? toggleGroup(v.id) : setActiveView(v.id)))}
           aria-expanded={group ? groupOpen : undefined}
         >
           <div className="lp-view-icon">
@@ -1387,6 +1406,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
         className={`lp-card lp-view-card${activeViewId === null ? ' active' : ''}`}
         style={{ ['--kind-color' as string]: VIEW_KIND_COLORS.table }}
         onClick={() => setActiveView(null)}
+        {...cardKeys(() => setActiveView(null))}
       >
         <div className="lp-view-icon"><Icon.TableGrid /></div>
         <div className="lp-card-body">
@@ -1574,6 +1594,15 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
   type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string }
   const [paneContent, setPaneContent] = useState<PaneContent | null>(null)
   const hasPaneContent = !!paneContent
+  // The pane slid out of sight takes no Tab stop: the hidden "◀ Back" (and,
+  // with properties open, the cards behind them) were stops the user could
+  // not see. `inert` is not in React 18's attributes: set on the element.
+  const listPane = useRef<HTMLDivElement>(null)
+  const propsPane = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    listPane.current?.toggleAttribute('inert', hasPaneContent)
+    propsPane.current?.toggleAttribute('inert', !hasPaneContent)
+  }, [hasPaneContent])
   // What the pane shows went away (an undo, a delete, an outside edit): back to the list.
   const paneGone = useDiagramStore((s) => {
     if (!paneContent) return false
@@ -1594,7 +1623,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
         <div className={`rp-slider${hasPaneContent ? ' show-props' : ''}`}>
 
           {/* Pane 1 — accordion */}
-          <div className="rp-pane lp-sections">
+          <div className="rp-pane lp-sections" ref={listPane}>
             <AccordionSection title="Views" icon="views" count={viewsCount} preview={`Open: ${activeViewName ?? 'All elements'}`}
               open={openSection === 'views'} onToggle={() => setOpenSection((o) => (o === 'views' ? null : 'views'))}>
               <ViewList
@@ -1616,7 +1645,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
           </div>
 
           {/* Pane 2 — view / milestone properties */}
-          <div className="rp-pane">
+          <div className="rp-pane" ref={propsPane}>
             <button className="rp-back-btn" onClick={() => setPaneContent(null)}>◀ Back</button>
             {paneContent?.kind === 'view' && (
               <ViewPropertiesContent

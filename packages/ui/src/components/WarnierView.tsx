@@ -438,6 +438,9 @@ export function WarnierView(): React.ReactElement {
   const onKeyDown = (e: React.KeyboardEvent) => {
     // The delete prompt and the repeat choices have the keys.
     if (renaming || !selected || deleting || repeatOpen) return
+    // A playing slide's keys are the presentation's: Esc only deselected,
+    // and the arrows moved the selection instead of the slides.
+    if (useDiagramStore.getState().presentationActive) return
     const index = items.indexOf(selected)
     const handled = (() => {
       if (e.altKey && e.key === 'ArrowUp') { move(selected, 'up'); return true }

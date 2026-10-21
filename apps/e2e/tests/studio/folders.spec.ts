@@ -326,8 +326,9 @@ test('Open → Folder… on the welcome screen opens a model folder', async ({ p
   await page.getByRole('button', { name: 'Folder…' }).click()
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
-  // It opens on All elements, the table of the whole model.
-  await expect(studio.row('customer')).toBeVisible()
+  // It opens on its first view (decided 2026-10-21; it landed on All elements).
+  await expect(page).toHaveURL(/\/v\/v-context$/)
+  await expect(studio.node('customer')).toBeVisible()
   await openModels(page)
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
 })
@@ -423,8 +424,9 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
   await write('closed', { requirements: 'done', domain: 'done' })
   await expect(button).toHaveAttribute('data-agent-phase', 'paused', { timeout: 10_000 })
   await expect(panel.locator('.forge-agent-line')).toHaveText('Stopped: Claude Code closed before the run finished.')
-  // Nothing more to follow.
-  await expect(panel.getByRole('button')).toHaveCount(1)
+  // Nothing more to follow; Studio's own Forge can be started again.
+  await expect(panel.getByRole('button')).toHaveCount(2)
+  await expect(panel.getByRole('button', { name: 'Start a new run' })).toBeVisible()
   await expect(button).not.toHaveAttribute('data-following')
   await page.keyboard.press('Escape')
   await expect(panel).toHaveCount(0)

@@ -384,6 +384,9 @@ label.app-menu-row { cursor: pointer; }
   transition: opacity 0.12s;
 }
 .pres-slide-card:hover .pres-slide-actions { opacity: 1; }
+/* Only the current slide's card has its buttons: hidden but there, a click
+   in the middle of another card hit Capture and overwrote that slide. */
+.pres-slide-card:not(.active) .pres-slide-actions { visibility: hidden; }
 .pres-icon-btn {
   width: 26px;
   height: 26px;
@@ -2050,7 +2053,17 @@ div.milestone-option { cursor: default; }
   display: flex;
   flex-direction: column;
   gap: 1px;
+  /* It opens upward from a bar 90px above the window's bottom: without a
+     limit a long list (Move to… with 59 parents) ran off the top, unreachable. */
+  max-height: calc(100vh - 210px);
+  overflow-y: auto;
   animation: sel-bar-in 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Why a Radical menu item is disabled (Radical Forge without an AI provider). */
+.app-menu-hint {
+  display: block;
+  font-size: 10.5px;
+  color: var(--text-muted);
 }
 .sel-bar-menu-item {
   display: block;

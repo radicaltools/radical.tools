@@ -709,6 +709,12 @@ export interface DocumentsAPI {
     downloadOverride?: (filename: string, json: string) => Promise<string | null>,
   ): Promise<DocumentMeta | null>
 
+  /** Keep a file or folder model in this browser again: `data` (the model
+   *  on screen) is stored here and the document stops writing the file or
+   *  folder, which stays on disk as it is. Null for a model already in the
+   *  browser; throws StorageFullError when the browser refuses it. */
+  moveToBrowser(id: string, data: DiagramData): DocumentMeta | null
+
   /** Open a folder (Electron only) containing a Radical md-folder model and
    *  register it as an md-backed document. Returns the meta, or null on
    *  cancel / unavailable environment. */
@@ -1205,6 +1211,29 @@ export const documents: DocumentsAPI = {
     if (meta.source === 'ls') deleteLSPayload(id)
     await bindFolder(meta, written)
     writeIndex(idx)
+    notify()
+    return meta
+  },
+
+  moveToBrowser(id, data) {
+    const idx = readIndex()
+    const meta = idx.docs.find((d) => d.id === id)
+    if (!meta || meta.source === 'ls') return null
+    if (!writeLSPayload(id, data)) throw new StorageFullError()
+    const was = { ...meta }
+    meta.source = 'ls'
+    meta.filePath = undefined
+    meta.folderPath = undefined
+    meta.lastModified = Date.now()
+    if (!writeIndex(idx)) {
+      Object.assign(meta, was)
+      deleteLSPayload(id)
+      throw new StorageFullError()
+    }
+    unreadable.delete(id)
+    connectedWebHandles.delete(id)
+    webSessions.delete(id)
+    void removeHandle(id)
     notify()
     return meta
   },

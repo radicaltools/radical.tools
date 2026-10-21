@@ -1080,13 +1080,73 @@ function slideModel(
   return (slide as { modelSnapshot?: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } }).modelSnapshot
 }
 
-/** Capture all node positions + collapsed state for a presentation slide */
-function captureCanvasState(nodes: Record<string, C4Node>): SlideCanvasState {
+/** Capture all node positions + collapsed state for a presentation slide,
+ *  and, on a view, what the view folds and opens: kept in the view, a fold
+ *  made or undone after the slide changed what the slide showed. */
+function captureCanvasState(nodes: Record<string, C4Node>, view?: DiagramView): SlideCanvasState {
   const result: SlideCanvasState['nodes'] = {}
   for (const [id, n] of Object.entries(nodes)) {
     result[id] = { x: n.x, y: n.y, width: n.width, height: n.height, collapsed: n.collapsed }
   }
-  return { nodes: result }
+  if (!view) return { nodes: result }
+  return { nodes: result, collapsedNodeIds: [...(view.collapsedNodeIds ?? [])], expandedNodeIds: [...(view.expandedNodeIds ?? [])] }
+}
+
+/** Puts a slide's captured canvas onto what is shown (inside immer set):
+ *  each node's place, size and fold, and its view's folds when it kept them.
+ *  Played from Designer the views are put back when it stops; in Presenter
+ *  Designer's are parked. */
+function applySlideCanvas(state: DiagramStore, canvasState: SlideCanvasState, viewId: string | null): void {
+  for (const [id, ns] of Object.entries(canvasState.nodes)) {
+    const n = state.c4Nodes[id]
+    if (!n) continue
+    n.x = ns.x; n.y = ns.y
+    n.width = ns.width; n.height = ns.height
+    n.collapsed = ns.collapsed
+  }
+  const view = viewId ? state.views[viewId] as DiagramView | undefined : undefined
+  if (!view || !canvasState.collapsedNodeIds) return
+  const same = (a: string[] | undefined, b: string[] | undefined): boolean => JSON.stringify(a ?? []) === JSON.stringify(b ?? [])
+  if (!same(view.collapsedNodeIds, canvasState.collapsedNodeIds)) view.collapsedNodeIds = [...canvasState.collapsedNodeIds]
+  if (!same(view.expandedNodeIds, canvasState.expandedNodeIds)) view.expandedNodeIds = [...(canvasState.expandedNodeIds ?? [])]
+}
+
+/** The drill level a hierarchy view shows: a slide's while one is shown,
+ *  else the view's own. */
+function shownTreemapFocus(state: { slideTreemapFocus: { viewId: string; focusId: string | null } | null }, view: DiagramView): string | null {
+  const slide = state.slideTreemapFocus
+  if (slide && slide.viewId === view.id) return slide.focusId
+  return view.treemapFocusId ?? null
+}
+
+/** What a slide keeps of view `viewId` besides the canvas: the drill level
+ *  of a hierarchy view, the page of a wiki view. */
+function slideViewFields(state: DiagramStore, viewId: string | null): Pick<PresentationSlide, 'treemapFocusId' | 'wikiFocusId' | 'wikiPageMode'> {
+  const view = viewId ? state.views[viewId] as DiagramView | undefined : undefined
+  // A hierarchy view's camera is the element it is drilled into.
+  if (view?.kind === 'treemap') return { treemapFocusId: shownTreemapFocus(state, view) }
+  // A wiki view's is the page it is on, and how that page is written.
+  if (view?.kind === 'wiki') {
+    const page = shownWikiPage(state, view)
+    return { wikiFocusId: page.focusId, wikiPageMode: page.pageMode }
+  }
+  return {}
+}
+
+/** The drill level a slide of a hierarchy view shows: the one it was added
+ *  on, or the top (one made over MCP, or before slides kept it) rather than
+ *  wherever the view was left. */
+function slideTreemapFocusOf(slide: PresentationSlide, viewId: string | null, views: Record<string, DiagramView>): { viewId: string; focusId: string | null } | null {
+  if (!viewId) return null
+  if (slide.treemapFocusId !== undefined) return { viewId, focusId: slide.treemapFocusId ?? null }
+  return views[viewId]?.kind === 'treemap' ? { viewId, focusId: null } : null
+}
+
+/** The view a slide shows: its own, or All elements once that view was
+ *  deleted (the whole model was drawn under the deleted view's address). */
+function slideViewIdOf(slide: PresentationSlide, views: Record<string, DiagramView>): string | null {
+  const id = slide.viewId ?? null
+  return id && views[id] ? id : null
 }
 
 /** Build the initial presentations array from possibly-legacy persisted data. */
@@ -6149,6 +6209,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // the views was put back as it had been on the way to Designer.
         const editing = (m: DiagramStore['appMode']): boolean => m === 'designer' || m === 'metamodel'
         const backToDesigner = !editing(prevMode) && mode === 'designer'
+        let parkedCamera: { camera: { x: number; y: number; zoom: number } | null; keep: boolean } | null = null
         if (editing(prevMode) && !editing(mode)) {
           // The canvas shown keeps its positions in the nodes until it is
           // left or saved: put them, and its camera, into its view (or All
@@ -6156,10 +6217,16 @@ export const useDiagramStore = create<DiagramStore>()(
           // in Presenter wrote the view's layout from when it was opened.
           if (!get().activeSnapshotId) get()._saveShownCanvas()
           W.__preModeLayout = parkDesigner(get())
+          // And its camera, put back with the rest: a camera moved in
+          // Presenter or Viewer stayed in Designer (40 px, or a zoom).
+          W.__preModeCamera = W.__rfCurrentViewport ? { ...W.__rfCurrentViewport } : undefined
           // Edits of a milestone not yet kept or dropped stay Designer's
           // question: Viewer and Presenter browse without being asked.
           set((state) => { state.milestoneDirty = false; state.milestonePromptOpen = false })
-        } else if (!editing(prevMode) && editing(mode) && W.__preModeLayout) {
+        } else if (!editing(prevMode) && (editing(mode) || prevMode === 'presenter') && W.__preModeLayout) {
+          // Back to Designer: its parked model. From Presenter to Viewer as
+          // well, kept parked: what the last slide showed (its places, its
+          // folds, its model) stayed in Viewer until a view switch.
           const pre = W.__preModeLayout as ParkedDesigner
           set((state) => {
             state.c4Nodes = pre.c4Nodes as any
@@ -6170,7 +6237,7 @@ export const useDiagramStore = create<DiagramStore>()(
             state.activeViewId = pre.activeViewId
             state.activeSnapshotId = pre.activeSnapshotId
             state.liveBackup = pre.liveBackup as any
-            state.milestoneDirty = pre.milestoneDirty
+            state.milestoneDirty = editing(mode) && pre.milestoneDirty
             state.milestonePromptOpen = false
             state.diffHighlight = pre.diffHighlight as any
             state.diffBaseSnapshotId = pre.diffBaseSnapshotId
@@ -6180,7 +6247,7 @@ export const useDiagramStore = create<DiagramStore>()(
             if (state.activeSequenceId && !pre.sequences[state.activeSequenceId]) state.activeSequenceId = null
           })
           if (pre.milestoneHubBase !== undefined) _milestoneHubBase = pre.milestoneHubBase
-          W.__preModeLayout = undefined
+          if (editing(mode)) W.__preModeLayout = undefined
           _beforeSlidePreview = null
           // Physics kept running during viewer (explore mode), so cola's
           // internal cache reflects the explored positions — *not* the
@@ -6191,7 +6258,15 @@ export const useDiagramStore = create<DiagramStore>()(
           // Designer positions and camera and saves nothing of the one left.
           if (shownViewId !== get().activeViewId && (shownViewId === null || get().views[shownViewId])) {
             get().setActiveView(shownViewId)
+          } else if (editing(mode) && W.__preModeCamera) {
+            parkedCamera = { camera: { ...W.__preModeCamera }, keep: true }
+          } else if (!editing(mode)) {
+            // Viewer opens the view as it opens any view: its own camera.
+            const id = get().activeViewId
+            const own = id ? get().views[id]?.viewport : get().defaultViewport
+            parkedCamera = { camera: own ? { ...own } : null, keep: false }
           }
+          if (editing(mode)) W.__preModeCamera = undefined
         }
         // Physics runs in *both* designer and viewer. In viewer the user
         // can drag/collapse to explore — mutations are sandboxed by the
@@ -6207,6 +6282,13 @@ export const useDiagramStore = create<DiagramStore>()(
         // Rebuild rfNodes so per-node draggable/selectable flags reflect
         // the new mode (designer = editable, viewer/presenter = locked).
         get()._sync()
+        // Designer's camera, with what it shows: given the nodes the canvas
+        // drew before (a container folded in Presenter), Smart fit took the
+        // ones Designer shows again for new and moved the camera.
+        if (parkedCamera) {
+          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+          ;(W.__rfPlaceCamera as ((vp: { x: number; y: number; zoom: number } | null, ids?: string[], opts?: { keep?: boolean }) => void) | undefined)?.(parkedCamera.camera, shown, { keep: parkedCamera.keep })
+        }
         // The view Designer shows was opened above, or first in Viewer or
         // Presenter, before appMode was designer: one never laid out (a view
         // per element, a view of a viewpoint) gets its Smart Layout now. It
@@ -6382,6 +6464,10 @@ export const useDiagramStore = create<DiagramStore>()(
 
       setPresentations(presentations) {
         set((state) => {
+          // The slide shown stays the current one wherever it moved: by its
+          // place, Presenter highlighted another card than the canvas showed
+          // after an agent reordered the slides.
+          const shownId = state.presentationSlides[state.presentationSlideIndex]?.id
           state.presentations = (presentations.length ? presentations : [{ id: uid(), name: 'Presentation 1', slides: [] }]) as any
           if (!state.presentations.some((p) => p.id === state.activePresentationId)) {
             state.activePresentationId = state.presentations[0].id
@@ -6389,7 +6475,8 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           const active = state.presentations.find((p) => p.id === state.activePresentationId)!
           state.presentationSlides = active.slides
-          state.presentationSlideIndex = Math.min(state.presentationSlideIndex, Math.max(0, active.slides.length - 1))
+          const moved = shownId ? active.slides.findIndex((slide) => slide.id === shownId) : -1
+          state.presentationSlideIndex = moved >= 0 ? moved : Math.min(state.presentationSlideIndex, Math.max(0, active.slides.length - 1))
         })
       },
 
@@ -6433,7 +6520,7 @@ export const useDiagramStore = create<DiagramStore>()(
           ? { x: raw.x, y: raw.y, zoom: raw.zoom }
           : (_getViewportFn()?.() ?? { x: 0, y: 0, zoom: 1 })
         const { presentationSlides, activeSnapshotId, activeViewId } = get()
-        const canvasState = captureCanvasState(get().c4Nodes as Record<string, C4Node>)
+        const canvasState = captureCanvasState(get().c4Nodes as Record<string, C4Node>, activeViewId ? get().views[activeViewId] : undefined)
         // Inline full model snapshot — guarantees the slide replays exactly
         // what was on screen at creation time, even if the user later edits
         // nodes/relations or switches the active milestone.
@@ -6446,12 +6533,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           const pres = state.presentations.find(p => p.id === state.activePresentationId)
           if (!pres) return
-          // A hierarchy view's camera is the element it is drilled into.
-          const view = activeViewId ? state.views[activeViewId] : undefined
-          const treemapFocusId = view?.kind === 'treemap' ? (view.treemapFocusId ?? null) : undefined
-          // A wiki view's is the page it is on, and how that page is written.
-          const wikiPage = view?.kind === 'wiki' ? shownWikiPage(state, view as DiagramView) : undefined
-          pres.slides.push({ id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, modelSnapshot, ...(treemapFocusId !== undefined ? { treemapFocusId } : {}), ...(wikiPage ? { wikiFocusId: wikiPage.focusId, wikiPageMode: wikiPage.pageMode } : {}) } as any)
+          pres.slides.push({ id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, modelSnapshot, ...slideViewFields(state, activeViewId) } as any)
           state.presentationSlides = pres.slides
         })
       },
@@ -6495,6 +6577,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // Snapshot full model + active view so we can restore on exit.
         // (goToSlide replaces c4Nodes/c4Relations from a slide snapshot,
         // so restoring just positions wouldn't be enough.)
+        // The views too: a slide puts its folds into its view, and from
+        // Designer (F5) a drill or fold made while it played was Designer's.
         ;(window as any).__prePresState = {
           c4Nodes: get().c4Nodes,
           c4Relations: get().c4Relations,
@@ -6502,6 +6586,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // The slides colour what changed between them; the milestone's
           // diff comes back after (Esc cleared it, the toggle still on).
           diffHighlight: get().diffHighlight,
+          views: get().views,
         }
         set((state) => { state.presentationActive = true })
         // Re-derive rfNodes immediately so the per-node `draggable` flag
@@ -6515,7 +6600,7 @@ export const useDiagramStore = create<DiagramStore>()(
       stopPresentation() {
         set((state) => { state.presentationActive = false; state.slideTreemapFocus = null; state.slideWikiPage = null })
         const pre = (window as any).__prePresState as
-          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight'] }
+          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight']; views?: Record<string, DiagramView> }
           | undefined
         get().setDiffHighlight(pre?.diffHighlight ?? {})
         if (pre) {
@@ -6523,6 +6608,7 @@ export const useDiagramStore = create<DiagramStore>()(
             state.c4Nodes = pre.c4Nodes as any
             state.c4Relations = pre.c4Relations as any
             state.activeViewId = pre.activeViewId
+            if (pre.views) state.views = pre.views as any
           })
           ;(window as any).__prePresState = undefined
         }
@@ -6541,7 +6627,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (!presentationSlides.length) return
         const i = Math.max(0, Math.min(index, presentationSlides.length - 1))
         const slide = presentationSlides[i]
-        const targetViewId = (slide as any).viewId ?? null
+        const targetViewId = slideViewIdOf(slide, get().views)
         set((state) => { state.presentationSlideIndex = i })
 
         // Disable physics while presenting
@@ -6571,19 +6657,11 @@ export const useDiagramStore = create<DiagramStore>()(
         // Mutates via the `state.c4Nodes[id]` draft, so it copy-on-writes only
         // the touched nodes and leaves the shared snapshot/slide data intact.
         if (slide.canvasState) {
-          set((state) => {
-            for (const [id, ns] of Object.entries(slide.canvasState!.nodes)) {
-              const n = state.c4Nodes[id]
-              if (!n) continue
-              n.x = ns.x; n.y = ns.y
-              n.width = ns.width; n.height = ns.height
-              n.collapsed = ns.collapsed
-            }
-          })
-        } else if ((slide as any).viewId) {
+          set((state) => { applySlideCanvas(state, slide.canvasState!, targetViewId) })
+        } else if (targetViewId) {
           // No captured canvas (generated / imported slides): show the view's
           // saved layout, the same positions setActiveView would load.
-          set((state) => { showSlideView(state, (slide as any).viewId, shown) })
+          set((state) => { showSlideView(state, targetViewId, shown) })
         }
 
         // Activate the view linked to this slide (or reset to "all" if none)
@@ -6594,9 +6672,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
         // A slide of a hierarchy view shows the element it was drilled into.
         set((state) => {
-          state.slideTreemapFocus = targetViewId && (slide as { treemapFocusId?: string | null }).treemapFocusId !== undefined
-            ? { viewId: targetViewId, focusId: (slide as { treemapFocusId?: string | null }).treemapFocusId ?? null }
-            : null
+          state.slideTreemapFocus = slideTreemapFocusOf(slide, targetViewId, state.views as Record<string, DiagramView>)
           // And one of a wiki view the page it was added on.
           state.slideWikiPage = slideWikiPageOf(slide, targetViewId)
         })
@@ -6682,34 +6758,24 @@ export const useDiagramStore = create<DiagramStore>()(
         }
 
         // Apply saved canvas state (positions + collapsed).
+        const targetViewId = slideViewIdOf(slide, get().views)
         if (slide.canvasState) {
-          set((state) => {
-            for (const [id, ns] of Object.entries(slide.canvasState!.nodes)) {
-              const n = state.c4Nodes[id]
-              if (!n) continue
-              n.x = ns.x; n.y = ns.y
-              n.width = ns.width; n.height = ns.height
-              n.collapsed = ns.collapsed
-            }
-          })
-        } else if ((slide as any).viewId) {
+          set((state) => { applySlideCanvas(state, slide.canvasState!, targetViewId) })
+        } else if (targetViewId) {
           // No captured canvas (generated / imported slides): show the view's
           // saved layout, the same positions setActiveView would load.
           let placed: string[] = []
-          set((state) => { placed = showSlideView(state, (slide as any).viewId, shown) })
+          set((state) => { placed = showSlideView(state, targetViewId, shown) })
           _liveLayout?.reset(placed)
         }
 
         // Navigate to the view linked to this slide (or reset to "all" if none).
-        const targetViewId = (slide as any).viewId ?? null
         if (targetViewId !== get().activeViewId) {
           set((state) => { state.activeViewId = targetViewId })
         }
 
         set((state) => {
-          state.slideTreemapFocus = targetViewId && (slide as { treemapFocusId?: string | null }).treemapFocusId !== undefined
-            ? { viewId: targetViewId, focusId: (slide as { treemapFocusId?: string | null }).treemapFocusId ?? null }
-            : null
+          state.slideTreemapFocus = slideTreemapFocusOf(slide, targetViewId, state.views as Record<string, DiagramView>)
           // And one of a wiki view the page it was added on.
           state.slideWikiPage = slideWikiPageOf(slide, targetViewId)
         })
@@ -6745,8 +6811,8 @@ export const useDiagramStore = create<DiagramStore>()(
           ? { x: raw.x, y: raw.y, zoom: raw.zoom }
           : (_getViewportFn()?.() ?? null)
         if (!vp) return
-        const canvasState = captureCanvasState(get().c4Nodes as Record<string, C4Node>)
         const currentViewId = get().activeViewId
+        const canvasState = captureCanvasState(get().c4Nodes as Record<string, C4Node>, currentViewId ? get().views[currentViewId] : undefined)
         // Re-capture the full inline model snapshot too — "Capture viewport"
         // semantically means "this slide should look like the screen does now".
         const modelSnapshot = {
@@ -6762,6 +6828,10 @@ export const useDiagramStore = create<DiagramStore>()(
             ;(slide as any).canvasState = canvasState
             ;(slide as any).viewId = currentViewId
             ;(slide as any).modelSnapshot = modelSnapshot
+            // The drill level or wiki page shown now, as Add slide takes it:
+            // the old one stayed, and the slide played where it was added.
+            delete slide.treemapFocusId; delete slide.wikiFocusId; delete slide.wikiPageMode
+            Object.assign(slide, slideViewFields(state, currentViewId))
           }
           state.presentationSlides = pres.slides
         })
@@ -6782,7 +6852,16 @@ export const useDiagramStore = create<DiagramStore>()(
           const pres = state.presentations.find(p => p.id === state.activePresentationId)
           if (!pres) return
           const slide = pres.slides.find(s => s.id === slideId)
-          if (slide) (slide as any).viewId = viewId
+          if (slide && (slide.viewId ?? null) !== viewId) {
+            slide.viewId = viewId
+            // What was captured on the old view is not this one's: kept, the
+            // linked view was drawn at the old view's places. It fits the view
+            // instead, as a slide made over MCP does.
+            delete slide.canvasState
+            delete slide.focusNodeIds
+            delete slide.treemapFocusId; delete slide.wikiFocusId; delete slide.wikiPageMode
+            slide.viewport = { x: 0, y: 0, zoom: 0 }
+          }
           state.presentationSlides = pres.slides
         })
       },

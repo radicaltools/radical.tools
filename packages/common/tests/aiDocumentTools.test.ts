@@ -187,6 +187,25 @@ describe('presentation tools', () => {
     expect((await call('delete_presentation', { id: pitch.id })).ok).toBe(true)
     expect(facade.getPresentations!()).toEqual([])
   })
+
+  // Item 199: slides reordered by id and name lost every view and framing,
+  // while a missing milestone or focus kept the old.
+  it('keeps a kept slide\'s view and framing when viewId is left out', async () => {
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 's', type: 'system', label: 'Shop' })
+    await call('create_view', { tempId: 'v', name: 'Context', nodeIds: ['s'] })
+    await call('create_view', { tempId: 'w', name: 'Other', nodeIds: ['s'] })
+    await call('create_presentation', { name: 'Pitch', slides: [{ name: 'One', viewId: 'v' }, { name: 'Two', viewId: 'w' }] })
+    const pitch = facade.getPresentations!()[0]
+    const [one, two] = pitch.slides.map((slide) => ({ ...slide, viewport: { x: 1, y: 2, zoom: 3 }, canvasState: { nodes: {} } }))
+    facade.setPresentations!([{ ...pitch, slides: [one, two] }])
+    const reordered = await call('update_presentation', { id: pitch.id, slides: [{ id: two.id, name: 'Two' }, { id: one.id, name: 'One' }] })
+    expect(reordered.ok, reordered.resultText).toBe(true)
+    expect(facade.getPresentations!()[0].slides).toEqual([two, one])
+    // viewId null still moves it to All elements.
+    await call('update_presentation', { id: pitch.id, slides: [{ id: two.id, name: 'Two', viewId: null }] })
+    expect(facade.getPresentations!()[0].slides[0]).toEqual({ id: two.id, name: 'Two', snapshotId: null, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } })
+  })
 })
 
 describe('presentation focus', () => {
@@ -224,6 +243,22 @@ describe('presentation focus', () => {
     expect(facade.getPresentations!()[0].slides[0]).toEqual({ ...captured, name: 'DB', viewport: { x: 0, y: 0, zoom: 0 }, focusNodeIds: [ctx.resolveId('d')] })
     await call('update_presentation', { id: tour.id, slides: [{ id: captured.id, name: 'All', viewId: 'v', focus: [] }] })
     expect(facade.getPresentations!()[0].slides[0].focusNodeIds).toBeUndefined()
+  })
+
+  // A slide with no view shows the All elements table, and a table, wiki,
+  // matrix, hierarchy, flow or Warnier view has no canvas: a focus did nothing.
+  it('refuses a focus on a slide that shows no canvas', async () => {
+    const { call } = setup()
+    await call('add_node', { tempId: 's', type: 'system', label: 'Shop' })
+    await call('create_view', { tempId: 't', name: 'Table', nodeIds: ['s'], kind: 'table' })
+    const onTable = await call('create_presentation', { name: 'T', slides: [{ name: 'Rows', viewId: 't', focus: ['s'] }] })
+    expect(onTable.ok).toBe(false)
+    expect(onTable.resultText).toContain('view "Table" is a table')
+    const noView = await call('create_presentation', { name: 'T', slides: [{ name: 'All', focus: ['s'] }] })
+    expect(noView.ok).toBe(false)
+    expect(noView.resultText).toContain('All elements')
+    // An empty focus (the whole view) is fine anywhere.
+    expect((await call('create_presentation', { name: 'T', slides: [{ name: 'All', focus: [] }] })).ok).toBe(true)
   })
 })
 
@@ -304,9 +339,11 @@ describe('milestone tools', () => {
     const asIs = facade.getMilestones!()[0].id
     await call('delete_node', { id: 'old' })
     await call('add_node', { tempId: 'new', type: 'system', label: 'Cloud' })
+    // A view listing no elements shows every element of the model it is shown with.
+    expect((await call('create_view', { tempId: 'all', name: 'Landscape', nodeIds: [] })).ok).toBe(true)
     const created = await call('create_presentation', {
       name: 'Roadmap',
-      slides: [{ name: 'Today', milestone: asIs, focus: ['old'] }, { name: 'Tomorrow', focus: ['new'] }],
+      slides: [{ name: 'Today', viewId: 'all', milestone: asIs, focus: ['old'] }, { name: 'Tomorrow', viewId: 'all', focus: ['new'] }],
     })
     expect(created.ok, created.resultText).toBe(true)
     const roadmap = facade.getPresentations!()[0]
@@ -318,7 +355,7 @@ describe('milestone tools', () => {
     await call('update_presentation', { id: roadmap.id, slides: [{ id: roadmap.slides[0].id, name: 'Now', milestone: null }] })
     expect(facade.getPresentations!()[0].slides[0].snapshotId).toBeNull()
     expect((await call('update_presentation', { id: roadmap.id, slides: [{ name: 'X', milestone: 'nope' }] })).resultText).toContain('unknown milestone')
-    expect((await call('update_presentation', { id: roadmap.id, slides: [{ name: 'X', focus: ['old'] }] })).resultText).toContain('unknown node')
+    expect((await call('update_presentation', { id: roadmap.id, slides: [{ name: 'X', viewId: 'all', focus: ['old'] }] })).resultText).toContain('unknown node')
   })
 
   it('re-frame a Studio slide moved to another milestone and unlink slides from a deleted one', async () => {

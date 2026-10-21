@@ -15,6 +15,9 @@ import { RadicalForgeModal } from './RadicalForgeModal'
 import { AgentForgeModal } from './AgentForgeModal'
 import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { useExport } from '../hooks/useExport'
+import { keysTakenByDialog } from './dialogKeys'
+import { FORGE_NEEDS_AI, aiReady, loadAISettings } from '../ai/settings'
+import { useMenuKeys } from './menuKeys'
 import {
   loadStudioSettings,
   saveStudioSettings,
@@ -272,6 +275,10 @@ function AppMenu({
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // Radical Forge talks to an AI provider: without one it is offered
+  // disabled (it saved the description, made its views and fetched the
+  // Hub's index before saying so). Read each time the menu opens.
+  const forgeReady = open && aiReady(loadAISettings())
   const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac')
   // How the model's canvases draw relations (All elements, and the views
   // that do not choose their own in their properties).
@@ -296,6 +303,7 @@ function AppMenu({
   // Close on outside-click (covers pointerdown + mousedown, capture phase
   // so descendants that call stopPropagation can't keep the menu open).
   useOutsideClick([wrapRef], open, useCallback(() => setOpen(false), []))
+  useMenuKeys(wrapRef, open, () => setOpen(false))
 
   useEffect(() => {
     if (!open) return
@@ -450,10 +458,17 @@ function AppMenu({
               className="app-menu-item"
               role="menuitem"
               onClick={run(onOpenForge)}
-              title="Generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model from a description"
+              disabled={!forgeReady}
+              aria-describedby={forgeReady ? undefined : 'app-menu-forge-hint'}
+              title={forgeReady
+                ? 'Generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model from a description'
+                : FORGE_NEEDS_AI}
             >
               <span className="app-menu-icon"><IconAI /></span>
-              <span className="app-menu-text">Radical Forge…</span>
+              <span className="app-menu-text">
+                Radical Forge…
+                {!forgeReady && <span id="app-menu-forge-hint" className="app-menu-hint">Needs an AI provider: AI providers… above</span>}
+              </span>
             </button>
           </div>
 
@@ -508,15 +523,6 @@ function AppMenu({
 
 /** Input kinds that hold no text: Ctrl/Cmd+Z there is not about typing. */
 const NOT_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image'])
-
-/** A modal dialog is open (a node wizard, the Models dialog, the metamodel
- *  editor…): Studio's own shortcuts stay out of it. Ctrl/Cmd+Z in a wizard
- *  took back the element the wizard was creating its child in, and Create
- *  then saved a child of nothing (the model could not be opened again); F5
- *  started a presentation behind it. */
-function inModalDialog(): boolean {
-  return !!document.querySelector('[role="dialog"][aria-modal="true"]') || !!useDiagramStore.getState().nodeWizard
-}
 
 /** Whether the key event comes from a field the user types text into. */
 function typingInTextField(target: EventTarget | null): boolean {
@@ -615,7 +621,7 @@ export function Toolbar(): React.ReactElement {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'F5') {
         e.preventDefault()
-        if (inModalDialog()) return
+        if (keysTakenByDialog(e.target)) return
         const state = useDiagramStore.getState()
         if (state.presentationActive) state.stopPresentation()
         else state.startPresentation()
@@ -632,13 +638,13 @@ export function Toolbar(): React.ReactElement {
         // written before it). And undo belongs to Designer: from Viewer or
         // Presenter it took one of Designer's steps, unseen.
         if (typingInTextField(e.target)) return
-        if (inModalDialog()) return
+        if (keysTakenByDialog(e.target)) return
         if (useDiagramStore.getState().appMode !== 'designer') return
         e.preventDefault()
         if (undoKey) useDiagramStore.getState().undo()
         else useDiagramStore.getState().redo()
       } else if ((e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') && (window as any).__radicalZoomIn
-        && useDiagramStore.getState().appMode !== 'inspector') {
+        && useDiagramStore.getState().appMode !== 'inspector' && !keysTakenByDialog(e.target)) {
         // The canvas and the Flow view register zoom; elsewhere (the
         // Inspector shows no canvas, though the one left registered) the
         // browser zooms the page.
@@ -661,7 +667,13 @@ export function Toolbar(): React.ReactElement {
   const handleCloseAbout = useCallback(() => { setAboutOpen(false) }, [])
 
   const [forgeOpen, setForgeOpen] = useState(false)
-  const handleOpenForge = useCallback(() => { setForgeOpen(true) }, [])
+  const handleOpenForge = useCallback(() => {
+    if (!aiReady(loadAISettings())) {
+      useDiagramStore.getState().pushNotification(FORGE_NEEDS_AI, 'info')
+      return
+    }
+    setForgeOpen(true)
+  }, [])
   const handleCloseForge = useCallback(() => { setForgeOpen(false) }, [])
 
   const [hubOpen, setHubOpen] = useState(false)
@@ -706,10 +718,10 @@ export function Toolbar(): React.ReactElement {
   // open) launch Radical Forge right after creating the blank model it opens
   // into — same window-event pattern as the AI settings modal above.
   useEffect(() => {
-    const onOpen = () => setForgeOpen(true)
+    const onOpen = () => handleOpenForge()
     window.addEventListener('radical:open-forge', onOpen as EventListener)
     return () => window.removeEventListener('radical:open-forge', onOpen as EventListener)
-  }, [])
+  },[handleOpenForge])
 
   // The Forge button opens a read-only view instead while an agent runs
   // Forge on this folder over MCP (see persistence/agentForge).

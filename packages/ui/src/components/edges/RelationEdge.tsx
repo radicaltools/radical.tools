@@ -169,6 +169,9 @@ export const RelationEdge = memo(
     const endSelected = useStore(endSelectedSelector)
     // A selection brings its relations forward and dims the rest (canvasFocus.ts).
     const focus = useDiagramStore((s) => edgeFocus(s, id))
+    // Its ends are rewired in Designer only: in Viewer and Presenter a drag
+    // rewired the relation on the canvas, unsaved and gone back in Designer.
+    const rewirable = useDiagramStore((s) => s.appMode === 'designer' && !s.presentationActive)
 
     // Not drawable yet (an end is hidden or not measured).
     if (!geometry) return null
@@ -216,7 +219,7 @@ export const RelationEdge = memo(
         <Arrow x={tp.x} y={tp.y} side={tgtSide} color={diffStroke ?? strokeColor} size={selected ? 10 : 8} />
 
         {/* Reconnect handles at endpoints when edge is selected */}
-        {selected && !data?.isVirtual && (
+        {selected && !data?.isVirtual && rewirable && (
           <>
             <ReconnectHandle x={sp.x} y={sp.y} edgeId={id} end="source" otherNodeId={target} />
             <ReconnectHandle x={tp.x} y={tp.y} edgeId={id} end="target" otherNodeId={source} />

@@ -59,8 +59,9 @@ const CANVAS_KINDS = new Set<DiagramView['kind']>([undefined, 'static', 'dynamic
 const isCanvas = (view: DiagramView): boolean => CANVAS_KINDS.has(view.kind)
 
 /** The view to follow `ids` to, with what it shows of them: the open one
- *  when it shows any, else the one that shows the most, a canvas before
- *  anything else; null when no view that shows some elements shows them. */
+ *  when it shows any, else a canvas before anything else (a table opened at
+ *  a stage's end framed nothing), the one that shows the most; null when no
+ *  view that shows some elements shows them. */
 function viewFor(ids: string[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): { view: DiagramView; shown: Set<string> } | null {
   if (!ids.length) return null
   const s = useDiagramStore.getState()
@@ -75,7 +76,10 @@ function viewFor(ids: string[], nodes: Record<string, C4Node>, relations: Record
     const shown = new Set(ids.filter((id) => all.has(id)))
     if (!shown.size) continue
     if (view.id === s.activeViewId) return { view, shown }
-    if (!best || shown.size > best.count || (shown.size === best.count && isCanvas(view) && !isCanvas(best.view))) {
+    const better = !best
+      || (isCanvas(view) && !isCanvas(best.view))
+      || (isCanvas(view) === isCanvas(best.view) && shown.size > best.count)
+    if (better) {
       best = { view, shown, count: shown.size }
     }
   }
@@ -97,19 +101,25 @@ onOutsideEditLoaded((before) => {
 
   // The elements added or changed, and the ends of the relations that were.
   const touched: string[] = []
+  const ends = new Set<string>()
   for (const [id, kind] of Object.entries(computeSnapDiff(before.nodes, nodes, before.relations, relations))) {
     if (kind === 'removed') continue
     if (nodes[id]) touched.push(id)
     const rel = relations[id]
-    if (rel) touched.push(...[rel.sourceId, rel.targetId].filter((end) => nodes[end]))
+    if (rel) for (const end of [rel.sourceId, rel.targetId]) if (nodes[end]) ends.add(end)
   }
   if (paused) return
   for (const id of touched) { turn.add(id); unseen.add(id) }
+  // A relation's ends lead to a view that shows it; one the agent did not
+  // touch is context: it stayed to be shown, and a later write went to a
+  // view of that far end.
+  for (const id of ends) if (!touched.includes(id)) unseen.add(id)
   for (const id of unseen) if (!nodes[id]) unseen.delete(id)
 
   // What is still to be shown; a change of views alone (Forge filing a
   // stage) may be what shows it.
   const target = viewFor([...unseen], nodes, relations)
+  for (const id of ends) if (!touched.includes(id)) unseen.delete(id)
   if (!target) return
   for (const id of target.shown) unseen.delete(id)
   if (target.view.id !== s.activeViewId) {
@@ -118,7 +128,9 @@ onOutsideEditLoaded((before) => {
   }
   if (!isCanvas(target.view)) return
   const all = viewShownNodes(target.view, nodes, relations)
-  const ids = [...new Set([...turn, ...target.shown])].filter((id) => all?.has(id))
+  // A far end is framed only when the relation is all the turn did.
+  const subjects = [...target.shown].filter((id) => !ends.has(id) || touched.includes(id))
+  const ids = [...new Set([...turn, ...(subjects.length || turn.size ? subjects : target.shown)])].filter((id) => all?.has(id))
   // Once the canvas has drawn the view it may have just opened.
   if (frameTimer !== null) clearTimeout(frameTimer)
   frameTimer = setTimeout(() => {

@@ -12,7 +12,9 @@ import type { ApplyReport } from '@radical/common/ai/diagramFacade'
 import { forgeRunClientName, forgeRunCurrentStage } from '@radical/common/formats/forgeRunStatus'
 import { agentForgePhase, useAgentForgeStore } from '../persistence/agentForge'
 import { useFollowAgentStore } from '../persistence/followAgent'
-import { viewNodeSets as viewNodeSetsOf } from '../navigation'
+import { pickViewFor, showOnPage, viewNodeSets as viewNodeSetsOf } from '../navigation'
+import { keysTakenByDialog } from './dialogKeys'
+import { FORGE_NEEDS_AI } from '../ai/settings'
 
 /**
  * Cmd/Ctrl+P quick-search palette.
@@ -174,6 +176,9 @@ export function QuickSearch(): React.ReactElement | null {
       const mod = isMac ? e.metaKey : e.ctrlKey
       if (mod && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault()
+        // Behind a dialog (or the metamodel editor) a pick switched the view
+        // under it.
+        if (keysTakenByDialog(e.target)) return
         inputRef.current?.focus()
         inputRef.current?.select()
       } else if (e.key === 'Escape' && document.activeElement === inputRef.current) {
@@ -236,20 +241,11 @@ export function QuickSearch(): React.ReactElement | null {
   const viewNodeSets = useMemo(() => viewNodeSetsOf(views, c4Nodes, c4Relations), [views, c4Nodes, c4Relations])
 
   // Pick a stable view to switch into when the user jumps to a node that
-  // isn't visible in the active view. Prefers (in order): the active view
-  // if it already contains the node, the smallest view containing it
-  // (most focused), else any view, else null (means "no view filter").
-  const pickViewForNode = (nodeId: string): string | null => {
-    // All elements (no active view) shows every element: stay on it.
-    if (!activeViewId) return null
-    if (viewNodeSets[activeViewId]?.has(nodeId)) return activeViewId
-    let best: { id: string; size: number } | null = null
-    for (const [vid, set] of Object.entries(viewNodeSets)) {
-      if (!set.has(nodeId)) continue
-      if (!best || set.size < best.size) best = { id: vid, size: set.size }
-    }
-    return best?.id ?? null
-  }
+  // isn't visible in the active view: the active view if it already
+  // contains the node, else a diagram before a table or wiki, before a
+  // matrix or flow, the smallest of each (navigation.pickViewFor), else
+  // null (means "no view filter").
+  const pickViewForNode = (nodeId: string): string | null => pickViewFor(nodeId, activeViewId, views, viewNodeSets)
 
   type Result =
     | { kind: 'node'; id: string; label: string; sub: string; viewIds: string[]; score: number }
@@ -348,6 +344,11 @@ export function QuickSearch(): React.ReactElement | null {
 
   // Reset hover when the result list shape changes.
   useEffect(() => { setHover(0) }, [q])
+  // The highlighted result stays in sight: ↓ moved it under the list's
+  // bottom, and Enter opened a result never seen.
+  useEffect(() => {
+    wrapRef.current?.querySelector('.quick-search-item.active')?.scrollIntoView({ block: 'nearest' })
+  }, [hover])
 
 
   // Open the containers around the target that the view shown has
@@ -386,6 +387,7 @@ export function QuickSearch(): React.ReactElement | null {
         // to it. Walk from outermost to innermost so each toggle's auto-fit
         // works on already-expanded outer levels.
         expandAncestors(r.id)
+        showOnPage(targetView, r.id)
         setSelectedNodeIds([r.id])
         selectNode(r.id)
         requestAnimationFrame(() => {
@@ -517,7 +519,10 @@ export function QuickSearch(): React.ReactElement | null {
         <button
           type="button"
           className={`qs-forge-toggle${agentPhase ? ` qs-forge-agent qs-forge-${agentPhase}` : ''}`}
-          title={agentPhase ? agentTitle : 'Open Radical Forge — generate a model from a description'}
+          // Studio's own Forge runs on an AI provider: without one the
+          // button says how to get one (an agent's run is shown anyway).
+          disabled={!agentPhase && !aiConfigured}
+          title={agentPhase ? agentTitle : aiConfigured ? 'Open Radical Forge — generate a model from a description' : FORGE_NEEDS_AI}
           aria-label={agentPhase ? 'Show the agent\'s Radical Forge run' : 'Open Radical Forge'}
           data-agent-phase={agentPhase ?? undefined}
           data-following={followingAgent || undefined}

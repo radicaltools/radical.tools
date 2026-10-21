@@ -8,6 +8,7 @@
 import type { C4Node, C4Relation, DiagramView, Presentation, PresentationSlide } from '../../c4'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 import { viewShownNodes } from '../../viewPipeline'
+import { VIEW_KIND_LABELS, isViewpointKind } from '../../viewpoints'
 
 const randomId = (): string =>
   (globalThis as unknown as { crypto: { randomUUID(): string } }).crypto.randomUUID()
@@ -20,12 +21,12 @@ const SLIDES_SCHEMA = {
     properties: {
       id: { type: 'string', description: 'Existing slide id to keep; omit for a new slide.' },
       name: { type: 'string' },
-      viewId: { type: ['string', 'null'], description: 'Real view id or a tempId from this run.' },
+      viewId: { type: ['string', 'null'], description: 'Real view id or a tempId from this run. null = no view (the All elements table). Omit on a kept slide to keep its view and framing; changing it resets the slide\'s framing.' },
       milestone: { type: ['string', 'null'], description: 'Milestone id (list_milestones): the slide shows the model as saved in it. null = the current model. Omit on a kept slide to keep its milestone; changing it resets the slide\'s framing.' },
       focus: {
         type: 'array',
         items: { type: 'string' },
-        description: "Node ids (or tempIds) the slide zooms onto, shown in the slide's view; the camera frames just these. Empty = the whole view. Omit on a kept slide to keep its focus and framing; passing it drops framing captured in Studio.",
+        description: "Node ids (or tempIds) the slide zooms onto, shown in the slide's view, which must be a Structure view (a canvas); the camera frames just these. Empty = the whole view. Omit on a kept slide to keep its focus and framing; passing it drops framing captured in Studio.",
       },
     },
     required: ['name'],
@@ -80,9 +81,23 @@ function shownIn(view: DiagramView | undefined, nodes: Record<string, C4Node>, r
   return shown ? (id) => shown.has(id) : (id) => id in nodes
 }
 
+/** Why a slide of `view` cannot zoom onto elements: only a canvas (a
+ *  Structure view) has a camera. Without a view a slide shows the All
+ *  elements table. */
+function noCanvas(view: DiagramView | undefined): string | null {
+  if (!view) return 'without viewId it shows the All elements table'
+  const kind = view.kind ?? 'static'
+  if (kind === 'static') return null
+  const label = kind === 'dynamic' ? 'flow' : isViewpointKind(kind) ? VIEW_KIND_LABELS[kind].toLowerCase() : kind
+  return `view "${view.name}" is a ${label} view`
+}
+
 /** `nodes`: the model the slide shows, the current one or its milestone's. */
 function parseFocus(tool: string, i: number, raw: unknown, ctx: ToolRunContext, view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): string[] | string {
   if (!Array.isArray(raw) || raw.some((id) => typeof id !== 'string')) return `${tool}: slide ${i + 1} focus must be an array of node ids`
+  // A focus on a slide with no canvas did nothing: it played the whole table.
+  const refused = raw.length ? noCanvas(view) : null
+  if (refused) return `${tool}: slide ${i + 1} cannot focus on elements: ${refused}, and only a Structure view (a canvas) zooms onto elements`
   const shown = shownIn(view, nodes, relations)
   const focus = [...new Set((raw as string[]).map((id) => ctx.resolveId(id)))]
   const unknown = focus.filter((id) => !(id in nodes))
@@ -115,7 +130,9 @@ function parseSlides(tool: string, raw: unknown, ctx: ToolRunContext, existing: 
       snapshotId = s.milestone
     }
     const milestone = snapshotId ? milestones.find((m) => m.id === snapshotId) : undefined
-    let viewId: string | null = null
+    // A kept slide keeps its view unless told otherwise, as it keeps its
+    // milestone and focus: slides reordered by id and name all lost theirs.
+    let viewId: string | null = s.viewId === undefined ? (previous?.viewId ?? null) : null
     if (s.viewId != null) {
       if (typeof s.viewId !== 'string') return `${tool}: slide ${i + 1} has an invalid viewId`
       viewId = ctx.resolveId(s.viewId)

@@ -94,7 +94,9 @@ test.describe('returning visit', () => {
     await expect(last).toBeFocused()
     await page.keyboard.press('Enter')
     await studio.ready()
-    await expect(page.locator('tr.tv-row').first()).toBeVisible()
+    // On its first view, not All elements (decided 2026-10-21).
+    await expect(page).toHaveURL(/\/v\/v-context$/)
+    await expect(studio.nodes.first()).toBeVisible()
   })
 })
 
@@ -126,5 +128,25 @@ test.describe('Models dialog', () => {
     await expect(models.locator('.docmgr-item')).toHaveCount(0) // the filter says e2e
     await models.getByRole('searchbox', { name: 'Search models' }).fill('')
     await expect(models.locator('.docmgr-name', { hasText: 'Bookstore' })).toBeVisible()
+  })
+
+  test('a model picked in the list opens on its first view, and the dialog closes', async ({ page, studio }) => {
+    await studio.seed()
+    await studio.open('v-context')
+    const models = page.getByRole('dialog', { name: 'Models' })
+    const open = async (): Promise<void> => {
+      await page.getByTitle('Menu', { exact: true }).click()
+      await page.getByRole('menuitem', { name: /Manage models/ }).click()
+      await expect(models).toBeVisible()
+    }
+    await open()
+    await models.getByRole('button', { name: '+ New model' }).click()
+    await models.getByRole('button', { name: 'Create model' }).click()
+    await expect(models).toBeHidden()
+    await open()
+    await models.locator('.docmgr-item', { hasText: 'E2E' }).locator('.docmgr-item-main').click()
+    await expect(models).toBeHidden()
+    await expect(page).toHaveURL(/\/v\/v-context$/)
+    await expect(studio.nodes).toHaveCount(3)
   })
 })

@@ -31,7 +31,9 @@ test('Open → File… keeps the model in the file and saves changes to it', asy
   await page.getByRole('button', { name: 'File…' }).click()
   await studio.ready()
   await studio.designer()
-  // It opens on All elements, the table of the whole model.
+  // It opens on its first view (decided 2026-10-21; it landed on All elements).
+  await expect(page).toHaveURL(/\/v\/v-context$/)
+  await page.locator('.lp-view-card', { hasText: 'All elements' }).click()
   await studio.row('customer').click()
   await expect(labelField(page)).toHaveValue('Customer')
   await labelField(page).fill('Shopper')
@@ -43,7 +45,8 @@ test('Open → File… keeps the model in the file and saves changes to it', asy
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.locator('.msteps-row').first().click()
   await studio.ready()
-  await expect(studio.row('customer')).toContainText('Shopper')
+  await expect(page).toHaveURL(/\/v\/v-context$/)
+  await expect(studio.node('customer')).toContainText('Shopper')
   await openModels(page)
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.fs')).toBeVisible()
 })
@@ -91,7 +94,8 @@ test('a model file that does not parse, or is gone, is named and left as it is',
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.locator('.msteps-row').first().click()
   await studio.ready()
-  await expect(studio.row('customer')).toBeVisible()
+  // On its first view (decided 2026-10-21).
+  await expect(studio.node('customer')).toBeVisible()
 
   // Deleted outside Studio once its saves are done, then opened again.
   await page.waitForTimeout(1500)
@@ -151,4 +155,28 @@ test('Open → Structurizr DSL… brings the views, opens the first, and says wh
   await expect(studio.nodes).toHaveCount(4)
   await studio.settle()
   await expect.poll(() => studio.layoutViolations(studio.activeDocId())).toEqual([])
+})
+
+test('Move to browser keeps a file model in this browser and leaves the file as it is', async ({ page, studio }) => {
+  // Decided 2026-10-21: there was no way back from a file or folder.
+  await page.goto('/')
+  await file.write(fixture('bookstore'))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'File…' }).click()
+  await studio.ready()
+  await openModels(page)
+  const models = page.getByRole('dialog', { name: 'Models' })
+  await models.getByRole('button', { name: /^Actions for / }).first().click()
+  page.once('dialog', (d) => void d.accept())
+  await models.getByRole('menuitem', { name: 'Move to browser' }).click()
+  await expect(models.locator('.docmgr-item.active .docmgr-badge.ls')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(models).toBeHidden()
+  const onDisk = await file.read()
+  await studio.designer()
+  await studio.node('customer').click()
+  await labelField(page).fill('Shopper')
+  await labelField(page).press('Tab')
+  await expect.poll(async () => JSON.stringify(await studio.storedDoc(studio.activeDocId()))).toContain('"Shopper"')
+  expect(await file.read()).toBe(onDisk)
 })

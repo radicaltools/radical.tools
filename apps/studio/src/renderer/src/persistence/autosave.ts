@@ -17,6 +17,7 @@ import { mergeModelEdits, mergeModels, mergeNotices, modelEdits, type MergeDrop,
 import { useDiagramStore, historyMark, parkedLiveModel, type ParkedDesigner } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore, DocumentUnreadableError, StorageFullError, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
+import { openFirstView } from '../navigation'
 
 let reloadActive: () => void = () => {}
 
@@ -356,7 +357,7 @@ if (typeof window !== 'undefined') {
   const loadActive = (
     id: string,
     source: DocumentSource | undefined,
-    opts?: { keepUi?: boolean },
+    opts?: { keepUi?: boolean; firstView?: boolean },
   ): void => {
     const seq = ++_loadSeq
     _changedWhilePresenting = null
@@ -410,6 +411,10 @@ if (typeof window !== 'undefined') {
         } else {
           store.loadDiagram(data, { outsideChange })
         }
+        // A model opened (from a file, a folder, the list, a Hub link) shows
+        // its first view: All elements, the table of everything, only when
+        // it has none. It landed on All elements.
+        if (opts?.firstView) openFirstView()
         // A reload of the same document keeps the user where they were.
         if (opts?.keepUi) {
           const next = useDiagramStore.getState()
@@ -513,6 +518,8 @@ if (typeof window !== 'undefined') {
       // folder…"): start following its folder.
       const active = s.docs.find(d => d.id === s.activeId)
       if (active?.source === 'md' && !_suspended) watchActive(active.id)
+      // Moved back to the browser: the folder is not followed any more.
+      else if (active && active.source !== 'md') stopWatching()
       return
     }
     const leaving = prevActive
@@ -539,7 +546,7 @@ if (typeof window !== 'undefined') {
       }
       return
     }
-    loadActive(s.activeId, documents.listDocuments().find(d => d.id === s.activeId)?.source)
+    loadActive(s.activeId, documents.listDocuments().find(d => d.id === s.activeId)?.source, { firstView: true })
   })
 
   // Expose hooks for other modules / future use.

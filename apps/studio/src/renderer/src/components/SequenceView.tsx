@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { computeStepDiff, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS } from '@radical/common/c4'
 import type { C4Node, C4Relation } from '@radical/common/c4'
+import { keysTakenByDialog } from './dialogKeys'
 
 // Participants use the same fills and shapes as the C4 nodes on the canvas
 // (see components/nodes/C4Nodes.tsx), so a flow reads like the structure view.
@@ -192,12 +193,13 @@ export function SequenceView(): React.ReactElement {
     const handler = (e: KeyboardEvent) => {
       // ⌘+ / ⌘− are handled app-wide (Toolbar) through __radicalZoomIn/Out.
       if (!(e.ctrlKey || e.metaKey)) return
-      if (e.key === '0') { e.preventDefault(); fitFnRef.current() }
+      // On the window, as ⌘+ is: on the view's box ⌘0 needed a click first.
+      if (e.key === '0' && !keysTakenByDialog(e.target)) { e.preventDefault(); fitFnRef.current() }
     }
-    el.addEventListener('keydown', handler)
+    window.addEventListener('keydown', handler)
     return () => {
       el.removeEventListener('wheel', onWheel)
-      el.removeEventListener('keydown', handler)
+      window.removeEventListener('keydown', handler)
     }
   }, [clampZoom, onWheel])
 
