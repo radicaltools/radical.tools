@@ -169,3 +169,24 @@ describe('a view that is not a canvas', () => {
     expect(box('web')).toMatchObject({ x: 60, y: 120 })
   })
 })
+
+describe('an element whose file was moved into another container by hand', () => {
+  // Orders DB moved from Shop's folder into Bank's: its places are still
+  // the ones it had in Shop, far right of Bank's frame here (x 700 in a
+  // frame 300 wide), on every canvas, after a reload too.
+  const moved = (): DiagramData => {
+    const data = model()
+    data.nodes.push({ id: 'db', type: 'container', label: 'Orders DB', collapsed: false, parentId: 'bank', x: 700, y: 120, ...size } as C4Node)
+    data.defaultPositions!.db = pos(700, 120, size.width, size.height)
+    data.views!.push({ id: 'banks', name: 'Banks', nodeIds: ['bank', 'db'], positions: { bank: pos(0, 0, 300, 200), db: pos(700, 120, size.width, size.height) } })
+    return data
+  }
+
+  it('is placed inside its new parent when the model opens, and on a view', () => {
+    s().loadDiagram(moved())
+    expect(inside('db')).toBe(true)
+    expect(overlap(box('bank'), box('shop'))).toBe(false)
+    s().setActiveView('banks')
+    expect(inside('db')).toBe(true)
+  })
+})

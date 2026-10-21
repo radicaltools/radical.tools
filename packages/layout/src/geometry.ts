@@ -379,11 +379,33 @@ export function makeRoomAround(
 }
 
 /**
+ * The nodes whose place on a canvas (`nodes` hold it, `positions` say which
+ * it knows) lies mostly outside their parent's frame there: the middle of
+ * the box outside it. A place kept relative to another parent (a node file
+ * moved by hand into another container's folder, a model edited outside
+ * Studio) reads so; such a node is placed afresh (placeUnplaced).
+ */
+export function strayNodeIds(nodes: Record<string, C4Node>, positions: Record<string, unknown>): Set<string> {
+  const out = new Set<string>()
+  for (const n of Object.values(nodes)) {
+    const parent = n.parentId ? nodes[n.parentId] : undefined
+    // A folded parent may keep the size it is drawn at, smaller than what
+    // it holds: opened, it is fit to it.
+    if (!parent || parent.collapsed || !(n.id in positions) || !(parent.id in positions)) continue
+    const cx = n.x + effectiveWidth(n) / 2
+    const cy = n.y + effectiveHeight(n) / 2
+    if (cx < 0 || cy < 0 || cx > parent.width || cy > parent.height) out.add(n.id)
+  }
+  return out
+}
+
+/**
  * Gives the nodes a canvas has no place for a place on it. `nodes` hold the
  * canvas's positions for every node it knows (`positions`, its own map); a
  * node added on another canvas is still where that one had it, relative to
  * a parent that is laid out differently here: outside its frame, or on a
- * sibling. Each such node wraps what it holds here, goes right of the
+ * sibling. So is one whose place there lies mostly outside its parent's
+ * frame (strayNodeIds). Each such node wraps what it holds here, goes right of the
  * siblings the canvas has placed, top-aligned with them, and its ancestors
  * are refit; where one grew, its siblings make room for it (growWithRoom). What is inside a node
  * placed this way keeps its place in it. Only nodes in `shown` (the ones a
@@ -397,7 +419,8 @@ export function placeUnplaced(
   shown?: Set<string>,
 ): string[] {
   if (!positions || Object.keys(positions).length === 0) return []
-  const known = (id: string): boolean => id in positions
+  const strays = strayNodeIds(nodes, positions)
+  const known = (id: string): boolean => id in positions && !strays.has(id)
   const depth = (n: C4Node): number => {
     let d = 0
     const seen = new Set<string>([n.id])

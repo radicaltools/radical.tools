@@ -61,7 +61,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, fittedParentSize, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph } from '@radical/layout/geometry'
+import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, fittedParentSize, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
@@ -5950,9 +5950,11 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         let nodes = atDefaultPositions(data.nodes, data.defaultPositions)
         // What was added on a view since All elements was last shown has no
-        // place there yet (on copies: `data` may hold the store's own nodes).
+        // place there yet, and what was moved into another parent outside
+        // Studio (a node file into another folder) lies outside it (on
+        // copies: `data` may hold the store's own nodes).
         let placedOnLoad: string[] = []
-        if (data.defaultPositions && data.nodes.some((n) => !(n.id in data.defaultPositions!))) {
+        if (data.defaultPositions && (data.nodes.some((n) => !(n.id in data.defaultPositions!)) || strayNodeIds(nodes, data.defaultPositions).size > 0)) {
           nodes = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { ...n }]))
           placedOnLoad = placeUnplaced(nodes, data.defaultPositions)
         }

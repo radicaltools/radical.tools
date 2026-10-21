@@ -12,7 +12,7 @@ import { viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramView
 const s = () => useDiagramStore.getState()
 const node = (id: string, type: C4Node['type'], x: number, parentId?: string): C4Node =>
   ({ id, type, label: id, x, y: 0, width: 160, height: 80, ...(parentId ? { parentId } : {}) }) as C4Node
-const nodes = [node('user', 'person', 0), node('shop', 'system', 300), node('web', 'container', 320, 'shop'), node('db', 'container', 520, 'shop'), node('bank', 'system', 900)]
+const nodes = [node('user', 'person', 0), { ...node('shop', 'system', 300), width: 900 }, node('web', 'container', 320, 'shop'), node('db', 'container', 520, 'shop'), node('bank', 'system', 1300)]
 const all = Object.fromEntries(nodes.map((n) => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]))
 const view = (id: string, nodeIds: string[], kind?: DiagramView['kind']): DiagramView => ({ id, name: id, nodeIds, positions: { ...all }, ...(kind ? { kind } : {}) })
 
