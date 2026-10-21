@@ -12,18 +12,42 @@ Adds a line to the repository's post-checkout, post-commit, post-merge and
 post-rewrite git hooks that saves the model folder's base (radical diff
 --save-base) after a checkout, a commit, a pull or merge and a rebase, so
 Studio shows the changes of the branch checked out without anyone running
-it. What the hooks already do stays; running it again adds nothing, but
-brings the line up to date when the CLI or node has moved.
+it. The line goes right after the hook's first line, where an exit or an
+exec further down cannot skip it, and what the hooks already do stays. Each
+model folder has a line of its own; running it again adds nothing, but
+brings the line up to date when the CLI or node has moved. A hook written
+in another language than sh is left alone: the message says what to call
+from it.
 
   folder              the model folder (default: the working directory)
 
-Exit status: 0 the hooks hold the line, 2 they could not be written.`
+Exit status: 0 the hooks hold the line, 2 one or more could not be written.`
 
 /** A checkout, a commit (amended too), a pull or merge, a rebase. */
 export const HOOK_NAMES = ['post-checkout', 'post-commit', 'post-merge', 'post-rewrite'] as const
 
-/** Marks the line, so a second install finds it. */
+/** Marks the line, so a second install finds it. The line after it names
+ *  the folder: a repository may hold more than one model. */
 export const HOOK_MARKER = '# radical: save the model base for Studio'
+
+/** True when the hook script `text` is run by a POSIX shell: no `#!` line
+ *  (git runs it with sh), or one naming sh, bash, dash, zsh, ksh or ash,
+ *  directly or through env. */
+function isShHook(text: string): boolean {
+  const shebang = /^#!\s*(\S+)(.*)/.exec(text.split('\n')[0])
+  if (!shebang) return true
+  const program = (path: string) => path.slice(path.lastIndexOf('/') + 1)
+  let interpreter = program(shebang[1])
+  if (interpreter === 'env') interpreter = program(shebang[2].trim().split(/\s+/).find((arg) => !arg.startsWith('-') && !arg.includes('=')) ?? '')
+  return /^(sh|bash|dash|zsh|ksh|mksh|ash)$/.test(interpreter)
+}
+
+/** `lines` without the marked line that saves the base of `folder` (as
+ *  quoted in the hook), and where it was (-1 when it was not there). */
+function withoutLine(lines: string[], folder: string): { lines: string[]; at: number } {
+  const at = lines.findIndex((text, i) => text === HOOK_MARKER && lines[i + 1]?.includes(` diff ${folder} --save-base`))
+  return at < 0 ? { lines, at } : { lines: [...lines.slice(0, at), ...lines.slice(at + 2)], at }
+}
 
 const quote = (text: string) => `"${text.replace(/\\/g, '/').replace(/(["$`])/g, '\\$1')}"`
 
@@ -50,32 +74,52 @@ export async function hooksCommand(args: string[], io: Io): Promise<number> {
     // core.hooksPath and worktrees included; relative to the folder.
     const hooksDir = resolve(root, await git('rev-parse', '--git-path', 'hooks'))
     await mkdir(hooksDir, { recursive: true })
-    // Git runs hooks at the top of the working tree.
-    const line = `${io.command ?? 'radical'} diff ${quote(relative(top, root) || '.')} --save-base --quiet || true`
+    // Git runs hooks at the top of the working tree. The hook's stdin
+    // (post-rewrite's list of commits) is for the hook's own commands.
+    const folderArg = quote(relative(top, root) || '.')
+    const line = `${io.command ?? 'radical'} diff ${folderArg} --save-base --quiet </dev/null || true`
     const written: string[] = []
     const updated: string[] = []
+    const foreign: string[] = []
     for (const name of HOOK_NAMES) {
       const path = resolve(hooksDir, name)
       const old = await readFile(path, 'utf8').catch(() => null)
-      if (old?.includes(HOOK_MARKER)) {
-        // Installed before: the line after the marker becomes today's (the CLI or node moved).
-        const lines = old.split('\n')
-        const at = lines.indexOf(HOOK_MARKER)
-        if (lines[at + 1] === line) continue
-        lines[at + 1] = line
-        await writeFile(path, lines.join('\n'))
-        updated.push(name)
+      if (old === null) {
+        await writeFile(path, `#!/bin/sh\n${HOOK_MARKER}\n${line}\n`)
+        await chmod(path, 0o755)
+        written.push(name)
         continue
       }
-      const head = old === null ? '#!/bin/sh\n' : old.endsWith('\n') ? old : `${old}\n`
-      await writeFile(path, `${head}${HOOK_MARKER}\n${line}\n`)
+      const { lines, at } = withoutLine(old.split('\n'), folderArg)
+      if (!isShHook(old)) {
+        // A sh line breaks a Python (or any other) hook: the user adds the
+        // call in the hook's own language. A line an earlier version
+        // appended to it is taken out.
+        if (at >= 0) await writeFile(path, lines.join('\n'))
+        foreign.push(name)
+        continue
+      }
+      // Right after the #! line (and the other folders' lines): an exit or
+      // exec further down would skip a line at the end.
+      let after = lines[0].startsWith('#!') ? 1 : 0
+      while (lines[after] === HOOK_MARKER && lines[after + 1] !== undefined) after += 2
+      if (at >= 0 && at <= after) after = at
+      const text = [...lines.slice(0, after), HOOK_MARKER, line, ...lines.slice(after)].join('\n')
+      if (text === old) continue
+      await writeFile(path, text.endsWith('\n') ? text : `${text}\n`)
       await chmod(path, 0o755)
-      written.push(name)
+      ;(at >= 0 ? updated : written).push(name)
     }
     const where = relative(io.cwd, hooksDir) || hooksDir
-    io.out(written.length ? `Added to ${written.join(', ')} in ${where}: ${line}`
-      : updated.length ? `Updated in ${updated.join(', ')} in ${where}: ${line}`
-        : 'The hooks already save the base; nothing changed.')
+    if (written.length) io.out(`Added to ${written.join(', ')} in ${where}: ${line}`)
+    if (updated.length) io.out(`Updated in ${updated.join(', ')} in ${where}: ${line}`)
+    if (foreign.length) {
+      io.err(`radical hooks: ${foreign.join(', ')} in ${where} ${foreign.length > 1 ? 'are' : 'is'} not a sh script, so no line was added. `
+        + `Make ${foreign.length > 1 ? 'each' : 'it'} run this sh command from the top of the repository, ignoring its exit status: `
+        + `${io.command ?? 'radical'} diff ${folderArg} --save-base --quiet`)
+      return 2
+    }
+    if (!written.length && !updated.length) io.out('The hooks already save the base; nothing changed.')
     return 0
   } catch (error) {
     io.err(`radical hooks: ${folder}: ${(error as Error).message}`)

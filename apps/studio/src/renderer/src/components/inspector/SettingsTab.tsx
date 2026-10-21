@@ -117,6 +117,8 @@ export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckR
     const result = check.rules.find((r) => r.id === key)
     const change = changeOf('rule', key)
     const folderRule = FOLDER_RULE_IDS.has(base)
+    // A rule that reads test reports found nothing because it did not run.
+    const notRun = !!result?.notRun || (!check.evidence && !!CHECK_RULES.find((r) => r.id === base)?.readsReports)
     return (
       <React.Fragment key={key}>
         <div className={`insp-set-row rule${change ? (change.loosens ? ' loose' : ' changed') : ''}`} data-rule={key}>
@@ -138,7 +140,7 @@ export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckR
           </span>
           <input type="number" min={0} className="insp-set-max" value={setting.max ?? ''} placeholder="—" disabled={disabled || severity === 'off'} aria-label={`Baseline of ${key}`}
             onChange={(e) => { const v = e.target.value; if (v === '') rule(key, { max: null }); else if (!Number.isNaN(Number(v))) rule(key, { max: Math.max(0, Math.round(Number(v))) }) }} />
-          <b className="insp-set-now" title={folderRule ? 'radical check counts these on the folder\'s files' : undefined}>{folderRule ? '—' : result?.count ?? 0}</b>
+          <b className="insp-set-now" title={folderRule ? 'radical check counts these on the folder\'s files' : undefined}>{folderRule ? '—' : notRun ? <span className="insp-muted">needs test results</span> : result?.count ?? 0}</b>
         </div>
         {change?.loosens && <div className="insp-set-warn">⚠ {looseText(change)}</div>}
       </React.Fragment>

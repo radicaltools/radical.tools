@@ -260,9 +260,9 @@ function RuleBlock({ r, check, ctx, list, focused }: { r: CheckRuleResult; check
   return (
     <div ref={ref} className={`insp-rule-block${focused ? ' focused' : ''}`} data-rule={r.id}>
       <div className="insp-rule-head">
-        <span className={`insp-sev ${r.failed ? 'error' : 'warning'}`}>{r.failed ? '✖' : findings.length ? '⚠' : '✓'}</span>
+        <span className={`insp-sev ${r.failed ? 'error' : 'warning'}`}>{r.failed ? '✖' : findings.length ? '⚠' : r.notRun ? '–' : '✓'}</span>
         <span><span className="insp-rid">{r.id}</span><span className="insp-rdesc">{RULE_INFO.get(r.id.split('/')[0]) ?? ''}</span></span>
-        <span className="insp-rcount">{r.count}{r.max !== undefined && <small> / max {r.max}</small>}</span>
+        <span className="insp-rcount">{r.notRun ? <span className="insp-muted">not run</span> : r.count}{r.max !== undefined && <small> / max {r.max}</small>}</span>
       </div>
       {findings.length > 0 && <RuleFindings list={findings} ctx={ctx} />}
     </div>

@@ -64,3 +64,40 @@ test('New model can keep the model in a file', async ({ page, studio }) => {
   await page.getByRole('button', { name: 'New model' }).click()
   await expect(page.getByRole('radio', { name: /In a file/ })).toBeChecked()
 })
+
+test('a model file that does not parse, or is gone, is named and left as it is', async ({ page, studio }) => {
+  // A trailing comma added by hand: after a reload the model opened with no
+  // elements and no word, and the file was rewritten empty. A file deleted
+  // outside Studio was made again, empty, the same way.
+  await page.goto('/')
+  await file.write(fixture('bookstore'))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'File…' }).click()
+  await studio.ready()
+  const saved = await file.read()
+  const broken = saved.replace(/\}\s*\]\s*,\s*"sequences"/, '},\n  ],\n  "sequences"')
+  expect(broken).not.toBe(saved)
+  await file.write(broken)
+
+  await page.reload()
+  const toasts = page.getByRole('region', { name: 'Notifications' })
+  await expect(toasts).toContainText('model.radical cannot be read (malformed JSON)')
+  await page.waitForTimeout(1500)
+  expect(await file.read()).toBe(broken)
+
+  // Fixed by hand and opened again from Recent: the model is back, and saved.
+  await file.write(saved)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.locator('.msteps-row').first().click()
+  await studio.ready()
+  await expect(studio.row('customer')).toBeVisible()
+
+  // Deleted outside Studio once its saves are done, then opened again.
+  await page.waitForTimeout(1500)
+  await file.remove()
+  await page.reload()
+  await expect(toasts).toContainText('model.radical cannot be read (it is not there')
+  await page.waitForTimeout(1500)
+  expect(await file.exists()).toBe(false)
+})

@@ -126,6 +126,18 @@ export class ModelFile {
     }, this.name)
   }
 
+  /** Delete the file as another program would. */
+  async remove(): Promise<void> {
+    await this.page.evaluate(async (name) => { await (await navigator.storage.getDirectory()).removeEntry(name) }, this.name)
+  }
+
+  /** Whether the file is there, without making it. */
+  async exists(): Promise<boolean> {
+    return this.page.evaluate(async (name) => {
+      try { await (await navigator.storage.getDirectory()).getFileHandle(name); return true } catch { return false }
+    }, this.name)
+  }
+
   /** Write the file as another program would. */
   async write(content: string): Promise<void> {
     await this.page.evaluate(async ([name, text]) => {

@@ -23,6 +23,11 @@ const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' 
 export function formatCheckText(result: CheckResult, options: FormatOptions): string {
   const lines = [`radical check: ${options.folder} (${plural(result.nodeCount, 'element')}, ${plural(result.relationCount, 'relation')})`, '']
   for (const rule of result.rules) {
+    if (rule.notRun) {
+      // Not ✓: it found nothing because it did not look.
+      if (rule.max !== undefined && rule.severity !== 'off') lines.push(`– ${rule.id}  not run: ${rule.notRun === 'no-report' ? 'no test report' : 'the folder is no model'} (max ${rule.max})`)
+      continue
+    }
     if (rule.severity === 'off' || rule.count === 0) {
       if (rule.max !== undefined && rule.severity !== 'off') lines.push(`✓ ${rule.id}  0 (max ${rule.max})`)
       continue

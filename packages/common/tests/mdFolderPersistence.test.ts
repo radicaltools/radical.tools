@@ -304,6 +304,21 @@ describe('a node file in a folder model', () => {
     expect(() => deserializeFromMdFolder(files)).toThrow(path)
   })
 
+  it('saved with a byte-order mark is still the element it was', () => {
+    // Notepad, PowerShell 5 and Visual Studio may save UTF-8 with a BOM. The
+    // browser drops it when it reads the file, Node does not: for the MCP
+    // server and \`radical check\` the element was gone, its relations
+    // dangled, and the agent's next write dropped its places.
+    const files = serializeToMdFolder(model(), 'model')
+    const path = Object.keys(files).find((p) => p.startsWith('nodes/') && files[p].includes('"API"'))!
+    files[path] = '\uFEFF' + files[path]
+    files['_layout.json'] = '\uFEFF' + files['_layout.json']
+    const api = deserializeFromMdFolder(files).data.nodes.find((n) => n.id === 'api')
+    expect(api?.label).toBe('API')
+    expect(api?.parentId).toBe('shop')
+    expect(staleMdFolderFiles(files, {})).toContain(path)
+  })
+
   it('that _layout.json does not know gets its type\'s size, not 0×0', () => {
     // A file written by hand or brought in by git: drawn and saved with no
     // size at all.

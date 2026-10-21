@@ -152,9 +152,13 @@ radical hooks install path/to/model
 
 Adds one marked line to the repository's `post-checkout`, `post-commit`,
 `post-merge` and `post-rewrite` hooks that runs `radical diff <folder> --save-base --quiet`, so
-the base Studio compares with follows the branch checked out. What the hooks
-already do stays, a second install adds nothing (or brings the line up to
-date when the CLI or node moved), and the line never fails the git command.
+the base Studio compares with follows the branch checked out. The line goes
+right after the hook's `#!` line, where an `exit` or `exec` further down
+cannot skip it; what the hooks already do stays. Each model folder of the
+repository has a line of its own, a second install adds nothing (or brings
+the line up to date when the CLI or node moved), and the line never fails
+the git command. A hook written in another language than sh (Python, say)
+is left as it is: the command exits 2 and says what to call from it.
 It runs the CLI that installed it, with the `node` on the PATH, else the one
 that installed it. In this repository `npm run hooks` builds the CLI,
 installs the hooks for `architecture/` and saves its base once.
@@ -203,7 +207,9 @@ rules by id, or one kind of metamodel issue by `metamodel/<code>`:
 With `max`, up to that many findings pass as warnings and one more fails the
 check, so an existing model can adopt a rule before every gap is closed.
 `--ratchet` lowers each `max` to the count found now and writes the config
-back; it never raises one.
+back; it never raises one. A rule that did not run keeps its `max`: the
+`test-*` rules without `--report` (the output marks them `–` and "not run"),
+every rule but the folder's when the folder is no model.
 
 ### Goals
 

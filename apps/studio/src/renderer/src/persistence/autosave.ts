@@ -517,6 +517,13 @@ if (typeof window !== 'undefined') {
 
   if (h.onFileChanged) {
     h.onFileChanged(({ content }) => {
+      // A file that could not be read is read again, now that it changed:
+      // until a read succeeds nothing is saved to it.
+      const activeId = documents.getActiveId()
+      if (activeId && documents.isUnreadable(activeId)) {
+        loadActive(activeId, 'fs')
+        return
+      }
       _suspended = true
       try {
         const data = JSON.parse(content) as DiagramData

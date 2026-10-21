@@ -54,6 +54,8 @@ export interface CheckRule {
   severity: CheckSeverity
   /** What it is about, for the Inspector's grouping. */
   dimension: CheckDimension
+  /** It reads the outcomes in test reports: without them it does not run. */
+  readsReports?: true
   run(model: CheckModel): RuleFinding[]
 }
 
@@ -271,6 +273,7 @@ export const CHECK_RULES: CheckRule[] = [
     description: 'With --report: every test a scenario or fitness function names passed.',
     severity: 'error',
     dimension: 'tests',
+    readsReports: true,
     run: testRule('failed', (node, id, model) => `${TYPE_NAME[node.type]} ${quote(node)}: test ${id} failed.${brokenWith(model, node)}`),
   },
   {
@@ -278,6 +281,7 @@ export const CHECK_RULES: CheckRule[] = [
     description: 'With --report: every test a scenario or fitness function names is in the report of its file (a renamed or deleted test is not).',
     severity: 'error',
     dimension: 'tests',
+    readsReports: true,
     run: testRule('not-found', (node, id, model) => `${TYPE_NAME[node.type]} ${quote(node)}: no test ${id} in the reports, though its file ran; renamed or deleted?${brokenWith(model, node)}`),
   },
   {
@@ -285,6 +289,7 @@ export const CHECK_RULES: CheckRule[] = [
     description: 'With --report: no test a scenario or fitness function names was skipped.',
     severity: 'warning',
     dimension: 'tests',
+    readsReports: true,
     run: testRule('skipped', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: test ${id} was skipped.`),
   },
   {
@@ -292,6 +297,7 @@ export const CHECK_RULES: CheckRule[] = [
     description: 'With --report: every file a scenario or fitness function names a test in is in the reports.',
     severity: 'warning',
     dimension: 'tests',
+    readsReports: true,
     run: testRule('not-run', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: no report has the file of test ${id}.`),
   },
   {
@@ -299,6 +305,7 @@ export const CHECK_RULES: CheckRule[] = [
     description: 'With --report and an include in check.json: every test in the files it includes is named by a scenario or a fitness function, by its title or its describe block (a whole file or directory does not count). One finding per test file.',
     severity: 'warning',
     dimension: 'tests',
+    readsReports: true,
     run: unboundTests,
   },
 ]
