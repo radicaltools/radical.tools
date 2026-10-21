@@ -79,9 +79,10 @@ test.describe('views panel', () => {
     await studio.seed()
   })
 
-  test('a whole-model view says it shows all nodes', async ({ page, studio }) => {
+  test('a whole-model view counts every element it shows', async ({ page, studio }) => {
     await studio.open('v-context')
-    await expect(page.locator('.lp-view-card').filter({ hasText: 'Element Table' })).toContainText('All nodes')
+    // It said "All nodes" where the other cards give a count (open point of runs 25–34).
+    await expect(page.locator('.lp-view-card').filter({ hasText: 'Element Table' })).toContainText('6 nodes')
     await expect(page.locator('.lp-view-card').filter({ hasText: 'System Context' })).toContainText('3 nodes')
   })
 
@@ -401,4 +402,17 @@ test('undoing a new view brings back the list of views, not its empty properties
   await page.keyboard.press('ControlOrMeta+z')
   await expect(page.locator('.left-panel .rp-slider.show-props')).toHaveCount(0)
   await expect(page.locator('.lp-view-card', { hasText: 'System Context' })).toBeVisible()
+})
+
+// Open point of runs 25 to 34: a blank view was named after the number of
+// views ("View 6" for the first); the manual says View 1, View 2…
+test('blank views are named View 1, View 2…', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-context')
+  for (const name of ['View 1', 'View 2']) {
+    await page.getByRole('button', { name: 'New view' }).click()
+    await page.getByRole('menuitem', { name: /Blank view/ }).click()
+    await expect(page.locator('.lp-view-card', { hasText: name })).toHaveCount(1)
+    await page.locator('.left-panel .rp-back-btn').click()
+  }
 })

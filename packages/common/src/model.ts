@@ -330,6 +330,20 @@ export function checkReparent(state: ModelState, ids: string[], newParentId: str
   return null
 }
 
+/** The elements the element `id` may be moved into, as the card's and the
+ *  wiki's Parent pickers offer them: those checkReparent takes (they listed
+ *  parents it then refused: a descendant, a final state, a group with no
+ *  place for it), and no external element, which the model leaves as a box
+ *  (but the one it is in now). */
+export function parentCandidates(state: ModelState, id: string): C4Node[] {
+  const node = state.c4Nodes[id]
+  if (!node) return []
+  return Object.values(state.c4Nodes).filter((n) => n.id !== id
+    && (n.id === node.parentId || !n.external)
+    && isParentAllowed(state.metamodel, node.type, n.type)
+    && (n.id === node.parentId || checkReparent(state, [id], n.id) === null))
+}
+
 /** Moves the nodes under `newParentId` (null = the root), keeping each one
  *  where it is on the canvas: positions are relative to the parent, so they
  *  are rebased onto the new parent's absolute position (the canvas shown

@@ -6,6 +6,7 @@ import {
   resolveEarsSubject,
   composeEarsSentence,
   requirementStatePhrase,
+  stateOfPhrase,
   parseEarsSentence,
   earsActionIsClause,
   refLabels,
@@ -42,6 +43,7 @@ import {
 } from '@radical/common/c4'
 import { wikiDepthOf, type ViewSort } from '@radical/common/c4'
 import { newElementFilters, pipelineOf, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
+import { parentCandidates as movableInto } from '@radical/common/model'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
@@ -1874,8 +1876,7 @@ function WikiElementPage({
   // read-only page (each chapter of Multi page went through the whole model).
   const parentCandidates = useMemo(
     () =>
-      embedded || readOnly ? [] : Object.values(nodes)
-        .filter((n) => n.id !== node.id && isPlacementAllowed(metamodel, node.type, n, nodes))
+      embedded || readOnly ? [] : movableInto({ c4Nodes: nodes, c4Relations: {}, views: {}, activeViewId: null, metamodel }, node.id)
         .sort((a, b) => a.label.localeCompare(b.label)),
     [nodes, node, metamodel, embedded, readOnly],
   )
@@ -2703,6 +2704,9 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, statePhrase, r
   // from it again, which is how its pattern changes ("When" to "While").
   const [rewriting, setRewriting] = useState(false)
   const [draft, setDraft] = useState('')
+  // The sentence the rewrite opened with: Enter on it unchanged writes
+  // nothing (it wrote the state's phrase over the precondition's text).
+  const [opened, setOpened] = useState('')
   const rewriteRef = useRef<HTMLTextAreaElement | null>(null)
   useLayoutEffect(() => {
     const el = rewriteRef.current
@@ -2714,19 +2718,23 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, statePhrase, r
   const rewrite = (): void => {
     const parsed = parseEarsSentence(draft, subjectProp)
     setRewriting(false)
-    if (!parsed.action) return
+    if (!parsed.action || draft.trim() === opened.trim()) return
     // Every part is set, the ones the new sentence has not are cleared. A
     // "While" rewritten to something else than the state's phrase no longer
-    // points at the state.
+    // points at the state; one rewritten to a state's phrase points at it
+    // (and keeps the precondition's own text, which the state stands for).
     const keepsState = !!statePhrase && (parsed.precondition ?? '').trim().toLowerCase() === statePhrase.toLowerCase()
+    const { c4Nodes, c4Relations } = useDiagramStore.getState()
+    const toState = !keepsState && parsed.precondition ? stateOfPhrase(parsed.precondition, c4Nodes, c4Relations) : undefined
+    const inState = keepsState || !!toState
     updateNode(nodeId, {
       ears_type: parsed.ears_type,
       action: parsed.action,
       trigger: parsed.trigger,
-      precondition: parsed.precondition,
+      precondition: inState ? node.precondition : parsed.precondition,
       unwanted_condition: parsed.unwanted_condition,
       feature: parsed.feature,
-      ...(statePhrase && !keepsState ? { precondition_state: undefined } : {}),
+      ...(toState ? { precondition_state: toState } : statePhrase && !keepsState ? { precondition_state: undefined } : {}),
     })
   }
 
@@ -2885,6 +2893,7 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, statePhrase, r
             const { sentence, complete } = composeEarsSentence(node, subjectProp, statePhrase)
             // A pattern with holes in it is no sentence to start from.
             setDraft(complete ? sentence : '')
+            setOpened(complete ? sentence : '')
             setRewriting(true)
           }}
         >

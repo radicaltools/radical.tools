@@ -85,6 +85,22 @@ export function requirementStatePhrase(requirement: C4Node, nodes: Record<string
   return entity ? `the ${entity.label} is ${state.label}` : `in ${state.label}`
 }
 
+/** The state whose phrase (requirementStatePhrase) `text` is, as a
+ *  requirement's precondition reads it: "the Order is Confirmed" or "in
+ *  Confirmed", any case. Undefined when no state, or more than one, reads so. */
+export function stateOfPhrase(text: string, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): string | undefined {
+  const wanted = text.trim().replace(/\s+/g, ' ').toLowerCase()
+  if (!wanted) return undefined
+  const found = Object.values(nodes).filter((n) => {
+    if (!isState(n)) return false
+    const machine = machineOf(n, nodes)
+    const entity = machine ? machineEntity(machine.id, nodes, relations) : undefined
+    const phrase = entity ? `the ${entity.label} is ${n.label}` : `in ${n.label}`
+    return phrase.replace(/\s+/g, ' ').toLowerCase() === wanted
+  })
+  return found.length === 1 ? found[0].id : undefined
+}
+
 // ─── Refusals ──────────────────────────────────────────────────────────────
 // What validateStateMachines would flag, refused before an edit makes it:
 // the model's check* functions (Studio and the MCP server) call these, so

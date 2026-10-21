@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkAddNode, checkAddRelation, checkRemoveNodeType, checkRemoveNodeTypeFromMetamodel, checkRemoveRelationType, checkRemoveRelationTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, patchNode, patchRelation, type ModelState } from '../src/model'
+import { checkAddNode, checkAddRelation, checkRemoveNodeType, checkRemoveNodeTypeFromMetamodel, checkRemoveRelationType, checkRemoveRelationTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, parentCandidates, patchNode, patchRelation, type ModelState } from '../src/model'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel } from '../src/metamodel'
 import { viewShowsEveryNode, type C4Node } from '../src/c4'
 
@@ -116,6 +116,20 @@ describe('the parent of an element', () => {
     s.c4Nodes.other = node('other', 'system')
     expect(checkNodeUpdate(s, 'inner', { parentId: 'other' })).toBeNull()
     expect(checkNodeUpdate(s, 'inner', { parentId: undefined })).toBeNull()
+  })
+
+  // Open points of runs 25–34 and 35–44: the card's Parent field listed
+  // parents a move then refused, and Edit facts offered external systems.
+  it('is offered only where a move takes it, and not in an external element', () => {
+    const s = nested()
+    s.c4Nodes.other = node('other', 'system')
+    s.c4Nodes.bank = { ...node('bank', 'system'), external: true } as C4Node
+    s.c4Nodes.api = { ...node('api', 'container'), parentId: 'inner' }
+    expect(parentCandidates(s, 'inner').map((n) => n.id).sort()).toEqual(['other', 'shop'])
+    expect(parentCandidates(s, 'api').map((n) => n.id).sort()).toEqual(['inner', 'innermost', 'other', 'shop'])
+    // The external element it is in already stays on the list.
+    s.c4Nodes.api.parentId = 'bank'
+    expect(parentCandidates(s, 'api').map((n) => n.id)).toContain('bank')
   })
 })
 

@@ -355,6 +355,18 @@ test('a hierarchy drilled into an element its filter then leaves out shows the t
   await expect(page.locator('.tm-bc-item').last()).toHaveText('Banking Services')
 })
 
+// Open point of runs 35 to 44: a hierarchy with a chain drew the ancestors
+// of its elements, which the filter does not give.
+test('a hierarchy with a chain draws only what the chain gives', async ({ page, studio }) => {
+  await studio.openSample('view-treemap')
+  await openFilter(page, 'Platform Hierarchy')
+  await page.locator('.rp-pipeline').getByRole('button', { name: '+ Start with' }).click()
+  await page.getByRole('menuitem', { name: /^Container/ }).click()
+  await expect(page.locator('.treemap-wrap rect[data-id="ctn-payments"]')).toBeAttached()
+  await expect(page.locator('.treemap-wrap rect[data-id="sys-core"]')).toHaveCount(0)
+  await expect(page.locator('.treemap-wrap rect[data-id="dom-banking"]')).toHaveCount(0)
+})
+
 test('every kind of view follows its chain, again when the chain or the model changes', async ({ page, studio }) => {
   await studio.openSample()
   await openFilter(page, 'Requirements Traceability')
@@ -389,7 +401,7 @@ test('every kind of view follows its chain, again when the chain or the model ch
   await expect(rowHead('Same signatory cannot approve twice')).toHaveCount(0)
   await studio.properties.getByRole('button', { name: 'Close properties' }).click()
 
-  // The hierarchy: the chain's elements in the containers they sit in.
+  // The hierarchy: the chain's elements, each in the one of them it lies in.
   await kind('Hierarchy')
   const tiles = page.locator('.treemap-wrap svg rect[data-id]')
   await expect(tiles.first()).toBeVisible()

@@ -110,3 +110,11 @@ test('the card is as wide as it was dragged, also after a reload', async ({ page
   await expect(studio.node('payments')).toHaveClass(/selected/)
   await expect.poll(async () => Math.round((await studio.properties.boundingBox())!.width)).toBe(Math.round(width + 100))
 })
+
+// Open points of runs 25 to 44: the card's Parent field listed parents a
+// move then refused, and external systems, which the model leaves a box.
+test('the card\'s Parent lists only where the element can go', async ({ studio }) => {
+  await studio.open('v-containers')
+  await studio.node('api').click()
+  await expect(studio.attribute('Parent').locator('option')).toHaveText(['—', 'Bookstore'])
+})

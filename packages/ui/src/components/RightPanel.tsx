@@ -15,7 +15,7 @@ import { viewShownNodes } from '@radical/common/viewPipeline'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
-import { isViewGroup, viewsOfGroup } from '@radical/common/model'
+import { isViewGroup, parentCandidates, viewsOfGroup } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
@@ -36,7 +36,9 @@ function useViewNodeCounts(views: Record<string, DiagramView>): Record<string, n
   const relations = useDiagramStore((s) => s.c4Relations)
   const count = useCallback(() => {
     const out: Record<string, number | undefined> = {}
-    for (const v of Object.values(views)) out[v.id] = viewShownNodes(v, nodes, relations)?.size
+    // A view that shows every element counts them too (it said "All nodes").
+    const all = Object.keys(nodes).length
+    for (const v of Object.values(views)) out[v.id] = viewShownNodes(v, nodes, relations)?.size ?? (viewShowsEveryNode(v) ? all : undefined)
     return out
   }, [views, nodes, relations])
   const [counts, setCounts] = useState(count)
@@ -60,6 +62,15 @@ function useBranchViewCounts(views: Record<string, DiagramView>): Record<string,
 function BranchCount({ n }: { n: number | undefined }): React.ReactElement | null {
   if (!n) return null
   return <span className="lp-branch-count" title={`${n} element${n === 1 ? '' : 's'} changed since the base`}>{n}</span>
+}
+
+/** A blank view's name: View 1, View 2…, the first one no view has (it
+ *  was "View" and the number of views plus one: View 6 for the first). */
+function blankViewName(views: DiagramView[]): string {
+  const taken = new Set(views.map((v) => v.name.trim()))
+  let n = 1
+  while (taken.has(`View ${n}`)) n++
+  return `View ${n}`
 }
 
 /** Views by name, as a group lists its views. */
@@ -1403,14 +1414,14 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
         <div className="lp-add-view" ref={newMenuRef}>
           <button className="lp-add-btn" aria-expanded={viewpoints.length ? newMenuOpen : undefined} onClick={() => {
             if (viewpoints.length) setNewMenuOpen((o) => !o)
-            else openNew(addView(`View ${viewList.length + 1}`, 'table'))
+            else openNew(addView(blankViewName(viewList), 'table'))
           }}>
             <Icon.Plus /> New view
           </button>
           {newMenuOpen && createPortal(
             <div className="lp-add-view-menu" role="menu" aria-label="New view" ref={newMenuPopRef} style={newMenuAt}>
               <div className="lp-add-view-head">New view</div>
-              <button className="lp-add-view-option" role="menuitem" onClick={() => openNew(addView(`View ${viewList.length + 1}`, 'table'))}>
+              <button className="lp-add-view-option" role="menuitem" onClick={() => openNew(addView(blankViewName(viewList), 'table'))}>
                 <span className="lp-add-view-icon"><Icon.Plus /></span>
                 <span className="lp-add-view-text">
                   <span className="lp-add-view-name">Blank view</span>
@@ -2348,8 +2359,9 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
                 <select className="pp-input pp-select" aria-label="Parent" value={node.parentId ?? ''} disabled={readOnly}
                   onChange={(e) => !readOnly && reparentNodes([node.id], e.target.value || null)}>
                   <option value="">—</option>
-                  {Object.values(c4Nodes)
-                    .filter((n) => n.id !== node.id && allowedParentTypes.includes(n.type))
+                  {/* Only the ones a move takes (it listed parents it then refused). */}
+                  {parentCandidates({ c4Nodes, c4Relations, views: {}, activeViewId: null, metamodel }, node.id)
+                    .filter((n) => allowedParentTypes.includes(n.type))
                     .map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
                 </select>
               </AttrRow>

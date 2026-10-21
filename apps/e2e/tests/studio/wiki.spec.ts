@@ -346,3 +346,35 @@ folderTest('wiki text opened before an agent\'s edit takes the edit, and leaving
   expect(Object.values(files).some((c) => c.includes('label: "Web App"'))).toBe(false)
   expect(Object.values(files).some((c) => c.includes('label: "Storefront"'))).toBe(true)
 })
+
+// Open points of runs 35 to 44 on rewriting a requirement's sentence: Enter
+// on it unchanged wrote the state's phrase over a precondition's own text,
+// and a sentence rewritten to a state's phrase did not point at the state.
+test('a requirement\'s sentence rewritten: unchanged it writes nothing, to a state\'s phrase it points at the state', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('order-machine'))
+  const req = (id: string, props: Record<string, unknown>) => ({ id, type: 'requirement', label: id, x: 0, y: 900, width: 240, height: 100, collapsed: false, ...props })
+  doc.nodes.push(
+    req('hold', { ears_type: 'state-driven', action: 'hold the stock', precondition: 'it is paid', precondition_state: 'confirmed' }),
+    req('ship', { ears_type: 'ubiquitous', action: 'ship the order' }),
+  )
+  doc.views.push({ id: 'v-wiki', name: 'Wiki', kind: 'wiki', nodeIds: [], positions: {} })
+  await studio.seedDocument(JSON.stringify(doc))
+  const stored = async (id: string) => (await studio.storedDoc()).nodes.find((n) => n.id === id) as unknown as Record<string, unknown>
+
+  await studio.open('v-wiki/f/hold')
+  await expect(page.locator('.ears-sentence')).toContainText('While the Order is Confirmed, the system shall hold the stock.')
+  await page.locator('.ears-sentence').hover()
+  await page.getByRole('button', { name: 'Rewrite the sentence' }).click()
+  await page.getByRole('textbox', { name: 'The requirement as one sentence' }).press('Enter')
+  await page.waitForTimeout(800)
+  expect(await stored('hold')).toMatchObject({ precondition: 'it is paid', precondition_state: 'confirmed' })
+
+  await studio.open('v-wiki/f/ship')
+  await page.locator('.ears-sentence').hover()
+  await page.getByRole('button', { name: 'Rewrite the sentence' }).click()
+  const sentence = page.getByRole('textbox', { name: 'The requirement as one sentence' })
+  await sentence.fill('While the Order is Confirmed, the system shall ship the order')
+  await sentence.press('Enter')
+  await expect.poll(async () => (await stored('ship')).precondition_state).toBe('confirmed')
+  await expect(page.locator('.ears-sentence [title="The state it points at (While in state)"]')).toHaveText('the Order is Confirmed')
+})
