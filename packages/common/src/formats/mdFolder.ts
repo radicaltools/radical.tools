@@ -220,8 +220,10 @@ function slugify(text: string, fallback: string): string {
     .normalize('NFKD')
     .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 60)
-  return slug || fallback
+  // 60 characters, not UTF-16 units: a cut through a character outside the
+  // BMP left half of it, which the disk writes as U+FFFD, and the next
+  // write took the file for a stale one and deleted it.
+  return [...slug].slice(0, 60).join('') || fallback
 }
 
 /** Allocate a unique slug within a directory (case-insensitive), appending
