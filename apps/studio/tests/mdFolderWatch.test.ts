@@ -158,6 +158,39 @@ describe('md-folder documents follow outside edits', () => {
     expect(labels(folder.model())).toEqual({ sys1: 'Payments hub', sys2: 'General ledger', sys3: 'Fraud' })
   })
 
+  it('lets a presentation play on through an outside edit, and reads the edit once it stops (item 136)', async () => {
+    const slide = (id: string) => ({ id, name: id, snapshotId: null, viewport: { x: 0, y: 0, zoom: 1 } })
+    const withDecks: DiagramData = {
+      ...SAMPLE,
+      presentations: [
+        { id: 'main', name: 'Main', slides: [slide('m1')] },
+        { id: 'agent', name: 'Agent deck', slides: [slide('a1'), slide('a2'), slide('a3')] },
+      ],
+    }
+    const folder = installFolderApi(serializeToMdFolder(withDecks, 'model'))
+    documents.createMdDocument('/tmp/model')
+    await settle()
+    const store = useDiagramStore.getState
+    store().setAppMode('designer')
+    store().setActivePresentation('agent')
+    store().startPresentation()
+    store().goToSlide(2)
+
+    folder.setDisk(serializeToMdFolder({ ...withDecks, nodes: [sys('sys1', 'Payments hub'), sys('sys2', 'Ledger')] }, 'model'))
+    folder.emit({ folderPath: '/tmp/model', paths: ['nodes/payments-hub/_index.md'] })
+    await settle()
+    expect(store().presentationActive).toBe(true)
+    expect(store().activePresentationId).toBe('agent')
+    expect(store().presentationSlideIndex).toBe(2)
+
+    store().stopPresentation()
+    await settle()
+    await settle()
+    expect(store().c4Nodes.sys1.label).toBe('Payments hub')
+    expect(store().activePresentationId).toBe('agent')
+    expect(store().presentationSlideIndex).toBe(2)
+  })
+
   it('keeps Undo after an outside edit: it takes back the user\'s edit, not the agent\'s', async () => {
     const folder = installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
     documents.createMdDocument('/tmp/model')

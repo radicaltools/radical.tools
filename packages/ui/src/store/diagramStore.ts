@@ -6244,10 +6244,14 @@ export const useDiagramStore = create<DiagramStore>()(
           // Studio shows the loaded model's branch changes again once it has them.
           if (state.branch) { state.branch = null; state.showDiff = false }
           state.presentations = presInit.presentations as any
-          state.activePresentationId = presInit.activeId
-          state.presentationSlides = presInit.presentations[0].slides as any
+          // The same document read again keeps the presentation picked and
+          // its slide (Presenter went back to the first presentation).
+          const keptPres = opts?.outsideChange ? presInit.presentations.find((p) => p.id === st.activePresentationId) : undefined
+          const pres = keptPres ?? presInit.presentations[0]
+          state.activePresentationId = pres.id
+          state.presentationSlides = pres.slides as any
           state.presentationActive = false
-          state.presentationSlideIndex = 0
+          state.presentationSlideIndex = keptPres ? Math.max(0, Math.min(st.presentationSlideIndex, pres.slides.length - 1)) : 0
           state.metamodel = model.documentMetamodel(data.metamodel, data.nodes) as any
           model.syncViewpoints(state as unknown as model.ModelState)
           state.hubTemplates = (data.hubTemplates ?? {}) as any
