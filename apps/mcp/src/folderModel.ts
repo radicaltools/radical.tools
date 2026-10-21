@@ -166,7 +166,8 @@ const depth = (node: C4Node, nodes: Record<string, C4Node>): number => {
  *  when you switch back to All elements, so stale entries would undo the
  *  change. A node moved into another parent keeps its place only where it
  *  lies inside it and clear of its new siblings; else it is placed beside
- *  them (settleMovedNodes). Mutates `after`. */
+ *  them (settleMovedNodes), and the rows and columns it stays in hold.
+ *  Mutates `after`. */
 function settleGeometry(before: DiagramData, after: DiagramData): void {
   const old = byId(before.nodes)
   const nodes = byId(after.nodes)
@@ -184,9 +185,19 @@ function settleGeometry(before: DiagramData, after: DiagramData): void {
   const canvas = modelCanvas(nodes)
   // Every child counts, as fitAncestors counts them.
   const fit = (id: string): void => fitShown(nodes, id, { shown: () => true })
-  settleMovedNodes(nodes, moved, canvas, fit)
+  // One moved under a folded container is measured as its expand opens it.
+  const foldsAbove = new Set(moved.flatMap((id) => {
+    const out: string[] = []
+    for (let p = nodes[id].parentId; p && nodes[p] && !out.includes(p); p = nodes[p].parentId) out.push(p)
+    return out
+  }))
+  const open = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, foldsAbove.has(id) ? { ...n, collapsed: false } : n]))
+  const opened = modelCanvas(open)
+  settleMovedNodes(nodes, moved, canvas, fit, { shown: opened.shown, boxOf: (n) => opened.boxOf(foldsAbove.has(n.id) ? { ...n, collapsed: false } : n) })
   for (const node of before.nodes) if (!nodes[node.id]) touch(node.parentId)
   for (const id of [...parents].sort((a, b) => depth(nodes[b], nodes) - depth(nodes[a], nodes))) growWithRoom(nodes, id, canvas, fit)
+  // A row or column a moved node stays in holds, as Studio draws it.
+  if (moved.length) applyAlignments(nodes, viewLayoutInput(undefined, nodes, byId(after.relations), after.defaultLayoutConstraints))
 
   if (!after.defaultPositions) return
   for (const node of after.nodes) {

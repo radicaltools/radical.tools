@@ -385,6 +385,64 @@ describe('get_changes', () => {
   })
 })
 
+describe('move_node into a folded container', () => {
+  it('places what lies outside it inside, beside what it holds (item 238)', async () => {
+    // S1 lies left of S2, which the model folds: its place, rebased onto
+    // S2, is outside S2's frame. Not drawn while S2 is folded, it kept it,
+    // and S2's expand drew it there, outside its parent.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = [
+      { id: 's1', type: 'system', label: 'S1', x: 0, y: 400, width: 300, height: 180, collapsed: false },
+      { id: 's2', type: 'system', label: 'S2', x: 400, y: 0, width: 600, height: 330, collapsed: true },
+      { id: 'q0', type: 'container', label: 'Q0', parentId: 's2', x: 30, y: 120, width: 240, height: 150, collapsed: false },
+      { id: 'q1', type: 'container', label: 'Q1', parentId: 's2', x: 330, y: 120, width: 240, height: 150, collapsed: false },
+    ] as never
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    expect((await model.call('move_node', { id: 's1', parentId: 's2' })).ok).toBe(true)
+    const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const [s1, s2, q0, q1] = ['s1', 's2', 'q0', 'q1'].map((id) => saved.nodes.find((n) => n.id === id)!)
+    expect(s1.parentId).toBe('s2')
+    expect(s1.x).toBeGreaterThanOrEqual(0)
+    expect(s1.y).toBeGreaterThanOrEqual(0)
+    const overlap = (a: C4Node, b: C4Node) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+    expect(overlap(s1, q0) || overlap(s1, q1)).toBe(false)
+    // Folded, S2 keeps its place and its size; its expand fits it.
+    expect(s2).toMatchObject({ x: 400, y: 0, collapsed: true })
+  })
+
+  it('holds a row the moved element stays in, as Studio draws it (item 239)', async () => {
+    // A row [S1, S3] on All elements: S1 moved into S2 stays in it (S3 is
+    // none of its ancestors). Not held in the file, Studio held it on
+    // opening the model and moved six elements, the file unchanged.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = [
+      { id: 's1', type: 'system', label: 'S1', x: 0, y: 400, width: 300, height: 180, collapsed: false },
+      { id: 's2', type: 'system', label: 'S2', x: 400, y: 0, width: 600, height: 330, collapsed: false },
+      { id: 'q0', type: 'container', label: 'Q0', parentId: 's2', x: 30, y: 120, width: 240, height: 150, collapsed: false },
+      { id: 'q1', type: 'container', label: 'Q1', parentId: 's2', x: 330, y: 120, width: 240, height: 150, collapsed: false },
+      { id: 's3', type: 'system', label: 'S3', x: 1100, y: 400, width: 300, height: 180, collapsed: false },
+    ] as never
+    data.defaultLayoutConstraints = [{ id: 'row', type: 'align', axis: 'horizontal', nodeIds: ['s1', 's3'] }]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    expect((await model.call('move_node', { id: 's1', parentId: 's2' })).ok).toBe(true)
+    const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const at = Object.fromEntries(saved.nodes.map((n) => [n.id, n]))
+    expect(at.s1.parentId).toBe('s2')
+    expect(saved.defaultLayoutConstraints).toEqual([expect.objectContaining({ nodeIds: ['s1', 's3'] })])
+    expect(at.s2.y + at.s1.y + at.s1.height / 2).toBeCloseTo(at.s3.y + at.s3.height / 2, 0)
+  })
+})
+
 describe('warnier', () => {
   it('an agent writes a process with its steps and a Warnier view of it', async () => {
     const folder = await fixture()
