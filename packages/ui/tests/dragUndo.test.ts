@@ -63,6 +63,32 @@ describe('A drag as an undo step', () => {
     expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual([])
   })
 
+  it('held across a step that lands meanwhile (Smart Layout\'s result) gives back no mid-drag state (item 220)', async () => {
+    const move = (id: string, to: { x: number; y: number }) =>
+      useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, [id]: { ...st.c4Nodes[id], ...to } } }))
+    s().liveGrab('a', 0, 0, 'calm', { x: 0, y: 0 })
+    move('a', { x: 100, y: 50 })
+    // As runSmartLayout applies its result: a step, then the new layout.
+    s()._pushUndo()
+    move('b', { x: 900, y: 300 })
+    move('a', { x: 40, y: 400 })
+    await Promise.resolve()
+    move('a', { x: 300, y: 500 })
+    s().liveRelease('a', [], true)
+
+    s().undo()
+    expect(at('a')).toEqual({ x: 40, y: 400 })
+    expect(at('b')).toEqual({ x: 900, y: 300 })
+    s().undo()
+    expect(at('a')).toEqual({ x: 0, y: 0 })
+    expect(at('b')).toEqual({ x: 600, y: 0 })
+    expect(s().canUndo).toBe(false)
+    s().redo()
+    expect(at('a')).toEqual({ x: 40, y: 400 })
+    s().redo()
+    expect(at('a')).toEqual({ x: 300, y: 500 })
+  })
+
   it('is no step in Viewer, where nothing that is moved is kept', () => {
     s().setAppMode('viewer')
     drag('a', { x: 300, y: 200 })

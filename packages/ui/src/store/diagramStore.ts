@@ -468,6 +468,16 @@ function _pushUndo(state: DiagramStore): void {
   // Undo belongs to Designer. What is collapsed or laid out in Viewer or
   // Presenter is put back on the way out and is no step of Designer's.
   if (state.appMode === 'viewer' || state.appMode === 'presenter' || state.appMode === 'inspector') return
+  // A step that lands while a drag is held (Smart Layout's result) starts
+  // from where the drag began: the model halfway through a drag is none to
+  // go back to (Undo gave a mid-drag state never seen). The drag's own step
+  // starts from what that step made, once it is made.
+  const held = _beforeDrag
+  if (held) {
+    _pushUndoEntry(held)
+    queueMicrotask(() => { if (_beforeDrag === held) _beforeDrag = _captureState(useDiagramStore.getState()) })
+    return
+  }
   _pushUndoEntry(_captureState(state))
 }
 
