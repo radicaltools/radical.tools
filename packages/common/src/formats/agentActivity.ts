@@ -55,9 +55,13 @@ export function parseAgentActivity(text: string | null | undefined): AgentActivi
 
 /** Until when an agent writes the folder, per its activity file; 0 when it
  *  does not (no file, a file that does not read, a mark that has passed). A
- *  mark further ahead than one period (a clock that jumped) is cut to one. */
-export function agentWritingUntil(text: string | null | undefined, now = Date.now()): number {
+ *  mark further ahead than one period (a clock that jumped, a server whose
+ *  clock runs ahead) is cut to one period after `seenAt`, when the reader
+ *  first saw this mark. Cut to one from each check, it renewed itself, and
+ *  held Studio's saves as long as the mark said (item 237). */
+export function agentWritingUntil(text: string | null | undefined, now = Date.now(), seenAt = now): number {
   const activity = parseAgentActivity(text)
   if (!activity || activity.until <= now) return 0
-  return Math.min(activity.until, now + AGENT_ACTIVE_MS)
+  const until = Math.min(activity.until, seenAt + AGENT_ACTIVE_MS)
+  return until > now ? until : 0
 }
