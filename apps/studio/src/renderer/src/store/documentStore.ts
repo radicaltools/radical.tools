@@ -255,10 +255,22 @@ function fileUnreadable(id: string, file: string, reason: string): never {
 /** The model in a folder's files, remembered as what document `id` was
  *  loaded from. Null when the files hold no model that can be read; a file
  *  that is there but does not parse is a DocumentUnreadableError. */
+/** Folder models renamed in Studio whose radical.md has the old name until
+ *  the write of the new one: a read meanwhile keeps the new name. */
+const renamedFolders = new Set<string>()
+
 function readFolderModel(id: string, files: FolderFiles): DiagramData | null {
   try {
-    const { data } = deserializeFromMdFolder(files)
+    const { data, name } = deserializeFromMdFolder(files)
     unreadable.delete(id)
+    // The model is named as its radical.md says: named after the folder,
+    // the next save rewrote radical.md's name (opening a view did).
+    const idx = readIndex()
+    const meta = idx.docs.find((d) => d.id === id)
+    if (name && meta && meta.name !== name && !renamedFolders.has(id)) {
+      meta.name = name
+      if (writeIndex(idx)) notify()
+    }
     return data
   } catch (e) {
     if (!(e instanceof MalformedFolderFileError)) return null
@@ -389,13 +401,14 @@ async function pickAndWriteFolder(
   data: DiagramData,
   fallbackName: string,
   confirmForeign?: (folderName: string) => boolean | Promise<boolean>,
+  modelName?: string,
 ): Promise<WrittenFolder | null> {
   const h = host()
   // ── Electron: pick a destination folder, write via IPC. ──
   if (h.pickFolder && h.writeFolder) {
     const picked = await h.pickFolder()
     if (!picked.success || !picked.folderPath) return null
-    const name = defaultNameFromFolder(picked.folderPath)
+    const name = modelName ?? defaultNameFromFolder(picked.folderPath)
     const present = h.readFolder ? await h.readFolder(picked.folderPath) : null
     if (present?.success && present.files && !(await mayWriteInto(present.files, name, confirmForeign))) {
       return null
@@ -412,7 +425,7 @@ async function pickAndWriteFolder(
   if (webFolderSupported()) {
     const handle = await pickWebDirectory()
     if (!handle) return null
-    const name = handle.name || fallbackName
+    const name = modelName ?? (handle.name || fallbackName)
     const session = new MdFolderSession(handleFolderStorage(handle))
     try {
       if (!(await mayWriteInto(await session.readAll(), name, confirmForeign))) return null
@@ -951,6 +964,14 @@ export const documents: DocumentsAPI = {
     // Refused by full storage, the rename did nothing and said nothing.
     if (!writeIndex(idx)) throw new StorageFullError()
     notify()
+    // A folder model's name is in its radical.md: written now, not at the
+    // next save. The model is written as the folder has it, with the name.
+    if (meta.source === 'md') {
+      renamedFolders.add(id)
+      void this.loadDocument(id).then((data) => { if (data) return enqueueSave(id, data) }).catch((e) => {
+        console.warn('[documentStore] could not write the new name into radical.md:', e)
+      }).finally(() => renamedFolders.delete(id))
+    }
   },
 
   deleteDocument(id, opts) {
@@ -1173,7 +1194,8 @@ export const documents: DocumentsAPI = {
   async saveAsFolder(id, data, confirmForeignFolder) {
     const current = readIndex().docs.find((d) => d.id === id)
     if (!current) return null
-    const written = await pickAndWriteFolder(data, current.name, confirmForeignFolder)
+    // A model moved keeps its name; it was renamed after the folder.
+    const written = await pickAndWriteFolder(data, current.name, confirmForeignFolder, current.name)
     if (!written) return null
     const idx = readIndex()
     const meta = idx.docs.find((d) => d.id === id)

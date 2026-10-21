@@ -382,6 +382,8 @@ function writeJsonIfPresent<T>(
 
 export interface DeserializeMdFolderResult {
   data: DiagramData
+  /** The model's name in `radical.md`, where it has one. */
+  name?: string
 }
 
 export function deserializeFromMdFolder(
@@ -472,7 +474,8 @@ export function deserializeFromMdFolder(
   if (layout.defaultLayoutConstraints?.length) data.defaultLayoutConstraints = layout.defaultLayoutConstraints
   if (layout.defaultEdgeStyle === 'orthogonal') data.defaultEdgeStyle = layout.defaultEdgeStyle
 
-  return { data }
+  const manifest = typeof files[MD_MANIFEST_FILE] === 'string' ? parseMarkdown(files[MD_MANIFEST_FILE]).front.name : undefined
+  return { data, ...(typeof manifest === 'string' && manifest.trim() ? { name: manifest.trim() } : {}) }
 }
 
 /** True when the file map looks like a Radical md-folder (has the manifest). */
