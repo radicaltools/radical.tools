@@ -206,6 +206,25 @@ describe('mergeModels: order and id lists', () => {
     }
   })
 
+  it('puts a view the other side filed into a folder one side renamed into the renamed folder', () => {
+    // The old folder came back with only that view.
+    const b = withViews([
+      { id: 'a', name: 'A', folder: 'C4', nodeIds: [], positions: {} },
+      { id: 'b', name: 'B', folder: 'C4/Deep', nodeIds: [], positions: {} },
+      { id: 'c', name: 'C', nodeIds: [], positions: {} },
+    ])
+    const renamed = clone(b)
+    renamed.views![0].folder = 'Structure'
+    renamed.views![1].folder = 'Structure/Deep'
+    const filed = clone(b)
+    filed.views![2].folder = 'C4/Deep'
+    filed.views!.push({ id: 'd', name: 'D', folder: 'C4', nodeIds: [], positions: {} })
+    for (const [o, t] of [[renamed, filed], [filed, renamed]]) {
+      const { merged } = mergeModels(b, o, t)
+      expect(Object.fromEntries(merged.views!.map((v) => [v.id, v.folder]))).toEqual({ a: 'Structure', b: 'Structure/Deep', c: 'Structure/Deep', d: 'Structure' })
+    }
+  })
+
   it('merges the viewpoints, allowed parents and enum options each side removed as sets', () => {
     const mm = (removedViewpoints: string[] | undefined, allowedParents: string[], options: string[]) => ({
       ...clone(base),

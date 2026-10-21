@@ -372,6 +372,7 @@ export function mergeModels(base: DiagramData, ours: DiagramData, theirs: Diagra
   const ctx: Ctx = { conflicts: [], dropped: [] }
   const merged = merge3(base, ours, theirs, [], ctx, false) as DiagramData
   const restored = opts?.keepParents === false ? [] : restoreParents(merged, ours, theirs)
+  followFolderRenames(merged, base, ours, theirs)
   const dropped = ctx.dropped.filter((d, i) => !restored.includes(d.name) && ctx.dropped.findIndex((e) => e.name === d.name && e.by === d.by) === i)
   return { merged, conflicts: [...new Set(ctx.conflicts)], dropped, restored }
 }
@@ -384,6 +385,38 @@ export function mergeNotices(result: { dropped?: MergeDrop[]; restored?: string[
     ...(result.dropped ?? []).map((d) => `${d.name} was deleted ${where[other(d.by)]}; the change made to it ${where[d.by]} was dropped`),
     ...(result.restored ?? []).map((name) => `${name}, deleted on one side, came back with its relations: an element was put into it on the other`),
   ]
+}
+
+/** View folders one side renamed (every view of the folder, and of those
+ *  in it, moved to another path), followed in `merged` (in place) by the
+ *  views the other side filed under the old path: the old folder came back
+ *  with only those. */
+function followFolderRenames(merged: DiagramData, base: DiagramData, ours: DiagramData, theirs: DiagramData): void {
+  const path = (folder: string | undefined) => (folder ?? '').split('/').map((p) => p.trim()).filter(Boolean)
+  const under = (folder: string[], prefix: string[]) => prefix.length > 0 && prefix.every((p, i) => folder[i] === p)
+  const renames = new Map<string, string[]>()
+  for (const side of [ours, theirs]) {
+    const now = new Map((side.views ?? []).map((v) => [v.id, path(v.folder)]))
+    for (const view of base.views ?? []) {
+      const from = path(view.folder)
+      const to = now.get(view.id)
+      if (!to || !from.length || from.join('/') === to.join('/')) continue
+      // The folder renamed: the path less the segments both end in.
+      const f = [...from], t = [...to]
+      while (f.length > 1 && t.length > 1 && f[f.length - 1] === t[t.length - 1]) { f.pop(); t.pop() }
+      if ([...now.values()].some((folder) => under(folder, f))) continue
+      const key = f.join('/')
+      if (renames.has(key) && renames.get(key)!.join('/') !== t.join('/')) renames.set(key, f) // two renames: none
+      else renames.set(key, t)
+    }
+  }
+  const prefixes = [...renames].filter(([from, to]) => from !== to.join('/')).sort((a, b) => b[0].length - a[0].length)
+  if (!prefixes.length) return
+  merged.views = merged.views?.map((view) => {
+    const folder = path(view.folder)
+    const hit = prefixes.find(([from]) => under(folder, from.split('/')))
+    return hit ? { ...view, folder: [...hit[1], ...folder.slice(hit[0].split('/').length)].join('/') } : view
+  })
 }
 
 /** Containers one side deleted while the other put an element into them,
