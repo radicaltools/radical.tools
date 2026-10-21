@@ -399,18 +399,18 @@ label.app-menu-row { cursor: pointer; }
 }
 .pres-icon-btn svg { width: 14px; height: 14px; }
 .pres-icon-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
-/* Snapshot picker */
+/* A slide card's Link milestone / Link view picker: on the page, placed
+   above its button (PresentationBar's DockPicker), not clipped by the dock */
 .pres-snap-picker {
-  position: absolute;
-  bottom: calc(100% + 4px);
-  right: 0;
+  position: fixed;
   z-index: 500;
   background: var(--bg-toolbar);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.22);
   min-width: 160px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .pres-snap-picker-title {
   padding: 6px 10px 4px;

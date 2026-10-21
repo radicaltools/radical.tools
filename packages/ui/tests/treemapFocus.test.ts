@@ -51,3 +51,36 @@ describe('a slide added on a hierarchy view drilled into an element', () => {
     expect(s().views.tree.treemapFocusId ?? null).toBeNull()
   })
 })
+
+describe('a slide added on a wiki page', () => {
+  // The slide kept no page: shown or played, it showed the page the view
+  // was on then (the Overview after a reload).
+  it('keeps the page and its page mode, and shows them over the view\'s own', () => {
+    const m = model()
+    s().loadDiagram({ ...m, views: [...(m.views ?? []), { id: 'wiki', name: 'Wiki', kind: 'wiki', nodeIds: [], positions: {} }] })
+    const presId = s().addPresentation('Deck')
+    s().setActivePresentation(presId)
+    s().setActiveView('wiki')
+    s().setWikiFocus('wiki', 'api')
+    s().setWikiPageMode('wiki', 'multi')
+    s().addPresentationSlide('The API')
+    s().setWikiFocus('wiki', null)
+    s().setWikiPageMode('wiki', 'single')
+    const slide = s().presentationSlides[s().presentationSlides.length - 1]
+    expect(slide.wikiFocusId).toBe('api')
+    expect(slide.wikiPageMode).toBe('multi')
+    // Its card in Presenter.
+    s().setAppMode('presenter')
+    s().previewSlide(s().presentationSlides.length - 1)
+    expect(s().slideWikiPage).toEqual({ viewId: 'wiki', focusId: 'api', pageMode: 'multi' })
+    // Played.
+    s().startPresentation()
+    s().goToSlide(s().presentationSlides.length - 1)
+    expect(s().slideWikiPage).toEqual({ viewId: 'wiki', focusId: 'api', pageMode: 'multi' })
+    s().stopPresentation()
+    expect(s().slideWikiPage).toBeNull()
+    s().setAppMode('designer')
+    expect(s().views.wiki.wikiFocusId ?? null).toBeNull()
+    expect(s().views.wiki.wikiPageMode).toBe('single')
+  })
+})

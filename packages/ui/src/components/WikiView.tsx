@@ -369,8 +369,26 @@ export function WikiView(): React.ReactElement {
   const typeMeta = useTypeMeta()
 
   const view = activeViewId ? views[activeViewId] : null
-  const focusId = view?.wikiFocusId ?? null
-  const pageMode = view?.wikiPageMode ?? 'single'
+  // A slide shows the page it was added on, over the view's own; reading
+  // on from it goes on from that page, in the view.
+  const slidePage = useDiagramStore((s) => s.slideWikiPage)
+  const shownSlide = view && slidePage?.viewId === view.id ? slidePage : null
+  const focusId = shownSlide ? shownSlide.focusId : view?.wikiFocusId ?? null
+  const pageMode = shownSlide ? shownSlide.pageMode : view?.wikiPageMode ?? 'single'
+  /** The slide's page becomes the view's, before the view moves on. */
+  const leaveSlidePage = () => {
+    const { slideWikiPage: page, views: now } = useDiagramStore.getState()
+    const own = page ? now[page.viewId] : undefined
+    if (!page || !own || page.viewId !== view?.id) return
+    useDiagramStore.setState({ slideWikiPage: null })
+    if ((own.wikiFocusId ?? null) !== page.focusId) setWikiFocus(own.id, page.focusId)
+    if ((own.wikiPageMode ?? 'single') !== page.pageMode) setWikiPageMode(own.id, page.pageMode)
+  }
+  const changePageMode = (mode: 'single' | 'multi') => {
+    if (!view) return
+    leaveSlidePage()
+    setWikiPageMode(view.id, mode)
+  }
 
   const [filter, setFilter] = useState('')
 
@@ -390,7 +408,9 @@ export function WikiView(): React.ReactElement {
   const focus = focusNode && (!shownSet || shownSet.has(focusNode.id)) ? focusNode : null
 
   const goTo = (id: string | null) => {
-    if (view) setWikiFocus(view.id, id)
+    if (!view) return
+    leaveSlidePage()
+    setWikiFocus(view.id, id)
   }
 
   const typeOrder = useMemo(() => allNodeTypeIds(metamodel), [metamodel])
@@ -620,14 +640,14 @@ export function WikiView(): React.ReactElement {
         <div className="wiki-page-mode-toggle">
           <button
             className={pageMode === 'single' ? 'active' : ''}
-            onClick={() => view && setWikiPageMode(view.id, 'single')}
+            onClick={() => changePageMode('single')}
             title="One element per page: its children are named and linked"
           >
             Single page
           </button>
           <button
             className={pageMode === 'multi' ? 'active' : ''}
-            onClick={() => view && setWikiPageMode(view.id, 'multi')}
+            onClick={() => changePageMode('multi')}
             title="One article: the children are chapters of this page"
           >
             Multi page

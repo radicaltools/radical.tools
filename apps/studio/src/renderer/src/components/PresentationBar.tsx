@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { DiagramView, PresentationSlide } from '@radical/common/c4'
 import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
@@ -59,19 +60,46 @@ const IconView = () => (
   </svg>
 )
 
-// ── Snapshot picker dropdown ──────────────────────────────────────────────────
+// ── Picker dropdowns ──────────────────────────────────────────────────────────
 
-function SnapPicker({ currentId, onPick, onClose }: {
+/**
+ * A slide card's picker, above its button. Put on the page itself: inside
+ * the dock, whose track scrolls sideways, it was clipped to the card's
+ * height, only its last item showed and a click on the others reached the
+ * canvas. Scrolls when it is taller than the room above the button.
+ */
+function DockPicker({ anchor, pickerRef, children }: {
+  anchor: RefObject<HTMLElement | null>
+  pickerRef: RefObject<HTMLDivElement>
+  children: React.ReactNode
+}) {
+  const box = anchor.current?.getBoundingClientRect()
+  const style: React.CSSProperties | undefined = box && {
+    bottom: window.innerHeight - box.top + 4,
+    right: window.innerWidth - box.right,
+    maxHeight: Math.max(120, box.top - 8),
+  }
+  return createPortal(
+    <div ref={pickerRef} className="pres-snap-picker" style={style}
+      onClick={e => e.stopPropagation()}>
+      {children}
+    </div>,
+    document.body,
+  )
+}
+
+function SnapPicker({ anchor, currentId, onPick, onClose }: {
+  anchor: RefObject<HTMLElement | null>
   currentId: string | null
   onPick: (id: string | null) => void
   onClose: () => void
 }) {
   const snapshots = useDiagramStore(s => s.snapshots)
   const ref = useRef<HTMLDivElement>(null)
-  useOutsideClick([ref], true, onClose)
+  useOutsideClick([ref, anchor], true, onClose)
 
   return (
-    <div ref={ref} className="pres-snap-picker">
+    <DockPicker anchor={anchor} pickerRef={ref}>
       <div className="pres-snap-picker-title">Link milestone</div>
       <button className={`pres-snap-item${currentId === null ? ' active' : ''}`}
         onClick={() => { onPick(null); onClose() }}>
@@ -87,13 +115,12 @@ function SnapPicker({ currentId, onPick, onClose }: {
           {s.name}
         </button>
       ))}
-    </div>
+    </DockPicker>
   )
 }
 
-// ── View picker dropdown ──────────────────────────────────────────────────────
-
-function ViewPicker({ currentId, views, onPick, onClose }: {
+function ViewPicker({ anchor, currentId, views, onPick, onClose }: {
+  anchor: RefObject<HTMLElement | null>
   currentId: string | null | undefined
   views: Record<string, DiagramView>
   onPick: (id: string | null) => void
@@ -101,10 +128,10 @@ function ViewPicker({ currentId, views, onPick, onClose }: {
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const viewList = Object.values(views)
-  useOutsideClick([ref], true, onClose)
+  useOutsideClick([ref, anchor], true, onClose)
 
   return (
-    <div ref={ref} className="pres-snap-picker">
+    <DockPicker anchor={anchor} pickerRef={ref}>
       <div className="pres-snap-picker-title">Link view</div>
       <button className={`pres-snap-item${!currentId ? ' active' : ''}`}
         onClick={() => { onPick(null); onClose() }}>
@@ -120,7 +147,7 @@ function ViewPicker({ currentId, views, onPick, onClose }: {
           {v.name}
         </button>
       ))}
-    </div>
+    </DockPicker>
   )
 }
 
@@ -145,6 +172,8 @@ function SlideCard({ slide, index, isActive, snapshotNames, viewNames, views, on
   const [snapPickerOpen, setSnapPickerOpen] = useState(false)
   const [viewPickerOpen, setViewPickerOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const snapButtonRef = useRef<HTMLButtonElement>(null)
+  const viewButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => { setDraftName(slide.name) }, [slide.name])
   useEffect(() => { if (editing) inputRef.current?.select() }, [editing])
@@ -191,26 +220,22 @@ function SlideCard({ slide, index, isActive, snapshotNames, viewNames, views, on
         <button className="pres-icon-btn" title="Capture canvas state (positions, zoom, expanded/collapsed)" onClick={onCapture}>
           <IconCapture />
         </button>
-        <div style={{ position: 'relative' }}>
-          <button className={`pres-icon-btn${slide.snapshotId ? ' linked' : ''}`}
-            title="Link milestone" onClick={() => setSnapPickerOpen(v => !v)}>
-            <IconLink />
-          </button>
-          {snapPickerOpen && (
-            <SnapPicker currentId={slide.snapshotId} onPick={onLinkSnapshot}
-              onClose={() => setSnapPickerOpen(false)} />
-          )}
-        </div>
-        <div style={{ position: 'relative' }}>
-          <button className={`pres-icon-btn${slide.viewId ? ' linked' : ''}`}
-            title="Link view" onClick={() => setViewPickerOpen(v => !v)}>
-            <IconView />
-          </button>
-          {viewPickerOpen && (
-            <ViewPicker currentId={slide.viewId} views={views} onPick={onLinkView}
-              onClose={() => setViewPickerOpen(false)} />
-          )}
-        </div>
+        <button ref={snapButtonRef} className={`pres-icon-btn${slide.snapshotId ? ' linked' : ''}`}
+          title="Link milestone" onClick={() => setSnapPickerOpen(v => !v)}>
+          <IconLink />
+        </button>
+        {snapPickerOpen && (
+          <SnapPicker anchor={snapButtonRef} currentId={slide.snapshotId} onPick={onLinkSnapshot}
+            onClose={() => setSnapPickerOpen(false)} />
+        )}
+        <button ref={viewButtonRef} className={`pres-icon-btn${slide.viewId ? ' linked' : ''}`}
+          title="Link view" onClick={() => setViewPickerOpen(v => !v)}>
+          <IconView />
+        </button>
+        {viewPickerOpen && (
+          <ViewPicker anchor={viewButtonRef} currentId={slide.viewId} views={views} onPick={onLinkView}
+            onClose={() => setViewPickerOpen(false)} />
+        )}
         <button className="pres-icon-btn danger" title="Delete slide" onClick={onDelete}>
           <IconDelete />
         </button>

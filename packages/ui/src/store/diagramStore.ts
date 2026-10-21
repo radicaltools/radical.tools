@@ -568,6 +568,48 @@ function firstCanvasPositions(
   return milestoneAllPositions ?? defaultPositions
 }
 
+/** The page a slide of a wiki view shows: the element whose page it is
+ *  (null: the Overview) and the page mode. */
+export interface SlideWikiPage { viewId: string; focusId: string | null; pageMode: 'single' | 'multi' }
+
+/** The page wiki view `view` shows: a slide's while one is shown, else the
+ *  view's own. */
+function shownWikiPage(state: { slideWikiPage: SlideWikiPage | null }, view: DiagramView): SlideWikiPage {
+  const slide = state.slideWikiPage
+  if (slide && slide.viewId === view.id) return slide
+  return { viewId: view.id, focusId: view.wikiFocusId ?? null, pageMode: view.wikiPageMode ?? 'single' }
+}
+
+/** What a slide shows of its wiki view, when it keeps a page (a slide added
+ *  on one): shown over the view's own page, which it leaves as it is. */
+function slideWikiPageOf(slide: PresentationSlide, viewId: string | null): SlideWikiPage | null {
+  if (!viewId || slide.wikiFocusId === undefined) return null
+  return { viewId, focusId: slide.wikiFocusId ?? null, pageMode: slide.wikiPageMode ?? 'single' }
+}
+
+/**
+ * Puts the layout of view `viewId` onto the nodes of a slide with no
+ * captured canvas, as setActiveView loads it: its own positions, or, never
+ * laid out, All elements' (the slide's own model's, for a slide of a
+ * milestone), with the elements it has no place for placed in their parent.
+ * Applied only when it had some, a view never laid out was drawn at the
+ * places the slide before left, its elements over each other and outside
+ * their containers. Mutates `state` (inside immer set); returns the ids
+ * placed, for the live layout.
+ */
+function showSlideView(
+  state: DiagramStore,
+  viewId: string,
+  shown: { nodes: Record<string, C4Node> } | undefined,
+): string[] {
+  const view = state.views[viewId] as DiagramView | undefined
+  if (!view) return []
+  const positions = firstCanvasPositions(view, state.defaultPositions as Record<string, NodePosition>, shown ? snapshotPositions(shown.nodes) : null)
+    ?? view.positions as Record<string, NodePosition>
+  if (!Object.keys(positions ?? {}).length) return []
+  return showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions, view, state.c4Relations as Record<string, C4Relation>)
+}
+
 /**
  * The nodes of a saved document as All elements has them. A document is
  * saved with its nodes where the canvas shown at that moment had them (a
@@ -1933,6 +1975,9 @@ interface DiagramStore {
   /** The drill level a slide of a hierarchy view shows, over the view's
    *  own, while the slide is shown (not saved into the view). */
   slideTreemapFocus: { viewId: string; focusId: string | null } | null
+  /** The page (and page mode) a slide of a wiki view shows, over the
+   *  view's own, while the slide is shown (not saved into the view). */
+  slideWikiPage: SlideWikiPage | null
   addPresentation: (name?: string) => string
   /** Replace every presentation (AI tools). Keeps the active one when it
    *  still exists; an empty list leaves one empty presentation. */
@@ -2116,6 +2161,7 @@ const _setViewportFn = (): ((vp: { x: number; y: number; zoom: number }, opts?: 
  */
 function setSlideCamera(vp: { x: number; y: number; zoom: number }, duration: number): void {
   const W = window as any
+  W.__rfPendingFocus = undefined
   W.__rfPendingCamera = { vp, duration }
   requestAnimationFrame(() => {
     const pending = W.__rfPendingCamera as { vp: typeof vp; duration: number } | undefined
@@ -2124,6 +2170,35 @@ function setSlideCamera(vp: { x: number; y: number; zoom: number }, duration: nu
     W.__rfPendingCamera = undefined
     setViewport(pending.vp, { duration: pending.duration })
   })
+}
+
+/**
+ * Zooms onto a slide's focus elements (a slide with no captured camera).
+ * After a slide without a canvas, from a deep link or after a reload the
+ * canvas is still mounting, and the view's own camera it then placed showed
+ * the whole view: the focus waits for the canvas as the camera does
+ * (`__rfPendingFocus`, taken by Canvas once it has placed its first camera;
+ * until then it has no `__rfFocusNodes`).
+ */
+function setSlideFocus(ids: string[], duration: number): void {
+  const W = window as any
+  W.__rfPendingCamera = undefined
+  W.__rfPendingFocus = { ids, duration }
+  requestAnimationFrame(() => {
+    const pending = W.__rfPendingFocus as { ids: string[]; duration: number } | undefined
+    const focusNodes = W.__rfFocusNodes as ((ids: string[], opts?: { duration?: number }) => void) | undefined
+    if (!pending || !focusNodes) return
+    W.__rfPendingFocus = undefined
+    focusNodes(pending.ids, { duration: pending.duration })
+  })
+}
+
+/** A slide that fits its whole view: no camera or focus of an earlier slide
+ *  is left waiting for the canvas. */
+function clearSlideCamera(): void {
+  const W = window as any
+  W.__rfPendingCamera = undefined
+  W.__rfPendingFocus = undefined
 }
 
 // ─── Store implementation ────────────────────────────────────────────────────
@@ -2403,6 +2478,7 @@ export const useDiagramStore = create<DiagramStore>()(
       presentationActive: false,
       presentationSlideIndex: 0,
       slideTreemapFocus: null,
+      slideWikiPage: null,
 
       // ── sync helper ──────────────────────────────────────────────────────
       _sync() {
@@ -5457,6 +5533,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // (autosave saves in the editor), and what a metamodel edit made of
         // the views was put back as it had been on the way to Designer.
         const editing = (m: DiagramStore['appMode']): boolean => m === 'designer' || m === 'metamodel'
+        const backToDesigner = !editing(prevMode) && mode === 'designer'
         if (editing(prevMode) && !editing(mode)) {
           // The canvas shown keeps its positions in the nodes until it is
           // left or saved: put them, and its camera, into its view (or All
@@ -5509,10 +5586,15 @@ export const useDiagramStore = create<DiagramStore>()(
         } else {
           get().startLiveLayout()
         }
-        set((state) => { state.appMode = mode as any; state.slideTreemapFocus = null })
+        set((state) => { state.appMode = mode as any; state.slideTreemapFocus = null; state.slideWikiPage = null })
         // Rebuild rfNodes so per-node draggable/selectable flags reflect
         // the new mode (designer = editable, viewer/presenter = locked).
         get()._sync()
+        // The view Designer shows was opened above, or first in Viewer or
+        // Presenter, before appMode was designer: one never laid out (a view
+        // per element, a view of a viewpoint) gets its Smart Layout now. It
+        // kept All elements' places, and the next view switch saved them.
+        if (backToDesigner) arrangeOnFirstOpen()
       },
 
       // ── Metamodel ──────────────────────────────────────────────────────
@@ -5713,7 +5795,9 @@ export const useDiagramStore = create<DiagramStore>()(
           // A hierarchy view's camera is the element it is drilled into.
           const view = activeViewId ? state.views[activeViewId] : undefined
           const treemapFocusId = view?.kind === 'treemap' ? (view.treemapFocusId ?? null) : undefined
-          pres.slides.push({ id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, modelSnapshot, ...(treemapFocusId !== undefined ? { treemapFocusId } : {}) } as any)
+          // A wiki view's is the page it is on, and how that page is written.
+          const wikiPage = view?.kind === 'wiki' ? shownWikiPage(state, view as DiagramView) : undefined
+          pres.slides.push({ id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, modelSnapshot, ...(treemapFocusId !== undefined ? { treemapFocusId } : {}), ...(wikiPage ? { wikiFocusId: wikiPage.focusId, wikiPageMode: wikiPage.pageMode } : {}) } as any)
           state.presentationSlides = pres.slides
         })
       },
@@ -5772,7 +5856,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       stopPresentation() {
-        set((state) => { state.presentationActive = false; state.slideTreemapFocus = null })
+        set((state) => { state.presentationActive = false; state.slideTreemapFocus = null; state.slideWikiPage = null })
         get().setDiffHighlight({})
         const pre = (window as any).__prePresState as
           | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null }
@@ -5842,10 +5926,7 @@ export const useDiagramStore = create<DiagramStore>()(
         } else if ((slide as any).viewId) {
           // No captured canvas (generated / imported slides): show the view's
           // saved layout, the same positions setActiveView would load.
-          const viewPositions = get().views[(slide as any).viewId]?.positions as Record<string, NodePosition> | undefined
-          if (viewPositions && Object.keys(viewPositions).length > 0) {
-            set((state) => { applyPositions(state.c4Nodes as Record<string, C4Node>, viewPositions) })
-          }
+          set((state) => { showSlideView(state, (slide as any).viewId, shown) })
         }
 
         // Activate the view linked to this slide (or reset to "all" if none)
@@ -5859,6 +5940,8 @@ export const useDiagramStore = create<DiagramStore>()(
           state.slideTreemapFocus = targetViewId && (slide as { treemapFocusId?: string | null }).treemapFocusId !== undefined
             ? { viewId: targetViewId, focusId: (slide as { treemapFocusId?: string | null }).treemapFocusId ?? null }
             : null
+          // And one of a wiki view the page it was added on.
+          state.slideWikiPage = slideWikiPageOf(slide, targetViewId)
         })
 
         // Re-derive rfNodes / rfEdges (always needed: view filter or canvas state may have changed)
@@ -5905,9 +5988,9 @@ export const useDiagramStore = create<DiagramStore>()(
           setSlideCamera({ x: vp.x, y: vp.y, zoom: vp.zoom }, 600)
         } else if (slide.focusNodeIds?.length) {
           // No captured camera: zoom onto the slide's focus elements.
-          const focus = slide.focusNodeIds
-          requestAnimationFrame(() => (window as any).__rfFocusNodes?.(focus, { duration: 600 }))
+          setSlideFocus(slide.focusNodeIds, 600)
         } else {
+          clearSlideCamera()
           requestAnimationFrame(() => {
             requestAnimationFrame(() => _getFitViewFn()?.())
           })
@@ -5955,10 +6038,9 @@ export const useDiagramStore = create<DiagramStore>()(
         } else if ((slide as any).viewId) {
           // No captured canvas (generated / imported slides): show the view's
           // saved layout, the same positions setActiveView would load.
-          const viewPositions = get().views[(slide as any).viewId]?.positions as Record<string, NodePosition> | undefined
-          if (viewPositions && Object.keys(viewPositions).length > 0) {
-            set((state) => { applyPositions(state.c4Nodes as Record<string, C4Node>, viewPositions) })
-          }
+          let placed: string[] = []
+          set((state) => { placed = showSlideView(state, (slide as any).viewId, shown) })
+          _liveLayout?.reset(placed)
         }
 
         // Navigate to the view linked to this slide (or reset to "all" if none).
@@ -5971,6 +6053,8 @@ export const useDiagramStore = create<DiagramStore>()(
           state.slideTreemapFocus = targetViewId && (slide as { treemapFocusId?: string | null }).treemapFocusId !== undefined
             ? { viewId: targetViewId, focusId: (slide as { treemapFocusId?: string | null }).treemapFocusId ?? null }
             : null
+          // And one of a wiki view the page it was added on.
+          state.slideWikiPage = slideWikiPageOf(slide, targetViewId)
         })
 
         // Re-derive rfNodes / rfEdges.
@@ -5984,9 +6068,9 @@ export const useDiagramStore = create<DiagramStore>()(
           setSlideCamera({ x: vp.x, y: vp.y, zoom: vp.zoom }, 400)
         } else if (slide.focusNodeIds?.length) {
           // No captured camera: zoom onto the slide's focus elements.
-          const focus = slide.focusNodeIds
-          requestAnimationFrame(() => (window as any).__rfFocusNodes?.(focus, { duration: 400 }))
+          setSlideFocus(slide.focusNodeIds, 400)
         } else {
+          clearSlideCamera()
           requestAnimationFrame(() => {
             requestAnimationFrame(() => _getFitViewFn()?.())
           })
