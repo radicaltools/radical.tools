@@ -361,3 +361,110 @@ export async function applyTreeLayout(
     childOptions: TREE_CHILD_OPTIONS,
   })
 }
+
+// ─── Layers by distance (an exploration) ────────────────────────────────────
+//
+// Explore from here lays its view out top-down in layers by distance from
+// the element it started from: the start on top, its neighbours a layer
+// below, theirs below those. The layers are ELK partitions, so a relation's
+// direction does not move an element up or down; a container is a frame
+// across the layers of what it holds (INCLUDE_CHILDREN lays the nested
+// graph out as one). Within a layer the elements keep the order given.
+
+const LAYERS_OPTIONS: LayoutOptions = {
+  'elk.algorithm': 'layered',
+  'elk.direction': 'DOWN',
+  'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+  'elk.partitioning.activate': 'true',
+  'elk.separateConnectedComponents': 'false',
+  'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+  'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+  'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+  'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
+  'elk.spacing.edgeNode': '30',
+  'elk.spacing.edgeEdge': '15',
+}
+
+export interface LayersInput {
+  /** The elements drawn, each at the size it is drawn at, with its
+   *  containers among them (they are laid out round what they hold). */
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  /** Each element's layer (0 on top); a container's is the least of what
+   *  it holds and its own. */
+  layerOf: (id: string) => number
+  /** The order of the elements within a layer. */
+  order: readonly string[]
+  /** The room inside a container's frame round what it holds. */
+  paddingOf: (n: C4Node) => { top: number; side: number; bottom: number }
+  /** The least space between elements of a layer, and between layers
+   *  (the room a relation's label needs among them). */
+  gap: { inLayer: number; betweenLayers: number }
+}
+
+/** The places of `input.nodes` in layers by distance; relative to their
+ *  parents, with the containers' sizes. Empty when ELK fails. */
+export async function applyLayersLayout(input: LayersInput): Promise<PositionMap> {
+  const { nodes, relations, layerOf, order, paddingOf, gap } = input
+  const rank = new Map(order.map((id, i) => [id, i]))
+  const byOrder = (a: C4Node, b: C4Node): number => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity)
+  const kids = new Map<string | undefined, C4Node[]>()
+  for (const n of Object.values(nodes)) {
+    const parent = n.parentId && nodes[n.parentId] ? n.parentId : undefined
+    const list = kids.get(parent)
+    if (list) list.push(n)
+    else kids.set(parent, [n])
+  }
+  for (const list of kids.values()) list.sort(byOrder)
+  const spacing: LayoutOptions = {
+    'elk.spacing.nodeNode': String(gap.inLayer),
+    'elk.layered.spacing.nodeNodeBetweenLayers': String(gap.betweenLayers),
+  }
+  const build = (n: C4Node): ElkNode => {
+    const children = (kids.get(n.id) ?? []).map(build)
+    const pad = paddingOf(n)
+    return {
+      id: n.id,
+      ...(children.length ? {} : { width: n.width, height: n.height }),
+      layoutOptions: {
+        'elk.partitioning.partition': String(layerOf(n.id)),
+        // A frame's graph keeps the same gaps: ELK reads them per graph.
+        ...(children.length ? { 'elk.padding': `[top=${pad.top}, right=${pad.side}, bottom=${pad.bottom}, left=${pad.side}]`, ...spacing } : {}),
+      },
+      children,
+    }
+  }
+  const inside = (a: string, b: string): boolean => {
+    for (let p = nodes[b]?.parentId; p; p = nodes[p]?.parentId) if (p === a) return true
+    return false
+  }
+  // Each relation from the nearer end to the farther: layers by distance,
+  // not by the relation's direction. One within a layer, or between a
+  // container and what it holds, places nothing.
+  const edges: ElkExtendedEdge[] = []
+  for (const r of Object.values(relations)) {
+    if (!nodes[r.sourceId] || !nodes[r.targetId] || r.sourceId === r.targetId) continue
+    if (inside(r.sourceId, r.targetId) || inside(r.targetId, r.sourceId)) continue
+    const [from, to] = layerOf(r.sourceId) <= layerOf(r.targetId) ? [r.sourceId, r.targetId] : [r.targetId, r.sourceId]
+    if (layerOf(from) === layerOf(to)) continue
+    edges.push({ id: r.id, sources: [from], targets: [to] })
+  }
+  const root: ElkNode = {
+    id: 'root',
+    layoutOptions: {
+      ...LAYERS_OPTIONS,
+      ...spacing,
+    },
+    children: (kids.get(undefined) ?? []).map(build),
+    edges,
+  }
+  try {
+    const result = await elk.layout(root)
+    const positions: PositionMap = {}
+    parseElkResult(result, positions)
+    return positions
+  } catch (err) {
+    console.error('[ELK] Layers layout error:', err)
+    return {}
+  }
+}

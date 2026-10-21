@@ -17,6 +17,20 @@ async function flowBox(page: Page, node: Locator): Promise<{ x: number; y: numbe
   return { x: Math.round((box.x - pane.x - tx) / zoom), y: Math.round((box.y - pane.y - ty) / zoom) }
 }
 
+type Box = { x: number; y: number; width: number; height: number }
+
+/** `a` lies inside `frame`. */
+const within = (a: Box, frame: Box): boolean =>
+  a.x >= frame.x && a.y >= frame.y && a.x + a.width <= frame.x + frame.width && a.y + a.height <= frame.y + frame.height
+
+/** `a` and `b` do not overlap. */
+const apart = (a: Box, b: Box): boolean =>
+  a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y
+
+/** Selects an element by its corner: a relation's line can run across
+ *  its middle once the exploration is laid out in layers. */
+const pick = (node: Locator): Promise<void> => node.click({ position: { x: 8, y: 8 } })
+
 /** The names of the views listed, in order. */
 const viewNames = (page: Page): Promise<string[]> =>
   page.locator('.lp-view-list .lp-view-card .lp-card-title').allTextContents()
@@ -28,32 +42,42 @@ test('Explore from here grows by + and by a level', async ({ page, studio }) => 
   await studio.node('api').click()
   await page.getByRole('button', { name: 'Explore from here' }).click()
 
-  // A view of API alone, listed first, named after it.
+  // A view of API alone in the Bookstore frame, listed first, named after it.
   await expect(page.locator('.explore-bar')).toContainText('Explore: API')
   expect((await viewNames(page))[0]).toBe('Explore: API')
   await expect(page.locator('.lp-explore-card')).toHaveClass(/active/)
   await expect(studio.node('api')).toBeVisible()
+  await expect(studio.node('bookstore')).toBeVisible()
   for (const id of ['web', 'db', 'payments', 'customer']) await expect(studio.node(id)).toHaveCount(0)
-  await studio.settle()
-  const api = await flowBox(page, studio.node('api'))
 
-  // Its +: its three neighbours, API where it was, and no + left on it.
+  // Its +: its three neighbours a layer below it, Web App and Orders DB in
+  // the Bookstore frame, and no + left on it.
   await page.getByRole('button', { name: 'Show 3 more related to API', exact: true }).click()
   for (const id of ['web', 'db', 'payments']) await expect(studio.node(id)).toBeVisible()
   await expect(studio.node('customer')).toHaveCount(0)
   await studio.settle()
-  expect(await flowBox(page, studio.node('api'))).toEqual(api)
+  let box = await studio.boxes()
+  for (const id of ['api', 'web', 'db']) expect(within(box[id], box.bookstore)).toBe(true)
+  expect(apart(box.payments, box.bookstore)).toBe(true)
+  for (const id of ['web', 'db', 'payments']) expect(box[id].y).toBeGreaterThanOrEqual(box.api.y + box.api.height)
+  expect(await studio.layoutViolations()).toEqual([])
   await expect(studio.node('api').locator('.explore-more')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Show 1 more related to Web App', exact: true })).toBeVisible()
-  expect(await studio.layoutViolations()).toEqual([])
 
-  // + 1 level: the customer, who uses the web app.
+  // + 1 level: the customer, who uses the web app, a layer further.
   await page.getByRole('button', { name: '+ 1 level' }).click()
   await expect(studio.node('customer')).toBeVisible()
   await expect(page.locator('.explore-more')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '+ 1 level' })).toBeDisabled()
   await studio.settle()
-  expect(await flowBox(page, studio.node('api'))).toEqual(api)
+  box = await studio.boxes()
+  for (const id of ['web', 'db', 'payments']) {
+    expect(box[id].y).toBeGreaterThanOrEqual(box.api.y + box.api.height)
+    expect(box.customer.y).toBeGreaterThanOrEqual(box[id].y + box[id].height)
+  }
+  for (const id of ['api', 'web', 'db']) expect(within(box[id], box.bookstore)).toBe(true)
+  for (const id of ['payments', 'customer']) expect(apart(box[id], box.bookstore)).toBe(true)
+  expect(await studio.layoutViolations()).toEqual([])
 
   // Nothing of it was saved, and it is no step to undo.
   await page.waitForTimeout(1000)
@@ -89,7 +113,7 @@ test('an exploration is saved as a view, and dropped when closed', async ({ page
   expect(await flowBox(page, studio.node('api'))).toEqual(places.api)
   expect(await flowBox(page, studio.node('payments'))).toEqual(places.payments)
   await expect.poll(async () => (await studio.storedDoc()).views?.find((v) => (v as { name?: string }).name === 'API context')?.nodeIds.sort())
-    .toEqual(['api', 'db', 'payments', 'web'])
+    .toEqual(['api', 'bookstore', 'db', 'payments', 'web'])
 
   // One step: Undo takes the view away, Redo brings it back.
   await page.getByTitle('Undo (⌘Z)').click()
@@ -101,7 +125,7 @@ test('an exploration is saved as a view, and dropped when closed', async ({ page
   await expect.poll(async () => (await studio.storedDoc()).views?.some((v) => (v as { name?: string }).name === 'API context')).toBe(true)
   await page.waitForTimeout(1000)
   const stored = await studio.storedJson()
-  await studio.node('db').click()
+  await pick(studio.node('db'))
   await page.getByRole('button', { name: 'Explore from here' }).click()
   await expect(page.locator('.explore-bar')).toContainText('Explore: Orders DB')
   await page.getByRole('button', { name: 'Show 1 more related to Orders DB', exact: true }).click()
@@ -113,9 +137,9 @@ test('an exploration is saved as a view, and dropped when closed', async ({ page
   expect(await studio.storedJson()).toBe(stored)
 
   // Replaced by another exploration, and dropped with another model.
-  await studio.node('web').click()
+  await pick(studio.node('web'))
   await page.getByRole('button', { name: 'Explore from here' }).click()
-  await studio.node('web').click()
+  await pick(studio.node('web'))
   await page.getByRole('button', { name: 'Explore from here' }).click()
   await expect(page.locator('.lp-explore-card')).toHaveCount(1)
   await studio.openSample()

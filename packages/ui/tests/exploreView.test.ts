@@ -4,7 +4,9 @@
  * document's: it never reaches the saved model, the undo history or the
  * list of views the document keeps. Each element's + adds the elements
  * related to it that the view does not show yet, beside it, inside the
- * frames of their containers, and moves nothing shown; + 1 level does that
+ * frames of their containers (drawn round what was added), clear of what
+ * is shown by the gap the add rule keeps and the room a relation's label
+ * needs, and moves nothing shown; + 1 level does that
  * for every element at once. Save as view keeps it as an ordinary
  * structure view (one undo step); closing it, another exploration or
  * another model drops it without a question.
@@ -12,6 +14,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { viewShownNodes } from '@radical/common/viewPipeline'
+import { labelGaps, pairKey } from '@radical/layout/labelRoom'
 import { historyMark, useDiagramStore, viewById } from '../src/store/diagramStore'
 // The e2e suite's fixture, the model the scenarios name.
 import bookstoreFile from '../../../apps/e2e/fixtures/bookstore.radical?raw'
@@ -34,7 +37,7 @@ function drawnPlaces(): Record<string, { x: number; y: number }> {
   return Object.fromEntries(s().rfNodes.filter((n) => !n.hidden).map((n) => [n.id, abs(n.id)]))
 }
 
-/** The elements the exploration lists (not its frames). */
+/** The elements the exploration lists, the containers drawn round them among them. */
 const listed = (): string[] => [...(viewShownNodes(s().exploration ?? undefined, s().c4Nodes, s().c4Relations) ?? [])].sort()
 
 /** Whether `a` and `b` lie on each other as the canvas draws them. */
@@ -43,6 +46,52 @@ const overlap = (a: string, b: string): boolean => {
   const pa = abs(a)
   const pb = abs(b)
   return pa.x < pb.x + size(b).width && pb.x < pa.x + size(a).width && pa.y < pb.y + size(b).height && pb.y < pa.y + size(a).height
+}
+
+/** Drawn: on the canvas and visible (a frame held only to place what is
+ *  in it is not). */
+const drawn = (id: string): boolean => s().rfNodes.some((n) => n.id === id && !n.hidden)
+
+/** `id` lies inside `frame`'s drawn box. */
+function inside(id: string, frame: string): boolean {
+  const size = (n: string) => s().rfNodes.find((r) => r.id === n)!.data
+  const a = abs(id)
+  const f = abs(frame)
+  return a.x >= f.x && a.y >= f.y && a.x + size(id).width <= f.x + size(frame).width && a.y + size(id).height <= f.y + size(frame).height
+}
+
+/** `a` lies in a layer below `b`'s: its top under `b`'s bottom. */
+function below(a: string, b: string): boolean {
+  const height = s().rfNodes.find((r) => r.id === b)!.data.height
+  return abs(a).y >= abs(b).y + height
+}
+
+/** The clear space between `a` and `b` falls short of what the add rule
+ *  keeps between siblings (20 inside a container, 60 at the top) or what
+ *  the label of a relation between them needs: what is missing, or null. */
+function tooClose(a: string, b: string): string | null {
+  const size = (n: string) => s().rfNodes.find((r) => r.id === n)!.data
+  const pa = abs(a)
+  const pb = abs(b)
+  const dx = Math.max(pb.x - (pa.x + size(a).width), pa.x - (pb.x + size(b).width))
+  const dy = Math.max(pb.y - (pa.y + size(a).height), pa.y - (pb.y + size(b).height))
+  const base = s().c4Nodes[a].parentId ? 20 : 60
+  const need = labelGaps(s().c4Nodes, s().c4Relations).get(pairKey(a, b))
+  const nx = Math.max(base, need?.x ?? 0)
+  const ny = Math.max(base, need?.y ?? 0)
+  return dx >= nx || dy >= ny ? null : `${a}–${b}: ${Math.round(dx)} px across (needs ${nx}), ${Math.round(dy)} px down (needs ${ny})`
+}
+
+/** Every pair of siblings drawn too close (tooClose). */
+function crowded(): string[] {
+  const shown = s().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+  const out: string[] = []
+  for (const a of shown) for (const b of shown) {
+    if (a >= b || (s().c4Nodes[a].parentId ?? '') !== (s().c4Nodes[b].parentId ?? '')) continue
+    const close = tooClose(a, b)
+    if (close) out.push(close)
+  }
+  return out
 }
 
 /** What the document would hold if it were saved now. */
@@ -64,81 +113,76 @@ beforeEach(() => {
 })
 
 describe('an explore view', () => {
-  it('opens on the element alone, in the frame of its container, as a view the document does not hold', () => {
+  it('opens on the element alone, in the frame of its container, as a view the document does not hold', async () => {
     const views = s().views
-    s().exploreFrom('api')
+    await s().exploreFrom('api')
     const exploration = s().exploration!
     expect(exploration.name).toBe('Explore: API')
     expect(s().activeViewId).toBe(exploration.id)
     expect(s().views).toBe(views)
-    expect(listed()).toEqual(['api'])
-    // API alone, inside the Bookstore frame (which a structure view draws
-    // only to hold what it shows).
-    expect(Object.keys(drawnPlaces())).toEqual(['api'])
+    expect(listed()).toEqual(['api', 'bookstore'])
+    // API alone, inside the Bookstore frame, drawn round it alone.
+    expect(Object.keys(drawnPlaces()).sort()).toEqual(['api', 'bookstore'])
     expect(s().rfNodes.find((n) => n.id === 'api')!.parentNode).toBe('bookstore')
+    expect(inside('api', 'bookstore')).toBe(true)
+    const frame = s().rfNodes.find((n) => n.id === 'bookstore')!.data
+    expect(frame.collapsed).toBe(false)
+    expect(frame.width).toBeLessThan(s().rfNodes.find((n) => n.id === 'api')!.data.width + 200)
   })
 
-  it("API's + adds Web App, Orders DB and Payment Provider inside their frames beside API, and moves nothing", () => {
-    s().exploreFrom('api')
+  it("API's + adds Web App, Orders DB and Payment Provider a layer below API, inside their frames", async () => {
+    await s().exploreFrom('api')
     expect(s().exploreMore?.api).toBe(3)
-    const before = { api: abs('api'), bookstore: abs('bookstore') }
-    s().exploreNeighbours('api')
-    expect(listed()).toEqual(['api', 'db', 'payments', 'web'])
-    // What was drawn stays where it was.
-    expect(abs('api')).toEqual(before.api)
-    expect(abs('bookstore')).toEqual(before.bookstore)
-    // Web App and Orders DB in the Bookstore frame, clear of API and each other.
-    const frame = s().c4Nodes.bookstore
-    for (const id of ['web', 'db']) {
-      const n = s().c4Nodes[id]
-      expect(n.parentId).toBe('bookstore')
-      expect(n.x).toBeGreaterThanOrEqual(0)
-      expect(n.y).toBeGreaterThanOrEqual(0)
-      const drawn = s().rfNodes.find((r) => r.id === id)!.data
-      expect(n.x + drawn.width).toBeLessThanOrEqual(frame.width)
-      expect(n.y + drawn.height).toBeLessThanOrEqual(frame.height)
-      expect(overlap(id, 'api')).toBe(false)
-    }
-    expect(overlap('web', 'db')).toBe(false)
-    // Payment Provider outside the frame, near it.
+    await s().exploreNeighbours('api')
+    expect(listed()).toEqual(['api', 'bookstore', 'db', 'payments', 'web'])
+    // The Bookstore frame drawn round API, Web App and Orders DB, Payment
+    // Provider outside it.
+    expect(drawn('bookstore')).toBe(true)
+    for (const id of ['api', 'web', 'db']) expect(inside(id, 'bookstore')).toBe(true)
     expect(overlap('payments', 'bookstore')).toBe(false)
-    const api = abs('api')
-    const pay = abs('payments')
-    expect(Math.hypot(pay.x - api.x, pay.y - api.y)).toBeLessThan(1500)
+    // The start on top, its neighbours a layer below.
+    for (const id of ['web', 'db', 'payments']) expect(below(id, 'api')).toBe(true)
+    // Clear of each other by the gap siblings keep and the room their
+    // relation's label needs.
+    expect(crowded()).toEqual([])
     // API has no neighbour left to show.
     expect(s().exploreMore?.api ?? 0).toBe(0)
     expect(s().exploreMore?.web).toBe(1)
   })
 
-  it('+ 1 level adds the neighbours of every element at once, and moves nothing shown', () => {
-    s().exploreFrom('api')
-    s().exploreNeighbours('api')
-    const before = drawnPlaces()
-    s().exploreLevel()
-    expect(listed()).toEqual(['api', 'customer', 'db', 'payments', 'web'])
-    for (const [id, at] of Object.entries(before)) expect(abs(id)).toEqual(at)
-    expect(overlap('customer', 'bookstore')).toBe(false)
+  it('+ 1 level adds the next layer, and the layering holds through a second +', async () => {
+    await s().exploreFrom('api')
+    await s().exploreNeighbours('api')
+    await s().exploreLevel()
+    expect(listed()).toEqual(['api', 'bookstore', 'customer', 'db', 'payments', 'web'])
+    for (const id of ['web', 'db', 'payments']) {
+      expect(below(id, 'api')).toBe(true)
+      expect(below('customer', id)).toBe(true)
+    }
+    for (const id of ['api', 'web', 'db']) expect(inside(id, 'bookstore')).toBe(true)
+    for (const id of ['payments', 'customer']) expect(overlap(id, 'bookstore')).toBe(false)
     expect(overlap('customer', 'payments')).toBe(false)
+    expect(crowded()).toEqual([])
     expect(Object.values(s().exploreMore ?? {}).filter(Boolean)).toEqual([])
   })
 
-  it('is not saved: the document is as it was, its views among it', () => {
+  it('is not saved: the document is as it was, its views among it', async () => {
     const was = saved()
     const views = s().views
-    s().exploreFrom('api')
-    s().exploreNeighbours('api')
-    s().exploreLevel()
+    await s().exploreFrom('api')
+    await s().exploreNeighbours('api')
+    await s().exploreLevel()
     expect(saved()).toBe(was)
     expect(s().views).toBe(views)
     expect(s().saveDiagram().views!.map((v) => v.name)).not.toContain('Explore: API')
   })
 
-  it('is no undo step: opening it, its +, + 1 level, a drag and a fold leave the history as it was', () => {
+  it('is no undo step: opening it, its +, + 1 level, a drag and a fold leave the history as it was', async () => {
     s().updateNode('customer', { label: 'Reader' })
     const mark = historyMark()
-    s().exploreFrom('api')
-    s().exploreNeighbours('api')
-    s().exploreLevel()
+    await s().exploreFrom('api')
+    await s().exploreNeighbours('api')
+    await s().exploreLevel()
     const web = s().c4Nodes.web
     s().liveGrab('web', web.x, web.y, 'calm', abs('web'))
     useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, web: { ...st.c4Nodes.web, x: web.x + 40 } } }))
@@ -153,9 +197,9 @@ describe('an explore view', () => {
     expect(s().canUndo).toBe(false)
   })
 
-  it('an edit made on it is an undo step that comes back to it', () => {
-    s().exploreFrom('api')
-    s().exploreNeighbours('api')
+  it('an edit made on it is an undo step that comes back to it', async () => {
+    await s().exploreFrom('api')
+    await s().exploreNeighbours('api')
     const id = s().exploration!.id
     const places = drawnPlaces()
     s().updateNode('db', { label: 'Orders' })
@@ -168,30 +212,30 @@ describe('an explore view', () => {
     expect(s().activeViewId).toBe(id)
   })
 
-  it('another exploration replaces it, without a question', () => {
-    s().exploreFrom('api')
-    s().exploreNeighbours('api')
+  it('another exploration replaces it, without a question', async () => {
+    await s().exploreFrom('api')
+    await s().exploreNeighbours('api')
     const first = s().exploration!.id
     const was = saved()
-    s().exploreFrom('db')
+    await s().exploreFrom('db')
     expect(s().exploration!.id).not.toBe(first)
     expect(s().exploration!.name).toBe('Explore: Orders DB')
-    expect(listed()).toEqual(['db'])
+    expect(listed()).toEqual(['bookstore', 'db'])
     expect(viewById(s(), first)).toBeUndefined()
     expect(s().pendingDelete).toBeNull()
     expect(saved()).toBe(was)
   })
 
-  it('another model drops it', () => {
-    s().exploreFrom('api')
+  it('another model drops it', async () => {
+    await s().exploreFrom('api')
     s().loadDiagram({ nodes: [], relations: [] })
     expect(s().exploration).toBeNull()
     expect(s().activeViewId).toBeNull()
   })
 
-  it('an outside change keeps it on screen, without what an agent deleted, and never writes it', () => {
-    s().exploreFrom('api')
-    s().exploreNeighbours('api')
+  it('an outside change keeps it on screen, without what an agent deleted, and never writes it', async () => {
+    await s().exploreFrom('api')
+    await s().exploreNeighbours('api')
     const id = s().exploration!.id
     const places = drawnPlaces()
     outsideChange((data) => {
@@ -199,28 +243,28 @@ describe('an explore view', () => {
       data.relations = data.relations.filter((r) => r.sourceId !== 'payments' && r.targetId !== 'payments')
     })
     expect(s().activeViewId).toBe(id)
-    expect(listed()).toEqual(['api', 'db', 'web'])
+    expect(listed()).toEqual(['api', 'bookstore', 'db', 'web'])
     const now = drawnPlaces()
     for (const n of ['api', 'web', 'db']) expect(now[n]).toEqual(places[n])
     expect(now.payments).toBeUndefined()
     expect(s().saveDiagram().views!.some((v) => v.id === id)).toBe(false)
   })
 
-  it('in Designer a milestone shown closes it, and none opens while one is shown', () => {
-    s().exploreFrom('api')
+  it('in Designer a milestone shown closes it, and none opens while one is shown', async () => {
+    await s().exploreFrom('api')
     s().createSnapshot('As-is')
     s().selectMilestone(s().snapshots[s().snapshots.length - 1].id)
     expect(s().exploration).toBeNull()
-    s().exploreFrom('db')
+    await s().exploreFrom('db')
     expect(s().exploration).toBeNull()
     s().discardMilestoneChanges()
   })
 })
 
 describe('saving and closing an explore view', () => {
-  it('Save as view keeps it as a structure view in its folder, with its places and folds, as one undo step', () => {
-    s().exploreFrom('api')
-    s().exploreNeighbours('api')
+  it('Save as view keeps it as a structure view in its folder, with its places and folds, as one undo step', async () => {
+    await s().exploreFrom('api')
+    await s().exploreNeighbours('api')
     s().toggleCollapse('api')
     const places = drawnPlaces()
     const mark = historyMark()
@@ -230,7 +274,7 @@ describe('saving and closing an explore view', () => {
     expect(view.name).toBe('API context')
     expect(view.folder).toBe('Explorations')
     expect((view.kind ?? 'static')).toBe('static')
-    expect([...view.nodeIds].sort()).toEqual(['api', 'db', 'payments', 'web'])
+    expect([...view.nodeIds].sort()).toEqual(['api', 'bookstore', 'db', 'payments', 'web'])
     expect(view.collapsedNodeIds).toEqual(['api'])
     expect(s().exploration).toBeNull()
     expect(s().activeViewId).toBe(id)
@@ -249,12 +293,12 @@ describe('saving and closing an explore view', () => {
     expect(drawnPlaces()).toEqual(places)
   })
 
-  it('closing it drops it without a question, back on the canvas it was opened from', () => {
+  it('closing it drops it without a question, back on the canvas it was opened from', async () => {
     s().setActiveView('v-containers')
     const was = saved()
     const mark = historyMark()
-    s().exploreFrom('api')
-    s().exploreNeighbours('api')
+    await s().exploreFrom('api')
+    await s().exploreNeighbours('api')
     s().closeExploration()
     expect(s().exploration).toBeNull()
     expect(s().activeViewId).toBe('v-containers')
@@ -270,32 +314,32 @@ describe('an explore view in Viewer', () => {
     s().setAppMode('viewer')
   })
 
-  it('explores the milestone shown, follows Current (live), and keeps nothing', () => {
+  it('explores the milestone shown, follows Current (live), and keeps nothing', async () => {
     s().setAppMode('designer')
     const was = saved()
     const mark = historyMark()
     s().setAppMode('viewer')
     s().selectMilestone('snap-1')
-    s().exploreFrom('ctn2')
+    await s().exploreFrom('ctn2')
     const id = s().exploration!.id
     expect(s().activeViewId).toBe(id)
     // In v1 the backend is the API, related to the frontend only.
     expect(s().exploration!.name).toBe('Explore: API')
     expect(s().exploreMore?.ctn2).toBe(1)
-    s().exploreNeighbours('ctn2')
-    expect(listed()).toEqual(['ctn1', 'ctn2'])
+    await s().exploreNeighbours('ctn2')
+    expect(listed().filter((n) => n.startsWith('ctn'))).toEqual(['ctn1', 'ctn2'])
     const places = drawnPlaces()
     // Current (live): the same elements, their neighbours counted there.
     s().discardMilestoneChanges()
     expect(s().activeSnapshotId).toBeNull()
     expect(s().activeViewId).toBe(id)
-    expect(listed()).toEqual(['ctn1', 'ctn2'])
+    expect(listed().filter((n) => n.startsWith('ctn'))).toEqual(['ctn1', 'ctn2'])
     expect(drawnPlaces().ctn2).toEqual(places.ctn2)
     expect(s().exploreMore?.ctn2).toBe(2)
     // The frontend's: the end user and the auth service.
     expect(s().exploreMore?.ctn1).toBe(2)
-    s().exploreLevel()
-    expect(listed().length).toBeGreaterThan(2)
+    await s().exploreLevel()
+    expect(listed().filter((n) => n.startsWith('ctn')).length).toBeGreaterThan(2)
     // No Save as view, no undo step; Designer finds its model as it was.
     expect(s().saveExploration('Kept', null)).toBeNull()
     expect(Object.values(s().views).map((v) => v.name)).not.toContain('Kept')
@@ -306,23 +350,23 @@ describe('an explore view in Viewer', () => {
     expect(historyMark()).toBe(mark)
   })
 
-  it('a milestone shown keeps it, with what that milestone lacks left out', () => {
-    s().exploreFrom('ctn2')
-    s().exploreNeighbours('ctn2')
+  it('a milestone shown keeps it, with what that milestone lacks left out', async () => {
+    await s().exploreFrom('ctn2')
+    await s().exploreNeighbours('ctn2')
     const before = listed()
-    expect(before.length).toBe(4)
+    expect(before.filter((n) => n.startsWith('ctn')).length).toBe(4)
     s().selectMilestone('snap-1')
     expect(s().exploration).not.toBeNull()
     expect(listed()).toEqual(before.filter((x) => !!s().c4Nodes[x]))
     expect(listed()).toContain('ctn2')
   })
 
-  it('closes when the perspective changes, and is not offered in Presenter', () => {
-    s().exploreFrom('ctn1')
+  it('closes when the perspective changes, and is not offered in Presenter', async () => {
+    await s().exploreFrom('ctn1')
     expect(s().exploration).not.toBeNull()
     s().setAppMode('presenter')
     expect(s().exploration).toBeNull()
-    s().exploreFrom('ctn1')
+    await s().exploreFrom('ctn1')
     expect(s().exploration).toBeNull()
     s().setAppMode('designer')
   })
