@@ -108,6 +108,21 @@ describe('radical check', () => {
       'Slide "Intro" of "Deck" shows view missing, which the model does not have.',
     ])
   })
+
+  // A slide's focus kept an element deleted since, and nothing said so.
+  it('lists a slide focus on an element the model it shows does not have', () => {
+    const data = complete()
+    data.snapshots = [{ id: 'm', name: 'As-is', savedAt: '2026-01-01', nodes: { old: { id: 'old', type: 'system', label: 'Old', x: 0, y: 0, width: 1, height: 1, collapsed: false } }, relations: {} } as never]
+    const slide = { snapshotId: null, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } }
+    data.presentations = [{ id: 'p', name: 'Deck', slides: [
+      { ...slide, id: 'a', name: 'Now', focusNodeIds: ['sys', 'gone'] },
+      // Shown with its milestone, which holds the element.
+      { ...slide, id: 'b', name: 'Then', snapshotId: 'm', focusNodeIds: ['old'] },
+    ] }]
+    expect(check(data).findings.filter((f) => f.rule === 'stale-reference').map((f) => f.message)).toEqual([
+      'Slide "Now" of "Deck" focuses on 1 element(s) the model it shows does not have: gone.',
+    ])
+  })
 })
 
 describe('radical check: the folder', () => {
