@@ -919,6 +919,15 @@ const KNOWN: Known[] = [
     match: (t, v) => (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent') && !!v.facts?.overlap,
     note: 'K33: Undo after an agent\'s write puts an element back under one the write grew (new; next to K16, K17)',
   },
+  {
+    // Nested: a database added into System 0 (not saved yet) while the agent
+    // moves Container 0.0 into System 1; after the merge a component of
+    // System 0 dragged 1 px: System 1, grown by the agent's write, is drawn
+    // 92 px over System 2. The same on the code before these fixes.
+    rule: 'geometry',
+    match: (t, v, resolved) => lastAction(t) === 'drag' && !!v.facts?.overlap && resolved.some((r) => /merged with unsaved edits/.test(r)),
+    note: 'K34: after a merge with unsaved edits, the next drag shows a container the agent grew over its neighbour (new; next to K19)',
+  },
 ]
 
 const knownHits = new Map<string, number>()

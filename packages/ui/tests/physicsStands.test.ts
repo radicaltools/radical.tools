@@ -236,6 +236,59 @@ describe('a row of containers, one of them holding what is dragged', () => {
     rest()
     expect(s().saveDiagram().defaultPositions).toEqual(saved.defaultPositions)
   })
+
+  it('stays on its line to the half pixel after a 1 px drag inside one of them (fuzzer K2)', () => {
+    // Nested: Component 0.2.0 dragged 1 px: Container 0.2 framed anew, the
+    // row moved onto it, but Container 0.0 and 0.1 a third of a pixel short
+    // (a frame kept from the layout followed its leaves only half a pixel
+    // at a time); read again, the row was snapped and every container refit.
+    const box = (id: string, type: string, parentId: string | undefined, x: number, y: number, width: number, height: number): C4Node =>
+      ({ id, type, label: id, description: '', parentId, x, y, width, height, collapsed: false }) as C4Node
+    const nodes: C4Node[] = [box('sys', 'system', undefined, 0, 400, 2440, 440)]
+    let x = 40
+    for (const [c, count] of [['a', 3], ['b', 2], ['c', 4]] as const) {
+      const width = 40 + count * 240
+      nodes.push(box(c, 'container', 'sys', x, 120, width, 280))
+      for (let k = 0; k < count; k++) nodes.push(box(`${c}${k}`, 'component', c, 40 + k * 240, 120, 200, 120))
+      x += width + 40
+    }
+    s().loadDiagram({ nodes, relations: [], views: [], defaultLayoutConstraints: [{ id: 'row', type: 'align', axis: 'horizontal', nodeIds: ['a', 'b', 'c'] }] } as DiagramData)
+    rest()
+    drag('c0', 0, 1)
+    const d = drawn()
+    const mid = (id: string): number => d[id].y + d[id].height / 2
+    expect(Math.abs(mid('a') - mid('c'))).toBeLessThanOrEqual(0.01)
+    expect(Math.abs(mid('b') - mid('c'))).toBeLessThanOrEqual(0.01)
+    const saved = clone(s().saveDiagram())
+    s().loadDiagram(clone(saved))
+    rest()
+    expect(s().saveDiagram().defaultPositions).toEqual(saved.defaultPositions)
+  })
+
+  it('moves nothing when something else is dropped', () => {
+    // The lines are held as drawn after a drop, nothing is pushed along
+    // them (that moved a nested model's first system 60 px, onto the next).
+    const box = (id: string, type: string, parentId: string | undefined, x: number, y: number, width: number, height: number): C4Node =>
+      ({ id, type, label: id, description: '', parentId, x, y, width, height, collapsed: false }) as C4Node
+    s().loadDiagram({
+      nodes: [
+        box('shop', 'system', undefined, 0, 300, 1180, 460),
+        box('web', 'container', 'shop', 30, 270 - 150, 240, 160),
+        box('orders', 'container', 'shop', 330, 120, 280, 310),
+        box('k0', 'component', 'orders', 30, 120, 220, 140),
+        box('api', 'container', 'shop', 670, 120 + 75, 240, 160),
+        box('buyer', 'person', undefined, 2000, 0, 150, 170),
+      ],
+      relations: [],
+      views: [],
+      defaultLayoutConstraints: [{ id: 'row', type: 'align', axis: 'horizontal', nodeIds: ['web', 'orders', 'api'] }],
+    } as DiagramData)
+    rest()
+    const before = drawn()
+    drag('buyer', 0, 1)
+    const after = drawn()
+    for (const id of ['shop', 'web', 'orders', 'k0', 'api']) expect(after[id], id).toEqual(before[id])
+  })
 })
 
 describe('a row of elements in a container', () => {

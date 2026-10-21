@@ -620,9 +620,9 @@ export class LiveColaEngine {
         // 2.5 px off its row, and the next load snapped the row and refit
         // every container).
         this.followCarriers(moved)
-        this.projectGroupAlignments()
+        this.projectGroupAlignments(false)
       }
-      this.emitPositions()
+      this.emitPositions(true)
       this.callbacks.onSettled?.()
       return
     }
@@ -859,7 +859,9 @@ export class LiveColaEngine {
       const dy = first ? first.node.y - first.y : 0
       const rigid = kept.leaves.every((l) => Math.abs(l.node.x - l.x - dx) <= REPORT_PX && Math.abs(l.node.y - l.y - dy) <= REPORT_PX)
       if (rigid) {
-        if (Math.abs(dx) > REPORT_PX || Math.abs(dy) > REPORT_PX) {
+        // However little: a frame left behind by a third of a pixel showed
+        // a row through it off its line by that much.
+        if (dx !== 0 || dy !== 0) {
           kept.frame = { x: kept.frame.x + dx, X: kept.frame.X + dx, y: kept.frame.y + dy, Y: kept.frame.Y + dy }
           for (const l of kept.leaves) { l.x = l.node.x; l.y = l.node.y }
         }
@@ -1579,7 +1581,8 @@ export class LiveColaEngine {
         // a model change rebuilds the layout.
         this.cola?.stop()
         this.resetPace()
-        this.emitPositions()
+        // relax() reports where its steps end (RELAX_MAX_STEPS), as before.
+        this.emitPositions(!this.untimed)
         this.unfreeze()
         this.callbacks.onSettled?.()
         return
@@ -1777,9 +1780,11 @@ export class LiveColaEngine {
   /**
    * Holds alignments that have a group member, after each WebCoLa step:
    * every member moves onto the members' mean line, or onto the line of the
-   * member being dragged, which the others then follow.
+   * member being dragged, which the others then follow. `apart`: and they
+   * are kept clear of each other along it, as overlap removal sees them
+   * (not after a calm drop, which moves nothing to make room).
    */
-  private projectGroupAlignments(): void {
+  private projectGroupAlignments(apart = true): void {
     // Frozen leaves where they are held first (the step just taken pulled
     // them on their springs): a group's frame is read from its leaves, and
     // one read off a pulled leaf is no longer the frame the layout gave it.
@@ -1793,8 +1798,10 @@ export class LiveColaEngine {
       let held = a.members.findIndex((m) => this.holdsGrabbed(m.id))
       // A pinned member stays: the line runs through it.
       if (held < 0) held = a.members.findIndex((m) => this.pinnedMembers.has(m.id))
+      // After a calm drop the line runs where its members are now: one
+      // kept from the physics' last run may be far from there.
       if (held >= 0) a.line = centres[held]!
-      else a.line ??= (centres as number[]).reduce((sum, c) => sum + c, 0) / centres.length
+      else if (!apart || a.line === undefined) a.line = (centres as number[]).reduce((sum, c) => sum + c, 0) / centres.length
       const target = a.line
       a.members.forEach((m, i) => {
         const d = target - centres[i]!
@@ -1810,10 +1817,10 @@ export class LiveColaEngine {
         .map((m) => ({ m, c: this.memberCentre(m, along) ?? 0 }))
         .sort((p, q) => p.c - q.c)
         .map((p) => p.m)
-      this.pushApart(standing, along)
+      if (apart) this.pushApart(standing, along)
     }
     // Ordered lines: the same, in the order asked for.
-    for (const o of this.groupOrders) this.pushApart(o.members, o.along)
+    if (apart) for (const o of this.groupOrders) this.pushApart(o.members, o.along)
   }
 
   /** Pushes each member clear of the previous one along `along`; when the
@@ -1889,7 +1896,12 @@ export class LiveColaEngine {
   // ─── Emit positions to store ───────────────────────────────────────────────
   // Reads absolute positions from cola nodes/groups, converts to RF-relative.
 
-  private emitPositions(): void {
+  /** `exact`: where a run or a drop ends, every change is reported, however
+   *  small. Changes under REPORT_PX left the canvas and the saved file up
+   *  to half a pixel off what the layout had: a group just off its row by
+   *  that much was snapped onto it, and every container refit, on the next
+   *  load. */
+  private emitPositions(exact = false): void {
     // 1. Collect absolute top-left positions from cola
     const abs: Record<string, { x: number; y: number; width?: number; height?: number }> = {}
 
@@ -1966,10 +1978,11 @@ export class LiveColaEngine {
     let any = false
     for (const [id, pos] of Object.entries(result)) {
       const last = this.reported.get(id)
+      const within = exact ? 0 : REPORT_PX
       if (last
-        && Math.abs(last.x - pos.x) <= REPORT_PX && Math.abs(last.y - pos.y) <= REPORT_PX
-        && Math.abs((last.width ?? 0) - (pos.width ?? 0)) <= REPORT_PX
-        && Math.abs((last.height ?? 0) - (pos.height ?? 0)) <= REPORT_PX) continue
+        && Math.abs(last.x - pos.x) <= within && Math.abs(last.y - pos.y) <= within
+        && Math.abs((last.width ?? 0) - (pos.width ?? 0)) <= within
+        && Math.abs((last.height ?? 0) - (pos.height ?? 0)) <= within) continue
       this.reported.set(id, pos)
       changed[id] = pos
       any = true
