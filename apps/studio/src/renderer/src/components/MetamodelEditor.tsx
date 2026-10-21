@@ -44,6 +44,20 @@ const IconTrash = () => (
  *  keeps the text as typed and parses it on the way out: re-made from the
  *  parsed options on each key, a comma or a space at the end never survived
  *  ("gold, silver" became one option "goldsilver"). */
+
+/** A type's card opens and closes from the keyboard as by a click on its
+ *  header (a div): it was out of reach of Tab. */
+function headerKeys(toggle: () => void): { role: 'button'; tabIndex: number; onKeyDown: (e: React.KeyboardEvent) => void } {
+  return {
+    role: 'button',
+    tabIndex: 0,
+    onKeyDown: (e) => {
+      if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+      e.preventDefault()
+      toggle()
+    },
+  }
+}
 function EnumOptionsInput({ options, onChange }: { options: string[]; onChange: (next: string[]) => void }): React.ReactElement {
   const parse = (text: string): string[] => text.split(',').map((s) => s.trim()).filter(Boolean)
   const [text, setText] = useState(options.join(', '))
@@ -279,7 +293,7 @@ function NodeTypeCard({
 
   return (
     <div ref={ref} className={`mm-card${focusToken !== undefined ? ' focused' : ''}`}>
-      <div className="mm-card-header" onClick={() => setOpen((v) => !v)}>
+      <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open}>
         <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
           <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -478,7 +492,7 @@ function RelationTypeCard({
 
   return (
     <div ref={ref} className={`mm-card${focusToken !== undefined ? ' focused' : ''}`}>
-      <div className="mm-card-header" onClick={() => setOpen((v) => !v)}>
+      <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open}>
         <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
           <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -650,7 +664,7 @@ function ViewpointCard({
 
   return (
     <div className="mm-card">
-      <div className="mm-card-header" onClick={() => setOpen((v) => !v)}>
+      <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open}>
         <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
           <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
