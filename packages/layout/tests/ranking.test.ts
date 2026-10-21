@@ -52,6 +52,18 @@ describe('aggregated quality', () => {
     expect(KEEP_CURRENT_MARGIN).toBeGreaterThan(0)
   })
 
+  it('counts a layout several candidates came out as once, when it picks the winner', () => {
+    // Three ELK variants giving one Layered TB weighed it three times in the
+    // means and deviations, and so decided between two other near equals.
+    const a = score({ renderedCrossings: 32, labelCollisions: 3, edgeLengthSd: 1.1 })
+    const b = score({ renderedCrossings: 25, compactness: 0.6, edgeLengthSd: 2.5 })
+    const c = score({ renderedCrossings: 99, renderedOverdraws: 54, edgeLengthSd: 2.2 })
+    const once = aggregatedQuality([a, b, c], true)
+    const thrice = aggregatedQuality([a, b, c, { ...c }, { ...c }], true)
+    for (let i = 0; i < 3; i++) expect(thrice[i]).toBeCloseTo(once[i], 9)
+    expect(aggregatedQuality([a, b, c, { ...c }, { ...c }])[0]).not.toBeCloseTo(once[0], 3)
+  })
+
   it('picks the same winner whatever layout it starts from, and keeps it the next time (item 193)', () => {
     // The sample's 13-element Trace list: its two best layered layouts, and
     // the unarranged layout the first run started from. Ranked with that
