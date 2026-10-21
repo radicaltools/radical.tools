@@ -1636,7 +1636,7 @@ export async function runSmartLayoutWorkerPhase(
   const contenders = [refinedCandidate, ...valid]
   const scores = contenders.map((c) => c.score)
   if (currentCompetes) scores.push(currentScore)
-  const pick = currentCompetes ? bestIndexKeepingCurrent(scores) : bestIndex(scores)
+  const pick = currentCompetes ? bestIndexKeepingCurrent(scores) : bestIndex(scores, true)
   const keptCurrent = currentCompetes && pick === contenders.length
   let winner = keptCurrent ? refinedCandidate : contenders[pick]
   if (keptCurrent) {
