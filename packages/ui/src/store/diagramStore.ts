@@ -389,6 +389,21 @@ function _pushUndoEntry(entry: HistoryEntry): void {
   _redoStack.length = 0 // clear redo on new change
 }
 
+/** A text field has focus (beginTyping): what is typed into it until it
+ *  loses focus (endTyping) is one undo step, the one its first letter
+ *  pushed (`step`), as long as that step is still the last and the edits
+ *  are to the same fields of the same element (`key`). Each letter typed
+ *  into the Name field was a step of its own. */
+let _typing: { key: string; step: HistoryItem | null } | null = null
+
+/** The undo step of an edit of `key` ("node:<id>:label"), unless it goes on
+ *  what is being typed into a focused field (_typing). */
+function _pushTextEdit(state: DiagramStore, key: string): void {
+  if (_typing && _typing.key === key && _typing.step && _undoStack[_undoStack.length - 1] === _typing.step) return
+  _pushUndo(state)
+  if (_typing) _typing = { key, step: _undoStack[_undoStack.length - 1] ?? null }
+}
+
 /** The model as it was when the drag in progress began (liveGrab). A drag
  *  changes it over many frames, and only its end says whether anything
  *  moved (React Flow reports a click as a drag): the undo step is made
@@ -1636,6 +1651,11 @@ interface DiagramStore {
   removeNodes: (ids: string[]) => void
   /** Runs `action`, whatever store actions it calls, as one undo step. */
   runAsOneStep: (action: () => void) => void
+  /** A text field got focus: what is typed into it (updateNode,
+   *  updateRelation) until endTyping is one undo step. */
+  beginTyping: () => void
+  /** The text field lost focus: the next edit is a step of its own. */
+  endTyping: () => void
   /** Asks to delete the elements, as the Delete key on the canvas does. */
   requestDelete: (nodeIds: string[]) => void
   toggleCollapse: (id: string) => void
@@ -2715,7 +2735,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(refused, 'error')
           return
         }
-        get()._pushUndo()
+        _pushTextEdit(get(), `node:${id}:${keys.sort().join(',')}`)
         get()._markMilestoneEdit()
         set((state) => { keepingSharedViews(state as DiagramStore, () => model.patchNode(state, id, updates)) })
         get()._sync()
@@ -2751,6 +2771,12 @@ export const useDiagramStore = create<DiagramStore>()(
 
       runAsOneStep(action) {
         _asOneStep(action)
+      },
+      beginTyping() {
+        _typing = { key: '', step: null }
+      },
+      endTyping() {
+        _typing = null
       },
 
       requestDelete(nodeIds) {
@@ -3125,7 +3151,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(refused, 'error')
           return
         }
-        get()._pushUndo()
+        _pushTextEdit(get(), `relation:${id}:${Object.keys(updates).sort().join(',')}`)
         get()._markMilestoneEdit()
         set((state) => { model.patchRelation(state, id, updates) })
         get()._sync()

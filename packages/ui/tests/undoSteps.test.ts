@@ -506,3 +506,55 @@ describe('Multi page and Depth of a wiki', () => {
     expect(s().c4Nodes.bank.description).toBeUndefined()
   })
 })
+
+describe('typing into a text field is one undo step (item 158)', () => {
+  const type = (text: string, edit: (v: string) => void) => {
+    for (let i = 1; i <= text.length; i++) edit(text.slice(0, i))
+  }
+
+  it('a name typed letter by letter is taken back at once', () => {
+    s().beginTyping()
+    type('Card Gateway', (v) => s().updateNode('bank', { label: v }))
+    s().endTyping()
+    expect(s().c4Nodes.bank.label).toBe('Card Gateway')
+    s().undo()
+    expect(s().c4Nodes.bank.label).toBe('bank')
+    s().redo()
+    expect(s().c4Nodes.bank.label).toBe('Card Gateway')
+  })
+
+  it("a relation's name too, and each field typed into is a step of its own", () => {
+    s().beginTyping()
+    type('pays', (v) => s().updateRelation('r3', { label: v }))
+    s().endTyping()
+    s().beginTyping()
+    type('HTTPS', (v) => s().updateRelation('r3', { technology: v }))
+    s().endTyping()
+    s().undo()
+    expect(s().c4Relations.r3).toMatchObject({ label: 'pays' })
+    expect(s().c4Relations.r3.technology).toBeUndefined()
+    s().undo()
+    expect(s().c4Relations.r3.label).toBeUndefined()
+  })
+
+  it('the same field typed into again after it lost focus, or after Undo, is a new step', () => {
+    s().beginTyping()
+    type('Card', (v) => s().updateNode('bank', { label: v }))
+    s().endTyping()
+    s().beginTyping()
+    type('Card Gateway', (v) => v.length > 4 && s().updateNode('bank', { label: v }))
+    s().undo()
+    expect(s().c4Nodes.bank.label).toBe('Card')
+    type('Card Bank', (v) => v.length > 4 && s().updateNode('bank', { label: v }))
+    s().endTyping()
+    s().undo()
+    expect(s().c4Nodes.bank.label).toBe('Card')
+  })
+
+  it('without a focused field each edit is a step', () => {
+    s().updateNode('bank', { label: 'B' })
+    s().updateNode('bank', { label: 'Ba' })
+    s().undo()
+    expect(s().c4Nodes.bank.label).toBe('B')
+  })
+})
