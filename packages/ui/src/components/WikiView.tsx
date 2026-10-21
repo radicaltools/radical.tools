@@ -11,6 +11,8 @@ import {
   earsActionIsClause,
   refLabels,
   relationTypeForProse,
+  relationTypeKeepsAggregates,
+  relationTypesFitting,
   NODE_TYPE_CATEGORIES,
   CUSTOM_CATEGORY,
   nodeTypeCategory,
@@ -30,6 +32,7 @@ import { EarsQuickEntry } from './EarsQuickEntry'
 import { MockupWireframe } from './MockupWireframe'
 import { MarkdownText } from './MarkdownText'
 import { RefPicker } from './RefPicker'
+import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { wireframeDataUri } from '@radical/common/wireframe'
 import {
   C4Node,
@@ -332,8 +335,11 @@ function relationReadingsOf(
     for (const direction of ['out', 'in'] as const) {
       const partners = others.filter((n) => {
         if (related.has(`${direction}:${def.id}:${n.id}`)) return false
-        const [from, to] = direction === 'out' ? [node.type, n.type] : [n.type, node.type]
-        return def.allowedPairs.length === 0 || def.allowedPairs.some((pair) => pair.from === from && pair.to === to)
+        const [from, to] = direction === 'out' ? [node, n] : [n, node]
+        // The aggregate rules too: Part of… from one aggregate root to
+        // another was offered, and Validation then flagged it.
+        return (def.allowedPairs.length === 0 || def.allowedPairs.some((pair) => pair.from === from.type && pair.to === to.type))
+          && relationTypeKeepsAggregates(def.id, from, to)
       })
       if (partners.length === 0) continue
       const phrase = relationPhrase(def, direction)
@@ -359,7 +365,7 @@ export function WikiView(): React.ReactElement {
   const updateRelation = useDiagramStore((s) => s.updateRelation)
   const requestCreateNode = useDiagramStore((s) => s.requestCreateNode)
   const addNodes = useDiagramStore((s) => s.addNodes)
-  const removeNode = useDiagramStore((s) => s.removeNode)
+  const requestDelete = useDiagramStore((s) => s.requestDelete)
   const addRelation = useDiagramStore((s) => s.addRelation)
   const removeRelation = useDiagramStore((s) => s.removeRelation)
   const pushNotification = useDiagramStore((s) => s.pushNotification)
@@ -420,13 +426,18 @@ export function WikiView(): React.ReactElement {
   // The page being read went (an Undo of Add child, an agent's delete):
   // the Overview shows, and the address says so too (it kept /f/<gone>).
   const readFocus = useRef<string | null>(null)
+  // The element Delete was asked for here, and its parent: its page goes
+  // to the parent's.
+  const leaving = useRef<{ id: string; parentId: string | null } | null>(null)
   useEffect(() => {
     if (focus) { readFocus.current = focus.id; return }
     if (view && focusId && !glossary && readFocus.current === focusId) {
       readFocus.current = null
-      setWikiFocus(view.id, null)
+      const parentId = leaving.current?.id === focusId ? leaving.current.parentId : null
+      leaving.current = null
+      setWikiFocus(view.id, parentId && c4Nodes[parentId] ? parentId : null)
     }
-  }, [focus, focusId, glossary, view, setWikiFocus])
+  }, [focus, focusId, glossary, view, setWikiFocus, c4Nodes])
 
   const typeOrder = useMemo(() => allNodeTypeIds(metamodel), [metamodel])
 
@@ -512,16 +523,14 @@ export function WikiView(): React.ReactElement {
     })
   }
 
+  // Delete asks as the canvas does (DeleteConfirmDialog, below), counting
+  // the relations and sequence steps that go; Undo brings them back. The
+  // page of the element deleted gives way to its parent's.
   const deleteNode = (id: string) => {
     const target = c4Nodes[id]
     if (!target) return
-    const kids = Object.values(c4Nodes).filter((n) => n.parentId === id)
-    const extra = kids.length ? ` and its ${kids.length} child element${kids.length === 1 ? '' : 's'}` : ''
-    if (!window.confirm(`Delete "${target.label}"${extra}? This cannot be undone from here.`)) return
-    const parentId = target.parentId ?? null
-    removeNode(id)
-    pushNotification(`"${target.label}" deleted.`, 'info')
-    if (focusId === id || (focusId && !c4Nodes[focusId])) goTo(parentId)
+    leaving.current = { id, parentId: target.parentId ?? null }
+    requestDelete([id])
   }
 
   const createRelation = (sourceId: string, targetId: string, relationType?: string) => {
@@ -723,6 +732,7 @@ export function WikiView(): React.ReactElement {
           onClose={() => setMenu(null)}
         />
       )}
+      <DeleteConfirmDialog />
     </div>
     </WikiDocumentContext.Provider>
     </WikiActionsContext.Provider>
@@ -2451,17 +2461,16 @@ function WikiRelationLine({
     : undefined
   const srcNode = nodes[relation.sourceId]
   const dstNode = nodes[relation.targetId]
+  // As the properties card offers them: the types that connect these two
+  // under the aggregate rules. "generic" made a relation with no type,
+  // which Validation flags where types fit.
   const compatibleTypes = useMemo(
-    () =>
-      metamodel
-        ? Object.values(metamodel.relationTypes).filter(
-            (rt) =>
-              rt.allowedPairs.length === 0 ||
-              rt.allowedPairs.some((p) => p.from === srcNode?.type && p.to === dstNode?.type),
-          )
-        : [],
+    () => relationTypesFitting(metamodel, srcNode?.type, dstNode?.type).filter((rt) => relationTypeKeepsAggregates(rt.id, srcNode, dstNode)),
     [metamodel, srcNode, dstNode],
   )
+  const currentType = relation.relationType ?? ''
+  const fitsNow = !currentType || compatibleTypes.some((rt) => rt.id === currentType)
+  const showType = compatibleTypes.length > 1 || !fitsNow || (!currentType && compatibleTypes.length > 0)
   const relMetaProps = relTypeDef?.properties ?? []
   const getVal = (key: string) => (relation as unknown as Record<string, unknown>)[key]
 
@@ -2492,21 +2501,20 @@ function WikiRelationLine({
             onCommit={(v) => updateRelation(relation.id, { label: v })}
           />
 
-          {compatibleTypes.length > 1 && (
+          {showType && (
             <span className="wiki-rel-pill">
               <InlineSelect
-                value={relation.relationType ?? ''}
+                value={currentType}
                 readOnly={readOnly}
                 options={[
-                  { value: '', label: 'generic' },
+                  ...(!currentType ? [{ value: '', label: '— choose a type —', disabled: true }] : []),
+                  ...(!fitsNow ? [{ value: currentType, label: `${relTypeDef?.label ?? currentType} (does not connect these)` }] : []),
                   ...compatibleTypes.map((rt) => ({ value: rt.id, label: rt.label })),
                 ]}
-                display={<span>{relTypeDef?.label ?? 'generic'}</span>}
-                onCommit={(v) =>
-                  updateRelation(relation.id, {
-                    relationType: v || undefined,
-                  } as Parameters<UpdateRelation>[1])
-                }
+                display={<span>{relTypeDef?.label ?? 'no type'}</span>}
+                onCommit={(v) => {
+                  if (v && v !== currentType) updateRelation(relation.id, { relationType: v } as Parameters<UpdateRelation>[1])
+                }}
               />
             </span>
           )}
@@ -3016,7 +3024,7 @@ function InlineSelect({
   onCommit,
 }: {
   value: string
-  options: { value: string; label: string }[]
+  options: { value: string; label: string; disabled?: boolean }[]
   display: React.ReactNode
   readOnly?: boolean
   onCommit: (v: string) => void
@@ -3041,7 +3049,7 @@ function InlineSelect({
         onBlur={() => setEditing(false)}
       >
         {options.map((o) => (
-          <option key={o.value} value={o.value}>
+          <option key={o.value} value={o.value} disabled={o.disabled}>
             {o.label}
           </option>
         ))}

@@ -42,6 +42,7 @@ import {
   builtInGovernanceMetamodel,
   isRelationAllowed,
   relationTypeKeepsAggregates,
+  relationTypesFitting,
   isParentAllowed,
   isPlacementAllowed,
   canAddMoreOfType,
@@ -2417,7 +2418,11 @@ interface DiagramStore {
   setMetamodel: (m: Metamodel) => void
   /** Brings the views of a viewpoint in step with the metamodel. */
   _syncViewpoints: () => void
-  resetMetamodelToC4: () => void
+  /** `confirm`, when given, is asked with the metamodel the change makes
+   *  once the change is allowed (the metamodel editor lists there what it
+   *  would leave the model against); false makes nothing. So for the two
+   *  removes below. */
+  resetMetamodelToC4: (confirm?: (next: Metamodel) => boolean) => void
   _forgetStepsOfLostTypes: () => void
   /** Where the undo history stands now, for _mergeStepsSince. */
   _historyMark: () => number
@@ -2426,9 +2431,9 @@ interface DiagramStore {
    *  after another (a Hub concept with its related concepts). */
   _mergeStepsSince: (mark: number) => void
   upsertNodeType: (def: NodeTypeDef) => void
-  removeNodeType: (id: string) => void
+  removeNodeType: (id: string, confirm?: (next: Metamodel) => boolean) => void
   upsertRelationType: (def: RelationTypeDef) => void
-  removeRelationType: (id: string) => void
+  removeRelationType: (id: string, confirm?: (next: Metamodel) => boolean) => void
 
   // ── hub import templates (per document) ──
   /** Keyed by import-instance UUID. Allows reconfiguring template values after import. */
@@ -3755,8 +3760,8 @@ export const useDiagramStore = create<DiagramStore>()(
         if (made.relationType) { s.addRelation({ sourceId, targetId, relationType: made.relationType }); return }
         // Several types fit the pair: which one is the user's to say (left
         // to inference, the relation had none, and nothing flagged it).
-        const types = Object.values(s.metamodel?.relationTypes ?? {})
-          .filter((rt) => rt.allowedPairs.some((p) => p.from === source.type && p.to === target.type) && relationTypeKeepsAggregates(rt.id, source, target))
+        const types = relationTypesFitting(s.metamodel, source.type, target.type)
+          .filter((rt) => relationTypeKeepsAggregates(rt.id, source, target))
           .map((rt) => rt.id)
         if (types.length > 1) { set((state) => { state.relationTypeChoice = { sourceId, targetId, types } }); return }
         s.addRelation({ sourceId, targetId, ...(types.length === 1 ? { relationType: types[0] } : {}) })
@@ -6389,7 +6394,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { changed = model.syncViewpoints(state as unknown as model.ModelState) })
         if (changed.length) get()._sync()
       },
-      resetMetamodelToC4() {
+      resetMetamodelToC4(confirm) {
         // On a model with governance elements this left them as unknown
         // types, and the editor has nothing to bring the types back with.
         const preset = builtInC4Metamodel()
@@ -6399,6 +6404,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(`Cannot reset the metamodel: ${refused}`, 'error')
           return
         }
+        if (confirm && !confirm(preset)) return
         get()._pushUndo()
         set((state) => { state.metamodel = preset as any })
         get()._syncViewpoints()
@@ -6431,7 +6437,7 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(state.metamodel as Metamodel).nodeTypes[def.id] = def
         })
       },
-      removeNodeType(id) {
+      removeNodeType(id, confirm) {
         // Elements of a type the metamodel no longer has would be left
         // behind as "unknown type"; the MCP server refuses this too.
         const refused = model.checkRemoveNodeType(..._typeHolders(id))
@@ -6440,6 +6446,7 @@ export const useDiagramStore = create<DiagramStore>()(
           return
         }
         if (!get().metamodel.nodeTypes[id] || get().metamodel.nodeTypes[id].builtin) return
+        if (confirm && !confirm(model.metamodelWithoutNodeType(get().metamodel, id))) return
         get()._pushUndo()
         set((state) => {
           const forked = model.forkPresetMetamodel(state.metamodel as Metamodel) ?? (state.metamodel as Metamodel)
@@ -6459,13 +6466,17 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(state.metamodel as Metamodel).relationTypes[def.id] = def
         })
       },
-      removeRelationType(id) {
+      removeRelationType(id, confirm) {
         const refused = model.checkRemoveRelationType(..._typeHolders(id))
         if (refused) {
           get().pushNotification(`Cannot delete this type: ${refused}`, 'error')
           return
         }
         if (!get().metamodel.relationTypes[id] || get().metamodel.relationTypes[id].builtin) return
+        if (confirm) {
+          const { [id]: _removed, ...relationTypes } = get().metamodel.relationTypes
+          if (!confirm({ ...get().metamodel, relationTypes })) return
+        }
         get()._pushUndo()
         set((state) => {
           state.metamodel = (model.forkPresetMetamodel(state.metamodel as Metamodel) ?? state.metamodel) as any

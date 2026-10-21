@@ -68,9 +68,14 @@ function EnumOptionsInput({ options, onChange }: { options: string[]; onChange: 
   // An option added goes in at once; one taken out or renamed when the
   // field is left or Enter is pressed, so an option an element holds is
   // asked about once (the editor asks before it narrows the metamodel),
-  // not at each letter of a new name.
-  const keepsAll = (next: string[]) => options.every((o) => next.includes(o))
+  // not at each letter of a new name. No options yet means any value: the
+  // first ones narrow that, and wait for the field to be left too (they
+  // were asked about at "g", "go" and "gol").
+  const keepsAll = (next: string[]) => options.length > 0 && options.every((o) => next.includes(o))
+  // Typed into since it was last taken.
+  const dirty = useRef(false)
   const commit = () => {
+    dirty.current = false
     const next = parse(text)
     if (next.join('\u0000') !== options.join('\u0000')) {
       onChange(next)
@@ -79,12 +84,23 @@ function EnumOptionsInput({ options, onChange }: { options: string[]; onChange: 
       setText(options.join(', '))
     } else setText(next.join(', '))
   }
+  // The editor closed (Esc) with the focus here: what the field shows is
+  // taken, as when it is left. Only the additions typed so far were, and
+  // ["gold", "s"] stayed while the field had shown "gold, silver".
+  const latest = useRef({ text, options, onChange })
+  latest.current = { text, options, onChange }
+  useEffect(() => () => {
+    if (!dirty.current) return
+    const { text: last, options: held, onChange: change } = latest.current
+    const next = parse(last)
+    if (next.join('\u0000') !== held.join('\u0000')) change(next)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <input
       className="mm-input mm-prop-options"
       value={text}
       placeholder="opt1, opt2"
-      onChange={(e) => { setText(e.target.value); if (keepsAll(parse(e.target.value))) onChange(parse(e.target.value)) }}
+      onChange={(e) => { dirty.current = true; setText(e.target.value); if (keepsAll(parse(e.target.value))) onChange(parse(e.target.value)) }}
       onBlur={commit}
       onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
     />
@@ -863,14 +879,17 @@ export function MetamodelEditor(): React.ReactElement {
 
   /** Whether to make a change of the metamodel to `next`: at once, unless
    *  it leaves what the model holds against the metamodel (parents, a
-   *  maximum, options, a required property or pairs narrowed below it);
-   *  then after the user has seen what it breaks and said yes. */
-  const confirmNarrowing = (next: Metamodel): boolean => {
+   *  maximum, options, a required property, pairs narrowed below it, a
+   *  type deleted, an any-pair type added beside the one an untyped
+   *  relation reads as); then after the user has seen what it breaks and
+   *  said yes. A change that asks anyway (`question`) asks it once, with
+   *  the list. */
+  const confirmNarrowing = (next: Metamodel, question?: string): boolean => {
     const breaks = metamodelChangeBreaks(nodes, relations, metamodel, next)
-    if (!breaks.length) return true
+    if (!breaks.length) return question ? window.confirm(question) : true
     const shown = breaks.slice(0, 10).map((i) => `• ${i.message}`).join('\n')
     const more = breaks.length > 10 ? `\n…and ${breaks.length - 10} more` : ''
-    return window.confirm(`This change leaves what the model holds against the metamodel (${breaks.length} ${breaks.length === 1 ? 'issue' : 'issues'}):\n\n${shown}${more}\n\nChange the metamodel anyway? Validation will list them until they are fixed.`)
+    return window.confirm(`${question ? `${question}\n\n` : ''}This change leaves what the model holds against the metamodel (${breaks.length} ${breaks.length === 1 ? 'issue' : 'issues'}):\n\n${shown}${more}\n\nChange the metamodel anyway? Validation will list them until they are fixed.`)
   }
   const changeNodeType = (def: NodeTypeDef): void => {
     if (confirmNarrowing({ ...metamodel, nodeTypes: { ...metamodel.nodeTypes, [def.id]: def } })) upsertNodeType(def)
@@ -906,7 +925,9 @@ export function MetamodelEditor(): React.ReactElement {
       i += 1
       id = `rel${i}`
     }
-    upsertRelationType({ id, label: `New relation ${i}`, allowedPairs: [], builtin: false })
+    const def: RelationTypeDef = { id, label: `New relation ${i}`, allowedPairs: [], builtin: false }
+    // With no pairs it fits every pair (decided 2026-10-21).
+    changeRelationType(def)
   }
 
   const setAppMode = useDiagramStore((s) => s.setAppMode)
@@ -1005,11 +1026,7 @@ export function MetamodelEditor(): React.ReactElement {
           </div>
           <button
             className="mm-btn"
-            onClick={() => {
-              if (window.confirm('Reset metamodel to built-in C4? Custom types will be lost.')) {
-                resetMetamodelToC4()
-              }
-            }}
+            onClick={() => resetMetamodelToC4((next) => confirmNarrowing(next, 'Reset metamodel to built-in C4? Custom types will be lost.'))}
           >
             Reset to C4 preset
           </button>
@@ -1040,7 +1057,7 @@ export function MetamodelEditor(): React.ReactElement {
                 allTypes={nodeTypes}
                 focusToken={focusTokenFor('type', t.id)}
                 onChange={(patch) => changeNodeType({ ...t, ...patch })}
-                onDelete={() => removeNodeType(t.id)}
+                onDelete={() => removeNodeType(t.id, (next) => confirmNarrowing(next))}
               />
             ))}
           </div>
@@ -1061,7 +1078,7 @@ export function MetamodelEditor(): React.ReactElement {
                 allTypes={nodeTypes}
                 focusToken={focusTokenFor('relation', t.id)}
                 onChange={(patch) => changeRelationType({ ...t, ...patch })}
-                onDelete={() => removeRelationType(t.id)}
+                onDelete={() => removeRelationType(t.id, (next) => confirmNarrowing(next))}
               />
             ))}
           </div>

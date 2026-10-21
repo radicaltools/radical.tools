@@ -2,7 +2,7 @@
 
 import { C4Node, C4Relation } from '../c4'
 import { Metamodel, PropertyDef } from './types'
-import { chainTypeNames, GROUP_TYPE, hasPlaceUnder, placeOf, propertyKeyProblem } from './lookup'
+import { chainTypeNames, GROUP_TYPE, hasPlaceUnder, placeOf, propertyKeyProblem, relationTypesFitting } from './lookup'
 import { validateStateMachines } from './statechart'
 import { validateDomainModel } from './domainModel'
 import { refIds, refProblem } from './refs'
@@ -236,13 +236,14 @@ export function validateModel(
   // A relation with no type where the metamodel has several types for its
   // pair is none of them (made with "(generic)" in the card, or by a tool
   // that named no type). Where one type fits, that one is meant: a relation
-  // added there gets it, and one saved without it reads as it.
+  // added there gets it, and one saved without it reads as it. A type with
+  // no pairs fits every pair, and counts.
   for (const r of Object.values(relations)) {
     if (r.relationType) continue
     const src = nodes[r.sourceId]
     const dst = nodes[r.targetId]
     if (!src || !dst) continue
-    const fitting = Object.values(metamodel.relationTypes).filter((rt) => rt.allowedPairs.some((p) => p.from === src.type && p.to === dst.type))
+    const fitting = relationTypesFitting(metamodel, src.type, dst.type)
     if (fitting.length < 2) continue
     issues.push({
       id: `untyped-rel:${r.id}`,

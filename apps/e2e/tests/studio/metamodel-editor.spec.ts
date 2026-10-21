@@ -1,4 +1,5 @@
 import { test, expect, WHOLE, fixture } from '../../support/fixtures'
+import { builtInC4Metamodel } from '@radical/common/metamodel'
 
 // The list side of the metamodel editor (the Diagram tab has its own spec).
 
@@ -185,4 +186,119 @@ test('a value that is no option any more shows as it is in the card', async ({ p
   const tier = studio.attribute('Tier')
   await expect(tier).toHaveValue('silver')
   await expect(tier.locator('option:checked')).toHaveText('silver (not an option)')
+})
+
+// Item 243: typing the first options of an enum whose elements hold a
+// value asked at each letter ("g", "go", "gol": the empty list allowed any
+// value, so each letter narrowed it), and once stored ["gold", "s"] while
+// the field showed "gold, silver".
+test('typing an enum\'s first options asks nothing until the field is left', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.nodes = doc.nodes.map((n: { id: string }) => (n.id === 'api' ? { ...n, tier: 'gold' } : n))
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-containers')
+  await openEditor(page)
+  const row = await newPropertyRow(page, 'container')
+  await row.locator('.mm-prop-key').fill('tier')
+  await row.locator('.mm-prop-label').fill('Tier')
+  await row.locator('.mm-prop-type').selectOption('enum')
+  const asked: string[] = []
+  page.on('dialog', (d) => { asked.push(d.message()); void d.dismiss() })
+  await row.locator('.mm-prop-options').click()
+  await page.keyboard.type('gold, silver', { delay: 40 })
+  await expect(row.locator('.mm-prop-options')).toHaveValue('gold, silver')
+  await row.locator('.mm-prop-label').click()
+  await closeEditor(page)
+  await expect.poll(async () => {
+    const stored = JSON.parse(await studio.storedJson()) as { metamodel?: { nodeTypes: Record<string, { properties?: { key: string; options?: string[] }[] }> } }
+    return stored.metamodel?.nodeTypes.container.properties?.find((p) => p.key === 'tier')?.options
+  }).toEqual(['gold', 'silver'])
+  expect(asked).toEqual([])
+})
+
+// Item 242: deleting a relation type, Reset to C4 and Add relation type
+// changed what the model holds against the metamodel without the list the
+// editor shows for a narrowed type (Validation went 0 → 1 unasked).
+test.describe('metamodel changes that leave the model against it ask first', () => {
+  // Bookstore, its C4 metamodel with an any-pair type "Misc", and Orders DB
+  // → Customer, which only Misc lets through (C4 has no database → person).
+  const withMisc = (): string => {
+    const doc = JSON.parse(fixture('bookstore'))
+    const c4 = builtInC4Metamodel()
+    doc.metamodel = { ...c4, id: 'custom-c4', name: 'Custom', relationTypes: { ...c4.relationTypes, misc: { id: 'misc', label: 'Misc', allowedPairs: [], builtin: false } } }
+    // Two types fit them now: they say which.
+    doc.relations = doc.relations.map((r: Record<string, unknown>) => ({ ...r, relationType: 'interacts' }))
+    // Untyped (written by an older Studio or by hand), it reads as the one
+    // type that fits: Misc. Deleting Misc is not refused for it.
+    doc.relations.push({ id: 'r-db', sourceId: 'db', targetId: 'customer', label: 'emails' })
+    return JSON.stringify(doc)
+  }
+  const relationTypeIds = async (studio: { storedJson(): Promise<string> }): Promise<string[]> =>
+    Object.keys((JSON.parse(await studio.storedJson()) as { metamodel?: { relationTypes?: Record<string, unknown> } }).metamodel?.relationTypes ?? {})
+
+  test('deleting a relation type lists what it breaks', async ({ page, studio }) => {
+    await studio.seedDocument(withMisc())
+    await studio.open('v-containers')
+    await openEditor(page)
+    let asked = ''
+    page.once('dialog', (d) => { asked = d.message(); void d.dismiss() })
+    await page.locator('.mm-card', { has: page.locator('.mm-type-label', { hasText: /^Misc$/ }) }).getByTitle('Delete relation type').click()
+    await expect.poll(() => asked).toContain('"Orders DB" → "Customer"')
+    await expect(page.locator('.mm-issues-count')).toHaveText('0')
+    expect(await relationTypeIds(studio)).toContain('misc')
+    page.once('dialog', (d) => { void d.accept() })
+    await page.locator('.mm-card', { has: page.locator('.mm-type-label', { hasText: /^Misc$/ }) }).getByTitle('Delete relation type').click()
+    await expect(page.locator('.mm-issues-count')).toHaveText('1')
+  })
+
+  test('Reset to C4 lists what it breaks in its one question', async ({ page, studio }) => {
+    await studio.seedDocument(withMisc())
+    await studio.open('v-containers')
+    await openEditor(page)
+    const asked: string[] = []
+    page.on('dialog', (d) => { asked.push(d.message()); void d.dismiss() })
+    await page.getByRole('button', { name: 'Reset to C4 preset' }).click()
+    await expect.poll(() => asked.length).toBe(1)
+    expect(asked[0]).toContain('Custom types will be lost')
+    expect(asked[0]).toContain('"Orders DB" → "Customer"')
+    await expect(page.locator('.mm-issues-count')).toHaveText('0')
+    expect(await relationTypeIds(studio)).toContain('misc')
+  })
+
+  test('Add relation type says which untyped relations it leaves without a type', async ({ page, studio }) => {
+    // A relation type with no pairs fits every pair: the untyped relations
+    // that read as Interacts could now be either (decided 2026-10-21).
+    await studio.seedWhole()
+    await studio.open('v-containers')
+    await openEditor(page)
+    let asked = ''
+    page.once('dialog', (d) => { asked = d.message(); void d.dismiss() })
+    await page.getByRole('button', { name: 'Add relation type' }).click()
+    await expect.poll(() => asked).toContain('has no type')
+    await expect(page.locator('.mm-type-label', { hasText: /^New relation 1$/ })).toHaveCount(0)
+  })
+})
+
+// Item 243: options typed after others went in letter by letter, and the
+// editor closed with Esc kept the first letter: ["gold", "s"] while the
+// field had shown "gold, silver".
+test('enum options typed and the editor closed with Esc are kept as the field showed them', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await openEditor(page)
+  const row = await newPropertyRow(page, 'container')
+  await row.locator('.mm-prop-key').fill('tier')
+  await row.locator('.mm-prop-type').selectOption('enum')
+  const options = row.locator('.mm-prop-options')
+  await options.fill('gold')
+  await row.locator('.mm-prop-key').click()
+  await options.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(', silver', { delay: 40 })
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: 'Close metamodel editor' })).toHaveCount(0)
+  await expect.poll(async () => {
+    const stored = JSON.parse(await studio.storedJson()) as { metamodel?: { nodeTypes: Record<string, { properties?: { key: string; options?: string[] }[] }> } }
+    return stored.metamodel?.nodeTypes.container.properties?.find((p) => p.key === 'tier')?.options
+  }).toEqual(['gold', 'silver'])
 })
