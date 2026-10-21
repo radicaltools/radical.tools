@@ -451,3 +451,64 @@ test('a way and a filter are edited in place, and a level can follow any relatio
   // Kept with the view.
   await expect.poll(async () => (await studio.storedJson(studio.activeDocId())).includes('"is-not"')).toBe(true)
 })
+
+// Item 191: on a canvas whose filter is a chain, Alt-drag added relations
+// the canvas did not draw (twice, two copies), and an element dropped from
+// the palette was added and not drawn, without a word.
+test.describe('a canvas whose filter is a chain', () => {
+  const node = (id: string, type: string, x: number, y: number) => ({ id, type, label: id, x, y, width: 220, height: 90, collapsed: false })
+  test.beforeEach(async ({ studio }) => {
+    await studio.seedDocument(JSON.stringify({
+      metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+      nodes: [node('need', 'need', 0, 0), node('req', 'requirement', 0, 250), node('req2', 'requirement', 400, 250), node('sc', 'scenario', 800, 250)],
+      relations: [{ id: 'd1', sourceId: 'req', targetId: 'need', relationType: 'derives' }, { id: 'd2', sourceId: 'req2', targetId: 'need', relationType: 'derives' }],
+      views: [{ id: 'trace', name: 'Trace', nodeIds: [], positions: {}, pipeline: { levels: [
+        { ways: [{ types: ['need'] }] },
+        { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }] },
+      ] } }],
+    }))
+    await studio.open('trace')
+  })
+
+  test('Alt-drag adds no relation the canvas would not draw', async ({ page, studio }) => {
+    await expect(studio.node('req')).toBeVisible()
+    await expect(studio.node('sc')).toHaveCount(0)
+    // req → req2: a derives between two requirements, which the chain (need,
+    // then the requirements derived from it) does not draw.
+    await studio.connect(studio.node('req'), studio.node('req2'))
+    await expect(page.getByText(/Not added: this view shows only the relations its filter follows/)).toBeVisible()
+    await studio.connect(studio.node('req'), studio.node('req2'))
+    await page.waitForTimeout(500)
+    expect((await studio.storedDoc()).relations).toHaveLength(2)
+  })
+
+  test('an element dropped from the palette that the chain leaves out is said so', async ({ page, studio }) => {
+    // A requirement derived from nothing: the chain has no place for it.
+    await page.locator('.palette-item', { hasText: /^\s*Requirement\s*$/ }).first().dragTo(studio.pane, { targetPosition: await studio.nearBottom() })
+    await page.getByRole('button', { name: 'Create', exact: true }).click()
+    await expect(page.getByText(/was added, but this view's filter does not show it/)).toBeVisible()
+  })
+})
+
+// D5: where several relation types fit a pair, the canvas asks for one (an
+// Alt-drag between two entities added a relation with none, nothing flagged).
+test('a relation drawn between two entities asks for its type', async ({ page, studio }) => {
+  const node = (id: string, kind: string, x: number) => ({ id, type: 'entity', kind, label: id, x, y: 0, width: 220, height: 90, collapsed: false })
+  await studio.seedDocument(JSON.stringify({
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+    nodes: [node('Order', 'aggregate-root', 0), node('Line', 'entity', 400)],
+    relations: [],
+    views: [{ id: 'dom', name: 'Domain', nodeIds: [], positions: {} }],
+  }))
+  await studio.open('dom')
+  await studio.connect(studio.node('Line'), studio.node('Order'))
+  const menu = page.getByRole('menu', { name: 'Relation from Line to Order' })
+  await expect(menu.getByRole('menuitem')).toHaveText(['Part of', 'References'])
+  await menu.getByRole('menuitem', { name: 'Part of' }).click()
+  await expect(menu).toHaveCount(0)
+  await expect.poll(async () => (await studio.storedDoc()).relations.map((r) => (r as { relationType?: string }).relationType)).toEqual(['part-of'])
+  // Its card: the type can be changed to the other one; no "(generic)".
+  await page.locator('.react-flow__edge-interaction').first().dispatchEvent('click')
+  const type = page.locator('.right-panel.open').getByLabel('Type', { exact: true })
+  await expect(type.locator('option')).toHaveText(['Part of', 'References'])
+})

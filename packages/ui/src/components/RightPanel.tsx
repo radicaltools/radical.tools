@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useDiagramStore, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } from '@radical/common/c4'
-import { resolveEarsSubject, isReservedPropertyKey, type PropertyDef } from '@radical/common/metamodel'
+import { resolveEarsSubject, isReservedPropertyKey, relationTypeKeepsAggregates, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { ViewPipelinePanel } from './ViewPipelinePanel'
 import { MarkdownText } from './MarkdownText'
@@ -2403,10 +2403,18 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
       const dstNode = c4Nodes[rel.targetId]
       const compatibleTypes = metamodel
         ? Object.values(metamodel.relationTypes).filter(rt =>
-            rt.allowedPairs.length === 0 ||
-            rt.allowedPairs.some(p => p.from === srcNode?.type && p.to === dstNode?.type)
+            (rt.allowedPairs.length === 0 ||
+              rt.allowedPairs.some(p => p.from === srcNode?.type && p.to === dstNode?.type))
+            && relationTypeKeepsAggregates(rt.id, srcNode, dstNode)
           )
         : []
+      // A type that does not connect these two (an end moved, the metamodel
+      // changed) shows as it is, with the ones that do to change it to; a
+      // relation with no type, too. "(generic)" made one with none, which
+      // is what the validation flags where types fit.
+      const currentType = rel.relationType ?? ''
+      const fitsNow = !currentType || compatibleTypes.some((rt) => rt.id === currentType)
+      const showType = compatibleTypes.length > 1 || !fitsNow || (!currentType && compatibleTypes.length > 0)
 
       return (
         <div className="props-content" key={rel.id}>
@@ -2427,13 +2435,14 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
             menu={readOnly ? [] : [{ label: 'Delete relation', danger: true, onClick: () => { removeRelation(rel.id); selectEdge(null) } }]}
             onClose={onClose}
           />
-          {(short.length > 0 || compatibleTypes.length > 1) && (
+          {(short.length > 0 || showType) && (
             <section className="pp-section pp-grid" aria-label="Attributes">
-              {compatibleTypes.length > 1 && (
-                <AttrRow label="Type">
-                  <select className="pp-input pp-select" aria-label="Type" value={rel.relationType ?? ''} disabled={readOnly}
-                    onChange={(e) => set('relationType', e.target.value || undefined)}>
-                    <option value="">(generic)</option>
+              {showType && (
+                <AttrRow label="Type" missing={!currentType}>
+                  <select className="pp-input pp-select" aria-label="Type" value={currentType} disabled={readOnly}
+                    onChange={(e) => { if (e.target.value) set('relationType', e.target.value) }}>
+                    {!currentType && <option value="" disabled>— choose a type —</option>}
+                    {!fitsNow && <option value={currentType}>{`${relTypeDef?.label ?? currentType} (does not connect these)`}</option>}
                     {compatibleTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.label}</option>)}
                   </select>
                 </AttrRow>

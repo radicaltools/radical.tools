@@ -14,6 +14,15 @@ const kindOf = (n: C4Node): string => {
   return typeof kind === 'string' && kind ? kind : 'aggregate-root'
 }
 
+/** Whether a relation of `typeId` from `source` to `target` keeps the
+ *  aggregate rules: a part-of leads from a part (an entity that is no root)
+ *  to an aggregate root. Pickers offer only the types that do (part-of
+ *  between two roots was offered, and then flagged). */
+export function relationTypeKeepsAggregates(typeId: string, source: C4Node | undefined, target: C4Node | undefined): boolean {
+  if (typeId !== 'part-of' || source?.type !== 'entity' || target?.type !== 'entity') return true
+  return kindOf(source) === 'entity' && kindOf(target) === 'aggregate-root'
+}
+
 export function validateDomainModel(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,

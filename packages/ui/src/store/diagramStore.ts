@@ -41,6 +41,7 @@ import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
   isRelationAllowed,
+  relationTypeKeepsAggregates,
   isParentAllowed,
   isPlacementAllowed,
   canAddMoreOfType,
@@ -54,7 +55,7 @@ import {
 import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
-import { pipelineOf, viewDrawnIds } from '@radical/common/viewPipeline'
+import { chainRelationFor, pipelineOf, viewDrawnIds } from '@radical/common/viewPipeline'
 import { mergeModels, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
@@ -1643,6 +1644,9 @@ interface DiagramStore {
   // ── connect mode ──
   connectSource: string | null
   connectionModifier: 'shift' | 'ctrl' | 'alt' | 'meta'
+  /** A relation drawn between two elements that several relation types
+   *  fit: the canvas asks which (chooseRelationType). */
+  relationTypeChoice: { sourceId: string; targetId: string; types: string[] } | null
 
   // ── actions: nodes ──
   addNode: (node: Omit<C4Node, 'id'>) => string
@@ -1696,6 +1700,13 @@ interface DiagramStore {
   updateRelation: (id: string, updates: Partial<Omit<C4Relation, 'id'>>) => void
   removeRelation: (id: string) => void
   onConnect: (connection: Connection) => void
+  /** A relation drawn on the canvas (a handle, Alt-drag): refused where the
+   *  metamodel or the view's filter chain would not have it (a relation the
+   *  chain does not follow is not drawn), of the type the chain follows, and
+   *  asked about where several types fit (relationTypeChoice). */
+  connectNodes: (sourceId: string, targetId: string) => void
+  /** Adds the relation asked about, of `type`; null drops it. */
+  chooseRelationType: (type: string | null) => void
 
   // ── actions: selection ──
   selectNode: (id: string | null) => void
@@ -2503,6 +2514,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().lowDetail !== low) set((state) => { state.lowDetail = low })
       },
       connectSource: null,
+      relationTypeChoice: null,
       connectionModifier: 'alt' as const,
       autoFitActive: loadStudioSettings().smartFit,
       canUndo: false,
@@ -3216,7 +3228,43 @@ export const useDiagramStore = create<DiagramStore>()(
       onConnect(connection) {
         if (!connection.source || !connection.target) return
         if (connection.source === connection.target) return
-        get().addRelation({ sourceId: connection.source, targetId: connection.target })
+        get().connectNodes(connection.source, connection.target)
+      },
+
+      connectNodes(sourceId, targetId) {
+        const s = get()
+        const source = s.c4Nodes[sourceId], target = s.c4Nodes[targetId]
+        if (!source || !target || sourceId === targetId) return
+        const label = (type: string) => s.metamodel?.nodeTypes[type]?.label ?? type
+        if (!isRelationAllowed(s.metamodel, source.type, target.type)) {
+          s.pushNotification(`Relation not allowed: ${label(source.type)} → ${label(target.type)}. The metamodel does not permit this connection.`, 'error')
+          return
+        }
+        // On a canvas whose filter is a chain, the relation is one the chain
+        // follows, or it would be added and not drawn (twice, by a second try).
+        const view = s.activeViewId ? s.views[s.activeViewId] : undefined
+        let made: { relationType?: string } | null = {}
+        if (pipelineOf(view)?.levels?.length) {
+          made = chainRelationFor(view, sourceId, targetId, { nodes: s.c4Nodes, relations: s.c4Relations, metamodel: s.metamodel })
+          if (!made) {
+            s.pushNotification(`Not added: this view shows only the relations its filter follows, and none leads from ${source.label} to ${target.label}.`, 'error')
+            return
+          }
+        }
+        if (made.relationType) { s.addRelation({ sourceId, targetId, relationType: made.relationType }); return }
+        // Several types fit the pair: which one is the user's to say (left
+        // to inference, the relation had none, and nothing flagged it).
+        const types = Object.values(s.metamodel?.relationTypes ?? {})
+          .filter((rt) => rt.allowedPairs.some((p) => p.from === source.type && p.to === target.type) && relationTypeKeepsAggregates(rt.id, source, target))
+          .map((rt) => rt.id)
+        if (types.length > 1) { set((state) => { state.relationTypeChoice = { sourceId, targetId, types } }); return }
+        s.addRelation({ sourceId, targetId, ...(types.length === 1 ? { relationType: types[0] } : {}) })
+      },
+
+      chooseRelationType(type) {
+        const choice = get().relationTypeChoice
+        set((state) => { state.relationTypeChoice = null })
+        if (choice && type) get().addRelation({ sourceId: choice.sourceId, targetId: choice.targetId, relationType: type })
       },
 
       // ── selection ────────────────────────────────────────────────────────
