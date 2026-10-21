@@ -75,6 +75,12 @@ export function wikiViewFor(nodeId: string): string | null {
   return wikis[0]?.id ?? null
 }
 
+/** A move that changes several things in turn (the perspective, the view,
+ *  then the selection: revealOnCanvas) is one place to go back from: while
+ *  it is held, the address waits (route.ts). Show on canvas from an
+ *  Inspector card made two Back steps. */
+export const usePlaceHold = create<{ held: number }>(() => ({ held: 0 }))
+
 type FocusFn = (id: string, opts?: { zoom?: number; duration?: number }) => void
 const FOCUS_ZOOM = 1.2
 
@@ -82,6 +88,7 @@ const FOCUS_ZOOM = 1.2
  *  user chose; null for All elements), with it selected, its containers
  *  open and the camera on it. */
 export function revealOnCanvas(nodeId: string, viewId?: string | null): void {
+  usePlaceHold.setState((h) => ({ held: h.held + 1 }))
   if (useDiagramStore.getState().appMode !== 'designer') useDiagramStore.getState().setAppMode('designer')
   const target = viewId !== undefined ? viewId : canvasViewFor(nodeId)
   const store = useDiagramStore.getState()
@@ -92,9 +99,13 @@ export function revealOnCanvas(nodeId: string, viewId?: string | null): void {
   // node is on the canvas, or it cannot find it.
   setTimeout(() => {
     const s = useDiagramStore.getState()
-    s.expandAncestors(nodeId)
-    s.setSelectedNodeIds([nodeId])
-    s.selectNode(nodeId)
+    try {
+      s.expandAncestors(nodeId)
+      s.setSelectedNodeIds([nodeId])
+      s.selectNode(nodeId)
+    } finally {
+      usePlaceHold.setState((h) => ({ held: Math.max(0, h.held - 1) }))
+    }
     ;(window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel?.()
     // The canvas registers its camera function when it mounts, so right
     // after the switch the one on window may still be the unmounted

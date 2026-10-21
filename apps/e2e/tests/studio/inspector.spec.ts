@@ -89,6 +89,13 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await expect(page.locator('.canvas-controls').getByRole('button', { name: 'Fit All' })).toBeVisible()
   await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Specification')
   await expect(studio.node('req')).toHaveClass(/selected/)
+  // One Back leads back to the Inspector: the move is one step.
+  await expect(page).toHaveURL(/m\/designer\/v\/v-spec\/e\/req/)
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Inspector/)
+  await page.getByRole('button', { name: 'Forward', exact: true }).click()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  await expect(studio.node('req')).toHaveClass(/selected/)
 
   // The test passes in the next run: the model is verified, no errors.
   await folder.write('.radical/test-results.json', results('passed'))

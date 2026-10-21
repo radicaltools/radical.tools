@@ -42,7 +42,7 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from './store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
 import { host } from './platform/host'
-import { INSPECTOR_TABS, useInspectorNav, type InspectorTab } from './navigation'
+import { INSPECTOR_TABS, useInspectorNav, usePlaceHold, type InspectorTab } from './navigation'
 import { useBranchStore } from './persistence/branchChanges'
 import { pushEntry, replaceEntry, moveTo, restoreNav, saveNav, useNavHistory, type NavEntry } from './navHistory'
 
@@ -418,6 +418,9 @@ export function startRouteSync(): () => void {
     if (applying || pending) return
     if (replace) replaceNext = true
     if (timer) clearTimeout(timer)
+    timer = null
+    // A move held (usePlaceHold) is written once it is let go.
+    if (usePlaceHold.getState().held > 0) return
     timer = setTimeout(() => {
       timer = null
       const push = !replaceNext
@@ -483,11 +486,23 @@ export function startRouteSync(): () => void {
   })
   const unsubDocs = useDocumentsStore.subscribe(() => schedule())
   const unsubInspector = useInspectorNav.subscribe(() => schedule())
+  const unsubHold = usePlaceHold.subscribe((h, p) => {
+    // The place left is written first, if it waits: it is where Back goes.
+    if (h.held > 0 && p.held === 0 && timer) {
+      clearTimeout(timer)
+      timer = null
+      const push = !replaceNext
+      replaceNext = false
+      writeUrl(push)
+    }
+    if (h.held === 0 && p.held > 0) schedule()
+  })
 
   return () => {
     window.removeEventListener('hashchange', onHash)
     window.removeEventListener('popstate', onPop)
     unsubInspector()
+    unsubHold()
     unsubNav()
     unsubLoad()
     pending = null
