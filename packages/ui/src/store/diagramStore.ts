@@ -57,7 +57,7 @@ import {
 import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
-import { chainRelationFor, pipelineOf, viewDrawnIds, withAncestors } from '@radical/common/viewPipeline'
+import { chainRelationFor, pipelineOf, viewDrawnIds } from '@radical/common/viewPipeline'
 import { mergeModels, mergeNotices, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
@@ -1102,116 +1102,140 @@ function canvasSetsOf(view: DiagramView, nodes: Record<string, C4Node>, relation
   return { viewFilter, viewCollapsedSet, expandedSet: viewExpandedSet(view, nodes, relations) }
 }
 
-/** Each element an exploration draws, by its layer: its distance from the
- *  element the exploration started from (its first), along relations
- *  either way among what it lists. A container is in the layer of the
- *  nearest of what it holds, if not nearer itself; what no relation
- *  reaches goes under the rest. */
-function explorationLayers(ids: readonly string[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Map<string, number> {
-  const shown = new Set(ids.filter((id) => !!nodes[id]))
-  const next = new Map<string, string[]>()
-  for (const r of Object.values(relations)) {
-    if (!shown.has(r.sourceId) || !shown.has(r.targetId)) continue
-    next.set(r.sourceId, [...(next.get(r.sourceId) ?? []), r.targetId])
-    next.set(r.targetId, [...(next.get(r.targetId) ?? []), r.sourceId])
-  }
-  const layer = new Map<string, number>()
-  const start = ids.find((id) => shown.has(id))
-  if (start) {
-    layer.set(start, 0)
-    const queue = [start]
-    for (let i = 0; i < queue.length; i++) {
-      for (const other of next.get(queue[i]) ?? []) {
-        if (layer.has(other)) continue
-        layer.set(other, layer.get(queue[i])! + 1)
-        queue.push(other)
-      }
-    }
-  }
-  // A container: no lower than what it holds.
-  for (const id of shown) {
-    const d = layer.get(id)
-    if (d === undefined) continue
-    for (let p = nodes[id].parentId; p && shown.has(p); p = nodes[p].parentId) {
-      if ((layer.get(p) ?? Infinity) > d) layer.set(p, d)
-    }
-  }
-  const last = Math.max(0, ...layer.values())
-  for (const id of shown) if (!layer.has(id)) layer.set(id, last + 1)
-  return layer
+/** The level of each element an exploration lists: the level it was
+ *  added on (Exploration.levels); one with none (added from the palette)
+ *  under the rest. */
+function explorationLevelOf(exploration: Exploration): (id: string) => number {
+  const last = Math.max(0, ...Object.values(exploration.levels))
+  return (id) => exploration.levels[id] ?? last + 1
 }
 
 /**
- * The places of an exploration listing `exploration.nodeIds`, laid out
- * again as a whole, top-down in layers by distance from where it started
- * (explorationLayers, applyLayersLayout): containers are frames round what
- * it holds of them, across layers; the elements of a layer in the order
- * they were added, as far apart as the canvas keeps siblings and the
- * labels of the relations between them need. It is temporary: the rule
- * that a laid-out diagram stands is for views. The outermost frame of the
- * element it started from stays where it is drawn (`state`'s canvas when it
- * shows the exploration, else its own places). Positions relative to their
- * parents, as views keep them; null when the layout failed.
+ * An exploration listing `exploration.nodeIds`, laid out again as a whole,
+ * top-down in layers by level (the start on level 0, what the + of an
+ * element on level k added on level k + 1; applyLayersLayout): each element on its own, with no frame of the
+ * containers it lies in (a structure view draws those invisibly, round
+ * what it holds of them); a layer of more than EXPLORATION_ROW elements
+ * in rows, the elements of a layer in the order they were added, as far
+ * apart as the canvas keeps siblings and the labels of the relations
+ * between them need. Only the relations between an element and the next
+ * layer are drawn: those within a layer go into `hidden`. It is temporary:
+ * the rule that a laid-out diagram stands is for views. The element it
+ * started from stays where it is drawn when it is shown. Positions relative
+ * to their parents, as views keep them; null when the layout failed.
  */
 async function layExplorationOut(
   state: Pick<DiagramStore, 'activeViewId' | 'exploration' | 'c4Nodes' | 'c4Relations'>,
-  exploration: DiagramView,
-): Promise<Record<string, NodePosition> | null> {
+  exploration: Exploration,
+): Promise<{ places: Record<string, NodePosition>; hidden: string[] } | null> {
   const nodes = state.c4Nodes
   const relations = state.c4Relations
   const { viewFilter, viewCollapsedSet, expandedSet } = canvasSetsOf(exploration, nodes, relations)
   const canvas = canvasBoxes(nodes, viewFilter, viewCollapsedSet, expandedSet)
-  const drawn: Record<string, C4Node> = {}
-  for (const n of Object.values(nodes)) {
-    if (!canvas.shown(n)) continue
-    const box = canvas.boxOf(n)
-    drawn[n.id] = { ...n, width: box.w, height: box.h }
-  }
-  const ids = exploration.nodeIds.filter((id) => !!drawn[id])
+  const ids = exploration.nodeIds.filter((id) => !!nodes[id] && canvas.shown(nodes[id]))
   if (!ids.length) return null
-  const layers = explorationLayers(ids, drawn, relations)
-  const layerOf = (id: string): number => layers.get(id) ?? 0
+  const listed = new Set(ids)
+  // What it lists, each in the nearest container it lists too (an element
+  // and what it explored inside it), else on its own.
+  const laidOut: Record<string, C4Node> = {}
+  for (const id of ids) {
+    let parent = nodes[id].parentId
+    while (parent && !listed.has(parent)) parent = nodes[parent]?.parentId
+    const box = canvas.boxOf(nodes[id])
+    laidOut[id] = { ...nodes[id], parentId: parent, width: box.w, height: box.h }
+  }
+  const layerOf = explorationLevelOf(exploration)
+  const within = (a: string, b: string): boolean => {
+    for (let p = laidOut[b]?.parentId; p; p = laidOut[p]?.parentId) if (p === a) return true
+    return false
+  }
+  // Drawn: a relation to the next level. Hidden: any other (within a
+  // level, or across more than one).
+  const drawnRelations: Record<string, C4Relation> = {}
+  const hidden: string[] = []
+  for (const r of Object.values(relations)) {
+    if (!listed.has(r.sourceId) || !listed.has(r.targetId) || r.sourceId === r.targetId) continue
+    if (within(r.sourceId, r.targetId) || within(r.targetId, r.sourceId)) continue
+    if (Math.abs(layerOf(r.sourceId) - layerOf(r.targetId)) === 1) drawnRelations[r.id] = r
+    else hidden.push(r.id)
+  }
   // The room a relation's label needs between two elements, beside each
   // other in a layer or in two layers.
   let inLayer = 60
-  let betweenRows = 40
   let betweenLayers = 80
-  for (const [key, need] of labelGaps(drawn, relations)) {
+  for (const [key, need] of labelGaps(laidOut, drawnRelations)) {
     const [a, b] = key.split('\n')
-    if (layerOf(a) === layerOf(b)) { inLayer = Math.max(inLayer, need.x); betweenRows = Math.max(betweenRows, need.y) }
+    if (layerOf(a) === layerOf(b)) inLayer = Math.max(inLayer, need.x)
     else betweenLayers = Math.max(betweenLayers, need.y)
   }
   const laid = await applyLayersLayout({
-    nodes: drawn,
-    relations,
+    nodes: laidOut,
+    relations: drawnRelations,
     layerOf,
     order: ids,
     paddingOf: (n) => compoundPadding(n.type),
     // The rows of a layer closer together than the layers.
-    gap: { inLayer, betweenRows: Math.min(betweenRows, betweenLayers), betweenLayers: Math.max(betweenLayers, betweenRows + 40) },
+    gap: { inLayer, betweenRows: 40, betweenLayers },
     maxPerRow: EXPLORATION_ROW,
   })
   if (!Object.keys(laid).length) return null
-  const parents = new Set(Object.values(drawn).map((n) => n.parentId).filter((p): p is string => !!p && !!drawn[p]))
-  const out: Record<string, NodePosition> = {}
-  for (const [id, at] of Object.entries(laid)) {
+  // Where each is drawn, summed up the containers it was laid out in.
+  const abs = new Map<string, { x: number; y: number; w: number; h: number }>()
+  const absOf = (id: string): { x: number; y: number; w: number; h: number } => {
+    const known = abs.get(id)
+    if (known) return known
+    const at = laid[id] ?? { x: 0, y: 0 }
+    const parent = laidOut[id]?.parentId
+    const base = parent ? absOf(parent) : { x: 0, y: 0 }
+    const hasKids = Object.values(laidOut).some((n) => n.parentId === id)
+    const out = { x: base.x + at.x, y: base.y + at.y, w: hasKids ? at.width ?? laidOut[id].width : laidOut[id].width, h: hasKids ? at.height ?? laidOut[id].height : laidOut[id].height }
+    abs.set(id, out)
+    return out
+  }
+  for (const id of ids) absOf(id)
+  // The element it started from stays where it is drawn.
+  const start = ids[0]
+  if (onExploration(state) && state.exploration?.id === exploration.id && abs.get(start)) {
+    let x = 0
+    let y = 0
+    for (let n: C4Node | undefined = nodes[start]; n; n = n.parentId ? nodes[n.parentId] : undefined) { x += n.x; y += n.y }
+    const was = abs.get(start)!
+    const dx = x - was.x
+    const dy = y - was.y
+    for (const [id, b] of abs) abs.set(id, { ...b, x: b.x + dx, y: b.y + dy })
+  }
+  // The containers it does not list, drawn invisibly to hold what it
+  // does: round what they hold, deepest first (a child out of its parent's
+  // frame would be placed again when the view is shown).
+  const depth = (id: string): number => {
+    let d = 0
+    for (let p = nodes[id]?.parentId; p; p = nodes[p]?.parentId) d++
+    return d
+  }
+  const frames = [...(viewFilter ?? [])].filter((id) => !listed.has(id) && nodes[id]).sort((a, b) => depth(b) - depth(a))
+  for (const id of frames) {
+    const inside = [...abs.entries()].filter(([child]) => nodes[child]?.parentId === id).map(([, b]) => b)
+    if (!inside.length) continue
+    const pad = compoundPadding(nodes[id].type)
+    const minX = Math.min(...inside.map((b) => b.x))
+    const minY = Math.min(...inside.map((b) => b.y))
+    const maxX = Math.max(...inside.map((b) => b.x + b.w))
+    const maxY = Math.max(...inside.map((b) => b.y + b.h))
+    abs.set(id, { x: minX - pad.side, y: minY - pad.top, w: maxX - minX + 2 * pad.side, h: maxY - minY + pad.top + pad.bottom })
+  }
+  const places: Record<string, NodePosition> = {}
+  for (const [id, b] of abs) {
     const n = nodes[id]
-    if (!n) continue
-    // A frame is as large as the layout made it; the others keep their size.
-    out[id] = parents.has(id)
-      ? { x: at.x, y: at.y, width: at.width ?? n.width, height: at.height ?? n.height }
-      : { x: at.x, y: at.y, width: n.width, height: n.height }
+    const parent = n.parentId ? abs.get(n.parentId) : undefined
+    const sized = !listed.has(id) || Object.values(laidOut).some((c) => c.parentId === id)
+    places[id] = {
+      x: b.x - (parent?.x ?? 0),
+      y: b.y - (parent?.y ?? 0),
+      width: sized ? b.w : n.width,
+      height: sized ? b.h : n.height,
+    }
   }
-  // Where it was drawn: the outermost frame of the start stays there.
-  let top: string | undefined = ids[0]
-  while (top && drawn[top]?.parentId && drawn[drawn[top].parentId!]) top = drawn[top].parentId
-  const was = top ? (onExploration(state) && state.exploration?.id === exploration.id ? nodes[top] : exploration.positions[top] ?? nodes[top]) : undefined
-  if (top && was && out[top]) {
-    const dx = was.x - out[top].x
-    const dy = was.y - out[top].y
-    for (const [id, at] of Object.entries(out)) if (!drawn[id]?.parentId || !drawn[drawn[id].parentId!]) out[id] = { ...at, x: at.x + dx, y: at.y + dy }
-  }
-  return out
+  return { places, hidden }
 }
 
 /** Writes the places and sizes of `nodes` that differ onto the model.
@@ -1648,6 +1672,11 @@ function layoutInputForView(state: DiagramStore): LayoutInput {
  *  more wraps into rows of this many. */
 export const EXPLORATION_ROW = 8
 
+/** An exploration: the structure view it draws, and the level each element
+ *  it lists was added on (the start 0; what the + of an element on level k
+ *  added, k + 1). An element keeps its level. */
+export type Exploration = DiagramView & { levels: Record<string, number> }
+
 /** An exploration's view id begins with it: no view of a document's does. */
 const EXPLORATION_ID = 'explore:'
 
@@ -1696,17 +1725,16 @@ let _explorationWork: Promise<void> = Promise.resolve()
 /** The exploration open, read again with the model `nodes` (an outside
  *  change): what is gone is gone from it too; none when nothing it listed
  *  is left. */
-function explorationOf(exploration: DiagramView | null, nodes: Record<string, C4Node>): DiagramView | null {
+function explorationOf(exploration: Exploration | null, nodes: Record<string, C4Node>): Exploration | null {
   if (!exploration) return null
-  const kept = exploration.nodeIds.filter((id) => !!nodes[id])
-  if (!kept.length) return null
-  // With the containers they are in now (one moved into another).
-  const nodeIds = [...withAncestors(kept, nodes)]
+  const nodeIds = exploration.nodeIds.filter((id) => !!nodes[id])
+  if (!nodeIds.length) return null
   const positions = Object.fromEntries(Object.entries(exploration.positions).filter(([id]) => !!nodes[id]))
   return {
     ...exploration,
     nodeIds,
     positions,
+    levels: Object.fromEntries(Object.entries(exploration.levels).filter(([id]) => !!nodes[id])),
     ...(exploration.collapsedNodeIds ? { collapsedNodeIds: exploration.collapsedNodeIds.filter((id) => !!nodes[id]) } : {}),
     ...(exploration.expandedNodeIds ? { expandedNodeIds: exploration.expandedNodeIds.filter((id) => !!nodes[id]) } : {}),
   }
@@ -1717,7 +1745,11 @@ function explorationOf(exploration: DiagramView | null, nodes: Record<string, C4
  *  element added there was not drawn. Mutates `state` (inside immer set). */
 function insertNodeShown(state: DiagramStore, id: string, node: Omit<C4Node, 'id'>): void {
   model.insertNode(state as unknown as model.ModelState, id, node)
-  if (state.exploration && onExploration(state)) addToViewList(state.exploration, [...withAncestors([id], state.c4Nodes)])
+  if (state.exploration && onExploration(state)) {
+    addToViewList(state.exploration, [id])
+    // Under the rest: no + added it.
+    state.exploration.levels[id] ??= Math.max(0, ...Object.values(state.exploration.levels)) + 1
+  }
 }
 
 /**
@@ -2433,18 +2465,19 @@ interface DiagramStore {
    *  is its id. Never in `views`: it is not saved, undone, merged or put in
    *  a milestone, and code that draws the canvas reads it with viewById.
    *  null: none open. */
-  exploration: DiagramView | null
+  exploration: Exploration | null
   /** On the exploration shown in Designer: for each element it lists, how
    *  many elements related to it it does not show yet (its +). null else. */
   exploreMore: Record<string, number> | null
-  /** Opens an exploration of `nodeId` alone (in the frames of its
-   *  containers), in place of the one open: Designer's on the live model,
+  /** Opens an exploration of `nodeId` alone (no frame of its containers
+   *  drawn), in place of the one open: Designer's on the live model,
    *  not while a milestone is shown; Viewer's on the model it shows.
    *  Resolves once it is laid out. */
   exploreFrom: (nodeId: string) => Promise<void>
   /** The + of an element of the exploration shown: the elements related to
-   *  it that it does not show yet join it, with their containers as frames,
-   *  and it is laid out again in layers by distance from its start. No undo
+   *  it that it does not show yet join it, each on its own, and it is laid
+   *  out again in layers by distance from its start, drawing only the
+   *  relations to the next layer (layExplorationOut). No undo
    *  step. Resolves once it is laid out. */
   exploreNeighbours: (nodeId: string) => Promise<void>
   /** + 1 level: the + of every element of the exploration shown at once. */
@@ -3372,9 +3405,10 @@ export const useDiagramStore = create<DiagramStore>()(
       return { ...node, x: Math.max(node.x, pad.side), y: Math.max(node.y, pad.top) }
     }
 
-    /** The + of each of `from` (none: of every element, + 1 level) on the
-     *  exploration shown: the elements related to it that it does not list
-     *  yet join it, with their containers as frames, and the whole
+    /** The + of each of `from` (none: + 1 level, the + of every element on
+     *  the last level) on the exploration shown: the elements related to it
+     *  that it does not list yet join it, each on its own, on the level after
+     *  its (an element keeps the level it was added on), and the whole
      *  exploration is laid out again in layers (layExplorationOut). No undo
      *  step. One after another: a second + waits for the layout of the
      *  first. */
@@ -3384,26 +3418,32 @@ export const useDiagramStore = create<DiagramStore>()(
         const exploration = s.exploration
         if (!exploration || !onExploration(s) || (s.appMode !== 'designer' && s.appMode !== 'viewer')) return
         const more = explorationNeighbours(exploration, s.c4Nodes, s.c4Relations)
-        const added = new Set<string>()
-        for (const id of from_ ?? [...more.keys()]) for (const other of more.get(id) ?? []) added.add(other)
+        const levelOf = explorationLevelOf(exploration)
+        const listed = exploration.nodeIds.filter((id) => !!s.c4Nodes[id])
+        const last = Math.max(0, ...listed.map(levelOf))
+        const from = from_ ?? listed.filter((id) => levelOf(id) === last)
+        const added = new Map<string, number>()
+        for (const id of from) for (const other of more.get(id) ?? []) if (!added.has(other)) added.set(other, levelOf(id) + 1)
         if (!added.size) return
-        const nodeIds = [...exploration.nodeIds]
-        for (const id of withAncestors(added, s.c4Nodes)) if (!nodeIds.includes(id)) nodeIds.push(id)
+        const nodeIds = [...exploration.nodeIds, ...[...added.keys()].filter((id) => !exploration.nodeIds.includes(id))]
+        const levels = { ...exploration.levels, ...Object.fromEntries(added) }
         const drawnBefore = activeCanvasSets(s).viewFilter ?? new Set<string>()
         // Laid out on the model as it is when the layout lands: an edit (an
         // agent's write) meanwhile asks for it again.
         let laidOn = s
-        let places = await layExplorationOut(laidOn, { ...exploration, nodeIds })
+        let laid = await layExplorationOut(laidOn, { ...exploration, nodeIds, levels })
         for (let i = 0; i < 3 && (get().c4Nodes !== laidOn.c4Nodes || get().c4Relations !== laidOn.c4Relations); i++) {
           laidOn = get()
-          places = await layExplorationOut(laidOn, { ...exploration, nodeIds })
+          laid = await layExplorationOut(laidOn, { ...exploration, nodeIds, levels })
         }
         if (get().exploration?.id !== exploration.id) return
         set((state) => {
           const x = state.exploration!
           addToViewList(x, nodeIds.filter((id) => !!state.c4Nodes[id]))
-          if (places && onExploration(state)) applyPositions(state.c4Nodes as Record<string, C4Node>, places)
-          else if (places) x.positions = { ...x.positions, ...places } as any
+          for (const [id, level] of added) x.levels[id] ??= level
+          if (laid) x.hiddenRelationIds = laid.hidden
+          if (laid && onExploration(state)) applyPositions(state.c4Nodes as Record<string, C4Node>, laid.places)
+          else if (laid) x.positions = { ...x.positions, ...laid.places } as any
           else if (onExploration(state)) {
             // No layout (ELK failed): beside their siblings, the rest as it was.
             placeUnplaced(state.c4Nodes as Record<string, C4Node>, Object.fromEntries([...drawnBefore].map((id) => [id, true])), computeViewNodeSet(x as DiagramView, state.c4Nodes as Record<string, C4Node>, state.c4Relations as Record<string, C4Relation>))
@@ -3414,8 +3454,8 @@ export const useDiagramStore = create<DiagramStore>()(
         _liveLayout?.reset()
         // The camera shows what was added, with what it was added from.
         if (onExploration(get())) {
-          const from = (from_ ?? []).filter((id) => !!get().c4Nodes[id])
-          ;(window as any).__rfShowAdded?.([...added].filter((id) => !!get().c4Nodes[id]), from.length ? from : [...more.keys()].filter((id) => (more.get(id) ?? []).some((o) => added.has(o))))
+          const shownFrom = from.filter((id) => (more.get(id) ?? []).some((o) => added.has(o)) && !!get().c4Nodes[id])
+          ;(window as any).__rfShowAdded?.([...added.keys()].filter((id) => !!get().c4Nodes[id]), shownFrom)
         }
       })
       return _explorationWork
@@ -4786,17 +4826,16 @@ export const useDiagramStore = create<DiagramStore>()(
         // canvas the first was opened from.
         if (!onExploration(s)) _exploredFrom = s.activeViewId && s.views[s.activeViewId] ? s.activeViewId : null
         const id = EXPLORATION_ID + uid()
-        // With its containers: their frames are drawn round it.
-        const nodeIds = [...withAncestors([nodeId], s.c4Nodes)]
-        const exploration = { id, name: `Explore: ${node.label || 'element'}`, kind: 'static', nodeIds, positions: {} } as DiagramView
+        // The element alone: its containers are no frames drawn round it.
+        const exploration: Exploration = { id, name: `Explore: ${node.label || 'element'}`, kind: 'static', nodeIds: [nodeId], positions: {}, levels: { [nodeId]: 0 } }
         set((state) => { state.exploration = exploration as any })
         get().setActiveView(id)
         _explorationWork = _explorationWork.then(async () => {
-          const places = await layExplorationOut(get(), exploration)
-          if (get().exploration?.id !== id || !places) return
+          const laid = await layExplorationOut(get(), exploration)
+          if (get().exploration?.id !== id || !laid) return
           set((state) => {
-            if (onExploration(state)) applyPositions(state.c4Nodes as Record<string, C4Node>, places)
-            else state.exploration!.positions = places as any
+            if (onExploration(state)) applyPositions(state.c4Nodes as Record<string, C4Node>, laid.places)
+            else state.exploration!.positions = laid.places as any
           })
           get()._sync()
           _liveLayout?.reset()
@@ -4834,6 +4873,9 @@ export const useDiagramStore = create<DiagramStore>()(
           if (kept.viewport) view.viewport = { ...kept.viewport }
           if (kept.collapsedNodeIds?.length) view.collapsedNodeIds = [...kept.collapsedNodeIds]
           if (kept.expandedNodeIds?.length) view.expandedNodeIds = [...kept.expandedNodeIds]
+          // What it draws: the relations within a layer stay hidden.
+          const hidden = (kept.hiddenRelationIds ?? []).filter((r) => !!state.c4Relations[r])
+          if (hidden.length) view.hiddenRelationIds = hidden
           model.setViewFolder(state as unknown as model.ModelState, id, folder)
           state.exploration = null
           // The nodes hold its places already: it is the canvas shown.

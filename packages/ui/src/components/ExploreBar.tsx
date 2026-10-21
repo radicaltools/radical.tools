@@ -10,7 +10,14 @@ import { onExploration, useDiagramStore } from '../store/diagramStore'
 export function ExploreBar(): React.ReactElement | null {
   const exploration = useDiagramStore((s) => (onExploration(s) ? s.exploration : null))
   const appMode = useDiagramStore((s) => s.appMode)
-  const hasMore = useDiagramStore((s) => Object.values(s.exploreMore ?? {}).some((n) => n > 0))
+  // + 1 level is the + of every element on the last level.
+  const hasMore = useDiagramStore((s) => {
+    const x = s.exploration
+    if (!x) return false
+    const listed = x.nodeIds.filter((id) => !!s.c4Nodes[id])
+    const last = Math.max(0, ...listed.map((id) => x.levels[id] ?? 0))
+    return listed.some((id) => (x.levels[id] ?? 0) === last && (s.exploreMore?.[id] ?? 0) > 0)
+  })
   const exploreLevel = useDiagramStore((s) => s.exploreLevel)
   const closeExploration = useDiagramStore((s) => s.closeExploration)
   const saveExploration = useDiagramStore((s) => s.saveExploration)
@@ -38,7 +45,7 @@ export function ExploreBar(): React.ReactElement | null {
         Explore: <strong>{exploration.name.replace(/^Explore: /, '')}</strong>
       </span>
       <button type="button" className="explore-bar-btn" onClick={exploreLevel} disabled={!hasMore}
-        title="Show the elements related to every element shown, one level further">
+        title="Show the elements related to every element of the last level, one level further">
         + 1 level
       </button>
       {canSave && (

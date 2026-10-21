@@ -907,13 +907,18 @@ function StructuralCanvas(): React.ReactElement {
         const rect = containerRef.current?.getBoundingClientRect()
         if (!rect || rect.width === 0 || shown.length === 0) return
         const MARGIN = 60
-        const freeW = rect.width - paletteCover() - propertiesPanelCover() - 2 * MARGIN
-        const freeH = rect.height - 2 * MARGIN
+        const PADDING = 0.08
+        const freeW = rect.width - paletteCover() - propertiesPanelCover()
+        // As viewportInFree frames them: with the margin, and the padding
+        // round that.
         const fits = (list: typeof shown): boolean => {
           const b = getNodesBounds(list)
-          return b.width * EXPLORE_MIN_ZOOM <= freeW && b.height * EXPLORE_MIN_ZOOM <= freeH
+          const scale = EXPLORE_MIN_ZOOM * (1 + PADDING)
+          return (b.width + 2 * MARGIN) * scale <= freeW && (b.height + 2 * MARGIN) * scale <= rect.height
         }
-        const anchors = shown.filter((n) => from.includes(n.id))
+        // All the elements added from when they fit, else the first of them.
+        const all = shown.filter((n) => from.includes(n.id))
+        const anchors = all.length && !fits(all) ? [all.find((n) => n.id === from.find((id) => all.some((a) => a.id === id)))!] : all
         const centre = (n: (typeof shown)[number]) => {
           const p = n.positionAbsolute ?? n.position
           return { x: p.x + (n.width ?? 0) / 2, y: p.y + (n.height ?? 0) / 2 }
@@ -922,13 +927,13 @@ function StructuralCanvas(): React.ReactElement {
         const mid = { x: at.x + at.width / 2, y: at.y + at.height / 2 }
         const added = shown.filter((n) => !from.includes(n.id))
           .sort((a, b) => Math.hypot(centre(a).x - mid.x, centre(a).y - mid.y) - Math.hypot(centre(b).x - mid.x, centre(b).y - mid.y))
-        let framed = anchors.length && fits(anchors) ? [...anchors] : []
+        let framed = [...anchors]
         for (const n of added) if (fits([...framed, n])) framed.push(n)
         if (!framed.length) framed = [added[0] ?? shown[0]]
         const b = getNodesBounds(framed)
         const target = viewportInFree(
           { x: b.x - MARGIN, y: b.y - MARGIN, width: b.width + MARGIN * 2, height: b.height + MARGIN * 2 },
-          rect, EXPLORE_MIN_ZOOM, 1, 0.08, true,
+          rect, EXPLORE_MIN_ZOOM, 1, PADDING, true,
         )
         suppressAutoFit(SELECTION_CAMERA_MS + 1800)
         instance.setViewport(target, { duration: SELECTION_CAMERA_MS })

@@ -19,10 +19,6 @@ async function flowBox(page: Page, node: Locator): Promise<{ x: number; y: numbe
 
 type Box = { x: number; y: number; width: number; height: number }
 
-/** `a` lies inside `frame`. */
-const within = (a: Box, frame: Box): boolean =>
-  a.x >= frame.x && a.y >= frame.y && a.x + a.width <= frame.x + frame.width && a.y + a.height <= frame.y + frame.height
-
 /** `a` and `b` do not overlap. */
 const apart = (a: Box, b: Box): boolean =>
   a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y
@@ -48,6 +44,11 @@ async function inPane(page: Page, node: Locator): Promise<boolean> {
 const drawnIds = (page: Page): Promise<string[]> =>
   page.locator('.react-flow__node').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.id!))
 
+/** The ids of the relations the canvas draws. */
+const drawnEdges = async (page: Page): Promise<string[]> =>
+  (await page.locator('.react-flow__edge').evaluateAll((els) => els.map((e) => (e.getAttribute('data-testid') ?? '').replace(/^rf__edge-/, ''))))
+    .filter((id) => id && !id.startsWith('virtual-')).sort()
+
 /** The names of the views listed, in order. */
 const viewNames = (page: Page): Promise<string[]> =>
   page.locator('.lp-view-list .lp-view-card .lp-card-title').allTextContents()
@@ -59,24 +60,24 @@ test('Explore from here grows by + and by a level', async ({ page, studio }) => 
   await studio.node('api').click()
   await page.getByRole('button', { name: 'Explore from here' }).click()
 
-  // A view of API alone in the Bookstore frame, listed first, named after it.
+  // A view of API alone, no Bookstore frame, listed first, named after it.
   await expect(page.locator('.explore-bar')).toContainText('Explore: API')
   expect((await viewNames(page))[0]).toBe('Explore: API')
   await expect(page.locator('.lp-explore-card')).toHaveClass(/active/)
   await expect(studio.node('api')).toBeVisible()
-  await expect(studio.node('bookstore')).toBeVisible()
+  await expect(studio.node('bookstore')).toHaveCount(0)
   for (const id of ['web', 'db', 'payments', 'customer']) await expect(studio.node(id)).toHaveCount(0)
 
-  // Its +: its three neighbours a layer below it, Web App and Orders DB in
-  // the Bookstore frame, and no + left on it.
+  // Its +: its three neighbours a layer below it, each with its relation to
+  // API, no frame round any, and no + left on it.
   await page.getByRole('button', { name: 'Show 3 more related to API', exact: true }).click()
   for (const id of ['web', 'db', 'payments']) await expect(studio.node(id)).toBeVisible()
   await expect(studio.node('customer')).toHaveCount(0)
   await studio.settle()
   let box = await studio.boxes()
-  for (const id of ['api', 'web', 'db']) expect(within(box[id], box.bookstore)).toBe(true)
-  expect(apart(box.payments, box.bookstore)).toBe(true)
+  await expect(studio.node('bookstore')).toHaveCount(0)
   for (const id of ['web', 'db', 'payments']) expect(box[id].y).toBeGreaterThanOrEqual(box.api.y + box.api.height)
+  expect(await drawnEdges(page)).toEqual(['r2', 'r3', 'r4'])
   expect(await studio.layoutViolations()).toEqual([])
   // The camera shows what was added, with API, at a readable zoom.
   expect(await zoomOf(page)).toBeGreaterThanOrEqual(0.6)
@@ -95,8 +96,10 @@ test('Explore from here grows by + and by a level', async ({ page, studio }) => 
     expect(box[id].y).toBeGreaterThanOrEqual(box.api.y + box.api.height)
     expect(box.customer.y).toBeGreaterThanOrEqual(box[id].y + box[id].height)
   }
-  for (const id of ['api', 'web', 'db']) expect(within(box[id], box.bookstore)).toBe(true)
-  for (const id of ['payments', 'customer']) expect(apart(box[id], box.bookstore)).toBe(true)
+  await expect(studio.node('bookstore')).toHaveCount(0)
+  // Each relation drawn joins two layers next to each other.
+  expect(await drawnEdges(page)).toEqual(['r1', 'r2', 'r3', 'r4'])
+  for (const id of ['api', 'web', 'db', 'payments']) expect(apart(box[id], box.customer)).toBe(true)
   expect(await studio.layoutViolations()).toEqual([])
 
   // Nothing of it was saved, and it is no step to undo.
@@ -133,7 +136,7 @@ test('an exploration is saved as a view, and dropped when closed', async ({ page
   expect(await flowBox(page, studio.node('api'))).toEqual(places.api)
   expect(await flowBox(page, studio.node('payments'))).toEqual(places.payments)
   await expect.poll(async () => (await studio.storedDoc()).views?.find((v) => (v as { name?: string }).name === 'API context')?.nodeIds.sort())
-    .toEqual(['api', 'bookstore', 'db', 'payments', 'web'])
+    .toEqual(['api', 'db', 'payments', 'web'])
 
   // One step: Undo takes the view away, Redo brings it back.
   await page.getByTitle('Undo (⌘Z)').click()

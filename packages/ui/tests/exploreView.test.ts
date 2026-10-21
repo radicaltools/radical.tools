@@ -3,10 +3,10 @@
  * It is drawn like a view while it is shown, yet it is none of the
  * document's: it never reaches the saved model, the undo history or the
  * list of views the document keeps. Each element's + adds the elements
- * related to it that the view does not show yet, beside it, inside the
- * frames of their containers (drawn round what was added), clear of what
- * is shown by the gap the add rule keeps and the room a relation's label
- * needs, and moves nothing shown; + 1 level does that
+ * related to it that the view does not show yet, each on its own (no frame
+ * of its containers drawn), and lays the exploration out again top-down in
+ * layers by distance from its start, a long layer in rows of 8, drawing
+ * only the relations to the next layer; + 1 level does that
  * for every element at once. Save as view keeps it as an ordinary
  * structure view (one undo step); closing it, another exploration or
  * another model drops it without a question.
@@ -37,7 +37,7 @@ function drawnPlaces(): Record<string, { x: number; y: number }> {
   return Object.fromEntries(s().rfNodes.filter((n) => !n.hidden).map((n) => [n.id, abs(n.id)]))
 }
 
-/** The elements the exploration lists, the containers drawn round them among them. */
+/** The elements the exploration lists. */
 const listed = (): string[] => [...(viewShownNodes(s().exploration ?? undefined, s().c4Nodes, s().c4Relations) ?? [])].sort()
 
 /** Whether `a` and `b` lie on each other as the canvas draws them. */
@@ -52,42 +52,38 @@ const overlap = (a: string, b: string): boolean => {
  *  in it is not). */
 const drawn = (id: string): boolean => s().rfNodes.some((n) => n.id === id && !n.hidden)
 
-/** `id` lies inside `frame`'s drawn box. */
-function inside(id: string, frame: string): boolean {
-  const size = (n: string) => s().rfNodes.find((r) => r.id === n)!.data
-  const a = abs(id)
-  const f = abs(frame)
-  return a.x >= f.x && a.y >= f.y && a.x + size(id).width <= f.x + size(frame).width && a.y + size(id).height <= f.y + size(frame).height
-}
-
 /** `a` lies in a layer below `b`'s: its top under `b`'s bottom. */
 function below(a: string, b: string): boolean {
   const height = s().rfNodes.find((r) => r.id === b)!.data.height
   return abs(a).y >= abs(b).y + height
 }
 
-/** The clear space between `a` and `b` falls short of what the add rule
- *  keeps between siblings (20 inside a container, 60 at the top) or what
- *  the label of a relation between them needs: what is missing, or null. */
+/** The clear space between `a` and `b` falls short of what the layout
+ *  keeps between elements (40) or what the label of a relation drawn
+ *  between them needs: what is missing, or null. */
 function tooClose(a: string, b: string): string | null {
   const size = (n: string) => s().rfNodes.find((r) => r.id === n)!.data
   const pa = abs(a)
   const pb = abs(b)
   const dx = Math.max(pb.x - (pa.x + size(a).width), pa.x - (pb.x + size(b).width))
   const dy = Math.max(pb.y - (pa.y + size(a).height), pa.y - (pb.y + size(b).height))
-  const base = s().c4Nodes[a].parentId ? 20 : 60
-  const need = labelGaps(s().c4Nodes, s().c4Relations).get(pairKey(a, b))
+  const base = 40
+  const drawnRelations = Object.fromEntries(Object.entries(s().c4Relations).filter(([id]) => edges().includes(id)))
+  const need = labelGaps(Object.fromEntries(Object.entries(s().c4Nodes).map(([id, n]) => [id, { ...n, parentId: undefined }])), drawnRelations).get(pairKey(a, b))
   const nx = Math.max(base, need?.x ?? 0)
   const ny = Math.max(base, need?.y ?? 0)
   return dx >= nx || dy >= ny ? null : `${a}–${b}: ${Math.round(dx)} px across (needs ${nx}), ${Math.round(dy)} px down (needs ${ny})`
 }
 
-/** Every pair of siblings drawn too close (tooClose). */
+/** The relations the canvas draws. */
+const edges = (): string[] => s().rfEdges.filter((e) => !e.data?.isVirtual).map((e) => e.id).sort()
+
+/** Every pair of elements drawn too close (tooClose). */
 function crowded(): string[] {
   const shown = s().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
   const out: string[] = []
   for (const a of shown) for (const b of shown) {
-    if (a >= b || (s().c4Nodes[a].parentId ?? '') !== (s().c4Nodes[b].parentId ?? '')) continue
+    if (a >= b) continue
     const close = tooClose(a, b)
     if (close) out.push(close)
   }
@@ -113,36 +109,29 @@ beforeEach(() => {
 })
 
 describe('an explore view', () => {
-  it('opens on the element alone, in the frame of its container, as a view the document does not hold', async () => {
+  it('opens on the element alone, with no frame, as a view the document does not hold', async () => {
     const views = s().views
     await s().exploreFrom('api')
     const exploration = s().exploration!
     expect(exploration.name).toBe('Explore: API')
     expect(s().activeViewId).toBe(exploration.id)
     expect(s().views).toBe(views)
-    expect(listed()).toEqual(['api', 'bookstore'])
-    // API alone, inside the Bookstore frame, drawn round it alone.
-    expect(Object.keys(drawnPlaces()).sort()).toEqual(['api', 'bookstore'])
-    expect(s().rfNodes.find((n) => n.id === 'api')!.parentNode).toBe('bookstore')
-    expect(inside('api', 'bookstore')).toBe(true)
-    const frame = s().rfNodes.find((n) => n.id === 'bookstore')!.data
-    expect(frame.collapsed).toBe(false)
-    expect(frame.width).toBeLessThan(s().rfNodes.find((n) => n.id === 'api')!.data.width + 200)
+    expect(listed()).toEqual(['api'])
+    // API alone: no frame of Bookstore drawn round it.
+    expect(Object.keys(drawnPlaces())).toEqual(['api'])
+    expect(drawn('bookstore')).toBe(false)
   })
 
-  it("API's + adds Web App, Orders DB and Payment Provider a layer below API, inside their frames", async () => {
+  it("API's + adds Web App, Orders DB and Payment Provider a layer below API, each with its relation to API, no frame drawn", async () => {
     await s().exploreFrom('api')
     expect(s().exploreMore?.api).toBe(3)
     await s().exploreNeighbours('api')
-    expect(listed()).toEqual(['api', 'bookstore', 'db', 'payments', 'web'])
-    // The Bookstore frame drawn round API, Web App and Orders DB, Payment
-    // Provider outside it.
-    expect(drawn('bookstore')).toBe(true)
-    for (const id of ['api', 'web', 'db']) expect(inside(id, 'bookstore')).toBe(true)
-    expect(overlap('payments', 'bookstore')).toBe(false)
-    // The start on top, its neighbours a layer below.
+    expect(listed()).toEqual(['api', 'db', 'payments', 'web'])
+    expect(drawn('bookstore')).toBe(false)
+    // The start on top, its neighbours a layer below, each with its relation.
     for (const id of ['web', 'db', 'payments']) expect(below(id, 'api')).toBe(true)
-    // Clear of each other by the gap siblings keep and the room their
+    expect(edges()).toEqual(['r2', 'r3', 'r4'])
+    // Clear of each other by the layout's gaps and the room their
     // relation's label needs.
     expect(crowded()).toEqual([])
     // API has no neighbour left to show.
@@ -154,14 +143,13 @@ describe('an explore view', () => {
     await s().exploreFrom('api')
     await s().exploreNeighbours('api')
     await s().exploreLevel()
-    expect(listed()).toEqual(['api', 'bookstore', 'customer', 'db', 'payments', 'web'])
+    expect(listed()).toEqual(['api', 'customer', 'db', 'payments', 'web'])
     for (const id of ['web', 'db', 'payments']) {
       expect(below(id, 'api')).toBe(true)
       expect(below('customer', id)).toBe(true)
     }
-    for (const id of ['api', 'web', 'db']) expect(inside(id, 'bookstore')).toBe(true)
-    for (const id of ['payments', 'customer']) expect(overlap(id, 'bookstore')).toBe(false)
-    expect(overlap('customer', 'payments')).toBe(false)
+    expect(drawn('bookstore')).toBe(false)
+    expect(edges()).toEqual(['r1', 'r2', 'r3', 'r4'])
     expect(crowded()).toEqual([])
     expect(Object.values(s().exploreMore ?? {}).filter(Boolean)).toEqual([])
   })
@@ -174,7 +162,11 @@ describe('an explore view', () => {
     const outer = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6']
     s().loadDiagram({
       nodes: [box('user', 'person'), box('sys', 'system'), ...inner.map((id) => box(id, 'container', 'sys')), ...outer.map((id) => box(id, 'system'))],
-      relations: [...inner, ...outer].map((id) => ({ id: `uses-${id}`, sourceId: 'user', targetId: id, label: 'uses' })),
+      relations: [
+        ...[...inner, ...outer].map((id) => ({ id: `uses-${id}`, sourceId: 'user', targetId: id, label: 'uses' })),
+        // Within the layer below the user: not drawn.
+        { id: 'r1-r2', sourceId: 'r1', targetId: 'r2', label: 'calls' },
+      ],
     })
     await s().exploreFrom('user')
     await s().exploreNeighbours('user')
@@ -194,11 +186,42 @@ describe('an explore view', () => {
     const height = s().rfNodes.find((n) => n.id === 'r6')!.data.height
     const layerGap = tops[0] - (abs('user').y + s().rfNodes.find((n) => n.id === 'user')!.data.height)
     expect(tops[1] - (tops[0] + height)).toBeLessThan(layerGap)
-    // The system's frame holds its containers, the other systems lie outside it.
-    expect(drawn('sys')).toBe(true)
-    for (const id of inner) expect(inside(id, 'sys')).toBe(true)
-    for (const id of outer) expect(overlap(id, 'sys')).toBe(false)
+    // No frame of the system; only the relations to the next layer drawn.
+    expect(drawn('sys')).toBe(false)
+    expect(edges()).toEqual(added.map((id) => `uses-${id}`).sort())
+    expect(s().exploration!.hiddenRelationIds).toEqual(['r1-r2'])
     expect(crowded()).toEqual([])
+    // Saved as a view, it draws what the exploration drew.
+    const view = s().saveExploration('Uses', null)!
+    expect(s().views[view].hiddenRelationIds).toEqual(['r1-r2'])
+  })
+
+  it('an element keeps the level it is added on: one related to the start, added by a later +, goes on that later level', async () => {
+    const box = (id: string): C4Node => ({ id, type: 'system', label: id, x: 0, y: 0, width: 200, height: 120, collapsed: false } as C4Node)
+    s().loadDiagram({
+      nodes: ['start', 'a', 'b', 'p'].map(box),
+      relations: [
+        { id: 'start-a', sourceId: 'start', targetId: 'a', label: 'uses' },
+        { id: 'a-b', sourceId: 'a', targetId: 'b', label: 'uses' },
+        { id: 'b-p', sourceId: 'b', targetId: 'p', label: 'uses' },
+      ],
+    })
+    await s().exploreFrom('start')
+    await s().exploreNeighbours('start')
+    await s().exploreNeighbours('a')
+    // Related to the start since the start's + was used.
+    s().addRelation({ sourceId: 'start', targetId: 'p', label: 'pays' })
+    await s().exploreNeighbours('b')
+    expect(s().exploration!.levels).toEqual({ start: 0, a: 1, b: 2, p: 3 })
+    expect(below('a', 'start')).toBe(true)
+    expect(below('b', 'a')).toBe(true)
+    expect(below('p', 'b')).toBe(true)
+    // Drawn: level k to level k + 1 only; the start's relation to p is not.
+    expect(edges()).toEqual(['a-b', 'b-p', 'start-a'])
+    // + 1 level is the + of the last level: none left there.
+    const levels = { ...s().exploration!.levels }
+    await s().exploreLevel()
+    expect(s().exploration!.levels).toEqual(levels)
   })
 
   it('is not saved: the document is as it was, its views among it', async () => {
@@ -255,7 +278,7 @@ describe('an explore view', () => {
     await s().exploreFrom('db')
     expect(s().exploration!.id).not.toBe(first)
     expect(s().exploration!.name).toBe('Explore: Orders DB')
-    expect(listed()).toEqual(['bookstore', 'db'])
+    expect(listed()).toEqual(['db'])
     expect(viewById(s(), first)).toBeUndefined()
     expect(s().pendingDelete).toBeNull()
     expect(saved()).toBe(was)
@@ -278,7 +301,9 @@ describe('an explore view', () => {
       data.relations = data.relations.filter((r) => r.sourceId !== 'payments' && r.targetId !== 'payments')
     })
     expect(s().activeViewId).toBe(id)
-    expect(listed()).toEqual(['api', 'bookstore', 'db', 'web'])
+    expect(listed()).toEqual(['api', 'db', 'web'])
+    // Each keeps its level.
+    expect(s().exploration!.levels).toEqual({ api: 0, web: 1, db: 1 })
     const now = drawnPlaces()
     for (const n of ['api', 'web', 'db']) expect(now[n]).toEqual(places[n])
     expect(now.payments).toBeUndefined()
@@ -309,7 +334,7 @@ describe('saving and closing an explore view', () => {
     expect(view.name).toBe('API context')
     expect(view.folder).toBe('Explorations')
     expect((view.kind ?? 'static')).toBe('static')
-    expect([...view.nodeIds].sort()).toEqual(['api', 'bookstore', 'db', 'payments', 'web'])
+    expect([...view.nodeIds].sort()).toEqual(['api', 'db', 'payments', 'web'])
     expect(view.collapsedNodeIds).toEqual(['api'])
     expect(s().exploration).toBeNull()
     expect(s().activeViewId).toBe(id)
