@@ -6070,7 +6070,9 @@ export const useDiagramStore = create<DiagramStore>()(
           state.sequences = (snap.sequences ?? {}) as any
           if (state.activeSequenceId && !state.sequences[state.activeSequenceId]) state.activeSequenceId = null
           // The Hub template values its texts hold, not the live model's.
-          _milestoneHubBase = milestoneHubTemplates((backup?.hubTemplates ?? state.hubTemplates) as Record<string, HubImportRecord>, snap.nodes as Record<string, C4Node>)
+          // Read from the store, not the draft: _milestoneHubBase outlives
+          // this set, and a draft kept is revoked (Propagate threw).
+          _milestoneHubBase = milestoneHubTemplates((backup?.hubTemplates ?? get().hubTemplates) as Record<string, HubImportRecord>, snap.nodes as Record<string, C4Node>)
           state.hubTemplates = _milestoneHubBase as any
           state.activeSnapshotId = id
           // Coming from another milestone: its views (its own, or edits
@@ -6198,7 +6200,7 @@ export const useDiagramStore = create<DiagramStore>()(
             state.snapshots.splice(idx + 1, 0, newSnap as any)
             // The live model is as it was: so are its Hub template records.
             // The new milestone shown has the values its texts hold.
-            _milestoneHubBase = milestoneHubTemplates((liveBackup?.hubTemplates ?? state.hubTemplates) as Record<string, HubImportRecord>, editedNodes)
+            _milestoneHubBase = milestoneHubTemplates((liveBackup?.hubTemplates ?? get().hubTemplates) as Record<string, HubImportRecord>, editedNodes)
             state.hubTemplates = _milestoneHubBase as any
             // Stay viewing the freshly-created milestone (canvas already shows its content).
             // liveBackup is preserved so the user can still discard back to live HEAD.
@@ -7480,7 +7482,9 @@ export const useDiagramStore = create<DiagramStore>()(
           set((state) => {
             state.liveBackup = { nodes: state.c4Nodes, relations: state.c4Relations, sequences: state.sequences, hubTemplates: state.hubTemplates } as any
             showMilestoneViews(state as DiagramStore, snapshots.find((m) => m.id === shownMilestone.id))
-            _milestoneHubBase = milestoneHubTemplates(state.hubTemplates as Record<string, HubImportRecord>, shownNodes as Record<string, C4Node>)
+            // From the store, not the draft: a draft kept past this set is
+            // revoked, and Propagate threw on it.
+            _milestoneHubBase = milestoneHubTemplates(get().hubTemplates as Record<string, HubImportRecord>, shownNodes as Record<string, C4Node>)
             state.hubTemplates = _milestoneHubBase as any
             state.c4Nodes = shownNodes as any
             state.c4Relations = milestone.relations as any

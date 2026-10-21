@@ -754,15 +754,6 @@ const KNOWN: Known[] = [
     note: 'K12: an element added in a milestone is listed in the live view it was added on, also after Discard (new; sibling of item 230)',
   },
   {
-    // A milestone shown, the agent adds a system (reloaded with the
-    // milestone kept), a group added in the milestone, Propagate: TypeError
-    // "Cannot perform 'ownKeys' on a proxy that has been revoked" in
-    // propagatedHubTemplates (diagramStore.ts).
-    rule: 'noErrors',
-    match: (_t, v) => v.detail.includes('propagatedHubTemplates'),
-    note: 'K13: Propagate throws after an agent write reloaded the milestone shown (new)',
-  },
-  {
     // An agent adds a system Studio reloads; with a view that does not draw
     // it shown (Place Order Flow, Containers), folding it and unfolding it
     // throws "Cannot read properties of undefined (reading 'x')" in
