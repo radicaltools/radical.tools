@@ -9,6 +9,9 @@ import { refIds, refProblem } from './refs'
 
 export type IssueSeverity = 'error' | 'warning'
 
+/** No value: nothing, an empty text or an empty list. */
+const isNoValue = (v: unknown): boolean => v == null || v === '' || (Array.isArray(v) && v.length === 0)
+
 export interface Issue {
   id: string
   severity: IssueSeverity
@@ -25,6 +28,27 @@ export function validateModel(
 ): Issue[] {
   const issues: Issue[] = []
   const nodeList = Object.values(nodes)
+
+  // A required property is missing when it has no value and no default the
+  // card shows in its place (an empty text or list is none); an enum value
+  // that is no option any more, and several references in a property that
+  // takes one, are flagged too (a metamodel narrowed below what the model
+  // holds).
+  const checkValues = (item: Record<string, unknown>, props: PropertyDef[] | undefined, at: { nodeId?: string; relationId?: string }, what: string): void => {
+    const key = at.nodeId ?? at.relationId
+    for (const p of props ?? []) {
+      const v = item[p.key]
+      if (p.required && isNoValue(v) && isNoValue(p.default)) {
+        issues.push({ id: `missing-prop:${key}:${p.key}`, severity: 'warning', message: `${what} is missing required property "${p.label}".`, ...at })
+      }
+      if (p.type === 'enum' && p.options?.length && !isNoValue(v) && !p.options.includes(String(v))) {
+        issues.push({ id: `bad-option:${key}:${p.key}`, severity: 'warning', message: `${what}: "${p.label}" is "${String(v)}", which is not one of its options (${p.options.join(', ')}).`, ...at })
+      }
+      if (p.type === 'ref' && !p.multiple && refIds(v).length > 1) {
+        issues.push({ id: `many-refs:${key}:${p.key}`, severity: 'warning', message: `${what}: "${p.label}" points at ${refIds(v).length} elements, but takes one.`, ...at })
+      }
+    }
+  }
 
   for (const n of nodeList) {
     const def = metamodel.nodeTypes[n.type]
@@ -78,19 +102,8 @@ export function validateModel(
       })
     }
 
-    // Required properties
-    for (const p of def.properties ?? []) {
-      if (!p.required) continue
-      const v = (n as unknown as Record<string, unknown>)[p.key]
-      if (v == null || v === '') {
-        issues.push({
-          id: `missing-prop:${n.id}:${p.key}`,
-          severity: 'warning',
-          message: `${def.label} "${n.label}" is missing required property "${p.label}".`,
-          nodeId: n.id,
-        })
-      }
-    }
+    // Required properties, and values the property no longer takes
+    checkValues(n as unknown as Record<string, unknown>, def.properties, { nodeId: n.id }, `${def.label} "${n.label}"`)
   }
 
   // Type cardinality
@@ -211,23 +224,32 @@ export function validateModel(
     }
   }
 
-  // A relation's required properties are checked as an element's are.
+  // A relation's properties are checked as an element's are.
   for (const r of Object.values(relations)) {
     const def = r.relationType ? metamodel.relationTypes[r.relationType] : undefined
-    for (const p of def?.properties ?? []) {
-      if (!p.required) continue
-      const v = (r as unknown as Record<string, unknown>)[p.key]
-      if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) {
-        const src = nodes[r.sourceId]?.label ?? r.sourceId
-        const dst = nodes[r.targetId]?.label ?? r.targetId
-        issues.push({
-          id: `missing-prop:${r.id}:${p.key}`,
-          severity: 'warning',
-          message: `Relation "${src}" → "${dst}" (${def!.label}) is missing required property "${p.label}".`,
-          relationId: r.id,
-        })
-      }
-    }
+    if (!def) continue
+    const src = nodes[r.sourceId]?.label ?? r.sourceId
+    const dst = nodes[r.targetId]?.label ?? r.targetId
+    checkValues(r as unknown as Record<string, unknown>, def.properties, { relationId: r.id }, `Relation "${src}" → "${dst}" (${def.label})`)
+  }
+
+  // A relation with no type where the metamodel has several types for its
+  // pair is none of them (made with "(generic)" in the card, or by a tool
+  // that named no type). Where one type fits, that one is meant: a relation
+  // added there gets it, and one saved without it reads as it.
+  for (const r of Object.values(relations)) {
+    if (r.relationType) continue
+    const src = nodes[r.sourceId]
+    const dst = nodes[r.targetId]
+    if (!src || !dst) continue
+    const fitting = Object.values(metamodel.relationTypes).filter((rt) => rt.allowedPairs.some((p) => p.from === src.type && p.to === dst.type))
+    if (fitting.length < 2) continue
+    issues.push({
+      id: `untyped-rel:${r.id}`,
+      severity: 'warning',
+      message: `Relation "${src.label}" → "${dst.label}" has no type; give it one of ${fitting.map((rt) => `"${rt.label}"`).join(', ')}.`,
+      relationId: r.id,
+    })
   }
 
   // A relation that names its type is one that type has between its ends
@@ -286,4 +308,19 @@ export function validateModel(
   }
 
   return issues
+}
+
+/** What the model holds that `after` flags and `before` did not: what a
+ *  change of the metamodel breaks (allowed parents, a maximum, enum options,
+ *  a required property or pairs narrowed below what the model holds).
+ *  Studio asks before it makes such a change and lists these; the MCP
+ *  server makes it and warns with them. */
+export function metamodelChangeBreaks(
+  nodes: Record<string, C4Node>,
+  relations: Record<string, C4Relation>,
+  before: Metamodel,
+  after: Metamodel,
+): Issue[] {
+  const had = new Set(validateModel(nodes, relations, before).map((i) => i.id))
+  return validateModel(nodes, relations, after).filter((i) => !had.has(i.id))
 }

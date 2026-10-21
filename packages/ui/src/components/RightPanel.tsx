@@ -2075,6 +2075,9 @@ function AttrValue({ def, value, readOnly, onChange }: {
             set: picking that one changed nothing, so it could not be
             chosen and a required property stayed "missing". */}
         {isEmptyValue(shown) && <option value="">—</option>}
+        {/* A value that is no option any more (the metamodel lost it)
+            showed as the first option, which then could not be picked. */}
+        {!isEmptyValue(shown) && !def.options.includes(String(shown)) && <option value={String(shown)}>{`${String(shown)} (not an option)`}</option>}
         {def.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
       </select>
     )

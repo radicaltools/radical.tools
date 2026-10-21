@@ -564,7 +564,7 @@ export function checkReplaceMetamodel(state: ModelState, next: Metamodel, milest
   const nodeTypes = count(Object.values(state.c4Nodes).map((n) => n.type).filter((t) => !next.nodeTypes[t]))
   const relationTypes = count(Object.values(state.c4Relations).flatMap((r) => r.relationType && !next.relationTypes[r.relationType] ? [r.relationType] : []))
   if (nodeTypes.size === 0 && relationTypes.size === 0) {
-    const lostNodeTypes = new Set(milestones.flatMap((m) => Object.values(m.nodes ?? {}).map((n) => n.type)).filter((t) => !next.nodeTypes[t]))
+    const lostNodeTypes = new Set<string>(milestones.flatMap((m) => Object.values(m.nodes ?? {}).map((n): string => n.type)).filter((t) => !next.nodeTypes[t]))
     const lostRelationTypes = new Set(milestones.flatMap((m) => Object.values(m.relations ?? {}).flatMap((r) => r.relationType && !next.relationTypes[r.relationType] ? [r.relationType] : [])))
     for (const t of Object.keys(state.metamodel?.nodeTypes ?? {})) if (!next.nodeTypes[t]) lostNodeTypes.add(t)
     for (const t of Object.keys(state.metamodel?.relationTypes ?? {})) if (!next.relationTypes[t]) lostRelationTypes.add(t)
