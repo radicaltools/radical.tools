@@ -428,6 +428,19 @@ function _asOneStep<T>(action: () => T): T {
   }
 }
 
+/** The camera in use when a model was loaded. Loading shows All elements
+ *  while the canvas still has the camera of what it showed (a view, on a
+ *  reload): until it moves, it is not All elements' and is not saved as
+ *  theirs (a merged reload wrote the view's camera into defaultViewport). */
+let _cameraAtLoad: { x: number; y: number; zoom: number } | null = null
+
+/** The camera in use now, unless it is still the one from before a load. */
+function allElementsCamera(camera: { x: number; y: number; zoom: number } | null): { x: number; y: number; zoom: number } | null {
+  const was = _cameraAtLoad
+  if (!camera || (was && was.x === camera.x && was.y === camera.y && was.zoom === camera.zoom)) return null
+  return camera
+}
+
 /** Counts the user's steps: each undo step made, undone or redone. */
 let _historyMark = 0
 
@@ -3665,7 +3678,8 @@ export const useDiagramStore = create<DiagramStore>()(
             if (activeViewId === null) _milestoneAllPositions = currentPos
           } else if (activeViewId === null) {
             state.defaultPositions = currentPos as any
-            if (currentViewport) state.defaultViewport = currentViewport
+            const camera = allElementsCamera(currentViewport)
+            if (camera) state.defaultViewport = camera
           } else if (state.views[activeViewId]) {
             const view = state.views[activeViewId]
             view.positions = viewCanvasPositions(view, c4Nodes, currentPos, viewDrawnIds(view as DiagramView, c4Nodes as Record<string, C4Node>, state.c4Relations as Record<string, C4Relation>)) as any
@@ -3838,7 +3852,8 @@ export const useDiagramStore = create<DiagramStore>()(
           const viewId = state.activeViewId
           if (viewId === null) {
             state.defaultPositions = currentPos as any
-            if (camera) state.defaultViewport = camera
+            const shown = allElementsCamera(camera)
+            if (shown) state.defaultViewport = shown
           } else if (state.views[viewId]) {
             const view = state.views[viewId]
             view.positions = viewCanvasPositions(view, get().c4Nodes, currentPos, viewDrawnIds(view as DiagramView, get().c4Nodes, get().c4Relations)) as any
@@ -6339,6 +6354,8 @@ export const useDiagramStore = create<DiagramStore>()(
           state.views = views as any
           state.defaultPositions = defaultPos as any
           state.defaultViewport = defaultVP
+          const rawVP = typeof window !== 'undefined' ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
+          _cameraAtLoad = rawVP ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom } : null
           state.defaultLayoutConstraints = (data.defaultLayoutConstraints ?? []) as any
           state.defaultEdgeStyle = data.defaultEdgeStyle ?? 'curved'
           state.activeViewId = null
