@@ -513,10 +513,12 @@ describe('Radical Forge over MCP', () => {
       const done = await call(client, 'forge_complete_stage', { stage: 'review', summary: 'Linked the shop to its requirement.' })
       expect(done).toContain('It refined earlier stages as the user accepted (1)')
       expect(done).toContain('added satisfies Shop → Reserve online')
+      // The relation is the refinement's, not counted as added as well.
+      expect(done).toContain('Review done: +0 nodes, +0 relations')
       expect(done).toContain('tell the user which stay open')
       expect(done).not.toContain('Nothing satisfies')
       expect(done).toContain('This was the last stage.')
-      expect(await call(client, 'forge_finish', {})).toContain('- Review: +0 nodes · +1 relations · 1 refinements of earlier stages accepted')
+      expect(await call(client, 'forge_finish', {})).toContain('- Review: +0 nodes · +0 relations · 1 refinements of earlier stages accepted')
     } finally {
       await client.close()
     }
