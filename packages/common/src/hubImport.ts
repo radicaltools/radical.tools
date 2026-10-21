@@ -6,7 +6,7 @@
 // adds it to the folder, beside the existing model.
 
 import type { C4ElementType, C4Node, C4Relation, DiagramData, DiagramSequence, DiagramView } from './c4'
-import { NODE_SIZES } from './c4'
+import { NODE_SIZES, trimStepBackward } from './c4'
 import type { HubConcept, HubImportRecord, TemplateParam } from './hubFormat'
 import { conceptViewsToDiagram, uniqueName } from './hubViews'
 
@@ -201,6 +201,7 @@ export function buildConceptInsert(concept: HubConcept, options: ConceptInsertOp
       name: uniqueName((raw.name as string) || concept.name, takenSequenceNames),
       relationIds: mapped as string[],
       stepDescriptions: raw.stepDescriptions as (string | undefined)[] | undefined,
+      stepBackward: trimStepBackward(Array.isArray(raw.stepBackward) ? raw.stepBackward : undefined),
     }
   }
 

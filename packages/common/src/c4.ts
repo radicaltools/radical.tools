@@ -66,6 +66,28 @@ export interface DiagramSequence {
    * Optional for backwards compat with persisted sequences.
    */
   stepDescriptions?: (string | undefined)[]
+  /**
+   * Per step, parallel to relationIds: true where the step runs along its
+   * relation the other way, from the relation's target to its source (a
+   * response, as a call's return). Kept up to the last backward step and
+   * absent when there is none, so a sequence without one is stored as it
+   * always was, and one stored before is all forward.
+   */
+  stepBackward?: boolean[]
+}
+
+/** Whether step `i` of the sequence runs from its relation's target to its
+ *  source (a response). */
+export function isBackwardStep(sequence: Pick<DiagramSequence, 'stepBackward'> | undefined, i: number): boolean {
+  return sequence?.stepBackward?.[i] === true
+}
+
+/** Per-step backward flags as a sequence keeps them: up to the last true,
+ *  undefined when none is. */
+export function trimStepBackward(flags: readonly unknown[] | undefined): boolean[] | undefined {
+  const out = Array.from(flags ?? [], (flag) => flag === true)
+  while (out.length > 0 && !out[out.length - 1]) out.pop()
+  return out.length ? out : undefined
 }
 
 /** How a canvas draws relations: smooth curves, or horizontal and vertical
@@ -499,6 +521,9 @@ export interface C4EdgeRFData {
   /** 1-based step indices when this edge is part of the active dynamic view sequence.
    *  Array because the same relation can appear multiple times in one sequence. */
   sequenceStep?: number[]
+  /** The steps that run this relation backward (responses), numbered at its
+   *  target end. */
+  sequenceStepBack?: number[]
 }
 
 // ─── Layout position map ─────────────────────────────────────────────────────

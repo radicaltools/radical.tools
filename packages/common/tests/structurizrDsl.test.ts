@@ -424,3 +424,45 @@ describe('views', () => {
     expect(r.notRead.join(' ')).toMatch(/Filtered views are not imported/)
   })
 })
+
+describe('a dynamic step against its relationship', () => {
+  // Structurizr's Big Bank "SignIn": the answers run back along the calls'
+  // relationships (database -> securityComponent). They were left out with
+  // "no relationship between their elements"; they are backward steps.
+  const r = parseStructurizrDsl(`workspace {
+    model {
+        bank = softwareSystem "Internet Banking" {
+            spa = container "Single-Page Application"
+            api = container "API Application" {
+                signin = component "Sign In Controller"
+                security = component "Security Component"
+            }
+            database = container "Database" "" "" "Database"
+        }
+        spa -> signin "Makes API calls to"
+        signin -> security "Uses"
+        security -> database "Reads from and writes to"
+    }
+    views {
+        dynamic api "SignIn" {
+            spa -> signin "Submits credentials to"
+            signin -> security "Validates credentials using"
+            security -> database "select * from users where username = ?"
+            database -> security "Returns user data to"
+            security -> signin "Returns true if the hashed password matches"
+            signin -> spa "Sends back an authentication token to"
+        }
+    }
+}`)
+
+  it('imports it as a backward step along that relationship, with its description', () => {
+    const v = r.views.find((x) => x.name === 'SignIn')!
+    const seq = r.sequences.find((s) => s.id === v.sequenceId)!
+    expect(seq.relationIds.map((id) => r.relations.find((x) => x.id === id)?.label)).toEqual([
+      'Makes API calls to', 'Uses', 'Reads from and writes to', 'Reads from and writes to', 'Uses', 'Makes API calls to',
+    ])
+    expect(seq.stepBackward).toEqual([false, false, false, true, true, true])
+    expect(seq.stepDescriptions?.[3]).toBe('Returns user data to')
+    expect(r.notRead.join(' ')).not.toMatch(/SignIn/)
+  })
+})

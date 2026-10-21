@@ -117,7 +117,7 @@ export interface DiagramFacade {
   addSequence?(name: string): string
   renameSequence?(id: string, name: string): void
   /** Replaces the steps, in order; a relation may repeat. */
-  setSequenceSteps?(id: string, steps: Array<{ relationId: string; description?: string }>): void
+  setSequenceSteps?(id: string, steps: Array<{ relationId: string; description?: string; backward?: boolean }>): void
   removeSequence?(id: string): void
   /** Optional — replaces the document's metamodel (metamodel tools). */
   setMetamodel?(metamodel: Metamodel): void

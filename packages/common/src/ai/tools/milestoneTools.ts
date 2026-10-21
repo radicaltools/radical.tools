@@ -97,8 +97,8 @@ function describeChanges(changes: ModelChanges, before: ModelCopy, after: ModelC
   return lines.join('\n')
 }
 
-/** The sequences added, removed and changed (name, steps, notes) from
- *  `before` to `after`, as lines for describeChanges' sections. */
+/** The sequences added, removed and changed (name, steps and their ways,
+ *  notes) from `before` to `after`, as lines for describeChanges' sections. */
 function describeSequenceChanges(before: Record<string, DiagramSequence>, after: Record<string, DiagramSequence>): string {
   const name = (q: DiagramSequence) => `${q.name} (${q.id})`
   const same = (a: unknown, b: unknown) => JSON.stringify(a ?? []) === JSON.stringify(b ?? [])
@@ -108,7 +108,8 @@ function describeSequenceChanges(before: Record<string, DiagramSequence>, after:
     const was = before[q.id]
     const fields = [
       ...(was.name !== q.name ? ['name'] : []),
-      ...(!same(was.relationIds, q.relationIds) ? ['steps'] : []),
+      // A step turned to run the other way is a change of the steps.
+      ...(!same(was.relationIds, q.relationIds) || !same(was.stepBackward, q.stepBackward) ? ['steps'] : []),
       ...(!same(was.stepDescriptions, q.stepDescriptions) ? ['notes'] : []),
     ]
     return fields.length ? `${name(q)}: ${fields.join(', ')}` : null

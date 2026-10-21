@@ -32,7 +32,7 @@
  */
 
 import type { C4Node, C4Relation, C4ElementType, DiagramSequence, DiagramView } from '../c4'
-import { NODE_SIZES } from '../c4'
+import { NODE_SIZES, trimStepBackward } from '../c4'
 import type { Metamodel } from '../metamodel/types'
 import { isPlacementAllowed, isRelationAllowed } from '../metamodel/lookup'
 import { builtInC4Metamodel } from '../metamodel/presets/c4'
@@ -912,19 +912,26 @@ export function parseStructurizrDsl(src: string, options: StructurizrDslOptions 
       if (spec.kind === 'dynamic') {
         const relationIds: string[] = []
         const notes: (string | undefined)[] = []
+        const backward: boolean[] = []
         const missing: string[] = []
         for (const step of spec.steps) {
           const a = resolveId(step.src, [], null), b = resolveId(step.tgt, [], null)
           const found = a && b ? relations.find((r) => r.sourceId === a && r.targetId === b) : undefined
-          if (!found) { missing.push(`${step.src} -> ${step.tgt}`); continue }
-          relationIds.push(found.id)
-          notes.push(step.description && step.description !== found.label ? step.description : undefined)
-          ids.add(found.sourceId); ids.add(found.targetId)
+          // A step against a relationship (a response) runs along it backward.
+          const back = !found && a && b ? relations.find((r) => r.sourceId === b && r.targetId === a) : undefined
+          const rel = found ?? back
+          if (!rel) { missing.push(`${step.src} -> ${step.tgt}`); continue }
+          relationIds.push(rel.id)
+          notes.push(step.description && step.description !== rel.label ? step.description : undefined)
+          backward.push(!!back)
+          ids.add(rel.sourceId); ids.add(rel.targetId)
         }
         if (missing.length) skipped(`View "${name}": ${missing.length} step${missing.length === 1 ? '' : 's'} with no relationship between ${missing.length === 1 ? 'its' : 'their'} elements left out (${missing.join('; ')}).`)
         if (relationIds.length) {
           const seq: DiagramSequence = { id: `seq-${sequences.length + 1}`, name, relationIds }
           if (notes.some((d) => d)) seq.stepDescriptions = notes
+          const back = trimStepBackward(backward)
+          if (back) seq.stepBackward = back
           sequences.push(seq)
           view.kind = 'dynamic'
           view.sequenceId = seq.id

@@ -8,7 +8,7 @@ import {
   staleMdFolderFiles,
   MD_MANIFEST_FILE,
 } from '../src/formats/mdFolder'
-import type { DiagramData, C4Node } from '../src/c4'
+import { isBackwardStep, type DiagramData, type C4Node } from '../src/c4'
 import { builtInC4Metamodel } from '../src/metamodel'
 
 function node(partial: Partial<C4Node> & Pick<C4Node, 'id' | 'type' | 'label'>): C4Node {
@@ -114,6 +114,15 @@ describe('md-folder persistence', () => {
     expect(back.sequences).toEqual(sample.sequences)
     expect(back.defaultPositions).toEqual(sample.defaultPositions)
     expect(back.defaultViewport).toEqual(sample.defaultViewport)
+  })
+
+  it('keeps a sequence\'s backward steps in sequences.json; a file without them reads as all forward', () => {
+    const data = { ...sample, sequences: [{ id: 's1', name: 'Pay flow', relationIds: ['rel1', 'rel1'], stepBackward: [false, true] }] }
+    const files = serializeToMdFolder(data, 'Demo')
+    expect(JSON.parse(files['sequences.json'])[0].stepBackward).toEqual([false, true])
+    expect(deserializeFromMdFolder(files).data.sequences).toEqual(data.sequences)
+    const old = deserializeFromMdFolder(serializeToMdFolder(sample, 'Demo')).data.sequences![0]
+    expect(isBackwardStep(old, 0)).toBe(false)
   })
 
   it('writes no empty text, unticked box or empty list, unless the property\'s default would show instead', () => {

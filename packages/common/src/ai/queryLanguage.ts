@@ -1,4 +1,4 @@
-import { type C4Node, type C4Relation, type DiagramSequence, type DiagramView } from '../c4'
+import { isBackwardStep, type C4Node, type C4Relation, type DiagramSequence, type DiagramView } from '../c4'
 import { viewShownNodes } from '../viewPipeline'
 
 export const MODEL_QUERY_LANGUAGE_HELP = `Query the CURRENT diagram structure with a small built-in query language —
@@ -563,6 +563,8 @@ export function runModelQuery(query: string, ctx: ModelQueryContext): ModelQuery
         step: i + 1,
         ...(rel ? summarizeRelation(rel, ctx.nodes) : { id: relationId, missing: true }),
         ...(sequence.stepDescriptions?.[i] ? { stepDescription: sequence.stepDescriptions[i] } : {}),
+        // From the relation's target back to its source: a response.
+        ...(isBackwardStep(sequence, i) ? { backward: true } : {}),
       }
     })
     const shownIn = Object.values(views).filter((view) => view.sequenceId === sequence.id).map((view) => ({ id: view.id, name: view.name }))
