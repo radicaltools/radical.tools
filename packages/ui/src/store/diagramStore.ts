@@ -428,11 +428,22 @@ function _asOneStep<T>(action: () => T): T {
   }
 }
 
+/** Counts the user's steps: each undo step made, undone or redone. */
+let _historyMark = 0
+
+/** A number that changes with each undo step the user makes, undoes or
+ *  redoes: whether the model was edited since a moment (autosave saves
+ *  after a load only once it was, D15). */
+export function historyMark(): number {
+  return _historyMark
+}
+
 function _pushUndoEntry(entry: HistoryEntry): void {
   if (_oneStepDepth > 0) {
     if (_oneStepPushed) return
     _oneStepPushed = true
   }
+  _historyMark++
   _undoStack.push(entry)
   if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
   _redoStack.length = 0 // clear redo on new change
@@ -4954,6 +4965,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().appMode !== 'designer') return
         if (_undoStack.length === 0) return
         const item = _undoStack.pop()!
+        _historyMark++
         // push current state to redo
         const now = _captureState(get())
         _redoStack.push(isStepChange(item) ? { from: item.to, to: item.from } : now)
@@ -4985,6 +4997,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().appMode !== 'designer') return
         if (_redoStack.length === 0) return
         const item = _redoStack.pop()!
+        _historyMark++
         // push current state to undo
         const now = _captureState(get())
         _undoStack.push(isStepChange(item) ? { from: item.to, to: item.from } : now)
