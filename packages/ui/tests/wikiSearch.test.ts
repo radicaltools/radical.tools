@@ -90,6 +90,20 @@ describe('wikiSearchHit', () => {
     expect(hit('pay', 'kafka')).toBeNull()
     expect(hit('pay', '')).toBeNull()
   })
+
+  // Item 184: the search read the Markdown source: words split by ** or a
+  // link were not found, and a link's address was.
+  it('reads Markdown fields as the page shows them', () => {
+    const web = node('web', 'container', 'Web App', {
+      description: 'Serves the catalogue **and checkout UI**; [see the guide](https://docs.example/web).\n\n## Notes\n\n**Proposed approach:** cache pages.',
+    })
+    const find = (query: string) => wikiSearchHit(web, query, { web }, {}, mm)
+    expect(find('and checkout ui')?.snippet?.match).toBe('and checkout UI')
+    expect(find('see the guide')?.snippet?.match).toBe('see the guide')
+    expect(find('proposed approach: cache')?.snippet?.match).toBe('Proposed approach: cache')
+    expect(find('docs.example')).toBeNull()
+    expect(find('##')).toBeNull()
+  })
 })
 
 describe('searchableTexts', () => {

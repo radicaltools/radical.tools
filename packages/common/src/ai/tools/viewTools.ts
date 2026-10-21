@@ -38,7 +38,7 @@ export const PIPELINE_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          ways: { type: 'array', description: 'Ways into the level, joined with or. A way with neither types nor via takes every element.', items: { type: 'object', properties: { types: { type: 'array', items: { type: 'string' }, description: 'Node type ids; omit for any type.' }, via: VIA_SCHEMA } } },
+          ways: { type: 'array', description: 'Ways into the level, joined with or. On the first level a way takes no via, and one with no types takes every element; on a later level every way needs a via.', items: { type: 'object', properties: { types: { type: 'array', items: { type: 'string' }, description: 'Node type ids; omit for any type.' }, via: VIA_SCHEMA } } },
           filters: { type: 'array', items: FILTER_SCHEMA },
         },
         required: ['ways'],
@@ -49,8 +49,12 @@ export const PIPELINE_SCHEMA = {
   },
 }
 
+/** Fields every element has that a property filter may test. */
+const BUILT_IN_FIELDS = ['label', 'description', 'technology', 'external']
+
 /** A chain given to a tool, read and checked against the model: element ids
- *  (tempIds too) resolved, unknown types, relation types and elements refused. */
+ *  (tempIds too) resolved, unknown types, relation types and elements
+ *  refused, and so is what the chain would read otherwise than written. */
 export function pipelineFor(ctx: ToolRunContext, tool: string, raw: unknown): { pipeline: ViewPipeline } | { error: string } {
   if (raw === null) return { pipeline: {} }
   const pipeline = readPipeline(raw)
@@ -58,6 +62,38 @@ export function pipelineFor(ctx: ToolRunContext, tool: string, raw: unknown): { 
   const metamodel = ctx.diagram.getMetamodel?.()
   const nodes = ctx.diagram.getNodes()
   const problems: string[] = []
+  // What readPipeline would read otherwise than written (a via it cannot
+  // read is dropped, a filter is matched as far as it goes) is refused: a
+  // step written as one thing was saved as another and showed other elements.
+  const rawLevels = Array.isArray((raw as { levels?: unknown }).levels) ? (raw as { levels: unknown[] }).levels : []
+  rawLevels.forEach((l, i) => {
+    const level = (l ?? {}) as { ways?: unknown; filters?: unknown }
+    const at = `level ${i + 1}`
+    for (const w of Array.isArray(level.ways) ? level.ways : []) {
+      const via = (w as { via?: Record<string, unknown> } | null)?.via
+      if (via === undefined) { if (i > 0) problems.push(`${at}: a way needs a via (how its elements hang under the level above)`); continue }
+      if (i === 0) { problems.push(`${at}: the first level takes no via (it has no level above)`); continue }
+      const readable = !!via && typeof via === 'object' && (via.contains === true || via.anyRelation === true
+        || (typeof via.relationType === 'string' && (via.direction === 'in' || via.direction === 'out')))
+      if (!readable) problems.push(`${at}: a via is {relationType, direction:"in"|"out"}, {anyRelation:true} or {contains:true}`)
+    }
+    for (const f of Array.isArray(level.filters) ? level.filters as Array<Record<string, unknown>> : []) {
+      const kind = f?.kind
+      if (kind === 'type') { if (!Array.isArray(f.types) || !f.types.length) problems.push(`${at}: a type filter needs types`) }
+      else if (kind === 'property') {
+        if (!['is', 'is-not', 'set', 'unset'].includes(f.op as string)) problems.push(`${at}: a property filter's op is "is", "is-not", "set" or "unset", not "${String(f.op)}"`)
+        else if ((f.op === 'is' || f.op === 'is-not') && (!Array.isArray(f.values) || !f.values.length)) problems.push(`${at}: a property filter with op "${f.op}" needs values`)
+        const known = !metamodel || BUILT_IN_FIELDS.includes(f.key as string)
+          || Object.values(metamodel.nodeTypes).some((t) => t.properties?.some((p) => p.key === f.key))
+        if (!known) problems.push(`${at}: no node type has a property "${String(f.key)}"`)
+      } else if (kind === 'relation') {
+        if (f.direction !== 'in' && f.direction !== 'out') problems.push(`${at}: a relation filter needs direction "in" or "out"`)
+        if (typeof f.has !== 'boolean') problems.push(`${at}: a relation filter needs has: true or false`)
+      } else if (kind === 'within') { if (typeof f.nodeId !== 'string') problems.push(`${at}: a within filter needs a nodeId`) }
+      else if (kind === 'text') { if (typeof f.text !== 'string') problems.push(`${at}: a text filter needs a text`) }
+      else problems.push(`${at}: unknown filter kind "${String(kind)}"`)
+    }
+  })
   const type = (t: string) => { if (metamodel && !metamodel.nodeTypes[t]) problems.push(`unknown node type "${t}"`) }
   const relation = (r: string) => { if (metamodel && !metamodel.relationTypes[r]) problems.push(`unknown relation type "${r}"`) }
   for (const level of pipeline.levels ?? []) {

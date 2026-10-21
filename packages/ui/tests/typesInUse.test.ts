@@ -69,3 +69,16 @@ describe('Deleting a type from the metamodel', () => {
     expect(s().metamodel.relationTypes.feeds).toBeUndefined()
   })
 })
+
+describe('Reset to C4', () => {
+  // Item 209: accepted while a milestone held an element of a custom type;
+  // Restore to live then gave "has unknown type".
+  it('is refused while a milestone holds an element of a type C4 does not have', () => {
+    useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, g: node('g', 'gadget') } }))
+    s().createSnapshot('As-is')
+    s().removeNode('g')
+    s().resetMetamodelToC4()
+    expect(s().metamodel.nodeTypes.gadget).toBeDefined()
+    expect(lastNotice()).toMatch(/Cannot reset the metamodel: C4 \(built-in\) has no type Gadget, and the milestone "As-is" holds 1 element of type Gadget/)
+  })
+})

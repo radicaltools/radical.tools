@@ -2,6 +2,8 @@ import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallba
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { computeViewNodeSet } from '@radical/layout/viewInput'
+import { pipelineOf, viewShownNodes } from '@radical/common/viewPipeline'
+import { propertiesPanelCover } from '@radical/ui/components/propertiesCover'
 
 // ─── Color palette per C4 type ──────────────────────────────────────────────
 const TYPE_COLORS_LIGHT: Record<string, readonly [string, string, string]> = {
@@ -69,6 +71,14 @@ interface Rect { x: number; y: number; w: number; h: number }
 // so the camera can zoom continuously across a single static layout instead
 // of rebuilding a new one every time the focus changes.
 
+/** The element a drawn element lies in on the hierarchy: its nearest
+ *  ancestor the view draws (undefined: at the top). */
+function drawnParentOf(id: string, nodes: Record<string, C4Node>, viewFilter: Set<string> | undefined): string | undefined {
+  let p = nodes[id]?.parentId
+  for (let seen = 0; p && viewFilter && !viewFilter.has(p) && seen < 64; seen++) p = nodes[p]?.parentId
+  return p && nodes[p] ? p : undefined
+}
+
 function buildTree(
   nodes:      Record<string, C4Node>,
   relCount:   Record<string, number>,
@@ -79,8 +89,8 @@ function buildTree(
 ): TNode[] {
   const result: TNode[] = []
   for (const n of Object.values(nodes)) {
-    if (n.parentId !== parentId) continue
     if (viewFilter && !viewFilter.has(n.id)) continue
+    if (drawnParentOf(n.id, nodes, viewFilter) !== parentId) continue
     const children = buildTree(nodes, relCount, viewFilter, n.id, depth + 1, sizeBy)
     const hasKids = children.length > 0
     const rc = relCount[n.id] ?? 0
@@ -209,6 +219,21 @@ export function TreemapView(): React.ReactElement {
   const views           = useDiagramStore(s => s.views)
   const selectNode      = useDiagramStore(s => s.selectNode)
   const selectedNodeId  = useDiagramStore(s => s.selectedNodeId)
+  const selectedEdgeId  = useDiagramStore(s => s.selectedEdgeId)
+  // The properties card lies over the right of the view: the controls at
+  // the right of the bar (Size, Levels, ↑ Up) move left of it, or a click
+  // on them reached the card.
+  const [cardCover, setCardCover] = useState(0)
+  useLayoutEffect(() => {
+    const measure = () => setCardCover(propertiesPanelCover())
+    measure()
+    const panel = document.querySelector('.right-panel')
+    const resize = typeof ResizeObserver !== 'undefined' && panel ? new ResizeObserver(measure) : null
+    if (resize && panel) resize.observe(panel)
+    panel?.addEventListener('transitionend', measure)
+    window.addEventListener('resize', measure)
+    return () => { resize?.disconnect(); panel?.removeEventListener('transitionend', measure); window.removeEventListener('resize', measure) }
+  }, [selectedNodeId, selectedEdgeId])
   const setTreemapFocus = useDiagramStore(s => s.setTreemapFocus)
   const setTreemapSizeBy = useDiagramStore(s => s.setTreemapSizeBy)
   const setTreemapMaxDepth = useDiagramStore(s => s.setTreemapMaxDepth)
@@ -217,8 +242,13 @@ export function TreemapView(): React.ReactElement {
   // View filter — the view's elements, or what its filter chain gives
   // (viewPipeline.ts), with their ancestors. A view without elements shows
   // the whole model (a fresh treemap view should never be empty).
+  // A view whose filter is a chain draws what the chain gives, each in the
+  // nearest of them it lies in (it drew their ancestors too, which the
+  // filter does not give).
   const viewFilter = useMemo(
-    () => computeViewNodeSet(activeView ?? undefined, c4Nodes, c4Relations),
+    () => pipelineOf(activeView ?? undefined)?.levels?.length
+      ? viewShownNodes(activeView ?? undefined, c4Nodes, c4Relations)
+      : computeViewNodeSet(activeView ?? undefined, c4Nodes, c4Relations),
     [activeView, c4Nodes, c4Relations],
   )
 
@@ -284,11 +314,11 @@ export function TreemapView(): React.ReactElement {
     if (focusId && c4Nodes[focusId]) {
       const chain: C4Node[] = []
       let cur: string | undefined = focusId
-      while (cur && c4Nodes[cur]) { chain.unshift(c4Nodes[cur]); cur = c4Nodes[cur].parentId }
+      while (cur && c4Nodes[cur]) { chain.unshift(c4Nodes[cur]); cur = drawnParentOf(cur, c4Nodes, viewFilter) }
       for (const n of chain) path.push({ id: n.id, label: n.label })
     }
     return path
-  }, [focusId, c4Nodes])
+  }, [focusId, c4Nodes, viewFilter])
 
   // Forget the view's focus when its element was deleted from the live
   // model. Not while a milestone is shown: views belong to the live model,
@@ -446,8 +476,8 @@ export function TreemapView(): React.ReactElement {
 
   const handleBack = useCallback(() => {
     if (!focusId) return
-    setFocus(c4Nodes[focusId]?.parentId ?? null)
-  }, [focusId, c4Nodes, setFocus])
+    setFocus(drawnParentOf(focusId, c4Nodes, viewFilter) ?? null)
+  }, [focusId, c4Nodes, setFocus, viewFilter])
 
   // Keyboard: Esc / Backspace to zoom out one level
   useEffect(() => {
@@ -483,14 +513,14 @@ export function TreemapView(): React.ReactElement {
   }, [selectNode])
 
   const handleDoubleClick = useCallback((n: TNode) => {
-    if (n.id === focusId) setFocus(c4Nodes[n.id]?.parentId ?? null)
+    if (n.id === focusId) setFocus(drawnParentOf(n.id, c4Nodes, viewFilter) ?? null)
     else if (n.hasKids) setFocus(n.id)
-  }, [focusId, c4Nodes, setFocus])
+  }, [focusId, c4Nodes, setFocus, viewFilter])
 
   return (
     <div className="treemap-wrap-outer">
       {/* Breadcrumb + controls bar */}
-      <div className="treemap-breadcrumb">
+      <div className="treemap-breadcrumb" style={cardCover ? { paddingRight: 12 + cardCover } : undefined}>
         {breadcrumb.map((b, i) => {
           const isLast = i === breadcrumb.length - 1
           return (

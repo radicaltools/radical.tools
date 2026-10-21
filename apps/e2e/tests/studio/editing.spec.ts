@@ -186,7 +186,7 @@ for (const perspective of ['Viewer', 'Presenter']) {
   })
 }
 
-test('the Parent field moves an element into its new parent, and refuses a loop', async ({ page, studio }) => {
+test('the Parent field moves an element into its new parent, and offers no loop', async ({ page, studio }) => {
   await studio.open('v-containers')
   const parent = studio.attribute('Parent')
   await studio.node('payments').click()
@@ -202,8 +202,8 @@ test('the Parent field moves an element into its new parent, and refuses a loop'
   const frame = (await studio.node('bookstore').boundingBox())!
   await studio.node('bookstore').click({ position: { x: frame.width - 80, y: 12 } })
   await expect(parent).toHaveValue('')
-  await parent.selectOption({ label: 'Payment Provider' })
-  await expect(page.getByText('Cannot move a node into itself or one of its descendants.').first()).toBeVisible()
+  // Its own child is not offered (it was, and the move was then refused).
+  await expect(parent.locator('option', { hasText: 'Payment Provider' })).toHaveCount(0)
   await expect(studio.node('bookstore')).toBeVisible()
   expect((await studio.storedDoc()).nodes.find((n) => n.id === 'bookstore')?.parentId).toBeUndefined()
 })
@@ -464,4 +464,19 @@ test('Move to… with many parents stays in the window and scrolls', async ({ pa
   await page.keyboard.press('End')
   await expect(menu.getByRole('menuitem').last()).toBeFocused()
   await expect(menu.getByRole('menuitem').last()).toBeInViewport()
+})
+
+// Open point of runs 45 to 64: after Enter or Tab in a table cell the
+// keyboard went to the page body; Enter on the row renames it again.
+test('a name written in the table leaves the keyboard on its row', async ({ page, studio }) => {
+  await studio.open('v-table')
+  const row = page.locator('tr.tv-row[data-node-id="api"]')
+  await row.locator('.tv-chain-cell').dblclick()
+  await page.locator('.tv-cell-input').fill('Orders API')
+  await page.keyboard.press('Enter')
+  await expect(row).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.tv-cell-input')).toHaveValue('Orders API')
+  await page.keyboard.press('Tab')
+  await expect(row).toBeFocused()
 })

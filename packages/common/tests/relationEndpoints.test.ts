@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkAddNode, checkAddRelation, checkRemoveNodeType, checkRemoveNodeTypeFromMetamodel, checkRemoveRelationType, checkRemoveRelationTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, patchNode, patchRelation, type ModelState } from '../src/model'
+import { checkAddNode, checkAddRelation, checkRemoveNodeType, checkRemoveNodeTypeFromMetamodel, checkRemoveRelationType, checkRemoveRelationTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, parentCandidates, patchNode, patchRelation, type ModelState } from '../src/model'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel } from '../src/metamodel'
 import { viewShowsEveryNode, type C4Node } from '../src/c4'
 
@@ -117,6 +117,20 @@ describe('the parent of an element', () => {
     expect(checkNodeUpdate(s, 'inner', { parentId: 'other' })).toBeNull()
     expect(checkNodeUpdate(s, 'inner', { parentId: undefined })).toBeNull()
   })
+
+  // Open points of runs 25–34 and 35–44: the card's Parent field listed
+  // parents a move then refused, and Edit facts offered external systems.
+  it('is offered only where a move takes it, and not in an external element', () => {
+    const s = nested()
+    s.c4Nodes.other = node('other', 'system')
+    s.c4Nodes.bank = { ...node('bank', 'system'), external: true } as C4Node
+    s.c4Nodes.api = { ...node('api', 'container'), parentId: 'inner' }
+    expect(parentCandidates(s, 'inner').map((n) => n.id).sort()).toEqual(['other', 'shop'])
+    expect(parentCandidates(s, 'api').map((n) => n.id).sort()).toEqual(['inner', 'innermost', 'other', 'shop'])
+    // The external element it is in already stays on the list.
+    s.c4Nodes.api.parentId = 'bank'
+    expect(parentCandidates(s, 'api').map((n) => n.id)).toContain('bank')
+  })
 })
 
 describe('unwrapping an element (its children move one level up)', () => {
@@ -159,6 +173,19 @@ describe('replacing the metamodel', () => {
     delete s.c4Nodes.adrNew
     delete s.c4Relations.rule
     expect(checkReplaceMetamodel(s, builtInC4Metamodel())).toBeNull()
+  })
+
+  // Item 209: Reset to C4 while a milestone held an ADR; Restore to live
+  // then brought back an unknown type.
+  it('is refused while a milestone holds what the new one has no type for, or a view names it', () => {
+    const s = state()
+    delete s.c4Nodes.adrOld
+    delete s.c4Nodes.adrNew
+    delete s.c4Relations.rule
+    const v1 = { name: 'v1', nodes: { adr: node('adr', 'adr') }, relations: {} }
+    expect(checkReplaceMetamodel(s, builtInC4Metamodel(), [v1])).toBe('C4 (built-in) has no type ADR, and the milestone "v1" holds 1 element of type ADR: delete the milestone first.')
+    s.views = { req: { id: 'req', name: 'Requirements', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['requirement'] }] }] } } as never }
+    expect(checkReplaceMetamodel(s, builtInC4Metamodel())).toMatch(/has no type Requirement, and the filter of the view "Requirements" names Requirement/)
   })
 })
 
@@ -329,5 +356,24 @@ describe('a required property of a relation type', () => {
     s.metamodel!.relationTypes.interacts.properties = [{ key: 'evidence', label: 'Evidence', type: 'text', required: true }]
     const issues = validateModel(s.c4Nodes, s.c4Relations, s.metamodel!)
     expect(issues.find((i) => i.id === 'missing-prop:uses:evidence')?.relationId).toBe('uses')
+  })
+})
+
+// Item 212: a type added by hand to a preset folder's metamodel.json was an
+// unknown type, and Studio's next save erased it.
+describe('a preset metamodel with a type the preset lacks', () => {
+  it('keeps the type, under a custom copy of the preset', () => {
+    const stored = builtInGovernanceMetamodel()
+    stored.nodeTypes.risk = { ...stored.nodeTypes.system, id: 'risk', label: 'Risk', builtin: false }
+    stored.relationTypes.mitigates = { id: 'mitigates', label: 'Mitigates', allowedPairs: [{ from: 'adr', to: 'risk' }] }
+    const mm = documentMetamodel(JSON.parse(JSON.stringify(stored)))
+    expect(mm.nodeTypes.risk?.label).toBe('Risk')
+    expect(mm.relationTypes.mitigates?.label).toBe('Mitigates')
+    expect(mm.id).toBe('c4-ddd-governance-custom')
+    expect(Object.keys(mm.nodeTypes)).toEqual(expect.arrayContaining(Object.keys(builtInGovernanceMetamodel().nodeTypes)))
+    // Saved and opened again, it stays.
+    expect(documentMetamodel(JSON.parse(JSON.stringify(mm))).nodeTypes.risk?.label).toBe('Risk')
+    // Without one, the preset is the preset.
+    expect(documentMetamodel(builtInGovernanceMetamodel()).id).toBe('c4-ddd-governance-builtin')
   })
 })

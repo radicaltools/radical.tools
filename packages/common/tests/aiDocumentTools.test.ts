@@ -605,3 +605,50 @@ describe('a type added by another writer', () => {
     expect(res.resultText).toMatch(/unknown type "no-such-type"/)
   })
 })
+
+// Item 192: create_view and update_view accepted chains they then read
+// otherwise: a via with no direction was dropped (the step took nothing), a
+// relation filter without direction was read as in, a property filter on an
+// unknown key or with an unknown op ("like" acted as is-not) was kept.
+describe('a filter chain given to create_view or update_view', () => {
+  const needs = { ways: [{ types: ['need'] }] }
+  const refused = async (pipeline: unknown) => {
+    const { call } = setup()
+    const made = await call('create_view', { tempId: 'v', name: 'Trace', pipeline })
+    expect(made.ok, JSON.stringify(pipeline)).toBe(false)
+    return made.resultText
+  }
+
+  it('is refused where it would be read otherwise than written', async () => {
+    expect(await refused({ levels: [needs, { ways: [{ via: { relationType: 'derives' }, types: ['requirement'] }] }] })).toMatch(/level 2: a via is \{relationType, direction/)
+    expect(await refused({ levels: [needs, { ways: [{ types: ['requirement'] }] }] })).toMatch(/level 2: a way needs a via/)
+    expect(await refused({ levels: [{ ways: [{ types: ['need'], via: { contains: true } }] }] })).toMatch(/level 1: the first level takes no via/)
+    expect(await refused({ levels: [{ ...needs, filters: [{ kind: 'relation', relationType: 'derives', has: true }] }] })).toMatch(/needs direction "in" or "out"/)
+    expect(await refused({ levels: [{ ...needs, filters: [{ kind: 'property', key: 'nope', op: 'set' }] }] })).toMatch(/no node type has a property "nope"/)
+    expect(await refused({ levels: [{ ...needs, filters: [{ kind: 'property', key: 'source', op: 'like', values: ['x'] }] }] })).toMatch(/op is "is", "is-not", "set" or "unset", not "like"/)
+    expect(await refused({ levels: [{ ...needs, filters: [{ kind: 'colour', value: 'red' }] }] })).toMatch(/unknown filter kind "colour"/)
+  })
+
+  it('is taken when it reads as written', async () => {
+    const { call } = setup()
+    const made = await call('create_view', { tempId: 'v', name: 'Trace', pipeline: { levels: [
+      { ...needs, filters: [{ kind: 'property', key: 'source', op: 'is', values: ['brief'] }, { kind: 'property', key: 'label', op: 'set' }] },
+      { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }], filters: [{ kind: 'relation', relationType: 'satisfies', direction: 'in', has: false }] },
+    ] } })
+    expect(made.ok, made.resultText).toBe(true)
+  })
+})
+
+describe('a within filter on an element that is deleted', () => {
+  it('goes from the view, so a viewpoint made from it is not refused', async () => {
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await call('add_node', { tempId: 'api', type: 'container', label: 'API', parentId: 'shop' })
+    expect((await call('create_view', { tempId: 'v', name: 'Inside', pipeline: { levels: [{ ways: [{ types: ['container'] }], filters: [{ kind: 'within', nodeId: 'shop' }] }] } })).ok).toBe(true)
+    expect((await call('delete_node', { id: 'shop' })).ok).toBe(true)
+    const view = Object.values(facade.toDiagramData().views ?? []).find((v) => v.name === 'Inside')!
+    expect(JSON.stringify(view.pipeline)).not.toContain('within')
+    const made = await call('upsert_viewpoint', { label: 'Inside', fromViewId: view.id })
+    expect(made.ok, made.resultText).toBe(true)
+  })
+})

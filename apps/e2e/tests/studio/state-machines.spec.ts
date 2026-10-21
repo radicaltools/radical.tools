@@ -35,3 +35,48 @@ test('a transition shows its events by name and picks them by reference', async 
   await name.press('Tab')
   await expect(page.locator('.relation-label', { hasText: '[ok]' })).toHaveText('CancelOrder [ok] / reserve')
 })
+
+// Open points of runs 45 to 64 on the card of a transition and the Delete
+// prompt: the card was titled "No label" while the line read "PaymentReceived
+// [ok] / reserve ^OrderPaid"; Event (none) stored event: ""; the prompt
+// counted the selection, not what goes with it.
+test('a transition\'s card reads as its line, and Event (none) stores no event', async ({ page, studio }) => {
+  await page.locator('[data-testid="rf__edge-t-pay"] path').first().click({ force: true })
+  const panel = studio.properties
+  await expect(panel.getByRole('textbox').first()).toHaveAttribute('placeholder', 'PaymentReceived [ok] / reserve ^OrderPaid')
+  await panel.getByLabel(/^Event \(trigger/).selectOption({ index: 0 })
+  await expect.poll(async () => 'event' in ((await studio.storedDoc()).relations.find((r) => r.id === 't-pay') as object)).toBe(false)
+})
+
+test('the Delete prompt says what Remove from model takes', async ({ page, studio }) => {
+  await studio.node('order').click()
+  await page.keyboard.press('Delete')
+  // The machine, its 7 states, pseudostates and events; its 4 relations.
+  await expect(page.locator('.milestone-modal')).toContainText('8 elements and 4 relations')
+})
+
+// Item 221 in Studio: Alt-drag from a final state added a transition the
+// validation then flagged.
+test('a transition from a final state is refused, with the reason', async ({ page, studio }) => {
+  await studio.connect(studio.node('cancelled'), studio.node('pending'))
+  await expect(page.getByText('Relation not allowed: Final state "Cancelled" cannot have outgoing transitions.')).toBeVisible()
+  expect((await studio.storedDoc()).relations).toHaveLength(4)
+})
+
+// Item 223: the card's sentence said "While ‹precondition›" where the
+// canvas and the wiki say "While the Order is Confirmed".
+test('the card\'s sentence of a requirement in a state names the state', async ({ page, studio }) => {
+  // Before the app boots on the next load (it saves its own copy on the way out).
+  await page.addInitScript(() => {
+    const key = 'radical-doc:e2e-doc'
+    const doc = JSON.parse(localStorage.getItem(key)!)
+    if (doc.nodes.some((n: { id: string }) => n.id === 'hold')) return
+    doc.nodes.push({ id: 'hold', type: 'requirement', label: 'Hold stock', ears_type: 'state-driven', action: 'hold the stock', precondition_state: 'confirmed', x: 0, y: 700, width: 240, height: 100, collapsed: false })
+    doc.views = doc.views.map((v: { id: string; nodeIds: string[] }) => (v.id === 'v-order' && v.nodeIds.length ? { ...v, nodeIds: [...v.nodeIds, 'hold'] } : v))
+    localStorage.setItem(key, JSON.stringify(doc))
+  })
+  await page.reload()
+  await studio.ready()
+  await studio.node('hold').click()
+  await expect(studio.properties.locator('.ears-sentence-sm')).toHaveText('While the Order is Confirmed, the system shall hold the stock.')
+})

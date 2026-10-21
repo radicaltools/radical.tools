@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { builtInC4Metamodel, propertyKeyProblem, validateModel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, metamodelChangeBreaks, propertyKeyProblem, validateModel, type Metamodel } from '@radical/common/metamodel'
 import { forkPresetMetamodel } from '@radical/common/model'
 import { chainSummary, VIEW_KIND_LABELS, VIEWPOINT_KINDS, viewpointsOf, withViewpoint, withoutViewpoint } from '@radical/common/viewpoints'
 import { DEFAULT_SUMMARIES, nodeSummary, summaryTokens } from '@radical/common/nodeSummary'
@@ -65,13 +65,51 @@ function EnumOptionsInput({ options, onChange }: { options: string[]; onChange: 
   useEffect(() => {
     setText((cur) => (parse(cur).join('\u0000') === options.join('\u0000') ? cur : options.join(', ')))
   }, [options.join('\u0000')]) // eslint-disable-line react-hooks/exhaustive-deps
+  // An option added goes in at once; one taken out or renamed when the
+  // field is left or Enter is pressed, so an option an element holds is
+  // asked about once (the editor asks before it narrows the metamodel),
+  // not at each letter of a new name.
+  const keepsAll = (next: string[]) => options.every((o) => next.includes(o))
+  const commit = () => {
+    const next = parse(text)
+    if (next.join('\u0000') !== options.join('\u0000')) {
+      onChange(next)
+      // Refused, the options stay, and so does the field; taken, the
+      // effect above shows them.
+      setText(options.join(', '))
+    } else setText(next.join(', '))
+  }
   return (
     <input
       className="mm-input mm-prop-options"
       value={text}
       placeholder="opt1, opt2"
-      onChange={(e) => { setText(e.target.value); onChange(parse(e.target.value)) }}
-      onBlur={() => setText(parse(text).join(', '))}
+      onChange={(e) => { setText(e.target.value); if (keepsAll(parse(e.target.value))) onChange(parse(e.target.value)) }}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
+    />
+  )
+}
+
+/** A type's minimum or maximum count, taken when the field is left or
+ *  Enter is pressed: on each key, "10" was "1" first, which the editor
+ *  asks about when fewer elements are allowed than the model holds. */
+function CountInput({ value, onCommit }: { value: number | undefined; onCommit: (next: number | undefined) => void }): React.ReactElement {
+  const [text, setText] = useState(value === undefined ? '' : String(value))
+  useEffect(() => { setText(value === undefined ? '' : String(value)) }, [value])
+  const commit = () => {
+    const next = text.trim() === '' ? undefined : Number(text)
+    if (next !== value && (next === undefined || Number.isFinite(next))) onCommit(next)
+    setText(value === undefined ? '' : String(value))
+  }
+  return (
+    <input
+      className="mm-input"
+      type="number"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
     />
   )
 }
@@ -382,34 +420,16 @@ function NodeTypeCard({
           <div className="mm-row">
             <label className="mm-field">
               <span>Min instances</span>
-              <input
-                className="mm-input"
-                type="number"
-                value={def.cardinality?.min ?? ''}
-                onChange={(e) =>
-                  onChange({
-                    cardinality: {
-                      ...def.cardinality,
-                      min: e.target.value === '' ? undefined : Number(e.target.value),
-                    },
-                  })
-                }
+              <CountInput
+                value={def.cardinality?.min}
+                onCommit={(min) => onChange({ cardinality: { ...def.cardinality, min } })}
               />
             </label>
             <label className="mm-field">
               <span>Max instances</span>
-              <input
-                className="mm-input"
-                type="number"
-                value={def.cardinality?.max ?? ''}
-                onChange={(e) =>
-                  onChange({
-                    cardinality: {
-                      ...def.cardinality,
-                      max: e.target.value === '' ? undefined : Number(e.target.value),
-                    },
-                  })
-                }
+              <CountInput
+                value={def.cardinality?.max}
+                onCommit={(max) => onChange({ cardinality: { ...def.cardinality, max } })}
               />
             </label>
           </div>
@@ -841,6 +861,24 @@ export function MetamodelEditor(): React.ReactElement {
   const views = useDiagramStore((s) => s.views)
   const viewpointCtx = useMemo(() => ({ nodes, relations, metamodel }), [nodes, relations, metamodel])
 
+  /** Whether to make a change of the metamodel to `next`: at once, unless
+   *  it leaves what the model holds against the metamodel (parents, a
+   *  maximum, options, a required property or pairs narrowed below it);
+   *  then after the user has seen what it breaks and said yes. */
+  const confirmNarrowing = (next: Metamodel): boolean => {
+    const breaks = metamodelChangeBreaks(nodes, relations, metamodel, next)
+    if (!breaks.length) return true
+    const shown = breaks.slice(0, 10).map((i) => `• ${i.message}`).join('\n')
+    const more = breaks.length > 10 ? `\n…and ${breaks.length - 10} more` : ''
+    return window.confirm(`This change leaves what the model holds against the metamodel (${breaks.length} ${breaks.length === 1 ? 'issue' : 'issues'}):\n\n${shown}${more}\n\nChange the metamodel anyway? Validation will list them until they are fixed.`)
+  }
+  const changeNodeType = (def: NodeTypeDef): void => {
+    if (confirmNarrowing({ ...metamodel, nodeTypes: { ...metamodel.nodeTypes, [def.id]: def } })) upsertNodeType(def)
+  }
+  const changeRelationType = (def: RelationTypeDef): void => {
+    if (confirmNarrowing({ ...metamodel, relationTypes: { ...metamodel.relationTypes, [def.id]: def } })) upsertRelationType(def)
+  }
+
   const addNodeType = () => {
     const base = builtInC4Metamodel().nodeTypes.system
     let i = 1
@@ -1001,7 +1039,7 @@ export function MetamodelEditor(): React.ReactElement {
                 def={t}
                 allTypes={nodeTypes}
                 focusToken={focusTokenFor('type', t.id)}
-                onChange={(patch) => upsertNodeType({ ...t, ...patch })}
+                onChange={(patch) => changeNodeType({ ...t, ...patch })}
                 onDelete={() => removeNodeType(t.id)}
               />
             ))}
@@ -1022,7 +1060,7 @@ export function MetamodelEditor(): React.ReactElement {
                 def={t}
                 allTypes={nodeTypes}
                 focusToken={focusTokenFor('relation', t.id)}
-                onChange={(patch) => upsertRelationType({ ...t, ...patch })}
+                onChange={(patch) => changeRelationType({ ...t, ...patch })}
                 onDelete={() => removeRelationType(t.id)}
               />
             ))}

@@ -149,6 +149,13 @@ describe('element summary: what matters first, never empty', () => {
     expect(summary('cancel')).toBe('The buyer gives up.')
   })
 
+  // Open point (runs 45–64): an event only raised (^Event) showed nothing.
+  it('says which transitions raise an event', () => {
+    const shipped = n('shipped', 'event', { label: 'Shipped' })
+    const raised = { ...relations, t1: rel('t1', 'a', 'b', 'transition', { event: 'pay', raises: ['shipped'] }) }
+    expect(nodeSummary(shipped, { ...nodes, shipped }, raised, mm)).toBe('Raised by Open → Paid')
+  })
+
   it('cuts a scenario\'s outcome at its first phrase, and puts a domain\'s kind first', () => {
     expect(summary('sc')).toBe('**The second is rejected** — when it is approved twice')
     expect(summary('d')).toBe('**Core** · Taking orders.')

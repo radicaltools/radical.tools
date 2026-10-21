@@ -157,10 +157,19 @@ export function flatten(tree: WarnierNode[]): WarnierNode[] {
   return tree.flatMap((item) => [item, ...flatten(item.children)])
 }
 
-/** order 1, 2, 3, … for the elements of `nodes` whose type has one. */
-export function renumber(nodes: C4Node[], hasOrder: (type: string) => boolean): Record<string, number> {
+/** order 1, 2, 3, … for the elements of `nodes` whose type has one,
+ *  counted among those of one parent (`parentOf`, the model's by default):
+ *  the top of a view can show processes of several containers, and each
+ *  container's are numbered on their own (they were numbered across them). */
+export function renumber(nodes: C4Node[], hasOrder: (type: string) => boolean, parentOf: (node: C4Node) => string | null | undefined = (n) => n.parentId): Record<string, number> {
   const orders: Record<string, number> = {}
-  nodes.forEach((node, i) => { if (hasOrder(node.type)) orders[node.id] = i + 1 })
+  const counts = new Map<string, number>()
+  for (const node of nodes) {
+    const parent = parentOf(node) ?? ''
+    const n = (counts.get(parent) ?? 0) + 1
+    counts.set(parent, n)
+    if (hasOrder(node.type)) orders[node.id] = n
+  }
   return orders
 }
 
@@ -196,14 +205,15 @@ export function outlinePlan(tree: WarnierNode[], key: string, move: OutlineMove,
     const into = siblings[index - 1]
     return {
       parentId: into.node.id,
-      orders: { ...renumber(without(siblings, index), hasOrder), ...renumber([...into.children.map((c) => c.node), item.node], hasOrder) },
+      orders: { ...renumber(without(siblings, index), hasOrder), ...renumber([...into.children.map((c) => c.node), item.node], hasOrder, () => into.node.id) },
     }
   }
   if (!at.parent) return null
   const parentAt = locate(tree, at.parent.key)!
   const landing = [...parentAt.siblings.map((s) => s.node)]
   landing.splice(parentAt.index + 1, 0, item.node)
-  return { parentId: parentIdOf(parentAt), orders: { ...renumber(without(siblings, index), hasOrder), ...renumber(landing, hasOrder) } }
+  const parentId = parentIdOf(parentAt)
+  return { parentId, orders: { ...renumber(without(siblings, index), hasOrder), ...renumber(landing, hasOrder, (n) => (n.id === item.node.id ? parentId : n.parentId)) } }
 }
 
 export interface InsertPlan {
@@ -221,11 +231,12 @@ export function insertPlan(tree: WarnierNode[], key: string, where: 'after' | 'i
   const at = locate(tree, key)
   if (!at) return null
   const NEW = '\0new'
-  const placeholder = { id: NEW, type } as C4Node
+  const parentId = where === 'after' ? parentIdOf(at) : at.item.node.id
+  const placeholder = { id: NEW, type, parentId } as C4Node
   const landing = where === 'after' ? at.siblings.map((s) => s.node) : at.item.children.map((c) => c.node)
   landing.splice(where === 'after' ? at.index + 1 : landing.length, 0, placeholder)
-  const { [NEW]: order, ...orders } = renumber(landing, hasOrder)
-  return { parentId: where === 'after' ? parentIdOf(at) : at.item.node.id, ...(order !== undefined ? { order } : {}), orders }
+  const { [NEW]: order, ...orders } = renumber(landing, hasOrder, where === 'after' ? undefined : () => parentId)
+  return { parentId, ...(order !== undefined ? { order } : {}), orders }
 }
 
 // ─── The flow of steps on a canvas ───────────────────────────────────────────

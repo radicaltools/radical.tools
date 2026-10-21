@@ -1,0 +1,75 @@
+/**
+ * A relation drawn on the canvas (a handle, Alt-drag): item 191 and D5.
+ *   - on a canvas whose filter is a chain it is of the type the chain
+ *     follows, or refused with a word (it was added, not drawn, and a
+ *     second try added a copy);
+ *   - where several relation types fit the pair, Studio asks which (it was
+ *     added with none); a type the aggregate rules refuse is not offered.
+ */
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import type { C4Node, DiagramView } from '@radical/common/c4'
+import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import { useDiagramStore } from '../src/store/diagramStore'
+
+const s = useDiagramStore.getState
+const node = (id: string, type: string, props: Record<string, unknown> = {}): C4Node =>
+  ({ id, type, label: id, collapsed: false, x: 0, y: 0, width: 200, height: 80, ...props } as C4Node)
+// As React Flow hands a connection made from a handle to the store.
+const connect = (source: string, target: string) => s().onConnect({ source, target, sourceHandle: null, targetHandle: null })
+const lastNotice = (): string | undefined => s().notifications[s().notifications.length - 1]?.message
+
+const TRACE: DiagramView = { id: 'trace', name: 'Trace', nodeIds: [], positions: {}, pipeline: { levels: [
+  { ways: [{ types: ['need'] }] },
+  { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }] },
+] } }
+
+beforeEach(() => {
+  s().setAppMode('designer')
+  s().loadDiagram({
+    nodes: [node('need', 'need'), node('req', 'requirement'), node('sc', 'scenario'),
+      node('order', 'entity', { kind: 'aggregate-root' }), node('customer', 'entity', { kind: 'aggregate-root' }), node('line', 'entity', { kind: 'entity' })],
+    relations: [],
+    views: [TRACE],
+    metamodel: builtInGovernanceMetamodel(),
+  })
+})
+afterEach(() => s().stopLiveLayout())
+
+describe('a relation drawn on a canvas whose filter is a chain', () => {
+  it('is of the type the chain follows', () => {
+    s().setActiveView('trace')
+    connect('req', 'need')
+    expect(Object.values(s().c4Relations)).toEqual([expect.objectContaining({ sourceId: 'req', targetId: 'need', relationType: 'derives' })])
+  })
+
+  it('is refused, with a word, when the chain would not draw it', () => {
+    s().setActiveView('trace')
+    connect('sc', 'req')
+    connect('sc', 'req')
+    expect(Object.values(s().c4Relations)).toEqual([])
+    expect(lastNotice()).toBe('Not added: this view shows only the relations its filter follows, and none leads from sc to req.')
+  })
+})
+
+describe('a relation drawn where several types fit', () => {
+  it('asks which, and adds the one chosen', () => {
+    connect('line', 'order')
+    expect(Object.values(s().c4Relations)).toEqual([])
+    expect(s().relationTypeChoice).toEqual({ sourceId: 'line', targetId: 'order', types: ['part-of', 'references'] })
+    s().chooseRelationType('part-of')
+    expect(s().relationTypeChoice).toBeNull()
+    expect(Object.values(s().c4Relations)).toEqual([expect.objectContaining({ sourceId: 'line', targetId: 'order', relationType: 'part-of' })])
+  })
+
+  it('adds nothing when the question is dismissed', () => {
+    connect('line', 'order')
+    s().chooseRelationType(null)
+    expect(Object.values(s().c4Relations)).toEqual([])
+  })
+
+  it('does not offer part-of between two aggregate roots: references it is', () => {
+    connect('order', 'customer')
+    expect(s().relationTypeChoice).toBeNull()
+    expect(Object.values(s().c4Relations)).toEqual([expect.objectContaining({ relationType: 'references' })])
+  })
+})
