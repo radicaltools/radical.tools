@@ -207,6 +207,20 @@ describe('md-folder persistence', () => {
   })
 })
 
+describe('a custom metamodel in a folder', () => {
+  it('keeps the order of its node and relation types', () => {
+    // The file's keys were sorted: types read back A–Z by id, and the
+    // metamodel editor's list and the palette changed order after a reload.
+    const mm = builtInC4Metamodel()
+    const nodeTypes = Object.fromEntries([['zeta', { ...mm.nodeTypes.system, id: 'zeta', label: 'Zeta' }], ['alpha', { ...mm.nodeTypes.system, id: 'alpha', label: 'Alpha' }], ...Object.entries(mm.nodeTypes)])
+    const relationTypes = Object.fromEntries([['zz', { ...Object.values(mm.relationTypes)[0], id: 'zz' }], ...Object.entries(mm.relationTypes)])
+    const metamodel = { ...mm, id: 'custom', nodeTypes, relationTypes }
+    const back = deserializeFromMdFolder(serializeToMdFolder({ nodes: [], relations: [], metamodel }, 'Types')).data.metamodel!
+    expect(Object.keys(back.nodeTypes)).toEqual(Object.keys(nodeTypes))
+    expect(Object.keys(back.relationTypes)).toEqual(Object.keys(relationTypes))
+  })
+})
+
 describe('md-folder ownership', () => {
   it('reports where each node was written', () => {
     const { files, nodePaths } = serializeToMdFolderWithPaths(sample)
