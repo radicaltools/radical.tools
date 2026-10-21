@@ -5,5 +5,5 @@ label: "Explore view discarded"
 action: "the system shall discard the explore view without a question, leaving the document and the undo history as they were"
 ears_type: "unwanted-behaviour"
 rationale: "Settled 2026-10-21: an exploration is temporary unless saved."
-unwanted_condition: "the user closes an explore view, starts another exploration, or opens another model"
+unwanted_condition: "the user closes an explore view, starts another exploration, opens another model, switches perspective (the metamodel editor excepted), or shows a milestone in Designer"
 ---
