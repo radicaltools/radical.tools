@@ -755,23 +755,6 @@ const KNOWN: Known[] = [
     note: 'K14: folding and unfolding a system an agent added, with a view shown that does not draw it, throws (new)',
   },
   {
-    // Views of the viewpoint System › containers made (one is of System 2),
-    // the milestone Early (no System 2) opened, Customer deleted, Undo: the
-    // view of System 2 loses its subject and its "within System 2" filter,
-    // shown and in the saved live views.
-    rule: 'undoRestores',
-    match: (_t, v) => /\.subject: /.test(v.detail),
-    note: 'K15: Undo in a milestone that lacks a view\'s element strips the view of its element and filter, in the live views too (new)',
-  },
-  {
-    // K15 the other way: a view of API's (Container › components), a
-    // milestone with API opened, API deleted there; Undo, then Redo: the
-    // view has lost its subject and its "within API" filter.
-    rule: 'redoRestores',
-    match: (_t, v) => /\.subject: /.test(v.detail),
-    note: 'K15b: Undo and Redo of a delete in a milestone strip a view of that element of its element and filter (new)',
-  },
-  {
     // Nested: the agent deletes Component 1.0.0; Container 2.2 folded;
     // Component 2.2.0 moved into Container 0.1: System 1 (nothing to do
     // with the move) moves (−325, −476), Container 1.0 shrinks 520 × 280 →

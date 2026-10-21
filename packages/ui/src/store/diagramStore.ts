@@ -901,6 +901,16 @@ function keepingSharedViews(state: DiagramStore, edit: () => void): void {
   state.defaultLayoutConstraints = defaultLayoutConstraints
 }
 
+/** model.syncViewpoints on the views, which are the live model's: their
+ *  elements are looked up there, not in the milestone shown. Checked
+ *  against a milestone without it (or with it deleted there), a view of
+ *  one element lost its element and its "within" filter, in the live views
+ *  too (Undo and Redo in a milestone). Use inside immer set. */
+function syncViewpointsOfLive(state: DiagramStore): string[] {
+  const nodes = state.activeSnapshotId && state.liveBackup ? state.liveBackup.nodes : state.c4Nodes
+  return model.syncViewpoints({ c4Nodes: nodes, views: state.views, metamodel: state.metamodel } as unknown as model.ModelState)
+}
+
 /** The Hub template records as a milestone has them: its texts hold the
  *  values (read from them through the Hub's originals), the records keep
  *  the live model's. Shown so, the section said 250 where the card said
@@ -3060,7 +3070,7 @@ export const useDiagramStore = create<DiagramStore>()(
       // drafts of the views: in the pass above they are the entry's own,
       // frozen, and changing them threw once the step was off the stack
       // (Undo after "Save as viewpoint… → Replace").
-      set((state) => { model.syncViewpoints(state as unknown as model.ModelState) })
+      set((state) => { syncViewpointsOfLive(state as DiagramStore) })
       get()._sync()
       if (canvasChanged && typeof window !== 'undefined') {
         const viewId = get().activeViewId
@@ -6710,7 +6720,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
       _syncViewpoints() {
         let changed: string[] = []
-        set((state) => { changed = model.syncViewpoints(state as unknown as model.ModelState) })
+        set((state) => { changed = syncViewpointsOfLive(state as DiagramStore) })
         if (changed.length) get()._sync()
       },
       resetMetamodelToC4(confirm) {
