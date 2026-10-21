@@ -376,3 +376,25 @@ describe('a container collapsed at its parent\'s edge', () => {
     expect(at()).toEqual(folded)
   })
 })
+
+describe('the assistant folding and opening a container on the view shown', () => {
+  it('does what the −/+ does: folds to the middle and opens round it (item 172)', () => {
+    const s = useDiagramStore.getState
+    s().loadDiagram({
+      nodes: [
+        { id: 'sys', type: 'system', label: 'Shop', x: 0, y: 0, width: 860, height: 310, collapsed: false },
+        { id: 'a', type: 'container', label: 'Web', parentId: 'sys', x: 30, y: 120, width: 240, height: 160, collapsed: false },
+        { id: 'b', type: 'container', label: 'API', parentId: 'sys', x: 590, y: 120, width: 240, height: 160, collapsed: false },
+      ] as C4Node[],
+      relations: [],
+      views: [{ id: 'v', name: 'Shop', nodeIds: ['sys', 'a', 'b'], positions: {} }],
+    } as any)
+    s().setActiveView('v')
+    s().setViewCollapsed('v', ['sys'], true)
+    expect(s().views.v.collapsedNodeIds).toEqual(['sys'])
+    expect(s().c4Nodes.sys.x + COLLAPSED_WIDTH.system / 2).toBeCloseTo(430, 0)
+    s().setViewCollapsed('v', ['sys'], false)
+    expect(s().views.v.collapsedNodeIds).toEqual([])
+    expect(s().c4Nodes.sys.x).toBeCloseTo(0, 0)
+  })
+})

@@ -3930,7 +3930,21 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       setViewCollapsed(viewId, nodeIds, collapsed) {
-        if (!get().views[viewId]) return
+        const view = get().views[viewId]
+        if (!view) return
+        // On the canvas shown, as its −/+ does: the box shrinks to its
+        // middle, or opens round it and makes room. The lists alone opened
+        // it at the folded box's corner, over its neighbours.
+        if (get().activeViewId === viewId && (view.kind ?? 'static') === 'static') {
+          const toggled = nodeIds.filter((id) => {
+            const n = get().c4Nodes[id]
+            return !!n && isContainerType(n.type) && nodeEffectivelyCollapsedInView(n, viewId, get().views[viewId]) !== collapsed
+          })
+          if (toggled.length === nodeIds.length) {
+            _asOneStep(() => { for (const id of toggled) get().toggleCollapse(id) })
+            return
+          }
+        }
         get()._pushUndo()
         set((state) => { model.setViewCollapsed(state, viewId, nodeIds, collapsed) })
         get()._sync()

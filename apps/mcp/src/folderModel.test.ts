@@ -16,7 +16,7 @@ import { parseModelBase } from '@radical/common/formats/modelBase'
 import { AGENT_ACTIVE_MS, AGENT_ACTIVITY_FILE, parseAgentActivity } from '@radical/common/formats/agentActivity'
 import { FolderModel } from './folderModel'
 import { drawnSize } from '@radical/layout/geometry'
-import type { C4Node } from '@radical/common/c4'
+import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, type C4Node } from '@radical/common/c4'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
@@ -477,6 +477,49 @@ describe('long Smart Layout runs', () => {
     expect(outcome.text).toContain('Unpinned 2 elements.')
     const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
     expect(after.defaultLayoutConstraints ?? []).toEqual([])
+  }, 60_000)
+
+  it('opens and folds a container on a view round its middle, making room as Studio does (item 172)', async () => {
+    // Bookstore folded in Studio, Payment Provider beside the folded box.
+    // update_view expand drew it at the box's corner at full size, over
+    // Payment Provider.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const open = { width: 860, height: 310 }
+    const fold = { x: (open.width - COLLAPSED_WIDTH.system) / 2, y: (open.height - COLLAPSED_HEIGHT.system) / 2 }
+    const pay = { x: fold.x + COLLAPSED_WIDTH.system + 100, y: fold.y, width: 300, height: 180 }
+    data.nodes = [
+      { id: 'shop', type: 'system', label: 'Bookstore', x: 0, y: 0, ...open, collapsed: false },
+      { id: 'web', type: 'container', label: 'Web', parentId: 'shop', x: 30, y: 120, width: 240, height: 160, collapsed: false },
+      { id: 'api', type: 'container', label: 'API', parentId: 'shop', x: 330, y: 120, width: 240, height: 160, collapsed: false },
+      { id: 'db', type: 'container', label: 'DB', parentId: 'shop', x: 600, y: 120, width: 230, height: 160, collapsed: false },
+      { id: 'pay', type: 'system', label: 'Payment Provider', ...pay, collapsed: false },
+    ] as never
+    const at = (n: { x: number; y: number; width: number; height: number }) => ({ x: n.x, y: n.y, width: n.width, height: n.height })
+    data.views = [{
+      id: 'v', name: 'Context', nodeIds: [], collapsedNodeIds: ['shop'],
+      positions: { shop: { ...fold, ...open }, web: at(data.nodes[1]), api: at(data.nodes[2]), db: at(data.nodes[3]), pay },
+    } as never]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const view = async () => deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data.views!.find((v) => v.id === 'v')!
+
+    expect((await model.call('update_view', { id: 'v', expand: ['shop'] })).ok).toBe(true)
+    const opened = (await view()).positions
+    // Round the folded box's middle, clear of Payment Provider.
+    expect(opened.shop.x + opened.shop.width / 2).toBeCloseTo(fold.x + COLLAPSED_WIDTH.system / 2, 0)
+    expect(opened.shop.y + opened.shop.height / 2).toBeCloseTo(fold.y + COLLAPSED_HEIGHT.system / 2, 0)
+    const overlap = (a: typeof pay, b: typeof pay) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+    expect(overlap(opened.shop, opened.pay)).toBe(false)
+
+    // Folded again: to the middle of the frame, where Studio folds it.
+    expect((await model.call('update_view', { id: 'v', collapse: ['shop'] })).ok).toBe(true)
+    const folded = (await view()).positions
+    expect(folded.shop.x + COLLAPSED_WIDTH.system / 2).toBeCloseTo(opened.shop.x + opened.shop.width / 2, 0)
+    expect(folded.shop.y + COLLAPSED_HEIGHT.system / 2).toBeCloseTo(opened.shop.y + opened.shop.height / 2, 0)
   }, 60_000)
 
   it('lays out a view set to "Hierarchical nested tree" as a tree, as Studio does', async () => {
