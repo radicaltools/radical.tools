@@ -433,3 +433,34 @@ describe('a container a view shows without its children', () => {
     }
   })
 })
+
+describe('an element the view shown does not draw', () => {
+  it('folds and opens there without a throw, and nothing moves (item 259)', () => {
+    // An agent added a system; with a view that does not draw it shown,
+    // folding and opening it threw in makeRoomAround: the expand made room
+    // round a box the canvas has not got.
+    const s = useDiagramStore.getState
+    s().loadDiagram({
+      nodes: [
+        { id: 'shop', type: 'system', label: 'Shop', x: 0, y: 0, width: 400, height: 300, collapsed: false },
+        { id: 'web', type: 'container', label: 'Web', parentId: 'shop', x: 30, y: 120, width: 240, height: 140, collapsed: false },
+        { id: 'bank', type: 'system', label: 'Bank', x: 600, y: 0, width: 280, height: 180, collapsed: false },
+        { id: 'agent', type: 'system', label: 'Agent system', x: 1000, y: 0, width: 400, height: 300, collapsed: false },
+        { id: 'job', type: 'container', label: 'Job', parentId: 'agent', x: 30, y: 120, width: 240, height: 140, collapsed: false },
+      ] as C4Node[],
+      relations: [],
+      views: [{ id: 'v', name: 'Context', nodeIds: ['shop', 'bank'], positions: {} }],
+    } as any)
+    s().setActiveView('v')
+    const places = () => Object.fromEntries(Object.values(s().c4Nodes).map((n) => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]))
+    const before = places()
+    s().toggleCollapse('agent')
+    expect(s().views.v.collapsedNodeIds).toEqual(['agent'])
+    expect(() => s().toggleCollapse('agent')).not.toThrow()
+    expect(s().views.v.collapsedNodeIds).toEqual([])
+    expect(places()).toEqual(before)
+    s().setActiveView(null)
+    expect(s().c4Nodes.agent).toMatchObject({ x: 1000, y: 0, width: 400, height: 300 })
+    s().stopLiveLayout()
+  })
+})

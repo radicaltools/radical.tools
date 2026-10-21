@@ -3643,6 +3643,13 @@ export const useDiagramStore = create<DiagramStore>()(
           ? ((modelCollapsed && !(get().views[activeViewId]?.expandedNodeIds?.includes(id) ?? false))
               || (get().views[activeViewId]?.collapsedNodeIds?.includes(id) ?? false))
           : modelCollapsed
+        // An element the view shown does not draw (one an agent added,
+        // folded from the search or the Nodes tree) only changes the fold
+        // the view keeps: nothing on the canvas grows or shrinks. Laid out
+        // as drawn, the expand made room round a box the canvas has not
+        // got and threw (item 259).
+        const viewShown = activeViewId ? get().views[activeViewId] : undefined
+        const drawnHere = computeViewNodeSet(viewShown as any, get().c4Nodes, get().c4Relations)?.has(id) ?? true
         // Apply to model temporarily — layout helpers below (separateSiblings /
         // fitParentToChildren) query node.collapsed to compute effective sizes.
         set((state) => {
@@ -3659,7 +3666,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Seeding live cola with the correct absolute position prevents the
         // "teleport, then drift" jump that would occur if cola treated the
         // node as brand-new and spawned it at neighbours' average.
-        if (prevCollapsed) {
+        if (prevCollapsed && drawnHere) {
           const allNodes = get().c4Nodes
           const parent = allNodes[id]
           if (parent && isContainerType(parent.type)) {
@@ -3735,7 +3742,7 @@ export const useDiagramStore = create<DiagramStore>()(
               }
             }
           }
-        } else {
+        } else if (!prevCollapsed && drawnHere) {
           // Collapsing: shrink to the centre of the expanded box, the
           // reverse of an expand. The node turns from a cola group into a
           // leaf the layout has no position for, and a new leaf spawns among
@@ -3812,7 +3819,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Opening: the frame is the one its children need now. One added
         // while it was collapsed was not fit for (a collapsed container
         // keeps its size) and lay outside the frame it came back with.
-        if (prevCollapsed) {
+        if (prevCollapsed && drawnHere) {
           const openVcs = loopVcs ? new Set([...loopVcs].filter((nid) => nid !== id)) : undefined
           const untangled = untangleChildren(id, get().c4Nodes, loopViewFilter, openVcs, loopExpandedSet)
           if (Object.keys(untangled).length > 0) {
@@ -3830,7 +3837,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         // An expand makes room round what grew, level by level up the tree.
         const roomVcs = loopVcs ? new Set([...loopVcs].filter((nid) => nid !== id)) : undefined
-        let currentId: string | undefined = id
+        let currentId: string | undefined = drawnHere ? id : undefined
         while (currentId) {
           const overlapUpdates = prevCollapsed
             ? makeRoomAround(currentId, get().c4Nodes, canvasBoxes(get().c4Nodes, loopViewFilter, roomVcs, loopExpandedSet))

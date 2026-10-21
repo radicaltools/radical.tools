@@ -754,15 +754,6 @@ const KNOWN: Known[] = [
     note: 'K13: Propagate throws after an agent write reloaded the milestone shown (new)',
   },
   {
-    // An agent adds a system Studio reloads; with a view that does not draw
-    // it shown (Place Order Flow, Containers), folding it and unfolding it
-    // throws "Cannot read properties of undefined (reading 'x')" in
-    // makeRoomAround (packages/layout/src/geometry.ts).
-    rule: 'noErrors',
-    match: (_t, v) => v.detail.includes('makeRoomAround'),
-    note: 'K14: folding and unfolding a system an agent added, with a view shown that does not draw it, throws (new)',
-  },
-  {
     // Views of the viewpoint System › containers made (one is of System 2),
     // the milestone Early (no System 2) opened, Customer deleted, Undo: the
     // view of System 2 loses its subject and its "within System 2" filter,
