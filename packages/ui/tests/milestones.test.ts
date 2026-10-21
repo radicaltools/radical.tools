@@ -166,6 +166,20 @@ describe('restoreSnapshot', () => {
     // v1 had only sys1 + ctn1 + ctn2 + usr1
     expect(Object.keys(s.c4Nodes).sort()).toEqual(['ctn1', 'ctn2', 'sys1', 'usr1'])
   })
+
+  // The views kept the ids of elements the restored model lacks (a view
+  // listing 23 drew 3), with their folds and alignments.
+  it('takes the elements the milestone lacks out of the views, in the same undo step', () => {
+    useDiagramStore.setState({
+      views: { v: { id: 'v', name: 'v', nodeIds: ['sys1', 'ctn4'], positions: {}, collapsedNodeIds: ['ctn4'] } },
+    } as any)
+    useDiagramStore.getState().restoreSnapshot('snap-1')
+    expect(useDiagramStore.getState().views.v.nodeIds).toEqual(['sys1'])
+    expect(useDiagramStore.getState().views.v.collapsedNodeIds).toEqual([])
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().views.v.nodeIds).toEqual(['sys1', 'ctn4'])
+    expect(useDiagramStore.getState().c4Nodes.ctn4).toBeDefined()
+  })
 })
 
 describe('renameSnapshot', () => {

@@ -5178,8 +5178,12 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         _pushUndo(get())
         set((state) => {
+          // What the milestone lacks goes out of the views, as a delete
+          // takes it: they kept its id (a view listing 23 drew 3).
+          const gone = new Set(Object.keys(state.c4Nodes).filter((id) => !(snap.nodes as Record<string, C4Node>)[id]))
           state.c4Nodes = snap.nodes as any
           state.c4Relations = snap.relations as any
+          if (gone.size) model.forgetNodesInViews(state as unknown as model.ModelState, gone)
           // What the milestone has: none when it was saved without them.
           state.sequences = (snap.sequences ?? {}) as any
           if (state.activeSequenceId && !state.sequences[state.activeSequenceId]) state.activeSequenceId = null
