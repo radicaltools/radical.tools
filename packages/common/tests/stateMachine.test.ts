@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation } from '../src/c4'
 import { isContainerType } from '../src/c4'
 import { builtInC4Metamodel, builtInDddC4Metamodel, builtInGovernanceMetamodel, composeEarsSentence, isPlacementAllowed, relationDisplayLabel, requirementStatePhrase, validateModel } from '../src/metamodel'
-import { checkAddNode, checkNodeUpdate, checkReparent, type ModelState } from '../src/model'
+import { checkAddNode, checkAddRelation, checkNodeUpdate, checkPatchRelation, checkReparent, insertNode, type ModelState } from '../src/model'
 import { addChoices } from '../src/viewPipeline'
 
 const mm = builtInGovernanceMetamodel()
@@ -230,6 +230,84 @@ describe('a final state holds nothing', () => {
     const ctx = { nodes: byId(m.nodes), relations: m.relations, metamodel: mm }
     expect(addChoices(undefined, ctx, { node: m.shipped, depth: 0 })).toEqual([])
     expect(addChoices(undefined, ctx, { node: m.pending, depth: 0 }).map((c) => c.type)).toEqual(expect.arrayContaining(['state', 'pseudostate']))
+  })
+})
+
+// Item 221: what validateStateMachines flags is refused when an edit would
+// make it, in Studio and over MCP alike (both go through these checks).
+describe('an edit the statechart rules flag is refused', () => {
+  const stateOf = (nodes: C4Node[], relations: C4Relation[]): ModelState => ({
+    c4Nodes: byId(nodes), c4Relations: byId(relations), sequences: {}, views: {}, activeViewId: null, metamodel: mm,
+  } as unknown as ModelState)
+  const draft = (type: string, parentId: string, props: Record<string, string> = {}) =>
+    ({ type, label: 'New', parentId, collapsed: false, x: 0, y: 0, width: 160, height: 60, ...props }) as unknown as Omit<C4Node, 'id'>
+  const rel = (source: C4Node, target: C4Node, relationType?: string) => ({ sourceId: source.id, targetId: target.id, ...(relationType ? { relationType } : {}) })
+
+  it('a transition out of a final state, into an initial pseudostate, a second from an initial one, or out of its machine', () => {
+    const m = orderMachine()
+    const s = stateOf(m.nodes, m.relations)
+    expect(checkAddRelation(s, rel(m.shipped, m.pending, 'transition'))).toBe('Relation not allowed: Final state "Shipped" cannot have outgoing transitions.')
+    // Untyped, as Alt-drag adds it: the type it is given is a transition.
+    expect(checkAddRelation(s, rel(m.shipped, m.pending))).toMatch(/Final state "Shipped" cannot have outgoing transitions/)
+    expect(checkAddRelation(s, rel(m.pending, m.init, 'transition'))).toMatch(/cannot point at the initial pseudostate of "Order lifecycle"/)
+    expect(checkAddRelation(s, rel(m.init, m.paid, 'transition'))).toMatch(/initial pseudostate of "Order lifecycle" has its one transition/)
+    const other = node('state-machine', 'Payment')
+    const authorised = node('state', 'Authorised', other.id)
+    expect(checkAddRelation(stateOf([...m.nodes, other, authorised], m.relations), rel(m.pending, authorised, 'transition'))).toMatch(/cannot leave its state machine/)
+    expect(checkAddRelation(s, rel(m.pending, m.shipped, 'transition'))).toBeNull()
+  })
+
+  it('an end of a transition moved onto a final source or an initial target', () => {
+    const m = orderMachine()
+    const s = stateOf(m.nodes, m.relations)
+    const pendingToPaid = m.relations.find((r) => r.sourceId === m.pending.id)!
+    expect(checkPatchRelation(s, pendingToPaid.id, { sourceId: m.shipped.id })).toMatch(/Final state "Shipped" cannot have outgoing transitions/)
+    expect(checkPatchRelation(s, pendingToPaid.id, { targetId: m.init.id })).toMatch(/cannot point at the initial pseudostate/)
+    // The initial pseudostate's own transition may be moved to another state.
+    const initOut = m.relations.find((r) => r.sourceId === m.init.id)!
+    expect(checkPatchRelation(s, initOut.id, { targetId: m.paid.id })).toBeNull()
+  })
+
+  it('a state made final while transitions leave it', () => {
+    const m = orderMachine()
+    const s = stateOf(m.nodes, m.relations)
+    expect(checkNodeUpdate(s, m.pending.id, { kind: 'final' } as Partial<C4Node>)).toBe('Cannot make State "Pending" final: 1 transition leaves it, and a final state cannot have outgoing transitions.')
+    const pendingLeft = stateOf(m.nodes, m.relations.filter((r) => r.sourceId !== m.pending.id))
+    expect(checkNodeUpdate(pendingLeft, m.pending.id, { kind: 'final' } as Partial<C4Node>)).toBeNull()
+  })
+
+  it('an initial pseudostate added, moved or made in a parallel state, or beside another', () => {
+    const m = orderMachine()
+    const s = stateOf(m.nodes, m.relations)
+    expect(checkAddNode(s, draft('pseudostate', m.paid.id, { kind: 'initial' }))).toMatch(/Parallel state "Paid" enters all its regions; it takes no initial pseudostate/)
+    expect(checkAddNode(s, draft('pseudostate', m.machine.id, { kind: 'initial' }))).toMatch(/"Order lifecycle" has an initial pseudostate already/)
+    expect(checkReparent(s, [m.init.id], m.paid.id)).toMatch(/Parallel state "Paid"/)
+    const choice = node('pseudostate', 'Which', m.machine.id, { kind: 'choice' })
+    const withChoice = stateOf([...m.nodes, choice], m.relations)
+    expect(checkNodeUpdate(withChoice, choice.id, { kind: 'initial' } as Partial<C4Node>)).toMatch(/has an initial pseudostate already/)
+    expect(checkAddNode(s, draft('pseudostate', m.pending.id, { kind: 'initial' }))).toBeNull()
+  })
+
+  it('a pseudostate added with no kind where an initial one may not go is a choice', () => {
+    const m = orderMachine()
+    const s = stateOf(m.nodes, m.relations)
+    insertNode(s, 'p-machine', draft('pseudostate', m.machine.id))
+    insertNode(s, 'p-paid', draft('pseudostate', m.paid.id))
+    insertNode(s, 'p-pending', draft('pseudostate', m.pending.id))
+    expect((s.c4Nodes['p-machine'] as unknown as { kind: string }).kind).toBe('choice')
+    expect((s.c4Nodes['p-paid'] as unknown as { kind: string }).kind).toBe('choice')
+    expect((s.c4Nodes['p-pending'] as unknown as { kind: string }).kind).toBe('initial')
+    expect(validateModel(s.c4Nodes, s.c4Relations, mm).filter((i) => i.id.startsWith('sm-many-initials') || i.id.startsWith('sm-parallel-initial'))).toEqual([])
+  })
+
+  it('a second state machine for an entity', () => {
+    const m = orderMachine()
+    const second = node('state-machine', 'Order payment')
+    const s = stateOf([...m.nodes, second], m.relations)
+    expect(checkAddRelation(s, rel(second, m.order, 'lifecycle-of'))).toMatch(/Entity "Order" has a state machine already \("Order lifecycle"\)/)
+    const customer = node('entity', 'Customer', undefined, { kind: 'aggregate-root' })
+    expect(checkAddRelation(stateOf([...m.nodes, customer], m.relations), rel(m.machine, customer, 'lifecycle-of'))).toMatch(/is the lifecycle of "Order" already/)
+    expect(checkAddRelation(stateOf([...m.nodes, second, customer], m.relations), rel(second, customer, 'lifecycle-of'))).toBeNull()
   })
 })
 

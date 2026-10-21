@@ -26,6 +26,12 @@ import {
   isPlacementAllowed,
   isRelationAllowed,
   placeOf,
+  initialPseudostateRefusal,
+  isInitialPseudostate,
+  lifecycleRefusal,
+  newPseudostateKind,
+  outgoingTransitionCount,
+  transitionRefusal,
   type Metamodel,
 } from './metamodel'
 
@@ -185,14 +191,27 @@ export function checkAddNode(state: ModelState, node: Omit<C4Node, 'id'>): strin
   if (!isPlacementAllowed(mm, node.type, parent, state.c4Nodes)) {
     return `Cannot place ${label} inside ${placementError(mm, node.type, parent, state.c4Nodes)}`
   }
+  if (hasStatecharts(mm) && isInitialPseudostate(node as C4Node)) {
+    const why = initialPseudostateRefusal(parent, state.c4Nodes)
+    if (why) return `Cannot add an initial ${label.toLowerCase()}: ${why}`
+  }
   return null
 }
+
+/** Whether the metamodel has the statechart types, whose rules
+ *  (statechart.ts) the checks apply as validateModel does. */
+const hasStatecharts = (mm: Metamodel | undefined): boolean => !!(mm?.nodeTypes.state && mm.relationTypes.transition)
 
 /** Adds the node, and lists it in the active view when there is one. A view
  *  with no nodeIds shows every node, so it already shows the new one —
  *  listing it there would hide all the others. */
 export function insertNode(state: ModelState, id: string, node: Omit<C4Node, 'id'>): void {
   const created = { id, ...node } as NodeRecord
+  // A pseudostate given no kind is initial where an initial one may go, else
+  // a choice (a + row under a machine that has its initial one).
+  if (created.type === 'pseudostate' && created.kind === undefined && hasStatecharts(state.metamodel)) {
+    created.kind = newPseudostateKind(created.parentId ? state.c4Nodes[created.parentId] : undefined, state.c4Nodes)
+  }
   materializeDefaults(created, state.metamodel)
   state.c4Nodes[id] = created
   const view = state.activeViewId ? state.views[state.activeViewId] : undefined
@@ -221,6 +240,16 @@ export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<
   if (isFinalState({ ...existing, ...updates } as C4Node) && !isFinalState(existing)) {
     const held = Object.values(state.c4Nodes).filter((n) => n.parentId === id).length
     if (held > 0) return `Cannot make ${typeLabel(state.metamodel, newType)} "${existing.label}" final: it holds ${held} element${held === 1 ? '' : 's'}, and ${FINAL_HOLDS_NOTHING}`
+    const out = hasStatecharts(state.metamodel) ? outgoingTransitionCount(id, state.c4Relations) : 0
+    if (out > 0) return `Cannot make ${typeLabel(state.metamodel, newType)} "${existing.label}" final: ${out} transition${out === 1 ? ' leaves' : 's leave'} it, and a final state cannot have outgoing transitions.`
+  }
+  // An initial pseudostate, made or moved: one per machine or compound
+  // state, none in a parallel state, and nothing points at it.
+  const next = { ...existing, ...updates } as C4Node
+  if (hasStatecharts(state.metamodel) && isInitialPseudostate(next) && (!isInitialPseudostate(existing) || 'parentId' in updates)) {
+    const why = initialPseudostateRefusal(parent, state.c4Nodes, id)
+      ?? (Object.values(state.c4Relations).some((r) => r.targetId === id && r.relationType === 'transition') ? 'a transition points at it, and a transition targets the state itself.' : null)
+    if (why) return `Cannot ${'parentId' in updates && isInitialPseudostate(existing) ? 'move' : 'make'} ${typeLabel(state.metamodel, newType)} "${existing.label}" ${'parentId' in updates && isInitialPseudostate(existing) ? 'there' : 'initial'}: ${why}`
   }
   // A retyped element keeps its relations: each must be one the metamodel
   // has between the new type and the other end.
@@ -278,6 +307,10 @@ export function checkReparent(state: ModelState, ids: string[], newParentId: str
   for (const n of nodes) {
     if (!isPlacementAllowed(state.metamodel, n.type, newParent, state.c4Nodes)) {
       return `Cannot place ${typeLabel(state.metamodel, n.type)} "${n.label}" inside ${placementError(state.metamodel, n.type, newParent, state.c4Nodes)}`
+    }
+    if (hasStatecharts(state.metamodel) && isInitialPseudostate(n) && (n.parentId ?? null) !== newParentId) {
+      const why = initialPseudostateRefusal(newParent, state.c4Nodes, n.id)
+      if (why) return `Cannot move ${typeLabel(state.metamodel, n.type)} "${n.label}" there: ${why}`
     }
     const misplaced = misplacedInGroup(state, n, newParent)
     if (misplaced) return groupContentsError(state.metamodel, n, misplaced)
@@ -550,6 +583,12 @@ export function checkRemoveRelationType(state: ModelState, typeId: string, miles
 // ── Relations ────────────────────────────────────────────────────────────────
 
 export function checkAddRelation(state: ModelState, rel: Omit<C4Relation, 'id'>): string | null {
+  return relationRefusal(state, rel)
+}
+
+/** checkAddRelation for a new relation, or for the relation `exceptId`
+ *  changed into `rel` (its type `kept` stays where it still has the pair). */
+function relationRefusal(state: ModelState, rel: Omit<C4Relation, 'id'>, exceptId?: string, kept?: string): string | null {
   const src = state.c4Nodes[rel.sourceId]
   const dst = state.c4Nodes[rel.targetId]
   if (!src || !dst) return null
@@ -560,6 +599,15 @@ export function checkAddRelation(state: ModelState, rel: Omit<C4Relation, 'id'>)
   const def = rel.relationType ? state.metamodel?.relationTypes[rel.relationType] : undefined
   if (def && !relationTypeAllows(def, src.type, dst.type)) {
     return `Relation not allowed: "${def.label}" does not connect ${typeLabel(state.metamodel, src.type)} → ${typeLabel(state.metamodel, dst.type)}.`
+  }
+  // The type it will have (insertRelation and patchRelation infer one).
+  const keptDef = kept ? state.metamodel?.relationTypes[kept] : undefined
+  const type = rel.relationType ?? (keptDef && relationTypeAllows(keptDef, src.type, dst.type) ? kept : inferRelationType(state.metamodel, src.type, dst.type))
+  if (hasStatecharts(state.metamodel)) {
+    const why = type === 'transition' ? transitionRefusal(src, dst, state.c4Nodes, state.c4Relations, exceptId)
+      : type === 'lifecycle-of' ? lifecycleRefusal(src, dst, state.c4Nodes, state.c4Relations, exceptId)
+      : null
+    if (why) return `Relation not allowed: ${why}`
   }
   return null
 }
@@ -598,7 +646,7 @@ export function checkPatchRelation(state: ModelState, id: string, updates: Parti
   if (!rel) return null
   const retyped = updates.relationType !== undefined && updates.relationType !== rel.relationType
   if (updates.sourceId === undefined && updates.targetId === undefined && !retyped) return null
-  return checkAddRelation(state, { ...rel, ...updates, relationType: retyped ? updates.relationType : undefined })
+  return relationRefusal(state, { ...rel, ...updates, relationType: retyped ? updates.relationType : undefined }, id, rel.relationType)
 }
 
 export function patchRelation(state: ModelState, id: string, updates: Partial<Omit<C4Relation, 'id'>>): void {

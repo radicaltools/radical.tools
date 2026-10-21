@@ -85,6 +85,72 @@ export function requirementStatePhrase(requirement: C4Node, nodes: Record<string
   return entity ? `the ${entity.label} is ${state.label}` : `in ${state.label}`
 }
 
+// ─── Refusals ──────────────────────────────────────────────────────────────
+// What validateStateMachines would flag, refused before an edit makes it:
+// the model's check* functions (Studio and the MCP server) call these, so
+// neither builds a statechart the validation then flags.
+
+/** Why a transition from `src` to `dst` (in a model of these `nodes` and
+ *  `relations`, besides the relation `exceptId` being changed) breaks the
+ *  statechart rules, or null. */
+export function transitionRefusal(src: C4Node, dst: C4Node, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, exceptId?: string): string | null {
+  const inLabel = (n: C4Node) => (n.parentId ? nodes[n.parentId]?.label ?? '' : '')
+  if (isState(src) && stateKind(src) === 'final') return `Final state "${src.label}" cannot have outgoing transitions.`
+  if (isPseudo(dst) && pseudoKind(dst) === 'initial') return `A transition cannot point at the initial pseudostate of "${inLabel(dst)}"; target the state itself.`
+  if (isPseudo(src) && pseudoKind(src) === 'initial'
+    && Object.values(relations).some((r) => r.id !== exceptId && r.sourceId === src.id && r.relationType === 'transition')) {
+    return `The initial pseudostate of "${inLabel(src)}" has its one transition, to the default state, already.`
+  }
+  const from = machineOf(src, nodes)
+  const to = machineOf(dst, nodes)
+  if (from && to && from.id !== to.id) return `A transition cannot leave its state machine ("${from.label}" → "${to.label}").`
+  return null
+}
+
+/** Why `machine` cannot be the lifecycle of `entity`: the entity has a
+ *  machine already, or the machine is the lifecycle of another entity
+ *  (one lifecycle per entity, with parallel regions where parts of it
+ *  progress at once). */
+export function lifecycleRefusal(machine: C4Node, entity: C4Node, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, exceptId?: string): string | null {
+  for (const r of Object.values(relations)) {
+    if (r.id === exceptId || r.relationType !== 'lifecycle-of') continue
+    if (r.targetId === entity.id && r.sourceId !== machine.id && nodes[r.sourceId]) {
+      return `Entity "${entity.label}" has a state machine already ("${nodes[r.sourceId].label}"); model one lifecycle, with parallel regions if parts of it progress at once.`
+    }
+    if (r.sourceId === machine.id && r.targetId !== entity.id && nodes[r.targetId]) {
+      return `State machine "${machine.label}" is the lifecycle of "${nodes[r.targetId].label}" already.`
+    }
+  }
+  return null
+}
+
+/** Why an initial pseudostate cannot be in `parent` (besides `exceptId`,
+ *  the one being moved or changed): a parallel state enters every region
+ *  and takes none, and a machine or compound state takes one. */
+export function initialPseudostateRefusal(parent: C4Node | undefined, nodes: Record<string, C4Node>, exceptId?: string): string | null {
+  if (!parent) return null
+  if (isState(parent) && stateKind(parent) === 'parallel') return `Parallel state "${parent.label}" enters all its regions; it takes no initial pseudostate.`
+  const held = Object.values(nodes).some((n) => n.id !== exceptId && n.parentId === parent.id && isPseudo(n) && pseudoKind(n) === 'initial')
+  if (held) return `"${parent.label}" has an initial pseudostate already; keep one.`
+  return null
+}
+
+/** The kind a new pseudostate in `parent` gets when none is given: initial
+ *  where an initial one may go, else a choice. */
+export function newPseudostateKind(parent: C4Node | undefined, nodes: Record<string, C4Node>): 'initial' | 'choice' {
+  return initialPseudostateRefusal(parent, nodes) ? 'choice' : 'initial'
+}
+
+/** Whether `node` is an initial pseudostate. */
+export function isInitialPseudostate(node: C4Node): boolean {
+  return isPseudo(node) && pseudoKind(node) === 'initial'
+}
+
+/** How many transitions leave the state or pseudostate `id`. */
+export function outgoingTransitionCount(id: string, relations: Record<string, C4Relation>): number {
+  return Object.values(relations).filter((r) => r.sourceId === id && r.relationType === 'transition').length
+}
+
 export function validateStateMachines(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,

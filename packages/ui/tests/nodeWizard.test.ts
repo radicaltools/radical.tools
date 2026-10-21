@@ -88,6 +88,27 @@ describe('requestCreateNode', () => {
     expect(id).toBe('')
     expect(store().nodeWizard).toBeNull()
   })
+
+  // Item 221: an Entity lifecycles + row under an entity that has its
+  // machine added a second one, without the link, which Validation flagged.
+  it('refuses the node when the rules refuse one of its links', () => {
+    useDiagramStore.setState({
+      c4Nodes: {
+        ...store().c4Nodes,
+        order: { id: 'order', type: 'entity', label: 'Order', kind: 'aggregate-root', collapsed: false, x: 0, y: 300, width: 200, height: 80 } as C4Node,
+        life: { id: 'life', type: 'state-machine', label: 'Order lifecycle', collapsed: false, x: 300, y: 300, width: 300, height: 200 },
+      },
+      c4Relations: { l: { id: 'l', sourceId: 'life', targetId: 'order', relationType: 'lifecycle-of' } },
+    } as any)
+    store()._sync()
+    const notify = vi.spyOn(store(), 'pushNotification')
+    const id = store().requestCreateNode(draft('state-machine', 'Order payment'), {
+      links: [{ relationType: 'lifecycle-of', direction: 'out', otherId: 'order' }], skipWizard: true,
+    })
+    expect(id).toBe('')
+    expect(Object.values(store().c4Nodes).filter((n) => n.type === 'state-machine')).toHaveLength(1)
+    expect(notify).toHaveBeenCalledWith(expect.stringMatching(/Entity "Order" has a state machine already/), 'error')
+  })
 })
 
 describe('finishNodeWizard (create)', () => {

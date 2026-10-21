@@ -2442,9 +2442,23 @@ export const useDiagramStore = create<DiagramStore>()(
         get().pushNotification(refused, 'error')
         return ''
       }
+      const id = uid()
+      // A link the rules refuse (a second state machine for an entity, from
+      // an Entity lifecycles + row) refuses the element: added without it,
+      // it was what the validation then flagged.
+      const s0 = get()
+      const withNode = { ...s0, c4Nodes: { ...s0.c4Nodes, [id]: { id, ...node } as C4Node } } as unknown as model.ModelState
+      for (const link of links) {
+        if (!s0.c4Nodes[link.otherId]) continue
+        const rel = link.direction === 'out' ? { sourceId: id, targetId: link.otherId, relationType: link.relationType } : { sourceId: link.otherId, targetId: id, relationType: link.relationType }
+        const linkRefused = model.checkAddRelation(withNode, rel)
+        if (linkRefused) {
+          get().pushNotification(linkRefused, 'error')
+          return ''
+        }
+      }
       get()._pushUndo()
       get()._markMilestoneEdit()
-      const id = uid()
       set((state) => {
         model.insertNode(state, id, node)
         _insertWizardLinks(state, id, links)
