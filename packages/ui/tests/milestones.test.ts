@@ -234,11 +234,21 @@ describe('sequence versioning in milestones', () => {
     expect(useDiagramStore.getState().sequences['seqA']).toBeDefined()
   })
 
-  it('selectMilestone keeps live sequences when snapshot has none (backward compat)', () => {
+  it('selectMilestone shows no sequences when the snapshot has none, and Save as new and Propagate store none', () => {
     useDiagramStore.setState({ sequences: { seqA: { ...seqA } } } as any)
     // snap-2 has no sequences field — simulating an old file format
     useDiagramStore.getState().selectMilestone('snap-2')
-    expect(useDiagramStore.getState().sequences['seqA']).toBeDefined()
+    expect(useDiagramStore.getState().sequences).toEqual({})
+    const first = Object.keys(useDiagramStore.getState().c4Nodes)[0]
+    useDiagramStore.getState().updateNode(first, { label: 'Renamed' })
+    useDiagramStore.getState().commitMilestoneChanges('new', 'copy')
+    const copy = useDiagramStore.getState().snapshots.find((m) => m.name === 'copy')!
+    expect(copy.sequences ?? {}).toEqual({})
+    useDiagramStore.getState().updateNode(first, { label: 'Renamed again' })
+    useDiagramStore.getState().commitMilestoneChanges('propagate')
+    for (const m of useDiagramStore.getState().snapshots) expect(Object.keys(m.sequences ?? {})).toEqual([])
+    // The live model keeps its own.
+    expect(useDiagramStore.getState().liveBackup!.sequences.seqA).toBeDefined()
   })
 
   it('liveBackup captures sequences when first entering a milestone', () => {
@@ -340,9 +350,14 @@ describe('sequence versioning in milestones', () => {
 describe('sequence mutations mark milestone dirty', () => {
   const seqA: DiagramSequence = { id: 'seqA', name: 'Login Flow', relationIds: ['r00', 'r01'] }
 
-  // Helper: enter milestone snap-1 in designer mode.
+  // Helper: enter milestone snap-1 in designer mode, with the sequences the
+  // live model has (a milestone saved without them has none).
   function enterMilestone() {
-    useDiagramStore.setState({ appMode: 'designer' } as any)
+    useDiagramStore.setState((s: any) => {
+      s.snapshots.find((x: any) => x.id === 'snap-1').sequences = JSON.parse(JSON.stringify(s.sequences))
+      s.appMode = 'designer'
+      return s
+    })
     useDiagramStore.getState().selectMilestone('snap-1')
     expect(useDiagramStore.getState().activeSnapshotId).toBe('snap-1')
   }

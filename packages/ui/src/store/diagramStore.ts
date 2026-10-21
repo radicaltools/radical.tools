@@ -143,6 +143,9 @@ interface HistoryEntry {
   sequences: Record<string, DiagramSequence>
   /** The Hub templates' values: changing them is a step of its own. */
   hubTemplates: Record<string, HubImportRecord>
+  /** In a milestone: whether it had edits not kept or dropped yet. Undo of
+   *  every edit left it "unsaved", with nothing to save. */
+  milestoneDirty?: boolean
 }
 
 /**
@@ -313,6 +316,7 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
       defaultPositions,
       sequences,
       hubTemplates: (merged.hubTemplates ?? {}) as Record<string, HubImportRecord>,
+      milestoneDirty: change.to.milestoneDirty,
     },
     conflicts,
     dropped,
@@ -402,6 +406,7 @@ function _captureState(state: DiagramStore): HistoryEntry {
     defaultPositions: state.defaultPositions,
     sequences: state.sequences,
     hubTemplates: state.hubTemplates,
+    milestoneDirty: state.milestoneDirty,
   }
 }
 
@@ -618,6 +623,19 @@ function keepingSharedViews(state: DiagramStore, edit: () => void): void {
   state.views = views
   state.activeViewId = activeViewId
   state.defaultLayoutConstraints = defaultLayoutConstraints
+}
+
+/** The milestone is left without its edits carried into the live model:
+ *  the views, All elements' positions and alignments its edits changed are
+ *  put back as the live model has them (liveBackup, _milestoneViewEdit). A
+ *  view deleted meanwhile stays deleted. Use inside immer set. */
+function unparkLiveViews(state: DiagramStore, backup: DiagramStore['liveBackup']): void {
+  if (!backup) return
+  for (const [id, view] of Object.entries(backup.views ?? {})) {
+    if (state.views[id]) state.views[id] = view as any
+  }
+  if (backup.defaultPositions) state.defaultPositions = backup.defaultPositions as any
+  if (backup.defaultLayoutConstraints) state.defaultLayoutConstraints = backup.defaultLayoutConstraints as any
 }
 
 /** Snapshot all node positions from c4Nodes into a positions map */
@@ -1902,7 +1920,14 @@ interface DiagramStore {
   /** Backup of the live HEAD state, kept while a milestone is loaded. Its
    *  Hub template records too: they are the live model's, and an Apply in
    *  the milestone changes them only once it is propagated. */
-  liveBackup: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; sequences: Record<string, DiagramSequence>; hubTemplates?: Record<string, HubImportRecord> } | null
+  liveBackup: {
+    nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; sequences: Record<string, DiagramSequence>; hubTemplates?: Record<string, HubImportRecord>
+    /** The live versions of the views, of All elements' positions and of
+     *  its alignments, as they were before an edit of the milestone changed
+     *  them (_milestoneViewEdit): saved in their place, and put back when the
+     *  milestone is left without its edits propagated. */
+    views?: Record<string, DiagramView>; defaultPositions?: Record<string, NodePosition>; defaultLayoutConstraints?: LayoutConstraint[]
+  } | null
   /** True after the user makes a structural edit while viewing a milestone. */
   milestoneDirty: boolean
   /** Open the propagate/new prompt modal. */
@@ -2046,6 +2071,11 @@ interface DiagramStore {
   _sync: () => void
   _pushUndo: () => void
   _markMilestoneEdit: () => void
+  /** An edit of view `viewId` (null: All elements' alignments; 'every':
+   *  every view and All elements' positions) while a milestone is shown is
+   *  an edit of the milestone: marks it, and parks the live version first
+   *  (liveBackup.views). No-op on the live model. */
+  _milestoneViewEdit: (viewId: string | null | 'every') => void
   _resizeParentsBottomUp: (viewFilter?: Set<string>, viewCollapsedSet?: Set<string>, expandedSet?: Set<string>) => void
   /** Moves the active canvas's elements so its layout constraints hold
    *  (no undo step of its own). */
@@ -2367,6 +2397,12 @@ export const useDiagramStore = create<DiagramStore>()(
         state.sequences = entry.sequences as any
         if (entry.hubTemplates) state.hubTemplates = entry.hubTemplates as any
         if (state.activeSequenceId && !entry.sequences[state.activeSequenceId]) state.activeSequenceId = null
+        // A milestone's steps are its edits: with them all undone there is
+        // nothing to keep or drop.
+        if (state.activeSnapshotId && entry.milestoneDirty !== undefined) {
+          state.milestoneDirty = entry.milestoneDirty
+          if (!entry.milestoneDirty) state.milestonePromptOpen = false
+        }
         state.canUndo = _undoStack.length > 0
         state.canRedo = _redoStack.length > 0
       })
@@ -2629,6 +2665,26 @@ export const useDiagramStore = create<DiagramStore>()(
         })
       },
 
+      _milestoneViewEdit(viewId) {
+        const { activeSnapshotId, appMode, liveBackup, views, defaultPositions, defaultLayoutConstraints } = get()
+        if (!activeSnapshotId || appMode !== 'designer' || !liveBackup) return
+        // Views are the live model's and every milestone's: what is done on
+        // one while a milestone is shown (a collapse, Hide from view, an
+        // alignment, a pin, its filter) went into the live view at once, was
+        // saved, and stayed after Discard.
+        const ids = viewId === 'every' ? Object.keys(views) : viewId ? [viewId] : []
+        set((state) => {
+          const backup = state.liveBackup!
+          for (const id of ids) {
+            if (!views[id] || backup.views?.[id]) continue
+            backup.views = { ...backup.views, [id]: views[id] }
+          }
+          if (viewId === 'every' && !backup.defaultPositions) backup.defaultPositions = defaultPositions as any
+          if ((viewId === null || viewId === 'every') && !backup.defaultLayoutConstraints) backup.defaultLayoutConstraints = defaultLayoutConstraints as any
+        })
+        get()._markMilestoneEdit()
+      },
+
       // ── nodes ────────────────────────────────────────────────────────────
       addNode(node) {
         // Cardinality and parent containment (metamodel rules)
@@ -2873,6 +2929,9 @@ export const useDiagramStore = create<DiagramStore>()(
         // disk. We therefore only push to undo history while editing.
         const inDesigner = get().appMode === 'designer'
         if (inDesigner) get()._pushUndo()
+        // In a milestone, an edit of it (a view's folds are the live view's).
+        if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
+        else get()._markMilestoneEdit()
         const activeViewId = get().activeViewId
         const modelCollapsed = get().c4Nodes[id]?.collapsed === true
         // Effective collapsed: model-level OR per-view collapse for named views.
@@ -3508,7 +3567,9 @@ export const useDiagramStore = create<DiagramStore>()(
           : 'the canvas root'
 
         get()._pushUndo()
-        get()._markMilestoneEdit()
+        // It rebases the element's place on every canvas: in a milestone,
+        // on the live views too, which Discard and Save as new left so.
+        get()._milestoneViewEdit('every')
         set((state) => { model.reparentNodes(state, ids, newParentId) })
 
         // On the canvas shown (model.reparentNodes saw to the others): the
@@ -3703,6 +3764,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // A group's views show what their element holds: nothing is picked by hand.
         if (!view || view.nodeIds.includes(nodeId) || setByGroup(get(), viewId)) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => {
           state.views[viewId].nodeIds.push(nodeId)
           delete state.views[viewId].empty
@@ -3743,6 +3805,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const fields = (v: DiagramView) => JSON.stringify([v.nodeIds, v.empty ?? false, v.collapsedNodeIds ?? [], v.expandedNodeIds ?? []])
         if (fields(probe) === fields(view)) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => { hide(state.views[viewId] as DiagramView) })
         get()._sync()
       },
@@ -3754,6 +3817,7 @@ export const useDiagramStore = create<DiagramStore>()(
           return
         }
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         // Unknown ids are dropped (the AI may emit a stale one) and the rest deduplicated
         set((state) => { model.setViewNodeIds(state, viewId, nodeIds) })
         get()._sync()
@@ -3763,6 +3827,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const view = get().views[viewId]
         if (!view || view.hiddenRelationIds?.includes(relationId)) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => {
           const v = state.views[viewId]
           v.hiddenRelationIds = [...(v.hiddenRelationIds ?? []), relationId]
@@ -3773,6 +3838,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const view = get().views[viewId]
         if (!view?.hiddenRelationIds?.includes(relationId)) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => {
           const v = state.views[viewId]
           v.hiddenRelationIds = (v.hiddenRelationIds ?? []).filter((id) => id !== relationId)
@@ -3782,6 +3848,7 @@ export const useDiagramStore = create<DiagramStore>()(
       setViewHiddenRelations(viewId, relationIds) {
         if (!get().views[viewId]) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => { model.setViewHiddenRelations(state, viewId, relationIds) })
         get()._sync()
       },
@@ -3831,6 +3898,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const view = get().views[viewId]
         if (!view || (view.edgeStyle ?? null) === style) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => { model.setViewEdgeStyle(state, viewId, style) })
         get()._sync()
       },
@@ -3873,6 +3941,7 @@ export const useDiagramStore = create<DiagramStore>()(
         model.setViewPipeline(probe, viewId, pipeline)
         if (JSON.stringify(probe.views[viewId].pipeline ?? {}) === JSON.stringify(view.pipeline ?? {})) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => { model.setViewPipeline(state, viewId, pipeline) })
         get()._sync()
       },
@@ -3923,6 +3992,7 @@ export const useDiagramStore = create<DiagramStore>()(
       setViewCollapsed(viewId, nodeIds, collapsed) {
         if (!get().views[viewId]) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => { model.setViewCollapsed(state, viewId, nodeIds, collapsed) })
         get()._sync()
       },
@@ -3982,6 +4052,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const view = get().views[viewId]
         if (!view || (view.wikiPageMode ?? 'single') === mode) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => {
           const view = state.views[viewId]
           if (!view) return
@@ -3994,6 +4065,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const view = get().views[viewId]
         if (!view || wikiDepthOf(view) === wikiDepthOf({ wikiDepth: depth })) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => {
           const view = state.views[viewId]
           if (!view) return
@@ -4039,7 +4111,7 @@ export const useDiagramStore = create<DiagramStore>()(
           return null
         }
         get()._pushUndo()
-        get()._markMilestoneEdit()
+        get()._milestoneViewEdit(viewId)
         const id = uid()
         set((state) => { model.insertAlignment(state, viewId, id, axis, ids, ordered) })
         get()._enforceLayoutConstraints()
@@ -4059,7 +4131,7 @@ export const useDiagramStore = create<DiagramStore>()(
           return null
         }
         get()._pushUndo()
-        get()._markMilestoneEdit()
+        get()._milestoneViewEdit(viewId)
         const id = uid()
         set((state) => { model.insertGrid(state, viewId, id, ids, cols) })
         get()._arrangeGrid(id)
@@ -4077,7 +4149,7 @@ export const useDiagramStore = create<DiagramStore>()(
           return
         }
         get()._pushUndo()
-        get()._markMilestoneEdit()
+        get()._milestoneViewEdit(viewId)
         set((state) => { model.setGridColumns(state, viewId, id, columns) })
         if (viewId === get().activeViewId) {
           get()._arrangeGrid(id)
@@ -4123,7 +4195,7 @@ export const useDiagramStore = create<DiagramStore>()(
           }
         }
         get()._pushUndo()
-        get()._markMilestoneEdit()
+        get()._milestoneViewEdit(viewId)
         set((state) => { model.setAlignmentOrder(state, viewId, id, ids) })
         if (viewId === get().activeViewId) {
           get()._enforceLayoutConstraints()
@@ -4136,7 +4208,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const pinned = pinnedNodeIds(model.layoutConstraintsOf(get(), viewId))
         if (!ids.some((id) => pinned.includes(id))) return
         get()._pushUndo()
-        get()._markMilestoneEdit()
+        get()._milestoneViewEdit(viewId)
         set((state) => { model.setPinned(state, viewId, ids, false, uid) })
         _liveLayout?.invalidate()
       },
@@ -4146,7 +4218,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const remove = new Set(typeof ids === 'string' ? [ids] : ids)
         if (!model.layoutConstraintsOf(get(), viewId).some((c) => remove.has(c.id))) return
         get()._pushUndo()
-        get()._markMilestoneEdit()
+        get()._milestoneViewEdit(viewId)
         set((state) => { for (const id of remove) model.deleteLayoutConstraint(state, viewId, id) })
         if (viewId === get().activeViewId) _liveLayout?.invalidate()
       },
@@ -4608,7 +4680,7 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           // One undo step for the whole layout. Viewer reverts positions on exit anyway.
           if (get().appMode === 'designer') get()._pushUndo()
-          get()._markMilestoneEdit()
+          get()._milestoneViewEdit(get().activeViewId)
           set((state) => {
             applyLayoutPositions(state.c4Nodes, positions, input)
             // A container the refit grows past what ELK laid it out at lay
@@ -4690,7 +4762,7 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           // One undo step for the whole layout. Viewer reverts positions on exit anyway.
           if (get().appMode === 'designer') get()._pushUndo()
-          get()._markMilestoneEdit()
+          get()._milestoneViewEdit(get().activeViewId)
           set((state) => {
             applyLayoutPositions(state.c4Nodes, result.winner.positions, input)
             unpinLaidOut(state, get().appMode)
@@ -4902,6 +4974,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // The physics already holds it (release); the rule keeps it held
         // after a rebuild and in the saved file.
         if (moved && get().appMode === 'designer') {
+          get()._milestoneViewEdit(get().activeViewId)
           set((state) => { model.setPinned(state, state.activeViewId, [nodeId, ...withIds], true, uid) })
         }
         // A drag while editing a milestone is a real edit too — mark dirty
@@ -5013,10 +5086,9 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           state.c4Nodes = snap.nodes as any
           state.c4Relations = snap.relations as any
-          if (snap.sequences) {
-            state.sequences = snap.sequences as any
-            if (state.activeSequenceId && !snap.sequences[state.activeSequenceId]) state.activeSequenceId = null
-          }
+          // What the milestone has: none when it was saved without them.
+          state.sequences = (snap.sequences ?? {}) as any
+          if (state.activeSequenceId && !state.sequences[state.activeSequenceId]) state.activeSequenceId = null
           state.canUndo = _undoStack.length > 0
           state.canRedo = _redoStack.length > 0
         })
@@ -5045,6 +5117,7 @@ export const useDiagramStore = create<DiagramStore>()(
                 state.sequences = (backup as any).sequences as any
               }
               if (backup.hubTemplates) state.hubTemplates = backup.hubTemplates as any
+              unparkLiveViews(state as DiagramStore, backup)
             }
             state.activeSnapshotId = null
             state.liveBackup = null
@@ -5170,9 +5243,10 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           state.c4Nodes = nextNodes as any
           state.c4Relations = snap.relations as any
-          if (snap.sequences) {
-            state.sequences = snap.sequences as any
-          }
+          // A milestone saved without sequences has none: it showed the live
+          // ones, and Save as new and Propagate then stored them in it.
+          state.sequences = (snap.sequences ?? {}) as any
+          if (state.activeSequenceId && !state.sequences[state.activeSequenceId]) state.activeSequenceId = null
           state.activeSnapshotId = id
           state.liveBackup = backup as any
           state.milestoneDirty = false
@@ -5215,6 +5289,7 @@ export const useDiagramStore = create<DiagramStore>()(
               state.sequences = (liveBackup as any).sequences as any
             }
             if (liveBackup.hubTemplates) state.hubTemplates = liveBackup.hubTemplates as any
+            unparkLiveViews(state as DiagramStore, liveBackup)
           }
           state.activeSnapshotId = null
           state.liveBackup = null
@@ -5377,7 +5452,16 @@ export const useDiagramStore = create<DiagramStore>()(
         ) => {
           for (const n of addedNodes) targetNodes[n.id] = JSON.parse(JSON.stringify(n))
           for (const { id, updates } of updatedNodes) {
-            if (targetNodes[id]) Object.assign(targetNodes[id], updates)
+            if (!targetNodes[id]) continue
+            // A move into a parent this model does not have leaves the
+            // element where it is here (its place is its parent's): it went
+            // under a parent that did not exist.
+            if ('parentId' in updates && updates.parentId && !targetNodes[updates.parentId]) {
+              const { parentId: _parentId, x: _x, y: _y, ...rest } = updates
+              Object.assign(targetNodes[id], rest)
+              continue
+            }
+            Object.assign(targetNodes[id], updates)
           }
           // What lies inside a removed element there goes with it, and so do
           // the relations to anything removed: a later model can hold children
@@ -5390,6 +5474,14 @@ export const useDiagramStore = create<DiagramStore>()(
             for (const d of model.descendantIds(id, targetNodes)) gone.add(d)
           }
           for (const id of gone) delete targetNodes[id]
+          // So does an element added under a parent this model does not have.
+          for (let stray = true; stray;) {
+            stray = false
+            for (const n of addedNodes) {
+              const there = targetNodes[n.id]
+              if (there?.parentId && !targetNodes[there.parentId]) { delete targetNodes[n.id]; stray = true }
+            }
+          }
           for (const r of addedRels) targetRels[r.id] = JSON.parse(JSON.stringify(r))
           for (const { id, updates } of updatedRels) {
             if (targetRels[id]) Object.assign(targetRels[id], updates)
@@ -5444,6 +5536,11 @@ export const useDiagramStore = create<DiagramStore>()(
             applyDiff(state.liveBackup.nodes as any, state.liveBackup.relations as any, (state.liveBackup as any).sequences)
             // The Hub template records go with the texts they wrote.
             state.liveBackup.hubTemplates = state.hubTemplates as any
+            // What was done on the views in the milestone is the live
+            // views' now: nothing of them is put back on leaving it.
+            delete state.liveBackup.views
+            delete state.liveBackup.defaultPositions
+            delete state.liveBackup.defaultLayoutConstraints
             const gone = new Set(before.filter((id) => !state.liveBackup!.nodes[id]))
             if (gone.size) {
               const shown = state.activeViewId
@@ -6394,7 +6491,7 @@ export const useDiagramStore = create<DiagramStore>()(
             state.liveBackup = { nodes: state.c4Nodes, relations: state.c4Relations, sequences: state.sequences } as any
             state.c4Nodes = shownNodes as any
             state.c4Relations = milestone.relations as any
-            if (snapshots.find((m) => m.id === shownMilestone.id)?.sequences) state.sequences = milestone.sequences as any
+            state.sequences = milestone.sequences as any
             state.activeSnapshotId = shownMilestone.id
             state.milestoneDirty = shownMilestone.dirty
             state.milestonePromptOpen = shownMilestone.promptOpen
@@ -6443,19 +6540,22 @@ export const useDiagramStore = create<DiagramStore>()(
         // Snapshot current positions into the active context before saving —
         // but not from the milestone's nodes, whose layout is not the live one.
         const currentPos = timeTravelling ? null : snapshotPositions(c4Nodes)
-        const savedDefaultPos = activeViewId === null && currentPos ? currentPos : defaultPositions
+        const savedDefaultPos = activeViewId === null && currentPos ? currentPos : (timeTravelling && liveBackup.defaultPositions) || defaultPositions
         // Same for camera state so on reload each view restores its framing.
         const rawVP = (window as any).__rfCurrentViewport
         const currentVP: { x: number; y: number; zoom: number } | null = rawVP && !timeTravelling
           ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom }
           : null
         const savedDefaultVP = activeViewId === null ? (currentVP ?? defaultViewport) : defaultViewport
-        const savedViews = Object.values(views).map(v => ({
+        // A view a milestone's edit changed is saved as the live model has it.
+        const parked = timeTravelling ? liveBackup.views ?? {} : {}
+        const savedViews = Object.values(views).map((shown) => parked[shown.id] ?? shown).map(v => ({
           ...v,
           positions: v.id === activeViewId && currentPos ? viewCanvasPositions(v, liveNodes, currentPos, viewDrawnIds(v, liveNodes, liveRelations)) : v.positions,
           viewport: v.id === activeViewId ? (currentVP ?? v.viewport) : v.viewport,
         }))
 
+        const liveConstraints = (timeTravelling && liveBackup.defaultLayoutConstraints) || get().defaultLayoutConstraints
         return {
           nodes: Object.values(liveNodes),
           relations: Object.values(liveRelations),
@@ -6463,7 +6563,7 @@ export const useDiagramStore = create<DiagramStore>()(
           views: savedViews,
           defaultPositions: savedDefaultPos,
           defaultViewport: savedDefaultVP,
-          ...(get().defaultLayoutConstraints.length ? { defaultLayoutConstraints: get().defaultLayoutConstraints as LayoutConstraint[] } : {}),
+          ...(liveConstraints.length ? { defaultLayoutConstraints: liveConstraints as LayoutConstraint[] } : {}),
           ...(get().defaultEdgeStyle !== 'curved' ? { defaultEdgeStyle: get().defaultEdgeStyle } : {}),
           snapshots: snapshots as DiagramSnapshot[],
           presentations: presentations as Presentation[],
