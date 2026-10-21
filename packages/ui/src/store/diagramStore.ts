@@ -5579,7 +5579,12 @@ export const useDiagramStore = create<DiagramStore>()(
         _historyMark++
         // push current state to redo, on the step's canvas, where Undo goes
         const now = _captureState(get())
-        const canvas = (isStepChange(item) ? item.to : item).activeViewId
+        // Redo goes there too, unless the view shown is one the step made:
+        // Redo of "+ New view" stayed on the view it was made from.
+        const after = isStepChange(item) ? item.from : now
+        const before = isStepChange(item) ? item.to : item
+        const made = after.activeViewId !== null && !before.views[after.activeViewId]
+        const canvas = made ? after.activeViewId : before.activeViewId
         _redoStack.push(isStepChange(item) ? { from: item.to, to: _entryOnCanvas(item.from, canvas) } : _entryOnCanvas(now, canvas))
         _restoreHistoryItem(item, now, 'Undo')
       },
