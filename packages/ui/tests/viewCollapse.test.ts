@@ -398,3 +398,38 @@ describe('the assistant folding and opening a container on the view shown', () =
     expect(s().c4Nodes.sys.x).toBeCloseTo(0, 0)
   })
 })
+
+describe('a container a view shows without its children', () => {
+  it('keeps its place there on a reload (item 180)', () => {
+    // A Containers view of an imported workspace: API Application, which
+    // holds components the view does not list, is drawn folded; its stored
+    // (open) size put its middle outside its system, and every reload
+    // placed it, and what it pushed, afresh.
+    const s = useDiagramStore.getState
+    const doc = {
+      nodes: [
+        { id: 'bank', type: 'system', label: 'Big Bank', x: 0, y: 0, width: 700, height: 330, collapsed: false },
+        { id: 'web', type: 'container', label: 'Web', parentId: 'bank', x: 30, y: 120, width: 240, height: 180, collapsed: false },
+        { id: 'api', type: 'container', label: 'API Application', parentId: 'bank', x: 330, y: 120, width: 1400, height: 900, collapsed: false },
+        { id: 'c1', type: 'component', label: 'Sign In', parentId: 'api', x: 30, y: 120, width: 220, height: 140, collapsed: false },
+        { id: 'c2', type: 'component', label: 'Accounts', parentId: 'api', x: 1100, y: 700, width: 220, height: 140, collapsed: false },
+      ] as C4Node[],
+      relations: [],
+      views: [{
+        id: 'v', name: 'Containers', nodeIds: ['bank', 'web', 'api'],
+        positions: {
+          bank: { x: 0, y: 0, width: 640, height: 330 },
+          web: { x: 30, y: 120, width: 240, height: 180 },
+          api: { x: 330, y: 120, width: 1400, height: 900 },
+        },
+      }],
+    }
+    const view = doc.views[0]
+    s().loadDiagram(structuredClone(doc) as any)
+    s().setActiveView('v')
+    for (const id of ['bank', 'web', 'api']) {
+      expect(Math.round(s().c4Nodes[id].x), id).toBe(Math.round(view.positions[id].x))
+      expect(Math.round(s().c4Nodes[id].y), id).toBe(Math.round(view.positions[id].y))
+    }
+  })
+})
