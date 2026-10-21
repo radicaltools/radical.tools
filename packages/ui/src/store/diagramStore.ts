@@ -273,6 +273,24 @@ function _withoutStrays(parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' 
   return { parts: next, dropped }
 }
 
+/** `entry` as shown on the canvas `viewId` (null: All elements): the same
+ *  model, with the positions of that canvas in its nodes. Redo after an
+ *  Undo pressed on another canvas than the step's went to the canvas Undo
+ *  was pressed on, which the step never changed. */
+function _entryOnCanvas(entry: HistoryEntry, viewId: string | null): HistoryEntry {
+  if (entry.activeViewId === viewId || (viewId !== null && !entry.views[viewId])) return entry
+  const data = _entryModel(entry)
+  const c4Nodes: Record<string, C4Node> = {}
+  for (const n of data.nodes) c4Nodes[n.id] = { ...n }
+  const views: Record<string, DiagramView> = {}
+  for (const v of data.views ?? []) views[v.id] = v
+  const defaultPositions = data.defaultPositions ?? {}
+  const view = viewId ? views[viewId] : undefined
+  const positions = view ? view.positions : defaultPositions
+  if (Object.keys(positions).length > 0) showCanvasPositions(c4Nodes, positions, view, entry.c4Relations)
+  return { ...entry, c4Nodes, views, defaultPositions, activeViewId: viewId }
+}
+
 /** What a step removes (an element `from` has) that was built on outside
  *  Studio since: a child added into it, a relation added to it. It stays,
  *  as it is in `now`, with its places on the views and its relations, and
@@ -5025,9 +5043,10 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().appMode !== 'designer') return
         if (_undoStack.length === 0) return
         const item = _undoStack.pop()!
-        // push current state to redo
+        // push current state to redo, on the step's canvas, where Undo goes
         const now = _captureState(get())
-        _redoStack.push(isStepChange(item) ? { from: item.to, to: item.from } : now)
+        const canvas = (isStepChange(item) ? item.to : item).activeViewId
+        _redoStack.push(isStepChange(item) ? { from: item.to, to: _entryOnCanvas(item.from, canvas) } : _entryOnCanvas(now, canvas))
         _restoreHistoryItem(item, now, 'Undo')
       },
 
@@ -5056,9 +5075,10 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().appMode !== 'designer') return
         if (_redoStack.length === 0) return
         const item = _redoStack.pop()!
-        // push current state to undo
+        // push current state to undo, on the step's canvas, where Redo goes
         const now = _captureState(get())
-        _undoStack.push(isStepChange(item) ? { from: item.to, to: item.from } : now)
+        const canvas = (isStepChange(item) ? item.to : item).activeViewId
+        _undoStack.push(isStepChange(item) ? { from: item.to, to: _entryOnCanvas(item.from, canvas) } : _entryOnCanvas(now, canvas))
         _restoreHistoryItem(item, now, 'Redo')
       },
 

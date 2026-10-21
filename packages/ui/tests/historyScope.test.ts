@@ -73,15 +73,39 @@ describe('Undo and the canvas a step was made on', () => {
     expect(at('b')).toEqual({ x: 900, y: 100 })
   })
 
-  it('gives the step back on the canvas where it was undone from', () => {
+  // Redo went to the canvas where Undo was pressed, which the step never
+  // changed.
+  it('gives the step back on that canvas too, wherever it was undone from', () => {
     s().setActiveView('one')
     drag('b', { x: 1300, y: 400 })
     s().setActiveView('two')
     s().undo()
     s().redo()
-    expect(s().activeViewId).toBe('two')
-    s().setActiveView('one')
+    expect(s().activeViewId).toBe('one')
     expect(at('b')).toEqual({ x: 1300, y: 400 })
+    s().setActiveView('two')
+    expect(at('a')).toEqual({ x: 50, y: 700 })
+    expect(at('b')).toEqual({ x: 50, y: 1100 })
+    // And Undo after a Redo pressed elsewhere goes back to it as well.
+    s().undo()
+    expect(s().activeViewId).toBe('one')
+    expect(at('b')).toEqual({ x: 900, y: 100 })
+    s().setActiveView('two')
+    s().redo()
+    expect(s().activeViewId).toBe('one')
+    expect(at('b')).toEqual({ x: 1300, y: 400 })
+  })
+
+  it('gives a step made on All elements back there, redone from a view', () => {
+    drag('b', { x: 600, y: 500 })
+    s().setActiveView('one')
+    s().undo()
+    s().setActiveView('one')
+    s().redo()
+    expect(s().activeViewId).toBeNull()
+    expect(at('b')).toEqual({ x: 600, y: 500 })
+    s().setActiveView('one')
+    expect(at('b')).toEqual({ x: 900, y: 100 })
   })
 })
 
