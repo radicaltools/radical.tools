@@ -417,6 +417,7 @@ export class FolderModel {
         this.restoreTempIds(priorTempIds)
         return { ok: false, text: refused }
       }
+      const metamodelBefore = facade.getMetamodel?.()
       const result: ForgeResult = FORGE_TOOLS.has(name)
         ? await this.forge.call(name, input, ctx, facade)
         : await runTool(name, input, ctx)
@@ -444,7 +445,7 @@ export class FolderModel {
         if (laidOut.changed) changed = laidOut.changed
       }
       const note = fresh.length ? ` Smart Layout arranged ${fresh.length === 1 ? `the new view ${fresh[0].name}` : `the ${fresh.length} new views per element`}.` : ''
-      const outcome = await this.commit(session, before, data, changed, metamodel, result.resultText + note)
+      const outcome = await this.commit(session, before, data, changed, metamodel, result.resultText + note, metamodelBefore)
       if (!outcome.ok) {
         this.restoreTempIds(priorTempIds)
         return outcome
@@ -538,23 +539,30 @@ export class FolderModel {
   }
 
   /** Validates `changed` against the metamodel and writes the files that
-   *  differ from `before`, unless the folder changed in the meantime. */
+   *  differ from `before`, unless the folder changed in the meantime.
+   *  `metamodelBefore` is the metamodel before the call: a change of it that
+   *  breaks what the model holds is made, and the agent is told what it
+   *  breaks, as Studio lists it before it asks. */
   private async commit(
     session: MdFolderSession, before: FolderFiles, data: DiagramData, changed: DiagramData,
-    metamodel: Metamodel | undefined, resultText: string,
+    metamodel: Metamodel | undefined, resultText: string, metamodelBefore?: Metamodel,
   ): Promise<CallOutcome> {
     checkData(changed)
     if (!metamodel) throw new Error('Model has no metamodel')
-    const previous = new Set(issuesOf(data, metamodel).map((issue) => issue.id))
+    // Compared with the metamodel the model had, so a narrowed one is
+    // heard of (compared with the new one, nothing was new).
+    const retyped = !!metamodelBefore && JSON.stringify(metamodelBefore) !== JSON.stringify(metamodel)
+    const previous = new Set(issuesOf(data, retyped ? metamodelBefore! : metamodel).map((issue) => issue.id))
     const fresh = issuesOf(changed, metamodel).filter((issue) => !previous.has(issue.id))
-    const newError = fresh.find((issue) => issue.severity === 'error')
+    const newError = retyped ? undefined : fresh.find((issue) => issue.severity === 'error')
     if (newError) return { ok: false, text: newError.message }
     // Warnings do not stop a write (a machine is incomplete while it is being
     // built), but the agent hears about the ones its change brought in.
-    const warnings = fresh.filter((issue) => issue.severity === 'warning')
-    const warned = warnings.length
-      ? ` New warnings (fine while you are still building; fix them before you finish, see get_issues):${warnings.slice(0, MAX_WARNINGS).map((issue) => `\n- ${issue.message}`).join('')}${warnings.length > MAX_WARNINGS ? `\n- …and ${warnings.length - MAX_WARNINGS} more` : ''}`
-      : ''
+    const warnings = retyped ? fresh : fresh.filter((issue) => issue.severity === 'warning')
+    const list = `${warnings.slice(0, MAX_WARNINGS).map((issue) => `\n- ${issue.message}`).join('')}${warnings.length > MAX_WARNINGS ? `\n- …and ${warnings.length - MAX_WARNINGS} more` : ''}`
+    const warned = !warnings.length ? ''
+      : retyped ? ` Warning: the metamodel now flags what the model holds (${warnings.length} ${warnings.length === 1 ? 'issue' : 'issues'}; change those elements or the metamodel back, see get_issues):${list}`
+      : ` New warnings (fine while you are still building; fix them before you finish, see get_issues):${list}`
     const next = serializeToMdFolderWithPaths(changed).files
     // Preserve the user's manifest prose/name. The format codec only needs
     // to rewrite model-owned sidecars and node Markdown.

@@ -660,3 +660,45 @@ describe('state machines over MCP', () => {
     }
   })
 })
+
+describe('metamodel changes over MCP', () => {
+  // Item 210: properties sent as get_model_summary lists them were refused
+  // (visibleWhen was an additional property); sent without it, the rules
+  // were gone and a ubiquitous requirement's card showed While in state.
+  it('keep a property\'s visibleWhen, sent or left out', async () => {
+    const folder = await fixture()
+    const client = new Client({ name: 'radical-test', version: '1.0.0' })
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(import.meta.dirname, '../dist/index.js'), '--folder', folder] }))
+    try {
+      const requirement = builtInGovernanceMetamodel().nodeTypes.requirement
+      const ruled = requirement.properties!.filter((p) => p.visibleWhen)
+      expect(ruled.length).toBeGreaterThan(0)
+      const sent = await client.callTool({ name: 'upsert_node_type', arguments: { id: 'requirement', properties: requirement.properties } })
+      expect(sent.isError, JSON.stringify(sent.content)).not.toBe(true)
+      const stripped = requirement.properties!.map(({ visibleWhen: _v, ...p }) => (p.key === 'action' ? { ...p, label: 'What shall be done' } : p))
+      const left = await client.callTool({ name: 'upsert_node_type', arguments: { id: 'requirement', properties: stripped } })
+      expect(left.isError, JSON.stringify(left.content)).not.toBe(true)
+      const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      const props = saved.metamodel!.nodeTypes.requirement.properties!
+      for (const p of ruled) expect(props.find((q) => q.key === p.key)?.visibleWhen, p.key).toEqual(p.visibleWhen)
+      expect(props.find((q) => q.key === 'action')?.label).toBe('What shall be done')
+    } finally {
+      await client.close()
+    }
+  })
+
+  // D3: narrowing the metamodel below what the model holds is done, and
+  // the agent is told what it breaks (it was accepted without a word).
+  it('narrowed below what the model holds is written, with what it breaks', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    await model.call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await model.call('add_node', { tempId: 'api', type: 'container', label: 'API', parentId: 'shop' })
+    const narrowed = await model.call('upsert_node_type', { id: 'container', allowedParents: ['group'] })
+    expect(narrowed.ok, narrowed.text).toBe(true)
+    expect(narrowed.text).toContain('Warning: the metamodel now flags what the model holds (1 issue')
+    expect(narrowed.text).toContain('Container "API" cannot be inside Software System. Allowed parents: group.')
+    const limited = await model.call('upsert_node_type', { id: 'system', maxCount: 1 })
+    expect(limited.text).not.toContain('Warning')
+  })
+})
