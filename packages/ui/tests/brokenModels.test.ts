@@ -21,3 +21,20 @@ it('draws a child whose parent is missing as one without a parent', () => {
   expect(orphan.parentNode).toBeUndefined()
   expect(s().rfNodes.every((n) => !n.parentNode || s().rfNodes.some((p) => p.id === n.parentNode))).toBe(true)
 })
+
+it('opens a view saved without a positions key as one not laid out yet', () => {
+  const s = useDiagramStore.getState
+  s().setAppMode('designer')
+  s().loadDiagram({
+    nodes: [
+      { id: 'a', type: 'system', label: 'A', collapsed: false, x: 0, y: 0, width: 300, height: 200 },
+      { id: 'b', type: 'system', label: 'B', collapsed: false, x: 400, y: 0, width: 300, height: 200 },
+    ],
+    relations: [],
+    // A hand-written document: the view names its elements, nothing more.
+    views: [{ id: 'v', name: 'Part', nodeIds: ['a', 'b'] } as any],
+  })
+  expect(() => s().setActiveView('v')).not.toThrow()
+  expect(s().activeViewId).toBe('v')
+  expect(s().rfNodes.filter((n) => !n.hidden).map((n) => n.id).sort()).toEqual(['a', 'b'])
+})

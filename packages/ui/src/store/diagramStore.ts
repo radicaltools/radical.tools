@@ -300,7 +300,7 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
   const defaultPositions = merged.defaultPositions ?? {}
   const activeViewId = change.to.activeViewId && views[change.to.activeViewId] ? change.to.activeViewId : null
   const view = activeViewId ? views[activeViewId] : undefined
-  const positions = view ? view.positions : defaultPositions
+  const positions = view ? view.positions ?? {} : defaultPositions
   if (Object.keys(positions).length > 0) showCanvasPositions(c4Nodes, positions, view, c4Relations)
   return {
     entry: {
@@ -3669,7 +3669,7 @@ export const useDiagramStore = create<DiagramStore>()(
             incomingViewport = state.defaultViewport as typeof incomingViewport
           } else {
             const view = state.views[newId]
-            if (view && Object.keys(view.positions).length > 0) {
+            if (view && Object.keys(view.positions ?? {}).length > 0) {
               incoming = view.positions as Record<string, NodePosition>
             }
             if (view?.viewport) incomingViewport = view.viewport
