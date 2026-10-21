@@ -187,7 +187,7 @@ for (const perspective of ['Viewer', 'Presenter']) {
   })
 }
 
-test('the Parent field moves an element into its new parent, and refuses a loop', async ({ page, studio }) => {
+test('the Parent field moves an element into its new parent, and offers no loop', async ({ page, studio }) => {
   await studio.open('v-containers')
   const parent = studio.attribute('Parent')
   await studio.node('payments').click()
@@ -203,8 +203,8 @@ test('the Parent field moves an element into its new parent, and refuses a loop'
   const frame = (await studio.node('bookstore').boundingBox())!
   await studio.node('bookstore').click({ position: { x: frame.width - 80, y: 12 } })
   await expect(parent).toHaveValue('')
-  await parent.selectOption({ label: 'Payment Provider' })
-  await expect(page.getByText('Cannot move a node into itself or one of its descendants.').first()).toBeVisible()
+  // Its own child is not offered (it was, and the move was then refused).
+  await expect(parent.locator('option', { hasText: 'Payment Provider' })).toHaveCount(0)
   await expect(studio.node('bookstore')).toBeVisible()
   expect((await studio.storedDoc()).nodes.find((n) => n.id === 'bookstore')?.parentId).toBeUndefined()
 })
