@@ -174,10 +174,15 @@ describe('goToSlide', () => {
     useDiagramStore.getState().addPresentationSlide('b')
     useDiagramStore.getState().startPresentation()
     const savedState = (window as any).__prePresState
-    setTimeout(() => {
-      useDiagramStore.getState().goToSlide(1) // already active — must not overwrite
-      expect((window as any).__prePresState).toBe(savedState) // same object reference
-    }, 60)
+    // Awaited: a timer left running reached the next tests, under load
+    // clearing the camera a later slide preview waited for.
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        useDiagramStore.getState().goToSlide(1) // already active — must not overwrite
+        expect((window as any).__prePresState).toBe(savedState) // same object reference
+        resolve()
+      }, 60)
+    })
   })
 
   describe('slides without a captured canvas (generated sample slides)', () => {
