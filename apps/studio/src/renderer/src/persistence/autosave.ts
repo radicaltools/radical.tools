@@ -445,6 +445,8 @@ if (typeof window !== 'undefined') {
       // folder…"): start following its folder.
       const active = s.docs.find(d => d.id === s.activeId)
       if (active?.source === 'md' && !_suspended) watchActive(active.id)
+      // Moved back to the browser: the folder is not followed any more.
+      else if (active && active.source !== 'md') stopWatching()
       return
     }
     const leaving = prevActive

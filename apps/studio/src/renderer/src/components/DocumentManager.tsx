@@ -57,6 +57,17 @@ function ModelMenu({ doc, onRename }: { doc: DocumentMeta; onRename: () => void 
   const moveToFolder = async (): Promise<void> => {
     await documents.saveAsFolder(doc.id, saveDiagram(), confirmForeignFolder)
   }
+  // Back from a file or folder: the model on screen is kept in this
+  // browser, and the file or folder stays on disk as it is.
+  const moveToBrowser = (): void => {
+    const where = doc.source === 'md' ? 'folder' : 'file'
+    if (!window.confirm(`Keep "${doc.name}" in this browser?\n\nThe ${where} stays on disk as it is; Studio no longer saves to it.`)) return
+    try {
+      documents.moveToBrowser(doc.id, saveDiagram())
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }
   const remove = (): void => {
     const question = doc.source === 'fs'
       ? `Remove "${doc.name}" from the list?\n\n(The file on disk is kept.)`
@@ -91,6 +102,16 @@ function ModelMenu({ doc, onRename }: { doc: DocumentMeta; onRename: () => void 
               title={fileSupported ? 'Keep this model in a file; every change is saved to it' : 'Download this model as a file'}
             >
               {fileSupported ? 'Move to a file…' : 'Download as file…'}
+            </button>
+          )}
+          {isActive && doc.source !== 'ls' && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={run(moveToBrowser)}
+              title="Keep this model in this browser; the file or folder stays on disk as it is"
+            >
+              Move to browser
             </button>
           )}
           {isActive && folderSupported && doc.source !== 'md' && (
