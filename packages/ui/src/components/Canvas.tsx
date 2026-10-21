@@ -723,6 +723,10 @@ function StructuralCanvas(): React.ReactElement {
   // is not on screen any more.
   const registeredViewportFns = useRef<{ getViewport: unknown; setViewport: unknown } | null>(null)
   const registeredFocusNodes = useRef<unknown>(null)
+  // And the zoom keys': left behind by a canvas gone (a table, wiki, matrix,
+  // hierarchy or Warnier view shown), ⌘+ did nothing there, kept the
+  // browser from zooming, and zoomed the gone canvas to NaN.
+  const registeredZoom = useRef<{ zoomIn: unknown; zoomOut: unknown } | null>(null)
   // Gone before its first camera (a slide without a canvas came straight
   // after): it puts nothing on window any more, and takes no slide's focus.
   const unmountedRef = useRef(false)
@@ -732,6 +736,9 @@ function StructuralCanvas(): React.ReactElement {
       unmountedRef.current = true
       const W = window as any
       if (registeredFocusNodes.current && W.__rfFocusNodes === registeredFocusNodes.current) delete W.__rfFocusNodes
+      const zoom = registeredZoom.current
+      if (zoom && W.__radicalZoomIn === zoom.zoomIn) delete W.__radicalZoomIn
+      if (zoom && W.__radicalZoomOut === zoom.zoomOut) delete W.__radicalZoomOut
       const mine = registeredViewportFns.current
       if (!mine) return
       if (W.__rfSetViewport === mine.setViewport) delete W.__rfSetViewport
@@ -915,8 +922,12 @@ function StructuralCanvas(): React.ReactElement {
     }, 100)
 
     // Register global zoom helpers used by the Toolbar zoom buttons.
-    ;(window as any).__radicalZoomIn  = () => { takeCamera(); instance.zoomIn({ duration: 300 }) }
-    ;(window as any).__radicalZoomOut = () => { takeCamera(); instance.zoomOut({ duration: 300 }) }
+    if (unmountedRef.current) return
+    const zoomIn = () => { takeCamera(); instance.zoomIn({ duration: 300 }) }
+    const zoomOut = () => { takeCamera(); instance.zoomOut({ duration: 300 }) }
+    registeredZoom.current = { zoomIn, zoomOut }
+    ;(window as any).__radicalZoomIn  = zoomIn
+    ;(window as any).__radicalZoomOut = zoomOut
     return () => {
       delete (window as any).__radicalZoomIn
       delete (window as any).__radicalZoomOut

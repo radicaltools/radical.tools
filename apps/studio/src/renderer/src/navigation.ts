@@ -75,6 +75,60 @@ export function wikiViewFor(nodeId: string): string | null {
   return wikis[0]?.id ?? null
 }
 
+/** How readily a view of this kind shows a picked element: a diagram (a
+ *  structure view) first, then a table, wiki, hierarchy or Warnier view,
+ *  then a matrix or flow. The smallest view had it, a matrix or flow too. */
+export function pickRank(view: DiagramView): number {
+  const kind = view.kind ?? 'static'
+  if (kind === 'static') return 0
+  if (kind === 'matrix' || kind === 'dynamic') return 2
+  return 1
+}
+
+/** The view a Quick Search pick of `nodeId` opens: the active one when it
+ *  shows it, else the first by pickRank, the smallest within a rank; null
+ *  (All elements) when no view shows it or All elements is shown. */
+export function pickViewFor(nodeId: string, activeViewId: string | null, views: Record<string, DiagramView>, sets: Record<string, Set<string>>): string | null {
+  // All elements (no active view) shows every element: stay on it.
+  if (!activeViewId) return null
+  if (sets[activeViewId]?.has(nodeId)) return activeViewId
+  let best: { id: string; rank: number; size: number } | null = null
+  for (const v of Object.values(views)) {
+    const set = sets[v.id]
+    if (!set?.has(nodeId)) continue
+    const rank = pickRank(v)
+    if (!best || rank < best.rank || (rank === best.rank && set.size < best.size)) best = { id: v.id, rank, size: set.size }
+  }
+  return best?.id ?? null
+}
+
+/** Puts `nodeId` in sight on a wiki or hierarchy view picked for it: the
+ *  wiki shows its page, the hierarchy the level that draws it. A pick there
+ *  selected the element and stayed on the Overview, or on a level that did
+ *  not draw it. */
+export function showOnPage(viewId: string | null, nodeId: string): void {
+  const store = useDiagramStore.getState()
+  const view = viewId ? store.views[viewId] : undefined
+  if (!view) return
+  if (view.kind === 'wiki') {
+    if (store.slideWikiPage) useDiagramStore.setState({ slideWikiPage: null })
+    if ((view.wikiFocusId ?? null) !== nodeId) store.setWikiFocus(view.id, nodeId)
+    return
+  }
+  if (view.kind !== 'treemap') return
+  const nodes = store.c4Nodes
+  const focusId = store.slideTreemapFocus?.viewId === view.id ? store.slideTreemapFocus.focusId : (view.treemapFocusId ?? null)
+  const maxDepth = view.treemapMaxDepth === null ? Infinity : (typeof view.treemapMaxDepth === 'number' && view.treemapMaxDepth > 0 ? view.treemapMaxDepth : 2)
+  // How many levels below the focus the element is (Infinity: not under it).
+  let depth = 0
+  let cur: string | undefined = nodeId
+  while (cur && cur !== focusId) { cur = nodes[cur]?.parentId; depth++ }
+  if (focusId !== null && cur !== focusId) depth = Infinity
+  if (depth >= 1 && depth <= maxDepth) return
+  if (store.slideTreemapFocus) useDiagramStore.setState({ slideTreemapFocus: null })
+  store.setTreemapFocus(view.id, nodes[nodeId]?.parentId ?? null)
+}
+
 type FocusFn = (id: string, opts?: { zoom?: number; duration?: number }) => void
 const FOCUS_ZOOM = 1.2
 
