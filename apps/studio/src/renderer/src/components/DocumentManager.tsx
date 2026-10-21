@@ -158,8 +158,10 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   if (!open) return null
 
   const handleSwitch = (id: string): void => {
-    if (id === activeId || renamingId) return
-    documents.setActiveId(id)
+    if (renamingId) return
+    // The model picked is opened: the dialog stayed open over it.
+    if (id !== activeId) documents.setActiveId(id)
+    onClose()
   }
 
   // Web File System Access API handles lose permission across reloads; a user

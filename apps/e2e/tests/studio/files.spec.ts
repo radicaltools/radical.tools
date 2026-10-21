@@ -31,7 +31,9 @@ test('Open → File… keeps the model in the file and saves changes to it', asy
   await page.getByRole('button', { name: 'File…' }).click()
   await studio.ready()
   await studio.designer()
-  // It opens on All elements, the table of the whole model.
+  // It opens on its first view (decided 2026-10-21; it landed on All elements).
+  await expect(page).toHaveURL(/\/v\/v-context$/)
+  await page.locator('.lp-view-card', { hasText: 'All elements' }).click()
   await studio.row('customer').click()
   await expect(labelField(page)).toHaveValue('Customer')
   await labelField(page).fill('Shopper')
@@ -43,7 +45,8 @@ test('Open → File… keeps the model in the file and saves changes to it', asy
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.locator('.msteps-row').first().click()
   await studio.ready()
-  await expect(studio.row('customer')).toContainText('Shopper')
+  await expect(page).toHaveURL(/\/v\/v-context$/)
+  await expect(studio.node('customer')).toContainText('Shopper')
   await openModels(page)
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.fs')).toBeVisible()
 })

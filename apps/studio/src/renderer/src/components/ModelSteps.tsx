@@ -7,6 +7,7 @@ import { documents, StorageFullError, type DocumentMeta } from '../store/documen
 import { buildFintechSampleRaw } from '../store/fintechSample'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { formatRoute, openInDesigner } from '../route'
+import { openFirstView } from '../navigation'
 import { availableMetamodels } from '@radical/common/metamodel'
 import { parseStructurizrDsl } from '@radical/common/formats/structurizrDsl'
 import type { DiagramData } from '@radical/common/c4'
@@ -77,6 +78,9 @@ function createInBrowser(name: string, data: DiagramData): DocumentMeta | null {
  *  granted again; the click that got here is the gesture the browser asks for. */
 export async function openDocument(id: string): Promise<void> {
   if (documents.awaitsReconnect(id)) await documents.reconnect(id)
+  // The model open already (a Hub link's welcome lists it): it is not
+  // loaded again, so it shows its first view here.
+  if (id === documents.getActiveId()) openFirstView()
   documents.setActiveId(id)
 }
 
