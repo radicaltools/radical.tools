@@ -13,6 +13,11 @@
 //     folder, it refuses to run at all;
 //   • `poll` reports such outside edits so the app can reload promptly.
 //
+// The check for outside edits and the write that follows hold the storage's
+// lock, when it has one: two processes writing one folder within a few
+// milliseconds both found it unchanged, and the second write took the
+// first one's change out while both reported success.
+//
 // Stamps are cheap change markers (mtime + size, whatever the storage offers):
 // only files whose stamp moved are read, and a file counts as changed only when
 // its content differs. Operations run one at a time; a poll that would have to
@@ -29,6 +34,12 @@ export interface MdFolderStorage {
   /** Write a file, creating directories as needed; resolves with its new stamp. */
   write(path: string, content: string): Promise<string>
   remove(path: string): Promise<void>
+  /** Wait for the folder's write turn against other processes writing it
+   *  (a second MCP server, Studio's desktop app); resolves with the call
+   *  that gives it back. A storage that cannot (a browser folder) has none.
+   *  `forRead`: only to read the folder whole, which leaves no trace in a
+   *  folder nobody writes. */
+  lock?(forRead?: boolean): Promise<() => Promise<void>>
 }
 
 export type MdFolderWriteResult =
@@ -94,7 +105,13 @@ export class MdFolderSession {
   /** Read every model file and make that the baseline. */
   readAll(): Promise<FolderFiles> {
     return this.exclusive(async () => {
-      await this.loadBaseline()
+      // Not half way through another process's write.
+      const release = await this.storage.lock?.(true)
+      try {
+        await this.loadBaseline()
+      } finally {
+        await release?.()
+      }
       const files: FolderFiles = {}
       for (const [path, entry] of this.baseline) files[path] = entry.content
       return files
@@ -107,42 +124,51 @@ export class MdFolderSession {
    *  a merge, or when it cannot, nothing is written. */
   write(files: FolderFiles, merge?: MdFolderMerge): Promise<MdFolderWriteResult> {
     return this.exclusive(async () => {
-      // A folder never read in this session (a fresh "save as folder", a
-      // restarted main process): what is on disk now is the baseline.
-      if (!this.loaded) await this.loadBaseline()
-      const stamps = await this.storage.list()
-      const conflict = await this.changedSince(stamps)
-      let merged: { changed: string[]; conflicts: string[] } | undefined
-      if (conflict.length > 0) {
-        const theirs = merge ? await this.readFiles(stamps) : {}
-        const result = merge ? merge(this.baselineFiles(), files, theirs) : null
-        if (!result) {
-          this.observed = stamps
-          this.onExternalChange?.(conflict)
-          return { ok: false, conflict }
-        }
-        // The folder as the merge read it is what the merged files replace.
-        this.baseline = new Map(Object.entries(theirs).map(([path, content]) => [path, { content, stamp: stamps[path] }]))
-        files = result.files
-        merged = { changed: conflict, conflicts: result.conflicts }
+      const release = await this.storage.lock?.()
+      try {
+        return await this.writeLocked(files, merge)
+      } finally {
+        await release?.()
       }
-
-      for (const [path, content] of Object.entries(files)) {
-        if (this.baseline.get(path)?.content === content) continue
-        const stamp = await this.storage.write(path, content)
-        this.baseline.set(path, { content, stamp })
-      }
-      const current: FolderFiles = {}
-      for (const [path, entry] of this.baseline) current[path] = entry.content
-      for (const path of staleMdFolderFiles(current, files)) {
-        await this.storage.remove(path)
-        this.baseline.delete(path)
-      }
-      this.observed = this.baselineStamps()
-      // What came from the other writer is not on the app's screen yet.
-      if (merged) this.onExternalChange?.(merged.changed)
-      return merged ? { ok: true, merged } : { ok: true }
     })
+  }
+
+  private async writeLocked(files: FolderFiles, merge?: MdFolderMerge): Promise<MdFolderWriteResult> {
+    // A folder never read in this session (a fresh "save as folder", a
+    // restarted main process): what is on disk now is the baseline.
+    if (!this.loaded) await this.loadBaseline()
+    const stamps = await this.storage.list()
+    const conflict = await this.changedSince(stamps)
+    let merged: { changed: string[]; conflicts: string[] } | undefined
+    if (conflict.length > 0) {
+      const theirs = merge ? await this.readFiles(stamps) : {}
+      const result = merge ? merge(this.baselineFiles(), files, theirs) : null
+      if (!result) {
+        this.observed = stamps
+        this.onExternalChange?.(conflict)
+        return { ok: false, conflict }
+      }
+      // The folder as the merge read it is what the merged files replace.
+      this.baseline = new Map(Object.entries(theirs).map(([path, content]) => [path, { content, stamp: stamps[path] }]))
+      files = result.files
+      merged = { changed: conflict, conflicts: result.conflicts }
+    }
+
+    for (const [path, content] of Object.entries(files)) {
+      if (this.baseline.get(path)?.content === content) continue
+      const stamp = await this.storage.write(path, content)
+      this.baseline.set(path, { content, stamp })
+    }
+    const current: FolderFiles = {}
+    for (const [path, entry] of this.baseline) current[path] = entry.content
+    for (const path of staleMdFolderFiles(current, files)) {
+      await this.storage.remove(path)
+      this.baseline.delete(path)
+    }
+    this.observed = this.baselineStamps()
+    // What came from the other writer is not on the app's screen yet.
+    if (merged) this.onExternalChange?.(merged.changed)
+    return merged ? { ok: true, merged } : { ok: true }
   }
 
   /** Look for edits made outside the app since the folder was last read,

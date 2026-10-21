@@ -20,14 +20,21 @@ async function selectionDir(root: string, create: boolean): Promise<string | nul
   return dir
 }
 
+/** The model folder's `.radical/` directory, made when missing, with the
+ *  `.gitignore` that keeps it out of version control. */
+export async function editorStateDir(root: string): Promise<string> {
+  const dir = (await selectionDir(root, true))!
+  const ignore = join(resolve(root), SELECTION_GITIGNORE)
+  try { await lstat(ignore) }
+  catch { await writeFile(ignore, SELECTION_GITIGNORE_CONTENT, 'utf-8') }
+  return dir
+}
+
 /** Writes an editor-state file under `.radical/` in a model folder (`path`
  *  relative to the folder), with the `.gitignore` that keeps the directory
  *  out of version control. */
 export async function writeEditorStateFile(root: string, path: string, content: string): Promise<void> {
-  await selectionDir(root, true)
-  const ignore = join(resolve(root), SELECTION_GITIGNORE)
-  try { await lstat(ignore) }
-  catch { await writeFile(ignore, SELECTION_GITIGNORE_CONTENT, 'utf-8') }
+  await editorStateDir(root)
   const file = join(resolve(root), path)
   if (await lstat(file).then((s) => s.isSymbolicLink(), () => false)) throw new Error(`symlink in model path: ${path}`)
   await writeFile(file, content, 'utf-8')
