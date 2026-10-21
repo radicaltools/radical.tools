@@ -37,6 +37,14 @@ export const FOLDER_RULES: ReadonlyArray<{ id: string; description: string; seve
 /** Rules whose findings stop the check: nothing else can be read. */
 const FATAL = new Set(['folder-manifest', 'folder-json', 'folder-conflict'])
 
+/** The folder rule that reads the model, not its files: it runs wherever the
+ *  model does. */
+const STALE_REFERENCE = 'stale-reference'
+
+/** The rules that read the model (checkData), whether it is in a folder or
+ *  in memory. */
+const MODEL_RULE_IDS = new Set([STALE_REFERENCE, ...CHECK_RULES.map((r) => r.id), GOAL_RULE.id])
+
 export interface CheckFinding extends RuleFinding {
   rule: string
   severity: CheckSeverity
@@ -72,9 +80,10 @@ export interface CheckRuleResult {
   /** Findings above the baseline, or any finding of an error rule without one. */
   failed: boolean
   /** The rule did not run: it reads test reports and none was given
-   *  ('no-report'), or the folder could not be read as a model ('no-model').
-   *  Its count says nothing. */
-  notRun?: 'no-report' | 'no-model'
+   *  ('no-report'), the folder could not be read as a model ('no-model'), or
+   *  it reads a folder's files and the model was checked in memory
+   *  (checkModel, 'no-folder'). Its count says nothing. */
+  notRun?: 'no-report' | 'no-model' | 'no-folder'
 }
 
 export interface CheckResult {
@@ -90,6 +99,9 @@ export interface CheckResult {
   unknownGoals: string[]
   /** Each metric the model has something to count for, with its goal. */
   metrics: CheckMetricResult[]
+  /** The goals that were not measured, and why: they read test reports and
+   *  none was given, or the folder could not be read as a model. */
+  goalsNotRun: Array<{ id: string; min: number; notRun: 'no-report' | 'no-model' }>
   nodeCount: number
   relationCount: number
   /** With test reports: what they say about each scenario, fitness
@@ -137,7 +149,10 @@ export function runCheck(files: FolderFiles, config: CheckConfig = {}, options: 
     }
   }
 
-  let model: ModelCheck = { found: [], nodeCount: 0, relationCount: 0, metrics: [], notRun: new Map([...CHECK_RULES, GOAL_RULE].map((r) => [r.id, 'no-model'])) }
+  let model: ModelCheck = {
+    found: [], nodeCount: 0, relationCount: 0, metrics: [], notRun: new Map([...MODEL_RULE_IDS].map((id) => [id, 'no-model'])),
+    goalsNotRun: Object.keys(config.goals ?? {}).filter(isMetricId).map((id) => ({ id, notRun: 'no-model' })),
+  }
   if (!found.some((f) => FATAL.has(f.rule))) model = checkData(deserializeFromMdFolder(files).data, options, config)
 
   const result = settle([...found, ...model.found].map((f) => ({
@@ -156,6 +171,8 @@ interface ModelCheck {
   evidence?: Evidence
   /** The rules that did not run, and why. */
   notRun: Map<string, NonNullable<CheckRuleResult['notRun']>>
+  /** The goals that were not measured, and why. */
+  goalsNotRun: Array<{ id: string; notRun: 'no-report' | 'no-model' }>
 }
 
 function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig): ModelCheck {
@@ -163,7 +180,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
   const nodes = byId(data.nodes)
   const relations = byId(data.relations)
   staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations)
-    .forEach((finding) => found.push({ rule: 'stale-reference', ...finding }))
+    .forEach((finding) => found.push({ rule: STALE_REFERENCE, ...finding }))
   const model = {
     nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), settings: config.rules ?? {},
     ...(options.tests ? { tests: options.tests } : {}),
@@ -179,13 +196,16 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     metrics: goals.metrics,
     ...(evidence ? { evidence } : {}),
     notRun: new Map(options.tests ? [] : CHECK_RULES.filter((r) => r.readsReports).map((r) => [r.id, 'no-report'])),
+    goalsNotRun: goals.notRun.map((id) => ({ id, notRun: 'no-report' })),
   }
 }
 
 /** Checks a model already in memory, as Studio holds it: every rule but the
- *  ones about the folder's files, which only a folder has. */
+ *  ones about the folder's files, which only a folder has. Those are not
+ *  run, so a count of 0 lowers no baseline the CLI still counts against. */
 export function checkModel(data: DiagramData, config: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
   const model = checkData(data, options, config)
+  for (const rule of FOLDER_RULES) if (!MODEL_RULE_IDS.has(rule.id)) model.notRun.set(rule.id, 'no-folder')
   const result = settle(model.found, config, model)
   return model.evidence ? { ...result, evidence: model.evidence } : result
 }
@@ -225,7 +245,7 @@ const keyOf = (f: { rule: string; code?: string }, rules: Record<string, RuleSet
 const settingOf = (setting: RuleSetting | undefined): Exclude<RuleSetting, string> =>
   setting === undefined ? {} : typeof setting === 'string' ? { severity: setting } : setting
 
-function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfig, { nodeCount, relationCount, metrics, notRun }: ModelCheck): CheckResult {
+function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfig, { nodeCount, relationCount, metrics, notRun, goalsNotRun }: ModelCheck): CheckResult {
   const rules = config.rules ?? {}
   const groups = new Map<string, Array<RuleFinding & { rule: string }>>()
   for (const f of found) {
@@ -276,6 +296,7 @@ function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfi
     unknownRules: Object.keys(rules).filter((k) => !RULE_IDS.has(k.split('/')[0])),
     unknownGoals: Object.keys(config.goals ?? {}).filter((k) => !isMetricId(k)),
     metrics,
+    goalsNotRun: goalsNotRun.map((g) => ({ ...g, min: config.goals![g.id].min })),
     nodeCount,
     relationCount,
   }

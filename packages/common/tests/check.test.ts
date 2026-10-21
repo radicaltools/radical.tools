@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHECK_RULES, FOLDER_RULES, formatCheckGithub, formatCheckText, ratchetConfig, runCheck, type CheckConfig } from '../src/check'
+import { CHECK_RULES, FOLDER_RULES, checkModel, formatCheckGithub, formatCheckText, ratchetConfig, runCheck, type CheckConfig } from '../src/check'
 import { serializeToMdFolderWithPaths, type FolderFiles } from '../src/formats/mdFolder'
 import { builtInC4Metamodel, builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
@@ -200,6 +200,24 @@ describe('radical check: config', () => {
     expect(result.rules.find((r) => r.id === 'requirement-without-scenario')).toMatchObject({ count: 0, notRun: 'no-model' })
     expect(ratchetConfig(config, result).lowered).toEqual([])
     expect(formatCheckText(result, { folder: 'm' })).toContain('– requirement-without-scenario  not run: the folder is no model (max 5)')
+  })
+
+  it('ratchets no stale-reference baseline on a folder that is no model', () => {
+    const config: CheckConfig = { rules: { 'stale-reference': { max: 1 } } }
+    const files = filesOf(complete())
+    files['relations.json'] = '<<<<<<< HEAD\n[]\n=======\n[]\n>>>>>>> other\n'
+    const result = runCheck(files, config)
+    expect(result.rules.find((r) => r.id === 'stale-reference')).toMatchObject({ count: 0, notRun: 'no-model' })
+    expect(ratchetConfig(config, result).lowered).toEqual([])
+  })
+
+  it('counts no folder rule on a model in memory, so neither Ratchet lowers its baseline', () => {
+    const config: CheckConfig = { rules: { 'folder-not-a-node': { severity: 'error', max: 1 }, 'stale-reference': { max: 3 } } }
+    const result = checkModel(complete(), config)
+    expect(result.rules.find((r) => r.id === 'folder-not-a-node')).toMatchObject({ count: 0, notRun: 'no-folder', failed: false })
+    // Views, sequences and slides are in memory too: that one is counted.
+    expect(result.rules.find((r) => r.id === 'stale-reference')?.notRun).toBeUndefined()
+    expect(ratchetConfig(config, result).lowered).toEqual([{ id: 'stale-reference', from: 3, to: 0 }])
   })
 
   it('has unique rule ids', () => {

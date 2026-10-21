@@ -152,6 +152,43 @@ describe('radical check', () => {
     expect((await run(cwd, 'check', 'model', '--evidence', 'e.json')).code).toBe(2)
   })
 
+  it('reads a check.json saved with a byte-order mark', async () => {
+    const cwd = await workspace()
+    await writeFile(join(cwd, 'model/check.json'), '\ufeff' + JSON.stringify({ rules: { 'requirement-without-scenario': 'error' } }))
+    const { code, out, err } = await run(cwd, 'check', 'model')
+    expect(err).toBe('')
+    expect(code).toBe(1)
+    expect(out).toContain('✖ 1 error, 0 warnings')
+  })
+
+  it('exits 2 on a report with no test case, naming it, and keeps the test results it had', async () => {
+    const cwd = await workspace()
+    await writeFile(join(cwd, 'green.json'), JSON.stringify({ testResults: [{ name: `${cwd}/src/pay.test.ts`, assertionResults: [{ ancestorTitles: [], title: 'pays', status: 'passed' }] }] }))
+    expect((await run(cwd, 'check', 'model', '--report', 'green.json')).code).toBe(0)
+    const kept = await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8')
+
+    await writeFile(join(cwd, 'notes.xml'), '<?xml version="1.0"?><notes><note>not a report</note></notes>')
+    const xml = await run(cwd, 'check', 'model', '--report', 'notes.xml')
+    expect(xml.code).toBe(2)
+    expect(xml.err).toContain('notes.xml')
+    expect(xml.err).toContain('no test case')
+    await mkdir(join(cwd, 'empty'))
+    const dir = await run(cwd, 'check', 'model', '--report', 'empty')
+    expect(dir.code).toBe(2)
+    expect(dir.err).toContain('empty')
+    // With a good report beside it, too: the check does not run on part of the input.
+    expect((await run(cwd, 'check', 'model', '--report', 'green.json', '--report', 'notes.xml')).code).toBe(2)
+    expect(await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8')).toBe(kept)
+  })
+
+  it('says that a goal on what the tests verify did not run without a report', async () => {
+    const cwd = await workspace()
+    await writeFile(join(cwd, 'model/check.json'), JSON.stringify({ goals: { 'requirements-verified': { min: 80 }, 'requirements-satisfied': { min: 50 } } }))
+    const { code, out } = await run(cwd, 'check', 'model')
+    expect(code).toBe(0)
+    expect(out).toContain('Goals:\n  ✓ requirements-satisfied  100% (1 of 1, min 50%)\n  – requirements-verified  not run: no test report (min 80%)')
+  })
+
   it('lists the rules', async () => {
     const { code, out } = await run(await workspace(), 'check', '--list-rules')
     expect(code).toBe(0)

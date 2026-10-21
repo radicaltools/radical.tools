@@ -156,11 +156,17 @@ const METRIC_IDS = new Set(CHECK_METRICS.map((m) => m.id))
 export const isMetricId = (id: string): boolean => METRIC_IDS.has(id)
 
 /** Each metric the model has something to count for, with its goal, and a
- *  goal-unmet finding for each goal it misses. */
-export function measureGoals(ctx: MeasureContext, goals: Record<string, GoalSetting>): { metrics: CheckMetricResult[]; findings: RuleFinding[] } {
+ *  goal-unmet finding for each goal it misses. `notRun`: the metrics with a
+ *  goal that only test reports measure, when there are none. */
+export function measureGoals(ctx: MeasureContext, goals: Record<string, GoalSetting>): { metrics: CheckMetricResult[]; findings: RuleFinding[]; notRun: string[] } {
   const metrics: CheckMetricResult[] = []
   const findings: RuleFinding[] = []
+  const notRun: string[] = []
   for (const metric of CHECK_METRICS) {
+    if (metric.tests && !ctx.evidence) {
+      if (goals[metric.id] !== undefined) notRun.push(metric.id)
+      continue
+    }
     const value = metric.measure(ctx)
     if (!value) continue
     const min = goals[metric.id]?.min
@@ -176,5 +182,5 @@ export function measureGoals(ctx: MeasureContext, goals: Record<string, GoalSett
       })
     }
   }
-  return { metrics, findings }
+  return { metrics, findings, notRun }
 }
