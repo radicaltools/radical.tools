@@ -4160,7 +4160,11 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       updateStepDescription(sequenceId, idx, description) {
-        if (!get().sequences[sequenceId]) return
+        const current = get().sequences[sequenceId]
+        if (!current || idx < 0 || idx >= current.relationIds.length) return
+        // A note left as it was is no edit: a click into it and out made an
+        // undo step, and in a milestone asked how to save it.
+        if ((current.stepDescriptions?.[idx] || undefined) === (description || undefined)) return
         get()._pushUndo()
         set((state) => {
           const seq = state.sequences[sequenceId]

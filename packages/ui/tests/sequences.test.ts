@@ -205,6 +205,23 @@ describe('updateStepDescription', () => {
     expect(seq.stepDescriptions?.[0]).toBeUndefined()
   })
 
+  it('is no edit when the note stays as it was', () => {
+    // A click into a note and out wrote it back unchanged: an undo step, and
+    // in a milestone the question how to save changes nobody had made.
+    const seqId = useDiagramStore.getState().addSequence('S')
+    const relIds = Object.keys(useDiagramStore.getState().c4Relations).slice(0, 2)
+    for (const r of relIds) useDiagramStore.getState().toggleRelationInSequence(seqId, r)
+    useDiagramStore.getState().updateStepDescription(seqId, 0, 'note')
+    const before = useDiagramStore.getState().sequences[seqId]
+    for (const [idx, text] of [[0, 'note'], [1, ''], [5, '']] as const) {
+      useDiagramStore.getState().updateStepDescription(seqId, idx, text)
+    }
+    expect(useDiagramStore.getState().sequences[seqId]).toBe(before)
+    // One Undo takes the note back, not a write that changed nothing.
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().sequences[seqId].stepDescriptions?.[0]).toBeUndefined()
+  })
+
   it('preserves descriptions when removing a step', () => {
     const seqId = useDiagramStore.getState().addSequence('S')
     const relIds = Object.keys(useDiagramStore.getState().c4Relations).slice(0, 3)
