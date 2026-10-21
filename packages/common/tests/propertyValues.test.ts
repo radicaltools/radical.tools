@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation } from '../src/c4'
-import { builtInGovernanceMetamodel, validateModel, type Metamodel } from '../src/metamodel'
+import { builtInC4Metamodel, builtInGovernanceMetamodel, inferRelationType, validateModel, type Metamodel } from '../src/metamodel'
 
 // What the validation says about the values elements and relations hold:
 // a required one missing, one the metamodel no longer offers, several
@@ -71,5 +71,32 @@ describe('a relation without a type', () => {
     const issues = validateModel(byId(nodes), byId(relations), mm).filter((i) => i.id.startsWith('untyped-rel'))
     expect(issues.map((i) => i.id)).toEqual(['untyped-rel:untyped'])
     expect(issues[0].message).toBe('Relation "order" → "customer" has no type; give it one of "Part of", "References".')
+  })
+
+  // Decided 2026-10-21 (runs 65 to 69): a type with no pairs fits every
+  // pair, and counts as one of the types that fit (it was left out: an
+  // untyped relation between two of the C4 types it shares went unflagged).
+  const withAnyPair = (): Metamodel => {
+    const mm = builtInC4Metamodel()
+    mm.relationTypes.misc = { id: 'misc', label: 'Misc', allowedPairs: [] }
+    return mm
+  }
+
+  it('is flagged where an any-pair type fits besides another', () => {
+    const nodes = [node('shop', 'system'), node('user', 'person'), node('db', 'database')]
+    const relations: C4Relation[] = [
+      { id: 'two', sourceId: 'user', targetId: 'shop' },
+      // Only the any-pair type fits: that one is meant.
+      { id: 'one', sourceId: 'db', targetId: 'user' },
+    ]
+    const issues = validateModel(byId(nodes), byId(relations), withAnyPair()).filter((i) => i.id.startsWith('untyped-rel'))
+    expect(issues.map((i) => i.id)).toEqual(['untyped-rel:two'])
+    expect(issues[0].message).toBe('Relation "user" → "shop" has no type; give it one of "Interacts", "Misc".')
+  })
+
+  it('is given the one type that fits, an any-pair type included', () => {
+    expect(inferRelationType(withAnyPair(), 'database', 'person')).toBe('misc')
+    expect(inferRelationType(withAnyPair(), 'person', 'system')).toBeUndefined()
+    expect(inferRelationType(builtInC4Metamodel(), 'person', 'system')).toBe('interacts')
   })
 })

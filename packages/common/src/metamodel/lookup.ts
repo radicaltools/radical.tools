@@ -1,6 +1,6 @@
 // ─── Metamodel lookup helpers (with safe fallback for unknown types) ───────
 
-import { Metamodel, NodeTypeDef, PropertyDef } from './types'
+import { Metamodel, NodeTypeDef, PropertyDef, RelationTypeDef } from './types'
 
 /** Check whether a property should be visible given the node's current values. */
 export function isPropertyVisible(prop: PropertyDef, node: Record<string, unknown>): boolean {
@@ -31,22 +31,32 @@ export function isRelationAllowed(
   return rts.some(rt => rt.allowedPairs.some(p => p.from === fromType && p.to === toType))
 }
 
+/** The relation types a relation from `fromType` to `toType` can have: the
+ *  ones that list the pair, and the ones with no pairs, which fit every
+ *  pair (they were left out, and a relation only such a type let through
+ *  was made with no type, unasked). */
+export function relationTypesFitting(
+  metamodel: Metamodel | undefined,
+  fromType: string | undefined,
+  toType: string | undefined,
+): RelationTypeDef[] {
+  if (!metamodel) return []
+  return Object.values(metamodel.relationTypes).filter(
+    rt => rt.allowedPairs.length === 0 || rt.allowedPairs.some(p => p.from === fromType && p.to === toType),
+  )
+}
+
 /**
- * Returns the id of the unique restricted relation type that permits the
- * given (fromType, toType) pair, or `undefined` when zero or multiple types
- * match.  "Restricted" means the type's `allowedPairs` list is non-empty.
- * Catch-all types (empty allowedPairs) are ignored so that e.g. the `uses`
- * type does not shadow a more specific one.
+ * Returns the id of the one relation type that fits the given (fromType,
+ * toType) pair (relationTypesFitting: an any-pair type included), or
+ * `undefined` when none or several do: then which one is the user's to say.
  */
 export function inferRelationType(
   metamodel: Metamodel | undefined,
   fromType: string,
   toType: string,
 ): string | undefined {
-  if (!metamodel) return undefined
-  const matches = Object.values(metamodel.relationTypes).filter(
-    rt => rt.allowedPairs.length > 0 && rt.allowedPairs.some(p => p.from === fromType && p.to === toType),
-  )
+  const matches = relationTypesFitting(metamodel, fromType, toType)
   return matches.length === 1 ? matches[0].id : undefined
 }
 

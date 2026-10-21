@@ -378,3 +378,83 @@ test('a requirement\'s sentence rewritten: unchanged it writes nothing, to a sta
   await expect.poll(async () => (await stored('ship')).precondition_state).toBe('confirmed')
   await expect(page.locator('.ears-sentence [title="The state it points at (While in state)"]')).toHaveText('the Order is Confirmed')
 })
+
+// A governance model with domains, aggregates and a sequence (run 68).
+const DOMAINS = (() => {
+  const n = (id: string, type: string, label: string, parentId: string | null, x: number, y: number, extra: Record<string, unknown> = {}) =>
+    ({ id, type, label, description: '', technology: '', ...(parentId ? { parentId } : {}), x, y, width: 220, height: 120, collapsed: false, external: false, ...extra })
+  return JSON.stringify({
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+    nodes: [
+      n('p1', 'person', 'Customer', null, 0, 0, { width: 160, height: 160 }),
+      n('s1', 'system', 'Shop', null, 300, 0, { width: 600, height: 300 }),
+      n('c1', 'container', 'API', 's1', 40, 60),
+      n('c2', 'database', 'DB', 's1', 320, 60),
+      n('d1', 'domain', 'Ordering', null, 0, 500, { width: 560, height: 300 }),
+      n('e1', 'entity', 'Order', 'd1', 40, 60, { kind: 'aggregate-root' }),
+      n('e3', 'entity', 'Line', 'd1', 300, 60, { kind: 'entity' }),
+      n('d2', 'domain', 'Billing', null, 700, 500, { width: 320, height: 300 }),
+      n('e2', 'entity', 'Invoice', 'd2', 40, 60, { kind: 'aggregate-root' }),
+    ],
+    relations: [
+      { id: 'r1', sourceId: 'p1', targetId: 'c1', relationType: 'interacts', label: 'orders' },
+      { id: 'r2', sourceId: 'c1', targetId: 'c2', relationType: 'interacts', label: 'stores' },
+      { id: 'r3', sourceId: 'd1', targetId: 'd2', relationType: 'depends-on', label: 'bills' },
+      { id: 'r4', sourceId: 'e3', targetId: 'e1', relationType: 'part-of', label: '' },
+    ],
+    sequences: [{ id: 'seq1', name: 'Order flow', relationIds: ['r1', 'r2'], stepDescriptions: ['orders', 'stores'] }],
+    views: [{ id: 'v-wiki', name: 'Wiki', kind: 'wiki', nodeIds: [], positions: {} }],
+  })
+})()
+
+test.describe('the wiki keeps the metamodel', () => {
+  test.beforeEach(async ({ studio }) => {
+    await studio.seedDocument(DOMAINS)
+  })
+
+  // Item 241: the relation editor offered "generic" between two domains,
+  // which made a relation with no type that Validation flags.
+  test('a relation\'s type is changed among the types that fit, never to none', async ({ page, studio }) => {
+    await studio.open('v-wiki/f/d2')
+    await page.getByRole('link', { name: 'Ordering' }).last().click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Edit relationship' }).click()
+    const pill = page.locator('.wiki-rel-editor .wiki-rel-pill')
+    await pill.locator('.wiki-inline-view').click()
+    await expect(pill.locator('select option')).toHaveText(['Depends on', 'Partnership'])
+  })
+
+  // Item 241: Add relationship offered Part of… from one aggregate root to
+  // another (the canvas and the card leave it out there).
+  test('Add relationship offers Part of only from a part to an aggregate root', async ({ page, studio }) => {
+    await studio.open('v-wiki/f/e2')
+    await page.getByRole('button', { name: 'Edit Invoice' }).click()
+    await page.getByRole('menuitem', { name: 'Add relationship' }).click()
+    await expect(page.getByRole('menuitem').first()).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: /part of/i })).toHaveCount(0)
+  })
+
+  // Decided 2026-10-21 (runs 65 to 69): the wiki's Delete asks as the
+  // canvas does, counting the relations and sequence steps that go, and
+  // Undo brings it all back.
+  test('Delete asks as the canvas does, and Undo brings everything back', async ({ page, studio }) => {
+    await studio.open('v-wiki/f/c1')
+    const native: string[] = []
+    page.on('dialog', (d) => { native.push(d.message()); void d.dismiss() })
+    await page.getByRole('button', { name: 'Edit API' }).click()
+    await page.getByRole('menuitem', { name: 'Delete' }).click()
+    const option = page.getByRole('button', { name: /Remove from model/ })
+    await expect(option).toContainText('1 element and 2 relations')
+    await expect(option).toContainText('2 sequence steps along its relations go too')
+    await expect(page.getByText(/cannot be undone/)).toHaveCount(0)
+    await option.click()
+    await expect.poll(async () => (await studio.storedDoc()).nodes.some((n) => n.id === 'c1')).toBe(false)
+    await expect(page.locator('.wiki-title')).toHaveText('Shop')
+    await page.locator('.wiki-title').click()
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect.poll(async () => {
+      const doc = await studio.storedDoc() as unknown as { nodes: { id: string }[]; relations: { id: string }[]; sequences: { relationIds: string[] }[] }
+      return [doc.nodes.some((n) => n.id === 'c1'), doc.relations.length, doc.sequences[0].relationIds]
+    }).toEqual([true, 4, ['r1', 'r2']])
+    expect(native).toEqual([])
+  })
+})

@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramView } from '@radical/common/c4'
-import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { useDiagramStore } from '../src/store/diagramStore'
 
 const s = useDiagramStore.getState
@@ -71,5 +71,28 @@ describe('a relation drawn where several types fit', () => {
     connect('order', 'customer')
     expect(s().relationTypeChoice).toBeNull()
     expect(Object.values(s().c4Relations)).toEqual([expect.objectContaining({ relationType: 'references' })])
+  })
+})
+
+// Decided 2026-10-21 (runs 65 to 69): a relation type with no pairs fits
+// every pair. Where only it fits, a new relation gets it (Alt-drag made one
+// with no type, unasked); where it fits besides another, Studio asks.
+describe('a relation drawn with an any-pair type in the metamodel', () => {
+  beforeEach(() => {
+    const metamodel = builtInC4Metamodel()
+    metamodel.relationTypes.misc = { id: 'misc', label: 'Misc', allowedPairs: [] }
+    s().loadDiagram({ nodes: [node('user', 'person'), node('shop', 'system'), node('db', 'database')], relations: [], views: [], metamodel })
+  })
+
+  it('gets that type where only it fits', () => {
+    connect('db', 'user')
+    expect(s().relationTypeChoice).toBeNull()
+    expect(Object.values(s().c4Relations)).toEqual([expect.objectContaining({ sourceId: 'db', targetId: 'user', relationType: 'misc' })])
+  })
+
+  it('asks where it fits besides another', () => {
+    connect('user', 'shop')
+    expect(Object.values(s().c4Relations)).toEqual([])
+    expect(s().relationTypeChoice).toEqual({ sourceId: 'user', targetId: 'shop', types: ['interacts', 'misc'] })
   })
 })

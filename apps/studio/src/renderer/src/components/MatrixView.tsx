@@ -7,7 +7,7 @@ import {
 } from '@radical/ui/store/diagramStore'
 import type { C4Node } from '@radical/common/c4'
 import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
-import { isRelationAllowed } from '@radical/common/metamodel'
+import { isRelationAllowed, relationTypeKeepsAggregates, relationTypesFitting } from '@radical/common/metamodel'
 import { viewShowsEveryNode } from '@radical/common/c4'
 import { chainDrawn, chainRelationFor } from '@radical/common/viewPipeline'
 import { viewExpandedSet } from '@radical/layout/viewInput'
@@ -59,6 +59,9 @@ export function MatrixView(): React.ReactElement {
   // ── Multi-relation popup ──────────────────────────────────────────────────
   type PopupState = {
     relIds: string[]
+    /** An empty cell where several relation types fit: the types to pick
+     *  the new relation's from, in place of the cell's relations. */
+    types?: string[]
     sourceNode: C4Node
     targetNode: C4Node
     x: number
@@ -233,6 +236,19 @@ export function MatrixView(): React.ReactElement {
         pushNotification(`Not added: this matrix shows only the relations its filter follows, and none leads from ${source.label} to ${target.label}.`, 'error')
         return
       }
+      // Several types fit the pair: which one is the user's to say, as on
+      // the canvas (added with none, Validation flagged it).
+      if (!made.relationType) {
+        const types = relationTypesFitting(metamodel, source.type, target.type)
+          .filter((rt) => relationTypeKeepsAggregates(rt.id, source, target))
+          .map((rt) => rt.id)
+        if (types.length > 1) {
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+          setPopup({ relIds: [], types, sourceNode: source, targetNode: target, x: rect.left + rect.width / 2, y: rect.bottom + 4, above: rect.top })
+          return
+        }
+        if (types.length === 1) made.relationType = types[0]
+      }
       addRelation({ sourceId: source.id, targetId: target.id, ...made })
       pushNotification(`Added relation: ${source.label} \u2192 ${target.label}`, 'info')
     },
@@ -358,6 +374,22 @@ export function MatrixView(): React.ReactElement {
             <span className="mx-popup-to">{popup.targetNode.label}</span>
           </div>
           <ul className="mx-popup-list">
+            {popup.types?.map((t) => (
+              <li key={t} className="mx-popup-item">
+                <button
+                  className="mx-popup-select"
+                  title={metamodel?.relationTypes[t]?.description}
+                  onClick={() => {
+                    addRelation({ sourceId: popup.sourceNode.id, targetId: popup.targetNode.id, relationType: t })
+                    pushNotification(`Added relation: ${popup.sourceNode.label} \u2192 ${popup.targetNode.label}`, 'info')
+                    setPopup(null)
+                  }}
+                >
+                  <span className="mx-popup-dot" style={{ background: relColor(t) }} />
+                  <span className="mx-popup-rel-label">{relLabel(t)}</span>
+                </button>
+              </li>
+            ))}
             {popup.relIds.map((rid) => {
               const r = relations[rid]
               if (!r) return null
