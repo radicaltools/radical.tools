@@ -6342,9 +6342,35 @@ export const useDiagramStore = create<DiagramStore>()(
           const name = st.snapshots.find((m) => m.id === id)?.name ?? id
           get().pushNotification(`The milestone "${name}" was deleted outside Studio: the edits made in it and not saved are gone.`, 'warning')
         }
-        if (opts?.outsideChange && st.appMode === 'designer' && !st.activeSnapshotId && !st.presentationActive) {
+        // The metamodel editor edits Designer's model in the store; Viewer,
+        // Presenter and the Inspector park it (ParkedDesigner). The history
+        // was forgotten when the agent wrote while one of them was open.
+        const designerShown = st.appMode === 'designer' || st.appMode === 'metamodel'
+        const parked = typeof window !== 'undefined' && !designerShown ? (window as any).__preModeLayout as ParkedDesigner | undefined : undefined
+        if (opts?.outsideChange && designerShown && !st.activeSnapshotId && !st.presentationActive) {
           _historyRebased(_captureState(st))
-        } else if (opts?.outsideChange && st.appMode === 'designer' && milestone && !st.presentationActive) {
+        } else if (opts?.outsideChange && parked) {
+          const live = parked.activeSnapshotId && parked.liveBackup ? parked.liveBackup : null
+          const now: HistoryEntry = {
+            c4Nodes: live ? atDefaultPositions(Object.values(live.nodes), parked.defaultPositions) : parked.c4Nodes,
+            c4Relations: live ? live.relations : parked.c4Relations,
+            views: parked.views,
+            defaultLayoutConstraints: st.defaultLayoutConstraints,
+            defaultEdgeStyle: st.defaultEdgeStyle,
+            activeViewId: live ? null : parked.activeViewId,
+            defaultPositions: parked.defaultPositions,
+            sequences: live ? live.sequences ?? parked.sequences : parked.sequences,
+            hubTemplates: st.hubTemplates,
+          }
+          // A milestone shown in Designer: its own steps start again, the
+          // live model's make their change on it as it is now.
+          if (!live) _historyRebased(now)
+          else {
+            _undoStack.length = 0
+            _redoStack.length = 0
+            if (_liveHistory) _historyRebased(now, [_liveHistory.undo, _liveHistory.redo])
+          }
+        } else if (opts?.outsideChange && designerShown && milestone && !st.presentationActive) {
           // The milestone's steps stay, unless it was changed too; the live
           // model's, parked, make their change on it as it is now.
           if (milestone.changed) { _undoStack.length = 0; _redoStack.length = 0 }

@@ -239,6 +239,23 @@ describe('Undo after an outside change', () => {
     expect(at('b')).toEqual({ x: 900, y: 400 })
   })
 
+  // The history was forgotten when the agent wrote while Designer was left
+  // for the Inspector, the metamodel editor, Viewer or Presenter.
+  for (const mode of ['inspector', 'metamodel', 'viewer', 'presenter'] as const) {
+    it(`outlives an outside change while the ${mode} is open`, () => {
+      s().updateNode('a', { label: 'Shop' })
+      s().setAppMode(mode)
+      outsideChange((d) => { d.nodes.find((n) => n.id === 'b')!.label = 'Bank' })
+      s().setAppMode('designer')
+      expect(s().canUndo).toBe(true)
+      s().undo()
+      expect(label('a')).toBe('a')
+      expect(label('b')).toBe('Bank')
+      s().redo()
+      expect(label('a')).toBe('Shop')
+    })
+  }
+
   it('another model loaded still forgets the history', () => {
     s().updateNode('a', { label: 'Shop' })
     s().loadDiagram(model())
