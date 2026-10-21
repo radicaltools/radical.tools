@@ -4,21 +4,13 @@ import { onExploration, useDiagramStore } from '../store/diagramStore'
 
 /**
  * The bar of an exploration (Explore from here) over the canvas, where a
- * view shows its name: + 1 level, Save as view… (Designer only: Viewer
- * keeps nothing) and × to close it. Save as view asks a name and a folder.
+ * view shows its name: Save as view… (Designer only: Viewer keeps nothing)
+ * and × to close it. Save as view asks a name and a folder. Each element
+ * grows the exploration by its own + (ExploreMenu).
  */
 export function ExploreBar(): React.ReactElement | null {
   const exploration = useDiagramStore((s) => (onExploration(s) ? s.exploration : null))
   const appMode = useDiagramStore((s) => s.appMode)
-  // + 1 level is the + of every element on the last level.
-  const hasMore = useDiagramStore((s) => {
-    const x = s.exploration
-    if (!x) return false
-    const listed = x.nodeIds.filter((id) => !!s.c4Nodes[id])
-    const last = Math.max(0, ...listed.map((id) => x.levels[id] ?? 0))
-    return listed.some((id) => (x.levels[id] ?? 0) === last && (s.exploreMore?.[id] ?? 0) > 0)
-  })
-  const exploreLevel = useDiagramStore((s) => s.exploreLevel)
   const closeExploration = useDiagramStore((s) => s.closeExploration)
   const saveExploration = useDiagramStore((s) => s.saveExploration)
   const views = useDiagramStore((s) => s.views)
@@ -44,10 +36,6 @@ export function ExploreBar(): React.ReactElement | null {
       <span className="explore-bar-name">
         Explore: <strong>{exploration.name.replace(/^Explore: /, '')}</strong>
       </span>
-      <button type="button" className="explore-bar-btn" onClick={exploreLevel} disabled={!hasMore}
-        title="Show the elements related to every element of the last level, one level further">
-        + 1 level
-      </button>
       {canSave && (
         <button type="button" className="explore-bar-btn" aria-expanded={saving !== null}
           onClick={() => setSaving(saving ? null : { name: `${rootLabel ?? 'Exploration'} context`, folder: '' })}

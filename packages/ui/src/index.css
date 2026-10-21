@@ -4648,11 +4648,17 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* ── Explore from here ─────────────────────────────────────────────────────
    An exploration's + on each element (how many related elements it does
    not show yet), and its bar where a view shows its name. */
-.explore-more {
+.explore-more-group {
   position: absolute;
   top: 50%;
   right: -15px;
   transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 6;
+}
+.explore-more {
   min-width: 30px;
   height: 22px;
   padding: 0 6px;
@@ -4666,7 +4672,55 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
   cursor: pointer;
   z-index: 6;
 }
-.explore-more:hover { background: var(--accent); color: #fff; }
+.explore-more:hover, .explore-more[aria-expanded="true"] { background: var(--accent); color: #fff; }
+.explore-fold { font-size: 14px; }
+.explore-menu {
+  position: absolute;
+  z-index: 120;
+  min-width: 300px;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.explore-menu button { font-size: 12px; cursor: pointer; }
+.explore-menu-title { font-size: 11px; color: var(--text-muted); }
+.explore-menu-all, .explore-menu-show {
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-surface, var(--bg-panel));
+  color: var(--text-primary);
+}
+.explore-menu-all { align-self: flex-start; font-weight: 600; }
+.explore-menu-show { align-self: flex-end; background: var(--accent); border-color: var(--accent); color: #fff; }
+.explore-menu-show:disabled { opacity: 0.4; cursor: default; }
+.explore-menu-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.explore-menu-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.explore-menu-head { font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 2px 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.explore-menu-row { display: flex; align-items: center; gap: 4px; }
+.explore-menu-add {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-primary);
+  text-align: left;
+}
+.explore-menu-add:hover, .explore-menu-add:focus-visible { background: var(--bg-surface, rgba(127, 127, 127, 0.15)); outline: none; }
+.explore-menu-note { color: var(--text-muted); }
+.explore-menu-count { color: var(--text-muted); }
 .explore-bar {
   position: absolute;
   top: 8px;

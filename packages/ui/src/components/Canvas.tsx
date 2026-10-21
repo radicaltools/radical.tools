@@ -30,6 +30,7 @@ import { noteUserCamera } from '../store/userCamera'
 import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
 import { ExploreBar } from './ExploreBar'
+import { ExploreMenu } from './ExploreMenu'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
 import { newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
 import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
@@ -1544,6 +1545,7 @@ function StructuralCanvas(): React.ReactElement {
       </ReactFlow>
 
       <RelationTypeMenu containerRef={containerRef} />
+      <ExploreMenu containerRef={containerRef} />
 
       {connectSource && connectMouse && (
         <ConnectionPreviewLine
