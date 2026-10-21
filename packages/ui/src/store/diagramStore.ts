@@ -3155,7 +3155,7 @@ export const useDiagramStore = create<DiagramStore>()(
       })
       if (node.parentId) get().fitParentToChildren(node.parentId)
       get()._sync()
-      _liveLayout?.invalidate()
+      _liveLayout?.invalidate(node.parentId ? [id, node.parentId] : [id])
       return id
     }
 
@@ -3378,7 +3378,9 @@ export const useDiagramStore = create<DiagramStore>()(
           get().fitParentToChildren(node.parentId)
         }
         get()._sync()
-        _liveLayout?.invalidate()
+        // It stays where it was dropped; what it (or the parent it grew,
+        // where this canvas does not draw it) covers is pushed clear.
+        _liveLayout?.invalidate(node.parentId ? [id, node.parentId] : [id])
         return id
       },
 
@@ -3408,7 +3410,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const parents = new Set(ids.map((id) => get().c4Nodes[id]?.parentId).filter((p): p is string => !!p))
         for (const parentId of parents) get().fitParentToChildren(parentId)
         get()._sync()
-        _liveLayout?.invalidate()
+        _liveLayout?.invalidate([...ids, ...parents])
         return ids
       },
 
@@ -4846,9 +4848,9 @@ export const useDiagramStore = create<DiagramStore>()(
         const id = uid()
         set((state) => { model.insertAlignment(state, viewId, id, axis, ids, ordered) })
         get()._enforceLayoutConstraints()
-        // The members were snapped onto their line: the physics settles them
-        // there, with what they now touch; the rest of the diagram stays.
-        _liveLayout?.reset(ids)
+        // The members were snapped onto their line: what they now cover is
+        // pushed clear; the rest of the diagram stays.
+        _liveLayout?.reset([], ids)
         return id
       },
 
@@ -4866,7 +4868,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const id = uid()
         set((state) => { model.insertGrid(state, viewId, id, ids, cols) })
         get()._arrangeGrid(id)
-        _liveLayout?.reset(ids)
+        _liveLayout?.reset([], ids)
         return id
       },
 
@@ -4884,7 +4886,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { model.setGridColumns(state, viewId, id, columns) })
         if (viewId === get().activeViewId) {
           get()._arrangeGrid(id)
-          _liveLayout?.reset(c.nodeIds)
+          _liveLayout?.reset([], c.nodeIds)
         }
       },
 
@@ -4930,7 +4932,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { model.setAlignmentOrder(state, viewId, id, ids) })
         if (viewId === get().activeViewId) {
           get()._enforceLayoutConstraints()
-          _liveLayout?.reset(c.nodeIds)
+          _liveLayout?.reset([], c.nodeIds)
         }
       },
 

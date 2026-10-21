@@ -610,16 +610,6 @@ interface Known { rule: string; match: (trace: Action[], v: Violation, resolved:
 const lastAction = (trace: Action[]): Action['a'] | undefined => trace[trace.length - 1]?.a
 const KNOWN: Known[] = [
   {
-    // Bookstore dragged by a pixel (pinned), then a component dropped into
-    // Web App near its right edge: Web App grows 210 → 260.7 px wide, onto
-    // API 80 px to its right; a pin holds what is in the container, so the
-    // physics moves nothing. Without the pin the add makes room.
-    rule: 'geometry',
-    // The same for a move into a container that grows next to a pinned one.
-    match: (t, v) => !!v.facts?.pinned && !!v.facts.overlap && ['add', 'reparent', 'collapse', 'redo', 'undo'].includes(lastAction(t) ?? ''),
-    note: 'K1: what grows next to or inside a pinned element is left over its neighbour (IMPROVEMENTS "Calm drags and pins" item 2)',
-  },
-  {
     // A container dropped into Payment Provider, then Payment Provider and
     // Bookstore kept in a row: the physics frames Bookstore with 60 px over
     // its children; read again, the frame is refitted with 120 (top 333.5 →
@@ -660,14 +650,6 @@ const KNOWN: Known[] = [
     note: 'K3b: a move into another parent grows the parent over its neighbour on a view it was not made on (new)',
   },
   {
-    // A group dropped on the bookstore's All elements at (310, 136): drawn
-    // 360 × 220 at (50, −41), 55 px over Customer; a system dropped there
-    // moves clear.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'add' && !!v.facts?.overlap && !v.facts.pinned,
-    note: 'K4: an element dropped where there is no room for it stays over its neighbours (new)',
-  },
-  {
     // API (no children: drawn 240 × 160, the model 300 × 200) dropped 81 px
     // right: drawn at x 371, saved at 401; the next rebuild (a fold, a
     // reload) draws it at 401 and 20 px lower, 1 px over Orders DB.
@@ -696,13 +678,6 @@ const KNOWN: Known[] = [
     note: 'K5c: a drag of a container moves a member of a row in it out of it, the row spaced by a container drawn without children (new)',
   },
   {
-    // API and Orders DB in a row, API dragged 196 px right onto Orders DB:
-    // they stay 56 px over each other, also after a view switch.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'drag' && !!v.facts?.overlap && !!v.facts.aligned,
-    note: 'K6: a calm drop onto an element of the same row leaves them overlapping (new; after the fix of "Calm drags and pins" item 3)',
-  },
-  {
     // API and Orders DB kept in a row, not saved yet, while the agent
     // deletes API: the merge keeps the row holding API; it is saved so.
     rule: 'references',
@@ -728,31 +703,6 @@ const KNOWN: Known[] = [
     rule: 'references',
     match: (t, v) => t.some((a) => a.a === 'agent') && (lastAction(t) === 'undo' || lastAction(t) === 'redo') && /names missing relation/.test(v.detail),
     note: 'K9: Undo after an outside change brings back a sequence step whose relation it drops as a stray (new; sibling of items 127 and 234)',
-  },
-  {
-    // Nested model: Component 0.0.0, 0.0.1, 0.0.2, one row already, kept in
-    // a row: System 0 grows 2440 → 3040 and moves 814 px left, Container
-    // 0.0 754 px left, Component 0.0.2 ends 40 px outside Container 0.0.
-    rule: 'geometry',
-    match: (t) => lastAction(t) === 'align',
-    note: 'K10: keeping elements in a row moves their container far and leaves one outside it (new)',
-  },
-  {
-    // K10 seen later: in the milestone Early a row of Component 0.0.0 and
-    // 0.0.1 made, Propagate, reload: Container 0.0 is drawn at x −703, its
-    // components at 80 to 760, outside it.
-    rule: 'geometry',
-    match: (t, v) => !!v.facts?.outside && t.some((a) => a.a === 'align') && ['reload', 'propagate', 'discard', 'view', 'openMilestone', 'undo', 'redo'].includes(lastAction(t) ?? ''),
-    note: 'K10b: a row of components, read again or shown again, puts their container away from them (new)',
-  },
-  {
-    // Sample, All elements: a component dropped into Fraud Detection moves
-    // 43 elements (ADRs, needs, mockups, a process); the step Validate goes
-    // from (270, 5696) to (−289, 5887), 220 → 556 wide, and its child
-    // Screen for fraud stays at (290, 5856), outside it.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'add' && !!v.facts?.outside,
-    note: 'K11: an add moves elements with nothing in common with it and leaves a child outside its moved parent (new)',
   },
   {
     // Nested: Context open, milestone Early shown, a group dropped on the
@@ -796,15 +746,6 @@ const KNOWN: Known[] = [
     rule: 'redoRestores',
     match: (_t, v) => /\.subject: /.test(v.detail),
     note: 'K15b: Undo and Redo of a delete in a milestone strip a view of that element of its element and filter (new)',
-  },
-  {
-    // Nested: the agent deletes Component 1.0.0; Container 2.2 folded;
-    // Component 2.2.0 moved into Container 0.1: System 1 (nothing to do
-    // with the move) moves (−325, −476), Container 1.0 shrinks 520 × 280 →
-    // 300 × 260 and Component 1.0.1 lies 50 px left of it.
-    rule: 'geometry',
-    match: (t, v) => t.some((a) => a.a === 'agent') && !!v.facts?.outside,
-    note: 'K16: after an agent deletes a child, the next local layout moves its container and leaves a sibling outside it (new; next to "Calm drags and pins" item 6, agent adds)',
   },
   {
     // Bookstore: a milestone shown with edits; the agent moves Web App into
@@ -870,6 +811,31 @@ const KNOWN: Known[] = [
       return !!dragged && !(v.keys ?? []).some((k) => k.includes(dragged))
     },
     note: 'K22: an expand on a view that does not draw the children leaves seeds that move them out of their container later, also after a reload (new)',
+  },
+  {
+    // Bookstore: API dragged, saved, Smart Layout (not saved yet), the agent
+    // deletes API: the server refits Bookstore around Orders DB where the
+    // folder has it (890 wide), the merge keeps Orders DB where Smart Layout
+    // put it (x 785.8), 86 px past Bookstore's right edge. Also when it
+    // shows only later: a component added into API, Bookstore folded, the
+    // agent deletes API (the merge keeps it for its new child, and Bookstore
+    // refitted without it, 315 high), Undo opens Bookstore: API, 260 high,
+    // lies 65 px below it. Before the fixes of items 249 to 261 K16 took
+    // these in.
+    rule: 'geometry',
+    match: (t, v, resolved) => !!v.facts?.outside && (/merged with unsaved edits/.test(resolved[resolved.length - 1] ?? '') ||
+      (['undo', 'redo', 'collapse', 'view', 'reload', 'discard', 'openMilestone'].includes(lastAction(t) ?? '') && resolved.some((r) => /merged with unsaved edits/.test(r)))),
+    note: 'K23: a merge keeps the parent the agent\'s write refitted around the folder\'s places and the children where Studio has moved them since, one outside it (new; next to K19)',
+  },
+  {
+    // Nested: groups added, Component 0.0.0 moved into Container 2.0,
+    // Component 0.0.2 deleted, then the view Table turned into a canvas: it
+    // shows Container 0.0 at x −406.9, 760 wide, over Container 0.1 at
+    // 257.1. The same before the fixes of items 249 to 261 (no entry took
+    // it in: it was not found then).
+    rule: 'geometry',
+    match: (t, v) => lastAction(t) === 'viewKind' && !!v.facts?.overlap && t.some((a) => a.a === 'reparent' || a.a === 'add'),
+    note: 'K24: a view turned into a canvas after a move or an add shows the places it then takes over each other (new; K3 through a view type change?)',
   },
 ]
 
