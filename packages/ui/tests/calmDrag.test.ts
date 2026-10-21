@@ -7,7 +7,9 @@
  *   - the drop pushes what it covers clear, whole, and nothing more
  *   - a row moves up and down with a dragged member, the others stay put
  *     along it
- *   - a container grown by a drag pushes a neighbouring container whole
+ *   - a container grown by a drag pushes a neighbouring container whole,
+ *     clear of it even when it grew past the whole of it; a drop leaves
+ *     nothing overlapping, also when the pushes run out
  *   - a row through a container follows it while a child's drag grows it
  *   - a dropped element is pinned: the physics leaves it where it is, on a
  *     small diagram that relaxes as a whole too
@@ -305,6 +307,74 @@ describe('Calm drag', () => {
     // Whole: its children moved with it, by the same amount.
     expect(absOf(nodes, 'r1')).toEqual({ x: r1.x + shift, y: r1.y })
     expect(absOf(nodes, 'r2')).toEqual({ x: r2.x + shift, y: r2.y })
+  })
+
+  it('leaves nothing overlapping when a child is dragged far out of its container, past the one below', () => {
+    // A system with two containers one above the other, and a system below
+    // it: a component dragged down out of the top container, onto the bottom
+    // of the one below, grows its container over the whole of that one.
+    const nodes: Nodes = {
+      sys: node('sys', 'system', { x: 0, y: 0, width: 640, height: 900 }),
+      top: node('top', 'container', { parentId: 'sys', x: 40, y: 120, width: 560, height: 330 }),
+      k0: node('k0', 'component', { parentId: 'top', x: 40, y: 120 }),
+      k1: node('k1', 'component', { parentId: 'top', x: 300, y: 120 }),
+      low: node('low', 'container', { parentId: 'sys', x: 40, y: 520, width: 560, height: 330 }),
+      m0: node('m0', 'component', { parentId: 'low', x: 40, y: 120 }),
+      m1: node('m1', 'component', { parentId: 'low', x: 300, y: 120 }),
+      next: node('next', 'system', { x: 0, y: 1000, width: 640, height: 500 }),
+      n0: node('n0', 'container', { parentId: 'next', x: 40, y: 120 }),
+    }
+    const relations: Record<string, C4Relation> = {}
+    withFillers(nodes, relations)
+    const engine = engineFor(nodes, relations)
+    engine.start(true)
+    const k00 = absOf(nodes, 'k0')
+    calmDrag(engine, nodes, 'k0', { x: k00.x + 1, y: k00.y }, [], 1)
+    engine.release('k0')
+
+    // Down past m0, to the bottom edge of the container below.
+    const m0 = absOf(nodes, 'm0')
+    calmDrag(engine, nodes, 'k0', { x: m0.x, y: m0.y + 120 })
+    engine.release('k0')
+    engine.stop()
+
+    const ancestors = (id: string): string[] => {
+      const out: string[] = []
+      for (let p = nodes[id].parentId; p; p = nodes[p].parentId) out.push(p)
+      return out
+    }
+    const ids = ['sys', 'top', 'k0', 'k1', 'low', 'm0', 'm1', 'next', 'n0']
+    const overlapping: string[] = []
+    for (const a of ids) {
+      for (const b of ids) {
+        if (a >= b || ancestors(a).includes(b) || ancestors(b).includes(a)) continue
+        if (overlaps(nodes, a, b)) overlapping.push(`${a}/${b}`)
+      }
+    }
+    expect(overlapping).toEqual([])
+  })
+
+  it('leaves nothing overlapping when the pushes run out', () => {
+    // A column of 420 elements, each 24 px (CALM_GAP) below the last: a drop
+    // on the first pushes each one onto the next, more pushes than a drop
+    // makes.
+    const nodes: Nodes = { a: node('a', 'component', { x: 600, y: 0 }) }
+    const { height } = NODE_SIZES.component
+    for (let i = 0; i < 420; i++) nodes[`c${i}`] = node(`c${i}`, 'component', { x: 0, y: i * (height + 24) })
+    const engine = engineFor(nodes, {})
+    engine.start(true)
+
+    calmDrag(engine, nodes, 'a', { x: 0, y: -100 })
+    engine.release('a')
+    engine.stop()
+
+    const ids = Object.keys(nodes).sort((p, q) => nodes[p].y - nodes[q].y)
+    const overlapping: string[] = []
+    for (let i = 1; i < ids.length; i++) {
+      if (overlaps(nodes, ids[i - 1], ids[i])) overlapping.push(`${ids[i - 1]}/${ids[i]}`)
+    }
+    expect(overlapping).toEqual([])
+    expect(absOf(nodes, 'a')).toEqual({ x: 0, y: -100 })
   })
 })
 
