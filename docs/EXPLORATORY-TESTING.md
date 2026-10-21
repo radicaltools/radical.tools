@@ -198,6 +198,11 @@ Do not walk the same path twice in a row. Each run, choose differently.
 - Drive the MCP server as `apps/mcp/scripts/test-package.mjs` does: a stdio
   client against `apps/mcp/dist/index.js --folder <a temp folder>`.
 - Take a screenshot when something looks wrong; it goes into the report.
+- When many runs share one machine (twenty did at once), keep one browser
+  open at a time, close it when a script ends, and do not run the e2e
+  suite: it uses fixed ports and a server of its own.
+- If `git status` in the repository shows changes you did not make, say so
+  in the report and leave them as they are.
 
 Do not change the repository, do not touch model folders outside your
 scratch directory, and do not send anything outside `localhost`.

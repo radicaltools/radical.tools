@@ -2893,6 +2893,747 @@ accepts focus on a table; `move_node` says it keeps the canvas position but
 the element leaves `views.json`; hooks installed from a worktree fail
 silently once it is gone.
 
+**Runs 45 to 64, 2026-10-21, commit 3acb1c3** (main with the fixes of runs
+25 to 44, PRs #227 and #228), twenty at the same time. 70 findings, 3 of
+them duplicates, each reproduced again by hand; 67 items below (a duplicate
+is listed once, naming the other run). About 40% of them are siblings or
+regressions of earlier fixes, the same pattern left in another place: a
+byte-order mark in `check.json` (177, after 156), the table's add in a
+milestone (226, after Warnier's 104), stale wiki text written back (185,
+after the step notes of 143), the Move to… menu (168, after the Radical menu
+of 121).
+
+*Run 45.* Covered: Undo and Redo after an agent's writes on a folder (item
+109) for table cell renames, table rows, Move to folder against
+`order_views`, step removals and notes against `update_sequence`, Save as
+viewpoint against `delete_viewpoint` and `upsert_viewpoint`, wiki titles,
+each with writes on other and on the same elements; several writes between
+two steps; Viewer and Presenter with a rebased history. Not covered: the
+metamodel editor open, Hub imports across a write, Undo on a flow view,
+milestones, a drag against the agent's `add_node` on the same view.
+
+163. **Undo of an add takes away what the agent built on the element.**
+     Bookstore folder: drop a Software System, the agent adds a container in
+     it (with `set_view_nodes`) or a relation to it, Ctrl+Z: both go, with
+     "Undo left out what needs an element removed outside Studio since that
+     step: Agent Container"; Redo brings back only the system, and the
+     folder loses the agent's container or relation. A guess:
+     `_rebasedEntry` → `_withoutStrays` drops what the step's own reversal
+     orphans, and the redo step never held it.
+164. **A name typed while an agent writes is two undo steps.** Typing
+     "Orders", an agent write, "API", Tab: the first Undo leaves
+     "OrdersAPI", the second gives "API"; without the write one Undo takes
+     back the name, and during a Forge run it is one step per agent write
+     (item 158 undone). Cause (fairly sure): `_pushTextEdit` checks
+     `_typing.step === top` by identity, and `_historyRebased` replaces the
+     entries.
+165. **Undo of Keep in a row after the agent's `align_nodes` on the same
+     view puts the row back only sideways.** Customer ends at (355, 41)
+     instead of (355, 0), Payment Provider at (960, 36) instead of (960,
+     355); saved. A guess: the reload's constraint enforcement moves the
+     row's y by 0.04 px, and `merge3`, which merges each coordinate apart,
+     keeps y as an outside layout change.
+
+*Run 46.* Covered: Move to… into ordered and unordered rows and grids; a
+parent collapsed on the model or the view, with expand and reload; pinned
+children with undo, redo and reload; views that do not draw the parent;
+Discard and Save as new in a milestone; MCP `move_node` into a collapsed
+parent and a grid member; 300 elements. Not covered: the wiki and the Parent
+field in a milestone, Propagate, Studio and MCP live during a move.
+
+166. **An element moved into another member of its grid breaks the grid.**
+     Grid S1 to S4 in 2 columns, S4 Move to… S2, reload: S1 and S3 overlap
+     by 70 px, and saved places change (S3 318 → 188, S4 120 → 250, S2 −22 →
+     −62). The grid still holds S4 inside S2, which Align refuses to make;
+     MCP `move_node` does the same without a warning. A guess:
+     `reparentNodes` leaves `layoutConstraints` and
+     `defaultLayoutConstraints` as they are.
+167. **Move to… in a milestone, then Discard, moves the element on every
+     live view.** S1 (0, 75) → (1480, 0) on live, all four elements of Part
+     move; saved, kept by a reload, and the same with Save as new. Run 64 on
+     the sample: v3, Fraud Detection → Banking Services, Discard: live Core
+     Banking Platform 1230 → 1570 px wide, Risk & Data 460×500 → 790×360,
+     Fraud Detection drawn 440 px right; five other views and All elements
+     lose its place, "not laid out yet" after a reload. Undo before the
+     choice puts it right; a discarded drag does not leak. A guess:
+     `reparentNodes` (`model.ts`) writes `views[].positions` and
+     `defaultPositions` in a milestone, and Discard and Save as new restore
+     only nodes, relations and sequences.
+168. **The Move to… menu runs off the top of the window.** Sample, Payment
+     Process, Book the ledger at 1280×720: the first item at y −38; with 59
+     parents 44 items are above the window, with no scroll. Wrap into… and
+     Change source/destination… use the same popover. A guess:
+     `.sel-bar-menu` in `studio.css` opens upward with no maximum height (as
+     the Radical menu did, item 121).
+
+*Run 47.* Covered: collapse and expand cycles on the sample, on generated
+models of 30, 228 and 580 elements and on a filter-chain view; a nested
+chain of six undo steps (exact); canvases kept apart; Viewer, Presenter and
+a milestone in Viewer; Smart Layout around collapsed containers; rolled-up
+relations; a folder with an agent. Not covered: the injury model, a
+`.radical` round trip with collapsed views, collapse inside rows and grids,
+Warnier and Screen Map groups, desktop.
+
+169. **A container collapsed and expanded again comes back about 40 px
+     higher each time.** Sample, Core Banking, Banking Services: y 770 → 725
+     → 685 → 645 (x +5 each), saved; after six cycles it pushes Access &
+     Security 135 px up and Core Banking Platform grows upward. On 580
+     elements one cycle of System 2 moves System 0's 145 elements 25 px;
+     after an agent folds Bookstore, Studio's expand moves it 290 px left
+     and 130 px up. A guess: `toggleCollapse` shrinks toward the frame's
+     centre, and the expand centres the children's bounds, lower by the
+     header, on the box.
+170. **Collapse while a milestone is shown collapses the live view.** v4:
+     the view's `collapsedNodeIds` is saved at once, with no prompt, and
+     live Undo is disabled; on live the box sits at the old frame's corner
+     (50, 770) in a parent still 1440 px high, and the view is "not laid out
+     yet", also after a reload. A guess: `toggleCollapse` writes the view
+     milestones share and does not call `_markMilestoneEdit`.
+171. **A slide does not keep the collapse state it was captured with.** A
+     slide captured with Banking Services open shows it folded after a
+     collapse in Designer; one captured folded shows it open, at the folded
+     box's place, 405 px outside Core Banking Platform. `captureCanvasState`
+     keeps only the model's `collapsed`, not the view's (read in the code).
+172. **An agent's `update_view` expanding a container folded in Studio draws
+     it over its neighbours.** Bookstore folder: Bookstore is drawn at the
+     folded box's place at full size (290, 355, 860×350), over Payment
+     Provider; saved. A guess: `model.setViewCollapsed` edits the lists only
+     and places nothing.
+
+*Run 48.* Covered: a milestone shown while the agent creates, updates or
+deletes milestones or edits the live model, Propagate; Designer → Viewer →
+Designer; the agent deleting the view a milestone shows; a step note in a
+milestone against live notes; presentations against `update_presentation`;
+metamodel edits on both sides; relations deleted against updated; renames
+against a rename, `move_node` and a sibling's rename; kept edits through a
+reload while saves are held. Not covered: a view folder rename against
+`update_view` folder, Save as viewpoint against `upsert_viewpoint` with the
+same label, groups of views on both sides, the desktop watcher, two servers.
+
+173. **A viewpoint deleted in Studio comes back when the agent deletes
+     another.** C4 preset folder, saves held, each side deletes one:
+     `metamodel.json` lists only `removedViewpoints: ["components"]`, 5
+     viewpoints instead of 4 (also after a reload and in
+     `get_model_summary`), and the notice says "folder's was kept:
+     metamodel: removedViewpoints" where nothing conflicted. A guess:
+     `removedViewpoints` is not in `ID_SET_KEYS` (`modelMerge.ts`), so it
+     merges as one value; allowed parents and enum options likely the same
+     (read in the code).
+174. **A view emptied on both sides shows the whole model.** View Duo of
+     Customer and Payments: Studio hides Customer while the agent sets
+     `set_view_nodes ["customer"]` (or deletes Payments): `nodeIds` becomes
+     [] with no `empty`, all 6 elements are drawn, "All nodes", no notice,
+     also after a reload. The other way, Studio adds an element while the
+     agent sets [] (every element): Duo shows only the new element. A guess:
+     `mergeIdSet` treats [] as an empty set, while a view reads [] as every
+     element unless marked empty (item 60, through the merge).
+
+*Run 49.* Covered: stale and odd write locks (a dead pid, a live foreign
+pid, garbage, a directory, a time in the future); SIGKILL during
+`create_milestone` (8 times); two and three servers with `radical check` and
+`radical diff` in loops (50 of 50 nodes); odd paths and Unicode labels;
+`get_selection` with odd files; `update_relation` properties; hand edits.
+Not covered: Studio next to the lock, the desktop watcher, network folders.
+
+175. **A read-only model folder cannot be checked, diffed or served.** With
+     `.radical/` in it, `radical check` and `radical diff` exit 2 with
+     EACCES on `.radical/write.lock`, and the MCP server does not start. A
+     guess: `MdFolderSession.readAll` takes the write lock, and
+     `takeWriteTurn` (`diskFolderStorage.ts`) creates it with `wx` and
+     handles only EEXIST.
+176. **An element whose label has a character outside the BMP at the 60th
+     place is deleted by the next write.** `slugify` cuts at 60 UTF-16 units
+     and splits the surrogate pair, the file name gets U+FFFD, and the next
+     write's pass over stale files deletes it: 1 of 2 nodes left and an
+     empty directory. A guess: `.slice(0, 60)` in the folder format's paths
+     (`mdFolderPersistence`).
+177. **`radical check` refuses a `check.json` saved with a byte-order
+     mark.** It exits 2 with "not valid JSON". `apps/cli/src/check.ts` (line
+     95) and `readCheckFiles` in node-files' `selectionFile.ts` do not strip
+     the mark; item 156 covered node and model files only.
+
+*Run 50.* Covered: the Structurizr DSL parser on groups, enterprise,
+deployment environments, styles, relationship blocks, comments, `this`, text
+blocks, archetypes, `!include` and `extends`; the import's table, New view
+of viewpoints, geometry and undo; round trips browser → file → folder; a Hub
+import into an imported model; Hub Download → Open → File… for 4 concepts;
+the CLI's Confluence export escaping. Not covered: PNG and SVG of imported
+views, the Gherkin export, Confluence publish, desktop `--file`.
+
+178. **A Structurizr import with `!identifiers hierarchical` joins
+     relationships to the wrong elements.** Two systems, each with
+     `api.controller` and `api.repository`: 5 of 6 relationships, 3 of them
+     to the other system's elements ("Places orders using" Customer →
+     Payment Controller), "Requests payment from" gone, no message; a root
+     `email` next to `bank.api.email`: 0 of 1. A guess: `structurizrDsl.ts`
+     registers keys only as `<ancestor>.<var>`, `resolveId` falls back to a
+     suffix a later system overwrites, and a bare name in `varMap` is
+     overwritten too.
+179. **A Structurizr import brings in relations and parents the metamodel
+     forbids.** Big Bank plc imports with 7 validation issues (person →
+     person, container → component), pairs that Studio and MCP
+     `add_relation` refuse; a group inside a container imports ("Group
+     cannot be inside Container"), and its Containers view drifts ~33 px per
+     reload. A guess: `parseStructurizrDsl` and `handleDsl` (ModelSteps)
+     never check the metamodel; the C4 preset lacks container and web app →
+     component, and person → person.
+180. **An imported model's new view is drawn elsewhere after the first
+     reload.** Big Bank plc with a group, New view → Containers, reload: all
+     12 elements move (Customer (1172, −387) → (900, −132)) and the saved
+     view is rewritten; the groups example moves on every reload. Seeded
+     with real positions it holds. A guess: the saved view gives API
+     Application its expanded size while its hidden components have no
+     positions, and `placeUnplaced` on load and the physics move them.
+
+*Run 51.* Covered: processes in a system, a group and a domain (Enter, Tab
+refused, Alt+↑/↓, geometry); fast outline typing; undo keys while naming;
+deleting a step that has `performed-by`, with undo and redo; trees of 100 to
+300 steps; a folder with MCP `add_node` while a name is open; Propagate and
+Discard; an F5 slide; a `within` filter against the table. Not covered:
+export, chains of several levels, Forge's Processes stage, Save as new after
+Warnier edits, table and wiki slides during F5.
+
+181. **Propagating a move made in an older milestone puts the step under a
+     parent the later models lack.** S1: Train, Tab into Extra (deleted in
+     S2 and on live), Propagate: S2 and live get `Train.parentId = st-bx`,
+     which does not exist; Warnier draws Train at the top level with Parent
+     "—", though a step may not be at the root; also after a reload. A
+     guess: `commitMilestoneChanges` → `applyDiff` copies `parentId`
+     unchecked (item 73 handled deletes only).
+182. **+ Process in a Warnier view filtered to "Inside Bank" adds the
+     process at the top of the model.** It is not shown, only a warning says
+     so; a table with the same chain adds the process in Bank. A guess:
+     `addProcess` in `WarnierView.tsx` uses only
+     `newElementFilters().properties` and ignores `within` (next to item
+     139).
+183. **A Warnier slide played with F5 from Designer can be edited, and
+     Ctrl+Z after Exit adds the edit to the model.** 21 controls answer;
+     Exit drops the edit, then Ctrl+Z adds "Mid" to the model (saved,
+     Train's order 2 → 3), and a second Ctrl+Z leaves "New step". A guess:
+     `readOnly = appMode !== 'designer'` ignores `presentationActive`, and
+     `stopPresentation` keeps the slide's undo steps (a neighbour of item
+     83; table and wiki slides maybe too).
+
+*Run 52.* Covered: Markdown in descriptions (no script runs, no outside
+request); search after writing and renames; the glossary after writing and
+undo; Back and Forward over 8 pages; a wiki viewpoint per element; Multi
+page with a chain; PNG and SVG export; the CLI's Markdown and HTML export; a
+folder with the agent's rename. Not covered: the Hub's wiki viewer (probably
+item 187 too), Presenter on a wiki per element, Confluence publish.
+
+184. **The wiki search reads descriptions as Markdown source, not as the
+     page shows them.** "and checkout UI" and "see the guide" find 0 pages;
+     "docs.example", only in a link's URL, finds Web App with a raw snippet;
+     on `architecture/`, "**Proposed approach:**" is searched as written. A
+     guess: `searchableTexts` in `wikiSearch.ts` does not use
+     `markdownToPlain`.
+185. **Wiki text clicked into before an agent's edit writes the old text
+     back when left.** Title focused, MCP `update_node` renames Web App to
+     Storefront, click out: "Web App" is back in the model and the folder,
+     no notice; a description does the same. A guess: `InlineText` in
+     `WikiView.tsx` keeps its draft while editing and commits the stale
+     draft (the pattern of item 143).
+186. **The wiki Overview counts the whole model's relations.** Architecture
+     Wiki "14 elements · 125 relations" while its glossary has 8; Product
+     Wiki 125 against 50 (noted in the To decide of runs 13 to 24).
+     `WikiView.tsx` (about line 692) takes
+     `Object.keys(c4Relations).length`.
+187. **One letter in Search pages crashes Studio on a wiki whose chain
+     loops.** Filter Container, Web App and Database, then any relation to
+     the same level: "Maximum call stack size exceeded" and the error
+     boundary; Multi page at Depth 5 writes API › Orders DB › API… A guess:
+     `createWikiDocument`'s merged `chainChildren` index has cycles, and the
+     navigation's `renderNode` and the chapters keep no ancestor guard.
+188. **`radical export confluence --format markdown` copies description
+     Markdown raw.** A "# Notes" heading outranks "## Bookstore" and the
+     children fall under it; a raw `<img onerror>` and `[x](javascript:)` go
+     out as they are; the html and storage formats shift, escape or drop the
+     same text. `fieldValue` in `apps/cli/src/wikiExport.ts` returns
+     `field.text` for Markdown.
+
+*Run 53.* Covered: every card control on every Radical type and 7 relation
+types with undo and redo (120 edits, exact); a relation label typed in a
+milestone; Studio and an agent on one relation; Hide relation with undo and
+reload; the read-only card in Viewer. Not covered: a relation's type changed
+in a milestone, the Change source/destination menus, properties left after a
+type change, the EARS While in state select, the need, blueprint, system and
+group cards. Its first finding is in item 221.
+
+189. **An agent's write closes the card of a selected relation while it is
+     typed in.** Bookstore folder, a relation's label being typed, any agent
+     write (also `update_relation` on that relation): the focus goes and the
+     next keys are lost (what was typed before stays); an element's card
+     stays open. A guess: `showSelection` keeps an edge only if `rfEdges`
+     has it, and the reload restores the selection before the edges are
+     derived.
+190. **In Viewer and Presenter a relation's ends can be dragged to another
+     element.** API → Web App rewired on the canvas and in the read-only
+     card; not saved, back in Designer, no notice. A guess:
+     `ReconnectHandle` in `RelationEdge.tsx` is drawn for `selected &&
+     !isVirtual` in any perspective (like item 145).
+
+*Run 54.* Covered: a chain view live and in v4 and v1; Presenter slides of a
+chain view (rule 7, identical bytes); a folder with agent adds in and out of
+the chain and a reload; `within` filters with agent moves, deletes and undo;
+a containment chain with collapse and Smart Layout; a chain both ways as
+canvas, matrix, table and hierarchy; no filter editor in Viewer; MCP chains
+against Studio's. Not covered: the wiki of a two-way chain, undo of filter
+edits in a milestone, `upsert_viewpoint` with bad chains, concurrent chain
+edits, the injury model.
+
+191. **On a canvas whose filter is a chain, Alt-drag and the palette add
+     what the canvas does not draw.** Trace chain (Need ← derives ←
+     Requirement ← verifies ← Scenario): two Alt-drags add 2 identical
+     `derives` relations (125 → 127) while 10 lines stay drawn; a
+     Requirement dropped from the palette is added and not drawn; no notice.
+     A guess: `Canvas.tsx` (about line 1027) calls `addRelation` without
+     `chainRelationFor`, and `onDrop` uses no `newElementFilters` (the
+     canvas sibling of items 138 and 139).
+192. **MCP `update_view` and `create_view` accept filters they then read
+     otherwise.** A chain step with `via` and no direction is saved as a
+     step taking nothing ("Updated"; the view shows 3 of 10, `via` dropped);
+     a relation filter without direction is read as in; a property filter on
+     an unknown key and an unknown op ("like" acts as is-not) are accepted.
+     The schema's "A way with neither types nor via takes every element" is
+     false on later levels. `readPipeline` (`viewPipeline.ts`) drops `via`,
+     and `pipelineFor` (`viewTools.ts`) checks only types, relation types
+     and `within`.
+193. **MCP `smart_layout` called twice picks another winner the second
+     time.** 13 elements: call 1 Layered TB, call 2 Layered LR with
+     crossings 0 → 0, and `views.json` changed; only call 3 says already
+     best, where Studio says so after the first. A plain list view too.
+     Cause not found; a guess: the server scores its saved winner
+     differently (`FolderModel.smartLayout` → `runSmartLayoutCore`,
+     `keptCurrent`).
+
+*Run 55.* Covered: one concept imported twice with Apply on the first (exact
+undo and reload); undo and redo of Apply; a folder with agent writes around
+an import, Apply and undo; blueprint views in a folder across a reload;
+Apply in a milestone with Save as new. Not covered: a custom metamodel
+lacking the types, Forge's Hub cards, an import with a template in Viewer,
+MCP `forge_import_hub_concept`'s record against Studio's.
+
+194. **Apply in the Hub template section leaves flow step notes at the old
+     value.** E-commerce blueprint, p95 800 → 500: the requirement and 2
+     mockups say 500, Shopper journey's step 4 still 800 ms, also after a
+     reload. A guess: `applyHubTemplate` (`diagramStore.ts`) rewrites only
+     the record's `originalNodes`, and the record keeps no original
+     relations or sequences (item 89 reached step notes on import only).
+195. **A concept downloaded from the Hub keeps its `{{KEY}}` placeholders.**
+     Download, then Open → File…: e-commerce has 13 texts with them (API
+     Response Time "within {{P95_MS}} ms") and no `hubTemplates` record,
+     where Add to Studio fills 300 and keeps a record. A guess: the Hub's
+     `downloadConcept` (`HubApp.tsx`) hands out the catalogue file, and
+     Studio's `loadDiagram` keeps its hub block as an unused `hubMeta`.
+196. **Apply undoes a rename of an imported element.** ADR "Primary Data
+     Store" renamed "ADR-007 Orders on PostgreSQL", DATABASE → MySQL, Apply:
+     the label is "ADR: MySQL as primary data store". Any edited field that
+     holds a parameter is replaced. A guess: `applyHubTemplate` rewrites
+     from the Hub's original every field whose original has a placeholder
+     (item 90 covers only fields without one); maybe a question of design.
+
+*Run 56.* Covered: Capture again on hierarchy and canvas slides, with undo;
+the Link view and Link milestone pickers; the diff toggle with cards and F5;
+MCP reorders; all 13 sample slides; F5 from Designer; a slide's milestone
+deleted or renamed; a slide of a deleted view; Designer undo and redo after
+slide edits (exact); Presenter → Viewer. Not covered: two tabs, wiki slides
+captured again, several presentations with MCP, the clipboard.
+
+197. **Capture again on a Hierarchy slide keeps the old drill level.**
+     Sample, slide 13 added at Banking Services, drilled to Risk & Data,
+     Capture again: the card and play show Banking Services
+     (`treemapFocusId` dom-banking). A guess: `captureSlideViewport`
+     (`diagramStore.ts`) does not take `treemapFocusId` (maybe not the wiki
+     page either).
+198. **Link view draws the linked view at the old view's places.** A slide
+     on System Context, Link view → Core Banking: Core Banking Platform
+     150×97 with its 3 groups outside it. A guess: `linkViewToSlide` changes
+     only `viewId` and keeps `canvasState` (MCP drops the framing).
+199. **MCP `update_presentation` reordering slides by `{id, name}` drops
+     every slide's view and framing.** `viewId` null, zoom 0, no
+     `canvasState`; the first card plays the All elements table.
+     `parseSlides` (`presentationTools.ts`) reads a missing `viewId` as
+     null, while a missing milestone or focus keeps the old.
+200. **After an agent reorders the slides, Presenter highlights another
+     slide than the canvas shows.** A guess: `setPresentations` keeps
+     `presentationSlideIndex`, an index, not the slide's id.
+201. **Esc ending F5 on a drilled-in Hierarchy slide drills Designer's
+     view.** Designer's `treemapFocusId` is saved as sys-core (it was at the
+     top); a double-click while playing is saved too; no undo step. A guess:
+     `TreemapView`'s window keydown for Esc runs together with the HUD's,
+     and `startPresentation` keeps only nodes, relations and the view.
+202. **F5 then Esc with the milestone diff on loses the diff.** Diff tags 4
+     → 0 while the button still says on, and off and on again does not bring
+     them back (also Present from Presenter). A guess: `stopPresentation`
+     calls `setDiffHighlight({})`.
+
+*Run 57.* Covered: linking a flow view to a sequence with undo, redo and
+reload; Create Flow view from a sequence; deleting an element whose
+relations are steps, with undo; deleting a relation used twice; a Presenter
+flow slide with F5; a folder round trip of sequences; MCP `update_sequence`
+with a milestone shown; relation ends changed outside Studio. Not covered: a
+`.radical` round trip, a relation's type changed, a Presenter slide with a
+milestone on a flow, flow zoom.
+
+203. **The milestone diff on a flow view misses steps whose relation appears
+     twice.** As-is r1 r2 r3 r4 r2 → Target r1 r2 r3 r4: no ghost; a copy
+     added: no NEW; a note changed on step 5 colours steps 2 and 5. A guess:
+     `computeSeqDiff` (`diagramStore.ts`) compares sets of relation ids,
+     `diffHighlight` is per relation, and `SequenceView` draws no ghost for
+     an id the current set holds.
+204. **A relation used by two adjacent steps loses a note in a merge.**
+     Notes "validates" and "submits": Studio removes the step "validates"
+     while the agent changes the note "submits"; the folder keeps "submits",
+     and the agent's note is lost under "folder's was kept". Undo of the
+     remove after the agent's change gives `submits (agent) | submits`, and
+     "validates" is lost. Cause (checked): `alignSteps` in `modelMerge.ts`
+     pairs steps by relation id greedily.
+
+*Run 58.* Covered: the CLI's text, json and github output, exit codes,
+malformed reports, rules not run, `--ratchet` on a folder that is no model,
+`--evidence`; the CLI against the Inspector on `architecture/` with reports
+(identical), the sample folder and the 7 Hub blueprints; Settings Save
+writes only `check.json`, with undo; Changes on branch disabled in a
+milestone; deep links, Back and Forward. Not covered: Peek's Show on canvas
+in a milestone, JUnit entities, Playwright with several projects, an invalid
+`readAt`, desktop.
+
+205. **The Inspector's Ratchet lowers a folder rule's baseline the CLI still
+     counts.** `folder-not-a-node` max 1 → 0 while the CLI still finds 1, so
+     CI goes from 1 to 2 errors; with the rule at error the Inspector says
+     "✓ No errors · 11 warnings" and the CLI "✖ 1 error", exit 1. A guess:
+     `checkModel` skips folder rules, but the settings report them as run
+     with 0, not as not run (as in item 161).
+206. **`radical check --ratchet` on a folder with conflict markers in
+     `relations.json` lowers stale-reference to 0.** ✓ stale-reference 0,
+     Ratchet 1 → 0; once the conflict is resolved ✖ (max 0), exit 1. A
+     guess: `runCheck`'s "not run" list for no model is built from
+     `[...CHECK_RULES, GOAL_RULE]`, and stale-reference is in `FOLDER_RULES`
+     (item 161 missed it).
+207. **With a milestone open, Inspector › Changes shows empty rows or the
+     milestone's old names.** v1: ADDED 1 empty row, CHANGED 1 with just
+     "name"; v4: the milestone's names; the header counts the live model.
+     Model quality shows `Relation ""`. A guess: `Inspector.tsx` takes
+     `ctx.nodes` from `c4Nodes`, the milestone's, so the chips find nothing.
+
+*Run 59.* Covered: enum options, required single and many references, Reads
+as; type and relation label renames (the wiki follows); parents and maximums
+lowered; Reset to C4 with custom types and milestones; MCP
+`upsert_node_type` against the editor; a custom metamodel in a folder; a
+metamodel edit with a milestone shown (fine). Not covered: a `.radical`
+round trip, a type id rename, the Diagram tab, relation pair minimums and
+maximums.
+
+208. **An enum option removed while an element holds it shows another
+     option, and nothing flags it.** API `tier: silver`, options left gold
+     and bronze: the card's select shows "gold" (no empty entry, and gold
+     cannot be picked), Validation 0; MCP refuses silver on a write, but
+     `get_issues` does not list it. A guess: `AttrValue` in `RightPanel.tsx`
+     adds "—" only for an empty value, and `validateModel` has no enum
+     check.
+209. **Reset to C4 is accepted while a milestone holds an element of a
+     custom type.** Restore to live then gives "Node Type1 has unknown type
+     type1" (item 124, through Reset). A guess: `checkReplaceMetamodel`
+     counts the live model only, without the milestone and view checks
+     Delete type has.
+210. **MCP `upsert_node_type` on requirement loses its visibleWhen rules.**
+     Properties sent as `get_model_summary` lists them are refused
+     (visibleWhen is an additional property); sent without it they are
+     accepted and all 5 visibleWhen rules are gone, so a ubiquitous
+     requirement's card shows While in state. Studio's editor keeps them. A
+     guess: `PROPERTIES_SCHEMA` in `metamodelTools.ts` lacks `visibleWhen`,
+     and `parseProperties` drops it.
+211. **A required many-reference emptied in the card passes Validation.**
+     Emptied to [], the card shows the required dot and Validation says 0;
+     the folder drops [], so the model is flagged again when reopened. A
+     guess: `validate.ts` checks `v == null || v === ''` and misses [].
+212. **A type added by hand to a preset folder's `metamodel.json` is
+     ignored, and Studio's next save erases it.** The file names the preset
+     `c4-ddd-governance-builtin` with the full preset (42 KB) plus the new
+     type: an unknown type in Studio and MCP; Studio's save removes it from
+     the file, an MCP write keeps it. A guess: `documentMetamodel` swaps a
+     stored preset id for the current preset.
+
+*Run 60.* Covered: ⌘P on 8 view types in 3 perspectives, the Inspector and
+the metamodel editor; Quick Search's Enter on every view type; zoom keys
+everywhere; Tab order through the toolbar, left panel, card, canvas and 7
+dialogs; table cells with Enter, Esc, Tab and undo; the wiki writing line's
+keys; Wrap, Move, Align and Hide by keyboard with undo; Shift connect with a
+multi-selection. Not covered: ⌘Z in text fields, the agent Forge panel's
+keys, Inspector tabs, wizard steps, the slide dock, Ctrl multi-select on
+Windows.
+
+213. **Ctrl+Z and F5 reach the model behind the Models, Hub import, AI
+     providers and Forge dialogs.** Ctrl+Z on the Models dialog's Close
+     undoes a drag (Web App (60, 244) → (30, 120)); F5 with text typed in
+     Forge starts a presentation, Forge closes and the text is lost. ⌘P, ⌘+,
+     Alt+← and the first Tab reach behind too; in the metamodel editor ⌘P,
+     "Ledger", Enter switches the view behind it. `inModalDialog()`
+     (Toolbar) looks for `aria-modal`, which only About and the node wizard
+     set (item 70 fixed the wizard only); Quick Search's ⌘P and `useNavKeys`
+     check no dialog.
+214. **A ⌘/Ctrl-click without a drag lets the physics rearrange the whole
+     view.** Saved, kept by a reload, no undo step: sample System Context 8
+     of 8 moved (Core Banking Platform (720, 120) → (397, 576)), Core
+     Banking 14 of 14, bookstore 6 of 6; also a ⌘-click multi-select when
+     Shift is the connect key. A guess: a zero-length push starts
+     `liveGrab`, and `liveRelease(moved = false)` keeps the relaxed
+     positions without a step.
+215. **View, milestone, sequence and metamodel type cards cannot be opened
+     by keyboard.** View cards in Viewer and Presenter (none of 22; in
+     Designer only View properties), milestone cards and Current (live),
+     sequence cards, and metamodel types (`.mm-card-header` is a div with
+     onClick).
+216. **Quick Search's ↓ moves the highlight out of sight.** At 1280×720,
+     result 20 is at y 950 under a list ending at 474, scrollTop 0; Enter
+     opens a result never seen. `onInputKey` only sets the hover, with no
+     `scrollIntoView`.
+217. **⌘+ on a table, wiki, matrix, hierarchy or Warnier view does nothing
+     and blocks the browser's zoom.** Back on a canvas, 6 console errors
+     (`<circle>` cx NaN, pattern `translate(-NaN)`); on a flow view ⌘0 needs
+     a click first. A guess: the hidden canvas keeps its zoom helpers, and
+     `zoomIn` on an unmounted React Flow writes NaN.
+
+*Run 61.* Covered: MCP `remove_alignment` against real drags in an open
+Studio (folder), undo across an agent's write; orthogonal lines with
+alignments; Smart Layout twice in two fresh pages (the same); Unpin all with
+undo; Smart Layout in Viewer and Presenter with milestones (rule 7 held);
+Tree Layout on 4 views; Smart Layout on 300 elements interrupted by an add,
+a view switch or a reload; labels by zoom. Not covered: Smart Layout
+interrupted by a delete, a collapse or an agent's write; alignments with
+Propagate and Discard; Unpin all with dense adds; MCP `smart_layout` on the
+model of item 219; grids across groups.
+
+218. **A drag inside a group leaves the next group on its system's header,
+     and a reload moves it 12 px down.** Sample, Core Banking, API Gateway
+     dragged by (60, 40): Risk & Data saved 38 px below Core Banking
+     Platform's top; after a reload it and its 3 children are drawn at 242
+     instead of 230 while the file keeps 38 (run 64 saw the same for Access
+     & Security after a drag of Fraud Detection). A guess: the calm drop's
+     frame refit (`liveColaEngine` release → `clearOverlaps`,
+     `refreshBounds`) ignores `LIVE_CHILD_TOP_MIN`, which `deriveRFNodes`
+     applies after a rebuild.
+219. **An ordered column across groups stands upside down, and a reload
+     scatters it.** Sample: API Gateway on top against the saved order
+     [accounts, apigw]; a reload flips them, 11 of 14 elements move, tops
+     from −2134 to 4103, 3 overlaps (Access & Security over Banking
+     Services, 520×720); Screen Map with a column of 3 mockups: all 23
+     elements move to y −10728 … 17214, a group 13981 px tall, 11 overlaps.
+     An unordered column holds and a reversed row is kept. A guess:
+     `projectGroupAlignments` (`liveColaEngine`) ignores order across
+     groups, and on load `enforceAlignments` / `applyAlignments`
+     (`constraints.ts`) force it by moving groups and do not converge.
+220. **A drag held across Smart Layout's result gives a mid-drag state on
+     Undo.** 300 elements, ~10 s: Undo 1 → the start (all 297), Undo 2 → a
+     mid-drag state never seen (14 off the start), Redo 1 → the start, Redo
+     2 → the layout with the drop. A guess: `liveGrab` captures
+     `_beforeDrag`, `runSmartLayout`'s `_pushUndo` snapshots mid-drag, and
+     `liveRelease` pushes the pre-grab snapshot on top.
+
+*Run 62.* Covered: parallel, history, final, choice and compound states over
+MCP; `get_issues` against Validation; transition card edits with an undo
+chain; a compound delete with undo on the injury model; collapse, reload and
+view switch; the viewpoints State machine, Entity lifecycles and Event
+catalogue; the wiki of a machine; the requirement wizard's Fill in, Back and
+Esc; `lifecycle-of` from a table; domains with Alt-drag. Not covered:
+compound states in milestones, `implements` next to deletes, the need,
+scenario and fitness wizards, `smart_layout` against Studio on state views.
+
+221. **Studio and MCP build statecharts that Validation then flags.**
+     order-machine: Alt-drag from Cancelled (final) to Pending payment
+     ("Final state cannot have outgoing transitions"); Confirmed made final
+     in the card's Kind while it has an outgoing transition (Validation 0 →
+     1, run 53); Pending → Confirmed's source end dragged onto Cancelled (0
+     → 3, run 53); Alt-drag onto the initial pseudostate; an initial
+     pseudostate dropped into a parallel state (palette or the wiki's Add:);
+     a second state machine under Order from Entity lifecycles' + row. No
+     notice; MCP `add_relation` and `update_node` accept with a warning. A
+     guess: `checkAddRelation`, `checkPatchRelation` and `checkNodeUpdate`
+     (`model.ts`) check allowed pairs and that a final state holds nothing,
+     while the statechart rules are only in `validateStateMachines`
+     (`statechart.ts`); item 100 did a final state's children only.
+222. **A container collapsed at its parent's edge moves its surroundings on
+     the next view switch or reload.** Ticket lifecycle, Review collapsed
+     (the machine 1220 → 1105 wide), All elements and back: 10 of 13 move
+     (Review (1003, 388) → (896, 519)), saved; on C4, Shop 770×380 at (0, 0)
+     → 650×280 at (−53, 56). A guess: `strayNodeIds` and `effectiveWidth`
+     (`geometry.ts` in `packages/layout`) read only the model's `collapsed`,
+     not the view's `collapsedNodeIds`, so the centre falls outside the
+     shrunk parent and `placeUnplaced` runs (like item 78).
+223. **The properties card's sentence ignores While in state.** The canvas
+     says "While the Order is Confirmed, …", the card "While ‹precondition›,
+     …"; with a precondition text the card shows the text. A guess:
+     `EarsSentencePreview` in `RightPanel.tsx` does not use
+     `requirementStatePhrase` (items 52 and 59 fixed the canvas and the
+     wiki).
+
+*Run 63.* Covered: the matrix popup for several relations with undo and
+redo, matrix refusals and adds on the Radical metamodel, multi-reference
+chips from a matrix selection with undo; hierarchy Size and Levels with
+undo; a table rename on a folder during the agent's `add_node`; a table add
+in a milestone. Not covered: number fields, the Summary column, sorting next
+to adds, hidden relations in a matrix, Viewer and Presenter.
+
+224. **On a hierarchy view the properties card covers Size, Levels and ↑
+     Up.** Sample › Platform Hierarchy, 1280 to 1920 px wide: a double-click
+     on Core Banking Platform opens the card, and a click on Levels then
+     reaches the card; Levels stays 2. A guess: the controls of
+     `.treemap-breadcrumb` (`TreemapView`) sit flush right, under
+     `aside.right-panel`.
+225. **A required property with a default is reported missing while the card
+     shows the default.** Transition › Kind (default external) made
+     required: Validation says 3 missing (4 after a matrix add); the card
+     shows "external" unmarked, and picking "external" stores nothing. A
+     guess: `validate.ts` ignores `p.default`, the card's `missing()` uses
+     `?? p.default`, and `insertRelation` writes no defaults.
+226. **In a milestone, a table's + row closes the new element's name after
+     the save question.** v4, All elements as a table, + Component under API
+     Gateway, Continue editing: the name field is closed, the focus on the
+     page body, the typing lost, the row "New Component". Item 104 was fixed
+     in Warnier only. A guess: `renderName` in `TableView` commits on blur,
+     where `WarnierView` skips while `milestonePromptOpen`.
+
+*Run 64.* Covered: Save as new, Discard and Propagate after a drag, move,
+collapse, alignment, Hide, rename and step note; milestones around the
+metamodel editor and Viewer; undo around the choice; the diff toggle and
+ghosts; deleting and renaming milestones that slides link;
+`compare_milestones` against the chip (+11, +29, +118, the same); a folder
+with the agent's milestone tools; Restore to live with undo, redo and
+reload. Not covered: alignments propagated, Capture again of milestone
+slides, hundreds of elements. Its first finding is item 167; the 12 px shift
+after a drag it saw outside its area is item 218.
+
+227. **A milestone saved without sequences shows the live ones, and Save as
+     new stores them.** The sample's milestones have no `sequences` key;
+     Save as new after a drag stores 4 sequences (17 steps naming relations
+     the milestone lacks), with the diff "+23 ~0 −0"; Propagate gives v3 and
+     v4 the 4 sequences; with a deleted element "+22 ~0 −2". A guess:
+     `selectMilestone` keeps the live sequences when `snap.sequences` is
+     absent.
+228. **Delete milestone asks nothing and cannot be undone, and its slides
+     show "?".** Undo disabled, Ctrl+Z does nothing; a slide keeps the
+     `snapshotId`: a "?" tag, the title "Milestone: undefined", and it shows
+     the live 78 elements (also run 56). MCP `delete_milestone` unlinks the
+     slides (`milestoneTools.ts`). A guess: `removeSnapshot` pushes no step,
+     milestones are not in `_captureState`, and slides are not unlinked.
+229. **A space typed in the "Save as new milestone" name saves at once.**
+     Typing "Target 2027" saves "Target", and "2027" goes to the canvas. A
+     guess: the `<input>` of `MilestoneEditOverlay` lies inside `<button
+     class="milestone-option">`.
+
+To decide (runs 45 to 64): an agent's write while the Inspector is open
+clears Designer's undo history (as with the metamodel editor); Undo after
+Save as viewpoint leaves the viewpoint, since the metamodel is in no step,
+and metamodel edits are no undo steps at all while the manual says
+"Everything is undoable"; whether a move takes the element out of alignments
+it shares with its new ancestor, or is refused; a view saved without a
+`positions` key crashes Studio in `setActiveView` (the radical-diagram
+skill's format does not say it is required); whether a collapse in a
+milestone is shared layout or a milestone edit (item 170 needs it), and Hide
+from view and Unpin all in a milestone change the live view before or
+without the prompt; an alignment made in a milestone stays after Discard;
+undoing every milestone edit still says unsaved; table, wiki, hierarchy,
+matrix and Warnier views show no milestone chip, though the manual says the
+chip names it; after Restore to live views keep ids of elements the model
+lacks (Screen Map lists 23, draws 3); any reload, also in Viewer and
+Presenter, saves the document and its `nodes[].x/y` mirror (19 values after
+a collapse in Viewer); zoomed out, a relation line covers a container's −/+
+button; a view folder renamed in Studio while the agent puts a view in the
+old folder brings the old folder back with only that view; custom types read
+back A–Z by id, so the editor's list and the palette change order after a
+reload or an agent write; an agent deleting the milestone shown with an
+unsaved edit lights up elements it did not change; an empty label in a node
+file makes MCP refuse every call naming no file while `radical check` finds
+0 errors; `add_node` refuses a label " " but `update_node` accepts " " (file
+`person.md`); `get_selection` for a deleted view says All elements, and a
+broken or v2 `selection.json` reads as "Studio has not had this folder
+open"; `update_relation` stores a relationType "" (Studio stores none); the
+properties of an old type stay after a type change and cannot be set over
+MCP, and `add_relation` without a type stores unchecked properties with
+`get_issues` silent; a read waits 15 s on a fresh garbage lock, then says
+"nothing was written"; Structurizr views are not imported (the import lands
+on a table), and the import says nothing about what it drops (`this ->`,
+archetype elements, `"""` descriptions, a workspace-level `!include` that
+loses the whole model, `extends`, deployment); whether the C4 preset should
+allow container → component and person → person, as Structurizr does, or the
+import refuse them; Enter or Alt+↑/↓ on a top-level process renumbers the
+order across processes in different containers, and Warnier and agent adds
+at once can share an order; Esc in a playing Warnier slide with a selection
+only deselects, and F5 does not stop an F5 presentation; the save after an
+add waits longer with size (Warnier: ~10 s at 100 steps, ~34 s at 149, never
+at 150 to 200); links the sanitizer emptied (`javascript:`, `data:`) are
+drawn as links that do nothing, and a Markdown link to a wiki route opens a
+new tab; a one-level chain's Overview lists groups with no heading; the HTML
+export puts description headings at h3, the level of the children; PNG
+export includes the editing controls; the card's Type select offers
+`part-of` between two aggregate roots, shows "(generic)" for a type the pair
+does not allow and no Type row when only one fits, so a wrong relation type
+cannot be fixed there, and "(generic)", like Alt-drag between two entities,
+makes an untyped relation nothing flags; the table's add menu repeats
+choices on a level reached both ways; a first-level `via` is kept but
+ignored by `create_view`; template records are live-only (in a milestone the
+card says 450, the Hub Template section 250); two imports of one concept
+give views and sequences the same names; `HubTemplateSection` calls a hook
+after an early return; a slide of a deleted view plays the whole model with
+`/v/view-core` kept in the address; what Presenter showed stays in Viewer
+until a view switch; the sample's Hierarchy slide 8 has no level of its own,
+and a double-click on a Hierarchy slide leaves `/e/<id>` in the address for
+later slides; a flow numbers the steps left with gaps (3, 4) under "2
+steps"; an empty `--report` directory or a non-JUnit `.xml` reads as 0 test
+cases (exit 1, overwriting `test-results.json`) where a non-report `.json`
+exits 2, and without `--report` report-metric goals are left out of Goals
+without a word; Inspector Settings shows Now "—" for stale-reference,
+"counted on the folder's files", though Studio counts it; a deep link opens
+the Inspector while its button is greyed out; narrowing allowed parents or a
+maximum below what exists is accepted (Studio and MCP) with only a
+Validation error, while Delete type refuses; a reference switched from many
+to one keeps its array (the card shows the first, the wiki all); a Quick
+Search pick in a wiki selects but stays on Overview, one deeper than a
+hierarchy's Levels does not drill, and one not on the view jumps to the
+smallest view that has it (it can be a matrix or flow); the Radical menu and
+the selection bar's menus do not answer ↑/↓, and the Radical menu stays open
+when Tab leaves it; after Enter or Tab in a table cell the focus goes to the
+page body; the hidden right panel's "◀ Back" takes a Tab stop; an element
+added during Smart Layout keeps its drop point in the old coordinates (893
+px from the nearest on 300 elements); Escape does not clear the canvas
+selection; the Delete prompt says "8 node(s) + 10 relation(s)" and removes
+10 and 30 (a compound state on injury); a transition's card is titled "No
+label" while its line reads "PaymentReceived [ok] / reserve ^OrderPaid";
+Event (none) stores `event: ""`; the Event catalogue's summary counts only
+`emits`, so an event only raised shows empty; Undo of an earlier step resets
+a hierarchy's Size and Levels and saves it; the matrix popup stays under the
+clicked cell, with no flip or clamp, also while the matrix scrolls.
+
+Decided 2026-10-21 (the maintainer, on the "To decide" lists of runs 25 to
+64): what is done on a view while a milestone is shown (a collapse, Hide
+from view, an alignment, pins and Unpin all, a filter, Multi page) is an
+edit of the milestone, asked about as a drag is and taken back by Discard;
+metamodel edits, Save as viewpoint and Reset to C4 included, are undo steps;
+narrowing the metamodel below what the model holds (allowed parents, a
+maximum, enum options, required) is done after a confirmation that lists
+what it breaks, and the MCP server warns the same way; deleting a relation
+or an element removes its sequence steps in the same undo step, and the
+Delete prompt counts them; where several relation types fit a pair, Studio
+asks for one, and Validation and `get_issues` warn about an untyped relation
+where the metamodel has types for the pair; the C4 preset allows container
+and web app → component and person → person, and the Structurizr import says
+what it could not read and brings in the workspace's views; Apply in the Hub
+template section replaces the old value with the new one in the text as it
+is now; a model opened from a file or a `?hub=` link opens its first view;
+in a merge a delete wins over an edit of the other side, and a child added
+into a container the other side deleted brings the container back, each
+with a notice; a move takes the element out of alignments it would share
+with its new ancestor; an element added during Smart Layout is placed as a
+new element once the layout is applied; Quick Search goes to a diagram
+before a table, wiki, matrix or flow; a remote image in a Markdown field is
+shown as a link and not fetched; without an AI provider the Forge is
+disabled; a reload saves nothing by itself; the first layout of a new view
+belongs to the step that made the view; `radical check` exits 2 on a report
+with no test case; a blank Hub template parameter takes the template's
+default in Studio and over MCP; the Models dialog gets Move to browser. Every
+other point of these lists is a bug, fixed as the manual and the rules of
+`docs/EXPLORATORY-TESTING.md` say.
+
 ### Radical Forge over MCP (2026-10-07)
 
 Added in `feat/forge-mcp`: the MCP server runs Radical Forge with the
