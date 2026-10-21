@@ -115,6 +115,21 @@ describe('Live layout physics: a diagram that has a layout', () => {
     expect(after.q).toEqual(before.q)
   })
 
+  it('keeps it through a ⌘/Ctrl-click: a push grab released without a move (item 214)', async () => {
+    const { nodes, relations } = spread()
+    const before = at(nodes)
+    const { engine } = engineOver(nodes, relations)
+    engine.start(true)
+    engine.grab('a', 0, 0, 'push', { x: 0, y: 0 })
+    // React Flow reports a click as a drag that goes nowhere.
+    engine.drag('a', 0, 0, { x: 0, y: 0 })
+    await wait(300)
+    engine.release('a')
+    await wait(300)
+    engine.stop()
+    expect(at(nodes)).toEqual(before)
+  })
+
   it('still arranges one that has no layout yet', async () => {
     const nodes: Nodes = { a: node('a', 0, 0), b: node('b', 0, 0), c: node('c', 0, 0) }
     const { engine, moved } = engineOver(nodes, spread().relations)
