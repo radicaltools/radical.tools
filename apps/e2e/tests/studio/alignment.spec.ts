@@ -52,6 +52,15 @@ test('a row on a canvas of the whole model holds through a drag, Smart Layout an
   // The properties card lies over the canvas's right side, where Payment Provider may be.
   await studio.properties.getByRole('button', { name: 'Close properties' }).click()
   await studio.settle()
+  // The click framed Customer too, which can leave Payment Provider off the
+  // canvas: the empty canvas brings back the camera before the drag.
+  await studio.canvas.click({ position: { x: 700, y: 20 } })
+  await studio.settle()
+  const shown = page.viewportSize()!
+  await expect.poll(async () => {
+    const b = await studio.node('payments').boundingBox()
+    return !!b && b.x >= 0 && b.y >= 0 && b.x + b.width <= shown.width && b.y + b.height <= shown.height
+  }).toBe(true)
 
   // Drag one member down: the others follow it onto its new line.
   const box = (await studio.node('payments').boundingBox())!
