@@ -130,6 +130,31 @@ describe('Confluence wiki projection', () => {
     expect(out.warnings.join(' ')).toContain('unsupported Markdown links')
   })
 
+  // Item 188: the Markdown export copied a description's Markdown as
+  // written: "# Notes" outranked the element's heading and the children fell
+  // under it, and raw HTML and javascript: links went out live. The HTML and
+  // storage formats put the same heading at the children's level (h3).
+  it('puts a field\'s headings below the element\'s and its children\'s, in every format, and writes no raw HTML or unsafe link', () => {
+    const data = model()
+    Object.assign(data.nodes[0], { rationale: 'Why.\n\n# Notes\n\nOpen questions.\n\nMore\n---\n\n<img src="x" onerror="alert(1)"> [help](javascript:alert(2)) [docs](https://example.com) `<kept>`' })
+    const out = exportWiki(data, view)
+    const outline = out.markdown.split('\n').filter((l) => /^#{1,6} /.test(l))
+    const at = (title: string) => outline.find((l) => l.endsWith(` ${title}`))?.indexOf(' ')
+    expect(at('Pay & confirm')).toBe(2)
+    expect(at('Successful checkout')).toBe(3)
+    expect(at('Notes')).toBe(4)
+    expect(at('More')).toBe(5)
+    expect(out.markdown).not.toMatch(/(^|[^\\])<img/m)
+    expect(out.markdown).toContain('\\<img src="x" onerror="alert(1)">')
+    expect(out.markdown).not.toContain('javascript:')
+    expect(out.markdown).toContain('help [docs](https://example.com) `<kept>`')
+    expect(out.storage).toContain('<h4>Notes</h4>')
+    expect(out.storage).toContain('<h5>More</h5>')
+    expect(out.html).toContain('<h4>Notes</h4>')
+    expect(out.storage).toContain('&lt;img')
+    expect(out.warnings.join(' ')).toContain('unsupported Markdown links')
+  })
+
   it('preserves custom fields, reference links, booleans and numbers', () => {
     const data = model()
     data.metamodel!.id = 'custom-wiki'
