@@ -185,12 +185,39 @@ const _redoStack: HistoryItem[] = []
  * milestone undone after leaving it made the milestone the live model.
  */
 let _liveHistory: { undo: HistoryItem[]; redo: HistoryItem[] } | null = null
+/** The live model when the milestone shown was opened (_liveHistory). */
+let _liveAtVisit: HistoryEntry | null = null
 
 /** A milestone is about to be shown: its steps start from nothing. The
- *  live model's are kept for the way back. */
-function _historyEntersMilestone(fromLive: boolean): void {
+ *  live model's are kept for the way back, with the live model as it is
+ *  (`live`). */
+function _historyEntersMilestone(fromLive: boolean, live: HistoryEntry): void {
   const parked = { undo: _undoStack.splice(0), redo: _redoStack.splice(0) }
-  if (fromLive) _liveHistory = parked
+  if (fromLive) { _liveHistory = parked; _liveAtVisit = live }
+}
+
+/** The milestones, the metamodel, the views and the slides' milestones are
+ *  the live model's as much as a milestone's: what is done to them while a
+ *  milestone is shown (Save as new, a rename, a type added) is no edit of
+ *  it, and stays. The live model's parked steps held them as they were
+ *  before the visit, and Undo of a live step took them back with it
+ *  (saved). Once any of them changed (`now`), each of those steps becomes
+ *  the change it makes (StepChange), from the live model as the visit
+ *  began, as after a change made outside Studio. */
+function _liveHistoryKeepsVisit(now: Pick<HistoryEntry, 'views' | 'metamodel' | 'snapshots' | 'slideMilestones' | 'defaultEdgeStyle'>, stacks: HistoryItem[][]): void {
+  const was = _liveAtVisit
+  if (!was) return
+  const viewIds = new Set([...Object.keys(was.views), ...Object.keys(now.views)])
+  const changed = [...viewIds].some((id) => was.views[id] !== now.views[id]) ||
+    was.metamodel !== now.metamodel ||
+    (!!now.snapshots && was.snapshots !== now.snapshots) ||
+    (!!now.slideMilestones && JSON.stringify(was.slideMilestones ?? {}) !== JSON.stringify(now.slideMilestones)) ||
+    was.defaultEdgeStyle !== now.defaultEdgeStyle
+  if (!changed) return
+  const drag = _beforeDrag
+  _historyRebased(was, stacks)
+  _beforeDrag = drag
+  _liveAtVisit = null
 }
 
 /** The live model is shown again: the milestone's steps go, its own come
@@ -203,6 +230,7 @@ function _historyBackOnLive(changed = false): void {
     _redoStack.push(..._liveHistory.redo)
   }
   _liveHistory = null
+  _liveAtVisit = null
 }
 
 /** Another model was loaded: nothing of the history belongs to it, and
@@ -212,6 +240,7 @@ function _historyForgotten(): void {
   _undoStack.length = 0
   _redoStack.length = 0
   _liveHistory = null
+  _liveAtVisit = null
   _beforeDrag = null
 }
 
@@ -527,6 +556,23 @@ function _captureState(state: DiagramStore): HistoryEntry {
     milestoneDirty: state.milestoneDirty,
     snapshots: state.snapshots,
     slideMilestones: slideMilestonesOf(state.presentations),
+  }
+}
+
+/** What the live model shares with the milestone shown, as it is on the
+ *  way back to the live model: the views with what was done on them in the
+ *  milestone put back (unparkLiveViews). */
+function _sharedNow(state: Pick<DiagramStore, 'views' | 'metamodel' | 'snapshots' | 'presentations' | 'defaultEdgeStyle'>, backup: DiagramStore['liveBackup']): Pick<HistoryEntry, 'views' | 'metamodel' | 'snapshots' | 'slideMilestones' | 'defaultEdgeStyle'> {
+  let views = state.views as Record<string, DiagramView>
+  for (const [id, view] of Object.entries(backup?.views ?? {})) {
+    if (views[id] && views[id] !== view) views = { ...views, [id]: view as DiagramView }
+  }
+  return {
+    views,
+    metamodel: state.metamodel as Metamodel,
+    snapshots: state.snapshots,
+    slideMilestones: slideMilestonesOf(state.presentations),
+    defaultEdgeStyle: state.defaultEdgeStyle,
   }
 }
 
@@ -5806,7 +5852,7 @@ export const useDiagramStore = create<DiagramStore>()(
           : { nodes: {}, relations: {} }
         // Designer's steps only: Viewer and Presenter have none, and what
         // they pick is put back on return (setAppMode).
-        if (get().appMode === 'designer') _historyEntersMilestone(!activeSnapshotId)
+        if (get().appMode === 'designer') _historyEntersMilestone(!activeSnapshotId, _captureState(get()))
         set((state) => {
           // `snap.nodes` is shared (never mutated in place, see _captureState).
           // When preserving layout, shallow-copy the map and only build a
@@ -5868,7 +5914,10 @@ export const useDiagramStore = create<DiagramStore>()(
 
       discardMilestoneChanges() {
         const { liveBackup } = get()
-        if (get().activeSnapshotId && get().appMode === 'designer') _historyBackOnLive()
+        const backOnLive = !!get().activeSnapshotId && get().appMode === 'designer'
+        const parked = backOnLive && _liveHistory ? [_liveHistory.undo, _liveHistory.redo] : null
+        if (parked) _liveHistoryKeepsVisit(_sharedNow(get(), liveBackup), parked)
+        if (backOnLive) _historyBackOnLive()
         set((state) => {
           state.canUndo = _undoStack.length > 0
           state.canRedo = _redoStack.length > 0
@@ -6157,6 +6206,7 @@ export const useDiagramStore = create<DiagramStore>()(
         _undoStack.length = 0
         _redoStack.length = 0
         _liveHistory = null
+        _liveAtVisit = null
         if (lostShownView) get()._showLiveCanvasPositions()
         get()._sync()
         _liveLayout?.reset()
@@ -7014,7 +7064,10 @@ export const useDiagramStore = create<DiagramStore>()(
           else {
             _undoStack.length = 0
             _redoStack.length = 0
-            if (_liveHistory) _historyRebased(now, [_liveHistory.undo, _liveHistory.redo])
+            if (_liveHistory) {
+              _liveHistoryKeepsVisit(_sharedNow({ ...st, views: parked.views }, parked.liveBackup), [_liveHistory.undo, _liveHistory.redo])
+              _historyRebased(now, [_liveHistory.undo, _liveHistory.redo])
+            }
           }
         } else if (opts?.outsideChange && designerShown && milestone && !st.presentationActive) {
           // The milestone's steps stay, unless it was changed too; the live
@@ -7022,6 +7075,7 @@ export const useDiagramStore = create<DiagramStore>()(
           if (milestone.changed) { _undoStack.length = 0; _redoStack.length = 0 }
           if (_liveHistory) {
             const live = st.liveBackup!
+            _liveHistoryKeepsVisit(_sharedNow(st, live), [_liveHistory.undo, _liveHistory.redo])
             _historyRebased({
               c4Nodes: atDefaultPositions(Object.values(live.nodes), st.defaultPositions),
               c4Relations: live.relations,

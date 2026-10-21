@@ -169,7 +169,7 @@ describe('A view property set in a milestone', () => {
     ['the Auto-layout', () => s().setViewLayoutMode('v', 'tree'), (v) => v?.layoutMode],
     ['the flow\'s Sequence', () => s().setViewSequence('v', 'seq'), (v) => v?.sequenceId],
     ['the view type', () => s().setViewKind('v', 'table'), (v) => v?.kind],
-    ['the hierarchy\'s Size', () => s().setTreemapSizeBy('v', 'children'), (v) => v?.treemapSizeBy],
+    ['the hierarchy\'s Size', () => s().setTreemapSizeBy('v', 'uniform'), (v) => v?.treemapSizeBy],
     ['the hierarchy\'s Levels', () => s().setTreemapMaxDepth('v', 4), (v) => v?.treemapMaxDepth],
   ]
   for (const [what, edit, read] of cases) {
