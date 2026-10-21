@@ -894,7 +894,6 @@ interface World {
   liveAtMilestone: Canon | null
   trace: string[]
   actions: Action[]
-  errors: string[]
   /** Views an agent's write may have left with places that break
    *  containment: they settle when next opened (decided 2026-10-21), and
    *  the MCP server's own settling is not part of this harness. */
@@ -914,7 +913,7 @@ function containerIds(st: State): string[] {
   return sortedIds(st.c4Nodes).filter((id) => isContainerType(st.c4Nodes[id].type))
 }
 
-async function runAction(store: Store, action: Action, w: World, prepared: Prepared): Promise<string> {
+async function runAction(store: Store, action: Action, w: World): Promise<string> {
   const st = store.getState()
   const nodeIds = sortedIds(st.c4Nodes)
   const relIds = sortedIds(st.c4Relations)
@@ -1136,7 +1135,6 @@ async function runAction(store: Store, action: Action, w: World, prepared: Prepa
       w.saved = JSON.parse(text) as DiagramData
       store.getState().loadDiagram(JSON.parse(text) as DiagramData)
       if (viewId && store.getState().views[viewId]) store.getState().setActiveView(viewId)
-      void prepared
       return `reload (on ${viewId ?? 'All elements'})`
     }
   }
@@ -1271,7 +1269,7 @@ function issueIds(st: State): Map<string, string> {
   return new Map(issues.map((i) => [i.id, i.message]))
 }
 
-async function checkReload(store: Store, prepared: Prepared): Promise<Violation | null> {
+async function checkReload(store: Store): Promise<Violation | null> {
   const st = store.getState()
   const text = JSON.stringify(st.saveDiagram())
   const saved = canon(JSON.parse(text) as DiagramData)
@@ -1301,7 +1299,6 @@ async function checkReload(store: Store, prepared: Prepared): Promise<Violation 
         if (moved.length) return { rule: 'reloadKeeps', detail: `the canvas shown draws differently after a reload:\n      ${moved.join('\n      ')}` }
       }
     }
-    void prepared
     return null
   } finally {
     second.getState().stopLiveLayout()
@@ -1407,7 +1404,7 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
   const consoleError = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => { errors.push(args.map(String).join(' ').slice(0, 300)) })
   let text: string
   try {
-    text = await runAction(store, action, w, prepared)
+    text = await runAction(store, action, w)
     if (!(await settle(store))) {
       w.actions.push(action)
       w.trace.push(text)
@@ -1565,7 +1562,7 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
   const folder = checkFolder(store)
   if (folder) fail(folder)
 
-  const reload = await checkReload(store, prepared)
+  const reload = await checkReload(store)
   if (reload) fail(reload)
 }
 
@@ -1575,7 +1572,7 @@ async function runSequence(name: string, prepared: Prepared, actions: Action[]):
   store.getState().setAppMode('designer')
   store.getState().loadDiagram(clone(prepared.data))
   await settle(store)
-  const w: World = { saved: clone(store.getState().saveDiagram()), undoChain: [], redoChain: [], liveAtMilestone: null, trace: [], actions: [], errors: [], maySettle: new Set(), afterAgent: null, knownGeometry: new Set() }
+  const w: World = { saved: clone(store.getState().saveDiagram()), undoChain: [], redoChain: [], liveAtMilestone: null, trace: [], actions: [], maySettle: new Set(), afterAgent: null, knownGeometry: new Set() }
   try {
     stats.runs++
     for (const action of actions) {
