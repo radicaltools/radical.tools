@@ -47,3 +47,11 @@ export type AsyncToolHandler = (input: unknown, ctx: ToolRunContext) => Promise<
 export function fail(resultText: string): ToolResult {
   return { ok: false, resultText }
 }
+
+/** How many steps the model's sequences have, all together. */
+export function sequenceStepCount(ctx: ToolRunContext): number {
+  return Object.values(ctx.diagram.getSequences?.() ?? {}).reduce((n, q) => n + q.relationIds.length, 0)
+}
+
+/** What a delete says of the sequence steps it took out with its relations. */
+export const stepsGone = (n: number): string => (n > 0 ? ` and ${n} sequence step${n === 1 ? '' : 's'} along its relation${n === 1 ? '' : 's'}` : '')

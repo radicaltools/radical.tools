@@ -2,7 +2,7 @@
 
 import type { C4Relation } from '../../c4'
 import { inferRelationType, isReservedPropertyKey, type Metamodel } from '../../metamodel'
-import { fail, type ToolDef, type ToolHandler } from './types'
+import { fail, sequenceStepCount, stepsGone, type ToolDef, type ToolHandler } from './types'
 import { validateProperties, type PropertyValue } from './propertyBag'
 
 export function buildRelationToolDefs(mm: Metamodel | undefined): ToolDef[] {
@@ -193,8 +193,9 @@ export function buildRelationToolHandlers(): Record<string, ToolHandler> {
       if (typeof input.id !== 'string' || !input.id) return fail('delete_relation: id is required')
       const realId = ctx.resolveId(input.id)
       if (!(realId in ctx.diagram.getRelations())) return fail(`delete_relation: unknown id "${input.id}"`)
+      const steps = sequenceStepCount(ctx)
       ctx.diagram.removeRelation(realId)
-      return { ok: true, resultText: `Deleted relation ${realId}.`, deleted: { relations: 1 } }
+      return { ok: true, resultText: `Deleted relation ${realId}${stepsGone(steps - sequenceStepCount(ctx))}.`, deleted: { relations: 1 } }
     },
   }
 }

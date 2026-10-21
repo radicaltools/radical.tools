@@ -185,3 +185,22 @@ describe('view filter chains over tools', () => {
     expect(view().pipeline).toBeUndefined()
   })
 })
+
+describe('deleting what a sequence steps along (D4)', () => {
+  it('delete_relation and delete_node take the steps out with their notes, and say how many', () => {
+    const { facade, call, rel } = setup()
+    call('create_sequence', {
+      tempId: 'checkout', name: 'Checkout',
+      steps: [{ relationId: rel('Orders'), description: 'orders' }, { relationId: rel('Charges'), description: 'charges' }, { relationId: rel('Orders'), description: 'again' }],
+    })
+    const seq = () => Object.values(facade.getSequences!())[0]
+    const charges = rel('Charges')
+    const gone = call('delete_relation', { id: charges })
+    expect(gone.resultText).toBe(`Deleted relation ${charges} and 1 sequence step along its relation.`)
+    expect(seq().relationIds).toEqual([rel('Orders'), rel('Orders')])
+    expect(seq().stepDescriptions).toEqual(['orders', 'again'])
+    const user = Object.values(facade.getNodes()).find((n) => n.label === 'User')!.id
+    expect(call('delete_node', { id: user }).resultText).toBe(`Deleted node ${user} and 2 sequence steps along its relations.`)
+    expect(seq().relationIds).toEqual([])
+  })
+})

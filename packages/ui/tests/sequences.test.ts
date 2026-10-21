@@ -251,3 +251,40 @@ describe('updateStepDescription', () => {
     expect(seq.stepDescriptions?.[2]).toBe('first')
   })
 })
+
+describe('deleting what a sequence steps along (D4)', () => {
+  // A deleted relation's steps stayed: a flow numbered the steps left with
+  // gaps (3, 4) under "2 steps", and nothing flagged them.
+  const withSteps = () => {
+    const s = useDiagramStore.getState()
+    const seqId = s.addSequence('S')
+    const relIds = Object.keys(s.c4Relations).slice(0, 3)
+    for (const r of [...relIds, relIds[1]]) useDiagramStore.getState().toggleRelationInSequence(seqId, r)
+    relIds.forEach((_, i) => useDiagramStore.getState().updateStepDescription(seqId, i, `step ${i}`))
+    useDiagramStore.getState().updateStepDescription(seqId, 3, 'again')
+    return { seqId, relIds }
+  }
+
+  it('removes a deleted relation\'s steps with their notes, in the same undo step', () => {
+    const { seqId, relIds } = withSteps()
+    useDiagramStore.getState().removeRelation(relIds[1])
+    const seq = useDiagramStore.getState().sequences[seqId]
+    expect(seq.relationIds).toEqual([relIds[0], relIds[2]])
+    expect(seq.stepDescriptions).toEqual(['step 0', 'step 2'])
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().c4Relations[relIds[1]]).toBeDefined()
+    expect(useDiagramStore.getState().sequences[seqId].relationIds).toEqual([...relIds, relIds[1]])
+    expect(useDiagramStore.getState().sequences[seqId].stepDescriptions).toEqual(['step 0', 'step 1', 'step 2', 'again'])
+  })
+
+  it('removes the steps of the relations a deleted element takes with it', () => {
+    const { seqId, relIds } = withSteps()
+    const s = useDiagramStore.getState()
+    const end = s.c4Relations[relIds[0]].sourceId
+    const gone = new Set(Object.values(s.c4Relations).filter((r) => r.sourceId === end || r.targetId === end).map((r) => r.id))
+    useDiagramStore.getState().removeNode(end)
+    const seq = useDiagramStore.getState().sequences[seqId]
+    expect(seq.relationIds).toEqual([...relIds, relIds[1]].filter((r) => !gone.has(r)))
+    expect(seq.relationIds.every((r) => useDiagramStore.getState().c4Relations[r])).toBe(true)
+  })
+})

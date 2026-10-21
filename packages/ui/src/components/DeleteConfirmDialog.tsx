@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { hideRefusal, useDiagramStore } from '../store/diagramStore'
+import { sequenceStepsRemovedBy } from '@radical/common/model'
 
 /**
  * Confirmation modal that appears when the user presses Delete on the canvas.
@@ -12,6 +13,10 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const c4Relations = useDiagramStore((s) => s.c4Relations)
   const resolve = useDiagramStore((s) => s.resolvePendingDelete)
+  // The steps of sequences that go with the relations deleted (D4).
+  const steps = useDiagramStore((s) => (s.pendingDelete
+    ? sequenceStepsRemovedBy(s as unknown as Parameters<typeof sequenceStepsRemovedBy>[0], s.pendingDelete.nodeIds, s.pendingDelete.edgeIds)
+    : 0))
   // A view per element shows what its element holds, a view that lists
   // nothing what its filter gives: nothing is hidden from them.
   const refusal = useDiagramStore((s) => (s.activeViewId ? hideRefusal(s, s.activeViewId) : null))
@@ -52,6 +57,7 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
             <div className="milestone-option-desc">
               Permanently delete from the model (and from every view that
               references it). Children of nodes are removed as well.
+              {steps > 0 && ` ${steps} ${steps === 1 ? 'step' : 'steps'} of sequences along their relations go with them.`}
             </div>
           </button>
           <button

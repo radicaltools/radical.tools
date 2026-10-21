@@ -381,11 +381,41 @@ export function checkUnwrap(state: ModelState, id: string): string | null {
 export function deleteNode(state: ModelState, id: string): Set<string> {
   const removed = new Set([id, ...descendantIds(id, state.c4Nodes)])
   for (const nid of removed) delete state.c4Nodes[nid]
+  const relations = new Set<string>()
   for (const [rid, rel] of Object.entries(state.c4Relations)) {
-    if (removed.has(rel.sourceId) || removed.has(rel.targetId)) delete state.c4Relations[rid]
+    if (removed.has(rel.sourceId) || removed.has(rel.targetId)) { delete state.c4Relations[rid]; relations.add(rid) }
   }
+  forgetRelationsInSequences(state, relations)
   forgetNodesInViews(state, removed)
   return removed
+}
+
+/** Takes the steps of the `removed` relations out of every sequence, each
+ *  with its note. Left in, a flow numbered the steps left with gaps, and
+ *  nothing said they pointed at nothing. */
+export function forgetRelationsInSequences(state: ModelState, removed: Set<string>): void {
+  if (!removed.size) return
+  for (const sequence of Object.values(state.sequences ?? {})) {
+    if (!sequence.relationIds.some((rid) => removed.has(rid))) continue
+    const keep = sequence.relationIds.map((rid) => !removed.has(rid))
+    const notes = sequence.stepDescriptions?.filter((_, i) => keep[i] ?? true)
+    sequence.relationIds = sequence.relationIds.filter((_, i) => keep[i])
+    if (notes) {
+      while (notes.length > 0 && !notes[notes.length - 1]) notes.pop()
+      sequence.stepDescriptions = notes
+    }
+  }
+}
+
+/** How many steps of sequences deleting `nodeIds` (with what they hold)
+ *  and `relationIds` takes out with their relations (the Delete prompt). */
+export function sequenceStepsRemovedBy(state: ModelState, nodeIds: string[], relationIds: string[]): number {
+  const nodes = new Set(nodeIds.flatMap((id) => [id, ...descendantIds(id, state.c4Nodes)]))
+  const relations = new Set(relationIds)
+  for (const [rid, rel] of Object.entries(state.c4Relations)) {
+    if (nodes.has(rel.sourceId) || nodes.has(rel.targetId)) relations.add(rid)
+  }
+  return Object.values(state.sequences ?? {}).reduce((n, q) => n + q.relationIds.filter((rid) => relations.has(rid)).length, 0)
 }
 
 /** Takes the `removed` elements out of every view (its list, folds and
@@ -615,6 +645,7 @@ export function patchRelation(state: ModelState, id: string, updates: Partial<Om
 
 export function deleteRelation(state: ModelState, id: string): void {
   delete state.c4Relations[id]
+  forgetRelationsInSequences(state, new Set([id]))
 }
 
 // ── Views ────────────────────────────────────────────────────────────────────
