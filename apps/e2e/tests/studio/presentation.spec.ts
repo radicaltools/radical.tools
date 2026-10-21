@@ -1,4 +1,5 @@
-import { test, expect } from '../../support/fixtures'
+import type { Page } from '@playwright/test'
+import { test, expect, DOC_ID, type Studio } from '../../support/fixtures'
 
 // The bookstore fixture has one presentation, "Main", with two slides:
 // Context (v-context) and Containers (v-containers).
@@ -39,4 +40,99 @@ test('a slide deep link opens the running presentation', async ({ page, studio }
   await studio.ready()
   await expect(page.getByText('2 / 2')).toBeVisible()
   await expect(studio.nodes).toHaveCount(6)
+})
+
+/** Rewrites the seeded document (`edit` on its JSON) and opens `view` in
+ *  Presenter on it. */
+async function reseed(page: Page, studio: Studio, edit: (doc: any) => void, view = 'v-containers'): Promise<void> {
+  const key = `radical-doc:${DOC_ID}`
+  const doc = JSON.parse((await page.evaluate((k) => localStorage.getItem(k), key))!)
+  edit(doc)
+  await page.evaluate(([k, v]) => localStorage.setItem(k, v), [key, JSON.stringify(doc)] as const)
+  await page.reload()
+  await studio.ready()
+  await studio.open(view, 'presenter')
+}
+
+/** The canvas camera's zoom. */
+async function zoom(page: Page): Promise<number> {
+  const style = await page.locator('.react-flow__viewport').first().getAttribute('style')
+  return Number(/scale\(([\d.]+)\)/.exec(style ?? '')?.[1])
+}
+
+test('a slide made with focus zooms onto its elements after a table slide, from a deep link and after a reload', async ({ page, studio }) => {
+  const none = { x: 0, y: 0, zoom: 0 }
+  await reseed(page, studio, (doc) => {
+    doc.presentations = [{ id: 'p-focus', name: 'Focus deck', slides: [
+      { id: 's-table', name: 'Table', snapshotId: null, viewId: 'v-table', viewport: none },
+      { id: 's-db', name: 'Orders DB', snapshotId: null, viewId: 'v-containers', viewport: none, focusNodeIds: ['db'] },
+    ] }]
+  })
+  const card = (name: string) => page.locator('.pres-slide-card .pres-slide-name', { hasText: name })
+  // Canvas to canvas it zoomed in: the whole view is about 0.7.
+  await card('Orders DB').click()
+  await studio.settle()
+  expect(await zoom(page)).toBeGreaterThan(1.2)
+  // After the table slide the canvas mounts again.
+  await card('Table').click()
+  await studio.settle()
+  await card('Orders DB').click()
+  await studio.settle()
+  expect(await zoom(page)).toBeGreaterThan(1.2)
+  // A deep link to the playing slide from the table, and a reload of it.
+  await studio.open('v-table', 'presenter')
+  await page.goto(`/#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/presenter/v/v-containers/p/p-focus/play/1/sl/1`)
+  await studio.ready()
+  expect(await zoom(page)).toBeGreaterThan(1.2)
+  await page.reload()
+  await studio.ready()
+  await expect(page.getByText('2 / 2')).toBeVisible()
+  expect(await zoom(page)).toBeGreaterThan(1.2)
+})
+
+test('a slide card\'s Link view and Link milestone pickers show all their items above the dock', async ({ page }) => {
+  const card = page.locator('.pres-slide-card', { hasText: 'Containers' })
+  await card.hover()
+  await card.getByTitle('Link view').click()
+  // The item farthest from the button: clipped by the dock, a click on it
+  // reached the canvas.
+  await page.locator('.pres-snap-item', { hasText: 'show all' }).click()
+  await expect(card.locator('.pres-slide-view-tag')).toHaveCount(0)
+  await card.hover()
+  await card.getByTitle('Link view').click()
+  await page.locator('.pres-snap-item', { hasText: 'Element Table' }).click()
+  await expect(card.locator('.pres-slide-view-tag')).toHaveText('Element Table')
+  await expect(page.locator('.pres-snap-picker')).toHaveCount(0)
+
+  await card.hover()
+  await card.getByTitle('Link milestone').click()
+  await expect(page.locator('.pres-snap-picker-title')).toHaveText('Link milestone')
+  await page.locator('.pres-snap-item', { hasText: 'current state' }).click()
+  await expect(page.locator('.pres-snap-picker')).toHaveCount(0)
+})
+
+test('a slide added on a wiki page shows that page, on its card and played after a reload', async ({ page, studio }) => {
+  await reseed(page, studio, (doc) => {
+    doc.views.push({ id: 'v-wiki', name: 'Wiki', kind: 'wiki', nodeIds: [], positions: {}, hiddenRelationIds: [] })
+  }, 'v-wiki/f/api')
+  const title = page.locator('.wiki-page .wiki-title').first()
+  await expect(title).toHaveText('API')
+  await page.getByTitle('Add slide from current canvas state').click()
+  const cards = page.locator('.pres-slide-card')
+  await expect(cards).toHaveCount(3)
+  await studio.settle()
+  await expect.poll(async () => ((await studio.storedDoc()) as unknown as { presentations: Array<{ slides: unknown[] }> }).presentations[0].slides.length).toBe(3)
+  // Another page read, another slide shown: the new slide's card shows its page.
+  await page.getByRole('button', { name: 'Overview', exact: true }).click()
+  await expect(title).toHaveText('Overview')
+  await cards.first().locator('.pres-slide-name').click()
+  await cards.last().locator('.pres-slide-name').click()
+  await expect(title).toHaveText('API')
+  await expect(page).toHaveURL(/\/v\/v-wiki\/f\/api$/)
+  // Played from a fresh page, where the view is on its Overview.
+  await page.goto(`/#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/presenter/v/v-wiki/p/pres-main/play/1/sl/2`)
+  await page.reload()
+  await studio.ready()
+  await expect(page.getByText('3 / 3')).toBeVisible()
+  await expect(title).toHaveText('API')
 })

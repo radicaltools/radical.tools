@@ -20,6 +20,11 @@ import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
+/** A text field got or lost focus: what is typed into it in between (each
+ *  letter an edit of the model) is one undo step. */
+const beginTyping = (): void => useDiagramStore.getState().beginTyping()
+const endTyping = (): void => useDiagramStore.getState().endTyping()
+
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 
 /** How many elements each view shows (viewShownNodes: its filter's chain,
@@ -434,6 +439,27 @@ function SnapshotList({ readOnly = false, onOpenProps }: { readOnly?: boolean; o
 
 // ── Sequence list ─────────────────────────────────────────────────────────────
 
+/** A step's note, written when the field is left. It shows the note as the
+ *  model has it now: left to itself, the field kept the text from before an
+ *  Undo or a switch to a milestone, and leaving it wrote that text back. */
+function StepNoteInput({ value, placeholder, onCommit, style }: {
+  value: string | undefined; placeholder: string; onCommit: (text: string) => void; style: React.CSSProperties
+}) {
+  const [draft, setDraft] = useState(value ?? '')
+  useEffect(() => { setDraft(value ?? '') }, [value])
+  return (
+    <input
+      className="props-input"
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => { if (draft !== (value ?? '')) onCommit(draft) }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+      style={style}
+    />
+  )
+}
+
 function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolean; compact?: boolean }) {
   const sequences = useDiagramStore((s) => s.sequences)
   const activeSequenceId = useDiagramStore((s) => s.activeSequenceId)
@@ -482,7 +508,7 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
                 <div className="lp-card-title">{seq.name}</div>
                 <div className="lp-card-meta">
                   <span>{seq.relationIds.length} {seq.relationIds.length === 1 ? 'step' : 'steps'}</span>
-                  {isActive && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>editing</span>}
+                  {isActive && !readOnly && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>editing</span>}
                 </div>
               </div>
             </div>
@@ -517,12 +543,10 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
                             </div>
                           )}
                           {!readOnly && (
-                            <input
-                              className="props-input"
-                              defaultValue={stepDesc ?? ''}
+                            <StepNoteInput
+                              value={stepDesc}
                               placeholder={rel?.label || 'Add step note…'}
-                              onBlur={(e) => updateStepDescription(seq.id, idx, e.currentTarget.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                              onCommit={(text) => updateStepDescription(seq.id, idx, text)}
                               style={{ marginTop: 3, fontSize: 10, padding: '2px 4px', width: '100%', boxSizing: 'border-box' }}
                             />
                           )}
@@ -1692,9 +1716,11 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
           Steps
           <span style={{ marginLeft: 6, opacity: 0.5, fontWeight: 400 }}>({seq.relationIds.length})</span>
         </div>
-        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6, lineHeight: 1.4 }}>
-          Click relations on canvas to add steps
-        </div>
+        {!readOnly && (
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6, lineHeight: 1.4 }}>
+            Click relations on canvas to add steps
+          </div>
+        )}
         {seq.relationIds.length === 0 ? (
           <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '6px 4px', textAlign: 'center', opacity: 0.55, fontStyle: 'italic' }}>
             No steps yet
@@ -1725,12 +1751,10 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
                       </div>
                     )}
                     {!readOnly && (
-                      <input
-                        className="props-input"
-                        defaultValue={stepDesc ?? ''}
+                      <StepNoteInput
+                        value={stepDesc}
                         placeholder={rel?.label || 'Add step note…'}
-                        onBlur={(e) => updateStepDescription(seq.id, idx, e.currentTarget.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                        onCommit={(text) => updateStepDescription(seq.id, idx, text)}
                         style={{ marginTop: 4, fontSize: 11, padding: '3px 6px', width: '100%', boxSizing: 'border-box' }}
                       />
                     )}
@@ -2005,8 +2029,8 @@ function MarkdownField({ label, value, readOnly, onChange }: {
     return (
       <AutoResizeTextarea autoFocus aria-label={label} value={value} placeholder={MARKDOWN_HINT}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={(e) => { const t = e.currentTarget; t.setSelectionRange(t.value.length, t.value.length) }}
-        onBlur={() => setEditing(false)}
+        onFocus={(e) => { const t = e.currentTarget; t.setSelectionRange(t.value.length, t.value.length); beginTyping() }}
+        onBlur={() => { endTyping(); setEditing(false) }}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); e.currentTarget.blur() } }} />
     )
   }
@@ -2059,6 +2083,7 @@ function AttrValue({ def, value, readOnly, onChange }: {
     <input className="pp-input" aria-label={def.label} placeholder="—"
       type={def.type === 'number' ? 'number' : undefined}
       value={String(shown ?? '')} readOnly={readOnly}
+      onFocus={beginTyping} onBlur={endTyping}
       onChange={(e) => {
         if (readOnly) return
         // An emptied number clears the value (Number('') saved 0).
@@ -2127,6 +2152,7 @@ function PanelHeader({ typeLabel, color, iconPath, title, titlePlaceholder, read
       {(title || titlePlaceholder) && (onTitle && !readOnly
         ? <input className="pp-title" aria-label="Name" value={title} placeholder={titlePlaceholder}
             onChange={(e) => onTitle(e.target.value)}
+            onFocus={beginTyping} onBlur={endTyping}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }} />
         : <div className={`pp-title${title ? '' : ' empty'}`}>{title || titlePlaceholder}</div>)}
       {context && <div className="pp-context">{context}</div>}

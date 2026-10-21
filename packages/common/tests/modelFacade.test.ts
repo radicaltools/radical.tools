@@ -79,12 +79,15 @@ describe('createModelFacade', () => {
         { id: 'a', ...node('system', 'A', { x: 0, y: 0, width: 600, height: 400 }) },
         { id: 'b', ...node('system', 'B', { x: 700, y: 0, width: 600, height: 400 }) },
         { id: 'api', ...node('container', 'API', { parentId: 'a', x: 30, y: 130 }) },
+        { id: 'db', ...node('container', 'DB', { parentId: 'b', x: 30, y: 130 }) },
       ] as C4Node[],
       views: [
         // B lies round API here: moved into B, API keeps its place on it.
-        { id: 'over', name: 'Over', nodeIds: [], positions: { a: at(0, 0, 600, 400), b: at(-100, 100, 600, 400), api: at(30, 130) } },
+        { id: 'over', name: 'Over', nodeIds: [], positions: { a: at(0, 0, 600, 400), b: at(-100, 100, 600, 400), api: at(30, 130), db: at(300, 200) } },
         // B is far away: API's place here is dropped, for the canvas to give it one inside B.
         { id: 'apart', name: 'Apart', nodeIds: [], positions: { a: at(0, 0, 600, 400), b: at(0, 900, 600, 400), api: at(30, 130) } },
+        // Inside B, but on DB: dropped too.
+        { id: 'onDb', name: 'On DB', nodeIds: [], positions: { a: at(0, 0, 600, 400), b: at(-100, 100, 600, 400), api: at(30, 130), db: at(100, 0) } },
       ],
     })
     f.moveNodes!(['api'], 'b')
@@ -92,6 +95,7 @@ describe('createModelFacade', () => {
     const views = f.getViews!()
     expect(views.over.positions.api).toEqual(at(130, 30))
     expect(views.apart.positions.api).toBeUndefined()
+    expect(views.onDb.positions.api).toBeUndefined()
     expect(views.apart.positions.b).toEqual(at(0, 900, 600, 400))
   })
 

@@ -9,10 +9,15 @@
  *   • tags block and inline tag strings:
  *       - "External System" / "External Person" → external: true
  *       - "Database" / "MS SQL db" / "Oracle db" → type: 'database'
- *   • relationships with optional label and technology strings
+ *   • relationships with optional label and technology strings, and a
+ *     block of their own (tags, properties) that is skipped
+ *   • enterprise blocks: their elements are part of the model
+ *   • comments: line and block comments anywhere outside strings, # at the
+ *     start of a line
  *
  * Sections not relevant to the node/relation model (views, styles,
- * configuration, deployment, …) are skipped.
+ * configuration, deploymentEnvironment, any unknown keyword with a block) are
+ * skipped.
  *
  * All positions are set to (0,0) so the diagram auto-layouts on first open.
  */
@@ -47,8 +52,9 @@ function tokenize(src: string): Tok[] {
 
     if (/\s/.test(c)) { i++; continue }
 
-    // Line comment  // …   and block comment  /* … */
-    if (c === '/' && s[i + 1] === '/') {
+    // Line comment  // …,  # … at the start of a line (only there: a
+    // colour in a style is #08427b), and block comment  /* … */
+    if ((c === '/' && s[i + 1] === '/') || (c === '#' && /(^|\n)[ \t]*$/.test(s.slice(Math.max(0, i - 200), i)))) {
       while (i < s.length && s[i] !== '\n') i++
       continue
     }
@@ -136,6 +142,14 @@ export function parseStructurizrDsl(src: string): StructurizrDslResult {
       if (t.kind === 'LBRACE') depth++
       else if (t.kind === 'RBRACE') depth--
     }
+  }
+
+  /** An unknown keyword with strings and then a block, as in
+   *  `deploymentEnvironment "Live" { … }`: true when the block is there. */
+  function namedBlockAhead(): boolean {
+    let k = 1
+    while (peek(k).kind === 'STR') k++
+    return peek(k).kind === 'LBRACE'
   }
 
   /** Consume consecutive STR tokens and return their values. */
@@ -276,9 +290,9 @@ export function parseStructurizrDsl(src: string): StructurizrDslResult {
         parseRel(parentId); continue
       }
 
-      // Unknown IDENT followed by a block — skip
-      if (t.kind === 'IDENT' && peek(1).kind === 'LBRACE') {
-        eat(); skipBlock(); continue
+      // Unknown IDENT followed by a block, with or without strings — skip
+      if (t.kind === 'IDENT' && namedBlockAhead()) {
+        eat(); consumeStrings(); skipBlock(); continue
       }
 
       eat() // skip anything else
@@ -369,9 +383,12 @@ export function parseStructurizrDsl(src: string): StructurizrDslResult {
   function parseRel(implied?: string): void {
     const srcRef = implied === undefined ? eat().val : null // source identifier
     eat()                    // consume ->
-    if (peek().kind !== 'IDENT') { consumeStrings(); return }
+    if (peek().kind !== 'IDENT') { consumeStrings(); skipBlock(); return }
     const tgtRef = eat().val // target identifier
     const ss     = consumeStrings()
+    // Its own block (tags, properties): its closing brace closed the block
+    // the relationship is in, and what followed was lost.
+    skipBlock()
 
     const srcId = srcRef === null ? implied : resolveId(srcRef)
     const tgtId = resolveId(tgtRef)
@@ -409,6 +426,12 @@ export function parseStructurizrDsl(src: string): StructurizrDslResult {
         eat(); if (peek().kind === 'LBRACE') skipBlock(); continue
       }
 
+      // enterprise "name" { ... }: its elements belong to the model. Its
+      // closing brace closed the model, and what followed was lost.
+      if (t.kind === 'IDENT' && lc(t.val) === 'enterprise' && namedBlockAhead()) {
+        eat(); consumeStrings(); parseModel(); continue
+      }
+
       // Assignment:  varName = elementKeyword ...
       if (t.kind === 'IDENT' && peek(1).kind === 'EQ') {
         const vn = eat().val; eat() // varName and =
@@ -430,9 +453,10 @@ export function parseStructurizrDsl(src: string): StructurizrDslResult {
         parseRel(); continue
       }
 
-      // Unknown IDENT with block — skip
-      if (t.kind === 'IDENT' && peek(1).kind === 'LBRACE') {
-        eat(); skipBlock(); continue
+      // Unknown IDENT with a block, with or without strings
+      // (deploymentEnvironment "Live" { … }) — skip
+      if (t.kind === 'IDENT' && namedBlockAhead()) {
+        eat(); consumeStrings(); skipBlock(); continue
       }
 
       eat() // skip anything else
@@ -456,7 +480,7 @@ export function parseStructurizrDsl(src: string): StructurizrDslResult {
         if (t.kind === 'IDENT' && t.val.startsWith('!')) { eat(); consumeStrings(); continue }
         if (t.kind === 'IDENT' && lc(t.val) === 'model')  { eat(); parseModel(); continue }
         // views, configuration, etc. — skip the whole block
-        if (t.kind === 'IDENT' && peek(1).kind === 'LBRACE') { eat(); skipBlock(); continue }
+        if (t.kind === 'IDENT' && namedBlockAhead()) { eat(); consumeStrings(); skipBlock(); continue }
         eat()
       }
 

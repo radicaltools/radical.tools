@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkModel, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestIds, parseTestReport, parseTestResults, runCheck, serializeTestResults, type TestCase } from '../src/check'
+import { checkModel, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestIds, parseTestReport, parseTestResults, ratchetConfig, runCheck, serializeTestResults, type TestCase } from '../src/check'
 import { findTests, globMatch } from '../src/check/reports'
 import { serializeToMdFolderWithPaths } from '../src/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
@@ -165,6 +165,21 @@ describe('radical check with test reports', () => {
     expect(messages(result, 'scenario-without-tests')).toEqual(['Scenario "S-NONE" names no test.'])
     expect(result.errors).toBe(2)
     expect(result.ok).toBe(false)
+  })
+
+  it('leaves the baselines of the rules that read reports as they are when none was given', () => {
+    // They counted 0 and showed ✓ though they did not run: --ratchet (and
+    // the Inspector's Ratchet) lowered their baselines to 0, and the next
+    // check with the reports failed.
+    const config = { rules: { 'test-not-found': { severity: 'error' as const, max: 1 }, 'scenario-without-tests': { max: 3 } } }
+    const files = serializeToMdFolderWithPaths(model(), 'T').files
+    const without = runCheck(files, config)
+    expect(without.rules.find((r) => r.id === 'test-not-found')).toMatchObject({ count: 0, max: 1, notRun: 'no-report', failed: false })
+    expect(ratchetConfig(config, without).lowered).toEqual([{ id: 'scenario-without-tests', from: 3, to: 1 }])
+    expect(formatCheckText(without, { folder: 'm' })).toContain('– test-not-found  not run: no test report (max 1)')
+    const withReports = runCheck(files, config, { tests })
+    expect(withReports.rules.find((r) => r.id === 'test-not-found')?.notRun).toBeUndefined()
+    expect(ratchetConfig(config, withReports).lowered).toEqual([{ id: 'scenario-without-tests', from: 3, to: 1 }])
   })
 
   it('reads no outcomes without reports', () => {

@@ -3,7 +3,7 @@ import { useDiagramStore } from '../store/diagramStore'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { TYPE_LABELS, nodeTypeSize, type C4ElementType, type C4Node } from '@radical/common/c4'
 import { isPlacementAllowed } from '@radical/common/metamodel'
-import { pipelineOf, type PipelineContext } from '@radical/common/viewPipeline'
+import { newElementFilters, pipelineOf, viewShownNodes, type PipelineContext } from '@radical/common/viewPipeline'
 import {
   flatten, insertPlan, locate, outlinePlan, warnierEditable, warnierRows, warnierTree,
   type OutlineMove, type WarnierMode, type WarnierNode,
@@ -254,9 +254,15 @@ export function WarnierView(): React.ReactElement {
   const runAsOneStep = useDiagramStore((s) => s.runAsOneStep)
   const requestDelete = useDiagramStore((s) => s.requestDelete)
   const deleting = useDiagramStore((s) => !!s.pendingDelete)
+  const pushNotification = useDiagramStore((s) => s.pushNotification)
 
+  // The element whose name is being written; `added` when it was just
+  // added: drawn where it goes even when the filter leaves it out, until
+  // its name is written (which may let it through).
+  const [renaming, setRenaming] = useState<{ id: string; draft: string; added?: true } | null>(null)
+  const naming = renaming?.added ? renaming.id : undefined
   const ctx = useMemo<PipelineContext>(() => ({ nodes, relations, metamodel }), [nodes, relations, metamodel])
-  const tree = useMemo(() => warnierTree(warnierRows(activeView, ctx)), [activeView, ctx])
+  const tree = useMemo(() => warnierTree(warnierRows(activeView, ctx, naming)), [activeView, ctx, naming])
   const typeOf = useMemo(() => (type: string) => ({
     label: metamodel?.nodeTypes[type]?.label ?? TYPE_LABELS[type as keyof typeof TYPE_LABELS] ?? type,
     color: metamodel?.nodeTypes[type]?.color ?? '#64748b',
@@ -277,7 +283,6 @@ export function WarnierView(): React.ReactElement {
   }
   const items = useMemo(() => flatten(tree), [tree])
   const selected = selectedId ? items.find((i) => i.node.id === selectedId) : undefined
-  const [renaming, setRenaming] = useState<{ id: string; draft: string } | null>(null)
   const [repeatOpen, setRepeatOpen] = useState<string | null>(null)
   const root = useRef<HTMLDivElement>(null)
 
@@ -349,6 +354,8 @@ export function WarnierView(): React.ReactElement {
         x: 0,
         y: 0,
         ...nodeTypeSize(type, metamodel),
+        // The values the view's filter asks for, as the table gives them.
+        ...newElementFilters(activeView, ctx, type)?.properties,
         ...(plan.parentId ? { parentId: plan.parentId } : {}),
         ...(plan.order !== undefined ? { order: plan.order } : {}),
       } as unknown as Omit<C4Node, 'id'>)
@@ -356,7 +363,7 @@ export function WarnierView(): React.ReactElement {
     })
     if (!created) return
     selectNode(created)
-    setRenaming({ id: created, draft: label })
+    setRenaming({ id: created, draft: label, added: true })
   }
 
   /** A process at the top, after the ones there are, its name open. */
@@ -375,11 +382,12 @@ export function WarnierView(): React.ReactElement {
       created = addNode({
         type: 'process' as C4ElementType, label, collapsed: false, x: 0, y: 0,
         ...nodeTypeSize('process', metamodel), ...(hasOrder('process') ? { order: roots + 1 } : {}),
+        ...newElementFilters(activeView, ctx, 'process')?.properties,
       } as unknown as Omit<C4Node, 'id'>)
     })
     if (!created) return
     selectNode(created)
-    setRenaming({ id: created, draft: label })
+    setRenaming({ id: created, draft: label, added: true })
   }
 
   const startRename = (id: string) => {
@@ -392,6 +400,21 @@ export function WarnierView(): React.ReactElement {
     const label = renaming.draft.trim()
     if (label && label !== nodes[renaming.id]?.label) updateNode(renaming.id, { label })
     setRenaming(null)
+    if (renaming.added) warnIfHidden(renaming.id)
+  }
+  const cancelRename = () => {
+    if (!renaming) return
+    setRenaming(null)
+    if (renaming.added) warnIfHidden(renaming.id)
+  }
+  /** Says so when the filter does not show an element just added and named,
+   *  as the table does: it is there, in the model, but not here. */
+  const warnIfHidden = (id: string) => {
+    const s = useDiagramStore.getState()
+    const node = s.c4Nodes[id]
+    const view = s.activeViewId ? s.views[s.activeViewId] : undefined
+    const shown = viewShownNodes(view, s.c4Nodes, s.c4Relations)
+    if (node && shown && !shown.has(id)) pushNotification(`${node.label} was added, but this view's filter does not show it.`, 'warning')
   }
 
   const edit: Editing | null = readOnly ? null : {
@@ -461,7 +484,7 @@ export function WarnierView(): React.ReactElement {
               onRename={startRename}
               onDraft={(draft) => setRenaming((r) => (r ? { ...r, draft } : r))}
               onCommit={commitRename}
-              onCancel={() => setRenaming(null)}
+              onCancel={cancelRename}
               typeOf={typeOf}
               edit={edit}
             />

@@ -4,6 +4,6 @@ type: "requirement"
 label: "Unreadable folder file"
 action: "Studio shall name the file in an error notification, keep the model that was on screen when the folder was reloaded (or open an empty one when the folder was being opened), write nothing to the folder until the file reads again, and reload the model once the file changes."
 ears_type: "unwanted-behaviour"
-rationale: "An unreadable relations.json used to read as no relations, and the next save removed the file. Evidence: apps/studio/src/renderer/src/store/documentStore.ts (DocumentUnreadableError, mdUnreadable, saveDocument), apps/studio/src/renderer/src/persistence/autosave.ts (loadActive catch), packages/common/src/formats/mdFolder.ts (MalformedFolderFileError)."
-unwanted_condition: "a JSON file of the open folder model cannot be parsed (a trailing comma, git conflict markers, a file caught half written)"
+rationale: "An unreadable relations.json used to read as no relations, and the next save removed the file; a .radical file that did not parse opened as an empty model and was overwritten with it (exploratory run 43, 2026-10-21). Evidence: apps/studio/src/renderer/src/store/documentStore.ts (DocumentUnreadableError, unreadable, readFileModel, saveDocument), apps/studio/src/renderer/src/persistence/autosave.ts (loadActive catch), packages/common/src/formats/mdFolder.ts (MalformedFolderFileError)."
+unwanted_condition: "a JSON file of the open folder model cannot be parsed (a trailing comma, git conflict markers, a file caught half written), or a .radical model file does not parse or was moved or deleted outside Studio"
 ---

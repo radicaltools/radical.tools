@@ -722,12 +722,21 @@ function StructuralCanvas(): React.ReactElement {
   // (a slide without a canvas unmounts it), so no one moves a camera that
   // is not on screen any more.
   const registeredViewportFns = useRef<{ getViewport: unknown; setViewport: unknown } | null>(null)
-  useEffect(() => () => {
-    const W = window as any
-    const mine = registeredViewportFns.current
-    if (!mine) return
-    if (W.__rfSetViewport === mine.setViewport) delete W.__rfSetViewport
-    if (W.__rfGetViewport === mine.getViewport) delete W.__rfGetViewport
+  const registeredFocusNodes = useRef<unknown>(null)
+  // Gone before its first camera (a slide without a canvas came straight
+  // after): it puts nothing on window any more, and takes no slide's focus.
+  const unmountedRef = useRef(false)
+  useEffect(() => {
+    unmountedRef.current = false
+    return () => {
+      unmountedRef.current = true
+      const W = window as any
+      if (registeredFocusNodes.current && W.__rfFocusNodes === registeredFocusNodes.current) delete W.__rfFocusNodes
+      const mine = registeredViewportFns.current
+      if (!mine) return
+      if (W.__rfSetViewport === mine.setViewport) delete W.__rfSetViewport
+      if (W.__rfGetViewport === mine.getViewport) delete W.__rfGetViewport
+    }
   }, [])
   /** Frames the nodes `ids` the canvas shows, once React Flow has drawn them
    *  (a slide switch may have just swapped the view), zooming in no further
@@ -858,8 +867,10 @@ function StructuralCanvas(): React.ReactElement {
     // A presentation slide with focus elements frames just those, once React
     // Flow has drawn them (the slide switch may have just swapped the view).
     // Hidden ones (inside a collapsed group) are left out; with none shown,
-    // the slide falls back to fitting the whole view.
-    ;(window as any).__rfFocusNodes = (ids: string[], opts?: { duration?: number }) => {
+    // the slide falls back to fitting the whole view. Put on window only
+    // once this canvas has placed its first camera (below): a slide that
+    // asks before then leaves its focus pending (`__rfPendingFocus`).
+    const focusNodes = (ids: string[], opts?: { duration?: number }) => {
       frameNodes(ids, opts?.duration ?? 600, 1.5)
     }
     // Presentation slide navigation (diagramStore's goToSlide/previewSlide)
@@ -870,13 +881,26 @@ function StructuralCanvas(): React.ReactElement {
     // Restore the camera saved with the active view (or default context).
     // Falls back to fit-all if no viewport was persisted yet.
     setTimeout(() => {
+      if (unmountedRef.current) return
       const s = useDiagramStore.getState()
+      const W = window as any
+      W.__rfFocusNodes = focusNodes
+      registeredFocusNodes.current = focusNodes
       // A slide asked for its camera while this canvas was mounting.
-      const pending = (window as any).__rfPendingCamera as { vp: { x: number; y: number; zoom: number } } | undefined
+      const pending = W.__rfPendingCamera as { vp: { x: number; y: number; zoom: number } } | undefined
       if (pending) {
-        ;(window as any).__rfPendingCamera = undefined
+        W.__rfPendingCamera = undefined
         suppressAutoFit(1800)
         instance.setViewport(pending.vp)
+        return
+      }
+      // A slide asked to zoom onto its focus elements while this canvas was
+      // mounting (after a table slide, from a deep link or a reload): the
+      // view's own camera placed here after it showed the whole view.
+      const pendingFocus = W.__rfPendingFocus as { ids: string[]; duration: number } | undefined
+      if (pendingFocus) {
+        W.__rfPendingFocus = undefined
+        focusNodes(pendingFocus.ids, { duration: 0 })
         return
       }
       const stored = s.activeViewId
@@ -1047,8 +1071,10 @@ function StructuralCanvas(): React.ReactElement {
       // A step's arrow to the next is no relation to select.
       if (edge.id.startsWith('flow:')) return
       const state = useDiagramStore.getState()
-      // If a sequence is being edited, toggle this relation and don't open properties
-      if (state.activeSequenceId && !edge.id.startsWith('virtual-')) {
+      // If a sequence is being edited, toggle this relation and don't open
+      // properties. Only Designer edits one: Viewer and Presenter show the
+      // sequence picked, and a click there selects the relation.
+      if (state.activeSequenceId && state.appMode === 'designer' && !state.presentationActive && !edge.id.startsWith('virtual-')) {
         state.toggleRelationInSequence(state.activeSequenceId, edge.id)
         return
       }
@@ -1300,11 +1326,13 @@ function StructuralCanvas(): React.ReactElement {
           pointerEvents: 'all',
           userSelect: 'none',
         }}>
-          Editing: {activeSequenceName ?? activeSequenceId} — click relations to add steps (remove via step list)
+          {isViewMode || presentationActive
+            ? <>Sequence: {activeSequenceName ?? activeSequenceId}</>
+            : <>Editing: {activeSequenceName ?? activeSequenceId} — click relations to add steps (remove via step list)</>}
           <button
             onClick={() => setActiveSequence(null)}
             style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '0 2px', fontSize: 13, lineHeight: 1, opacity: 0.85 }}
-            title="Stop editing"
+            title={isViewMode || presentationActive ? 'Close the sequence' : 'Stop editing'}
           >✕</button>
         </div>
       )}

@@ -158,3 +158,67 @@ test('a concept imported into a selected container lands beside what it holds', 
   // The container grew; its neighbour made room, as after a drop.
   expect(overlaps(await studio.boxes(), ['bookstore', 'payments', 'customer'])).toEqual([])
 })
+
+test('a concept added in Viewer with a container selected goes into it, as the card says', async ({ page, studio }) => {
+  // The switch to Designer dropped the selection before the import read it:
+  // the card said "↳ Bookstore" and the concept landed at the top.
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-containers', 'viewer')
+  await studio.node('bookstore').click({ position: { x: 30, y: 12 } })
+  await expect(studio.node('bookstore')).toHaveClass(/selected/)
+  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByText(/Import from Hub/).first().click()
+  const dialog = page.locator('[aria-label="Import from Hub"]')
+  await dialog.getByPlaceholder('Search concepts…').pressSequentially('API Versioning')
+  const card = dialog.locator('div', { has: page.getByRole('heading', { name: /API Versioning/ }) })
+    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
+  await expect(card).toContainText('↳ Bookstore')
+  await card.getByRole('button', { name: 'Add to Model' }).click()
+  await page.waitForTimeout(800)
+  const skip = dialog.getByRole('button', { name: 'Skip', exact: true })
+  if (await skip.count()) await skip.click()
+  await page.waitForTimeout(300)
+  const importButton = dialog.getByRole('button', { name: 'Import', exact: true })
+  if (await importButton.count()) await importButton.click()
+  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  const added = (await studio.storedDoc()).nodes.filter((n) => !JSON.parse(fixture('bookstore')).nodes.some((m: { id: string }) => m.id === n.id))
+  expect(added.map((n) => n.parentId)).toEqual(['bookstore'])
+})
+
+test("a blueprint's views keep the Hub's layout, also after a reload", async ({ page, studio }) => {
+  // Imported on a view, its elements had places on that view only (1 of 39
+  // on All elements) and its views none: Containers, opened after a reload,
+  // drew the Ledger Platform over the model's root elements.
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-containers')
+  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByText(/Import from Hub/).first().click()
+  const dialog = page.locator('[aria-label="Import from Hub"]')
+  await dialog.getByPlaceholder('Search concepts…').pressSequentially('Fintech')
+  const card = dialog.locator('div', { has: page.getByRole('heading', { name: /Fintech/ }) })
+    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
+  await card.getByRole('button', { name: 'Add to Model' }).click()
+  for (const box of await dialog.locator('input[type=checkbox]:checked').all()) {
+    const label = (await box.locator('xpath=..').innerText()).trim()
+    if (/hub|concept/i.test(label)) await box.uncheck().catch(() => {})
+  }
+  await dialog.getByRole('button', { name: /^Import \(/ }).click()
+  await dialog.getByRole('button', { name: 'Import', exact: true }).click()
+  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBeGreaterThan(20)
+  await page.waitForTimeout(1000)
+  const saved = await studio.storedDoc() as unknown as { nodes: Array<{ id: string }>; views: Array<{ id: string; name: string; positions: Record<string, unknown> }>; defaultPositions: Record<string, unknown> }
+  expect(saved.nodes.filter((n) => !(n.id in saved.defaultPositions)).map((n) => n.id)).toEqual([])
+  const view = (name: string) => saved.views.find((v) => v.name.endsWith(`— ${name}`))!
+  expect(Object.keys(view('Containers').positions).length).toBeGreaterThan(10)
+  await studio.open(view('System context').id)
+  await page.reload()
+  await studio.ready()
+  await studio.open(view('Containers').id)
+  await studio.settle()
+  expect(await studio.layoutViolations()).toEqual([])
+})

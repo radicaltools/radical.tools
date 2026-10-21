@@ -41,6 +41,7 @@ import {
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
 import { wikiDepthOf } from '@radical/common/c4'
+import { newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
@@ -368,8 +369,26 @@ export function WikiView(): React.ReactElement {
   const typeMeta = useTypeMeta()
 
   const view = activeViewId ? views[activeViewId] : null
-  const focusId = view?.wikiFocusId ?? null
-  const pageMode = view?.wikiPageMode ?? 'single'
+  // A slide shows the page it was added on, over the view's own; reading
+  // on from it goes on from that page, in the view.
+  const slidePage = useDiagramStore((s) => s.slideWikiPage)
+  const shownSlide = view && slidePage?.viewId === view.id ? slidePage : null
+  const focusId = shownSlide ? shownSlide.focusId : view?.wikiFocusId ?? null
+  const pageMode = shownSlide ? shownSlide.pageMode : view?.wikiPageMode ?? 'single'
+  /** The slide's page becomes the view's, before the view moves on. */
+  const leaveSlidePage = () => {
+    const { slideWikiPage: page, views: now } = useDiagramStore.getState()
+    const own = page ? now[page.viewId] : undefined
+    if (!page || !own || page.viewId !== view?.id) return
+    useDiagramStore.setState({ slideWikiPage: null })
+    if ((own.wikiFocusId ?? null) !== page.focusId) setWikiFocus(own.id, page.focusId)
+    if ((own.wikiPageMode ?? 'single') !== page.pageMode) setWikiPageMode(own.id, page.pageMode)
+  }
+  const changePageMode = (mode: 'single' | 'multi') => {
+    if (!view) return
+    leaveSlidePage()
+    setWikiPageMode(view.id, mode)
+  }
 
   const [filter, setFilter] = useState('')
 
@@ -389,7 +408,9 @@ export function WikiView(): React.ReactElement {
   const focus = focusNode && (!shownSet || shownSet.has(focusNode.id)) ? focusNode : null
 
   const goTo = (id: string | null) => {
-    if (view) setWikiFocus(view.id, id)
+    if (!view) return
+    leaveSlidePage()
+    setWikiFocus(view.id, id)
   }
 
   const typeOrder = useMemo(() => allNodeTypeIds(metamodel), [metamodel])
@@ -405,13 +426,17 @@ export function WikiView(): React.ReactElement {
     const hierarchy = under ? metamodel?.nodeTypes[under.type]?.hierarchyRelation : undefined
     const parentId = under ? (hierarchy ? under.parentId : under.id) : undefined
     const links: WizardLink[] = under && hierarchy ? [{ relationType: hierarchy, direction: 'out', otherId: under.id }] : []
-    return addNodes(lines.map((line) => ({
+    // The values the view's filter asks for, as the table gives them; what
+    // the line says wins (a sentence's own EARS type).
+    const filtered = newElementFilters(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }, type, under ? { node: under, link: links[0] } : undefined)
+    const ids = addNodes(lines.map((line) => ({
       node: {
         type: type as C4ElementType,
         description: '',
         technology: '',
         collapsed: false,
         external: false,
+        ...filtered?.properties,
         ...elementFromLine(type, line),
         parentId,
         x: 0,
@@ -420,6 +445,13 @@ export function WikiView(): React.ReactElement {
       },
       links,
     })))
+    // Not lost from sight without a word, as in the table.
+    const s = useDiagramStore.getState()
+    const shown = viewShownNodes(s.activeViewId ? s.views[s.activeViewId] : undefined, s.c4Nodes, s.c4Relations)
+    const hidden = shown ? ids.filter((id) => !shown.has(id)) : []
+    if (hidden.length === 1) pushNotification(`${s.c4Nodes[hidden[0]]?.label ?? 'It'} was added, but this view's filter does not show it.`, 'warning')
+    else if (hidden.length > 1) pushNotification(`${hidden.length} elements were added, but this view's filter does not show them.`, 'warning')
+    return ids
   }
 
   const actions: WikiActions = {
@@ -608,14 +640,14 @@ export function WikiView(): React.ReactElement {
         <div className="wiki-page-mode-toggle">
           <button
             className={pageMode === 'single' ? 'active' : ''}
-            onClick={() => view && setWikiPageMode(view.id, 'single')}
+            onClick={() => changePageMode('single')}
             title="One element per page: its children are named and linked"
           >
             Single page
           </button>
           <button
             className={pageMode === 'multi' ? 'active' : ''}
-            onClick={() => view && setWikiPageMode(view.id, 'multi')}
+            onClick={() => changePageMode('multi')}
             title="One article: the children are chapters of this page"
           >
             Multi page

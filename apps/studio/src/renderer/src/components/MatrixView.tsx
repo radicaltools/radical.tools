@@ -9,7 +9,8 @@ import type { C4Node } from '@radical/common/c4'
 import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
 import { isRelationAllowed } from '@radical/common/metamodel'
 import { viewShowsEveryNode } from '@radical/common/c4'
-import { chainDrawn } from '@radical/common/viewPipeline'
+import { chainDrawn, chainRelationFor } from '@radical/common/viewPipeline'
+import { viewExpandedSet } from '@radical/layout/viewInput'
 
 // ─── Tree ordering helper (hierarchical, parents before children) ────────────
 
@@ -104,10 +105,12 @@ export function MatrixView(): React.ReactElement {
     return vcs
   }, [viewFilter, nodes, activeView])
 
-  const expandedSet = useMemo<Set<string> | undefined>(() => {
-    if (!activeView?.expandedNodeIds?.length) return undefined
-    return new Set(activeView.expandedNodeIds)
-  }, [activeView])
+  // Opened in the view, and the containers the filter leaves out, which
+  // only hold what it gives: folded, they would hide it.
+  const expandedSet = useMemo<Set<string> | undefined>(
+    () => viewExpandedSet(activeView, nodes, relations),
+    [activeView, nodes, relations],
+  )
 
   // ── Visible node list (respects collapse state) ────────────────────────────
 
@@ -189,16 +192,30 @@ export function MatrixView(): React.ReactElement {
         return
       }
       if (readonly) return
+      // An empty cell over a relation the matrix does not draw (hidden from
+      // the view, or not one its chain follows): another would be a copy.
+      const undrawn = Object.values(relations).find((r) => r.sourceId === source.id && r.targetId === target.id)
+      if (undrawn) {
+        pushNotification(`${source.label} \u2192 ${target.label} has a relation (${relLabel(undrawn.relationType)}) that this matrix does not show.`, 'info')
+        return
+      }
       if (!isRelationAllowed(metamodel, source.type, target.type)) {
         const s = metamodel?.nodeTypes[source.type]?.label ?? source.type
         const t = metamodel?.nodeTypes[target.type]?.label ?? target.type
         pushNotification(`Relation not allowed: ${s} \u2192 ${t}.`, 'error')
         return
       }
-      addRelation({ sourceId: source.id, targetId: target.id })
+      // With a chain, the matrix draws only the relations the chain follows:
+      // the new one is of such a type, or none is added.
+      const made = chain?.relationIds ? chainRelationFor(activeView, source.id, target.id, { nodes, relations, metamodel }) : {}
+      if (!made) {
+        pushNotification(`Not added: this matrix shows only the relations its filter follows, and none leads from ${source.label} to ${target.label}.`, 'error')
+        return
+      }
+      addRelation({ sourceId: source.id, targetId: target.id, ...made })
       pushNotification(`Added relation: ${source.label} \u2192 ${target.label}`, 'info')
     },
-    [relMap, selectedEdgeId, armedId, selectEdge, removeRelation, addRelation, metamodel, pushNotification, readonly],
+    [relMap, selectedEdgeId, armedId, selectEdge, removeRelation, addRelation, metamodel, pushNotification, readonly, relations, relLabel, chain, activeView, nodes],
   )
 
   const n = orderedNodes.length

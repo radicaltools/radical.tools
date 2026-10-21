@@ -15,6 +15,8 @@ import { serializeSelection } from '@radical/common/formats/canvasSelection'
 import { parseModelBase } from '@radical/common/formats/modelBase'
 import { AGENT_ACTIVE_MS, AGENT_ACTIVITY_FILE, parseAgentActivity } from '@radical/common/formats/agentActivity'
 import { FolderModel } from './folderModel'
+import { drawnSize } from '@radical/layout/geometry'
+import type { C4Node } from '@radical/common/c4'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
@@ -114,6 +116,7 @@ describe('folder-backed MCP model', () => {
         { tempId: 'orders', type: 'system', label: 'Orders', parentId: 'shop' },
         { tempId: 'billing', type: 'system', label: 'Billing', parentId: 'shop' },
         { tempId: 'crm', type: 'system', label: 'CRM' },
+        { tempId: 'bank', type: 'system', label: 'Bank' },
       ]) {
         const added = await client.callTool({ name: 'add_node', arguments: args })
         expect(added.isError, JSON.stringify(added.content)).not.toBe(true)
@@ -147,6 +150,31 @@ describe('folder-backed MCP model', () => {
       expect(erp.x + erp.width).toBeLessThanOrEqual(shopNow.width)
       expect(erp.y + erp.height).toBeLessThanOrEqual(shopNow.height)
       expect(data.defaultPositions?.[erp.id]).toEqual({ x: erp.x, y: erp.y, width: erp.width, height: erp.height })
+      // Nothing lies on anything else at any level, as drawn (a system
+      // holding nothing is drawn small): where Shop grew, the root elements
+      // beside it made room.
+      const overlapping = (): string[] => {
+        const out: string[] = []
+        const parents = new Set(data.nodes.map((n) => n.parentId))
+        const drawn = (n: C4Node) => ({ x: n.x, y: n.y, ...drawnSize(n, parents.has(n.id)) })
+        for (const a of data.nodes.map((n) => ({ ...n, ...drawn(n) }))) {
+          for (const b of data.nodes.map((n) => ({ ...n, ...drawn(n) }))) {
+            if (a.id < b.id && a.parentId === b.parentId && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height) out.push(`${a.label} ~ ${b.label}`)
+          }
+        }
+        return out
+      }
+      expect(overlapping()).toEqual([])
+
+      // Billing moved out of Shop: not left on Shop, beside the root elements.
+      const out = await client.callTool({ name: 'move_node', arguments: { id: billing.id, parentId: null } })
+      expect(out.isError, JSON.stringify(out.content)).not.toBe(true)
+      data = await read()
+      expect(byLabel('Billing').parentId).toBeUndefined()
+      expect(overlapping()).toEqual([])
+      for (const node of data.nodes) {
+        expect(data.defaultPositions?.[node.id]).toEqual({ x: node.x, y: node.y, width: node.width, height: node.height })
+      }
 
       const user = await client.callTool({ name: 'add_node', arguments: { tempId: 'user', type: 'person', label: 'Buyer' } })
       expect(user.isError).not.toBe(true)

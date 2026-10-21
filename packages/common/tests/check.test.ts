@@ -192,6 +192,16 @@ describe('radical check: config', () => {
     expect(ratchetConfig(tight, check(incomplete(), tight)).lowered).toEqual([])
   })
 
+  it('ratchets no baseline of a rule that did not run on a folder that is no model', () => {
+    const config: CheckConfig = { rules: { 'requirement-without-scenario': { severity: 'error', max: 5 } } }
+    const files = filesOf(incomplete())
+    delete files['radical.md']
+    const result = runCheck(files, config)
+    expect(result.rules.find((r) => r.id === 'requirement-without-scenario')).toMatchObject({ count: 0, notRun: 'no-model' })
+    expect(ratchetConfig(config, result).lowered).toEqual([])
+    expect(formatCheckText(result, { folder: 'm' })).toContain('– requirement-without-scenario  not run: the folder is no model (max 5)')
+  })
+
   it('has unique rule ids', () => {
     const ids = [...FOLDER_RULES, ...CHECK_RULES].map((r) => r.id)
     expect(new Set(ids).size).toBe(ids.length)

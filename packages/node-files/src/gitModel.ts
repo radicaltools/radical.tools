@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
-import { deserializeFromMdFolder, isMdFolderModelPath, type FolderFiles } from '@radical/common/formats/mdFolder'
+import { deserializeFromMdFolder, isMdFolderModelPath, stripBom, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { countModelChanges, formatModelChanges, modelChangeReport, type ModelChangeReport } from '@radical/common/modelChanges'
 import type { ModelCopy } from '@radical/common/model'
 import type { DiagramData } from '@radical/common/c4'
@@ -92,7 +92,7 @@ function catFiles(cwd: string, shas: string[]): Promise<string[]> {
         const [gotSha, type, size] = out.subarray(at, end).toString().split(' ')
         if (gotSha !== sha || type !== 'blob') { reject(new Error(`git cat-file: unexpected entry for ${sha}`)); return }
         const start = end + 1
-        contents.push(out.subarray(start, start + Number(size)).toString('utf8'))
+        contents.push(stripBom(out.subarray(start, start + Number(size)).toString('utf8')))
         at = start + Number(size) + 1
       }
       resolve(contents)

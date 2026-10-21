@@ -47,12 +47,12 @@ describe('radical hooks', () => {
     for (const name of HOOK_NAMES) {
       const text = await readFile(join(hooks, name), 'utf8')
       expect(text.split(HOOK_MARKER)).toHaveLength(2)
-      expect(text).toContain(`${command} diff "my model" --save-base --quiet || true`)
+      expect(text).toContain(`${command} diff "my model" --save-base --quiet </dev/null || true`)
       // Windows does not expose POSIX executable bits; the commit below
       // verifies that Git runs the installed hook on every platform.
       if (process.platform !== 'win32') expect((await stat(join(hooks, name))).mode & 0o111).toBeTruthy()
     }
-    expect(await readFile(join(hooks, 'post-commit'), 'utf8')).toMatch(/^#!\/bin\/sh\necho own >> own\.txt\n# radical/)
+    expect(await readFile(join(hooks, 'post-commit'), 'utf8')).toMatch(/^#!\/bin\/sh\n# radical.*\n.*\necho own >> own\.txt\n$/)
     // The CLI moved: installing again brings the line up to date, once.
     const moved = `"${process.execPath}" "${join(cwd, 'moved.mjs')}"`
     expect((await run(cwd, moved, 'hooks', 'install', 'my model')).out).toContain('Updated in post-checkout, post-commit, post-merge, post-rewrite')
@@ -64,6 +64,73 @@ describe('radical hooks', () => {
     await git(cwd, 'commit', '-q', '-m', 'model')
     expect(await readFile(join(cwd, 'ran.txt'), 'utf8')).toBe('diff my model --save-base --quiet\n')
     expect(await readFile(join(cwd, 'own.txt'), 'utf8')).toBe('own\n')
+  })
+
+  it('keeps the line of every model folder it was installed for', async () => {
+    // The marker was one for all folders: installing for a second folder
+    // "updated" the first one's line, whose base was never saved again.
+    const cwd = await mkdtemp(join(tmpdir(), 'radical-hooks-'))
+    dirs.push(cwd)
+    await git(cwd, 'init', '-q', '-b', 'main')
+    for (const folder of ['one', 'two']) await mkdir(join(cwd, folder))
+    expect((await run(cwd, 'radical', 'hooks', 'install', 'one')).out).toContain('Added to')
+    expect((await run(cwd, 'radical', 'hooks', 'install', 'two')).out).toContain('Added to')
+    expect((await run(cwd, 'radical', 'hooks', 'install', 'one')).out).toContain('nothing changed')
+    for (const name of HOOK_NAMES) {
+      const text = await readFile(join(cwd, '.git/hooks', name), 'utf8')
+      expect(text).toContain('radical diff "one" --save-base')
+      expect(text).toContain('radical diff "two" --save-base')
+      expect(text.split(HOOK_MARKER)).toHaveLength(3)
+    }
+  })
+
+  it('puts the line where it runs in a sh hook, and leaves a hook in another language to the user', async () => {
+    // Appended at the end, the line never ran after an `exit` or an `exec`,
+    // and a Python hook failed on it with a SyntaxError and stopped running.
+    const cwd = await mkdtemp(join(tmpdir(), 'radical-hooks-'))
+    dirs.push(cwd)
+    await git(cwd, 'init', '-q', '-b', 'main')
+    await mkdir(join(cwd, 'model'))
+    const hooks = join(cwd, '.git/hooks')
+    await mkdir(hooks, { recursive: true })
+    const python = '#!/usr/bin/env python3\nopen("python-ran.txt", "w").write("yes")\n'
+    await writeFile(join(hooks, 'post-commit'), python, { mode: 0o755 })
+    await writeFile(join(hooks, 'post-checkout'), '#!/usr/bin/env bash\necho ran >> sh-ran.txt\nexit 0\n')
+    // An install by an earlier version: the line appended to the Python hook.
+    await writeFile(join(hooks, 'post-merge'), `#!/usr/bin/python3\nprint("merged")\n${HOOK_MARKER}\nradical diff "model" --save-base --quiet || true\n`)
+    await writeFile(join(cwd, 'record.mjs'), "import { appendFileSync } from 'node:fs'\nappendFileSync('ran.txt', process.argv.slice(2).join(' ') + '\\n')\n")
+    const command = `"${process.execPath}" "${join(cwd, 'record.mjs')}"`
+
+    const result = await run(cwd, command, 'hooks', 'install', 'model')
+    expect(result.code).toBe(2)
+    expect(result.out).toContain('Added to post-checkout, post-rewrite')
+    expect(result.err).toContain('post-commit, post-merge')
+    expect(result.err).toContain(`${command} diff "model" --save-base --quiet`)
+    expect(await readFile(join(hooks, 'post-commit'), 'utf8')).toBe(python)
+    // The line an earlier version appended to a Python hook is taken out.
+    expect(await readFile(join(hooks, 'post-merge'), 'utf8')).toBe('#!/usr/bin/python3\nprint("merged")\n')
+    const checkout = await readFile(join(hooks, 'post-checkout'), 'utf8')
+    expect(checkout).toMatch(/^#!\/usr\/bin\/env bash\n# radical/)
+    expect(checkout).toMatch(/echo ran >> sh-ran\.txt\nexit 0\n$/)
+
+    await git(cwd, 'commit', '-q', '--allow-empty', '-m', 'x')
+    expect(await readFile(join(cwd, 'python-ran.txt'), 'utf8')).toBe('yes')
+    await git(cwd, 'checkout', '-q', '-b', 'feature')
+    expect(await readFile(join(cwd, 'ran.txt'), 'utf8')).toBe('diff model --save-base --quiet\n')
+    expect(await readFile(join(cwd, 'sh-ran.txt'), 'utf8')).toBe('ran\n')
+  })
+
+  it('moves a line an earlier version put after the hook\'s exit to where it runs', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'radical-hooks-'))
+    dirs.push(cwd)
+    await git(cwd, 'init', '-q', '-b', 'main')
+    await mkdir(join(cwd, 'model'))
+    const hooks = join(cwd, '.git/hooks')
+    await mkdir(hooks, { recursive: true })
+    const line = 'radical diff "model" --save-base --quiet </dev/null || true'
+    await writeFile(join(hooks, 'post-checkout'), `#!/bin/sh\nexit 0\n${HOOK_MARKER}\n${line}\n`)
+    expect((await run(cwd, 'radical', 'hooks', 'install', 'model')).out).toContain('Updated in post-checkout')
+    expect(await readFile(join(hooks, 'post-checkout'), 'utf8')).toBe(`#!/bin/sh\n${HOOK_MARKER}\n${line}\nexit 0\n`)
   })
 
   it('exits 2 outside git and on a wrong action', async () => {

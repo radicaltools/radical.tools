@@ -71,6 +71,10 @@ export interface CheckRuleResult {
   max?: number
   /** Findings above the baseline, or any finding of an error rule without one. */
   failed: boolean
+  /** The rule did not run: it reads test reports and none was given
+   *  ('no-report'), or the folder could not be read as a model ('no-model').
+   *  Its count says nothing. */
+  notRun?: 'no-report' | 'no-model'
 }
 
 export interface CheckResult {
@@ -133,14 +137,14 @@ export function runCheck(files: FolderFiles, config: CheckConfig = {}, options: 
     }
   }
 
-  let model: ModelCheck = { found: [], nodeCount: 0, relationCount: 0, metrics: [] }
+  let model: ModelCheck = { found: [], nodeCount: 0, relationCount: 0, metrics: [], notRun: new Map([...CHECK_RULES, GOAL_RULE].map((r) => [r.id, 'no-model'])) }
   if (!found.some((f) => FATAL.has(f.rule))) model = checkData(deserializeFromMdFolder(files).data, options, config)
 
   const result = settle([...found, ...model.found].map((f) => ({
     ...f,
     ...(!f.path && f.nodeId && pathOf.has(f.nodeId) ? { path: pathOf.get(f.nodeId) } : {}),
     ...(!f.path && f.relationId ? { path: 'relations.json' } : {}),
-  })), config, model.nodeCount, model.relationCount, model.metrics)
+  })), config, model)
   return model.evidence ? { ...result, evidence: model.evidence } : result
 }
 
@@ -150,6 +154,8 @@ interface ModelCheck {
   relationCount: number
   metrics: CheckMetricResult[]
   evidence?: Evidence
+  /** The rules that did not run, and why. */
+  notRun: Map<string, NonNullable<CheckRuleResult['notRun']>>
 }
 
 function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig): ModelCheck {
@@ -172,6 +178,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     relationCount: Object.keys(relations).length,
     metrics: goals.metrics,
     ...(evidence ? { evidence } : {}),
+    notRun: new Map(options.tests ? [] : CHECK_RULES.filter((r) => r.readsReports).map((r) => [r.id, 'no-report'])),
   }
 }
 
@@ -179,7 +186,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
  *  ones about the folder's files, which only a folder has. */
 export function checkModel(data: DiagramData, config: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
   const model = checkData(data, options, config)
-  const result = settle(model.found, config, model.nodeCount, model.relationCount, model.metrics)
+  const result = settle(model.found, config, model)
   return model.evidence ? { ...result, evidence: model.evidence } : result
 }
 
@@ -218,7 +225,7 @@ const keyOf = (f: { rule: string; code?: string }, rules: Record<string, RuleSet
 const settingOf = (setting: RuleSetting | undefined): Exclude<RuleSetting, string> =>
   setting === undefined ? {} : typeof setting === 'string' ? { severity: setting } : setting
 
-function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfig, nodeCount: number, relationCount: number, metrics: CheckMetricResult[]): CheckResult {
+function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfig, { nodeCount, relationCount, metrics, notRun }: ModelCheck): CheckResult {
   const rules = config.rules ?? {}
   const groups = new Map<string, Array<RuleFinding & { rule: string }>>()
   for (const f of found) {
@@ -235,6 +242,11 @@ function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfi
     const list = groups.get(key) ?? []
     const { severity: set, max } = settingOf(rules[key])
     const ruleSeverity = DEFAULT_SEVERITY.get(key.split('/')[0]) ?? 'error'
+    const why = notRun.get(key.split('/')[0])
+    if (why) {
+      results.push({ id: key, count: 0, severity: set ?? ruleSeverity, ...(max !== undefined ? { max } : {}), failed: false, notRun: why })
+      continue
+    }
     if (set === 'off') {
       results.push({ id: key, count: list.length, severity: 'off', failed: false })
       continue
@@ -271,13 +283,14 @@ function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfi
 
 /** The config with each baseline lowered to the count found now: a rule
  *  that got better cannot get worse again. A count above its baseline is
- *  left failing, never raised into it. */
+ *  left failing, never raised into it, and a rule that did not run (no
+ *  test report) keeps its baseline. */
 export function ratchetConfig(config: CheckConfig, result: CheckResult): { config: CheckConfig; lowered: Array<{ id: string; from: number; to: number }> } {
   const rules = { ...(config.rules ?? {}) }
   const lowered: Array<{ id: string; from: number; to: number }> = []
   for (const r of result.rules) {
     const setting = rules[r.id]
-    if (typeof setting !== 'object' || setting.max === undefined || r.count >= setting.max) continue
+    if (r.notRun || typeof setting !== 'object' || setting.max === undefined || r.count >= setting.max) continue
     rules[r.id] = { ...setting, max: r.count }
     lowered.push({ id: r.id, from: setting.max, to: r.count })
   }

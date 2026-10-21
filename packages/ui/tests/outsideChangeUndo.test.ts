@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
+import { deserializeFromMdFolder, serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { useDiagramStore } from '../src/store/diagramStore'
 
 const s = useDiagramStore.getState
@@ -43,6 +44,21 @@ function outsideChange(change: (data: DiagramData) => void): void {
   s().loadDiagram(data, { outsideChange: true })
   if (viewId) s().setActiveView(viewId)
 }
+
+/** The model as the folder gives it back: what the store saves, written
+ *  and read again (an empty text, an unticked box are written as nothing). */
+const throughFolder = (data: DiagramData): DiagramData => deserializeFromMdFolder(serializeToMdFolder(data)).data
+
+/** An outside change as Studio reads it from a folder. */
+function outsideFolderChange(change: (data: DiagramData) => void): void {
+  const viewId = s().activeViewId
+  const data = throughFolder(structuredClone(s().saveDiagram()))
+  change(data)
+  s().loadDiagram(data, { outsideChange: true })
+  if (viewId && s().views[viewId]) s().setActiveView(viewId)
+}
+
+const lastNotice = () => s().notifications[s().notifications.length - 1]?.message ?? ''
 
 describe('Undo after an outside change', () => {
   beforeEach(() => {
@@ -103,9 +119,120 @@ describe('Undo after an outside change', () => {
     expect(s().c4Nodes.c).toBeDefined()
   })
 
+  it('takes back an add after a folder round trip, with no notice (item 125)', () => {
+    s().loadDiagram(throughFolder(s().saveDiagram()))
+    const notices = s().notifications.length
+    const id = s().addNode({ type: 'system', label: 'System', description: '', x: 1200, y: 0, ...NODE_SIZES.system, collapsed: false } as Omit<C4Node, 'id'>)
+    outsideFolderChange((d) => { d.nodes.find((n) => n.id === 'b')!.description = 'agent wrote' })
+    expect(s().c4Nodes[id]).toBeDefined()
+    s().undo()
+    expect(s().c4Nodes[id]).toBeUndefined()
+    expect(s().c4Nodes.b.description).toBe('agent wrote')
+    expect(s().notifications.length).toBe(notices)
+  })
+
+  it('takes back a new view after a folder round trip, with no notice (item 125)', () => {
+    s().loadDiagram(throughFolder(s().saveDiagram()))
+    const notices = s().notifications.length
+    const id = s().addView('Fresh')
+    s().addNodeToView(id, 'a')
+    s().setActiveView(id)
+    // The camera in use is saved with the view shown, not kept in the store.
+    ;(window as any).__rfCurrentViewport = { x: 40, y: 20, zoom: 0.8 }
+    try {
+      outsideFolderChange((d) => { d.nodes.find((n) => n.id === 'b')!.description = 'agent wrote' })
+    } finally {
+      delete (window as any).__rfCurrentViewport
+    }
+    expect(s().views[id]).toBeDefined()
+    s().undo()
+    s().undo()
+    expect(s().views[id]).toBeUndefined()
+    expect(s().notifications.length).toBe(notices)
+  })
+
+  it('brings back no relation to an element removed outside Studio, and says so (item 127)', () => {
+    s().addRelation({ sourceId: 'a', targetId: 'b', label: 'charges card' })
+    s().removeNode('b')
+    expect(Object.keys(s().c4Relations)).toEqual([])
+    outsideChange((d) => { d.nodes = d.nodes.filter((n) => n.id !== 'a') })
+    s().undo()
+    expect(s().c4Nodes.b).toBeDefined()
+    expect(s().c4Nodes.a).toBeUndefined()
+    expect(Object.values(s().c4Relations)).toEqual([])
+    expect(lastNotice()).toMatch(/outside Studio.*charges card/)
+  })
+
+  it('brings back no element whose container was removed outside Studio, and says so (item 127)', () => {
+    const db = s().addNode({ type: 'container', label: 'Orders DB', parentId: 'a', x: 40, y: 80, ...NODE_SIZES.container, collapsed: false } as Omit<C4Node, 'id'>)
+    s().addRelation({ sourceId: 'b', targetId: db, label: 'reads' })
+    s().removeNode(db)
+    outsideChange((d) => {
+      d.nodes = d.nodes.filter((n) => n.id !== 'a')
+      for (const v of d.views ?? []) v.nodeIds = v.nodeIds.filter((id) => id !== 'a')
+    })
+    s().undo()
+    expect(s().c4Nodes[db]).toBeUndefined()
+    expect(Object.values(s().c4Relations)).toEqual([])
+    expect(s().views.one.nodeIds).not.toContain(db)
+    expect(lastNotice()).toMatch(/outside Studio.*Orders DB/)
+  })
+
   it('another model loaded still forgets the history', () => {
     s().updateNode('a', { label: 'Shop' })
     s().loadDiagram(model())
     expect(s().canUndo).toBe(false)
+  })
+})
+
+describe('an outside change while a milestone is shown (item 126)', () => {
+  beforeEach(() => {
+    s().setAppMode('designer')
+    s().loadDiagram(model())
+  })
+  afterEach(() => s().stopLiveLayout())
+
+  it('keeps the milestone shown and its edits, and brings the change into the live model', () => {
+    s().updateNode('a', { label: 'Shop' })
+    const m = s().createSnapshot('As-is')
+    s().selectMilestone(m)
+    s().updateNode('b', { label: 'Bank (as-is)' })
+    expect(s().milestoneDirty).toBe(true)
+
+    outsideChange((d) => { d.nodes.push(sys('c', 0, 600, { label: 'Courier' })) })
+    expect(s().activeSnapshotId).toBe(m)
+    expect(s().milestoneDirty).toBe(true)
+    expect(label('b')).toBe('Bank (as-is)')
+    expect(s().c4Nodes.c).toBeUndefined()
+    expect(s().liveBackup?.nodes.c?.label).toBe('Courier')
+    expect(s().saveDiagram().nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c'])
+
+    // The milestone's steps stay its own.
+    s().undo()
+    expect(label('b')).toBe('b')
+    s().redo()
+    expect(label('b')).toBe('Bank (as-is)')
+
+    // Its edits saved as a new milestone; the live model has the change, and
+    // its own steps take back the user's, not the agent's.
+    s().commitMilestoneChanges('new', 'As-is 2')
+    s().discardMilestoneChanges()
+    expect(s().activeSnapshotId).toBeNull()
+    expect(label('c')).toBe('Courier')
+    expect(label('b')).toBe('b')
+    expect(s().snapshots.find((x) => x.name === 'As-is 2')?.nodes.b.label).toBe('Bank (as-is)')
+    s().undo()
+    expect(label('a')).toBe('a')
+    expect(label('c')).toBe('Courier')
+  })
+
+  it('says so when the milestone with edits was deleted outside Studio', () => {
+    const m = s().createSnapshot('As-is')
+    s().selectMilestone(m)
+    s().updateNode('b', { label: 'Bank (as-is)' })
+    outsideChange((d) => { d.snapshots = [] })
+    expect(s().activeSnapshotId).toBeNull()
+    expect(label('b')).toBe('b')
+    expect(lastNotice()).toMatch(/As-is.*deleted outside Studio/)
   })
 })

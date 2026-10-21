@@ -16,7 +16,7 @@ import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE, serializeAgentActivity } from '@radical/common/formats/agentActivity'
 import { displayVersion } from '@radical/common/version'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
-import { effectiveHeight, effectiveWidth, fitAncestors, placeBesideSiblings, placeNewNode } from '@radical/layout/geometry'
+import { fitShown, growWithRoom, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
@@ -156,12 +156,13 @@ const depth = (node: C4Node, nodes: Record<string, C4Node>): number => {
   return d
 }
 
-/** Refits every parent whose children a change added, moved or removed, and
+/** Refits every parent whose children a change added, moved or removed
+ *  (where one grew, what lies round it makes room: growWithRoom), and
  *  keeps defaultPositions in step with node geometry: Studio restores them
  *  when you switch back to All elements, so stale entries would undo the
- *  change. A node moved into a parent whose frame it does not lie in (it
- *  keeps its place on the canvas, which is elsewhere) is placed inside it,
- *  beside its new siblings. Mutates `after`. */
+ *  change. A node moved into another parent keeps its place only where it
+ *  lies inside it and clear of its new siblings; else it is placed beside
+ *  them (settleMovedNodes). Mutates `after`. */
 function settleGeometry(before: DiagramData, after: DiagramData): void {
   const old = byId(before.nodes)
   const nodes = byId(after.nodes)
@@ -172,21 +173,16 @@ function settleGeometry(before: DiagramData, after: DiagramData): void {
     if (!prev) touch(node.parentId)
     else if (prev.parentId !== node.parentId) { touch(prev.parentId); touch(node.parentId) }
   }
-  const outside = after.nodes.filter((node) => {
-    const prev = old[node.id]
-    const parent = node.parentId ? nodes[node.parentId] : undefined
-    if (!prev || prev.parentId === node.parentId || !parent) return false
-    return node.x < 0 || node.y < 0 || node.x + effectiveWidth(node) > parent.width || node.y + effectiveHeight(node) > parent.height
-  })
-  const waiting = new Set(outside.map((node) => node.id))
-  for (const node of outside) {
-    const at = placeBesideSiblings(nodes, node.parentId, (s) => !waiting.has(s.id))
-    node.x = at.x
-    node.y = at.y
-    waiting.delete(node.id)
-  }
+  // Moved into another parent: kept where it lies inside it, clear of its
+  // new siblings, else placed beside them; the parent grows and what lies
+  // round it makes room, as in Studio.
+  const moved = after.nodes.filter((node) => old[node.id] && old[node.id].parentId !== node.parentId).map((node) => node.id)
+  const canvas = modelCanvas(nodes)
+  // Every child counts, as fitAncestors counts them.
+  const fit = (id: string): void => fitShown(nodes, id, { shown: () => true })
+  settleMovedNodes(nodes, moved, canvas, fit)
   for (const node of before.nodes) if (!nodes[node.id]) touch(node.parentId)
-  for (const id of [...parents].sort((a, b) => depth(nodes[b], nodes) - depth(nodes[a], nodes))) fitAncestors(nodes, id)
+  for (const id of [...parents].sort((a, b) => depth(nodes[b], nodes) - depth(nodes[a], nodes))) growWithRoom(nodes, id, canvas, fit)
 
   if (!after.defaultPositions) return
   for (const node of after.nodes) {

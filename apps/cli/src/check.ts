@@ -24,6 +24,8 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
                       scenario, fitness function, requirement and ADR as JSON
   --ratchet           lower each baseline (max) in the config to the count found
                       now, so a rule that got better cannot get worse again
+                      (the test rules only with --report: without it they
+                      do not run and keep their baselines)
   --verbose           list every warning, not the first five of each rule
   --list-rules        list the rules and their default severity, and the
                       metrics check.json can set goals for ("goals":

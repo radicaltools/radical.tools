@@ -46,6 +46,31 @@ describe('mergeModels', () => {
     expect(conflicts).toEqual(['orders'])
   })
 
+  it('takes an empty text, an unticked box or an empty list for no value, as the folder writes them', () => {
+    const b = clone(base)
+    b.nodes.push(node('new', 'New', { description: '', external: false, tags: [] } as Partial<C4Node>))
+    const ours = clone(base) // the add taken back
+    const theirs = clone(base) // the folder read back: the element, its empty fields not written
+    theirs.nodes.push(node('new', 'New'))
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(conflicts).toEqual([])
+    expect(byId(merged.nodes, 'new')).toBeUndefined()
+  })
+
+  it('removes what one side removed and the other only moved or framed anew', () => {
+    const ours = clone(base)
+    ours.views = []
+    ours.nodes = ours.nodes.filter((n) => n.id !== 'bank')
+    const theirs = clone(base)
+    theirs.views![0].viewport = { x: 10, y: 20, zoom: 0.5 }
+    theirs.views![0].positions = { shop: { x: 99, y: 0, width: 200, height: 100 } }
+    Object.assign(theirs.nodes.find((n) => n.id === 'bank')!, { x: 400, y: 30 })
+    const { merged, conflicts } = mergeModels(base, ours, theirs)
+    expect(conflicts).toEqual([])
+    expect(merged.views).toEqual([])
+    expect(byId(merged.nodes, 'bank')).toBeUndefined()
+  })
+
   it('keeps theirs where both changed the same field, and says so; positions merge without a word', () => {
     const ours = clone(base)
     ours.nodes.find((n) => n.id === 'shop')!.description = 'Ours'
@@ -107,6 +132,53 @@ describe('mergeModels: order and id lists', () => {
     expect(merged.views![0].nodeIds).toEqual(['shop', 'user', 'stock'])
     expect(merged.views![0].hiddenRelationIds).toEqual(['r2'])
     expect(conflicts).toEqual([])
+  })
+})
+
+describe('mergeModels: a sequence\'s steps and notes', () => {
+  // The steps (relationIds) and their notes (stepDescriptions) merged apart:
+  // Studio removed step 1 while an agent changed note 3, and the merge put
+  // Studio's steps beside the agent's notes, every note one step off.
+  const withSteps = (relationIds: string[], stepDescriptions?: (string | undefined)[]): DiagramData =>
+    ({ ...clone(base), sequences: [{ id: 's', name: 'Place Order', relationIds, ...(stepDescriptions ? { stepDescriptions } : {}) }] })
+  const pairs = (d: DiagramData) => {
+    const q = d.sequences![0]
+    return q.relationIds.map((r, i) => `${r}:${q.stepDescriptions?.[i] ?? '-'}`)
+  }
+  const b = withSteps(['r1', 'r2', 'r3', 'r4'], ['submits', 'posts', 'stores', 'charges'])
+
+  it('keeps each note on its step when one side removes a step and the other changes a note', () => {
+    const ours = withSteps(['r2', 'r3', 'r4'], ['posts', 'stores', 'charges'])
+    const theirs = withSteps(['r1', 'r2', 'r3', 'r4'], ['submits', 'posts', 'STORES', 'charges'])
+    for (const [o, t] of [[ours, theirs], [theirs, ours]]) {
+      const { merged, conflicts } = mergeModels(b, o, t)
+      expect(pairs(merged)).toEqual(['r2:posts', 'r3:STORES', 'r4:charges'])
+      expect(conflicts).toEqual([])
+    }
+  })
+
+  it('keeps each note on its step when one side moves a step and the other changes a note', () => {
+    const ours = withSteps(['r2', 'r1', 'r3', 'r4'], ['posts', 'submits', 'stores', 'charges'])
+    const theirs = withSteps(['r1', 'r2', 'r3', 'r4'], ['submits', 'posts', 'STORES', 'charges'])
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(pairs(merged)).toEqual(['r2:posts', 'r1:submits', 'r3:STORES', 'r4:charges'])
+    expect(conflicts).toEqual([])
+  })
+
+  it('keeps the steps both sides added, each with its note, and the steps a side repeats', () => {
+    const ours = withSteps(['r1', 'r2', 'r9', 'r3', 'r4'], ['submits', 'posts', 'checks', 'stores', 'charges'])
+    const theirs = withSteps(['r1', 'r2', 'r3', 'r4', 'r1'], ['submits', 'posts', 'stores', 'charges', 'again'])
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(pairs(merged)).toEqual(['r1:submits', 'r2:posts', 'r9:checks', 'r3:stores', 'r4:charges', 'r1:again'])
+    expect(conflicts).toEqual([])
+  })
+
+  it('keeps theirs where both changed one note, and says so', () => {
+    const ours = withSteps(['r1', 'r2', 'r3', 'r4'], ['submits', 'ours', 'stores', 'charges'])
+    const theirs = withSteps(['r1', 'r2', 'r3'], ['submits', 'theirs', 'stores'])
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect(pairs(merged)).toEqual(['r1:submits', 'r2:theirs', 'r3:stores'])
+    expect(conflicts).toEqual(['Place Order: steps'])
   })
 })
 

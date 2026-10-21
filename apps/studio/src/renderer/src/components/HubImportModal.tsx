@@ -454,7 +454,18 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       // Adding to the model is Designer's work, as a Forge run is. In Viewer
       // (where the Hub's link lands) the concept went into what Viewer
       // shows: drawn, never saved, and gone on the way to Designer.
-      if (useDiagramStore.getState().appMode !== 'designer') useDiagramStore.getState().setAppMode('designer')
+      if (useDiagramStore.getState().appMode !== 'designer') {
+        // The element selected in Viewer, which the card promised the
+        // concept would go into ("↳ Bookstore"): read before the switch
+        // drops it, and selected in Designer again.
+        const selected = useDiagramStore.getState().selectedNodeId
+        useDiagramStore.getState().setAppMode('designer')
+        const s = useDiagramStore.getState()
+        if (selected && s.c4Nodes[selected] && s.selectedNodeId !== selected) {
+          s.setSelectedNodeIds([selected])
+          s.selectNode(selected)
+        }
+      }
       const store = useDiagramStore.getState()
 
       // Map old concept node IDs → new store IDs.
@@ -614,7 +625,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       const newViews = conceptViewsToDiagram(
         concept.views,
         { node: (id) => idMap.get(id), relation: (id) => relIdMap.get(id), sequence: (id) => seqIdMap.get(id) },
-        { newId: () => crypto.randomUUID(), namePrefix: concept.name },
+        { newId: () => crypto.randomUUID(), namePrefix: concept.name, keepPositions: true },
       )
 
       store._pushUndo()
@@ -645,6 +656,8 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         // The container grew to hold the import: its neighbours make room,
         // as after a drop (it was left lying over them).
         if (useDropParent && dropParentId && storeAfter.c4Nodes[dropParentId]) storeAfter.resolveOverlaps(dropParentId)
+        // Imported on a view: All elements gets places for them too.
+        storeAfter._placeOnAllElements()
       }
 
       store._sync()

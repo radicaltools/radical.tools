@@ -16,6 +16,7 @@ import {
   deserializeFromMdFolder,
   MalformedFolderFileError,
   isMdFolder,
+  stripBom,
   type FolderFiles,
 } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
@@ -194,21 +195,54 @@ function readLSPayload(id: string): DiagramData | null {
   }
 }
 
-/** A folder model with a file Studio cannot parse. Its model is not loaded
- *  and, until a read succeeds, nothing is saved to the folder: a save would
- *  write the model without what the file holds, or remove the file. */
+/** A folder model with a file Studio cannot parse, or a model file (a
+ *  `.radical`) that does not parse or is not there. Its model is not loaded
+ *  and, until a read succeeds, nothing is saved to the folder or the file:
+ *  a save would write the model without what the file holds, remove the
+ *  file, or write an empty model over it or where it had been deleted. */
 export class DocumentUnreadableError extends Error {
-  constructor(readonly file: string, readonly reason = 'malformed JSON') {
-    super(
-      `${file} in this model's folder cannot be read (${reason}). ` +
-      'Nothing is saved to the folder until the file is fixed; the model is read again when it changes.',
-    )
+  constructor(readonly file: string, readonly reason = 'malformed JSON', readonly inFolder = true) {
+    super(inFolder
+      ? `${file} in this model's folder cannot be read (${reason}). ` +
+        'Nothing is saved to the folder until the file is fixed; the model is read again when it changes.'
+      : `${file} cannot be read (${reason}). ` +
+        'Nothing is saved to it until it can be read again: fix or restore it, then open the model again.')
     this.name = 'DocumentUnreadableError'
   }
 }
 
-/** Folder documents whose last read failed on a file (id → the file). */
-const mdUnreadable = new Map<string, { file: string; reason: string }>()
+/** Disk documents whose last read failed on a file (id → the file). */
+const unreadable = new Map<string, { file: string; reason: string; inFolder: boolean }>()
+
+/** Why a model file's text is no model, or null when it is one. */
+function fileProblem(content: string): string | null {
+  let parsed: unknown
+  try { parsed = JSON.parse(stripBom(content)) } catch { return 'malformed JSON' }
+  const data = parsed as Partial<DiagramData> | null
+  return data && typeof data === 'object' && Array.isArray(data.nodes) && Array.isArray(data.relations) ? null : 'no Radical model'
+}
+
+/** Said of a model file that is gone. */
+const NOT_THERE = 'it is not there: moved, renamed or deleted outside Studio'
+
+/** The model in file `file` of document `id` (`content` as read), or null
+ *  for an empty file, a new one. Anything else that is no model is a
+ *  DocumentUnreadableError, remembered until a read succeeds. */
+function readFileModel(id: string, file: string, content: string): DiagramData | null {
+  if (!content.trim()) {
+    unreadable.delete(id)
+    return null
+  }
+  const problem = fileProblem(content)
+  if (problem) return fileUnreadable(id, file, problem)
+  unreadable.delete(id)
+  return JSON.parse(stripBom(content)) as DiagramData
+}
+
+function fileUnreadable(id: string, file: string, reason: string): never {
+  unreadable.set(id, { file, reason, inFolder: false })
+  throw new DocumentUnreadableError(file, reason, false)
+}
 
 /** The model in a folder's files, remembered as what document `id` was
  *  loaded from. Null when the files hold no model that can be read; a file
@@ -216,11 +250,11 @@ const mdUnreadable = new Map<string, { file: string; reason: string }>()
 function readFolderModel(id: string, files: FolderFiles): DiagramData | null {
   try {
     const { data } = deserializeFromMdFolder(files)
-    mdUnreadable.delete(id)
+    unreadable.delete(id)
     return data
   } catch (e) {
     if (!(e instanceof MalformedFolderFileError)) return null
-    mdUnreadable.set(id, { file: e.path, reason: e.reason })
+    unreadable.set(id, { file: e.path, reason: e.reason, inFolder: true })
     throw new DocumentUnreadableError(e.path, e.reason)
   }
 }
@@ -606,8 +640,13 @@ export interface DocumentsAPI {
   createMdDocument(folderPath: string): DocumentMeta
 
   /** Read the payload for a document, an md folder's element descriptions
-   *  included. Async because FS reads cross IPC. */
+   *  included. Async because FS reads cross IPC. A folder file or a model
+   *  file that cannot be read rejects with DocumentUnreadableError. */
   loadDocument(id: string): Promise<DiagramData | null>
+
+  /** The document's last read failed on a file (DocumentUnreadableError):
+   *  nothing is saved to it until a read succeeds. */
+  isUnreadable(id: string): boolean
 
   /** Persist new payload under an existing document.
    *  localStorage docs are written synchronously (before this returns), so a
@@ -836,17 +875,26 @@ export const documents: DocumentsAPI = {
     if (meta.source === 'ls') return readLSPayload(id)
     // Don't read a folder (or file) while our own write to it is half done.
     await saveSettled(id)
+    // A file that does not parse, or is not there, used to read as a new
+    // empty file: the model opened empty, and the next save wrote that
+    // over the file, or made it again where it had been deleted.
     if (meta.source === 'fs' && meta.filePath && h.readFile) {
       const res = await h.readFile(meta.filePath)
-      if (!res.success || !res.content) return null
-      try { return JSON.parse(res.content) as DiagramData } catch { return null }
+      if (!res.success) return fileUnreadable(id, meta.filePath, /ENOENT|not found/i.test(res.error ?? '') ? NOT_THERE : res.error || 'it cannot be opened')
+      return readFileModel(id, meta.filePath, res.content ?? '')
     }
     if (isWebFileDoc(meta)) {
       const handle = await loadHandle<FsFileHandle>(id)
       if (!handle) return null
       if (!(await verifyPermission(handle, 'readwrite', false))) return null // needs reconnect
       connectedWebHandles.add(id)
-      try { return parseModel(await readFileHandle(handle)) } catch { return null }
+      let content: string
+      try {
+        content = await readFileHandle(handle)
+      } catch (e) {
+        return fileUnreadable(id, handle.name, (e as Error).name === 'NotFoundError' ? NOT_THERE : (e as Error).message)
+      }
+      return readFileModel(id, handle.name, content)
     }
     if (meta.source === 'md' && meta.folderPath && h.readFolder) {
       const res = await h.readFolder(meta.folderPath)
@@ -869,12 +917,16 @@ export const documents: DocumentsAPI = {
     return null
   },
 
+  isUnreadable(id) {
+    return unreadable.has(id)
+  },
+
   async saveDocument(id, data) {
     const idx = readIndex()
     const meta = idx.docs.find(d => d.id === id)
     if (!meta) return
-    const unreadable = meta.source === 'md' ? mdUnreadable.get(id) : undefined
-    if (unreadable) throw new DocumentUnreadableError(unreadable.file, unreadable.reason)
+    const bad = meta.source !== 'ls' ? unreadable.get(id) : undefined
+    if (bad) throw new DocumentUnreadableError(bad.file, bad.reason, bad.inFolder)
     if (meta.source !== 'ls') return enqueueSave(id, data)
     if (!writeLSPayload(id, data)) throw new StorageFullError()
     meta.lastModified = Date.now()
@@ -899,9 +951,9 @@ export const documents: DocumentsAPI = {
     idx.docs = idx.docs.filter(d => d.id !== id)
     if (idx.docs.length === before) return
     if (opts?.wipePayload !== false) deleteLSPayload(id)
+    unreadable.delete(id)
     if (removed?.source === 'md') {
       connectedWebHandles.delete(id)
-      mdUnreadable.delete(id)
       webSessions.delete(id)
       void removeHandle(id)
     } else if (removed?.source === 'fs' && !removed.filePath) {

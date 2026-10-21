@@ -37,3 +37,27 @@ it('changes only the fields that hold a parameter, as one undo step', () => {
   expect((s().c4Nodes.req as unknown as Record<string, unknown>).action).toBe('investigate within 10 days')
   expect(s().hubTemplates.imp.paramValues.DAYS).toBe('10')
 })
+
+it('in a milestone, asks how to keep it, and the record goes the way of the edit', () => {
+  const action = () => (s().c4Nodes.req as unknown as Record<string, unknown>).action
+  const snap = s().createSnapshot('As-is')
+  s().selectMilestone(snap)
+  s().applyHubTemplate('imp', { DAYS: '5' })
+  expect(s().milestoneDirty).toBe(true)
+  expect(s().milestonePromptOpen).toBe(true)
+  // Saved meanwhile, the live model keeps its record.
+  expect(s().saveDiagram().hubTemplates?.imp.paramValues.DAYS).toBe('10')
+
+  // Discarded: the live text and its record as they were.
+  s().discardMilestoneChanges()
+  expect(action()).toBe('investigate within 10 days')
+  expect(s().hubTemplates.imp.paramValues.DAYS).toBe('10')
+
+  // Propagated: the live text and its record changed.
+  s().selectMilestone(snap)
+  s().applyHubTemplate('imp', { DAYS: '7' })
+  s().commitMilestoneChanges('propagate')
+  s().discardMilestoneChanges()
+  expect(action()).toBe('investigate within 7 days')
+  expect(s().hubTemplates.imp.paramValues.DAYS).toBe('7')
+})
