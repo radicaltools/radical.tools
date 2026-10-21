@@ -2,7 +2,7 @@
 
 import { C4Node, C4Relation } from '../c4'
 import { Metamodel, PropertyDef } from './types'
-import { GROUP_TYPE, hasPlaceUnder, placeOf, propertyKeyProblem } from './lookup'
+import { chainTypeNames, GROUP_TYPE, hasPlaceUnder, placeOf, propertyKeyProblem } from './lookup'
 import { validateStateMachines } from './statechart'
 import { validateDomainModel } from './domainModel'
 import { refIds, refProblem } from './refs'
@@ -143,6 +143,22 @@ export function validateModel(
       if (problem) {
         issues.push({ id: `reserved-rel-prop:${def.id}:${p.key}`, severity: 'error', message: `Relation type "${def.label}": property key ${problem}` })
       }
+    }
+  }
+
+  // A viewpoint that names a type the metamodel lacks (left behind by a
+  // deletion before it was refused) draws nothing of it.
+  for (const vp of Array.isArray(metamodel.viewpoints) ? metamodel.viewpoints : []) {
+    if (!vp || typeof vp !== 'object') continue
+    const named = chainTypeNames(vp.pipeline)
+    const subject = Array.isArray(vp.subject?.types) ? vp.subject.types : []
+    for (const t of new Set([...subject, ...named.nodeTypes])) {
+      if (metamodel.nodeTypes[t]) continue
+      issues.push({ id: `viewpoint-unknown-type:${vp.id}:${t}`, severity: 'warning', message: `Viewpoint "${vp.label}" names node type "${t}", which the metamodel does not have.` })
+    }
+    for (const t of named.relationTypes) {
+      if (metamodel.relationTypes[t]) continue
+      issues.push({ id: `viewpoint-unknown-rel-type:${vp.id}:${t}`, severity: 'warning', message: `Viewpoint "${vp.label}" names relation type "${t}", which the metamodel does not have.` })
     }
   }
 

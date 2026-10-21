@@ -3,6 +3,7 @@ import type { C4Node } from '../src/c4'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import { createModelFacade } from '../src/ai/modelFacade'
 import {
+  acceptedRefinements,
   describeRefinement,
   forgeGaps,
   formatForgeGaps,
@@ -87,6 +88,37 @@ describe('stageRefinements', () => {
     facade.addNode(fresh('scenario', { label: 'Refund', given: 'a', when: 'b', then: 'c' }))
     expect(stageRefinements('review', snapshot, snapshotOf(facade)).map((r) => r.type)).toEqual(['scenario'])
     expect(stageRefinements('scenarios', snapshot, snapshotOf(facade))).toEqual([])
+  })
+})
+
+describe('acceptedRefinements', () => {
+  it('counts only what the accepted proposals wrote, not what someone else changed while the stage ran', () => {
+    const facade = before()
+    const snapshot = snapshotOf(facade)
+    // The user, in Studio, while the stage runs.
+    facade.updateNode('r1', { label: 'Take payments' })
+    facade.updateNode('s1', { given: 'a full cart' } as Partial<C4Node>)
+    // A proposal the user accepted.
+    const proposalBefore = snapshotOf(facade)
+    const r3 = facade.addNode(fresh('requirement', { label: 'Refund', ears_type: 'ubiquitous', action: 'refund a cancelled order' }))
+    facade.addRelation({ sourceId: r3, targetId: 'n', relationType: 'derives' })
+    facade.updateNode('s1', { then: 'the order is paid and shipped' } as Partial<C4Node>)
+    const accepted = stageRefinements('review', proposalBefore, snapshotOf(facade))
+    // The user again.
+    facade.addRelation({ sourceId: 's1', targetId: 'r2', relationType: 'verifies' })
+    facade.removeNode('e')
+    const refinements = acceptedRefinements(stageRefinements('processes', snapshot, snapshotOf(facade)), accepted)
+    expect(refinements.map(describeRefinement).sort()).toEqual([
+      'added requirement "Refund"',
+      'changed scenario "s1" (then)',
+    ])
+    // Regenerate takes back the proposal only.
+    rejectRefinements(facade, refinements)
+    const nodes = facade.getNodes() as unknown as Record<string, Record<string, unknown>>
+    expect(nodes[r3]).toBeUndefined()
+    expect(nodes.s1).toMatchObject({ given: 'a full cart', then: 'the order is paid' })
+    expect(nodes.r1.label).toBe('Take payments')
+    expect(Object.values(facade.getRelations()).some((r) => r.sourceId === 's1' && r.targetId === 'r2')).toBe(true)
   })
 })
 

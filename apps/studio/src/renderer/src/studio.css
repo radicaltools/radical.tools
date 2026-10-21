@@ -152,6 +152,11 @@
     0 1px 2px rgba(0, 0, 0, 0.15),
     0 8px 24px rgba(0, 0, 0, 0.28);
   padding: 6px;
+  /* A window lower than the menu scrolls it: below the toolbar, 8 px clear
+     of the bottom edge. */
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   animation: app-menu-in 120ms ease-out;
   transform-origin: top left;
 }

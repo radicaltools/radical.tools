@@ -10,17 +10,19 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramView, type GridConstraint, type LayoutConstraint } from './c4'
+import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition } from './c4'
 import { readPipeline } from './viewPipeline'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
   canAddMoreOfType,
+  chainTypeNames,
   GROUP_TYPE,
   hasPlaceUnder,
   inferRelationType,
   isParentAllowed,
+  isFinalState,
   isPlacementAllowed,
   isRelationAllowed,
   placeOf,
@@ -39,6 +41,9 @@ export interface ModelState {
   defaultLayoutConstraints?: LayoutConstraint[]
   /** How All elements and views without their own draw relations. */
   defaultEdgeStyle?: EdgeStyle
+  /** Where All elements has the nodes while another canvas is shown
+   *  (Studio's store; DiagramData.defaultPositions). */
+  defaultPositions?: Record<string, NodePosition>
 }
 
 type NodeRecord = C4Node & Record<string, unknown>
@@ -115,9 +120,14 @@ function typeLabel(mm: Metamodel | undefined, type: string): string {
 /** Where a node of `type` was refused, and what it may sit in: the end of
  *  "Cannot place Component inside …". A group that the type may sit in
  *  refuses it for where the group stands. */
+const FINAL_HOLDS_NOTHING = 'a final state cannot contain other states.'
+
 function placementError(mm: Metamodel | undefined, type: string, parent: C4Node | undefined, nodes: Record<string, C4Node>): string {
   const allowed = mm?.nodeTypes[type]?.allowedParents
   const parentLabel = parent ? typeLabel(mm, parent.type) : 'the canvas root'
+  if (parent && isParentAllowed(mm, type, parent.type) && isFinalState(parent)) {
+    return `Final ${parentLabel.toLowerCase()} "${parent.label}": ${FINAL_HOLDS_NOTHING}`
+  }
   if (parent && isParentAllowed(mm, type, parent.type)) {
     const place = placeOf(parent, nodes)
     const where = place ? `inside ${typeLabel(mm, place.type)} "${place.label}"` : 'at the top of the model'
@@ -192,7 +202,7 @@ export function insertNode(state: ModelState, id: string, node: Omit<C4Node, 'id
 export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<Omit<C4Node, 'id'>>): string | null {
   const existing = state.c4Nodes[id]
   if (!existing) return null
-  if (!('parentId' in updates) && !('type' in updates)) return null
+  if (!('parentId' in updates) && !('type' in updates) && !('kind' in updates)) return null
   const newType = (updates.type as string | undefined) ?? existing.type
   const newParentId = ('parentId' in updates ? (updates.parentId as string | null | undefined) : existing.parentId) ?? undefined
   const parent = newParentId ? state.c4Nodes[newParentId] : undefined
@@ -207,6 +217,11 @@ export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<
   }
   const misplaced = 'parentId' in updates ? misplacedInGroup(state, { ...existing, type: newType } as C4Node, parent) : undefined
   if (misplaced) return groupContentsError(state.metamodel, existing, misplaced)
+  // A state made final keeps its children: it would hold them.
+  if (isFinalState({ ...existing, ...updates } as C4Node) && !isFinalState(existing)) {
+    const held = Object.values(state.c4Nodes).filter((n) => n.parentId === id).length
+    if (held > 0) return `Cannot make ${typeLabel(state.metamodel, newType)} "${existing.label}" final: it holds ${held} element${held === 1 ? '' : 's'}, and ${FINAL_HOLDS_NOTHING}`
+  }
   // A retyped element keeps its relations: each must be one the metamodel
   // has between the new type and the other end.
   if (newType !== existing.type) {
@@ -229,17 +244,21 @@ export function patchNode(state: ModelState, id: string, updates: Partial<Omit<C
   const node = state.c4Nodes[id] as NodeRecord | undefined
   if (!node) return
   const retyped = 'type' in updates && updates.type !== node.type
-  // A view of this element named after it is renamed with it; one renamed
-  // by hand keeps its name.
-  const label = typeof updates.label === 'string' ? updates.label.trim() : ''
-  if (label && label !== node.label.trim()) {
-    for (const view of Object.values(state.views)) if (view.subject === id && view.name === node.label.trim()) view.name = label
-  }
+  if (typeof updates.label === 'string') renameViewsOf(state, id, updates.label)
   Object.assign(node, updates)
   if ('type' in updates) materializeDefaults(node, state.metamodel)
   // Its relations keep a type that fits the new pair (checkNodeUpdate made
   // sure there is one).
   if (retyped) for (const rel of Object.values(state.c4Relations)) if (rel.sourceId === id || rel.targetId === id) refitRelationType(state, rel)
+}
+
+/** A view of element `id` named after it is renamed with it to `label`;
+ *  one renamed by hand keeps its name. Call before the element takes it. */
+export function renameViewsOf(state: ModelState, id: string, label: string): void {
+  const before = state.c4Nodes[id]?.label.trim()
+  const after = label.trim()
+  if (!before || !after || after === before) return
+  for (const view of Object.values(state.views)) if (view.subject === id && view.name === before) view.name = after
 }
 
 /** Why `ids` cannot move under `newParentId` (null = the root), or null.
@@ -268,28 +287,53 @@ export function checkReparent(state: ModelState, ids: string[], newParentId: str
 
 /** Moves the nodes under `newParentId` (null = the root), keeping each one
  *  where it is on the canvas: positions are relative to the parent, so they
- *  are rebased onto the new parent's absolute position. */
+ *  are rebased onto the new parent's absolute position. The other canvases
+ *  that keep a place for a moved node (the views' positions, and All
+ *  elements' while a view is shown) are rebased the same way where the node
+ *  then lies inside its new parent's frame there; where it does not, its
+ *  place there is dropped, and that canvas gives it one inside the parent
+ *  (placeUnplaced) when it shows. */
 export function reparentNodes(state: ModelState, ids: string[], newParentId: string | null): void {
-  const absOf = (id: string | null): { x: number; y: number } => {
+  const absOf = (id: string | null, positions?: Record<string, NodePosition>): { x: number; y: number } => {
     let x = 0, y = 0
     let cur: C4Node | undefined = id ? state.c4Nodes[id] : undefined
     const seen = new Set<string>()
     while (cur && !seen.has(cur.id)) {
       seen.add(cur.id)
-      x += cur.x
-      y += cur.y
+      const at = positions?.[cur.id] ?? cur
+      x += at.x
+      y += at.y
       cur = cur.parentId ? state.c4Nodes[cur.parentId] : undefined
     }
     return { x, y }
   }
-  const target = absOf(newParentId)
+  const moving = ids.filter((id) => state.c4Nodes[id] && (state.c4Nodes[id].parentId ?? null) !== newParentId)
   // Measure every node against the original tree before changing any parent.
+  const canvases = [state.defaultPositions, ...Object.values(state.views).map((view) => view.positions)]
+    .filter((positions): positions is Record<string, NodePosition> => !!positions && moving.some((id) => id in positions))
+  const rebased = canvases.map((positions) => {
+    const parent = newParentId ? positions[newParentId] : undefined
+    const target = absOf(newParentId, positions)
+    return moving.filter((id) => id in positions).map((id) => {
+      const abs = absOf(id, positions)
+      const box = { ...positions[id], x: abs.x - target.x, y: abs.y - target.y }
+      // At the root, anywhere is inside; in a parent the canvas has no place
+      // for, or outside its frame, the node is placed afresh.
+      const inside = !newParentId || (!!parent && box.x >= 0 && box.y >= 0 && box.x + box.width <= parent.width && box.y + box.height <= parent.height)
+      return { positions, id, box: inside ? box : null }
+    })
+  }).flat()
+  const target = absOf(newParentId)
   const placed = ids.filter((id) => state.c4Nodes[id]).map((id) => ({ id, abs: absOf(id) }))
   for (const { id, abs } of placed) {
     const node = state.c4Nodes[id]
     node.parentId = newParentId ?? undefined
     node.x = abs.x - target.x
     node.y = abs.y - target.y
+  }
+  for (const { positions, id, box } of rebased) {
+    if (box) positions[id] = box
+    else delete positions[id]
   }
 }
 
@@ -322,6 +366,14 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
   for (const [rid, rel] of Object.entries(state.c4Relations)) {
     if (removed.has(rel.sourceId) || removed.has(rel.targetId)) delete state.c4Relations[rid]
   }
+  forgetNodesInViews(state, removed)
+  return removed
+}
+
+/** Takes the `removed` elements out of every view (its list, folds and
+ *  alignments) and out of All elements' alignments; a view of one of them
+ *  goes with it. */
+export function forgetNodesInViews(state: ModelState, removed: Set<string>): void {
   for (const view of Object.values(state.views)) {
     removeFromViewList(view, removed)
     if (view.collapsedNodeIds?.length) view.collapsedNodeIds = view.collapsedNodeIds.filter((nid) => !removed.has(nid))
@@ -336,7 +388,6 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
     if (view.subject && removed.has(view.subject)) delete state.views[view.id]
   }
   if (state.activeViewId && !state.views[state.activeViewId]) state.activeViewId = null
-  return removed
 }
 
 /** Constraints without the removed nodes; a rule left with one member goes
@@ -349,12 +400,60 @@ function withoutNodes(constraints: LayoutConstraint[], removed: Set<string>): La
 
 // ── Types in use ─────────────────────────────────────────────────────────────
 
+/** What a milestone holds of the model's types. */
+export type MilestoneContent = Pick<DiagramSnapshot, 'name' | 'nodes' | 'relations'>
+
 /** Why a node type cannot be deleted from the metamodel: elements are still
- *  of it. Null when none is (built-in types are the caller's to refuse). */
-export function checkRemoveNodeType(state: ModelState, typeId: string): string | null {
+ *  of it, in the model or in one of its `milestones` (opened, or restored to
+ *  live, it brought back elements of an unknown type), or the metamodel or
+ *  a view names it. Null when none does (built-in types are the caller's to
+ *  refuse). */
+export function checkRemoveNodeType(state: ModelState, typeId: string, milestones: MilestoneContent[] = []): string | null {
   const used = Object.values(state.c4Nodes).filter((n) => n.type === typeId).length
   if (used) return `${used} ${used === 1 ? 'element is' : 'elements are'} still of type ${typeLabel(state.metamodel, typeId)}: retype or delete ${used === 1 ? 'it' : 'them'} first.`
-  return state.metamodel ? checkRemoveNodeTypeFromMetamodel(state.metamodel, typeId) : null
+  return milestoneHoldsType(milestones, typeId, 'node', state.metamodel)
+    ?? (state.metamodel ? checkRemoveNodeTypeFromMetamodel(state.metamodel, typeId) : null)
+    ?? viewNamesType(state.views, typeId, 'node', state.metamodel)
+}
+
+/** Why a type cannot go while a milestone holds elements (or relations) of
+ *  it: a milestone keeps what it saved, and its types with it. */
+export function milestoneHoldsType(milestones: MilestoneContent[], typeId: string, of: 'node' | 'relation', mm: Metamodel | undefined): string | null {
+  for (const m of milestones) {
+    const count = of === 'node'
+      ? Object.values(m.nodes ?? {}).filter((n) => n.type === typeId).length
+      : Object.values(m.relations ?? {}).filter((r) => r.relationType === typeId).length
+    if (!count) continue
+    const what = of === 'node' ? `${count === 1 ? 'element' : 'elements'} of type ${typeLabel(mm, typeId)}` : `${count === 1 ? 'relation' : 'relations'} of type ${relationTypeName(mm, typeId)}`
+    return `the milestone "${m.name}" holds ${count} ${what}: delete the milestone first.`
+  }
+  return null
+}
+
+const relationTypeName = (mm: Metamodel | undefined, typeId: string): string => `"${mm?.relationTypes[typeId]?.label ?? typeId}"`
+
+/** Why a type cannot go while a viewpoint names it: one that makes a view
+ *  per element of it, or whose filter chain names it. Left behind, the
+ *  viewpoint kept the type, its views were empty, and nothing in Studio
+ *  took it out. */
+function viewpointNamesType(mm: Metamodel, typeId: string, of: 'node' | 'relation'): string | null {
+  const name = of === 'node' ? typeLabel(mm, typeId) : relationTypeName(mm, typeId)
+  for (const vp of viewpointsOf(mm)) {
+    if (of === 'node' && vp.subject?.types.includes(typeId)) return `the viewpoint "${vp.label}" makes a view per ${name}: change or delete it first.`
+    const named = chainTypeNames(vp.pipeline)
+    if ((of === 'node' ? named.nodeTypes : named.relationTypes).includes(typeId)) return `the filter of the viewpoint "${vp.label}" names ${name}: change or delete the viewpoint first.`
+  }
+  return null
+}
+
+/** Why a type cannot go while a view's own filter chain names it. */
+export function viewNamesType(views: Record<string, DiagramView>, typeId: string, of: 'node' | 'relation', mm: Metamodel | undefined): string | null {
+  const name = of === 'node' ? typeLabel(mm, typeId) : relationTypeName(mm, typeId)
+  for (const view of Object.values(views ?? {})) {
+    const named = chainTypeNames(view.pipeline)
+    if ((of === 'node' ? named.nodeTypes : named.relationTypes).includes(typeId)) return `the filter of the view "${view.name}" names ${name}: change it first.`
+  }
+  return null
 }
 
 /**
@@ -375,7 +474,13 @@ export function checkRemoveNodeTypeFromMetamodel(mm: Metamodel, typeId: string):
     const ref = (def.properties ?? []).find((p) => p.type === 'ref' && p.refType === typeId)
     if (ref) return `the property "${ref.label}" of "${def.label}" points at ${label}: change or remove it first.`
   }
-  return null
+  return viewpointNamesType(mm, typeId, 'node')
+}
+
+/** Why the metamodel cannot lose relation type `typeId`: a viewpoint's
+ *  filter chain follows it or tests for it. */
+export function checkRemoveRelationTypeFromMetamodel(mm: Metamodel, typeId: string): string | null {
+  return viewpointNamesType(mm, typeId, 'relation')
 }
 
 /** The metamodel without node type `typeId`, and without what names it: it
@@ -414,12 +519,14 @@ export function checkReplaceMetamodel(state: ModelState, next: Metamodel): strin
 }
 
 /** Why a relation type cannot be deleted from the metamodel: relations are
- *  still of it. */
-export function checkRemoveRelationType(state: ModelState, typeId: string): string | null {
+ *  still of it, in the model or one of its `milestones`, or a viewpoint or
+ *  a view names it. */
+export function checkRemoveRelationType(state: ModelState, typeId: string, milestones: MilestoneContent[] = []): string | null {
   const used = Object.values(state.c4Relations).filter((r) => r.relationType === typeId).length
-  if (!used) return null
-  const label = state.metamodel?.relationTypes[typeId]?.label ?? typeId
-  return `${used} ${used === 1 ? 'relation is' : 'relations are'} still of type "${label}": change or delete ${used === 1 ? 'it' : 'them'} first.`
+  if (used) return `${used} ${used === 1 ? 'relation is' : 'relations are'} still of type ${relationTypeName(state.metamodel, typeId)}: change or delete ${used === 1 ? 'it' : 'them'} first.`
+  return milestoneHoldsType(milestones, typeId, 'relation', state.metamodel)
+    ?? (state.metamodel ? checkRemoveRelationTypeFromMetamodel(state.metamodel, typeId) : null)
+    ?? viewNamesType(state.views, typeId, 'relation', state.metamodel)
 }
 
 // ── Relations ────────────────────────────────────────────────────────────────
@@ -559,15 +666,29 @@ export function isViewGroup(view: DiagramView | undefined, metamodel: Metamodel 
   return !!viewpointsOf(metamodel).find((t) => t.id === view.viewpoint)?.subject
 }
 
+/** Why the elements of view `viewId` cannot be picked by hand, or null: a
+ *  view of a group shows what its element holds, and the group shows its
+ *  views. A list of their own hid an element added later, and nothing in
+ *  Studio takes one away. */
+export function groupViewNodesRefusal(state: Pick<ModelState, 'views' | 'metamodel'>, viewId: string): string | null {
+  const view = state.views[viewId]
+  if (view?.partOf) return `${view.name} is one of the views of the group ${state.views[view.partOf]?.name ?? view.partOf}: it shows what its element holds, and no element is picked by hand`
+  if (isViewGroup(view, state.metamodel)) return `${view!.name} is a group of views per element: each of its views shows what its element holds, and it lists no elements itself`
+  return null
+}
+
 /** The views of group `groupId`, in the list's order. */
 export function viewsOfGroup(views: Record<string, DiagramView>, groupId: string): DiagramView[] {
   return Object.values(views).filter((v) => v.partOf === groupId)
 }
 
 /** What syncViewGroups would do: the views to add (a group and an element),
- *  the ids of the views to remove and of those to move into their group's
- *  folder. All empty when the groups are in step. */
-export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'metamodel'>): { add: Array<{ groupId: string; subjectId: string }>; remove: string[]; refolder: string[] } {
+ *  the ids of the views to remove, of those to move into their group's
+ *  folder, of the groups and views of one that list elements of their own
+ *  (groupViewNodesRefusal), to show what they hold again, and of the views
+ *  whose name is not their element's. All empty when the groups are in
+ *  step. */
+export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'metamodel'>): { add: Array<{ groupId: string; subjectId: string }>; remove: string[]; refolder: string[]; unlist: string[]; rename: string[] } {
   const defs = new Map(viewpointsOf(state.metamodel).map((t) => [t.id, t]))
   const add: Array<{ groupId: string; subjectId: string }> = []
   const remove: string[] = []
@@ -575,6 +696,7 @@ export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'me
   const groups = new Map(views.filter((v) => isViewGroup(v, state.metamodel)).map((v) => [v.id, v]))
   const members = new Map<string, Set<string>>()
   const refolder: string[] = []
+  const rename: string[] = []
   for (const v of views) {
     if (!v.partOf) continue
     const group = groups.get(v.partOf)
@@ -587,7 +709,10 @@ export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'me
     seen.add(node.id)
     members.set(v.partOf, seen)
     if ((v.folder ?? '') !== (group.folder ?? '')) refolder.push(v.id)
+    // Its name is its element's: nobody renames it by hand.
+    if (v.name !== subjectViewName(node, def)) rename.push(v.id)
   }
+  const unlist = views.filter((v) => (v.partOf ? !remove.includes(v.id) : groups.has(v.id)) && (v.nodeIds.length > 0 || v.empty)).map((v) => v.id)
   for (const group of groups.values()) {
     const def = defs.get(group.viewpoint!)!
     const has = members.get(group.id) ?? new Set<string>()
@@ -595,15 +720,24 @@ export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'me
       if (!node.external && canBeSubject(def, node) && !has.has(node.id)) add.push({ groupId: group.id, subjectId: node.id })
     }
   }
-  return { add, remove, refolder }
+  return { add, remove, refolder, unlist, rename }
 }
 
 /** Brings every group of views of one element in step with the model: a
  *  view of each element it should hold (ids from `newId`), none of those it
  *  should not, each in the group's folder. Whether it changed anything. */
 export function syncViewGroups(state: ModelState, newId: () => string): boolean {
-  const { add, remove, refolder } = planViewGroups(state)
+  const { add, remove, refolder, unlist, rename } = planViewGroups(state)
   for (const id of remove) delete state.views[id]
+  for (const id of rename) {
+    const view = state.views[id]
+    const def = viewpointsOf(state.metamodel).find((t) => t.id === view.viewpoint)!
+    view.name = subjectViewName(state.c4Nodes[view.subject!], def)
+  }
+  for (const id of unlist) {
+    state.views[id].nodeIds = []
+    delete state.views[id].empty
+  }
   for (const { groupId, subjectId } of add) {
     const group = state.views[groupId]
     const def = viewpointsOf(state.metamodel).find((t) => t.id === group.viewpoint)!
@@ -622,7 +756,7 @@ export function syncViewGroups(state: ModelState, newId: () => string): boolean 
     else delete view.folder
   }
   if (state.activeViewId && !state.views[state.activeViewId]) state.activeViewId = null
-  return add.length > 0 || remove.length > 0 || refolder.length > 0
+  return add.length > 0 || remove.length > 0 || refolder.length > 0 || unlist.length > 0 || rename.length > 0
 }
 
 /** The view keeps its kind and chain for itself, of no viewpoint (and of no
@@ -1103,7 +1237,22 @@ export function sequenceNodeIds(state: ModelState, id: string): string[] {
 /** Layout fields, which a copy also keeps but which are not changes to the system. */
 const LAYOUT_KEYS = new Set(['id', 'x', 'y', 'width', 'height', 'collapsed'])
 
-const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+/** A field's value as a comparison sees it: an empty text, an unticked box
+ *  and an empty list are no value, as an absent field is. The folder writes
+ *  none of them (serializeToMdFolder), so a change undone by hand is no change in
+ *  Studio, in `radical diff` and in get_changes alike. A property with a
+ *  default has it written on the element (materializeDefaults), so absent
+ *  is its unset value too. */
+export function modelValue(value: unknown): unknown {
+  if (value === undefined || value === '' || value === false) return null
+  if (Array.isArray(value) && !value.length) return null
+  return value
+}
+
+/** Whether two values of a field are the same to a comparison (modelValue). */
+export const sameModelValue = (a: unknown, b: unknown): boolean => JSON.stringify(modelValue(a)) === JSON.stringify(modelValue(b))
+
+const sameValue = sameModelValue
 
 /** Fields that differ between two versions of an element or relation, layout left out. */
 function changedFields(before: object, after: object): string[] {

@@ -1,7 +1,7 @@
 import { mkdir, readdir, realpath, stat } from 'node:fs/promises'
 import { basename, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { buildToolDefs, runTool, type ToolDef, type ToolRunContext } from '@radical/common/ai/tools'
+import { buildToolDefs, noCanvasLayout, runTool, type ToolDef, type ToolRunContext } from '@radical/common/ai/tools'
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
 import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
@@ -16,7 +16,7 @@ import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE, serializeAgentActivity } from '@radical/common/formats/agentActivity'
 import { displayVersion } from '@radical/common/version'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
-import { fitAncestors, placeNewNode } from '@radical/layout/geometry'
+import { effectiveHeight, effectiveWidth, fitAncestors, placeBesideSiblings, placeNewNode } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
@@ -159,7 +159,9 @@ const depth = (node: C4Node, nodes: Record<string, C4Node>): number => {
 /** Refits every parent whose children a change added, moved or removed, and
  *  keeps defaultPositions in step with node geometry: Studio restores them
  *  when you switch back to All elements, so stale entries would undo the
- *  change. Mutates `after`. */
+ *  change. A node moved into a parent whose frame it does not lie in (it
+ *  keeps its place on the canvas, which is elsewhere) is placed inside it,
+ *  beside its new siblings. Mutates `after`. */
 function settleGeometry(before: DiagramData, after: DiagramData): void {
   const old = byId(before.nodes)
   const nodes = byId(after.nodes)
@@ -169,6 +171,19 @@ function settleGeometry(before: DiagramData, after: DiagramData): void {
     const prev = old[node.id]
     if (!prev) touch(node.parentId)
     else if (prev.parentId !== node.parentId) { touch(prev.parentId); touch(node.parentId) }
+  }
+  const outside = after.nodes.filter((node) => {
+    const prev = old[node.id]
+    const parent = node.parentId ? nodes[node.parentId] : undefined
+    if (!prev || prev.parentId === node.parentId || !parent) return false
+    return node.x < 0 || node.y < 0 || node.x + effectiveWidth(node) > parent.width || node.y + effectiveHeight(node) > parent.height
+  })
+  const waiting = new Set(outside.map((node) => node.id))
+  for (const node of outside) {
+    const at = placeBesideSiblings(nodes, node.parentId, (s) => !waiting.has(s.id))
+    node.x = at.x
+    node.y = at.y
+    waiting.delete(node.id)
   }
   for (const node of before.nodes) if (!nodes[node.id]) touch(node.parentId)
   for (const id of [...parents].sort((a, b) => depth(nodes[b], nodes) - depth(nodes[a], nodes))) fitAncestors(nodes, id)
@@ -460,9 +475,8 @@ export class FolderModel {
     const changed = JSON.parse(JSON.stringify(data)) as DiagramData
     const view = viewId === undefined ? undefined : changed.views?.find((v) => v.id === viewId)
     if (viewId !== undefined && !view) return { ok: false, text: `smart_layout: unknown view id "${viewId}"` }
-    if (view?.kind && view.kind !== 'static' && view.kind !== 'dynamic') {
-      return { ok: false, text: `smart_layout: "${view.name}" is a ${view.kind} view; only static and dynamic views have a canvas layout.` }
-    }
+    const refused = view ? noCanvasLayout('smart_layout', view) : null
+    if (refused) return { ok: false, text: `${refused}.` }
     // The canvas the view shows: its saved positions over the model's.
     const nodes = byId(view ? (JSON.parse(JSON.stringify(changed.nodes)) as C4Node[]) : changed.nodes)
     for (const [id, pos] of Object.entries(view?.positions ?? {})) {

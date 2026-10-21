@@ -5,7 +5,7 @@
 // from the metamodel, so callers rebuild them after these run.
 
 import { builtInC4Metamodel, propertyKeyProblem, type Metamodel, type NodeTypeDef, type PropertyDef, type RelationPair, type RelationTypeDef } from '../../metamodel'
-import { checkRemoveNodeTypeFromMetamodel, forkPresetMetamodel, metamodelWithoutNodeType } from '../../model'
+import { checkRemoveNodeTypeFromMetamodel, checkRemoveRelationTypeFromMetamodel, forkPresetMetamodel, metamodelWithoutNodeType, milestoneHoldsType, viewNamesType } from '../../model'
 import { pipelineOf } from '../../viewPipeline'
 import { isViewpointKind, newViewpointId, VIEWPOINT_KINDS, viewpointsOf, withViewpoint, withoutViewpoint } from '../../viewpoints'
 import { fail, type ToolDef, type ToolHandler, type ToolResult, type ToolRunContext } from './types'
@@ -251,7 +251,9 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       if (def.builtin) return fail(`delete_node_type: "${def.id}" is built in and cannot be deleted`)
       const used = Object.values(ctx.diagram.getNodes()).filter((node) => node.type === def.id).length
       if (used) return fail(`delete_node_type: ${used} node(s) still use "${def.id}"; retype or delete them first`)
-      const refused = checkRemoveNodeTypeFromMetamodel(current, def.id)
+      const refused = milestoneHoldsType(ctx.diagram.getMilestones?.() ?? [], def.id, 'node', current)
+        ?? checkRemoveNodeTypeFromMetamodel(current, def.id)
+        ?? viewNamesType(ctx.diagram.getViews?.() ?? {}, def.id, 'node', current)
       if (refused) return fail(`delete_node_type: ${refused}`)
       const { mm: editableMm, note } = editable(current)
       const mm = metamodelWithoutNodeType(editableMm, def.id)
@@ -306,6 +308,10 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       if (def.builtin) return fail(`delete_relation_type: "${def.id}" is built in and cannot be deleted`)
       const used = Object.values(ctx.diagram.getRelations()).filter((relation) => relation.relationType === def.id).length
       if (used) return fail(`delete_relation_type: ${used} relation(s) still use "${def.id}"; change or delete them first`)
+      const refused = milestoneHoldsType(ctx.diagram.getMilestones?.() ?? [], def.id, 'relation', current)
+        ?? checkRemoveRelationTypeFromMetamodel(current, def.id)
+        ?? viewNamesType(ctx.diagram.getViews?.() ?? {}, def.id, 'relation', current)
+      if (refused) return fail(`delete_relation_type: ${refused}`)
       const { mm, note } = editable(current)
       delete mm.relationTypes[def.id]
       return save(ctx, mm, `Deleted relation type "${def.id}".${note}`)

@@ -75,10 +75,24 @@ export function parseModelBase(text: string): ModelBase | null {
 export const isBaseOld = (base: Pick<ModelBase, 'savedAt' | 'source'>, now = Date.now()): boolean =>
   base.source !== 'forge' && now - Date.parse(base.savedAt) > BASE_OLD_MS
 
-/** What the changes are counted since, for a sentence: "main 534f32f" or
- *  "the start of the Forge run". */
-export const baseSince = (base: Pick<ModelBase, 'source' | 'commit'>): string =>
-  base.source === 'forge' ? 'the start of the Forge run' : `main ${base.commit.slice(0, 7)}`
+/** The name a base from git was chosen by: the branch it is the merge base
+ *  with ("main" for origin/main), or the ref `radical diff --since` was
+ *  given ("HEAD", a tag, a branch); null when that was the commit itself. */
+export function baseName(base: Pick<ModelBase, 'commit' | 'described'>): string | null {
+  const merge = /^merge base with (.+)$/.exec(base.described)
+  if (merge) return merge[1].replace(/^origin\//, '')
+  if (!base.described || base.commit.startsWith(base.described)) return null
+  return base.described
+}
+
+/** What the changes are counted since, for a sentence: "main 534f32f",
+ *  "HEAD 473d593" or "the start of the Forge run". */
+export function baseSince(base: Pick<ModelBase, 'source' | 'commit' | 'described'>): string {
+  if (base.source === 'forge') return 'the start of the Forge run'
+  const name = baseName(base)
+  const short = base.commit.slice(0, 7)
+  return name ? `${name} ${short}` : short
+}
 
 /** The model as a Forge run starts on it, as a base file. */
 export function forgeModelBase(nodes: C4Node[], relations: C4Relation[], now = new Date()): string {

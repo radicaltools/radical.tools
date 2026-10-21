@@ -47,7 +47,9 @@ function useBranchViewCounts(views: Record<string, DiagramView>): Record<string,
   const branch = useDiagramStore((s) => s.branch)
   const nodes = useDiagramStore((s) => s.c4Nodes)
   const relations = useDiagramStore((s) => s.c4Relations)
-  return useMemo(() => branch ? viewChangeCounts(Object.values(views), nodes, relations, branch.nodes) : null, [branch, views, nodes, relations])
+  return useMemo(() => branch
+    ? viewChangeCounts(Object.values(views), nodes, relations, branch.nodes, { nodes: branch.ghostNodes, relations: branch.ghostRelations })
+    : null, [branch, views, nodes, relations])
 }
 
 function BranchCount({ n }: { n: number | undefined }): React.ReactElement | null {
@@ -2482,6 +2484,11 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
   const [dismissed, setDismissed] = useState<string | null>(null)
   const open = !!subject && dismissed !== subject
   const close = useCallback(() => setDismissed(subject), [subject])
+  // Anything else selected, or nothing, ends it: the element picked again
+  // has its card. Kept until another ✕, the card never opened for it again.
+  useEffect(() => {
+    if (dismissed !== null && dismissed !== subject) setDismissed(null)
+  }, [dismissed, subject])
 
   // An explicit "show its properties" (Quick Search, a table row's button)
   // brings back a card that ✕ hid.

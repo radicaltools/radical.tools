@@ -107,6 +107,42 @@ describe('metamodel tools', () => {
     expect(facade.getMetamodel!()!.relationTypes.issues.allowedPairs).toEqual([{ from: 'badge', to: 'badge' }])
   })
 
+  it('refuse to delete a type a viewpoint or a view names', async () => {
+    // The viewpoint kept subject and chain of a type gone, and upsert_viewpoint
+    // then refused them as unknown.
+    const { facade, call } = setup()
+    await call('upsert_node_type', { id: 'service', label: 'Service', allowedAtRoot: true })
+    await call('upsert_relation_type', { id: 'calls', label: 'Calls', allowedPairs: [{ from: 'service', to: 'service' }, { from: 'system', to: 'system' }] })
+    expect((await call('upsert_viewpoint', { label: 'Service map', kind: 'static', subjectTypes: ['service'] })).ok).toBe(true)
+    expect((await call('delete_node_type', { id: 'service' })).resultText).toContain('the viewpoint "Service map" makes a view per Service')
+    const id = facade.getMetamodel!()!.viewpoints!.find((v) => v.label === 'Service map')!.id
+    expect((await call('upsert_viewpoint', { id, subjectTypes: [], pipeline: { levels: [{ ways: [{ types: ['system'] }] }, { ways: [{ via: { relationType: 'calls', direction: 'out' } }] }] } })).ok).toBe(true)
+    expect((await call('delete_relation_type', { id: 'calls' })).resultText).toContain('the filter of the viewpoint "Service map" names "Calls"')
+    expect((await call('delete_viewpoint', { id })).ok).toBe(true)
+    // The views keep the filter: they name it now.
+    await call('create_view', { tempId: 'v', name: 'Calls', pipeline: { levels: [{ ways: [{ types: ['service'] }] }] } })
+    expect((await call('delete_node_type', { id: 'service' })).resultText).toContain('the filter of the view "Calls" names Service')
+    expect((await call('delete_view', { id: 'v' })).ok).toBe(true)
+    expect((await call('delete_node_type', { id: 'service' })).ok).toBe(true)
+    expect(facade.getMetamodel!()!.nodeTypes.service).toBeUndefined()
+  })
+
+  it('refuse to delete a type a milestone still holds elements or relations of', async () => {
+    // Restore to live then brought back an element of an unknown type.
+    const { facade, call } = setup()
+    await call('upsert_node_type', { id: 'service', label: 'Service', allowedAtRoot: true })
+    await call('upsert_relation_type', { id: 'calls', label: 'Calls', allowedPairs: [{ from: 'service', to: 'service' }] })
+    await call('add_node', { tempId: 'a', type: 'service', label: 'Legacy Billing' })
+    await call('add_node', { tempId: 'b', type: 'service', label: 'Ledger' })
+    expect((await call('add_relation', { sourceId: 'a', targetId: 'b', relationType: 'calls' })).ok).toBe(true)
+    expect((await call('create_milestone', { name: 'As-is' })).ok).toBe(true)
+    for (const id of ['a', 'b']) expect((await call('delete_node', { id })).ok).toBe(true)
+    expect((await call('delete_relation_type', { id: 'calls' })).resultText).toContain('the milestone "As-is" holds 1 relation of type "Calls"')
+    expect((await call('delete_node_type', { id: 'service' })).resultText).toContain('the milestone "As-is" holds 2 elements of type Service')
+    expect(facade.getMetamodel!()!.nodeTypes.service).toBeDefined()
+    expect(facade.getMetamodel!()!.relationTypes.calls).toBeDefined()
+  })
+
   it('describe a new type, without inheriting the description of its base type', async () => {
     const { facade, call } = setup()
     await call('upsert_node_type', { id: 'risk', label: 'Risk', baseType: 'adr', allowedAtRoot: true })
@@ -344,6 +380,27 @@ describe('smart_layout', () => {
     await call('smart_layout', { viewId: 'v' })
     expect(seen).toEqual([undefined, Object.keys(facade.getViews!()).find((id) => facade.getViews!()[id].name === 'Context')])
     expect((await call('smart_layout', { viewId: 't' })).resultText).toContain('table view')
+  })
+
+  it('refuses a flow (dynamic) view: Studio plays its sequence and draws no canvas there', async () => {
+    // It reported a better layout and wrote nothing, every time; align_nodes
+    // and grid_nodes wrote alignments into a view no canvas shows.
+    const seen: Array<string | undefined> = []
+    const { facade, call } = setup({ runLayout: async (doc: DiagramData, viewId?: string) => { seen.push(viewId); return { ok: true, text: 'laid out', data: doc } } })
+    await call('add_node', { tempId: 'a', type: 'system', label: 'Shop' })
+    await call('add_node', { tempId: 'b', type: 'system', label: 'Bank' })
+    await call('add_relation', { sourceId: 'a', targetId: 'b', label: 'pays' })
+    const seq = await call('create_sequence', { tempId: 'seq', name: 'Pay', steps: [{ relationId: Object.keys(facade.getRelations())[0] }] })
+    expect(seq.ok, seq.resultText).toBe(true)
+    expect((await call('create_view', { tempId: 'f', name: 'Place Order Flow', kind: 'dynamic', sequenceId: 'seq' })).ok).toBe(true)
+    const flow = Object.values(facade.getViews!()).find((v) => v.name === 'Place Order Flow')!
+    for (const [tool, input] of [['smart_layout', {}], ['align_nodes', { nodeIds: ['a', 'b'], axis: 'horizontal' }], ['grid_nodes', { nodeIds: ['a', 'b'] }]] as const) {
+      const res = await call(tool, { ...input, viewId: 'f' })
+      expect(res.ok, tool).toBe(false)
+      expect(res.resultText).toContain(`${tool}: "Place Order Flow" is a dynamic view; only static views have a canvas layout`)
+    }
+    expect(seen).toEqual([])
+    expect(facade.getViews!()[flow.id].layoutConstraints ?? []).toEqual([])
   })
 
   it('reports when the context cannot lay out', async () => {

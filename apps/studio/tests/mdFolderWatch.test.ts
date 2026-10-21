@@ -2,6 +2,7 @@
 // reports a folder change, autosave reloads the document from disk.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { documents, useDocumentsStore } from '../src/renderer/src/store/documentStore'
+import { reloadActiveDocument } from '../src/renderer/src/persistence/autosave'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { deserializeFromMdFolder, serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { serializeAgentActivity } from '@radical/common/formats/agentActivity'
@@ -157,6 +158,26 @@ describe('md-folder documents follow outside edits', () => {
     expect(labels(folder.model())).toEqual({ sys1: 'Payments hub', sys2: 'General ledger', sys3: 'Fraud' })
   })
 
+  it('keeps Undo after an outside edit: it takes back the user\'s edit, not the agent\'s', async () => {
+    const folder = installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
+    documents.createMdDocument('/tmp/model')
+    await settle()
+    const store = useDiagramStore.getState
+    store().setAppMode('designer')
+    store().updateNode('sys2', { label: 'General ledger' })
+    await wait(500) // saved
+
+    folder.setDisk(serializeToMdFolder({ ...SAMPLE, nodes: [sys('sys1', 'Payments hub'), sys('sys2', 'General ledger')] }, 'model'))
+    folder.emit({ folderPath: '/tmp/model', paths: ['nodes/payments-hub/_index.md'] })
+    await settle()
+    expect(store().c4Nodes.sys1.label).toBe('Payments hub')
+    expect(store().canUndo).toBe(true)
+    store().undo()
+    expect([store().c4Nodes.sys1.label, store().c4Nodes.sys2.label]).toEqual(['Payments hub', 'Ledger'])
+    await wait(500)
+    expect(labels(folder.model())).toEqual({ sys1: 'Payments hub', sys2: 'Ledger' })
+  })
+
   it('holds its saves while an agent writes the folder, then saves them merged', async () => {
     const folder = installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
     documents.createMdDocument('/tmp/model')
@@ -183,6 +204,48 @@ describe('md-folder documents follow outside edits', () => {
     expect(labels(folder.model())).toEqual({ sys1: 'Payments hub', sys2: 'General ledger' })
     expect(notices).toHaveBeenCalledTimes(1) // said once
     notices.mockRestore()
+  })
+
+  it('writes the edits it holds for an agent when the page goes away', async () => {
+    const folder = installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
+    documents.createMdDocument('/tmp/model')
+    await settle()
+    folder.api.readAgentActivity.mockResolvedValue({ success: true, content: serializeAgentActivity('claude-code', Date.now()) })
+    useDiagramStore.getState().updateNode('sys2', { label: 'General ledger' })
+    await wait(450)
+    expect(folder.api.writeFolder).not.toHaveBeenCalled()
+
+    // The write merges with what the agent wrote meanwhile (the folder
+    // session in the main process; mdFolderSync.test.ts).
+    window.dispatchEvent(new Event('pagehide'))
+    await settle()
+    expect(folder.api.writeFolder).toHaveBeenCalledTimes(1)
+    expect(labels(folder.model())).toEqual({ sys1: 'Payments', sys2: 'General ledger' })
+  })
+
+  it('keeps those edits for the next visit when the write cannot land before the page goes', async () => {
+    const folder = installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
+    documents.createMdDocument('/tmp/model')
+    await settle()
+    folder.api.readAgentActivity.mockResolvedValue({ success: true, content: serializeAgentActivity('claude-code', Date.now() - 15_000 + 900) })
+    useDiagramStore.getState().updateNode('sys2', { label: 'General ledger' })
+    await wait(450)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    folder.api.writeFolder.mockRejectedValueOnce(new Error('the page is gone'))
+    window.dispatchEvent(new Event('pagehide'))
+    await settle()
+    warn.mockRestore()
+
+    // The next visit: the agent's change is on disk, the user's is not.
+    folder.setDisk(serializeToMdFolder({ ...SAMPLE, nodes: [sys('sys1', 'Payments hub'), sys('sys2', 'Ledger'), sys('sys3', 'Fraud')] }, 'model'))
+    reloadActiveDocument()
+    await settle()
+    const nodes = useDiagramStore.getState().c4Nodes
+    expect([nodes.sys1.label, nodes.sys2.label, nodes.sys3?.label]).toEqual(['Payments hub', 'General ledger', 'Fraud'])
+    // Saved once the agent's mark has passed, and kept no longer.
+    await wait(900)
+    expect(labels(folder.model())).toEqual({ sys1: 'Payments hub', sys2: 'General ledger', sys3: 'Fraud' })
+    expect([...Array((localStorage as unknown as MemLS).length).keys()].map((i) => localStorage.key(i)).filter((k) => k?.startsWith('radical-unsaved-edits:'))).toEqual([])
   })
 
   it('keeps the document unchanged on disk when a save is refused as a conflict', async () => {

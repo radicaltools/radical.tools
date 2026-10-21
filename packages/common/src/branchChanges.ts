@@ -53,15 +53,24 @@ export function branchChanges(base: ModelCopy, nodes: Record<string, C4Node>, re
 }
 
 /** By view id: how many of the changed elements (`marks`) the view shows.
- *  A removed element counts in a view that listed it, or in one that shows
- *  every element. */
-export function viewChangeCounts(views: DiagramView[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, marks: Record<string, BranchMark>): Record<string, number> {
-  const marked = Object.entries(marks)
+ *  A removed element counts where its ghost is drawn: in a view that shows
+ *  every element, one that still lists it, or one whose chain shows it once
+ *  the `removed` elements and relations (as the base has them) are back. */
+export function viewChangeCounts(
+  views: DiagramView[],
+  nodes: Record<string, C4Node>,
+  relations: Record<string, C4Relation>,
+  marks: Record<string, BranchMark>,
+  removed: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } = { nodes: {}, relations: {} },
+): Record<string, number> {
+  const marked = Object.keys(marks)
+  const withRemoved = Object.keys(removed.nodes).length || Object.keys(removed.relations).length
+  const allNodes = withRemoved ? { ...removed.nodes, ...nodes } : nodes
+  const allRelations = withRemoved ? { ...removed.relations, ...relations } : relations
   const counts: Record<string, number> = {}
   for (const view of views) {
-    const shown = viewShownNodes(view, nodes, relations)
-    const listed = new Set(view.nodeIds ?? [])
-    counts[view.id] = marked.filter(([id, mark]) => !shown || (mark === 'removed' ? listed.has(id) : shown.has(id))).length
+    const shown = viewShownNodes(view, allNodes, allRelations)
+    counts[view.id] = marked.filter((id) => !shown || shown.has(id)).length
   }
   return counts
 }

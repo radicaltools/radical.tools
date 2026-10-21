@@ -9,6 +9,7 @@ import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
+import { serializeAgentActivity } from '@radical/common/formats/agentActivity'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 
 // Models persisted as a folder of Markdown files (web build: File System
@@ -203,6 +204,39 @@ test('an MCP model edit appears in the open browser canvas', async ({ page, stud
   } finally {
     await rm(disk, { recursive: true, force: true })
   }
+})
+
+test('an edit made while an agent writes the folder survives a reload', async ({ page, studio }) => {
+  await saveAsFolder(page)
+  await expect.poll(() => folder.paths()).toContain('nodes/payment-provider/_index.md')
+  // The agent's mark: Studio holds its saves for 15 s.
+  await folder.write('.radical/agent-activity.json', serializeAgentActivity('claude-code'))
+  await studio.node('payments').click()
+  await rename(page, 'Payment Provider', 'Card Gateway')
+  await expect(page.getByText(/An agent is editing this model/)).toBeVisible()
+  expect(await folder.paths()).not.toContain('nodes/card-gateway/_index.md')
+
+  await page.reload()
+  await studio.ready()
+  await expect(studio.node('payments')).toContainText('Card Gateway')
+  await expect.poll(() => folder.paths(), { timeout: 20_000 }).toContain('nodes/card-gateway/_index.md')
+})
+
+test('Undo after an outside edit takes back the user\'s edit and keeps the outside one', async ({ page, studio }) => {
+  await saveAsFolder(page)
+  await studio.node('payments').click()
+  await rename(page, 'Payment Provider', 'Card Gateway')
+  await expect.poll(() => folder.paths()).toContain('nodes/card-gateway/_index.md')
+
+  const file = (await folder.files())['nodes/customer.md']
+  await folder.write('nodes/customer.md', file.replace('label: "Customer"', 'label: "Book Lover"'))
+  await expect(studio.node('customer')).toContainText('Book Lover', { timeout: 10_000 })
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(studio.node('payments')).toContainText('Payment Provider')
+  await expect(studio.node('customer')).toContainText('Book Lover')
+  await expect.poll(() => folder.paths()).toContain('nodes/payment-provider/_index.md')
+  expect(Object.values(await folder.files()).some((c) => c.includes('label: "Book Lover"'))).toBe(true)
 })
 
 test('files the model does not own are left alone', async ({ page, studio }) => {

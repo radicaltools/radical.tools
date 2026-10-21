@@ -211,6 +211,92 @@ export function freeSpotNear(
   return { x: right + gap, y: start.y }
 }
 
+/**
+ * The ghosts of removed elements (Changes on branch, a milestone compared)
+ * on a canvas: they come with the place the base gave them, relative to a
+ * parent that may be laid out differently here (All elements' place on a
+ * view), so outside its frame or on a sibling. A ghost keeps its place when
+ * that lies inside its parent's frame and clear of the siblings the canvas
+ * shows; else it takes the free place inside the frame nearest to it, and
+ * when the frame has none, the place below the siblings. At the root it
+ * keeps clear of the other root elements. What is inside a ghost moves with
+ * it. Only the ghosts move, frames keep their size. `shown`: the nodes the
+ * view draws, when it does not draw every one. Returns `nodes`, or a copy
+ * with the ghosts moved.
+ */
+export function placeGhosts(
+  nodes: Record<string, C4Node>,
+  ghostIds: ReadonlySet<string>,
+  shown?: ReadonlySet<string>,
+): Record<string, C4Node> {
+  const drawn = (id: string): boolean => !!nodes[id] && (!shown || shown.has(id))
+  const parents = new Set(Object.values(nodes).filter((n) => drawn(n.id) && n.parentId).map((n) => n.parentId!))
+  const box = (n: C4Node) => ({ x: n.x, y: n.y, ...drawnSize(n, parents.has(n.id)) })
+  // A ghost inside another one moves with it.
+  const ghosts = [...ghostIds].filter((id) => drawn(id) && !(nodes[id].parentId && ghostIds.has(nodes[id].parentId!)))
+  let out = nodes
+  const placed = new Set<string>()
+  for (const id of ghosts) {
+    const ghost = out[id]
+    // In a container the view does not draw: drawn where the canvas puts it.
+    if (ghost.parentId && nodes[ghost.parentId] && !drawn(ghost.parentId)) continue
+    const size = drawnSize(ghost, parents.has(id))
+    const taken = Object.values(out)
+      .filter((s) => s.id !== id && (s.parentId ?? undefined) === (ghost.parentId ?? undefined) && drawn(s.id) && (!ghostIds.has(s.id) || placed.has(s.id)))
+      .map(box)
+    const parent = ghost.parentId ? out[ghost.parentId] : undefined
+    const at = parent ? placeInFrame(parent, size, taken, ghost) : placeAtRoot(size, taken, ghost)
+    placed.add(id)
+    if (at.x === ghost.x && at.y === ghost.y) continue
+    if (out === nodes) out = { ...nodes }
+    out[id] = { ...ghost, ...at }
+  }
+  return out
+}
+
+/** Gap between a ghost and the siblings around it, inside a frame. */
+const GHOST_GAP = 20
+
+type Box = { x: number; y: number; width: number; height: number }
+
+const clearOf = (taken: Box[], x: number, y: number, size: { width: number; height: number }, gap: number): boolean =>
+  taken.every((b) => x + size.width + gap <= b.x || b.x + b.width + gap <= x || y + size.height + gap <= b.y || b.y + b.height + gap <= y)
+
+/** Where a ghost of `size` goes inside `parent`'s frame, nearest to `want`. */
+function placeInFrame(parent: C4Node, size: { width: number; height: number }, taken: Box[], want: { x: number; y: number }): { x: number; y: number } {
+  const pad = compoundPadding(parent.type)
+  const minX = pad.side, maxX = parent.width - pad.side - size.width
+  const minY = pad.top, maxY = parent.height - pad.bottom - size.height
+  const fits = (x: number, y: number): boolean => x >= minX && x <= maxX && y >= minY && y <= maxY && clearOf(taken, x, y, size, GHOST_GAP)
+  if (fits(want.x, want.y)) return { x: want.x, y: want.y }
+  // Every 10 px from one edge of the room to the other, the far edge included.
+  const steps = (min: number, max: number): number[] => {
+    const out: number[] = []
+    for (let v = min; v < max; v += 10) out.push(v)
+    if (max >= min) out.push(max)
+    return out
+  }
+  let best: { x: number; y: number } | undefined
+  let bestDistance = Infinity
+  const columns = steps(minX, maxX)
+  for (const y of steps(minY, maxY)) {
+    for (const x of columns) {
+      const distance = Math.hypot(x - want.x, y - want.y)
+      if (distance < bestDistance && fits(x, y)) { best = { x, y }; bestDistance = distance }
+    }
+  }
+  if (best) return best
+  // No room in the frame: below the siblings, at the left of them.
+  if (!taken.length) return { x: minX, y: minY }
+  return { x: Math.min(...taken.map((b) => b.x)), y: Math.max(...taken.map((b) => b.y + b.height)) + GHOST_GAP }
+}
+
+/** Where a root ghost goes: its place when clear of the other roots, else the nearest free one. */
+function placeAtRoot(size: { width: number; height: number }, taken: Box[], want: { x: number; y: number }): { x: number; y: number } {
+  if (clearOf(taken, want.x, want.y, size, 0)) return { x: want.x, y: want.y }
+  return freeSpotNear(taken, size, { x: want.x + size.width / 2, y: want.y + size.height / 2 })
+}
+
 /** Spacing of the cells a batch placer hands out. */
 export const BATCH_CELL = { width: 360, height: 280 }
 /** Gap between the nodes already on a canvas and a new batch beside them. */

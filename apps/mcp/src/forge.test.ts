@@ -411,6 +411,51 @@ describe('Radical Forge over MCP', () => {
     }
   }, 60_000)
 
+  it('leaves out of the stage\'s refinements what someone else changed while it ran', async () => {
+    const { client, read, folder } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
+      const need = (await read()).nodes.find((n) => n.type === 'need')!
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      await call(client, 'forge_generate', { stage: 'requirements' })
+      await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
+      await call(client, 'add_relation', { sourceId: 'req', targetId: need.id, relationType: 'derives' })
+      await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement.' })
+      for (const stage of ['domain', 'fitness']) {
+        await call(client, 'forge_clarify', { stage })
+        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
+      }
+      await call(client, 'forge_clarify', { stage: 'scenarios' })
+      await call(client, 'forge_generate', { stage: 'scenarios' })
+      const reqId = (await read()).nodes.find((n) => n.label === 'Reserve online')!.id
+      // The user renames the requirement in Studio while the stage runs.
+      const files = (await readdir(folder, { recursive: true })).filter((f) => f.endsWith('.md'))
+      let renamed = false
+      for (const file of files) {
+        const text = await readFile(join(folder, file), 'utf8')
+        if (!text.includes('Reserve online')) continue
+        await writeFile(join(folder, file), text.split('Reserve online').join('Reserve in the app'))
+        renamed = true
+      }
+      expect(renamed).toBe(true)
+      expect((await read()).nodes.find((n) => n.id === reqId)!.label).toBe('Reserve in the app')
+      await call(client, 'add_node', { tempId: 'sc', type: 'scenario', label: 'Reserve', properties: { given: 'a product in stock', when: 'a shopper reserves it', then: 'it is held for two hours' } })
+      await call(client, 'add_relation', { sourceId: 'sc', targetId: reqId, relationType: 'verifies' })
+      const done = await call(client, 'forge_complete_stage', { stage: 'scenarios', summary: 'One scenario.' })
+      expect(done).not.toContain('refined earlier stages')
+      const status = parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
+      expect(status.stages.find((s) => s.id === 'scenarios')?.refined ?? 0).toBe(0)
+      // Regenerate takes back the stage's scenario, not the user's rename.
+      await call(client, 'forge_generate', { stage: 'scenarios', regenerate: true })
+      const data = await read()
+      expect(data.nodes.some((n) => n.type === 'scenario')).toBe(false)
+      expect(data.nodes.find((n) => n.id === reqId)!.label).toBe('Reserve in the app')
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
   it('saves the model before the run as the base when there is none from git, and leaves a git base alone', async () => {
     const { client, folder, read } = await connect()
     const baseFile = join(folder, '.radical/base.json')
@@ -526,6 +571,46 @@ describe('Radical Forge over MCP', () => {
       expect(Math.abs(context.positions[shop].x - context.positions[shopper].x)).toBeGreaterThanOrEqual(360)
       expect(await call(client, 'forge_arrange', { stage: 'c4', align: 'row' })).toContain('System context: 2 elements in a row.\nContainers: 2 elements in a row.')
       expect(await call(client, 'forge_finish', {})).toContain("The elements are in the run's views (Radical:")
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
+  it('keeps the places a view gave the stage\'s elements while it ran, and places only the rest', async () => {
+    const { client, read } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'radical', viewpoints: ['system-context'] } })
+      for (const stage of ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups']) {
+        await call(client, 'forge_clarify', { stage })
+        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
+      }
+      await call(client, 'forge_clarify', { stage: 'c4' })
+      await call(client, 'forge_generate', { stage: 'c4', hubConcepts: [] })
+      await call(client, 'add_node', { tempId: 'shopper', type: 'person', label: 'Shopper' })
+      await call(client, 'add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+      await call(client, 'add_relation', { sourceId: 'shopper', targetId: 'shop', relationType: 'interacts', label: 'Reserves' })
+      const contextId = (await read()).views!.find((v) => v.name === 'System context')!.id
+      // The view laid out while the stage runs, as Studio follows it there.
+      await call(client, 'smart_layout', { viewId: contextId })
+      const laidOut = (await read()).views!.find((v) => v.id === contextId)!.positions
+      let data = await read()
+      const ids = ['Shopper', 'Shop'].map((label) => data.nodes.find((n) => n.label === label)!.id)
+      expect(ids.every((id) => laidOut[id])).toBe(true)
+      // One more added after the layout, which the view has no place for.
+      await call(client, 'add_node', { tempId: 'store', type: 'system', label: 'Store system', properties: { external: true } })
+      await call(client, 'forge_complete_stage', { stage: 'c4', summary: 'The shop.' })
+      data = await read()
+      const positions = data.views!.find((v) => v.id === contextId)!.positions
+      for (const id of ids) expect({ x: positions[id].x, y: positions[id].y }).toEqual({ x: laidOut[id].x, y: laidOut[id].y })
+      const store = data.nodes.find((n) => n.label === 'Store system')!.id
+      expect(positions[store]).toBeDefined()
+      // Beside what the view showed, not over it.
+      for (const id of ids) {
+        const a = positions[id], b = positions[store]
+        const apart = a.x + a.width! <= b.x || b.x + b.width! <= a.x || a.y + a.height! <= b.y || b.y + b.height! <= a.y
+        expect(apart).toBe(true)
+      }
     } finally {
       await client.close()
     }

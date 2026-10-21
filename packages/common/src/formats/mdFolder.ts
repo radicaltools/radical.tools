@@ -30,6 +30,7 @@ import type {
 } from '../c4'
 import { NODE_SIZES, isContainerType } from '../c4'
 import type { Metamodel } from '../metamodel'
+import { modelValue } from '../model'
 
 /** File map: relative POSIX path → UTF-8 file content. */
 export type FolderFiles = Record<string, string>
@@ -264,6 +265,9 @@ export function serializeToMdFolderWithPaths(data: DiagramData, modelName?: stri
     childrenOf.set(parent, list)
   }
 
+  const defaultOf = (type: string, key: string): unknown =>
+    data.metamodel?.nodeTypes[type]?.properties?.find((p) => p.key === key)?.default
+
   const emitNode = (node: C4Node, dir: string, slug: string): void => {
     // Record layout / state in the sidecar, not the Markdown.
     layout.nodes[node.id] = {
@@ -286,6 +290,10 @@ export function serializeToMdFolderWithPaths(data: DiagramData, modelName?: stri
     for (const key of extraKeys) {
       const value = (node as unknown as Record<string, unknown>)[key]
       if (value === undefined || value === null) continue
+      // An empty text, an unticked box or an empty list is no value
+      // (modelValue): a change undone by hand leaves the file as it was.
+      // Unless the property has a default, which would show instead.
+      if (modelValue(value) === null && modelValue(defaultOf(node.type, key)) === null) continue
       if (Array.isArray(value) && value.every((v) => typeof v === 'string')) { front[key] = value as string[]; continue }
       if (typeof value === 'object') continue // defensive: no nested props expected
       front[key] = value as Scalar

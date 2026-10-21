@@ -49,6 +49,33 @@ test('concepts added from a Hub link land where nothing is', async ({ page, stud
   expect(overlaps(await studio.boxes(), roots)).toEqual([])
 })
 
+test('a concept added from a Hub link in Viewer reaches the model', async ({ page, studio }) => {
+  // The Hub's link lands in Viewer, a perspective for looking: Add to Model
+  // said "imported" and drew it, but it went into what Viewer shows, was
+  // never saved and was gone on the way to Designer. The import switches to
+  // Designer first, as a Forge run does.
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await page.goto(`/?hub=req-mfa#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/viewer/v/canvas`)
+  await studio.ready()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
+  const dialog = page.locator('[aria-label="Import from Hub"]')
+  await dialog.getByRole('button', { name: 'Add to Model' }).first().click()
+  const skip = dialog.getByRole('button', { name: 'Skip', exact: true })
+  const importButton = dialog.getByRole('button', { name: 'Import', exact: true })
+  await expect.poll(async () => (await skip.count()) + (await importButton.count()) > 0
+    || (await studio.storedDoc()).nodes.length === 7).toBe(true)
+  if (await skip.count()) await skip.click()
+  if (await importButton.count()) await importButton.click()
+  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  expect(await studio.storedJson()).toContain('Multi-Factor')
+  await dialog.getByRole('button', { name: 'Close' }).first().click()
+  await studio.settle()
+  expect((await studio.storedDoc()).nodes.length).toBe(7)
+})
+
 test('a concept added with its related concepts is one undo step', async ({ page, studio }) => {
   // Each related concept came in with its own step: one Undo took back the
   // main concept only.

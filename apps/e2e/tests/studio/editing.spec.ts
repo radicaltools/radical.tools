@@ -137,6 +137,17 @@ test('undo and redo', async ({ page, studio }) => {
   await expect(studio.nodes).toHaveCount(4)
 })
 
+test('undoing the add of the selected element leaves no card and no selection', async ({ page, studio }) => {
+  // The card stayed, empty, with "1 node selected" for an element that was gone.
+  await studio.addFromPalette('Software System', await studio.nearBottom())
+  await studio.nodeByLabel('System').click()
+  await expect(studio.attribute('Name')).toHaveValue('System')
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(studio.nodes).toHaveCount(3)
+  await expect(studio.properties).toHaveCount(0)
+  await expect(page.getByText(/node selected/)).toHaveCount(0)
+})
+
 test('the undo keys in a text field are about the typing, not the model', async ({ page, studio }) => {
   // The handler sat on the window and did not look at the focus: a typo
   // "undone" while writing took back the model's last step instead.

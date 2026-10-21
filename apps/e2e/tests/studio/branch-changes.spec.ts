@@ -111,6 +111,68 @@ test('the changes since the base show on the canvas, in the list of views and on
   await expect(page.locator('.lp-branch-count')).toHaveCount(0)
 })
 
+test('a removed element is drawn inside its container on a view laid out its own way, and a view with a chain counts it', async ({ page, studio }) => {
+  // Containers draws what its chain gives, the shop narrower than on All
+  // elements (room below its containers): where the base had Legacy billing
+  // (x 560 in the shop) lies outside the shop's frame there.
+  const model: DiagramData = {
+    ...ARCH,
+    views: [
+      ...ARCH.views!,
+      {
+        id: 'v-cont', name: 'Containers', nodeIds: [],
+        pipeline: { levels: [{ ways: [{ types: ['system', 'container'] }] }] },
+        positions: {
+          shop: { x: 0, y: 0, width: 560, height: 480 },
+          api: { x: 20, y: 120, width: 240, height: 150 },
+          fraud: { x: 290, y: 120, width: 240, height: 150 },
+        },
+      },
+    ],
+  }
+  // Legacy billing gone from every list, as a deletion leaves it.
+  model.views = model.views!.map((v) => ({ ...v, nodeIds: v.nodeIds.filter((id) => id !== 'legacy') }))
+  await openFolder(page, studio, model, { '.radical/base.json': ARCH_BASE })
+  const button = page.getByRole('button', { name: /^Changes on branch/ })
+  await expect(button.locator('.branch-count')).toHaveText('3', { timeout: 10_000 })
+  await button.click()
+  const card = (name: string) => page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: name }) })
+  await expect(card('Containers').locator('.lp-branch-count')).toHaveText('3')
+
+  await card('Containers').click()
+  const ghost = studio.node('legacy')
+  await expect(ghost).toHaveClass(/rf-node-ghost/)
+  await studio.settle()
+  const box = async (id: string) => (await studio.node(id).boundingBox())!
+  // Inside the shop's frame, over neither of the containers it holds. Read
+  // again until the camera has come to rest: boxes taken while it still
+  // moves belong to different frames.
+  await expect.poll(async () => {
+    const [g, shop, api, fraud] = [await box('legacy'), await box('shop'), await box('api'), await box('fraud')]
+    const problems: string[] = []
+    if (g.x < shop.x || g.y < shop.y || g.x + g.width > shop.x + shop.width + 0.5 || g.y + g.height > shop.y + shop.height + 0.5) problems.push('outside the shop')
+    for (const [name, other] of [['api', api], ['fraud', fraud]] as const) {
+      const apart = g.x + g.width <= other.x || other.x + other.width <= g.x || g.y + g.height <= other.y || other.y + other.height <= g.y
+      if (!apart) problems.push(`over ${name}`)
+    }
+    return problems
+  }, { timeout: 10_000 }).toEqual([])
+})
+
+test('a base saved since HEAD says so', async ({ page, studio }) => {
+  const sinceHead = serializeModelBase({ commit: COMMIT, described: 'HEAD', branch: 'main', nodes: JSON.parse(ARCH_BASE).nodes, relations: [] })
+  await openFolder(page, studio, ARCH, { '.radical/base.json': sinceHead })
+  const button = page.getByRole('button', { name: /^Changes on branch/ })
+  await expect(button.locator('.branch-count')).toHaveText('3', { timeout: 10_000 })
+  await button.hover()
+  await expect(page.getByRole('tooltip')).toContainText('3 elements changed since HEAD 534f32f')
+  await expect(page.getByRole('tooltip')).not.toContainText('main 534f32f')
+  await page.getByRole('button', { name: /^Inspector/ }).click()
+  await page.getByRole('tab', { name: /^Changes/ }).click()
+  const changes = page.getByRole('region', { name: 'Changes', exact: true })
+  await expect(changes).toContainText('since HEAD 534f32f (main), uncommitted edits included')
+})
+
 test('the Inspector lists every change since the base, and a click leads to the element', async ({ page, studio }) => {
   await openFolder(page, studio, ARCH, { '.radical/base.json': ARCH_BASE })
   // No test report, but a base: the Inspector has the branch's changes to show.

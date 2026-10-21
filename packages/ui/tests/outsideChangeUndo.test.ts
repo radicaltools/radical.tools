@@ -1,0 +1,111 @@
+/**
+ * Undo after an outside change. A folder model reloads whenever an agent (or
+ * an editor, git) writes it, and the reload forgot the history: Undo stayed
+ * grey for an agent's whole run, also for the user's own edits merged into
+ * it. The history now outlives such a reload: Undo and Redo take back and
+ * give back the user's steps on the model as it is now, and never take back
+ * the outside change (item 36: a step that restored the model from before
+ * the change undid the agent's edit).
+ */
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import type { C4Node, DiagramData } from '@radical/common/c4'
+import { NODE_SIZES } from '@radical/common/c4'
+import { useDiagramStore } from '../src/store/diagramStore'
+
+const s = useDiagramStore.getState
+const sys = (id: string, x: number, y: number, extra: Partial<C4Node> = {}): C4Node =>
+  ({ id, type: 'system', label: id, collapsed: false, x, y, ...NODE_SIZES.system, ...extra } as C4Node)
+const at = (id: string) => ({ x: s().c4Nodes[id].x, y: s().c4Nodes[id].y })
+const label = (id: string) => s().c4Nodes[id]?.label
+
+function model(): DiagramData {
+  const size = NODE_SIZES.system
+  return {
+    nodes: [sys('a', 0, 0), sys('b', 600, 0)],
+    relations: [],
+    views: [{ id: 'one', name: 'One', nodeIds: ['a', 'b'], positions: { a: { x: 100, y: 100, ...size }, b: { x: 900, y: 100, ...size } } }],
+  }
+}
+
+/** What a drag does to the store (see dragUndo.test.ts). */
+function drag(id: string, to: { x: number; y: number }): void {
+  s().liveGrab(id, at(id).x, at(id).y, 'calm', at(id))
+  useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, [id]: { ...st.c4Nodes[id], ...to } } }))
+  s().liveRelease(id, [], true)
+}
+
+/** The folder changed outside Studio: what autosave reloads, the user's
+ *  unsaved edits merged in, with `change` made to it. */
+function outsideChange(change: (data: DiagramData) => void): void {
+  const data = structuredClone(s().saveDiagram())
+  change(data)
+  const viewId = s().activeViewId
+  s().loadDiagram(data, { outsideChange: true })
+  if (viewId) s().setActiveView(viewId)
+}
+
+describe('Undo after an outside change', () => {
+  beforeEach(() => {
+    s().setAppMode('designer')
+    s().loadDiagram(model())
+  })
+  afterEach(() => s().stopLiveLayout())
+
+  it('takes back the user\'s steps and keeps the outside change; Redo gives them back', () => {
+    s().updateNode('a', { label: 'Shop' })
+    s().addNode({ type: 'system', label: 'Stock', x: 1200, y: 0, ...NODE_SIZES.system, collapsed: false } as Omit<C4Node, 'id'>)
+    outsideChange((d) => {
+      d.nodes.find((n) => n.id === 'b')!.label = 'Bank'
+      d.nodes.push(sys('c', 0, 600, { label: 'Courier' }))
+    })
+    expect(s().canUndo).toBe(true)
+    const stock = Object.values(s().c4Nodes).find((n) => n.label === 'Stock')!.id
+
+    s().undo()
+    expect(s().c4Nodes[stock]).toBeUndefined()
+    expect(label('a')).toBe('Shop')
+    s().undo()
+    expect(label('a')).toBe('a')
+    expect(s().canUndo).toBe(false)
+    // The agent's edits stay all along.
+    expect(label('b')).toBe('Bank')
+    expect(label('c')).toBe('Courier')
+
+    s().redo()
+    expect(label('a')).toBe('Shop')
+    s().redo()
+    expect(label(stock)).toBe('Stock')
+    expect(label('b')).toBe('Bank')
+    expect(label('c')).toBe('Courier')
+  })
+
+  it('never takes back an outside change to what the step changed, and says so', () => {
+    s().updateNode('a', { label: 'Shop' })
+    outsideChange((d) => { d.nodes.find((n) => n.id === 'a')!.label = 'Bookshop' })
+    s().undo()
+    expect(label('a')).toBe('Bookshop')
+    expect(s().notifications[s().notifications.length - 1]?.message).toMatch(/outside Studio.*Bookshop: label/)
+  })
+
+  it('takes back a drag on a view, on that view, with the agent\'s element still there', () => {
+    s().setActiveView('one')
+    drag('a', { x: 300, y: 400 })
+    outsideChange((d) => {
+      d.nodes.push(sys('c', 0, 600))
+      d.views![0].nodeIds.push('c')
+    })
+    expect(at('a')).toEqual({ x: 300, y: 400 })
+    s().undo()
+    expect(s().activeViewId).toBe('one')
+    expect(at('a')).toEqual({ x: 100, y: 100 })
+    expect(at('b')).toEqual({ x: 900, y: 100 })
+    expect(s().views.one.nodeIds).toContain('c')
+    expect(s().c4Nodes.c).toBeDefined()
+  })
+
+  it('another model loaded still forgets the history', () => {
+    s().updateNode('a', { label: 'Shop' })
+    s().loadDiagram(model())
+    expect(s().canUndo).toBe(false)
+  })
+})

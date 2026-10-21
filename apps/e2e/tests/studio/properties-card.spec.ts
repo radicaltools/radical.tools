@@ -31,6 +31,30 @@ test('the properties card slides over the canvas on a selection and leaves its s
   expect(await studio.canvas.boundingBox()).toEqual(before)
 })
 
+test('after ✕ the card opens again for the element once something else was selected', async ({ studio }) => {
+  // The card stayed hidden for that element until another ✕.
+  const close = () => studio.properties.getByRole('button', { name: 'Close properties' }).click()
+  await studio.node('customer').click()
+  await close()
+  await expect(studio.properties).toHaveCount(0)
+  await studio.node('payments').click()
+  await expect(studio.attribute('Name')).toHaveValue('Payment Provider')
+  await studio.node('customer').click()
+  await expect(studio.attribute('Name')).toHaveValue('Customer')
+
+  // Nothing selected in between, and a view switch, count too.
+  await close()
+  await expect(studio.properties).toHaveCount(0)
+  await studio.pane.click({ position: { x: 20, y: 20 } })
+  await studio.node('customer').click()
+  await expect(studio.attribute('Name')).toHaveValue('Customer')
+  await close()
+  await studio.open('v-containers')
+  await studio.open('v-context')
+  await studio.node('customer').click()
+  await expect(studio.attribute('Name')).toHaveValue('Customer')
+})
+
 test('a long field reads as Markdown and edits on a click', async ({ page, studio }) => {
   await studio.node('payments').click()
   const description = studio.properties.getByRole('button', { name: 'Edit Description' })

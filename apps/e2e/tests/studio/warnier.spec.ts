@@ -329,3 +329,58 @@ test('a process is built by clicking where it is drawn, from an empty Warnier vi
   await name('Billing')
   await expect(diagram.locator('.wn-roots > .wn-item > .wn-node > .wn-label .wn-name')).toHaveText(['Checkout', 'Billing'])
 })
+
+test('in a milestone, the name of the first element added stays open through the question how to save it', async ({ page, studio }) => {
+  // The question opens on the first edit of a milestone; a click on it took
+  // the focus from the new process's name, which closed: what was typed
+  // then was lost, and Enter added a second "New process".
+  await studio.openSample('view-processes')
+  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v4' }).click()
+  await expect(page).toHaveURL(/\/s\//)
+  const diagram = page.getByLabel('Warnier diagram')
+  const before = await diagram.locator('.wn-name').count()
+  await diagram.getByRole('button', { name: '+ Process' }).first().click()
+  await page.locator('.milestone-modal').getByRole('button', { name: 'Continue editing (decide later)' }).click()
+  const input = diagram.locator('.wn-name-input')
+  await expect(input).toBeFocused()
+  await page.keyboard.type('Onboard a customer')
+  await page.keyboard.press('Enter')
+  await expect(input).toHaveCount(0)
+  await expect(diagram.locator('.wn-name')).toHaveCount(before + 1)
+  await expect(diagram.locator('.wn-name', { hasText: /^Onboard a customer$/ })).toHaveCount(1)
+})
+
+test('in a view of one process, what is added or moved stays in that process', async ({ page, studio }) => {
+  const folder = await openFolder(page, studio, MODEL)
+  // New view → Process: a view per element, one of Checkout.
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByRole('menu', { name: 'New view' }).getByRole('group', { name: 'Process' }).getByRole('menuitem', { name: /^Process(?! \()/ }).click()
+  const diagram = page.getByLabel('Warnier diagram')
+  const label = (id: string) => diagram.locator(`.wn-label[data-node-id="${id}"]`)
+  const names = diagram.locator('.wn-item', { has: page.locator(':scope > .wn-node > .wn-label[data-node-id="checkout"]') })
+    .locator(':scope > .wn-children > .wn-item > .wn-node > .wn-label .wn-name')
+  await expect(diagram.locator('.wn-roots > .wn-item > .wn-node > .wn-label .wn-name')).toHaveText(['Checkout'])
+  // Another process would not be drawn here: none is offered.
+  await expect(diagram.getByRole('button', { name: '+ Process' })).toHaveCount(0)
+
+  // Enter on Checkout adds its last step, its name open.
+  await label('checkout').click()
+  await page.keyboard.press('Enter')
+  const input = diagram.getByRole('textbox', { name: 'Name' })
+  await expect(input).toHaveValue('New step')
+  await input.fill('Ship')
+  await input.press('Enter')
+  await expect(names).toHaveText(['Take the order', 'Reserve stock', 'Pay', 'Ship'])
+  await expect.poll(async () => {
+    const data = deserializeFromMdFolder(await folder.files()).data
+    return data.nodes.filter((n) => n.type === 'process').map((n) => n.label)
+  }).toEqual(['Checkout'])
+  await expect.poll(async () => deserializeFromMdFolder(await folder.files()).data.nodes.find((n) => n.label === 'Ship')?.parentId).toBe('checkout')
+
+  // Outdented, a step of Checkout would leave it, and the view: it stays.
+  await label('take').click()
+  await page.keyboard.press('Shift+Tab')
+  await expect(diagram.getByRole('group', { name: 'Actions of Take the order' }).getByRole('button', { name: 'Outdent' })).toBeDisabled()
+  await expect(names).toHaveText(['Take the order', 'Reserve stock', 'Pay', 'Ship'])
+})

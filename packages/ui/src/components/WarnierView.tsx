@@ -182,7 +182,11 @@ function Item(props: ItemProps): React.ReactElement {
               onChange={(e) => onDraft(e.target.value)}
               onClick={(e) => e.stopPropagation()}
               onFocus={(e) => e.currentTarget.select()}
-              onBlur={onCommit}
+              // The question how to save a milestone, opened by its first
+              // edit (this element added), takes the focus while it is
+              // answered and gives it back: the name stays open. Kept on
+              // that blur, it closed, and what was typed next was lost.
+              onBlur={() => { if (!useDiagramStore.getState().milestonePromptOpen) onCommit() }}
               onKeyDown={(e) => {
                 e.stopPropagation()
                 if (e.key === 'Enter') { e.preventDefault(); onCommit() }
@@ -262,6 +266,15 @@ export function WarnierView(): React.ReactElement {
 
   // Structure edits only where the tree is containment; renaming everywhere.
   const structural = !readOnly && warnierEditable(activeView)
+  // A view of one element (a view per element) draws it and what lies in
+  // it: whatever is added or moved stays inside it, or the view would not
+  // draw it.
+  const subject = activeView?.subject
+  const withinSubject = (parentId: string | null | undefined): boolean => {
+    if (!subject) return true
+    for (let id = parentId ?? undefined, seen = 0; id && seen < 64; id = nodes[id]?.parentId, seen++) if (id === subject) return true
+    return false
+  }
   const items = useMemo(() => flatten(tree), [tree])
   const selected = selectedId ? items.find((i) => i.node.id === selectedId) : undefined
   const [renaming, setRenaming] = useState<{ id: string; draft: string } | null>(null)
@@ -290,7 +303,7 @@ export function WarnierView(): React.ReactElement {
     if (!structural) return
     commitRename()
     const plan = outlinePlan(tree, item.key, m, hasOrder)
-    if (!plan) return
+    if (!plan || (plan.parentId !== undefined && !withinSubject(plan.parentId))) return
     const id = item.node.id
     runAsOneStep(() => {
       if (plan.parentId !== undefined) {
@@ -301,8 +314,15 @@ export function WarnierView(): React.ReactElement {
       writeOrders(plan.orders)
     })
   }
-  const canMove = (item: WarnierNode, m: OutlineMove) =>
-    structural && (m === 'outdent' ? !!locate(tree, item.key)?.parent : !!outlinePlan(tree, item.key, m, hasOrder))
+  const canMove = (item: WarnierNode, m: OutlineMove) => {
+    if (!structural) return false
+    if (m !== 'outdent') {
+      const plan = outlinePlan(tree, item.key, m, hasOrder)
+      return !!plan && (plan.parentId === undefined || withinSubject(plan.parentId))
+    }
+    const parent = locate(tree, item.key)?.parent
+    return !!parent && withinSubject(parent.node.parentId)
+  }
 
   /** The type a new element inside `node` gets: what it holds already, a
    *  step in a process or step, else the first the view shows that fits. */
@@ -318,7 +338,7 @@ export function WarnierView(): React.ReactElement {
     if (!structural || !type) return
     commitRename()
     const plan = insertPlan(tree, item.key, where, type, hasOrder)
-    if (!plan) return
+    if (!plan || !withinSubject(plan.parentId)) return
     const label = `New ${typeOf(type).label.toLowerCase()}`
     let created = ''
     runAsOneStep(() => {
@@ -340,7 +360,7 @@ export function WarnierView(): React.ReactElement {
   }
 
   /** A process at the top, after the ones there are, its name open. */
-  const canAddProcess = !readOnly && !!metamodel?.nodeTypes.process && warnierEditable(activeView)
+  const canAddProcess = !readOnly && !!metamodel?.nodeTypes.process && warnierEditable(activeView) && !subject
     && (() => {
       const types = pipelineOf(activeView)?.levels?.[0]?.ways.flatMap((w) => w.types ?? []) ?? []
       return types.length === 0 || types.includes('process')
@@ -402,7 +422,13 @@ export function WarnierView(): React.ReactElement {
       if (e.key === 'ArrowUp') { if (index > 0) selectNode(items[index - 1].node.id); return true }
       if (e.key === 'ArrowDown') { if (index < items.length - 1) selectNode(items[index + 1].node.id); return true }
       if (e.key === 'Tab') { if (structural) { move(selected, e.shiftKey ? 'outdent' : 'indent'); return true } return false }
-      if (e.key === 'Enter') { insert(selected, 'after', selected.node.type); return true }
+      if (e.key === 'Enter') {
+        // The element a view of one element is of has nothing after it
+        // there: Enter adds its last step, as + Step under its brace does.
+        if (selected.node.id === subject) insert(selected, 'inside', childTypeFor(selected))
+        else insert(selected, 'after', selected.node.type)
+        return true
+      }
       if (e.key === 'F2') { startRename(selected.node.id); return true }
       if ((e.key === 'Delete' || e.key === 'Backspace') && structural) { requestDelete([selected.node.id]); return true }
       if (e.key === 'Escape') { selectNode(null); return true }

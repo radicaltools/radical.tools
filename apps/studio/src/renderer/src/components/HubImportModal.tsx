@@ -451,6 +451,10 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       templateData?: { originalConcept: HubConcept; paramValues: Record<string, string> },
       opts?: { suppressClose?: boolean; placementOffset?: { x: number; y: number } },
     ) => {
+      // Adding to the model is Designer's work, as a Forge run is. In Viewer
+      // (where the Hub's link lands) the concept went into what Viewer
+      // shows: drawn, never saved, and gone on the way to Designer.
+      if (useDiagramStore.getState().appMode !== 'designer') useDiagramStore.getState().setAppMode('designer')
       const store = useDiagramStore.getState()
 
       // Map old concept node IDs → new store IDs.

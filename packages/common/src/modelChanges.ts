@@ -7,7 +7,7 @@
 // definition of a change as compare_milestones (compareModels).
 
 import type { C4Node, C4Relation } from './c4'
-import { compareModels, type ModelCopy } from './model'
+import { compareModels, modelValue, sameModelValue, type ModelCopy } from './model'
 
 export interface FieldChange {
   field: string
@@ -60,7 +60,7 @@ const NOT_MODEL = new Set(['id', 'x', 'y', 'width', 'height', 'collapsed'])
 /** Fields an entry already shows in its heading. */
 const SHOWN = new Set(['type', 'label', 'parentId', 'sourceId', 'targetId', 'relationType'])
 
-const present = (value: unknown): boolean => value !== undefined && value !== null && value !== ''
+const present = (value: unknown): boolean => modelValue(value) !== null
 
 function modelFields(item: object): Record<string, unknown> {
   return Object.fromEntries(Object.entries(item).filter(([key, value]) => !NOT_MODEL.has(key) && !SHOWN.has(key) && present(value)))
@@ -72,7 +72,7 @@ export function modelFieldChanges(before: object, after: object): FieldChange[] 
   const a = before as Record<string, unknown>
   const b = after as Record<string, unknown>
   return [...new Set([...Object.keys(a), ...Object.keys(b)])]
-    .filter((key) => !NOT_MODEL.has(key) && JSON.stringify(a[key] ?? null) !== JSON.stringify(b[key] ?? null))
+    .filter((key) => !NOT_MODEL.has(key) && !sameModelValue(a[key], b[key]))
     .sort()
     .map((field) => ({ field, before: a[field] ?? null, after: b[field] ?? null }))
 }

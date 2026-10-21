@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
 import { builtInC4Metamodel, builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import { saveAsViewpoint, viewpointsOf } from '@radical/common/viewpoints'
 import { useDiagramStore } from '../src/store/diagramStore'
 
 const s = useDiagramStore.getState
@@ -351,5 +352,157 @@ describe('deleting several elements from the selection bar', () => {
     s().undo()
     expect(Object.keys(s().c4Nodes).length).toBe(before)
     stillBefore()
+  })
+})
+
+describe('a change of view type', () => {
+  // It pushed no step: Undo took back the New view before it, and Redo
+  // brought the view back as a table.
+  it('is one undo step, and takes the viewpoint back with it', () => {
+    const v = s().addViewOfViewpoint('containers')!
+    s().setViewKind(v, 'table')
+    expect(s().views[v]).toMatchObject({ kind: 'table' })
+    expect(s().views[v].viewpoint).toBeUndefined()
+    s().undo()
+    expect(s().views[v]).toMatchObject({ kind: 'static', viewpoint: 'containers' })
+    s().redo()
+    expect(s().views[v].kind).toBe('table')
+    s().undo()
+    s().undo()
+    expect(s().views[v]).toBeUndefined()
+    stillBefore()
+  })
+
+  it('to the type it has is no step', () => {
+    s().setViewKind('v1', 'static')
+    s().undo()
+    expect(s().c4Nodes.bank.description).toBeUndefined()
+  })
+})
+
+describe('undo after a viewpoint changed in the metamodel', () => {
+  // The metamodel is in no step, so a view of a viewpoint is brought in step
+  // with it on undo. That changed the history entry's own views, which are
+  // frozen: Undo threw, changed nothing, and the step was gone.
+  it('"Save as viewpoint… → Replace": each step is taken back in turn', () => {
+    const a = s().addViewOfViewpoint('system-context')!
+    const b = s().addViewOfViewpoint('containers')!
+    s().detachViewpoint(b)
+    const saved = saveAsViewpoint(s().metamodel, 'System context', 'static', s().views[b].pipeline!)
+    s().setMetamodel(saved.metamodel)
+    s().applyViewpoint(b, saved.type.id)
+    const chain = JSON.stringify(s().views[a].pipeline)
+    expect(chain).toBe(JSON.stringify(s().views[b].pipeline))
+
+    s().undo()
+    expect(s().views[b].viewpoint).toBeUndefined()
+    // A follows the viewpoint as the metamodel has it now.
+    expect(s().views[a].viewpoint).toBe('system-context')
+    expect(JSON.stringify(s().views[a].pipeline)).toBe(chain)
+    s().undo()
+    expect(s().views[b].viewpoint).toBe('containers')
+    s().undo()
+    expect(s().views[b]).toBeUndefined()
+    expect(s().views[a]).toBeDefined()
+    s().undo()
+    expect(s().views[a]).toBeUndefined()
+    stillBefore()
+    s().redo()
+    expect(JSON.stringify(s().views[a].pipeline)).toBe(chain)
+  })
+
+  it('a viewpoint deleted in the metamodel editor', () => {
+    const a = s().addViewOfViewpoint('containers')!
+    s().updateNode('bank', { description: 'after' })
+    s().setMetamodel({ ...s().metamodel, viewpoints: viewpointsOf(s().metamodel).filter((t) => t.id !== 'containers') })
+    expect(s().views[a].viewpoint).toBeUndefined()
+    s().undo()
+    expect(s().c4Nodes.bank.description).toBe('before')
+    expect(s().views[a].viewpoint).toBeUndefined()
+    s().undo()
+    expect(s().views[a]).toBeUndefined()
+  })
+})
+
+describe('the selection after an undo', () => {
+  // Undoing the add of the selected element left an empty properties card
+  // and "1 node selected" for an element that was gone.
+  it('drops an element the undo took away', () => {
+    const id = add('system', 'New')
+    s().selectNode(id)
+    s().undo()
+    expect(s().c4Nodes[id]).toBeUndefined()
+    expect(s().selectedNodeId).toBeNull()
+    expect(s().selectedNodeIds).toEqual([])
+  })
+
+  it('drops a relation the undo took away, and keeps what is still there', () => {
+    s().setSelectedNodeIds(['web', 'api'])
+    s().addRelation({ sourceId: 'web', targetId: 'db' })
+    const id = Object.keys(s().c4Relations).find((r) => !['r1', 'r2', 'r3'].includes(r))!
+    s().undo()
+    expect(s().selectedNodeIds).toEqual(['web', 'api'])
+    s().redo()
+    s().selectEdge(id)
+    s().undo()
+    expect(s().selectedEdgeId).toBeNull()
+  })
+
+  it('drops an element the milestone opened does not have', () => {
+    const snap = s().createSnapshot('Before')
+    const id = add('system', 'New')
+    s().selectNode(id)
+    s().selectMilestone(snap)
+    expect(s().c4Nodes[id]).toBeUndefined()
+    expect(s().selectedNodeId).toBeNull()
+    expect(s().selectedNodeIds).toEqual([])
+  })
+})
+
+describe('Hide from view of what the view does not show', () => {
+  // It pushed a step that changed nothing, and that dropped the redo.
+  it('is no undo step', () => {
+    s().setActiveView('v1')
+    useDiagramStore.setState((st) => ({ views: { ...st.views, v1: { ...st.views.v1, nodeIds: ['shop', 'web', 'api'] } } }))
+    const id = add('system', 'New')
+    s().undo()
+    expect(s().canRedo).toBe(true)
+    s().removeNodeFromView('v1', id)
+    s().removeNodeFromView('v1', 'bank')
+    expect(s().canRedo).toBe(true)
+    s().redo()
+    expect(s().c4Nodes[id]).toBeDefined()
+  })
+})
+
+describe('Multi page and Depth of a wiki', () => {
+  // Neither was a step, and Undo of an element written before them gave
+  // back Single page at Depth 1 with it (saved).
+  it('are undo steps of their own', () => {
+    s().setViewKind('v1', 'wiki')
+    const id = add('system', 'Written in the wiki')
+    s().setWikiPageMode('v1', 'multi')
+    s().setWikiDepth('v1', 3)
+    s().undo()
+    expect(s().views.v1.wikiPageMode).toBe('multi')
+    expect(s().views.v1.wikiDepth ?? 1).toBe(1)
+    expect(s().c4Nodes[id]).toBeDefined()
+    s().undo()
+    expect(s().views.v1.wikiPageMode ?? 'single').toBe('single')
+    expect(s().c4Nodes[id]).toBeDefined()
+    s().undo()
+    expect(s().c4Nodes[id]).toBeUndefined()
+    expect(s().views.v1.kind).toBe('wiki')
+    s().redo()
+    s().redo()
+    s().redo()
+    expect(s().views.v1).toMatchObject({ wikiPageMode: 'multi', wikiDepth: 3 })
+  })
+
+  it('set to what they are is no step', () => {
+    s().setWikiPageMode('v1', 'single')
+    s().setWikiDepth('v1', 1)
+    s().undo()
+    expect(s().c4Nodes.bank.description).toBeUndefined()
   })
 })

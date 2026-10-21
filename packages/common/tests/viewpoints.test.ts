@@ -223,7 +223,25 @@ describe('viewpoint subjects', () => {
     expect(members()).toEqual([['Order', 'order', 'States'], ['Payment', 'payment', 'States']])
     // Each shows its element open, folded on the model or not.
     expect(model.viewsOfGroup(state.views, 'g').map((v) => v.expandedNodeIds)).toEqual([['order'], ['payment']])
-    expect(model.planViewGroups(state)).toEqual({ add: [], remove: [], refolder: [] })
+    expect(model.planViewGroups(state)).toEqual({ add: [], remove: [], refolder: [], unlist: [], rename: [] })
+    // A group's view is named after its element, also after the name was
+    // emptied on the way (the properties card writes each keystroke).
+    model.patchNode(state, 'order', { label: '' })
+    model.syncViewGroups(state, newId)
+    model.patchNode(state, 'order', { label: 'Purchase' })
+    expect(model.planViewGroups(state).rename).toEqual(['v1'])
+    expect(model.syncViewGroups(state, newId)).toBe(true)
+    expect(state.views.v1.name).toBe('Purchase')
+    model.patchNode(state, 'order', { label: 'Order' })
+    model.syncViewGroups(state, newId)
+    // A list of elements of its own, in a group's view or the group (a
+    // model written before they were refused), goes: it hid what the
+    // element holds.
+    state.views.v1.nodeIds = ['order']
+    state.views.g.nodeIds = ['payment']
+    expect(model.planViewGroups(state).unlist.sort()).toEqual(['g', 'v1'])
+    expect(model.syncViewGroups(state, newId)).toBe(true)
+    expect([state.views.v1.nodeIds, state.views.g.nodeIds]).toEqual([[], []])
     // A new machine: a new view; the group moves: its views follow.
     state.c4Nodes.refund = el('refund', 'state-machine', 'Refund')
     model.setViewFolder(state, 'g', 'Life')
@@ -326,6 +344,15 @@ describe('viewpoint tools', () => {
     expect(view('Payment')).toMatchObject({ partOf: group.id })
     expect((await call('delete_view', { id: view('Order').id })).resultText).toContain('goes with its element')
     expect((await call('update_view', { id: view('Order').id, kind: 'table' })).resultText).toContain('one of the views of the group Machines')
+    // Its elements are what its element holds, and the group lists none:
+    // nothing is picked by hand, in either.
+    expect((await call('set_view_nodes', { id: view('Order').id, nodeIds: ['placed'] })).resultText).toContain('Order is one of the views of the group Machines')
+    expect((await call('set_view_nodes', { id: 'g', nodeIds: ['order'] })).resultText).toContain('Machines is a group of views per element')
+    expect((await call('set_view_nodes', { id: view('Order').id, nodeIds: [] })).resultText).toContain('one of the views of the group')
+    expect(view('Order').nodeIds).toEqual([])
+    expect(view('Machines').nodeIds).toEqual([])
+    expect((await call('create_view', { tempId: 'g2', name: 'Picked', viewpoint: 'state-machine', nodeIds: ['order'] })).resultText).toContain('lists no elements')
+    expect(Object.values(facade.getViews!()).some((v) => v.name === 'Picked')).toBe(false)
     // The group keeps its viewpoint: another kind or none would end it.
     expect((await call('update_view', { id: 'g', kind: 'table' })).resultText).toContain('is a group of views per element')
     expect((await call('update_view', { id: 'g', viewpoint: null })).resultText).toContain('is a group of views per element')

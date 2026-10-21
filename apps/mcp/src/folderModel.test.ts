@@ -109,6 +109,7 @@ describe('folder-backed MCP model', () => {
     try {
       await client.connect(transport)
       for (const args of [
+        { tempId: 'erp', type: 'system', label: 'ERP' },
         { tempId: 'shop', type: 'domain', label: 'Shop' },
         { tempId: 'orders', type: 'system', label: 'Orders', parentId: 'shop' },
         { tempId: 'billing', type: 'system', label: 'Billing', parentId: 'shop' },
@@ -132,6 +133,20 @@ describe('folder-backed MCP model', () => {
       const crm = byLabel('CRM')
       expect(crm.parentId).toBe(shop.id)
       expect(data.defaultPositions?.[crm.id]).toEqual({ x: crm.x, y: crm.y, width: crm.width, height: crm.height })
+
+      // ERP lies left of Shop: moved in, it keeps no place outside Shop's
+      // frame (x < 0) but is placed inside it, beside the others, and Shop
+      // grows for it.
+      const erpMoved = await client.callTool({ name: 'move_node', arguments: { id: 'erp', parentId: 'shop' } })
+      expect(erpMoved.isError, JSON.stringify(erpMoved.content)).not.toBe(true)
+      data = await read()
+      const [erp, shopNow] = [byLabel('ERP'), byLabel('Shop')]
+      expect(erp.parentId).toBe(shop.id)
+      expect(erp.x).toBeGreaterThanOrEqual(0)
+      expect(erp.y).toBeGreaterThanOrEqual(0)
+      expect(erp.x + erp.width).toBeLessThanOrEqual(shopNow.width)
+      expect(erp.y + erp.height).toBeLessThanOrEqual(shopNow.height)
+      expect(data.defaultPositions?.[erp.id]).toEqual({ x: erp.x, y: erp.y, width: erp.width, height: erp.height })
 
       const user = await client.callTool({ name: 'add_node', arguments: { tempId: 'user', type: 'person', label: 'Buyer' } })
       expect(user.isError).not.toBe(true)
@@ -459,6 +474,28 @@ describe('long Smart Layout runs', () => {
     // A tree: each container below the one it calls.
     expect(pos.api.y).toBeGreaterThan(pos.web.y)
     expect(pos.db.y).toBeGreaterThan(pos.api.y)
+  }, 60_000)
+
+  it('lays out no flow (dynamic) view: Studio draws no canvas there', async () => {
+    // It reported "crossings 0 -> 0, overdraws 1 -> 0. No files changed."
+    // on every call: a flow view keeps no positions.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = ['a', 'b'].map((id, i) => ({ id, type: 'system', label: id.toUpperCase(), x: i * 10, y: 0, width: 240, height: 160, collapsed: false }))
+    data.relations = [{ id: 'r1', sourceId: 'a', targetId: 'b' }]
+    data.sequences = [{ id: 's', name: 'Flow', relationIds: ['r1'] } as never]
+    data.views = [{ id: 'v', name: 'Place Order Flow', nodeIds: ['a', 'b'], positions: {}, kind: 'dynamic', sequenceId: 's' } as never]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const outcome = await model.call('smart_layout', { viewId: 'v' })
+    expect(outcome.ok).toBe(false)
+    expect(outcome.text).toContain('"Place Order Flow" is a dynamic view; only static views have a canvas layout')
+    expect((await model.call('align_nodes', { nodeIds: ['a', 'b'], axis: 'vertical', viewId: 'v' })).ok).toBe(false)
+    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(after.views!.find((v) => v.id === 'v')!.layoutConstraints ?? []).toEqual([])
   }, 60_000)
 
   it('takes a type that another writer added to the metamodel since its last call', async () => {
