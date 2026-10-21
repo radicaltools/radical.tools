@@ -37,10 +37,31 @@ function showAllEdgeLabels(el: HTMLElement): Promise<() => void> {
 }
 
 /** What the view shown is drawn in: the canvas (also of a flow view), or
- *  the page of a wiki, table, matrix or hierarchy view. Export looked for
- *  the canvas only, so on those views PNG and SVG did nothing, with no
- *  file and no notice. */
-const EXPORT_TARGETS = '.canvas-area, .wiki-view, .tv-wrap, .mx-wrap, .treemap-wrap-outer'
+ *  the page of a wiki, table, matrix, hierarchy or Warnier view. Export
+ *  looked for the canvas only, so on those views PNG and SVG did nothing,
+ *  with no file and no notice (the Warnier view said "There is nothing on
+ *  screen to export"). */
+const EXPORT_TARGETS = '.canvas-area, .wiki-view, .tv-wrap, .mx-wrap, .treemap-wrap-outer, .warnier-view'
+
+/** Parts of a view that are there to edit it, not what it shows: the
+ *  wiki's page mode, add, edit and writing lines and its search box, the
+ *  table's add buttons, the hierarchy's Size by and Levels, the Warnier
+ *  view's step buttons. An export showed them. */
+const EDITING_CONTROLS = [
+  'wiki-page-mode-toggle', 'wiki-add', 'wiki-tools', 'wiki-write', 'wiki-nav-search',
+  'tv-add-btn', 'tm-bc-sizeby', 'wn-actions', 'wn-add-first', 'wn-add', 'wn-empty-add',
+]
+
+/** What an export leaves out: the canvas's background grid, the panels and
+ *  bars around it, and the editing controls. */
+function exportFilter(node: HTMLElement | SVGElement): boolean {
+  if (!(node instanceof Element)) return true
+  const cls = node.getAttribute('class') ?? ''
+  if (cls.includes('react-flow__background')) return false
+  if (cls.includes('toolbar') || cls.includes('left-panel') || cls.includes('right-panel')) return false
+  if (cls.includes('sel-bar') || cls.includes('edge-action') || cls.includes('quick-search')) return false
+  return ![...node.classList].some((t) => EDITING_CONTROLS.some((c) => t === c || t.startsWith(`${c}-`)))
+}
 
 function exportTarget(): HTMLElement | null {
   const el = document.querySelector(EXPORT_TARGETS) as HTMLElement | null
@@ -90,14 +111,7 @@ export function useExport(): {
       cacheBust: true,
       backgroundColor: getComputedStyle(el).backgroundColor || '#1e1e2e',
       pixelRatio: window.devicePixelRatio || 2,
-      filter: (node: HTMLElement | SVGElement) => {
-        if (!(node instanceof Element)) return true
-        const cls = node.getAttribute('class') ?? ''
-        if (cls.includes('react-flow__background')) return false
-        if (cls.includes('toolbar') || cls.includes('left-panel') || cls.includes('right-panel')) return false
-        if (cls.includes('sel-bar') || cls.includes('edge-action') || cls.includes('quick-search')) return false
-        return true
-      },
+      filter: exportFilter,
     }
     let restoreLabels = () => {}
     labelsShown
@@ -120,14 +134,7 @@ export function useExport(): {
       cacheBust: true,
       backgroundColor: getComputedStyle(el).backgroundColor || '#1e1e2e',
       pixelRatio: window.devicePixelRatio || 2,
-      filter: (node: HTMLElement | SVGElement) => {
-        if (!(node instanceof Element)) return true
-        const cls = node.getAttribute('class') ?? ''
-        if (cls.includes('react-flow__background')) return false
-        if (cls.includes('toolbar') || cls.includes('left-panel') || cls.includes('right-panel')) return false
-        if (cls.includes('sel-bar') || cls.includes('edge-action') || cls.includes('quick-search')) return false
-        return true
-      },
+      filter: exportFilter,
     }
     let restoreLabels = () => {}
     labelsShown

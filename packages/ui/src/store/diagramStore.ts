@@ -584,10 +584,28 @@ function suggestSmartLayoutIfUnarranged(loaded = false): void {
  *  replacing the live model: it lays out the view on screen itself, after. */
 let _arrangeOnLeavingMilestone = true
 
+/** True when the elements have no places at all: each one at the same
+ *  point as its siblings (a Structurizr import puts them all at 0,0). No
+ *  picture to keep, unlike one that only looks unarranged. */
+function hasNoPlaces(nodes: Record<string, C4Node>): boolean {
+  const list = Object.values(nodes)
+  if (list.length < 2) return false
+  const first = new Map<string, C4Node>()
+  for (const n of list) {
+    const key = n.parentId ?? ''
+    const sibling = first.get(key)
+    if (!sibling) first.set(key, n)
+    else if (sibling.x !== n.x || sibling.y !== n.y) return false
+  }
+  return true
+}
+
 /** On opening a view: a view of a viewpoint never laid out (no positions
  *  of its own), one of a group of views per element among them, gets Smart
- *  Layout at once, in the designer on the live model; another canvas that
- *  looks unarranged gets the notice. Until then it shows All elements'
+ *  Layout at once, in the designer on the live model; so does a canvas never
+ *  laid out whose elements have no places at all (an imported Structurizr
+ *  view). Another canvas that looks
+ *  unarranged gets the notice. Until then it shows All elements'
  *  places (firstCanvasPositions). With a milestone shown the layout would be
  *  an edit of the milestone and is not kept in the view: the view is laid
  *  out back on live (called again when the milestone is left with it on
@@ -595,7 +613,12 @@ let _arrangeOnLeavingMilestone = true
 function arrangeOnFirstOpen(): void {
   const s = useDiagramStore.getState()
   const view = s.activeViewId ? s.views[s.activeViewId] : undefined
-  if ((view?.partOf || view?.viewpoint) && s.appMode === 'designer' && !s.activeSnapshotId && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) {
+  const neverLaidOut = !!view && s.appMode === 'designer' && !s.activeSnapshotId && !Object.keys(view.positions ?? {}).length
+  if (neverLaidOut && (view.partOf || view.viewpoint) && (view.kind ?? 'static') === 'static') {
+    void s.runSmartLayout()
+    return
+  }
+  if (neverLaidOut && ((view.kind ?? 'static') === 'static' || view.kind === 'dynamic') && hasNoPlaces(s.c4Nodes)) {
     void s.runSmartLayout()
     return
   }

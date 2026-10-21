@@ -403,8 +403,8 @@ describe('views', () => {
     expect(r.views.map((v) => v.name)).toEqual(['Landscape', 'Context', 'Containers of Shop', 'API components', 'Ordering'])
     expect(labels('Landscape')).toEqual(['Customer', 'Staff', 'Shop', 'Mail', 'Other'])
     expect(labels('Context')).toEqual(['Customer', 'Shop', 'Mail'])
-    expect(labels('Containers of Shop')).toEqual(['Customer', 'Web App', 'API', 'DB'])
-    expect(labels('API components')).toEqual(['Web App', 'Orders', 'Auth', 'DB', 'Mail'])
+    expect(labels('Containers of Shop')).toEqual(['Customer', 'Shop', 'Web App', 'API', 'DB'])
+    expect(labels('API components')).toEqual(['Web App', 'API', 'Orders', 'Auth', 'DB', 'Mail'])
     for (const v of r.views) expect(v.positions).toEqual({})
   })
 

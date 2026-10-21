@@ -136,10 +136,19 @@ test('Open → Structurizr DSL… brings the views, opens the first, and says wh
   await page.getByRole('button', { name: 'Structurizr DSL…' }).click()
   await (await chooser).setFiles({ name: 'shop.dsl', mimeType: 'text/plain', buffer: Buffer.from(dsl) })
   await studio.ready()
-  // The first view, with what it shows: Customer and Shop, folded.
+  // The first view, with what it shows: Customer and Shop, folded, laid out.
   await expect(page).toHaveURL(/\/v\/view-1/)
   await expect(studio.nodes).toHaveCount(2)
-  await expect(page.locator('.toast-message')).toContainText(/!include people\.dsl.*Deployment environment "Live"/)
+  await expect(page.locator('.toast-message').filter({ hasText: 'Structurizr import left out' }))
+    .toContainText(/!include people\.dsl.*Deployment environment "Live"/)
   const doc = JSON.parse(await studio.storedJson(studio.activeDocId())) as { views: { name: string }[] }
   expect(doc.views.map((v) => v.name)).toEqual(['Context', 'Containers'])
+  await studio.settle()
+  await expect.poll(() => studio.layoutViolations(studio.activeDocId())).toEqual([])
+  // The other view, the system with its containers, is laid out when it
+  // is first opened.
+  await page.locator('.left-panel').getByText('Containers', { exact: true }).click()
+  await expect(studio.nodes).toHaveCount(4)
+  await studio.settle()
+  await expect.poll(() => studio.layoutViolations(studio.activeDocId())).toEqual([])
 })

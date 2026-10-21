@@ -867,6 +867,8 @@ export function parseStructurizrDsl(src: string, options: StructurizrDslOptions 
             if (b === scope.id && a && a !== scope.id) ids.add(a)
           }
         } else if (spec.kind === 'container' && scope) {
+          // The system is the boundary its containers are drawn in.
+          ids.add(scope.id)
           for (const n of nodes) if (levelOf(n) === 'container' && upTo(n.id, 'system') === scope.id) ids.add(n.id)
           for (const r of relations) {
             for (const [mine, other] of [[r.sourceId, r.targetId], [r.targetId, r.sourceId]]) {
@@ -877,6 +879,7 @@ export function parseStructurizrDsl(src: string, options: StructurizrDslOptions 
           }
         } else if (spec.kind === 'component' && scope) {
           const system = upTo(scope.id, 'system')
+          ids.add(scope.id)
           for (const n of nodes) if (n.type === 'component' && upTo(n.id, 'container') === scope.id) ids.add(n.id)
           for (const r of relations) {
             for (const [mine, other] of [[r.sourceId, r.targetId], [r.targetId, r.sourceId]]) {
