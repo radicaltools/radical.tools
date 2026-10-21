@@ -819,6 +819,26 @@ const KNOWN: Known[] = [
     },
     note: 'K22: an expand on a view that does not draw the children leaves seeds that move them out of their container later, also after a reload (new)',
   },
+  {
+    // Found by group E's runs (2026-10-21, also on d04b081): bookstore,
+    // Smart Layout, Containers opened, the agent adds a container into
+    // Payment Provider (merged with unsaved edits), Undo, Redo: on All
+    // elements Payment Provider (260, 40) 360 × 350 overlaps Bookstore (30,
+    // 300). FUZZ_SEED=13 FUZZ_PATH=542:3:4:6:7:17:13:16:17.
+    rule: 'geometry',
+    match: (t, v) => !!v.facts?.overlap && (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent' && a.kind === 'add'),
+    note: 'KE1: Undo and Redo after an agent added into a system leave it grown over its neighbour (new)',
+  },
+  {
+    // Found by group E's runs (2026-10-21, also on d04b081): nested,
+    // Container 0.2 folded and unfolded, Container 1.0 and 1.1 kept in a
+    // row, Component 0.2.0 moved into Container 0.0: Component 0.1.0 lies
+    // outside Container 0.1 (971.7 against 1027.7). FUZZ_SEED=11
+    // FUZZ_PATH=71:8:8:14:13:17:23:22:22:22:26:26:31:36:19:18:21:26:29:17:10:11:10:10:16:12:12:12:12.
+    rule: 'geometry',
+    match: (t, v) => lastAction(t) === 'reparent' && !!v.facts?.outside && !!v.facts.aligned,
+    note: 'KE2: a move into another parent, with a row elsewhere, leaves a child of a neighbouring container outside it (new)',
+  },
 ]
 
 const knownHits = new Map<string, number>()
