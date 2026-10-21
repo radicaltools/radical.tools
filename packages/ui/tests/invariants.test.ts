@@ -780,15 +780,6 @@ const KNOWN: Known[] = [
     note: 'K16: after an agent deletes a child, the next local layout moves its container and leaves a sibling outside it (new; next to "Calm drags and pins" item 6, agent adds)',
   },
   {
-    // Bookstore: a milestone shown with edits; the agent moves Web App into
-    // another system (the facade drops its place on Containers); a group
-    // added in the milestone, Undo: the live Containers view has Web App's
-    // old place (30, 120) again.
-    rule: 'milestoneKeepsLive',
-    match: (t) => (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent'),
-    note: 'K17: Undo in a milestone after an agent\'s write takes back part of the write in the live views (new; sibling of item 36)',
-  },
-  {
     // Nested: Component 1.1.1 moved into Container 2.0, a view of the
     // Components viewpoint laid out, the milestone Early opened (there it
     // is still in Container 1.1): on that view it is drawn exactly on
@@ -799,18 +790,6 @@ const KNOWN: Known[] = [
     // (30, 120), over Container 0.1 and 0.2.
     match: (t, v) => /^on (?!live\|)/.test(v.detail) && t.some((a) => a.a === 'reparent' || a.a === 'collapse' || (a.a === 'agent' && a.kind === 'move')),
     note: 'K18: in a milestone, an element moved or folded since on live is drawn on a view by the live layout, onto its siblings (new)',
-  },
-  {
-    // A queue dropped into Payment Provider, not saved yet, while the agent
-    // moves Orders DB into it: the merge puts both at (1140, 464.8).
-    rule: 'geometry',
-    // Also when it shows only later: a component of System 0 dragged (System
-    // 0 grows, System 1 moves 21 px right), a milestone opened, the agent
-    // adds a container into System 1 (the server grows it and moves System 2
-    // from where System 1 was); back on live, System 1 overlaps System 2.
-    match: (t, v, resolved) => !!v.facts?.overlap && (/merged with unsaved edits/.test(resolved[resolved.length - 1] ?? '') ||
-      (['discard', 'view', 'reload', 'openMilestone'].includes(lastAction(t) ?? '') && resolved.some((r) => /merged with unsaved edits/.test(r)))),
-    note: 'K19: a merge puts what Studio and the agent each placed or moved on top of each other (new)',
   },
   {
     // Sample, All elements: Auth Service folded, a component dropped into

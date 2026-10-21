@@ -451,6 +451,10 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry, inMilestone = fals
   const view = activeViewId ? views[activeViewId] : undefined
   const positions = view ? view.positions ?? {} : defaultPositions
   if (Object.keys(positions).length > 0) showCanvasPositions(c4Nodes, positions, view, c4Relations)
+  // What the step puts back may meet what was placed outside Studio since,
+  // as a merge of unsaved edits does (Undo of Smart Layout after the agent
+  // grew Payment Provider): on All elements, room is made as on a load.
+  if (!activeViewId && !change.to.activeViewId) _settleOutsidePlaces(c4Nodes, change.to.c4Nodes)
   return {
     entry: {
       c4Nodes,
@@ -493,6 +497,73 @@ function _rebasedMilestones(change: StepChange, now: HistoryEntry): Pick<History
     list.splice(Math.min(i, list.length), 0, m)
   })
   return { snapshots: list, slideMilestones: { ...now.slideMilestones, ...change.to.slideMilestones } }
+}
+
+/** What a change read from outside Studio (an agent's write, merged with
+ *  the edits Studio had not written yet) placed on a sibling where Studio
+ *  has it (`was`, Studio's live model before the change, at All elements'
+ *  places), on All elements. Each side placed clear of what it had: a queue
+ *  dropped into Payment Provider in Studio and Orders DB moved into it by
+ *  the agent came to the same spot (item 264). By the rule for moves, the
+ *  one the change placed (added, moved into another parent or moved) keeps
+ *  its place where it lies clear, else goes beside its siblings, with room
+ *  made (settleMovedNodes); one the change grew where Studio has it (a
+ *  container the agent added into) has room made round it (makeRoomAround),
+ *  as an add makes it. Overlaps Studio had already stay. Mutates `nodes`
+ *  (copies); returns the ids moved. */
+function _settleOutsidePlaces(nodes: Record<string, C4Node>, was: Record<string, C4Node>): string[] {
+  const before = canvasBoxes(was)
+  const overlap = (a: CanvasBox, b: CanvasBox): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+  const sameParent = (a: C4Node, b: C4Node): boolean => (a.parentId ?? undefined) === (b.parentId ?? undefined)
+  const placed = (n: C4Node): boolean => {
+    const w = was[n.id]
+    return !w || !sameParent(w, n) || Math.abs(w.x - n.x) >= 0.5 || Math.abs(w.y - n.y) >= 0.5
+  }
+  const touched: string[] = []
+  const settled = new Set<string>()
+  let canvas = canvasBoxes(nodes)
+  const siblings = new Map<string, string[]>()
+  for (const n of Object.values(nodes)) {
+    if (!canvas.shown(n)) continue
+    const key = n.parentId ?? ''
+    siblings.set(key, [...(siblings.get(key) ?? []), n.id])
+  }
+  const pairs = [...siblings.values()].flatMap((group) => group.flatMap((aId, i) => group.slice(i + 1).map((bId) => [aId, bId] as const)))
+  for (const [aId, bId] of pairs) {
+    const a = nodes[aId], b = nodes[bId]
+    if (settled.has(aId) || settled.has(bId) || !sameParent(a, b)) continue
+    if (!overlap(canvas.boxOf(a), canvas.boxOf(b))) continue
+    const wa = was[aId], wb = was[bId]
+    if (wa && wb && sameParent(wa, wb) && before.shown(wa) && before.shown(wb) && overlap(before.boxOf(wa), before.boxOf(wb))) continue
+    const grew = (n: C4Node): boolean => {
+      const w = was[n.id]
+      if (!w || !sameParent(w, n)) return false
+      const now = canvas.boxOf(n), then = before.boxOf(w)
+      return now.w > then.w + 0.5 || now.h > then.h + 0.5
+    }
+    const [pa, pb, ga, gb] = [placed(a), placed(b), grew(a), grew(b)]
+    if (!pa && !pb && !ga && !gb) continue
+    // One the change grew where Studio has it: room is made round it.
+    const grown = !pb && gb ? b : !pa && ga ? a : undefined
+    if (grown) {
+      for (const [id, at] of Object.entries(makeRoomAround(grown.id, nodes, canvas))) {
+        nodes[id].x = at.x
+        nodes[id].y = at.y
+        touched.push(id)
+      }
+      // What was pushed may reach past the parent's frame: it fits again.
+      if (grown.parentId && nodes[grown.parentId]) touched.push(...growWithRoom(nodes, grown.parentId, canvasBoxes(nodes)))
+      settled.add(grown.id)
+      canvas = canvasBoxes(nodes)
+      continue
+    }
+    // The one the change placed; of two, the one Studio did not have.
+    const mover = pa && pb ? (wb ? a : b) : pa ? a : b
+    touched.push(mover.id, ...settleMovedNodes(nodes, [mover.id], canvas))
+    settled.add(mover.id)
+    canvas = canvasBoxes(nodes)
+  }
+  return [...new Set(touched)]
 }
 
 /** A milestone shown when the folder changed outside Studio (an agent's
@@ -7282,6 +7353,11 @@ export const useDiagramStore = create<DiagramStore>()(
         // The history is Designer's live model's: a milestone shown, a slide
         // played or Viewer's model in the store is not the one it rebases on.
         const st = get()
+        // Studio's live model at All elements' places, for what the change
+        // placed on it (_settleOutsidePlaces).
+        const wasLive = opts?.outsideChange && (st.appMode === 'designer' || st.appMode === 'metamodel') && !st.presentationActive
+          ? (() => { const doc = st.saveDiagram(); return atDefaultPositions(doc.nodes, doc.defaultPositions) })()
+          : null
         // A milestone shown stays shown, with its edits (ShownMilestone).
         const shownBefore = opts?.outsideChange && st.activeSnapshotId && st.liveBackup ? st.snapshots.find((m) => m.id === st.activeSnapshotId) : undefined
         const shownMilestone: ShownMilestone | null = shownBefore ? {
@@ -7338,8 +7414,13 @@ export const useDiagramStore = create<DiagramStore>()(
           }
         } else if (opts?.outsideChange && designerShown && milestone && !st.presentationActive) {
           // The milestone's steps stay, unless it was changed too; the live
-          // model's, parked, make their change on it as it is now.
+          // model's, parked, make their change on it as it is now. So do
+          // the milestone's: they hold the views, the metamodel and the
+          // milestones, which are the live model's too, and put back whole,
+          // Undo took back what the change did to them (Web App's place on
+          // Containers after the agent moved it: item 262).
           if (milestone.changed) { _undoStack.length = 0; _redoStack.length = 0 }
+          else _historyRebased(_captureState(st))
           if (_liveHistory) {
             const live = st.liveBackup!
             _liveHistoryKeepsVisit(_sharedNow(st, live), [_liveHistory.undo, _liveHistory.redo])
@@ -7371,6 +7452,12 @@ export const useDiagramStore = create<DiagramStore>()(
           nodes = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { ...n }]))
           placedOnLoad = placeUnplaced(nodes, data.defaultPositions)
         }
+        let settledOnLoad: string[] = []
+        if (wasLive) {
+          nodes = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { ...n }]))
+          settledOnLoad = _settleOutsidePlaces(nodes, wasLive)
+          placedOnLoad = [...new Set([...placedOnLoad, ...settledOnLoad])]
+        }
         const relations: Record<string, C4Relation> = {}
         const views: Record<string, DiagramView> = {}
         const sequences: Record<string, DiagramSequence> = {}
@@ -7384,7 +7471,8 @@ export const useDiagramStore = create<DiagramStore>()(
         const presInit = buildPresentationsFromData(data.presentations, data.presentationSlides)
 
         // Restore per-view positions (backward compat: old files won't have them)
-        const defaultPos = data.defaultPositions ?? snapshotPositions(nodes)
+        const settledPos = settledOnLoad.length ? Object.fromEntries(Object.entries(snapshotPositions(nodes)).filter(([id]) => settledOnLoad.includes(id))) : {}
+        const defaultPos = data.defaultPositions ? { ...data.defaultPositions, ...settledPos } : snapshotPositions(nodes)
         const defaultVP: { x: number; y: number; zoom: number } | null = data.defaultViewport ?? null
 
         const activeDocId = documentBackend()?.getActiveId()
