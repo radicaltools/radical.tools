@@ -412,6 +412,10 @@ export interface PresentationSlide {
   focusNodeIds?: string[]
   /** A slide of a hierarchy view: the element it was drilled into. */
   treemapFocusId?: string | null
+  /** A slide of a wiki view: the element whose page it shows (null: the
+   *  Overview), and how that page is written. */
+  wikiFocusId?: string | null
+  wikiPageMode?: 'single' | 'multi'
   /** Full node positions + collapsed flags at the time the slide was created/captured */
   canvasState?: SlideCanvasState
   /**

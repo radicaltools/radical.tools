@@ -7,7 +7,7 @@
  * at its 360×260 System Context box, its containers wherever another canvas
  * had left them, outside it and over Payment Provider.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { C4Node, DiagramData, NodePosition } from '@radical/common/c4'
 import { useDiagramStore } from '../src/store/diagramStore'
 
@@ -100,4 +100,54 @@ describe('a view with no positions of its own', () => {
     s().setViewKind('list', 'static')
     tidy()
   })
+})
+
+describe('a slide of a view with no positions of its own', () => {
+  // Slides with no captured canvas, as create_presentation makes them.
+  const slides = [
+    { id: 's-ctx', name: 'Context', viewId: 'ctx', snapshotId: null, viewport: { x: 0, y: 0, zoom: 0 } },
+    { id: 's-new', name: 'Containers', viewId: 'containers', snapshotId: null, viewport: { x: 0, y: 0, zoom: 0 } },
+  ]
+  beforeEach(() => {
+    useDiagramStore.setState({ presentations: [{ id: 'p', name: 'P', slides }], activePresentationId: 'p', presentationSlides: slides } as never)
+    s().setAppMode('presenter')
+  })
+
+  it('opens on All elements\' places when played', () => {
+    s().goToSlide(0)
+    expect(abs('shop')).toEqual(pos(0, 0, 360, 260))
+    s().goToSlide(1)
+    tidy()
+    expect(abs('shop')).toEqual(pos(0, 0, 640, 320))
+  })
+
+  it('and when its card is shown', () => {
+    s().previewSlide(0)
+    s().previewSlide(1)
+    tidy()
+  })
+})
+
+describe('a view of a viewpoint opened first in Viewer or Presenter', () => {
+  // Designer lays it out on first opening (Smart Layout); opened in another
+  // mode, Designer then showed it at All elements' places.
+  for (const mode of ['viewer', 'presenter'] as const) {
+    it(`is laid out once Designer shows it (${mode})`, () => {
+      const original = s().runSmartLayout
+      const runSmartLayout = vi.fn(async () => {})
+      useDiagramStore.setState({ runSmartLayout } as never)
+      try {
+        useDiagramStore.setState((st: any) => { st.views.containers.viewpoint = 'containers' })
+        s().setActiveView('ctx')
+        s().setAppMode(mode)
+        s().setActiveView('containers')
+        expect(runSmartLayout).not.toHaveBeenCalled()
+        s().setAppMode('designer')
+        expect(s().activeViewId).toBe('containers')
+        expect(runSmartLayout).toHaveBeenCalledTimes(1)
+      } finally {
+        useDiagramStore.setState({ runSmartLayout: original } as never)
+      }
+    })
+  }
 })

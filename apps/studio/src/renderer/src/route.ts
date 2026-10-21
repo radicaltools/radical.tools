@@ -182,7 +182,9 @@ export function currentRoute(): Route {
   let focus: string | undefined
   if (s.activeViewId) {
     const v = s.views[s.activeViewId]
-    if (v && v.kind === 'wiki' && v.wikiFocusId) focus = v.wikiFocusId
+    // A slide of a wiki view shows its own page over the view's.
+    const page = s.slideWikiPage?.viewId === s.activeViewId ? s.slideWikiPage.focusId : v?.wikiFocusId
+    if (v && v.kind === 'wiki' && page) focus = page
   }
   const playing = s.presentationActive
   const inspector = s.appMode === 'inspector'
@@ -463,6 +465,7 @@ export function startRouteSync(): () => void {
       s.activeViewId !== p.activeViewId ||
       s.selectedNodeId !== p.selectedNodeId ||
       s.views !== p.views ||
+      s.slideWikiPage !== p.slideWikiPage ||
       s.activeSnapshotId !== p.activeSnapshotId ||
       s.presentationActive !== p.presentationActive ||
       s.presentationSlideIndex !== p.presentationSlideIndex ||
