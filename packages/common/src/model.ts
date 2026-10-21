@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType } from './c4'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType } from './c4'
 import { readPipeline } from './viewPipeline'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
@@ -433,15 +433,30 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
   return removed
 }
 
-/** Takes the `removed` elements out of every view (its list, folds and
- *  alignments) and out of All elements' alignments; a view of one of them
- *  goes with it. */
+/** Whether a chain level has a within filter on one of the `removed`. */
+function namesRemoved(level: unknown, removed: Set<string>): boolean {
+  const filters = (level as { filters?: unknown } | null)?.filters
+  return Array.isArray(filters) && filters.some((f) => f?.kind === 'within' && removed.has(f.nodeId))
+}
+
+/** Takes the `removed` elements out of every view (its list, folds,
+ *  alignments and within filters) and out of All elements' alignments; a
+ *  view of one of them goes with it. */
 export function forgetNodesInViews(state: ModelState, removed: Set<string>): void {
   for (const view of Object.values(state.views)) {
     removeFromViewList(view, removed)
     if (view.collapsedNodeIds?.length) view.collapsedNodeIds = view.collapsedNodeIds.filter((nid) => !removed.has(nid))
     if (view.expandedNodeIds?.length) view.expandedNodeIds = view.expandedNodeIds.filter((nid) => !removed.has(nid))
     if (view.layoutConstraints?.length) view.layoutConstraints = withoutNodes(view.layoutConstraints, removed)
+    // A filter "inside" an element that is gone kept every element out,
+    // and a viewpoint made from the view took it along.
+    const levels = (view.pipeline as { levels?: unknown } | undefined)?.levels
+    if (Array.isArray(levels) && levels.some((l) => namesRemoved(l, removed))) {
+      view.pipeline = {
+        ...view.pipeline,
+        levels: levels.map((l) => namesRemoved(l, removed) ? { ...l, filters: (l as { filters: ViewFilter[] }).filters.filter((f) => !(f?.kind === 'within' && removed.has(f.nodeId))) } : l),
+      } as ViewPipeline
+    }
   }
   if (state.defaultLayoutConstraints?.length) {
     state.defaultLayoutConstraints = withoutNodes(state.defaultLayoutConstraints, removed)

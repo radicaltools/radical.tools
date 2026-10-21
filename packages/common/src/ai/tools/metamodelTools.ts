@@ -126,7 +126,7 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           kind: { type: 'string', enum: [...VIEWPOINT_KINDS], description: "How its views show the chain: 'table', 'wiki', 'treemap' (hierarchy), 'matrix', 'warnier' (a Warnier–Orr diagram of the hierarchy) or 'static' (canvas)." },
           pipeline: { ...PIPELINE_SCHEMA, type: 'object' },
           fromViewId: { type: 'string', description: 'A view whose kind and filter chain the viewpoint takes (kind and pipeline given here win).' },
-          subjectTypes: { type: 'array', items: { type: 'string' }, description: 'Node types it draws one element of: a view of it is of one such element (create_view subject), named after it, its first level kept to the element and what lies inside it. [] makes it draw the whole model again.' },
+          subjectTypes: { type: 'array', items: { type: 'string' }, description: 'Node types it draws one element of: create_view with the viewpoint makes a group holding a view of each such element, named after it, its first level kept to the element and what lies inside it. [] makes it draw the whole model again.' },
         },
         additionalProperties: false,
       },
@@ -372,6 +372,12 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
         if (!isViewpointKind(view.kind ?? 'static')) return fail(`upsert_viewpoint: a ${view.kind} view cannot be a viewpoint`)
         kind = (view.kind ?? 'static') as typeof kind
         pipeline = pipelineOf(view) ?? {}
+        // Checked as a chain given here is: one that keeps an element that is
+        // gone was copied, and create_view then refused it.
+        if (input.pipeline === undefined && pipeline.levels?.length) {
+          const chain = pipelineFor(ctx, 'upsert_viewpoint', pipeline)
+          if ('error' in chain) return fail(`${chain.error} (in the chain of the view "${view.name}")`)
+        }
       }
       if (input.kind !== undefined) kind = input.kind as typeof kind
       if (input.pipeline !== undefined) {
