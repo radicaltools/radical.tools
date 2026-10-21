@@ -700,10 +700,36 @@ function arrangeOnFirstOpen(): void {
   const s = useDiagramStore.getState()
   const view = s.activeViewId ? s.views[s.activeViewId] : undefined
   if ((view?.partOf || view?.viewpoint) && s.appMode === 'designer' && !s.activeSnapshotId && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) {
+    if (_firstLayoutOf === view.id && s.isLayoutRunning) return
+    _firstLayoutOf = view.id
     void s.runSmartLayout()
     return
   }
   suggestSmartLayoutIfUnarranged()
+}
+
+/** The view whose first layout (arrangeOnFirstOpen) is running. It is no
+ *  undo step: it belongs to the step that made the view (New view: one
+ *  Undo, not two), and opening a view is none. Until it lands, All
+ *  elements' places it shows are not saved as its own: a reload or a view
+ *  switch at once kept them for good, and it was never laid out. */
+let _firstLayoutOf: string | null = null
+
+/** A view's first layout landed (`positions`): the steps that hold the view
+ *  with no positions of its own hold it laid out. Undo of a step made before
+ *  the view was opened gave it back All elements' places, for good. */
+function _historyKeepsFirstLayout(viewId: string, positions: Record<string, NodePosition>): void {
+  const laidOut = (entry: HistoryEntry): HistoryEntry => {
+    const view = entry.views[viewId]
+    if (!view || entry.activeViewId === viewId || Object.keys(view.positions ?? {}).length) return entry
+    return { ...entry, views: { ...entry.views, [viewId]: { ...view, positions } } }
+  }
+  for (const stack of [_undoStack, _redoStack, ...(_liveHistory ? [_liveHistory.undo, _liveHistory.redo] : [])]) {
+    for (let i = 0; i < stack.length; i++) {
+      const item = stack[i]
+      stack[i] = isStepChange(item) ? { from: laidOut(item.from), to: laidOut(item.to) } : laidOut(item)
+    }
+  }
 }
 
 /** Runs `edit`, a rename or delete, on the model in `state` (a draft). In a
@@ -3757,7 +3783,7 @@ export const useDiagramStore = create<DiagramStore>()(
             if (currentViewport) state.defaultViewport = currentViewport
           } else if (state.views[activeViewId]) {
             const view = state.views[activeViewId]
-            view.positions = viewCanvasPositions(view, c4Nodes, currentPos, viewDrawnIds(view as DiagramView, c4Nodes as Record<string, C4Node>, state.c4Relations as Record<string, C4Relation>)) as any
+            if (activeViewId !== _firstLayoutOf) view.positions = viewCanvasPositions(view, c4Nodes, currentPos, viewDrawnIds(view as DiagramView, c4Nodes as Record<string, C4Node>, state.c4Relations as Record<string, C4Relation>)) as any
             if (currentViewport) view.viewport = currentViewport
           }
 
@@ -3930,7 +3956,7 @@ export const useDiagramStore = create<DiagramStore>()(
             if (camera) state.defaultViewport = camera
           } else if (state.views[viewId]) {
             const view = state.views[viewId]
-            view.positions = viewCanvasPositions(view, get().c4Nodes, currentPos, viewDrawnIds(view as DiagramView, get().c4Nodes, get().c4Relations)) as any
+            if (viewId !== _firstLayoutOf) view.positions = viewCanvasPositions(view, get().c4Nodes, currentPos, viewDrawnIds(view as DiagramView, get().c4Nodes, get().c4Relations)) as any
             if (camera) view.viewport = camera
           }
         })
@@ -4775,7 +4801,12 @@ export const useDiagramStore = create<DiagramStore>()(
         // Allowed in designer and viewer (viewer = explore: positions are
         // reverted on exit by the __preModeLayout snapshot in setAppMode).
         // Disallowed in metamodel where the canvas isn't shown.
-        if (get().appMode === 'metamodel') return
+        // The first layout of the view shown (arrangeOnFirstOpen).
+        const firstOpen = _firstLayoutOf !== null && _firstLayoutOf === get().activeViewId ? _firstLayoutOf : null
+        if (get().appMode === 'metamodel') {
+          if (firstOpen) _firstLayoutOf = null
+          return
+        }
         // Per-view layout-mode override: views configured for the
         // hierarchical nested-tree strategy delegate here. Default is
         // unchanged (ensemble Smart Layout).
@@ -4783,6 +4814,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const s = get()
           const v = s.activeViewId ? s.views[s.activeViewId] : undefined
           if (v?.layoutMode === 'tree') {
+            if (firstOpen) _firstLayoutOf = null
             await get().runTreeLayout()
             return
           }
@@ -4807,8 +4839,9 @@ export const useDiagramStore = create<DiagramStore>()(
             get().pushNotification('Smart layout: the current layout already scores best — nothing changed.', 'info')
             return
           }
-          // One undo step for the whole layout. Viewer reverts positions on exit anyway.
-          if (get().appMode === 'designer') get()._pushUndo()
+          // One undo step for the whole layout. Viewer reverts positions on
+          // exit anyway; a view's first layout is none (_firstLayoutOf).
+          if (get().appMode === 'designer' && !firstOpen) get()._pushUndo()
           get()._markMilestoneEdit()
           set((state) => {
             applyLayoutPositions(state.c4Nodes, result.winner.positions, input)
@@ -4836,6 +4869,12 @@ export const useDiagramStore = create<DiagramStore>()(
           // The parent refit and root separation above know nothing of the
           // user's alignments; put them back.
           get()._enforceLayoutConstraints()
+          if (firstOpen) {
+            if (_firstLayoutOf === firstOpen) _firstLayoutOf = null
+            get()._saveShownCanvas()
+            const view = get().views[firstOpen]
+            if (view) _historyKeepsFirstLayout(firstOpen, view.positions)
+          }
 
           // The live layout takes the new positions as they are: it does
           // not relax a diagram Smart Layout arranged (Smart Layout scored
@@ -4909,6 +4948,7 @@ export const useDiagramStore = create<DiagramStore>()(
           console.error('[smartLayout] failed:', err)
           get().pushNotification('Smart layout failed — see console.', 'error')
         } finally {
+          if (firstOpen && _firstLayoutOf === firstOpen) _firstLayoutOf = null
           set((state) => { state.isLayoutRunning = false; state.smartLayoutProgress = null })
         }
       },
@@ -6620,7 +6660,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const savedDefaultVP = activeViewId === null ? (currentVP ?? defaultViewport) : defaultViewport
         const savedViews = Object.values(views).map(v => ({
           ...v,
-          positions: v.id === activeViewId && currentPos ? viewCanvasPositions(v, liveNodes, currentPos, viewDrawnIds(v, liveNodes, liveRelations)) : v.positions,
+          positions: v.id === activeViewId && currentPos && v.id !== _firstLayoutOf ? viewCanvasPositions(v, liveNodes, currentPos, viewDrawnIds(v, liveNodes, liveRelations)) : v.positions,
           viewport: v.id === activeViewId ? (currentVP ?? v.viewport) : v.viewport,
         }))
 

@@ -151,3 +151,58 @@ describe('a view of a viewpoint opened first in Viewer or Presenter', () => {
     })
   }
 })
+
+describe('the first layout of a view (decided 2026-10-21)', () => {
+  // It was an undo step of its own: New view of a viewpoint took two Undos,
+  // and opening two views of a group three to remove the group. A reload or
+  // a view switch before it landed saved All elements' places as the view's
+  // own, and it was never laid out.
+  const laidOut = async (): Promise<void> => {
+    await vi.waitFor(() => expect(s().isLayoutRunning).toBe(false), { timeout: 30_000 })
+  }
+  const asAgentMade = (): void => {
+    useDiagramStore.setState((st: any) => { st.views.containers.viewpoint = 'containers' })
+  }
+
+  it('belongs to the step that made the view: New view is one Undo', async () => {
+    s().updateNode('pay', { description: 'before' })
+    const id = s().addViewOfViewpoint('containers')!
+    expect(id).toBeTruthy()
+    s().setActiveView(id)
+    await laidOut()
+    expect(Object.keys(s().views[id].positions).length).toBeGreaterThan(0)
+    s().undo()
+    expect(s().views[id]).toBeUndefined()
+    expect(s().c4Nodes.pay.description).toBe('before')
+    s().redo()
+    expect(Object.keys(s().views[id].positions).length).toBeGreaterThan(0)
+  }, 60_000)
+
+  it('of a view opened for the first time is no step, and an Undo keeps it', async () => {
+    asAgentMade()
+    s().updateNode('pay', { description: 'before' })
+    s().setActiveView('containers')
+    await laidOut()
+    const positions = s().views.containers.positions
+    expect(Object.keys(positions).length).toBeGreaterThan(0)
+    s().undo()
+    expect(s().c4Nodes.pay.description).toBeUndefined()
+    expect(s().views.containers.positions).toEqual(positions)
+    expect(s().canUndo).toBe(false)
+  }, 60_000)
+
+  it('is not replaced by All elements\' places saved before it lands', async () => {
+    asAgentMade()
+    s().setActiveView('containers')
+    expect(s().isLayoutRunning).toBe(true)
+    const saved = s().saveDiagram().views!.find((v) => v.id === 'containers')!
+    expect(saved.positions).toEqual({})
+    // Left at once: it is laid out on the next opening.
+    s().setActiveView('ctx')
+    expect(s().views.containers.positions).toEqual({})
+    await laidOut()
+    s().setActiveView('containers')
+    await laidOut()
+    expect(Object.keys(s().views.containers.positions).length).toBeGreaterThan(0)
+  }, 60_000)
+})
