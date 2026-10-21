@@ -27,9 +27,12 @@
 // - An empty text, an unticked box and an empty list are no value, as an
 //   absent one is (modelValue): the folder writes none of them, so a model
 //   read back from it is the same model.
+// - A relation one side drew to (or turned to) an element the other side
+//   deleted goes, as does a step one side added of a relation the other
+//   deleted: the delete wins here too, and the drop is reported (dropStrays).
 //
-// The merged model may break a rule each side kept on its own (a relation to
-// an element the other side deleted); validation shows it.
+// The merged model may break another rule each side kept on its own;
+// validation shows it.
 
 import type { DiagramData } from './c4'
 import { modelValue } from './model'
@@ -50,6 +53,9 @@ export interface ModelMergeResult {
 export interface MergeDrop {
   name: string
   by: 'ours' | 'theirs'
+  /** What of `by`'s was dropped, when not a change to the entry itself:
+   *  "the relation Shop → Bank made to it". */
+  change?: string
 }
 
 /** Keys whose values are layout, merged without a report. */
@@ -151,8 +157,11 @@ function merge3(base: unknown, ours: unknown, theirs: unknown, where: string[], 
     for (const key of new Set([...Object.keys(theirs), ...Object.keys(ours), ...Object.keys(b)])) {
       if (sequence && STEP_KEYS.has(key)) {
         if (key === 'relationIds') {
-          const { steps, conflict } = mergeSteps(b, ours, theirs)
+          const { steps, conflict, dropped } = mergeSteps(b, ours, theirs)
           if (conflict) ctx.conflicts.push([...where, 'steps'].join(': '))
+          // A step one side removed and the other changed the note of: the
+          // remove won, which "the folder's was kept" did not say.
+          for (const d of dropped) ctx.dropped.push({ name: `${where.join(': ')}, step ${d.step + 1}`, by: d.by })
           Object.assign(out, steps)
         }
         continue
@@ -324,14 +333,14 @@ function alignSteps(a: Step[], b: Step[]): number[] {
 /** The steps `ours` and `theirs` made of `base`'s merged: the steps of base
  *  that both kept, in base's order, with the note the side that changed it
  *  gave it (theirs where both did: a conflict); a step one side removed is
- *  out (a conflict where the other changed its note); the steps each side
- *  added sit after the step of base they follow there, theirs first. A step
- *  moved is one removed and one added. */
+ *  out (`dropped`, by the side whose note went, where the other changed its
+ *  note); the steps each side added sit after the step of base they follow
+ *  there, theirs first. A step moved is one removed and one added. */
 export function mergeSteps(
   base: Partial<SequenceSteps> | Plain | undefined,
   ours: Partial<SequenceSteps> | Plain | undefined,
   theirs: Partial<SequenceSteps> | Plain | undefined,
-): { steps: SequenceSteps; conflict: boolean } {
+): { steps: SequenceSteps; conflict: boolean; dropped: Array<{ step: number; by: MergeDrop['by'] }> } {
   const b = stepsOf(base), o = stepsOf(ours), t = stepsOf(theirs)
   const toO = alignSteps(b, o), toT = alignSteps(b, t)
   /** The steps a side added, by the index of the step of base they follow (-1: first). */
@@ -348,6 +357,7 @@ export function mergeSteps(
   }
   const addedO = added(o, toO), addedT = added(t, toT)
   let conflict = false
+  const dropped: Array<{ step: number; by: MergeDrop['by'] }> = []
   const out: Step[] = []
   const insert = (after: number) => {
     const fromT = addedT.get(after) ?? [], fromO = addedO.get(after) ?? []
@@ -362,15 +372,17 @@ export function mergeSteps(
       const note = so.note === step.note ? st.note : st.note === step.note ? so.note : st.note
       if (so.note !== step.note && st.note !== step.note && so.note !== st.note) conflict = true
       out.push({ rel: step.rel, note })
-    } else if ((so && so.note !== step.note) || (st && st.note !== step.note)) {
-      conflict = true
+    } else if (so && so.note !== step.note) {
+      dropped.push({ step: i, by: 'ours' })
+    } else if (st && st.note !== step.note) {
+      dropped.push({ step: i, by: 'theirs' })
     }
     insert(i)
   })
   const notes = out.map((s) => s.note)
   while (notes.length > 0 && notes[notes.length - 1] === undefined) notes.pop()
   const keepsNotes = notes.length > 0 || [ours, theirs].some((s) => Array.isArray(s?.stepDescriptions))
-  return { steps: { relationIds: out.map((s) => s.rel), ...(keepsNotes ? { stepDescriptions: notes } : {}) }, conflict }
+  return { steps: { relationIds: out.map((s) => s.rel), ...(keepsNotes ? { stepDescriptions: notes } : {}) }, conflict, dropped }
 }
 
 /** Whether `side` puts the ids it shares with `base` in another order. */
@@ -409,16 +421,18 @@ function mergeOrder(base: string[], ours: string[], theirs: string[], where: str
 
 /** `ours` and `theirs`, both changed from `base`, merged (see above).
  *  `keepParents: false` leaves a container deleted on one side deleted,
- *  where an element the other side put into it is left without one (Undo
- *  leaves such an element out, item 127). */
+ *  where an element the other side put into it is left without one, and
+ *  a relation or a step to what one side deleted in place: Undo keeps what
+ *  was built on since and leaves the rest out itself (item 127). */
 export function mergeModels(base: DiagramData, ours: DiagramData, theirs: DiagramData, opts?: { keepParents?: boolean }): ModelMergeResult {
   const labels = new Map<string, string>()
   for (const side of [base, ours, theirs]) for (const n of side.nodes ?? []) if (n.label) labels.set(n.id, n.label)
   const ctx: Ctx = { conflicts: [], labels, dropped: [] }
   const merged = merge3(base, ours, theirs, [], ctx, false) as DiagramData
   const restored = opts?.keepParents === false ? [] : restoreParents(merged, ours, theirs)
+  if (opts?.keepParents !== false) dropStrays(merged, base, ours, theirs, ctx)
   followFolderRenames(merged, base, ours, theirs)
-  const dropped = ctx.dropped.filter((d, i) => !restored.includes(d.name) && ctx.dropped.findIndex((e) => e.name === d.name && e.by === d.by) === i)
+  const dropped = ctx.dropped.filter((d, i) => !restored.includes(d.name) && ctx.dropped.findIndex((e) => e.name === d.name && e.by === d.by && e.change === d.change) === i)
   return { merged, conflicts: [...new Set(ctx.conflicts)], dropped, restored }
 }
 
@@ -427,7 +441,7 @@ export function mergeModels(base: DiagramData, ours: DiagramData, theirs: Diagra
 export function mergeNotices(result: { dropped?: MergeDrop[]; restored?: string[] }, where: { ours: string; theirs: string }): string[] {
   const other = (by: MergeDrop['by']) => (by === 'ours' ? 'theirs' : 'ours')
   return [
-    ...(result.dropped ?? []).map((d) => `${d.name} was deleted ${where[other(d.by)]}; the change made to it ${where[d.by]} was dropped`),
+    ...(result.dropped ?? []).map((d) => `${d.name} was deleted ${where[other(d.by)]}; ${d.change ?? 'the change made to it'} ${where[d.by]} was dropped`),
     ...(result.restored ?? []).map((name) => `${name}, deleted on one side, came back with its relations: an element was put into it on the other`),
   ]
 }
@@ -505,6 +519,55 @@ function restoreParents(merged: DiagramData, ours: DiagramData, theirs: DiagramD
     })
   }
   return back.map(({ id }) => entryName(nodes.get(id) as unknown as Plain, id))
+}
+
+/** Relations to an element one side deleted, which the other side drew or
+ *  turned to it, and the steps one side added of a relation the other side
+ *  deleted, taken out of `merged` (in place): the delete wins, as it does
+ *  for an element one side deleted and the other changed (mergeById). Each
+ *  is reported as dropped, by the side that made it; a step of a relation
+ *  dropped here goes with it, without a word of its own. An end or a
+ *  relation no side had is left as it is: the merge did not break it. They
+ *  stayed in the folder, which get_issues flagged while the canvas did not
+ *  draw them (item 234). */
+function dropStrays(merged: DiagramData, base: DiagramData, ours: DiagramData, theirs: DiagramData, ctx: Ctx): void {
+  if (!Array.isArray(merged.nodes) || !Array.isArray(merged.relations)) return
+  const sides = [base, ours, theirs]
+  const nodes = new Set(merged.nodes.map((n) => n.id))
+  const hadNode = (id: string) => sides.some((d) => d.nodes?.some((n) => n.id === id))
+  const label = (id: string) => ctx.labels.get(id) || id
+  const gone = new Set<string>()
+  merged.relations = merged.relations.filter((r) => {
+    const end = [r.sourceId, r.targetId].find((id) => !nodes.has(id) && hadNode(id))
+    if (end === undefined) return true
+    // The side that still has the element drew the relation to it.
+    const by = ours.nodes?.some((n) => n.id === end) ? 'ours' : 'theirs'
+    ctx.dropped.push({ name: label(end), by, change: `the relation ${label(r.sourceId)} → ${label(r.targetId)} made to it` })
+    gone.add(r.id)
+    return false
+  })
+  const relations = new Set(merged.relations.map((r) => r.id))
+  const relationOf = (id: string) => sides.map((d) => d.relations?.find((r) => r.id === id)).find(Boolean)
+  merged.sequences = merged.sequences?.map((seq) => {
+    const keep = seq.relationIds.map((id) => relations.has(id) || (!gone.has(id) && !relationOf(id)))
+    if (keep.every(Boolean)) return seq
+    for (const id of new Set(seq.relationIds.filter((id, i) => !keep[i] && !gone.has(id)))) {
+      const r = relationOf(id)!
+      const by = ours.relations?.some((x) => x.id === id) ? 'ours' : 'theirs'
+      // Only steps the side that deleted the relation did not have are news
+      // (a file from before deletes took the steps along keeps them).
+      const count = (ids: string[] | undefined) => (ids ?? []).filter((x) => x === id).length
+      const deleter = (by === 'ours' ? theirs : ours).sequences?.find((q) => q.id === seq.id)
+      if (count(seq.relationIds) <= count(deleter?.relationIds)) continue
+      ctx.dropped.push({ name: r.label || `${label(r.sourceId)} → ${label(r.targetId)}`, by, change: `the step of ${seq.name} made with it` })
+    }
+    const notes = seq.stepDescriptions?.filter((_, i) => keep[i])
+    return { ...seq, relationIds: seq.relationIds.filter((_, i) => keep[i]), ...(notes ? { stepDescriptions: notes } : {}) }
+  })
+  if (gone.size) {
+    merged.views = merged.views?.map((view) =>
+      view.hiddenRelationIds?.some((id) => gone.has(id)) ? { ...view, hiddenRelationIds: view.hiddenRelationIds.filter((id) => !gone.has(id)) } : view)
+  }
 }
 
 // ─── Edits kept apart ────────────────────────────────────────────────────────

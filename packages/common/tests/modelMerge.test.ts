@@ -78,6 +78,53 @@ describe('mergeModels', () => {
     expect(mergeNotices({ dropped: [{ name: 'Shop', by: 'ours' }] }, where)).toEqual(['Shop was deleted outside Studio; the change made to it in Studio was dropped'])
   })
 
+  it('drops a relation one side drew to an element the other deleted, either way round, and says so (item 234)', () => {
+    // Studio deleted Bank while the agent drew Shop → Bank: relations.json
+    // kept it, get_issues said it points at no element, the search bar
+    // counted a relation the canvas did not draw, and no notice.
+    const deleted = clone(base)
+    deleted.nodes = deleted.nodes.filter((n) => n.id !== 'bank')
+    const drawn = clone(base)
+    drawn.relations.push(rel('r2', 'shop', 'bank', 'charges'))
+    drawn.views![0].hiddenRelationIds = ['r2']
+    for (const [o, t, by] of [[deleted, drawn, 'theirs'], [drawn, deleted, 'ours']] as const) {
+      const { merged, conflicts, dropped } = mergeModels(base, o, t)
+      expect(merged.nodes.map((n) => n.id)).toEqual(['shop', 'user'])
+      expect(merged.relations.map((r) => r.id)).toEqual(['r1'])
+      expect(merged.views![0].hiddenRelationIds ?? []).toEqual([])
+      expect(conflicts).toEqual([])
+      expect(dropped).toEqual([{ name: 'Bank', by, change: 'the relation Shop → Bank made to it' }])
+    }
+    // A relation turned to the deleted element goes too.
+    const turned = clone(base)
+    turned.relations[0].targetId = 'bank'
+    const { merged, dropped } = mergeModels(base, deleted, turned)
+    expect(merged.relations).toEqual([])
+    expect(dropped).toEqual([{ name: 'Bank', by: 'theirs', change: 'the relation Customer → Bank made to it' }])
+    expect(mergeNotices({ dropped }, { ours: 'in Studio', theirs: 'outside Studio' })).toEqual([
+      'Bank was deleted in Studio; the relation Customer → Bank made to it outside Studio was dropped',
+    ])
+  })
+
+  it('drops a step one side added for a relation the other deleted, and says so (item 234)', () => {
+    const b = { ...clone(base), relations: [rel('r1', 'user', 'shop', 'buys'), rel('r2', 'shop', 'bank', 'charges')], sequences: [{ id: 's', name: 'Order', relationIds: ['r1', 'r2'] }] }
+    const deleted = { ...clone(b), relations: [rel('r1', 'user', 'shop', 'buys')], sequences: [{ id: 's', name: 'Order', relationIds: ['r1'] }] }
+    const added = { ...clone(b), sequences: [{ id: 's', name: 'Order', relationIds: ['r1', 'r2', 'r1', 'r2'] }] }
+    for (const [o, t, by] of [[deleted, added, 'theirs'], [added, deleted, 'ours']] as const) {
+      const { merged, conflicts, dropped } = mergeModels(b, o, t)
+      expect(merged.relations.map((r) => r.id)).toEqual(['r1'])
+      expect(merged.sequences![0].relationIds).toEqual(['r1', 'r1'])
+      expect(conflicts).toEqual([])
+      expect(dropped).toEqual([{ name: 'charges', by, change: 'the step of Order made with it' }])
+    }
+    // A step of a relation dropped with its end goes without a word of its own.
+    const bankGone = { ...clone(b), nodes: b.nodes.filter((n) => n.id !== 'bank'), relations: [rel('r1', 'user', 'shop', 'buys')], sequences: [{ id: 's', name: 'Order', relationIds: ['r1'] }] }
+    const drawn = { ...clone(b), relations: [...b.relations, rel('r3', 'user', 'bank', 'pays')], sequences: [{ id: 's', name: 'Order', relationIds: ['r1', 'r2', 'r3'] }] }
+    const { merged, dropped } = mergeModels(b, bankGone, drawn)
+    expect(merged.sequences![0].relationIds).toEqual(['r1'])
+    expect(dropped).toEqual([{ name: 'Bank', by: 'theirs', change: 'the relation Customer → Bank made to it' }])
+  })
+
   it('brings back a container one side deleted while the other added an element into it, with its relations and places', () => {
     const b = clone(base)
     b.views![0].nodeIds = ['shop', 'user']
@@ -363,6 +410,19 @@ describe('mergeModels: a sequence\'s steps and notes', () => {
     const { merged, conflicts } = mergeModels(b, ours, theirs)
     expect(pairs(merged)).toEqual(['r1:submits', 'r2:theirs', 'r3:stores'])
     expect(conflicts).toEqual(['Place Order: steps'])
+  })
+
+  it('says a step one side removed and the other changed the note of was removed, not that the folder\'s was kept', () => {
+    // Studio deleted the relation of step 4 while the agent changed its
+    // note: the step went, and the notice said the folder's was kept.
+    const removed = withSteps(['r1', 'r2', 'r3'], ['submits', 'posts', 'stores'])
+    const noted = withSteps(['r1', 'r2', 'r3', 'r4'], ['submits', 'posts', 'stores', 'charges once'])
+    for (const [o, t, by] of [[removed, noted, 'theirs'], [noted, removed, 'ours']] as const) {
+      const { merged, conflicts, dropped } = mergeModels(b, o, t)
+      expect(pairs(merged)).toEqual(['r1:submits', 'r2:posts', 'r3:stores'])
+      expect(conflicts).toEqual([])
+      expect(dropped).toEqual([{ name: 'Place Order, step 4', by }])
+    }
   })
 })
 
