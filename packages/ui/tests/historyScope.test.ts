@@ -166,3 +166,63 @@ describe('Undo and the model a step was made on', () => {
     expect(Object.keys(s().snapshots.find((m) => m.id === v1)!.nodes).length).toBe(2)
   })
 })
+
+// The milestones, the metamodel and the views are the live model's as much
+// as a milestone's: what is done to them while a milestone is shown is no
+// edit of it. Undo of a live step after the visit took it back with the
+// step (the steps held them as they were before the visit), and saved that.
+describe('Undo of a live step after a look at a milestone', () => {
+  function visit(v1: string, edit: () => void): void {
+    drag('a', { x: 300, y: 300 })
+    s().selectMilestone(v1)
+    edit()
+    s().discardMilestoneChanges()
+    expect(s().canUndo).toBe(true)
+    s().undo()
+    expect(at('a')).toEqual({ x: 0, y: 0 })
+  }
+
+  it('keeps the milestone made by Save as new', () => {
+    const v1 = s().createSnapshot('v1')
+    visit(v1, () => {
+      drag('b', { x: 600, y: 400 })
+      s().commitMilestoneChanges('new', 'v1 moved')
+    })
+    expect(s().snapshots.map((m) => m.name)).toEqual(['v1', 'v1 moved'])
+    s().redo()
+    expect(at('a')).toEqual({ x: 300, y: 300 })
+    expect(s().snapshots.map((m) => m.name)).toEqual(['v1', 'v1 moved'])
+  })
+
+  it('keeps a milestone renamed', () => {
+    const v1 = s().createSnapshot('v1')
+    visit(v1, () => s().renameSnapshot(v1, 'first'))
+    expect(s().snapshots.map((m) => m.name)).toEqual(['first'])
+  })
+
+  it('keeps a view renamed', () => {
+    const v1 = s().createSnapshot('v1')
+    visit(v1, () => s().renameView('one', 'Uno'))
+    expect(s().views.one.name).toBe('Uno')
+  })
+
+  it('keeps a type added to the metamodel', () => {
+    const v1 = s().createSnapshot('v1')
+    visit(v1, () => s().upsertNodeType({ ...s().metamodel.nodeTypes.system, id: 'gizmo', label: 'Gizmo', builtin: false, properties: [] }))
+    expect(s().metamodel.nodeTypes.gizmo).toBeDefined()
+  })
+
+  it('still takes back a milestone made on live', () => {
+    drag('a', { x: 300, y: 300 })
+    const v1 = s().createSnapshot('v1')
+    s().selectMilestone(v1)
+    s().renameView('one', 'Uno')
+    s().discardMilestoneChanges()
+    s().undo()
+    expect(s().snapshots).toEqual([])
+    expect(s().views.one.name).toBe('Uno')
+    s().undo()
+    expect(at('a')).toEqual({ x: 0, y: 0 })
+  })
+})
+

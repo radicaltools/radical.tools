@@ -613,6 +613,33 @@ describe('Size and Levels of a hierarchy', () => {
   })
 })
 
+describe('the Auto-layout of a view (decided 2026-10-21)', () => {
+  // It was no step: Undo of an element added before it gave back the old
+  // mode with it (saved).
+  it('is an undo step of its own', () => {
+    const id = add('system', 'Added')
+    s().setViewLayoutMode('v1', 'tree')
+    s().undo()
+    expect(s().views.v1.layoutMode ?? 'auto').toBe('auto')
+    expect(s().c4Nodes[id]).toBeDefined()
+    s().redo()
+    expect(s().views.v1.layoutMode).toBe('tree')
+    s().undo()
+    s().undo()
+    expect(s().c4Nodes[id]).toBeUndefined()
+    expect(s().views.v1.layoutMode ?? 'auto').toBe('auto')
+    s().redo()
+    s().redo()
+    expect(s().views.v1.layoutMode).toBe('tree')
+  })
+
+  it('set to what it is is no step', () => {
+    s().setViewLayoutMode('v1', 'auto')
+    s().undo()
+    expect(s().c4Nodes.bank.description).toBeUndefined()
+  })
+})
+
 describe('typing into a text field is one undo step (item 158)', () => {
   const type = (text: string, edit: (v: string) => void) => {
     for (let i = 1; i <= text.length; i++) edit(text.slice(0, i))

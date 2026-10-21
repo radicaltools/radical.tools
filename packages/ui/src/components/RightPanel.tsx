@@ -2110,7 +2110,9 @@ function MarkdownField({ label, value, readOnly, onChange }: {
       <AutoResizeTextarea autoFocus aria-label={label} value={value} placeholder={MARKDOWN_HINT}
         onChange={(e) => onChange(e.target.value)}
         onFocus={(e) => { const t = e.currentTarget; t.setSelectionRange(t.value.length, t.value.length); beginTyping() }}
-        onBlur={() => { endTyping(); setEditing(false) }}
+        // The milestone question takes the focus and gives it back once
+        // answered: the editor stays open for it.
+        onBlur={() => { endTyping(); if (!useDiagramStore.getState().milestonePromptOpen) setEditing(false) }}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); e.currentTarget.blur() } }} />
     )
   }
