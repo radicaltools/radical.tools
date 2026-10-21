@@ -620,18 +620,6 @@ const KNOWN: Known[] = [
     note: 'K1: what grows next to or inside a pinned element is left over its neighbour (IMPROVEMENTS "Calm drags and pins" item 2)',
   },
   {
-    // A container dropped into Payment Provider, then Payment Provider and
-    // Bookstore kept in a row: the physics frames Bookstore with 60 px over
-    // its children; read again, the frame is refitted with 120 (top 333.5 →
-    // 273.8, left −42.1 → −12.3, 980 → 920 wide), its children where they were.
-    // The same after any add, expand or drag the physics framed a
-    // container for (nested: Container 0.0 saved at (84, 84) 696 × 376,
-    // read again at (30, 120) 624 × 404).
-    rule: 'reloadKeeps',
-    match: (_t, v) => v.detail.split('\n').slice(1).every((line) => /positions|^\s+[\w-]+\.(x|y|width|height):/i.test(line)),
-    note: 'K2: a container the physics framed is framed anew on a reload, 60 → 120 px over its children (the leftover of item 1 of "Found by exploratory runs")',
-  },
-  {
     // Payment Provider moved into Bookstore on All elements: the Containers
     // view, which lists it, has no place for it any more; opening the view
     // places it and the physics moves Customer by (−179, −82), Bookstore
@@ -666,34 +654,6 @@ const KNOWN: Known[] = [
     rule: 'geometry',
     match: (t, v) => lastAction(t) === 'add' && !!v.facts?.overlap && !v.facts.pinned,
     note: 'K4: an element dropped where there is no room for it stays over its neighbours (new)',
-  },
-  {
-    // API (no children: drawn 240 × 160, the model 300 × 200) dropped 81 px
-    // right: drawn at x 371, saved at 401; the next rebuild (a fold, a
-    // reload) draws it at 401 and 20 px lower, 1 px over Orders DB.
-    rule: 'geometry',
-    // The same on a view that does not draw a container's children (nested,
-    // Systems and containers: Container 2.0, 1000 × 280 in the model, drawn
-    // 240 × 160, jumps (380, 60) onto Container 2.1 when folded).
-    match: (_t, v) => (!!v.facts?.overlap || !!v.facts?.outside) && !!v.facts?.childless,
-    note: 'K5: a container drawn without its children is placed by the physics at its drawn size and saved at its model size: the next rebuild shifts it by half the difference (new)',
-  },
-  {
-    // K5 seen from the parent: on a new view of the Containers viewpoint
-    // (nested), folding Container 0.2 (drawn 240 × 160, 1000 × 280 in the
-    // model) moves it (380, 60) and System 0 grows 681 → 1061 wide, over
-    // System 2.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'collapse' && !!v.facts?.overlap,
-    note: 'K5b: a fold of a container drawn without its children moves it, and its parent grows over a neighbour (new)',
-  },
-  {
-    // K5 through a row: API (drawn 240 wide, 300 in the model) and Orders
-    // DB in a row, Bookstore folded and unfolded, then dragged 1 px: Orders
-    // DB moves 55 px right (727 → 782), 25 px out of Bookstore.
-    rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'drag' && !!v.facts?.outside && !!v.facts.aligned,
-    note: 'K5c: a drag of a container moves a member of a row in it out of it, the row spaced by a container drawn without children (new)',
   },
   {
     // API and Orders DB in a row, API dragged 196 px right onto Orders DB:
@@ -840,14 +800,6 @@ const KNOWN: Known[] = [
     note: 'K19: a merge puts what Studio and the agent each placed or moved on top of each other (new)',
   },
   {
-    // Sample, All elements: Auth Service folded, a component dropped into
-    // Accounts Service: after 2500 frames (40 s at 60 fps) the physics
-    // still runs and 19 elements still move (ADR-000 by 21 px a second).
-    rule: 'nothingMovesByItself',
-    match: (_t, v) => v.detail.includes('still moving'),
-    note: 'K20: after an add the live physics can go on moving for good (seen on the sample\'s and the bookstore\'s All elements; new)',
-  },
-  {
     // Sample: milestone v1 opened, Web Banking deleted there, Propagate:
     // the live model loses Web Banking and its relations, but the live
     // sequence Payment Processing keeps steps 1 and 2 (r-cust-web,
@@ -857,19 +809,26 @@ const KNOWN: Known[] = [
     note: 'K21: Propagate of a delete leaves the live sequences\' steps of the relations it deletes (new)',
   },
   {
-    // Nested: Container 2.1 folded and unfolded on Systems and containers
-    // (which does not draw its components), All elements opened, Component
-    // 0.0.1 dragged: Component 2.1.0 jumps (140, 60), out of Container 2.1.
-    // Also after the model is loaded again: the expand's seeds stay in the
-    // physics until the children are next laid out, so a run of this test
-    // can depend on the run before it.
-    rule: 'geometry',
-    match: (t, v, resolved) => {
-      if (lastAction(t) !== 'drag' || !v.facts?.outside) return false
-      const dragged = /^drag .*\(([^()]+)\) by/.exec(resolved[resolved.length - 1] ?? '')?.[1]
-      return !!dragged && !(v.keys ?? []).some((k) => k.includes(dragged))
-    },
-    note: 'K22: an expand on a view that does not draw the children leaves seeds that move them out of their container later, also after a reload (new)',
+    // Sample, All elements: Auth Service folded, a component dropped into
+    // Accounts Service. The add leaves Check balance outside the step
+    // Validate it is in (K11); read again, it is placed afresh (a stray)
+    // and the physics moves what is near it: Customer (550, 0) → (450, 30),
+    // Core Banking 1802 → 1706 high. Seen once the physics rests (K20 fixed).
+    rule: 'reloadKeeps',
+    match: (t, v) => lastAction(t) === 'add' && v.detail.split('\n').slice(1).every((line) => /^\s+defaultPositions\./.test(line)),
+    note: 'K23: a child an add left outside its parent (K11) is placed afresh on a reload, and what is near it moves (new)',
+  },
+  {
+    // Bookstore: a milestone saved, Containers opened, the milestone shown,
+    // a group dropped, Propagate: the live Containers lists the group but
+    // has no place for it; read again, the view places it and saves
+    // (1370, 0) 520 × 360. So before the fixes of K5 too, whose fold of
+    // API (a step of the run found) ended such runs first. A container
+    // dropped into Bookstore so: read again, the view places it and
+    // Bookstore grows 860 → 1300 wide, Customer moves (−101, −55).
+    rule: 'reloadKeeps',
+    match: (t, v) => t.some((a) => a.a === 'propagate') && v.detail.split('\n').slice(1).every((line) => /^\s+views\.[\w-]+\.positions\./.test(line)),
+    note: 'K24: an element added in a milestone and propagated has no place on the live view it was added on; a reload places it (new; sibling of K12)',
   },
 ]
 
