@@ -4,7 +4,7 @@
  *
  * Covers:
  *   - a row of two open containers the physics framed stays where it is
- *     on a reload (fuzzer K2)
+ *     on a reload, also after a fold or a drop inside one of them (fuzzer K2)
  *   - a row's members stay where they are when the layout is built again
  *     (an unfold): a later drag does not show them elsewhere (K5c)
  *   - a run of the physics comes to rest, on the sample too (K20)
@@ -127,6 +127,24 @@ describe('a row of containers the physics framed', () => {
       expect(after[id].width, id).toBeCloseTo(before[id].width, 0)
       expect(after[id].height, id).toBeCloseTo(before[id].height, 0)
     }
+    expect(s().saveDiagram().defaultPositions).toEqual(saved.defaultPositions)
+  })
+
+  it('stays on its line when a fold inside one of them shrinks it, and on a reload (fuzzer K2)', () => {
+    // Bookstore and Customer in a row, API folded: Bookstore shrank round
+    // the folded API and left the line by 30 px; read again, the row was
+    // snapped and Bookstore refit (Web App, API, Orders DB 60 px lower in it).
+    s().loadDiagram(bookstore())
+    rest()
+    s().addAlignment('horizontal', ['bookstore', 'customer'])
+    rest()
+    s().toggleCollapse('api')
+    rest()
+    const d = drawn()
+    expect(Math.abs(d.bookstore.y + d.bookstore.height / 2 - (d.customer.y + d.customer.height / 2))).toBeLessThanOrEqual(0.5)
+    const saved = clone(s().saveDiagram())
+    s().loadDiagram(clone(saved))
+    rest()
     expect(s().saveDiagram().defaultPositions).toEqual(saved.defaultPositions)
   })
 })

@@ -3871,19 +3871,19 @@ export const useDiagramStore = create<DiagramStore>()(
           })
         }
 
-        if (prevCollapsed) {
-          // Children kept in a row or column while it was collapsed line up
-          // now: the physics, which held them on their line, takes this
-          // result as it is.
-          const input = layoutInputForView(get())
-          if (input.alignments.length) {
-            let snapped = false
-            set((state) => { snapped = applyAlignments(state.c4Nodes, input) })
-            if (snapped) get()._resizeParentsBottomUp(input.viewFilter, input.viewCollapsedSet, input.expandedSet)
-          }
+        // Children kept in a row or column while it was collapsed line up
+        // now: the physics, which held them on their line, takes this
+        // result as it is. A fold too: the parent it shrinks may be on a
+        // line, which then ran off it until the next load snapped it and
+        // refit every container.
+        let snapped = false
+        const input = layoutInputForView(get())
+        if (input.alignments.length) {
+          set((state) => { snapped = applyAlignments(state.c4Nodes, input) })
+          if (snapped) get()._resizeParentsBottomUp(input.viewFilter, input.viewCollapsedSet, input.expandedSet)
         }
         get()._sync()
-        if (prevCollapsed) _liveLayout?.reset()
+        if (prevCollapsed || snapped) _liveLayout?.reset()
         else _liveLayout?.invalidate()
         // Smart fit frames the result as soon as the canvas shows it, not on
         // its next 300 ms tick. React Flow takes the new nodes in an effect,

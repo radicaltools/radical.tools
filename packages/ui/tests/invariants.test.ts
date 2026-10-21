@@ -830,6 +830,25 @@ const KNOWN: Known[] = [
     match: (t, v) => t.some((a) => a.a === 'propagate') && v.detail.split('\n').slice(1).every((line) => /^\s+views\.[\w-]+\.positions\./.test(line)),
     note: 'K24: an element added in a milestone and propagated has no place on the live view it was added on; a reload places it (new; sibling of K12)',
   },
+  {
+    // Nested: System 0 and Customer kept in a row: the physics throws
+    // Customer 1170 px left, System 0 grows 2440 → 3604 wide, and the run
+    // ends with the row 122 px off; read again, the row is snapped and
+    // every container refit (Container 0.0 (84, 52) → (30, 121)). The same
+    // on the code before these fixes, where K2 hid it.
+    rule: 'reloadKeeps',
+    match: (t) => lastAction(t) === 'align',
+    note: 'K25: a row or column of a container and another element is not held when the physics stops; a reload snaps it and refits every container (new; sibling of K10)',
+  },
+  {
+    // A milestone shown, a view of the viewpoint Container › components
+    // made: it is saved without the views it holds, one per container; read
+    // again, Studio makes them (5 views saved, 7 after a reload). The same
+    // on the code before these fixes, where K2 hid it.
+    rule: 'reloadKeeps',
+    match: (t, v) => t.some((a) => a.a === 'openMilestone') && t.some((a) => a.a === 'viewpointView') && v.detail.split('\n').slice(1).every((line) => /^\s+views\.[\w-]+: undefined →/.test(line)),
+    note: 'K26: a view of a viewpoint made while a milestone is shown is saved without its views per element; a reload makes them (new)',
+  },
 ]
 
 const knownHits = new Map<string, number>()
