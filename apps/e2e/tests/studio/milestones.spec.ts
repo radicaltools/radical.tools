@@ -85,3 +85,27 @@ test('the diff of a flow view finds a step removed whose relation is another ste
   await expect(page.locator('.seq-diagram-step[data-diff="removed"]')).toHaveCount(1)
   await expect(page.locator('.seq-diagram-step[data-diff="new"], .seq-diagram-step[data-diff="changed"]')).toHaveCount(0)
 })
+
+test('opening a milestone and going back to the live model writes nothing', async ({ page, studio }) => {
+  // Showing one saved the live document as the store had it: every view's
+  // positions trimmed to what it draws, a node's place mirror changed, a
+  // camera and empty Hub records written. Nothing was edited (D15).
+  await studio.openSample()
+  const docId = studio.activeDocId()
+  await studio.designer()
+  const stored = () => page.evaluate((k) => localStorage.getItem(k), `radical-doc:${docId}`)
+  await expect.poll(stored).not.toBeNull()
+  await page.waitForTimeout(1500)
+  const before = await stored()
+  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v1' }).first().click()
+  await expect(page).toHaveURL(/\/s\//)
+  await studio.settle()
+  await page.waitForTimeout(1500)
+  expect(await stored()).toBe(before)
+  await page.locator('.lp-snap-current').click()
+  await expect(page).not.toHaveURL(/\/s\//)
+  await studio.settle()
+  await page.waitForTimeout(1500)
+  expect(await stored()).toBe(before)
+})

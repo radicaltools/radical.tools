@@ -329,7 +329,11 @@ if (typeof window !== 'undefined') {
     // explored model layout is not written alongside them.
     const presChangedInExplore =
       isExploreMode && s.presentations !== prev.presentations
-    if (_loadedAt !== null && modelChanged && historyMark() === _loadedAt && placesOnlyChange(s, prev)) {
+    // A milestone shown, or the live model shown again, is no edit: the
+    // store holds the milestone's model meanwhile, and the live document is
+    // as it was. Opening one saved the document as the store had it.
+    const milestoneSwitched = s.activeSnapshotId !== prev.activeSnapshotId
+    if (_loadedAt !== null && modelChanged && historyMark() === _loadedAt && (milestoneSwitched || placesOnlyChange(s, prev))) {
       // The load settling: kept from disk until the user edits.
       prev = s
       return
