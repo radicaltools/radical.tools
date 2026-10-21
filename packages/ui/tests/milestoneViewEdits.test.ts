@@ -158,3 +158,45 @@ describe('Undo in a milestone', () => {
     expect(s().milestoneDirty).toBe(true)
   })
 })
+
+// Every setting of a view's properties is an edit of the milestone shown,
+// as the filter and the Lines are: the viewpoint, the Auto-layout and the
+// flow's Sequence went into the live view at once (saved, kept after
+// Discard), with no question and no step to undo on live.
+describe('A view property set in a milestone', () => {
+  const cases: [string, () => void, (v: DiagramView | undefined) => unknown][] = [
+    ['the viewpoint', () => { expect(s().applyViewpoint('v', 'containers', null)).toBe(true) }, (v) => v?.viewpoint],
+    ['the Auto-layout', () => s().setViewLayoutMode('v', 'tree'), (v) => v?.layoutMode],
+    ['the flow\'s Sequence', () => s().setViewSequence('v', 'seq'), (v) => v?.sequenceId],
+    ['the view type', () => s().setViewKind('v', 'table'), (v) => v?.kind],
+    ['the hierarchy\'s Size', () => s().setTreemapSizeBy('v', 'children'), (v) => v?.treemapSizeBy],
+    ['the hierarchy\'s Levels', () => s().setTreemapMaxDepth('v', 4), (v) => v?.treemapMaxDepth],
+  ]
+  for (const [what, edit, read] of cases) {
+    it(`${what}: asks, is not saved into the live view, and Discard takes it back`, () => {
+      const live = json(savedView('v'))
+      const was = read(s().views.v)
+      edit()
+      expect(read(s().views.v)).not.toEqual(was)
+      expect(s().milestoneDirty).toBe(true)
+      expect(s().milestonePromptOpen).toBe(true)
+      expect(json(savedView('v'))).toBe(live)
+      s().discardMilestoneChanges()
+      expect(read(s().views.v)).toEqual(was)
+      expect(json(savedView('v'))).toBe(live)
+    })
+  }
+
+  it('the viewpoint detached: asks, and Discard gives the live view its viewpoint back', () => {
+    s().discardMilestoneChanges()
+    s().applyViewpoint('v', 'containers', null)
+    const live = json(savedView('v'))
+    s().selectMilestone(early)
+    s().detachViewpoint('v')
+    expect(s().views.v.viewpoint).toBeUndefined()
+    expect(s().milestoneDirty).toBe(true)
+    expect(json(savedView('v'))).toBe(live)
+    s().discardMilestoneChanges()
+    expect(s().views.v.viewpoint).toBe('containers')
+  })
+})

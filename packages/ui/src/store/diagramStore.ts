@@ -4421,6 +4421,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (subjectId && !canBeSubject(type, get().c4Nodes[subjectId])) return false
         if (view.viewpoint === typeId && (subjectId === undefined || (subjectId ?? undefined) === view.subject)) return true
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => { model.applyViewpoint(state as unknown as model.ModelState, viewId, typeId, subjectId) })
         get()._sync()
         return true
@@ -4441,6 +4442,7 @@ export const useDiagramStore = create<DiagramStore>()(
       detachViewpoint(viewId) {
         if (!get().views[viewId]?.viewpoint || setByGroup(get(), viewId)) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => { model.detachViewpoint(state as unknown as model.ModelState, viewId) })
       },
       setViewPipeline(viewId, pipeline) {
@@ -4527,6 +4529,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Nothing changes: no undo step.
         if ((view.kind ?? 'static') === kind && !view.viewpoint && !view.subject) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         let placed: string[] | null = null
         const wasCanvas = (view.kind ?? 'static') === 'static'
         set((state) => {
@@ -4606,6 +4609,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const view = get().views[viewId]
         if (!view || (view.treemapSizeBy ?? 'leaves') === mode) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => {
           const view = state.views[viewId]
           if (!view) return
@@ -4620,6 +4624,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const levels = (d: number | null | undefined): number | null => d === null ? null : typeof d === 'number' && d > 0 ? d : 2
         if (!view || levels(view.treemapMaxDepth) === levels(depth)) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => {
           const view = state.views[viewId]
           if (!view) return
@@ -4628,7 +4633,13 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
       },
 
+      // A step of its own, as Size and Levels are: Undo of an earlier step
+      // gave back the old mode with it (saved).
       setViewLayoutMode(viewId, mode) {
+        const view = get().views[viewId]
+        if (!view || (view.layoutMode ?? 'auto') === mode) return
+        get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => {
           const view = state.views[viewId]
           if (!view) return
@@ -4768,8 +4779,10 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       setViewSequence(viewId, sequenceId) {
-        if (!get().views[viewId]) return
+        const view = get().views[viewId]
+        if (!view || (view.sequenceId ?? null) === (sequenceId ?? null)) return
         get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
         set((state) => {
           const view = state.views[viewId]
           if (!view) return
