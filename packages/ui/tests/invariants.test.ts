@@ -44,7 +44,9 @@
  * replays the counterexample a failure prints. A failure names the rule,
  * shows the shrunk sequence, the ids and labels each step resolved to, and
  * what differs. FUZZ_SURVEY=<file> reports every distinct failure into the
- * file and goes on; FUZZ_NO_KNOWN=1 lets KNOWN filter nothing.
+ * file and goes on; FUZZ_NO_KNOWN=1 lets KNOWN filter nothing;
+ * FUZZ_NO_SHRINK=1 reports a failure unshrunk; FUZZ_FROM=n skips the runs
+ * before the nth (does a failure need them?).
  *
  * Violations that are product bugs not fixed yet are listed in KNOWN: a
  * run that hits one ends there, quietly (a known geometry violation is
@@ -114,6 +116,9 @@ const NO_KNOWN = !!env.FUZZ_NO_KNOWN
 /** FUZZ_NO_SHRINK=1: report the first failure as found (shrinking a long
  *  sequence on the sample takes minutes). */
 const NO_SHRINK = !!env.FUZZ_NO_SHRINK
+/** FUZZ_FROM=n: the first n-1 runs pass without running (to tell whether a
+ *  failure depends on the runs before it). */
+const FROM = env.FUZZ_FROM ? Number(env.FUZZ_FROM) : 0
 /** Where survey mode appends its reports as they come (FUZZ_SURVEY=<file>). */
 const SURVEY_FILE = env.FUZZ_SURVEY && env.FUZZ_SURVEY !== '1' ? env.FUZZ_SURVEY : undefined
 /** Half a pixel: what a place may be off by and still be the same. */
@@ -545,18 +550,22 @@ function danglingReferences(data: { nodes: Record<string, C4Node>; relations: Re
 
 // ─── Driving the store to rest ──────────────────────────────────────────────
 
+/** The physics' clock (flushPhysics). */
+let frameClock = 1_000_000
+
 /** Steps the live physics until it rests; false when it did not within MAX_TICKS. */
 function flushPhysics(): boolean {
   const t = timers()
   if (!t.timers.size) return true
-  // The engine also caps a run by the clock (MAX_PROJECTED_RUN_MS): it reads
-  // a frame clock here, 16 ms a tick, as on a screen, not the time the
-  // ticks take to compute.
+  // The engine reads the clock in its ticks only: to cap a run
+  // (MAX_PROJECTED_RUN_MS) and to skip renders after a slow tick. It reads a
+  // frame clock here, 16 ms a tick as on a screen, that runs only while the
+  // physics does: the time the ticks take to compute, or the time between
+  // two steps, made runs depend on the machine and on the runs before.
   const realNow = performance.now
-  let frame = realNow.call(performance)
-  performance.now = () => frame
+  performance.now = () => frameClock
   try {
-    for (let n = 0; n < MAX_TICKS && t.timers.size; n++) { t.tick(); frame += 16 }
+    for (let n = 0; n < MAX_TICKS && t.timers.size; n++) { t.tick(); frameClock += 16 }
   } finally {
     performance.now = realNow
   }
@@ -836,7 +845,7 @@ const KNOWN: Known[] = [
     // still runs and 19 elements still move (ADR-000 by 21 px a second).
     rule: 'nothingMovesByItself',
     match: (_t, v) => v.detail.includes('still moving'),
-    note: 'K20: after an add on the sample\'s All elements the live physics never comes to rest (new)',
+    note: 'K20: after an add the live physics can go on moving for good (seen on the sample\'s and the bookstore\'s All elements; new)',
   },
   {
     // Sample: milestone v1 opened, Web Banking deleted there, Propagate:
@@ -1578,7 +1587,9 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
   if (reload) fail(reload)
 }
 
+let runIndex = 0
 async function runSequence(name: string, prepared: Prepared, actions: Action[]): Promise<void> {
+  if (++runIndex < FROM) return
   const store = useDiagramStore
   resetDeterminism(1)
   store.getState().setAppMode('designer')
