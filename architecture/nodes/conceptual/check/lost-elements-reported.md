@@ -5,7 +5,8 @@ label: "Lost elements reported"
 given: "a model folder with a node file without a type, a copy of another node file, a README, and views, sequences and slides that point at what the model lacks"
 tests: |
   packages/common/tests/check.test.ts › radical check › lists stale references in views, sequences and slides
+  packages/common/tests/check.test.ts › radical check › lists a slide focus on an element the model it shows does not have
   packages/common/tests/check.test.ts › radical check: the folder › finds a node file without id or type and a duplicated id, but not a README
-then: "it reports the file that is not a node and the duplicated id with their paths, leaves the README alone, and lists each stale reference of the view, sequence and slide"
+then: "it reports the file that is not a node and the duplicated id with their paths, leaves the README alone, and lists each stale reference of the view, sequence and slide, a slide's focus on an element the model it shows lacks among them"
 when: "radical check runs on it"
 ---

@@ -2,7 +2,6 @@
 id: "1bc446a4-cd6e-469f-87d5-818b9758f268"
 type: "scenario"
 label: "Agent placement and layout"
-gherkin: ""
 given: "an MCP server bound to a model folder"
 tests: |
   apps/mcp/src/folderModel.test.ts › places children inside their parent, keeps defaultPositions in step and runs Smart Layout

@@ -9,6 +9,7 @@ tests: |
   packages/common/tests/aiDocumentTools.test.ts › metamodel tools › refuse a property keyed like a field every element or relation has
   packages/common/tests/aiDocumentTools.test.ts › metamodel tools › describe a new type, without inheriting the description of its base type
   packages/common/tests/aiDocumentTools.test.ts › metamodel tools › set and clear how a relation type reads from either end
-then: "the type is added and only the given fields change, and each bad input is refused with its reason, leaving the metamodel as it was"
+  apps/mcp/src/folderModel.test.ts › metamodel changes over MCP › keep a property's visibleWhen, sent or left out
+then: "the type is added and only the given fields change, a property's visibleWhen is kept whether sent or left out, and each bad input is refused with its reason, leaving the metamodel as it was"
 when: "an agent adds a node type, changes only its colour or description, sets and clears how a relation type reads, and sends bad ids, unknown parents or pairs, an enum without options or a property keyed like a built-in field"
 ---

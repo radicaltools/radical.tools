@@ -2,7 +2,6 @@
 id: "a808de10-1f55-4107-8e02-5c366b6ac41f"
 type: "scenario"
 label: "Name required to create"
-gherkin: ""
 given: "a create-time wizard whose Name field is empty"
 tests: "packages/common/tests/nodeWizard.test.ts › requires a name"
 then: "Create is disabled and \"Required: Name\" is shown"

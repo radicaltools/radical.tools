@@ -6,7 +6,9 @@ given: "an order state machine, the lifecycle of the Order entity, with a transi
 tests: |
   apps/e2e/tests/studio/state-machines.spec.ts › a machine is named after the entity it is the lifecycle of
   apps/e2e/tests/studio/state-machines.spec.ts › a transition shows its events by name and picks them by reference
+  apps/e2e/tests/studio/state-machines.spec.ts › a transition's card reads as its line, and Event (none) stores no event
   packages/common/tests/stateMachine.test.ts › state machine types (governance preset) › labels a transition `event [guard] / actions ^raised` by the events' names
-then: "the machine is headed State machine · Order and the transition reads PaymentReceived [ok] / reserve ^OrderPaid by the events' current names"
+  packages/common/tests/nodeSummary.test.ts › element summary: what matters first, never empty › says which transitions raise an event
+then: "the machine is headed State machine · Order and the transition reads PaymentReceived [ok] / reserve ^OrderPaid by the events' current names; the transition's card is titled as its line, and Event (none) stores no event; an event's summary says which transitions raise it"
 when: "it is shown on the canvas and the event is renamed"
 ---

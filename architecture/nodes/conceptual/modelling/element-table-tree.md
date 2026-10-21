@@ -2,7 +2,6 @@
 id: "8ff79bac-1bea-4189-a23b-65005d9c8a43"
 type: "scenario"
 label: "Element table tree"
-gherkin: ""
 given: "the bookstore Element Table view with no element list (whole model) and no steps"
 tests: |
   apps/e2e/tests/studio/views.spec.ts › bookstore views › Element Table (table)

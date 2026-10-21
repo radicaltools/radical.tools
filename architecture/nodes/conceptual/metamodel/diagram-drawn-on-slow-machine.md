@@ -2,7 +2,6 @@
 id: "96d5274f-90ca-4fe6-89c8-87dbb9f9ae8f"
 type: "scenario"
 label: "Diagram drawn on slow machine"
-gherkin: ""
 given: "the CPU is throttled six times"
 tests: "apps/e2e/tests/studio/metamodel-diagram.spec.ts › the diagram stays drawn on a slow machine"
 then: "the layout finishes and all 96 edges and the Requirement box are drawn"

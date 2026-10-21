@@ -2,7 +2,6 @@
 id: "9991fb44-61a0-432d-9a13-ba54cbd69dc8"
 type: "scenario"
 label: "Browse category and search"
-gherkin: ""
 given: "the Hub landing page is open"
 tests: "apps/e2e/tests/hub/hub.spec.ts › browse a category and search"
 then: "only blueprints are listed with the link #/cat/blueprint, and the search shows the Fintech Ledger blueprint but not the AI Support Assistant one"
