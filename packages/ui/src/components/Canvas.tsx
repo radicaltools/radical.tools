@@ -109,6 +109,9 @@ function draggedNode(grabbedNode: RFNode | undefined, nodes: RFNode[]): RFNode |
 
 /** How long the camera takes to frame a selection, or to go back. */
 const SELECTION_CAMERA_MS = 400
+/** The least zoom the camera shows what an exploration's + added at:
+ *  readable cards. */
+const EXPLORE_MIN_ZOOM = 0.6
 /** Framing a selection zooms in no further than this, or than the zoom in
  *  use when that is closer already. */
 const SELECTION_MAX_ZOOM = 1
@@ -888,6 +891,50 @@ function StructuralCanvas(): React.ReactElement {
     // captured camera right after a slide switch swaps the visible node set.
     ;(window as any).__rfSuppressAutoFit = suppressAutoFit
     ;(window as any).__rfPlaceCamera = placeCamera
+    // Explore from here: what a + (or + 1 level, or the opening) just added,
+    // `ids`, with what it was added from, `from`, at a readable zoom (no
+    // less than EXPLORE_MIN_ZOOM): as many of them, nearest to `from` first,
+    // as fit at that zoom; never a fit of the whole exploration.
+    ;(window as any).__rfShowAdded = (ids: string[], from: string[]) => {
+      const wanted = new Set([...ids, ...from])
+      let frames = 0
+      const frame = () => {
+        const shown = instance.getNodes().filter((n) => wanted.has(n.id) && !n.hidden)
+        if (!(shown.length > 0 && shown.every((n) => n.width && n.height)) && ++frames < 30) {
+          requestAnimationFrame(frame)
+          return
+        }
+        const rect = containerRef.current?.getBoundingClientRect()
+        if (!rect || rect.width === 0 || shown.length === 0) return
+        const MARGIN = 60
+        const freeW = rect.width - paletteCover() - propertiesPanelCover() - 2 * MARGIN
+        const freeH = rect.height - 2 * MARGIN
+        const fits = (list: typeof shown): boolean => {
+          const b = getNodesBounds(list)
+          return b.width * EXPLORE_MIN_ZOOM <= freeW && b.height * EXPLORE_MIN_ZOOM <= freeH
+        }
+        const anchors = shown.filter((n) => from.includes(n.id))
+        const centre = (n: (typeof shown)[number]) => {
+          const p = n.positionAbsolute ?? n.position
+          return { x: p.x + (n.width ?? 0) / 2, y: p.y + (n.height ?? 0) / 2 }
+        }
+        const at = anchors.length ? getNodesBounds(anchors) : getNodesBounds(shown)
+        const mid = { x: at.x + at.width / 2, y: at.y + at.height / 2 }
+        const added = shown.filter((n) => !from.includes(n.id))
+          .sort((a, b) => Math.hypot(centre(a).x - mid.x, centre(a).y - mid.y) - Math.hypot(centre(b).x - mid.x, centre(b).y - mid.y))
+        let framed = anchors.length && fits(anchors) ? [...anchors] : []
+        for (const n of added) if (fits([...framed, n])) framed.push(n)
+        if (!framed.length) framed = [added[0] ?? shown[0]]
+        const b = getNodesBounds(framed)
+        const target = viewportInFree(
+          { x: b.x - MARGIN, y: b.y - MARGIN, width: b.width + MARGIN * 2, height: b.height + MARGIN * 2 },
+          rect, EXPLORE_MIN_ZOOM, 1, 0.08, true,
+        )
+        suppressAutoFit(SELECTION_CAMERA_MS + 1800)
+        instance.setViewport(target, { duration: SELECTION_CAMERA_MS })
+      }
+      requestAnimationFrame(frame)
+    }
     // Restore the camera saved with the active view (or default context).
     // Falls back to fit-all if no viewport was persisted yet.
     setTimeout(() => {

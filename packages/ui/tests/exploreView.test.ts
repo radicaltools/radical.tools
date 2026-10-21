@@ -166,6 +166,41 @@ describe('an explore view', () => {
     expect(Object.values(s().exploreMore ?? {}).filter(Boolean)).toEqual([])
   })
 
+  it('a layer of more than 8 wraps into rows of at most 8, closer together than the layers, in the order added', async () => {
+    // A person using six containers of one system and six other systems.
+    const box = (id: string, type: string, parentId?: string): C4Node =>
+      ({ id, type, label: id, x: 0, y: 0, width: 200, height: 120, collapsed: false, ...(parentId ? { parentId } : {}) } as C4Node)
+    const inner = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6']
+    const outer = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6']
+    s().loadDiagram({
+      nodes: [box('user', 'person'), box('sys', 'system'), ...inner.map((id) => box(id, 'container', 'sys')), ...outer.map((id) => box(id, 'system'))],
+      relations: [...inner, ...outer].map((id) => ({ id: `uses-${id}`, sourceId: 'user', targetId: id, label: 'uses' })),
+    })
+    await s().exploreFrom('user')
+    await s().exploreNeighbours('user')
+    const added = [...inner, ...outer]
+    for (const id of added) expect(below(id, 'user')).toBe(true)
+    // Rows by their top, each of at most 8, the added order kept in each.
+    const rows = new Map<number, string[]>()
+    for (const id of added) rows.set(Math.round(abs(id).y), [...(rows.get(Math.round(abs(id).y)) ?? []), id])
+    expect(rows.size).toBeGreaterThan(1)
+    for (const row of rows.values()) {
+      expect(row.length).toBeLessThanOrEqual(8)
+      const xs = row.map((id) => abs(id).x)
+      expect(xs).toEqual([...xs].sort((a, b) => a - b))
+    }
+    // The second row closer under the first than the first under the start.
+    const tops = [...rows.keys()].sort((a, b) => a - b)
+    const height = s().rfNodes.find((n) => n.id === 'r6')!.data.height
+    const layerGap = tops[0] - (abs('user').y + s().rfNodes.find((n) => n.id === 'user')!.data.height)
+    expect(tops[1] - (tops[0] + height)).toBeLessThan(layerGap)
+    // The system's frame holds its containers, the other systems lie outside it.
+    expect(drawn('sys')).toBe(true)
+    for (const id of inner) expect(inside(id, 'sys')).toBe(true)
+    for (const id of outer) expect(overlap(id, 'sys')).toBe(false)
+    expect(crowded()).toEqual([])
+  })
+
   it('is not saved: the document is as it was, its views among it', async () => {
     const was = saved()
     const views = s().views

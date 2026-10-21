@@ -366,10 +366,12 @@ export async function applyTreeLayout(
 //
 // Explore from here lays its view out top-down in layers by distance from
 // the element it started from: the start on top, its neighbours a layer
-// below, theirs below those. The layers are ELK partitions, so a relation's
-// direction does not move an element up or down; a container is a frame
-// across the layers of what it holds (INCLUDE_CHILDREN lays the nested
-// graph out as one). Within a layer the elements keep the order given.
+// below, theirs below those. A layer of more elements than a row takes
+// wraps into rows, closer together than the layers are. The rows are ELK
+// partitions, so a relation's direction does not move an element up or
+// down; a container is a frame across the rows of what it holds
+// (INCLUDE_CHILDREN lays the nested graph out as one). Within a layer the
+// elements keep the order given.
 
 const LAYERS_OPTIONS: LayoutOptions = {
   'elk.algorithm': 'layered',
@@ -379,6 +381,7 @@ const LAYERS_OPTIONS: LayoutOptions = {
   'elk.separateConnectedComponents': 'false',
   'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
   'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+  'elk.layered.crossingMinimization.forceNodeModelOrder': 'true',
   'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
   'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
   'elk.spacing.edgeNode': '30',
@@ -397,9 +400,11 @@ export interface LayersInput {
   order: readonly string[]
   /** The room inside a container's frame round what it holds. */
   paddingOf: (n: C4Node) => { top: number; side: number; bottom: number }
-  /** The least space between elements of a layer, and between layers
-   *  (the room a relation's label needs among them). */
-  gap: { inLayer: number; betweenLayers: number }
+  /** The least space between elements of a row, between the rows of a
+   *  layer, and between layers (the room a relation's label needs). */
+  gap: { inLayer: number; betweenRows: number; betweenLayers: number }
+  /** The most elements in one row; a layer with more wraps (none: no limit). */
+  maxPerRow?: number
 }
 
 /** The places of `input.nodes` in layers by distance; relative to their
@@ -416,6 +421,42 @@ export async function applyLayersLayout(input: LayersInput): Promise<PositionMap
     else kids.set(parent, [n])
   }
   for (const list of kids.values()) list.sort(byOrder)
+
+  // Rows: each layer's elements (not its frames) in order, `maxPerRow` to
+  // a row. A row is an ELK partition; a frame is in the first row of what
+  // it holds, or of its own layer when that is nearer.
+  const layers = [...new Set(Object.values(nodes).map((n) => layerOf(n.id)))].sort((a, b) => a - b)
+  const leaves = Object.values(nodes).filter((n) => !kids.get(n.id)?.length).sort(byOrder)
+  const per = input.maxPerRow && input.maxPerRow > 0 ? input.maxPerRow : Infinity
+  const partition = new Map<string, number>()
+  /** Each partition's layer, by its index among the layers. */
+  const layerIndexOf: number[] = []
+  const firstRowOf = new Map<number, number>()
+  for (const [index, layer] of layers.entries()) {
+    const inLayer = leaves.filter((n) => layerOf(n.id) === layer)
+    firstRowOf.set(layer, layerIndexOf.length)
+    const rows = Math.max(1, Math.ceil(inLayer.length / per))
+    inLayer.forEach((n, i) => partition.set(n.id, layerIndexOf.length + Math.floor(i / per)))
+    for (let r = 0; r < rows; r++) layerIndexOf.push(index)
+  }
+  const span = new Map<string, { first: number; last: number }>()
+  const spanOf = (n: C4Node): { first: number; last: number } => {
+    const known = span.get(n.id)
+    if (known) return known
+    const own = firstRowOf.get(layerOf(n.id)) ?? 0
+    let first = partition.get(n.id) ?? own
+    let last = first
+    for (const c of kids.get(n.id) ?? []) {
+      const s = spanOf(c)
+      first = Math.min(first, s.first)
+      last = Math.max(last, s.last)
+    }
+    if (kids.get(n.id)?.length) first = Math.min(first, own)
+    const out = { first, last }
+    span.set(n.id, out)
+    return out
+  }
+
   const spacing: LayoutOptions = {
     'elk.spacing.nodeNode': String(gap.inLayer),
     'elk.layered.spacing.nodeNodeBetweenLayers': String(gap.betweenLayers),
@@ -427,7 +468,7 @@ export async function applyLayersLayout(input: LayersInput): Promise<PositionMap
       id: n.id,
       ...(children.length ? {} : { width: n.width, height: n.height }),
       layoutOptions: {
-        'elk.partitioning.partition': String(layerOf(n.id)),
+        'elk.partitioning.partition': String(spanOf(n).first),
         // A frame's graph keeps the same gaps: ELK reads them per graph.
         ...(children.length ? { 'elk.padding': `[top=${pad.top}, right=${pad.side}, bottom=${pad.bottom}, left=${pad.side}]`, ...spacing } : {}),
       },
@@ -439,32 +480,70 @@ export async function applyLayersLayout(input: LayersInput): Promise<PositionMap
     return false
   }
   // Each relation from the nearer end to the farther: layers by distance,
-  // not by the relation's direction. One within a layer, or between a
+  // not by the relation's direction. One within a row, or between a
   // container and what it holds, places nothing.
   const edges: ElkExtendedEdge[] = []
   for (const r of Object.values(relations)) {
     if (!nodes[r.sourceId] || !nodes[r.targetId] || r.sourceId === r.targetId) continue
     if (inside(r.sourceId, r.targetId) || inside(r.targetId, r.sourceId)) continue
-    const [from, to] = layerOf(r.sourceId) <= layerOf(r.targetId) ? [r.sourceId, r.targetId] : [r.targetId, r.sourceId]
-    if (layerOf(from) === layerOf(to)) continue
-    edges.push({ id: r.id, sources: [from], targets: [to] })
+    const a = spanOf(nodes[r.sourceId]).first
+    const b = spanOf(nodes[r.targetId]).first
+    if (a === b) continue
+    edges.push({ id: r.id, sources: [a < b ? r.sourceId : r.targetId], targets: [a < b ? r.targetId : r.sourceId] })
   }
   const root: ElkNode = {
     id: 'root',
-    layoutOptions: {
-      ...LAYERS_OPTIONS,
-      ...spacing,
-    },
+    layoutOptions: { ...LAYERS_OPTIONS, ...spacing },
     children: (kids.get(undefined) ?? []).map(build),
     edges,
   }
+  let laid: PositionMap
   try {
     const result = await elk.layout(root)
-    const positions: PositionMap = {}
-    parseElkResult(result, positions)
-    return positions
+    laid = {}
+    parseElkResult(result, laid)
   } catch (err) {
     console.error('[ELK] Layers layout error:', err)
     return {}
   }
+
+  // The rows of a layer stand `betweenRows` apart, layers `betweenLayers`:
+  // ELK keeps one gap between partitions, so each row after the first of
+  // its layer moves up by the difference, with what lies below it, and a
+  // frame shrinks by as much as what it holds moved more than its top.
+  const less = Math.max(0, gap.betweenLayers - gap.betweenRows)
+  const wrapped: number[] = []
+  for (let row = 0, count = 0; row < layerIndexOf.length; row++) {
+    if (row > 0 && layerIndexOf[row] === layerIndexOf[row - 1]) count++
+    wrapped.push(count)
+  }
+  if (less === 0 || !wrapped.some(Boolean)) return laid
+  const shift = (row: number): number => -less * (wrapped[row] ?? wrapped[wrapped.length - 1] ?? 0)
+  const absY = new Map<string, number>()
+  const absOf = (id: string): number => {
+    const known = absY.get(id)
+    if (known !== undefined) return known
+    const parent = nodes[id]?.parentId
+    const y = (laid[id]?.y ?? 0) + (parent && nodes[parent] ? absOf(parent) : 0)
+    absY.set(id, y)
+    return y
+  }
+  const moved = new Map<string, { top: number; height: number }>()
+  for (const id of Object.keys(laid)) {
+    const n = nodes[id]
+    if (!n) continue
+    const s = spanOf(n)
+    const top = absOf(id) + shift(s.first)
+    const height = (laid[id].height ?? n.height) + shift(s.last) - shift(s.first)
+    moved.set(id, { top, height })
+  }
+  const out: PositionMap = {}
+  for (const [id, at] of Object.entries(laid)) {
+    const m = moved.get(id)
+    if (!m) { out[id] = at; continue }
+    const parent = nodes[id].parentId
+    const parentTop = parent && moved.get(parent) ? moved.get(parent)!.top : 0
+    out[id] = { ...at, y: m.top - parentTop, height: kids.get(id)?.length ? m.height : at.height }
+  }
+  return out
 }

@@ -31,6 +31,23 @@ const apart = (a: Box, b: Box): boolean =>
  *  its middle once the exploration is laid out in layers. */
 const pick = (node: Locator): Promise<void> => node.click({ position: { x: 8, y: 8 } })
 
+/** The canvas camera's zoom. */
+async function zoomOf(page: Page): Promise<number> {
+  const transform = await page.locator('.react-flow__viewport').getAttribute('style') ?? ''
+  return Number(transform.match(/scale\((-?[\d.]+)\)/)?.[1] ?? 1)
+}
+
+/** `node` lies wholly inside the canvas's visible pane. */
+async function inPane(page: Page, node: Locator): Promise<boolean> {
+  const pane = (await page.locator('.react-flow__pane').boundingBox())!
+  const b = (await node.boundingBox())!
+  return b.x >= pane.x && b.y >= pane.y && b.x + b.width <= pane.x + pane.width && b.y + b.height <= pane.y + pane.height
+}
+
+/** The ids of the elements the canvas draws. */
+const drawnIds = (page: Page): Promise<string[]> =>
+  page.locator('.react-flow__node').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.id!))
+
 /** The names of the views listed, in order. */
 const viewNames = (page: Page): Promise<string[]> =>
   page.locator('.lp-view-list .lp-view-card .lp-card-title').allTextContents()
@@ -61,6 +78,9 @@ test('Explore from here grows by + and by a level', async ({ page, studio }) => 
   expect(apart(box.payments, box.bookstore)).toBe(true)
   for (const id of ['web', 'db', 'payments']) expect(box[id].y).toBeGreaterThanOrEqual(box.api.y + box.api.height)
   expect(await studio.layoutViolations()).toEqual([])
+  // The camera shows what was added, with API, at a readable zoom.
+  expect(await zoomOf(page)).toBeGreaterThanOrEqual(0.6)
+  for (const id of ['api', 'web', 'db', 'payments']) expect(await inPane(page, studio.node(id))).toBe(true)
   await expect(studio.node('api').locator('.explore-more')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Show 1 more related to Web App', exact: true })).toBeVisible()
 
@@ -170,8 +190,15 @@ test('Explore from here in Viewer follows the milestone shown and saves nothing'
   await expect(page.locator('.lp-explore-card')).toHaveClass(/active/)
   for (const id of ['ctn-apigw', 'ctn-web', 'ctn-accounts', 'ctn-auth']) await expect(studio.node(id)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Show 3 more related to API Gateway', exact: true })).toBeVisible()
+  const before = new Set(await drawnIds(page))
   await page.getByRole('button', { name: 'Show 3 more related to API Gateway', exact: true }).click()
   await expect(studio.node('ctn-payments')).toBeVisible()
+  // The camera shows the three just added, with the gateway, readable.
+  await studio.settle()
+  const added = (await drawnIds(page)).filter((id) => !before.has(id) && !id.startsWith('sys-') && !id.startsWith('dom-'))
+  expect(added.length).toBeGreaterThanOrEqual(3)
+  expect(await zoomOf(page)).toBeGreaterThanOrEqual(0.6)
+  for (const id of [...added, 'ctn-apigw']) expect(await inPane(page, studio.node(id)), id).toBe(true)
 
   // Nothing saved; Designer finds its model and its history as they were.
   await page.waitForTimeout(1000)

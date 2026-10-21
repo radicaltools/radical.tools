@@ -1174,10 +1174,11 @@ async function layExplorationOut(
   // The room a relation's label needs between two elements, beside each
   // other in a layer or in two layers.
   let inLayer = 60
+  let betweenRows = 40
   let betweenLayers = 80
   for (const [key, need] of labelGaps(drawn, relations)) {
     const [a, b] = key.split('\n')
-    if (layerOf(a) === layerOf(b)) inLayer = Math.max(inLayer, need.x)
+    if (layerOf(a) === layerOf(b)) { inLayer = Math.max(inLayer, need.x); betweenRows = Math.max(betweenRows, need.y) }
     else betweenLayers = Math.max(betweenLayers, need.y)
   }
   const laid = await applyLayersLayout({
@@ -1186,7 +1187,9 @@ async function layExplorationOut(
     layerOf,
     order: ids,
     paddingOf: (n) => compoundPadding(n.type),
-    gap: { inLayer, betweenLayers },
+    // The rows of a layer closer together than the layers.
+    gap: { inLayer, betweenRows: Math.min(betweenRows, betweenLayers), betweenLayers: Math.max(betweenLayers, betweenRows + 40) },
+    maxPerRow: EXPLORATION_ROW,
   })
   if (!Object.keys(laid).length) return null
   const parents = new Set(Object.values(drawn).map((n) => n.parentId).filter((p): p is string => !!p && !!drawn[p]))
@@ -1640,6 +1643,10 @@ function layoutInputForView(state: DiagramStore): LayoutInput {
 // `views`: what saves, undoes, merges, puts in a milestone or lists the
 // document's views never sees it. Code that draws the canvas shown reads it
 // through viewById.
+
+/** The most elements in one row of an exploration's layer: a layer with
+ *  more wraps into rows of this many. */
+export const EXPLORATION_ROW = 8
 
 /** An exploration's view id begins with it: no view of a document's does. */
 const EXPLORATION_ID = 'explore:'
@@ -3371,14 +3378,14 @@ export const useDiagramStore = create<DiagramStore>()(
      *  exploration is laid out again in layers (layExplorationOut). No undo
      *  step. One after another: a second + waits for the layout of the
      *  first. */
-    const _growExploration = (from: string[] | null): Promise<void> => {
+    const _growExploration = (from_: string[] | null): Promise<void> => {
       _explorationWork = _explorationWork.then(async () => {
         const s = get()
         const exploration = s.exploration
         if (!exploration || !onExploration(s) || (s.appMode !== 'designer' && s.appMode !== 'viewer')) return
         const more = explorationNeighbours(exploration, s.c4Nodes, s.c4Relations)
         const added = new Set<string>()
-        for (const id of from ?? [...more.keys()]) for (const other of more.get(id) ?? []) added.add(other)
+        for (const id of from_ ?? [...more.keys()]) for (const other of more.get(id) ?? []) added.add(other)
         if (!added.size) return
         const nodeIds = [...exploration.nodeIds]
         for (const id of withAncestors(added, s.c4Nodes)) if (!nodeIds.includes(id)) nodeIds.push(id)
@@ -3405,8 +3412,11 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
         // Taken as they are: the physics moves nothing.
         _liveLayout?.reset()
-        // The camera follows the new layout.
-        if (onExploration(get())) _getFitViewFn()?.()
+        // The camera shows what was added, with what it was added from.
+        if (onExploration(get())) {
+          const from = (from_ ?? []).filter((id) => !!get().c4Nodes[id])
+          ;(window as any).__rfShowAdded?.([...added].filter((id) => !!get().c4Nodes[id]), from.length ? from : [...more.keys()].filter((id) => (more.get(id) ?? []).some((o) => added.has(o))))
+        }
       })
       return _explorationWork
     }
@@ -4791,8 +4801,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get()._sync()
           _liveLayout?.reset()
           if (!onExploration(get())) return
-          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
-          ;(window as any).__rfPlaceCamera?.(null, shown)
+          ;(window as any).__rfShowAdded?.([nodeId], [])
         })
         return _explorationWork
       },
