@@ -191,6 +191,21 @@ describe('Move to… a container', () => {
     expect(violations()).toEqual([])
   })
 
+  // The other canvases had no place for it until they were opened: the
+  // place was made then, and the live layout settled it with its
+  // surroundings (Payment Provider moved into Bookstore on All elements:
+  // opening Containers moved Customer by (−179, −82)).
+  it('gives it its place on the other canvases at once: opening one moves nothing there', () => {
+    s().reparentNodes(['loose'], 'a', { quiet: true })
+    const other = () => JSON.parse(JSON.stringify(s().saveDiagram().views!.find((v) => v.id === 'other')!.positions)) as Record<string, NodePosition>
+    const there = other()
+    expect(there.loose).toBeDefined()
+    expect(there.loose.x >= 0 && there.loose.y >= 0 && there.loose.x + there.loose.width <= there.a.width && there.loose.y + there.loose.height <= there.a.height).toBe(true)
+    s().setActiveView('other')
+    expect(other()).toEqual(there)
+    expect(violations()).toEqual([])
+  })
+
   it('keeps the place of what lies inside it, clear of what it holds', () => {
     useDiagramStore.setState((st: any) => {
       st.c4Nodes.a.width = 1100
@@ -201,6 +216,27 @@ describe('Move to… a container', () => {
     s().reparentNodes(['loose'], 'a', { quiet: true })
     expect(abs('loose')).toMatchObject({ x: 720, y: 120 })
     expect(violations()).toEqual([])
+  })
+})
+
+describe('Move to… a container the view draws with nothing in it', () => {
+  // The view lists S2 without what it holds: S2 is drawn at its folded
+  // size, though it keeps its open one (600 × 330). S1 moved into it grew
+  // it from the size it keeps, which counted as no growth: no room was
+  // made, and S2 lay over S3 just below it (System 0 moved into System 1
+  // on a System context view, over Operator).
+  it('grows it from the size it is drawn at, and makes room for it', () => {
+    const data = folds(false)
+    data.views = [{
+      id: 'roots', name: 'Roots', nodeIds: ['s1', 's2', 's3'],
+      positions: { ...JSON.parse(JSON.stringify(data.defaultPositions)), s3: pos(400, 220, 300, 180) },
+    }]
+    s().loadDiagram(data)
+    s().setActiveView('roots')
+    s().reparentNodes(['s1'], 's2', { quiet: true })
+    expect(s().c4Nodes.s1.parentId).toBe('s2')
+    expect(inside('s1')).toBe(true)
+    expect(overlap(abs('s2'), abs('s3'))).toBe(false)
   })
 })
 

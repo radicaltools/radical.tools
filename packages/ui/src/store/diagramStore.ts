@@ -67,6 +67,7 @@ import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
 import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
+import { liesClearInParent, modelCanvas } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
@@ -1173,6 +1174,19 @@ function settleMoveOnShownCanvas(
     }))))
   }
   const canvas = canvasBoxes(shownNodes, viewFilter, viewCollapsedSet, expandedSet)
+  // A new parent the canvas drew with nothing in it was drawn at its folded
+  // size, whatever size it keeps: it grows from that, and makes room for
+  // what it grows by. Measured at the size it kept, it shrank to what was
+  // moved into it, made no room, and lay over its neighbours (System 0
+  // moved into System 1 on a System context view, over Operator).
+  const moved = new Set(ids.flatMap((id) => [id, ...getDescendants(id, shownNodes)]))
+  for (const parentId of new Set(ids.map((id) => shownNodes[id]?.parentId))) {
+    const parent = parentId ? shownNodes[parentId] : undefined
+    if (!parent || !isContainerType(parent.type) || isFixedSizeType(parent.type) || isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet)) continue
+    if (Object.values(shownNodes).some((c) => c.parentId === parent.id && !moved.has(c.id) && canvas.shown(c))) continue
+    parent.width = COLLAPSED_WIDTH[parent.type]
+    parent.height = COLLAPSED_HEIGHT[parent.type]
+  }
   // A refit can grow the old parent too (to its type's least size).
   for (const oldParentId of oldParentIds) if (shownNodes[oldParentId]) growWithRoom(shownNodes, oldParentId, canvas, fit)
   // Measured with the folds above it open.
@@ -1214,6 +1228,8 @@ function applyPositions(nodes: Record<string, C4Node>, positions: Record<string,
  * elements') onto the nodes, and gives the nodes it has none for a place of
  * their own there (placeUnplaced): an element added on another canvas kept
  * that one's place, outside its parent's frame here or on a sibling.
+ * In a milestone (`live`: the live nodes), what the milestone cannot draw at
+ * the view's places gets one of its own too (ownPlacesInMilestone).
  * Mutates the nodes (use inside immer set); returns the ids it placed, for
  * the live layout to settle with their surroundings.
  */
@@ -1222,7 +1238,15 @@ function showCanvasPositions(
   positions: Record<string, NodePosition>,
   view: DiagramView | undefined,
   relations: Record<string, C4Relation>,
+  live?: Record<string, C4Node>,
 ): string[] {
+  // Only the view's own places are the live layout's (All elements', which
+  // a view never laid out opens on, are the milestone's own).
+  const own = view && live && positions === view.positions ? ownPlacesInMilestone(positions, view, nodes, live) : []
+  if (own.length) {
+    positions = { ...positions }
+    for (const id of own) delete positions[id]
+  }
   applyPositions(nodes, positions)
   // Only a canvas draws positions: a table, wiki, matrix, hierarchy or flow
   // view keeps what it was given.
@@ -1232,7 +1256,113 @@ function showCanvasPositions(
   // container none of whose children it shows.
   const childless = computeViewCollapsedSet(shown, nodes)
   const folded = view ? (n: C4Node): boolean => nodeEffectivelyCollapsedInView(n, view.id, view) || childless.has(n.id) : undefined
-  return placeUnplaced(nodes, positions, shown, folded)
+  const placed = placeUnplaced(nodes, positions, shown, folded)
+  // One whose parent got a place of its own too moved with it, at a place
+  // that was not its own in it: it is placed in it now.
+  const left = own.filter((id) => nodes[id] && !placed.includes(id))
+  if (!left.length) return placed
+  const known = Object.fromEntries(Object.keys(nodes).filter((id) => !left.includes(id)).map((id) => [id, true]))
+  return [...placed, ...placeUnplaced(nodes, known, shown, folded)]
+}
+
+/**
+ * What a milestone shown (`nodes`) cannot draw at a view's places. A view keeps
+ * one layout for every milestone, the live model's (`live`); an element with
+ * another parent in the milestone than on live has its place there relative
+ * to the live parent, and one folded on live but open in the milestone has
+ * the room of its fold: drawn there, it lay on its siblings (Component 1.1.1
+ * moved into Container 2.0 since, drawn on 1.1.2 in Early). Such an element
+ * has no place in the view for the milestone, and gets one of its own there
+ * as an add does (placeUnplaced: beside its siblings, its parent grown with
+ * room made), which nothing saves into the view. Returns their ids.
+ */
+function ownPlacesInMilestone(
+  positions: Record<string, NodePosition>,
+  view: DiagramView,
+  nodes: Record<string, C4Node>,
+  live: Record<string, C4Node>,
+): string[] {
+  const differs = (id: string): boolean => {
+    const n = nodes[id]
+    const was = live[id]
+    if (!n || !was) return false
+    if ((n.parentId ?? null) !== (was.parentId ?? null)) return true
+    return isContainerType(n.type) && !nodeEffectivelyCollapsedInView(n, view.id, view) && nodeEffectivelyCollapsedInView(was, view.id, view)
+  }
+  return Object.keys(positions).filter(differs)
+}
+
+/** The live nodes while a milestone is shown, for showCanvasPositions. */
+const liveWhileInMilestone = (state: Pick<DiagramStore, 'activeSnapshotId' | 'liveBackup'>): Record<string, C4Node> | undefined =>
+  state.activeSnapshotId && state.liveBackup ? state.liveBackup.nodes as Record<string, C4Node> : undefined
+
+/**
+ * The places the other canvases give `ids` (just added, or moved into
+ * another parent, on the canvas shown) where they draw them and have none
+ * for them: All elements while a view is shown, and every view laid out
+ * before (one with positions). Each gets them as showing it would
+ * (showCanvasPositions): inside the parent, beside its siblings, the parent
+ * grown there with room made. Left to the canvas's next opening, the place
+ * was made then and the live layout settled it with its surroundings:
+ * opening a view moved elements no one had touched, and a parent grown
+ * there lay over its neighbour. Not in a milestone, whose canvases are not
+ * the live ones. Returns the positions to write, per canvas ('' for All
+ * elements).
+ */
+function placesOnOtherCanvases(
+  state: Pick<DiagramStore, 'c4Nodes' | 'c4Relations' | 'views' | 'activeViewId' | 'activeSnapshotId' | 'defaultPositions'>,
+  ids: readonly string[],
+  added: boolean,
+): Map<string, Record<string, NodePosition>> {
+  const out = new Map<string, Record<string, NodePosition>>()
+  const nodes = state.c4Nodes as Record<string, C4Node>
+  const relations = state.c4Relations as Record<string, C4Relation>
+  const touched = ids.filter((id) => nodes[id])
+  if (state.activeSnapshotId || !touched.length) return out
+  const place = (key: string, positions: Record<string, NodePosition>, view: DiagramView | undefined): void => {
+    if (!Object.keys(positions).length || touched.every((id) => id in positions)) return
+    const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
+    if (!touched.some((id) => !(id in positions) && (!shown || shown.has(id)))) return
+    const copy: Record<string, C4Node> = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { ...n }]))
+    // An element added into a parent the canvas has a place for keeps its
+    // place in it where that lies inside its frame there, clear of its
+    // siblings, as a move does (a child added into a container added just
+    // before stays where it was put in it).
+    let known = positions
+    if (added) {
+      applyPositions(copy, positions)
+      const canvas = modelCanvas(copy, shown)
+      for (const id of touched) {
+        const n = copy[id]
+        if (id in positions || !n.parentId || !(n.parentId in positions) || !canvas.shown(n) || !liesClearInParent(n, copy, canvas)) continue
+        if (known === positions) known = { ...positions }
+        known[id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+      }
+    }
+    if (!showCanvasPositions(copy, known, view, relations).length && known === positions) return
+    const next: Record<string, NodePosition> = {}
+    for (const n of Object.values(copy)) {
+      if (!(n.id in positions) && shown && !shown.has(n.id)) continue
+      const was = positions[n.id]
+      if (was && was.x === n.x && was.y === n.y && was.width === n.width && was.height === n.height) continue
+      next[n.id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+    }
+    if (Object.keys(next).length) out.set(key, next)
+  }
+  if (state.activeViewId !== null) place('', state.defaultPositions ?? {}, undefined)
+  for (const view of Object.values(state.views) as DiagramView[]) {
+    if (view.id === state.activeViewId || view.id === _firstLayoutOf || (view.kind ?? 'static') !== 'static') continue
+    place(view.id, view.positions ?? {}, view)
+  }
+  return out
+}
+
+/** Writes what placesOnOtherCanvases gave. Mutates `state` (inside immer set). */
+function writeOtherCanvases(state: DiagramStore, places: Map<string, Record<string, NodePosition>>): void {
+  for (const [key, next] of places) {
+    const positions = key === '' ? state.defaultPositions : state.views[key]?.positions
+    if (positions) Object.assign(positions, next)
+  }
 }
 
 /** The positions a canvas view opens with when it has none of its own (a
@@ -1290,7 +1420,7 @@ function showSlideView(
   const positions = firstCanvasPositions(view, state.defaultPositions as Record<string, NodePosition>, shown ? snapshotPositions(shown.nodes) : null)
     ?? view.positions as Record<string, NodePosition>
   if (!Object.keys(positions ?? {}).length) return []
-  return showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions, view, state.c4Relations as Record<string, C4Relation>)
+  return showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions, view, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
 }
 
 /**
@@ -3232,6 +3362,13 @@ export const useDiagramStore = create<DiagramStore>()(
       return [live as unknown as model.ModelState, typeId, milestones]
     }
 
+    /** Gives `ids` (added, or else moved) their places on the other canvases
+     *  (placesOnOtherCanvases). */
+    const _placeOnOtherCanvases = (ids: readonly string[], added = true): void => {
+      const places = placesOnOtherCanvases(get(), ids, added)
+      if (places.size) set((state) => { writeOtherCanvases(state as DiagramStore, places) })
+    }
+
     const _createNodeWithLinks = (draft: Omit<C4Node, 'id'>, links: WizardLink[]): string => {
       const node = _placeNewChild(draft)
       const refused = model.checkAddNode(get(), node)
@@ -3265,6 +3402,7 @@ export const useDiagramStore = create<DiagramStore>()(
         _insertWizardLinks(state, id, links)
       })
       if (node.parentId) get().fitParentToChildren(node.parentId)
+      _placeOnOtherCanvases([id])
       get()._sync()
       _liveLayout?.invalidate()
       return id
@@ -3490,6 +3628,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (node.parentId) {
           get().fitParentToChildren(node.parentId)
         }
+        _placeOnOtherCanvases([id])
         get()._sync()
         _liveLayout?.invalidate()
         return id
@@ -3522,6 +3661,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (ids.length === 0) return ids
         const parents = new Set(ids.map((id) => get().c4Nodes[id]?.parentId).filter((p): p is string => !!p))
         for (const parentId of parents) get().fitParentToChildren(parentId)
+        _placeOnOtherCanvases(ids)
         get()._sync()
         _liveLayout?.invalidate()
         return ids
@@ -4414,6 +4554,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // On the canvas shown (model.reparentNodes saw to the others).
         const shownNodes = settleMoveOnShownCanvas(get(), ids, oldParentId ? [oldParentId] : [])
         set((state) => { writeGeometry(state, shownNodes) })
+        // And on the others, where it lost its place.
+        _placeOnOtherCanvases(ids, false)
 
         get().setSelectedNodeIds(ids)
         get()._sync()
@@ -4487,7 +4629,7 @@ export const useDiagramStore = create<DiagramStore>()(
               : firstCanvasPositions(state.views[newId] as DiagramView | undefined, state.defaultPositions as Record<string, NodePosition>, null)
                 ?? state.views[newId]?.positions as Record<string, NodePosition> | undefined
             if (incoming && Object.keys(incoming).length > 0) {
-              placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView, state.c4Relations as Record<string, C4Relation>)
+              placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
             }
             state.activeViewId = newId
             if (incomingViewport) state.lowDetail = lowDetailAt(incomingViewport.zoom, state.lowDetail)
@@ -4545,7 +4687,7 @@ export const useDiagramStore = create<DiagramStore>()(
           }
 
           if (incoming) {
-            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView, state.c4Relations as Record<string, C4Relation>)
+            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
           }
 
           state.activeViewId = newId
@@ -4672,7 +4814,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           const view = state.activeViewId ? state.views[state.activeViewId] as DiagramView | undefined : undefined
           const positions = view ? view.positions : (_milestoneAllPositions ?? state.defaultPositions)
-          if (positions && Object.keys(positions).length > 0) showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions as Record<string, NodePosition>, view, state.c4Relations as Record<string, C4Relation>)
+          if (positions && Object.keys(positions).length > 0) showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions as Record<string, NodePosition>, view, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
         })
       },
 
@@ -4855,7 +4997,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const view = state.views[viewId] as DiagramView
           const first = firstCanvasPositions(view, state.defaultPositions as Record<string, NodePosition>, state.activeSnapshotId ? _milestoneAllPositions : null)
             ?? (!wasCanvas && kind === 'static' ? view.positions : undefined)
-          if (first) placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, first, view, state.c4Relations as Record<string, C4Relation>)
+          if (first) placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, first, view, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
         })
         get()._sync()
         // The live layout drops what it had of the canvas shown before (and,
