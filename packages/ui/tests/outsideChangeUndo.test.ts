@@ -178,6 +178,67 @@ describe('Undo after an outside change', () => {
     expect(lastNotice()).toMatch(/outside Studio.*Orders DB/)
   })
 
+  it('keeps an element the agent built on since its add, and says so (item 163)', () => {
+    s().setActiveView('one')
+    const id = s().addNode({ type: 'system', label: 'Shop', x: 1200, y: 0, ...NODE_SIZES.system, collapsed: false } as Omit<C4Node, 'id'>)
+    outsideChange((d) => {
+      d.nodes.push({ id: 'agent', type: 'container', label: 'Agent Container', parentId: id, collapsed: false, x: 40, y: 80, ...NODE_SIZES.container } as C4Node)
+      d.relations.push({ id: 'uses', sourceId: 'a', targetId: id, label: 'uses' })
+      d.views![0].nodeIds.push(id, 'agent')
+    })
+    s().undo()
+    expect(label(id)).toBe('Shop')
+    expect(label('agent')).toBe('Agent Container')
+    expect(s().c4Relations.uses).toBeDefined()
+    expect(s().views.one.nodeIds).toEqual(expect.arrayContaining([id, 'agent']))
+    expect(lastNotice()).toMatch(/outside Studio.*Shop/)
+    expect(lastNotice()).not.toMatch(/left out/)
+    s().redo()
+    expect(label('agent')).toBe('Agent Container')
+    expect(s().c4Relations.uses).toBeDefined()
+  })
+
+  it('a relation the agent drew to an added element keeps the element too (item 163)', () => {
+    const id = s().addNode({ type: 'system', label: 'Shop', x: 1200, y: 0, ...NODE_SIZES.system, collapsed: false } as Omit<C4Node, 'id'>)
+    outsideChange((d) => { d.relations.push({ id: 'uses', sourceId: id, targetId: 'b', label: 'uses' }) })
+    s().undo()
+    expect(label(id)).toBe('Shop')
+    expect(s().c4Relations.uses).toBeDefined()
+  })
+
+  it('a name typed while the agent writes is one step (item 164)', () => {
+    s().beginTyping()
+    for (const v of ['O', 'Or', 'Orders']) s().updateNode('a', { label: v })
+    outsideChange((d) => { d.nodes.find((n) => n.id === 'b')!.description = 'agent wrote' })
+    for (const v of ['Orders ', 'Orders A', 'Orders API']) s().updateNode('a', { label: v })
+    s().endTyping()
+    expect(label('a')).toBe('Orders API')
+    s().undo()
+    expect(label('a')).toBe('a')
+    expect(s().c4Nodes.b.description).toBe('agent wrote')
+    expect(s().canUndo).toBe(false)
+    s().redo()
+    expect(label('a')).toBe('Orders API')
+  })
+
+  it('takes back Keep in a row whole when the reload nudged the row (item 165)', () => {
+    s().setActiveView('one')
+    drag('b', { x: 900, y: 400 })
+    s().addAlignment('horizontal', ['a', 'b'])
+    const row = { a: at('a'), b: at('b') }
+    expect(row.a.y).toBe(row.b.y)
+    outsideChange((d) => {
+      // The reload's enforcement of the row moves it by a hair.
+      const p = d.views![0].positions!
+      p.a = { ...p.a, y: p.a.y + 0.04 }
+      p.b = { ...p.b, y: p.b.y + 0.04 }
+      d.nodes.find((n) => n.id === 'b')!.description = 'agent wrote'
+    })
+    s().undo()
+    expect(at('a')).toEqual({ x: 100, y: 100 })
+    expect(at('b')).toEqual({ x: 900, y: 400 })
+  })
+
   it('another model loaded still forgets the history', () => {
     s().updateNode('a', { label: 'Shop' })
     s().loadDiagram(model())

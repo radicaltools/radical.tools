@@ -214,6 +214,8 @@ function _historyRebased(now: HistoryEntry, stacks: HistoryItem[][] = [_undoStac
       const item = stack[i]
       if (isStepChange(item)) { next = item.to; continue }
       stack[i] = { from: next, to: item }
+      // What is typed after the change goes on the same step (_typing).
+      if (_typing?.step === item) _typing.step = stack[i]
       next = item
     }
   }
@@ -271,14 +273,70 @@ function _withoutStrays(parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' 
   return { parts: next, dropped }
 }
 
+/** What a step removes (an element `from` has) that was built on outside
+ *  Studio since: a child added into it, a relation added to it. It stays,
+ *  as it is in `now`, with its places on the views and its relations, and
+ *  so does what holds it. Undo of an add after the agent added a container
+ *  in it took the container away with it ("left out what needs an element
+ *  removed"), and Redo brought back the system alone. Returns the merged
+ *  model with them, and their names. */
+function _keptBuiltOn(from: DiagramData, now: DiagramData, merged: DiagramData): { merged: DiagramData; kept: string[] } {
+  const had = new Set(from.nodes.map((n) => n.id))
+  const hadRelation = new Set(from.relations.map((r) => r.id))
+  const nowNodes = new Map(now.nodes.map((n) => [n.id, n]))
+  const present = new Set(merged.nodes.map((n) => n.id))
+  const kept: C4Node[] = []
+  const keep = (id: string | undefined): void => {
+    while (id && !present.has(id) && had.has(id) && nowNodes.has(id)) {
+      const node = nowNodes.get(id)!
+      present.add(id)
+      kept.push(node)
+      id = node.parentId
+    }
+  }
+  for (const n of merged.nodes) if (!had.has(n.id)) keep(n.parentId)
+  for (const r of merged.relations) if (!hadRelation.has(r.id)) { keep(r.sourceId); keep(r.targetId) }
+  if (kept.length === 0) return { merged, kept: [] }
+  const keptIds = new Set(kept.map((n) => n.id))
+  const relations = [...merged.relations]
+  const mergedRelations = new Set(relations.map((r) => r.id))
+  for (const r of now.relations) {
+    if (mergedRelations.has(r.id) || !(keptIds.has(r.sourceId) || keptIds.has(r.targetId))) continue
+    if (present.has(r.sourceId) && present.has(r.targetId)) relations.push(r)
+  }
+  const nowViews = new Map((now.views ?? []).map((v) => [v.id, v]))
+  const views = (merged.views ?? []).map((v) => {
+    const there = nowViews.get(v.id)
+    const ids = there ? [...keptIds].filter((id) => there.nodeIds.includes(id) && !v.nodeIds.includes(id)) : []
+    const places = there ? [...keptIds].filter((id) => there.positions?.[id] && !v.positions?.[id]) : []
+    if (!ids.length && !places.length) return v
+    return {
+      ...v,
+      nodeIds: [...v.nodeIds, ...ids],
+      positions: { ...v.positions, ...Object.fromEntries(places.map((id) => [id, there!.positions![id]])) },
+    }
+  })
+  const defaultPositions = { ...merged.defaultPositions }
+  for (const id of keptIds) if (now.defaultPositions?.[id] && !defaultPositions[id]) defaultPositions[id] = now.defaultPositions[id]
+  return {
+    merged: { ...merged, nodes: [...merged.nodes, ...kept], relations, views, defaultPositions },
+    kept: kept.map((n) => n.label || n.id),
+  }
+}
+
 /** What the step `change` makes, made on the model `now`: a three-way merge
  *  from `change.from` (mergeModels). Where the model changed since in a
- *  value the step changes too, it stays as it is now (`conflicts`); what
+ *  value the step changes too, it stays as it is now (`conflicts`); what it
+ *  removes that was built on since stays too (`kept`, _keptBuiltOn); what
  *  the step brings back that has no place left in it does not come back
  *  (`dropped`, _withoutStrays). Shown on the canvas of `change.to`, as Undo
  *  goes back to its step's canvas. */
-function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[]; dropped: string[] } {
-  const { merged, conflicts } = mergeModels(_entryModel(change.from), _entryModel(change.to), _entryModel(now))
+function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[]; kept: string[]; dropped: string[] } {
+  const nowModel = _entryModel(now)
+  const fromModel = _entryModel(change.from)
+  const result = mergeModels(fromModel, _entryModel(change.to), nowModel)
+  const { conflicts } = result
+  const { merged, kept } = _keptBuiltOn(fromModel, nowModel, result.merged)
   const mergedNodes: Record<string, C4Node> = {}
   for (const n of merged.nodes) mergedNodes[n.id] = n
   const mergedRelations: Record<string, C4Relation> = {}
@@ -315,6 +373,7 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
       hubTemplates: (merged.hubTemplates ?? {}) as Record<string, HubImportRecord>,
     },
     conflicts,
+    kept,
     dropped,
   }
 }
@@ -446,9 +505,21 @@ function _pushUndoEntry(entry: HistoryEntry): void {
 let _typing: { key: string; step: HistoryItem | null } | null = null
 
 /** The undo step of an edit of `key` ("node:<id>:label"), unless it goes on
- *  what is being typed into a focused field (_typing). */
-function _pushTextEdit(store: DiagramStore, key: string): void {
-  if (_typing && _typing.key === key && _typing.step && _undoStack[_undoStack.length - 1] === _typing.step) return
+ *  what is being typed into a focused field (_typing). A step made before an
+ *  outside change (StepChange) that the typing goes on gets the edit
+ *  (`edit`) in the model it changes from: left out, Undo took what was typed
+ *  after an agent's write for a change made outside Studio and kept it
+ *  ("Orders", a write, " API": Undo gave "OrdersAPI"). */
+function _pushTextEdit(store: DiagramStore, key: string, edit: (state: model.ModelState) => void): void {
+  if (_typing && _typing.key === key && _typing.step && _undoStack[_undoStack.length - 1] === _typing.step) {
+    const step = _typing.step
+    if (isStepChange(step)) {
+      step.from = produce(step.from, (draft) => {
+        edit({ c4Nodes: draft.c4Nodes, c4Relations: draft.c4Relations, views: draft.views, metamodel: store.metamodel } as unknown as model.ModelState)
+      })
+    }
+    return
+  }
   store._pushUndo()
   if (_typing) _typing = { key, step: _undoStack[_undoStack.length - 1] ?? null }
 }
@@ -2389,11 +2460,14 @@ export const useDiagramStore = create<DiagramStore>()(
     // is made on the model as it is now (`now`), keeping that change.
     const _restoreHistoryItem = (item: HistoryItem, now: HistoryEntry, action: 'Undo' | 'Redo'): void => {
       if (!isStepChange(item)) { _restoreHistoryEntry(item); return }
-      const { entry, conflicts, dropped } = _rebasedEntry(item, now)
+      const { entry, conflicts, kept, dropped } = _rebasedEntry(item, now)
       _restoreHistoryEntry(entry)
       const list = (names: string[]): string => names.slice(0, 5).join('; ') + (names.length > 5 ? ` and ${names.length - 5} more` : '')
       if (conflicts.length) {
         get().pushNotification(`${action} kept what was changed outside Studio since that step: ${list(conflicts)}.`, 'info')
+      }
+      if (kept.length) {
+        get().pushNotification(`${action} kept what was built on outside Studio since that step: ${list(kept)}.`, 'info')
       }
       if (dropped.length) {
         get().pushNotification(`${action} left out what needs an element removed outside Studio since that step: ${list(dropped)}.`, 'info')
@@ -2783,7 +2857,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(refused, 'error')
           return
         }
-        _pushTextEdit(get(), `node:${id}:${keys.sort().join(',')}`)
+        _pushTextEdit(get(), `node:${id}:${keys.sort().join(',')}`, (state) => model.patchNode(state, id, updates))
         get()._markMilestoneEdit()
         set((state) => { keepingSharedViews(state as DiagramStore, () => model.patchNode(state, id, updates)) })
         get()._sync()
@@ -3181,7 +3255,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(refused, 'error')
           return
         }
-        _pushTextEdit(get(), `relation:${id}:${Object.keys(updates).sort().join(',')}`)
+        _pushTextEdit(get(), `relation:${id}:${Object.keys(updates).sort().join(',')}`, (state) => model.patchRelation(state, id, updates))
         get()._markMilestoneEdit()
         set((state) => { model.patchRelation(state, id, updates) })
         get()._sync()
