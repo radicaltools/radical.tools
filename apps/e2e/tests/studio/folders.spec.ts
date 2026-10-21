@@ -318,6 +318,48 @@ test('declining the prompt leaves a non-model folder untouched', async ({ page }
   expect(await folder.paths()).toEqual(['nodes/README.md'])
 })
 
+test('Move to a folder… into another model\'s folder asks before replacing it, and a yes leaves one entry for the folder', async ({ page, studio }) => {
+  // Orders moved into the folder E2E was kept in replaced E2E without a
+  // question, and both list entries opened Orders (item 235).
+  await saveAsFolder(page)
+  await expect.poll(async () => (await folder.files())['radical.md']).toContain('name: "E2E"')
+  await page.evaluate((data) => {
+    const idx = JSON.parse(localStorage.getItem('radical-docs-index')!)
+    idx.docs.push({ id: 'e2e-orders', name: 'Orders', source: 'ls', lastModified: 1 })
+    localStorage.setItem('radical-docs-index', JSON.stringify(idx))
+    localStorage.setItem('radical-doc:e2e-orders', data)
+  }, fixture('order-machine'))
+  await studio.open('v-order', 'designer', 'e2e-orders')
+  const moveOrders = async (): Promise<void> => {
+    await openModels(page)
+    await page.getByRole('button', { name: 'Actions for Orders' }).click()
+    await page.getByRole('menuitem', { name: 'Move to a folder…' }).click()
+  }
+  const models = page.getByRole('dialog', { name: 'Models' })
+  const question = (answer: 'accept' | 'dismiss') => page.waitForEvent('dialog').then(async (d) => {
+    expect(d.message()).toContain('holds the model "E2E"')
+    await d[answer]()
+  })
+
+  // No: nothing is written, and Orders stays in the browser.
+  let asked = question('dismiss')
+  await moveOrders()
+  await asked
+  await expect(models.locator('.docmgr-badge.ls')).toHaveCount(1)
+  await page.waitForTimeout(500)
+  expect((await folder.files())['radical.md']).toContain('name: "E2E"')
+  await models.getByRole('button', { name: 'Close' }).click()
+
+  // Yes: Orders replaces it, and the entry of E2E, whose folder it was, goes.
+  asked = question('accept')
+  await moveOrders()
+  await asked
+  await expect(models.locator('.docmgr-badge.md')).toHaveCount(1)
+  await expect(models.locator('.docmgr-badge.ls')).toHaveCount(0)
+  await expect(models.getByRole('button', { name: 'Actions for E2E' })).toHaveCount(0)
+  await expect.poll(async () => (await folder.files())['radical.md']).toContain('name: "Orders"')
+})
+
 test('Open → Folder… on the welcome screen opens a model folder', async ({ page, studio }) => {
   const files = serializeToMdFolder(JSON.parse(fixture('bookstore')), 'Bookstore')
   for (const [path, content] of Object.entries(files)) await folder.write(path, content)
@@ -344,6 +386,22 @@ test('New model on the welcome screen can keep the model in a folder', async ({ 
   await expect.poll(() => folder.paths()).toContain('metamodel.json')
   await openModels(page)
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
+  // A folder that holds a model already is not replaced without a question
+  // (item 235); a no writes nothing.
+  const files = serializeToMdFolder(JSON.parse(fixture('bookstore')), 'Bookstore')
+  for (const [path, content] of Object.entries(files)) await folder.write(path, content)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'New model' }).click()
+  await page.getByRole('radio', { name: /In a folder/ }).check()
+  const asked = page.waitForEvent('dialog').then(async (d) => {
+    expect(d.message()).toContain('holds the model "Bookstore"')
+    await d.dismiss()
+  })
+  await page.getByRole('button', { name: 'Choose folder and create' }).click()
+  await asked
+  await page.waitForTimeout(500)
+  expect((await folder.files())['radical.md']).toBe(files['radical.md'])
+  expect(Object.keys(await folder.files()).filter((p) => p.startsWith('nodes/')).sort()).toEqual(Object.keys(files).filter((p) => p.startsWith('nodes/')).sort())
   // The choice is remembered for the next new model.
   await page.goto('/')
   await page.getByRole('button', { name: 'New model' }).click()
