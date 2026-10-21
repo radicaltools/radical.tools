@@ -2587,8 +2587,31 @@ function _insertWizardLinks(state: model.ModelState, nodeId: string, links: Wiza
 
 // Counts the times the whole model was replaced (a document loaded, a new or
 // sample model started): what was computed for the model before is not for
-// the one after.
+// the one after. The model shown read again with a change made outside
+// Studio (an agent's write) is the same model: a layout computed meanwhile
+// is still for it (item 236), and takes the change in (layoutChangedMeanwhile).
 let _modelLoads = 0
+
+/** What changed in the model while a layout of `before` (the elements and
+ *  their parents when it started) ran: the elements added, and those moved
+ *  into another parent, which its result has no place for; they are placed
+ *  as new elements once it is applied (placeAddedDuringLayout, D11). An
+ *  element deleted meanwhile is left out of the result where it is applied. */
+function layoutChangedMeanwhile(before: Map<string, string | undefined>, nodes: Record<string, C4Node>): string[] {
+  return Object.values(nodes).filter((n) => !before.has(n.id) || before.get(n.id) !== n.parentId).map((n) => n.id)
+}
+
+/** The elements of `nodes` with their parents, for layoutChangedMeanwhile. */
+const parentsOf = (nodes: Record<string, C4Node>): Map<string, string | undefined> =>
+  new Map(Object.values(nodes).map((n) => [n.id, n.parentId]))
+
+/** `positions` less those of `ids`. */
+const positionsWithout = <T,>(positions: Record<string, T>, ids: string[]): Record<string, T> => {
+  if (!ids.length) return positions
+  const out = { ...positions }
+  for (const id of ids) delete out[id]
+  return out
+}
 
 /** The canvas a layout run was started on. Smart Layout and the tree layout
  *  take seconds on a large view, and the user can open another view, change
@@ -5209,6 +5232,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const target = layoutTarget(get())
+          const present = parentsOf(get().c4Nodes)
           const positions = await applyTreeLayout(input.nodes, input.relations)
           if (layoutTarget(get()) !== target) {
             layoutMissedItsCanvas(get().pushNotification)
@@ -5217,8 +5241,11 @@ export const useDiagramStore = create<DiagramStore>()(
           // One undo step for the whole layout. Viewer reverts positions on exit anyway.
           if (get().appMode === 'designer') get()._pushUndo()
           get()._milestoneViewEdit(get().activeViewId)
+          // Added or moved into another parent by an outside write meanwhile.
+          const added = layoutChangedMeanwhile(present, get().c4Nodes)
           set((state) => {
-            applyLayoutPositions(state.c4Nodes, positions, input)
+            applyLayoutPositions(state.c4Nodes, positionsWithout(positions, added), input)
+            if (added.length) placeAddedDuringLayout(state, added)
             // A container the refit grows past what ELK laid it out at lay
             // on its neighbour: siblings are parted, level by level.
             fitAndSeparateBottomUp(state.c4Nodes, input)
@@ -5287,7 +5314,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const target = layoutTarget(get())
-          const present = new Set(Object.keys(get().c4Nodes))
+          const present = parentsOf(get().c4Nodes)
           const result = await runSmartLayout(input.nodes, input.relations, get().metamodel as Metamodel | undefined, (progress) => {
             set((s) => { s.smartLayoutProgress = progress })
           }, { alignments: input.alignments, edgeStyle: model.edgeStyleOf(get(), get().activeViewId) })
@@ -5317,15 +5344,16 @@ export const useDiagramStore = create<DiagramStore>()(
           // exit anyway; a view's first layout is none (_firstLayoutOf).
           if (get().appMode === 'designer' && !firstOpen) get()._pushUndo()
           get()._milestoneViewEdit(get().activeViewId)
-          set((state) => {
-            applyLayoutPositions(state.c4Nodes, result.winner.positions, input)
-            unpinLaidOut(state, get().appMode)
-          })
           // Added while the layout ran: its drop point was a place in the
           // layout this one replaces (893 px from anything on 300
           // elements). It is placed as a new element here, in the layout's
-          // undo step (D11).
-          const added = Object.keys(get().c4Nodes).filter((id) => !present.has(id))
+          // undo step (D11); so is one an outside write moved into another
+          // parent meanwhile.
+          const added = layoutChangedMeanwhile(present, get().c4Nodes)
+          set((state) => {
+            applyLayoutPositions(state.c4Nodes, positionsWithout(result.winner.positions, added), input)
+            unpinLaidOut(state, get().appMode)
+          })
           if (added.length) set((state) => { placeAddedDuringLayout(state, added) })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
@@ -6947,7 +6975,7 @@ export const useDiagramStore = create<DiagramStore>()(
       loadDiagram(loaded, opts) {
         // A Hub concept file opened as a model: its template filled in.
         const data = conceptFileAsModel(loaded)
-        _modelLoads++
+        if (!opts?.outsideChange) _modelLoads++
         get().stopLiveLayout()
         // The history is Designer's live model's: a milestone shown, a slide
         // played or Viewer's model in the store is not the one it rebases on.

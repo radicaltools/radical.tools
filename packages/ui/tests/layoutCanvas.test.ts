@@ -69,6 +69,62 @@ describe('A layout and the canvas it was started on', () => {
     expect(places(['a', 'b', 'c', 'd'])).toEqual(loaded)
   }, 60_000)
 
+  it('is applied when an outside write reloaded the model shown while it ran: what it added is placed, what it deleted left out', async () => {
+    // An agent's update_node 300 ms into Smart Layout threw the whole layout
+    // away: the reload of its change counted as another model loaded (item 236).
+    const before = places(['a', 'b', 'c'])
+    useDiagramStore.setState({ notifications: [] })
+    const running = s().runSmartLayout()
+    const changed = model()
+    changed.nodes[0] = { ...changed.nodes[0], description: 'Changed by an agent' }
+    changed.nodes = changed.nodes.filter((n) => n.id !== 'd')
+    changed.relations = changed.relations.filter((r) => r.id !== 'cd')
+    changed.nodes.push({ id: 'e', type: 'system', label: 'e', collapsed: false, x: 9000, y: 9000, ...NODE_SIZES.system } as C4Node)
+    changed.relations.push({ id: 'ce', sourceId: 'c', targetId: 'e' })
+    s().loadDiagram(changed, { outsideChange: true })
+    await running
+    expect(s().notifications.some((n) => /was not applied/.test(n.message))).toBe(false)
+    expect(places(['a', 'b', 'c'])).not.toEqual(before)
+    expect(s().c4Nodes.a.description).toBe('Changed by an agent')
+    expect(s().c4Nodes.d).toBeUndefined()
+    // The element the write added is placed by what it relates to, clear of the rest.
+    const nodes = s().c4Nodes
+    const gap = (p: C4Node, q: C4Node) => Math.hypot(
+      Math.max(0, q.x - (p.x + p.width), p.x - (q.x + q.width)),
+      Math.max(0, q.y - (p.y + p.height), p.y - (q.y + q.height)))
+    expect(gap(nodes.e, nodes.c)).toBeLessThan(400)
+    for (const id of ['a', 'b', 'c']) expect(gap(nodes.e, nodes[id]), id).toBeGreaterThan(0)
+  }, 60_000)
+
+  it('places an element an outside write moved into another parent while it ran inside that parent, clear of its children', async () => {
+    const node = (id: string, type: string, x: number, y: number, parentId?: string): C4Node =>
+      ({ id, type, label: id, collapsed: false, x, y, ...NODE_SIZES[type as keyof typeof NODE_SIZES], ...(parentId ? { parentId } : {}) } as C4Node)
+    const nested = (): DiagramData => ({
+      nodes: [
+        node('s1', 'system', 0, 0), node('k1', 'container', 40, 60, 's1'), node('j1', 'container', 340, 60, 's1'),
+        node('s2', 'system', 3000, 0), node('k2', 'container', 40, 60, 's2'),
+      ],
+      relations: [{ id: 'r1', sourceId: 'k1', targetId: 'k2' }, { id: 'r2', sourceId: 'j1', targetId: 'k1' }],
+      views: [],
+    })
+    s().loadDiagram(nested())
+    useDiagramStore.setState({ notifications: [] })
+    const running = s().runSmartLayout()
+    const moved = nested()
+    moved.nodes = moved.nodes.map((n) => (n.id === 'k1' ? { ...n, parentId: 's2' } : n))
+    s().loadDiagram(moved, { outsideChange: true })
+    await running
+    expect(s().notifications.some((n) => /was not applied/.test(n.message))).toBe(false)
+    // A child's place is relative to its parent.
+    const { k1, k2, s2 } = s().c4Nodes
+    expect(k1.x).toBeGreaterThanOrEqual(0)
+    expect(k1.y).toBeGreaterThanOrEqual(0)
+    expect(k1.x + k1.width).toBeLessThanOrEqual(s2.width)
+    expect(k1.y + k1.height).toBeLessThanOrEqual(s2.height)
+    const clear = k1.x + k1.width <= k2.x || k2.x + k2.width <= k1.x || k1.y + k1.height <= k2.y || k2.y + k2.height <= k1.y
+    expect(clear).toBe(true)
+  }, 60_000)
+
   it('asks for a save at once in Designer, and for none in Viewer', async () => {
     let asked = 0
     const w = window as unknown as Record<string, unknown>
