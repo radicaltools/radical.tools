@@ -84,14 +84,24 @@ function sameApartFromLayout(a: unknown, b: unknown): boolean {
 const byIdArray = (v: unknown): v is Array<Plain & { id: string }> =>
   Array.isArray(v) && v.length > 0 && v.every((item) => isPlain(item) && typeof item.id === 'string')
 
-/** What a report calls an entry: its label or name, else its id. */
-function entryName(entry: Plain | undefined, id: string): string {
+/** What a report calls an entry: its label or name; a layout rule (a pin,
+ *  a row, a grid) by the elements in it; else its id. An Undo notice named
+ *  a pin by its id. */
+function entryName(entry: Plain | undefined, id: string, ctx: Ctx): string {
   const name = entry && (typeof entry.label === 'string' ? entry.label : typeof entry.name === 'string' ? entry.name : '')
-  return name || id
+  if (name) return name
+  if (entry && Array.isArray(entry.nodeIds) && typeof entry.type === 'string') {
+    const rule = entry.type === 'pin' ? 'pins' : entry.type === 'grid' ? 'grid' : entry.axis === 'vertical' ? 'column' : 'row'
+    const members = (entry.nodeIds as unknown[]).map((n) => ctx.labels.get(n as string) || String(n))
+    return `the ${rule} of ${members.slice(0, 4).join(', ')}${members.length > 4 ? ` and ${members.length - 4} more` : ''}`
+  }
+  return id
 }
 
 interface Ctx {
   conflicts: string[]
+  /** The elements' names, for a report (entryName). */
+  labels: Map<string, string>
 }
 
 /** `base`, `ours` and `theirs` of one value merged; `where` names it for a report. */
@@ -150,7 +160,7 @@ function mergeById(base: Plain[], ours: Plain[], theirs: Plain[], where: string[
   const ids = mergeOrder([...b.keys()], [...o.keys()], [...t.keys()], where, layout ? null : ctx)
   const out: Plain[] = []
   for (const id of ids) {
-    const name = entryName(t.get(id) ?? o.get(id) ?? b.get(id), id)
+    const name = entryName(t.get(id) ?? o.get(id) ?? b.get(id), id, ctx)
     // A list of entries is named by its parent; an entry by its name, the
     // folder's where both renamed it (the one the screen shows then).
     const value = merge3(b.get(id), o.get(id), t.get(id), [...where.slice(0, -1), name], ctx, layout)
@@ -298,7 +308,9 @@ function mergeOrder(base: string[], ours: string[], theirs: string[], where: str
 
 /** `ours` and `theirs`, both changed from `base`, merged (see above). */
 export function mergeModels(base: DiagramData, ours: DiagramData, theirs: DiagramData): ModelMergeResult {
-  const ctx: Ctx = { conflicts: [] }
+  const labels = new Map<string, string>()
+  for (const side of [base, ours, theirs]) for (const n of side.nodes ?? []) if (n.label) labels.set(n.id, n.label)
+  const ctx: Ctx = { conflicts: [], labels }
   const merged = merge3(base, ours, theirs, [], ctx, false) as DiagramData
   return { merged, conflicts: [...new Set(ctx.conflicts)] }
 }

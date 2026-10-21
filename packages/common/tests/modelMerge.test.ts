@@ -97,6 +97,24 @@ describe('mergeModels', () => {
     expect(mergeModels(base, theirs, ours).merged.views![0].positions).toEqual(ours.views![0].positions)
   })
 
+  it('names a pin, a row or a grid in a conflict by its elements, not its id', () => {
+    const withRules = clone(base)
+    withRules.defaultLayoutConstraints = [
+      { id: 'c0ffee', type: 'pin', nodeIds: ['shop'] },
+      { id: 'beef', type: 'align', axis: 'horizontal', nodeIds: ['shop', 'bank'] },
+    ]
+    const ours = clone(withRules)
+    ours.defaultLayoutConstraints = []
+    const theirs = clone(withRules)
+    theirs.defaultLayoutConstraints = [
+      { id: 'c0ffee', type: 'pin', nodeIds: ['shop', 'bank'], extra: 1 } as never,
+      { id: 'beef', type: 'align', axis: 'vertical', nodeIds: ['shop', 'bank'] },
+    ]
+    const { conflicts } = mergeModels(withRules, ours, theirs)
+    expect(conflicts.join(' ')).not.toMatch(/c0ffee|beef/)
+    expect(conflicts).toEqual(expect.arrayContaining(['the pins of Shop, Bank', 'the column of Shop, Bank']))
+  })
+
   it('takes the other side whole when only one changed', () => {
     const theirs = clone(base)
     theirs.nodes[0].label = 'Bookshop'
