@@ -185,6 +185,24 @@ describe('Undo after an outside change', () => {
   })
 })
 
+describe('an outside change while a sequence is open', () => {
+  beforeEach(() => {
+    s().setAppMode('designer')
+    s().loadDiagram(model())
+  })
+  afterEach(() => s().stopLiveLayout())
+
+  it('keeps the sequence card open, unless the sequence is gone', () => {
+    // An agent's write closed the sequence card.
+    const seq = s().addSequence('Checkout')
+    s().setActiveSequence(seq)
+    outsideChange((d) => { d.nodes.push(sys('c', 0, 600, { label: 'Courier' })) })
+    expect(s().activeSequenceId).toBe(seq)
+    outsideChange((d) => { d.sequences = [] })
+    expect(s().activeSequenceId).toBeNull()
+  })
+})
+
 describe('an outside change while a milestone is shown (item 126)', () => {
   beforeEach(() => {
     s().setAppMode('designer')

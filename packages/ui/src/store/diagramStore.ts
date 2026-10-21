@@ -6298,7 +6298,9 @@ export const useDiagramStore = create<DiagramStore>()(
           state.c4Nodes = nodes as any
           state.c4Relations = relations as any
           state.sequences = sequences as any
-          state.activeSequenceId = null
+          // An outside change keeps the sequence open, while it is there:
+          // an agent's write closed its card.
+          state.activeSequenceId = opts?.outsideChange && st.activeSequenceId && (sequences as Record<string, unknown>)[st.activeSequenceId] ? st.activeSequenceId : null
           state.views = views as any
           state.defaultPositions = defaultPos as any
           state.defaultViewport = defaultVP
