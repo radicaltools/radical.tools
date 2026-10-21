@@ -125,6 +125,50 @@ describe('mergeModels', () => {
     expect(dropped).toEqual([{ name: 'Bank', by: 'theirs', change: 'the relation Customer → Bank made to it' }])
   })
 
+  it('takes out of views and layout rules what one side added there of an element, relation or sequence the other deleted, either way round (item 252)', () => {
+    // Studio kept Shop and Bank in a row (or folded Shop, or listed it on a
+    // view) while the agent deleted Shop: the row, the fold and the entry
+    // stayed, saved so.
+    const b: DiagramData = {
+      ...clone(base),
+      relations: [rel('r1', 'user', 'shop', 'buys'), rel('r2', 'user', 'bank', 'pays')],
+      sequences: [{ id: 's', name: 'Order', relationIds: ['r1'] }],
+      views: [
+        { id: 'v1', name: 'Context', nodeIds: [], positions: { shop: { x: 0, y: 0, width: 200, height: 100 } } },
+        { id: 'v2', name: 'Order flow', kind: 'dynamic', nodeIds: ['user', 'shop'], positions: {} },
+      ],
+    }
+    const kept = clone(b)
+    kept.defaultLayoutConstraints = [{ id: 'row', type: 'align', axis: 'horizontal', nodeIds: ['shop', 'bank'] }, { id: 'pin', type: 'pin', nodeIds: ['shop'] }]
+    kept.views![0] = { ...kept.views![0], nodeIds: ['shop', 'bank', 'user'], collapsedNodeIds: ['shop'], hiddenRelationIds: ['r2'], layoutConstraints: [{ id: 'col', type: 'align', axis: 'vertical', nodeIds: ['shop', 'user'] }] }
+    kept.views![1].sequenceId = 's'
+    kept.views!.push({ id: 'v3', name: 'Shop', nodeIds: [], positions: {}, subject: 'shop' })
+    // Shop deleted with its relation, the relation Customer → Bank and the sequence too.
+    const deleted = clone(b)
+    deleted.nodes = deleted.nodes.filter((n) => n.id !== 'shop')
+    deleted.relations = []
+    deleted.sequences = []
+    deleted.views![1].nodeIds = ['user']
+    for (const [o, t] of [[kept, deleted], [deleted, kept]] as const) {
+      const { merged } = mergeModels(b, o, t)
+      expect(byId(merged.nodes, 'shop')).toBeUndefined()
+      expect(merged.defaultLayoutConstraints).toEqual([])
+      const context = byId(merged.views, 'v1')!
+      expect(context.nodeIds).toEqual(['bank', 'user'])
+      expect(context.collapsedNodeIds).toEqual([])
+      expect(context.hiddenRelationIds).toEqual([])
+      expect(context.layoutConstraints).toEqual([])
+      // Its places stay: they are the view's layout for every milestone.
+      expect(context.positions.shop).toBeDefined()
+      expect(byId(merged.views, 'v2')!.sequenceId).toBeUndefined()
+      // A view of the element goes with it.
+      expect(byId(merged.views, 'v3')).toBeUndefined()
+    }
+    // Neither side's own objects are changed.
+    expect(kept.views![0].collapsedNodeIds).toEqual(['shop'])
+    expect(kept.defaultLayoutConstraints![0].nodeIds).toEqual(['shop', 'bank'])
+  })
+
   it('keeps each backward step on its step when a dropped step goes before it', () => {
     const b = { ...clone(base), relations: [rel('r1', 'user', 'shop', 'buys'), rel('r2', 'shop', 'bank', 'charges')], sequences: [{ id: 's', name: 'Order', relationIds: ['r1', 'r2'] }] }
     const deleted = { ...clone(b), relations: [rel('r1', 'user', 'shop', 'buys')], sequences: [{ id: 's', name: 'Order', relationIds: ['r1'] }] }

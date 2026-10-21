@@ -295,8 +295,18 @@ function _entryModel(entry: HistoryEntry): DiagramData {
  *  element that is gone. A step brought them back on a model an outside
  *  change had taken their container or other end from (Undo of a delete
  *  after the agent deleted the API: "charges card" from no element). Taken
- *  out; returns the names of what was. */
-function _withoutStrays(parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' | 'views' | 'defaultLayoutConstraints'>): { parts: typeof parts; dropped: string[] } {
+ *  out; returns the names of what was. With them go the steps of every
+ *  relation gone, `gone.relations` too (deleted outside Studio since): Undo
+ *  of a relation's delete after the agent deleted its end brought its step
+ *  back without it (item 254). And what the step puts back on the views and
+ *  layout rules of the elements and relations in `gone` (a fold, a row, an
+ *  entry in a view's list, a hidden relation), unless a milestone is shown
+ *  (`inMilestone`): the views are the live model's then (keepingSharedViews). */
+function _withoutStrays(
+  parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' | 'views' | 'defaultLayoutConstraints' | 'sequences'>,
+  gone: { nodes: Set<string>; relations: Set<string> },
+  inMilestone: boolean,
+): { parts: typeof parts; dropped: string[] } {
   const dropped: string[] = []
   const next = produce(parts, (draft) => {
     const state = { ...draft, activeViewId: null } as unknown as model.ModelState
@@ -305,12 +315,22 @@ function _withoutStrays(parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' 
       dropped.push(node.label || node.id)
       model.deleteNode(state, node.id)
     }
+    const relations = new Set([...gone.relations].filter((id) => !state.c4Relations[id]))
     for (const [id, rel] of Object.entries(state.c4Relations)) {
       const ends = [state.c4Nodes[rel.sourceId], state.c4Nodes[rel.targetId]]
       if (ends.every(Boolean)) continue
       const end = ends.find(Boolean)
       dropped.push(rel.label || (end ? `a relation of ${end.label}` : 'a relation'))
       delete state.c4Relations[id]
+      relations.add(id)
+    }
+    model.forgetRelationsInSequences(state, relations)
+    if (!inMilestone) {
+      for (const view of Object.values(state.views)) {
+        if (view.hiddenRelationIds?.some((id) => relations.has(id))) view.hiddenRelationIds = view.hiddenRelationIds.filter((id) => !relations.has(id))
+      }
+      const nodes = new Set([...gone.nodes].filter((id) => !state.c4Nodes[id]))
+      if (nodes.size) model.forgetNodesInViews(state, nodes)
     }
     // Set anew, not changed in place (forgetNodesInViews).
     draft.defaultLayoutConstraints = state.defaultLayoutConstraints ?? []
@@ -394,10 +414,11 @@ function _keptBuiltOn(from: DiagramData, now: DiagramData, merged: DiagramData):
  *  the step brings back that has no place left in it does not come back
  *  (`dropped`, _withoutStrays). Shown on the canvas of `change.to`, as Undo
  *  goes back to its step's canvas. */
-function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[]; kept: string[]; dropped: string[]; notices: string[] } {
+function _rebasedEntry(change: StepChange, now: HistoryEntry, inMilestone = false): { entry: HistoryEntry; conflicts: string[]; kept: string[]; dropped: string[]; notices: string[] } {
   const nowModel = _entryModel(now)
   const fromModel = _entryModel(change.from)
-  const result = mergeModels(fromModel, _entryModel(change.to), nowModel, { keepParents: false })
+  const toModel = _entryModel(change.to)
+  const result = mergeModels(fromModel, toModel, nowModel, { keepParents: false })
   // What the step changes in an element deleted outside Studio since stays deleted.
   const conflicts = [...result.conflicts, ...result.dropped.filter((d) => d.by === 'ours').map((d) => d.name)]
   const notices = mergeNotices({ dropped: result.dropped.filter((d) => d.by === 'theirs') }, { ours: 'by the step', theirs: 'outside Studio' })
@@ -408,23 +429,32 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
   for (const r of merged.relations) mergedRelations[r.id] = r
   const mergedViews: Record<string, DiagramView> = {}
   for (const v of merged.views ?? []) mergedViews[v.id] = v
+  const sequencesIn: Record<string, DiagramSequence> = {}
+  for (const q of merged.sequences ?? []) sequencesIn[q.id] = q
+  // What a side had and the merge left out: deleted on one side.
+  const had = (of: (d: DiagramData) => Array<{ id: string }>, present: Record<string, unknown>) =>
+    new Set([fromModel, toModel, nowModel].flatMap((d) => of(d).map((e) => e.id)).filter((id) => !present[id]))
   const { parts, dropped } = _withoutStrays({
     c4Nodes: mergedNodes,
     c4Relations: mergedRelations,
     views: mergedViews,
     defaultLayoutConstraints: merged.defaultLayoutConstraints ?? [],
-  })
+    sequences: sequencesIn,
+  }, { nodes: had((d) => d.nodes, mergedNodes), relations: had((d) => d.relations, mergedRelations) }, inMilestone)
   const c4Nodes: Record<string, C4Node> = {}
   for (const n of Object.values(parts.c4Nodes)) c4Nodes[n.id] = { ...n }
   const c4Relations = parts.c4Relations
   const views = parts.views
-  const sequences: Record<string, DiagramSequence> = {}
-  for (const q of merged.sequences ?? []) sequences[q.id] = q
+  const sequences = parts.sequences ?? {}
   const defaultPositions = merged.defaultPositions ?? {}
   const activeViewId = change.to.activeViewId && views[change.to.activeViewId] ? change.to.activeViewId : null
   const view = activeViewId ? views[activeViewId] : undefined
   const positions = view ? view.positions ?? {} : defaultPositions
   if (Object.keys(positions).length > 0) showCanvasPositions(c4Nodes, positions, view, c4Relations)
+  // What the step puts back may meet what was placed outside Studio since,
+  // as a merge of unsaved edits does (Undo of Smart Layout after the agent
+  // grew Payment Provider): on All elements, room is made as on a load.
+  if (!activeViewId && !change.to.activeViewId) _settleOutsidePlaces(c4Nodes, change.to.c4Nodes)
   return {
     entry: {
       c4Nodes,
@@ -467,6 +497,73 @@ function _rebasedMilestones(change: StepChange, now: HistoryEntry): Pick<History
     list.splice(Math.min(i, list.length), 0, m)
   })
   return { snapshots: list, slideMilestones: { ...now.slideMilestones, ...change.to.slideMilestones } }
+}
+
+/** What a change read from outside Studio (an agent's write, merged with
+ *  the edits Studio had not written yet) placed on a sibling where Studio
+ *  has it (`was`, Studio's live model before the change, at All elements'
+ *  places), on All elements. Each side placed clear of what it had: a queue
+ *  dropped into Payment Provider in Studio and Orders DB moved into it by
+ *  the agent came to the same spot (item 264). By the rule for moves, the
+ *  one the change placed (added, moved into another parent or moved) keeps
+ *  its place where it lies clear, else goes beside its siblings, with room
+ *  made (settleMovedNodes); one the change grew where Studio has it (a
+ *  container the agent added into) has room made round it (makeRoomAround),
+ *  as an add makes it. Overlaps Studio had already stay. Mutates `nodes`
+ *  (copies); returns the ids moved. */
+function _settleOutsidePlaces(nodes: Record<string, C4Node>, was: Record<string, C4Node>): string[] {
+  const before = canvasBoxes(was)
+  const overlap = (a: CanvasBox, b: CanvasBox): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+  const sameParent = (a: C4Node, b: C4Node): boolean => (a.parentId ?? undefined) === (b.parentId ?? undefined)
+  const placed = (n: C4Node): boolean => {
+    const w = was[n.id]
+    return !w || !sameParent(w, n) || Math.abs(w.x - n.x) >= 0.5 || Math.abs(w.y - n.y) >= 0.5
+  }
+  const touched: string[] = []
+  const settled = new Set<string>()
+  let canvas = canvasBoxes(nodes)
+  const siblings = new Map<string, string[]>()
+  for (const n of Object.values(nodes)) {
+    if (!canvas.shown(n)) continue
+    const key = n.parentId ?? ''
+    siblings.set(key, [...(siblings.get(key) ?? []), n.id])
+  }
+  const pairs = [...siblings.values()].flatMap((group) => group.flatMap((aId, i) => group.slice(i + 1).map((bId) => [aId, bId] as const)))
+  for (const [aId, bId] of pairs) {
+    const a = nodes[aId], b = nodes[bId]
+    if (settled.has(aId) || settled.has(bId) || !sameParent(a, b)) continue
+    if (!overlap(canvas.boxOf(a), canvas.boxOf(b))) continue
+    const wa = was[aId], wb = was[bId]
+    if (wa && wb && sameParent(wa, wb) && before.shown(wa) && before.shown(wb) && overlap(before.boxOf(wa), before.boxOf(wb))) continue
+    const grew = (n: C4Node): boolean => {
+      const w = was[n.id]
+      if (!w || !sameParent(w, n)) return false
+      const now = canvas.boxOf(n), then = before.boxOf(w)
+      return now.w > then.w + 0.5 || now.h > then.h + 0.5
+    }
+    const [pa, pb, ga, gb] = [placed(a), placed(b), grew(a), grew(b)]
+    if (!pa && !pb && !ga && !gb) continue
+    // One the change grew where Studio has it: room is made round it.
+    const grown = !pb && gb ? b : !pa && ga ? a : undefined
+    if (grown) {
+      for (const [id, at] of Object.entries(makeRoomAround(grown.id, nodes, canvas))) {
+        nodes[id].x = at.x
+        nodes[id].y = at.y
+        touched.push(id)
+      }
+      // What was pushed may reach past the parent's frame: it fits again.
+      if (grown.parentId && nodes[grown.parentId]) touched.push(...growWithRoom(nodes, grown.parentId, canvasBoxes(nodes)))
+      settled.add(grown.id)
+      canvas = canvasBoxes(nodes)
+      continue
+    }
+    // The one the change placed; of two, the one Studio did not have.
+    const mover = pa && pb ? (wb ? a : b) : pa ? a : b
+    touched.push(mover.id, ...settleMovedNodes(nodes, [mover.id], canvas))
+    settled.add(mover.id)
+    canvas = canvasBoxes(nodes)
+  }
+  return [...new Set(touched)]
 }
 
 /** A milestone shown when the folder changed outside Studio (an agent's
@@ -3085,7 +3182,7 @@ export const useDiagramStore = create<DiagramStore>()(
     // is made on the model as it is now (`now`), keeping that change.
     const _restoreHistoryItem = (item: HistoryItem, now: HistoryEntry, action: 'Undo' | 'Redo'): void => {
       if (!isStepChange(item)) { _restoreHistoryEntry(item); return }
-      const { entry, conflicts, kept, dropped, notices } = _rebasedEntry(item, now)
+      const { entry, conflicts, kept, dropped, notices } = _rebasedEntry(item, now, !!get().activeSnapshotId)
       _restoreHistoryEntry(entry)
       const list = (names: string[]): string => names.slice(0, 5).join('; ') + (names.length > 5 ? ` and ${names.length - 5} more` : '')
       if (conflicts.length) {
@@ -3635,6 +3732,13 @@ export const useDiagramStore = create<DiagramStore>()(
           ? ((modelCollapsed && !(get().views[activeViewId]?.expandedNodeIds?.includes(id) ?? false))
               || (get().views[activeViewId]?.collapsedNodeIds?.includes(id) ?? false))
           : modelCollapsed
+        // An element the view shown does not draw (one an agent added,
+        // folded from the search or the Nodes tree) only changes the fold
+        // the view keeps: nothing on the canvas grows or shrinks. Laid out
+        // as drawn, the expand made room round a box the canvas has not
+        // got and threw (item 259).
+        const viewShown = activeViewId ? get().views[activeViewId] : undefined
+        const drawnHere = computeViewNodeSet(viewShown as any, get().c4Nodes, get().c4Relations)?.has(id) ?? true
         // Apply to model temporarily — layout helpers below (separateSiblings /
         // fitParentToChildren) query node.collapsed to compute effective sizes.
         set((state) => {
@@ -3651,7 +3755,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Seeding live cola with the correct absolute position prevents the
         // "teleport, then drift" jump that would occur if cola treated the
         // node as brand-new and spawned it at neighbours' average.
-        if (prevCollapsed) {
+        if (prevCollapsed && drawnHere) {
           const allNodes = get().c4Nodes
           const parent = allNodes[id]
           if (parent && isContainerType(parent.type)) {
@@ -3727,7 +3831,7 @@ export const useDiagramStore = create<DiagramStore>()(
               }
             }
           }
-        } else {
+        } else if (!prevCollapsed && drawnHere) {
           // Collapsing: shrink to the centre of the expanded box, the
           // reverse of an expand. The node turns from a cola group into a
           // leaf the layout has no position for, and a new leaf spawns among
@@ -3804,7 +3908,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Opening: the frame is the one its children need now. One added
         // while it was collapsed was not fit for (a collapsed container
         // keeps its size) and lay outside the frame it came back with.
-        if (prevCollapsed) {
+        if (prevCollapsed && drawnHere) {
           const openVcs = loopVcs ? new Set([...loopVcs].filter((nid) => nid !== id)) : undefined
           const untangled = untangleChildren(id, get().c4Nodes, loopViewFilter, openVcs, loopExpandedSet)
           if (Object.keys(untangled).length > 0) {
@@ -3822,7 +3926,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         // An expand makes room round what grew, level by level up the tree.
         const roomVcs = loopVcs ? new Set([...loopVcs].filter((nid) => nid !== id)) : undefined
-        let currentId: string | undefined = id
+        let currentId: string | undefined = drawnHere ? id : undefined
         while (currentId) {
           const overlapUpdates = prevCollapsed
             ? makeRoomAround(currentId, get().c4Nodes, canvasBoxes(get().c4Nodes, loopViewFilter, roomVcs, loopExpandedSet))
@@ -7286,6 +7390,11 @@ export const useDiagramStore = create<DiagramStore>()(
         // The history is Designer's live model's: a milestone shown, a slide
         // played or Viewer's model in the store is not the one it rebases on.
         const st = get()
+        // Studio's live model at All elements' places, for what the change
+        // placed on it (_settleOutsidePlaces).
+        const wasLive = opts?.outsideChange && (st.appMode === 'designer' || st.appMode === 'metamodel') && !st.presentationActive
+          ? (() => { const doc = st.saveDiagram(); return atDefaultPositions(doc.nodes, doc.defaultPositions) })()
+          : null
         // A milestone shown stays shown, with its edits (ShownMilestone).
         const shownBefore = opts?.outsideChange && st.activeSnapshotId && st.liveBackup ? st.snapshots.find((m) => m.id === st.activeSnapshotId) : undefined
         const shownMilestone: ShownMilestone | null = shownBefore ? {
@@ -7342,8 +7451,13 @@ export const useDiagramStore = create<DiagramStore>()(
           }
         } else if (opts?.outsideChange && designerShown && milestone && !st.presentationActive) {
           // The milestone's steps stay, unless it was changed too; the live
-          // model's, parked, make their change on it as it is now.
+          // model's, parked, make their change on it as it is now. So do
+          // the milestone's: they hold the views, the metamodel and the
+          // milestones, which are the live model's too, and put back whole,
+          // Undo took back what the change did to them (Web App's place on
+          // Containers after the agent moved it: item 262).
           if (milestone.changed) { _undoStack.length = 0; _redoStack.length = 0 }
+          else _historyRebased(_captureState(st))
           if (_liveHistory) {
             const live = st.liveBackup!
             _liveHistoryKeepsVisit(_sharedNow(st, live), [_liveHistory.undo, _liveHistory.redo])
@@ -7375,6 +7489,12 @@ export const useDiagramStore = create<DiagramStore>()(
           nodes = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { ...n }]))
           placedOnLoad = placeUnplaced(nodes, data.defaultPositions)
         }
+        let settledOnLoad: string[] = []
+        if (wasLive) {
+          nodes = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { ...n }]))
+          settledOnLoad = _settleOutsidePlaces(nodes, wasLive)
+          placedOnLoad = [...new Set([...placedOnLoad, ...settledOnLoad])]
+        }
         const relations: Record<string, C4Relation> = {}
         const views: Record<string, DiagramView> = {}
         const sequences: Record<string, DiagramSequence> = {}
@@ -7388,7 +7508,8 @@ export const useDiagramStore = create<DiagramStore>()(
         const presInit = buildPresentationsFromData(data.presentations, data.presentationSlides)
 
         // Restore per-view positions (backward compat: old files won't have them)
-        const defaultPos = data.defaultPositions ?? snapshotPositions(nodes)
+        const settledPos = settledOnLoad.length ? Object.fromEntries(Object.entries(snapshotPositions(nodes)).filter(([id]) => settledOnLoad.includes(id))) : {}
+        const defaultPos = data.defaultPositions ? { ...data.defaultPositions, ...settledPos } : snapshotPositions(nodes)
         const defaultVP: { x: number; y: number; zoom: number } | null = data.defaultViewport ?? null
 
         const activeDocId = documentBackend()?.getActiveId()

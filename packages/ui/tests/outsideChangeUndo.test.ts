@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
 import { deserializeFromMdFolder, serializeToMdFolder } from '@radical/common/formats/mdFolder'
+import { mergeModels } from '@radical/common/modelMerge'
 import { useDiagramStore } from '../src/store/diagramStore'
 
 const s = useDiagramStore.getState
@@ -176,6 +177,52 @@ describe('Undo after an outside change', () => {
     expect(Object.values(s().c4Relations)).toEqual([])
     expect(s().views.one.nodeIds).not.toContain(db)
     expect(lastNotice()).toMatch(/outside Studio.*Orders DB/)
+  })
+
+  it('brings back no step of a relation it leaves out (item 254)', () => {
+    // "browses and orders" deleted, the agent deleted Bookstore, Undo: no
+    // relation came back, but its step did, saved so.
+    s().addRelation({ sourceId: 'a', targetId: 'b', label: 'charges card' })
+    const rel = Object.keys(s().c4Relations)[0]
+    const seq = s().addSequence('Order')
+    s().toggleRelationInSequence(seq, rel)
+    s().removeRelation(rel)
+    expect(s().sequences[seq].relationIds).toEqual([])
+    outsideChange((d) => {
+      d.nodes = d.nodes.filter((n) => n.id !== 'a')
+      for (const v of d.views ?? []) v.nodeIds = v.nodeIds.filter((id) => id !== 'a')
+    })
+    s().undo()
+    expect(Object.values(s().c4Relations)).toEqual([])
+    expect(s().sequences[seq].relationIds).toEqual([])
+    expect(lastNotice()).toMatch(/outside Studio.*charges card/)
+  })
+
+  it('brings back no row, fold or hidden relation of what was removed outside Studio (item 254)', () => {
+    s().setActiveView('one')
+    s().addRelation({ sourceId: 'a', targetId: 'b', label: 'pays' })
+    const rel = Object.keys(s().c4Relations)[0]
+    s().addAlignment('horizontal', ['a', 'b'])
+    const row = s().views.one.layoutConstraints![0].id
+    s().toggleCollapse('a')
+    s().hideRelationFromView('one', rel)
+    // Undone after the agent removed A, these steps put back what they took.
+    s().removeLayoutConstraint([row])
+    s().toggleCollapse('a')
+    s().unhideRelationInView('one', rel)
+    outsideChange((d) => {
+      d.nodes = d.nodes.filter((n) => n.id !== 'a')
+      d.relations = []
+      for (const v of d.views ?? []) v.nodeIds = v.nodeIds.filter((id) => id !== 'a')
+    })
+    s().undo()
+    s().undo()
+    s().undo()
+    const view = s().views.one
+    expect(view.layoutConstraints ?? []).toEqual([])
+    expect(view.collapsedNodeIds ?? []).toEqual([])
+    expect(view.hiddenRelationIds ?? []).toEqual([])
+    expect(view.nodeIds).toEqual(['b'])
   })
 
   it('keeps an element the agent built on since its add, and says so (item 163)', () => {
@@ -355,6 +402,29 @@ describe('an outside change while a milestone is shown (item 126)', () => {
     expect(label('c')).toBe('Courier')
   })
 
+  it('takes back the milestone\'s steps and leaves the views as the change left them (item 262)', () => {
+    // The agent moved Web App into another system (its place on Containers
+    // dropped), a group added in the milestone, Undo: the live Containers
+    // view had Web App's old place again.
+    const m = s().createSnapshot('As-is')
+    s().selectMilestone(m)
+    s().updateNode('b', { label: 'Bank (as-is)' })
+    outsideChange((d) => {
+      const view = d.views![0]
+      delete view.positions.a
+      view.positions.b = { ...view.positions.b, x: 1200, y: 300 }
+    })
+    const views = () => structuredClone(s().saveDiagram().views)
+    const after = views()
+    expect(after![0].positions.a).toBeUndefined()
+    s().undo()
+    expect(label('b')).toBe('b')
+    expect(views()).toEqual(after)
+    s().redo()
+    expect(label('b')).toBe('Bank (as-is)')
+    expect(views()).toEqual(after)
+  })
+
   it('says so when the milestone with edits was deleted outside Studio', () => {
     const m = s().createSnapshot('As-is')
     s().selectMilestone(m)
@@ -363,5 +433,98 @@ describe('an outside change while a milestone is shown (item 126)', () => {
     expect(s().activeSnapshotId).toBeNull()
     expect(label('b')).toBe('b')
     expect(lastNotice()).toMatch(/As-is.*deleted outside Studio/)
+  })
+})
+
+describe('Studio\'s edits merged with an outside change (item 264)', () => {
+  // A queue dropped into Payment Provider, not saved yet, while the agent
+  // moved Orders DB into it: each placed clear of what it had, and the
+  // merge put both at (1140, 464.8).
+  beforeEach(() => {
+    s().setAppMode('designer')
+    s().loadDiagram({
+      nodes: [
+        sys('shop', 0, 0, { width: 600, height: 400 }),
+        { id: 'db', type: 'container', label: 'Orders DB', parentId: 'shop', collapsed: false, x: 40, y: 120, ...NODE_SIZES.container } as C4Node,
+        sys('pay', 800, 0, { width: 400, height: 400 }),
+        { id: 'gw', type: 'container', label: 'Gateway', parentId: 'pay', collapsed: false, x: 40, y: 120, ...NODE_SIZES.container } as C4Node,
+      ],
+      relations: [],
+    })
+  })
+  afterEach(() => s().stopLiveLayout())
+
+  const box = (id: string) => ({ ...s().c4Nodes[id], width: s().c4Nodes[id].width, height: s().c4Nodes[id].height })
+  const overlaps = (a: string, b: string) => {
+    const p = box(a), q = box(b)
+    return p.x < q.x + q.width && q.x < p.x + p.width && p.y < q.y + q.height && q.y < p.y + p.height
+  }
+
+  it('moves what the change placed clear of what Studio placed there, inside the parent', () => {
+    const base = throughFolder(structuredClone(s().saveDiagram()))
+    const queue = s().addNode({ type: 'container', label: 'Queue', parentId: 'pay', x: 40, y: 280, ...NODE_SIZES.container, collapsed: false } as Omit<C4Node, 'id'>)
+    const placed = { x: s().c4Nodes[queue].x, y: s().c4Nodes[queue].y }
+    const theirs = structuredClone(base)
+    const db = theirs.nodes.find((n) => n.id === 'db')!
+    Object.assign(db, { parentId: 'pay', x: placed.x, y: placed.y })
+    theirs.defaultPositions!.db = { x: placed.x, y: placed.y, width: db.width, height: db.height }
+    const { merged } = mergeModels(base, structuredClone(s().saveDiagram()), theirs)
+    s().loadDiagram(structuredClone(merged), { outsideChange: true })
+    expect(s().c4Nodes.db.parentId).toBe('pay')
+    // Studio's queue stays where it was dropped; Orders DB goes beside it.
+    expect({ x: s().c4Nodes[queue].x, y: s().c4Nodes[queue].y }).toEqual(placed)
+    expect(overlaps(queue, 'db')).toBe(false)
+    expect(overlaps('gw', 'db')).toBe(false)
+    const pay = box('pay'), d = box('db')
+    expect(d.x).toBeGreaterThanOrEqual(0)
+    expect(d.x + d.width).toBeLessThanOrEqual(pay.width)
+    expect(d.y + d.height).toBeLessThanOrEqual(pay.height)
+    expect(overlaps('shop', 'pay')).toBe(false)
+    // Saved so: All elements' places are the settled ones.
+    expect(s().saveDiagram().defaultPositions!.db).toMatchObject({ x: d.x, y: d.y })
+  })
+
+  it('makes room round what the change grew where Studio moved a neighbour next to it', () => {
+    // Smart Layout not saved yet, the agent adds a container into Payment
+    // Provider: the server grew it where the old layout had room, onto
+    // Bookstore where Smart Layout put it.
+    const base = throughFolder(structuredClone(s().saveDiagram()))
+    drag('shop', { x: 800, y: 450 })
+    const theirs = structuredClone(base)
+    theirs.nodes.push({ id: 'job', type: 'container', label: 'Job', parentId: 'pay', collapsed: false, x: 40, y: 400, ...NODE_SIZES.container } as C4Node)
+    theirs.defaultPositions!.job = { x: 40, y: 400, ...NODE_SIZES.container }
+    theirs.nodes.find((n) => n.id === 'pay')!.height = 600
+    theirs.defaultPositions!.pay = { ...theirs.defaultPositions!.pay, height: 600 }
+    const { merged } = mergeModels(base, structuredClone(s().saveDiagram()), theirs)
+    s().loadDiagram(structuredClone(merged), { outsideChange: true })
+    expect(s().c4Nodes.pay.height).toBe(600)
+    expect(overlaps('shop', 'pay')).toBe(false)
+  })
+
+  it('makes room on Undo where the step puts back an element where the change grew another', () => {
+    drag('shop', { x: 800, y: 450 })
+    drag('shop', { x: 0, y: 900 })
+    // The agent adds a container into Payment Provider, which grows down.
+    outsideFolderChange((d) => {
+      d.nodes.push({ id: 'job', type: 'container', label: 'Job', parentId: 'pay', collapsed: false, x: 40, y: 400, ...NODE_SIZES.container } as C4Node)
+      d.defaultPositions!.job = { x: 40, y: 400, ...NODE_SIZES.container }
+      d.nodes.find((n) => n.id === 'pay')!.height = 600
+      d.defaultPositions!.pay = { ...d.defaultPositions!.pay, height: 600 }
+    })
+    s().undo()
+    expect(at('shop').x).toBe(800)
+    expect(overlaps('shop', 'pay')).toBe(false)
+  })
+
+  it('leaves an overlap Studio had as it was', () => {
+    s().loadDiagram({ nodes: [sys('a', 0, 0), sys('b', 100, 50)], relations: [] })
+    const base = throughFolder(structuredClone(s().saveDiagram()))
+    s().updateNode('a', { label: 'Shop' })
+    const theirs = structuredClone(base)
+    theirs.nodes.find((n) => n.id === 'b')!.description = 'agent wrote'
+    const { merged } = mergeModels(base, structuredClone(s().saveDiagram()), theirs)
+    s().loadDiagram(structuredClone(merged), { outsideChange: true })
+    expect(at('a')).toEqual({ x: 0, y: 0 })
+    expect(at('b')).toEqual({ x: 100, y: 50 })
   })
 })

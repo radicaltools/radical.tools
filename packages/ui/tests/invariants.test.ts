@@ -721,6 +721,15 @@ const KNOWN: Known[] = [
     note: 'K9: Undo after an outside change brings back a sequence step whose relation it drops as a stray (new; sibling of items 127 and 234)',
   },
   {
+    // API moved into Payment Provider (API → Payment Provider "charges
+    // card", now a relation to its own container), then Smart Layout: 11
+    // "[ELK] Layout error … UnsupportedGraphException" on the console; the
+    // layout is applied all the same.
+    rule: 'noErrors',
+    match: (_t, v) => v.detail.includes('UnsupportedGraphException'),
+    note: 'K8: Smart Layout logs ELK errors for a relation between an element and its container (new)',
+  },
+  {
     // Nested model: Component 0.0.0, 0.0.1, 0.0.2, one row already, kept in
     // a row: System 0 grows 2440 → 3040 and moves 814 px left, Container
     // 0.0 754 px left, Component 0.0.2 ends 40 px outside Container 0.0.
@@ -755,6 +764,40 @@ const KNOWN: Known[] = [
     note: 'K14: folding and unfolding a system an agent added, with a view shown that does not draw it, throws (new)',
   },
   {
+    // Nested: Context open, milestone Early shown, a group dropped on the
+    // canvas: the saved live Context lists the new id (no such element in
+    // the live model or any milestone), and still does after Discard.
+    rule: 'references',
+    match: (t, v) => t.some((a) => a.a === 'openMilestone') && /nodeIds has missing/.test(v.detail),
+    note: 'K12: an element added in a milestone is listed in the live view it was added on, also after Discard (new; sibling of item 230)',
+  },
+  {
+    // A milestone shown, the agent adds a system (reloaded with the
+    // milestone kept), a group added in the milestone, Propagate: TypeError
+    // "Cannot perform 'ownKeys' on a proxy that has been revoked" in
+    // propagatedHubTemplates (diagramStore.ts).
+    rule: 'noErrors',
+    match: (_t, v) => v.detail.includes('propagatedHubTemplates'),
+    note: 'K13: Propagate throws after an agent write reloaded the milestone shown (new)',
+  },
+  {
+    // Views of the viewpoint System › containers made (one is of System 2),
+    // the milestone Early (no System 2) opened, Customer deleted, Undo: the
+    // view of System 2 loses its subject and its "within System 2" filter,
+    // shown and in the saved live views.
+    rule: 'undoRestores',
+    match: (_t, v) => /\.subject: /.test(v.detail),
+    note: 'K15: Undo in a milestone that lacks a view\'s element strips the view of its element and filter, in the live views too (new)',
+  },
+  {
+    // K15 the other way: a view of API's (Container › components), a
+    // milestone with API opened, API deleted there; Undo, then Redo: the
+    // view has lost its subject and its "within API" filter.
+    rule: 'redoRestores',
+    match: (_t, v) => /\.subject: /.test(v.detail),
+    note: 'K15b: Undo and Redo of a delete in a milestone strip a view of that element of its element and filter (new)',
+  },
+  {
     // Nested: the agent deletes Component 1.0.0; Container 2.2 folded;
     // Component 2.2.0 moved into Container 0.1: System 1 (nothing to do
     // with the move) moves (−325, −476), Container 1.0 shrinks 520 × 280 →
@@ -762,15 +805,6 @@ const KNOWN: Known[] = [
     rule: 'geometry',
     match: (t, v) => t.some((a) => a.a === 'agent') && !!v.facts?.outside,
     note: 'K16: after an agent deletes a child, the next local layout moves its container and leaves a sibling outside it (new; next to "Calm drags and pins" item 6, agent adds)',
-  },
-  {
-    // Bookstore: a milestone shown with edits; the agent moves Web App into
-    // another system (the facade drops its place on Containers); a group
-    // added in the milestone, Undo: the live Containers view has Web App's
-    // old place (30, 120) again.
-    rule: 'milestoneKeepsLive',
-    match: (t) => (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent'),
-    note: 'K17: Undo in a milestone after an agent\'s write takes back part of the write in the live views (new; sibling of item 36)',
   },
   {
     // Nested: Component 1.1.1 moved into Container 2.0, a view of the
@@ -783,18 +817,6 @@ const KNOWN: Known[] = [
     // (30, 120), over Container 0.1 and 0.2.
     match: (t, v) => /^on (?!live\|)/.test(v.detail) && t.some((a) => a.a === 'reparent' || a.a === 'collapse' || (a.a === 'agent' && a.kind === 'move')),
     note: 'K18: in a milestone, an element moved or folded since on live is drawn on a view by the live layout, onto its siblings (new)',
-  },
-  {
-    // A queue dropped into Payment Provider, not saved yet, while the agent
-    // moves Orders DB into it: the merge puts both at (1140, 464.8).
-    rule: 'geometry',
-    // Also when it shows only later: a component of System 0 dragged (System
-    // 0 grows, System 1 moves 21 px right), a milestone opened, the agent
-    // adds a container into System 1 (the server grows it and moves System 2
-    // from where System 1 was); back on live, System 1 overlaps System 2.
-    match: (t, v, resolved) => !!v.facts?.overlap && (/merged with unsaved edits/.test(resolved[resolved.length - 1] ?? '') ||
-      (['discard', 'view', 'reload', 'openMilestone'].includes(lastAction(t) ?? '') && resolved.some((r) => /merged with unsaved edits/.test(r)))),
-    note: 'K19: a merge puts what Studio and the agent each placed or moved on top of each other (new)',
   },
   {
     // Sample, All elements: Auth Service folded, a component dropped into
