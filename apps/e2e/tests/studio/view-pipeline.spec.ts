@@ -280,6 +280,22 @@ test('a matrix with a chain adds only a relation its cell shows, and never a cop
   expect(added?.relationType).toBe('derives')
 })
 
+test('a hierarchy drilled into an element its filter then leaves out shows the top, with no way up', async ({ page, studio }) => {
+  await studio.openSample('view-treemap')
+  await page.locator('.treemap-wrap rect[data-id="dom-banking"]').dblclick({ force: true })
+  await expect(page.locator('.tm-bc-item').last()).toHaveText('Banking Services')
+  await openFilter(page, 'Platform Hierarchy')
+  const steps = page.locator('.rp-pipeline')
+  await steps.getByRole('button', { name: '+ Start with' }).click()
+  await page.getByRole('menuitem', { name: /^Software System/ }).click()
+  // Only the systems are drawn: the breadcrumb names none of their insides.
+  await expect(page.locator('.tm-bc-item')).toHaveText(['All'])
+  await expect(page.locator('.tm-bc-back')).toHaveCount(0)
+  // The view keeps where it was drilled: without the filter it is there again.
+  await steps.getByRole('button', { name: 'Reset' }).click()
+  await expect(page.locator('.tm-bc-item').last()).toHaveText('Banking Services')
+})
+
 test('every kind of view follows its chain, again when the chain or the model changes', async ({ page, studio }) => {
   await studio.openSample()
   await openFilter(page, 'Requirements Traceability')
