@@ -1047,8 +1047,10 @@ function StructuralCanvas(): React.ReactElement {
       // A step's arrow to the next is no relation to select.
       if (edge.id.startsWith('flow:')) return
       const state = useDiagramStore.getState()
-      // If a sequence is being edited, toggle this relation and don't open properties
-      if (state.activeSequenceId && !edge.id.startsWith('virtual-')) {
+      // If a sequence is being edited, toggle this relation and don't open
+      // properties. Only Designer edits one: Viewer and Presenter show the
+      // sequence picked, and a click there selects the relation.
+      if (state.activeSequenceId && state.appMode === 'designer' && !state.presentationActive && !edge.id.startsWith('virtual-')) {
         state.toggleRelationInSequence(state.activeSequenceId, edge.id)
         return
       }
@@ -1300,11 +1302,13 @@ function StructuralCanvas(): React.ReactElement {
           pointerEvents: 'all',
           userSelect: 'none',
         }}>
-          Editing: {activeSequenceName ?? activeSequenceId} — click relations to add steps (remove via step list)
+          {isViewMode || presentationActive
+            ? <>Sequence: {activeSequenceName ?? activeSequenceId}</>
+            : <>Editing: {activeSequenceName ?? activeSequenceId} — click relations to add steps (remove via step list)</>}
           <button
             onClick={() => setActiveSequence(null)}
             style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '0 2px', fontSize: 13, lineHeight: 1, opacity: 0.85 }}
-            title="Stop editing"
+            title={isViewMode || presentationActive ? 'Close the sequence' : 'Stop editing'}
           >✕</button>
         </div>
       )}

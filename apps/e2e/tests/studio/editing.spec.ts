@@ -291,3 +291,58 @@ test('removing one of two steps of the same relation leaves the list as the sequ
   await expect.poll(async () => (JSON.parse(await studio.storedJson()) as { sequences: Array<{ relationIds: string[] }> }).sequences[0].relationIds)
     .toEqual(['r1', 'r3', 'r4', 'r2'])
 })
+
+type StoredSequences = { sequences: Array<{ relationIds: string[]; stepDescriptions?: Array<string | null> }> }
+
+test('a step note shows the note after Undo, and leaving it unchanged writes nothing', async ({ page, studio }) => {
+  // The note field was left to itself: after Undo it kept the undone text,
+  // and a click into it and out wrote that text back.
+  await studio.open('v-containers')
+  await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+  await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
+  const note = page.locator('.right-panel .seq-step input').first()
+  await expect(note).toHaveValue('submits the order')
+  await note.fill('EDITED NOTE')
+  await note.press('Enter')
+  const firstNote = async () => (JSON.parse(await studio.storedJson()) as StoredSequences).sequences[0].stepDescriptions?.[0]
+  await expect.poll(firstNote).toBe('EDITED NOTE')
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(firstNote).toBe('submits the order')
+  await expect(note).toHaveValue('submits the order')
+  await note.click()
+  await note.press('Tab')
+  await page.waitForTimeout(1200)
+  expect(await firstNote()).toBe('submits the order')
+  // Nothing was written: Undo still has the edit before it to take back,
+  // the first Redo puts the edited note back.
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await expect.poll(firstNote).toBe('EDITED NOTE')
+})
+
+for (const mode of ['viewer', 'presenter'] as const) {
+  test(`in ${mode}, a sequence picked is shown, and a click on a relation adds no step`, async ({ page, studio }) => {
+    // Picking one turned on "Editing", and a click on a relation added a
+    // step (never saved, gone back in Designer).
+    await studio.open('v-containers', mode)
+    await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+    await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
+    await expect(page.getByText(/Sequence: Place Order/)).toBeVisible()
+    await expect(page.getByText(/Editing: Place Order/)).toHaveCount(0)
+    await expect(page.locator('.lp-view-card', { hasText: 'Place Order' }).last()).not.toContainText(/editing/i)
+    if (mode === 'viewer') await expect(page.locator('.right-panel .seq-step')).toHaveCount(4)
+    const edge = page.locator('[data-testid="rf__edge-r3"] path.react-flow__edge-interaction').first()
+    const mid = await edge.evaluate((el) => {
+      const path = el as SVGPathElement
+      const p = path.getPointAtLength(path.getTotalLength() / 2)
+      const m = path.getScreenCTM()!
+      return { x: p.x * m.a + m.e, y: p.y * m.d + m.f }
+    })
+    // The relation's badge numbers its steps: 3, and 3,5 with one more.
+    const badges = page.locator('.react-flow__edgelabel-renderer')
+    await expect(badges.getByText('3', { exact: true })).toBeVisible()
+    await page.mouse.click(mid.x, mid.y)
+    await page.waitForTimeout(500)
+    await expect(badges.getByText('3,5', { exact: true })).toHaveCount(0)
+    await expect(badges.getByText('3', { exact: true })).toBeVisible()
+  })
+}
