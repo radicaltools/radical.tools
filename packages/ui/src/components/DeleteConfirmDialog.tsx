@@ -57,7 +57,7 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
             <div className="milestone-option-desc">
               Permanently delete from the model (and from every view that
               references it). Children of nodes are removed as well.
-              {steps > 0 && ` ${steps} ${steps === 1 ? 'step' : 'steps'} of sequences along their relations go with them.`}
+              {steps > 0 && (steps === 1 ? ' The sequence step along its relations goes too.' : ` ${steps} sequence steps along its relations go too.`)}
             </div>
           </button>
           <button

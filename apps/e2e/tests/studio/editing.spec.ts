@@ -294,6 +294,28 @@ test('removing one of two steps of the same relation leaves the list as the sequ
 
 type StoredSequences = { sequences: Array<{ relationIds: string[]; stepDescriptions?: Array<string | null> }> }
 
+test('deleting a relation takes its steps out of the sequence, says so first, and Undo puts them back', async ({ page, studio }) => {
+  // The step stayed: the flow numbered the steps left with gaps (D4).
+  await studio.open('v-containers')
+  const steps = async () => (JSON.parse(await studio.storedJson()) as StoredSequences).sequences[0].relationIds
+  expect(await steps()).toEqual(['r1', 'r2', 'r3', 'r4'])
+  const edge = page.locator('[data-testid="rf__edge-r3"] path.react-flow__edge-interaction').first()
+  const mid = await edge.evaluate((el) => {
+    const path = el as SVGPathElement
+    const p = path.getPointAtLength(path.getTotalLength() / 2)
+    const m = path.getScreenCTM()!
+    return { x: p.x * m.a + m.e, y: p.y * m.d + m.f }
+  })
+  await page.mouse.click(mid.x, mid.y)
+  await page.keyboard.press('Delete')
+  const prompt = page.locator('.milestone-modal-backdrop')
+  await expect(prompt).toContainText('The sequence step along its relations goes too.')
+  await prompt.getByRole('button', { name: /Remove from model/ }).click()
+  await expect.poll(steps).toEqual(['r1', 'r2', 'r4'])
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(steps).toEqual(['r1', 'r2', 'r3', 'r4'])
+})
+
 test('a step note shows the note after Undo, and leaving it unchanged writes nothing', async ({ page, studio }) => {
   // The note field was left to itself: after Undo it kept the undone text,
   // and a click into it and out wrote that text back.
