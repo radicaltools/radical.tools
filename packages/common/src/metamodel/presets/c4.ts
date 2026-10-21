@@ -134,7 +134,9 @@ export function builtInC4Metamodel(): Metamodel {
   //   initiator calls/uses/delivers-to a target.
   //   Forbids database → * (passive store, never initiates).
   const interactsPairs: RelationPair[] = [
-    // Person interacts with the system surface
+    // Person interacts with the system surface, and with other people (a
+    // customer asks the support staff: Structurizr models it)
+    { from: 'person', to: 'person' },
     { from: 'person', to: 'system' },
     { from: 'person', to: 'container' },
     { from: 'person', to: 'webapp' },
@@ -156,6 +158,9 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'container', to: 'database' },
     { from: 'container', to: 'webapp' },
     { from: 'container', to: 'queue' },
+    // …and calls a component of another container (a single-page app calls
+    // the API's controllers, as Structurizr models it)
+    { from: 'container', to: 'component' },
 
     // Web / UI container
     { from: 'webapp', to: 'person' },
@@ -164,6 +169,7 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'webapp', to: 'database' },
     { from: 'webapp', to: 'webapp' },
     { from: 'webapp', to: 'queue' },
+    { from: 'webapp', to: 'component' },
 
     // Queues fan out to consumers
     { from: 'queue', to: 'container' },

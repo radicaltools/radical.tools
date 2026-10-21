@@ -4,7 +4,7 @@
  * from the Hub's original (an element renamed since lost its new name), one
  * undo step per element, and Undo left the new values in the record.
  */
-import { it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node } from '@radical/common/c4'
 import { useDiagramStore } from '../src/store/diagramStore'
 
@@ -92,4 +92,86 @@ it('a milestone looked at in Viewer leaves Designer the live record', () => {
   s().setAppMode('designer')
   expect(s().hubTemplates.imp.paramValues.DAYS).toBe('15')
   expect(s().saveDiagram().hubTemplates?.imp.paramValues.DAYS).toBe('15')
+})
+
+describe('Apply on what was edited since the import', () => {
+  const load = () => s().loadDiagram({
+    nodes: [
+      node('adr', 'ADR-007 Orders on PostgreSQL', { type: 'adr', decision: 'Use PostgreSQL as the primary store.' }),
+      node('other', 'Keeps Oracle', { type: 'adr', decision: 'We moved to Oracle.' }),
+      node('a', 'Shop'), node('b', 'Search'),
+    ],
+    relations: [{ id: 'r', sourceId: 'a', targetId: 'b', label: 'search in 800 ms' }],
+    sequences: [{ id: 'flow', name: 'Shopper journey', relationIds: ['r'], stepDescriptions: ['results within 800 ms'] }],
+    hubTemplates: {
+      imp: {
+        conceptId: 'bp', conceptName: 'E-commerce',
+        templateParams: [{ key: 'DATABASE', label: 'Database', defaultValue: 'PostgreSQL' }, { key: 'P95', label: 'p95', defaultValue: '800' }] as never,
+        paramValues: { DATABASE: 'PostgreSQL', P95: '800' }, nodeIds: ['adr', 'other', 'a', 'b'],
+        originalNodes: {
+          adr: { label: 'ADR: {{DATABASE}} as primary data store', decision: 'Use {{DATABASE}} as the primary store.' },
+          other: { label: 'ADR: {{DATABASE}} too', decision: 'Use {{DATABASE}}.' },
+          a: { label: 'Shop' }, b: { label: 'Search' },
+        },
+        originalRelations: { r: { label: 'search in {{P95}} ms' } },
+        originalSequences: { flow: { stepDescriptions: ['results within {{P95}} ms'] } },
+      },
+    } as never,
+  })
+  const field = (id: string, key: string) => (s().c4Nodes[id] as unknown as Record<string, unknown>)[key]
+
+  // Item 196 and D7: a renamed element got its Hub label back.
+  it('replaces only the old value in the text as it is now, and leaves a text without it alone', () => {
+    load()
+    s().applyHubTemplate('imp', { DATABASE: 'MySQL', P95: '800' })
+    expect(s().c4Nodes.adr.label).toBe('ADR-007 Orders on MySQL')
+    expect(field('adr', 'decision')).toBe('Use MySQL as the primary store.')
+    expect(s().c4Nodes.other.label).toBe('Keeps Oracle')
+    expect(field('other', 'decision')).toBe('We moved to Oracle.')
+  })
+
+  // Item 194: the flow's step notes and the relation stayed at 800.
+  it('reaches the relations and the step notes of the flows, as one undo step', () => {
+    load()
+    s().applyHubTemplate('imp', { DATABASE: 'PostgreSQL', P95: '500' })
+    expect(s().c4Relations.r.label).toBe('search in 500 ms')
+    expect(s().sequences.flow.stepDescriptions).toEqual(['results within 500 ms'])
+    s().undo()
+    expect(s().c4Relations.r.label).toBe('search in 800 ms')
+    expect(s().sequences.flow.stepDescriptions).toEqual(['results within 800 ms'])
+  })
+
+  // D18: a value left blank takes the template's default.
+  it('gives a value left blank the template\'s default', () => {
+    load()
+    s().applyHubTemplate('imp', { DATABASE: 'MySQL', P95: '500' })
+    s().applyHubTemplate('imp', { DATABASE: '', P95: '500' })
+    expect(s().hubTemplates.imp.paramValues.DATABASE).toBe('PostgreSQL')
+    expect(s().c4Nodes.adr.label).toBe('ADR-007 Orders on PostgreSQL')
+  })
+})
+
+// Runs 35 to 44: a templated import made in a milestone and discarded left
+// its record behind (fixed with item 146; checked here).
+it('a templated import discarded in a milestone leaves no record', () => {
+  const snap = s().createSnapshot('As-is')
+  s().selectMilestone(snap)
+  s()._pushUndo()
+  s()._markMilestoneEdit()
+  s().upsertHubTemplate('imp2', { conceptId: 'x', conceptName: 'X', templateParams: [], paramValues: {}, nodeIds: [], originalNodes: {} })
+  s().discardMilestoneChanges()
+  expect(s().hubTemplates.imp2).toBeUndefined()
+})
+
+// Item 195: a concept file from the Hub's Download, opened as a model.
+it('a Hub concept file opens with its template filled and editable', () => {
+  s().loadDiagram({
+    hub: { id: 'req-x', category: 'requirement', name: 'API Response Time', description: '', tags: [], templateParams: [{ key: 'P95_MS', label: 'p95', defaultValue: '300' }] },
+    nodes: [node('r1', 'API Response Time', { action: 'respond within {{P95_MS}} ms' })],
+    relations: [],
+  } as never)
+  expect((s().c4Nodes.r1 as unknown as Record<string, unknown>).action).toBe('respond within 300 ms')
+  const [id] = Object.keys(s().hubTemplates)
+  s().applyHubTemplate(id, { P95_MS: '250' })
+  expect((s().c4Nodes.r1 as unknown as Record<string, unknown>).action).toBe('respond within 250 ms')
 })

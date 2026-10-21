@@ -6,8 +6,8 @@ import type { C4Node, C4Relation, C4ElementType, DiagramSequence } from '@radica
 import { NODE_SIZES } from '@radical/common/c4'
 import { isPlacementAllowed } from '@radical/common/metamodel'
 import { nodeTypeTheme } from '@radical/ui/types/hubTheme'
-import { conceptViewsToDiagram } from '@radical/common/hubViews'
-import { applyTemplateParams, templateKeysUsed } from '@radical/common/hubImport'
+import { conceptViewsToDiagram, uniqueName } from '@radical/common/hubViews'
+import { applyTemplateParams, resolveParamValues, templateKeysUsed, templateRecord } from '@radical/common/hubImport'
 import { freeSpotNear, placeBesideSiblings } from '@radical/layout/geometry'
 import { computeViewNodeSet } from '@radical/layout/viewInput'
 import { addToViewList } from '@radical/common/c4'
@@ -284,14 +284,12 @@ function applyTemplate(concept: HubConcept, values: Record<string, string>): Hub
   return applyTemplateParams(concept, values) as HubConcept
 }
 
-/** Apply each templateParam's own default (or hint) — used for concepts
- *  imported as a "related" tag-along rather than the primary import target,
- *  so their {{KEY}} tokens don't land in the model unresolved. */
+/** Apply each templateParam's own default — used for concepts imported as
+ *  a "related" tag-along rather than the primary import target, so their
+ *  {{KEY}} tokens don't land in the model unresolved. */
 function withDefaultParams(concept: HubConcept): HubConcept {
   if (!concept.templateParams?.length) return concept
-  const values: Record<string, string> = {}
-  for (const p of concept.templateParams) values[p.key] = p.defaultValue ?? p.hint ?? ''
-  return applyTemplate(concept, values)
+  return applyTemplate(concept, resolveParamValues(concept.templateParams))
 }
 
 /** One checkbox row for a referenced hub concept — shared by the blueprint
@@ -605,6 +603,9 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       // Sequences (dynamic flows) survive only if every step's relation was imported.
       const newSequences: Record<string, DiagramSequence> = {}
       const seqIdMap = new Map<string, string>()
+      // A concept imported twice: its flows and views get names of their
+      // own (" 2"), not those of the first import.
+      const takenSequenceNames = new Set(Object.values(store.sequences).map((x) => x.name))
       for (const raw of concept.sequences ?? []) {
         const ids = (raw.relationIds as string[] | undefined) ?? []
         const mapped = ids.map((id) => relIdMap.get(id))
@@ -613,7 +614,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         if (typeof raw.id === 'string') seqIdMap.set(raw.id, seqId)
         newSequences[seqId] = {
           id: seqId,
-          name: (raw.name as string) || concept.name,
+          name: uniqueName((raw.name as string) || concept.name, takenSequenceNames),
           relationIds: mapped as string[],
           stepDescriptions: raw.stepDescriptions as (string | undefined)[] | undefined,
         }
@@ -625,7 +626,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       const newViews = conceptViewsToDiagram(
         concept.views,
         { node: (id) => idMap.get(id), relation: (id) => relIdMap.get(id), sequence: (id) => seqIdMap.get(id) },
-        { newId: () => crypto.randomUUID(), namePrefix: concept.name, keepPositions: true },
+        { newId: () => crypto.randomUUID(), namePrefix: concept.name, keepPositions: true, takenNames: new Set(Object.values(store.views).map((v) => v.name)) },
       )
 
       store._pushUndo()
@@ -665,25 +666,9 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       // Persist hub template record so values can be reconfigured later.
       if (templateData && concept.templateParams?.length) {
         const importId = crypto.randomUUID()
-        const originalNodesMap: Record<string, Record<string, unknown>> = {}
-        const nodeParamsMap: Record<string, TemplateParam[]> = {}
-        for (const origNode of templateData.originalConcept.nodes) {
-          const newId = idMap.get(origNode.id as string)
-          if (newId) {
-            originalNodesMap[newId] = origNode as Record<string, unknown>
-            const perNodeParams = origNode.templateParams as TemplateParam[] | undefined
-            if (perNodeParams?.length) nodeParamsMap[newId] = perNodeParams
-          }
-        }
-        const record: HubImportRecord = {
-          conceptId: concept.id,
-          conceptName: concept.name,
-          templateParams: concept.templateParams,
-          paramValues: { ...templateData.paramValues },
-          nodeIds: Object.keys(newNodes),
-          originalNodes: originalNodesMap,
-          nodeParams: Object.keys(nodeParamsMap).length ? nodeParamsMap : undefined,
-        }
+        // The Hub's texts of the elements, relations and flows, so Apply
+        // can change their values later.
+        const record: HubImportRecord = templateRecord(templateData.originalConcept, templateData.paramValues, { node: idMap, relation: relIdMap, sequence: seqIdMap })
         store.upsertHubTemplate(importId, record)
       }
 
@@ -1300,9 +1285,11 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
                 style={S.importBtn}
                 onClick={() => {
                   const originalConcept = pendingConcept
-                  const resolved = applyTemplate(pendingConcept, paramValues)
+                  // A field left blank takes the template's default.
+                  const values = resolveParamValues(pendingConcept.templateParams, paramValues)
+                  const resolved = applyTemplate(pendingConcept, values)
                   setPendingConcept(null)
-                  handleImport(resolved, { originalConcept, paramValues: { ...paramValues } })
+                  handleImport(resolved, { originalConcept, paramValues: values })
                 }}
               >
                 Import

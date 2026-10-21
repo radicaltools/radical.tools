@@ -97,6 +97,12 @@ export interface HubImportRecord {
    * Positions (x/y/width/height) are excluded — they are user-managed.
    */
   originalNodes: Record<string, Record<string, unknown>>
+  /** Original template relations (label, technology) keyed by new relation
+   *  id, with their {{TOKEN}} placeholders. Older records have none. */
+  originalRelations?: Record<string, Record<string, unknown>>
+  /** Original template sequences (name, step notes) keyed by new sequence
+   *  id, with their {{TOKEN}} placeholders. Older records have none. */
+  originalSequences?: Record<string, { name?: string; stepDescriptions?: (string | undefined)[] }>
   /**
    * Per-node template params keyed by new node UUID.
    * Derived from node-level templateParams at import time.

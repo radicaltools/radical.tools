@@ -35,6 +35,7 @@ export function importHubConceptIntoDiagram(
     newId: () => crypto.randomUUID(),
     place: ({ width, height }) => ({ x: centerX - width / 2, y: centerY - height / 2 }),
     paramValues: opts?.paramValues,
+    takenNames: { views: Object.values(store.views).map((v) => v.name), sequences: Object.values(store.sequences).map((q) => q.name) },
   })
 
   store._pushUndo()

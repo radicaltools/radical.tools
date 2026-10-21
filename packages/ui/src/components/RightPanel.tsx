@@ -1912,6 +1912,10 @@ function HubTemplateSection({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Record<string, string>>(record.paramValues)
 
+  // Sync draft when record changes externally (e.g. after save/load). Before
+  // the return below: a hook after it ran on some renders and not others.
+  useEffect(() => { setDraft({ ...record.paramValues }) }, [importId, JSON.stringify(record.paramValues)]) // eslint-disable-line
+
   // If nodeParams map exists, use only this node's params (undefined = node has none).
   // Fall back to record.templateParams only when no per-node map was built (legacy records).
   const nodeSpecificParams = record.nodeParams
@@ -1919,9 +1923,6 @@ function HubTemplateSection({
     : record.templateParams
   // If this node has no params, render nothing.
   if (!nodeSpecificParams?.length) return null
-
-  // Sync draft when record changes externally (e.g. after save/load)
-  useEffect(() => { setDraft({ ...record.paramValues }) }, [importId, JSON.stringify(record.paramValues)]) // eslint-disable-line
 
   if (!editing) {
     return (
@@ -1959,10 +1960,12 @@ function HubTemplateSection({
         {nodeSpecificParams.map(p => (
           <div key={p.key} className="props-field">
             <label className="props-label">{p.label}</label>
-            {p.hint && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.hint}</span>}
+            {/* The hint is an example, never a value: a field left blank
+                takes the template's default. */}
             <input
               className="props-input"
               type={p.type === 'number' ? 'number' : 'text'}
+              placeholder={p.hint ?? ''}
               value={draft[p.key] ?? ''}
               onChange={e => setDraft(d => ({ ...d, [p.key]: e.target.value }))}
             />

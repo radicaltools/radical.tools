@@ -57,15 +57,15 @@ describe('moving a relation end via the store', () => {
     const node = (id: string, type: string) =>
       ({ id, type, label: id, description: '', x: 0, y: 0, width: 100, height: 60, collapsed: false })
     useDiagramStore.setState({
-      c4Nodes: { user: node('user', 'person'), admin: node('admin', 'person'), shop: node('shop', 'system') },
+      c4Nodes: { user: node('user', 'person'), store: node('store', 'database'), shop: node('shop', 'system') },
       c4Relations: { uses: { id: 'uses', sourceId: 'user', targetId: 'shop', relationType: 'interacts' } },
       notifications: [],
     } as any)
 
-    useDiagramStore.getState().updateRelation('uses', { targetId: 'admin' })
+    useDiagramStore.getState().updateRelation('uses', { sourceId: 'store' })
 
     const after = useDiagramStore.getState()
     expect(after.c4Relations.uses.targetId).toBe('shop')
-    expect(after.notifications[after.notifications.length - 1]?.message).toMatch(/Relation not allowed: Person → Person/)
+    expect(after.notifications[after.notifications.length - 1]?.message).toMatch(/Relation not allowed: Database → Software System/)
   })
 })

@@ -58,6 +58,7 @@ import { pipelineOf, viewDrawnIds } from '@radical/common/viewPipeline'
 import { mergeModels, mergeNotices, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
+import { conceptFileAsModel, resolveParamValues, retemplateText } from '@radical/common/hubImport'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
@@ -739,10 +740,28 @@ function suggestSmartLayoutIfUnarranged(loaded = false): void {
  *  replacing the live model: it lays out the view on screen itself, after. */
 let _arrangeOnLeavingMilestone = true
 
+/** True when the elements have no places at all: each one at the same
+ *  point as its siblings (a Structurizr import puts them all at 0,0). No
+ *  picture to keep, unlike one that only looks unarranged. */
+function hasNoPlaces(nodes: Record<string, C4Node>): boolean {
+  const list = Object.values(nodes)
+  if (list.length < 2) return false
+  const first = new Map<string, C4Node>()
+  for (const n of list) {
+    const key = n.parentId ?? ''
+    const sibling = first.get(key)
+    if (!sibling) first.set(key, n)
+    else if (sibling.x !== n.x || sibling.y !== n.y) return false
+  }
+  return true
+}
+
 /** On opening a view: a view of a viewpoint never laid out (no positions
  *  of its own), one of a group of views per element among them, gets Smart
- *  Layout at once, in the designer on the live model; another canvas that
- *  looks unarranged gets the notice. Until then it shows All elements'
+ *  Layout at once, in the designer on the live model; so does a canvas never
+ *  laid out whose elements have no places at all (an imported Structurizr
+ *  view). Another canvas that looks
+ *  unarranged gets the notice. Until then it shows All elements'
  *  places (firstCanvasPositions). With a milestone shown the layout would be
  *  an edit of the milestone and is not kept in the view: the view is laid
  *  out back on live (called again when the milestone is left with it on
@@ -750,7 +769,10 @@ let _arrangeOnLeavingMilestone = true
 function arrangeOnFirstOpen(): void {
   const s = useDiagramStore.getState()
   const view = s.activeViewId ? s.views[s.activeViewId] : undefined
-  if ((view?.partOf || view?.viewpoint) && s.appMode === 'designer' && !s.activeSnapshotId && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) {
+  const neverLaidOut = !!view && s.appMode === 'designer' && !s.activeSnapshotId && !Object.keys(view.positions ?? {}).length
+  const viewpointView = neverLaidOut && !!(view.partOf || view.viewpoint) && (view.kind ?? 'static') === 'static'
+  const placeless = neverLaidOut && ((view.kind ?? 'static') === 'static' || view.kind === 'dynamic') && hasNoPlaces(s.c4Nodes)
+  if (view && (viewpointView || placeless)) {
     if (_firstLayoutOf === view.id && s.isLayoutRunning) return
     _firstLayoutOf = view.id
     void s.runSmartLayout()
@@ -6187,24 +6209,43 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       // ── Hub import templates ────────────────────────────────────────────
-      applyHubTemplate(id, values) {
+      applyHubTemplate(id, given) {
         const record = get().hubTemplates[id] as HubImportRecord | undefined
         if (!record) return
-        const subst = (text: string): string => text.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_m, key: string) => values[key] ?? `{{${key}}}`)
+        // A value left blank takes the template's default.
+        const values = resolveParamValues(record.templateParams, given)
+        const redo = (current: unknown, original: string): string =>
+          retemplateText(typeof current === 'string' ? current : '', original, record.paramValues, values)
         _asOneStep(() => {
           get()._pushUndo()
           // In a milestone: an edit of it, kept or dropped as the question
           // after it says (the record with it).
           get()._markMilestoneEdit()
           set((state) => {
-            // Only the fields the Hub's text gave a parameter: the others may
-            // have been edited since (a rename was lost to "Apply").
+            // Only the fields the Hub's text gave a parameter, and in them
+            // only the old value: the rest may have been edited since (a
+            // rename was lost to "Apply").
             for (const [nodeId, original] of Object.entries(record.originalNodes)) {
               const n = state.c4Nodes[nodeId] as unknown as Record<string, unknown> | undefined
               if (!n) continue
               for (const [key, value] of Object.entries(original)) {
-                if (typeof value === 'string' && /\{\{[A-Z0-9_]+\}\}/.test(value)) n[key] = subst(value)
+                if (typeof value === 'string' && /\{\{[A-Z0-9_]+\}\}/.test(value)) n[key] = redo(n[key], value)
               }
+            }
+            // The relations' texts and the flows' names and step notes too.
+            for (const [relId, original] of Object.entries(record.originalRelations ?? {})) {
+              const r = state.c4Relations[relId] as unknown as Record<string, unknown> | undefined
+              if (!r) continue
+              for (const [key, value] of Object.entries(original)) if (typeof value === 'string') r[key] = redo(r[key], value)
+            }
+            for (const [seqId, original] of Object.entries(record.originalSequences ?? {})) {
+              const seq = state.sequences[seqId]
+              if (!seq) continue
+              if (original.name) seq.name = redo(seq.name, original.name)
+              original.stepDescriptions?.forEach((note, i) => {
+                if (typeof note !== 'string' || !seq.stepDescriptions) return
+                seq.stepDescriptions[i] = redo(seq.stepDescriptions[i], note)
+              })
             }
             ;(state.hubTemplates as Record<string, HubImportRecord>)[id] = { ...record, paramValues: { ...values } }
             state.canUndo = _undoStack.length > 0
@@ -6641,7 +6682,9 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       // ── I/O ─────────────────────────────────────────────────────────────
-      loadDiagram(data, opts) {
+      loadDiagram(loaded, opts) {
+        // A Hub concept file opened as a model: its template filled in.
+        const data = conceptFileAsModel(loaded)
         _modelLoads++
         get().stopLiveLayout()
         // The history is Designer's live model's: a milestone shown, a slide
