@@ -135,6 +135,25 @@ describe('mergeModels: order and id lists', () => {
   })
 })
 
+describe('mergeModels: milestones made on both sides', () => {
+  // The milestone of the side that was not the folder went first, whenever
+  // it was made: the user's "v2", made before the agent's, became "v3".
+  const ms = (id: string, name: string, timestamp: number) => ({ id, name, timestamp, nodes: {}, relations: {} })
+  it('stand in the order they were made', () => {
+    const b = { ...clone(base), snapshots: [ms('m1', 'v1', 100)] }
+    const user = { ...clone(b), snapshots: [...b.snapshots, ms('m2', 'Studio', 200)] }
+    const agent = { ...clone(b), snapshots: [...b.snapshots, ms('m3', 'Agent', 300)] }
+    expect(mergeModels(b, agent, user).merged.snapshots!.map((m) => m.name)).toEqual(['v1', 'Studio', 'Agent'])
+    expect(mergeModels(b, user, agent).merged.snapshots!.map((m) => m.name)).toEqual(['v1', 'Studio', 'Agent'])
+  })
+  it('keep a milestone saved as new right after the one it was made from', () => {
+    const b = { ...clone(base), snapshots: [ms('m1', 'v1', 100), ms('m2', 'v2', 200)] }
+    const user = { ...clone(b), snapshots: [b.snapshots[0], ms('m4', 'v1 (edited)', 900), b.snapshots[1]] }
+    const agent = { ...clone(b), snapshots: [...b.snapshots, ms('m3', 'Agent', 300)] }
+    expect(mergeModels(b, agent, user).merged.snapshots!.map((m) => m.name)).toEqual(['v1', 'v1 (edited)', 'v2', 'Agent'])
+  })
+})
+
 describe('mergeModels: a sequence\'s steps and notes', () => {
   // The steps (relationIds) and their notes (stepDescriptions) merged apart:
   // Studio removed step 1 while an agent changed note 3, and the merge put
