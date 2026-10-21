@@ -3799,7 +3799,14 @@ export const useDiagramStore = create<DiagramStore>()(
           }
         })
         get()._sync()
-        if (placed) _liveLayout?.reset(placed)
+        // A row or column through what it leaves holds now, as a reload
+        // would draw it: a container left without children is drawn at its
+        // folded size, and its middle left the line.
+        let snapped = false
+        const input = layoutInputForView(get())
+        if (input.alignments.length) set((state) => { snapped = applyAlignments(state.c4Nodes, input) })
+        if (snapped) get()._sync()
+        if (placed || snapped) _liveLayout?.reset(placed ?? [])
         else _liveLayout?.invalidate()
       },
 
@@ -3979,8 +3986,15 @@ export const useDiagramStore = create<DiagramStore>()(
           const allNodes = get().c4Nodes
           const node = allNodes[id]
           if (node && isContainerType(node.type)) {
-            const dx = Math.max(0, ((node.width ?? 0) - COLLAPSED_WIDTH[node.type]) / 2)
-            const dy = Math.max(0, ((node.height ?? 0) - COLLAPSED_HEIGHT[node.type]) / 2)
+            // One the canvas shows without children (it has none, or the
+            // view draws none of them) is drawn at the folded size already:
+            // it stays where it is. Shrunk from its model size, it moved by
+            // half the difference on every fold.
+            const shownView = activeViewId ? get().views[activeViewId] : undefined
+            const shownHere = shownView ? computeViewNodeSet(shownView as any, allNodes, get().c4Relations) : undefined
+            const drawnOpen = Object.values(allNodes).some((c) => c.parentId === id && (!shownHere || shownHere.has(c.id)))
+            const dx = drawnOpen ? Math.max(0, ((node.width ?? 0) - COLLAPSED_WIDTH[node.type]) / 2) : 0
+            const dy = drawnOpen ? Math.max(0, ((node.height ?? 0) - COLLAPSED_HEIGHT[node.type]) / 2) : 0
             if (dx > 0 || dy > 0) {
               set((state) => {
                 const n = state.c4Nodes[id]
@@ -4126,19 +4140,19 @@ export const useDiagramStore = create<DiagramStore>()(
           })
         }
 
-        if (prevCollapsed) {
-          // Children kept in a row or column while it was collapsed line up
-          // now: the physics, which held them on their line, takes this
-          // result as it is.
-          const input = layoutInputForView(get())
-          if (input.alignments.length) {
-            let snapped = false
-            set((state) => { snapped = applyAlignments(state.c4Nodes, input) })
-            if (snapped) get()._resizeParentsBottomUp(input.viewFilter, input.viewCollapsedSet, input.expandedSet)
-          }
+        // Children kept in a row or column while it was collapsed line up
+        // now: the physics, which held them on their line, takes this
+        // result as it is. A fold too: the parent it shrinks may be on a
+        // line, which then ran off it until the next load snapped it and
+        // refit every container.
+        let snapped = false
+        const input = layoutInputForView(get())
+        if (input.alignments.length) {
+          set((state) => { snapped = applyAlignments(state.c4Nodes, input) })
+          if (snapped) get()._resizeParentsBottomUp(input.viewFilter, input.viewCollapsedSet, input.expandedSet)
         }
         get()._sync()
-        if (prevCollapsed) _liveLayout?.reset()
+        if (prevCollapsed || snapped) _liveLayout?.reset()
         else _liveLayout?.invalidate()
         // Smart fit frames the result as soon as the canvas shows it, not on
         // its next 300 ms tick. React Flow takes the new nodes in an effect,
@@ -4765,6 +4779,13 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._milestoneViewEdit(viewId)
         set((state) => { hide(state.views[viewId] as DiagramView) })
         get()._sync()
+        // A container whose children it hid is drawn at its folded size: a
+        // row or column through it holds again, as a reload would draw it,
+        // and the physics takes the canvas as it is now.
+        if (viewId === get().activeViewId) {
+          get()._enforceLayoutConstraints()
+          _liveLayout?.reset()
+        }
       },
       setViewNodes(viewId, nodeIds) {
         if (!get().views[viewId]) return
