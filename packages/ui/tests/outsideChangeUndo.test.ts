@@ -221,6 +221,10 @@ describe('an outside change while a milestone is shown (item 126)', () => {
     expect(label('c')).toBe('Courier')
     expect(label('b')).toBe('b')
     expect(s().snapshots.find((x) => x.name === 'As-is 2')?.nodes.b.label).toBe('Bank (as-is)')
+    // Making the milestone was a step of its own.
+    s().undo()
+    expect(s().snapshots.map((x) => x.name)).toEqual(['As-is 2'])
+    expect(label('a')).toBe('Shop')
     s().undo()
     expect(label('a')).toBe('a')
     expect(label('c')).toBe('Courier')

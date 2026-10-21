@@ -281,7 +281,10 @@ export function TableView(): React.ReactElement {
           className="tv-cell-input"
           value={editCell.draft}
           onChange={(e) => setEditCell({ ...editCell, draft: e.target.value })}
-          onBlur={commitEdit}
+          // The question how to save a milestone, opened by its first edit
+          // (this element added), takes the focus while it is answered and
+          // gives it back: the name stays open, as in the Warnier view.
+          onBlur={() => { if (!useDiagramStore.getState().milestonePromptOpen) commitEdit() }}
           onKeyDown={(e) => {
             if (e.key === 'Escape') cancelEdit()
             if (e.key === 'Enter') commitEdit()

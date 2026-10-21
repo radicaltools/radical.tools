@@ -201,6 +201,41 @@ describe('removeSnapshot', () => {
     expect(s.snapshots.find((x: any) => x.id === 'snap-2')).toBeUndefined()
   })
 
+  // It asked nothing, could not be undone, and the slides that showed it
+  // kept its id: a "?" tag, "Milestone: undefined", and the live model.
+  it('is an undo step, and unlinks the slides that showed it until it is undone', () => {
+    useDiagramStore.setState({
+      presentations: [{ id: 'p', name: 'P', slides: [{ id: 's1', name: 'S1', snapshotId: 'snap-2', viewport: { x: 0, y: 0, zoom: 1 } }, { id: 's2', name: 'S2', snapshotId: null, viewport: { x: 0, y: 0, zoom: 1 } }] }],
+      activePresentationId: 'p',
+    } as any)
+    useDiagramStore.setState((s: any) => { s.presentationSlides = s.presentations[0].slides; return s })
+    const names = () => useDiagramStore.getState().snapshots.map((m) => m.name)
+    const before = names()
+    useDiagramStore.getState().removeSnapshot('snap-2')
+    expect(useDiagramStore.getState().canUndo).toBe(true)
+    expect(useDiagramStore.getState().presentations[0].slides[0].snapshotId).toBeNull()
+    expect(useDiagramStore.getState().presentationSlides[0].snapshotId).toBeNull()
+    useDiagramStore.getState().undo()
+    expect(names()).toEqual(before)
+    expect(useDiagramStore.getState().presentations[0].slides[0].snapshotId).toBe('snap-2')
+    expect(useDiagramStore.getState().presentationSlides[0].snapshotId).toBe('snap-2')
+    useDiagramStore.getState().redo()
+    expect(useDiagramStore.getState().snapshots.find((m) => m.id === 'snap-2')).toBeUndefined()
+    expect(useDiagramStore.getState().presentations[0].slides[0].snapshotId).toBeNull()
+  })
+
+  it('a milestone made or renamed is an undo step too, so Undo of an earlier edit does not take it away', () => {
+    const first = Object.keys(useDiagramStore.getState().c4Nodes)[0]
+    useDiagramStore.getState().updateNode(first, { label: 'Edited' })
+    const id = useDiagramStore.getState().createSnapshot('M')
+    useDiagramStore.getState().renameSnapshot(id, 'M2')
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().snapshots.find((m) => m.id === id)?.name).toBe('M')
+    useDiagramStore.getState().undo()
+    expect(useDiagramStore.getState().snapshots.find((m) => m.id === id)).toBeUndefined()
+    expect(useDiagramStore.getState().c4Nodes[first].label).toBe('Edited')
+  })
+
   it('does not affect activeSnapshotId when a different snapshot is removed', () => {
     useDiagramStore.getState().selectMilestone('snap-1')
     useDiagramStore.getState().removeSnapshot('snap-2')

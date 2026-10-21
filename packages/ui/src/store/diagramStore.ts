@@ -146,6 +146,11 @@ interface HistoryEntry {
   /** In a milestone: whether it had edits not kept or dropped yet. Undo of
    *  every edit left it "unsaved", with nothing to save. */
   milestoneDirty?: boolean
+  /** The milestones, and the milestone each slide shows (slide id →
+   *  milestone id): making, renaming and deleting one is a step. A step
+   *  rebased on an outside change has neither and leaves them as they are. */
+  snapshots?: DiagramSnapshot[]
+  slideMilestones?: Record<string, string>
 }
 
 /**
@@ -317,10 +322,33 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
       sequences,
       hubTemplates: (merged.hubTemplates ?? {}) as Record<string, HubImportRecord>,
       milestoneDirty: change.to.milestoneDirty,
+      ...(_rebasedMilestones(change, now)),
     },
     conflicts,
     dropped,
   }
+}
+
+/** What the step `change` does to the milestones (one made, renamed or
+ *  deleted), done on the milestones as they are `now`: the others, an
+ *  agent's among them, stay as they are. */
+function _rebasedMilestones(change: StepChange, now: HistoryEntry): Pick<HistoryEntry, 'snapshots' | 'slideMilestones'> {
+  const from = change.from.snapshots
+  const to = change.to.snapshots
+  if (!from || !to || !now.snapshots) return {}
+  const fromById = new Map(from.map((m) => [m.id, m]))
+  const toIds = new Set(to.map((m) => m.id))
+  const list = now.snapshots.filter((m) => !(fromById.has(m.id) && !toIds.has(m.id)))
+    .map((m) => {
+      const was = fromById.get(m.id)
+      const becomes = to.find((x) => x.id === m.id)
+      return was && becomes && was.name !== becomes.name ? { ...m, name: becomes.name } : m
+    })
+  to.forEach((m, i) => {
+    if (fromById.has(m.id) || list.some((x) => x.id === m.id)) return
+    list.splice(Math.min(i, list.length), 0, m)
+  })
+  return { snapshots: list, slideMilestones: { ...now.slideMilestones, ...change.to.slideMilestones } }
 }
 
 /** A milestone shown when the folder changed outside Studio (an agent's
@@ -407,7 +435,16 @@ function _captureState(state: DiagramStore): HistoryEntry {
     sequences: state.sequences,
     hubTemplates: state.hubTemplates,
     milestoneDirty: state.milestoneDirty,
+    snapshots: state.snapshots,
+    slideMilestones: slideMilestonesOf(state.presentations),
   }
+}
+
+/** Which milestone each slide shows (slide id → milestone id). */
+function slideMilestonesOf(presentations: Presentation[] | undefined): Record<string, string> {
+  const links: Record<string, string> = {}
+  for (const p of presentations ?? []) for (const slide of p.slides) if (slide.snapshotId) links[slide.id] = slide.snapshotId
+  return links
 }
 
 function _pushUndo(state: DiagramStore): void {
@@ -842,6 +879,47 @@ function computeSeqDiff(
     }
   }
   return result
+}
+
+/**
+ * What changed in a sequence's steps from `prev` to `curr`, step by step: a
+ * relation can be two steps of one flow, so a set of relation ids (as
+ * computeSeqDiff keeps for the canvas) missed a second step removed or
+ * added, and a note changed on one coloured the other. The steps are
+ * paired in order (longest common subsequence of relation ids): `steps[i]`
+ * is 'new' for a step of `curr` with no pair, 'changed' for one whose note
+ * changed; `removed` lists the steps of `prev` with no pair (their index).
+ */
+export function computeStepDiff(
+  prev: Pick<DiagramSequence, 'relationIds' | 'stepDescriptions'> | undefined,
+  curr: Pick<DiagramSequence, 'relationIds' | 'stepDescriptions'>,
+): { steps: Array<'new' | 'changed' | undefined>; removed: number[] } {
+  const a = prev?.relationIds ?? []
+  const b = curr.relationIds
+  // lcs[i][j]: the longest common run of a[i..] and b[j..].
+  const lcs: number[][] = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0))
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1])
+    }
+  }
+  const steps: Array<'new' | 'changed' | undefined> = new Array(b.length).fill('new')
+  const removed: number[] = []
+  let i = 0
+  let j = 0
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      steps[j] = (prev?.stepDescriptions?.[i] ?? '') !== (curr.stepDescriptions?.[j] ?? '') ? 'changed' : undefined
+      i++
+      j++
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      removed.push(i++)
+    } else {
+      j++
+    }
+  }
+  while (i < a.length) removed.push(i++)
+  return { steps, removed }
 }
 
 /**
@@ -2397,6 +2475,21 @@ export const useDiagramStore = create<DiagramStore>()(
         state.sequences = entry.sequences as any
         if (entry.hubTemplates) state.hubTemplates = entry.hubTemplates as any
         if (state.activeSequenceId && !entry.sequences[state.activeSequenceId]) state.activeSequenceId = null
+        // The milestones as the step had them; a slide that showed one
+        // deleted since shows it again, one that shows one gone shows the
+        // live model. Other links are Presenter's and stay.
+        if (entry.snapshots) {
+          state.snapshots = entry.snapshots as any
+          const ids = new Set(entry.snapshots.map((m) => m.id))
+          for (const pres of state.presentations) {
+            for (const slide of pres.slides) {
+              const was = entry.slideMilestones?.[slide.id]
+              if (slide.snapshotId && !ids.has(slide.snapshotId)) slide.snapshotId = null
+              else if (!slide.snapshotId && was && ids.has(was)) slide.snapshotId = was
+            }
+            if (pres.id === state.activePresentationId) state.presentationSlides = pres.slides
+          }
+        }
         // A milestone's steps are its edits: with them all undone there is
         // nothing to keep or drop.
         if (state.activeSnapshotId && entry.milestoneDirty !== undefined) {
@@ -5057,6 +5150,7 @@ export const useDiagramStore = create<DiagramStore>()(
           relations: get().c4Relations,
           sequences: get().sequences,
         }
+        get()._pushUndo()
         set((state) => { state.snapshots.push(snap as any) })
         return id
       },
@@ -5101,44 +5195,35 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       removeSnapshot(id) {
-        const backup = get().liveBackup
-        const wasShown = get().activeSnapshotId === id
-        if (wasShown) _historyBackOnLive()
+        const milestone = get().snapshots.find((m) => m.id === id)
+        if (!milestone) return
+        // The milestone shown is left first, as Discard leaves it: the step
+        // is one of the live model's, and Undo gives the milestone back.
+        if (get().activeSnapshotId === id) get().discardMilestoneChanges()
+        get()._pushUndo()
+        let unlinked = 0
         set((state) => {
           state.snapshots = state.snapshots.filter(s => s.id !== id) as any
+          // The slides that showed it show the live model (as the MCP
+          // server's delete_milestone does): they kept its id, a "?".
+          for (const pres of state.presentations) {
+            for (const slide of pres.slides) {
+              if (slide.snapshotId === id) { slide.snapshotId = null; unlinked++ }
+            }
+            if (pres.id === state.activePresentationId) state.presentationSlides = pres.slides
+          }
           state.canUndo = _undoStack.length > 0
           state.canRedo = _redoStack.length > 0
-          if (state.activeSnapshotId === id) {
-            // If the active milestone is being deleted, restore live and clear flags.
-            if (backup) {
-              state.c4Nodes = backup.nodes as any
-              state.c4Relations = backup.relations as any
-              if ((backup as any).sequences) {
-                state.sequences = (backup as any).sequences as any
-              }
-              if (backup.hubTemplates) state.hubTemplates = backup.hubTemplates as any
-              unparkLiveViews(state as DiagramStore, backup)
-            }
-            state.activeSnapshotId = null
-            state.liveBackup = null
-            state.milestoneDirty = false
-            state.milestonePromptOpen = false
-            state.diffHighlight = {} as any
-            state.diffBaseSnapshotId = null
-            state.diffGhostNodes = {} as any
-            state.diffGhostRelations = {} as any
-          }
         })
-        if (wasShown) {
-          _milestoneAllPositions = null
-          get()._showLiveCanvasPositions()
+        if (unlinked) {
+          get().pushNotification(`Deleted milestone "${milestone.name}": ${unlinked === 1 ? 'the slide that showed it shows' : `the ${unlinked} slides that showed it show`} the live model now.`, 'info')
         }
-        get()._sync()
-        _liveLayout?.reset()
-        if (wasShown) arrangeOnFirstOpen()
       },
 
       renameSnapshot(id, name) {
+        const milestone = get().snapshots.find((m) => m.id === id)
+        if (!milestone || milestone.name === name) return
+        get()._pushUndo()
         set((state) => {
           const snap = state.snapshots.find(s => s.id === id)
           if (snap) snap.name = name
@@ -6011,6 +6096,9 @@ export const useDiagramStore = create<DiagramStore>()(
           c4Nodes: get().c4Nodes,
           c4Relations: get().c4Relations,
           activeViewId: get().activeViewId,
+          // The slides colour what changed between them; the milestone's
+          // diff comes back after (Esc cleared it, the toggle still on).
+          diffHighlight: get().diffHighlight,
         }
         set((state) => { state.presentationActive = true })
         // Re-derive rfNodes immediately so the per-node `draggable` flag
@@ -6023,10 +6111,10 @@ export const useDiagramStore = create<DiagramStore>()(
 
       stopPresentation() {
         set((state) => { state.presentationActive = false; state.slideTreemapFocus = null; state.slideWikiPage = null })
-        get().setDiffHighlight({})
         const pre = (window as any).__prePresState as
-          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null }
+          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight'] }
           | undefined
+        get().setDiffHighlight(pre?.diffHighlight ?? {})
         if (pre) {
           set((state) => {
             state.c4Nodes = pre.c4Nodes as any
@@ -6343,6 +6431,8 @@ export const useDiagramStore = create<DiagramStore>()(
               defaultPositions: st.defaultPositions,
               sequences: live.sequences ?? st.sequences,
               hubTemplates: st.hubTemplates,
+              snapshots: st.snapshots,
+              slideMilestones: slideMilestonesOf(st.presentations),
             }, [_liveHistory.undo, _liveHistory.redo])
           }
         } else {

@@ -518,6 +518,18 @@ label.app-menu-row { cursor: pointer; }
   cursor: pointer;
 }
 .milestone-btn:hover { background: var(--bg-hover, rgba(255,255,255,0.06)); }
+div.milestone-option { cursor: default; }
+.milestone-option-main {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .milestone-option-input {
   margin-top: 8px;
   width: 100%;

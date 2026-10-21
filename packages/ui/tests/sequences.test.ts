@@ -16,7 +16,7 @@
  *     sequence is subsequently deleted
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useDiagramStore } from '../src/store/diagramStore'
+import { computeStepDiff, useDiagramStore } from '../src/store/diagramStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 const initial = (() => {
@@ -249,5 +249,29 @@ describe('updateStepDescription', () => {
     expect(seq.stepDescriptions?.[0]).toBeUndefined()
     expect(seq.stepDescriptions?.[1]).toBe('third')
     expect(seq.stepDescriptions?.[2]).toBe('first')
+  })
+})
+
+describe('computeStepDiff (a flow view against the milestone before)', () => {
+  // The diff took a sequence as a set of relation ids: a relation that is
+  // two steps lost one with no ghost, gained one with no NEW, and a note
+  // changed on one step coloured the other too.
+  const seq = (relationIds: string[], stepDescriptions?: string[]) => ({ relationIds, stepDescriptions })
+  it('finds a second step of a relation removed', () => {
+    const d = computeStepDiff(seq(['r1', 'r2', 'r3', 'r4', 'r2']), seq(['r1', 'r2', 'r3', 'r4']))
+    expect(d.steps).toEqual([undefined, undefined, undefined, undefined])
+    expect(d.removed).toEqual([4])
+  })
+  it('finds a second step of a relation added', () => {
+    const d = computeStepDiff(seq(['r1', 'r2', 'r3', 'r4']), seq(['r1', 'r2', 'r3', 'r4', 'r2']))
+    expect(d.steps).toEqual([undefined, undefined, undefined, undefined, 'new'])
+    expect(d.removed).toEqual([])
+  })
+  it('colours only the step whose note changed', () => {
+    const d = computeStepDiff(seq(['r1', 'r2', 'r3', 'r4', 'r2'], ['', 'a', '', '', 'b']), seq(['r1', 'r2', 'r3', 'r4', 'r2'], ['', 'a', '', '', 'B']))
+    expect(d.steps).toEqual([undefined, undefined, undefined, undefined, 'changed'])
+  })
+  it('takes every step as new when the sequence was not there', () => {
+    expect(computeStepDiff(undefined, seq(['r1', 'r2'])).steps).toEqual(['new', 'new'])
   })
 })

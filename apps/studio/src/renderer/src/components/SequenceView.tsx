@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { computeStepDiff, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS } from '@radical/common/c4'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
@@ -27,6 +27,7 @@ interface Step {
   description?: string     // per-occurrence override (from stepDescriptions)
   index:      number       // 1-based step number
   ghost?:     boolean      // true = removed from sequence vs. previous milestone
+  diff?:      'new' | 'changed' | 'removed'  // this step against the diff base
 }
 
 export function SequenceView(): React.ReactElement {
@@ -67,6 +68,20 @@ export function SequenceView(): React.ReactElement {
     const effectiveGhostRelations = showDiff ? ghostRelations : {} as Record<string, C4Relation>
     const effectiveDiffHighlight  = showDiff ? diffHighlight  : {} as Record<string, 'new' | 'changed' | 'removed'>
     const effectiveDiffBaseId     = showDiff ? diffBaseSnapshotId : null
+    // Against the milestone before, step by step: a relation can be two
+    // steps (computeStepDiff). Without one, as the canvas colours it.
+    const baseSnap = effectiveDiffBaseId ? snapshots.find(s => s.id === effectiveDiffBaseId) : undefined
+    const baseSeq  = baseSnap && view?.sequenceId
+      ? (baseSnap.sequences as any)?.[view.sequenceId] as { relationIds: string[]; stepDescriptions?: (string | undefined)[] } | undefined
+      : undefined
+    const stepDiff = baseSnap ? computeStepDiff(baseSeq, sequence) : null
+    const stepKind = (rid: string, i: number): Step['diff'] => {
+      if (!stepDiff) return effectiveDiffHighlight[rid]
+      if (stepDiff.steps[i]) return stepDiff.steps[i]
+      // The same step; its relation may have changed itself.
+      const was = (baseSnap?.relations as Record<string, C4Relation> | undefined)?.[rid]
+      return was && relations[rid] && JSON.stringify(was) !== JSON.stringify(relations[rid]) ? 'changed' : undefined
+    }
     sequence.relationIds.forEach((rid, i) => {
       const r = relations[rid] ?? effectiveGhostRelations[rid]
       if (!r) return
@@ -82,34 +97,30 @@ export function SequenceView(): React.ReactElement {
         label:      r.label || r.technology || '',
         description: sequence.stepDescriptions?.[i] || undefined,
         index:      i + 1,
+        diff:       stepKind(rid, i),
       })
     })
-    // Add ghost steps: relation IDs removed from this sequence vs. the diff base.
-    if (effectiveDiffBaseId && view?.sequenceId) {
-      const baseSnap = snapshots.find(s => s.id === effectiveDiffBaseId)
-      const baseSeq  = (baseSnap?.sequences as any)?.[view.sequenceId] as { relationIds: string[]; stepDescriptions?: (string | undefined)[] } | undefined
-      if (baseSeq) {
-        const currSet = new Set(sequence.relationIds)
-        baseSeq.relationIds.forEach((rid, i) => {
-          if (currSet.has(rid)) return  // still in sequence
-          if (effectiveDiffHighlight[rid] !== 'removed') return  // only show seq-removed steps
-          // Prefer live relation data (still in model) → ghost (model-deleted)
-          const r = relations[rid] ?? effectiveGhostRelations[rid] ?? (baseSnap?.relations as any)?.[rid]
-          if (!r) return
-          const src = nodes[r.sourceId] ?? effectiveGhostNodes[r.sourceId] ?? (baseSnap?.nodes as any)?.[r.sourceId]
-          const tgt = nodes[r.targetId] ?? effectiveGhostNodes[r.targetId] ?? (baseSnap?.nodes as any)?.[r.targetId]
-          if (!src || !tgt) return
-          if (!seen.has(src.id)) seen.set(src.id, src)
-          if (!seen.has(tgt.id)) seen.set(tgt.id, tgt)
-          out.push({
-            relationId: rid,
-            sourceId:   src.id,
-            targetId:   tgt.id,
-            label:      r.label || r.technology || '',
-            description: baseSeq.stepDescriptions?.[i] || undefined,
-            index:      i + 1,
-            ghost:      true,
-          })
+    // Add ghost steps: the diff base's steps with no pair in this sequence.
+    if (stepDiff && baseSeq) {
+      for (const i of stepDiff.removed) {
+        const rid = baseSeq.relationIds[i]
+        // Prefer live relation data (still in model) → ghost (model-deleted)
+        const r = relations[rid] ?? effectiveGhostRelations[rid] ?? (baseSnap?.relations as any)?.[rid]
+        if (!r) continue
+        const src = nodes[r.sourceId] ?? effectiveGhostNodes[r.sourceId] ?? (baseSnap?.nodes as any)?.[r.sourceId]
+        const tgt = nodes[r.targetId] ?? effectiveGhostNodes[r.targetId] ?? (baseSnap?.nodes as any)?.[r.targetId]
+        if (!src || !tgt) continue
+        if (!seen.has(src.id)) seen.set(src.id, src)
+        if (!seen.has(tgt.id)) seen.set(tgt.id, tgt)
+        out.push({
+          relationId: rid,
+          sourceId:   src.id,
+          targetId:   tgt.id,
+          label:      r.label || r.technology || '',
+          description: baseSeq.stepDescriptions?.[i] || undefined,
+          index:      i + 1,
+          ghost:      true,
+          diff:       'removed',
         })
       }
     }
@@ -395,8 +406,7 @@ export function SequenceView(): React.ReactElement {
           const xt     = xOf(s.targetId)
           const isSel  = s.relationId === selectedEdgeId
           const isHov  = hoveredStep === idx
-          const dk       = diffHighlight[s.relationId] as 'new' | 'changed' | 'removed' | undefined
-          const diffDk   = showDiff ? dk : undefined
+          const diffDk   = showDiff ? s.diff : undefined
           const diffColor = diffDk === 'new' ? '#4ade80' : diffDk === 'removed' ? '#f87171' : diffDk === 'changed' ? '#fb923c' : null
           const stroke = isSel ? '#ffd84d' : diffColor ?? (isHov ? 'var(--accent)' : 'currentColor')
           const sw     = isSel || diffColor ? 2 : isHov ? 1.6 : 1.2
