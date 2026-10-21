@@ -183,6 +183,53 @@ test('a wiki view follows the same chain: needs on the overview, their requireme
   await expect(page.getByRole('heading', { name: 'Four-eyes approval' })).toBeVisible()
 })
 
+test('a requirement written in a wiki gets what its level\'s filter asks, and one the filter leaves out is announced', async ({ page, studio }) => {
+  await studio.openSample()
+  await openFilter(page, 'Requirements Register')
+  const steps = page.locator('.rp-pipeline')
+  await steps.locator('.rp-level').nth(1).getByRole('button', { name: /Add a filter/ }).click()
+  await page.getByRole('menuitem', { name: /^EARS type is event-driven/ }).click()
+  await page.locator('.props-content', { has: steps }).getByRole('button', { name: 'Wiki', exact: true }).click()
+  await page.getByRole('button', { name: '◀ Back' }).click()
+  await page.locator('.wiki-nav-item', { hasText: 'PSD2 & AMLD6 obligations' }).first().click()
+  const line = page.getByRole('textbox', { name: 'Write a requirement' })
+
+  // A line that names no EARS type takes the filter's: it is there.
+  await line.fill('Users can export their statements')
+  await line.press('Enter')
+  await expect(page.locator('.wiki-page')).toContainText('Users can export their statements')
+  await expect(page.getByRole('heading', { name: /^Requirements \(2\)/ }).first()).toBeVisible()
+  // A sentence of another type is kept as written, and the view says it does not show it.
+  await line.fill('The system shall keep statements for ten years')
+  await line.press('Enter')
+  await expect(page.locator('.toast-message').last()).toContainText("was added, but this view's filter does not show it")
+})
+
+test('a step added in a Warnier view its filter leaves it out of keeps its name open, and is announced when it stays out', async ({ page, studio }) => {
+  await studio.openSample('view-processes')
+  await openFilter(page, 'Processes')
+  await page.getByRole('button', { name: 'Detach' }).click()
+  await page.getByRole('button', { name: /^Add a filter to/ }).click()
+  await page.getByPlaceholder('Text in name or description…').fill('Payment')
+  await page.getByPlaceholder('Text in name or description…').press('Enter')
+  await page.getByRole('button', { name: '◀ Back' }).click()
+
+  // The name of the new step is open, and what is typed is kept.
+  await page.getByRole('button', { name: 'Add a step to Send a payment' }).click()
+  const name = page.locator('.wn-name-input')
+  await expect(name).toBeFocused()
+  await page.keyboard.type('Limits checked')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.toast-message').last()).toContainText("Limits checked was added, but this view's filter does not show it")
+  await expect.poll(async () => (await studio.storedDoc(studio.activeDocId())).nodes.some((n) => n.label === 'Limits checked')).toBe(true)
+  // A name the filter lets through: drawn, with no word.
+  await page.getByRole('button', { name: 'Add a step to Send a payment' }).click()
+  await expect(name).toBeFocused()
+  await page.keyboard.type('Payment limits checked')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.wn-label', { hasText: 'Payment limits checked' })).toBeVisible()
+})
+
 test('a level takes any of its ways: needs or requirements as roots, the scenarios verifying either under them', async ({ page, studio }) => {
   await studio.openSample()
   await openRegisterWithoutChain(page)
@@ -249,6 +296,63 @@ test('a view shows every element again from its steps, and a chain can start fro
   await expect(steps).toContainText('Every element')
   await expect(steps.getByRole('button', { name: 'Show every element' })).toHaveCount(0)
   await expect(steps.locator('.rp-level-head')).toContainText('78')
+})
+
+test('a matrix with a chain adds only a relation its cell shows, and never a copy', async ({ page, studio }) => {
+  await studio.openSample()
+  // One relation between two requirements, which the register's chain does not follow.
+  const doc = studio.activeDocId()
+  const key = `radical-doc:${doc}`
+  await expect.poll(() => page.evaluate((k) => localStorage.getItem(k) !== null, key)).toBe(true)
+  await page.evaluate((k) => {
+    const saved = JSON.parse(localStorage.getItem(k)!)
+    saved.relations.push({ id: 'r-psd2-hold', sourceId: 'req-psd2', targetId: 'req-fraud-hold', relationType: 'derives' })
+    localStorage.setItem(k, JSON.stringify(saved))
+  }, key)
+  await page.reload()
+  await studio.ready()
+  await openFilter(page, 'Requirements Register')
+  await page.locator('.props-content').getByRole('button', { name: 'Matrix', exact: true }).click()
+  const cell = async (from: string, to: string) => {
+    const heads = await page.locator('.mx-rowhead').evaluateAll((els) => els.map((e) => e.textContent?.trim()))
+    expect(heads).toContain(from)
+    expect(heads).toContain(to)
+    return page.locator('tbody tr').nth(heads.indexOf(from)).locator('td').nth(heads.indexOf(to))
+  }
+  const count = async () => (await studio.storedDoc(doc)).relations.length
+  const before = await count()
+
+  // A relation the matrix does not draw is not added again.
+  await (await cell('PSD2-compliant payments', 'Hold high-risk payments')).click()
+  await expect(page.locator('.toast-message').last()).toContainText('that this matrix does not show')
+  // Between two requirements the chain follows nothing: clicks add nothing.
+  for (let i = 0; i < 3; i++) await (await cell('Hold high-risk payments', 'PSD2-compliant payments')).click()
+  await expect(page.locator('.toast-message').last()).toContainText('Not added')
+  await page.waitForTimeout(800)
+  expect(await count()).toBe(before)
+
+  // A requirement refined from another need: the derives the chain follows, drawn.
+  await (await cell('Hold high-risk payments', 'PSD2 & AMLD6 obligations')).click()
+  await expect.poll(count).toBe(before + 1)
+  await expect(await cell('Hold high-risk payments', 'PSD2 & AMLD6 obligations')).toHaveClass(/mx-has-rel/)
+  const added = (await studio.storedDoc(doc)).relations.find((r) => r.sourceId === 'req-fraud-hold' && r.targetId === 'need-regulation')
+  expect((added as { relationType?: string } | undefined)?.relationType).toBe('derives')
+})
+
+test('a hierarchy drilled into an element its filter then leaves out shows the top, with no way up', async ({ page, studio }) => {
+  await studio.openSample('view-treemap')
+  await page.locator('.treemap-wrap rect[data-id="dom-banking"]').dblclick({ force: true })
+  await expect(page.locator('.tm-bc-item').last()).toHaveText('Banking Services')
+  await openFilter(page, 'Platform Hierarchy')
+  const steps = page.locator('.rp-pipeline')
+  await steps.getByRole('button', { name: '+ Start with' }).click()
+  await page.getByRole('menuitem', { name: /^Software System/ }).click()
+  // Only the systems are drawn: the breadcrumb names none of their insides.
+  await expect(page.locator('.tm-bc-item')).toHaveText(['All'])
+  await expect(page.locator('.tm-bc-back')).toHaveCount(0)
+  // The view keeps where it was drilled: without the filter it is there again.
+  await steps.getByRole('button', { name: 'Reset' }).click()
+  await expect(page.locator('.tm-bc-item').last()).toHaveText('Banking Services')
 })
 
 test('every kind of view follows its chain, again when the chain or the model changes', async ({ page, studio }) => {

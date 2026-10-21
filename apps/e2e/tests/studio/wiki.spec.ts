@@ -112,6 +112,40 @@ test.describe('wiki', () => {
     await search.fill('nothing like this')
     await expect(page.locator('.wiki-nav-empty')).toBeVisible()
   })
+
+  test('Back from the first page read goes to the Overview', async ({ page }) => {
+    await expect(page).toHaveURL(/\/v\/view-wiki$/)
+    const overview = await page.locator('.wiki-title').innerText()
+    // The opened view's address is written first: changes within 150 ms are one step.
+    await page.waitForTimeout(400)
+    await page.locator('.wiki-page').getByText('Core Banking Platform', { exact: true }).first().click()
+    await expect(page).toHaveURL(/\/v\/view-wiki\/f\/sys-core$/)
+    await expect(page.locator('.wiki-title')).toHaveText('Core Banking Platform')
+    const back = page.getByRole('button', { name: 'Back', exact: true })
+    await expect(back).toBeEnabled()
+    await back.click()
+    await expect(page).toHaveURL(/\/v\/view-wiki$/)
+    await expect(page.locator('.wiki-title')).toHaveText(overview)
+    // The Overview's entry is still there, and the page after it.
+    await page.getByRole('button', { name: 'Forward', exact: true }).click()
+    await expect(page.locator('.wiki-title')).toHaveText('Core Banking Platform')
+  })
+
+  test("a requirement's sentence sits beside the facts box, not over it", async ({ page, studio }) => {
+    await studio.open('view-product-wiki/f/req-sca', 'designer', studio.activeDocId())
+    const facts = page.locator('.wiki-infobox')
+    const sentence = page.locator('.wiki-ears-sentence .ears-sentence')
+    await expect(sentence).toBeVisible()
+    // What is drawn at the top of the facts box is the box.
+    const top = await facts.evaluate((box) => {
+      const r = box.getBoundingClientRect()
+      return [8, 30].map((dy) => box.contains(document.elementFromPoint(r.x + r.width / 2, r.y + dy)))
+    })
+    expect(top).toEqual([true, true])
+    const f = (await facts.boundingBox())!
+    const s = (await sentence.boundingBox())!
+    if (s.y < f.y + f.height) expect(s.x + s.width).toBeLessThanOrEqual(f.x)
+  })
 })
 
 // Writing in the wiki: a new model is written down from its Overview, with

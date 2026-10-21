@@ -1825,8 +1825,10 @@ interface DiagramStore {
   snapshots: DiagramSnapshot[]
   /** ID of the milestone currently loaded onto the canvas (null = live HEAD). */
   activeSnapshotId: string | null
-  /** Backup of the live HEAD state, kept while a milestone is loaded. */
-  liveBackup: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; sequences: Record<string, DiagramSequence> } | null
+  /** Backup of the live HEAD state, kept while a milestone is loaded. Its
+   *  Hub template records too: they are the live model's, and an Apply in
+   *  the milestone changes them only once it is propagated. */
+  liveBackup: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; sequences: Record<string, DiagramSequence>; hubTemplates?: Record<string, HubImportRecord> } | null
   /** True after the user makes a structural edit while viewing a milestone. */
   milestoneDirty: boolean
   /** Open the propagate/new prompt modal. */
@@ -4897,6 +4899,7 @@ export const useDiagramStore = create<DiagramStore>()(
               if ((backup as any).sequences) {
                 state.sequences = (backup as any).sequences as any
               }
+              if (backup.hubTemplates) state.hubTemplates = backup.hubTemplates as any
             }
             state.activeSnapshotId = null
             state.liveBackup = null
@@ -4948,7 +4951,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Backup live HEAD if we don't already have one.
         const backup = activeSnapshotId
           ? get().liveBackup
-          : { nodes: c4Nodes, relations: c4Relations, sequences }
+          : { nodes: c4Nodes, relations: c4Relations, sequences, hubTemplates: get().hubTemplates as Record<string, HubImportRecord> }
 
         // In viewer (explore mode) keep the user's currently-arranged
         // positions for any node that still exists in the new milestone
@@ -5066,6 +5069,7 @@ export const useDiagramStore = create<DiagramStore>()(
             if ((liveBackup as any).sequences) {
               state.sequences = (liveBackup as any).sequences as any
             }
+            if (liveBackup.hubTemplates) state.hubTemplates = liveBackup.hubTemplates as any
           }
           state.activeSnapshotId = null
           state.liveBackup = null
@@ -5127,6 +5131,8 @@ export const useDiagramStore = create<DiagramStore>()(
           _redoStack.length = 0
           set((state) => {
             state.snapshots.splice(idx + 1, 0, newSnap as any)
+            // The live model is as it was: so are its Hub template records.
+            if (liveBackup?.hubTemplates) state.hubTemplates = liveBackup.hubTemplates as any
             // Stay viewing the freshly-created milestone (canvas already shows its content).
             // liveBackup is preserved so the user can still discard back to live HEAD.
             state.activeSnapshotId = newId
@@ -5291,6 +5297,8 @@ export const useDiagramStore = create<DiagramStore>()(
             }
             const before = Object.keys(state.liveBackup.nodes)
             applyDiff(state.liveBackup.nodes as any, state.liveBackup.relations as any, (state.liveBackup as any).sequences)
+            // The Hub template records go with the texts they wrote.
+            state.liveBackup.hubTemplates = state.hubTemplates as any
             const gone = new Set(before.filter((id) => !state.liveBackup!.nodes[id]))
             if (gone.size) {
               const shown = state.activeViewId
@@ -5596,6 +5604,9 @@ export const useDiagramStore = create<DiagramStore>()(
         const subst = (text: string): string => text.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_m, key: string) => values[key] ?? `{{${key}}}`)
         _asOneStep(() => {
           get()._pushUndo()
+          // In a milestone: an edit of it, kept or dropped as the question
+          // after it says (the record with it).
+          get()._markMilestoneEdit()
           set((state) => {
             // Only the fields the Hub's text gave a parameter: the others may
             // have been edited since (a rename was lost to "Apply").
@@ -6200,7 +6211,7 @@ export const useDiagramStore = create<DiagramStore>()(
           snapshots: snapshots as DiagramSnapshot[],
           presentations: presentations as Presentation[],
           metamodel: metamodel as Metamodel,
-          hubTemplates: get().hubTemplates as Record<string, HubImportRecord>,
+          hubTemplates: (timeTravelling && liveBackup.hubTemplates ? liveBackup.hubTemplates : get().hubTemplates) as Record<string, HubImportRecord>,
           ...(get().hubMeta ? { hub: get().hubMeta as HubConceptMeta } : {}),
         }
       },

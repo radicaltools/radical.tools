@@ -214,13 +214,22 @@ export function TreemapView(): React.ReactElement {
   const setTreemapMaxDepth = useDiagramStore(s => s.setTreemapMaxDepth)
 
   const activeView = activeViewId ? views[activeViewId] : null
+  // View filter — the view's elements, or what its filter chain gives
+  // (viewPipeline.ts), with their ancestors. A view without elements shows
+  // the whole model (a fresh treemap view should never be empty).
+  const viewFilter = useMemo(
+    () => computeViewNodeSet(activeView ?? undefined, c4Nodes, c4Relations),
+    [activeView, c4Nodes, c4Relations],
+  )
+
   // A slide shows the drill level it was added on; otherwise the view's
-  // own. An element the model shown does not have (a milestone without it)
-  // is shown as the top, without changing the view.
+  // own. An element the view does not draw (a milestone without it, or one
+  // its filter now leaves out) is shown as the top, without changing the
+  // view: the breadcrumb and ↑ Up follow what is drawn.
   const slideFocus = useDiagramStore(s => s.slideTreemapFocus)
   const activeSnapshotId = useDiagramStore(s => s.activeSnapshotId)
   const savedFocusId = slideFocus && slideFocus.viewId === activeViewId ? slideFocus.focusId : (activeView?.treemapFocusId ?? null)
-  const focusId    = savedFocusId && c4Nodes[savedFocusId] ? savedFocusId : null
+  const focusId    = savedFocusId && c4Nodes[savedFocusId] && (!viewFilter || viewFilter.has(savedFocusId)) ? savedFocusId : null
   const sizeBy: SizeBy = activeView?.treemapSizeBy ?? 'leaves'
   // null/undefined = unlimited. Default = 2 levels below focus (children +
   // grandchildren) — keeps the view legible; user can change via dropdown.
@@ -252,14 +261,6 @@ export function TreemapView(): React.ReactElement {
     if (useDiagramStore.getState().slideTreemapFocus) useDiagramStore.setState({ slideTreemapFocus: null })
     setTreemapFocus(activeViewId, id)
   }, [activeViewId, setTreemapFocus])
-
-  // View filter — the view's elements, or what its filter chain gives
-  // (viewPipeline.ts), with their ancestors. A view without elements shows
-  // the whole model (a fresh treemap view should never be empty).
-  const viewFilter = useMemo(
-    () => computeViewNodeSet(activeView ?? undefined, c4Nodes, c4Relations),
-    [activeView, c4Nodes, c4Relations],
-  )
 
   // Relation count (only needed when sizeBy='relations' or for tooltip meta).
   const relCount = useMemo(() => {

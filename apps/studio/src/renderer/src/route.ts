@@ -266,10 +266,13 @@ function applyViewModeFocus(route: Route): void {
     if (useDiagramStore.getState().activeViewId !== targetView) {
       useDiagramStore.getState().setActiveView(targetView)
     }
-    if (route.focus && targetView) {
+    // A wiki's page is the route's focus; a route with none is the
+    // Overview (Back from the first page read leads there).
+    if (targetView) {
       const v = useDiagramStore.getState().views[targetView]
-      if (v && v.kind === 'wiki' && v.wikiFocusId !== route.focus) {
-        useDiagramStore.getState().setWikiFocus(targetView, route.focus)
+      const page = route.focus ?? null
+      if (v && v.kind === 'wiki' && (v.wikiFocusId ?? null) !== page) {
+        useDiagramStore.getState().setWikiFocus(targetView, page)
       }
     }
     // Milestone (snapshot). Apply-only: we view the requested milestone but
@@ -363,6 +366,10 @@ function writeUrl(push: boolean): void {
   if (current === hash) {
     // The same place: keep the list's label up to date (a renamed view).
     if (nav.entries.length) useNavHistory.setState(replaceEntry(nav, describeRoute(route, hash)))
+    // An entry the browser made for an address opened from outside (a link,
+    // one typed) carries no index of ours: Back to it moved the list
+    // nowhere, and the place Back led to was written over the one left.
+    if (stateIndex(history.state) !== useNavHistory.getState().index) history.replaceState({ navIndex: useNavHistory.getState().index }, '', hash)
     return
   }
   if (push && nav.entries.length) {

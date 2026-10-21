@@ -41,6 +41,7 @@ import {
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
 import { wikiDepthOf } from '@radical/common/c4'
+import { newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
@@ -405,13 +406,17 @@ export function WikiView(): React.ReactElement {
     const hierarchy = under ? metamodel?.nodeTypes[under.type]?.hierarchyRelation : undefined
     const parentId = under ? (hierarchy ? under.parentId : under.id) : undefined
     const links: WizardLink[] = under && hierarchy ? [{ relationType: hierarchy, direction: 'out', otherId: under.id }] : []
-    return addNodes(lines.map((line) => ({
+    // The values the view's filter asks for, as the table gives them; what
+    // the line says wins (a sentence's own EARS type).
+    const filtered = newElementFilters(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }, type, under ? { node: under, link: links[0] } : undefined)
+    const ids = addNodes(lines.map((line) => ({
       node: {
         type: type as C4ElementType,
         description: '',
         technology: '',
         collapsed: false,
         external: false,
+        ...filtered?.properties,
         ...elementFromLine(type, line),
         parentId,
         x: 0,
@@ -420,6 +425,13 @@ export function WikiView(): React.ReactElement {
       },
       links,
     })))
+    // Not lost from sight without a word, as in the table.
+    const s = useDiagramStore.getState()
+    const shown = viewShownNodes(s.activeViewId ? s.views[s.activeViewId] : undefined, s.c4Nodes, s.c4Relations)
+    const hidden = shown ? ids.filter((id) => !shown.has(id)) : []
+    if (hidden.length === 1) pushNotification(`${s.c4Nodes[hidden[0]]?.label ?? 'It'} was added, but this view's filter does not show it.`, 'warning')
+    else if (hidden.length > 1) pushNotification(`${hidden.length} elements were added, but this view's filter does not show them.`, 'warning')
+    return ids
   }
 
   const actions: WikiActions = {

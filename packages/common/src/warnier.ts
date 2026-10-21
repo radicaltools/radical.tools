@@ -56,11 +56,16 @@ export function warnierMode(node: C4Node): WarnierMode {
 
 /** The rows a Warnier view draws: the view's chain when it has levels to
  *  nest; with one level or none, the elements it shows by containment, so
- *  a chain of the types alone (processes and steps) draws the whole tree. */
-export function warnierRows(view: DiagramView | undefined, ctx: PipelineContext): ChainRow[] {
+ *  a chain of the types alone (processes and steps) draws the whole tree.
+ *  There, `naming` (an element just added, its name being written) is drawn
+ *  where it goes even when the filter leaves it out, so that the name that
+ *  may let it through can be written. */
+export function warnierRows(view: DiagramView | undefined, ctx: PipelineContext, naming?: string): ChainRow[] {
   const result = runPipeline(view, ctx)
   if (result.rows && (pipelineOf(view)?.levels?.length ?? 0) > 1) return result.rows
-  return containmentRows(result.rows ? result.nodes : result.source)
+  const shown = result.rows ? result.nodes : result.source
+  const extra = naming && ctx.nodes[naming] && !shown.some((n) => n.id === naming) ? [ctx.nodes[naming]] : []
+  return containmentRows([...shown, ...extra])
 }
 
 /** Siblings with an order first, by it; the rest after them as they came. */

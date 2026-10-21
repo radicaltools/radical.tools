@@ -454,7 +454,18 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       // Adding to the model is Designer's work, as a Forge run is. In Viewer
       // (where the Hub's link lands) the concept went into what Viewer
       // shows: drawn, never saved, and gone on the way to Designer.
-      if (useDiagramStore.getState().appMode !== 'designer') useDiagramStore.getState().setAppMode('designer')
+      if (useDiagramStore.getState().appMode !== 'designer') {
+        // The element selected in Viewer, which the card promised the
+        // concept would go into ("↳ Bookstore"): read before the switch
+        // drops it, and selected in Designer again.
+        const selected = useDiagramStore.getState().selectedNodeId
+        useDiagramStore.getState().setAppMode('designer')
+        const s = useDiagramStore.getState()
+        if (selected && s.c4Nodes[selected] && s.selectedNodeId !== selected) {
+          s.setSelectedNodeIds([selected])
+          s.selectNode(selected)
+        }
+      }
       const store = useDiagramStore.getState()
 
       // Map old concept node IDs → new store IDs.

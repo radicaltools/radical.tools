@@ -5,6 +5,7 @@
  *   - a page is found by its name, wherever in it and in any case
  *   - a page is found by its description, the sentence of a requirement and
  *     its text fields, with the words around the match as a snippet
+ *   - a state-driven sentence reads as the page writes it, with its state
  *   - a name match needs no snippet; no match is null
  *   - field labels lose the hint a form puts in brackets
  */
@@ -55,6 +56,28 @@ describe('wikiSearchHit', () => {
 
   it('finds a requirement by its sentence, with the element that satisfies it as subject', () => {
     expect(hit('req', 'payments service shall')?.snippet?.match).toBe('Payments Service shall')
+  })
+
+  it('reads a state-driven sentence with the state it points at, as the page does', () => {
+    const withState: Record<string, C4Node> = {
+      ...nodes,
+      sm: node('sm', 'state-machine', 'Order lifecycle'),
+      confirmed: node('confirmed', 'state', 'Confirmed', { parentId: 'sm' }),
+      order: node('order', 'entity', 'Order'),
+      waits: node('waits', 'requirement', 'Ship confirmed orders', {
+        ears_type: 'state-driven',
+        precondition: 'the order is waiting',
+        precondition_state: 'confirmed',
+        action: 'ship it',
+      }),
+    }
+    const rels: Record<string, C4Relation> = {
+      ...relations,
+      life: { id: 'life', sourceId: 'sm', targetId: 'order', relationType: 'lifecycle-of' },
+    }
+    const find = (query: string) => wikiSearchHit(withState.waits, query, withState, rels, mm)
+    expect(find('order is confirmed')?.snippet?.match).toBe('Order is Confirmed')
+    expect(find('waiting')).toBeNull()
   })
 
   it('names the field a match is in, and reads text across line breaks', () => {

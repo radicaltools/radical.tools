@@ -6,7 +6,7 @@
 // rather than its name is listed with the words around the match, so that
 // the list shows why it is there.
 
-import { composeEarsSentence, resolveEarsSubject, type Metamodel } from '@radical/common/metamodel'
+import { composeEarsSentence, requirementStatePhrase, resolveEarsSubject, type Metamodel } from '@radical/common/metamodel'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 import { wikiFieldTitle as fieldTitle } from '@radical/common/wikiDocument'
@@ -36,7 +36,9 @@ export function searchableTexts(
   }
   add(node.description)
   const isRequirement = node.type === 'requirement'
-  if (isRequirement) add(composeEarsSentence(values, resolveEarsSubject(node.id, relations, nodes)).sentence)
+  // The sentence as the page writes it: a precondition that points at a
+  // state reads as the state, not as the text it had before.
+  if (isRequirement) add(composeEarsSentence(values, resolveEarsSubject(node.id, relations, nodes), requirementStatePhrase(node, nodes, relations) || undefined).sentence)
   const props = metamodel?.nodeTypes[node.type]?.properties
   if (!props) {
     add(node.technology, 'Technology')
