@@ -924,6 +924,7 @@ export class Forge {
     const insert = buildConceptInsert(concept, {
       newId: () => crypto.randomUUID(),
       place: () => ({ x: right, y: top }),
+      takenNames: { views: (data.views ?? []).map((v) => v.name), sequences: (data.sequences ?? []).map((q) => q.name) },
     })
     data.nodes.push(...Object.values(insert.nodes))
     data.relations.push(...Object.values(insert.relations))

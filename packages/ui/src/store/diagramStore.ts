@@ -58,6 +58,7 @@ import { pipelineOf, viewDrawnIds } from '@radical/common/viewPipeline'
 import { mergeModels, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
+import { conceptFileAsModel, resolveParamValues, retemplateText } from '@radical/common/hubImport'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
@@ -5749,24 +5750,43 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       // ── Hub import templates ────────────────────────────────────────────
-      applyHubTemplate(id, values) {
+      applyHubTemplate(id, given) {
         const record = get().hubTemplates[id] as HubImportRecord | undefined
         if (!record) return
-        const subst = (text: string): string => text.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_m, key: string) => values[key] ?? `{{${key}}}`)
+        // A value left blank takes the template's default.
+        const values = resolveParamValues(record.templateParams, given)
+        const redo = (current: unknown, original: string): string =>
+          retemplateText(typeof current === 'string' ? current : '', original, record.paramValues, values)
         _asOneStep(() => {
           get()._pushUndo()
           // In a milestone: an edit of it, kept or dropped as the question
           // after it says (the record with it).
           get()._markMilestoneEdit()
           set((state) => {
-            // Only the fields the Hub's text gave a parameter: the others may
-            // have been edited since (a rename was lost to "Apply").
+            // Only the fields the Hub's text gave a parameter, and in them
+            // only the old value: the rest may have been edited since (a
+            // rename was lost to "Apply").
             for (const [nodeId, original] of Object.entries(record.originalNodes)) {
               const n = state.c4Nodes[nodeId] as unknown as Record<string, unknown> | undefined
               if (!n) continue
               for (const [key, value] of Object.entries(original)) {
-                if (typeof value === 'string' && /\{\{[A-Z0-9_]+\}\}/.test(value)) n[key] = subst(value)
+                if (typeof value === 'string' && /\{\{[A-Z0-9_]+\}\}/.test(value)) n[key] = redo(n[key], value)
               }
+            }
+            // The relations' texts and the flows' names and step notes too.
+            for (const [relId, original] of Object.entries(record.originalRelations ?? {})) {
+              const r = state.c4Relations[relId] as unknown as Record<string, unknown> | undefined
+              if (!r) continue
+              for (const [key, value] of Object.entries(original)) if (typeof value === 'string') r[key] = redo(r[key], value)
+            }
+            for (const [seqId, original] of Object.entries(record.originalSequences ?? {})) {
+              const seq = state.sequences[seqId]
+              if (!seq) continue
+              if (original.name) seq.name = redo(seq.name, original.name)
+              original.stepDescriptions?.forEach((note, i) => {
+                if (typeof note !== 'string' || !seq.stepDescriptions) return
+                seq.stepDescriptions[i] = redo(seq.stepDescriptions[i], note)
+              })
             }
             ;(state.hubTemplates as Record<string, HubImportRecord>)[id] = { ...record, paramValues: { ...values } }
             state.canUndo = _undoStack.length > 0
@@ -6200,7 +6220,9 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       // ── I/O ─────────────────────────────────────────────────────────────
-      loadDiagram(data, opts) {
+      loadDiagram(loaded, opts) {
+        // A Hub concept file opened as a model: its template filled in.
+        const data = conceptFileAsModel(loaded)
         _modelLoads++
         get().stopLiveLayout()
         // The history is Designer's live model's: a milestone shown, a slide
