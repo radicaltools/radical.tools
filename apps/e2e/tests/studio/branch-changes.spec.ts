@@ -61,7 +61,8 @@ test('the changes since the base show on the canvas, in the list of views and on
   await openFolder(page, studio, ARCH, { '.radical/base.json': ARCH_BASE })
 
   const button = page.getByRole('button', { name: /^Changes on branch/ })
-  await expect(button.locator('.branch-count')).toHaveText('3', { timeout: 10_000 })
+  // Three elements and the relation Checkout API → Fraud check.
+  await expect(button.locator('.branch-count')).toHaveText('4', { timeout: 10_000 })
   await expect(button).toHaveAttribute('aria-pressed', 'false')
   await expect(page.locator('.lp-branch-count')).toHaveCount(0)
 
@@ -72,7 +73,7 @@ test('the changes since the base show on the canvas, in the list of views and on
   const tip = page.getByRole('tooltip')
   await expect(tip).toBeVisible()
   await expect(tip).toContainText('Changes on branch')
-  await expect(tip).toContainText('3 elements changed since main 534f32f')
+  await expect(tip).toContainText('3 elements and 1 relation changed since main 534f32f')
 
   // Each view counts the changes it shows; All elements counts them all.
   const card = (name: string) => page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: name }) })
@@ -99,7 +100,7 @@ test('the changes since the base show on the canvas, in the list of views and on
   // An edit is a change at once.
   await studio.node('shop').click({ position: { x: 40, y: 12 } })
   await studio.properties.getByRole('textbox', { name: 'Name' }).fill('Book shop')
-  await expect(button.locator('.branch-count')).toHaveText('4')
+  await expect(button.locator('.branch-count')).toHaveText('5')
   await expect(studio.node('shop')).toContainText('CHANGED')
   await expect(studio.properties.getByRole('region', { name: 'Changes on branch' }).locator('del')).toHaveText(['Shop'])
 
@@ -134,7 +135,8 @@ test('a removed element is drawn inside its container on a view laid out its own
   model.views = model.views!.map((v) => ({ ...v, nodeIds: v.nodeIds.filter((id) => id !== 'legacy') }))
   await openFolder(page, studio, model, { '.radical/base.json': ARCH_BASE })
   const button = page.getByRole('button', { name: /^Changes on branch/ })
-  await expect(button.locator('.branch-count')).toHaveText('3', { timeout: 10_000 })
+  // Three elements and the relation Checkout API → Fraud check.
+  await expect(button.locator('.branch-count')).toHaveText('4', { timeout: 10_000 })
   await button.click()
   const card = (name: string) => page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: name }) })
   await expect(card('Containers').locator('.lp-branch-count')).toHaveText('3')
@@ -163,9 +165,10 @@ test('a base saved since HEAD says so', async ({ page, studio }) => {
   const sinceHead = serializeModelBase({ commit: COMMIT, described: 'HEAD', branch: 'main', nodes: JSON.parse(ARCH_BASE).nodes, relations: [] })
   await openFolder(page, studio, ARCH, { '.radical/base.json': sinceHead })
   const button = page.getByRole('button', { name: /^Changes on branch/ })
-  await expect(button.locator('.branch-count')).toHaveText('3', { timeout: 10_000 })
+  // Three elements and the relation Checkout API → Fraud check.
+  await expect(button.locator('.branch-count')).toHaveText('4', { timeout: 10_000 })
   await button.hover()
-  await expect(page.getByRole('tooltip')).toContainText('3 elements changed since HEAD 534f32f')
+  await expect(page.getByRole('tooltip')).toContainText('3 elements and 1 relation changed since HEAD 534f32f')
   await expect(page.getByRole('tooltip')).not.toContainText('main 534f32f')
   await page.getByRole('button', { name: /^Inspector/ }).click()
   await page.getByRole('tab', { name: /^Changes/ }).click()
@@ -189,11 +192,11 @@ test('the Inspector lists every change since the base, and a click leads to the 
   await page.getByRole('region', { name: 'This change' }).getByRole('button', { name: /^All changes/ }).click()
   const tab = page.getByRole('tab', { name: /^Changes/ })
   await expect(tab).toHaveAttribute('aria-selected', 'true')
-  await expect(tab).toContainText('3')
+  await expect(tab).toContainText('4')
 
   const changes = page.getByRole('region', { name: 'Changes', exact: true })
   await expect(changes).toContainText('since main 534f32f')
-  await expect(changes).toContainText('3 elements changed: 1 added, 1 changed, 1 removed')
+  await expect(changes).toContainText('3 elements changed: 1 added, 1 changed, 1 removed; 1 relation changed')
   const all = changes.getByRole('region', { name: 'All changes' })
   await expect(all.getByRole('region', { name: 'Added' })).toContainText('Fraud check')
   await expect(all.getByRole('region', { name: 'Changed' })).toContainText('Checkout API')
@@ -224,6 +227,43 @@ test('the Inspector lists every change since the base, and a click leads to the 
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
   await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Architecture')
   await expect(studio.node('api')).toHaveClass(/selected/)
+})
+
+test('a branch that only adds a relation counts it', async ({ page, studio }) => {
+  // The toolbar counted elements only: 0, and "0 elements changed".
+  const nodes = ARCH.nodes.filter((n) => n.id !== 'fraud')
+  await openFolder(page, studio, { ...ARCH, nodes, relations: [rel('r1', 'interacts', 'api', 'need')], views: [] }, { '.radical/base.json': base(nodes, []) })
+  const button = page.getByRole('button', { name: /^Changes on branch/ })
+  await expect(button.locator('.branch-count')).toHaveText('1', { timeout: 10_000 })
+  await button.hover()
+  await expect(page.getByRole('tooltip')).toContainText('1 relation changed since main 534f32f')
+  await page.getByRole('button', { name: /^Inspector/ }).click()
+  await expect(page.getByRole('tab', { name: /^Changes/ })).toContainText('1')
+  await expect(page.getByRole('region', { name: 'Changes', exact: true })).toContainText('0 elements changed: 0 added, 0 changed, 0 removed; 1 relation changed')
+})
+
+test('with a milestone open, the Inspector lists the changes of the model as it is', async ({ page, studio }) => {
+  // The chips looked the elements up in the milestone: empty rows, or the
+  // milestone's old names, under a header that counted the live model.
+  const milestone = {
+    id: 'm-v1', name: 'v1', timestamp: Date.parse('2026-10-01T10:00:00Z'),
+    nodes: Object.fromEntries([
+      node('shop', 'system', 'Shop', { x: 40, y: 40, width: 760, height: 300 }),
+      node('api', 'container', 'Old API', { parentId: 'shop', x: 40, y: 80 }),
+      node('need', 'need', 'Pay online', { x: 900, y: 40 }),
+    ].map((n) => [n.id, n])),
+    relations: {},
+  }
+  await openFolder(page, studio, { ...ARCH, snapshots: [milestone] }, { '.radical/base.json': ARCH_BASE })
+  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v1' }).click()
+  await expect(page).toHaveURL(/\/s\/m-v1/)
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+  const all = page.getByRole('region', { name: 'All changes' })
+  await expect(all.getByRole('region', { name: 'Added' }).getByRole('button')).toHaveText([/Fraud check/])
+  await expect(all.getByRole('region', { name: 'Changed' }).getByRole('button')).toHaveText([/Checkout API/])
+  await all.getByRole('button', { name: /^Relations/ }).click()
+  await expect(all.getByRole('region', { name: 'Relations' })).toContainText('Checkout API → Fraud check')
 })
 
 // Five requirements and a decision changed on the branch, and a test report.
@@ -308,7 +348,7 @@ test('without a base the button says how to save one, and an old base is marked'
 
   // A base saved two days ago, on another branch.
   await folder.write('.radical/base.json', base(JSON.parse(ARCH_BASE).nodes, [], new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), 'feat/inspector-tabs'))
-  await expect(button.locator('.branch-count')).toHaveText('⚠ 3', { timeout: 10_000 })
+  await expect(button.locator('.branch-count')).toHaveText('⚠ 4', { timeout: 10_000 })
   await button.hover()
   await expect(page.getByRole('tooltip')).toContainText('old base, saved 2 days ago on feat/inspector-tabs')
   const inspector = page.getByRole('button', { name: /^Inspector/ })

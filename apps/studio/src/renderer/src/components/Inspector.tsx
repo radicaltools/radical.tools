@@ -10,15 +10,17 @@
 
 import React, { useMemo, useState } from 'react'
 import { changeWork } from '@radical/common/branchChanges'
+import { compareCheckConfig, defaultSeverity } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { ElementCard, type CardBranch } from '@radical/ui/components/RightPanel'
 import { useInspectorNav, type InspectorTab } from '../navigation'
-import { useInspectorStore } from '../persistence/inspector'
+import { useInspectorStore, useSettingsDraft } from '../persistence/inspector'
 import { useBranchStore } from '../persistence/branchChanges'
 import { ThisChange } from './inspector/ThisChange'
 import { ChangesTab } from './inspector/ChangesTab'
 import { useDocumentsStore } from '../store/documentStore'
+import { changeTotal } from './BranchChanges'
 import { Errors, OpenWikiPage, Peek, ShowOnCanvas, TabBadge, dimensionOfFinding, dimensionsOf, type Ctx } from './inspector/shared'
 import { ModelTab } from './inspector/ModelTab'
 import { ImplementationTab } from './inspector/ImplementationTab'
@@ -30,8 +32,13 @@ export function Inspector(): React.ReactElement {
   const check = useInspectorStore((s) => s.check)
   const results = useInspectorStore((s) => s.results)
   const configError = useInspectorStore((s) => s.configError)
-  const nodes = useDiagramStore((s) => s.c4Nodes) as Record<string, C4Node>
-  const relations = useDiagramStore((s) => s.c4Relations) as Record<string, C4Relation>
+  const config = useInspectorStore((s) => s.config)
+  const draft = useSettingsDraft()
+  const unsaved = useMemo(() => !!draft && compareCheckConfig(config, draft, defaultSeverity).length > 0, [config, draft])
+  // The live model, as the check and the changes read it, also while a
+  // milestone is on screen (its elements are parked in liveBackup).
+  const nodes = useDiagramStore((s) => s.activeSnapshotId && s.liveBackup ? s.liveBackup.nodes : s.c4Nodes) as Record<string, C4Node>
+  const relations = useDiagramStore((s) => s.activeSnapshotId && s.liveBackup ? s.liveBackup.relations : s.c4Relations) as Record<string, C4Relation>
   const metamodel = useDiagramStore((s) => s.metamodel)
   const activeDoc = useDocumentsStore((s) => s.docs.find((d) => d.id === s.activeId) ?? null)
   const [peekId, setPeekId] = useState<string | null>(null)
@@ -69,13 +76,15 @@ export function Inspector(): React.ReactElement {
   const model = inPerspective('model')
   const impl = inPerspective('implementation')
   const tabs: Array<[Tab, string, React.ReactNode]> = [
-    ...(branch.changes && branch.base ? [['changes', 'Changes', <span key="c" className="insp-pill none">{branch.changes.counts.added + branch.changes.counts.changed + branch.changes.counts.removed}</span>] as [Tab, string, React.ReactNode]] : []),
+    ...(branch.changes && branch.base ? [['changes', 'Changes', <span key="c" className="insp-pill none">{changeTotal(branch.changes.counts)}</span>] as [Tab, string, React.ReactNode]] : []),
     ['model', 'Model quality', <TabBadge key="b" metrics={model.metrics} errors={model.errors.length} />],
     ['implementation', 'Implementation', <React.Fragment key="b">
       {check.evidence ? <TabBadge metrics={impl.metrics} errors={impl.errors.length} /> : <span className="insp-pill none">no results</span>}
       {work && work.newRequirements > 0 && <span className={`insp-pill ${work.newVerified === work.newRequirements ? 'ok' : 'warn'}`} title="New requirements of this change verified">This change {work.newVerified} / {work.newRequirements}</span>}
     </React.Fragment>],
-    ['settings', 'Settings', <code key="f" className="insp-muted">check.json</code>],
+    ['settings', 'Settings', unsaved
+      ? <span key="f" className="insp-pill warn" title="Settings changed and not saved to check.json yet">unsaved</span>
+      : <code key="f" className="insp-muted">check.json</code>],
   ]
 
   return (

@@ -31,7 +31,8 @@ export interface BranchChanges {
   /** The removed elements as the base has them, to draw as ghosts. */
   removedNodes: C4Node[]
   removedRelations: C4Relation[]
-  counts: { added: number; changed: number; removed: number }
+  /** The elements added, changed and removed, and the relations changed in any way. */
+  counts: { added: number; changed: number; removed: number; relations: number }
 }
 
 /** What changed from the base to the model now. */
@@ -48,7 +49,10 @@ export function branchChanges(base: ModelCopy, nodes: Record<string, C4Node>, re
     relations: marks(report.relations),
     removedNodes: report.elements.removed.map((c) => base.nodes[c.id]),
     removedRelations: report.relations.removed.map((c) => base.relations[c.id]),
-    counts: { added: report.elements.added.length, changed: report.elements.changed.length, removed: report.elements.removed.length },
+    counts: {
+      added: report.elements.added.length, changed: report.elements.changed.length, removed: report.elements.removed.length,
+      relations: report.relations.added.length + report.relations.changed.length + report.relations.removed.length,
+    },
   }
 }
 

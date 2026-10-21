@@ -25,7 +25,7 @@ export function formatCheckText(result: CheckResult, options: FormatOptions): st
   for (const rule of result.rules) {
     if (rule.notRun) {
       // Not ✓: it found nothing because it did not look.
-      if (rule.max !== undefined && rule.severity !== 'off') lines.push(`– ${rule.id}  not run: ${rule.notRun === 'no-report' ? 'no test report' : 'the folder is no model'} (max ${rule.max})`)
+      if (rule.max !== undefined && rule.severity !== 'off') lines.push(`– ${rule.id}  not run: ${rule.notRun === 'no-report' ? 'no test report' : rule.notRun === 'no-folder' ? 'no model folder' : 'the folder is no model'} (max ${rule.max})`)
       continue
     }
     if (rule.severity === 'off' || rule.count === 0) {
@@ -45,9 +45,11 @@ export function formatCheckText(result: CheckResult, options: FormatOptions): st
     if (shown.length < list.length) lines.push(`    … ${list.length - shown.length} more (--verbose shows them)`)
   }
   const goals = result.metrics.filter((m) => m.min !== undefined)
-  if (goals.length) {
+  if (goals.length || result.goalsNotRun.length) {
     lines.push('', 'Goals:')
     for (const m of goals) lines.push(`  ${m.met ? '✓' : '✖'} ${m.id}  ${m.percent}% (${m.count} of ${m.total}, min ${m.min}%)`)
+    // Not ✓: it was not measured.
+    for (const g of result.goalsNotRun) lines.push(`  – ${g.id}  not run: ${g.notRun === 'no-report' ? 'no test report' : 'the folder is no model'} (min ${g.min}%)`)
   }
   if (result.evidence) lines.push('', ...evidenceSummary(result))
   if (result.unknownRules.length) lines.push('', `⚠ The config names rules that do not exist: ${result.unknownRules.join(', ')}`)

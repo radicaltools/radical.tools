@@ -39,6 +39,10 @@ export interface Io {
   err: (text: string) => void
   /** How a shell runs this command line, for the git hooks (default: radical). */
   command?: string
+  /** The node and the script that run this command line, when it runs from
+   *  a file: in place of `command`, the hooks name a script inside the
+   *  repository by its path from the top, so each working tree runs its own. */
+  cli?: { node: string; script: string }
 }
 
 /** Runs `radical check` with `args` (after the command name); returns the exit status. */
@@ -104,9 +108,20 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   let tests: TestCase[] | undefined
   if (values.report?.length) {
     tests = []
-    for (const report of await reportFiles(values.report, io.cwd)) {
+    let reports: string[]
+    try {
+      reports = await reportFiles(values.report, io.cwd)
+    } catch (error) {
+      io.err((error as Error).message)
+      return 2
+    }
+    for (const report of reports) {
       try {
-        tests.push(...parseTestReport(await readFile(resolve(io.cwd, report), 'utf8'), report))
+        const cases = parseTestReport(await readFile(resolve(io.cwd, report), 'utf8'), report)
+        // A report that names no test (another kind of XML, a run that
+        // found nothing) is not what --report was meant to read.
+        if (!cases.length) throw new Error('it holds no test case')
+        tests.push(...cases)
       } catch (error) {
         io.err(`Cannot read the test report ${report}: ${(error as Error).message}`)
         return 2
@@ -138,13 +153,15 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
 }
 
 /** The report files `paths` name: a file as it is, a directory's .json and
- *  .xml files. A path that is not there is passed on, and fails to read. */
+ *  .xml files. A path that is not there is passed on, and fails to read; a
+ *  directory with no report in it throws. */
 async function reportFiles(paths: string[], cwd: string): Promise<string[]> {
   const files: string[] = []
   for (const path of paths) {
     const isDir = await stat(resolve(cwd, path)).then((s) => s.isDirectory(), () => false)
     if (!isDir) { files.push(path); continue }
     const names = (await readdir(resolve(cwd, path))).filter((name) => /\.(json|xml)$/i.test(name)).sort()
+    if (!names.length) throw new Error(`The report directory ${path} holds no .json or .xml report.`)
     files.push(...names.map((name) => join(path, name)))
   }
   return files

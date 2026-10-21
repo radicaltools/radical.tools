@@ -13,7 +13,7 @@ import type { ModelCopy } from '@radical/common/model'
 import type { ElementChange } from '@radical/common/modelChanges'
 import { Chip, type Ctx } from './shared'
 import { GoneChip } from './ThisChange'
-import { ago, BaseSince, SaveBaseHelp } from '../BranchChanges'
+import { ago, BaseSince, SaveBaseHelp, changeBreakdown } from '../BranchChanges'
 
 const FIELD_NAMES: Record<string, string> = { label: 'name', parentId: 'place', description: 'description', technology: 'technology', external: 'external', type: 'type' }
 
@@ -79,11 +79,10 @@ function AllChanges({ changes, baseModel, ctx }: { changes: BranchChanges; baseM
 export function ChangesTab({ changes, base, baseModel, ctx }: {
   changes: BranchChanges; base: ModelBase; baseModel: ModelCopy; ctx: Ctx
 }): React.ReactElement {
-  const { added, changed, removed } = changes.counts
   return (
     <section className="insp-changes" aria-label="Changes">
       <p className="insp-lede insp-tab-lede">
-        What changed in the model since <BaseSince base={base} />{base.source === 'forge' ? '' : ', uncommitted edits included'}; moving elements and editing views do not count. Base saved {ago(base.savedAt)} · {added + changed + removed} elements changed: {added} added, {changed} changed, {removed} removed.
+        What changed in the model since <BaseSince base={base} />{base.source === 'forge' ? '' : ', uncommitted edits included'}; moving elements and editing views do not count. Base saved {ago(base.savedAt)} · {changeBreakdown(changes.counts)}.
       </p>
       {isBaseOld(base) && (
         <div className="insp-notice warn insp-change-old">

@@ -12,7 +12,7 @@ import type { ModelBase } from '@radical/common/formats/modelBase'
 import type { ModelCopy } from '@radical/common/model'
 import { isBaseOld } from '@radical/common/formats/modelBase'
 import { Bar, Chip, SHORT_TYPE, type Ctx } from './shared'
-import { ago, BaseSince } from '../BranchChanges'
+import { ago, BaseSince, changeBreakdown } from '../BranchChanges'
 
 const STATUS: Record<ChangeWorkStatus, [tone: string, text: string]> = {
   verified: ['ok', '✓ verified'],
@@ -66,7 +66,6 @@ export function ThisChange({ work, changes, base, baseModel, ctx, onAllChanges }
   work: ChangeWork; changes: BranchChanges; base: ModelBase; baseModel: ModelCopy; ctx: Ctx; onAllChanges: () => void
 }): React.ReactElement {
   const [left, setLeft] = useState(false)
-  const { added, changed, removed } = changes.counts
   const items = left ? work.items.filter((item) => !done(item)) : work.items
   const toDo = work.items.filter((item) => !done(item)).length
   const newReqs = work.items.filter((item) => item.kind === 'added' && item.type === 'requirement')
@@ -78,7 +77,7 @@ export function ThisChange({ work, changes, base, baseModel, ctx, onAllChanges }
         <div>
           <h2>This change</h2>
           <p className="insp-muted">
-            Since <BaseSince base={base} /> · base saved {ago(base.savedAt)} · {added + changed + removed} elements changed: {added} added, {changed} changed, {removed} removed
+            Since <BaseSince base={base} /> · base saved {ago(base.savedAt)} · {changeBreakdown(changes.counts)}
           </p>
         </div>
         <button type="button" className="insp-all-link" onClick={onAllChanges}>All changes{isBaseOld(base) ? ' · old base' : ''} ›</button>

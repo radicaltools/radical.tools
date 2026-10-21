@@ -35,9 +35,11 @@ interface BranchState {
   changes: BranchChanges | null
   /** Changes on branch: the changes shown on the canvas. */
   on: boolean
+  /** The document whose base has been looked for, there or not. */
+  readFor: string | null
 }
 
-export const useBranchStore = create<BranchState>(() => ({ base: null, baseModel: null, model: null, changes: null, on: false }))
+export const useBranchStore = create<BranchState>(() => ({ base: null, baseModel: null, model: null, changes: null, on: false, readFor: null }))
 
 /** Changes on branch on or off; it stays off without a base. */
 export function setBranchChangesShown(on: boolean): void {
@@ -110,12 +112,14 @@ if (typeof window !== 'undefined') {
     if (id !== polledFor) {
       polledFor = id
       lastText = null
-      useBranchStore.setState({ base: null, baseModel: null, model: null, changes: null, on: false })
+      useBranchStore.setState({ base: null, baseModel: null, model: null, changes: null, on: false, readFor: null })
       showOverlay()
     }
     if (!id) return
     const text = await documents.readModelBase(id).catch(() => null)
-    if (documents.getActiveId() !== id || text === lastText) return
+    if (documents.getActiveId() !== id) return
+    if (useBranchStore.getState().readFor !== id) useBranchStore.setState({ readFor: id })
+    if (text === lastText) return
     lastText = text
     const base = text ? parseModelBase(text) : null
     useBranchStore.setState((s) => ({ base, baseModel: base ? baseCopy(base) : null, on: s.on && !!base }))

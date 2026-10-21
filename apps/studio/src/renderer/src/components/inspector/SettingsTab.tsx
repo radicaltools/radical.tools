@@ -12,11 +12,13 @@ import {
   CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, compareCheckConfig, defaultSeverity, ratchetConfig,
   type CheckConfig, type CheckConfigChange, type CheckMetric, type CheckResult, type CheckSeverity,
 } from '@radical/common/check'
-import { saveCheckConfig, serializeCheckConfig, useInspectorStore } from '../../persistence/inspector'
+import { saveCheckConfig, serializeCheckConfig, setSettingsDraft, useInspectorStore, useSettingsDraft } from '../../persistence/inspector'
 import { DIMENSIONS, RULE_INFO, dimensionOfKey, metricOf } from './shared'
 import { lineDiff, patchRule, setGoal, type RulePatch } from './settingsDraft'
 
-const FOLDER_RULE_IDS = new Set(FOLDER_RULES.map((r) => r.id))
+// The rules only radical check counts, on the folder's files; Studio checks
+// the model in memory (stale-reference reads the model, so Studio counts it).
+const FILE_RULE_IDS = new Set(FOLDER_RULES.map((r) => r.id).filter((id) => id !== 'stale-reference'))
 const SEVERITIES: Array<[CheckSeverity | 'off', string, string]> = [['error', 'Error', 'e'], ['warning', 'Warning', 'w'], ['off', 'Off', 'o']]
 
 const settingOf = (config: CheckConfig, key: string): { severity?: CheckSeverity | 'off'; max?: number; include?: string[]; exclude?: string[] } => {
@@ -53,7 +55,9 @@ function GlobList({ label, globs, onChange, disabled }: { label: string; globs: 
 export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckResult; editable: boolean; readOnlyReason: string }): React.ReactElement {
   const config = useInspectorStore((s) => s.config)
   const configError = useInspectorStore((s) => s.configError)
-  const [draft, setDraft] = useState<CheckConfig | null>(null)
+  // In the store, not here: going to another tab or Back kept no edit.
+  const draft = useSettingsDraft()
+  const setDraft = setSettingsDraft
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [allMetrics, setAllMetrics] = useState(false)
@@ -116,7 +120,7 @@ export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckR
     const severity = setting.severity ?? defaultSeverity(base)
     const result = check.rules.find((r) => r.id === key)
     const change = changeOf('rule', key)
-    const folderRule = FOLDER_RULE_IDS.has(base)
+    const folderRule = FILE_RULE_IDS.has(base)
     // A rule that reads test reports found nothing because it did not run.
     const notRun = !!result?.notRun || (!check.evidence && !!CHECK_RULES.find((r) => r.id === base)?.readsReports)
     return (
