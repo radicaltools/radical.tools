@@ -158,6 +158,25 @@ describe('outline edits', () => {
     expect(outlinePlan(tree, keyOf('checkout'), 'outdent', hasOrder)).toBeNull()
   })
 
+  // Open point (runs 45–64): Enter or Alt+↑/↓ on a top-level process
+  // renumbered the processes of other containers with it.
+  it('numbers top-level processes only among those of their own container', () => {
+    const nodes = byId([
+      node('shop', 'system', 'Shop'), node('bank', 'system', 'Bank'),
+      node('buy', 'process', 'Buy', { parentId: 'shop', order: 1 }), node('ship', 'process', 'Ship', { parentId: 'shop', order: 2 }),
+      node('lend', 'process', 'Lend', { parentId: 'bank', order: 1 }),
+    ])
+    const processes: DiagramView = { id: 'p', name: 'Processes', kind: 'warnier', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['process', 'step'] }] }] } }
+    const roots = warnierTree(warnierRows(processes, { nodes, relations: [], metamodel }))
+    const key = (id: string) => roots.find((i) => i.node.id === id)!.key
+    const ordered = (t: string) => t === 'process' || t === 'step'
+    expect(roots.map((i) => i.node.id)).toEqual(['buy', 'lend', 'ship'])
+    // Ship up past Lend (of Bank): Shop's two keep their numbers, Lend stays 1.
+    expect(outlinePlan(roots, key('ship'), 'up', ordered)).toEqual({ orders: { buy: 1, ship: 2, lend: 1 } })
+    // A new process after Lend goes into Bank, numbered among Bank's.
+    expect(insertPlan(roots, key('lend'), 'after', 'process', ordered)).toEqual({ parentId: 'bank', order: 2, orders: { buy: 1, lend: 1, ship: 2 } })
+  })
+
   it('edits a containment tree, and only renames a chain\'s', () => {
     expect(warnierEditable(view)).toBe(true)
     expect(warnierEditable(undefined)).toBe(true)

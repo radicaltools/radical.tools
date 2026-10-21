@@ -50,7 +50,9 @@ export function MatrixView(): React.ReactElement {
   const removeRelation   = useDiagramStore((s) => s.removeRelation)
   const pushNotification = useDiagramStore((s) => s.pushNotification)
   const appMode          = useDiagramStore((s) => s.appMode)
-  const readonly         = appMode !== 'designer'
+  // Read-only out of Designer, and on a slide played from it (F5).
+  const presenting       = useDiagramStore((s) => s.presentationActive)
+  const readonly         = appMode !== 'designer' || presenting
 
   const [hover, setHover] = useState<{ row: number; col: number } | null>(null)
 

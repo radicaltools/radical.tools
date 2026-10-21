@@ -106,7 +106,8 @@ export function TableView(): React.ReactElement {
   const selectNode       = useDiagramStore((s) => s.selectNode)
   const selectedNodeId   = useDiagramStore((s) => s.selectedNodeId)
   const activeView       = useDiagramStore((s) => s.activeViewId ? s.views[s.activeViewId] : undefined)
-  const readOnly         = useDiagramStore((s) => s.appMode !== 'designer')
+  // Read-only out of Designer, and on a slide played from it (F5).
+  const readOnly         = useDiagramStore((s) => s.appMode !== 'designer' || s.presentationActive)
   const metamodel        = useDiagramStore((s) => s.metamodel)
   const requestCreateNode = useDiagramStore((s) => s.requestCreateNode)
   const pushNotification = useDiagramStore((s) => s.pushNotification)

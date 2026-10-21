@@ -365,7 +365,9 @@ export function WikiView(): React.ReactElement {
   const setWikiPageMode = useDiagramStore((s) => s.setWikiPageMode)
   const appMode = useDiagramStore((s) => s.appMode)
 
-  const readOnly = appMode !== 'designer'
+  // Read-only out of Designer, and on a slide played from it (F5).
+  const presenting = useDiagramStore((s) => s.presentationActive)
+  const readOnly = appMode !== 'designer' || presenting
   const typeMeta = useTypeMeta()
 
   const view = activeViewId ? views[activeViewId] : null
@@ -440,6 +442,8 @@ export function WikiView(): React.ReactElement {
     // The values the view's filter asks for, as the table gives them; what
     // the line says wins (a sentence's own EARS type).
     const filtered = newElementFilters(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }, type, under ? { node: under, link: links[0] } : undefined)
+    // At the top, in the element a filter "inside" asks for.
+    const placed = under ? parentId : filtered?.within
     const ids = addNodes(lines.map((line) => ({
       node: {
         type: type as C4ElementType,
@@ -449,7 +453,7 @@ export function WikiView(): React.ReactElement {
         external: false,
         ...filtered?.properties,
         ...elementFromLine(type, line),
-        parentId,
+        parentId: placed,
         x: 0,
         y: 0,
         ...nodeTypeSize(type, metamodel),

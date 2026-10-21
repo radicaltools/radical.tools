@@ -847,14 +847,15 @@ export function addChoices(view: DiagramView | undefined, ctx: PipelineContext, 
  *  level holds what lies inside its elements too, as a Warnier view draws
  *  it. `hidden` when the view will not show it all the same: its type does
  *  not pass, there is no level for it, or a filter cannot be met (a text the
- *  name must hold). Null for a view without a chain. Views that add their
- *  own way (Warnier, the wiki) give it these values, as the table does. */
+ *  name must hold). `within`: the element a level's "inside" filter asks
+ *  it to go in. Null for a view without a chain. Views that add their own
+ *  way (Warnier, the wiki) give it these values, as the table does. */
 export function newElementFilters(
   view: DiagramView | undefined,
   ctx: PipelineContext,
   type: string,
   under?: { node: C4Node; link?: Omit<WizardLink, 'otherId'> },
-): { properties: Record<string, string>; hidden?: true } | null {
+): { properties: Record<string, string>; within?: string; hidden?: true } | null {
   const levels = pipelineOf(view)?.levels ?? []
   if (!levels.length) return null
   let at = 0
@@ -866,7 +867,7 @@ export function newElementFilters(
   if (!level || !level.ways.some((w) => !w.types?.length || w.types.includes(type))) return { properties: {}, hidden: true }
   const meet = meetFilters(type, level.filters, under?.link, ctx)
   if (meet.excluded) return { properties: {}, hidden: true }
-  return { properties: meet.properties, ...(meet.hidden ? { hidden: true as const } : {}) }
+  return { properties: meet.properties, ...(meet.within ? { within: meet.within } : {}), ...(meet.hidden ? { hidden: true as const } : {}) }
 }
 
 // ─── Suggestions for levels ─────────────────────────────────────────────────
