@@ -137,13 +137,277 @@ export function placeBesideSiblings(
   }
 }
 
+/** A box as a canvas draws it. */
+export type CanvasBox = { x: number; y: number; w: number; h: number }
+
+/** What a canvas draws (`shown`) and at what size (`boxOf`, in its
+ *  parent's frame): Studio's store knows a view's collapsed sets; without
+ *  them, modelCanvas. */
+export interface CanvasShape {
+  shown: (n: C4Node) => boolean
+  boxOf: (n: C4Node) => CanvasBox
+}
+
+/** A canvas as the model draws it: the nodes in `shownIds` (every node when
+ *  undefined) under no folded ancestor, at their drawn size (drawnSize). */
+export function modelCanvas(nodes: Record<string, C4Node>, shownIds?: ReadonlySet<string>): CanvasShape {
+  const shown = (n: C4Node): boolean => (!shownIds || shownIds.has(n.id)) && isVisible(n, nodes)
+  const parents = new Set(Object.values(nodes).filter(shown).map((n) => n.parentId).filter((id): id is string => !!id))
+  const boxOf = (n: C4Node): CanvasBox => {
+    const size = drawnSize(n, parents.has(n.id))
+    return { x: n.x, y: n.y, w: size.width, h: size.height }
+  }
+  return { shown, boxOf }
+}
+
+const boxesOverlap = (a: CanvasBox, b: CanvasBox): boolean =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+
+/** True when `node`, where it stands on the canvas, lies inside its
+ *  parent's frame (anywhere at the root) and on none of the siblings the
+ *  canvas draws, those `ignore` accepts left out. */
+export function liesClearInParent(
+  node: C4Node,
+  nodes: Record<string, C4Node>,
+  canvas: CanvasShape,
+  ignore: (sibling: C4Node) => boolean = () => false,
+): boolean {
+  const box = canvas.boxOf(node)
+  const parent = node.parentId ? nodes[node.parentId] : undefined
+  if (parent) {
+    const frame = canvas.boxOf(parent)
+    if (box.x < 0 || box.y < 0 || box.x + box.w > frame.w || box.y + box.h > frame.h) return false
+  }
+  return !Object.values(nodes).some((s) => s.id !== node.id && (s.parentId ?? undefined) === (node.parentId ?? undefined)
+    && canvas.shown(s) && !ignore(s) && boxesOverlap(box, canvas.boxOf(s)))
+}
+
+/**
+ * The nodes moved into another parent (`ids`, already under it) on one
+ * canvas, by the rule for moves: one keeps its place where it lies inside
+ * its new parent and clear of its new siblings (liesClearInParent);
+ * otherwise it goes inside the parent beside its siblings
+ * (placeBesideSiblings). The parents then fit what they hold, and where
+ * one grew its siblings make room for it (makeRoomAround), level by level
+ * up the tree, as an expand does. `fit` refits one parent to its children
+ * (the store's, which knows the view's folds); headless, fitShown. Mutates
+ * `nodes`; returns the ids it placed or pushed.
+ */
+export function settleMovedNodes(
+  nodes: Record<string, C4Node>,
+  ids: readonly string[],
+  canvas: CanvasShape,
+  fit: (parentId: string) => void = (parentId) => fitShown(nodes, parentId, canvas),
+): string[] {
+  const moved = ids.filter((id) => nodes[id] && canvas.shown(nodes[id]))
+  if (!moved.length) return []
+  const touched: string[] = []
+  const waiting = new Set(moved)
+  for (const id of moved) {
+    const node = nodes[id]
+    if (!liesClearInParent(node, nodes, canvas, (s) => waiting.has(s.id))) {
+      const at = placeBesideSiblings(nodes, node.parentId, (s) => s.id !== id && !waiting.has(s.id) && canvas.shown(s))
+      node.x = at.x
+      node.y = at.y
+      touched.push(id)
+    }
+    waiting.delete(id)
+  }
+  const parents = [...new Set(moved.map((id) => nodes[id].parentId).filter((p): p is string => !!p && !!nodes[p]))]
+  for (const parentId of parents) touched.push(...growWithRoom(nodes, parentId, canvas, fit))
+  return touched
+}
+
+/** Refits `startId` to its children, then each ancestor, and wherever one
+ *  grew on the canvas its siblings make room for it (makeRoomAround).
+ *  Returns the ids pushed aside. Mutates `nodes`. */
+export function growWithRoom(
+  nodes: Record<string, C4Node>,
+  startId: string,
+  canvas: CanvasShape,
+  fit: (parentId: string) => void = (parentId) => fitShown(nodes, parentId, canvas),
+): string[] {
+  const pushed: string[] = []
+  const seen = new Set<string>()
+  for (let cur: C4Node | undefined = nodes[startId]; cur && !seen.has(cur.id); cur = cur.parentId ? nodes[cur.parentId] : undefined) {
+    seen.add(cur.id)
+    const was = canvas.boxOf(cur)
+    fit(cur.id)
+    const now = canvas.boxOf(nodes[cur.id])
+    if (now.w <= was.w && now.h <= was.h) continue
+    for (const [id, at] of Object.entries(makeRoomAround(cur.id, nodes, canvas))) {
+      nodes[id].x = at.x
+      nodes[id].y = at.y
+      pushed.push(id)
+    }
+    // Pushed past the parent's left or top edge, where a refit (which grows
+    // right and down) does not follow: the frame grows that way.
+    if (cur.parentId) growFrameLeftUp(nodes, cur.parentId, canvas.shown)
+  }
+  return pushed
+}
+
+/** The top a child keeps below its parent's top edge; one above it is drawn
+ *  there (liveColaEngine's LIVE_CHILD_TOP_MIN). */
+const CHILD_TOP_MIN = 50
+
+/** Grows `parentId`'s frame left and up over children that reach past its
+ *  left or top edge (opened round its centre, or pushed aside), moving it
+ *  and moving them back by as much: they stay where they are drawn. Mutates
+ *  `nodes`. */
+export function growFrameLeftUp(nodes: Record<string, C4Node>, parentId: string, shown: (n: C4Node) => boolean = () => true): void {
+  const parent = nodes[parentId]
+  if (!parent) return
+  const kids = Object.values(nodes).filter((c) => c.parentId === parentId && shown(c))
+  if (!kids.length) return
+  const pad = compoundPadding(parent.type)
+  const minX = Math.min(...kids.map((c) => c.x))
+  const minY = Math.min(...kids.map((c) => c.y))
+  const dx = minX < 0 ? pad.side - minX : 0
+  const dy = minY < CHILD_TOP_MIN ? pad.top - minY : 0
+  if (!dx && !dy) return
+  parent.x -= dx
+  parent.y -= dy
+  for (const k of kids) { k.x += dx; k.y += dy }
+}
+
+/** Fits `parentId` to the children the canvas draws (`canvas.shown`, or
+ *  those `counts` accepts), as fitAncestors measures them (the size they
+ *  open to); a folded or childless one keeps its size. Mutates `nodes`. */
+export function fitShown(nodes: Record<string, C4Node>, parentId: string, canvas: CanvasShape | { shown: (n: C4Node) => boolean }): void {
+  const parent = nodes[parentId]
+  if (!parent || !isContainerType(parent.type) || parent.collapsed) return
+  const children = Object.values(nodes).filter((c) => c.parentId === parentId && canvas.shown(c))
+  if (!children.length) return
+  const size = fittedParentSize(parent, children.map((c) => ({ x: c.x, y: c.y, width: effectiveWidth(c), height: effectiveHeight(c) })))
+  parent.width = size.width
+  parent.height = size.height
+}
+
+/** The gap an expand leaves between what it pushed and what pushed it. */
+export const EXPAND_GAP = 20
+/** What a push counts for each sibling it would put the pushed one on (px). */
+const HIT_COST = 200
+
+/**
+ * Room for `grownId`, which an expand (or what was moved into it) made
+ * larger, among its siblings on the canvas: the siblings it now lies on move out of its way, and what
+ * they then lie on moves on, as a wave from it outwards. The siblings are
+ * taken nearest first; each moves the least way out of what was placed
+ * before it (never back towards the grown one, and rather not onto
+ * another), so a sibling moves only when something moved into it, and the
+ * arrangement around the grown one is kept. Pairs a push did not reach are
+ * left as they were, and siblings keep the room they had between them, up
+ * to EXPAND_GAP. Only what the canvas draws counts (`canvas.shown`), at
+ * the size it draws it (`canvas.boxOf`). Returns id → new {x, y} for the
+ * siblings that moved.
+ *
+ * Pairwise pushes (separateSiblings) left overlaps behind among many
+ * siblings: each pass pushed both of a pair half way, into others, and 20
+ * passes did not settle a grid of 48 root systems round an opened one.
+ */
+export function makeRoomAround(
+  grownId: string,
+  nodes: Record<string, C4Node>,
+  canvas: CanvasShape,
+): Record<string, { x: number; y: number }> {
+  const grown = nodes[grownId]
+  if (!grown) return {}
+  const { shown, boxOf } = canvas
+  const siblings = Object.values(nodes).filter((n) => (n.parentId ?? undefined) === (grown.parentId ?? undefined) && shown(n))
+  if (siblings.length < 2) return {}
+  const box = new Map(siblings.map((n) => [n.id, boxOf(n)]))
+  const before = new Map(siblings.map((n) => [n.id, boxOf(n)]))
+  const g = box.get(grownId)!
+  const gx = g.x + g.w / 2
+  const gy = g.y + g.h / 2
+  const gapTo = (b: CanvasBox): number =>
+    Math.max(g.x - (b.x + b.w), b.x - (g.x + g.w), g.y - (b.y + b.h), b.y - (g.y + g.h), 0)
+  const order = siblings.filter((n) => n.id !== grownId)
+    .map((n) => ({ id: n.id, gap: gapTo(box.get(n.id)!), centre: Math.hypot(box.get(n.id)!.x + box.get(n.id)!.w / 2 - gx, box.get(n.id)!.y + box.get(n.id)!.h / 2 - gy) }))
+    .sort((a, b) => a.gap - b.gap || a.centre - b.centre || (a.id < b.id ? -1 : 1))
+  const placed: string[] = [grownId]
+  const moved = new Set<string>([grownId])
+  const hits = (a: CanvasBox, b: CanvasBox, gap: number): boolean =>
+    a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap
+  // Two siblings keep the room they had, up to EXPAND_GAP: one pushed does
+  // not push on what was closer to it than that.
+  const gapOf = (a: string, b: string): number => {
+    if (a === grownId || b === grownId) return EXPAND_GAP
+    const [p, q] = [before.get(a)!, before.get(b)!]
+    return Math.min(EXPAND_GAP, Math.max(0, p.x - (q.x + q.w), q.x - (p.x + p.w), p.y - (q.y + q.h), q.y - (p.y + p.h)))
+  }
+  for (const { id } of order) {
+    const b = box.get(id)!
+    const cx = b.x + b.w / 2 - gx
+    const cy = b.y + b.h / 2 - gy
+    for (let step = 0; step < placed.length * 4 + 8; step++) {
+      // Only what moved can be in the way: two siblings the expand did not
+      // reach stay as they were, close or not.
+      const at = placed.findIndex((pid) => (moved.has(pid) || moved.has(id)) && hits(b, box.get(pid)!, gapOf(id, pid)))
+      if (at < 0) break
+      const blocker = box.get(placed[at])!
+      const gap = gapOf(id, placed[at])
+      // Out of its way, away from the grown one on each axis.
+      const ways = [
+        { dx: blocker.x + blocker.w + gap - b.x, dy: 0, ok: cx >= 0 },
+        { dx: blocker.x - gap - (b.x + b.w), dy: 0, ok: cx <= 0 },
+        { dx: 0, dy: blocker.y + blocker.h + gap - b.y, ok: cy >= 0 },
+        { dx: 0, dy: blocker.y - gap - (b.y + b.h), ok: cy <= 0 },
+      ].filter((w) => w.ok)
+      // The least way out, counting what it would then lie on: each such
+      // sibling would have to move on in turn.
+      const cost = (w: { dx: number; dy: number }): number => {
+        const to = { x: b.x + w.dx, y: b.y + w.dy, w: b.w, h: b.h }
+        let hit = 0
+        for (const n of siblings) if (n.id !== id && n.id !== grownId && hits(to, box.get(n.id)!, 0)) hit++
+        return Math.abs(w.dx) + Math.abs(w.dy) + HIT_COST * hit
+      }
+      const way = ways.reduce((best, w) => (cost(w) < cost(best) ? w : best))
+      b.x += way.dx
+      b.y += way.dy
+      moved.add(id)
+    }
+    placed.push(id)
+  }
+  const result: Record<string, { x: number; y: number }> = {}
+  for (const n of siblings) {
+    const b = box.get(n.id)!
+    if (n.id !== grownId && (b.x !== n.x || b.y !== n.y)) result[n.id] = { x: b.x, y: b.y }
+  }
+  return result
+}
+
+/**
+ * The nodes whose place on a canvas (`nodes` hold it, `positions` say which
+ * it knows) lies mostly outside their parent's frame there: the middle of
+ * the box outside it. A place kept relative to another parent (a node file
+ * moved by hand into another container's folder, a model edited outside
+ * Studio) reads so; such a node is placed afresh (placeUnplaced).
+ */
+export function strayNodeIds(nodes: Record<string, C4Node>, positions: Record<string, unknown>): Set<string> {
+  const out = new Set<string>()
+  for (const n of Object.values(nodes)) {
+    const parent = n.parentId ? nodes[n.parentId] : undefined
+    // A folded parent may keep the size it is drawn at, smaller than what
+    // it holds: opened, it is fit to it.
+    if (!parent || parent.collapsed || !(n.id in positions) || !(parent.id in positions)) continue
+    const cx = n.x + effectiveWidth(n) / 2
+    const cy = n.y + effectiveHeight(n) / 2
+    if (cx < 0 || cy < 0 || cx > parent.width || cy > parent.height) out.add(n.id)
+  }
+  return out
+}
+
 /**
  * Gives the nodes a canvas has no place for a place on it. `nodes` hold the
  * canvas's positions for every node it knows (`positions`, its own map); a
  * node added on another canvas is still where that one had it, relative to
  * a parent that is laid out differently here: outside its frame, or on a
- * sibling. Each such node goes right of the siblings the canvas has placed,
- * top-aligned with them, and its ancestors are refit. What is inside a node
+ * sibling. So is one whose place there lies mostly outside its parent's
+ * frame (strayNodeIds). Each such node wraps what it holds here, goes right of the
+ * siblings the canvas has placed, top-aligned with them, and its ancestors
+ * are refit; where one grew, its siblings make room for it (growWithRoom). What is inside a node
  * placed this way keeps its place in it. Only nodes in `shown` (the ones a
  * view lists) are placed, when given. Mutates `nodes`; returns the ids it
  * placed. A canvas with no positions at all has not been laid out and is
@@ -155,7 +419,8 @@ export function placeUnplaced(
   shown?: Set<string>,
 ): string[] {
   if (!positions || Object.keys(positions).length === 0) return []
-  const known = (id: string): boolean => id in positions
+  const strays = strayNodeIds(nodes, positions)
+  const known = (id: string): boolean => id in positions && !strays.has(id)
   const depth = (n: C4Node): number => {
     let d = 0
     const seen = new Set<string>([n.id])
@@ -165,19 +430,28 @@ export function placeUnplaced(
     }
     return d
   }
-  const unplaced = Object.values(nodes)
-    // Inside a parent that is itself new here, a node moves with it.
-    .filter((n) => !known(n.id) && (!shown || shown.has(n.id)) && (!n.parentId || !nodes[n.parentId] || known(n.parentId)))
-    // Deepest first: a parent has grown for what is new inside it before
-    // its own level is looked at.
+  // Deepest first: a parent has grown for what is new inside it before its
+  // own level is looked at.
+  const fresh = Object.values(nodes)
+    .filter((n) => !known(n.id) && (!shown || shown.has(n.id)))
     .sort((a, b) => depth(b) - depth(a) || (a.id < b.id ? -1 : 1))
+  // Inside a parent that is itself new here, a node moves with it.
+  const unplaced = fresh.filter((n) => !n.parentId || !nodes[n.parentId] || known(n.parentId))
   const waiting = new Set(unplaced.map((n) => n.id))
+  // What is still to be placed lies where another canvas had it: not yet
+  // on this one.
+  const drawn = modelCanvas(nodes, shown)
+  const canvas: CanvasShape = { shown: (n) => !waiting.has(n.id) && drawn.shown(n), boxOf: drawn.boxOf }
+  // A new node has the size another canvas gave it: here it wraps what it
+  // holds.
+  for (const node of fresh) if (!waiting.has(node.id)) fitShown(nodes, node.id, canvas)
   for (const node of unplaced) {
+    fitShown(nodes, node.id, canvas)
     const at = placeBesideSiblings(nodes, node.parentId, (s) => s.id !== node.id && !waiting.has(s.id) && (!shown || shown.has(s.id)))
     node.x = at.x
     node.y = at.y
     waiting.delete(node.id)
-    fitAncestors(nodes, node.parentId)
+    if (node.parentId && nodes[node.parentId]) growWithRoom(nodes, node.parentId, canvas)
   }
   return unplaced.map((n) => n.id)
 }

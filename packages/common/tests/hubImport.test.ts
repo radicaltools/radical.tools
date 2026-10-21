@@ -44,6 +44,21 @@ describe('buildConceptInsert', () => {
     expect(insert.template?.record).toMatchObject({ conceptId: 'pattern-x', paramValues: { NAME: 'Orders' } })
     expect(insert.template?.record.nodeIds.sort()).toEqual(nodes.map((node) => node.id).sort())
   })
+
+  it('brings its views with the places the Hub drew them at', () => {
+    // A blueprint's Containers view, opened after a reload, had none and
+    // drew the Ledger Platform over the model's root elements.
+    let n = 0
+    const at = (x: number, y: number, width: number, height: number) => ({ x, y, width, height })
+    const drawn = { ...concept, views: [{ ...concept.views![0], positions: { sys: at(0, 0, 400, 300), api: at(30, 120, 200, 100), db: at(500, 0, 200, 100) } }] }
+    const insert = buildConceptInsert(drawn, { newId: () => `id-${++n}`, place: () => ({ x: 1000, y: -20 }) })
+    const byLabel = Object.fromEntries(Object.values(insert.nodes).map((node) => [node.label, node]))
+    expect(insert.views[0].positions).toEqual({
+      [byLabel['Orders system'].id]: at(0, 0, 400, 300),
+      [byLabel.API.id]: at(30, 120, 200, 100),
+      [byLabel.DB.id]: at(500, 0, 200, 100),
+    })
+  })
 })
 
 describe('template values in a flow', () => {

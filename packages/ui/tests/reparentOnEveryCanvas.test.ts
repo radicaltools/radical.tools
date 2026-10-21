@@ -114,14 +114,104 @@ describe('a step indented in the Warnier view', () => {
 })
 
 describe('a step outdented in the Warnier view', () => {
-  it('keeps its place on a view where it lies inside its new parent', () => {
-    s().setActiveView('flow')
-    const before = abs('hold')
+  // It lay inside its old parent, which is now beside it: it keeps no place
+  // there, and goes beside its new siblings, clear of them.
+  it('lies clear of its old parent on every canvas', () => {
     s().setActiveView('outline')
     s().reparentNodes(['hold'], 'pay', { quiet: true })
-    s().setActiveView('flow')
     expect(s().c4Nodes.hold.parentId).toBe('pay')
-    expect(abs('hold')).toMatchObject({ x: before.x, y: before.y })
-    expect(inside('hold')).toBe(true)
+    for (const canvas of ['flow', null, 'flow']) {
+      s().setActiveView(canvas)
+      expect(inside('hold'), String(canvas)).toBe(true)
+      expect(overlap(abs('hold'), abs('approve')), String(canvas)).toBe(false)
+      expect(overlap(abs('hold'), abs('fx')), String(canvas)).toBe(false)
+    }
+  })
+})
+
+/** Two domains side by side at the root, holding systems, and a loose
+ *  system below the first; a view draws them all, the loose one elsewhere. */
+function roots(): DiagramData {
+  const all = {
+    a: pos(0, 0, 690, 340),
+    a1: pos(30, 120, 300, 200),
+    a2: pos(360, 120, 300, 200),
+    b: pos(730, 0, 360, 340),
+    b1: pos(30, 120, 300, 200),
+    loose: pos(0, 420, 300, 200),
+  }
+  const ids = Object.keys(all) as Array<keyof typeof all>
+  return {
+    nodes: [
+      node('a', 'domain', undefined, all.a),
+      node('a1', 'system', 'a', all.a1),
+      node('a2', 'system', 'a', all.a2),
+      node('b', 'domain', undefined, all.b),
+      node('b1', 'system', 'b', all.b1),
+      node('loose', 'system', undefined, all.loose),
+    ],
+    relations: [],
+    views: [{ id: 'other', name: 'Other', nodeIds: [...ids], positions: { ...all, loose: pos(200, 500, 300, 200) } }],
+    defaultPositions: all,
+  }
+}
+
+/** Pairs of siblings drawn on top of each other, and children outside
+ *  their parent, on the canvas shown. */
+const violations = (): string[] => {
+  const nodes = s().c4Nodes
+  const ids = Object.keys(nodes)
+  const out: string[] = []
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      if (nodes[ids[i]].parentId === nodes[ids[j]].parentId && overlap(abs(ids[i]), abs(ids[j]))) out.push(`${ids[i]} ~ ${ids[j]}`)
+    }
+  }
+  for (const id of ids) if (nodes[id].parentId && !inside(id)) out.push(`${id} outside`)
+  return out
+}
+
+describe('Move to… a container', () => {
+  beforeEach(() => s().loadDiagram(roots()))
+
+  it('places what lies outside it inside, beside what it holds, and makes room for it', () => {
+    const b = abs('b')
+    s().reparentNodes(['loose'], 'a', { quiet: true })
+    expect(violations()).toEqual([])
+    // A grew to the right, over where B stood: B moved out of its way.
+    expect(abs('b').x).toBeGreaterThan(b.x)
+    expect(abs('b').y).toBe(b.y)
+  })
+
+  it('does so on the other canvases too', () => {
+    s().reparentNodes(['loose'], 'a', { quiet: true })
+    s().setActiveView('other')
+    expect(violations()).toEqual([])
+    s().setActiveView(null)
+    expect(violations()).toEqual([])
+  })
+
+  it('keeps the place of what lies inside it, clear of what it holds', () => {
+    useDiagramStore.setState((st: any) => {
+      st.c4Nodes.a.width = 1100
+      st.c4Nodes.b.x = 1140
+      st.c4Nodes.loose.x = 720
+      st.c4Nodes.loose.y = 120
+    })
+    s().reparentNodes(['loose'], 'a', { quiet: true })
+    expect(abs('loose')).toMatchObject({ x: 720, y: 120 })
+    expect(violations()).toEqual([])
+  })
+})
+
+describe('Move to… the root', () => {
+  beforeEach(() => s().loadDiagram(roots()))
+
+  it('places it clear of its old parent, on every canvas', () => {
+    s().reparentNodes(['a2'], null, { quiet: true })
+    expect(s().c4Nodes.a2.parentId).toBeUndefined()
+    expect(violations()).toEqual([])
+    s().setActiveView('other')
+    expect(violations()).toEqual([])
   })
 })

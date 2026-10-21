@@ -62,7 +62,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { compoundPadding, createBatchPlacer, fittedParentSize, isFixedSizeType, placeBesideSiblings, placeGhosts, placeUnplaced, projectToVisibleGraph } from '@radical/layout/geometry'
+import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, fittedParentSize, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
@@ -71,6 +71,7 @@ import {
   chainHiddenRelations,
   computeViewNodeSet,
   viewFrames,
+  viewExpandedSet,
   fitAndSeparateBottomUp,
   isEffectivelyCollapsed,
   viewLayoutInput,
@@ -1147,103 +1148,19 @@ function separateSiblings(
   return result
 }
 
-/** The gap an expand leaves between what it pushed and what pushed it. */
-const EXPAND_GAP = 20
-/** What a push counts for each sibling it would put the pushed one on (px). */
-const HIT_COST = 200
-
-/**
- * Room for `grownId`, which an expand made larger, among its siblings on
- * the canvas: the siblings it now lies on move out of its way, and what
- * they then lie on moves on, as a wave from it outwards. The siblings are
- * taken nearest first; each moves the least way out of what was placed
- * before it (never back towards the grown one, and rather not onto
- * another), so a sibling moves only when something moved into it, and the
- * arrangement around the grown one is kept. Pairs a push did not reach are
- * left as they were, and siblings keep the room they had between them, up
- * to EXPAND_GAP. Only what the canvas draws counts (`viewFilter`, the
- * collapsed sets), at the size it draws it. Returns id → new {x, y} for
- * the siblings that moved.
- *
- * Pairwise pushes (separateSiblings) left overlaps behind among many
- * siblings: each pass pushed both of a pair half way, into others, and 20
- * passes did not settle a grid of 48 root systems round an opened one.
- */
-function makeRoomAround(
-  grownId: string,
-  nodes: Record<string, C4Node>,
-  viewFilter?: Set<string>,
-  viewCollapsedSet?: Set<string>,
-  expandedSet?: Set<string>,
-): Record<string, { x: number; y: number }> {
-  const grown = nodes[grownId]
-  if (!grown) return {}
-  const { shown, boxOf } = canvasBoxes(nodes, viewFilter, viewCollapsedSet, expandedSet)
-  const siblings = Object.values(nodes).filter((n) => (n.parentId ?? undefined) === (grown.parentId ?? undefined) && shown(n))
-  if (siblings.length < 2) return {}
-  const box = new Map(siblings.map((n) => [n.id, boxOf(n)]))
-  const before = new Map(siblings.map((n) => [n.id, boxOf(n)]))
-  const g = box.get(grownId)!
-  const gx = g.x + g.w / 2
-  const gy = g.y + g.h / 2
-  const gapTo = (b: CanvasBox): number =>
-    Math.max(g.x - (b.x + b.w), b.x - (g.x + g.w), g.y - (b.y + b.h), b.y - (g.y + g.h), 0)
-  const order = siblings.filter((n) => n.id !== grownId)
-    .map((n) => ({ id: n.id, gap: gapTo(box.get(n.id)!), centre: Math.hypot(box.get(n.id)!.x + box.get(n.id)!.w / 2 - gx, box.get(n.id)!.y + box.get(n.id)!.h / 2 - gy) }))
-    .sort((a, b) => a.gap - b.gap || a.centre - b.centre || (a.id < b.id ? -1 : 1))
-  const placed: string[] = [grownId]
-  const moved = new Set<string>([grownId])
-  const hits = (a: CanvasBox, b: CanvasBox, gap: number): boolean =>
-    a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap
-  // Two siblings keep the room they had, up to EXPAND_GAP: one pushed does
-  // not push on what was closer to it than that.
-  const gapOf = (a: string, b: string): number => {
-    if (a === grownId || b === grownId) return EXPAND_GAP
-    const [p, q] = [before.get(a)!, before.get(b)!]
-    return Math.min(EXPAND_GAP, Math.max(0, p.x - (q.x + q.w), q.x - (p.x + p.w), p.y - (q.y + q.h), q.y - (p.y + p.h)))
-  }
-  for (const { id } of order) {
-    const b = box.get(id)!
-    const cx = b.x + b.w / 2 - gx
-    const cy = b.y + b.h / 2 - gy
-    for (let step = 0; step < placed.length * 4 + 8; step++) {
-      // Only what moved can be in the way: two siblings the expand did not
-      // reach stay as they were, close or not.
-      const at = placed.findIndex((pid) => (moved.has(pid) || moved.has(id)) && hits(b, box.get(pid)!, gapOf(id, pid)))
-      if (at < 0) break
-      const blocker = box.get(placed[at])!
-      const gap = gapOf(id, placed[at])
-      // Out of its way, away from the grown one on each axis.
-      const ways = [
-        { dx: blocker.x + blocker.w + gap - b.x, dy: 0, ok: cx >= 0 },
-        { dx: blocker.x - gap - (b.x + b.w), dy: 0, ok: cx <= 0 },
-        { dx: 0, dy: blocker.y + blocker.h + gap - b.y, ok: cy >= 0 },
-        { dx: 0, dy: blocker.y - gap - (b.y + b.h), ok: cy <= 0 },
-      ].filter((w) => w.ok)
-      // The least way out, counting what it would then lie on: each such
-      // sibling would have to move on in turn.
-      const cost = (w: { dx: number; dy: number }): number => {
-        const to = { x: b.x + w.dx, y: b.y + w.dy, w: b.w, h: b.h }
-        let hit = 0
-        for (const n of siblings) if (n.id !== id && n.id !== grownId && hits(to, box.get(n.id)!, 0)) hit++
-        return Math.abs(w.dx) + Math.abs(w.dy) + HIT_COST * hit
-      }
-      const way = ways.reduce((best, w) => (cost(w) < cost(best) ? w : best))
-      b.x += way.dx
-      b.y += way.dy
-      moved.add(id)
-    }
-    placed.push(id)
-  }
-  const result: Record<string, { x: number; y: number }> = {}
-  for (const n of siblings) {
-    const b = box.get(n.id)!
-    if (n.id !== grownId && (b.x !== n.x || b.y !== n.y)) result[n.id] = { x: b.x, y: b.y }
-  }
-  return result
+/** The sets the canvas shown draws by (as _sync derives them): what the
+ *  active view draws, what it folds, what it opens over a fold. None for
+ *  All elements. */
+function activeCanvasSets(state: Pick<DiagramStore, 'activeViewId' | 'views' | 'c4Nodes' | 'c4Relations'>): {
+  viewFilter?: Set<string>; viewCollapsedSet?: Set<string>; expandedSet?: Set<string>
+} {
+  const view = state.activeViewId ? state.views[state.activeViewId] as DiagramView | undefined : undefined
+  if (!view) return {}
+  const viewFilter = computeViewNodeSet(view, state.c4Nodes, state.c4Relations)
+  const viewCollapsedSet = computeViewCollapsedSet(viewFilter, state.c4Nodes)
+  for (const id of view.collapsedNodeIds ?? []) viewCollapsedSet.add(id)
+  return { viewFilter, viewCollapsedSet, expandedSet: viewExpandedSet(view, state.c4Nodes, state.c4Relations) }
 }
-
-type CanvasBox = { x: number; y: number; w: number; h: number }
 
 /** What a canvas draws (`viewFilter`, the collapsed sets) and at what
  *  size, as deriveRFNodes draws it. */
@@ -1833,6 +1750,11 @@ interface DiagramStore {
   /** Puts the positions of the canvas shown onto the nodes: its view's, or
    *  All elements' (a milestone's own while one is shown). */
   _showLiveCanvasPositions: () => void
+  /** While a view is shown, gives the elements All elements has no place
+   *  for (added on the view: an import from the Hub) one there, beside
+   *  their siblings (placeUnplaced), so that a view opened on All
+   *  elements' places draws them where they belong. Not in a milestone. */
+  _placeOnAllElements: () => void
   /** Rename a folder of the list of views; its views and subfolders move
    *  along, as one undo step. Returns the new path, or null when refused
    *  (empty name, "/" in it, no such folder). */
@@ -2623,10 +2545,11 @@ export const useDiagramStore = create<DiagramStore>()(
           if (view?.collapsedNodeIds?.length) {
             for (const nid of view.collapsedNodeIds) vcs.add(nid)
           }
-          // Nodes explicitly expanded in this view override model-level collapse
-          const expandedSet = view?.expandedNodeIds?.length
-            ? new Set(view.expandedNodeIds)
-            : undefined
+          // Nodes explicitly expanded in this view override model-level
+          // collapse, and so do its frames: it draws them only to hold what
+          // it shows.
+          const frames = viewFrames(view as DiagramView | undefined, mergedNodes, mergedRels)
+          const expandedSet = viewExpandedSet(view as DiagramView | undefined, mergedNodes, mergedRels, frames)
           const ghostIdSet = hasGhosts ? new Set(Object.keys(ghostNodes)) : undefined
           // A ghost has the base's place, laid out for All elements: on this
           // canvas it goes inside its container's frame, clear of the rest.
@@ -2638,7 +2561,6 @@ export const useDiagramStore = create<DiagramStore>()(
           // While a presentation is active we also lock — slides are
           // static and must not drift from accidental drags.
           const locked = state.appMode === 'metamodel' || state.presentationActive
-          const frames = viewFrames(view as DiagramView | undefined, mergedNodes, mergedRels)
           state.rfNodes = deriveRFNodes(drawnNodes, filter, vcs, ghostIdSet, locked, expandedSet, frames) as any
           const chainHidden = chainHiddenRelations(view as DiagramView | undefined, mergedNodes, mergedRels)
           const hiddenRels = view?.hiddenRelationIds?.length || chainHidden.length
@@ -3101,8 +3023,8 @@ export const useDiagramStore = create<DiagramStore>()(
             // collapsing), it must be excluded from the expanded set even if it was
             // previously in view.expandedNodeIds — otherwise fitParentToChildren
             // would still measure it at full height (stale override).
-            if (view.expandedNodeIds?.length) {
-              loopExpandedSet = new Set(view.expandedNodeIds)
+            loopExpandedSet = viewExpandedSet(view as DiagramView, get().c4Nodes, get().c4Relations)
+            if (loopExpandedSet) {
               if (!prevCollapsed) loopExpandedSet.delete(id) // we are collapsing `id`
               if (loopExpandedSet.size === 0) loopExpandedSet = undefined
             }
@@ -3138,34 +3060,14 @@ export const useDiagramStore = create<DiagramStore>()(
           get().fitParentToChildren(id, loopViewFilter, openVcs, loopExpandedSet)
         }
         const growFrameLeftUp = (parentId: string, viewFilter?: Set<string>): void => {
-          const nodes = get().c4Nodes
-          const parent = nodes[parentId]
-          if (!parent) return
-          const kids = Object.values(nodes).filter((c) => c.parentId === parentId && (!viewFilter || viewFilter.has(c.id)))
-          if (!kids.length) return
-          const pad = compoundPadding(parent.type)
-          const minX = Math.min(...kids.map((c) => c.x))
-          const minY = Math.min(...kids.map((c) => c.y))
-          const dx = minX < 0 ? pad.side - minX : 0
-          const dy = minY < LIVE_CHILD_TOP_MIN ? pad.top - minY : 0
-          if (!dx && !dy) return
-          set((state) => {
-            const p = state.c4Nodes[parentId]
-            if (!p) return
-            p.x -= dx
-            p.y -= dy
-            for (const k of kids) {
-              const c = state.c4Nodes[k.id]
-              if (c) { c.x += dx; c.y += dy }
-            }
-          })
+          set((state) => { growFrameLeftUpIn(state.c4Nodes as Record<string, C4Node>, parentId, (c) => !viewFilter || viewFilter.has(c.id)) })
         }
         // An expand makes room round what grew, level by level up the tree.
         const roomVcs = loopVcs ? new Set([...loopVcs].filter((nid) => nid !== id)) : undefined
         let currentId: string | undefined = id
         while (currentId) {
           const overlapUpdates = prevCollapsed
-            ? makeRoomAround(currentId, get().c4Nodes, loopViewFilter, roomVcs, loopExpandedSet)
+            ? makeRoomAround(currentId, get().c4Nodes, canvasBoxes(get().c4Nodes, loopViewFilter, roomVcs, loopExpandedSet))
             : separate ? separateSiblings(currentId, get().c4Nodes) : {}
           if (Object.keys(overlapUpdates).length > 0) {
             set((state) => {
@@ -3182,7 +3084,9 @@ export const useDiagramStore = create<DiagramStore>()(
             // past its parent's left or top edge, where a refit (which grows
             // right and down) does not follow: the frame grows that way.
             if (prevCollapsed) growFrameLeftUp(current.parentId, loopViewFilter)
-            get().fitParentToChildren(current.parentId, loopViewFilter, loopVcs, loopExpandedSet)
+            // Opened, it counts at its full size: the view's collapsed list
+            // still names it until the end of the toggle.
+            get().fitParentToChildren(current.parentId, loopViewFilter, prevCollapsed ? roomVcs : loopVcs, loopExpandedSet)
             currentId = current.parentId
           } else {
             break
@@ -3607,18 +3511,37 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._markMilestoneEdit()
         set((state) => { model.reparentNodes(state, ids, newParentId) })
 
-        // Refit both sides of the move bottom-up so containers grow/shrink.
-        const refitChain = (startId: string | null | undefined): void => {
-          let cur: string | undefined = startId ?? undefined
-          const seen = new Set<string>()
-          while (cur && !seen.has(cur)) {
-            seen.add(cur)
-            get().fitParentToChildren(cur)
-            cur = get().c4Nodes[cur]?.parentId
-          }
+        // On the canvas shown (model.reparentNodes saw to the others): the
+        // old parent fits what it still holds; a moved node keeps its place
+        // only where it lies inside its new parent, clear of its new
+        // siblings, else it goes beside them; the new parent fits it and,
+        // where it grew, its siblings make room, level by level up the tree.
+        const { viewFilter, viewCollapsedSet, expandedSet } = activeCanvasSets(get())
+        const shownNodes = Object.fromEntries(Object.entries(get().c4Nodes).map(([id, n]) => [id, { ...n }]))
+        // Fit as fitParentToChildren does, on the copy.
+        const fit = (parentId: string): void => {
+          const parent = shownNodes[parentId]
+          if (!parent || !isContainerType(parent.type) || isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet)) return
+          const children = Object.values(shownNodes).filter((c) => c.parentId === parentId && (!viewFilter || viewFilter.has(c.id)))
+          if (!children.length) return
+          Object.assign(parent, fittedParentSize(parent, children.map((c) => ({
+            x: c.x, y: c.y, width: effectiveNodeWidth(c, viewCollapsedSet, expandedSet), height: effectiveNodeHeight(c, viewCollapsedSet, expandedSet),
+          }))))
         }
-        refitChain(oldParentId)
-        refitChain(newParentId)
+        const canvas = canvasBoxes(shownNodes, viewFilter, viewCollapsedSet, expandedSet)
+        // A refit can grow the old parent too (to its type's least size).
+        if (oldParentId) growWithRoom(shownNodes, oldParentId, canvas, fit)
+        settleMovedNodes(shownNodes, ids, canvas, fit)
+        set((state) => {
+          for (const [id, n] of Object.entries(shownNodes)) {
+            const live = state.c4Nodes[id]
+            if (!live || (live.x === n.x && live.y === n.y && live.width === n.width && live.height === n.height)) continue
+            live.x = n.x
+            live.y = n.y
+            live.width = n.width
+            live.height = n.height
+          }
+        })
 
         get().setSelectedNodeIds(ids)
         get()._sync()
@@ -3871,6 +3794,22 @@ export const useDiagramStore = create<DiagramStore>()(
         })
       },
 
+      _placeOnAllElements() {
+        const { activeViewId, activeSnapshotId, defaultPositions, c4Nodes } = get()
+        if (activeViewId === null || activeSnapshotId || !defaultPositions || !Object.keys(defaultPositions).length) return
+        if (Object.keys(c4Nodes).every((id) => id in defaultPositions)) return
+        const all = Object.fromEntries(Object.entries(c4Nodes).map(([id, n]) => [id, { ...n, ...(defaultPositions[id] ?? {}) }]))
+        placeUnplaced(all, defaultPositions)
+        set((state) => {
+          const kept = state.defaultPositions as Record<string, NodePosition>
+          for (const n of Object.values(all)) {
+            const was = kept[n.id]
+            if (was && was.x === n.x && was.y === n.y && was.width === n.width && was.height === n.height) continue
+            kept[n.id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+          }
+        })
+      },
+
       _saveShownCanvas() {
         const currentPos = snapshotPositions(get().c4Nodes)
         const rawVP = (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined
@@ -3995,13 +3934,24 @@ export const useDiagramStore = create<DiagramStore>()(
         if ((view.kind ?? 'static') === kind && !view.viewpoint && !view.subject) return
         get()._pushUndo()
         let placed: string[] | null = null
+        const wasCanvas = (view.kind ?? 'static') === 'static'
         set((state) => {
+          const shown = state.activeViewId === viewId
+          // Shown as a table (or another kind with no canvas), the view keeps
+          // the layout its canvas had until now, for when it is a canvas again.
+          if (shown && wasCanvas && kind !== 'static' && !state.activeSnapshotId) {
+            const view = state.views[viewId] as DiagramView
+            const nodes = state.c4Nodes as Record<string, C4Node>
+            view.positions = viewCanvasPositions(view, nodes, snapshotPositions(nodes), viewDrawnIds(view, nodes, state.c4Relations as Record<string, C4Relation>))
+          }
           model.setViewKind(state, viewId, kind)
-          // Turned into a canvas, a view with no positions of its own shows
-          // All elements' places, not the canvas shown before it.
-          if (state.activeViewId !== viewId) return
+          if (!shown) return
+          // Turned into a canvas, a view shows the positions it kept; one
+          // with none of its own shows All elements' places, not the canvas
+          // shown before it.
           const view = state.views[viewId] as DiagramView
           const first = firstCanvasPositions(view, state.defaultPositions as Record<string, NodePosition>, state.activeSnapshotId ? _milestoneAllPositions : null)
+            ?? (!wasCanvas && kind === 'static' ? view.positions : undefined)
           if (first) placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, first, view, state.c4Relations as Record<string, C4Relation>)
         })
         get()._sync()
@@ -6303,9 +6253,11 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         let nodes = atDefaultPositions(data.nodes, data.defaultPositions)
         // What was added on a view since All elements was last shown has no
-        // place there yet (on copies: `data` may hold the store's own nodes).
+        // place there yet, and what was moved into another parent outside
+        // Studio (a node file into another folder) lies outside it (on
+        // copies: `data` may hold the store's own nodes).
         let placedOnLoad: string[] = []
-        if (data.defaultPositions && data.nodes.some((n) => !(n.id in data.defaultPositions!))) {
+        if (data.defaultPositions && (data.nodes.some((n) => !(n.id in data.defaultPositions!)) || strayNodeIds(nodes, data.defaultPositions).size > 0)) {
           nodes = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { ...n }]))
           placedOnLoad = placeUnplaced(nodes, data.defaultPositions)
         }

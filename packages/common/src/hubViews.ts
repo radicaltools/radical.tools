@@ -12,10 +12,11 @@
 // views, and a view left with no nodes is dropped. A dynamic view whose
 // sequence did not survive falls back to a static view of the same nodes.
 //
-// Per-view positions are only meaningful where node ids and coordinates are
-// the concept's own (the Hub viewer); an import re-ids nodes and moves them
-// (Studio centres them on the viewport), so it drops them and the view keeps
-// the imported layout.
+// A view keeps the places the concept drew its elements at, under their new
+// ids on import: each view is a canvas of its own (an import places the
+// elements on the canvas shown, not on the views it brings), and a view
+// that came with none opened on All elements' places, where the imported
+// elements had none yet.
 
 import { normalizeViewFolder, wikiDepthOf, type DiagramView, type NodePosition, type ViewFilter, type ViewPipeline } from './c4'
 
@@ -33,7 +34,8 @@ export interface ConceptViewOptions {
   newId?: () => string
   /** Prepended to each view name, e.g. the concept name on import. */
   namePrefix?: string
-  /** Keep the view's stored node positions (only when ids are unchanged). */
+  /** Keep the view's stored node positions, under the ids `maps.node`
+   *  gives (the Hub viewer and the imports into a model). */
   keepPositions?: boolean
 }
 

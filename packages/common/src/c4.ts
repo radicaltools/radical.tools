@@ -647,14 +647,16 @@ export function viewShowsEveryNode(view: Pick<DiagramView, 'nodeIds' | 'empty'>)
 
 /**
  * The positions a view keeps of `positions` (where the canvas had the nodes):
- * those of the nodes it draws, its listed nodes and their ancestors, when it
- * is drawn on a canvas; none for a table, wiki, matrix, hierarchy or flow
- * view, which draw no positions; all of them when it shows every node. The
- * canvas keeps one set of positions in the nodes, so it used to store every
- * node's into each view: 99% of a large model's views.json.
+ * those of the nodes it draws, its listed nodes and their ancestors; all of
+ * them when it shows every node. The canvas keeps one set of positions in
+ * the nodes, so it used to store every node's into each view: 99% of a
+ * large model's views.json. A view shown as a table, wiki, matrix or flow
+ * draws no positions: it keeps those it had on its canvas (`view.positions`,
+ * of the nodes it draws), for when its type goes back to Structure, and the
+ * canvas shown with it is not its own.
  */
 export function viewCanvasPositions<P>(
-  view: Pick<DiagramView, 'kind' | 'nodeIds' | 'empty'>,
+  view: Pick<DiagramView, 'kind' | 'nodeIds' | 'empty'> & { positions?: Record<string, P> },
   nodes: Record<string, Pick<C4Node, 'parentId'>>,
   positions: Record<string, P>,
   /** What the view draws when its filter chain decides it (viewDrawnIds in
@@ -662,7 +664,7 @@ export function viewCanvasPositions<P>(
    *  what the chain gives, not every node. */
   drawn?: Iterable<string>,
 ): Record<string, P> {
-  if (view.kind && view.kind !== 'static') return {}
+  if (view.kind && view.kind !== 'static') positions = view.positions ?? {}
   const ids = drawn ?? (viewShowsEveryNode(view) ? undefined : view.nodeIds)
   if (!ids) return positions
   const kept: Record<string, P> = {}

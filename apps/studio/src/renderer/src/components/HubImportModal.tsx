@@ -625,7 +625,7 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
       const newViews = conceptViewsToDiagram(
         concept.views,
         { node: (id) => idMap.get(id), relation: (id) => relIdMap.get(id), sequence: (id) => seqIdMap.get(id) },
-        { newId: () => crypto.randomUUID(), namePrefix: concept.name },
+        { newId: () => crypto.randomUUID(), namePrefix: concept.name, keepPositions: true },
       )
 
       store._pushUndo()
@@ -656,6 +656,8 @@ export function HubImportModal({ open, onClose, preselectedIds }: Props): React.
         // The container grew to hold the import: its neighbours make room,
         // as after a drop (it was left lying over them).
         if (useDropParent && dropParentId && storeAfter.c4Nodes[dropParentId]) storeAfter.resolveOverlaps(dropParentId)
+        // Imported on a view: All elements gets places for them too.
+        storeAfter._placeOnAllElements()
       }
 
       store._sync()

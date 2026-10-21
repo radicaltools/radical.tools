@@ -10,6 +10,7 @@ import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
 import { isRelationAllowed } from '@radical/common/metamodel'
 import { viewShowsEveryNode } from '@radical/common/c4'
 import { chainDrawn, chainRelationFor } from '@radical/common/viewPipeline'
+import { viewExpandedSet } from '@radical/layout/viewInput'
 
 // ─── Tree ordering helper (hierarchical, parents before children) ────────────
 
@@ -104,10 +105,12 @@ export function MatrixView(): React.ReactElement {
     return vcs
   }, [viewFilter, nodes, activeView])
 
-  const expandedSet = useMemo<Set<string> | undefined>(() => {
-    if (!activeView?.expandedNodeIds?.length) return undefined
-    return new Set(activeView.expandedNodeIds)
-  }, [activeView])
+  // Opened in the view, and the containers the filter leaves out, which
+  // only hold what it gives: folded, they would hide it.
+  const expandedSet = useMemo<Set<string> | undefined>(
+    () => viewExpandedSet(activeView, nodes, relations),
+    [activeView, nodes, relations],
+  )
 
   // ── Visible node list (respects collapse state) ────────────────────────────
 
