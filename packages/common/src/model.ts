@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition } from './c4'
+import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType } from './c4'
 import { readPipeline } from './viewPipeline'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
@@ -287,12 +287,13 @@ export function checkReparent(state: ModelState, ids: string[], newParentId: str
 
 /** Moves the nodes under `newParentId` (null = the root), keeping each one
  *  where it is on the canvas: positions are relative to the parent, so they
- *  are rebased onto the new parent's absolute position. The other canvases
- *  that keep a place for a moved node (the views' positions, and All
- *  elements' while a view is shown) are rebased the same way where the node
- *  then lies inside its new parent's frame there; where it does not, its
- *  place there is dropped, and that canvas gives it one inside the parent
- *  (placeUnplaced) when it shows. */
+ *  are rebased onto the new parent's absolute position (the canvas shown
+ *  then settles it: settleMovedNodes). The other canvases that keep a place
+ *  for a moved node (the views' positions, and All elements' while a view
+ *  is shown) are rebased the same way where the node then lies inside its
+ *  new parent's frame there and on none of its new siblings; where it does
+ *  not, its place there is dropped, and that canvas gives it one inside the
+ *  parent, beside its siblings, when it shows (placeUnplaced). */
 export function reparentNodes(state: ModelState, ids: string[], newParentId: string | null): void {
   const absOf = (id: string | null, positions?: Record<string, NodePosition>): { x: number; y: number } => {
     let x = 0, y = 0
@@ -308,19 +309,36 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
     return { x, y }
   }
   const moving = ids.filter((id) => state.c4Nodes[id] && (state.c4Nodes[id].parentId ?? null) !== newParentId)
+  const movingSet = new Set(moving)
+  const siblings = Object.values(state.c4Nodes).filter((n) => (n.parentId ?? null) === newParentId && !movingSet.has(n.id))
   // Measure every node against the original tree before changing any parent.
-  const canvases = [state.defaultPositions, ...Object.values(state.views).map((view) => view.positions)]
-    .filter((positions): positions is Record<string, NodePosition> => !!positions && moving.some((id) => id in positions))
-  const rebased = canvases.map((positions) => {
+  const canvases = [
+    { positions: state.defaultPositions, view: undefined },
+    ...Object.values(state.views).map((view) => ({ positions: view.positions, view })),
+  ].filter((c): c is { positions: Record<string, NodePosition>; view: DiagramView | undefined } => !!c.positions && moving.some((id) => id in c.positions!))
+  const rebased = canvases.map(({ positions, view }) => {
     const parent = newParentId ? positions[newParentId] : undefined
     const target = absOf(newParentId, positions)
+    // As the canvas draws it: folded there, at its folded size.
+    const drawn = (id: string, at: NodePosition): NodePosition => {
+      const n = state.c4Nodes[id]
+      const folded = !!n && isContainerType(n.type)
+        && ((n.collapsed && !view?.expandedNodeIds?.includes(id)) || !!view?.collapsedNodeIds?.includes(id))
+      return folded ? { x: at.x, y: at.y, width: COLLAPSED_WIDTH[n.type], height: COLLAPSED_HEIGHT[n.type] } : at
+    }
+    const overlaps = (a: NodePosition, b: NodePosition): boolean =>
+      a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
     return moving.filter((id) => id in positions).map((id) => {
       const abs = absOf(id, positions)
       const box = { ...positions[id], x: abs.x - target.x, y: abs.y - target.y }
-      // At the root, anywhere is inside; in a parent the canvas has no place
-      // for, or outside its frame, the node is placed afresh.
-      const inside = !newParentId || (!!parent && box.x >= 0 && box.y >= 0 && box.x + box.width <= parent.width && box.y + box.height <= parent.height)
-      return { positions, id, box: inside ? box : null }
+      // It keeps its place where that lies inside its new parent's frame
+      // (anywhere at the root) and on none of its new siblings; in a parent
+      // the canvas has no place for, outside its frame or on a sibling, it
+      // is placed afresh (beside its siblings, placeUnplaced).
+      const at = drawn(id, box)
+      const inside = !newParentId || (!!parent && at.x >= 0 && at.y >= 0 && at.x + at.width <= parent.width && at.y + at.height <= parent.height)
+      const clear = !siblings.some((s) => s.id in positions && overlaps(at, drawn(s.id, positions[s.id])))
+      return { positions, id, box: inside && clear ? box : null }
     })
   }).flat()
   const target = absOf(newParentId)
