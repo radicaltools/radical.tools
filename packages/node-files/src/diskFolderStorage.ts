@@ -33,12 +33,37 @@ function staleLock(text: string, age: number): boolean {
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms))
 
+/** Errors of a file this process may not make: a folder it may only read. */
+const READ_ONLY = new Set(['EACCES', 'EPERM', 'EROFS'])
+
 /** Takes the write turn of the model folder at `base`: a lock file made
  *  only when there is none (O_EXCL), so of two processes one waits. To
  *  read, a folder without `.radical/` has no writer to wait for (one makes
- *  it first), and is left without one. */
+ *  it first), and is left without one; nor is one taken where this process
+ *  may not write (a read-only checkout): it reads once no writer holds it. */
 async function takeWriteTurn(base: string, forRead = false): Promise<() => Promise<void>> {
   if (forRead && !(await lstat(join(base, SELECTION_DIR)).then(() => true, () => false))) return async () => {}
+  try {
+    return await takeTurn(base)
+  } catch (error) {
+    if (!forRead || !READ_ONLY.has((error as NodeJS.ErrnoException).code ?? '')) throw error
+    await waitForWriter(join(base, SELECTION_DIR, WRITE_LOCK))
+    return async () => {}
+  }
+}
+
+/** Waits while another process holds the turn at `file` and is alive. */
+async function waitForWriter(file: string): Promise<void> {
+  const deadline = Date.now() + LOCK_WAIT_MS
+  for (;;) {
+    const held = await readFile(file, 'utf-8').catch(() => null)
+    const age = await stat(file).then((s) => Date.now() - s.mtimeMs, () => 0)
+    if (held === null || staleLock(held, age) || Date.now() > deadline) return
+    await sleep(10 + Math.random() * 30)
+  }
+}
+
+async function takeTurn(base: string): Promise<() => Promise<void>> {
   const file = join(await editorStateDir(base), WRITE_LOCK)
   if (await lstat(file).then((s) => s.isSymbolicLink(), () => false)) throw new Error(`symlink in model path: .radical/${WRITE_LOCK}`)
   const mine = `${process.pid} ${Date.now()} ${randomUUID()}\n`
