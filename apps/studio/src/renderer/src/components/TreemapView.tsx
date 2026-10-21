@@ -258,6 +258,12 @@ export function TreemapView(): React.ReactElement {
 
   const setFocus = useCallback((id: string | null) => {
     if (!activeViewId) return
+    // A playing slide is drilled on its own: started from Designer (F5) the
+    // drill was written into Designer's view and saved.
+    if (useDiagramStore.getState().presentationActive) {
+      useDiagramStore.setState({ slideTreemapFocus: { viewId: activeViewId, focusId: id } })
+      return
+    }
     if (useDiagramStore.getState().slideTreemapFocus) useDiagramStore.setState({ slideTreemapFocus: null })
     setTreemapFocus(activeViewId, id)
   }, [activeViewId, setTreemapFocus])
@@ -449,6 +455,8 @@ export function TreemapView(): React.ReactElement {
       if (focusId === null) return
       const target = e.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      // Esc ends a playing presentation (its HUD): it drilled out as well.
+      if (e.key === 'Escape' && useDiagramStore.getState().presentationActive) return
       if (e.key === 'Escape' || e.key === 'Backspace') {
         e.preventDefault()
         handleBack()
@@ -468,6 +476,9 @@ export function TreemapView(): React.ReactElement {
   // in; on the currently-focused node's own tile (the sliver still visible
   // behind its children) it zooms out one level, mirroring the breadcrumb.
   const handleClick = useCallback((n: TNode) => {
+    // Nothing is selected on a playing slide, as on a canvas slide: the
+    // selection stayed in the address for the slides after it.
+    if (useDiagramStore.getState().presentationActive) return
     selectNode(n.id)
   }, [selectNode])
 

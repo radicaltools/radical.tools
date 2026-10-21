@@ -384,6 +384,9 @@ label.app-menu-row { cursor: pointer; }
   transition: opacity 0.12s;
 }
 .pres-slide-card:hover .pres-slide-actions { opacity: 1; }
+/* Only the current slide's card has its buttons: hidden but there, a click
+   in the middle of another card hit Capture and overwrote that slide. */
+.pres-slide-card:not(.active) .pres-slide-actions { visibility: hidden; }
 .pres-icon-btn {
   width: 26px;
   height: 26px;

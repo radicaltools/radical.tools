@@ -254,7 +254,9 @@ function PresenterHUD() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { stopPresentation(); return }
+      // F5 starts a presentation from the toolbar, which is gone while it
+      // plays: here it stops it, as the toolbar's F5 does.
+      if (e.key === 'Escape' || e.key === 'F5') { e.preventDefault(); stopPresentation(); return }
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
         e.preventDefault(); goToSlide(idx + 1)
       }

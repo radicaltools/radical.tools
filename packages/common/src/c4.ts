@@ -394,6 +394,10 @@ export interface DiagramSnapshot {
 /** Saved positions + collapsed state for every node on the canvas */
 export interface SlideCanvasState {
   nodes: Record<string, { x: number; y: number; width: number; height: number; collapsed: boolean }>
+  /** A slide of a view: what the view folded and opened over the model's
+   *  fold when it was captured (its collapsedNodeIds / expandedNodeIds). */
+  collapsedNodeIds?: string[]
+  expandedNodeIds?: string[]
 }
 
 /** A single presentation slide — captures viewport + optional snapshot */
