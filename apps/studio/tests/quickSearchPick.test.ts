@@ -56,6 +56,28 @@ describe('the view a pick opens', () => {
   })
 })
 
+// Item 245: a relation's pick opened the smallest view with its source,
+// which did not draw it.
+describe('the view a relation\'s pick opens', () => {
+  it('shows both its ends', () => {
+    s().loadDiagram({
+      ...model(),
+      nodes: [...model().nodes, node('cust', 'person', 'Customer')],
+      views: [
+        ...model().views.filter((v) => v.id !== 'v-big'),
+        { id: 'v-ctx', name: 'Context', nodeIds: ['cust', 'sys'], positions: {} },
+        { id: 'v-big', name: 'Containers', nodeIds: ['cust', 'sys', 'api', 'cmp', 'bank'], positions: {} },
+      ],
+    })
+    const sets = viewNodeSets(s().views, s().c4Nodes, s().c4Relations)
+    expect(pickViewFor('cust', 'v-bank', s().views, sets)).toBe('v-ctx')
+    expect(pickViewFor(['cust', 'api'], 'v-bank', s().views, sets)).toBe('v-big')
+    // The view shown, when it shows both; else one that shows everything.
+    expect(pickViewFor(['cust', 'api'], 'v-big', s().views, sets)).toBe('v-big')
+    expect(pickViewFor(['cust', 'leaf'], 'v-bank', s().views, sets)).toBe('v-wiki')
+  })
+})
+
 describe('a pick on a wiki or hierarchy view', () => {
   it('opens the element\'s wiki page', () => {
     s().setActiveView('v-wiki')

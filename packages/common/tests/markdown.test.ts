@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { escapeMarkdown, isMarkdownField, keepLineBreaks, markdownToPlain } from '../src/markdown'
+import { escapeMarkdown, isMarkdownField, isRemoteUrl, keepLineBreaks, markdownToPlain } from '../src/markdown'
 
 describe('Markdown in an element\'s fields', () => {
   it('holds Markdown in the description and every textarea, plain text elsewhere', () => {
@@ -31,5 +31,22 @@ describe('Markdown in an element\'s fields', () => {
     expect(keepLineBreaks('one\ntwo\n\nthree')).toBe('one  \ntwo\n\nthree')
     expect(keepLineBreaks('```\na\nb\n```')).toBe('```\na\nb\n```')
     expect(keepLineBreaks('ends  \nwith a break')).toBe('ends  \nwith a break')
+  })
+
+  // Item 244: an image written as `https:host`, `\\host`, `/\host` or
+  // `https:/host` was taken for one beside the app, and fetched.
+  it('takes an address the browser resolves to another host for remote, in every form', () => {
+    const web = 'http://localhost:4310/#/d/x'
+    for (const src of [
+      '//evil.example/a.png', 'https:evil.example/b.png', '\\\\evil.example/c.png', '/\\evil.example/d.png',
+      'http://evil.example/e.png', '  HTTP://evil.example/g.png', 'https:/evil.example/h.png', 'http://localhost:9999/x.png',
+    ]) expect(isRemoteUrl(src, web), src).toBe(true)
+    for (const src of ['logo.png', '/assets/logo.png', './a/b.png', 'http://localhost:4310/x.png', 'data:image/png;base64,AAAA', 'http:x.png'])
+      expect(isRemoteUrl(src, web), src).toBe(false)
+    // Studio's own window is a file: page.
+    const app = 'file:///Applications/Radical.app/renderer/index.html'
+    expect(isRemoteUrl('logo.png', app)).toBe(false)
+    expect(isRemoteUrl('\\\\evil.example/c.png', app)).toBe(true)
+    expect(isRemoteUrl('https:evil.example/b.png', app)).toBe(true)
   })
 })

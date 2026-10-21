@@ -65,6 +65,22 @@ test.describe('Markdown in an element\'s fields', () => {
     expect(requests).toEqual([])
   })
 
+  // Item 244: four more forms the browser resolves to another host were
+  // drawn as images and fetched.
+  test('an image the browser would fetch from another host is a link, whatever form its address has', async ({ page, studio }) => {
+    const requests: string[] = []
+    page.on('request', (r) => { if (!r.url().startsWith('http://localhost') && !r.url().startsWith('data:')) requests.push(r.url()) })
+    await studio.open('v-wiki/f/payments')
+    await page.locator('.wiki-lead').getByText('refunds').click()
+    const text = ['![b](https:evil.example/b.png)', '![c](\\\\\\\\evil.example/c.png)', '![d](/\\\\evil.example/d.png)', '![h](https:/evil.example/h.png)'].join('\n\n')
+    await page.locator('textarea.wiki-lead').fill(text)
+    await page.locator('.wiki-title').click()
+    const lead = page.locator('.wiki-lead')
+    await expect(lead.locator('.md-remote-image')).toHaveCount(4)
+    await expect(lead.locator('img')).toHaveCount(0)
+    expect(requests).toEqual([])
+  })
+
   test('a card on the canvas shows the description without its marks', async ({ page, studio }) => {
     await studio.open('v-context')
     const desc = studio.node('payments').locator('.c4-node-desc')

@@ -398,12 +398,11 @@ export function QuickSearch(): React.ReactElement | null {
       if (needSwitch) setTimeout(apply, 80)
       else requestAnimationFrame(apply)
     } else {
-      // Edge: try to switch into a view that contains the source endpoint
-      // (the target should normally be co-visible since relations only
-      // render when both endpoints exist in the view).
+      // Edge: switch into a view that shows both its ends (a relation is
+      // drawn only there; one with its source alone drew another line).
       const rel = c4Relations[r.id]
       if (rel) {
-        const targetView = viewOverride === undefined ? pickViewForNode(rel.sourceId) : viewOverride
+        const targetView = viewOverride === undefined ? pickViewFor([rel.sourceId, rel.targetId], activeViewId, views, viewNodeSets) : viewOverride
         const needSwitch = targetView !== activeViewId
         if (needSwitch) setActiveView(targetView)
         const apply = (): void => {
