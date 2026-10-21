@@ -4644,3 +4644,73 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .relation-type-menu button:focus-visible { background: var(--hover-bg); outline: none; }
 .tv-row:focus { outline: none; }
 .tv-row:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.6); outline-offset: -2px; }
+
+/* ── Explore from here ─────────────────────────────────────────────────────
+   An exploration's + on each element (how many related elements it does
+   not show yet), and its bar where a view shows its name. */
+.explore-more {
+  position: absolute;
+  top: 50%;
+  right: -15px;
+  transform: translateY(-50%);
+  min-width: 30px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  border-radius: 11px;
+  background: var(--bg-panel);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  cursor: pointer;
+  z-index: 6;
+}
+.explore-more:hover { background: var(--accent); color: #fff; }
+.explore-bar {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 4px 6px 4px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+.explore-bar-name strong { color: var(--text-primary); }
+.explore-bar-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: var(--bg-surface, var(--bg-panel));
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.explore-bar-btn:disabled { opacity: 0.5; cursor: default; }
+.explore-bar-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.explore-bar-close { padding: 2px 6px; color: var(--text-muted); }
+.explore-bar-save {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border-color);
+}
+.explore-bar-save label { display: flex; align-items: center; gap: 4px; }
+.explore-bar-save input {
+  font-size: 11px;
+  padding: 2px 6px;
+  width: 140px;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: var(--bg-input, var(--bg-surface, var(--bg-panel)));
+  color: var(--text-primary);
+}
+.lp-explore-card .lp-card-title { font-style: italic; }

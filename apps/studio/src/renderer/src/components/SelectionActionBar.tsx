@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
-import { activeLayoutConstraints, childrenInView, hideRefusal, useDiagramStore } from '@radical/ui/store/diagramStore'
+import { activeLayoutConstraints, childrenInView, hideRefusal, onExploration, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, saveStudioSettings } from '@radical/ui/studioSettings'
 import { isParentAllowed, isPlacementAllowed } from '@radical/common/metamodel'
@@ -18,6 +18,7 @@ import { useMenuKeys } from './menuKeys'
  *    selected, the same for its children, in the order they stand (a
  *    collapsed one's children line up when it is expanded),
  *    or stop keeping the alignments wholly inside the selection,
+ *  • Explore from here, with one node selected (in Viewer, the only action),
  *  • a destructive Delete button.
  */
 export function SelectionActionBar(): React.ReactElement | null {
@@ -39,6 +40,12 @@ export function SelectionActionBar(): React.ReactElement | null {
   const addAlignment = useDiagramStore((s) => s.addAlignment)
   const addGrid = useDiagramStore((s) => s.addGrid)
   const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
+  const exploreFrom = useDiagramStore((s) => s.exploreFrom)
+  // Designer explores the live model (not a milestone it edits), Viewer the
+  // model it shows.
+  const canExplore = useDiagramStore((s) => (s.appMode === 'designer' && !s.activeSnapshotId) || s.appMode === 'viewer')
+  // An exploration draws what it lists and keeps no alignments.
+  const exploring = useDiagramStore(onExploration)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [moveMenuOpen, setMoveMenuOpen] = useState(false)
@@ -205,8 +212,34 @@ export function SelectionActionBar(): React.ReactElement | null {
     return out.sort((a, b) => a.path.localeCompare(b.path))
   }, [selectedNodeIds, c4Nodes, metamodel])
 
-  if (appMode !== 'designer') return null
   if (selectedNodeIds.length === 0) return null
+  const exploreButton = selectedNodeIds.length === 1 && canExplore && (
+    <>
+      <button
+        type="button"
+        className="sel-bar-btn"
+        onClick={() => exploreFrom(selectedNodeIds[0])}
+        title="Open a temporary view of this element, to grow by its relations"
+      >
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="8" cy="8" r="2.2" />
+          <path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3" />
+        </svg>
+        Explore from here
+      </button>
+      <div className="sel-bar-divider" />
+    </>
+  )
+  // Viewer edits nothing: exploring is all it does with a selection.
+  if (appMode === 'viewer') {
+    if (!exploreButton) return null
+    return (
+      <div className="sel-bar" role="toolbar" aria-label="Selection actions">
+        {exploreButton}
+      </div>
+    )
+  }
+  if (appMode !== 'designer') return null
 
   // Unwrap is offered only when exactly one node is selected AND it has at
   // least one direct child — otherwise the action would be identical to
@@ -276,6 +309,7 @@ export function SelectionActionBar(): React.ReactElement | null {
         </div>
       )}
       <div className="sel-bar-divider" />
+      {exploreButton}
       {moveTargets.length > 0 && (
         <>
           <div className="sel-bar-wrap" ref={moveMenuRef}>
@@ -338,7 +372,7 @@ export function SelectionActionBar(): React.ReactElement | null {
           <div className="sel-bar-divider" />
         </>
       )}
-      {alignCount >= 2 && (
+      {alignCount >= 2 && !exploring && (
         <>
           <div className="sel-bar-wrap" ref={alignMenuRef}>
             <button
@@ -450,7 +484,7 @@ export function SelectionActionBar(): React.ReactElement | null {
           <div className="sel-bar-divider" />
         </>
       )}
-      {activeViewId && canHide && (
+      {activeViewId && canHide && !exploring && (
         <>
           <button
             type="button"

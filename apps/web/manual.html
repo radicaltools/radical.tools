@@ -63,6 +63,7 @@
             <li><a href="#viewpoints">Viewpoints</a></li>
             <li><a href="#view-steps">Filter</a></li>
             <li><a href="#view-structure">Structure</a></li>
+            <li><a href="#explore">Explore from here</a></li>
             <li><a href="#view-flow">Flow &amp; sequences</a></li>
             <li><a href="#view-hierarchy">Hierarchy</a></li>
             <li><a href="#view-table">Table</a></li>
@@ -447,6 +448,19 @@
         <p>
           The classic diagram. Relations between elements hidden inside a collapsed container are drawn to the container instead, so a system-level view stays readable while the detail is one click away. Set the view's <strong>Auto-layout</strong> to <em>Hierarchical nested tree</em> for deep containment hierarchies. The button on the canvas then reads <em>Tree Layout</em> and lays the view out top-down, children too.
         </p>
+        <h3 id="explore">Explore from here</h3>
+        <p>
+          To see what an element touches without building a view for it, select it and choose <strong>Explore from here</strong> in the selection bar, or in the <em>⋯</em> menu of its properties card. A temporary structure view opens with that element alone, inside the frames of its containers, and is listed <strong>first</strong> among the views as <em>Explore: &lt;its name&gt;</em>, marked <em>exploration</em>.
+        </p>
+        <ul>
+          <li><strong>+</strong> — each element of the exploration has a <em>+</em> on its right edge, with the number of elements related to it (a relation in either direction, of any type) that the view does not show yet. A click adds them, each inside the frames of its containers, placed beside the element; what the view already shows stays where it is. The <em>+</em> is gone once nothing is left to add.</li>
+          <li><strong>+ 1 level</strong> — on the bar at the top of the canvas: the <em>+</em> of every element at once, one ring of neighbours further.</li>
+          <li><strong>Save as view…</strong> — asks a name and a folder and keeps the exploration as an ordinary structure view, with its elements, their places and folds. It takes the exploration's place and is one undo step: <em>Undo</em> takes the view away.</li>
+          <li><strong>×</strong> — on the bar or on the card closes the exploration without a question, back on the view it was opened from. Starting another exploration, or opening another model, drops it the same way.</li>
+        </ul>
+        <p>
+          An exploration is never saved and is no undo step: its <em>+</em>, <em>+ 1 level</em>, drags and folds leave the document and the history as they were (an edit of the model made on it, a rename say, is a step as anywhere else). It is not in the model's views, so agents, presentations and Quick Search do not see it, and a reload of the page drops it. A change made outside Studio (an agent's write) keeps it on screen, without what was deleted. In Designer it explores the live model and is closed when a milestone is shown; while one is shown it is not offered. In <a href="#presenting">Viewer</a> it explores the model shown, a milestone's when one is, and follows another milestone or <em>Current (live)</em>; Viewer has no <em>Save as view…</em>. Switching perspective closes it.
+        </p>
       </section>
 
       <section class="doc-section" id="view-flow">
@@ -623,7 +637,7 @@
           <figcaption>Viewer: everything you can do in Designer to <em>look</em>, nothing that changes the saved model.</figcaption>
         </figure>
         <p>
-          <strong>Viewer</strong> is a sandbox. Every view opens with the layout it has in Designer; drag, collapse, re-layout, switch views and milestones — all of it is thrown away when you return to Designer (which shows the milestone, or the live model, it showed before, on the view you were looking at, laid out as Designer has it), so you can explore freely in front of others. The metamodel editor, opened from Viewer or Presenter, edits Designer's model: what was explored is thrown away first. Adding to the model, with <a href="#hub">Import from Hub</a> or <a href="#forge">Radical Forge</a>, switches to Designer. It is also the perspective the <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a> uses to show concepts.
+          <strong>Viewer</strong> is a sandbox. Every view opens with the layout it has in Designer; drag, collapse, re-layout, switch views and milestones — all of it is thrown away when you return to Designer (which shows the milestone, or the live model, it showed before, on the view you were looking at, laid out as Designer has it), so you can explore freely in front of others. The metamodel editor, opened from Viewer or Presenter, edits Designer's model: what was explored is thrown away first. Adding to the model, with <a href="#hub">Import from Hub</a> or <a href="#forge">Radical Forge</a>, switches to Designer. <a href="#explore">Explore from here</a> works in Viewer too, on the model shown, and keeps nothing. It is also the perspective the <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a> uses to show concepts.
         </p>
         <figure class="doc-shot">
           <img class="shot-light" src="screenshots/presenter-light.png?v=__BUILD__" alt="Presenter perspective: the slide dock along the bottom lists the Architecture Walkthrough slides with Present and Add slide buttons" loading="lazy" />

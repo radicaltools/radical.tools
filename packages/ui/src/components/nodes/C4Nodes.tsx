@@ -157,12 +157,36 @@ const SimpleNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
 
 SimpleNode.displayName = 'SimpleNode'
 
+/** The + of an element of an exploration (Explore from here): how many
+ *  elements related to it the exploration does not show yet; a click shows
+ *  them beside it. None when it has none left, and off an exploration. */
+function ExploreMore({ c4id, label }: { c4id: string; label: string }): React.ReactElement | null {
+  const more = useDiagramStore((s) => s.exploreMore?.[c4id] ?? 0)
+  const exploreNeighbours = useDiagramStore((s) => s.exploreNeighbours)
+  if (!more) return null
+  return (
+    <button
+      type="button"
+      className="explore-more nodrag nopan"
+      aria-label={`Show ${more} more related to ${label}`}
+      title={`Show the ${more === 1 ? 'element' : `${more} elements`} related to ${label} not shown yet`}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => { e.stopPropagation(); exploreNeighbours(c4id) }}
+    >+{more}</button>
+  )
+}
+
 /** `Full` while the zoom shows cards, a SimpleNode below it; always the
- *  card while an export is drawn. */
+ *  card while an export is drawn. On an exploration, with its +. */
 export function withDetail(Full: React.ComponentType<NodeProps<C4NodeRFData>>): React.ComponentType<NodeProps<C4NodeRFData>> {
   const Detailed = memo((props: NodeProps<C4NodeRFData>) => {
     const low = useDiagramStore((s) => s.lowDetail && !s.allEdgeLabelsShown)
-    return low ? <SimpleNode {...props} /> : <Full {...props} />
+    return (
+      <>
+        {low ? <SimpleNode {...props} /> : <Full {...props} />}
+        <ExploreMore c4id={props.data.c4id} label={props.data.label} />
+      </>
+    )
   }, sameCard)
   Detailed.displayName = `WithDetail(${Full.displayName ?? 'Node'})`
   return Detailed

@@ -17,7 +17,7 @@ import ReactFlow, {
 } from 'reactflow'
 import { zoomIdentity } from 'd3-zoom'
 import { lowDetailAt } from '../store/canvasDetail'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore, viewById } from '../store/diagramStore'
 import { paletteCover, propertiesPanelCover } from './propertiesCover'
 import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode, ProcessNode, StepNode, GenericNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
@@ -29,6 +29,7 @@ import { selectCanvasFocus } from '../store/canvasFocus'
 import { noteUserCamera } from '../store/userCamera'
 import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
+import { ExploreBar } from './ExploreBar'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
 import { newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
 import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
@@ -913,7 +914,7 @@ function StructuralCanvas(): React.ReactElement {
         return
       }
       const stored = s.activeViewId
-        ? s.views[s.activeViewId]?.viewport ?? null
+        ? viewById(s, s.activeViewId)?.viewport ?? null
         : s.defaultViewport
       if (stored || s.autoFitActive) {
         placeCamera(stored)
@@ -1521,6 +1522,9 @@ function StructuralCanvas(): React.ReactElement {
           Connecting from "{rfNodes.find((n) => n.id === connectSource)?.data?.label ?? connectSource}" — release on target
         </div>
       )}
+
+      {/* An exploration's name, with what is done to it. */}
+      <ExploreBar />
 
       {/* View name caption — bottom-left, same style as SequenceView */}
       {activeViewName && !activeSnapshotId && (
