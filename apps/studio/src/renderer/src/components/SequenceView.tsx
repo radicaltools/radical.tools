@@ -427,6 +427,8 @@ export function SequenceView(): React.ReactElement {
           return (
             <g
               key={`step-${s.relationId}-${idx}`}
+              className="seq-diagram-step"
+              data-diff={diffDk}
               style={{ cursor: 'pointer', opacity: stepOpacity }}
               onMouseEnter={() => setHoveredStep(idx)}
               onMouseLeave={() => setHoveredStep((h) => (h === idx ? null : h))}
