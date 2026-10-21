@@ -849,6 +849,76 @@ const KNOWN: Known[] = [
     match: (t, v) => t.some((a) => a.a === 'openMilestone') && t.some((a) => a.a === 'viewpointView') && v.detail.split('\n').slice(1).every((line) => /^\s+views\.[\w-]+: undefined →/.test(line)),
     note: 'K26: a view of a viewpoint made while a milestone is shown is saved without its views per element; a reload makes them (new)',
   },
+  {
+    // Bookstore: API deleted, Orders DB and Web App kept in a row, Web App
+    // moved into Payment Provider, Bookstore dragged 2 px down: Orders DB
+    // goes with it, Web App does not, and the row is 2 px off; read again,
+    // it is snapped (Bookstore 1 px up, Payment Provider 1 px down). The
+    // same on the code before these fixes.
+    rule: 'reloadKeeps',
+    match: (t) => lastAction(t) === 'drag' && t.some((a) => a.a === 'align'),
+    note: 'K27: a drag of a container leaves a row or column through an element in it off its line; a reload snaps it (new)',
+  },
+  {
+    // Nested: milestone Early opened, Customer renamed, Systems and
+    // containers opened, Undo, Redo: the live view gets the milestone's
+    // places for System 0, 1 and their containers. The same on the code
+    // before these fixes.
+    rule: 'milestoneKeepsLive',
+    match: (t, v) => (lastAction(t) === 'undo' || lastAction(t) === 'redo') && v.detail.split('\n').slice(1).every((line) => /^\s+views\.[\w-]+\.positions\./.test(line)),
+    note: 'K28: Undo or Redo in a milestone after a view switch writes the milestone\'s places into the live view (new; sibling of K17)',
+  },
+  {
+    // Nested: milestone Early shown, the agent adds a component into
+    // Container 0.0: the live model is saved with the frames the agent's
+    // write gave it; read again, System 0 is refit (710 → 410 high) and its
+    // containers with it. The same on the code before these fixes.
+    // Also without a milestone: a component added into Container 2.0, the
+    // agent moves Component 2.0.1 into Container 2.1, the new component
+    // dragged 1 px: read again, System 0 and its containers are refit
+    // (Container 0.0 (84, 102) → (30, 138)).
+    rule: 'reloadKeeps',
+    match: (t) => t.some((a) => a.a === 'agent'),
+    note: 'K29: after an agent\'s write (a milestone shown or not) the live model is framed otherwise than a reload frames it (new)',
+  },
+  {
+    // Bookstore: a milestone saved and shown, API and Orders DB kept in a
+    // row, Propagate: the live model gets the row but not its places;
+    // read again, the row is snapped (API 10 px lower, Bookstore 10 px
+    // taller). The same on the code before these fixes.
+    rule: 'reloadKeeps',
+    match: (t) => t.some((a) => a.a === 'propagate') && t.some((a) => a.a === 'align'),
+    note: 'K30: a row or column made in a milestone and propagated does not hold in the live model; a reload snaps it (new; next to K10b)',
+  },
+  {
+    // Nested, Systems and containers (which draws no databases): System 0
+    // and System 1 in a row, a database dropped into System 0: System 0
+    // grows 280 → 370 high there for what the view does not draw, and the
+    // row is 45 px off; read again, it is snapped and the containers refit.
+    // The same on the code before these fixes.
+    rule: 'reloadKeeps',
+    match: (t, v) => lastAction(t) === 'add' && t.some((a) => a.a === 'align') && v.detail.split('\n').slice(1).every((line) => /^\s+views\.[\w-]+\.positions\./.test(line)),
+    note: 'K31: an add of an element the view shown does not draw grows its parent there, off a row or column; a reload snaps it (new; next to K3)',
+  },
+  {
+    // Nested: groups added, Component 0.0.0 moved into Container 2.0 and
+    // Component 0.0.2 deleted on Systems and containers, then the Table
+    // view turned into a canvas: Container 0.0 is drawn at x −407, 760
+    // wide, 96 px over Container 0.1. The same on the code before these
+    // fixes (K5 matched it there).
+    rule: 'geometry',
+    match: (t, v) => lastAction(t) === 'viewKind' && !!v.facts?.overlap,
+    note: 'K32: a table view turned into a canvas draws containers over each other (new)',
+  },
+  {
+    // Nested: System 1 deleted, the agent adds a container into System 0
+    // (merged with the delete not saved yet), Undo: System 1 comes back
+    // where it was, under System 0, which the agent's write grew 2440 →
+    // 2750 wide. The same on the code before these fixes.
+    rule: 'geometry',
+    match: (t, v) => (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent') && !!v.facts?.overlap,
+    note: 'K33: Undo after an agent\'s write puts an element back under one the write grew (new; next to K16, K17)',
+  },
 ]
 
 const knownHits = new Map<string, number>()

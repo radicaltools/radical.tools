@@ -4,7 +4,8 @@
  *
  * Covers:
  *   - a row of two open containers the physics framed stays where it is
- *     on a reload, also after a fold or a drop inside one of them (fuzzer K2)
+ *     on a reload, also after a fold, a drop or a delete inside one of them
+ *     (fuzzer K2)
  *   - a row's members stay where they are when the layout is built again
  *     (an unfold): a later drag does not show them elsewhere (K5c)
  *   - a run of the physics comes to rest, on the sample too (K20)
@@ -146,6 +147,58 @@ describe('a row of containers the physics framed', () => {
     s().loadDiagram(clone(saved))
     rest()
     expect(s().saveDiagram().defaultPositions).toEqual(saved.defaultPositions)
+  })
+})
+
+describe('a row through a container whose last children are deleted', () => {
+  it('stays on its line, and on a reload (fuzzer K2)', () => {
+    // Bookstore and Customer in a row, Web App, Orders DB and API deleted:
+    // Bookstore, drawn at its folded size now, left the line by 70 px; read
+    // again, the row was snapped.
+    s().loadDiagram(bookstore())
+    rest()
+    s().removeNodes(['web'])
+    rest()
+    s().addAlignment('horizontal', ['bookstore', 'customer'])
+    rest()
+    s().removeNodes(['db'])
+    rest()
+    s().removeNodes(['api'])
+    rest()
+    const d = drawn()
+    expect(Math.abs(d.bookstore.y + d.bookstore.height / 2 - (d.customer.y + d.customer.height / 2))).toBeLessThanOrEqual(0.5)
+    const saved = clone(s().saveDiagram())
+    s().loadDiagram(clone(saved))
+    rest()
+    expect(s().saveDiagram().defaultPositions).toEqual(saved.defaultPositions)
+  })
+})
+
+describe('a row through a container whose last children are hidden from the view', () => {
+  it('stays on its line, and on a reload (fuzzer K2)', () => {
+    // Containers view: Web App deleted, Bookstore and Customer in a row,
+    // Orders DB deleted, API hidden from the view: Bookstore, drawn at its
+    // folded size there now, left the line by 35 px; read again, the row
+    // was snapped.
+    s().loadDiagram(bookstore())
+    rest()
+    s().removeNodes(['web'])
+    s().setActiveView('v-containers')
+    rest()
+    s().addAlignment('horizontal', ['bookstore', 'customer'])
+    rest()
+    s().removeNodes(['db'])
+    rest()
+    s().removeNodeFromView('v-containers', 'api')
+    rest()
+    const d = drawn()
+    expect(d.api).toBeUndefined()
+    expect(Math.abs(d.bookstore.y + d.bookstore.height / 2 - (d.customer.y + d.customer.height / 2))).toBeLessThanOrEqual(0.5)
+    const saved = clone(s().saveDiagram())
+    s().loadDiagram(clone(saved))
+    s().setActiveView('v-containers')
+    rest()
+    expect(s().saveDiagram().views).toEqual(saved.views)
   })
 })
 

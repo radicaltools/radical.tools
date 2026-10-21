@@ -3544,7 +3544,14 @@ export const useDiagramStore = create<DiagramStore>()(
           }
         })
         get()._sync()
-        if (placed) _liveLayout?.reset(placed)
+        // A row or column through what it leaves holds now, as a reload
+        // would draw it: a container left without children is drawn at its
+        // folded size, and its middle left the line.
+        let snapped = false
+        const input = layoutInputForView(get())
+        if (input.alignments.length) set((state) => { snapped = applyAlignments(state.c4Nodes, input) })
+        if (snapped) get()._sync()
+        if (placed || snapped) _liveLayout?.reset(placed ?? [])
         else _liveLayout?.invalidate()
       },
 
@@ -4508,6 +4515,13 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._milestoneViewEdit(viewId)
         set((state) => { hide(state.views[viewId] as DiagramView) })
         get()._sync()
+        // A container whose children it hid is drawn at its folded size: a
+        // row or column through it holds again, as a reload would draw it,
+        // and the physics takes the canvas as it is now.
+        if (viewId === get().activeViewId) {
+          get()._enforceLayoutConstraints()
+          _liveLayout?.reset()
+        }
       },
       setViewNodes(viewId, nodeIds) {
         if (!get().views[viewId]) return

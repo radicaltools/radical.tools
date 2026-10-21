@@ -615,10 +615,12 @@ export class LiveColaEngine {
       if (calm.id === nodeId) {
         this.clearOverlaps([...moved, ...calm.partners])
         // What the drop pushed inside a group on a line grew the group, as
-        // the drag did: the line follows it (a 1 px drag of a component
-        // left its container 2.5 px off its row, and the next load snapped
-        // the row and refit every container).
+        // the drag did: the line follows it, and every line through a group
+        // holds as drawn (a 1 px drag of a component left its container
+        // 2.5 px off its row, and the next load snapped the row and refit
+        // every container).
         this.followCarriers(moved)
+        this.projectGroupAlignments()
       }
       this.emitPositions()
       this.callbacks.onSettled?.()
