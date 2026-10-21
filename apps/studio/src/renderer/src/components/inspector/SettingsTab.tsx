@@ -12,7 +12,7 @@ import {
   CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, compareCheckConfig, defaultSeverity, ratchetConfig,
   type CheckConfig, type CheckConfigChange, type CheckMetric, type CheckResult, type CheckSeverity,
 } from '@radical/common/check'
-import { saveCheckConfig, serializeCheckConfig, useInspectorStore } from '../../persistence/inspector'
+import { saveCheckConfig, serializeCheckConfig, setSettingsDraft, useInspectorStore, useSettingsDraft } from '../../persistence/inspector'
 import { DIMENSIONS, RULE_INFO, dimensionOfKey, metricOf } from './shared'
 import { lineDiff, patchRule, setGoal, type RulePatch } from './settingsDraft'
 
@@ -55,7 +55,9 @@ function GlobList({ label, globs, onChange, disabled }: { label: string; globs: 
 export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckResult; editable: boolean; readOnlyReason: string }): React.ReactElement {
   const config = useInspectorStore((s) => s.config)
   const configError = useInspectorStore((s) => s.configError)
-  const [draft, setDraft] = useState<CheckConfig | null>(null)
+  // In the store, not here: going to another tab or Back kept no edit.
+  const draft = useSettingsDraft()
+  const setDraft = setSettingsDraft
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [allMetrics, setAllMetrics] = useState(false)
