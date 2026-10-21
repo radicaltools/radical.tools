@@ -277,6 +277,26 @@ describe('milestone tools', () => {
     expect(Object.keys(facade.getNodes())).toHaveLength(3)
   })
 
+  // Milestones keep sequences, and the comparison left them out: a flow
+  // changed between two phases read as "No changes".
+  it('compare the sequences too', async () => {
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await call('add_node', { tempId: 'erp', type: 'system', label: 'ERP' })
+    await call('add_relation', { sourceId: 'shop', targetId: 'erp', label: 'orders' })
+    const rel = Object.keys(facade.getRelations())[0]
+    await call('create_sequence', { tempId: 'order', name: 'Order', steps: [{ relationId: rel, description: 'sends' }] })
+    await call('create_milestone', { name: 'As-is' })
+    const asIs = facade.getMilestones!()[0].id
+    const seqId = Object.keys(facade.getSequences!())[0]
+    await call('update_sequence', { id: seqId, steps: [{ relationId: rel, description: 'sends' }, { relationId: rel, description: 'sends again' }] })
+    await call('create_sequence', { tempId: 'refund', name: 'Refund' })
+    const compared = (await call('compare_milestones', { from: asIs })).resultText
+    expect(compared).not.toContain('No changes')
+    expect(compared).toMatch(/Sequences added:\n- Refund \(/)
+    expect(compared).toMatch(/Sequences changed:\n- Order \([^)]+\): steps/)
+  })
+
   it('let a slide show a milestone, its focus checked against that model', async () => {
     const { facade, call, ctx } = setup()
     await call('add_node', { tempId: 'old', type: 'system', label: 'Mainframe' })

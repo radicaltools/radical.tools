@@ -7,7 +7,7 @@
 // The tools never load a milestone over the current model: that is Studio's
 // milestone timeline, where the user sees what they are switching to.
 
-import type { DiagramSnapshot } from '../../c4'
+import type { DiagramSequence, DiagramSnapshot } from '../../c4'
 import { compareModels, type ModelChanges, type ModelCopy } from '../../model'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 
@@ -50,7 +50,7 @@ export function buildMilestoneToolDefs(): ToolDef[] {
     },
     {
       name: 'compare_milestones',
-      description: 'What changed between a milestone and a later one, or the current model: elements and relations added, removed and changed (with the changed fields).',
+      description: 'What changed between a milestone and a later one, or the current model: elements, relations and sequences added, removed and changed (with the changed fields).',
       inputSchema: {
         type: 'object',
         properties: {
@@ -94,6 +94,32 @@ function describeChanges(changes: ModelChanges, before: ModelCopy, after: ModelC
   section('Relations added', changes.relations.added.map(now.relation))
   section('Relations removed', changes.relations.removed.map(then.relation))
   section('Relations changed', changes.relations.changed.map((c) => `${now.relation(c.id)}: ${c.fields.join(', ')}`))
+  return lines.join('\n')
+}
+
+/** The sequences added, removed and changed (name, steps, notes) from
+ *  `before` to `after`, as lines for describeChanges' sections. */
+function describeSequenceChanges(before: Record<string, DiagramSequence>, after: Record<string, DiagramSequence>): string {
+  const name = (q: DiagramSequence) => `${q.name} (${q.id})`
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? []) === JSON.stringify(b ?? [])
+  const added = Object.values(after).filter((q) => !before[q.id]).map(name)
+  const removed = Object.values(before).filter((q) => !after[q.id]).map(name)
+  const changed = Object.values(after).filter((q) => before[q.id]).map((q) => {
+    const was = before[q.id]
+    const fields = [
+      ...(was.name !== q.name ? ['name'] : []),
+      ...(!same(was.relationIds, q.relationIds) ? ['steps'] : []),
+      ...(!same(was.stepDescriptions, q.stepDescriptions) ? ['notes'] : []),
+    ]
+    return fields.length ? `${name(q)}: ${fields.join(', ')}` : null
+  }).filter((line): line is string => !!line)
+  const lines: string[] = []
+  const section = (title: string, items: string[]) => {
+    if (items.length) lines.push(`${title}:`, ...items.map((item) => `- ${item}`))
+  }
+  section('Sequences added', added)
+  section('Sequences removed', removed)
+  section('Sequences changed', changed)
   return lines.join('\n')
 }
 
@@ -195,12 +221,15 @@ export function buildMilestoneToolHandlers(): Record<string, ToolHandler> {
         ? { nodes: to.nodes, relations: to.relations }
         : { nodes: ctx.diagram.getNodes(), relations: ctx.diagram.getRelations() }
       const changes = compareModels(before, after)
+      // A milestone saved without sequences has none.
+      const sequences = describeSequenceChanges(from.sequences ?? {}, (to ? to.sequences : ctx.diagram.getSequences?.()) ?? {})
       const target = to ? `milestone "${to.name}"` : 'the current model'
       const count = (group: ModelChanges['nodes']) => group.added.length + group.removed.length + group.changed.length
-      if (!count(changes.nodes) && !count(changes.relations)) {
+      if (!count(changes.nodes) && !count(changes.relations) && !sequences) {
         return { ok: true, resultText: `No changes from milestone "${from.name}" to ${target}.` }
       }
-      return { ok: true, resultText: `From milestone "${from.name}" to ${target}:\n${describeChanges(changes, before, after)}` }
+      const described = [describeChanges(changes, before, after), sequences].filter(Boolean).join('\n')
+      return { ok: true, resultText: `From milestone "${from.name}" to ${target}:\n${described}` }
     },
   }
 }
