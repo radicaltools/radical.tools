@@ -14,13 +14,18 @@ const WRITE_LOCK = 'write.lock'
 const LOCK_WAIT_MS = 15_000
 /** A turn held this long was left by a writer that hung or died. */
 const LOCK_STALE_MS = 15_000
+/** A lock file whose text names no turn is being written for no longer
+ *  than this: one line, written at once. Older, it is no writer's. */
+const LOCK_UNREAD_MS = 1_000
 
 /** True when the lock file's text names a process that is gone, or a turn
  *  taken too long ago. A text that does not read as one (being written, or
- *  cut short by a crash) is stale once the file is that old (`age`). */
+ *  cut short by a crash, or garbage) is stale once the file is older (`age`)
+ *  than a writer takes to write it: waiting out a whole turn for it made a
+ *  read wait 15 s. */
 function staleLock(text: string, age: number): boolean {
   const [pid, since] = text.trim().split(' ').map(Number)
-  if (!Number.isFinite(pid) || !Number.isFinite(since)) return age > LOCK_STALE_MS
+  if (!Number.isFinite(pid) || !Number.isFinite(since)) return age > LOCK_UNREAD_MS
   if (Date.now() - since > LOCK_STALE_MS) return true
   if (pid === process.pid) return false
   try {
@@ -61,7 +66,7 @@ async function takeWriteTurn(base: string, forRead = false): Promise<() => Promi
       continue
     }
     if (Date.now() > deadline) {
-      throw new Error(`Another program has been writing this model folder for ${LOCK_WAIT_MS / 1000} s (.radical/${WRITE_LOCK}); nothing was written. Try again.`)
+      throw new Error(`Another program has been writing this model folder for ${LOCK_WAIT_MS / 1000} s (.radical/${WRITE_LOCK}); ${forRead ? 'the folder was not read' : 'nothing was written'}. Try again.`)
     }
     await sleep(10 + Math.random() * 30)
   }

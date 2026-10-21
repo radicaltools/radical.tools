@@ -607,6 +607,8 @@ export function patchRelation(state: ModelState, id: string, updates: Partial<Om
   const moved = (updates.sourceId !== undefined && updates.sourceId !== rel.sourceId)
     || (updates.targetId !== undefined && updates.targetId !== rel.targetId)
   Object.assign(rel, updates)
+  // A key given no value is none: the folder writes none of it either.
+  for (const [key, value] of Object.entries(updates)) if (value === undefined) delete (rel as unknown as Record<string, unknown>)[key]
   // A moved end can leave the relation type behind; infer it again, as on insert.
   if (moved && updates.relationType === undefined) refitRelationType(state, rel)
 }

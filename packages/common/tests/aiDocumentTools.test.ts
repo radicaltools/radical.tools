@@ -455,7 +455,86 @@ describe('add_relation with no type and a properties bag', () => {
     const nodes = facade.getNodes()
     expect(nodes[rel.targetId as string]?.label).toBe('Bank')
     expect(rel.relationType).not.toBe('nonexistent-type')
-    expect(rel.note).toBe('kept')
+    // No type the bag could be checked against: nothing of it is stored.
+    expect(rel.note).toBeUndefined()
+    expect(res.resultText).toMatch(/ignored property "note"/)
+  })
+
+  it('checks the bag against the type inferred for the pair, and ignores it where no single type fits', async () => {
+    // The bag was stored unchecked (an enum value no type has, a key no type
+    // defines), and get_issues said nothing.
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'm', type: 'state-machine', label: 'Order' })
+    await call('add_node', { tempId: 'a', type: 'state', label: 'Pending', parentId: 'm' })
+    await call('add_node', { tempId: 'b', type: 'state', label: 'Paid', parentId: 'm' })
+    await call('add_node', { tempId: 'o', type: 'entity', label: 'Order' })
+    await call('add_node', { tempId: 'l', type: 'entity', label: 'Line' })
+    const one = await call('add_relation', { sourceId: 'a', targetId: 'b', properties: { guard: 'paid', bogus: 1 } })
+    expect(one.ok, one.resultText).toBe(true)
+    expect(one.resultText).toMatch(/ignored property "bogus"/)
+    const two = await call('add_relation', { sourceId: 'o', targetId: 'l', properties: { cardinality: 'bogus' } })
+    expect(two.ok, two.resultText).toBe(true)
+    expect(two.resultText).toMatch(/ignored property "cardinality"/)
+    const [t, r] = Object.values(facade.getRelations()) as unknown as Record<string, unknown>[]
+    expect(t).toMatchObject({ relationType: 'transition', guard: 'paid' })
+    expect(t.bogus).toBeUndefined()
+    expect(r.relationType).toBeUndefined()
+    expect(r.cardinality).toBeUndefined()
+  })
+})
+
+describe('update_node label', () => {
+  it('refuses a blank label as add_node does, and trims one given', async () => {
+    // "   " was taken: the element had no name, and its file became person.md.
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'a', type: 'person', label: 'Alice' })
+    const id = Object.keys(facade.getNodes())[0]
+    for (const label of ['', '   ']) {
+      const res = await call('update_node', { id, label })
+      expect(res.ok).toBe(false)
+      expect(res.resultText).toBe('update_node: label cannot be empty')
+    }
+    expect((await call('update_node', { id, label: '  Alice Smith ' })).ok).toBe(true)
+    expect(facade.getNodes()[id].label).toBe('Alice Smith')
+  })
+})
+
+describe('update_relation types and properties', () => {
+  const entities = async () => {
+    const s = setup()
+    await s.call('add_node', { tempId: 'o', type: 'entity', label: 'Order' })
+    await s.call('add_node', { tempId: 'l', type: 'entity', label: 'Line' })
+    await s.call('add_relation', { sourceId: 'o', targetId: 'l', relationType: 'references', properties: { cardinality: 'many', description: 'lines' } })
+    const id = Object.keys(s.facade.getRelations())[0]
+    const rel = () => s.facade.getRelations()[id] as unknown as Record<string, unknown>
+    return { ...s, id, rel }
+  }
+
+  it('stores no type for an empty one, as Studio does', async () => {
+    const { call, id, rel } = await entities()
+    const res = await call('update_relation', { id, relationType: '' })
+    expect(res.ok, res.resultText).toBe(true)
+    expect('relationType' in rel()).toBe(false)
+  })
+
+  it('drops the properties the new type does not have, and says so', async () => {
+    // They stayed, unseen in Studio and out of reach of update_relation,
+    // which checks the bag against the new type.
+    const { call, id, rel } = await entities()
+    const res = await call('update_relation', { id, relationType: 'part-of' })
+    expect(res.ok, res.resultText).toBe(true)
+    expect(res.resultText).toMatch(/removed property "cardinality"/)
+    expect(rel().relationType).toBe('part-of')
+    expect('cardinality' in rel()).toBe(false)
+    expect('description' in rel()).toBe(false)
+  })
+
+  it('clears a property given as null', async () => {
+    const { call, id, rel } = await entities()
+    const res = await call('update_relation', { id, properties: { cardinality: null } })
+    expect(res.ok, res.resultText).toBe(true)
+    expect('cardinality' in rel()).toBe(false)
+    expect(rel().description).toBe('lines')
   })
 })
 

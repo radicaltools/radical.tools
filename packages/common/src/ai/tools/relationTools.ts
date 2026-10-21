@@ -1,7 +1,7 @@
 // ─── Relation tools: add_relation / update_relation / delete_relation ───────
 
 import type { C4Relation } from '../../c4'
-import { isReservedPropertyKey, type Metamodel } from '../../metamodel'
+import { inferRelationType, isReservedPropertyKey, type Metamodel } from '../../metamodel'
 import { fail, type ToolDef, type ToolHandler } from './types'
 import { validateProperties, type PropertyValue } from './propertyBag'
 
@@ -45,8 +45,8 @@ export function buildRelationToolDefs(mm: Metamodel | undefined): ToolDef[] {
           id: { type: 'string' },
           label: { type: 'string' },
           technology: { type: 'string' },
-          relationType: relTypeSchema,
-          properties: { type: 'object', additionalProperties: true },
+          relationType: { ...relTypeSchema, description: 'Another type: the properties the new type does not have are removed. An empty string leaves the relation with no type.' },
+          properties: { type: 'object', additionalProperties: true, description: 'Values for the relation type\'s properties; null clears one.' },
         },
         required: ['id'],
         additionalProperties: false,
@@ -92,23 +92,22 @@ export function buildRelationToolHandlers(): Record<string, ToolHandler> {
         relationType = input.relationType
       }
 
+      // No type given: the one the store infers for the pair, where a single
+      // type fits. The bag is checked against it, as against a type given;
+      // with none, a bag stored unchecked was a value no type has and no
+      // check saw.
+      const checkedType = relationType ?? (mm ? inferRelationType(mm, nodes[sId].type, nodes[tId].type) : undefined)
       let propValues: Record<string, PropertyValue> = {}
       let notes: string[] = []
-      if (relationType) {
-        const validated = validateProperties(input.properties, mm?.relationTypes[relationType]?.properties, { nodes, resolveId: ctx.resolveId })
+      if (checkedType) {
+        const validated = validateProperties(input.properties, mm?.relationTypes[checkedType]?.properties, { nodes, resolveId: ctx.resolveId })
         propValues = validated.values
         notes = validated.notes
       } else if (input.properties && typeof input.properties === 'object') {
-        // Type wasn't given (will be auto-inferred by the store) — pass values
-        // through, but never a field every relation has: spread into the
-        // relation, `targetId` or `relationType` in the bag replaced the
-        // checked ends and type (a relation to nothing, of an unknown type).
-        for (const [key, value] of Object.entries(input.properties as Record<string, PropertyValue>)) {
-          if (isReservedPropertyKey(key, 'relation') || key === 'label' || key === 'technology') {
-            notes.push(`ignored property "${key}" — give it as an argument of its own`)
-          } else {
-            propValues[key] = value
-          }
+        for (const key of Object.keys(input.properties)) {
+          notes.push(isReservedPropertyKey(key, 'relation') || key === 'label' || key === 'technology'
+            ? `ignored property "${key}" — give it as an argument of its own`
+            : `ignored property "${key}" — the relation has no type to define it; give relationType`)
         }
       }
 
@@ -152,19 +151,37 @@ export function buildRelationToolHandlers(): Record<string, ToolHandler> {
         const pairOk = !def || def.allowedPairs.length === 0 || def.allowedPairs.some((p) => p.from === srcType && p.to === dstType)
         if (!pairOk) return fail(`update_relation: relationType "${input.relationType}" does not allow ${srcType} → ${dstType}`)
       }
-      const effectiveType = typeof input.relationType === 'string' ? input.relationType : rels[realId].relationType
+      const oldType = rels[realId].relationType
+      const effectiveType = typeof input.relationType === 'string' ? input.relationType || undefined : oldType
+      const newDefs = effectiveType ? mm?.relationTypes[effectiveType]?.properties : undefined
+      // A property given as null is cleared, where the type has it.
+      const bag = input.properties && typeof input.properties === 'object' ? input.properties as Record<string, unknown> : {}
+      const cleared = Object.keys(bag).filter((key) => bag[key] === null && newDefs?.some((d) => d.key === key))
       const { values: propValues, notes } = validateProperties(
-        input.properties,
-        effectiveType ? mm?.relationTypes[effectiveType]?.properties : undefined,
+        Object.fromEntries(Object.entries(bag).filter(([key]) => !cleared.includes(key))),
+        newDefs,
         { nodes: ctx.diagram.getNodes(), resolveId: ctx.resolveId },
       )
+      // Another type: the old type's properties the new one does not have
+      // go. They stayed, shown nowhere and out of reach of this tool.
+      const removed = effectiveType !== oldType && oldType
+        ? (mm?.relationTypes[oldType]?.properties ?? [])
+            .filter((d) => !newDefs?.some((n) => n.key === d.key) && (rels[realId] as unknown as Record<string, unknown>)[d.key] !== undefined)
+            .map((d) => d.key)
+        : []
+      for (const key of removed) notes.push(`removed property "${key}" — the new type does not have it`)
 
-      const updates = Object.fromEntries(Object.entries({
-        label: typeof input.label === 'string' ? input.label : undefined,
-        technology: typeof input.technology === 'string' ? input.technology : undefined,
-        relationType: typeof input.relationType === 'string' ? input.relationType : undefined,
-        ...propValues,
-      }).filter(([, value]) => value !== undefined)) as Partial<Omit<C4Relation, 'id'>>
+      const updates = {
+        ...Object.fromEntries(Object.entries({
+          label: typeof input.label === 'string' ? input.label : undefined,
+          technology: typeof input.technology === 'string' ? input.technology : undefined,
+          relationType: effectiveType !== oldType ? effectiveType : undefined,
+          ...propValues,
+        }).filter(([, value]) => value !== undefined)),
+        // Keys with no value are taken off the relation (patchRelation).
+        ...(effectiveType !== oldType && !effectiveType ? { relationType: undefined } : {}),
+        ...Object.fromEntries([...cleared, ...removed].map((key) => [key, undefined])),
+      } as Partial<Omit<C4Relation, 'id'>>
 
       ctx.diagram.updateRelation(realId, updates)
       const resultText = notes.length ? `Updated relation ${realId}. ${notes.join('; ')}` : `Updated relation ${realId}.`

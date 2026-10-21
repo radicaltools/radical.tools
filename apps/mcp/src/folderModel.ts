@@ -11,7 +11,8 @@ import { mergeNotices } from '@radical/common/modelMerge'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { modelChangesSince } from '@radical/node-files/gitModel'
-import { readEditorStateFile, readSelectionFile, writeEditorStateFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
+import { readEditorStateFile, writeEditorStateFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
+import { SELECTION_FILE, parseSelection } from '@radical/common/formats/canvasSelection'
 import { MODEL_BASE_FILE, forgeModelBase, mayReplaceWithForgeBase } from '@radical/common/formats/modelBase'
 import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE, serializeAgentActivity } from '@radical/common/formats/agentActivity'
@@ -121,8 +122,10 @@ function checkData(data: DiagramData): void {
       ids.add(item.id)
     }
   }
+  // An empty label is a name not given yet: Studio and radical check read
+  // the element, and so does the server (it refused every call).
   for (const node of data.nodes) {
-    if (!node.type || !node.label || ![node.x, node.y, node.width, node.height].every(Number.isFinite)) {
+    if (!node.type || typeof node.label !== 'string' || ![node.x, node.y, node.width, node.height].every(Number.isFinite)) {
       throw new Error(`Malformed node ${node.id}: invalid type, label or geometry`)
     }
   }
@@ -320,9 +323,16 @@ export class FolderModel {
   /** The canvas selection Studio wrote into the folder, resolved against
    *  the model as it is now. */
   private async selection(facade: ReturnType<typeof createModelFacade>): Promise<string> {
-    const selection = await readSelectionFile(this.folder)
-    if (!selection) {
+    const text = await readEditorStateFile(this.folder, SELECTION_FILE)
+    if (text === null) {
       return 'No selection: Studio has not had this folder open with a selection yet. Open the same folder in Studio and select something, or ask the user which element they mean.'
+    }
+    const selection = parseSelection(text)
+    if (!selection) {
+      const version = (() => { try { return (JSON.parse(text) as { version?: unknown }).version } catch { return undefined } })()
+      return typeof version === 'number' && version > 1
+        ? `No selection: ${SELECTION_FILE} was written by a newer Studio (version ${version}) than this server reads. Update the server, or ask the user which element they mean.`
+        : `No selection: ${SELECTION_FILE} cannot be read (Studio may be writing it, or it was edited by hand). Select again in Studio, or ask the user which element they mean.`
     }
     const query = {
       nodes: facade.getNodes(),
@@ -335,7 +345,8 @@ export class FolderModel {
     const result = {
       updatedAt: selection.updatedAt,
       secondsAgo: Math.max(0, Math.round((Date.now() - Date.parse(selection.updatedAt)) / 1000)),
-      view: view ? { id: view.id, name: view.name, kind: view.kind ?? 'static' } : { id: null, name: 'All elements' },
+      // A view deleted since Studio wrote the file is not All elements.
+      view: view ? { id: view.id, name: view.name, kind: view.kind ?? 'static' } : selection.viewId ? { id: selection.viewId, name: null, deleted: true } : { id: null, name: 'All elements' },
       nodes: selection.nodeIds.filter((id) => query.nodes[id]).map((id) => runModelQuery(`GET NODE "${id}"`, query).result),
       relations: selection.relationIds.map((id) => query.relations[id]).filter(Boolean)
         .map(({ id, relationType, label, sourceId, targetId, technology }) => ({
