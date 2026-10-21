@@ -5300,6 +5300,16 @@ export const useDiagramStore = create<DiagramStore>()(
             return
           }
           if (result.keptCurrent) {
+            // A view's first layout that keeps the places it opened with:
+            // they become its own, with no notice. It kept no positions,
+            // and the view stayed one never laid out.
+            if (firstOpen) {
+              if (_firstLayoutOf === firstOpen) _firstLayoutOf = null
+              get()._saveShownCanvas()
+              const view = get().views[firstOpen]
+              if (view) _historyKeepsFirstLayout(firstOpen, view.positions)
+              return
+            }
             get().pushNotification('Smart layout: the current layout already scores best — nothing changed.', 'info')
             return
           }

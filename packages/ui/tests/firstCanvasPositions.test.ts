@@ -11,6 +11,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { C4Node, DiagramData, NodePosition } from '@radical/common/c4'
 import { useDiagramStore } from '../src/store/diagramStore'
 
+// A first layout whose winner is the layout the view opened with (CI's
+// fonts gave it there): keepCurrent makes Smart Layout say so.
+const keepCurrent = vi.hoisted(() => ({ on: false }))
+vi.mock('../src/layout/smartLayoutRunner', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/layout/smartLayoutRunner')>()
+  return {
+    ...actual,
+    runSmartLayout: async (...args: Parameters<typeof actual.runSmartLayout>) => {
+      const result = await actual.runSmartLayout(...args)
+      return keepCurrent.on ? { ...result, keptCurrent: true } : result
+    },
+  }
+})
+
 const s = useDiagramStore.getState
 const pos = (x: number, y: number, width: number, height: number): NodePosition => ({ x, y, width, height })
 const node = (id: string, type: string, parentId: string | undefined, p: NodePosition): C4Node =>
@@ -189,6 +203,19 @@ describe('the first layout of a view (decided 2026-10-21)', () => {
     expect(s().c4Nodes.pay.description).toBeUndefined()
     expect(s().views.containers.positions).toEqual(positions)
     expect(s().canUndo).toBe(false)
+  }, 60_000)
+
+  it('that keeps the places the view opened with makes them its own, with no notice', async () => {
+    asAgentMade()
+    keepCurrent.on = true
+    try {
+      s().setActiveView('containers')
+      await laidOut()
+    } finally {
+      keepCurrent.on = false
+    }
+    expect(Object.keys(s().views.containers.positions).length).toBeGreaterThan(0)
+    expect(s().notifications.map((n: { message: string }) => n.message).join(' ')).not.toMatch(/already scores best/)
   }, 60_000)
 
   it('is not replaced by All elements\' places saved before it lands', async () => {
