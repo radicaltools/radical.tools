@@ -183,6 +183,56 @@ test('a wiki view follows the same chain: needs on the overview, their requireme
   await expect(page.getByRole('heading', { name: 'Four-eyes approval' })).toBeVisible()
 })
 
+test('a requirement written in a wiki gets what its level\'s filter asks, and one the filter leaves out is announced', async ({ page, studio }) => {
+  await studio.openSample()
+  await openFilter(page, 'Requirements Register')
+  const steps = page.locator('.rp-pipeline')
+  await steps.locator('.rp-level').nth(1).getByRole('button', { name: /Add a filter/ }).click()
+  await page.getByRole('menuitem', { name: /^EARS type is event-driven/ }).click()
+  await page.locator('.props-content', { has: steps }).getByRole('button', { name: 'Wiki', exact: true }).click()
+  await studio.properties.getByRole('button', { name: 'Close properties' }).click()
+  await page.locator('.wiki-nav-item', { hasText: 'PSD2 & AMLD6 obligations' }).first().click()
+  const line = page.getByRole('textbox', { name: 'Write a requirement' })
+
+  // A line that names no EARS type takes the filter's: it is there.
+  await line.fill('Users can export their statements')
+  await line.press('Enter')
+  await expect(page.locator('.wiki-page')).toContainText('Users can export their statements')
+  await expect.poll(async () => {
+    const doc = await studio.storedDoc(studio.activeDocId())
+    return (doc.nodes.find((n) => n.label === 'Users can export their statements') as { ears_type?: string } | undefined)?.ears_type
+  }).toBe('event-driven')
+  // A sentence of another type is kept as written, and the view says it does not show it.
+  await line.fill('The system shall keep statements for ten years')
+  await line.press('Enter')
+  await expect(page.locator('.toast-message').last()).toContainText("was added, but this view's filter does not show it")
+})
+
+test('a step added in a Warnier view its filter leaves it out of keeps its name open, and is announced when it stays out', async ({ page, studio }) => {
+  await studio.openSample('view-processes')
+  await openFilter(page, 'Processes')
+  await page.getByRole('button', { name: 'Detach' }).click()
+  await page.getByRole('button', { name: /^Add a filter to/ }).click()
+  await page.getByPlaceholder('Text in name or description…').fill('Payment')
+  await page.getByPlaceholder('Text in name or description…').press('Enter')
+  await studio.properties.getByRole('button', { name: 'Close properties' }).click()
+
+  // The name of the new step is open, and what is typed is kept.
+  await page.getByRole('button', { name: 'Add a step to Send a payment' }).click()
+  const name = page.locator('.wn-name-input')
+  await expect(name).toBeFocused()
+  await page.keyboard.type('Limits checked')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.toast-message').last()).toContainText("Limits checked was added, but this view's filter does not show it")
+  await expect.poll(async () => (await studio.storedDoc(studio.activeDocId())).nodes.some((n) => n.label === 'Limits checked')).toBe(true)
+  // A name the filter lets through: drawn, with no word.
+  await page.getByRole('button', { name: 'Add a step to Send a payment' }).click()
+  await expect(name).toBeFocused()
+  await page.keyboard.type('Payment limits checked')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.wn-label', { hasText: 'Payment limits checked' })).toBeVisible()
+})
+
 test('a level takes any of its ways: needs or requirements as roots, the scenarios verifying either under them', async ({ page, studio }) => {
   await studio.openSample()
   await openRegisterWithoutChain(page)
@@ -277,7 +327,7 @@ test('a matrix with a chain adds only a relation its cell shows, and never a cop
   await expect.poll(count).toBe(before + 1)
   await expect(await cell('Hold high-risk payments', 'PSD2 & AMLD6 obligations')).toHaveClass(/mx-has-rel/)
   const added = (await studio.storedDoc(doc)).relations.find((r) => r.sourceId === 'req-fraud-hold' && r.targetId === 'need-regulation')
-  expect(added?.relationType).toBe('derives')
+  expect((added as { relationType?: string } | undefined)?.relationType).toBe('derives')
 })
 
 test('a hierarchy drilled into an element its filter then leaves out shows the top, with no way up', async ({ page, studio }) => {

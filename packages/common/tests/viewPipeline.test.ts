@@ -4,7 +4,7 @@ import { builtInGovernanceMetamodel } from '../src/metamodel/presets/governance'
 import {
   applyFilters, chainDrawn, chainRelationFor, filterLabel, levelLabel, runChain, runPipeline, sortNodes, suggestFilters,
   suggestNextWays, suggestStartWays, viewShownNodes, readPipeline,
-  typeChoices, propertyChoices, relationChoices, placeChoices, viaChoices, addChoices, levelTypes, type ChainRow, type PipelineContext,
+  typeChoices, propertyChoices, relationChoices, placeChoices, viaChoices, addChoices, newElementFilters, levelTypes, type ChainRow, type PipelineContext,
 } from '../src/viewPipeline'
 import { setViewPipeline, type ModelState } from '../src/model'
 import { serializeToMdFolder, deserializeFromMdFolder } from '../src/formats/mdFolder'
@@ -307,6 +307,27 @@ describe('view pipeline: adding where the rows are', () => {
     expect(rest).toEqual([])
     expect(choice).toMatchObject({ type: 'requirement', parentId: 'Ledger', properties: { ears_type: 'event-driven' }, link: { relationType: 'derives', direction: 'out', otherId: 'n-pay' } })
     expect(choice.hidden).toBeUndefined()
+  })
+
+  it('says what a new element needs for the level it goes on, for views that add their own way', () => {
+    const filtered: ViewPipeline = { levels: [
+      { ways: [{ types: ['need'] }] },
+      { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }], filters: [
+        { kind: 'property', key: 'ears_type', op: 'is', values: ['event-driven'] },
+      ] },
+    ] }
+    const derives = { relationType: 'derives', direction: 'out' as const }
+    // Under a need: the requirements' level.
+    expect(newElementFilters(view(filtered), ctx, 'requirement', { node: nodes['n-pay'], link: derives }))
+      .toEqual({ properties: { ears_type: 'event-driven' } })
+    // At the top a requirement has no level; under a requirement, no level is left.
+    expect(newElementFilters(view(filtered), ctx, 'requirement')).toMatchObject({ hidden: true })
+    expect(newElementFilters(view(filtered), ctx, 'scenario', { node: nodes['r2'] })).toMatchObject({ hidden: true })
+    // One level holds what is inside its elements too; a text it cannot meet hides it.
+    const processes: ViewPipeline = { levels: [{ ways: [{}], filters: [{ kind: 'text', text: 'Payment' }] }] }
+    expect(newElementFilters(view(processes), ctx, 'need', { node: nodes['n-pay'] })).toEqual({ properties: {}, hidden: true })
+    // Without a chain there is nothing to meet.
+    expect(newElementFilters(view(), ctx, 'need')).toBeNull()
   })
 
   it('a filter it cannot meet still offers the type, hidden', () => {

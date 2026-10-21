@@ -114,6 +114,16 @@ describe('warnierTree', () => {
     const c4: DiagramView = { id: 's', name: 'Systems', kind: 'warnier', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['system', 'container'] }] }] } }
     expect(shape(warnierTree(warnierRows(c4, ctx)))).toEqual([['Shop', 'sequence', [['API']]]])
   })
+
+  it('draws an element being named where it goes, though the filter leaves it out', () => {
+    const payments: DiagramView = { id: 'p', name: 'Payments', kind: 'warnier', nodeIds: [], positions: {}, pipeline: { levels: [
+      { ways: [{ types: ['process', 'step'] }], filters: [{ kind: 'text', text: 'Checkout' }] },
+    ] } }
+    const nodes = byId([node('checkout', 'process', 'Checkout'), node('new', 'step', 'New step', { parentId: 'checkout' })])
+    const ctx = { nodes, relations: [], metamodel }
+    expect(shape(warnierTree(warnierRows(payments, ctx)))).toEqual([['Checkout']])
+    expect(shape(warnierTree(warnierRows(payments, ctx, 'new')))).toEqual([['Checkout', 'sequence', [['New step']]]])
+  })
 })
 
 describe('outline edits', () => {
