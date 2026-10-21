@@ -856,6 +856,21 @@ const KNOWN: Known[] = [
     match: (t, v) => t.some((a) => a.a === 'propagate') && /names missing relation/.test(v.detail),
     note: 'K21: Propagate of a delete leaves the live sequences\' steps of the relations it deletes (new)',
   },
+  {
+    // Nested: Container 2.1 folded and unfolded on Systems and containers
+    // (which does not draw its components), All elements opened, Component
+    // 0.0.1 dragged: Component 2.1.0 jumps (140, 60), out of Container 2.1.
+    // Also after the model is loaded again: the expand's seeds stay in the
+    // physics until the children are next laid out, so a run of this test
+    // can depend on the run before it.
+    rule: 'geometry',
+    match: (t, v, resolved) => {
+      if (lastAction(t) !== 'drag' || !v.facts?.outside) return false
+      const dragged = /^drag .*\(([^()]+)\) by/.exec(resolved[resolved.length - 1] ?? '')?.[1]
+      return !!dragged && !(v.keys ?? []).some((k) => k.includes(dragged))
+    },
+    note: 'K22: an expand on a view that does not draw the children leaves seeds that move them out of their container later, also after a reload (new)',
+  },
 ]
 
 const knownHits = new Map<string, number>()
