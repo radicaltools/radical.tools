@@ -142,6 +142,36 @@ describe('adding, renaming and deleting a view is an undo step', () => {
     expect(s().views[id]?.name).toBe('Two')
   })
 
+  // Runs 65 to 69 (decided 2026-10-21): Redo of "+ New view" stayed on the
+  // view it was made from, the new one back only in the list.
+  it('a new view redone is shown again, as Undo went back to the view it was made from', () => {
+    s().setActiveView('v1')
+    const id = s().addView('Two')
+    s().setActiveView(id)
+    s().undo()
+    expect(s().views[id]).toBeUndefined()
+    expect(s().activeViewId).toBe('v1')
+    s().redo()
+    expect(s().views[id]?.name).toBe('Two')
+    expect(s().activeViewId).toBe(id)
+    // And Undo again goes back to where it was made.
+    s().undo()
+    expect(s().activeViewId).toBe('v1')
+  })
+
+  it('a new view redone in a milestone is shown again too', () => {
+    s().selectMilestone(s().createSnapshot('M'))
+    s().setActiveView('v1')
+    const id = s().addView('Two')
+    s().setActiveView(id)
+    s().undo()
+    expect(s().activeViewId).toBe('v1')
+    s().redo()
+    expect(s().activeViewId).toBe(id)
+    expect(s().activeSnapshotId).not.toBeNull()
+    s().discardMilestoneChanges()
+  })
+
   it('a new view ends what could be redone', () => {
     s().undo()
     expect(s().canRedo).toBe(true)

@@ -183,3 +183,109 @@ describe('back in Designer from Presenter', () => {
     delete W.__rfPlaceCamera
   })
 })
+
+describe('the model a slide shows once its milestone is gone (item 232)', () => {
+  // Milestone v1 has the four elements; the live model has a fifth since.
+  const live = (): string => s().addNode({ type: 'system', label: 'Pay', x: 900, y: 600, collapsed: false, ...NODE_SIZES.system } as Omit<C4Node, 'id'>)
+
+  it('a slide added on a milestone shows the live model after Delete milestone', () => {
+    const v1 = s().createSnapshot('v1')
+    const pay = live()
+    s().setActiveView('ctx')
+    s().selectMilestone(v1)
+    s().addPresentationSlide('On v1')
+    s().discardMilestoneChanges()
+    s().removeSnapshot(v1)
+    expect(s().notifications[s().notifications.length - 1]?.message).toMatch(/shows the live model now/)
+    const slide = s().presentationSlides[0]
+    expect(slide.snapshotId).toBeNull()
+    // Nothing captured from v1 is left to replay over the live model.
+    expect(slide.modelSnapshot).toBeUndefined()
+    expect(slide.canvasState).toBeUndefined()
+    s().setAppMode('presenter')
+    s().previewSlide(0)
+    expect(s().c4Nodes[pay]).toBeDefined()
+    s().startPresentation()
+    s().goToSlide(0)
+    expect(s().c4Nodes[pay]).toBeDefined()
+  })
+
+  it('Undo of Delete milestone gives the slide back what it captured on it', () => {
+    const v1 = s().createSnapshot('v1')
+    live()
+    s().setActiveView('ctx')
+    s().selectMilestone(v1)
+    s().addPresentationSlide('On v1')
+    s().discardMilestoneChanges()
+    const before = s().presentationSlides[0]
+    expect(before.canvasState).toBeDefined()
+    s().removeSnapshot(v1)
+    s().undo()
+    expect(s().presentationSlides[0]).toEqual(before)
+    expect(s().presentations.find((p) => p.id === s().activePresentationId)?.slides[0]).toEqual(before)
+    s().redo()
+    expect(s().presentationSlides[0]).toMatchObject({ snapshotId: null, viewport: { x: 0, y: 0, zoom: 0 } })
+    expect(s().presentationSlides[0].canvasState).toBeUndefined()
+  })
+
+  it('a slide added on a milestone and unlinked by hand shows the live model', () => {
+    const v1 = s().createSnapshot('v1')
+    const pay = live()
+    s().selectMilestone(v1)
+    s().addPresentationSlide('On v1')
+    s().discardMilestoneChanges()
+    const id = s().presentationSlides[0].id
+    expect(s().presentationSlides[0].snapshotId).toBe(v1)
+    s().setAppMode('presenter')
+    s().previewSlide(0)
+    expect(s().c4Nodes[pay]).toBeUndefined()
+    s().linkSnapshotToSlide(id, null)
+    s().previewSlide(0)
+    expect(s().c4Nodes[pay]).toBeDefined()
+  })
+
+  it('Capture on a slide linked to a milestone keeps no copy of it either', () => {
+    const v1 = s().createSnapshot('v1')
+    const pay = live()
+    s().addPresentationSlide('Live')
+    const id = s().presentationSlides[0].id
+    s().linkSnapshotToSlide(id, v1)
+    s().setAppMode('presenter')
+    s().previewSlide(0)
+    s().captureSlideViewport(id)
+    expect(s().presentationSlides[0].modelSnapshot).toBeUndefined()
+    s().linkSnapshotToSlide(id, null)
+    s().previewSlide(0)
+    expect(s().c4Nodes[pay]).toBeDefined()
+  })
+
+  // Decided 2026-10-21: a slide with neither a milestone nor a copy of its
+  // own (the sample's, an agent's) showed the milestone open in Designer or
+  // Presenter.
+  it('a slide with neither a milestone nor a copy shows the live model whatever milestone is open', () => {
+    const v1 = s().createSnapshot('v1')
+    const pay = live()
+    s().setPresentations([{ id: 'p', name: 'P', slides: [{ id: 'a', name: 'A', snapshotId: null, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } }] }])
+    s().setActivePresentation('p')
+    s().selectMilestone(v1)
+    expect(s().c4Nodes[pay]).toBeUndefined()
+    s().setAppMode('presenter')
+    s().previewSlide(0)
+    expect(s().c4Nodes[pay]).toBeDefined()
+    s().startPresentation()
+    s().goToSlide(0)
+    expect(s().c4Nodes[pay]).toBeDefined()
+    s().stopPresentation()
+    // Picked in Presenter too.
+    s().setAppMode('designer')
+    s().discardMilestoneChanges()
+    s().setAppMode('presenter')
+    s().selectMilestone(v1)
+    s().previewSlide(0)
+    expect(s().c4Nodes[pay]).toBeDefined()
+    // Back in Designer: the live model it was left on.
+    s().setAppMode('designer')
+    expect(s().activeSnapshotId).toBeNull()
+    expect(s().c4Nodes[pay]).toBeDefined()
+  })
+})

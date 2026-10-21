@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { produce } from 'immer'
+import { current, produce } from 'immer'
 import { immer } from 'zustand/middleware/immer'
 import {
   Node,
@@ -33,6 +33,7 @@ import {
   COLLAPSED_HEIGHT,
   COLLAPSED_WIDTH,
   isContainerType,
+  slideWithoutMilestone,
 } from '@radical/common/c4'
 import {
   Metamodel,
@@ -1071,14 +1072,47 @@ function atDefaultPositions(nodes: readonly C4Node[], positions: Record<string, 
 
 /** The model a slide shows: its linked milestone when it has one (linked by
  *  hand, so it wins), else the copy captured when the slide was added. A slide
- *  with neither shows the live model. */
+ *  with neither shows the live model: `live` while a milestone is shown over
+ *  it (it showed that milestone), else undefined, the model shown. */
 function slideModel(
   slide: PresentationSlide,
   snapshots: DiagramSnapshot[],
+  live?: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> },
 ): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } | undefined {
   const milestone = slide.snapshotId ? snapshots.find((s) => s.id === slide.snapshotId) : undefined
   if (milestone) return { nodes: milestone.nodes as Record<string, C4Node>, relations: milestone.relations as Record<string, C4Relation> }
-  return (slide as { modelSnapshot?: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } }).modelSnapshot
+  return slide.modelSnapshot ?? live
+}
+
+/** The live model while a milestone is shown over it (Designer's, or one
+ *  picked in Presenter). */
+function liveUnderMilestone(state: Pick<DiagramStore, 'activeSnapshotId' | 'liveBackup'>): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } | undefined {
+  return state.activeSnapshotId && state.liveBackup
+    ? { nodes: state.liveBackup.nodes as Record<string, C4Node>, relations: state.liveBackup.relations as Record<string, C4Relation> }
+    : undefined
+}
+
+/** What the slides that showed a milestone deleted since had captured on
+ *  it (slide id → the slide as it was): Undo of the delete gives it back. */
+const _slidesOfDeletedMilestones = new Map<string, PresentationSlide>()
+
+/** A slide whose milestone is gone (inside immer set): it shows the live
+ *  model, with nothing it captured on the milestone. Its copy of the model
+ *  kept, it went on drawing the milestone. */
+function unlinkSlide(slide: PresentationSlide): void {
+  const was = current(slide)
+  _slidesOfDeletedMilestones.set(slide.id, was)
+  const bare = slideWithoutMilestone(was)
+  for (const key of Object.keys(slide) as (keyof PresentationSlide)[]) if (!(key in bare)) delete slide[key]
+  Object.assign(slide, bare)
+}
+
+/** A slide whose milestone `id` is back (Undo of its delete, inside immer
+ *  set): what it had captured on it, with the name it has now. */
+function relinkSlide(slide: PresentationSlide, id: string): void {
+  const was = _slidesOfDeletedMilestones.get(slide.id)
+  if (was?.snapshotId === id) Object.assign(slide, { ...was, name: slide.name })
+  else slide.snapshotId = id
 }
 
 /** Capture all node positions + collapsed state for a presentation slide,
@@ -2844,8 +2878,8 @@ export const useDiagramStore = create<DiagramStore>()(
           for (const pres of state.presentations) {
             for (const slide of pres.slides) {
               const was = entry.slideMilestones?.[slide.id]
-              if (slide.snapshotId && !ids.has(slide.snapshotId)) slide.snapshotId = null
-              else if (!slide.snapshotId && was && ids.has(was)) slide.snapshotId = was
+              if (slide.snapshotId && !ids.has(slide.snapshotId)) unlinkSlide(slide)
+              else if (!slide.snapshotId && was && ids.has(was)) relinkSlide(slide, was)
             }
             if (pres.id === state.activePresentationId) state.presentationSlides = pres.slides
           }
@@ -5622,7 +5656,12 @@ export const useDiagramStore = create<DiagramStore>()(
         _historyMark++
         // push current state to redo, on the step's canvas, where Undo goes
         const now = _captureState(get())
-        const canvas = (isStepChange(item) ? item.to : item).activeViewId
+        // Redo goes there too, unless the view shown is one the step made:
+        // Redo of "+ New view" stayed on the view it was made from.
+        const after = isStepChange(item) ? item.from : now
+        const before = isStepChange(item) ? item.to : item
+        const made = after.activeViewId !== null && !before.views[after.activeViewId]
+        const canvas = made ? after.activeViewId : before.activeViewId
         _redoStack.push(isStepChange(item) ? { from: item.to, to: _entryOnCanvas(item.from, canvas) } : _entryOnCanvas(now, canvas))
         _restoreHistoryItem(item, now, 'Undo')
       },
@@ -5740,7 +5779,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // server's delete_milestone does): they kept its id, a "?".
           for (const pres of state.presentations) {
             for (const slide of pres.slides) {
-              if (slide.snapshotId === id) { slide.snapshotId = null; unlinked++ }
+              if (slide.snapshotId === id) { unlinkSlide(slide); unlinked++ }
             }
             if (pres.id === state.activePresentationId) state.presentationSlides = pres.slides
           }
@@ -6645,8 +6684,11 @@ export const useDiagramStore = create<DiagramStore>()(
         const canvasState = captureCanvasState(get().c4Nodes as Record<string, C4Node>, activeViewId ? get().views[activeViewId] : undefined)
         // Inline full model snapshot — guarantees the slide replays exactly
         // what was on screen at creation time, even if the user later edits
-        // nodes/relations or switches the active milestone.
-        const modelSnapshot = {
+        // nodes/relations or switches the active milestone. On a milestone
+        // the slide shows the milestone it is linked to: a copy of it
+        // outlived the link, and the slide drew the milestone after it was
+        // deleted or unlinked.
+        const modelSnapshot = activeSnapshotId ? undefined : {
           nodes: get().c4Nodes as Record<string, C4Node>,
           relations: get().c4Relations as Record<string, C4Relation>,
         }
@@ -6655,7 +6697,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           const pres = state.presentations.find(p => p.id === state.activePresentationId)
           if (!pres) return
-          pres.slides.push({ id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, modelSnapshot, ...slideViewFields(state, activeViewId) } as any)
+          pres.slides.push({ id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, ...(modelSnapshot ? { modelSnapshot } : {}), ...slideViewFields(state, activeViewId) } as any)
           state.presentationSlides = pres.slides
         })
       },
@@ -6755,7 +6797,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Disable physics while presenting
         get().stopLiveLayout()
 
-        const shown = slideModel(slide, get().snapshots)
+        const shown = slideModel(slide, get().snapshots, liveUnderMilestone(get()))
         if (shown) {
           set((state) => {
             state.c4Nodes = shown.nodes as any
@@ -6802,25 +6844,13 @@ export const useDiagramStore = create<DiagramStore>()(
         // Re-derive rfNodes / rfEdges (always needed: view filter or canvas state may have changed)
         get()._sync()
 
-        // Compute diff highlight between previous and current slide snapshots.
-        // Prefer the inline modelSnapshot (always present on new slides);
-        // fall back to the legacy linked milestone snapshot.
+        // Compute diff highlight between the models of the previous and the
+        // current slide, as each shows it: a linked milestone wins over the
+        // copy (preferred here, the colours were of models not shown).
         {
           const prevSlide = i > 0 ? presentationSlides[i - 1] : null
-          const slideModel = (s: typeof slide | null | undefined) => {
-            if (!s) return null
-            const inline = (s as any).modelSnapshot as
-              | { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> }
-              | undefined
-            if (inline) return inline
-            if (s.snapshotId) {
-              const snap = get().snapshots.find(x => x.id === s.snapshotId)
-              if (snap) return { nodes: snap.nodes as Record<string, C4Node>, relations: snap.relations as Record<string, C4Relation> }
-            }
-            return null
-          }
-          const currModel = slideModel(slide)
-          const prevModel = slideModel(prevSlide as any)
+          const currModel = slideModel(slide, get().snapshots)
+          const prevModel = prevSlide ? slideModel(prevSlide, get().snapshots) : undefined
           if (currModel && prevModel) {
             get().setDiffHighlight(computeSnapDiff(prevModel.nodes, currModel.nodes, prevModel.relations, currModel.relations))
           } else {
@@ -6859,7 +6889,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const slide = presentationSlides[i]
         set((state) => { state.presentationSlideIndex = i })
 
-        const shown = slideModel(slide, get().snapshots)
+        const shown = slideModel(slide, get().snapshots, liveUnderMilestone(get()))
         if (shown) {
           _beforeSlidePreview ??= { nodes: get().c4Nodes, relations: get().c4Relations }
           set((state) => {
@@ -6949,7 +6979,10 @@ export const useDiagramStore = create<DiagramStore>()(
             slide.viewport = vp
             ;(slide as any).canvasState = canvasState
             ;(slide as any).viewId = currentViewId
-            ;(slide as any).modelSnapshot = modelSnapshot
+            // A slide linked to a milestone shows it, and keeps no copy of
+            // it, as one added on a milestone: the copy outlived the link.
+            if (slide.snapshotId) delete slide.modelSnapshot
+            else (slide as any).modelSnapshot = modelSnapshot
             // The drill level or wiki page shown now, as Add slide takes it:
             // the old one stayed, and the slide played where it was added.
             delete slide.treemapFocusId; delete slide.wikiFocusId; delete slide.wikiPageMode

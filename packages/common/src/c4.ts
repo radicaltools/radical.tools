@@ -426,7 +426,8 @@ export interface SlideCanvasState {
 export interface PresentationSlide {
   id: string
   name: string
-  /** null = use whatever is currently on canvas (no snapshot restore) */
+  /** The milestone the slide shows; null: its own copy of the model
+   *  (`modelSnapshot`), else the live model, whatever milestone is open. */
   snapshotId: string | null
   /** null = show all nodes; string = activate this view when navigating to slide */
   viewId?: string | null
@@ -448,7 +449,8 @@ export interface PresentationSlide {
    * Inline snapshot of the full model (nodes + relations) at slide-creation time.
    * Used as the source of truth on goToSlide — guarantees the slide shows
    * exactly what was on screen when "Add slide" was pressed, regardless of
-   * later edits to the live model. Takes precedence over `snapshotId`.
+   * later edits to the live model. A linked milestone (`snapshotId`) wins
+   * over it. A slide added on a milestone is linked to it and has none.
    */
   modelSnapshot?: {
     nodes: Record<string, C4Node>
@@ -461,6 +463,15 @@ export interface Presentation {
   id: string
   name: string
   slides: PresentationSlide[]
+}
+
+/** A slide whose milestone is deleted: it shows the live model. What was
+ *  captured with it (the camera, the canvas, the focus, the drill level or
+ *  wiki page and the copy of the model) was the milestone's, and kept, the
+ *  slide went on drawing the milestone; it fits its view instead, as a slide
+ *  moved to another milestone does. */
+export function slideWithoutMilestone(slide: PresentationSlide): PresentationSlide {
+  return { id: slide.id, name: slide.name, snapshotId: null, viewId: slide.viewId ?? null, viewport: { x: 0, y: 0, zoom: 0 } }
 }
 
 export interface DiagramData {
