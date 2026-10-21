@@ -63,4 +63,16 @@ describe('diskFolderStorage', () => {
     expect(await new MdFolderSession(diskFolderStorage(dir)).write({ 'radical.md': 'm' })).toEqual({ ok: true })
     expect(Date.now() - started).toBeLessThan(1000)
   })
+
+  it('takes over a lock file that names no turn once it is past being written, to read or to write', async () => {
+    // A garbage lock made a read wait 15 s and then say "nothing was written".
+    dir = await mkdtemp(join(tmpdir(), 'radical-garbage-'))
+    await new MdFolderSession(diskFolderStorage(dir)).write({ 'radical.md': 'm' })
+    for (const text of ['garbage\n', '']) {
+      await writeFile(join(dir, '.radical', 'write.lock'), text)
+      const started = Date.now()
+      expect(await new MdFolderSession(diskFolderStorage(dir)).readAll()).toEqual({ 'radical.md': 'm' })
+      expect(Date.now() - started).toBeLessThan(3000)
+    }
+  }, 10_000)
 })

@@ -3,7 +3,7 @@
 import { NODE_SIZES, type C4ElementType, type C4Node } from '../../c4'
 import type { Metamodel } from '../../metamodel'
 import { checkNodeUpdate, checkReparent } from '../../model'
-import { fail, type ToolDef, type ToolHandler } from './types'
+import { fail, sequenceStepCount, stepsGone, type ToolDef, type ToolHandler } from './types'
 import { validateProperties } from './propertyBag'
 
 export function buildNodeToolDefs(mm: Metamodel | undefined): ToolDef[] {
@@ -133,6 +133,7 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       const nodes = ctx.diagram.getNodes()
       if (!(realId in nodes)) return fail(`update_node: unknown id "${input.id}"`)
       if (input.type !== undefined && typeof input.type !== 'string') return fail('update_node: type must be a string')
+      if (typeof input.label === 'string' && !input.label.trim()) return fail('update_node: label cannot be empty')
 
       const mm = ctx.diagram.getMetamodel?.()
       if (mm && typeof input.type === 'string' && !mm.nodeTypes[input.type]) return fail(`update_node: unknown type "${input.type}". The metamodel has: ${Object.keys(mm.nodeTypes).join(', ')}`)
@@ -140,7 +141,7 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       const { values: propValues, notes } = validateProperties(input.properties, mm?.nodeTypes[effectiveType]?.properties, { nodes, resolveId: ctx.resolveId })
 
       const updates = Object.fromEntries(Object.entries({
-        label: typeof input.label === 'string' ? input.label : undefined,
+        label: typeof input.label === 'string' ? input.label.trim() : undefined,
         description: typeof input.description === 'string' ? input.description : undefined,
         technology: typeof input.technology === 'string' ? input.technology : undefined,
         external: typeof input.external === 'boolean' ? input.external : undefined,
@@ -191,8 +192,9 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       if (typeof input.id !== 'string' || !input.id) return fail('delete_node: id is required')
       const realId = ctx.resolveId(input.id)
       if (!(realId in ctx.diagram.getNodes())) return fail(`delete_node: unknown id "${input.id}"`)
+      const steps = sequenceStepCount(ctx)
       ctx.diagram.removeNode(realId)
-      return { ok: true, resultText: `Deleted node ${realId}.`, deleted: { nodes: 1 } }
+      return { ok: true, resultText: `Deleted node ${realId}${stepsGone(steps - sequenceStepCount(ctx))}.`, deleted: { nodes: 1 } }
     },
   }
 }

@@ -207,6 +207,20 @@ describe('md-folder persistence', () => {
   })
 })
 
+describe('a custom metamodel in a folder', () => {
+  it('keeps the order of its node and relation types', () => {
+    // The file's keys were sorted: types read back A–Z by id, and the
+    // metamodel editor's list and the palette changed order after a reload.
+    const mm = builtInC4Metamodel()
+    const nodeTypes = Object.fromEntries([['zeta', { ...mm.nodeTypes.system, id: 'zeta', label: 'Zeta' }], ['alpha', { ...mm.nodeTypes.system, id: 'alpha', label: 'Alpha' }], ...Object.entries(mm.nodeTypes)])
+    const relationTypes = Object.fromEntries([['zz', { ...Object.values(mm.relationTypes)[0], id: 'zz' }], ...Object.entries(mm.relationTypes)])
+    const metamodel = { ...mm, id: 'custom', nodeTypes, relationTypes }
+    const back = deserializeFromMdFolder(serializeToMdFolder({ nodes: [], relations: [], metamodel }, 'Types')).data.metamodel!
+    expect(Object.keys(back.nodeTypes)).toEqual(Object.keys(nodeTypes))
+    expect(Object.keys(back.relationTypes)).toEqual(Object.keys(relationTypes))
+  })
+})
+
 describe('md-folder ownership', () => {
   it('reports where each node was written', () => {
     const { files, nodePaths } = serializeToMdFolderWithPaths(sample)
@@ -317,6 +331,20 @@ describe('a node file in a folder model', () => {
     expect(api?.label).toBe('API')
     expect(api?.parentId).toBe('shop')
     expect(staleMdFolderFiles(files, {})).toContain(path)
+  })
+
+  it('whose label has a character outside the BMP at the 60th place keeps a file name the disk keeps', () => {
+    // The name was cut at 60 UTF-16 units, through the character: the disk
+    // wrote U+FFFD for the half left, and the next write's pass over stale
+    // files deleted the element's file.
+    const data = model()
+    data.nodes[1].label = `${'a'.repeat(59)}\u{20000}\u{20001}`
+    const files = serializeToMdFolder(data, 'model')
+    const paths = Object.keys(files)
+    expect(paths.filter((p) => /[\uD800-\uDFFF]/u.test(p))).toEqual([])
+    // Read back from a disk that writes a lone surrogate as U+FFFD.
+    const disk = Object.fromEntries(Object.entries(files).map(([p, c]) => [p.replace(/[\uD800-\uDFFF]/gu, '\uFFFD'), c]))
+    expect(staleMdFolderFiles(disk, serializeToMdFolder(deserializeFromMdFolder(disk).data, 'model'))).toEqual([])
   })
 
   it('that _layout.json does not know gets its type\'s size, not 0×0', () => {

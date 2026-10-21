@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
-import { mergeModelEdits, mergeModels, modelEdits } from '../src/modelMerge'
+import { mergeModelEdits, mergeModels, mergeNotices, modelEdits } from '../src/modelMerge'
 
 const node = (id: string, label: string, extra: Partial<C4Node> = {}): C4Node =>
   ({ id, type: 'system', label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...extra }) as C4Node
@@ -33,17 +33,73 @@ describe('mergeModels', () => {
     expect(merged.views![0].name).toBe('System context')
   })
 
-  it('removes what one side removed and the other left alone, and keeps what the other changed', () => {
+  it('removes what one side removed and the other left alone, or changed: the delete wins, and the dropped change is named', () => {
     const ours = clone(base)
     ours.nodes = ours.nodes.filter((n) => n.id !== 'bank')
     ours.relations = []
     const theirs = clone(base)
     theirs.relations[0].label = 'orders'
-    const { merged, conflicts } = mergeModels(base, ours, theirs)
+    const { merged, conflicts, dropped } = mergeModels(base, ours, theirs)
     expect(merged.nodes.map((n) => n.id)).toEqual(['shop', 'user'])
-    // Removed by us, changed by them: theirs wins, and it is reported.
-    expect(merged.relations.map((r) => r.label)).toEqual(['orders'])
-    expect(conflicts).toEqual(['orders'])
+    // Removed by us, changed by them: the relation goes, their change with it.
+    expect(merged.relations).toEqual([])
+    expect(conflicts).toEqual([])
+    expect(dropped).toEqual([{ name: 'orders', by: 'theirs' }])
+  })
+
+  it('deletes an element one side deleted and the other changed, with its relations and places, either way round', () => {
+    // A delete in Studio against an agent's edit brought the element back
+    // without its relations and off every view.
+    const b = clone(base)
+    b.views![0].nodeIds = ['shop', 'user']
+    const deleted = clone(b)
+    deleted.nodes = deleted.nodes.filter((n) => n.id !== 'shop')
+    deleted.relations = []
+    deleted.views![0].nodeIds = ['user']
+    deleted.views![0].positions = {}
+    const edited = clone(b)
+    edited.nodes.find((n) => n.id === 'shop')!.description = 'Sells and lends books'
+    for (const [o, t, by] of [[deleted, edited, 'theirs'], [edited, deleted, 'ours']] as const) {
+      const { merged, conflicts, dropped } = mergeModels(b, o, t)
+      expect(byId(merged.nodes, 'shop')).toBeUndefined()
+      expect(merged.relations).toEqual([])
+      expect(merged.views![0].nodeIds).toEqual(['user'])
+      expect(conflicts).toEqual([])
+      expect(dropped).toEqual([{ name: 'Shop', by }])
+    }
+  })
+
+  it('says whose change a delete dropped, and what came back', () => {
+    const where = { ours: 'in Studio', theirs: 'outside Studio' }
+    expect(mergeNotices({ dropped: [{ name: 'Shop', by: 'theirs' }], restored: ['Bank'] }, where)).toEqual([
+      'Shop was deleted in Studio; the change made to it outside Studio was dropped',
+      'Bank, deleted on one side, came back with its relations: an element was put into it on the other',
+    ])
+    expect(mergeNotices({ dropped: [{ name: 'Shop', by: 'ours' }] }, where)).toEqual(['Shop was deleted outside Studio; the change made to it in Studio was dropped'])
+  })
+
+  it('brings back a container one side deleted while the other added an element into it, with its relations and places', () => {
+    const b = clone(base)
+    b.views![0].nodeIds = ['shop', 'user']
+    const deleted = clone(b)
+    deleted.nodes = deleted.nodes.filter((n) => n.id !== 'shop')
+    deleted.relations = []
+    deleted.views![0].nodeIds = ['user']
+    deleted.views![0].positions = {}
+    const added = clone(b)
+    added.nodes.push(node('api', 'API', { type: 'container', parentId: 'shop' } as Partial<C4Node>))
+    added.views![0].nodeIds = ['shop', 'user', 'api']
+    for (const [o, t] of [[deleted, added], [added, deleted]]) {
+      const { merged, restored, dropped } = mergeModels(b, o, t)
+      expect(merged.nodes.map((n) => n.id).sort()).toEqual(['api', 'bank', 'shop', 'user'])
+      expect(merged.relations.map((r) => r.id)).toEqual(['r1'])
+      expect([...merged.views![0].nodeIds].sort()).toEqual(['api', 'shop', 'user'])
+      expect(merged.views![0].positions.shop).toEqual(b.views![0].positions.shop)
+      expect(restored).toEqual(['Shop'])
+      expect(dropped).toEqual([])
+    }
+    // The sides are left as they were.
+    expect(deleted.views![0].nodeIds).toEqual(['user'])
   })
 
   it('takes an empty text, an unticked box or an empty list for no value, as the folder writes them', () => {
@@ -103,16 +159,20 @@ describe('mergeModels', () => {
       { id: 'c0ffee', type: 'pin', nodeIds: ['shop'] },
       { id: 'beef', type: 'align', axis: 'horizontal', nodeIds: ['shop', 'bank'] },
     ]
+    // Both sides change the rules (a delete would win over the edit, D9).
     const ours = clone(withRules)
-    ours.defaultLayoutConstraints = []
+    ours.defaultLayoutConstraints = [
+      { id: 'c0ffee', type: 'pin', nodeIds: ['shop'], extra: 2 } as never,
+      { id: 'beef', type: 'align', axis: 'horizontal', nodeIds: ['shop', 'bank'], gap: 10 } as never,
+    ]
     const theirs = clone(withRules)
     theirs.defaultLayoutConstraints = [
       { id: 'c0ffee', type: 'pin', nodeIds: ['shop', 'bank'], extra: 1 } as never,
-      { id: 'beef', type: 'align', axis: 'vertical', nodeIds: ['shop', 'bank'] },
+      { id: 'beef', type: 'align', axis: 'vertical', nodeIds: ['shop', 'bank'], gap: 20 } as never,
     ]
     const { conflicts } = mergeModels(withRules, ours, theirs)
     expect(conflicts.join(' ')).not.toMatch(/c0ffee|beef/)
-    expect(conflicts).toEqual(expect.arrayContaining(['the pins of Shop, Bank', 'the column of Shop, Bank']))
+    expect(conflicts).toEqual(expect.arrayContaining(['the pins of Shop, Bank: extra', 'the column of Shop, Bank: gap']))
   })
 
   it('takes the other side whole when only one changed', () => {
@@ -158,6 +218,69 @@ describe('mergeModels: order and id lists', () => {
     const { merged, conflicts } = mergeModels(b, ours, theirs)
     expect(merged.views![0].nodeIds).toEqual(['shop', 'user', 'stock'])
     expect(merged.views![0].hiddenRelationIds).toEqual(['r2'])
+    expect(conflicts).toEqual([])
+  })
+
+  it('marks a view empty when each side takes out a different one of its elements, and keeps every element against an add', () => {
+    // An empty list is every element: the merge emptied the view and it drew
+    // the whole model.
+    const b = withViews([{ id: 'v', name: 'Duo', nodeIds: ['user', 'bank'], positions: {} }])
+    const ours = clone(b)
+    ours.views![0].nodeIds = ['bank']
+    const theirs = clone(b)
+    theirs.views![0].nodeIds = ['user']
+    for (const [o, t] of [[ours, theirs], [theirs, ours]]) {
+      const { merged } = mergeModels(b, o, t)
+      expect(merged.views![0]).toMatchObject({ nodeIds: [], empty: true })
+    }
+    // One side shows every element, the other added one: every element.
+    const all = clone(b)
+    all.views![0].nodeIds = []
+    const more = clone(b)
+    more.views![0].nodeIds = ['user', 'bank', 'shop']
+    for (const [o, t] of [[all, more], [more, all]]) {
+      const { merged, conflicts } = mergeModels(b, o, t)
+      expect(merged.views![0].nodeIds).toEqual([])
+      expect(merged.views![0].empty).toBeUndefined()
+      expect(conflicts).toEqual([])
+    }
+  })
+
+  it('puts a view the other side filed into a folder one side renamed into the renamed folder', () => {
+    // The old folder came back with only that view.
+    const b = withViews([
+      { id: 'a', name: 'A', folder: 'C4', nodeIds: [], positions: {} },
+      { id: 'b', name: 'B', folder: 'C4/Deep', nodeIds: [], positions: {} },
+      { id: 'c', name: 'C', nodeIds: [], positions: {} },
+    ])
+    const renamed = clone(b)
+    renamed.views![0].folder = 'Structure'
+    renamed.views![1].folder = 'Structure/Deep'
+    const filed = clone(b)
+    filed.views![2].folder = 'C4/Deep'
+    filed.views!.push({ id: 'd', name: 'D', folder: 'C4', nodeIds: [], positions: {} })
+    for (const [o, t] of [[renamed, filed], [filed, renamed]]) {
+      const { merged } = mergeModels(b, o, t)
+      expect(Object.fromEntries(merged.views!.map((v) => [v.id, v.folder]))).toEqual({ a: 'Structure', b: 'Structure/Deep', c: 'Structure/Deep', d: 'Structure' })
+    }
+  })
+
+  it('merges the viewpoints, allowed parents and enum options each side removed as sets', () => {
+    const mm = (removedViewpoints: string[] | undefined, allowedParents: string[], options: string[]) => ({
+      ...clone(base),
+      metamodel: {
+        id: 'c4-builtin', name: 'C4', relationTypes: {},
+        nodeTypes: { box: { id: 'box', label: 'Box', color: '', fg: '', iconPath: '', width: 1, height: 1, allowedParents, properties: [{ key: 'size', label: 'Size', type: 'enum' as const, options }] } },
+        ...(removedViewpoints ? { removedViewpoints } : {}),
+      },
+    })
+    const b = mm(undefined, ['a', 'b', 'c'], ['S', 'M', 'L'])
+    const ours = mm(['components'], ['a', 'b'], ['S', 'M'])
+    const theirs = mm(['containers'], ['b', 'c'], ['M', 'L', 'XL'])
+    const { merged, conflicts } = mergeModels(b, ours, theirs)
+    expect([...merged.metamodel!.removedViewpoints!].sort()).toEqual(['components', 'containers'])
+    expect(merged.metamodel!.nodeTypes.box.allowedParents).toEqual(['b'])
+    expect(merged.metamodel!.nodeTypes.box.properties![0].options).toEqual(['M', 'XL'])
     expect(conflicts).toEqual([])
   })
 })
@@ -219,6 +342,21 @@ describe('mergeModels: a sequence\'s steps and notes', () => {
     expect(conflicts).toEqual([])
   })
 
+  it('keeps each note on its step when one side removes a step of a relation that repeats and the other changes the next note', () => {
+    const b2 = withSteps(['r1', 'r1'], ['validates', 'submits'])
+    const ours = withSteps(['r1'], ['submits'])
+    const theirs = withSteps(['r1', 'r1'], ['validates', 'submits (agent)'])
+    for (const [o, t] of [[ours, theirs], [theirs, ours]]) {
+      const { merged, conflicts } = mergeModels(b2, o, t)
+      expect(pairs(merged)).toEqual(['r1:submits (agent)'])
+      expect(conflicts).toEqual([])
+    }
+    // Undo of the remove after the merge: the step comes back before it.
+    const undone = mergeModels(withSteps(['r1'], ['submits']), b2, withSteps(['r1'], ['submits (agent)']))
+    expect(pairs(undone.merged)).toEqual(['r1:validates', 'r1:submits (agent)'])
+    expect(undone.conflicts).toEqual([])
+  })
+
   it('keeps theirs where both changed one note, and says so', () => {
     const ours = withSteps(['r1', 'r2', 'r3', 'r4'], ['submits', 'ours', 'stores', 'charges'])
     const theirs = withSteps(['r1', 'r2', 'r3'], ['submits', 'theirs', 'stores'])
@@ -259,7 +397,7 @@ describe('modelEdits and mergeModelEdits', () => {
   it('change nothing when theirs already has them', () => {
     const ours = clone(base)
     ours.nodes[0].label = 'Bookshop'
-    expect(mergeModelEdits(modelEdits(base, ours), ours)).toEqual({ merged: ours, conflicts: [] })
+    expect(mergeModelEdits(modelEdits(base, ours), ours)).toEqual({ merged: ours, conflicts: [], dropped: [], restored: [] })
     expect(modelEdits(base, clone(base))).toEqual({})
   })
 })

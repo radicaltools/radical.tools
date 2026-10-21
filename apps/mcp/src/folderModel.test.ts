@@ -292,6 +292,44 @@ describe('canvas selection', () => {
   })
 })
 
+describe('a hand-edited folder', () => {
+  it('reads an element whose file has an empty label, as Studio and radical check do', async () => {
+    // Every call that named no file was refused ("Malformed node … label"),
+    // while radical check found nothing wrong.
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    await model.call('add_node', { tempId: 'bob', type: 'person', label: 'Bob' })
+    const path = join(folder, 'nodes/bob.md')
+    await writeFile(path, (await readFile(path, 'utf8')).replace(/^label: .*$/m, 'label: '))
+    const summary = await model.call('get_model_summary', {})
+    expect(summary.ok, summary.text).toBe(true)
+    const added = await model.call('add_node', { tempId: 'carol', type: 'person', label: 'Carol' })
+    expect(added.ok, added.text).toBe(true)
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(data.nodes.map((n) => n.label).sort()).toEqual(['', 'Carol'])
+  })
+})
+
+describe('get_selection with an odd selection file', () => {
+  it('names a view that is gone, not All elements', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    await writeSelectionFile(folder, serializeSelection({ viewId: 'view-gone', nodeIds: [], relationIds: [] }))
+    const text = (await model.call('get_selection', {})).text
+    expect(text).not.toContain('All elements')
+    expect(JSON.parse(text.replace(/^[^{]*/, '')).view).toEqual({ id: 'view-gone', name: null, deleted: true })
+  })
+
+  it('says a broken file or one of a newer Studio is that, not a folder Studio never opened', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    await writeSelectionFile(folder, '{"version": 1, "updatedAt": ')
+    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .radical\/selection.json cannot be read/)
+    await writeSelectionFile(folder, JSON.stringify({ version: 2, updatedAt: new Date().toISOString(), viewId: null, nodeIds: ['a'], relationIds: [] }))
+    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .radical\/selection.json was written by a newer Studio \(version 2\)/)
+  })
+})
+
 describe('milestones', () => {
   it('saves a milestone into the folder, lists it in the summary and compares without writing', async () => {
     const folder = await fixture()

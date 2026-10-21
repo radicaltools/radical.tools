@@ -13,7 +13,7 @@
 import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
-import { mergeModelEdits, mergeModels, modelEdits, type ModelEdits } from '@radical/common/modelMerge'
+import { mergeModelEdits, mergeModels, mergeNotices, modelEdits, type MergeDrop, type ModelEdits } from '@radical/common/modelMerge'
 import { useDiagramStore, parkedLiveModel, type ParkedDesigner } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore, DocumentUnreadableError, StorageFullError, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
@@ -219,13 +219,17 @@ if (typeof window !== 'undefined') {
   }
   // A save merged with an edit made outside Studio: where both changed the
   // same value the folder's was kept, and the user hears which.
-  documents.onSaveMerged((id, conflicts) => {
-    if (id === documents.getActiveId()) reportMergeConflicts(conflicts)
+  documents.onSaveMerged((id, merged) => {
+    if (id === documents.getActiveId()) reportMergeConflicts(merged)
   })
-  const reportMergeConflicts = (conflicts: string[]): void => {
-    if (!conflicts.length) return
-    const shown = conflicts.slice(0, 5).join('; ') + (conflicts.length > 5 ? ` and ${conflicts.length - 5} more` : '')
-    useDiagramStore.getState().pushNotification(`Your edits were merged with a change made outside Studio. Where both changed the same value, the folder's was kept: ${shown}.`, 'warning')
+  const reportMergeConflicts = ({ conflicts, ...rest }: { conflicts: string[]; dropped?: MergeDrop[]; restored?: string[] }): void => {
+    const list = (items: string[]) => items.slice(0, 5).join('; ') + (items.length > 5 ? ` and ${items.length - 5} more` : '')
+    if (conflicts.length) {
+      useDiagramStore.getState().pushNotification(`Your edits were merged with a change made outside Studio. Where both changed the same value, the folder's was kept: ${list(conflicts)}.`, 'warning')
+    }
+    // A delete won over an edit of the other side; a container came back.
+    const notices = mergeNotices(rest, { ours: 'in Studio', theirs: 'outside Studio' })
+    if (notices.length) useDiagramStore.getState().pushNotification(`Your edits were merged with a change made outside Studio: ${list(notices)}.`, 'warning')
   }
 
   /** The folder changed outside Studio while a presentation played: read
@@ -335,15 +339,15 @@ if (typeof window !== 'undefined') {
         // Edits the page had not written when it went away (keepEdits).
         const kept = !opts?.keepUi && source === 'md' ? takeKeptEdits(id) : null
         if (unsaved) {
-          const { merged, conflicts } = mergeModels(unsaved.base, unsaved.ours, data)
+          const { merged, ...report } = mergeModels(unsaved.base, unsaved.ours, data)
           store.loadDiagram(structuredClone(merged), { outsideChange })
           mergedEdits = true
-          reportMergeConflicts(conflicts)
+          reportMergeConflicts(report)
         } else if (kept) {
-          const { merged, conflicts } = mergeModelEdits(kept, data)
+          const { merged, ...report } = mergeModelEdits(kept, data)
           store.loadDiagram(structuredClone(merged))
           mergedEdits = true
-          reportMergeConflicts(conflicts)
+          reportMergeConflicts(report)
         } else {
           store.loadDiagram(data, { outsideChange })
         }

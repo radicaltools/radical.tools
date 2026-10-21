@@ -55,7 +55,7 @@ import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
 import { pipelineOf, viewDrawnIds } from '@radical/common/viewPipeline'
-import { mergeModels, mergeSteps } from '@radical/common/modelMerge'
+import { mergeModels, mergeNotices, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
@@ -361,11 +361,13 @@ function _keptBuiltOn(from: DiagramData, now: DiagramData, merged: DiagramData):
  *  the step brings back that has no place left in it does not come back
  *  (`dropped`, _withoutStrays). Shown on the canvas of `change.to`, as Undo
  *  goes back to its step's canvas. */
-function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[]; kept: string[]; dropped: string[] } {
+function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[]; kept: string[]; dropped: string[]; notices: string[] } {
   const nowModel = _entryModel(now)
   const fromModel = _entryModel(change.from)
-  const result = mergeModels(fromModel, _entryModel(change.to), nowModel)
-  const { conflicts } = result
+  const result = mergeModels(fromModel, _entryModel(change.to), nowModel, { keepParents: false })
+  // What the step changes in an element deleted outside Studio since stays deleted.
+  const conflicts = [...result.conflicts, ...result.dropped.filter((d) => d.by === 'ours').map((d) => d.name)]
+  const notices = mergeNotices({ dropped: result.dropped.filter((d) => d.by === 'theirs') }, { ours: 'by the step', theirs: 'outside Studio' })
   const { merged, kept } = _keptBuiltOn(fromModel, nowModel, result.merged)
   const mergedNodes: Record<string, C4Node> = {}
   for (const n of merged.nodes) mergedNodes[n.id] = n
@@ -408,6 +410,7 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
     conflicts,
     kept,
     dropped,
+    notices,
   }
 }
 
@@ -2704,7 +2707,7 @@ export const useDiagramStore = create<DiagramStore>()(
     // is made on the model as it is now (`now`), keeping that change.
     const _restoreHistoryItem = (item: HistoryItem, now: HistoryEntry, action: 'Undo' | 'Redo'): void => {
       if (!isStepChange(item)) { _restoreHistoryEntry(item); return }
-      const { entry, conflicts, kept, dropped } = _rebasedEntry(item, now)
+      const { entry, conflicts, kept, dropped, notices } = _rebasedEntry(item, now)
       _restoreHistoryEntry(entry)
       const list = (names: string[]): string => names.slice(0, 5).join('; ') + (names.length > 5 ? ` and ${names.length - 5} more` : '')
       if (conflicts.length) {
@@ -2716,6 +2719,7 @@ export const useDiagramStore = create<DiagramStore>()(
       if (dropped.length) {
         get().pushNotification(`${action} left out what needs an element removed outside Studio since that step: ${list(dropped)}.`, 'info')
       }
+      if (notices.length) get().pushNotification(`${action}: ${list(notices)}.`, 'info')
     }
 
     // addNode plus its wizard links, as one undo step.
@@ -6759,7 +6763,9 @@ export const useDiagramStore = create<DiagramStore>()(
           state.c4Nodes = nodes as any
           state.c4Relations = relations as any
           state.sequences = sequences as any
-          state.activeSequenceId = null
+          // An outside change keeps the sequence open, while it is there:
+          // an agent's write closed its card.
+          state.activeSequenceId = opts?.outsideChange && st.activeSequenceId && (sequences as Record<string, unknown>)[st.activeSequenceId] ? st.activeSequenceId : null
           state.views = views as any
           state.defaultPositions = defaultPos as any
           state.defaultViewport = defaultVP

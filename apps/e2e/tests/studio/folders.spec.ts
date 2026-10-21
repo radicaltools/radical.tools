@@ -239,6 +239,51 @@ test('Undo after an outside edit takes back the user\'s edit and keeps the outsi
   expect(Object.values(await folder.files()).some((c) => c.includes('label: "Book Lover"'))).toBe(true)
 })
 
+test('an agent\'s write leaves the sequence card open', async ({ page, studio }) => {
+  await saveAsFolder(page)
+  await expect.poll(() => folder.paths()).toContain('nodes/customer.md')
+  await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+  await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
+  await expect(page.locator('.right-panel .seq-step')).toHaveCount(4)
+  const file = (await folder.files())['nodes/customer.md']
+  await folder.write('nodes/customer.md', file.replace('label: "Customer"', 'label: "Book Lover"'))
+  await expect(studio.node('customer')).toContainText('Book Lover', { timeout: 10_000 })
+  await expect(page.locator('.right-panel .seq-step')).toHaveCount(4)
+})
+
+test('Move to a folder keeps the model\'s name, and a rename reaches radical.md at once', async ({ page }) => {
+  // The model was renamed after the folder, and a rename waited for the
+  // next save to reach radical.md.
+  await saveAsFolder(page)
+  await expect.poll(async () => (await folder.files())['radical.md']).toContain('name: "E2E"')
+  await openModels(page)
+  const models = page.getByRole('dialog', { name: 'Models' })
+  await expect(models.getByRole('button', { name: 'Actions for E2E' })).toBeVisible()
+  await models.getByRole('button', { name: 'Actions for E2E' }).click()
+  await page.getByRole('menuitem', { name: 'Rename' }).click()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.type('Bookshop')
+  await page.keyboard.press('Enter')
+  await expect.poll(async () => (await folder.files())['radical.md']).toContain('name: "Bookshop"')
+})
+
+test('a folder opened is named as its radical.md says, and opening a view leaves radical.md alone', async ({ page, studio }) => {
+  const files = serializeToMdFolder(JSON.parse(fixture('bookstore')), 'Bookstore')
+  for (const [path, content] of Object.entries(files)) await folder.write(path, content)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await openModels(page)
+  await expect(page.getByRole('dialog', { name: 'Models' }).getByRole('button', { name: 'Actions for Bookstore' })).toBeVisible()
+  await page.getByRole('dialog', { name: 'Models' }).getByRole('button', { name: 'Close' }).click()
+  await page.locator('.lp-view-card', { hasText: 'System Context' }).click()
+  await studio.settle()
+  await page.waitForTimeout(2500)
+  expect((await folder.files())['radical.md']).toBe(files['radical.md'])
+})
+
 test('files the model does not own are left alone', async ({ page, studio }) => {
   await folder.write('package.json', '{"name":"shop"}')
   await folder.write('nodes/README.md', '# Notes\n')

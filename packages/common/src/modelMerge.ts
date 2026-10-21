@@ -38,6 +38,18 @@ export interface ModelMergeResult {
   merged: DiagramData
   /** The values both sides changed, where theirs was kept: "Customer: description". */
   conflicts: string[]
+  /** Entries one side deleted and the other changed: the delete won, and
+   *  the change `by` that side was dropped. */
+  dropped: MergeDrop[]
+  /** Containers one side deleted that came back, with their relations and
+   *  places, since the other side put an element into them. */
+  restored: string[]
+}
+
+/** An entry deleted on one side and changed on the other (`by`). */
+export interface MergeDrop {
+  name: string
+  by: 'ours' | 'theirs'
 }
 
 /** Keys whose values are layout, merged without a report. */
@@ -45,7 +57,11 @@ const LAYOUT_KEYS = new Set(['x', 'y', 'width', 'height', 'positions', 'viewport
 
 /** Lists of ids merged as sets (see above). A sequence's `relationIds` are
  *  its steps in order, and may repeat: not one of them. */
-const ID_SET_KEYS = new Set(['nodeIds', 'hiddenRelationIds', 'collapsedNodeIds', 'expandedNodeIds', 'focusNodeIds'])
+const ID_SET_KEYS = new Set(['nodeIds', 'hiddenRelationIds', 'collapsedNodeIds', 'expandedNodeIds', 'focusNodeIds', 'removedViewpoints', 'allowedParents', 'options'])
+
+/** Lists of ids where an empty one means every id (a node type's allowed
+ *  parents: any parent): one that the merge alone empties is a conflict. */
+const ALL_WHEN_EMPTY_KEYS = new Set(['allowedParents'])
 
 /** A sequence's keys merged together, as its steps (mergeSteps). */
 const STEP_KEYS = new Set(['relationIds', 'stepDescriptions'])
@@ -80,19 +96,23 @@ function sameApartFromLayout(a: unknown, b: unknown): boolean {
   return same(strip(a), strip(b))
 }
 
-/** An array that merges by id: one whose items all are objects with an `id`. */
-const byIdArray = (v: unknown): v is Array<Plain & { id: string }> =>
-  Array.isArray(v) && v.length > 0 && v.every((item) => isPlain(item) && typeof item.id === 'string')
+/** An array that merges by id: one whose items all are objects with an `id`
+ *  (or the field `idKey` names: a type's properties have a `key`). */
+const byIdArray = (v: unknown, idKey = 'id'): v is Array<Plain & { id: string }> =>
+  Array.isArray(v) && v.length > 0 && v.every((item) => isPlain(item) && typeof item[idKey] === 'string')
+
+/** The field a list under `key` merges its entries by. */
+const idKeyOf = (key: string | undefined): string => (key === 'properties' ? 'key' : 'id')
 
 /** What a report calls an entry: its label or name; a layout rule (a pin,
  *  a row, a grid) by the elements in it; else its id. An Undo notice named
  *  a pin by its id. */
-function entryName(entry: Plain | undefined, id: string, ctx: Ctx): string {
+function entryName(entry: Plain | undefined, id: string, ctx?: Ctx): string {
   const name = entry && (typeof entry.label === 'string' ? entry.label : typeof entry.name === 'string' ? entry.name : '')
   if (name) return name
   if (entry && Array.isArray(entry.nodeIds) && typeof entry.type === 'string') {
     const rule = entry.type === 'pin' ? 'pins' : entry.type === 'grid' ? 'grid' : entry.axis === 'vertical' ? 'column' : 'row'
-    const members = (entry.nodeIds as unknown[]).map((n) => ctx.labels.get(n as string) || String(n))
+    const members = (entry.nodeIds as unknown[]).map((n) => ctx?.labels.get(n as string) || String(n))
     return `the ${rule} of ${members.slice(0, 4).join(', ')}${members.length > 4 ? ` and ${members.length - 4} more` : ''}`
   }
   return id
@@ -102,6 +122,7 @@ interface Ctx {
   conflicts: string[]
   /** The elements' names, for a report (entryName). */
   labels: Map<string, string>
+  dropped: MergeDrop[]
 }
 
 /** `base`, `ours` and `theirs` of one value merged; `where` names it for a report. */
@@ -117,13 +138,16 @@ function merge3(base: unknown, ours: unknown, theirs: unknown, where: string[], 
   if (layout && nudged(ours, base)) return theirs
   // An array of entries with ids on either side merges by id.
   const arrays = [base, ours, theirs].filter((v) => v !== undefined)
-  if (arrays.every((v) => Array.isArray(v)) && arrays.some(byIdArray) && arrays.every((v) => (v as unknown[]).length === 0 || byIdArray(v))) {
-    return mergeById((base ?? []) as Plain[], (ours ?? []) as Plain[], (theirs ?? []) as Plain[], where, ctx, layout)
+  const idKey = idKeyOf(where[where.length - 1])
+  const entries = (v: unknown) => byIdArray(v, idKey)
+  if (arrays.every((v) => Array.isArray(v)) && arrays.some(entries) && arrays.every((v) => (v as unknown[]).length === 0 || entries(v))) {
+    return mergeById((base ?? []) as Plain[], (ours ?? []) as Plain[], (theirs ?? []) as Plain[], where, ctx, layout, idKey)
   }
   if (isPlain(ours) && isPlain(theirs) && (base === undefined || isPlain(base))) {
     const b = (base ?? {}) as Plain
     const out: Plain = {}
     const sequence = [b, ours, theirs].some((e) => Array.isArray(e.relationIds))
+    const view = [b, ours, theirs].some((e) => Array.isArray(e.nodeIds) && isPlain(e.positions))
     for (const key of new Set([...Object.keys(theirs), ...Object.keys(ours), ...Object.keys(b)])) {
       if (sequence && STEP_KEYS.has(key)) {
         if (key === 'relationIds') {
@@ -133,8 +157,22 @@ function merge3(base: unknown, ours: unknown, theirs: unknown, where: string[], 
         }
         continue
       }
+      // A view's elements and its `empty` mark merge as one (mergeViewNodes).
+      if (view && (key === 'nodeIds' || key === 'empty') && [b.nodeIds, ours.nodeIds, theirs.nodeIds].every(isIdSet)) {
+        if (key === 'nodeIds') {
+          const { value, conflict } = mergeViewNodes(b, ours, theirs)
+          if (conflict) ctx.conflicts.push([...where, 'elements'].join(': '))
+          Object.assign(out, value)
+        }
+        continue
+      }
       if (ID_SET_KEYS.has(key) && [b[key], ours[key], theirs[key]].every(isIdSet)) {
-        const value = mergeIdSet(b[key] as string[] | undefined, ours[key] as string[] | undefined, theirs[key] as string[] | undefined)
+        let value = mergeIdSet(b[key] as string[] | undefined, ours[key] as string[] | undefined, theirs[key] as string[] | undefined)
+        // Each side narrowed the list, together to none, which would mean any.
+        if (ALL_WHEN_EMPTY_KEYS.has(key) && value && value.length === 0 && [ours[key], theirs[key]].every((v) => Array.isArray(v) && v.length > 0)) {
+          ctx.conflicts.push([...where, key].join(': '))
+          value = theirs[key] as string[]
+        }
         if (value !== undefined) out[key] = value
         continue
       }
@@ -151,9 +189,11 @@ function merge3(base: unknown, ours: unknown, theirs: unknown, where: string[], 
   return theirs
 }
 
-/** Entries of three arrays merged by id, in the order mergeOrder gives. */
-function mergeById(base: Plain[], ours: Plain[], theirs: Plain[], where: string[], ctx: Ctx, layout: boolean): Plain[] {
-  const index = (list: Plain[]) => new Map(list.map((e) => [e.id as string, e]))
+/** Entries of three arrays merged by id, in the order mergeOrder gives. An
+ *  entry one side deleted and the other changed goes: the delete wins, and
+ *  the change is reported as dropped. */
+function mergeById(base: Plain[], ours: Plain[], theirs: Plain[], where: string[], ctx: Ctx, layout: boolean, idKey = 'id'): Plain[] {
+  const index = (list: Plain[]) => new Map(list.map((e) => [e[idKey] as string, e]))
   const b = index(base)
   const o = index(ours)
   const t = index(theirs)
@@ -161,6 +201,11 @@ function mergeById(base: Plain[], ours: Plain[], theirs: Plain[], where: string[
   const out: Plain[] = []
   for (const id of ids) {
     const name = entryName(t.get(id) ?? o.get(id) ?? b.get(id), id, ctx)
+    const kept = o.get(id) ?? t.get(id)
+    if (b.has(id) && !(o.has(id) && t.has(id))) {
+      if (!layout && kept && !sameApartFromLayout(b.get(id), kept)) ctx.dropped.push({ name, by: o.has(id) ? 'ours' : 'theirs' })
+      continue
+    }
     // A list of entries is named by its parent; an entry by its name, the
     // folder's where both renamed it (the one the screen shows then).
     const value = merge3(b.get(id), o.get(id), t.get(id), [...where.slice(0, -1), name], ctx, layout)
@@ -190,6 +235,32 @@ function byTime(ids: string[], base: Map<string, Plain>, entry: (id: string) => 
     i = Math.max(j, i + 1)
   }
   return out
+}
+
+/** A view's elements (`nodeIds`, `empty`) merged: an empty list not marked
+ *  `empty` is every element, so it does not merge as an empty set. Every
+ *  element against a list changed on the other side is every element when
+ *  that side only added (they are in it), else a conflict, theirs kept; two
+ *  lists made of every element keep what both kept; a list the merge
+ *  empties is marked `empty` (a deleted element, a hidden one). */
+function mergeViewNodes(base: Plain, ours: Plain, theirs: Plain): { value: Plain; conflict: boolean } {
+  const list = (e: Plain): string[] | null => {
+    const ids = Array.isArray(e.nodeIds) ? (e.nodeIds as string[]) : []
+    return ids.length > 0 || e.empty === true ? ids : null
+  }
+  const as = (ids: string[] | null): Plain => (ids === null ? { nodeIds: [] } : ids.length ? { nodeIds: ids } : { nodeIds: [], empty: true })
+  const lb = list(base), lo = list(ours), lt = list(theirs)
+  const eq = (x: string[] | null, y: string[] | null) => (x === null || y === null ? x === y : same(x, y))
+  if (eq(lo, lb)) return { value: as(lt), conflict: false }
+  if (eq(lt, lb)) return { value: as(lo), conflict: false }
+  if (eq(lo, lt)) return { value: as(lt), conflict: false }
+  if (lo === null || lt === null) {
+    const other = (lo === null ? lt : lo)!
+    if (lb !== null && lb.every((id) => other.includes(id))) return { value: as(null), conflict: false }
+    return { value: as(lt), conflict: true }
+  }
+  if (lb === null) return { value: as(lt.filter((id) => lo.includes(id))), conflict: false }
+  return { value: as(mergeIdSet(lb, lo, lt) ?? []), conflict: false }
 }
 
 /** An absent list, or one of distinct ids. */
@@ -225,18 +296,25 @@ const stepsOf = (seq: Partial<SequenceSteps> | Plain | undefined): Step[] => {
 }
 
 /** For each step of `a`, the index of the step of `b` it is (-1: none), along
- *  the longest run of relations both have in the same order. */
+ *  the longest run of relations both have in the same order; of the runs as
+ *  long, the one whose steps keep the most notes (a relation used by two
+ *  steps: the step removed is the one whose note went, not the first). */
 function alignSteps(a: Step[], b: Step[]): number[] {
   const n = a.length, m = b.length
+  // A step paired weighs more than every note kept together.
+  const pair = n + m + 1
+  const weight = (i: number, j: number) => (a[i].rel !== b[j].rel ? 0 : pair + (a[i].note === b[j].note ? 1 : 0))
   const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0))
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
-      lcs[i][j] = a[i].rel === b[j].rel ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1])
+      const w = weight(i, j)
+      lcs[i][j] = Math.max(lcs[i + 1][j], lcs[i][j + 1], w ? lcs[i + 1][j + 1] + w : 0)
     }
   }
   const out = new Array<number>(n).fill(-1)
   for (let i = 0, j = 0; i < n && j < m;) {
-    if (a[i].rel === b[j].rel) { out[i++] = j++ }
+    const w = weight(i, j)
+    if (w && lcs[i][j] === lcs[i + 1][j + 1] + w) { out[i++] = j++ }
     else if (lcs[i + 1][j] >= lcs[i][j + 1]) i++
     else j++
   }
@@ -329,13 +407,104 @@ function mergeOrder(base: string[], ours: string[], theirs: string[], where: str
   return out
 }
 
-/** `ours` and `theirs`, both changed from `base`, merged (see above). */
-export function mergeModels(base: DiagramData, ours: DiagramData, theirs: DiagramData): ModelMergeResult {
+/** `ours` and `theirs`, both changed from `base`, merged (see above).
+ *  `keepParents: false` leaves a container deleted on one side deleted,
+ *  where an element the other side put into it is left without one (Undo
+ *  leaves such an element out, item 127). */
+export function mergeModels(base: DiagramData, ours: DiagramData, theirs: DiagramData, opts?: { keepParents?: boolean }): ModelMergeResult {
   const labels = new Map<string, string>()
   for (const side of [base, ours, theirs]) for (const n of side.nodes ?? []) if (n.label) labels.set(n.id, n.label)
-  const ctx: Ctx = { conflicts: [], labels }
+  const ctx: Ctx = { conflicts: [], labels, dropped: [] }
   const merged = merge3(base, ours, theirs, [], ctx, false) as DiagramData
-  return { merged, conflicts: [...new Set(ctx.conflicts)] }
+  const restored = opts?.keepParents === false ? [] : restoreParents(merged, ours, theirs)
+  followFolderRenames(merged, base, ours, theirs)
+  const dropped = ctx.dropped.filter((d, i) => !restored.includes(d.name) && ctx.dropped.findIndex((e) => e.name === d.name && e.by === d.by) === i)
+  return { merged, conflicts: [...new Set(ctx.conflicts)], dropped, restored }
+}
+
+/** What a merge dropped and brought back, in sentences; `where` says where
+ *  each side's edits were made: { ours: 'in Studio', theirs: 'outside Studio' }. */
+export function mergeNotices(result: { dropped?: MergeDrop[]; restored?: string[] }, where: { ours: string; theirs: string }): string[] {
+  const other = (by: MergeDrop['by']) => (by === 'ours' ? 'theirs' : 'ours')
+  return [
+    ...(result.dropped ?? []).map((d) => `${d.name} was deleted ${where[other(d.by)]}; the change made to it ${where[d.by]} was dropped`),
+    ...(result.restored ?? []).map((name) => `${name}, deleted on one side, came back with its relations: an element was put into it on the other`),
+  ]
+}
+
+/** View folders one side renamed (every view of the folder, and of those
+ *  in it, moved to another path), followed in `merged` (in place) by the
+ *  views the other side filed under the old path: the old folder came back
+ *  with only those. */
+function followFolderRenames(merged: DiagramData, base: DiagramData, ours: DiagramData, theirs: DiagramData): void {
+  const path = (folder: string | undefined) => (folder ?? '').split('/').map((p) => p.trim()).filter(Boolean)
+  const under = (folder: string[], prefix: string[]) => prefix.length > 0 && prefix.every((p, i) => folder[i] === p)
+  const renames = new Map<string, string[]>()
+  for (const side of [ours, theirs]) {
+    const now = new Map((side.views ?? []).map((v) => [v.id, path(v.folder)]))
+    for (const view of base.views ?? []) {
+      const from = path(view.folder)
+      const to = now.get(view.id)
+      if (!to || !from.length || from.join('/') === to.join('/')) continue
+      // The folder renamed: the path less the segments both end in.
+      const f = [...from], t = [...to]
+      while (f.length > 1 && t.length > 1 && f[f.length - 1] === t[t.length - 1]) { f.pop(); t.pop() }
+      if ([...now.values()].some((folder) => under(folder, f))) continue
+      const key = f.join('/')
+      if (renames.has(key) && renames.get(key)!.join('/') !== t.join('/')) renames.set(key, f) // two renames: none
+      else renames.set(key, t)
+    }
+  }
+  const prefixes = [...renames].filter(([from, to]) => from !== to.join('/')).sort((a, b) => b[0].length - a[0].length)
+  if (!prefixes.length) return
+  merged.views = merged.views?.map((view) => {
+    const folder = path(view.folder)
+    const hit = prefixes.find(([from]) => under(folder, from.split('/')))
+    return hit ? { ...view, folder: [...hit[1], ...folder.slice(hit[0].split('/').length)].join('/') } : view
+  })
+}
+
+/** Containers one side deleted while the other put an element into them,
+ *  brought back into `merged` (in place) from the side that kept them: the
+ *  container, the ones around it, their relations to what is left, and
+ *  their places on the views that side shows them on. Returns their names. */
+function restoreParents(merged: DiagramData, ours: DiagramData, theirs: DiagramData): string[] {
+  if (!Array.isArray(merged.nodes)) return []
+  const nodes = new Map(merged.nodes.map((n) => [n.id, n]))
+  const back: Array<{ id: string; side: DiagramData }> = []
+  const sideOf = (id: string) => [ours, theirs].find((d) => d.nodes?.some((n) => n.id === id))
+  for (let i = 0; i < merged.nodes.length; i++) {
+    const parentId = merged.nodes[i].parentId
+    if (!parentId || nodes.has(parentId)) continue
+    const side = sideOf(parentId)
+    const parent = side?.nodes.find((n) => n.id === parentId)
+    if (!side || !parent) continue
+    // Pushed onto the list it walks: a restored container's own parent next.
+    merged.nodes.push(parent)
+    nodes.set(parentId, parent)
+    back.push({ id: parentId, side })
+  }
+  if (!back.length) return []
+  const relationIds = new Set((merged.relations ?? []).map((r) => r.id))
+  for (const { id, side } of back) {
+    for (const r of side.relations ?? []) {
+      if ((r.sourceId === id || r.targetId === id) && nodes.has(r.sourceId) && nodes.has(r.targetId) && !relationIds.has(r.id)) {
+        merged.relations.push(r)
+        relationIds.add(r.id)
+      }
+    }
+    // Copies: a view the merge took whole is the side's own object.
+    merged.views = merged.views?.map((view) => {
+      const was = side.views?.find((v) => v.id === view.id)
+      if (!was || !was.nodeIds.includes(id) || view.nodeIds.includes(id)) return view
+      // An empty list not marked empty shows every element, this one too.
+      if (view.nodeIds.length === 0 && !view.empty) return view
+      const { empty: _empty, ...rest } = view
+      const place = was.positions?.[id] && !view.positions?.[id] ? { [id]: was.positions[id] } : {}
+      return { ...rest, nodeIds: [...view.nodeIds, id], positions: { ...view.positions, ...place } }
+    })
+  }
+  return back.map(({ id }) => entryName(nodes.get(id) as unknown as Plain, id))
 }
 
 // ─── Edits kept apart ────────────────────────────────────────────────────────
@@ -359,7 +528,7 @@ export function modelEdits(base: DiagramData, ours: DiagramData): ModelEdits {
   for (const key of new Set([...Object.keys(b), ...Object.keys(o)])) {
     if (same(b[key], o[key])) continue
     const lists = [b[key], o[key]].filter((v) => v !== undefined)
-    if (lists.every((v) => Array.isArray(v) && (v.length === 0 || byIdArray(v))) && lists.some(byIdArray)) {
+    if (lists.every((v) => Array.isArray(v) && (v.length === 0 || byIdArray(v))) && lists.some((v) => byIdArray(v))) {
       const bl = (b[key] ?? []) as Plain[]
       const ol = (o[key] ?? []) as Plain[]
       const bi = new Map(bl.map((e) => [e.id as string, e]))
