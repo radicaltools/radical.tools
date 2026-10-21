@@ -812,6 +812,46 @@ const KNOWN: Known[] = [
     match: (t, v) => lastAction(t) === 'view' && !!v.facts?.outside && t.some((a) => a.a === 'reparent'),
     note: 'KB3: a move made where no canvas is shown, then All elements opened: a group is framed short of its children (new; K3 seen as an outside?)',
   },
+  {
+    // Found on the merge of groups A to E (2026-10-22): nested, milestone
+    // Early shown, relation r0 deleted, the agent adds a system at the root,
+    // Undo: the live document loses All elements' place of the agent's
+    // system (on d04b081 with K21 and K13 fixed too), and on the merge
+    // those of System 2 and Container 2.0 as well, which Early has not
+    // (the milestone's rebased steps carry its own elements' places only).
+    // FUZZ_SEED=101 FUZZ_MODEL=nested FUZZ_PATH=202:2:2:3:6:7:11:11:11:15.
+    // With Later shown and a container added into System 1, System 1's
+    // place on All elements is refit to what Later has in it (1710 → 1400
+    // wide) and Component 1.1.1's, which Later has not, is dropped.
+    rule: 'milestoneKeepsLive',
+    match: (t, v) => (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent') && t.some((a) => a.a === 'openMilestone')
+      && v.detail.split('\n').slice(1).every((line) => /^\s+(nodes\.[\w-]+\.(x|y|width|height)|defaultPositions\.[\w-]+(\.\w+)?):/.test(line)),
+    note: 'KM1: Undo or Redo in a milestone after an agent\'s write drops or refits All elements\' places of live elements in the live document (new; next to K28, item 262)',
+  },
+  {
+    // Found on the merge of groups A to E (2026-10-22): nested, Component
+    // 0.2.0 deleted and Component 2.1.0 moved into Container 2.2 (not saved
+    // yet), the agent adds a container into System 2: after the merge
+    // Container 2.0 (4313.6, 573.8) 1152 × 232 lies 96 px over Container
+    // 2.1. On d04b081 the same path ends with the agent's component on
+    // Component 1.0.0, which Studio had moved into Container 2.0 (K19 took
+    // it in there). FUZZ_SEED=404 FUZZ_MODEL=nested FUZZ_PATH=288:2:0:0:3:3:3:3:3:6:5:4:4:8:8:10:12:1:6:3:15:14:14:19:24:13:6:7:8:7:16:17:14:14:15:18:5:19:19:16:16:16.
+    rule: 'geometry',
+    match: (t, v, resolved) => lastAction(t) === 'agent' && !!v.facts?.overlap && /merged with unsaved edits/.test(resolved[resolved.length - 1] ?? ''),
+    note: 'KM2: a merge of an agent\'s write with unsaved edits leaves two siblings over each other (new; next to K19, item 264)',
+  },
+  {
+    // Found on the merge of groups A to E (2026-10-22), also on d04b081:
+    // sample, an ADR dropped at the root, Access & Security folded, API
+    // Gateway (drawn in no open container) moved into Risk & Data: the move
+    // places it, then the live physics moves Digital Channels (910, 396)
+    // 500 × 450 to (856.7, 33.2) 620 × 480, over ADR-002 and FF: Zero ledger
+    // data loss. FUZZ_SEED=303 FUZZ_MODEL=sample FUZZ_RUNS=60
+    // FUZZ_PATH=11:3:1:3:3:3:5:16:16:15:31:31:31:31:31.
+    rule: 'geometry',
+    match: (t, v) => lastAction(t) === 'reparent' && !!v.facts?.overlap && t.some((a) => a.a === 'collapse') && t.some((a) => a.a === 'add'),
+    note: 'KM3: after an add and a fold, a move into another parent lets the live physics move the old parent over its neighbours (new; next to C1, KE2)',
+  },
 ]
 
 const knownHits = new Map<string, number>()
