@@ -525,6 +525,10 @@ export interface ParkedDesigner {
   diffBaseSnapshotId: string | null
   diffGhostNodes: DiagramStore['diffGhostNodes']
   diffGhostRelations: DiagramStore['diffGhostRelations']
+  /** The Hub template records shown: a milestone's are its own
+   *  (milestoneHubTemplates), and one picked in Viewer changed them. */
+  hubTemplates?: Record<string, HubImportRecord>
+  milestoneHubBase?: Record<string, HubImportRecord> | null
 }
 
 function parkDesigner(state: DiagramStore): ParkedDesigner {
@@ -542,6 +546,8 @@ function parkDesigner(state: DiagramStore): ParkedDesigner {
     diffBaseSnapshotId: state.diffBaseSnapshotId,
     diffGhostNodes: state.diffGhostNodes,
     diffGhostRelations: state.diffGhostRelations,
+    hubTemplates: state.hubTemplates,
+    milestoneHubBase: _milestoneHubBase,
   }
 }
 
@@ -660,6 +666,51 @@ function keepingSharedViews(state: DiagramStore, edit: () => void): void {
   state.views = views
   state.activeViewId = activeViewId
   state.defaultLayoutConstraints = defaultLayoutConstraints
+}
+
+/** The Hub template records as a milestone has them: its texts hold the
+ *  values (read from them through the Hub's originals), the records keep
+ *  the live model's. Shown so, the section said 250 where the card said
+ *  450. A value its texts do not give stays the live one. */
+function milestoneHubTemplates(records: Record<string, HubImportRecord>, nodes: Record<string, C4Node>): Record<string, HubImportRecord> {
+  let out = records
+  for (const [id, record] of Object.entries(records)) {
+    const found: Record<string, string> = {}
+    for (const [nodeId, original] of Object.entries(record.originalNodes ?? {})) {
+      const n = nodes[nodeId] as unknown as Record<string, unknown> | undefined
+      if (!n) continue
+      for (const [key, template] of Object.entries(original)) {
+        if (typeof template !== 'string' || typeof n[key] !== 'string' || !/\{\{[A-Z0-9_]+\}\}/.test(template)) continue
+        const keys: string[] = []
+        const pattern = template.split(/\{\{([A-Z0-9_]+)\}\}/).map((part, i) => {
+          if (i % 2 === 0) return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          keys.push(part)
+          return '([\\s\\S]*?)'
+        }).join('')
+        const match = new RegExp(`^${pattern}$`).exec(n[key] as string)
+        if (match) keys.forEach((k, i) => { if (!(k in found)) found[k] = match[i + 1] })
+      }
+    }
+    if (Object.entries(found).every(([k, v]) => record.paramValues[k] === v)) continue
+    if (out === records) out = { ...records }
+    out[id] = { ...record, paramValues: { ...record.paramValues, ...found } }
+  }
+  return out
+}
+
+/** The live records (`live`) with what the milestone's edits changed in
+ *  its records (`now` against `base`, those it was shown with): a value an
+ *  Apply changed, a record added or removed. */
+function propagatedHubTemplates(live: Record<string, HubImportRecord>, base: Record<string, HubImportRecord>, now: Record<string, HubImportRecord>): Record<string, HubImportRecord> {
+  const out = { ...live }
+  for (const [id, record] of Object.entries(now)) {
+    const was = base[id]
+    if (!was) { out[id] = record; continue }
+    const changed = Object.fromEntries(Object.entries(record.paramValues).filter(([k, v]) => was.paramValues[k] !== v))
+    if (Object.keys(changed).length) out[id] = { ...(out[id] ?? record), paramValues: { ...(out[id] ?? record).paramValues, ...changed } }
+  }
+  for (const id of Object.keys(base)) if (!now[id]) delete out[id]
+  return out
 }
 
 /** The milestone is left without its edits carried into the live model:
@@ -2180,6 +2231,9 @@ let _liveLayout: LiveColaLayout | null = null
  *  their positions and nothing of it is saved into them; its All elements is
  *  its own. Set when a milestone is shown. */
 let _milestoneAllPositions: Record<string, NodePosition> | null = null
+/** The Hub template records a milestone was shown with (milestoneHubTemplates):
+ *  Propagate carries forward only what an Apply changed from them. */
+let _milestoneHubBase: Record<string, HubImportRecord> | null = null
 
 /** What was selected on the open canvas ('' = All elements) when the same
  *  document was read again (an outside change), to show it again after the
@@ -5178,6 +5232,8 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         _pushUndo(get())
         set((state) => {
+          // The Hub template values its texts hold become the live ones.
+          state.hubTemplates = milestoneHubTemplates(state.hubTemplates as Record<string, HubImportRecord>, snap.nodes as Record<string, C4Node>) as any
           // What the milestone lacks goes out of the views, as a delete
           // takes it: they kept its id (a view listing 23 drew 3).
           const gone = new Set(Object.keys(state.c4Nodes).filter((id) => !(snap.nodes as Record<string, C4Node>)[id]))
@@ -5336,6 +5392,9 @@ export const useDiagramStore = create<DiagramStore>()(
           // ones, and Save as new and Propagate then stored them in it.
           state.sequences = (snap.sequences ?? {}) as any
           if (state.activeSequenceId && !state.sequences[state.activeSequenceId]) state.activeSequenceId = null
+          // The Hub template values its texts hold, not the live model's.
+          _milestoneHubBase = milestoneHubTemplates((backup?.hubTemplates ?? state.hubTemplates) as Record<string, HubImportRecord>, snap.nodes as Record<string, C4Node>)
+          state.hubTemplates = _milestoneHubBase as any
           state.activeSnapshotId = id
           state.liveBackup = backup as any
           state.milestoneDirty = false
@@ -5441,7 +5500,9 @@ export const useDiagramStore = create<DiagramStore>()(
           set((state) => {
             state.snapshots.splice(idx + 1, 0, newSnap as any)
             // The live model is as it was: so are its Hub template records.
-            if (liveBackup?.hubTemplates) state.hubTemplates = liveBackup.hubTemplates as any
+            // The new milestone shown has the values its texts hold.
+            _milestoneHubBase = milestoneHubTemplates((liveBackup?.hubTemplates ?? state.hubTemplates) as Record<string, HubImportRecord>, editedNodes)
+            state.hubTemplates = _milestoneHubBase as any
             // Stay viewing the freshly-created milestone (canvas already shows its content).
             // liveBackup is preserved so the user can still discard back to live HEAD.
             state.activeSnapshotId = newId
@@ -5623,8 +5684,13 @@ export const useDiagramStore = create<DiagramStore>()(
             }
             const before = Object.keys(state.liveBackup.nodes)
             applyDiff(state.liveBackup.nodes as any, state.liveBackup.relations as any, (state.liveBackup as any).sequences)
-            // The Hub template records go with the texts they wrote.
-            state.liveBackup.hubTemplates = state.hubTemplates as any
+            // The Hub template records go with the texts they wrote: what an
+            // Apply in the milestone changed, not the milestone's values.
+            state.liveBackup.hubTemplates = propagatedHubTemplates(
+              (state.liveBackup.hubTemplates ?? {}) as Record<string, HubImportRecord>,
+              _milestoneHubBase ?? {},
+              state.hubTemplates as Record<string, HubImportRecord>,
+            ) as any
             // What was done on the views in the milestone is the live
             // views' now: nothing of them is put back on leaving it.
             delete state.liveBackup.views
@@ -5643,6 +5709,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.canRedo = false
           // Keep activeSnapshotId + liveBackup so user can still discard / switch later.
         })
+        _milestoneHubBase = get().hubTemplates as Record<string, HubImportRecord>
         // The edits are in this milestone, the later ones and the live model
         // now: no step from before, here or on the live model, leads back.
         _undoStack.length = 0
@@ -5816,8 +5883,10 @@ export const useDiagramStore = create<DiagramStore>()(
             state.diffBaseSnapshotId = pre.diffBaseSnapshotId
             state.diffGhostNodes = pre.diffGhostNodes as any
             state.diffGhostRelations = pre.diffGhostRelations as any
+            if (pre.hubTemplates) state.hubTemplates = pre.hubTemplates as any
             if (state.activeSequenceId && !pre.sequences[state.activeSequenceId]) state.activeSequenceId = null
           })
+          if (pre.milestoneHubBase !== undefined) _milestoneHubBase = pre.milestoneHubBase
           W.__preModeLayout = undefined
           _beforeSlidePreview = null
           // Physics kept running during viewer (explore mode), so cola's
@@ -6582,7 +6651,9 @@ export const useDiagramStore = create<DiagramStore>()(
             ? atDefaultPositions(Object.values(milestone.nodes), _milestoneAllPositions)
             : milestone.nodes
           set((state) => {
-            state.liveBackup = { nodes: state.c4Nodes, relations: state.c4Relations, sequences: state.sequences } as any
+            state.liveBackup = { nodes: state.c4Nodes, relations: state.c4Relations, sequences: state.sequences, hubTemplates: state.hubTemplates } as any
+            _milestoneHubBase = milestoneHubTemplates(state.hubTemplates as Record<string, HubImportRecord>, shownNodes as Record<string, C4Node>)
+            state.hubTemplates = _milestoneHubBase as any
             state.c4Nodes = shownNodes as any
             state.c4Relations = milestone.relations as any
             state.sequences = milestone.sequences as any

@@ -110,8 +110,11 @@ if (typeof window !== 'undefined') {
       data.nodes = Object.values(live.nodes)
       data.relations = Object.values(live.relations)
       data.sequences = Object.values(live.sequences)
-      data.views = Object.values(pre.views)
-      data.defaultPositions = pre.defaultPositions
+      // A view an edit of Designer's milestone changed is saved as the live
+      // model has it (liveBackup.views).
+      const parked = pre.activeSnapshotId ? pre.liveBackup : null
+      data.views = Object.values(pre.views).map((v) => parked?.views?.[v.id] ?? v)
+      data.defaultPositions = parked?.defaultPositions ?? pre.defaultPositions
     }
     return data
   }
