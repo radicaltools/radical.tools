@@ -71,7 +71,19 @@ export function documentMetamodel(stored: Metamodel | undefined, nodes?: Readonl
     : stored.id === 'c4-ddd-builtin' || stored.id === 'c4-ddd-governance-builtin' ? builtInGovernanceMetamodel()
     : null
   if (!preset) return stored
-  return withPresetViewpoints(preset, stored)
+  const withViewpoints = withPresetViewpoints(preset, stored)
+  // Types the preset lacks (added by hand to the file, or by a program):
+  // swapped for the preset, they were unknown types, and the next save
+  // wrote them away. The document keeps them, under a custom copy.
+  const extraNodeTypes = Object.entries(stored.nodeTypes ?? {}).filter(([id, def]) => !preset.nodeTypes[id] && def && typeof def === 'object')
+  const extraRelationTypes = Object.entries(stored.relationTypes ?? {}).filter(([id, def]) => !preset.relationTypes[id] && def && typeof def === 'object')
+  if (!extraNodeTypes.length && !extraRelationTypes.length) return withViewpoints
+  const custom = forkPresetMetamodel({ ...withViewpoints, id: preset.id }) ?? withViewpoints
+  return {
+    ...custom,
+    nodeTypes: { ...custom.nodeTypes, ...Object.fromEntries(extraNodeTypes) },
+    relationTypes: { ...custom.relationTypes, ...Object.fromEntries(extraRelationTypes) },
+  }
 }
 
 /** The preset with the document's viewpoints: the preset's (but those the

@@ -344,3 +344,22 @@ describe('a required property of a relation type', () => {
     expect(issues.find((i) => i.id === 'missing-prop:uses:evidence')?.relationId).toBe('uses')
   })
 })
+
+// Item 212: a type added by hand to a preset folder's metamodel.json was an
+// unknown type, and Studio's next save erased it.
+describe('a preset metamodel with a type the preset lacks', () => {
+  it('keeps the type, under a custom copy of the preset', () => {
+    const stored = builtInGovernanceMetamodel()
+    stored.nodeTypes.risk = { ...stored.nodeTypes.system, id: 'risk', label: 'Risk', builtin: false }
+    stored.relationTypes.mitigates = { id: 'mitigates', label: 'Mitigates', allowedPairs: [{ from: 'adr', to: 'risk' }] }
+    const mm = documentMetamodel(JSON.parse(JSON.stringify(stored)))
+    expect(mm.nodeTypes.risk?.label).toBe('Risk')
+    expect(mm.relationTypes.mitigates?.label).toBe('Mitigates')
+    expect(mm.id).toBe('c4-ddd-governance-custom')
+    expect(Object.keys(mm.nodeTypes)).toEqual(expect.arrayContaining(Object.keys(builtInGovernanceMetamodel().nodeTypes)))
+    // Saved and opened again, it stays.
+    expect(documentMetamodel(JSON.parse(JSON.stringify(mm))).nodeTypes.risk?.label).toBe('Risk')
+    // Without one, the preset is the preset.
+    expect(documentMetamodel(builtInGovernanceMetamodel()).id).toBe('c4-ddd-governance-builtin')
+  })
+})
