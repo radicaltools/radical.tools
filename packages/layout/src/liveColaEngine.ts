@@ -820,7 +820,24 @@ export class LiveColaEngine {
       this.keptFrames.delete(g.c4id)
     }
     const s = g.visualShrink ?? 0
-    return { x: b.x + s, X: b.X - s, y: b.y + s, Y: b.Y - s }
+    const box = { x: b.x + s, X: b.X - s, y: b.y + s, Y: b.Y - s }
+    // A child group keeps the frame the layout gave it until something in
+    // it moves, and that frame may reach past the bounds WebCoLa takes from
+    // its leaves (room above its first child): this frame holds it, the
+    // child no nearer its top than LIVE_CHILD_TOP_MIN. Framed tighter, a
+    // drop inside a sibling left it on this one's header, saved above that,
+    // and the canvas drew it lower after a reload than the file said.
+    const margin = (g.padding ?? 0) - s
+    for (const id of this.childrenOf.get(g.c4id) ?? []) {
+      const child = this.idToGroup.get(id)
+      const inner = child && this.frameOf(child)
+      if (!inner) continue
+      box.x = Math.min(box.x, inner.x - margin)
+      box.X = Math.max(box.X, inner.X + margin)
+      box.y = Math.min(box.y, inner.y - LIVE_CHILD_TOP_MIN)
+      box.Y = Math.max(box.Y, inner.Y + margin)
+    }
+    return box
   }
 
   /** The group an element is laid out in, or '' for the canvas. */
