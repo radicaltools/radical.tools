@@ -190,7 +190,7 @@ test('a requirement written in a wiki gets what its level\'s filter asks, and on
   await steps.locator('.rp-level').nth(1).getByRole('button', { name: /Add a filter/ }).click()
   await page.getByRole('menuitem', { name: /^EARS type is event-driven/ }).click()
   await page.locator('.props-content', { has: steps }).getByRole('button', { name: 'Wiki', exact: true }).click()
-  await studio.properties.getByRole('button', { name: 'Close properties' }).click()
+  await page.getByRole('button', { name: '◀ Back' }).click()
   await page.locator('.wiki-nav-item', { hasText: 'PSD2 & AMLD6 obligations' }).first().click()
   const line = page.getByRole('textbox', { name: 'Write a requirement' })
 
@@ -198,10 +198,7 @@ test('a requirement written in a wiki gets what its level\'s filter asks, and on
   await line.fill('Users can export their statements')
   await line.press('Enter')
   await expect(page.locator('.wiki-page')).toContainText('Users can export their statements')
-  await expect.poll(async () => {
-    const doc = await studio.storedDoc(studio.activeDocId())
-    return (doc.nodes.find((n) => n.label === 'Users can export their statements') as { ears_type?: string } | undefined)?.ears_type
-  }).toBe('event-driven')
+  await expect(page.getByRole('heading', { name: /^Requirements \(2\)/ }).first()).toBeVisible()
   // A sentence of another type is kept as written, and the view says it does not show it.
   await line.fill('The system shall keep statements for ten years')
   await line.press('Enter')
@@ -215,7 +212,7 @@ test('a step added in a Warnier view its filter leaves it out of keeps its name 
   await page.getByRole('button', { name: /^Add a filter to/ }).click()
   await page.getByPlaceholder('Text in name or description…').fill('Payment')
   await page.getByPlaceholder('Text in name or description…').press('Enter')
-  await studio.properties.getByRole('button', { name: 'Close properties' }).click()
+  await page.getByRole('button', { name: '◀ Back' }).click()
 
   // The name of the new step is open, and what is typed is kept.
   await page.getByRole('button', { name: 'Add a step to Send a payment' }).click()
@@ -303,22 +300,34 @@ test('a view shows every element again from its steps, and a chain can start fro
 
 test('a matrix with a chain adds only a relation its cell shows, and never a copy', async ({ page, studio }) => {
   await studio.openSample()
+  // One relation between two requirements, which the register's chain does not follow.
+  const doc = studio.activeDocId()
+  const key = `radical-doc:${doc}`
+  await expect.poll(() => page.evaluate((k) => localStorage.getItem(k) !== null, key)).toBe(true)
+  await page.evaluate((k) => {
+    const saved = JSON.parse(localStorage.getItem(k)!)
+    saved.relations.push({ id: 'r-psd2-hold', sourceId: 'req-psd2', targetId: 'req-fraud-hold', relationType: 'derives' })
+    localStorage.setItem(k, JSON.stringify(saved))
+  }, key)
+  await page.reload()
+  await studio.ready()
   await openFilter(page, 'Requirements Register')
   await page.locator('.props-content').getByRole('button', { name: 'Matrix', exact: true }).click()
   const cell = async (from: string, to: string) => {
     const heads = await page.locator('.mx-rowhead').evaluateAll((els) => els.map((e) => e.textContent?.trim()))
+    expect(heads).toContain(from)
+    expect(heads).toContain(to)
     return page.locator('tbody tr').nth(heads.indexOf(from)).locator('td').nth(heads.indexOf(to))
   }
-  const doc = studio.activeDocId()
   const count = async () => (await studio.storedDoc(doc)).relations.length
   const before = await count()
 
-  // Between two requirements the chain follows nothing: clicks add nothing.
-  for (let i = 0; i < 3; i++) await (await cell('PSD2-compliant payments', 'Hold high-risk payments')).click()
-  await expect(page.locator('.toast-message').last()).toContainText('Not added')
   // A relation the matrix does not draw is not added again.
-  await (await cell('Strong customer authentication', 'PSD2-compliant payments')).click()
+  await (await cell('PSD2-compliant payments', 'Hold high-risk payments')).click()
   await expect(page.locator('.toast-message').last()).toContainText('that this matrix does not show')
+  // Between two requirements the chain follows nothing: clicks add nothing.
+  for (let i = 0; i < 3; i++) await (await cell('Hold high-risk payments', 'PSD2-compliant payments')).click()
+  await expect(page.locator('.toast-message').last()).toContainText('Not added')
   await page.waitForTimeout(800)
   expect(await count()).toBe(before)
 

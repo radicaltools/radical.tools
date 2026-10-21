@@ -116,10 +116,14 @@ test.describe('wiki', () => {
   test('Back from the first page read goes to the Overview', async ({ page }) => {
     await expect(page).toHaveURL(/\/v\/view-wiki$/)
     const overview = await page.locator('.wiki-title').innerText()
+    // The opened view's address is written first: changes within 150 ms are one step.
+    await page.waitForTimeout(400)
     await page.locator('.wiki-page').getByText('Core Banking Platform', { exact: true }).first().click()
     await expect(page).toHaveURL(/\/v\/view-wiki\/f\/sys-core$/)
     await expect(page.locator('.wiki-title')).toHaveText('Core Banking Platform')
-    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    const back = page.getByRole('button', { name: 'Back', exact: true })
+    await expect(back).toBeEnabled()
+    await back.click()
     await expect(page).toHaveURL(/\/v\/view-wiki$/)
     await expect(page.locator('.wiki-title')).toHaveText(overview)
     // The Overview's entry is still there, and the page after it.

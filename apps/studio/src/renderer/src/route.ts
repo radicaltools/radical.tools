@@ -366,6 +366,10 @@ function writeUrl(push: boolean): void {
   if (current === hash) {
     // The same place: keep the list's label up to date (a renamed view).
     if (nav.entries.length) useNavHistory.setState(replaceEntry(nav, describeRoute(route, hash)))
+    // An entry the browser made for an address opened from outside (a link,
+    // one typed) carries no index of ours: Back to it moved the list
+    // nowhere, and the place Back led to was written over the one left.
+    if (stateIndex(history.state) !== useNavHistory.getState().index) history.replaceState({ navIndex: useNavHistory.getState().index }, '', hash)
     return
   }
   if (push && nav.entries.length) {
