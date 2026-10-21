@@ -3807,6 +3807,247 @@ editor shows Undo and Redo buttons that do nothing there. Kept as it is: a
 view's positions reach a flow view through `update_view` changing its kind,
 as Studio's own type switch keeps a layout.
 
+**Runs 65 to 69, 2026-10-21, commit 9b7060b** (main with the fixes of runs
+25 to 64, PR #229), five at the same time. 17 findings, one of them seen by
+two runs, each reproduced again by hand; 17 items below. About half are
+siblings of earlier fixes: the wiki's relation editor (241, after the card's
+and canvas's), Quick Search on a relation (245, after D12 for elements), a
+merge's relation ends (234, after Undo's item 127), the viewpoint and
+Auto-layout selects in a milestone (230, after the Lines select), a move
+during Smart Layout (240, after D11 for adds), opening a milestone saving
+(233, after "a reload saves nothing").
+
+*Run 65.* Covered: mixed view edits in a milestone (collapse, column, Hide,
+drag) with Undo, Redo, Discard, Save as new and Propagate; a reload among
+them; a folder writing nothing until the choice; typing in a milestone;
+milestone, view and metamodel edits and New view made in a milestone, then
+undone on live; Presenter and F5 with unsaved milestone edits; which model a
+slide shows with a milestone open. Not covered: agent slides with `focus`
+and milestones, Link milestone with Undo of a delete, Propagate of
+alignments and pins, Wiki Multi page and hierarchy in a milestone, hundreds
+of elements.
+
+230. **A viewpoint picked in a milestone changes the live view's filter.**
+     Sample v3, Core Banking, View properties › Viewpoint → Containers ·
+     Structure: no question, no "unsaved", the live view is saved with the
+     Containers filter (14 → 9 drawn), it stays after Discard and a reload,
+     and Undo is disabled after Current (live); on a folder `views.json` is
+     written at once. The Auto-layout select does the same (live
+     `layoutMode: tree`); a flow's Sequence select by reading the code. The
+     Lines select asks, as ruled. A guess: `applyViewpoint`,
+     `detachViewpoint`, `setViewLayoutMode` and `setViewSequence`
+     (`diagramStore.ts`) do not call `_milestoneViewEdit`.
+231. **Undo after visiting a milestone takes back what was done in it.**
+     Sample: drag Fraud Detection, show v3, Save as new after a drag (or
+     rename v1, rename the view, add a metamodel property), Current (live),
+     Ctrl+Z: the drag goes back and the new milestone (the rename, the
+     property) with it, saved; any further edit makes it final. A folder
+     loses it from `snapshots.json` too. A guess: the parked live entries
+     (`_captureState`) hold views, metamodel and snapshots, and
+     `_restoreHistoryEntry` puts them back as they were before the visit.
+232. **A slide added on a milestone still shows it after Delete milestone.**
+     v1 shown on System Context, Presenter › Add slide, Current (live),
+     Delete v1: the notice says "the 2 slides that showed it show the live
+     model now", but the slide draws v1 (3 drawn, 11 nodes; live 8 of 78).
+     The saved slide has `snapshotId: null` and a `modelSnapshot` of 11
+     nodes. A guess: `slideModel` falls back to the `modelSnapshot` that
+     `addPresentationSlide` captured from the milestone.
+233. **Opening a milestone saves the live document.** A just-opened sample,
+     show any milestone: with no edit, every view's `positions` is trimmed
+     to what it draws (62 → 8 … 23), `sys-core`'s y mirror changes (926 →
+     120), view-ctx's viewport and `hubTemplates: {}` are written. Nothing
+     changes on screen. Also run 69. A guess: `selectMilestone` parks the
+     live document through the save path, a sibling of the reload that
+     saved (decided: a reload saves nothing).
+
+*Run 66.* Covered: a delete against an edit (card rename against
+`delete_node`, a step note against a relation delete, `set_view_nodes` of a
+deleted element, a drag against its container's delete); a child added into
+a container the other side deleted, both ways, also against a hand delete,
+and Undo afterwards; a reload and agent writes saving nothing; Move to
+browser with saves held; Smart Layout against an agent delete. Not covered:
+`write.lock` (web build), `base.json` and `get_changes` after merges,
+milestones and presentations in a merge, the `radical` CLI.
+
+234. **A merge keeps a relation or a sequence step to what the other side
+     deleted.** Bookstore folder, saves held: Studio deletes Payment
+     Provider while the agent adds web → payments (or Studio draws customer
+     → payments while the agent deletes it): `relations.json` keeps it,
+     `get_issues` says "points at 'payments', which is no element of the
+     model", the search bar counts 4 relations for 3 drawn, no notice. A
+     step the agent adds for a relation Studio deleted stays in
+     `sequences.json` (`[r1, r2, r3, r2, r4]`) and `get_issues` is silent. A
+     guess: `mergeModels` mends missing parents (`restoreParents`) but not
+     relation ends or a step's relation; Undo checks them (item 127).
+235. **Move to a folder… into another model's folder replaces that model
+     without a question.** Two browser models; Bookstore moved to folder
+     "model", then Orders to the same folder: no dialog, the folder holds
+     Orders' 9 elements, Bookstore exists nowhere any more, and both list
+     entries open Orders. A guess: `mayWriteInto` (`documentStore.ts`) asks
+     only about folders that are not a Radical model; `createFolderDocument`
+     (New model → folder) takes the same path.
+236. **An agent's write while Smart Layout computes throws the layout away.**
+     Injury model as a folder, View 7 (86 drawn), Smart Layout, then
+     `update_node` of one description 300 ms later: "The layout was not
+     applied: the canvas it was computed for is no longer the one shown",
+     nothing of it applied (without the write: 86 of 86 moved). Sample too.
+     During a Forge run Smart Layout on a large view cannot finish. Cause
+     (checked): `loadDiagram` counts the keepUi reload of an outside change
+     in `_modelLoads`, which `layoutTarget` includes (item 3's fix).
+237. **An agent mark ahead of Studio's clock holds its saves as long as the
+     mark says.** `.radical/agent-activity.json` with `until` 5 min or 1 h
+     ahead (a server whose clock runs ahead): a rename is not saved after 61
+     s; 14 s ahead, it is saved at 14 s. Cause (checked): `agentWritingUntil`
+     caps the mark at now + 15 s on each check, so the hold renews itself.
+
+*Run 67.* Covered: Move to… with rows, pins, model and view folds, then
+expand, Undo, Redo and reload; three nested moves on the injury model; moves
+across a group of views per element; a collapse in a grid, row and column;
+collapse, delete and ⌘ drag during Smart Layout; ⌘ drags at 144 and 168
+leaves; Smart Layout twice on the 7 Hub blueprints and 3 injury views (it
+stands). Not covered: MCP `move_node` and `smart_layout` against an open
+Studio, moves in a milestone, Warnier and wiki moves, ⌘ drags in groups of
+views per element, more than 300 elements.
+
+238. **An element moved into a folded container lies outside it after the
+     expand.** S2 folded on the view: S1 Move to… S2 saves S1 at (−400, 400)
+     in a 600×330 S2; expanding S2 (600×610 at (240, −215)) draws S1 left of
+     it, outside its parent, saved; a reload places it beside Q1 instead.
+     On a view where S2 is open the same move puts S1 inside at (590, 120).
+     A model-level fold gives the same. A guess: `settleMovedNodes` skips
+     nodes the canvas shown does not draw, so one under a folded parent
+     keeps its rebased offset (the pattern of item 130).
+239. **After a move, a row whose other member stays outside is not held until
+     a reload, which moves six elements.** Row [S1, S3] at the root, Move S1
+     to S2: the row stays in the constraints (as ruled, S3 is no ancestor)
+     but is not held (S1's centre at y 210, S3's at 490); a reload enforces
+     it and moves S2, S1, S3, S5, Q0 and Q1 by up to 150 px, while the file
+     is unchanged. A guess: `reparentNodes` never calls
+     `_enforceLayoutConstraints`.
+240. **An element moved during Smart Layout lands on its new siblings.**
+     g60 (63 elements), Smart Layout, 300 ms later Move Component 0.1.1 to
+     Container 1.0: once applied, Container 1.0 overlaps Container 1.1, or
+     the component lies on a new sibling; saved and kept by a reload (5 of 5,
+     also on 300 elements). The same move without Smart Layout overlaps
+     nothing. A guess: `runSmartLayout` applies the winner's positions to
+     every node present at its start; `placeAddedDuringLayout` handles only
+     added ids, not reparented ones.
+
+*Run 68.* Covered: the canvas's relation type menu on entity pairs and a
+filtered canvas; MCP `add_relation` warnings and narrowing warnings;
+`get_issues` and `radical check` agreeing with Studio; Undo and Redo of a
+confirmed narrowing next to a drag; a type's label rename in the wiki,
+tables and canvas; the metamodel's Diagram tab with an any-pair type; the
+presets' pairs. Not covered: the matrix, table adds along chains, Save as
+viewpoint undo next to type edits, milestones holding narrowed values,
+folders with Studio and MCP at once, a custom metamodel in a `.radical`
+round trip.
+
+241. **The wiki makes relations Validation flags.** Its relation editor
+     offers "generic" between two domains (Depends on and Partnership fit),
+     and Edit › Add relationship offers Part of… from one aggregate root to
+     another; each gives one Validation warning. The canvas and the card
+     offer neither. A guess: `WikiView`'s `compatibleTypes` keeps the
+     "generic" option and `relationReadingsOf` filters pairs only, without
+     the card's `relationTypeKeepsAggregates`.
+242. **Deleting a relation type or Reset to C4 narrows the metamodel without
+     the list.** An any-pair relation type lets Orders DB → Customer
+     through (database → person); deleting the type asks nothing, Reset to
+     C4 asks only "Custom types will be lost"; Validation goes 0 → 1, while
+     MCP `delete_relation_type` warns. A guess: only `changeNodeType` and
+     `changeRelationType` go through `confirmNarrowing` in
+     `MetamodelEditor.tsx`.
+243. **Typing an enum's first options asks at each letter.** API holds
+     `tier: "gold"`; Container › Add property `tier` (enum), typing "gold,
+     silver" into Options opens the narrowing confirmation at "g", "go" and
+     "gol" (3 when dismissed). Once in the agent's run and once in the
+     re-run the stored options were `["gold", "s"]` while the field showed
+     "gold, silver". A guess: `EnumOptionsInput` applies each keystroke that
+     keeps the current options, and empty → a set counts as narrowing.
+
+*Run 69.* Covered: the Structurizr parser on groups, repeated pairs,
+unicode, duplicate views and relations, `exclude`, `dynamic *`; in Studio
+the first view, reload, Ctrl+Z after an import and the flow view; a `?hub=`
+link, fresh and returning; Markdown links and the sanitizer; Quick Search
+with view-per-element groups, an element in no view, and a milestone shown.
+Not covered: file and folder round trips of an imported model, PNG and SVG
+export of imported views, `forge_import_hub_concept` with blank parameters,
+Hub template Apply in the browser, the Hub site.
+
+244. **A Markdown image on another host is fetched when written as
+     `https:host/x.png`, `\\host/x.png`, `/\host/x.png` or
+     `https:/host/x.png`.** Of 8 remote forms in a description, these 4 are
+     drawn as `<img>` and requested from evil.example; the other 4 are
+     links, as decided. A guess: `MarkdownText`'s `Image` treats as remote
+     only a src starting with `//` or `http(s)://`; the browser resolves
+     these to another host (`new URL(src, location.href)` would tell).
+245. **Quick Search's Enter on a relation opens a view that does not draw
+     it.** "browses and orders" (Customer → Web App) from a view without
+     Customer opens System Context, where only the folded line
+     customer → bookstore is drawn: 0 edges selected, no `/e/`, while the
+     result's chips list Containers. A guess: `pickResult`'s edge branch
+     calls `pickViewForNode(rel.sourceId)` instead of choosing among the
+     views with both ends (D12 covered elements only).
+246. **An imported Structurizr dynamic view plays the first relationship
+     between two elements, not the one its step names.** `api -> db "Reads
+     orders from"` and `"Writes orders to"`, a dynamic step `api -> db
+     "Writes orders to"`: the flow plays "Reads orders from" with the note
+     "Writes orders to"; "Writes" is in no flow, and deleting "Reads" takes
+     the step away (2 → 1). A guess: the dynamic step lookup in
+     `structurizrDsl.ts` matches source and target only.
+
+To decide (runs 65 to 69): with an any-pair relation type, an Alt-drag
+where only it fits makes an untyped relation, unasked, and Validation is
+silent; the wiki's Delete prompt does not count relations and sequence steps
+as the canvas's does (its Undo is exact); imported Structurizr views leave
+out the workspace's groups; the import ignores `workspace { name }` and
+never falls back to the file name ("Imported diagram"); a dynamic step
+against a relationship's direction (Structurizr's responses) is dropped with
+"no relationship between their elements"; a slide with neither a milestone
+nor a captured copy shows the milestone picked in Presenter or Designer,
+while `slideModel`'s comment says the live model; after Save as new the
+canvas shows the view edits but reopening the new milestone shows none
+(views are shared), and a reload drops unsaved milestone edits without a
+word; typing in a milestone, answering the question and typing on in the
+same field makes two undo steps; Viewer and Presenter show Undo and Redo
+enabled that do nothing; Redo of "+ New view" stays on the old view; the
+Auto-layout select is no undo step, so Undo of a drag before it resets it;
+a merge's relation to an element the other side deleted: drop it (delete
+wins) or bring the element back, as a container comes back for a new child;
+a step conflict's notice says the folder's was kept while the result is
+Studio's; a view whose places break containment settles again on every
+reload (not saved, as ruled), 44 of 86 on injury View 7; a calm drag of a
+component 300 px out of its container leaves the container over the next
+one and the component on another (g60, g144, g168: open item 3 of "Calm
+drags and pins", or new?); Smart Layout again after one delete moves all 62
+elements for "crossings 216 → 221, overdraws 125 → 117 (0% better)".
+
+Decided 2026-10-21 (the maintainer, on the "To decide" list of runs 65 to
+69): in a merge, a relation to an element the other side deleted goes, as
+does a step of a deleted relation, with a notice (the delete wins); a calm
+drag far out of a container is a bug to fix now (a drop leaves nothing
+overlapping; closes open item 3 of "Calm drags and pins"); Smart Layout
+keeps what stands unless its result is clearly better ("already scores
+best"); a view whose places break containment settles on every load and
+the settle is saved with the next edit (the reload ruling stands); Save as
+new keeps the view edits made in the milestone in the new milestone; while
+a milestone has unsaved edits, leaving or reloading the page asks first
+(the browser's own question); a slide with neither a milestone nor a
+captured copy shows the live model whatever is open; typing into one field
+in a milestone is one undo step across the question; Undo and Redo are
+hidden in Viewer, Presenter and the metamodel editor; the Auto-layout
+select is an undo step of its own; Redo of a new view shows the new view;
+where exactly one relation type fits a pair, an any-pair type included, a
+new relation gets it, and Validation counts any-pair types when it warns
+about an untyped relation; the Structurizr import brings in groups as
+`group` elements drawn on its views, names the model after the workspace
+and else the file, and imports a dynamic step against a relationship's
+direction as a backward step (new: a sequence step can run along its
+relation the other way, as a response, and flows and Presenter draw it so);
+the wiki's Delete prompt is the canvas's, counting relations and steps,
+without "cannot be undone". Every other point of the list is a bug: a step
+conflict's notice says which side was kept.
+
 ### Radical Forge over MCP (2026-10-07)
 
 Added in `feat/forge-mcp`: the MCP server runs Radical Forge with the
