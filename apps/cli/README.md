@@ -207,7 +207,9 @@ rules by id, or one kind of metamodel issue by `metamodel/<code>`:
 With `max`, up to that many findings pass as warnings and one more fails the
 check, so an existing model can adopt a rule before every gap is closed.
 `--ratchet` lowers each `max` to the count found now and writes the config
-back; it never raises one.
+back; it never raises one. A rule that did not run keeps its `max`: the
+`test-*` rules without `--report` (the output marks them `–` and "not run"),
+every rule but the folder's when the folder is no model.
 
 ### Goals
 
