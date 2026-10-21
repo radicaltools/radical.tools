@@ -703,16 +703,6 @@ const KNOWN: Known[] = [
     note: 'K6: a calm drop onto an element of the same row leaves them overlapping (new; after the fix of "Calm drags and pins" item 3)',
   },
   {
-    // API and Orders DB kept in a row, not saved yet, while the agent
-    // deletes API: the merge keeps the row holding API; it is saved so.
-    rule: 'references',
-    // The same for a view's fold of it (collapsedNodeIds ["api"]).
-    // And a view's list (Element Table listing all but API, the agent
-    // deletes Bookstore: the merged list keeps bookstore, web, db).
-    match: (t, v) => t.some((a) => a.a === 'agent') && /(: (align|grid|pin) .* holds missing|(collapsed|expanded)?NodeIds has missing|nodeIds has missing)/.test(v.detail),
-    note: 'K7: a merge keeps an alignment, pin, view fold or view list entry of an element the other side deleted (new; sibling of item 234)',
-  },
-  {
     // API moved into Payment Provider (API → Payment Provider "charges
     // card", now a relation to its own container), then Smart Layout: 11
     // "[ELK] Layout error … UnsupportedGraphException" on the console; the
@@ -720,14 +710,6 @@ const KNOWN: Known[] = [
     rule: 'noErrors',
     match: (_t, v) => v.detail.includes('UnsupportedGraphException'),
     note: 'K8: Smart Layout logs ELK errors for a relation between an element and its container (new)',
-  },
-  {
-    // "browses and orders" (step 1 of Place Order) deleted, the agent
-    // deletes Bookstore with Web App, Undo: no relation comes back (its end
-    // is gone) but the sequence has the step ["r1"] again, saved so.
-    rule: 'references',
-    match: (t, v) => t.some((a) => a.a === 'agent') && (lastAction(t) === 'undo' || lastAction(t) === 'redo') && /names missing relation/.test(v.detail),
-    note: 'K9: Undo after an outside change brings back a sequence step whose relation it drops as a stray (new; sibling of items 127 and 234)',
   },
   {
     // Nested model: Component 0.0.0, 0.0.1, 0.0.2, one row already, kept in

@@ -295,8 +295,18 @@ function _entryModel(entry: HistoryEntry): DiagramData {
  *  element that is gone. A step brought them back on a model an outside
  *  change had taken their container or other end from (Undo of a delete
  *  after the agent deleted the API: "charges card" from no element). Taken
- *  out; returns the names of what was. */
-function _withoutStrays(parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' | 'views' | 'defaultLayoutConstraints'>): { parts: typeof parts; dropped: string[] } {
+ *  out; returns the names of what was. With them go the steps of every
+ *  relation gone, `gone.relations` too (deleted outside Studio since): Undo
+ *  of a relation's delete after the agent deleted its end brought its step
+ *  back without it (item 254). And what the step puts back on the views and
+ *  layout rules of the elements and relations in `gone` (a fold, a row, an
+ *  entry in a view's list, a hidden relation), unless a milestone is shown
+ *  (`inMilestone`): the views are the live model's then (keepingSharedViews). */
+function _withoutStrays(
+  parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' | 'views' | 'defaultLayoutConstraints' | 'sequences'>,
+  gone: { nodes: Set<string>; relations: Set<string> },
+  inMilestone: boolean,
+): { parts: typeof parts; dropped: string[] } {
   const dropped: string[] = []
   const next = produce(parts, (draft) => {
     const state = { ...draft, activeViewId: null } as unknown as model.ModelState
@@ -305,12 +315,22 @@ function _withoutStrays(parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' 
       dropped.push(node.label || node.id)
       model.deleteNode(state, node.id)
     }
+    const relations = new Set([...gone.relations].filter((id) => !state.c4Relations[id]))
     for (const [id, rel] of Object.entries(state.c4Relations)) {
       const ends = [state.c4Nodes[rel.sourceId], state.c4Nodes[rel.targetId]]
       if (ends.every(Boolean)) continue
       const end = ends.find(Boolean)
       dropped.push(rel.label || (end ? `a relation of ${end.label}` : 'a relation'))
       delete state.c4Relations[id]
+      relations.add(id)
+    }
+    model.forgetRelationsInSequences(state, relations)
+    if (!inMilestone) {
+      for (const view of Object.values(state.views)) {
+        if (view.hiddenRelationIds?.some((id) => relations.has(id))) view.hiddenRelationIds = view.hiddenRelationIds.filter((id) => !relations.has(id))
+      }
+      const nodes = new Set([...gone.nodes].filter((id) => !state.c4Nodes[id]))
+      if (nodes.size) model.forgetNodesInViews(state, nodes)
     }
     // Set anew, not changed in place (forgetNodesInViews).
     draft.defaultLayoutConstraints = state.defaultLayoutConstraints ?? []
@@ -394,10 +414,11 @@ function _keptBuiltOn(from: DiagramData, now: DiagramData, merged: DiagramData):
  *  the step brings back that has no place left in it does not come back
  *  (`dropped`, _withoutStrays). Shown on the canvas of `change.to`, as Undo
  *  goes back to its step's canvas. */
-function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[]; kept: string[]; dropped: string[]; notices: string[] } {
+function _rebasedEntry(change: StepChange, now: HistoryEntry, inMilestone = false): { entry: HistoryEntry; conflicts: string[]; kept: string[]; dropped: string[]; notices: string[] } {
   const nowModel = _entryModel(now)
   const fromModel = _entryModel(change.from)
-  const result = mergeModels(fromModel, _entryModel(change.to), nowModel, { keepParents: false })
+  const toModel = _entryModel(change.to)
+  const result = mergeModels(fromModel, toModel, nowModel, { keepParents: false })
   // What the step changes in an element deleted outside Studio since stays deleted.
   const conflicts = [...result.conflicts, ...result.dropped.filter((d) => d.by === 'ours').map((d) => d.name)]
   const notices = mergeNotices({ dropped: result.dropped.filter((d) => d.by === 'theirs') }, { ours: 'by the step', theirs: 'outside Studio' })
@@ -408,18 +429,23 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
   for (const r of merged.relations) mergedRelations[r.id] = r
   const mergedViews: Record<string, DiagramView> = {}
   for (const v of merged.views ?? []) mergedViews[v.id] = v
+  const sequencesIn: Record<string, DiagramSequence> = {}
+  for (const q of merged.sequences ?? []) sequencesIn[q.id] = q
+  // What a side had and the merge left out: deleted on one side.
+  const had = (of: (d: DiagramData) => Array<{ id: string }>, present: Record<string, unknown>) =>
+    new Set([fromModel, toModel, nowModel].flatMap((d) => of(d).map((e) => e.id)).filter((id) => !present[id]))
   const { parts, dropped } = _withoutStrays({
     c4Nodes: mergedNodes,
     c4Relations: mergedRelations,
     views: mergedViews,
     defaultLayoutConstraints: merged.defaultLayoutConstraints ?? [],
-  })
+    sequences: sequencesIn,
+  }, { nodes: had((d) => d.nodes, mergedNodes), relations: had((d) => d.relations, mergedRelations) }, inMilestone)
   const c4Nodes: Record<string, C4Node> = {}
   for (const n of Object.values(parts.c4Nodes)) c4Nodes[n.id] = { ...n }
   const c4Relations = parts.c4Relations
   const views = parts.views
-  const sequences: Record<string, DiagramSequence> = {}
-  for (const q of merged.sequences ?? []) sequences[q.id] = q
+  const sequences = parts.sequences ?? {}
   const defaultPositions = merged.defaultPositions ?? {}
   const activeViewId = change.to.activeViewId && views[change.to.activeViewId] ? change.to.activeViewId : null
   const view = activeViewId ? views[activeViewId] : undefined
@@ -3075,7 +3101,7 @@ export const useDiagramStore = create<DiagramStore>()(
     // is made on the model as it is now (`now`), keeping that change.
     const _restoreHistoryItem = (item: HistoryItem, now: HistoryEntry, action: 'Undo' | 'Redo'): void => {
       if (!isStepChange(item)) { _restoreHistoryEntry(item); return }
-      const { entry, conflicts, kept, dropped, notices } = _rebasedEntry(item, now)
+      const { entry, conflicts, kept, dropped, notices } = _rebasedEntry(item, now, !!get().activeSnapshotId)
       _restoreHistoryEntry(entry)
       const list = (names: string[]): string => names.slice(0, 5).join('; ') + (names.length > 5 ? ` and ${names.length - 5} more` : '')
       if (conflicts.length) {

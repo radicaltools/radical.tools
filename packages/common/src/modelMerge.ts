@@ -31,12 +31,15 @@
 // - A relation one side drew to (or turned to) an element the other side
 //   deleted goes, as does a step one side added of a relation the other
 //   deleted: the delete wins here too, and the drop is reported (dropStrays).
+//   So does what one side added to a view or a layout rule of an element,
+//   relation or sequence the other deleted: a fold, an entry in the list, a
+//   row, a hidden relation, a dynamic view's sequence (forgetDeleted).
 //
 // The merged model may break another rule each side kept on its own;
 // validation shows it.
 
 import { trimStepBackward, type DiagramData } from './c4'
-import { modelValue } from './model'
+import { forgetNodesInViews, modelValue, type ModelState } from './model'
 
 export interface ModelMergeResult {
   merged: DiagramData
@@ -437,7 +440,10 @@ export function mergeModels(base: DiagramData, ours: DiagramData, theirs: Diagra
   const ctx: Ctx = { conflicts: [], labels, dropped: [] }
   const merged = merge3(base, ours, theirs, [], ctx, false) as DiagramData
   const restored = opts?.keepParents === false ? [] : restoreParents(merged, ours, theirs)
-  if (opts?.keepParents !== false) dropStrays(merged, base, ours, theirs, ctx)
+  if (opts?.keepParents !== false) {
+    dropStrays(merged, base, ours, theirs, ctx)
+    forgetDeleted(merged, [base, ours, theirs])
+  }
   followFolderRenames(merged, base, ours, theirs)
   const dropped = ctx.dropped.filter((d, i) => !restored.includes(d.name) && ctx.dropped.findIndex((e) => e.name === d.name && e.by === d.by && e.change === d.change) === i)
   return { merged, conflicts: [...new Set(ctx.conflicts)], dropped, restored }
@@ -577,6 +583,34 @@ function dropStrays(merged: DiagramData, base: DiagramData, ours: DiagramData, t
     merged.views = merged.views?.map((view) =>
       view.hiddenRelationIds?.some((id) => gone.has(id)) ? { ...view, hiddenRelationIds: view.hiddenRelationIds.filter((id) => !gone.has(id)) } : view)
   }
+}
+
+/** What views and layout rules of `merged` still name of the elements,
+ *  relations and sequences one of `sides` had and the merge deleted, taken
+ *  out (in place), as a delete takes it out (forgetNodesInViews): the side
+ *  that kept the element kept it in a row, folded it on a view, listed it
+ *  on one, while the other deleted it; merged as sets, the row, the fold and
+ *  the entry stayed, saved so (item 252). A view's places stay: they are
+ *  its layout for every milestone. */
+function forgetDeleted(merged: DiagramData, sides: DiagramData[]): void {
+  const gone = (now: Array<{ id: string }> | undefined, of: (d: DiagramData) => Array<{ id: string }> | undefined): Set<string> => {
+    const present = new Set((now ?? []).map((e) => e.id))
+    return new Set(sides.flatMap((d) => (of(d) ?? []).map((e) => e.id)).filter((id) => !present.has(id)))
+  }
+  const nodes = gone(merged.nodes, (d) => d.nodes)
+  const relations = gone(merged.relations, (d) => d.relations)
+  const sequences = gone(merged.sequences, (d) => d.sequences)
+  if (!nodes.size && !relations.size && !sequences.size) return
+  // Copies: a view the merge took whole is the side's own object.
+  const views = Object.fromEntries((merged.views ?? []).map((v) => [v.id, { ...v }]))
+  const state = { views, defaultLayoutConstraints: merged.defaultLayoutConstraints, activeViewId: null } as unknown as ModelState
+  if (nodes.size) forgetNodesInViews(state, nodes)
+  for (const view of Object.values(state.views)) {
+    if (view.hiddenRelationIds?.some((id) => relations.has(id))) view.hiddenRelationIds = view.hiddenRelationIds.filter((id) => !relations.has(id))
+    if (view.sequenceId && sequences.has(view.sequenceId)) delete view.sequenceId
+  }
+  if (merged.views) merged.views = merged.views.filter((v) => state.views[v.id]).map((v) => state.views[v.id])
+  if (merged.defaultLayoutConstraints) merged.defaultLayoutConstraints = state.defaultLayoutConstraints ?? []
 }
 
 // ─── Edits kept apart ────────────────────────────────────────────────────────

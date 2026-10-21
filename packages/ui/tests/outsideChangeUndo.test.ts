@@ -178,6 +178,52 @@ describe('Undo after an outside change', () => {
     expect(lastNotice()).toMatch(/outside Studio.*Orders DB/)
   })
 
+  it('brings back no step of a relation it leaves out (item 254)', () => {
+    // "browses and orders" deleted, the agent deleted Bookstore, Undo: no
+    // relation came back, but its step did, saved so.
+    s().addRelation({ sourceId: 'a', targetId: 'b', label: 'charges card' })
+    const rel = Object.keys(s().c4Relations)[0]
+    const seq = s().addSequence('Order')
+    s().toggleRelationInSequence(seq, rel)
+    s().removeRelation(rel)
+    expect(s().sequences[seq].relationIds).toEqual([])
+    outsideChange((d) => {
+      d.nodes = d.nodes.filter((n) => n.id !== 'a')
+      for (const v of d.views ?? []) v.nodeIds = v.nodeIds.filter((id) => id !== 'a')
+    })
+    s().undo()
+    expect(Object.values(s().c4Relations)).toEqual([])
+    expect(s().sequences[seq].relationIds).toEqual([])
+    expect(lastNotice()).toMatch(/outside Studio.*charges card/)
+  })
+
+  it('brings back no row, fold or hidden relation of what was removed outside Studio (item 254)', () => {
+    s().setActiveView('one')
+    s().addRelation({ sourceId: 'a', targetId: 'b', label: 'pays' })
+    const rel = Object.keys(s().c4Relations)[0]
+    s().addAlignment('horizontal', ['a', 'b'])
+    const row = s().views.one.layoutConstraints![0].id
+    s().toggleCollapse('a')
+    s().hideRelationFromView('one', rel)
+    // Undone after the agent removed A, these steps put back what they took.
+    s().removeLayoutConstraint([row])
+    s().toggleCollapse('a')
+    s().unhideRelationInView('one', rel)
+    outsideChange((d) => {
+      d.nodes = d.nodes.filter((n) => n.id !== 'a')
+      d.relations = []
+      for (const v of d.views ?? []) v.nodeIds = v.nodeIds.filter((id) => id !== 'a')
+    })
+    s().undo()
+    s().undo()
+    s().undo()
+    const view = s().views.one
+    expect(view.layoutConstraints ?? []).toEqual([])
+    expect(view.collapsedNodeIds ?? []).toEqual([])
+    expect(view.hiddenRelationIds ?? []).toEqual([])
+    expect(view.nodeIds).toEqual(['b'])
+  })
+
   it('keeps an element the agent built on since its add, and says so (item 163)', () => {
     s().setActiveView('one')
     const id = s().addNode({ type: 'system', label: 'Shop', x: 1200, y: 0, ...NODE_SIZES.system, collapsed: false } as Omit<C4Node, 'id'>)
