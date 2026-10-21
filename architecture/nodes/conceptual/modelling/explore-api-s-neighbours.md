@@ -6,6 +6,6 @@ given: "the bookstore model in Designer with API selected"
 tests: |
   packages/ui/tests/exploreView.test.ts › an explore view
   apps/e2e/tests/studio/explore.spec.ts › Explore from here grows by + and by a level
-then: "a view \"Explore: API\" opens first in the list with API alone; the + adds Web App, Orders DB and Payment Provider inside their frames beside API without moving it, and its count goes to none; + 1 level adds Customer; the saved document and the undo history are unchanged"
+then: "a view \"Explore: API\" opens first in the list with API alone, in its Bookstore frame; the + adds Web App, Orders DB and Payment Provider a layer below API, with API, Web App and Orders DB inside the Bookstore frame and Payment Provider outside it, and its count goes to none; + 1 level adds Customer a layer below, outside the frame; nothing overlaps; the saved document and the undo history are unchanged"
 when: "the user chooses Explore from here, clicks API's +, then + 1 level"
 ---
