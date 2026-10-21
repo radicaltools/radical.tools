@@ -81,20 +81,28 @@ test('selecting a type shows its rules; Edit opens it in the list', async ({ pag
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 30_000 })
   const zoom = async (): Promise<number> =>
     diagram.locator('.react-flow__viewport').evaluate((el) => Number(/scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform)?.[1]))
+  // The camera's moves animate: the zoom once it has stopped.
+  const atRest = async (): Promise<number> => {
+    let now = await zoom()
+    await expect
+      .poll(async () => {
+        const prev = now
+        now = await zoom()
+        return now === prev
+      }, { intervals: [150] })
+      .toBe(true)
+    return now
+  }
   // The fit after the physics animates; read the overview once it has stopped.
-  let overview = await zoom()
-  await expect
-    .poll(async () => {
-      const prev = overview
-      overview = await zoom()
-      return overview === prev
-    }, { intervals: [150] })
-    .toBe(true)
+  const overview = await atRest()
 
   // Selecting a type frames it with what it is connected to (a pseudostate:
   // the states and machines in its frame).
   await diagram.getByTestId('rf__node-pseudostate').click()
   await expect.poll(zoom).toBeGreaterThan(overview * 1.5)
+  // Clicked while the camera still moved, the corner of the pane could be
+  // under another type by the time the click landed, which it selected.
+  await atRest()
   await diagram.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } })
   await expect.poll(zoom).toBeCloseTo(overview, 2)
 
