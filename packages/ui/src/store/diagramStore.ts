@@ -6934,7 +6934,10 @@ export const useDiagramStore = create<DiagramStore>()(
             slide.viewport = vp
             ;(slide as any).canvasState = canvasState
             ;(slide as any).viewId = currentViewId
-            ;(slide as any).modelSnapshot = modelSnapshot
+            // A slide linked to a milestone shows it, and keeps no copy of
+            // it, as one added on a milestone: the copy outlived the link.
+            if (slide.snapshotId) delete slide.modelSnapshot
+            else (slide as any).modelSnapshot = modelSnapshot
             // The drill level or wiki page shown now, as Add slide takes it:
             // the old one stayed, and the slide played where it was added.
             delete slide.treemapFocusId; delete slide.wikiFocusId; delete slide.wikiPageMode

@@ -244,6 +244,21 @@ describe('the model a slide shows once its milestone is gone (item 232)', () => 
     expect(s().c4Nodes[pay]).toBeDefined()
   })
 
+  it('Capture on a slide linked to a milestone keeps no copy of it either', () => {
+    const v1 = s().createSnapshot('v1')
+    const pay = live()
+    s().addPresentationSlide('Live')
+    const id = s().presentationSlides[0].id
+    s().linkSnapshotToSlide(id, v1)
+    s().setAppMode('presenter')
+    s().previewSlide(0)
+    s().captureSlideViewport(id)
+    expect(s().presentationSlides[0].modelSnapshot).toBeUndefined()
+    s().linkSnapshotToSlide(id, null)
+    s().previewSlide(0)
+    expect(s().c4Nodes[pay]).toBeDefined()
+  })
+
   // Decided 2026-10-21: a slide with neither a milestone nor a copy of its
   // own (the sample's, an agent's) showed the milestone open in Designer or
   // Presenter.
