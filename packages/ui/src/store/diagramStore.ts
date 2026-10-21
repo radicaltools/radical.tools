@@ -5663,7 +5663,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // the views was put back as it had been on the way to Designer.
         const editing = (m: DiagramStore['appMode']): boolean => m === 'designer' || m === 'metamodel'
         const backToDesigner = !editing(prevMode) && mode === 'designer'
-        let parkedCamera: { x: number; y: number; zoom: number } | null = null
+        let parkedCamera: { camera: { x: number; y: number; zoom: number } | null; keep: boolean } | null = null
         if (editing(prevMode) && !editing(mode)) {
           // The canvas shown keeps its positions in the nodes until it is
           // left or saved: put them, and its camera, into its view (or All
@@ -5710,8 +5710,13 @@ export const useDiagramStore = create<DiagramStore>()(
           // Designer positions and camera and saves nothing of the one left.
           if (shownViewId !== get().activeViewId && (shownViewId === null || get().views[shownViewId])) {
             get().setActiveView(shownViewId)
-          } else if (W.__preModeCamera) {
-            parkedCamera = { ...W.__preModeCamera }
+          } else if (editing(mode) && W.__preModeCamera) {
+            parkedCamera = { camera: { ...W.__preModeCamera }, keep: true }
+          } else if (!editing(mode)) {
+            // Viewer opens the view as it opens any view: its own camera.
+            const id = get().activeViewId
+            const own = id ? get().views[id]?.viewport : get().defaultViewport
+            parkedCamera = { camera: own ? { ...own } : null, keep: false }
           }
           if (editing(mode)) W.__preModeCamera = undefined
         }
@@ -5734,7 +5739,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // ones Designer shows again for new and moved the camera.
         if (parkedCamera) {
           const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
-          ;(W.__rfPlaceCamera as ((vp: { x: number; y: number; zoom: number }, ids?: string[], opts?: { keep?: boolean }) => void) | undefined)?.(parkedCamera, shown, { keep: true })
+          ;(W.__rfPlaceCamera as ((vp: { x: number; y: number; zoom: number } | null, ids?: string[], opts?: { keep?: boolean }) => void) | undefined)?.(parkedCamera.camera, shown, { keep: parkedCamera.keep })
         }
         // The view Designer shows was opened above, or first in Viewer or
         // Presenter, before appMode was designer: one never laid out (a view

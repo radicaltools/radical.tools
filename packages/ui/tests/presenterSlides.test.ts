@@ -179,7 +179,7 @@ describe('back in Designer from Presenter', () => {
     W.__rfCurrentViewport = { x: 50, y: 60, zoom: 2 }
     s().toggleCollapse('shop')
     s().setAppMode('designer')
-    expect(placed.at(-1)).toEqual([{ x: 1, y: 2, zoom: 0.5 }, expect.arrayContaining(['shop', 'api', 'db']), { keep: true }])
+    expect(placed[placed.length - 1]).toEqual([{ x: 1, y: 2, zoom: 0.5 }, expect.arrayContaining(['shop', 'api', 'db']), { keep: true }])
     delete W.__rfPlaceCamera
   })
 })
