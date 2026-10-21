@@ -517,6 +517,14 @@ if (typeof window !== 'undefined') {
       // The active document became folder-backed without a reload ("Save as
       // folder…"): start following its folder.
       const active = s.docs.find(d => d.id === s.activeId)
+      // The folder was just written with the model as it is: that is what
+      // later edits are kept against (keepEdits). Set only by a save, it
+      // stayed unset once a load stopped saving by itself (D15), and an edit
+      // held for an agent was lost by a reload.
+      if (active?.source === 'md' && !_baseModel) {
+        _baseModel = buildPersistData()
+        _savedShape = _baseModel
+      }
       if (active?.source === 'md' && !_suspended) watchActive(active.id)
       // Moved back to the browser: the folder is not followed any more.
       else if (active && active.source !== 'md') stopWatching()
