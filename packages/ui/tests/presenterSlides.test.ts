@@ -165,3 +165,21 @@ describe('Presenter, then Viewer', () => {
     expect(s().c4Nodes.api.x).toBe(60)
   })
 })
+
+describe('back in Designer from Presenter', () => {
+  // Its camera moved 40 px: a camera moved in Presenter stayed, and Smart fit
+  // took what Designer shows again for new.
+  it('puts Designer\'s camera back, with the nodes Designer shows', () => {
+    const W = window as unknown as Record<string, unknown>
+    const placed: unknown[][] = []
+    W.__rfPlaceCamera = (...args: unknown[]) => { placed.push(args) }
+    s().setActiveView('core')
+    W.__rfCurrentViewport = { x: 1, y: 2, zoom: 0.5 }
+    s().setAppMode('presenter')
+    W.__rfCurrentViewport = { x: 50, y: 60, zoom: 2 }
+    s().toggleCollapse('shop')
+    s().setAppMode('designer')
+    expect(placed.at(-1)).toEqual([{ x: 1, y: 2, zoom: 0.5 }, expect.arrayContaining(['shop', 'api', 'db']), { keep: true }])
+    delete W.__rfPlaceCamera
+  })
+})

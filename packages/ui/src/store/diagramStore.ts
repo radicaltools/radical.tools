@@ -5663,6 +5663,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // the views was put back as it had been on the way to Designer.
         const editing = (m: DiagramStore['appMode']): boolean => m === 'designer' || m === 'metamodel'
         const backToDesigner = !editing(prevMode) && mode === 'designer'
+        let parkedCamera: { x: number; y: number; zoom: number } | null = null
         if (editing(prevMode) && !editing(mode)) {
           // The canvas shown keeps its positions in the nodes until it is
           // left or saved: put them, and its camera, into its view (or All
@@ -5670,6 +5671,9 @@ export const useDiagramStore = create<DiagramStore>()(
           // in Presenter wrote the view's layout from when it was opened.
           if (!get().activeSnapshotId) get()._saveShownCanvas()
           W.__preModeLayout = parkDesigner(get())
+          // And its camera, put back with the rest: a camera moved in
+          // Presenter or Viewer stayed in Designer (40 px, or a zoom).
+          W.__preModeCamera = W.__rfCurrentViewport ? { ...W.__rfCurrentViewport } : undefined
           // Edits of a milestone not yet kept or dropped stay Designer's
           // question: Viewer and Presenter browse without being asked.
           set((state) => { state.milestoneDirty = false; state.milestonePromptOpen = false })
@@ -5706,7 +5710,10 @@ export const useDiagramStore = create<DiagramStore>()(
           // Designer positions and camera and saves nothing of the one left.
           if (shownViewId !== get().activeViewId && (shownViewId === null || get().views[shownViewId])) {
             get().setActiveView(shownViewId)
+          } else if (W.__preModeCamera) {
+            parkedCamera = { ...W.__preModeCamera }
           }
+          if (editing(mode)) W.__preModeCamera = undefined
         }
         // Physics runs in *both* designer and viewer. In viewer the user
         // can drag/collapse to explore — mutations are sandboxed by the
@@ -5722,6 +5729,13 @@ export const useDiagramStore = create<DiagramStore>()(
         // Rebuild rfNodes so per-node draggable/selectable flags reflect
         // the new mode (designer = editable, viewer/presenter = locked).
         get()._sync()
+        // Designer's camera, with what it shows: given the nodes the canvas
+        // drew before (a container folded in Presenter), Smart fit took the
+        // ones Designer shows again for new and moved the camera.
+        if (parkedCamera) {
+          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+          ;(W.__rfPlaceCamera as ((vp: { x: number; y: number; zoom: number }, ids?: string[], opts?: { keep?: boolean }) => void) | undefined)?.(parkedCamera, shown, { keep: true })
+        }
         // The view Designer shows was opened above, or first in Viewer or
         // Presenter, before appMode was designer: one never laid out (a view
         // per element, a view of a viewpoint) gets its Smart Layout now. It
