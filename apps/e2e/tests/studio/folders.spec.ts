@@ -222,6 +222,19 @@ test('an edit made while an agent writes the folder survives a reload', async ({
   await expect.poll(() => folder.paths(), { timeout: 20_000 }).toContain('nodes/card-gateway/_index.md')
 })
 
+test('an agent mark far ahead of Studio\'s clock holds the saves for one period, not as long as it says', async ({ page, studio }) => {
+  // A server whose clock ran an hour ahead held Studio's saves for the hour:
+  // each check cut the mark to 15 s from then, so the hold renewed itself
+  // (item 237).
+  await saveAsFolder(page)
+  await expect.poll(() => folder.paths()).toContain('nodes/payment-provider/_index.md')
+  await folder.write('.radical/agent-activity.json', serializeAgentActivity('claude-code', Date.now() + 3_600_000))
+  await studio.node('payments').click()
+  await rename(page, 'Payment Provider', 'Card Gateway')
+  await expect(page.getByText(/An agent is editing this model/)).toBeVisible()
+  await expect.poll(() => folder.paths(), { timeout: 25_000 }).toContain('nodes/card-gateway/_index.md')
+})
+
 test('Undo after an outside edit takes back the user\'s edit and keeps the outside one', async ({ page, studio }) => {
   await saveAsFolder(page)
   await studio.node('payments').click()

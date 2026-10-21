@@ -845,6 +845,9 @@ export interface DocumentsAPI {
 /** The text of an md-folder document's agent activity file (agentActivity),
  *  or null when there is none, it cannot be read, or the document is no
  *  folder (or a browser folder not yet connected). */
+/** Each document's agent mark as last read, and when it was first read. */
+const agentMarksSeen = new Map<string, { text: string; at: number }>()
+
 async function readAgentActivityText(id: string): Promise<string | null> {
   const meta = readIndex().docs.find((d) => d.id === id)
   if (meta?.source !== 'md') return null
@@ -1356,7 +1359,12 @@ export const documents: DocumentsAPI = {
   },
 
   async agentWritingUntil(id) {
-    return agentWritingUntil(await readAgentActivityText(id))
+    const text = await readAgentActivityText(id)
+    // A mark is cut to one period from when it was first seen, not from each check.
+    const seen = agentMarksSeen.get(id)
+    const now = Date.now()
+    if (!text || seen?.text !== text) agentMarksSeen.set(id, { text: text ?? '', at: now })
+    return agentWritingUntil(text, now, agentMarksSeen.get(id)!.at)
   },
 
   async readAgentActivity(id) {
