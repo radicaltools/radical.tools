@@ -103,7 +103,21 @@ test('selecting a type shows its rules; Edit opens it in the list', async ({ pag
   // Clicked while the camera still moved, the corner of the pane could be
   // under another type by the time the click landed, which it selected.
   await atRest()
-  await diagram.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } })
+  // A click on the empty pane: a fixed corner of it can lie on a relation
+  // (the wide stroke that catches clicks on a line), which a click there
+  // selects, framing every type it links.
+  const pane = diagram.locator('.react-flow__pane')
+  const empty = await pane.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    for (let y = 5; y < r.height; y += 15) {
+      for (let x = 5; x < r.width; x += 15) {
+        if (document.elementFromPoint(r.x + x, r.y + y) === el) return { x, y }
+      }
+    }
+    return null
+  })
+  expect(empty).not.toBeNull()
+  await pane.click({ position: empty! })
   await expect.poll(zoom).toBeCloseTo(overview, 2)
 
   // Selecting a relation shows only its sources and targets: ADR, Fitness
