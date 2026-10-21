@@ -20,6 +20,7 @@ import {
   type FolderFiles,
 } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
+import type { MergeDrop } from '@radical/common/modelMerge'
 import { agentWritingUntil, parseAgentActivity, type AgentActivity } from '@radical/common/formats/agentActivity'
 import {
   webFolderSupported,
@@ -85,11 +86,18 @@ const externalChangeListeners = new Map<string, () => void>()
 const routedHosts = new WeakSet<object>()
 
 /** Who to tell when a save was merged with an edit made outside Studio. */
-const mergedSaveListeners = new Set<(id: string, conflicts: string[]) => void>()
+const mergedSaveListeners = new Set<(id: string, merged: SaveMerge) => void>()
 
-function notifyMergedSave(id: string, merged: { conflicts: string[] } | undefined): void {
+/** What a save merged with an edit made outside Studio did (mergeModels). */
+export interface SaveMerge {
+  conflicts: string[]
+  dropped?: MergeDrop[]
+  restored?: string[]
+}
+
+function notifyMergedSave(id: string, merged: SaveMerge | undefined): void {
   if (!merged) return
-  for (const listener of [...mergedSaveListeners]) listener(id, merged.conflicts)
+  for (const listener of [...mergedSaveListeners]) listener(id, merged)
 }
 
 function notifyExternalChange(id: string): void {
@@ -247,10 +255,22 @@ function fileUnreadable(id: string, file: string, reason: string): never {
 /** The model in a folder's files, remembered as what document `id` was
  *  loaded from. Null when the files hold no model that can be read; a file
  *  that is there but does not parse is a DocumentUnreadableError. */
+/** Folder models renamed in Studio whose radical.md has the old name until
+ *  the write of the new one: a read meanwhile keeps the new name. */
+const renamedFolders = new Set<string>()
+
 function readFolderModel(id: string, files: FolderFiles): DiagramData | null {
   try {
-    const { data } = deserializeFromMdFolder(files)
+    const { data, name } = deserializeFromMdFolder(files)
     unreadable.delete(id)
+    // The model is named as its radical.md says: named after the folder,
+    // the next save rewrote radical.md's name (opening a view did).
+    const idx = readIndex()
+    const meta = idx.docs.find((d) => d.id === id)
+    if (name && meta && meta.name !== name && !renamedFolders.has(id)) {
+      meta.name = name
+      if (writeIndex(idx)) notify()
+    }
     return data
   } catch (e) {
     if (!(e instanceof MalformedFolderFileError)) return null
@@ -373,7 +393,7 @@ type WrittenFolder =
   | { name: string; handle: FsDirHandle; session: MdFolderSession }
 
 /** Pick a folder (Electron or web) and write `data` into it as a Markdown
- *  model named after the folder (`fallbackName` when the browser gives no
+ *  model named `modelName`, else after the folder (`fallbackName` when the browser gives no
  *  name). A folder that already holds `.md` / `.json` files but is not a
  *  Radical model is written into only if `confirmForeign` returns true.
  *  Returns null on cancel, refusal or a failed write. */
@@ -381,15 +401,17 @@ async function pickAndWriteFolder(
   data: DiagramData,
   fallbackName: string,
   confirmForeign?: (folderName: string) => boolean | Promise<boolean>,
+  modelName?: string,
 ): Promise<WrittenFolder | null> {
   const h = host()
   // ── Electron: pick a destination folder, write via IPC. ──
   if (h.pickFolder && h.writeFolder) {
     const picked = await h.pickFolder()
     if (!picked.success || !picked.folderPath) return null
-    const name = defaultNameFromFolder(picked.folderPath)
+    const folderName = defaultNameFromFolder(picked.folderPath)
+    const name = modelName ?? folderName
     const present = h.readFolder ? await h.readFolder(picked.folderPath) : null
-    if (present?.success && present.files && !(await mayWriteInto(present.files, name, confirmForeign))) {
+    if (present?.success && present.files && !(await mayWriteInto(present.files, folderName, confirmForeign))) {
       return null
     }
     const res = await h.writeFolder(picked.folderPath, serializeToMdFolder(data, name))
@@ -404,10 +426,11 @@ async function pickAndWriteFolder(
   if (webFolderSupported()) {
     const handle = await pickWebDirectory()
     if (!handle) return null
-    const name = handle.name || fallbackName
+    const folderName = handle.name || fallbackName
+    const name = modelName ?? folderName
     const session = new MdFolderSession(handleFolderStorage(handle))
     try {
-      if (!(await mayWriteInto(await session.readAll(), name, confirmForeign))) return null
+      if (!(await mayWriteInto(await session.readAll(), folderName, confirmForeign))) return null
       const res = await session.write(serializeToMdFolder(data, name))
       if (!res.ok) return null // changed while we were writing; nothing written
     } catch (e) {
@@ -686,6 +709,12 @@ export interface DocumentsAPI {
     downloadOverride?: (filename: string, json: string) => Promise<string | null>,
   ): Promise<DocumentMeta | null>
 
+  /** Keep a file or folder model in this browser again: `data` (the model
+   *  on screen) is stored here and the document stops writing the file or
+   *  folder, which stays on disk as it is. Null for a model already in the
+   *  browser; throws StorageFullError when the browser refuses it. */
+  moveToBrowser(id: string, data: DiagramData): DocumentMeta | null
+
   /** Open a folder (Electron only) containing a Radical md-folder model and
    *  register it as an md-backed document. Returns the meta, or null on
    *  cancel / unavailable environment. */
@@ -742,8 +771,9 @@ export interface DocumentsAPI {
 
   /** Calls `listener` each time a save of an md-folder document was merged
    *  with an edit made outside Studio since the last read, with the values
-   *  both changed, where the folder's was kept. Returns the unsubscribe. */
-  onSaveMerged(listener: (id: string, conflicts: string[]) => void): () => void
+   *  both changed, where the folder's was kept, and the deletes that won
+   *  over an edit. Returns the unsubscribe. */
+  onSaveMerged(listener: (id: string, merged: SaveMerge) => void): () => void
 
   /** Until when (ms since the epoch) an agent writes an md-folder document's
    *  folder over MCP (agentActivity); 0 when none does, or for other
@@ -942,6 +972,14 @@ export const documents: DocumentsAPI = {
     // Refused by full storage, the rename did nothing and said nothing.
     if (!writeIndex(idx)) throw new StorageFullError()
     notify()
+    // A folder model's name is in its radical.md: written now, not at the
+    // next save. The model is written as the folder has it, with the name.
+    if (meta.source === 'md') {
+      renamedFolders.add(id)
+      void this.loadDocument(id).then((data) => { if (data) return enqueueSave(id, data) }).catch((e) => {
+        console.warn('[documentStore] could not write the new name into radical.md:', e)
+      }).finally(() => renamedFolders.delete(id))
+    }
   },
 
   deleteDocument(id, opts) {
@@ -1164,7 +1202,8 @@ export const documents: DocumentsAPI = {
   async saveAsFolder(id, data, confirmForeignFolder) {
     const current = readIndex().docs.find((d) => d.id === id)
     if (!current) return null
-    const written = await pickAndWriteFolder(data, current.name, confirmForeignFolder)
+    // A model moved keeps its name; it was renamed after the folder.
+    const written = await pickAndWriteFolder(data, current.name, confirmForeignFolder, current.name)
     if (!written) return null
     const idx = readIndex()
     const meta = idx.docs.find((d) => d.id === id)
@@ -1172,6 +1211,29 @@ export const documents: DocumentsAPI = {
     if (meta.source === 'ls') deleteLSPayload(id)
     await bindFolder(meta, written)
     writeIndex(idx)
+    notify()
+    return meta
+  },
+
+  moveToBrowser(id, data) {
+    const idx = readIndex()
+    const meta = idx.docs.find((d) => d.id === id)
+    if (!meta || meta.source === 'ls') return null
+    if (!writeLSPayload(id, data)) throw new StorageFullError()
+    const was = { ...meta }
+    meta.source = 'ls'
+    meta.filePath = undefined
+    meta.folderPath = undefined
+    meta.lastModified = Date.now()
+    if (!writeIndex(idx)) {
+      Object.assign(meta, was)
+      deleteLSPayload(id)
+      throw new StorageFullError()
+    }
+    unreadable.delete(id)
+    connectedWebHandles.delete(id)
+    webSessions.delete(id)
+    void removeHandle(id)
     notify()
     return meta
   },

@@ -119,4 +119,37 @@ describe('follow the agent', () => {
     useAgentForgeStore.setState({ status: run('finished') })
     expect(useFollowAgentStore.getState().on).toBe(false)
   })
+
+  // Exploratory runs 25 to 34: the far end of a relation stayed to be shown
+  // and pulled Studio to another view later; at a stage's end Studio opened a
+  // table where nothing could be framed.
+  it('takes a relation\'s far end as context only, and opens a canvas before a table', async () => {
+    const focus = vi.fn()
+    ;(globalThis as any).window.__rfFocusNodes = focus
+    const nodes = [sys('sys1', 'Payments'), sys('sys2', 'Ledger', 500)]
+    const table = (ids: string[]): DiagramView => ({ ...view('t', 'Register', ids), kind: 'table' })
+    const edit = await openFolder({ nodes, relations: [], views: [view('a', 'Payments', ['sys1']), view('b', 'Ledger', ['sys2'])] })
+    useDiagramStore.getState().setActiveView('a')
+    useAgentForgeStore.setState({ status: run('active') })
+    setFollowAgent(true)
+
+    // A relation from Payments to Ledger, which the open view does not show.
+    const rel = { id: 'r1', sourceId: 'sys1', targetId: 'sys2', label: 'books' }
+    await edit({ nodes, relations: [rel], views: [view('a', 'Payments', ['sys1']), view('b', 'Ledger', ['sys2'])] })
+    await wait(150)
+    expect(useDiagramStore.getState().activeViewId).toBe('a')
+    // The next write, on Payments alone, does not go after Ledger.
+    await edit({ nodes: [{ ...nodes[0], label: 'Payments API' }, nodes[1]], relations: [rel], views: [view('a', 'Payments', ['sys1']), view('b', 'Ledger', ['sys2'])] })
+    await wait(150)
+    expect(useDiagramStore.getState().activeViewId).toBe('a')
+
+    // Two elements a table shows both of and a canvas one of: the canvas.
+    await wait(350)
+    const more = [sys('sys3', 'Audit', 1000), sys('sys4', 'Reports', 1500)]
+    await edit({ nodes: [{ ...nodes[0], label: 'Payments API' }, nodes[1], ...more], relations: [rel], views: [view('a', 'Payments', ['sys1']), view('b', 'Ledger', ['sys2', 'sys3']), table(['sys3', 'sys4'])] })
+    await wait(150)
+    expect(useDiagramStore.getState().activeViewId).toBe('b')
+    expect(focus).toHaveBeenLastCalledWith(['sys3'], { duration: 600 })
+    useAgentForgeStore.setState({ status: run('finished') })
+  })
 })

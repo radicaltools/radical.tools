@@ -729,9 +729,13 @@ export class Forge {
     if (state?.status !== 'generating') return fail(`forge_complete_stage: the ${stageTitle(id)} stage is not open; begin it with forge_generate`)
     if (state.pending) return fail(`forge_complete_stage: proposal ${state.pending.id} waits for the user's answer; ask them and call forge_answer_refinement first`)
     const summary = typeof args.summary === 'string' && args.summary.trim() ? args.summary.trim() : 'Done.'
-    const added = idsAddedSince(state.before, this.ids(facade))
+    const all = idsAddedSince(state.before, this.ids(facade))
     const refinements = acceptedRefinements(stageRefinements(id, state.snapshot, snapshotOf(facade)), state.accepted)
-    const filed = fileIntoForgeViews(facade, added.nodes, id, run.structure)
+    // What an accepted refinement added is the refinement's: counted as
+    // added too, forge_finish reported it twice. Filed into views all the same.
+    const refined = new Set(refinements.filter((r) => r.change === 'added').map((r) => r.id))
+    const added = { ...all, nodes: all.nodes.filter((n) => !refined.has(n)), relations: all.relations.filter((r) => !refined.has(r)) }
+    const filed = fileIntoForgeViews(facade, all.nodes, id, run.structure)
     // The views made for the stage that it left empty go again.
     const dropped = dropEmptyForgeViews(facade, state.opened)
     added.views = added.views.filter((v) => !dropped.includes(v))
@@ -924,6 +928,7 @@ export class Forge {
     const insert = buildConceptInsert(concept, {
       newId: () => crypto.randomUUID(),
       place: () => ({ x: right, y: top }),
+      takenNames: { views: (data.views ?? []).map((v) => v.name), sequences: (data.sequences ?? []).map((q) => q.name) },
     })
     data.nodes.push(...Object.values(insert.nodes))
     data.relations.push(...Object.values(insert.relations))

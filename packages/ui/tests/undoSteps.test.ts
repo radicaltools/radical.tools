@@ -217,32 +217,63 @@ describe('the Parent of an element', () => {
   })
 })
 
-describe('a step that needs a type the metamodel no longer has', () => {
+describe('a metamodel edit is an undo step (decided 2026-10-21)', () => {
+  // The metamodel was in no step: a step that held elements of a type
+  // deleted since was dropped from the history, and Undo after Save as
+  // viewpoint left the viewpoint.
   beforeEach(() => {
     s().upsertNodeType({ ...s().metamodel.nodeTypes.system, id: 'gizmo', label: 'Gizmo', builtin: false, properties: [] })
   })
 
-  it('cannot be gone back to once the type is deleted', () => {
+  it('a type deleted comes back, and the steps before it with their elements', () => {
     const id = add('gizmo', 'G')
     expect(id).not.toBe('')
     s().removeNode(id)
     s().removeNodeType('gizmo')
     expect(s().metamodel.nodeTypes.gizmo).toBeUndefined()
-    // Every step left is one from after the gizmo.
-    const gizmos = (): boolean => hasType('gizmo')
-    for (let i = 0; i < 5; i++) { s().undo(); expect(gizmos()).toBe(false) }
-    for (let i = 0; i < 5; i++) { s().redo(); expect(gizmos()).toBe(false) }
+    s().undo()
+    expect(s().metamodel.nodeTypes.gizmo).toBeDefined()
+    expect(hasType('gizmo')).toBe(false)
+    s().undo()
+    expect(s().c4Nodes[id]?.type).toBe('gizmo')
+    s().undo()
+    expect(s().c4Nodes[id]).toBeUndefined()
+    s().undo()
+    expect(s().metamodel.nodeTypes.gizmo).toBeUndefined()
+    stillBefore()
+    for (let i = 0; i < 4; i++) s().redo()
+    expect(s().metamodel.nodeTypes.gizmo).toBeUndefined()
+    expect(s().c4Nodes[id]).toBeUndefined()
   })
 
-  it('steps made after the last element of the type went stay', () => {
-    const id = add('gizmo', 'G')
-    s().removeNode(id)
-    s().updateNode('bank', { description: 'after' })
-    s().removeNodeType('gizmo')
-    expect(s().canUndo).toBe(true)
+  it('a type edited is one step for what is typed into a field', () => {
+    s().beginTyping()
+    for (const label of ['W', 'Wi', 'Widget']) s().upsertNodeType({ ...s().metamodel.nodeTypes.gizmo, label })
+    s().endTyping()
+    s().upsertNodeType({ ...s().metamodel.nodeTypes.gizmo, allowedAtRoot: false })
     s().undo()
+    expect(s().metamodel.nodeTypes.gizmo).toMatchObject({ label: 'Widget' })
+    s().undo()
+    expect(s().metamodel.nodeTypes.gizmo).toMatchObject({ label: 'Gizmo' })
+    s().undo()
+    expect(s().metamodel.nodeTypes.gizmo).toBeUndefined()
     stillBefore()
-    expect(s().canUndo).toBe(false)
+  })
+
+  it('a relation type added and deleted, each a step', () => {
+    s().upsertRelationType({ id: 'feeds', label: 'feeds', allowedPairs: [], builtin: false })
+    s().removeRelationType('feeds')
+    s().undo()
+    expect(s().metamodel.relationTypes.feeds).toBeDefined()
+    s().undo()
+    expect(s().metamodel.relationTypes.feeds).toBeUndefined()
+    expect(s().metamodel.nodeTypes.gizmo).toBeDefined()
+  })
+
+  it('the same type set again is no step', () => {
+    s().upsertNodeType({ ...s().metamodel.nodeTypes.gizmo })
+    s().undo()
+    expect(s().metamodel.nodeTypes.gizmo).toBeUndefined()
   })
 })
 
@@ -260,7 +291,7 @@ describe('Reset to C4 preset', () => {
     expect(lastNotice()).toMatch(/ADR|Decision|adr/i)
   })
 
-  it('goes through when every element has a type there, and forgets steps that do not', () => {
+  it('goes through when every element has a type there, and is an undo step', () => {
     const governance = builtInGovernanceMetamodel()
     s().loadDiagram({ ...model(), metamodel: governance })
     const id = add('adr', 'Use Postgres')
@@ -268,10 +299,14 @@ describe('Reset to C4 preset', () => {
     s().removeNode(id)
     s().resetMetamodelToC4()
     expect(s().metamodel.nodeTypes.adr).toBeUndefined()
-    for (let i = 0; i < 5; i++) {
-      s().undo()
-      expect(hasType('adr')).toBe(false)
-    }
+    s().undo()
+    expect(s().metamodel.nodeTypes.adr).toBeDefined()
+    s().undo()
+    expect(s().c4Nodes[id]?.type).toBe('adr')
+    s().redo()
+    s().redo()
+    expect(s().metamodel.nodeTypes.adr).toBeUndefined()
+    expect(hasType('adr')).toBe(false)
   })
 })
 
@@ -381,24 +416,28 @@ describe('a change of view type', () => {
 })
 
 describe('undo after a viewpoint changed in the metamodel', () => {
-  // The metamodel is in no step, so a view of a viewpoint is brought in step
-  // with it on undo. That changed the history entry's own views, which are
-  // frozen: Undo threw, changed nothing, and the step was gone.
-  it('"Save as viewpoint… → Replace": each step is taken back in turn', () => {
+  // "Save as viewpoint…" is one step, the metamodel's edit with it: Undo
+  // left the viewpoint in the metamodel.
+  it('"Save as viewpoint… → Replace" is one step, taken back with the viewpoint', () => {
     const a = s().addViewOfViewpoint('system-context')!
     const b = s().addViewOfViewpoint('containers')!
     s().detachViewpoint(b)
+    const before = JSON.stringify(s().views[a].pipeline)
+    const viewpoints = JSON.stringify(viewpointsOf(s().metamodel))
     const saved = saveAsViewpoint(s().metamodel, 'System context', 'static', s().views[b].pipeline!)
-    s().setMetamodel(saved.metamodel)
-    s().applyViewpoint(b, saved.type.id)
+    s().runAsOneStep(() => {
+      s().setMetamodel(saved.metamodel)
+      s().applyViewpoint(b, saved.type.id)
+    })
     const chain = JSON.stringify(s().views[a].pipeline)
     expect(chain).toBe(JSON.stringify(s().views[b].pipeline))
+    expect(chain).not.toBe(before)
 
     s().undo()
+    expect(JSON.stringify(viewpointsOf(s().metamodel))).toBe(viewpoints)
     expect(s().views[b].viewpoint).toBeUndefined()
-    // A follows the viewpoint as the metamodel has it now.
     expect(s().views[a].viewpoint).toBe('system-context')
-    expect(JSON.stringify(s().views[a].pipeline)).toBe(chain)
+    expect(JSON.stringify(s().views[a].pipeline)).toBe(before)
     s().undo()
     expect(s().views[b].viewpoint).toBe('containers')
     s().undo()
@@ -407,18 +446,22 @@ describe('undo after a viewpoint changed in the metamodel', () => {
     s().undo()
     expect(s().views[a]).toBeUndefined()
     stillBefore()
-    s().redo()
+    for (let i = 0; i < 4; i++) s().redo()
     expect(JSON.stringify(s().views[a].pipeline)).toBe(chain)
+    expect(s().views[b].viewpoint).toBe(saved.type.id)
   })
 
-  it('a viewpoint deleted in the metamodel editor', () => {
+  it('a viewpoint deleted in the metamodel editor comes back with its view', () => {
     const a = s().addViewOfViewpoint('containers')!
     s().updateNode('bank', { description: 'after' })
     s().setMetamodel({ ...s().metamodel, viewpoints: viewpointsOf(s().metamodel).filter((t) => t.id !== 'containers') })
     expect(s().views[a].viewpoint).toBeUndefined()
     s().undo()
+    expect(viewpointsOf(s().metamodel).some((t) => t.id === 'containers')).toBe(true)
+    expect(s().views[a].viewpoint).toBe('containers')
+    expect(s().c4Nodes.bank.description).toBe('after')
+    s().undo()
     expect(s().c4Nodes.bank.description).toBe('before')
-    expect(s().views[a].viewpoint).toBeUndefined()
     s().undo()
     expect(s().views[a]).toBeUndefined()
   })
@@ -502,6 +545,39 @@ describe('Multi page and Depth of a wiki', () => {
   it('set to what they are is no step', () => {
     s().setWikiPageMode('v1', 'single')
     s().setWikiDepth('v1', 1)
+    s().undo()
+    expect(s().c4Nodes.bank.description).toBeUndefined()
+  })
+})
+
+describe('Size and Levels of a hierarchy', () => {
+  // Neither was a step, and Undo of an element added before them gave back
+  // the old Size and Levels with it (saved).
+  it('are undo steps of their own', () => {
+    s().setViewKind('v1', 'treemap')
+    const id = add('system', 'Added')
+    s().setTreemapSizeBy('v1', 'uniform')
+    s().setTreemapMaxDepth('v1', 3)
+    s().undo()
+    expect(s().views.v1.treemapSizeBy).toBe('uniform')
+    expect(s().views.v1.treemapMaxDepth).toBeUndefined()
+    expect(s().c4Nodes[id]).toBeDefined()
+    s().undo()
+    expect(s().views.v1.treemapSizeBy).toBeUndefined()
+    expect(s().c4Nodes[id]).toBeDefined()
+    s().undo()
+    expect(s().c4Nodes[id]).toBeUndefined()
+    s().redo()
+    s().redo()
+    s().redo()
+    expect(s().views.v1).toMatchObject({ treemapSizeBy: 'uniform', treemapMaxDepth: 3 })
+  })
+
+  it('set to what they are is no step', () => {
+    s().setViewKind('v1', 'treemap')
+    s().undo()
+    s().setTreemapSizeBy('v1', 'leaves')
+    s().setTreemapMaxDepth('v1', 2)
     s().undo()
     expect(s().c4Nodes.bank.description).toBeUndefined()
   })

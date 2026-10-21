@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType } from './c4'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType } from './c4'
 import { readPipeline } from './viewPipeline'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
@@ -26,6 +26,12 @@ import {
   isPlacementAllowed,
   isRelationAllowed,
   placeOf,
+  initialPseudostateRefusal,
+  isInitialPseudostate,
+  lifecycleRefusal,
+  newPseudostateKind,
+  outgoingTransitionCount,
+  transitionRefusal,
   type Metamodel,
 } from './metamodel'
 
@@ -65,7 +71,19 @@ export function documentMetamodel(stored: Metamodel | undefined, nodes?: Readonl
     : stored.id === 'c4-ddd-builtin' || stored.id === 'c4-ddd-governance-builtin' ? builtInGovernanceMetamodel()
     : null
   if (!preset) return stored
-  return withPresetViewpoints(preset, stored)
+  const withViewpoints = withPresetViewpoints(preset, stored)
+  // Types the preset lacks (added by hand to the file, or by a program):
+  // swapped for the preset, they were unknown types, and the next save
+  // wrote them away. The document keeps them, under a custom copy.
+  const extraNodeTypes = Object.entries(stored.nodeTypes ?? {}).filter(([id, def]) => !preset.nodeTypes[id] && def && typeof def === 'object')
+  const extraRelationTypes = Object.entries(stored.relationTypes ?? {}).filter(([id, def]) => !preset.relationTypes[id] && def && typeof def === 'object')
+  if (!extraNodeTypes.length && !extraRelationTypes.length) return withViewpoints
+  const custom = forkPresetMetamodel({ ...withViewpoints, id: preset.id }) ?? withViewpoints
+  return {
+    ...custom,
+    nodeTypes: { ...custom.nodeTypes, ...Object.fromEntries(extraNodeTypes) },
+    relationTypes: { ...custom.relationTypes, ...Object.fromEntries(extraRelationTypes) },
+  }
 }
 
 /** The preset with the document's viewpoints: the preset's (but those the
@@ -185,14 +203,27 @@ export function checkAddNode(state: ModelState, node: Omit<C4Node, 'id'>): strin
   if (!isPlacementAllowed(mm, node.type, parent, state.c4Nodes)) {
     return `Cannot place ${label} inside ${placementError(mm, node.type, parent, state.c4Nodes)}`
   }
+  if (hasStatecharts(mm) && isInitialPseudostate(node as C4Node)) {
+    const why = initialPseudostateRefusal(parent, state.c4Nodes)
+    if (why) return `Cannot add an initial ${label.toLowerCase()}: ${why}`
+  }
   return null
 }
+
+/** Whether the metamodel has the statechart types, whose rules
+ *  (statechart.ts) the checks apply as validateModel does. */
+const hasStatecharts = (mm: Metamodel | undefined): boolean => !!(mm?.nodeTypes.state && mm.relationTypes.transition)
 
 /** Adds the node, and lists it in the active view when there is one. A view
  *  with no nodeIds shows every node, so it already shows the new one —
  *  listing it there would hide all the others. */
 export function insertNode(state: ModelState, id: string, node: Omit<C4Node, 'id'>): void {
   const created = { id, ...node } as NodeRecord
+  // A pseudostate given no kind is initial where an initial one may go, else
+  // a choice (a + row under a machine that has its initial one).
+  if (created.type === 'pseudostate' && created.kind === undefined && hasStatecharts(state.metamodel)) {
+    created.kind = newPseudostateKind(created.parentId ? state.c4Nodes[created.parentId] : undefined, state.c4Nodes)
+  }
   materializeDefaults(created, state.metamodel)
   state.c4Nodes[id] = created
   const view = state.activeViewId ? state.views[state.activeViewId] : undefined
@@ -221,6 +252,16 @@ export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<
   if (isFinalState({ ...existing, ...updates } as C4Node) && !isFinalState(existing)) {
     const held = Object.values(state.c4Nodes).filter((n) => n.parentId === id).length
     if (held > 0) return `Cannot make ${typeLabel(state.metamodel, newType)} "${existing.label}" final: it holds ${held} element${held === 1 ? '' : 's'}, and ${FINAL_HOLDS_NOTHING}`
+    const out = hasStatecharts(state.metamodel) ? outgoingTransitionCount(id, state.c4Relations) : 0
+    if (out > 0) return `Cannot make ${typeLabel(state.metamodel, newType)} "${existing.label}" final: ${out} transition${out === 1 ? ' leaves' : 's leave'} it, and a final state cannot have outgoing transitions.`
+  }
+  // An initial pseudostate, made or moved: one per machine or compound
+  // state, none in a parallel state, and nothing points at it.
+  const next = { ...existing, ...updates } as C4Node
+  if (hasStatecharts(state.metamodel) && isInitialPseudostate(next) && (!isInitialPseudostate(existing) || 'parentId' in updates)) {
+    const why = initialPseudostateRefusal(parent, state.c4Nodes, id)
+      ?? (Object.values(state.c4Relations).some((r) => r.targetId === id && r.relationType === 'transition') ? 'a transition points at it, and a transition targets the state itself.' : null)
+    if (why) return `Cannot ${'parentId' in updates && isInitialPseudostate(existing) ? 'move' : 'make'} ${typeLabel(state.metamodel, newType)} "${existing.label}" ${'parentId' in updates && isInitialPseudostate(existing) ? 'there' : 'initial'}: ${why}`
   }
   // A retyped element keeps its relations: each must be one the metamodel
   // has between the new type and the other end.
@@ -279,10 +320,28 @@ export function checkReparent(state: ModelState, ids: string[], newParentId: str
     if (!isPlacementAllowed(state.metamodel, n.type, newParent, state.c4Nodes)) {
       return `Cannot place ${typeLabel(state.metamodel, n.type)} "${n.label}" inside ${placementError(state.metamodel, n.type, newParent, state.c4Nodes)}`
     }
+    if (hasStatecharts(state.metamodel) && isInitialPseudostate(n) && (n.parentId ?? null) !== newParentId) {
+      const why = initialPseudostateRefusal(newParent, state.c4Nodes, n.id)
+      if (why) return `Cannot move ${typeLabel(state.metamodel, n.type)} "${n.label}" there: ${why}`
+    }
     const misplaced = misplacedInGroup(state, n, newParent)
     if (misplaced) return groupContentsError(state.metamodel, n, misplaced)
   }
   return null
+}
+
+/** The elements the element `id` may be moved into, as the card's and the
+ *  wiki's Parent pickers offer them: those checkReparent takes (they listed
+ *  parents it then refused: a descendant, a final state, a group with no
+ *  place for it), and no external element, which the model leaves as a box
+ *  (but the one it is in now). */
+export function parentCandidates(state: ModelState, id: string): C4Node[] {
+  const node = state.c4Nodes[id]
+  if (!node) return []
+  return Object.values(state.c4Nodes).filter((n) => n.id !== id
+    && (n.id === node.parentId || !n.external)
+    && isParentAllowed(state.metamodel, node.type, n.type)
+    && (n.id === node.parentId || checkReparent(state, [id], n.id) === null))
 }
 
 /** Moves the nodes under `newParentId` (null = the root), keeping each one
@@ -353,6 +412,38 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
     if (box) positions[id] = box
     else delete positions[id]
   }
+  leaveAncestorAlignments(state, moving)
+}
+
+/** Takes the `moved` elements (and what they hold) out of the rows, columns
+ *  and grids they now share with one of their ancestors, on every canvas:
+ *  an element cannot be aligned with its own container (checkMembers), and
+ *  a grid holding one of its members inside another drew them on top of
+ *  each other. A rule left with one member goes. Mutates `state`. */
+function leaveAncestorAlignments(state: ModelState, moved: string[]): void {
+  if (!moved.length) return
+  const inMoved = new Set(moved.flatMap((id) => [id, ...descendantIds(id, state.c4Nodes)]))
+  const ancestorsOf = (id: string): string[] => {
+    const out: string[] = []
+    for (let cur = state.c4Nodes[id]?.parentId; cur && state.c4Nodes[cur] && !out.includes(cur); cur = state.c4Nodes[cur].parentId) out.push(cur)
+    return out
+  }
+  const leave = (constraints: LayoutConstraint[]): LayoutConstraint[] => {
+    const out: LayoutConstraint[] = []
+    let changed = false
+    for (const c of constraints) {
+      const members = new Set(c.nodeIds)
+      const kept = c.type === 'pin' ? c.nodeIds : c.nodeIds.filter((id) => !inMoved.has(id) || !ancestorsOf(id).some((a) => members.has(a)))
+      if (kept.length === c.nodeIds.length) { out.push(c); continue }
+      changed = true
+      if (kept.length >= 2) out.push({ ...c, nodeIds: kept })
+    }
+    return changed ? out : constraints
+  }
+  for (const view of Object.values(state.views)) {
+    if (view.layoutConstraints?.length) view.layoutConstraints = leave(view.layoutConstraints)
+  }
+  if (state.defaultLayoutConstraints?.length) state.defaultLayoutConstraints = leave(state.defaultLayoutConstraints)
 }
 
 /** Why a node cannot be removed with its children kept (they move one level
@@ -381,22 +472,67 @@ export function checkUnwrap(state: ModelState, id: string): string | null {
 export function deleteNode(state: ModelState, id: string): Set<string> {
   const removed = new Set([id, ...descendantIds(id, state.c4Nodes)])
   for (const nid of removed) delete state.c4Nodes[nid]
+  const relations = new Set<string>()
   for (const [rid, rel] of Object.entries(state.c4Relations)) {
-    if (removed.has(rel.sourceId) || removed.has(rel.targetId)) delete state.c4Relations[rid]
+    if (removed.has(rel.sourceId) || removed.has(rel.targetId)) { delete state.c4Relations[rid]; relations.add(rid) }
   }
+  forgetRelationsInSequences(state, relations)
   forgetNodesInViews(state, removed)
   return removed
 }
 
-/** Takes the `removed` elements out of every view (its list, folds and
- *  alignments) and out of All elements' alignments; a view of one of them
- *  goes with it. */
+/** Takes the steps of the `removed` relations out of every sequence, each
+ *  with its note. Left in, a flow numbered the steps left with gaps, and
+ *  nothing said they pointed at nothing. */
+export function forgetRelationsInSequences(state: ModelState, removed: Set<string>): void {
+  if (!removed.size) return
+  for (const sequence of Object.values(state.sequences ?? {})) {
+    if (!sequence.relationIds.some((rid) => removed.has(rid))) continue
+    const keep = sequence.relationIds.map((rid) => !removed.has(rid))
+    const notes = sequence.stepDescriptions?.filter((_, i) => keep[i] ?? true)
+    sequence.relationIds = sequence.relationIds.filter((_, i) => keep[i])
+    if (notes) {
+      while (notes.length > 0 && !notes[notes.length - 1]) notes.pop()
+      sequence.stepDescriptions = notes
+    }
+  }
+}
+
+/** How many steps of sequences deleting `nodeIds` (with what they hold)
+ *  and `relationIds` takes out with their relations (the Delete prompt). */
+export function sequenceStepsRemovedBy(state: ModelState, nodeIds: string[], relationIds: string[]): number {
+  const nodes = new Set(nodeIds.flatMap((id) => [id, ...descendantIds(id, state.c4Nodes)]))
+  const relations = new Set(relationIds)
+  for (const [rid, rel] of Object.entries(state.c4Relations)) {
+    if (nodes.has(rel.sourceId) || nodes.has(rel.targetId)) relations.add(rid)
+  }
+  return Object.values(state.sequences ?? {}).reduce((n, q) => n + q.relationIds.filter((rid) => relations.has(rid)).length, 0)
+}
+
+/** Whether a chain level has a within filter on one of the `removed`. */
+function namesRemoved(level: unknown, removed: Set<string>): boolean {
+  const filters = (level as { filters?: unknown } | null)?.filters
+  return Array.isArray(filters) && filters.some((f) => f?.kind === 'within' && removed.has(f.nodeId))
+}
+
+/** Takes the `removed` elements out of every view (its list, folds,
+ *  alignments and within filters) and out of All elements' alignments; a
+ *  view of one of them goes with it. */
 export function forgetNodesInViews(state: ModelState, removed: Set<string>): void {
   for (const view of Object.values(state.views)) {
     removeFromViewList(view, removed)
     if (view.collapsedNodeIds?.length) view.collapsedNodeIds = view.collapsedNodeIds.filter((nid) => !removed.has(nid))
     if (view.expandedNodeIds?.length) view.expandedNodeIds = view.expandedNodeIds.filter((nid) => !removed.has(nid))
     if (view.layoutConstraints?.length) view.layoutConstraints = withoutNodes(view.layoutConstraints, removed)
+    // A filter "inside" an element that is gone kept every element out,
+    // and a viewpoint made from the view took it along.
+    const levels = (view.pipeline as { levels?: unknown } | undefined)?.levels
+    if (Array.isArray(levels) && levels.some((l) => namesRemoved(l, removed))) {
+      view.pipeline = {
+        ...view.pipeline,
+        levels: levels.map((l) => namesRemoved(l, removed) ? { ...l, filters: (l as { filters: ViewFilter[] }).filters.filter((f) => !(f?.kind === 'within' && removed.has(f.nodeId))) } : l),
+      } as ViewPipeline
+    }
   }
   if (state.defaultLayoutConstraints?.length) {
     state.defaultLayoutConstraints = withoutNodes(state.defaultLayoutConstraints, removed)
@@ -519,8 +655,10 @@ export function metamodelWithoutNodeType(mm: Metamodel, typeId: string): Metamod
 
 /** Why the model's metamodel cannot be replaced by `next`: elements or
  *  relations are of types it does not have (they would be left behind as
- *  unknown types, with nothing in the editor to bring the types back). */
-export function checkReplaceMetamodel(state: ModelState, next: Metamodel): string | null {
+ *  unknown types, with nothing in the editor to bring the types back), in
+ *  the model or in one of its `milestones` (restored to live, it brought
+ *  them back), or a view's filter names such a type, as for Delete type. */
+export function checkReplaceMetamodel(state: ModelState, next: Metamodel, milestones: MilestoneContent[] = []): string | null {
   const count = (items: string[]): Map<string, number> => {
     const out = new Map<string, number>()
     for (const t of items) out.set(t, (out.get(t) ?? 0) + 1)
@@ -528,7 +666,21 @@ export function checkReplaceMetamodel(state: ModelState, next: Metamodel): strin
   }
   const nodeTypes = count(Object.values(state.c4Nodes).map((n) => n.type).filter((t) => !next.nodeTypes[t]))
   const relationTypes = count(Object.values(state.c4Relations).flatMap((r) => r.relationType && !next.relationTypes[r.relationType] ? [r.relationType] : []))
-  if (nodeTypes.size === 0 && relationTypes.size === 0) return null
+  if (nodeTypes.size === 0 && relationTypes.size === 0) {
+    const lostNodeTypes = new Set<string>(milestones.flatMap((m) => Object.values(m.nodes ?? {}).map((n): string => n.type)).filter((t) => !next.nodeTypes[t]))
+    const lostRelationTypes = new Set(milestones.flatMap((m) => Object.values(m.relations ?? {}).flatMap((r) => r.relationType && !next.relationTypes[r.relationType] ? [r.relationType] : [])))
+    for (const t of Object.keys(state.metamodel?.nodeTypes ?? {})) if (!next.nodeTypes[t]) lostNodeTypes.add(t)
+    for (const t of Object.keys(state.metamodel?.relationTypes ?? {})) if (!next.relationTypes[t]) lostRelationTypes.add(t)
+    for (const t of lostNodeTypes) {
+      const why = milestoneHoldsType(milestones, t, 'node', state.metamodel) ?? viewNamesType(state.views, t, 'node', state.metamodel)
+      if (why) return `${next.name} has no type ${typeLabel(state.metamodel, t)}, and ${why}`
+    }
+    for (const t of lostRelationTypes) {
+      const why = milestoneHoldsType(milestones, t, 'relation', state.metamodel) ?? viewNamesType(state.views, t, 'relation', state.metamodel)
+      if (why) return `${next.name} has no type ${relationTypeName(state.metamodel, t)}, and ${why}`
+    }
+    return null
+  }
   const parts = [
     ...[...nodeTypes].map(([t, n]) => `${n} ${typeLabel(state.metamodel, t)}`),
     ...[...relationTypes].map(([t, n]) => `${n} "${state.metamodel?.relationTypes[t]?.label ?? t}" ${n === 1 ? 'relation' : 'relations'}`),
@@ -550,6 +702,12 @@ export function checkRemoveRelationType(state: ModelState, typeId: string, miles
 // ── Relations ────────────────────────────────────────────────────────────────
 
 export function checkAddRelation(state: ModelState, rel: Omit<C4Relation, 'id'>): string | null {
+  return relationRefusal(state, rel)
+}
+
+/** checkAddRelation for a new relation, or for the relation `exceptId`
+ *  changed into `rel` (its type `kept` stays where it still has the pair). */
+function relationRefusal(state: ModelState, rel: Omit<C4Relation, 'id'>, exceptId?: string, kept?: string): string | null {
   const src = state.c4Nodes[rel.sourceId]
   const dst = state.c4Nodes[rel.targetId]
   if (!src || !dst) return null
@@ -560,6 +718,15 @@ export function checkAddRelation(state: ModelState, rel: Omit<C4Relation, 'id'>)
   const def = rel.relationType ? state.metamodel?.relationTypes[rel.relationType] : undefined
   if (def && !relationTypeAllows(def, src.type, dst.type)) {
     return `Relation not allowed: "${def.label}" does not connect ${typeLabel(state.metamodel, src.type)} → ${typeLabel(state.metamodel, dst.type)}.`
+  }
+  // The type it will have (insertRelation and patchRelation infer one).
+  const keptDef = kept ? state.metamodel?.relationTypes[kept] : undefined
+  const type = rel.relationType ?? (keptDef && relationTypeAllows(keptDef, src.type, dst.type) ? kept : inferRelationType(state.metamodel, src.type, dst.type))
+  if (hasStatecharts(state.metamodel)) {
+    const why = type === 'transition' ? transitionRefusal(src, dst, state.c4Nodes, state.c4Relations, exceptId)
+      : type === 'lifecycle-of' ? lifecycleRefusal(src, dst, state.c4Nodes, state.c4Relations, exceptId)
+      : null
+    if (why) return `Relation not allowed: ${why}`
   }
   return null
 }
@@ -598,7 +765,7 @@ export function checkPatchRelation(state: ModelState, id: string, updates: Parti
   if (!rel) return null
   const retyped = updates.relationType !== undefined && updates.relationType !== rel.relationType
   if (updates.sourceId === undefined && updates.targetId === undefined && !retyped) return null
-  return checkAddRelation(state, { ...rel, ...updates, relationType: retyped ? updates.relationType : undefined })
+  return relationRefusal(state, { ...rel, ...updates, relationType: retyped ? updates.relationType : undefined }, id, rel.relationType)
 }
 
 export function patchRelation(state: ModelState, id: string, updates: Partial<Omit<C4Relation, 'id'>>): void {
@@ -607,12 +774,15 @@ export function patchRelation(state: ModelState, id: string, updates: Partial<Om
   const moved = (updates.sourceId !== undefined && updates.sourceId !== rel.sourceId)
     || (updates.targetId !== undefined && updates.targetId !== rel.targetId)
   Object.assign(rel, updates)
+  // A key given no value is none: the folder writes none of it either.
+  for (const [key, value] of Object.entries(updates)) if (value === undefined) delete (rel as unknown as Record<string, unknown>)[key]
   // A moved end can leave the relation type behind; infer it again, as on insert.
   if (moved && updates.relationType === undefined) refitRelationType(state, rel)
 }
 
 export function deleteRelation(state: ModelState, id: string): void {
   delete state.c4Relations[id]
+  forgetRelationsInSequences(state, new Set([id]))
 }
 
 // ── Views ────────────────────────────────────────────────────────────────────

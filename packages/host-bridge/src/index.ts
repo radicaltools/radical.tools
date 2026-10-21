@@ -34,7 +34,7 @@ export interface WriteFolderResult extends HostResult {
   /** Set when the write was merged with these files changed on disk since
    *  the folder was last read; `conflicts` names the values both changed,
    *  where the disk's was kept. */
-  merged?: { changed: string[]; conflicts: string[] }
+  merged?: { changed: string[]; conflicts: string[]; dropped?: Array<{ name: string; by: 'ours' | 'theirs' }>; restored?: string[] }
 }
 
 export interface FileChange {

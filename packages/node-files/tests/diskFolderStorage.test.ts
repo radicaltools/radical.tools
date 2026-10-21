@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, rm, writeFile, mkdir, readdir } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, rm, writeFile, mkdir, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
@@ -62,5 +62,37 @@ describe('diskFolderStorage', () => {
     const started = Date.now()
     expect(await new MdFolderSession(diskFolderStorage(dir)).write({ 'radical.md': 'm' })).toEqual({ ok: true })
     expect(Date.now() - started).toBeLessThan(1000)
+  })
+
+  it('takes over a lock file that names no turn once it is past being written, to read or to write', async () => {
+    // A garbage lock made a read wait 15 s and then say "nothing was written".
+    dir = await mkdtemp(join(tmpdir(), 'radical-garbage-'))
+    await new MdFolderSession(diskFolderStorage(dir)).write({ 'radical.md': 'm' })
+    for (const text of ['garbage\n', '']) {
+      await writeFile(join(dir, '.radical', 'write.lock'), text)
+      const started = Date.now()
+      expect(await new MdFolderSession(diskFolderStorage(dir)).readAll()).toEqual({ 'radical.md': 'm' })
+      expect(Date.now() - started).toBeLessThan(3000)
+    }
+  }, 10_000)
+
+  it('reads a folder it may not write, .radical/ and all', async () => {
+    // A checkout mounted read-only, or another user's folder: radical check
+    // and radical diff exited 2 with EACCES on .radical/write.lock, and the
+    // MCP server did not start.
+    dir = await mkdtemp(join(tmpdir(), 'radical-readonly-'))
+    const model: DiagramData = { nodes: [], relations: [] }
+    await new MdFolderSession(diskFolderStorage(dir)).write(serializeToMdFolder(model, 'model'))
+    await chmod(join(dir, '.radical'), 0o555)
+    await chmod(dir, 0o555)
+    try {
+      const files = await new MdFolderSession(diskFolderStorage(dir)).readAll()
+      expect(files['radical.md']).toContain('model')
+      // A write still says why it cannot.
+      await expect(new MdFolderSession(diskFolderStorage(dir)).write({ ...files, 'radical.md': files['radical.md'] + 'x' })).rejects.toThrow(/EACCES|EPERM/)
+    } finally {
+      await chmod(dir, 0o755)
+      await chmod(join(dir, '.radical'), 0o755)
+    }
   })
 })

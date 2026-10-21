@@ -28,6 +28,13 @@ const PROPERTIES_SCHEMA = {
       multiple: { type: 'boolean', description: "For type 'ref': an array of node ids instead of one." },
       default: { type: ['string', 'number', 'boolean'] },
       required: { type: 'boolean' },
+      visibleWhen: {
+        type: ['object', 'null'],
+        description: 'Show the property only while another property of the type has one of these values. Left out, a property keeps the rule it has; null removes it.',
+        properties: { key: { type: 'string' }, values: { type: 'array', items: { type: 'string' } } },
+        required: ['key', 'values'],
+        additionalProperties: false,
+      },
     },
     required: ['key', 'label', 'type'],
     additionalProperties: false,
@@ -119,7 +126,7 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           kind: { type: 'string', enum: [...VIEWPOINT_KINDS], description: "How its views show the chain: 'table', 'wiki', 'treemap' (hierarchy), 'matrix', 'warnier' (a Warnier–Orr diagram of the hierarchy) or 'static' (canvas)." },
           pipeline: { ...PIPELINE_SCHEMA, type: 'object' },
           fromViewId: { type: 'string', description: 'A view whose kind and filter chain the viewpoint takes (kind and pipeline given here win).' },
-          subjectTypes: { type: 'array', items: { type: 'string' }, description: 'Node types it draws one element of: a view of it is of one such element (create_view subject), named after it, its first level kept to the element and what lies inside it. [] makes it draw the whole model again.' },
+          subjectTypes: { type: 'array', items: { type: 'string' }, description: 'Node types it draws one element of: create_view with the viewpoint makes a group holding a view of each such element, named after it, its first level kept to the element and what lies inside it. [] makes it draw the whole model again.' },
         },
         additionalProperties: false,
       },
@@ -156,6 +163,10 @@ function parseProperties(tool: string, raw: unknown, of: 'node' | 'relation'): P
     if (p.type === 'ref' && (typeof p.refType !== 'string' || !p.refType)) {
       return `${tool}: ref property "${p.key}" needs a refType (a node type id)`
     }
+    const when = p.visibleWhen as { key?: unknown; values?: unknown } | undefined
+    if (when != null && (typeof when.key !== 'string' || !Array.isArray(when.values) || !when.values.every((v) => typeof v === 'string'))) {
+      return `${tool}: property "${p.key}" has a visibleWhen that is not { key, values: [strings] }`
+    }
     out.push({
       key: p.key,
       label: p.label.trim(),
@@ -164,9 +175,23 @@ function parseProperties(tool: string, raw: unknown, of: 'node' | 'relation'): P
       ...(p.type === 'ref' ? { refType: p.refType, ...(p.multiple ? { multiple: true } : {}) } : {}),
       ...(p.default !== undefined ? { default: p.default } : {}),
       ...(p.required ? { required: true } : {}),
+      ...(when ? { visibleWhen: { key: when.key as string, values: [...(when.values as string[])] } } : {}),
     })
   }
   return out
+}
+
+/** `properties` as parsed, where a property sent without a visibleWhen keeps
+ *  the one the type's property of its key has (`raw` left it out; null
+ *  removes it): sent as the summary lists them but for the rules, the
+ *  requirement's fields all showed at once. */
+function keepVisibility(properties: PropertyDef[], raw: unknown, current: PropertyDef[] | undefined): PropertyDef[] {
+  const items = raw as Array<Record<string, unknown>>
+  return properties.map((p, i) => {
+    if (p.visibleWhen || items[i]?.visibleWhen !== undefined) return p
+    const had = current?.find((c) => c.key === p.key)?.visibleWhen
+    return had ? { ...p, visibleWhen: { key: had.key, values: [...had.values] } } : p
+  })
 }
 
 /** The live metamodel, or the reason it cannot be edited here. */
@@ -237,7 +262,7 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
         if (typeof input.summary !== 'string') return fail('upsert_node_type: summary must be a string')
         def.summary = input.summary.trim() || undefined
       }
-      if (properties) def.properties = properties
+      if (properties) def.properties = keepVisibility(properties, input.properties, existing?.properties)
       mm.nodeTypes[id] = def
       return save(ctx, mm, `${existing ? 'Updated' : 'Added'} node type "${id}".${note}`)
     },
@@ -294,7 +319,7 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       }
       if (typeof input.color === 'string') def.color = input.color
       if (pairs) def.allowedPairs = pairs
-      if (properties) def.properties = properties
+      if (properties) def.properties = keepVisibility(properties, input.properties, existing?.properties)
       mm.relationTypes[id] = def
       return save(ctx, mm, `${existing ? 'Updated' : 'Added'} relation type "${id}".${note}`)
     },
@@ -347,6 +372,12 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
         if (!isViewpointKind(view.kind ?? 'static')) return fail(`upsert_viewpoint: a ${view.kind} view cannot be a viewpoint`)
         kind = (view.kind ?? 'static') as typeof kind
         pipeline = pipelineOf(view) ?? {}
+        // Checked as a chain given here is: one that keeps an element that is
+        // gone was copied, and create_view then refused it.
+        if (input.pipeline === undefined && pipeline.levels?.length) {
+          const chain = pipelineFor(ctx, 'upsert_viewpoint', pipeline)
+          if ('error' in chain) return fail(`${chain.error} (in the chain of the view "${view.name}")`)
+        }
       }
       if (input.kind !== undefined) kind = input.kind as typeof kind
       if (input.pipeline !== undefined) {

@@ -2,7 +2,6 @@
 id: "4ae9de15-ef14-4092-bcac-a3a6dd9b5b74"
 type: "scenario"
 label: "Forge stages land in their views"
-gherkin: ""
 given: "a governance model and AI configured"
 tests: |
   apps/e2e/tests/studio/forge.spec.ts › Forge files each stage into its view and offers to arrange it

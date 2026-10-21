@@ -7,6 +7,7 @@ import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { host } from '../platform/host'
 import { reloadActiveDocument } from '../persistence/autosave'
 import { NewModelStep, OpenSources, SourceIcon, fileSupported, folderSupported, shortDate } from './ModelSteps'
+import { useDialogFocus } from './dialogKeys'
 
 interface Props {
   open: boolean
@@ -56,6 +57,17 @@ function ModelMenu({ doc, onRename }: { doc: DocumentMeta; onRename: () => void 
   const moveToFolder = async (): Promise<void> => {
     await documents.saveAsFolder(doc.id, saveDiagram(), confirmForeignFolder)
   }
+  // Back from a file or folder: the model on screen is kept in this
+  // browser, and the file or folder stays on disk as it is.
+  const moveToBrowser = (): void => {
+    const where = doc.source === 'md' ? 'folder' : 'file'
+    if (!window.confirm(`Keep "${doc.name}" in this browser?\n\nThe ${where} stays on disk as it is; Studio no longer saves to it.`)) return
+    try {
+      documents.moveToBrowser(doc.id, saveDiagram())
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }
   const remove = (): void => {
     const question = doc.source === 'fs'
       ? `Remove "${doc.name}" from the list?\n\n(The file on disk is kept.)`
@@ -92,6 +104,16 @@ function ModelMenu({ doc, onRename }: { doc: DocumentMeta; onRename: () => void 
               {fileSupported ? 'Move to a file…' : 'Download as file…'}
             </button>
           )}
+          {isActive && doc.source !== 'ls' && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={run(moveToBrowser)}
+              title="Keep this model in this browser; the file or folder stays on disk as it is"
+            >
+              Move to browser
+            </button>
+          )}
           {isActive && folderSupported && doc.source !== 'md' && (
             <button
               type="button"
@@ -120,6 +142,8 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   const [query, setQuery] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef, open)
 
   // Each opening starts on the list.
   useEffect(() => {
@@ -155,8 +179,10 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   if (!open) return null
 
   const handleSwitch = (id: string): void => {
-    if (id === activeId || renamingId) return
-    documents.setActiveId(id)
+    if (renamingId) return
+    // The model picked is opened: the dialog stayed open over it.
+    if (id !== activeId) documents.setActiveId(id)
+    onClose()
   }
 
   // Web File System Access API handles lose permission across reloads; a user
@@ -319,9 +345,11 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
     >
       <div
         className="docmgr-modal"
+        ref={dialogRef}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
+        aria-modal="true"
         aria-label="Models"
       >
         <div className="docmgr-header">

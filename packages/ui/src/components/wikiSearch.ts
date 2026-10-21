@@ -7,6 +7,7 @@
 // the list shows why it is there.
 
 import { composeEarsSentence, requirementStatePhrase, resolveEarsSubject, type Metamodel } from '@radical/common/metamodel'
+import { markdownToPlain } from '@radical/common/markdown'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 import { wikiFieldTitle as fieldTitle } from '@radical/common/wikiDocument'
@@ -34,7 +35,12 @@ export function searchableTexts(
   const add = (text: unknown, field?: string): void => {
     if (typeof text === 'string' && text.trim()) texts.push({ field, text })
   }
-  add(node.description)
+  // A long field is Markdown: searched as the page shows it, in words (a
+  // link by its text, not its address; no ** or # of its source).
+  const addMarkdown = (text: unknown, field?: string): void => {
+    if (typeof text === 'string') add(markdownToPlain(text), field)
+  }
+  addMarkdown(node.description)
   const isRequirement = node.type === 'requirement'
   // The sentence as the page writes it: a precondition that points at a
   // state reads as the state, not as the text it had before.
@@ -48,7 +54,8 @@ export function searchableTexts(
     if (p.type !== 'text' && p.type !== 'textarea') continue
     if (p.key === 'label' || p.key === 'description') continue
     if (isRequirement && EARS_CLAUSE_KEYS.has(p.key)) continue
-    add(values[p.key], fieldTitle(p.label))
+    if (p.type === 'textarea') addMarkdown(values[p.key], fieldTitle(p.label))
+    else add(values[p.key], fieldTitle(p.label))
   }
   return texts
 }

@@ -7,6 +7,7 @@ tests: |
   packages/common/tests/aiSequenceTools.test.ts › sequence tools
   packages/common/tests/aiSequenceTools.test.ts › update_view
   packages/common/tests/aiToolCatalogue.test.ts › view tools › create_view sets kind via setViewKind
-then: "the sequence and view are kept with the sequence's elements, the deleted sequence is unlinked from its view, the view gets its new name, kind, hidden relations and folder, the listed views take their places in the given order, and a dynamic view without a sequence, a step on an unknown relation or an unknown view is refused"
+  packages/common/tests/aiDocumentTools.test.ts › a filter chain given to create_view or update_view
+then: "the sequence and view are kept with the sequence's elements, the deleted sequence is unlinked from its view, the view gets its new name, kind, hidden relations and folder, the listed views take their places in the given order, a chain that reads as written is taken, and a dynamic view without a sequence, a step on an unknown relation, an unknown view and a chain that would read otherwise than written are refused, saying what is wrong"
 when: "an agent records a sequence with a step note, creates a dynamic view that plays it, updates and deletes the sequence, renames a view, changes its kind, hides a relation, puts views into folders and orders four views"
 ---

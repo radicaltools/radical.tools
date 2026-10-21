@@ -16,7 +16,7 @@ import { parseModelBase } from '@radical/common/formats/modelBase'
 import { AGENT_ACTIVE_MS, AGENT_ACTIVITY_FILE, parseAgentActivity } from '@radical/common/formats/agentActivity'
 import { FolderModel } from './folderModel'
 import { drawnSize } from '@radical/layout/geometry'
-import type { C4Node } from '@radical/common/c4'
+import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, type C4Node } from '@radical/common/c4'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
@@ -292,6 +292,44 @@ describe('canvas selection', () => {
   })
 })
 
+describe('a hand-edited folder', () => {
+  it('reads an element whose file has an empty label, as Studio and radical check do', async () => {
+    // Every call that named no file was refused ("Malformed node … label"),
+    // while radical check found nothing wrong.
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    await model.call('add_node', { tempId: 'bob', type: 'person', label: 'Bob' })
+    const path = join(folder, 'nodes/bob.md')
+    await writeFile(path, (await readFile(path, 'utf8')).replace(/^label: .*$/m, 'label: '))
+    const summary = await model.call('get_model_summary', {})
+    expect(summary.ok, summary.text).toBe(true)
+    const added = await model.call('add_node', { tempId: 'carol', type: 'person', label: 'Carol' })
+    expect(added.ok, added.text).toBe(true)
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(data.nodes.map((n) => n.label).sort()).toEqual(['', 'Carol'])
+  })
+})
+
+describe('get_selection with an odd selection file', () => {
+  it('names a view that is gone, not All elements', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    await writeSelectionFile(folder, serializeSelection({ viewId: 'view-gone', nodeIds: [], relationIds: [] }))
+    const text = (await model.call('get_selection', {})).text
+    expect(text).not.toContain('All elements')
+    expect(JSON.parse(text.replace(/^[^{]*/, '')).view).toEqual({ id: 'view-gone', name: null, deleted: true })
+  })
+
+  it('says a broken file or one of a newer Studio is that, not a folder Studio never opened', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    await writeSelectionFile(folder, '{"version": 1, "updatedAt": ')
+    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .radical\/selection.json cannot be read/)
+    await writeSelectionFile(folder, JSON.stringify({ version: 2, updatedAt: new Date().toISOString(), viewId: null, nodeIds: ['a'], relationIds: [] }))
+    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .radical\/selection.json was written by a newer Studio \(version 2\)/)
+  })
+})
+
 describe('milestones', () => {
   it('saves a milestone into the folder, lists it in the summary and compares without writing', async () => {
     const folder = await fixture()
@@ -479,6 +517,49 @@ describe('long Smart Layout runs', () => {
     expect(after.defaultLayoutConstraints ?? []).toEqual([])
   }, 60_000)
 
+  it('opens and folds a container on a view round its middle, making room as Studio does (item 172)', async () => {
+    // Bookstore folded in Studio, Payment Provider beside the folded box.
+    // update_view expand drew it at the box's corner at full size, over
+    // Payment Provider.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const open = { width: 860, height: 310 }
+    const fold = { x: (open.width - COLLAPSED_WIDTH.system) / 2, y: (open.height - COLLAPSED_HEIGHT.system) / 2 }
+    const pay = { x: fold.x + COLLAPSED_WIDTH.system + 100, y: fold.y, width: 300, height: 180 }
+    data.nodes = [
+      { id: 'shop', type: 'system', label: 'Bookstore', x: 0, y: 0, ...open, collapsed: false },
+      { id: 'web', type: 'container', label: 'Web', parentId: 'shop', x: 30, y: 120, width: 240, height: 160, collapsed: false },
+      { id: 'api', type: 'container', label: 'API', parentId: 'shop', x: 330, y: 120, width: 240, height: 160, collapsed: false },
+      { id: 'db', type: 'container', label: 'DB', parentId: 'shop', x: 600, y: 120, width: 230, height: 160, collapsed: false },
+      { id: 'pay', type: 'system', label: 'Payment Provider', ...pay, collapsed: false },
+    ] as never
+    const at = (n: { x: number; y: number; width: number; height: number }) => ({ x: n.x, y: n.y, width: n.width, height: n.height })
+    data.views = [{
+      id: 'v', name: 'Context', nodeIds: [], collapsedNodeIds: ['shop'],
+      positions: { shop: { ...fold, ...open }, web: at(data.nodes[1]), api: at(data.nodes[2]), db: at(data.nodes[3]), pay },
+    } as never]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const view = async () => deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data.views!.find((v) => v.id === 'v')!
+
+    expect((await model.call('update_view', { id: 'v', expand: ['shop'] })).ok).toBe(true)
+    const opened = (await view()).positions
+    // Round the folded box's middle, clear of Payment Provider.
+    expect(opened.shop.x + opened.shop.width / 2).toBeCloseTo(fold.x + COLLAPSED_WIDTH.system / 2, 0)
+    expect(opened.shop.y + opened.shop.height / 2).toBeCloseTo(fold.y + COLLAPSED_HEIGHT.system / 2, 0)
+    const overlap = (a: typeof pay, b: typeof pay) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+    expect(overlap(opened.shop, opened.pay)).toBe(false)
+
+    // Folded again: to the middle of the frame, where Studio folds it.
+    expect((await model.call('update_view', { id: 'v', collapse: ['shop'] })).ok).toBe(true)
+    const folded = (await view()).positions
+    expect(folded.shop.x + COLLAPSED_WIDTH.system / 2).toBeCloseTo(opened.shop.x + opened.shop.width / 2, 0)
+    expect(folded.shop.y + COLLAPSED_HEIGHT.system / 2).toBeCloseTo(opened.shop.y + opened.shop.height / 2, 0)
+  }, 60_000)
+
   it('lays out a view set to "Hierarchical nested tree" as a tree, as Studio does', async () => {
     // It always ran Smart Layout: the agent and Studio's Tree Layout put the
     // same view in two different places.
@@ -658,5 +739,47 @@ describe('state machines over MCP', () => {
     } finally {
       await client.close()
     }
+  })
+})
+
+describe('metamodel changes over MCP', () => {
+  // Item 210: properties sent as get_model_summary lists them were refused
+  // (visibleWhen was an additional property); sent without it, the rules
+  // were gone and a ubiquitous requirement's card showed While in state.
+  it('keep a property\'s visibleWhen, sent or left out', async () => {
+    const folder = await fixture()
+    const client = new Client({ name: 'radical-test', version: '1.0.0' })
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(import.meta.dirname, '../dist/index.js'), '--folder', folder] }))
+    try {
+      const requirement = builtInGovernanceMetamodel().nodeTypes.requirement
+      const ruled = requirement.properties!.filter((p) => p.visibleWhen)
+      expect(ruled.length).toBeGreaterThan(0)
+      const sent = await client.callTool({ name: 'upsert_node_type', arguments: { id: 'requirement', properties: requirement.properties } })
+      expect(sent.isError, JSON.stringify(sent.content)).not.toBe(true)
+      const stripped = requirement.properties!.map(({ visibleWhen: _v, ...p }) => (p.key === 'action' ? { ...p, label: 'What shall be done' } : p))
+      const left = await client.callTool({ name: 'upsert_node_type', arguments: { id: 'requirement', properties: stripped } })
+      expect(left.isError, JSON.stringify(left.content)).not.toBe(true)
+      const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      const props = saved.metamodel!.nodeTypes.requirement.properties!
+      for (const p of ruled) expect(props.find((q) => q.key === p.key)?.visibleWhen, p.key).toEqual(p.visibleWhen)
+      expect(props.find((q) => q.key === 'action')?.label).toBe('What shall be done')
+    } finally {
+      await client.close()
+    }
+  })
+
+  // D3: narrowing the metamodel below what the model holds is done, and
+  // the agent is told what it breaks (it was accepted without a word).
+  it('narrowed below what the model holds is written, with what it breaks', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    await model.call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await model.call('add_node', { tempId: 'api', type: 'container', label: 'API', parentId: 'shop' })
+    const narrowed = await model.call('upsert_node_type', { id: 'container', allowedParents: ['group'] })
+    expect(narrowed.ok, narrowed.text).toBe(true)
+    expect(narrowed.text).toContain('Warning: the metamodel now flags what the model holds (1 issue')
+    expect(narrowed.text).toContain('Container "API" cannot be inside Software System. Allowed parents: group.')
+    const limited = await model.call('upsert_node_type', { id: 'system', maxCount: 1 })
+    expect(limited.text).not.toContain('Warning')
   })
 })

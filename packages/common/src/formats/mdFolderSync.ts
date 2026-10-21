@@ -24,7 +24,7 @@
 // wait is skipped rather than queued.
 
 import { deserializeFromMdFolder, isMdFolderModelPath, isOwnedMdFolderFile, serializeToMdFolder, staleMdFolderFiles, type FolderFiles } from './mdFolder'
-import { mergeModels } from '../modelMerge'
+import { mergeModels, type MergeDrop } from '../modelMerge'
 
 /** Where a session's files live. Paths are POSIX, relative to the folder. */
 export interface MdFolderStorage {
@@ -45,14 +45,14 @@ export interface MdFolderStorage {
 export type MdFolderWriteResult =
   /** Written; `merged` when it was merged with these files changed on disk,
    *  `conflicts` naming the values both changed, where the disk's was kept. */
-  | { ok: true; merged?: { changed: string[]; conflicts: string[] } }
+  | { ok: true; merged?: { changed: string[]; conflicts: string[]; dropped?: MergeDrop[]; restored?: string[] } }
   /** Nothing was written: these files changed on disk since the last read. */
   | { ok: false; conflict: string[] }
 
 /** The files to write in place of `ours` when the folder changed from `base`
  *  (as read) to `theirs` (on disk now), and the values both changed; null
  *  when they cannot be merged (a file that does not read as a model). */
-export type MdFolderMerge = (base: FolderFiles, ours: FolderFiles, theirs: FolderFiles) => { files: FolderFiles; conflicts: string[] } | null
+export type MdFolderMerge = (base: FolderFiles, ours: FolderFiles, theirs: FolderFiles) => { files: FolderFiles; conflicts: string[]; dropped?: MergeDrop[]; restored?: string[] } | null
 
 /** The three-way merge of a md-folder model (mergeModels): `ours` merged
  *  with `theirs` element by element and field by field. A file the merge
@@ -67,7 +67,7 @@ export const mergeMdFolderFiles: MdFolderMerge = (base, ours, theirs) => {
   }
   try {
     const t = deserializeFromMdFolder(theirs).data
-    const { merged, conflicts } = mergeModels(deserializeFromMdFolder(base).data, deserializeFromMdFolder(ours).data, t)
+    const { merged, conflicts, dropped, restored } = mergeModels(deserializeFromMdFolder(base).data, deserializeFromMdFolder(ours).data, t)
     const files = serializeToMdFolder(merged)
     const theirsAgain = serializeToMdFolder(t)
     for (const [path, content] of Object.entries(files)) {
@@ -76,7 +76,7 @@ export const mergeMdFolderFiles: MdFolderMerge = (base, ours, theirs) => {
     const manifest = 'radical.md'
     const pick = ours[manifest] === base[manifest] ? theirs[manifest] : theirs[manifest] === base[manifest] ? ours[manifest] : theirs[manifest]
     if (pick !== undefined) files[manifest] = pick
-    return { files, conflicts }
+    return { files, conflicts, dropped, restored }
   } catch {
     return null
   }
@@ -139,7 +139,7 @@ export class MdFolderSession {
     if (!this.loaded) await this.loadBaseline()
     const stamps = await this.storage.list()
     const conflict = await this.changedSince(stamps)
-    let merged: { changed: string[]; conflicts: string[] } | undefined
+    let merged: { changed: string[]; conflicts: string[]; dropped?: MergeDrop[]; restored?: string[] } | undefined
     if (conflict.length > 0) {
       const theirs = merge ? await this.readFiles(stamps) : {}
       const result = merge ? merge(this.baselineFiles(), files, theirs) : null
@@ -151,7 +151,7 @@ export class MdFolderSession {
       // The folder as the merge read it is what the merged files replace.
       this.baseline = new Map(Object.entries(theirs).map(([path, content]) => [path, { content, stamp: stamps[path] }]))
       files = result.files
-      merged = { changed: conflict, conflicts: result.conflicts }
+      merged = { changed: conflict, conflicts: result.conflicts, ...(result.dropped?.length ? { dropped: result.dropped } : {}), ...(result.restored?.length ? { restored: result.restored } : {}) }
     }
 
     for (const [path, content] of Object.entries(files)) {

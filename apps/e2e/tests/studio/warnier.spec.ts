@@ -384,3 +384,42 @@ test('in a view of one process, what is added or moved stays in that process', a
   await expect(diagram.getByRole('group', { name: 'Actions of Take the order' }).getByRole('button', { name: 'Outdent' })).toBeDisabled()
   await expect(names).toHaveText(['Take the order', 'Reserve stock', 'Pay', 'Ship'])
 })
+
+// Item 182: + Process in a Warnier view filtered to "inside Shop" added the
+// process at the top of the model, which the view did not show.
+test('+ Process in a view filtered to inside an element adds the process there', async ({ page, studio }) => {
+  const model = { ...MODEL, views: [...MODEL.views!, { id: 'v-in', name: 'Shop processes', kind: 'warnier' as const, nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['process', 'step'] }], filters: [{ kind: 'within' as const, nodeId: 'shop' }] }] } }] }
+  await studio.seedDocument(JSON.stringify(model))
+  await studio.open('v-in')
+  const diagram = page.getByLabel('Warnier diagram')
+  await diagram.getByRole('button', { name: '+ Process' }).first().click()
+  const input = diagram.getByRole('textbox', { name: 'Name' })
+  await input.fill('Restock')
+  await input.press('Enter')
+  await expect(diagram.locator('.wn-name', { hasText: /^Restock$/ })).toHaveCount(1)
+  await expect.poll(async () => (await studio.storedDoc()).nodes.find((n) => n.label === 'Restock')?.parentId).toBe('shop')
+})
+
+// Item 183: a Warnier slide played with F5 from Designer could be edited,
+// and Ctrl+Z after Exit then added the edit to the model.
+test('a Warnier slide played from Designer cannot be edited', async ({ page, studio }) => {
+  const model = {
+    ...MODEL,
+    views: [...MODEL.views!, { id: 'v-proc', name: 'Processes', kind: 'warnier' as const, nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['process', 'step'] }] }] } }],
+    presentations: [{ id: 'pres-1', name: 'Walk', slides: [{ id: 'sl-1', name: 'Processes', snapshotId: null, viewId: 'v-proc' }] }],
+  }
+  await studio.seedDocument(JSON.stringify(model))
+  await studio.open('v-proc')
+  const diagram = page.getByLabel('Warnier diagram')
+  await expect(diagram.locator('.wn-add, .wn-actions').first()).toBeAttached()
+  await page.keyboard.press('F5')
+  await expect(page.locator('.pres-hud-btn.exit')).toBeVisible()
+  await expect(diagram.locator('.wn-add, .wn-actions')).toHaveCount(0)
+  await diagram.locator('.wn-label[data-node-id="take"]').click()
+  await page.keyboard.press('Enter')
+  await expect(diagram.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
+  await page.locator('.pres-hud-btn.exit').click()
+  await page.keyboard.press('ControlOrMeta+z')
+  await page.waitForTimeout(1000)
+  expect((await studio.storedDoc()).nodes).toHaveLength(MODEL.nodes.length)
+})

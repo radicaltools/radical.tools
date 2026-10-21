@@ -89,6 +89,13 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await expect(page.locator('.canvas-controls').getByRole('button', { name: 'Fit All' })).toBeVisible()
   await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Specification')
   await expect(studio.node('req')).toHaveClass(/selected/)
+  // One Back leads back to the Inspector: the move is one step.
+  await expect(page).toHaveURL(/m\/designer\/v\/v-spec\/e\/req/)
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Inspector/)
+  await page.getByRole('button', { name: 'Forward', exact: true }).click()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  await expect(studio.node('req')).toHaveClass(/selected/)
 
   // The test passes in the next run: the model is verified, no errors.
   await folder.write('.radical/test-results.json', results('passed'))
@@ -173,4 +180,79 @@ test('Settings save goals and rules to check.json, and say when a change loosens
   await page.getByRole('tab', { name: /^Model quality/ }).click()
   await expect(page.getByRole('tab', { name: /^Model quality/ })).toContainText('1 / 1 goals')
   await expect(page.getByRole('tab', { name: /^Implementation/ })).toContainText('1 / 1 goals')
+})
+
+test('Settings edits wait for Save on another tab and after Back, and the tab says so', async ({ page, studio }) => {
+  // The draft lived in the tab: another tab or Back dropped it without a word.
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
+  await folder.write('.radical/test-results.json', results('passed'))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+  const settings = page.getByRole('tab', { name: /^Settings/ })
+  await settings.click()
+  await page.getByRole('button', { name: '+ Add goal' }).click()
+  await page.getByRole('spinbutton', { name: 'Goal for Requirements verified' }).fill('90')
+  await expect(page.locator('.insp-savebar')).toContainText('1 unsaved change')
+  await expect(settings).toContainText('unsaved')
+
+  await page.getByRole('tab', { name: /^Model quality/ }).click()
+  await expect(page).toHaveURL(/\/t\/model/)
+  await settings.click()
+  await expect(page).toHaveURL(/\/t\/settings/)
+  await expect(page.locator('.insp-savebar')).toContainText('1 unsaved change')
+  await page.getByRole('tab', { name: /^Implementation/ }).click()
+  await expect(page).toHaveURL(/\/t\/implementation/)
+  await page.goBack()
+  await expect(settings).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('spinbutton', { name: 'Goal for Requirements verified' })).toHaveValue('90')
+  // Discarded, the tab is check.json again.
+  await page.getByRole('button', { name: 'Discard' }).click()
+  await expect(settings).not.toContainText('unsaved')
+  expect((await folder.files())['check.json']).toBeUndefined()
+})
+
+test('Settings count stale references as the check does, and leave the rules on the folder\'s files to radical check', async ({ page, studio }) => {
+  // Studio said "—" for stale-reference, which it counts, and counted 0 for
+  // folder-not-a-node, which only the CLI reads: Ratchet took its baseline
+  // to 0 while CI still found 1.
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  const model = { ...MODEL, views: [...MODEL.views!, { id: 'v-gone', name: 'Gone', nodeIds: ['nobody'], positions: {} }] }
+  for (const [path, content] of Object.entries(serializeToMdFolder(model, 'Shop'))) await folder.write(path, content)
+  await folder.write('check.json', JSON.stringify({ rules: { 'folder-not-a-node': { severity: 'error', max: 1 }, 'stale-reference': { max: 2 } } }, null, 2) + '\n')
+  await folder.write('.radical/test-results.json', results('passed'))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+  await page.getByRole('tab', { name: /^Settings/ }).click()
+  await expect(page.locator('.insp-set-row[data-rule="stale-reference"] .insp-set-now')).toHaveText('1')
+  await expect(page.locator('.insp-set-row[data-rule="folder-not-a-node"] .insp-set-now')).toHaveText('—')
+  await expect(page.locator('.insp-ratchet')).toContainText('1 baseline can come down: stale-reference 2 → 1')
+  await page.getByRole('button', { name: 'Ratchet' }).click()
+  await expect(page.getByRole('spinbutton', { name: 'Baseline of folder-not-a-node' })).toHaveValue('1')
+})
+
+test('a link to the Inspector of a model with nothing for it opens Viewer, as its greyed-out button says', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  const inspector = page.getByRole('button', { name: /^Inspector/ })
+  await expect(inspector).toBeDisabled()
+  await expect(page).toHaveURL(/\/m\/viewer/)
+  await page.goto(page.url().replace(/\/m\/[a-z]+.*$/, '/m/inspector/v/all/t/settings'))
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/, { timeout: 15_000 })
+  await expect(page).toHaveURL(/\/m\/viewer/)
+  await expect(page.locator('.insp')).toHaveCount(0)
+  await expect(inspector).toBeDisabled()
 })

@@ -2,7 +2,6 @@
 id: "a9d52253-848c-402d-bbf1-5b11c1719f75"
 type: "scenario"
 label: "AI run placed sideways"
-gherkin: ""
 given: "a canvas with one element"
 tests: |
   apps/studio/tests/aiRunner.test.ts › places a run's new nodes beside the canvas in a block that grows sideways, and the next run beside that

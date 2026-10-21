@@ -113,6 +113,23 @@ describe('radical diff', () => {
     expect(out).toContain('Elements: 3 added, 0 changed, 0 removed. Relations: 2 added, 0 changed, 0 removed. The folder held no model then.')
   })
 
+  it('compares a renamed model folder with the folder it was', async () => {
+    // Every element was reported added: the folder held no model at the base.
+    const cwd = await repo()
+    await git(cwd, 'checkout', '-q', '-b', 'feature')
+    await git(cwd, 'mv', 'model', 'renamed')
+    await writeModel(join(cwd, 'renamed'), nodes('take the payment within 2 seconds'))
+    const staged = await run(cwd, 'diff', 'renamed')
+    expect(staged.code).toBe(0)
+    expect(staged.out).toContain('Elements: 0 added, 1 changed, 0 removed. Relations: 0 added, 0 changed, 0 removed. The folder was model then.')
+    await git(cwd, 'add', '-A')
+    await git(cwd, 'commit', '-q', '-m', 'rename')
+    expect((await run(cwd, 'diff', 'renamed')).out).toContain('Elements: 0 added, 1 changed, 0 removed.')
+    // Moved without git, too: the manifest is the same file.
+    await exec('mv', ['renamed', 'again'], { cwd })
+    expect((await run(cwd, 'diff', 'again')).out).toContain('Elements: 0 added, 1 changed, 0 removed.')
+  })
+
   it('exits 2 outside git, on an unknown ref, or with bad options', async () => {
     const outside = await mkdtemp(join(tmpdir(), 'radical-diff-'))
     dirs.push(outside)

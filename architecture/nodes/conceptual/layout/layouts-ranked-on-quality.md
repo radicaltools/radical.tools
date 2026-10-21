@@ -9,6 +9,6 @@ tests: |
   packages/layout/tests/packedGroups.test.ts › packed groups
   packages/layout/tests/packedGroups.test.ts › score scaling
   packages/layout/tests/packedGroups.test.ts › corridor crowding
-then: "a layout wins on how much it differs from the others in each criterion, not on the units of one; a difference too small to mean anything does not decide; an overlapping layout never wins over one without overlap; the layout on screen stays unless another is clearly better; shallow crossings and crowded angles are counted; sparse groups are packed in blocks with linked elements next to each other; six relations through one place count as a corridor and the same relations side by side do not"
+then: "a layout wins on how much it differs from the others in each criterion, not on the units of one; a difference too small to mean anything does not decide; a layout several candidates came out as counts once; an overlapping layout never wins over one without overlap; the same winner comes out whatever layout the run starts from, and a second run keeps it; the layout on screen stays unless another is clearly better; shallow crossings and crowded angles are counted; sparse groups are packed in blocks with linked elements next to each other; six relations through one place count as a corridor and the same relations side by side do not"
 when: "the layouts are ranked, the crossings and angles are counted, and the groups are laid out"
 ---

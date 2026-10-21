@@ -2,7 +2,6 @@
 id: "d3f3085c-2dc8-47b4-99fa-64051af06135"
 type: "scenario"
 label: "Model's Hub pick offered"
-gherkin: ""
 given: "a governance model, AI configured and the Hub catalogue loaded"
 tests: |
   apps/e2e/tests/studio/forge.spec.ts › Forge files each stage into its view and offers to arrange it

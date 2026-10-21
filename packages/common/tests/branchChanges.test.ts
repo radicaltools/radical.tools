@@ -19,7 +19,9 @@ describe('branch changes', () => {
     const changes = branchChanges(base, now.nodes, now.relations)
     expect(changes.nodes).toEqual({ a: 'changed', c: 'removed', d: 'new' })
     expect(changes.relations).toEqual({ r1: 'removed', r2: 'new' })
-    expect(changes.counts).toEqual({ added: 1, changed: 1, removed: 1 })
+    expect(changes.counts).toEqual({ added: 1, changed: 1, removed: 1, relations: 2 })
+    // A branch that only adds a relation has a change to count.
+    expect(branchChanges(base, base.nodes, { ...base.relations, r2: rel('r2', 'interacts', 'a', 'b') }).counts).toEqual({ added: 0, changed: 0, removed: 0, relations: 1 })
     expect(changes.removedNodes.map((n) => n.id)).toEqual(['c'])
     expect(changes.removedRelations.map((r) => r.id)).toEqual(['r1'])
   })

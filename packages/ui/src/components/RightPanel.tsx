@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useDiagramStore, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } from '@radical/common/c4'
-import { resolveEarsSubject, isReservedPropertyKey, type PropertyDef } from '@radical/common/metamodel'
+import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeKeepsAggregates, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { ViewPipelinePanel } from './ViewPipelinePanel'
 import { MarkdownText } from './MarkdownText'
@@ -15,7 +15,7 @@ import { viewShownNodes } from '@radical/common/viewPipeline'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
-import { isViewGroup, viewsOfGroup } from '@radical/common/model'
+import { isViewGroup, parentCandidates, viewsOfGroup } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
@@ -36,7 +36,9 @@ function useViewNodeCounts(views: Record<string, DiagramView>): Record<string, n
   const relations = useDiagramStore((s) => s.c4Relations)
   const count = useCallback(() => {
     const out: Record<string, number | undefined> = {}
-    for (const v of Object.values(views)) out[v.id] = viewShownNodes(v, nodes, relations)?.size
+    // A view that shows every element counts them too (it said "All nodes").
+    const all = Object.keys(nodes).length
+    for (const v of Object.values(views)) out[v.id] = viewShownNodes(v, nodes, relations)?.size ?? (viewShowsEveryNode(v) ? all : undefined)
     return out
   }, [views, nodes, relations])
   const [counts, setCounts] = useState(count)
@@ -60,6 +62,15 @@ function useBranchViewCounts(views: Record<string, DiagramView>): Record<string,
 function BranchCount({ n }: { n: number | undefined }): React.ReactElement | null {
   if (!n) return null
   return <span className="lp-branch-count" title={`${n} element${n === 1 ? '' : 's'} changed since the base`}>{n}</span>
+}
+
+/** A blank view's name: View 1, View 2…, the first one no view has (it
+ *  was "View" and the number of views plus one: View 6 for the first). */
+function blankViewName(views: DiagramView[]): string {
+  const taken = new Set(views.map((v) => v.name.trim()))
+  let n = 1
+  while (taken.has(`View ${n}`)) n++
+  return `View ${n}`
 }
 
 /** Views by name, as a group lists its views. */
@@ -331,6 +342,21 @@ function formatRelative(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+/** A card a click opens (a view, a milestone, a sequence) opens from the
+ *  keyboard as well: a Tab stop that Enter or Space opens. Only View
+ *  properties' button could be reached, and in Viewer and Presenter nothing. */
+export function cardKeys(open: () => void): { role: 'button'; tabIndex: number; onKeyDown: (e: React.KeyboardEvent) => void } {
+  return {
+    role: 'button',
+    tabIndex: 0,
+    onKeyDown: (e) => {
+      if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+      e.preventDefault()
+      open()
+    },
+  }
+}
+
 // ── Milestone list (left panel) ──────────────────────────────────────────────
 // Milestones are saved snapshots of the architecture used to track how the
 // model evolves over time. Clicking a milestone does NOT restore — it is
@@ -389,6 +415,7 @@ function SnapshotList({ readOnly = false, onOpenProps }: { readOnly?: boolean; o
       <div
         className={`lp-card lp-snap-card lp-snap-current${!activeSnapshotId ? ' active' : ''}`}
         onClick={() => { if (activeSnapshotId) clearMilestoneView() }}
+        {...cardKeys(() => { if (activeSnapshotId) clearMilestoneView() })}
         title="Current working state (live HEAD) — not yet saved as a milestone"
       >
         <div className="lp-snap-badge lp-snap-badge-live">●</div>
@@ -410,6 +437,7 @@ function SnapshotList({ readOnly = false, onOpenProps }: { readOnly?: boolean; o
             key={snap.id}
             className={`lp-card lp-snap-card${isActive ? ' active' : ''}`}
             onClick={() => viewMilestoneDiff(snap.id)}
+            {...cardKeys(() => viewMilestoneDiff(snap.id))}
             title={`${new Date(snap.timestamp).toLocaleString()}\nClick to load this milestone onto the canvas`}
           >
             <div className="lp-snap-badge">v{versionNum}</div>
@@ -500,6 +528,7 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
               className={`lp-card lp-view-card${isActive ? ' active' : ''}`}
               style={{ ['--kind-color' as string]: SECTION_COLORS.sequences }}
               onClick={() => setActiveSequence(isActive ? null : seq.id)}
+              {...cardKeys(() => setActiveSequence(isActive ? null : seq.id))}
             >
               <div className="lp-view-icon">
                 <Icon.Bolt />
@@ -1304,6 +1333,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
           className={`lp-card lp-view-card${isActive ? ' active' : ''}${group ? ' lp-view-group' : ''}`}
           style={{ ['--kind-color' as string]: VIEW_KIND_COLORS[badge] }}
           onClick={() => (group ? toggleGroup(v.id) : setActiveView(v.id))}
+          {...cardKeys(() => (group ? toggleGroup(v.id) : setActiveView(v.id)))}
           aria-expanded={group ? groupOpen : undefined}
         >
           <div className="lp-view-icon">
@@ -1387,6 +1417,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
         className={`lp-card lp-view-card${activeViewId === null ? ' active' : ''}`}
         style={{ ['--kind-color' as string]: VIEW_KIND_COLORS.table }}
         onClick={() => setActiveView(null)}
+        {...cardKeys(() => setActiveView(null))}
       >
         <div className="lp-view-icon"><Icon.TableGrid /></div>
         <div className="lp-card-body">
@@ -1403,14 +1434,14 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
         <div className="lp-add-view" ref={newMenuRef}>
           <button className="lp-add-btn" aria-expanded={viewpoints.length ? newMenuOpen : undefined} onClick={() => {
             if (viewpoints.length) setNewMenuOpen((o) => !o)
-            else openNew(addView(`View ${viewList.length + 1}`, 'table'))
+            else openNew(addView(blankViewName(viewList), 'table'))
           }}>
             <Icon.Plus /> New view
           </button>
           {newMenuOpen && createPortal(
             <div className="lp-add-view-menu" role="menu" aria-label="New view" ref={newMenuPopRef} style={newMenuAt}>
               <div className="lp-add-view-head">New view</div>
-              <button className="lp-add-view-option" role="menuitem" onClick={() => openNew(addView(`View ${viewList.length + 1}`, 'table'))}>
+              <button className="lp-add-view-option" role="menuitem" onClick={() => openNew(addView(blankViewName(viewList), 'table'))}>
                 <span className="lp-add-view-icon"><Icon.Plus /></span>
                 <span className="lp-add-view-text">
                   <span className="lp-add-view-name">Blank view</span>
@@ -1574,6 +1605,15 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
   type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string }
   const [paneContent, setPaneContent] = useState<PaneContent | null>(null)
   const hasPaneContent = !!paneContent
+  // The pane slid out of sight takes no Tab stop: the hidden "◀ Back" (and,
+  // with properties open, the cards behind them) were stops the user could
+  // not see. `inert` is not in React 18's attributes: set on the element.
+  const listPane = useRef<HTMLDivElement>(null)
+  const propsPane = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    listPane.current?.toggleAttribute('inert', hasPaneContent)
+    propsPane.current?.toggleAttribute('inert', !hasPaneContent)
+  }, [hasPaneContent])
   // What the pane shows went away (an undo, a delete, an outside edit): back to the list.
   const paneGone = useDiagramStore((s) => {
     if (!paneContent) return false
@@ -1594,7 +1634,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
         <div className={`rp-slider${hasPaneContent ? ' show-props' : ''}`}>
 
           {/* Pane 1 — accordion */}
-          <div className="rp-pane lp-sections">
+          <div className="rp-pane lp-sections" ref={listPane}>
             <AccordionSection title="Views" icon="views" count={viewsCount} preview={`Open: ${activeViewName ?? 'All elements'}`}
               open={openSection === 'views'} onToggle={() => setOpenSection((o) => (o === 'views' ? null : 'views'))}>
               <ViewList
@@ -1616,7 +1656,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
           </div>
 
           {/* Pane 2 — view / milestone properties */}
-          <div className="rp-pane">
+          <div className="rp-pane" ref={propsPane}>
             <button className="rp-back-btn" onClick={() => setPaneContent(null)}>◀ Back</button>
             {paneContent?.kind === 'view' && (
               <ViewPropertiesContent
@@ -1833,7 +1873,7 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
 // EARS inline sentence editor for right panel (compact)
 const EARS_SENTENCE_FIELDS = ['trigger', 'precondition', 'unwanted_condition', 'feature', 'action'] as const
 
-function EarsSentencePreview({ node, nodeId, subject: subjectProp, readOnly, updateNode }: { node: Record<string, unknown>; nodeId: string; subject?: string; readOnly: boolean; updateNode: (id: string, patch: Record<string, unknown>) => void }) {
+function EarsSentencePreview({ node, nodeId, subject: subjectProp, statePhrase, readOnly, updateNode }: { node: Record<string, unknown>; nodeId: string; subject?: string; statePhrase?: string; readOnly: boolean; updateNode: (id: string, patch: Record<string, unknown>) => void }) {
   const earsType = String(node.ears_type ?? 'ubiquitous')
   const subject = subjectProp || 'the system'
 
@@ -1868,6 +1908,12 @@ function EarsSentencePreview({ node, nodeId, subject: subjectProp, readOnly, upd
     )
   }
 
+  // A requirement pointing at a state (While in state) reads "While the
+  // Order is Confirmed", as on the canvas and in the wiki; it read the
+  // precondition's text, or ‹precondition›.
+  const precondition = statePhrase
+    ? <span className="ears-fixed-sm" title="The state it points at (While in state)">{statePhrase}</span>
+    : <Slot fieldKey="precondition" placeholder="‹precondition›" />
   const shall = (<><span className="ears-subject-sm">{subject}</span><span className="ears-fixed-sm"> shall </span><Slot fieldKey="action" placeholder="‹action›" /><span className="ears-fixed-sm">.</span></>)
 
   let content: React.ReactNode
@@ -1875,13 +1921,13 @@ function EarsSentencePreview({ node, nodeId, subject: subjectProp, readOnly, upd
     case 'event-driven':
       content = (<><span className="ears-fixed-sm">When </span><Slot fieldKey="trigger" placeholder="‹trigger›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
     case 'state-driven':
-      content = (<><span className="ears-fixed-sm">While </span><Slot fieldKey="precondition" placeholder="‹precondition›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
+      content = (<><span className="ears-fixed-sm">While </span>{precondition}<span className="ears-fixed-sm">, </span>{shall}</>); break
     case 'unwanted-behaviour':
       content = (<><span className="ears-fixed-sm">If </span><Slot fieldKey="unwanted_condition" placeholder="‹condition›" /><span className="ears-fixed-sm">, then </span>{shall}</>); break
     case 'optional':
       content = (<><span className="ears-fixed-sm">Where </span><Slot fieldKey="feature" placeholder="‹feature›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
     case 'complex':
-      content = (<><span className="ears-fixed-sm">While </span><Slot fieldKey="precondition" placeholder="‹precondition›" /><span className="ears-fixed-sm">, when </span><Slot fieldKey="trigger" placeholder="‹trigger›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
+      content = (<><span className="ears-fixed-sm">While </span>{precondition}<span className="ears-fixed-sm">, when </span><Slot fieldKey="trigger" placeholder="‹trigger›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
     default:
       content = (<><span className="ears-subject-sm">{subject.charAt(0).toUpperCase() + subject.slice(1)}</span><span className="ears-fixed-sm"> shall </span><Slot fieldKey="action" placeholder="‹action›" /><span className="ears-fixed-sm">.</span></>)
   }
@@ -1912,6 +1958,10 @@ function HubTemplateSection({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Record<string, string>>(record.paramValues)
 
+  // Sync draft when record changes externally (e.g. after save/load). Before
+  // the return below: a hook after it ran on some renders and not others.
+  useEffect(() => { setDraft({ ...record.paramValues }) }, [importId, JSON.stringify(record.paramValues)]) // eslint-disable-line
+
   // If nodeParams map exists, use only this node's params (undefined = node has none).
   // Fall back to record.templateParams only when no per-node map was built (legacy records).
   const nodeSpecificParams = record.nodeParams
@@ -1919,9 +1969,6 @@ function HubTemplateSection({
     : record.templateParams
   // If this node has no params, render nothing.
   if (!nodeSpecificParams?.length) return null
-
-  // Sync draft when record changes externally (e.g. after save/load)
-  useEffect(() => { setDraft({ ...record.paramValues }) }, [importId, JSON.stringify(record.paramValues)]) // eslint-disable-line
 
   if (!editing) {
     return (
@@ -1959,10 +2006,12 @@ function HubTemplateSection({
         {nodeSpecificParams.map(p => (
           <div key={p.key} className="props-field">
             <label className="props-label">{p.label}</label>
-            {p.hint && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.hint}</span>}
+            {/* The hint is an example, never a value: a field left blank
+                takes the template's default. */}
             <input
               className="props-input"
               type={p.type === 'number' ? 'number' : 'text'}
+              placeholder={p.hint ?? ''}
               value={draft[p.key] ?? ''}
               onChange={e => setDraft(d => ({ ...d, [p.key]: e.target.value }))}
             />
@@ -2057,7 +2106,8 @@ function AttrValue({ def, value, readOnly, onChange }: {
 }) {
   const shown = value ?? def.default
   if (def.type === 'ref') {
-    return <RefPicker def={def as PropertyDef} value={value} readOnly={readOnly} className="pp-input pp-select" onChange={(v) => !readOnly && onChange(v)} />
+    // None picked is no value ("(none)" stored event: "").
+    return <RefPicker def={def as PropertyDef} value={value} readOnly={readOnly} className="pp-input pp-select" onChange={(v) => !readOnly && onChange(v === '' ? undefined : v)} />
   }
   if (def.type === 'boolean') {
     return (
@@ -2075,6 +2125,9 @@ function AttrValue({ def, value, readOnly, onChange }: {
             set: picking that one changed nothing, so it could not be
             chosen and a required property stayed "missing". */}
         {isEmptyValue(shown) && <option value="">—</option>}
+        {/* A value that is no option any more (the metamodel lost it)
+            showed as the first option, which then could not be picked. */}
+        {!isEmptyValue(shown) && !def.options.includes(String(shown)) && <option value={String(shown)}>{`${String(shown)} (not an option)`}</option>}
         {def.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
       </select>
     )
@@ -2321,7 +2374,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
           <section className="pp-section">
             <div className="pp-section-title">Sentence</div>
             <div className="props-ears-sentence">
-              <EarsSentencePreview node={record} nodeId={node.id} subject={resolveEarsSubject(node.id, c4Relations, c4Nodes)} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} />
+              <EarsSentencePreview node={record} nodeId={node.id} subject={resolveEarsSubject(node.id, c4Relations, c4Nodes)} statePhrase={requirementStatePhrase(node, c4Nodes, c4Relations) || undefined} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} />
               <EarsQuickEntry nodeId={node.id} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} compact />
             </div>
           </section>
@@ -2338,8 +2391,9 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
                 <select className="pp-input pp-select" aria-label="Parent" value={node.parentId ?? ''} disabled={readOnly}
                   onChange={(e) => !readOnly && reparentNodes([node.id], e.target.value || null)}>
                   <option value="">—</option>
-                  {Object.values(c4Nodes)
-                    .filter((n) => n.id !== node.id && allowedParentTypes.includes(n.type))
+                  {/* Only the ones a move takes (it listed parents it then refused). */}
+                  {parentCandidates({ c4Nodes, c4Relations, views: {}, activeViewId: null, metamodel }, node.id)
+                    .filter((n) => allowedParentTypes.includes(n.type))
                     .map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
                 </select>
               </AttrRow>
@@ -2400,10 +2454,18 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
       const dstNode = c4Nodes[rel.targetId]
       const compatibleTypes = metamodel
         ? Object.values(metamodel.relationTypes).filter(rt =>
-            rt.allowedPairs.length === 0 ||
-            rt.allowedPairs.some(p => p.from === srcNode?.type && p.to === dstNode?.type)
+            (rt.allowedPairs.length === 0 ||
+              rt.allowedPairs.some(p => p.from === srcNode?.type && p.to === dstNode?.type))
+            && relationTypeKeepsAggregates(rt.id, srcNode, dstNode)
           )
         : []
+      // A type that does not connect these two (an end moved, the metamodel
+      // changed) shows as it is, with the ones that do to change it to; a
+      // relation with no type, too. "(generic)" made one with none, which
+      // is what the validation flags where types fit.
+      const currentType = rel.relationType ?? ''
+      const fitsNow = !currentType || compatibleTypes.some((rt) => rt.id === currentType)
+      const showType = compatibleTypes.length > 1 || !fitsNow || (!currentType && compatibleTypes.length > 0)
 
       return (
         <div className="props-content" key={rel.id}>
@@ -2411,7 +2473,9 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
             typeLabel={relTypeDef?.label ?? 'Relation'}
             color={relTypeDef?.color ?? '#64748b'}
             title={String(rel.label ?? '')}
-            titlePlaceholder="No label"
+            // A transition without a label of its own reads as its line does
+            // ("PaymentReceived [ok] / reserve ^OrderPaid"), not "No label".
+            titlePlaceholder={relationDisplayLabel(rel, c4Nodes) || 'No label'}
             readOnly={readOnly}
             onTitle={(v) => set('label', v)}
             context={(
@@ -2424,13 +2488,14 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
             menu={readOnly ? [] : [{ label: 'Delete relation', danger: true, onClick: () => { removeRelation(rel.id); selectEdge(null) } }]}
             onClose={onClose}
           />
-          {(short.length > 0 || compatibleTypes.length > 1) && (
+          {(short.length > 0 || showType) && (
             <section className="pp-section pp-grid" aria-label="Attributes">
-              {compatibleTypes.length > 1 && (
-                <AttrRow label="Type">
-                  <select className="pp-input pp-select" aria-label="Type" value={rel.relationType ?? ''} disabled={readOnly}
-                    onChange={(e) => set('relationType', e.target.value || undefined)}>
-                    <option value="">(generic)</option>
+              {showType && (
+                <AttrRow label="Type" missing={!currentType}>
+                  <select className="pp-input pp-select" aria-label="Type" value={currentType} disabled={readOnly}
+                    onChange={(e) => { if (e.target.value) set('relationType', e.target.value) }}>
+                    {!currentType && <option value="" disabled>— choose a type —</option>}
+                    {!fitsNow && <option value={currentType}>{`${relTypeDef?.label ?? currentType} (does not connect these)`}</option>}
                     {compatibleTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.label}</option>)}
                   </select>
                 </AttrRow>

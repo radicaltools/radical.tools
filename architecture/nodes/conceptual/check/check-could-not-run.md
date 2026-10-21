@@ -2,8 +2,8 @@
 id: "90cef56c-6de1-45e4-925b-b9759458224a"
 type: "requirement"
 label: "Check could not run"
-action: "say why on standard error and exit with status 2, without checking"
+action: "say why on standard error, naming the file, and exit with status 2, without checking and leaving .radical/test-results.json as it was"
 ears_type: "unwanted-behaviour"
 rationale: "Status 2 tells CI apart a broken setup from a model with errors (status 1). Evidence: apps/cli/src/check.ts (checkCommand returns 2), apps/cli/src/cli.ts, apps/cli/src/cli.test.ts › exits 2 when it cannot run, › exits 2 on a report it cannot read, or evidence without a report"
-unwanted_condition: "radical check gets invalid options (--evidence without --report among them), cannot read the model folder, a test report or the config that --config names or --ratchet needs"
+unwanted_condition: "radical check gets invalid options (--evidence without --report among them), cannot read the model folder, a test report or the config that --config names or --ratchet needs, or is given a report with no test case, a file that is no test report, or a directory with no report in it"
 ---

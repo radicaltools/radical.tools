@@ -30,6 +30,15 @@ describe('shared wiki document', () => {
     expect(createWikiDocument(null, ctx).nodeList).toHaveLength(4)
   })
 
+  // Item 186: the Overview counted the whole model's relations.
+  it('counts the relations between its own pages', () => {
+    const ctx = context([node('shop', 'system'), node('api', 'container', { parentId: 'shop' }), node('db', 'container', { parentId: 'shop' }), node('user', 'person'), node('bank', 'system')],
+      [relation('r1', 'api', 'db', 'interacts'), relation('r2', 'user', 'shop', 'interacts'), relation('r3', 'shop', 'bank', 'interacts')])
+    expect(createWikiDocument(view({ nodeIds: ['api', 'db'] }), ctx).relationCount).toBe(1)
+    expect(createWikiDocument(view({ nodeIds: ['api', 'db', 'user'] }), ctx).relationCount).toBe(2)
+    expect(createWikiDocument(null, ctx).relationCount).toBe(3)
+  })
+
   it('uses a requirement → incoming Verifies → scenario chain in navigation and page content', () => {
     const ctx = context([node('r1', 'requirement'), node('r2', 'requirement'), node('s', 'scenario'), node('outside', 'need')], [relation('v1', 's', 'r1', 'verifies'), relation('v2', 's', 'r2', 'verifies')])
     const wiki = createWikiDocument(view({ wikiFocusId: 'r1', wikiDepth: 1, pipeline: { levels: [

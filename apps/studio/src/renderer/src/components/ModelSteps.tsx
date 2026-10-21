@@ -7,6 +7,7 @@ import { documents, StorageFullError, type DocumentMeta } from '../store/documen
 import { buildFintechSampleRaw } from '../store/fintechSample'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { formatRoute, openInDesigner } from '../route'
+import { openFirstView } from '../navigation'
 import { availableMetamodels } from '@radical/common/metamodel'
 import { parseStructurizrDsl } from '@radical/common/formats/structurizrDsl'
 import type { DiagramData } from '@radical/common/c4'
@@ -77,6 +78,9 @@ function createInBrowser(name: string, data: DiagramData): DocumentMeta | null {
  *  granted again; the click that got here is the gesture the browser asks for. */
 export async function openDocument(id: string): Promise<void> {
   if (documents.awaitsReconnect(id)) await documents.reconnect(id)
+  // The model open already (a Hub link's welcome lists it): it is not
+  // loaded again, so it shows its first view here.
+  if (id === documents.getActiveId()) openFirstView()
   documents.setActiveId(id)
 }
 
@@ -287,10 +291,23 @@ export function openSample(onDone: () => void, setRoute?: boolean): void {
   const viewsBefore = useDiagramStore.getState().views
   const meta = createInBrowser('Fintech Banking Platform', buildFintechSampleRaw())
   if (!meta) return
+  openOnView(meta, viewsBefore, SAMPLE_START_VIEW, onDone, setRoute)
+}
+
+/** Opens a model just made in this browser (`meta`) on its view `viewId`,
+ *  once the doc has loaded; `viewsBefore` are the views of the doc open
+ *  until now. `onDone` runs once it is open. */
+function openOnView(
+  meta: DocumentMeta,
+  viewsBefore: ReturnType<typeof useDiagramStore.getState>['views'],
+  viewId: string,
+  onDone: () => void,
+  setRoute?: boolean,
+): void {
   openInDesigner()
   documents.setActiveId(meta.id)
   const loaded = (views: typeof viewsBefore): boolean =>
-    views !== viewsBefore && !!views[SAMPLE_START_VIEW]
+    views !== viewsBefore && !!views[viewId]
 
   // The doc loads asynchronously, so wait for the view to exist.
   let done = false
@@ -300,13 +317,22 @@ export function openSample(onDone: () => void, setRoute?: boolean): void {
     unsub()
     clearTimeout(timer)
     if (loaded(useDiagramStore.getState().views)) {
-      if (setRoute) history.replaceState(null, '', formatRoute({ mode: 'designer', view: SAMPLE_START_VIEW }))
-      else useDiagramStore.getState().setActiveView(SAMPLE_START_VIEW)
+      if (setRoute) history.replaceState(null, '', formatRoute({ mode: 'designer', view: viewId }))
+      else useDiagramStore.getState().setActiveView(viewId)
     }
     onDone()
   }
   const unsub = useDiagramStore.subscribe((s) => { if (loaded(s.views)) finish() })
   const timer = setTimeout(finish, 1500)
+}
+
+/** What a Structurizr import left out, as one notice: the first few, then
+ *  how many more (all of them are in the console). */
+export function dslImportNotice(notRead: string[]): string | null {
+  if (!notRead.length) return null
+  const shown = notRead.slice(0, 5)
+  const more = notRead.length - shown.length
+  return `The Structurizr import left out: ${shown.join(' ')}${more > 0 ? ` …and ${more} more (see the browser console).` : ''}`
 }
 
 /** Places to open a model from: a file, a folder, a Structurizr DSL file or
@@ -350,9 +376,23 @@ export function OpenSources({ onDone, before, setRoute, autoFocus }: {
         try {
           const result = parseStructurizrDsl(content)
           const name = result.name || file.name.replace(/\.(dsl|txt)$/i, '') || 'Imported DSL'
-          documents.createLSDocument(name, { nodes: result.nodes, relations: result.relations } as DiagramData)
-          openInDesigner()
-          onDone()
+          const viewsBefore = useDiagramStore.getState().views
+          const meta = documents.createLSDocument(name, {
+            nodes: result.nodes, relations: result.relations, sequences: result.sequences, views: result.views,
+          } as DiagramData)
+          // What it could not read is said, not dropped in silence.
+          if (result.notRead.length) console.info('[DSL import] left out:\n' + result.notRead.join('\n'))
+          const notice = dslImportNotice(result.notRead)
+          const told = (): void => {
+            if (notice) useDiagramStore.getState().pushNotification(notice, 'warning')
+            onDone()
+          }
+          // The workspace's first view opens, as Structurizr shows it first.
+          if (result.views.length) openOnView(meta, viewsBefore, result.views[0].id, told)
+          else {
+            openInDesigner()
+            told()
+          }
         } catch (err) {
           if (err instanceof StorageFullError) {
             window.alert(err.message)

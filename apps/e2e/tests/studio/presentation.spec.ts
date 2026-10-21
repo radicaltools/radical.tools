@@ -92,6 +92,8 @@ test('a slide made with focus zooms onto its elements after a table slide, from 
 
 test('a slide card\'s Link view and Link milestone pickers show all their items above the dock', async ({ page }) => {
   const card = page.locator('.pres-slide-card', { hasText: 'Containers' })
+  // The buttons are the current slide's.
+  await card.locator('.pres-slide-name').click()
   await card.hover()
   await card.getByTitle('Link view').click()
   // The item farthest from the button: clipped by the dock, a click on it
@@ -135,4 +137,67 @@ test('a slide added on a wiki page shows that page, on its card and played after
   await studio.ready()
   await expect(page.getByText('3 / 3')).toBeVisible()
   await expect(title).toHaveText('API')
+})
+
+test('a click in the middle of another slide\'s card shows that slide, it does not capture it', async ({ page, studio }) => {
+  const card = page.locator('.pres-slide-card', { hasText: 'Containers' })
+  await expect(card).not.toHaveClass(/active/)
+  const box = (await card.boundingBox())!
+  const capture = card.getByTitle(/^Capture canvas state/)
+  // The hidden Capture button sat where the card's middle is.
+  const button = (await capture.boundingBox())!
+  await page.mouse.click(button.x + button.width / 2, box.y + box.height / 2)
+  await expect(card).toHaveClass(/active/)
+  await studio.settle()
+  const slides = () => page.evaluate((k) => JSON.parse(localStorage.getItem(k)!).presentations[0].slides[1], `radical-doc:${DOC_ID}`)
+  expect((await slides()).viewport).toEqual({ x: 0, y: 0, zoom: 1 })
+  expect((await slides()).canvasState).toBeUndefined()
+})
+
+test('a playing hierarchy slide is drilled on its own: Esc ends it, Designer\'s view and the address keep nothing of it', async ({ page, studio }) => {
+  await reseed(page, studio, (doc) => {
+    doc.views.push({ id: 'v-tree', name: 'Tree', kind: 'treemap', nodeIds: [], positions: {} })
+    doc.presentations[0].slides.push({ id: 'slide-tree', name: 'Tree', snapshotId: null, viewId: 'v-tree', viewport: { x: 0, y: 0, zoom: 0 } })
+  }, 'v-tree')
+  await page.locator('.pres-slide-card .pres-slide-name', { hasText: 'Tree' }).click()
+  await studio.designer()
+  await studio.settle()
+  await expect(page).toHaveURL(/\/m\/designer\/v\/v-tree$/)
+  await page.keyboard.press('F5')
+  await studio.settle()
+  await expect(page.getByText('3 / 3')).toBeVisible()
+  await page.locator('rect[data-id="bookstore"]').dblclick({ position: { x: 60, y: 8 } })
+  await studio.settle()
+  await expect(page.locator('.tm-bc-item.active')).toHaveText('Bookstore')
+  await expect(page).not.toHaveURL(/\/e\//)
+  await page.keyboard.press('Escape')
+  await studio.settle()
+  await expect(page.getByText('3 / 3')).toHaveCount(0)
+  await expect(page).toHaveURL(/\/m\/designer\/v\/v-tree$/)
+  await expect(page.locator('.tm-bc-item.active')).toHaveText('All')
+  await studio.settle()
+  const tree = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)!).views.find((v: { id: string }) => v.id === 'v-tree'), `radical-doc:${DOC_ID}`)
+  expect(tree.treemapFocusId ?? null).toBeNull()
+})
+
+test('F5 stops a presentation F5 started, and Esc ends a Warnier slide with an element selected', async ({ page, studio }) => {
+  await reseed(page, studio, (doc) => {
+    doc.views.push({ id: 'v-warnier', name: 'Outline', kind: 'warnier', nodeIds: [], positions: {} })
+    doc.presentations[0].slides.push({ id: 'slide-w', name: 'Outline', snapshotId: null, viewId: 'v-warnier', viewport: { x: 0, y: 0, zoom: 0 } })
+  }, 'v-warnier')
+  await page.keyboard.press('F5')
+  await studio.settle()
+  await expect(page.getByText('1 / 3')).toBeVisible()
+  await page.keyboard.press('F5')
+  await studio.settle()
+  await expect(page.getByText('1 / 3')).toHaveCount(0)
+  await page.locator('.pres-slide-card .pres-slide-name', { hasText: 'Outline' }).click()
+  await page.getByRole('button', { name: 'Present', exact: true }).click()
+  await studio.settle()
+  await expect(page.getByText('3 / 3')).toBeVisible()
+  await page.locator('.warnier-view').getByText('API', { exact: true }).first().click()
+  await studio.settle()
+  await page.keyboard.press('Escape')
+  await studio.settle()
+  await expect(page.getByText('3 / 3')).toHaveCount(0)
 })

@@ -11,6 +11,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { C4Node, DiagramData, NodePosition } from '@radical/common/c4'
 import { useDiagramStore } from '../src/store/diagramStore'
 
+// A first layout whose winner is the layout the view opened with (CI's
+// fonts gave it there): keepCurrent makes Smart Layout say so.
+const keepCurrent = vi.hoisted(() => ({ on: false }))
+vi.mock('../src/layout/smartLayoutRunner', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/layout/smartLayoutRunner')>()
+  return {
+    ...actual,
+    runSmartLayout: async (...args: Parameters<typeof actual.runSmartLayout>) => {
+      const result = await actual.runSmartLayout(...args)
+      return keepCurrent.on ? { ...result, keptCurrent: true } : result
+    },
+  }
+})
+
 const s = useDiagramStore.getState
 const pos = (x: number, y: number, width: number, height: number): NodePosition => ({ x, y, width, height })
 const node = (id: string, type: string, parentId: string | undefined, p: NodePosition): C4Node =>
@@ -150,4 +164,72 @@ describe('a view of a viewpoint opened first in Viewer or Presenter', () => {
       }
     })
   }
+})
+
+describe('the first layout of a view (decided 2026-10-21)', () => {
+  // It was an undo step of its own: New view of a viewpoint took two Undos,
+  // and opening two views of a group three to remove the group. A reload or
+  // a view switch before it landed saved All elements' places as the view's
+  // own, and it was never laid out.
+  const laidOut = async (): Promise<void> => {
+    await vi.waitFor(() => expect(s().isLayoutRunning).toBe(false), { timeout: 30_000 })
+  }
+  const asAgentMade = (): void => {
+    useDiagramStore.setState((st: any) => { st.views.containers.viewpoint = 'containers' })
+  }
+
+  it('belongs to the step that made the view: New view is one Undo', async () => {
+    s().updateNode('pay', { description: 'before' })
+    const id = s().addViewOfViewpoint('containers')!
+    expect(id).toBeTruthy()
+    s().setActiveView(id)
+    await laidOut()
+    expect(Object.keys(s().views[id].positions).length).toBeGreaterThan(0)
+    s().undo()
+    expect(s().views[id]).toBeUndefined()
+    expect(s().c4Nodes.pay.description).toBe('before')
+    s().redo()
+    expect(Object.keys(s().views[id].positions).length).toBeGreaterThan(0)
+  }, 60_000)
+
+  it('of a view opened for the first time is no step, and an Undo keeps it', async () => {
+    asAgentMade()
+    s().updateNode('pay', { description: 'before' })
+    s().setActiveView('containers')
+    await laidOut()
+    const positions = s().views.containers.positions
+    expect(Object.keys(positions).length).toBeGreaterThan(0)
+    s().undo()
+    expect(s().c4Nodes.pay.description).toBeUndefined()
+    expect(s().views.containers.positions).toEqual(positions)
+    expect(s().canUndo).toBe(false)
+  }, 60_000)
+
+  it('that keeps the places the view opened with makes them its own, with no notice', async () => {
+    asAgentMade()
+    keepCurrent.on = true
+    try {
+      s().setActiveView('containers')
+      await laidOut()
+    } finally {
+      keepCurrent.on = false
+    }
+    expect(Object.keys(s().views.containers.positions).length).toBeGreaterThan(0)
+    expect(s().notifications.map((n: { message: string }) => n.message).join(' ')).not.toMatch(/already scores best/)
+  }, 60_000)
+
+  it('is not replaced by All elements\' places saved before it lands', async () => {
+    asAgentMade()
+    s().setActiveView('containers')
+    expect(s().isLayoutRunning).toBe(true)
+    const saved = s().saveDiagram().views!.find((v) => v.id === 'containers')!
+    expect(saved.positions).toEqual({})
+    // Left at once: it is laid out on the next opening.
+    s().setActiveView('ctx')
+    expect(s().views.containers.positions).toEqual({})
+    await laidOut()
+    s().setActiveView('containers')
+    await laidOut()
+    expect(Object.keys(s().views.containers.positions).length).toBeGreaterThan(0)
+  }, 60_000)
 })

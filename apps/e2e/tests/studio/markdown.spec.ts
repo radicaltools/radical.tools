@@ -40,6 +40,31 @@ test.describe('Markdown in an element\'s fields', () => {
     await expect(page.locator('textarea.wiki-lead')).toHaveValue(DESCRIPTION)
   })
 
+  // D13 and the open points of runs 45 to 64: a remote image was fetched
+  // (a request that left the machine), links the sanitizer emptied were
+  // drawn as links that did nothing, and a link to a wiki page opened a tab.
+  test('a remote image is a link with its address, an emptied link is text, a link into the app opens here', async ({ page, studio }) => {
+    const requests: string[] = []
+    page.on('request', (r) => { if (!r.url().startsWith('http://localhost') && !r.url().startsWith('data:')) requests.push(r.url()) })
+    await studio.open('v-wiki/f/payments')
+    await page.locator('.wiki-lead').getByText('refunds').click()
+    const text = 'Logo: ![the logo](https://images.example.com/logo.png)\n\n[bad](javascript:alert(1)) and [see API](#/d/ls%3Ae2e-doc/m/designer/v/v-wiki/f/api)'
+    await page.locator('textarea.wiki-lead').fill(text)
+    await page.locator('.wiki-title').click()
+    const lead = page.locator('.wiki-lead')
+    const image = lead.getByRole('link', { name: 'the logo (https://images.example.com/logo.png)' })
+    await expect(image).toHaveAttribute('href', 'https://images.example.com/logo.png')
+    await expect(lead.locator('img')).toHaveCount(0)
+    await expect(lead.getByText('bad', { exact: true })).toBeVisible()
+    await expect(lead.getByRole('link', { name: 'bad' })).toHaveCount(0)
+    const inApp = lead.getByRole('link', { name: 'see API' })
+    await expect(inApp).not.toHaveAttribute('target', '_blank')
+    await inApp.click()
+    await expect(page.locator('.wiki-title')).toHaveText('API')
+    expect(page.context().pages()).toHaveLength(1)
+    expect(requests).toEqual([])
+  })
+
   test('a card on the canvas shows the description without its marks', async ({ page, studio }) => {
     await studio.open('v-context')
     const desc = studio.node('payments').locator('.c4-node-desc')

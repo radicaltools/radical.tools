@@ -33,7 +33,7 @@
 import type { C4Node, C4Relation } from './c4'
 import type { Metamodel } from './metamodel/types'
 import { escapeMarkdown, isMarkdownField, markdownToPlain } from './markdown'
-import { composeEarsSentence, earsSummaryParts, firstParagraph, firstPhrase, requirementStatePhrase, resolveEarsSubject } from './metamodel'
+import { composeEarsSentence, earsSummaryParts, firstParagraph, firstPhrase, refIds, requirementStatePhrase, resolveEarsSubject } from './metamodel'
 
 const C4_SUMMARY = '[\\[{technology}\\] ]{description.sentence}'
 
@@ -107,13 +107,19 @@ function transitionEvents(rel: C4Relation): string[] {
  *  out ("on Files changed → Reloading", "→ Loading" without an event). */
 function transitionsOf(node: C4Node, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): string {
   const all = Object.values(relations).filter((r) => r.relationType === 'transition')
+  // An event a transition raises (^Event) is said too: an event only
+  // raised read as nothing.
+  const raisedBy = node.type === 'event'
+    ? all.filter((r) => refIds((r as unknown as Record<string, unknown>).raises).includes(node.id)).map((r) => `raised by ${nameOf(r.sourceId, nodes)} → ${nameOf(r.targetId, nodes)}`)
+    : []
   const moves = node.type === 'event'
-    ? all.filter((r) => transitionEvents(r).includes(node.id)).map((r) => `${nameOf(r.sourceId, nodes)} → **${nameOf(r.targetId, nodes)}**`)
+    ? [...all.filter((r) => transitionEvents(r).includes(node.id)).map((r) => `${nameOf(r.sourceId, nodes)} → **${nameOf(r.targetId, nodes)}**`), ...raisedBy]
     : all.filter((r) => r.sourceId === node.id).map((r) => {
         const on = transitionEvents(r).map((e) => nameOf(e, nodes)).filter(Boolean).join(' or ')
         return `${on ? `on ${on} ` : ''}→ **${nameOf(r.targetId, nodes)}**`
       })
-  return [...new Set(moves)].join('; ')
+  const line = [...new Set(moves)].join('; ')
+  return line.startsWith('raised by ') ? `R${line.slice(1)}` : line
 }
 
 /** The names of the elements linked to `node` by relations of `type`:

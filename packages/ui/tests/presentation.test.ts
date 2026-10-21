@@ -136,6 +136,22 @@ describe('startPresentation / stopPresentation', () => {
   })
 })
 
+describe('Present and Esc with a milestone\'s diff on', () => {
+  // The slides' diff replaced the milestone's, and Esc cleared it: the
+  // toggle said on and drew nothing, off and on again too.
+  it('gives the milestone\'s diff back', () => {
+    const ids = Object.keys(useDiagramStore.getState().c4Nodes)
+    useDiagramStore.setState({ diffHighlight: { [ids[0]]: 'new', [ids[1]]: 'changed' } } as any)
+    const diff = useDiagramStore.getState().diffHighlight
+    useDiagramStore.getState().addPresentationSlide('a')
+    useDiagramStore.getState().addPresentationSlide('b')
+    useDiagramStore.getState().startPresentation()
+    useDiagramStore.getState().goToSlide(1)
+    useDiagramStore.getState().stopPresentation()
+    expect(useDiagramStore.getState().diffHighlight).toEqual(diff)
+  })
+})
+
 describe('goToSlide', () => {
   it('replays the captured viewport via setViewportFn (during active presentation)', () => {
     const setVP = vi.fn()

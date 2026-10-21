@@ -81,21 +81,43 @@ test('selecting a type shows its rules; Edit opens it in the list', async ({ pag
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 30_000 })
   const zoom = async (): Promise<number> =>
     diagram.locator('.react-flow__viewport').evaluate((el) => Number(/scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform)?.[1]))
+  // The camera's moves animate: the zoom once it has stopped.
+  const atRest = async (): Promise<number> => {
+    let now = await zoom()
+    await expect
+      .poll(async () => {
+        const prev = now
+        now = await zoom()
+        return now === prev
+      }, { intervals: [150] })
+      .toBe(true)
+    return now
+  }
   // The fit after the physics animates; read the overview once it has stopped.
-  let overview = await zoom()
-  await expect
-    .poll(async () => {
-      const prev = overview
-      overview = await zoom()
-      return overview === prev
-    }, { intervals: [150] })
-    .toBe(true)
+  const overview = await atRest()
 
   // Selecting a type frames it with what it is connected to (a pseudostate:
   // the states and machines in its frame).
   await diagram.getByTestId('rf__node-pseudostate').click()
   await expect.poll(zoom).toBeGreaterThan(overview * 1.5)
-  await diagram.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } })
+  // Clicked while the camera still moved, the corner of the pane could be
+  // under another type by the time the click landed, which it selected.
+  await atRest()
+  // A click on the empty pane: a fixed corner of it can lie on a relation
+  // (the wide stroke that catches clicks on a line), which a click there
+  // selects, framing every type it links.
+  const pane = diagram.locator('.react-flow__pane')
+  const empty = await pane.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    for (let y = 5; y < r.height; y += 15) {
+      for (let x = 5; x < r.width; x += 15) {
+        if (document.elementFromPoint(r.x + x, r.y + y) === el) return { x, y }
+      }
+    }
+    return null
+  })
+  expect(empty).not.toBeNull()
+  await pane.click({ position: empty! })
   await expect.poll(zoom).toBeCloseTo(overview, 2)
 
   // Selecting a relation shows only its sources and targets: ADR, Fitness
@@ -147,8 +169,12 @@ test('"At the root" shows and sets whether a type may sit at the top level', asy
   const atRoot = system.getByRole('checkbox', { name: 'At the root' })
   // A Software System may sit inside a System, Domain or Group, and at the root.
   await expect(atRoot).toBeChecked()
+  // The model has systems at the root: the editor says so and asks first (D3).
+  let asked = ''
+  page.once('dialog', (d) => { asked = d.message(); void d.accept() })
   await atRoot.uncheck()
   await expect(atRoot).not.toBeChecked()
+  expect(asked).toContain('must be inside')
   await expect.poll(() => page.evaluate(() => {
     const docs = JSON.parse(localStorage.getItem('radical-docs-index') ?? '{}')
     const doc = JSON.parse(localStorage.getItem(`radical-doc:${docs.activeId}`) ?? '{}')

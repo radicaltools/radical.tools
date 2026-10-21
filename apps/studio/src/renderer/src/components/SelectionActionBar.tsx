@@ -4,6 +4,7 @@ import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, saveStudioSettings } from '@radical/ui/studioSettings'
 import { isParentAllowed, isPlacementAllowed } from '@radical/common/metamodel'
 import { defaultGridColumns } from '@radical/common/c4'
+import { useMenuKeys } from './menuKeys'
 
 /**
  * Floating action bar that appears over the canvas whenever one or more
@@ -60,6 +61,9 @@ export function SelectionActionBar(): React.ReactElement | null {
   const menuRef = useRef<HTMLDivElement | null>(null)
   const moveMenuRef = useRef<HTMLDivElement | null>(null)
   const alignMenuRef = useRef<HTMLDivElement | null>(null)
+  useMenuKeys(menuRef, menuOpen, () => setMenuOpen(false))
+  useMenuKeys(moveMenuRef, moveMenuOpen, () => setMoveMenuOpen(false))
+  useMenuKeys(alignMenuRef, alignMenuOpen, () => setAlignMenuOpen(false))
 
   // Close menu on outside click.
   useEffect(() => {

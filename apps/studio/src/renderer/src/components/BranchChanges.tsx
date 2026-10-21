@@ -17,6 +17,26 @@ export function ago(iso: string, now = Date.now()): string {
   return `${days} day${days === 1 ? '' : 's'} ago`
 }
 
+type ChangeCounts = { added: number; changed: number; removed: number; relations: number }
+const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
+
+/** The number Changes on branch shows: elements and relations changed. */
+export const changeTotal = (counts: ChangeCounts): number => counts.added + counts.changed + counts.removed + counts.relations
+
+/** "3 elements and 1 relation changed"; a branch that only changes relations
+ *  says so rather than "0 elements". */
+export function changedText(counts: ChangeCounts): string {
+  const elements = counts.added + counts.changed + counts.removed
+  if (!counts.relations) return `${plural(elements, 'element')} changed`
+  return `${elements ? `${plural(elements, 'element')} and ` : ''}${plural(counts.relations, 'relation')} changed`
+}
+
+/** "3 elements changed: 1 added, 1 changed, 1 removed; 1 relation changed". */
+export function changeBreakdown(counts: ChangeCounts): string {
+  const elements = counts.added + counts.changed + counts.removed
+  return `${plural(elements, 'element')} changed: ${counts.added} added, ${counts.changed} changed, ${counts.removed} removed${counts.relations ? `; ${plural(counts.relations, 'relation')} changed` : ''}`
+}
+
 /** What the changes are counted since, for the Inspector: "main <code>534f32f</code>
  *  (merge base with origin/main, feat/x)", "HEAD <code>473d593</code> (main)",
  *  or the start of the Forge run. */
@@ -70,14 +90,14 @@ export function BranchChangesButton(): React.ReactElement | null {
     return () => document.removeEventListener('mousedown', close)
   }, [help])
 
-  const total = counts ? counts.added + counts.changed + counts.removed : 0
+  const total = counts ? changeTotal(counts) : 0
   const old = !!base && branchBaseIsOld(base)
   // Under the name, on hover: what the count is about.
   const status = !base
     ? 'No base yet: click to see how to save one'
     : milestone
       ? 'A milestone is shown, with its own diff'
-      : `${total} element${total === 1 ? '' : 's'} changed since ${baseSince(base)}${old ? `; old base, saved ${ago(base.savedAt)}${base.branch ? ` on ${base.branch}` : ''}` : ''} · list in the Inspector`
+      : `${counts ? changedText(counts) : '0 elements changed'} since ${baseSince(base)}${old ? `; old base, saved ${ago(base.savedAt)}${base.branch ? ` on ${base.branch}` : ''}` : ''} · list in the Inspector`
   return (
     <div className="branch-btn-wrap" ref={box}>
       <button

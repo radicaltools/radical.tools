@@ -297,6 +297,21 @@ export function enforceAlignments(
     return set
   })
 
+  /** For each member of an ordered chain, the box that moves it into its
+   *  place: the part of the chain's common parent that holds it, when it
+   *  holds no other member; else the member itself. */
+  const chainMovers = (chain: readonly string[]): string[] => {
+    const lines = chain.map((id) => {
+      const up: string[] = []
+      for (let cur: string | undefined = id; cur; cur = parentOf(cur)) up.unshift(cur)
+      return up
+    })
+    let common = 0
+    while (lines.every((l) => l.length > common + 1 && l[common] === lines[0][common])) common++
+    const parts = lines.map((l) => l[common])
+    return chain.map((id, k) => (parts.filter((p) => p === parts[k]).length === 1 ? parts[k] : id))
+  }
+
   const snap = (): void => {
     // A grid's rows (columns) out of order: the rows take the places the
     // rows hold, in order, whole — moving single cells would break them.
@@ -311,14 +326,18 @@ export function enforceAlignments(
       const centres = a.ids.map((id) => centre(nodes, boxes, parents, id, a.axis))
       const target = centres.reduce((s, c) => s + c, 0) / centres.length
       a.ids.forEach((id, i) => { boxes[id][a.axis] += target - centres[i] })
-      // Out of order: the members take the places they hold, in order.
+      // Out of order: the members take the places they hold, in order. A
+      // member alone in its part of the chain (a group of the parent the
+      // chain shares) moves with that part: moved out of its group alone,
+      // the group stretched round it and the line across groups never held.
       const along = alongAxis(a)
       for (const chain of a.orders) {
         const cs = chain.map((id) => centre(nodes, boxes, parents, id, along))
         if (cs.every((c, k) => k === 0 || c - cs[k - 1] >= MIN_STEP)) continue
         const slots = [...cs].sort((x, y) => x - y)
         for (let k = 1; k < slots.length; k++) slots[k] = Math.max(slots[k], slots[k - 1] + MIN_STEP)
-        chain.forEach((id, k) => { boxes[id][along] += slots[k] - cs[k] })
+        const movers = chainMovers(chain)
+        chain.forEach((id, k) => { boxes[movers[k]][along] += slots[k] - cs[k] })
       }
     }
   }
@@ -377,6 +396,28 @@ export function enforceAlignments(
       const list = [...merged]
       for (const id of list) cluster[a.axis].set(id, list)
     })
+    // Siblings that carry members of an ordered line keep that order along
+    // it: separated by where they stand, a group holding a member the line
+    // puts first was pushed after the one holding the next, which carried
+    // its member back out of order; snap and separate then pulled against
+    // each other until the groups were thousands of pixels tall.
+    const carrierHere = (id: string): string | undefined => {
+      for (let cur: string | undefined = id; cur; cur = parentOf(cur)) if (level.has(cur)) return cur
+      return undefined
+    }
+    const before = { x: new Set<string>(), y: new Set<string>() }
+    for (const a of alignments) {
+      const along = alongAxis(a)
+      for (const chain of a.orders) {
+        for (let k = 1; k < chain.length; k++) {
+          const u = carrierHere(chain[k - 1])
+          const v = carrierHere(chain[k])
+          if (u && v && u !== v) before[along].add(`${u}\u0000${v}`)
+        }
+      }
+    }
+    const orderOf = (u: string, v: string, axis: 'x' | 'y'): number =>
+      before[axis].has(`${u}\u0000${v}`) ? 1 : before[axis].has(`${v}\u0000${u}`) ? -1 : 0
     const group = (id: string, axis: 'x' | 'y'): string[] => cluster[axis].get(id) ?? [id]
     const movable = (id: string, axis: 'x' | 'y'): boolean => !group(id, axis).some((m) => locked[axis].has(m))
     const move = (id: string, axis: 'x' | 'y', d: number): void => {
@@ -403,7 +444,7 @@ export function enforceAlignments(
           const { axis, depth } = best
           // Siblings share a frame, so drawn centres compare directly; using
           // them keeps the order the canvas shows (and snap() fixed).
-          const dir = drawnMid(ids[i], axis) <= drawnMid(ids[j], axis) ? 1 : -1
+          const dir = orderOf(ids[i], ids[j], axis) || (drawnMid(ids[i], axis) <= drawnMid(ids[j], axis) ? 1 : -1)
           const mi = movable(ids[i], axis)
           const mj = movable(ids[j], axis)
           const share = mi && mj ? depth / 2 : depth

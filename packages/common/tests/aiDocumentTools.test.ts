@@ -187,6 +187,25 @@ describe('presentation tools', () => {
     expect((await call('delete_presentation', { id: pitch.id })).ok).toBe(true)
     expect(facade.getPresentations!()).toEqual([])
   })
+
+  // Item 199: slides reordered by id and name lost every view and framing,
+  // while a missing milestone or focus kept the old.
+  it('keeps a kept slide\'s view and framing when viewId is left out', async () => {
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 's', type: 'system', label: 'Shop' })
+    await call('create_view', { tempId: 'v', name: 'Context', nodeIds: ['s'] })
+    await call('create_view', { tempId: 'w', name: 'Other', nodeIds: ['s'] })
+    await call('create_presentation', { name: 'Pitch', slides: [{ name: 'One', viewId: 'v' }, { name: 'Two', viewId: 'w' }] })
+    const pitch = facade.getPresentations!()[0]
+    const [one, two] = pitch.slides.map((slide) => ({ ...slide, viewport: { x: 1, y: 2, zoom: 3 }, canvasState: { nodes: {} } }))
+    facade.setPresentations!([{ ...pitch, slides: [one, two] }])
+    const reordered = await call('update_presentation', { id: pitch.id, slides: [{ id: two.id, name: 'Two' }, { id: one.id, name: 'One' }] })
+    expect(reordered.ok, reordered.resultText).toBe(true)
+    expect(facade.getPresentations!()[0].slides).toEqual([two, one])
+    // viewId null still moves it to All elements.
+    await call('update_presentation', { id: pitch.id, slides: [{ id: two.id, name: 'Two', viewId: null }] })
+    expect(facade.getPresentations!()[0].slides[0]).toEqual({ id: two.id, name: 'Two', snapshotId: null, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } })
+  })
 })
 
 describe('presentation focus', () => {
@@ -224,6 +243,22 @@ describe('presentation focus', () => {
     expect(facade.getPresentations!()[0].slides[0]).toEqual({ ...captured, name: 'DB', viewport: { x: 0, y: 0, zoom: 0 }, focusNodeIds: [ctx.resolveId('d')] })
     await call('update_presentation', { id: tour.id, slides: [{ id: captured.id, name: 'All', viewId: 'v', focus: [] }] })
     expect(facade.getPresentations!()[0].slides[0].focusNodeIds).toBeUndefined()
+  })
+
+  // A slide with no view shows the All elements table, and a table, wiki,
+  // matrix, hierarchy, flow or Warnier view has no canvas: a focus did nothing.
+  it('refuses a focus on a slide that shows no canvas', async () => {
+    const { call } = setup()
+    await call('add_node', { tempId: 's', type: 'system', label: 'Shop' })
+    await call('create_view', { tempId: 't', name: 'Table', nodeIds: ['s'], kind: 'table' })
+    const onTable = await call('create_presentation', { name: 'T', slides: [{ name: 'Rows', viewId: 't', focus: ['s'] }] })
+    expect(onTable.ok).toBe(false)
+    expect(onTable.resultText).toContain('view "Table" is a table')
+    const noView = await call('create_presentation', { name: 'T', slides: [{ name: 'All', focus: ['s'] }] })
+    expect(noView.ok).toBe(false)
+    expect(noView.resultText).toContain('All elements')
+    // An empty focus (the whole view) is fine anywhere.
+    expect((await call('create_presentation', { name: 'T', slides: [{ name: 'All', focus: [] }] })).ok).toBe(true)
   })
 })
 
@@ -277,6 +312,26 @@ describe('milestone tools', () => {
     expect(Object.keys(facade.getNodes())).toHaveLength(3)
   })
 
+  // Milestones keep sequences, and the comparison left them out: a flow
+  // changed between two phases read as "No changes".
+  it('compare the sequences too', async () => {
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await call('add_node', { tempId: 'erp', type: 'system', label: 'ERP' })
+    await call('add_relation', { sourceId: 'shop', targetId: 'erp', label: 'orders' })
+    const rel = Object.keys(facade.getRelations())[0]
+    await call('create_sequence', { tempId: 'order', name: 'Order', steps: [{ relationId: rel, description: 'sends' }] })
+    await call('create_milestone', { name: 'As-is' })
+    const asIs = facade.getMilestones!()[0].id
+    const seqId = Object.keys(facade.getSequences!())[0]
+    await call('update_sequence', { id: seqId, steps: [{ relationId: rel, description: 'sends' }, { relationId: rel, description: 'sends again' }] })
+    await call('create_sequence', { tempId: 'refund', name: 'Refund' })
+    const compared = (await call('compare_milestones', { from: asIs })).resultText
+    expect(compared).not.toContain('No changes')
+    expect(compared).toMatch(/Sequences added:\n- Refund \(/)
+    expect(compared).toMatch(/Sequences changed:\n- Order \([^)]+\): steps/)
+  })
+
   it('let a slide show a milestone, its focus checked against that model', async () => {
     const { facade, call, ctx } = setup()
     await call('add_node', { tempId: 'old', type: 'system', label: 'Mainframe' })
@@ -284,9 +339,11 @@ describe('milestone tools', () => {
     const asIs = facade.getMilestones!()[0].id
     await call('delete_node', { id: 'old' })
     await call('add_node', { tempId: 'new', type: 'system', label: 'Cloud' })
+    // A view listing no elements shows every element of the model it is shown with.
+    expect((await call('create_view', { tempId: 'all', name: 'Landscape', nodeIds: [] })).ok).toBe(true)
     const created = await call('create_presentation', {
       name: 'Roadmap',
-      slides: [{ name: 'Today', milestone: asIs, focus: ['old'] }, { name: 'Tomorrow', focus: ['new'] }],
+      slides: [{ name: 'Today', viewId: 'all', milestone: asIs, focus: ['old'] }, { name: 'Tomorrow', viewId: 'all', focus: ['new'] }],
     })
     expect(created.ok, created.resultText).toBe(true)
     const roadmap = facade.getPresentations!()[0]
@@ -298,7 +355,7 @@ describe('milestone tools', () => {
     await call('update_presentation', { id: roadmap.id, slides: [{ id: roadmap.slides[0].id, name: 'Now', milestone: null }] })
     expect(facade.getPresentations!()[0].slides[0].snapshotId).toBeNull()
     expect((await call('update_presentation', { id: roadmap.id, slides: [{ name: 'X', milestone: 'nope' }] })).resultText).toContain('unknown milestone')
-    expect((await call('update_presentation', { id: roadmap.id, slides: [{ name: 'X', focus: ['old'] }] })).resultText).toContain('unknown node')
+    expect((await call('update_presentation', { id: roadmap.id, slides: [{ name: 'X', viewId: 'all', focus: ['old'] }] })).resultText).toContain('unknown node')
   })
 
   it('re-frame a Studio slide moved to another milestone and unlink slides from a deleted one', async () => {
@@ -455,7 +512,86 @@ describe('add_relation with no type and a properties bag', () => {
     const nodes = facade.getNodes()
     expect(nodes[rel.targetId as string]?.label).toBe('Bank')
     expect(rel.relationType).not.toBe('nonexistent-type')
-    expect(rel.note).toBe('kept')
+    // No type the bag could be checked against: nothing of it is stored.
+    expect(rel.note).toBeUndefined()
+    expect(res.resultText).toMatch(/ignored property "note"/)
+  })
+
+  it('checks the bag against the type inferred for the pair, and ignores it where no single type fits', async () => {
+    // The bag was stored unchecked (an enum value no type has, a key no type
+    // defines), and get_issues said nothing.
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'm', type: 'state-machine', label: 'Order' })
+    await call('add_node', { tempId: 'a', type: 'state', label: 'Pending', parentId: 'm' })
+    await call('add_node', { tempId: 'b', type: 'state', label: 'Paid', parentId: 'm' })
+    await call('add_node', { tempId: 'o', type: 'entity', label: 'Order' })
+    await call('add_node', { tempId: 'l', type: 'entity', label: 'Line' })
+    const one = await call('add_relation', { sourceId: 'a', targetId: 'b', properties: { guard: 'paid', bogus: 1 } })
+    expect(one.ok, one.resultText).toBe(true)
+    expect(one.resultText).toMatch(/ignored property "bogus"/)
+    const two = await call('add_relation', { sourceId: 'o', targetId: 'l', properties: { cardinality: 'bogus' } })
+    expect(two.ok, two.resultText).toBe(true)
+    expect(two.resultText).toMatch(/ignored property "cardinality"/)
+    const [t, r] = Object.values(facade.getRelations()) as unknown as Record<string, unknown>[]
+    expect(t).toMatchObject({ relationType: 'transition', guard: 'paid' })
+    expect(t.bogus).toBeUndefined()
+    expect(r.relationType).toBeUndefined()
+    expect(r.cardinality).toBeUndefined()
+  })
+})
+
+describe('update_node label', () => {
+  it('refuses a blank label as add_node does, and trims one given', async () => {
+    // "   " was taken: the element had no name, and its file became person.md.
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'a', type: 'person', label: 'Alice' })
+    const id = Object.keys(facade.getNodes())[0]
+    for (const label of ['', '   ']) {
+      const res = await call('update_node', { id, label })
+      expect(res.ok).toBe(false)
+      expect(res.resultText).toBe('update_node: label cannot be empty')
+    }
+    expect((await call('update_node', { id, label: '  Alice Smith ' })).ok).toBe(true)
+    expect(facade.getNodes()[id].label).toBe('Alice Smith')
+  })
+})
+
+describe('update_relation types and properties', () => {
+  const entities = async () => {
+    const s = setup()
+    await s.call('add_node', { tempId: 'o', type: 'entity', label: 'Order' })
+    await s.call('add_node', { tempId: 'l', type: 'entity', label: 'Line' })
+    await s.call('add_relation', { sourceId: 'o', targetId: 'l', relationType: 'references', properties: { cardinality: 'many', description: 'lines' } })
+    const id = Object.keys(s.facade.getRelations())[0]
+    const rel = () => s.facade.getRelations()[id] as unknown as Record<string, unknown>
+    return { ...s, id, rel }
+  }
+
+  it('stores no type for an empty one, as Studio does', async () => {
+    const { call, id, rel } = await entities()
+    const res = await call('update_relation', { id, relationType: '' })
+    expect(res.ok, res.resultText).toBe(true)
+    expect('relationType' in rel()).toBe(false)
+  })
+
+  it('drops the properties the new type does not have, and says so', async () => {
+    // They stayed, unseen in Studio and out of reach of update_relation,
+    // which checks the bag against the new type.
+    const { call, id, rel } = await entities()
+    const res = await call('update_relation', { id, relationType: 'part-of' })
+    expect(res.ok, res.resultText).toBe(true)
+    expect(res.resultText).toMatch(/removed property "cardinality"/)
+    expect(rel().relationType).toBe('part-of')
+    expect('cardinality' in rel()).toBe(false)
+    expect('description' in rel()).toBe(false)
+  })
+
+  it('clears a property given as null', async () => {
+    const { call, id, rel } = await entities()
+    const res = await call('update_relation', { id, properties: { cardinality: null } })
+    expect(res.ok, res.resultText).toBe(true)
+    expect('cardinality' in rel()).toBe(false)
+    expect(rel().description).toBe('lines')
   })
 })
 
@@ -467,5 +603,52 @@ describe('a type added by another writer', () => {
     const res = await call('add_node', { tempId: 'x', type: 'no-such-type', label: 'X' })
     expect(res.ok).toBe(false)
     expect(res.resultText).toMatch(/unknown type "no-such-type"/)
+  })
+})
+
+// Item 192: create_view and update_view accepted chains they then read
+// otherwise: a via with no direction was dropped (the step took nothing), a
+// relation filter without direction was read as in, a property filter on an
+// unknown key or with an unknown op ("like" acted as is-not) was kept.
+describe('a filter chain given to create_view or update_view', () => {
+  const needs = { ways: [{ types: ['need'] }] }
+  const refused = async (pipeline: unknown) => {
+    const { call } = setup()
+    const made = await call('create_view', { tempId: 'v', name: 'Trace', pipeline })
+    expect(made.ok, JSON.stringify(pipeline)).toBe(false)
+    return made.resultText
+  }
+
+  it('is refused where it would be read otherwise than written', async () => {
+    expect(await refused({ levels: [needs, { ways: [{ via: { relationType: 'derives' }, types: ['requirement'] }] }] })).toMatch(/level 2: a via is \{relationType, direction/)
+    expect(await refused({ levels: [needs, { ways: [{ types: ['requirement'] }] }] })).toMatch(/level 2: a way needs a via/)
+    expect(await refused({ levels: [{ ways: [{ types: ['need'], via: { contains: true } }] }] })).toMatch(/level 1: the first level takes no via/)
+    expect(await refused({ levels: [{ ...needs, filters: [{ kind: 'relation', relationType: 'derives', has: true }] }] })).toMatch(/needs direction "in" or "out"/)
+    expect(await refused({ levels: [{ ...needs, filters: [{ kind: 'property', key: 'nope', op: 'set' }] }] })).toMatch(/no node type has a property "nope"/)
+    expect(await refused({ levels: [{ ...needs, filters: [{ kind: 'property', key: 'source', op: 'like', values: ['x'] }] }] })).toMatch(/op is "is", "is-not", "set" or "unset", not "like"/)
+    expect(await refused({ levels: [{ ...needs, filters: [{ kind: 'colour', value: 'red' }] }] })).toMatch(/unknown filter kind "colour"/)
+  })
+
+  it('is taken when it reads as written', async () => {
+    const { call } = setup()
+    const made = await call('create_view', { tempId: 'v', name: 'Trace', pipeline: { levels: [
+      { ...needs, filters: [{ kind: 'property', key: 'source', op: 'is', values: ['brief'] }, { kind: 'property', key: 'label', op: 'set' }] },
+      { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }], filters: [{ kind: 'relation', relationType: 'satisfies', direction: 'in', has: false }] },
+    ] } })
+    expect(made.ok, made.resultText).toBe(true)
+  })
+})
+
+describe('a within filter on an element that is deleted', () => {
+  it('goes from the view, so a viewpoint made from it is not refused', async () => {
+    const { facade, call } = setup()
+    await call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await call('add_node', { tempId: 'api', type: 'container', label: 'API', parentId: 'shop' })
+    expect((await call('create_view', { tempId: 'v', name: 'Inside', pipeline: { levels: [{ ways: [{ types: ['container'] }], filters: [{ kind: 'within', nodeId: 'shop' }] }] } })).ok).toBe(true)
+    expect((await call('delete_node', { id: 'shop' })).ok).toBe(true)
+    const view = Object.values(facade.toDiagramData().views ?? []).find((v) => v.name === 'Inside')!
+    expect(JSON.stringify(view.pipeline)).not.toContain('within')
+    const made = await call('upsert_viewpoint', { label: 'Inside', fromViewId: view.id })
+    expect(made.ok, made.resultText).toBe(true)
   })
 })

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CHANGELOG_URL, aboutRows, aboutText } from '../about'
 import { host } from '../platform/host'
+import { useDialogFocus } from './dialogKeys'
 
 interface Props {
   open: boolean
@@ -12,6 +13,8 @@ interface Props {
  *  Copy for a bug report and a link to the changelog. */
 export function AboutDialog({ open, onClose }: Props): React.ReactElement | null {
   const [copied, setCopied] = useState(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef, open)
 
   useEffect(() => {
     if (!open) return
@@ -30,7 +33,7 @@ export function AboutDialog({ open, onClose }: Props): React.ReactElement | null
 
   return createPortal(
     <div className="milestone-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="milestone-modal about-dialog" role="dialog" aria-modal="true" aria-label="About Radical Studio">
+      <div className="milestone-modal about-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-label="About Radical Studio">
         <button type="button" className="ai-settings-close" onClick={onClose} aria-label="Close" title="Close (Esc)">✕</button>
         <h3 className="milestone-modal-title">Radical Studio</h3>
         <dl className="about-rows">

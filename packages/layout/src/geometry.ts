@@ -385,15 +385,24 @@ export function makeRoomAround(
  * moved by hand into another container's folder, a model edited outside
  * Studio) reads so; such a node is placed afresh (placeUnplaced).
  */
-export function strayNodeIds(nodes: Record<string, C4Node>, positions: Record<string, unknown>): Set<string> {
+export function strayNodeIds(
+  nodes: Record<string, C4Node>,
+  positions: Record<string, unknown>,
+  folded: (n: C4Node) => boolean = (n) => n.collapsed,
+): Set<string> {
   const out = new Set<string>()
   for (const n of Object.values(nodes)) {
     const parent = n.parentId ? nodes[n.parentId] : undefined
     // A folded parent may keep the size it is drawn at, smaller than what
     // it holds: opened, it is fit to it.
-    if (!parent || parent.collapsed || !(n.id in positions) || !(parent.id in positions)) continue
-    const cx = n.x + effectiveWidth(n) / 2
-    const cy = n.y + effectiveHeight(n) / 2
+    if (!parent || folded(parent) || !(n.id in positions) || !(parent.id in positions)) continue
+    // Measured as the canvas draws it: folded there (in a view, by the
+    // view's own folds), at its folded size. At its open size the middle
+    // of a container folded at its parent's edge lay outside the parent
+    // fit to the fold, and a view switch placed it afresh.
+    const fold = isContainerType(n.type) && folded(n)
+    const cx = n.x + (fold ? COLLAPSED_WIDTH[n.type] : (n.width ?? NODE_SIZES[n.type].width)) / 2
+    const cy = n.y + (fold ? COLLAPSED_HEIGHT[n.type] : (n.height ?? NODE_SIZES[n.type].height)) / 2
     if (cx < 0 || cy < 0 || cx > parent.width || cy > parent.height) out.add(n.id)
   }
   return out
@@ -409,17 +418,19 @@ export function strayNodeIds(nodes: Record<string, C4Node>, positions: Record<st
  * siblings the canvas has placed, top-aligned with them, and its ancestors
  * are refit; where one grew, its siblings make room for it (growWithRoom). What is inside a node
  * placed this way keeps its place in it. Only nodes in `shown` (the ones a
- * view lists) are placed, when given. Mutates `nodes`; returns the ids it
- * placed. A canvas with no positions at all has not been laid out and is
+ * view lists) are placed, when given; `folded` says which containers the
+ * canvas draws folded (a view's own folds), the model's when not given.
+ * Mutates `nodes`; returns the ids it placed. A canvas with no positions at all has not been laid out and is
  * left as it is.
  */
 export function placeUnplaced(
   nodes: Record<string, C4Node>,
   positions: Record<string, unknown> | undefined,
   shown?: Set<string>,
+  folded?: (n: C4Node) => boolean,
 ): string[] {
   if (!positions || Object.keys(positions).length === 0) return []
-  const strays = strayNodeIds(nodes, positions)
+  const strays = strayNodeIds(nodes, positions, folded)
   const known = (id: string): boolean => id in positions && !strays.has(id)
   const depth = (n: C4Node): number => {
     let d = 0

@@ -13,10 +13,11 @@
 import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
-import { mergeModelEdits, mergeModels, modelEdits, type ModelEdits } from '@radical/common/modelMerge'
-import { useDiagramStore, parkedLiveModel, type ParkedDesigner } from '@radical/ui/store/diagramStore'
+import { mergeModelEdits, mergeModels, mergeNotices, modelEdits, type MergeDrop, type ModelEdits } from '@radical/common/modelMerge'
+import { useDiagramStore, historyMark, parkedLiveModel, type ParkedDesigner } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore, DocumentUnreadableError, StorageFullError, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
+import { openFirstView } from '../navigation'
 
 let reloadActive: () => void = () => {}
 
@@ -71,6 +72,8 @@ export function reloadActiveDocument(): void {
 // active document is (LS or FS, resolved fresh on every flush).
 if (typeof window !== 'undefined') {
   let _persistTimer: ReturnType<typeof setTimeout> | null = null
+  /** The longest a save waits while the model goes on changing. */
+  const MAX_SAVE_WAIT_MS = 2000
   let _suspended = false
   /** Edits made since the last save was handed to the document store: what a
    *  reload of an outside edit merges into the model it loads. */
@@ -110,8 +113,11 @@ if (typeof window !== 'undefined') {
       data.nodes = Object.values(live.nodes)
       data.relations = Object.values(live.relations)
       data.sequences = Object.values(live.sequences)
-      data.views = Object.values(pre.views)
-      data.defaultPositions = pre.defaultPositions
+      // A view an edit of Designer's milestone changed is saved as the live
+      // model has it (liveBackup.views).
+      const parked = pre.activeSnapshotId ? pre.liveBackup : null
+      data.views = Object.values(pre.views).map((v) => parked?.views?.[v.id] ?? v)
+      data.defaultPositions = parked?.defaultPositions ?? pre.defaultPositions
     }
     return data
   }
@@ -161,9 +167,19 @@ if (typeof window !== 'undefined') {
       reportSaveError(e, !leaving)
     }
   }
+  /** When the save waiting now was first asked for. */
+  let _pendingSince = 0
   const schedulePersist = (delay = 400): void => {
     _unsaved = true
-    if (_persistTimer !== null) clearTimeout(_persistTimer)
+    if (_persistTimer !== null) {
+      // Changes that keep coming (a layout settling on a large canvas) hold
+      // the save back no longer than this: each one put it off again, and
+      // a Warnier process of 150 steps was never saved.
+      if (Date.now() - _pendingSince >= MAX_SAVE_WAIT_MS) return
+      clearTimeout(_persistTimer)
+    } else {
+      _pendingSince = Date.now()
+    }
     _persistTimer = setTimeout(() => {
       _persistTimer = null
       void flushPersist()
@@ -216,19 +232,64 @@ if (typeof window !== 'undefined') {
   }
   // A save merged with an edit made outside Studio: where both changed the
   // same value the folder's was kept, and the user hears which.
-  documents.onSaveMerged((id, conflicts) => {
-    if (id === documents.getActiveId()) reportMergeConflicts(conflicts)
+  documents.onSaveMerged((id, merged) => {
+    if (id === documents.getActiveId()) reportMergeConflicts(merged)
   })
-  const reportMergeConflicts = (conflicts: string[]): void => {
-    if (!conflicts.length) return
-    const shown = conflicts.slice(0, 5).join('; ') + (conflicts.length > 5 ? ` and ${conflicts.length - 5} more` : '')
-    useDiagramStore.getState().pushNotification(`Your edits were merged with a change made outside Studio. Where both changed the same value, the folder's was kept: ${shown}.`, 'warning')
+  const reportMergeConflicts = ({ conflicts, ...rest }: { conflicts: string[]; dropped?: MergeDrop[]; restored?: string[] }): void => {
+    const list = (items: string[]) => items.slice(0, 5).join('; ') + (items.length > 5 ? ` and ${items.length - 5} more` : '')
+    if (conflicts.length) {
+      useDiagramStore.getState().pushNotification(`Your edits were merged with a change made outside Studio. Where both changed the same value, the folder's was kept: ${list(conflicts)}.`, 'warning')
+    }
+    // A delete won over an edit of the other side; a container came back.
+    const notices = mergeNotices(rest, { ours: 'in Studio', theirs: 'outside Studio' })
+    if (notices.length) useDiagramStore.getState().pushNotification(`Your edits were merged with a change made outside Studio: ${list(notices)}.`, 'warning')
   }
 
   /** The folder changed outside Studio while a presentation played: read
    *  once it stops. Read at once, it ended the presentation (the store holds
    *  a slide, not the document) and lost the edits held for an agent. */
   let _changedWhilePresenting: string | null = null
+
+  // ── A load saves nothing by itself ──────────────────────────────────────
+  // After a load (a reload of the page, a document opened, an outside
+  // change) the store goes on changing: the live layout settles, the canvas
+  // gives places to what it has none for, the camera is put back. None of
+  // it is the user's: until they edit the model (an undo step made, undone
+  // or redone, or a change to more than places), nothing is written. A
+  // reload saved the document and its nodes[].x/y mirror, also in Viewer
+  // and Presenter (D15).
+  /** historyMark() when the active document was last loaded; null once the
+   *  user has edited it since. */
+  let _loadedAt: number | null = historyMark()
+  const NODE_PLACE = new Set(['x', 'y', 'width', 'height'])
+  const VIEW_PLACE = new Set(['positions', 'viewport'])
+  /** `next` differs from `was` in the places `keys` name only. */
+  const placesOnly = <T extends object>(was: Record<string, T>, next: Record<string, T>, keys: Set<string>): boolean => {
+    const ids = new Set([...Object.keys(was), ...Object.keys(next)])
+    for (const id of ids) {
+      const a = was[id] as Record<string, unknown> | undefined
+      const b = next[id] as Record<string, unknown> | undefined
+      if (a === b) continue
+      if (!a || !b) return false
+      for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+        if (!keys.has(k) && a[k] !== b[k]) return false
+      }
+    }
+    return true
+  }
+  /** The change from `prev` to `s` only places things (the live layout, a
+   *  canvas shown, the camera). */
+  type StoreState = ReturnType<typeof useDiagramStore.getState>
+  const placesOnlyChange = (s: StoreState, prev: StoreState): boolean =>
+    s.c4Relations === prev.c4Relations &&
+    s.sequences === prev.sequences &&
+    s.defaultLayoutConstraints === prev.defaultLayoutConstraints &&
+    s.defaultEdgeStyle === prev.defaultEdgeStyle &&
+    s.snapshots === prev.snapshots &&
+    s.presentations === prev.presentations &&
+    s.metamodel === prev.metamodel &&
+    (s.c4Nodes === prev.c4Nodes || placesOnly(prev.c4Nodes as Record<string, object>, s.c4Nodes as Record<string, object>, NODE_PLACE)) &&
+    (s.views === prev.views || placesOnly(prev.views as Record<string, object>, s.views as Record<string, object>, VIEW_PLACE))
 
   let prev = useDiagramStore.getState()
   useDiagramStore.subscribe((s) => {
@@ -268,6 +329,12 @@ if (typeof window !== 'undefined') {
     // explored model layout is not written alongside them.
     const presChangedInExplore =
       isExploreMode && s.presentations !== prev.presentations
+    if (_loadedAt !== null && modelChanged && historyMark() === _loadedAt && placesOnlyChange(s, prev)) {
+      // The load settling: kept from disk until the user edits.
+      prev = s
+      return
+    }
+    if (modelChanged && !isExploreMode) _loadedAt = null
     if (!isExploreMode && modelChanged) {
       prev = s
       schedulePersist()
@@ -290,7 +357,7 @@ if (typeof window !== 'undefined') {
   const loadActive = (
     id: string,
     source: DocumentSource | undefined,
-    opts?: { keepUi?: boolean },
+    opts?: { keepUi?: boolean; firstView?: boolean },
   ): void => {
     const seq = ++_loadSeq
     _changedWhilePresenting = null
@@ -311,8 +378,13 @@ if (typeof window !== 'undefined') {
     if (_watchingId !== id) stopWatching()
     const live = useDiagramStore.getState()
     const camera = opts?.keepUi ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
+    // The live model, also while a milestone is shown: an outside change is
+    // the live model's. Compared with the milestone, a milestone deleted
+    // outside lit up what it and its edits had otherwise.
     const before: BeforeOutsideEdit | null = opts?.keepUi
-      ? { id, nodes: live.c4Nodes, relations: live.c4Relations }
+      ? live.activeSnapshotId && live.liveBackup
+        ? { id, nodes: live.liveBackup.nodes, relations: live.liveBackup.relations }
+        : { id, nodes: live.c4Nodes, relations: live.c4Relations }
       : null
     documents.loadDocument(id).then((data) => {
       if (seq !== _loadSeq || documents.getActiveId() !== id) return
@@ -327,18 +399,22 @@ if (typeof window !== 'undefined') {
         // Edits the page had not written when it went away (keepEdits).
         const kept = !opts?.keepUi && source === 'md' ? takeKeptEdits(id) : null
         if (unsaved) {
-          const { merged, conflicts } = mergeModels(unsaved.base, unsaved.ours, data)
+          const { merged, ...report } = mergeModels(unsaved.base, unsaved.ours, data)
           store.loadDiagram(structuredClone(merged), { outsideChange })
           mergedEdits = true
-          reportMergeConflicts(conflicts)
+          reportMergeConflicts(report)
         } else if (kept) {
-          const { merged, conflicts } = mergeModelEdits(kept, data)
+          const { merged, ...report } = mergeModelEdits(kept, data)
           store.loadDiagram(structuredClone(merged))
           mergedEdits = true
-          reportMergeConflicts(conflicts)
+          reportMergeConflicts(report)
         } else {
           store.loadDiagram(data, { outsideChange })
         }
+        // A model opened (from a file, a folder, the list, a Hub link) shows
+        // its first view: All elements, the table of everything, only when
+        // it has none. It landed on All elements.
+        if (opts?.firstView) openFirstView()
         // A reload of the same document keeps the user where they were.
         if (opts?.keepUi) {
           const next = useDiagramStore.getState()
@@ -386,6 +462,8 @@ if (typeof window !== 'undefined') {
         if (seq !== _loadSeq) return
         _suspended = false
         _loadingId = null
+        // What settles from here on is the load's, not an edit.
+        _loadedAt = mergedEdits ? null : historyMark()
         // The merged edits are still to be saved.
         if (mergedEdits) schedulePersist()
         if (documents.getActiveId() === id) for (const listener of [..._loadListeners]) listener(id)
@@ -439,7 +517,17 @@ if (typeof window !== 'undefined') {
       // The active document became folder-backed without a reload ("Save as
       // folder…"): start following its folder.
       const active = s.docs.find(d => d.id === s.activeId)
+      // The folder was just written with the model as it is: that is what
+      // later edits are kept against (keepEdits). Set only by a save, it
+      // stayed unset once a load stopped saving by itself (D15), and an edit
+      // held for an agent was lost by a reload.
+      if (active?.source === 'md' && !_baseModel) {
+        _baseModel = buildPersistData()
+        _savedShape = _baseModel
+      }
       if (active?.source === 'md' && !_suspended) watchActive(active.id)
+      // Moved back to the browser: the folder is not followed any more.
+      else if (active && active.source !== 'md') stopWatching()
       return
     }
     const leaving = prevActive
@@ -466,7 +554,7 @@ if (typeof window !== 'undefined') {
       }
       return
     }
-    loadActive(s.activeId, documents.listDocuments().find(d => d.id === s.activeId)?.source)
+    loadActive(s.activeId, documents.listDocuments().find(d => d.id === s.activeId)?.source, { firstView: true })
   })
 
   // Expose hooks for other modules / future use.

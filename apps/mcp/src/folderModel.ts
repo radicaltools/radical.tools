@@ -7,20 +7,22 @@ import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
 import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
 import { MD_FOLDER_FORMAT_VERSION, MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
+import { mergeNotices } from '@radical/common/modelMerge'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { modelChangesSince } from '@radical/node-files/gitModel'
-import { readEditorStateFile, readSelectionFile, writeEditorStateFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
+import { readEditorStateFile, writeEditorStateFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
+import { SELECTION_FILE, parseSelection } from '@radical/common/formats/canvasSelection'
 import { MODEL_BASE_FILE, forgeModelBase, mayReplaceWithForgeBase } from '@radical/common/formats/modelBase'
 import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE, serializeAgentActivity } from '@radical/common/formats/agentActivity'
 import { displayVersion } from '@radical/common/version'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
-import { fitShown, growWithRoom, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
+import { fitShown, growFrameLeftUp, growWithRoom, makeRoomAround, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
-import { viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
+import { computeViewNodeSet, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
-import { pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
+import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
 import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
@@ -120,8 +122,10 @@ function checkData(data: DiagramData): void {
       ids.add(item.id)
     }
   }
+  // An empty label is a name not given yet: Studio and radical check read
+  // the element, and so does the server (it refused every call).
   for (const node of data.nodes) {
-    if (!node.type || !node.label || ![node.x, node.y, node.width, node.height].every(Number.isFinite)) {
+    if (!node.type || typeof node.label !== 'string' || ![node.x, node.y, node.width, node.height].every(Number.isFinite)) {
       throw new Error(`Malformed node ${node.id}: invalid type, label or geometry`)
     }
   }
@@ -189,6 +193,55 @@ function settleGeometry(before: DiagramData, after: DiagramData): void {
     const prev = old[node.id]
     if (prev && prev.x === node.x && prev.y === node.y && prev.width === node.width && prev.height === node.height) continue
     after.defaultPositions[node.id] = { x: node.x, y: node.y, width: node.width, height: node.height }
+  }
+}
+
+/** Whether `view` draws `node` folded: folded there, or on the model and
+ *  not opened there. */
+const foldedOn = (view: DiagramView, node: C4Node): boolean =>
+  isContainerType(node.type) && ((node.collapsed && !view.expandedNodeIds?.includes(node.id)) || !!view.collapsedNodeIds?.includes(node.id))
+
+/** A container folded or opened on a view (update_view collapse, expand)
+ *  changes size there as Studio's toggle changes it: folded, to the middle
+ *  of its frame; opened, with the frame its children need round the folded
+ *  box's middle, what lies round it making room, its parents refit. Opened
+ *  as the lists alone said, it was drawn at the folded box's corner at full
+ *  size, over its neighbours. Mutates `after`'s view positions. */
+function settleViewFolds(before: DiagramData, after: DiagramData): void {
+  const old = byId(before.nodes)
+  const model = byId(after.nodes)
+  const relations = byId(after.relations)
+  const views = new Map((before.views ?? []).map((view) => [view.id, view]))
+  for (const view of after.views ?? []) {
+    const prev = views.get(view.id)
+    const positions = view.positions
+    if (!prev || !positions || (view.kind ?? 'static') !== 'static') continue
+    const toggled = after.nodes.filter((n) => n.id in positions && old[n.id] && foldedOn(prev, old[n.id]) !== foldedOn(view, n))
+    if (!toggled.length) continue
+    // The view's canvas: its places, folded as it folds them.
+    const nodes: Record<string, C4Node> = Object.fromEntries(after.nodes.map((n) => [n.id, { ...n, ...positions[n.id], collapsed: foldedOn(view, n) }]))
+    const canvas = modelCanvas(nodes, computeViewNodeSet(view, model, relations))
+    for (const { id } of toggled) {
+      const node = nodes[id]
+      if (node.collapsed) {
+        node.x += Math.max(0, (node.width - COLLAPSED_WIDTH[node.type]) / 2)
+        node.y += Math.max(0, (node.height - COLLAPSED_HEIGHT[node.type]) / 2)
+      } else {
+        fitShown(nodes, id, canvas)
+        node.x += COLLAPSED_WIDTH[node.type] / 2 - node.width / 2
+        node.y += COLLAPSED_HEIGHT[node.type] / 2 - node.height / 2
+        for (const [sid, at] of Object.entries(makeRoomAround(id, nodes, canvas))) Object.assign(nodes[sid], at)
+      }
+      if (!node.parentId || !nodes[node.parentId]) continue
+      // Opened round its middle, it can reach past its parent's left or top
+      // edge, where a refit (which grows right and down) does not follow.
+      growFrameLeftUp(nodes, node.parentId, canvas.shown)
+      growWithRoom(nodes, node.parentId, canvas)
+    }
+    for (const id of Object.keys(positions)) {
+      const n = nodes[id]
+      if (n) positions[id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+    }
   }
 }
 
@@ -319,9 +372,16 @@ export class FolderModel {
   /** The canvas selection Studio wrote into the folder, resolved against
    *  the model as it is now. */
   private async selection(facade: ReturnType<typeof createModelFacade>): Promise<string> {
-    const selection = await readSelectionFile(this.folder)
-    if (!selection) {
+    const text = await readEditorStateFile(this.folder, SELECTION_FILE)
+    if (text === null) {
       return 'No selection: Studio has not had this folder open with a selection yet. Open the same folder in Studio and select something, or ask the user which element they mean.'
+    }
+    const selection = parseSelection(text)
+    if (!selection) {
+      const version = (() => { try { return (JSON.parse(text) as { version?: unknown }).version } catch { return undefined } })()
+      return typeof version === 'number' && version > 1
+        ? `No selection: ${SELECTION_FILE} was written by a newer Studio (version ${version}) than this server reads. Update the server, or ask the user which element they mean.`
+        : `No selection: ${SELECTION_FILE} cannot be read (Studio may be writing it, or it was edited by hand). Select again in Studio, or ask the user which element they mean.`
     }
     const query = {
       nodes: facade.getNodes(),
@@ -334,7 +394,8 @@ export class FolderModel {
     const result = {
       updatedAt: selection.updatedAt,
       secondsAgo: Math.max(0, Math.round((Date.now() - Date.parse(selection.updatedAt)) / 1000)),
-      view: view ? { id: view.id, name: view.name, kind: view.kind ?? 'static' } : { id: null, name: 'All elements' },
+      // A view deleted since Studio wrote the file is not All elements.
+      view: view ? { id: view.id, name: view.name, kind: view.kind ?? 'static' } : selection.viewId ? { id: selection.viewId, name: null, deleted: true } : { id: null, name: 'All elements' },
       nodes: selection.nodeIds.filter((id) => query.nodes[id]).map((id) => runModelQuery(`GET NODE "${id}"`, query).result),
       relations: selection.relationIds.map((id) => query.relations[id]).filter(Boolean)
         .map(({ id, relationType, label, sourceId, targetId, technology }) => ({
@@ -417,6 +478,7 @@ export class FolderModel {
         this.restoreTempIds(priorTempIds)
         return { ok: false, text: refused }
       }
+      const metamodelBefore = facade.getMetamodel?.()
       const result: ForgeResult = FORGE_TOOLS.has(name)
         ? await this.forge.call(name, input, ctx, facade)
         : await runTool(name, input, ctx)
@@ -434,6 +496,7 @@ export class FolderModel {
 
       let changed = result.data ?? facade.toDiagramData()
       settleGeometry(data, changed)
+      settleViewFolds(data, changed)
       const metamodel = facade.getMetamodel?.()
       // A view per element this call made (an element added, a group made)
       // is laid out at once, as Studio does when it is first opened.
@@ -444,7 +507,7 @@ export class FolderModel {
         if (laidOut.changed) changed = laidOut.changed
       }
       const note = fresh.length ? ` Smart Layout arranged ${fresh.length === 1 ? `the new view ${fresh[0].name}` : `the ${fresh.length} new views per element`}.` : ''
-      const outcome = await this.commit(session, before, data, changed, metamodel, result.resultText + note)
+      const outcome = await this.commit(session, before, data, changed, metamodel, result.resultText + note, metamodelBefore)
       if (!outcome.ok) {
         this.restoreTempIds(priorTempIds)
         return outcome
@@ -538,23 +601,30 @@ export class FolderModel {
   }
 
   /** Validates `changed` against the metamodel and writes the files that
-   *  differ from `before`, unless the folder changed in the meantime. */
+   *  differ from `before`, unless the folder changed in the meantime.
+   *  `metamodelBefore` is the metamodel before the call: a change of it that
+   *  breaks what the model holds is made, and the agent is told what it
+   *  breaks, as Studio lists it before it asks. */
   private async commit(
     session: MdFolderSession, before: FolderFiles, data: DiagramData, changed: DiagramData,
-    metamodel: Metamodel | undefined, resultText: string,
+    metamodel: Metamodel | undefined, resultText: string, metamodelBefore?: Metamodel,
   ): Promise<CallOutcome> {
     checkData(changed)
     if (!metamodel) throw new Error('Model has no metamodel')
-    const previous = new Set(issuesOf(data, metamodel).map((issue) => issue.id))
+    // Compared with the metamodel the model had, so a narrowed one is
+    // heard of (compared with the new one, nothing was new).
+    const retyped = !!metamodelBefore && JSON.stringify(metamodelBefore) !== JSON.stringify(metamodel)
+    const previous = new Set(issuesOf(data, retyped ? metamodelBefore! : metamodel).map((issue) => issue.id))
     const fresh = issuesOf(changed, metamodel).filter((issue) => !previous.has(issue.id))
-    const newError = fresh.find((issue) => issue.severity === 'error')
+    const newError = retyped ? undefined : fresh.find((issue) => issue.severity === 'error')
     if (newError) return { ok: false, text: newError.message }
     // Warnings do not stop a write (a machine is incomplete while it is being
     // built), but the agent hears about the ones its change brought in.
-    const warnings = fresh.filter((issue) => issue.severity === 'warning')
-    const warned = warnings.length
-      ? ` New warnings (fine while you are still building; fix them before you finish, see get_issues):${warnings.slice(0, MAX_WARNINGS).map((issue) => `\n- ${issue.message}`).join('')}${warnings.length > MAX_WARNINGS ? `\n- …and ${warnings.length - MAX_WARNINGS} more` : ''}`
-      : ''
+    const warnings = retyped ? fresh : fresh.filter((issue) => issue.severity === 'warning')
+    const list = `${warnings.slice(0, MAX_WARNINGS).map((issue) => `\n- ${issue.message}`).join('')}${warnings.length > MAX_WARNINGS ? `\n- …and ${warnings.length - MAX_WARNINGS} more` : ''}`
+    const warned = !warnings.length ? ''
+      : retyped ? ` Warning: the metamodel now flags what the model holds (${warnings.length} ${warnings.length === 1 ? 'issue' : 'issues'}; change those elements or the metamodel back, see get_issues):${list}`
+      : ` New warnings (fine while you are still building; fix them before you finish, see get_issues):${list}`
     const next = serializeToMdFolderWithPaths(changed).files
     // Preserve the user's manifest prose/name. The format codec only needs
     // to rewrite model-owned sidecars and node Markdown.
@@ -569,8 +639,9 @@ export class FolderModel {
     const write = await session.write(next, mergeMdFolderFiles)
     if (!write.ok) return { ok: false, text: `The folder changed while this call ran and does not read as a model (${write.conflict.join(', ')}); no files written. Fix the file, then try again.` }
     await this.markAgentWriting()
+    const notices = write.merged ? mergeNotices(write.merged, { ours: 'by this call', theirs: 'in the folder meanwhile' }) : []
     const merged = write.merged
-      ? ` Merged with edits made in the folder while the call ran (${write.merged.changed.join(', ')})${write.merged.conflicts.length ? `; where both changed the same value the folder's was kept: ${write.merged.conflicts.join('; ')}. Check them with search_model` : ''}.`
+      ? ` Merged with edits made in the folder while the call ran (${write.merged.changed.join(', ')})${write.merged.conflicts.length ? `; where both changed the same value the folder's was kept: ${write.merged.conflicts.join('; ')}. Check them with search_model` : ''}${notices.length ? `; ${notices.join('; ')}` : ''}.`
       : ''
     const revision = createHash('sha256').update(paths.map((path) => `${path}\0${next[path] ?? ''}`).join('\0')).digest('hex').slice(0, 12)
     const createdRelation = changed.relations.find((relation) => !data.relations.some((old) => old.id === relation.id))?.id

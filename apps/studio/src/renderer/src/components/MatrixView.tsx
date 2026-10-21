@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
+import React, { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
 import {
   useDiagramStore,
   computeViewCollapsedSet,
@@ -50,7 +50,9 @@ export function MatrixView(): React.ReactElement {
   const removeRelation   = useDiagramStore((s) => s.removeRelation)
   const pushNotification = useDiagramStore((s) => s.pushNotification)
   const appMode          = useDiagramStore((s) => s.appMode)
-  const readonly         = appMode !== 'designer'
+  // Read-only out of Designer, and on a slide played from it (F5).
+  const presenting       = useDiagramStore((s) => s.presentationActive)
+  const readonly         = appMode !== 'designer' || presenting
 
   const [hover, setHover] = useState<{ row: number; col: number } | null>(null)
 
@@ -61,8 +63,14 @@ export function MatrixView(): React.ReactElement {
     targetNode: C4Node
     x: number
     y: number
+    /** The top of the clicked cell: the popup opens above it where there
+     *  is no room below. */
+    above: number
   }
   const [popup, setPopup] = useState<PopupState | null>(null)
+  // Where the popup is drawn: under the cell, or above it, and inside the
+  // window (it stayed under the cell, off the screen near its bottom edge).
+  const [popupAt, setPopupAt] = useState<{ left: number; top: number } | null>(null)
   // The relation whose cell was clicked last, here in the matrix: a second
   // click on that cell removes it. The selection alone is no such click: a
   // relation selected on a canvas (or in the table) and still selected when
@@ -77,12 +85,25 @@ export function MatrixView(): React.ReactElement {
     const onClickOutside = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) setPopup(null)
     }
+    // The matrix scrolled: the cell moved from under the popup, which closes.
+    const onScroll = (e: Event) => { if (!popupRef.current?.contains(e.target as Node)) setPopup(null) }
     document.addEventListener('keydown', onKey)
     document.addEventListener('mousedown', onClickOutside)
+    document.addEventListener('scroll', onScroll, true)
     return () => {
       document.removeEventListener('keydown', onKey)
       document.removeEventListener('mousedown', onClickOutside)
+      document.removeEventListener('scroll', onScroll, true)
     }
+  }, [popup])
+  useLayoutEffect(() => {
+    const el = popupRef.current
+    if (!popup || !el) { setPopupAt(null); return }
+    const w = el.offsetWidth, h = el.offsetHeight, margin = 8
+    const left = Math.max(margin + w / 2, Math.min(popup.x, window.innerWidth - margin - w / 2))
+    const below = popup.y + h <= window.innerHeight - margin
+    const top = below ? popup.y : Math.max(margin, popup.above - 4 - h)
+    setPopupAt({ left, top })
   }, [popup])
 
   // ── Collapse-aware view state ──────────────────────────────────────────────
@@ -175,7 +196,7 @@ export function MatrixView(): React.ReactElement {
         if (relIds.length > 1) {
           // Multiple relations — show popup to pick one.
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-          setPopup({ relIds, sourceNode: source, targetNode: target, x: rect.left + rect.width / 2, y: rect.bottom + 4 })
+          setPopup({ relIds, sourceNode: source, targetNode: target, x: rect.left + rect.width / 2, y: rect.bottom + 4, above: rect.top })
           return
         }
         const existingId = relIds[0]
@@ -329,7 +350,7 @@ export function MatrixView(): React.ReactElement {
         <div
           ref={popupRef}
           className="mx-popup"
-          style={{ left: popup.x, top: popup.y }}
+          style={{ left: popupAt?.left ?? popup.x, top: popupAt?.top ?? popup.y, visibility: popupAt ? undefined : 'hidden' }}
         >
           <div className="mx-popup-header">
             <span className="mx-popup-from">{popup.sourceNode.label}</span>

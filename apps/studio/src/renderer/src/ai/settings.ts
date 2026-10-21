@@ -95,6 +95,9 @@ export function activeProviderNeedsKey(settings: AISettings): boolean {
   return settings.active !== 'ollama' && !settings.providers[settings.active]?.apiKey
 }
 
+/** Why Radical Forge is not offered: it runs on an AI provider. */
+export const FORGE_NEEDS_AI = 'Radical Forge needs an AI provider. Set one up in the Radical menu → AI providers…'
+
 /** AI is switched on and the active provider can be called. */
 export function aiReady(settings: AISettings): boolean {
   return settings.enabled && !activeProviderNeedsKey(settings)

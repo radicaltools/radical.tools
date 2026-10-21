@@ -37,6 +37,18 @@ export interface ConceptViewOptions {
   /** Keep the view's stored node positions, under the ids `maps.node`
    *  gives (the Hub viewer and the imports into a model). */
   keepPositions?: boolean
+  /** Names the model's views have: a view gets another (" 2"), and its
+   *  name joins them. */
+  takenNames?: Set<string>
+}
+
+/** `name`, or, when `taken` has it, the first of "name 2", "name 3", … it
+ *  has not; the name returned joins `taken`. */
+export function uniqueName(name: string, taken: Set<string>): string {
+  let out = name
+  for (let i = 2; taken.has(out); i++) out = `${name} ${i}`
+  taken.add(out)
+  return out
 }
 
 function mapPositions(raw: unknown, map: IdMap): Record<string, NodePosition> {
@@ -101,9 +113,10 @@ export function conceptViewsToDiagram(
     if (nodeIds.length === 0) continue
     const sequenceId = kind === 'dynamic' && typeof raw.sequenceId === 'string' ? maps.sequence(raw.sequenceId) : undefined
     const name = typeof raw.name === 'string' && raw.name ? raw.name : `View ${i + 1}`
+    const fullName = opts.namePrefix ? `${opts.namePrefix} — ${name}` : name
     const view: DiagramView = {
       id: opts.newId ? opts.newId() : typeof raw.id === 'string' ? raw.id : `view-${i}`,
-      name: opts.namePrefix ? `${opts.namePrefix} — ${name}` : name,
+      name: opts.takenNames ? uniqueName(fullName, opts.takenNames) : fullName,
       kind: kind === 'dynamic' ? (sequenceId ? 'dynamic' : 'static') : kind,
       nodeIds,
       positions: opts.keepPositions ? mapPositions(raw.positions, maps.node) : {},

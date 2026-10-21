@@ -96,21 +96,28 @@ interface LayoutSidecar {
  *  semantic in JSON), array order preserved (it may be — e.g. view tab order),
  *  2-space indented, with a trailing newline. Deterministic output keeps git
  *  diffs minimal regardless of the store's internal key/insertion order. */
-function stableStringify(value: unknown): string {
-  return JSON.stringify(sortObjectKeys(value), null, 2) + '\n'
+function stableStringify(value: unknown, ordered?: ReadonlySet<string>): string {
+  return JSON.stringify(sortObjectKeys(value, ordered), null, 2) + '\n'
 }
 
-function sortObjectKeys(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortObjectKeys)
+/** `value` with its objects' keys sorted, but those of the objects under a
+ *  key in `ordered` (at any depth), whose order is the model's. */
+function sortObjectKeys(value: unknown, ordered?: ReadonlySet<string>, keep = false): unknown {
+  if (Array.isArray(value)) return value.map((item) => sortObjectKeys(item, ordered))
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}
-    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
-      out[key] = sortObjectKeys((value as Record<string, unknown>)[key])
+    const keys = Object.keys(value as Record<string, unknown>)
+    for (const key of keep ? keys : keys.sort()) {
+      out[key] = sortObjectKeys((value as Record<string, unknown>)[key], ordered, !!ordered?.has(key) && !keep)
     }
     return out
   }
   return value
 }
+
+/** The metamodel's types are in the order they were added, which the
+ *  metamodel editor and the palette show: read back A–Z, they changed order. */
+const METAMODEL_ORDERED_KEYS: ReadonlySet<string> = new Set(['nodeTypes', 'relationTypes'])
 
 const BARE_KEY = /^[A-Za-z0-9_-]+$/
 
@@ -220,8 +227,10 @@ function slugify(text: string, fallback: string): string {
     .normalize('NFKD')
     .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 60)
-  return slug || fallback
+  // 60 characters, not UTF-16 units: a cut through a character outside the
+  // BMP left half of it, which the disk writes as U+FFFD, and the next
+  // write took the file for a stale one and deleted it.
+  return [...slug].slice(0, 60).join('') || fallback
 }
 
 /** Allocate a unique slug within a directory (case-insensitive), appending
@@ -352,7 +361,7 @@ export function serializeToMdFolderWithPaths(data: DiagramData, modelName?: stri
   writeJsonIfPresent(files, SEQUENCES_FILE, data.sequences, (s) => !!s && s.length > 0)
   writeJsonIfPresent(files, SNAPSHOTS_FILE, data.snapshots, (s) => !!s && s.length > 0)
   writeJsonIfPresent(files, PRESENTATIONS_FILE, data.presentations, (p) => !!p && p.length > 0)
-  if (data.metamodel) files[METAMODEL_FILE] = stableStringify(data.metamodel)
+  if (data.metamodel) files[METAMODEL_FILE] = stableStringify(data.metamodel, METAMODEL_ORDERED_KEYS)
   if (data.hubTemplates && Object.keys(data.hubTemplates).length > 0) {
     files[HUB_TEMPLATES_FILE] = stableStringify(data.hubTemplates)
   }
@@ -373,6 +382,8 @@ function writeJsonIfPresent<T>(
 
 export interface DeserializeMdFolderResult {
   data: DiagramData
+  /** The model's name in `radical.md`, where it has one. */
+  name?: string
 }
 
 export function deserializeFromMdFolder(
@@ -463,7 +474,8 @@ export function deserializeFromMdFolder(
   if (layout.defaultLayoutConstraints?.length) data.defaultLayoutConstraints = layout.defaultLayoutConstraints
   if (layout.defaultEdgeStyle === 'orthogonal') data.defaultEdgeStyle = layout.defaultEdgeStyle
 
-  return { data }
+  const manifest = typeof files[MD_MANIFEST_FILE] === 'string' ? parseMarkdown(files[MD_MANIFEST_FILE]).front.name : undefined
+  return { data, ...(typeof manifest === 'string' && manifest.trim() ? { name: manifest.trim() } : {}) }
 }
 
 /** True when the file map looks like a Radical md-folder (has the manifest). */

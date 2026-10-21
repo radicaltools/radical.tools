@@ -239,6 +239,51 @@ test('Undo after an outside edit takes back the user\'s edit and keeps the outsi
   expect(Object.values(await folder.files()).some((c) => c.includes('label: "Book Lover"'))).toBe(true)
 })
 
+test('an agent\'s write leaves the sequence card open', async ({ page, studio }) => {
+  await saveAsFolder(page)
+  await expect.poll(() => folder.paths()).toContain('nodes/customer.md')
+  await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+  await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
+  await expect(page.locator('.right-panel .seq-step')).toHaveCount(4)
+  const file = (await folder.files())['nodes/customer.md']
+  await folder.write('nodes/customer.md', file.replace('label: "Customer"', 'label: "Book Lover"'))
+  await expect(studio.node('customer')).toContainText('Book Lover', { timeout: 10_000 })
+  await expect(page.locator('.right-panel .seq-step')).toHaveCount(4)
+})
+
+test('Move to a folder keeps the model\'s name, and a rename reaches radical.md at once', async ({ page }) => {
+  // The model was renamed after the folder, and a rename waited for the
+  // next save to reach radical.md.
+  await saveAsFolder(page)
+  await expect.poll(async () => (await folder.files())['radical.md']).toContain('name: "E2E"')
+  await openModels(page)
+  const models = page.getByRole('dialog', { name: 'Models' })
+  await expect(models.getByRole('button', { name: 'Actions for E2E' })).toBeVisible()
+  await models.getByRole('button', { name: 'Actions for E2E' }).click()
+  await page.getByRole('menuitem', { name: 'Rename' }).click()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.type('Bookshop')
+  await page.keyboard.press('Enter')
+  await expect.poll(async () => (await folder.files())['radical.md']).toContain('name: "Bookshop"')
+})
+
+test('a folder opened is named as its radical.md says, and opening a view leaves radical.md alone', async ({ page, studio }) => {
+  const files = serializeToMdFolder(JSON.parse(fixture('bookstore')), 'Bookstore')
+  for (const [path, content] of Object.entries(files)) await folder.write(path, content)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await openModels(page)
+  await expect(page.getByRole('dialog', { name: 'Models' }).getByRole('button', { name: 'Actions for Bookstore' })).toBeVisible()
+  await page.getByRole('dialog', { name: 'Models' }).getByRole('button', { name: 'Close' }).click()
+  await page.locator('.lp-view-card', { hasText: 'System Context' }).click()
+  await studio.settle()
+  await page.waitForTimeout(2500)
+  expect((await folder.files())['radical.md']).toBe(files['radical.md'])
+})
+
 test('files the model does not own are left alone', async ({ page, studio }) => {
   await folder.write('package.json', '{"name":"shop"}')
   await folder.write('nodes/README.md', '# Notes\n')
@@ -281,8 +326,9 @@ test('Open → Folder… on the welcome screen opens a model folder', async ({ p
   await page.getByRole('button', { name: 'Folder…' }).click()
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
-  // It opens on All elements, the table of the whole model.
-  await expect(studio.row('customer')).toBeVisible()
+  // It opens on its first view (decided 2026-10-21; it landed on All elements).
+  await expect(page).toHaveURL(/\/v\/v-context$/)
+  await expect(studio.node('customer')).toBeVisible()
   await openModels(page)
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
 })
@@ -378,9 +424,32 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
   await write('closed', { requirements: 'done', domain: 'done' })
   await expect(button).toHaveAttribute('data-agent-phase', 'paused', { timeout: 10_000 })
   await expect(panel.locator('.forge-agent-line')).toHaveText('Stopped: Claude Code closed before the run finished.')
-  // Nothing more to follow.
-  await expect(panel.getByRole('button')).toHaveCount(1)
+  // Nothing more to follow; Studio's own Forge can be started again.
+  await expect(panel.getByRole('button')).toHaveCount(2)
+  await expect(panel.getByRole('button', { name: 'Start a new run' })).toBeVisible()
   await expect(button).not.toHaveAttribute('data-following')
   await page.keyboard.press('Escape')
   await expect(panel).toHaveCount(0)
+})
+
+// Item 189: an agent's write closed the card of a selected relation while it
+// was typed in (the focus went, the next keys were lost); an element's card
+// stayed open. The reload took the document opened at boot for another, and
+// dropped the selection.
+test('an outside write keeps the selected relation\'s card open, and what is typed in it', async ({ page, studio }) => {
+  await page.locator('.lp-view-card', { hasText: 'Containers' }).click()
+  await expect(studio.node('api')).toBeVisible()
+  await saveAsFolder(page)
+  await expect.poll(() => folder.paths()).toContain('nodes/customer.md')
+  await page.locator('[data-testid="rf__edge-r3"] .react-flow__edge-interaction').dispatchEvent('click')
+  const technology = page.locator('.right-panel.open').getByLabel('Technology', { exact: true })
+  await technology.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' v2')
+  const file = (await folder.files())['nodes/customer.md']
+  await folder.write('nodes/customer.md', file.replace('label: "Customer"', 'label: "Book Lover"'))
+  await expect(studio.node('customer')).toContainText('Book Lover', { timeout: 10_000 })
+  await expect(technology).toBeFocused()
+  await page.keyboard.type('.1')
+  await expect(technology).toHaveValue('SQL v2.1')
 })

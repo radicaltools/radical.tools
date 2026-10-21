@@ -5,17 +5,55 @@
 // (hub/importConcept.ts, centred on the viewport); the MCP server's Forge
 // adds it to the folder, beside the existing model.
 
-import type { C4ElementType, C4Node, C4Relation, DiagramSequence, DiagramView } from './c4'
+import type { C4ElementType, C4Node, C4Relation, DiagramData, DiagramSequence, DiagramView } from './c4'
 import { NODE_SIZES } from './c4'
 import type { HubConcept, HubImportRecord, TemplateParam } from './hubFormat'
-import { conceptViewsToDiagram } from './hubViews'
+import { conceptViewsToDiagram, uniqueName } from './hubViews'
 
-/** Default parameter values (each param's `defaultValue`/`hint`, or `''`) —
- *  used when the caller doesn't collect explicit values via a param dialog. */
-export function defaultParamValues(params: TemplateParam[] | undefined): Record<string, string> {
-  const values: Record<string, string> = {}
-  for (const p of params ?? []) values[p.key] = p.defaultValue ?? p.hint ?? ''
+/** The value each parameter takes: the one given, or, left blank, the
+ *  template's default. The hint is only an example shown in the empty field,
+ *  never a value (the MCP server filled in the hint, Studio nothing). */
+export function resolveParamValues(params: TemplateParam[] | undefined, given: Record<string, string> = {}): Record<string, string> {
+  const values: Record<string, string> = { ...given }
+  for (const p of params ?? []) {
+    const v = given[p.key]
+    values[p.key] = v == null || v.trim() === '' ? p.defaultValue ?? '' : v
+  }
   return values
+}
+
+/** Default parameter values (each param's `defaultValue`, or `''`) — used
+ *  when the caller doesn't collect explicit values via a param dialog. */
+export function defaultParamValues(params: TemplateParam[] | undefined): Record<string, string> {
+  return resolveParamValues(params)
+}
+
+const TOKEN = /\{\{([A-Z0-9_]+)\}\}/g
+const hasToken = (v: unknown): v is string => typeof v === 'string' && /\{\{[A-Z0-9_]+\}\}/.test(v)
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * What a field reads after the template's values change from `oldValues`
+ * to `newValues`, given the Hub's `original` text (with its {{KEY}} tokens)
+ * and the `current` one. Untouched since the import, it is the original
+ * with the new values. Edited since, each changed value is replaced where
+ * the text still has it (a whole word, not inside another), and the rest of
+ * the edit stays; a text without the old value is left as it is.
+ */
+export function retemplateText(current: string, original: string, oldValues: Record<string, string>, newValues: Record<string, string>): string {
+  if (current === substituteParams(original, oldValues)) return substituteParams(original, newValues)
+  const changed = new Map<string, string>()
+  for (const [, key] of original.matchAll(TOKEN)) {
+    const was = oldValues[key] ?? ''
+    const now = newValues[key] ?? was
+    if (was !== '' && was !== now && !changed.has(was)) changed.set(was, now)
+  }
+  if (changed.size === 0) return current
+  const pattern = [...changed.keys()]
+    .sort((a, b) => b.length - a.length)
+    .map((v) => `${/^[\p{L}\p{N}_]/u.test(v) ? '(?<![\\p{L}\\p{N}_])' : ''}${escapeRegExp(v)}${/[\p{L}\p{N}_]$/u.test(v) ? '(?![\\p{L}\\p{N}_])' : ''}`)
+    .join('|')
+  return current.replace(new RegExp(pattern, 'gu'), (m) => changed.get(m) ?? m)
 }
 
 /** Replace all `{{KEY}}` tokens in a string with `values[KEY]` (left as-is
@@ -64,6 +102,9 @@ export interface ConceptInsertOptions {
    *  box around them. */
   place: (cluster: { width: number; height: number }) => { x: number; y: number }
   paramValues?: Record<string, string>
+  /** Names of the model's views and sequences: the import's take another
+   *  (" 2"), or a concept imported twice gave two of each name. */
+  takenNames?: { views?: Iterable<string>; sequences?: Iterable<string> }
 }
 
 export interface ConceptInsert {
@@ -78,7 +119,7 @@ export interface ConceptInsert {
 
 export function buildConceptInsert(concept: HubConcept, options: ConceptInsertOptions): ConceptInsert {
   const { newId } = options
-  const paramValues = options.paramValues ?? defaultParamValues(concept.templateParams)
+  const paramValues = resolveParamValues(concept.templateParams, options.paramValues)
   const templated = applyTemplateParams(concept, paramValues)
 
   const idMap = new Map<string, string>()
@@ -148,6 +189,7 @@ export function buildConceptInsert(concept: HubConcept, options: ConceptInsertOp
 
   const sequences: Record<string, DiagramSequence> = {}
   const seqIdMap = new Map<string, string>()
+  const takenSequenceNames = new Set(options.takenNames?.sequences ?? [])
   for (const raw of templated.sequences ?? []) {
     const ids = (raw.relationIds as string[] | undefined) ?? []
     const mapped = ids.map((id) => relIdMap.get(id))
@@ -156,7 +198,7 @@ export function buildConceptInsert(concept: HubConcept, options: ConceptInsertOp
     if (typeof raw.id === 'string') seqIdMap.set(raw.id, seqId)
     sequences[seqId] = {
       id: seqId,
-      name: (raw.name as string) || concept.name,
+      name: uniqueName((raw.name as string) || concept.name, takenSequenceNames),
       relationIds: mapped as string[],
       stepDescriptions: raw.stepDescriptions as (string | undefined)[] | undefined,
     }
@@ -165,33 +207,97 @@ export function buildConceptInsert(concept: HubConcept, options: ConceptInsertOp
   const views = conceptViewsToDiagram(
     templated.views,
     { node: (id) => idMap.get(id), relation: (id) => relIdMap.get(id), sequence: (id) => seqIdMap.get(id) },
-    { newId, namePrefix: concept.name, keepPositions: true },
+    { newId, namePrefix: concept.name, keepPositions: true, takenNames: new Set(options.takenNames?.views ?? []) },
   )
 
   const insert: ConceptInsert = { nodes, relations, sequences, views }
   if (concept.templateParams?.length) {
-    const originalNodes: Record<string, Record<string, unknown>> = {}
-    const nodeParamsMap: Record<string, TemplateParam[]> = {}
-    for (const origNode of concept.nodes) {
-      const id = idMap.get(origNode.id as string)
-      if (id) {
-        originalNodes[id] = origNode as Record<string, unknown>
-        const perNodeParams = origNode.templateParams as TemplateParam[] | undefined
-        if (perNodeParams?.length) nodeParamsMap[id] = perNodeParams
-      }
-    }
     insert.template = {
       id: newId(),
-      record: {
-        conceptId: concept.id,
-        conceptName: concept.name,
-        templateParams: concept.templateParams,
-        paramValues: { ...paramValues },
-        nodeIds: Object.keys(nodes),
-        originalNodes,
-        nodeParams: Object.keys(nodeParamsMap).length ? nodeParamsMap : undefined,
-      },
+      record: templateRecord(concept, paramValues, { node: idMap, relation: relIdMap, sequence: seqIdMap }),
     }
   }
   return insert
+}
+
+/**
+ * The record that keeps a templated import editable (Apply in the Hub
+ * template section): the values, and the Hub's texts with their {{KEY}}
+ * tokens under the new ids, of the elements, the relations and the
+ * sequences' names and step notes (only elements were kept: Apply left a
+ * flow's notes at the old value).
+ */
+export function templateRecord(
+  concept: HubConcept,
+  paramValues: Record<string, string>,
+  maps: { node: Map<string, string>; relation: Map<string, string>; sequence: Map<string, string> },
+): HubImportRecord {
+  const originalNodes: Record<string, Record<string, unknown>> = {}
+  const nodeParamsMap: Record<string, TemplateParam[]> = {}
+  for (const origNode of concept.nodes) {
+    const id = maps.node.get(origNode.id as string)
+    if (!id) continue
+    originalNodes[id] = origNode as Record<string, unknown>
+    const perNodeParams = origNode.templateParams as TemplateParam[] | undefined
+    if (perNodeParams?.length) nodeParamsMap[id] = perNodeParams
+  }
+  const originalRelations: Record<string, Record<string, unknown>> = {}
+  for (const raw of concept.relations ?? []) {
+    const id = typeof raw.id === 'string' ? maps.relation.get(raw.id) : undefined
+    if (!id) continue
+    const texts = Object.fromEntries(Object.entries(raw).filter(([k, v]) => k !== 'id' && hasToken(v)))
+    if (Object.keys(texts).length) originalRelations[id] = texts
+  }
+  const originalSequences: NonNullable<HubImportRecord['originalSequences']> = {}
+  for (const raw of concept.sequences ?? []) {
+    const id = typeof raw.id === 'string' ? maps.sequence.get(raw.id) : undefined
+    if (!id) continue
+    const notes = Array.isArray(raw.stepDescriptions) ? (raw.stepDescriptions as (string | undefined)[]) : undefined
+    if (!hasToken(raw.name) && !notes?.some(hasToken)) continue
+    originalSequences[id] = {
+      ...(hasToken(raw.name) ? { name: raw.name } : {}),
+      ...(notes?.some(hasToken) ? { stepDescriptions: notes } : {}),
+    }
+  }
+  return {
+    conceptId: concept.id,
+    conceptName: concept.name,
+    templateParams: concept.templateParams ?? [],
+    paramValues: { ...paramValues },
+    nodeIds: [...maps.node.values()],
+    originalNodes,
+    ...(Object.keys(originalRelations).length ? { originalRelations } : {}),
+    ...(Object.keys(originalSequences).length ? { originalSequences } : {}),
+    nodeParams: Object.keys(nodeParamsMap).length ? nodeParamsMap : undefined,
+  }
+}
+
+/**
+ * A Hub concept file opened as a model (the Hub's Download, then Open →
+ * File…): its {{KEY}} tokens filled with the template's defaults and a
+ * record kept, so the Hub template section can change them, as after Add to
+ * Studio; ids stay. It kept its tokens ("within {{P95_MS}} ms") and had no
+ * record. Anything else, and a concept already filled, comes back as it is.
+ */
+export function conceptFileAsModel(data: DiagramData): DiagramData {
+  const meta = data.hub
+  if (!meta?.templateParams?.length || Object.keys(data.hubTemplates ?? {}).length) return data
+  const concept: HubConcept = {
+    ...meta,
+    nodes: data.nodes as unknown as Array<Record<string, unknown>>,
+    relations: data.relations as unknown as Array<Record<string, unknown>>,
+    sequences: (data.sequences ?? []) as unknown as Array<Record<string, unknown>>,
+  }
+  if (templateKeysUsed(concept).size === 0) return data
+  const values = resolveParamValues(meta.templateParams)
+  const filled = applyTemplateParams(concept, values)
+  const same = (items: Array<{ id: string }>): Map<string, string> => new Map(items.map((x) => [x.id, x.id]))
+  const record = templateRecord(concept, values, { node: same(data.nodes), relation: same(data.relations), sequence: same(data.sequences ?? []) })
+  return {
+    ...data,
+    nodes: filled.nodes as unknown as C4Node[],
+    relations: (filled.relations ?? []) as unknown as C4Relation[],
+    ...(data.sequences ? { sequences: filled.sequences as unknown as DiagramSequence[] } : {}),
+    hubTemplates: { [`hub-${meta.id}`]: record },
+  }
 }

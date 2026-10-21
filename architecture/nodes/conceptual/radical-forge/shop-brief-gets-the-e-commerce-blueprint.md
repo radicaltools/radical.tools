@@ -2,7 +2,6 @@
 id: "b48c4e45-67d1-4062-bee2-c503876a6289"
 type: "scenario"
 label: "Shop brief gets the e-commerce blueprint"
-gherkin: ""
 given: "the Hub catalogue"
 tests: |
   packages/hub-catalogue/tests/forgeHubMatches.test.ts › forgeHubCandidates

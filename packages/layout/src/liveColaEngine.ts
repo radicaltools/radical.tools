@@ -470,9 +470,17 @@ export class LiveColaEngine {
       this.calm = this.calmDrag(nodeId, withIds, abs ?? { x: rfX, y: rfY }, { x: 0, y: 0 })
       return
     }
-    for (const leaf of this.leavesOf(nodeId)) leaf.fixed = (leaf.fixed ?? 0) & ~PINNED
+    // The physics starts when it moves (pushStart): a ⌘/Ctrl-click, which
+    // React Flow reports as a drag that goes nowhere, woke it, and it
+    // rearranged the whole view, saved and with no undo step.
     this.calm = null
     this.pushFrom = { x: rfX, y: rfY, moved: false }
+  }
+
+  /** A push drag moves: the held element is freed from its pin and the
+   *  physics runs. */
+  private pushStart(nodeId: string): void {
+    for (const leaf of this.leavesOf(nodeId)) leaf.fixed = (leaf.fixed ?? 0) & ~PINNED
     const cn = this.idToNode.get(nodeId)
     if (cn) {
       Layout.dragStart(cn)
@@ -485,7 +493,6 @@ export class LiveColaEngine {
         Layout.dragStart(leaf)
       }
     }
-    this.cola?.resume()
   }
 
   drag(nodeId: string, rfX: number, rfY: number, abs?: { x: number; y: number }): void {
@@ -518,7 +525,11 @@ export class LiveColaEngine {
       this.emitPositions()
       return
     }
-    if (this.pushFrom && (Math.abs(rfX - this.pushFrom.x) > REPORT_PX || Math.abs(rfY - this.pushFrom.y) > REPORT_PX)) this.pushFrom.moved = true
+    if (this.pushFrom && !this.pushFrom.moved) {
+      if (Math.abs(rfX - this.pushFrom.x) <= REPORT_PX && Math.abs(rfY - this.pushFrom.y) <= REPORT_PX) return
+      this.pushFrom.moved = true
+      this.pushStart(nodeId)
+    }
     const cn = this.idToNode.get(nodeId)
     if (cn) {
       // Convert RF relative top-left → cola absolute center. React Flow
@@ -581,6 +592,11 @@ export class LiveColaEngine {
       if (calm.id === nodeId) this.clearOverlaps([...moved, ...calm.partners])
       this.emitPositions()
       this.callbacks.onSettled?.()
+      return
+    }
+    if (this.pushFrom && !this.pushFrom.moved) {
+      // A click: nothing was started (pushStart).
+      this.pushFrom = null
       return
     }
     const cn = this.idToNode.get(nodeId)
@@ -820,7 +836,24 @@ export class LiveColaEngine {
       this.keptFrames.delete(g.c4id)
     }
     const s = g.visualShrink ?? 0
-    return { x: b.x + s, X: b.X - s, y: b.y + s, Y: b.Y - s }
+    const box = { x: b.x + s, X: b.X - s, y: b.y + s, Y: b.Y - s }
+    // A child group keeps the frame the layout gave it until something in
+    // it moves, and that frame may reach past the bounds WebCoLa takes from
+    // its leaves (room above its first child): this frame holds it, the
+    // child no nearer its top than LIVE_CHILD_TOP_MIN. Framed tighter, a
+    // drop inside a sibling left it on this one's header, saved above that,
+    // and the canvas drew it lower after a reload than the file said.
+    const margin = (g.padding ?? 0) - s
+    for (const id of this.childrenOf.get(g.c4id) ?? []) {
+      const child = this.idToGroup.get(id)
+      const inner = child && this.frameOf(child)
+      if (!inner) continue
+      box.x = Math.min(box.x, inner.x - margin)
+      box.X = Math.max(box.X, inner.X + margin)
+      box.y = Math.min(box.y, inner.y - LIVE_CHILD_TOP_MIN)
+      box.Y = Math.max(box.Y, inner.Y + margin)
+    }
+    return box
   }
 
   /** The group an element is laid out in, or '' for the canvas. */
@@ -1522,8 +1555,9 @@ export class LiveColaEngine {
     // Nothing to move: it is at rest as built.
     if (!arrange && !fresh.length && run !== 'whole') this.callbacks.onSettled?.()
 
-    // Restore grab state if rebuild happened during drag
-    if (this._grabbedId) {
+    // Restore grab state if rebuild happened during drag (a push drag that
+    // has not moved has none yet: pushStart)
+    if (this._grabbedId && !(this.pushFrom && !this.pushFrom.moved)) {
       for (const leaf of this.leavesOf(this._grabbedId)) leaf.fixed = (leaf.fixed ?? 0) & ~PINNED
       const cn = this.idToNode.get(this._grabbedId)
       if (cn && !this.calm?.moving) cn.fixed = (cn.fixed ?? 0) | 2

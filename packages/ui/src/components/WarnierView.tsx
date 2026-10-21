@@ -246,7 +246,8 @@ export function WarnierView(): React.ReactElement {
   const metamodel = useDiagramStore((s) => s.metamodel)
   const activeView = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
   const selectedId = useDiagramStore((s) => s.selectedNodeId)
-  const readOnly = useDiagramStore((s) => s.appMode !== 'designer')
+  // Read-only out of Designer, and on a slide played from it (F5).
+  const readOnly = useDiagramStore((s) => s.appMode !== 'designer' || s.presentationActive)
   const selectNode = useDiagramStore((s) => s.selectNode)
   const addNode = useDiagramStore((s) => s.addNode)
   const updateNode = useDiagramStore((s) => s.updateNode)
@@ -377,12 +378,16 @@ export function WarnierView(): React.ReactElement {
     commitRename()
     const roots = tree.filter((item) => item.node.type === 'process').length
     const label = `New ${typeOf('process').label.toLowerCase()}`
+    // In the element a filter "inside" asks for (it went to the top of the
+    // model, where the view did not show it), with the values the filters ask.
+    const filtered = newElementFilters(activeView, ctx, 'process')
     let created = ''
     runAsOneStep(() => {
       created = addNode({
         type: 'process' as C4ElementType, label, collapsed: false, x: 0, y: 0,
         ...nodeTypeSize('process', metamodel), ...(hasOrder('process') ? { order: roots + 1 } : {}),
-        ...newElementFilters(activeView, ctx, 'process')?.properties,
+        ...filtered?.properties,
+        ...(filtered?.within ? { parentId: filtered.within } : {}),
       } as unknown as Omit<C4Node, 'id'>)
     })
     if (!created) return
@@ -438,6 +443,9 @@ export function WarnierView(): React.ReactElement {
   const onKeyDown = (e: React.KeyboardEvent) => {
     // The delete prompt and the repeat choices have the keys.
     if (renaming || !selected || deleting || repeatOpen) return
+    // A playing slide's keys are the presentation's: Esc only deselected,
+    // and the arrows moved the selection instead of the slides.
+    if (useDiagramStore.getState().presentationActive) return
     const index = items.indexOf(selected)
     const handled = (() => {
       if (e.altKey && e.key === 'ArrowUp') { move(selected, 'up'); return true }

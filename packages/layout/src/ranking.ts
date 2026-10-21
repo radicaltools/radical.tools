@@ -52,16 +52,25 @@ export const RANK_CRITERIA: readonly Criterion[] = [
 const OVERLAP_TOLERANCE = 0.01
 
 /** The aggregated quality of each score among `scores`: the sum over
- *  RANK_CRITERIA of its standardised value. Lower is better. */
-export function aggregatedQuality(scores: readonly CompositeScore[]): number[] {
+ *  RANK_CRITERIA of its standardised value. Lower is better. With
+ *  `distinct`, each layout counts once in the means and deviations (see
+ *  bestIndexKeepingCurrent). */
+export function aggregatedQuality(scores: readonly CompositeScore[], distinct = false): number[] {
   const total = scores.map(() => 0)
   if (scores.length < 2) return total
+  const seen = new Set<string>()
+  const counted = !distinct ? scores : scores.filter((s) => {
+    const key = RANK_CRITERIA.map(({ key }) => Number(s[key]) || 0).join('|')
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
   for (const { key, floor } of RANK_CRITERIA) {
-    const values = scores.map((s) => Number(s[key]) || 0)
-    const mean = values.reduce((sum, v) => sum + v, 0) / values.length
-    const sd = Math.sqrt(values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length)
+    const pool = counted.map((s) => Number(s[key]) || 0)
+    const mean = pool.reduce((sum, v) => sum + v, 0) / pool.length
+    const sd = Math.sqrt(pool.reduce((sum, v) => sum + (v - mean) ** 2, 0) / pool.length)
     const scale = Math.max(sd, floor)
-    values.forEach((v, i) => { total[i] += (v - mean) / scale })
+    scores.forEach((s, i) => { total[i] += ((Number(s[key]) || 0) - mean) / scale })
   }
   return total
 }
@@ -69,8 +78,8 @@ export function aggregatedQuality(scores: readonly CompositeScore[]): number[] {
 /** The index of the best of `scores`: the best aggregated quality among the
  *  layouts without overlap, or the least overlap when all have some. Ties
  *  go to the earlier one. */
-export function bestIndex(scores: readonly CompositeScore[]): number {
-  const quality = aggregatedQuality(scores)
+export function bestIndex(scores: readonly CompositeScore[], distinct = false): number {
+  const quality = aggregatedQuality(scores, distinct)
   const clean = scores.map((s, i) => i).filter((i) => scores[i].nodeOverlap <= OVERLAP_TOLERANCE)
   const pool = clean.length > 0 ? clean : scores.map((_, i) => i)
   const leastOverlap = Math.min(...pool.map((i) => scores[i].nodeOverlap))
@@ -93,12 +102,23 @@ export function bestIndex(scores: readonly CompositeScore[]): number {
 export const KEEP_CURRENT_MARGIN = 0.25
 
 /** Like bestIndex, with the last score the layout on screen: it is kept
- *  (its index returned) unless another is better by KEEP_CURRENT_MARGIN. */
+ *  (its index returned) unless the best of the others is better by
+ *  KEEP_CURRENT_MARGIN. That best is the best among the others alone: with
+ *  the layout on screen in the ranking, how bad it was moved the means and
+ *  deviations, so the winner depended on where the run started, and a run
+ *  from the layout it had just made picked another one (MCP smart_layout
+ *  called twice rewrote the view twice). Each layout counts once in the
+ *  means and deviations: candidates that came out as the same layout
+ *  (Layered TB from three ELK variants, or the layout on screen when it is
+ *  one of them) weighed it two or three times, and moved every other
+ *  layout's standing towards or away from it; with the layout on screen
+ *  left out, that decided between near equals. */
 export function bestIndexKeepingCurrent(scores: readonly CompositeScore[]): number {
-  const best = bestIndex(scores)
   const current = scores.length - 1
-  if (best === current) return current
-  const quality = aggregatedQuality(scores)
+  if (current <= 0) return current
+  if (bestIndex(scores, true) === current) return current
+  const best = bestIndex(scores.slice(0, current), true)
+  const quality = aggregatedQuality(scores, true)
   const currentClean = scores[current].nodeOverlap <= OVERLAP_TOLERANCE || scores[current].nodeOverlap <= scores[best].nodeOverlap
   return currentClean && quality[current] - quality[best] < KEEP_CURRENT_MARGIN ? current : best
 }

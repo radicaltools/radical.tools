@@ -6,6 +6,6 @@ given: "a model committed on main and a feature branch on which a requirement's 
 tests: |
   apps/cli/src/diff.test.ts › radical diff
   packages/common/tests/modelChanges.test.ts › model changes
-then: "it lists the changed action with its old and new value and the requirement's relations, never a position, for the whole branch whether committed or not; since HEAD nothing; a new folder as all added; and exits 2 outside git, on the unknown ref and on bad options"
-when: "radical diff runs on the folder before and after the change is committed, with --since HEAD and main, as JSON, on a folder the base did not have, outside git and with an unknown or option-like ref"
+then: "it lists the changed action with its old and new value and the requirement's relations, never a position, for the whole branch whether committed or not; since HEAD nothing; a new folder as all added; a renamed folder against the folder it was; and exits 2 outside git, on the unknown ref and on bad options"
+when: "radical diff runs on the folder before and after the change is committed, with --since HEAD and main, as JSON, on a folder the base did not have, on a folder renamed since the base, outside git and with an unknown or option-like ref"
 ---

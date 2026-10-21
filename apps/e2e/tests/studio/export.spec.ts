@@ -1,8 +1,26 @@
 import { readFile } from 'node:fs/promises'
-import { test, expect } from '../../support/fixtures'
+import { test, expect, fixture } from '../../support/fixtures'
+
+/** The bookstore, with a process of two steps, a wiki view and a Warnier
+ *  view of the process. */
+function bookstoreWithProcess(): string {
+  const doc = JSON.parse(fixture('bookstore'))
+  const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}) =>
+    ({ id, type, label, x: 40, y: 900, width: 220, height: 80, collapsed: false, ...props })
+  doc.nodes.push(
+    node('checkout', 'process', 'Checkout', { width: 900, height: 360 }),
+    node('take', 'step', 'Take the order', { parentId: 'checkout', order: 1 }),
+    node('pay', 'step', 'Pay', { parentId: 'checkout', order: 2 }),
+  )
+  doc.views.push(
+    { id: 'v-wiki', name: 'Wiki', kind: 'wiki', nodeIds: [], positions: {} },
+    { id: 'v-steps', name: 'Steps', kind: 'warnier', nodeIds: ['checkout', 'take', 'pay'], positions: {} },
+  )
+  return JSON.stringify(doc)
+}
 
 test.beforeEach(async ({ studio }) => {
-  await studio.seed()
+  await studio.seedDocument(bookstoreWithProcess())
   await studio.open('v-context')
 })
 
@@ -61,5 +79,28 @@ test.describe('views without a canvas', () => {
     const svg = (await exportAs(page, 'Export as SVG…')).data.toString('utf8')
     expect(svg).toMatch(/^<svg[\s>]/)
     expect(svg).toContain('Payment Provider')
+  })
+
+  // Runs 25 to 34: on a Warnier view Export said "There is nothing on
+  // screen to export".
+  test('a Warnier view is exported, without its step buttons', async ({ page, studio }) => {
+    await studio.open('v-steps')
+    await expect(page.locator('.warnier-view')).toContainText('Take the order')
+    const png = await exportAs(page, 'Export as PNG…')
+    expect(png.name).toMatch(/Steps\.png$/)
+    expect(png.data.readUInt32BE(16)).toBeGreaterThan(200)
+    const svg = (await exportAs(page, 'Export as SVG…')).data.toString('utf8')
+    expect(svg).toContain('Take the order')
+    expect(svg).not.toContain('+ Step')
+    expect(svg).not.toContain('+ Process')
+  })
+
+  // Runs 45 to 64: a wiki's export showed its editing controls.
+  test('a wiki is exported without its editing controls', async ({ page, studio }) => {
+    await studio.open('v-wiki/f/bookstore')
+    await expect(page.locator('.wiki-page-mode-toggle')).toBeVisible()
+    const svg = (await exportAs(page, 'Export as SVG…')).data.toString('utf8')
+    expect(svg).toContain('Bookstore')
+    for (const control of ['Single page', 'Multi page', 'wiki-tool', 'wiki-write', 'wiki-nav-search']) expect(svg, control).not.toContain(control)
   })
 })

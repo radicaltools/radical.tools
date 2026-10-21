@@ -2,7 +2,6 @@
 id: "cf8ebe65-f329-4766-b0b0-adebce8d17f9"
 type: "scenario"
 label: "Ratchet lowers a baseline"
-gherkin: ""
 given: "that model and a config with requirement-without-scenario at error, max 4"
 tests: |
   apps/cli/src/cli.test.ts › radical check › ratchets the baseline in the config file

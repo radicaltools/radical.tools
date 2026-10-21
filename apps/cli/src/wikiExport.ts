@@ -43,17 +43,72 @@ function renderMarkdown(source: string, warnings: Set<string>, headingLevel: num
       }
       if (node.type === RuleType.link) {
         if (node.target?.startsWith('#radical-')) return anchorLink(node.target.slice(1), node.children.map((c) => c.type === RuleType.text ? c.text : '').join('') || node.target.slice(1))
-        if (!node.target) warnings.add('Relative or unsupported Markdown links were rendered as text. Use absolute https links.')
+        if (!node.target) warnings.add(LINK_WARNING)
       }
       if (node.type === RuleType.image) {
         if (node.target && /^https?:\/\//i.test(node.target)) return `<ac:image ac:alt="${xml(node.alt ?? '')}"><ri:url ri:value="${xml(node.target)}" /></ac:image>`
-        warnings.add('Local or unsupported images were not uploaded. Use an absolute https image URL.')
+        warnings.add(IMAGE_WARNING)
         return xml(node.alt ?? '(image unavailable)')
       }
       if (node.type === RuleType.gfmTask) return node.completed ? '[x] ' : '[ ] '
       return next()
     },
   })
+}
+
+const LINK_WARNING = 'Relative or unsupported Markdown links were rendered as text. Use absolute https links.'
+const IMAGE_WARNING = 'Local or unsupported images were not uploaded. Use an absolute https image URL.'
+
+/**
+ * A field's Markdown as the Markdown export writes it: what the other
+ * formats show, no more. Its headings go `shift` levels down (a "# Notes" in
+ * a description outranked the element's own heading, and the children fell
+ * under it), raw HTML reads as text, and a link or image the renderer would
+ * not keep (javascript:, a relative path) becomes its text. Code is left as
+ * written. (It all went out as written.)
+ */
+export function exportedMarkdown(source: string, shift: number, warnings: Set<string>): string {
+  const heading = (level: number, text: string): string => {
+    const to = level + shift
+    return to <= 6 ? `${'#'.repeat(to)} ${text}` : `**${text}**`
+  }
+  const inline = (text: string): string => text
+    .split(/(`+[^`]*`+)/)
+    .map((part, i) => i % 2 === 1 ? part : part
+      .replace(/!\[([^\]]*)\]\(\s*((?:[^()\s]|\([^()\s]*\))*)(?:\s+"[^"]*")?\s*\)/g, (m, alt: string, url: string) => {
+        if (/^https?:\/\//i.test(url)) return m
+        warnings.add(IMAGE_WARNING)
+        return alt
+      })
+      .replace(/(^|[^!])\[([^\]]*)\]\(\s*((?:[^()\s]|\([^()\s]*\))*)(?:\s+"[^"]*")?\s*\)/g, (m, before: string, label: string, url: string) => {
+        if (/^(https?:\/\/|mailto:|#)/i.test(url)) return m
+        warnings.add(LINK_WARNING)
+        return before + label
+      })
+      .replace(/<(?!(?:https?|mailto):[^>\s]+>)(?=[A-Za-z/!?])/g, '\\<'))
+    .join('')
+  const lines = source.split('\n')
+  const out: string[] = []
+  let fenced = false
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (/^ {0,3}(```|~~~)/.test(line)) { fenced = !fenced; out.push(line); continue }
+    if (fenced) { out.push(line); continue }
+    const atx = /^ {0,3}(#{1,6})[ \t]+(.*?)[ \t#]*$/.exec(line)
+    if (atx) { out.push(heading(atx[1].length, inline(atx[2]))); continue }
+    // A setext heading: the text, then a line of = (level 1) or - (level 2).
+    const under = lines[i + 1]
+    if (line.trim() && under !== undefined && /^ {0,3}(=+|-+)[ \t]*$/.test(under) && !/^ {0,3}([-*+]|\d+[.)])\s/.test(line)) {
+      out.push(heading(under.trim().startsWith('=') ? 1 : 2, inline(line.trim())))
+      i++
+      continue
+    }
+    // A reference definition to a link the renderer would not keep.
+    const ref = /^ {0,3}\[[^\]]+\]:\s*(\S+)/.exec(line)
+    if (ref && !/^(https?:\/\/|mailto:|#)/i.test(ref[1])) { warnings.add(LINK_WARNING); continue }
+    out.push(inline(line))
+  }
+  return out.join('\n')
 }
 
 /** Complete wiki projection: focus and interactive reading depth do not truncate an export. */
@@ -71,22 +126,25 @@ export function exportWiki(data: DiagramData, view: DiagramView, options: { titl
     return included.has(id) ? `[${escapeMarkdown(label)}](#${anchorOf(id)})` : escapeMarkdown(label)
   }
   const warnings = new Set<string>()
-  const fieldValue = (field: WikiField): string => field.references.length
+  /** A field's value; its Markdown's headings `shift` levels down. */
+  const fieldValue = (field: WikiField, shift: number): string => field.references.length
     ? field.references.map((ref) => link(ref.id)).join(', ')
-    : field.markdown ? field.text : escapeMarkdown(field.text)
-  const pageMarkdown = (page: DocumentPage): string => {
+    : field.markdown ? exportedMarkdown(field.text, shift, warnings) : escapeMarkdown(field.text)
+  /** A page's body; `shift` puts the headings of its fields below the
+   *  page's own and its children's. */
+  const pageMarkdown = (page: DocumentPage, shift: number): string => {
     const content = [`**${escapeMarkdown(page.typeLabel)}**`]
-    for (const field of page.facts) if (field.text) content.push(`**${escapeMarkdown(field.title)}**\n\n${fieldValue(field)}`)
+    for (const field of page.facts) if (field.text) content.push(`**${escapeMarkdown(field.title)}**\n\n${fieldValue(field, shift)}`)
     for (const block of page.blocks) {
       switch (block.kind) {
         case 'lead':
-          if (block.field.text) content.push(fieldValue(block.field))
+          if (block.field.text) content.push(fieldValue(block.field, shift))
           break
         case 'requirement':
           if (block.requirement.started) content.push(escapeMarkdown(block.requirement.sentence))
           break
         case 'section':
-          if (block.field.text) content.push(`**${escapeMarkdown(block.field.title)}**\n\n${fieldValue(block.field)}`)
+          if (block.field.text) content.push(`**${escapeMarkdown(block.field.title)}**\n\n${fieldValue(block.field, shift)}`)
           break
         case 'relations':
           for (const group of block.groups) content.push(`**${escapeMarkdown(group.label)}${group.label.endsWith(':') ? '' : ':'}** ${group.entries.map(({ relation, other, details }) => {
@@ -143,10 +201,13 @@ export function exportWiki(data: DiagramData, view: DiagramView, options: { titl
     md.push(`<a id="${anchorOf(node.id)}"></a>`, `${'#'.repeat(level)} ${escapeMarkdown(node.label)}`)
     storage.push(anchor(anchorOf(node.id)), `<h${level}>${xml(node.label)}</h${level}>`)
     const page = wiki.page(node.id)
-    const body = pageMarkdown(wiki.page(node.id, parentNodeId))
-    pages.push({ nodeId: node.id, label: node.label, parentNodeId, childIds: [...new Set(page.children.map((n) => n.id))], storage: `${anchor(markerOf(`${view.id}:${node.id}`))}\n${renderMarkdown(pageMarkdown(page), warnings, 1)}\n${footerStorage}` })
+    // A field's headings go below the page's (level) and its children's
+    // (level + 1): at the children's level they read as children (h3).
+    const body = pageMarkdown(wiki.page(node.id, parentNodeId), level + 1)
+    // On a page of its own the title stands above: its fields' headings from h2.
+    pages.push({ nodeId: node.id, label: node.label, parentNodeId, childIds: [...new Set(page.children.map((n) => n.id))], storage: `${anchor(markerOf(`${view.id}:${node.id}`))}\n${renderMarkdown(pageMarkdown(page, 1), warnings, 0)}\n${footerStorage}` })
     md.push(body)
-    storage.push(renderMarkdown(body, warnings, level))
+    storage.push(renderMarkdown(body, warnings, 0))
   }
   md.push(footer.split('\n').map((line) => line ? `> ${line}` : '>').join('\n'))
   storage.push(footerStorage)

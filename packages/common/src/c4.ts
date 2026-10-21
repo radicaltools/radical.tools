@@ -394,6 +394,10 @@ export interface DiagramSnapshot {
 /** Saved positions + collapsed state for every node on the canvas */
 export interface SlideCanvasState {
   nodes: Record<string, { x: number; y: number; width: number; height: number; collapsed: boolean }>
+  /** A slide of a view: what the view folded and opened over the model's
+   *  fold when it was captured (its collapsedNodeIds / expandedNodeIds). */
+  collapsedNodeIds?: string[]
+  expandedNodeIds?: string[]
 }
 
 /** A single presentation slide — captures viewport + optional snapshot */
@@ -686,7 +690,9 @@ export function withCanvasPositions<V extends DiagramView>(
 ): V[] {
   return views.map((view) => {
     const kept = viewCanvasPositions(view, nodes, view.positions ?? {}, drawnOf?.(view))
-    return Object.keys(kept).length === Object.keys(view.positions ?? {}).length ? view : { ...view, positions: kept }
+    // A view written without `positions` (by hand, by another tool) has
+    // none: it is not laid out yet.
+    return view.positions && Object.keys(kept).length === Object.keys(view.positions).length ? view : { ...view, positions: kept }
   })
 }
 

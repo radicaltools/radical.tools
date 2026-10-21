@@ -30,9 +30,32 @@ interface InspectorState {
   /** check.json as read, so Settings can tell a change of its own from the
    *  file; empty when there is none. */
   configText: string
+  /** Settings edited and not saved yet, by document: kept when the user goes
+   *  to another tab, perspective or model, and back. */
+  settingsDrafts: Record<string, CheckConfig>
 }
 
-export const useInspectorStore = create<InspectorState>(() => ({ results: null, config: {}, configError: null, check: null, configText: '' }))
+export const useInspectorStore = create<InspectorState>(() => ({ results: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {} }))
+
+/** The unsaved Settings of the active document, or null. */
+export function useSettingsDraft(): CheckConfig | null {
+  const id = useDocumentsStore((s) => s.activeId)
+  return useInspectorStore((s) => (id && s.settingsDrafts[id]) || null)
+}
+
+/** Sets (or with null, drops) the unsaved Settings of the active document;
+ *  a function gets the draft as it is now. */
+export function setSettingsDraft(next: CheckConfig | null | ((draft: CheckConfig | null) => CheckConfig | null)): void {
+  const id = documents.getActiveId()
+  if (!id) return
+  useInspectorStore.setState((s) => {
+    const draft = typeof next === 'function' ? next(s.settingsDrafts[id] ?? null) : next
+    const settingsDrafts = { ...s.settingsDrafts }
+    if (draft) settingsDrafts[id] = draft
+    else delete settingsDrafts[id]
+    return { settingsDrafts }
+  })
+}
 
 /** check.json as Settings write it. */
 export const serializeCheckConfig = (config: CheckConfig): string => JSON.stringify(config, null, 2) + '\n'

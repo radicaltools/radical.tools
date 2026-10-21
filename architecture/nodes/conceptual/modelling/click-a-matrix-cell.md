@@ -6,6 +6,7 @@ given: "a matrix view of the bookstore, with the calls relation already selected
 tests: |
   apps/e2e/tests/studio/matrix.spec.ts › one click on a cell selects its relation, even when it was selected on another view
   apps/e2e/tests/studio/runs-13-24.spec.ts › one click on a matrix cell selected in Viewer does not remove it in Designer
-then: "the relation is selected and stays in the model; a second click on the same cell removes it"
+  apps/e2e/tests/studio/matrix.spec.ts › the popup of a cell with several relations stays in the window, and goes when the matrix scrolls
+then: "the relation is selected and stays in the model; a second click on the same cell removes it; the popup of a cell with several relations stays in the window, and goes when the matrix scrolls"
 when: "the user clicks the relation's marked cell once in Designer"
 ---

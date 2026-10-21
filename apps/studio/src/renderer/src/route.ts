@@ -42,8 +42,9 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from './store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
 import { host } from './platform/host'
-import { INSPECTOR_TABS, useInspectorNav, type InspectorTab } from './navigation'
+import { INSPECTOR_TABS, useInspectorNav, usePlaceHold, type InspectorTab } from './navigation'
 import { useBranchStore } from './persistence/branchChanges'
+import { useInspectorStore } from './persistence/inspector'
 import { pushEntry, replaceEntry, moveTo, restoreNav, saveNav, useNavHistory, type NavEntry } from './navHistory'
 
 /** The view token of All elements, the table of the whole model. Links
@@ -88,6 +89,10 @@ let pending: { route: Route; docId: string } | null = null
 
 /** The perspective Studio starts in without a route. */
 let startMode: Mode = 'viewer'
+
+/** The document whose Inspector a route opened (a link, Back, a reload),
+ *  until it is known whether the Inspector has anything for it. */
+let inspectorByRoute: string | null = null
 
 /** For a model the user has just created: Designer, now and when the route
  *  sync starts (the web welcome screen holds it back until a model is picked). */
@@ -259,6 +264,7 @@ function applyViewModeFocus(route: Route): void {
     if ((MODES as readonly string[]).includes(route.mode) && store.appMode !== route.mode) {
       store.setAppMode(route.mode)
     }
+    inspectorByRoute = route.mode === 'inspector' ? documents.getActiveId() : null
     // Resolve the target view. A view id that doesn't exist in the current
     // document (e.g. a link opened on a machine whose localStorage doesn't
     // hold that doc, so we fell back to the freshly-seeded sample) degrades
@@ -277,15 +283,23 @@ function applyViewModeFocus(route: Route): void {
         useDiagramStore.getState().setWikiFocus(targetView, page)
       }
     }
-    // Milestone (snapshot). Apply-only: we view the requested milestone but
-    // never auto-discard on back-nav (discarding can drop unsaved edits). The
-    // forward direction — exiting a milestone in-app — still updates the URL.
-    // View it with selectMilestone, which parks the live model in liveBackup
-    // so autosave keeps saving it; restoreSnapshot would replace it.
+    // Milestone (snapshot). View it with selectMilestone, which parks the
+    // live model in liveBackup so autosave keeps saving it; restoreSnapshot
+    // would replace it. A route with none (Back from a milestone) leaves
+    // the one shown, as Current (live) does; with unsaved edits it asks
+    // first, as picking another milestone does (discarding them unasked
+    // would lose them). Back used to keep the milestone, and the address
+    // written then put it into the entry Back had gone to.
     if (route.snap) {
       const s = useDiagramStore.getState()
       if (s.activeSnapshotId !== route.snap && s.snapshots.some((sn) => sn.id === route.snap)) {
         s.selectMilestone(route.snap)
+      }
+    } else if (!route.play) {
+      const s = useDiagramStore.getState()
+      if (s.activeSnapshotId) {
+        if (s.milestoneDirty && s.appMode === 'designer') useDiagramStore.setState({ milestonePromptOpen: true })
+        else s.discardMilestoneChanges()
       }
     }
     // The Inspector's tab and card, or the selection: the route is the whole place.
@@ -418,6 +432,9 @@ export function startRouteSync(): () => void {
     if (applying || pending) return
     if (replace) replaceNext = true
     if (timer) clearTimeout(timer)
+    timer = null
+    // A move held (usePlaceHold) is written once it is let go.
+    if (usePlaceHold.getState().held > 0) return
     timer = setTimeout(() => {
       timer = null
       const push = !replaceNext
@@ -467,6 +484,8 @@ export function startRouteSync(): () => void {
   window.addEventListener('popstate', onPop)
 
   const unsubDiagram = useDiagramStore.subscribe((s, p) => {
+    // A route back to the Inspector of a model already looked at.
+    if (s.appMode !== p.appMode && s.appMode === 'inspector') queueMicrotask(() => leaveEmptyInspector())
     if (
       s.appMode !== p.appMode ||
       s.activeViewId !== p.activeViewId ||
@@ -483,11 +502,43 @@ export function startRouteSync(): () => void {
   })
   const unsubDocs = useDocumentsStore.subscribe(() => schedule())
   const unsubInspector = useInspectorNav.subscribe(() => schedule())
+  const unsubHold = usePlaceHold.subscribe((h, p) => {
+    // The place left is written first, if it waits: it is where Back goes.
+    if (h.held > 0 && p.held === 0 && timer) {
+      clearTimeout(timer)
+      timer = null
+      const push = !replaceNext
+      replaceNext = false
+      writeUrl(push)
+    }
+    if (h.held === 0 && p.held > 0) schedule()
+  })
+
+  // The Inspector's button is greyed out while the model has no test report
+  // and no base beside it. A route to it then opens the start perspective
+  // in its place, written over the address, once both have been looked for.
+  function leaveEmptyInspector(): void {
+    const id = documents.getActiveId()
+    if (!inspectorByRoute) return
+    if (inspectorByRoute !== id || useDiagramStore.getState().appMode !== 'inspector') { inspectorByRoute = null; return }
+    const { check, results } = useInspectorStore.getState()
+    const { readFor, base } = useBranchStore.getState()
+    if (!check || readFor !== id) return
+    inspectorByRoute = null
+    if (results || base) return
+    useDiagramStore.getState().setAppMode(startMode)
+    schedule(true)
+  }
+  const unsubCheck = useInspectorStore.subscribe(leaveEmptyInspector)
+  const unsubBase = useBranchStore.subscribe(leaveEmptyInspector)
 
   return () => {
     window.removeEventListener('hashchange', onHash)
     window.removeEventListener('popstate', onPop)
     unsubInspector()
+    unsubHold()
+    unsubCheck()
+    unsubBase()
     unsubNav()
     unsubLoad()
     pending = null

@@ -4,6 +4,7 @@ import { loadAISettings, saveAISettings } from '../ai/settings'
 import { listAdapters, getAdapter } from '../ai/registry'
 import type { AIProviderId, AISettings } from '../ai/types'
 import { textOf } from '../ai/types'
+import { useDialogFocus } from './dialogKeys'
 
 interface Props {
   open: boolean
@@ -33,6 +34,8 @@ export function AISettingsModal({ open, onClose }: Props): React.ReactElement | 
   const [test, setTest] = useState<TestState>({ status: 'idle' })
   const [savedFlash, setSavedFlash] = useState(false)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef, open)
 
   // Refresh from storage every time the modal opens.
   useEffect(() => {
@@ -125,9 +128,11 @@ export function AISettingsModal({ open, onClose }: Props): React.ReactElement | 
     >
       <div
         className="milestone-modal ai-settings-modal"
+        ref={dialogRef}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
+        aria-modal="true"
         aria-label="AI provider settings"
       >
         <button

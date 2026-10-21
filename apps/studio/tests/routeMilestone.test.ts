@@ -35,4 +35,23 @@ describe('milestone in the route', () => {
     const saved = after.saveDiagram()
     expect(saved.nodes.find((n) => n.id === id)?.label).toBe('Renamed after v1')
   })
+
+  // Back from a milestone kept it shown, and the URL written then put it
+  // into the entry Back had gone to.
+  it('a route without one leaves the milestone shown, and asks first when it has unsaved edits', () => {
+    const store = useDiagramStore.getState()
+    const id = Object.keys(store.c4Nodes)[0]
+    const snap = store.createSnapshot('v1')
+    applyRoute({ mode: 'designer', view: 'canvas', snap })
+    expect(useDiagramStore.getState().activeSnapshotId).toBe(snap)
+    applyRoute({ mode: 'designer', view: 'canvas' })
+    expect(useDiagramStore.getState().activeSnapshotId).toBeNull()
+
+    applyRoute({ mode: 'designer', view: 'canvas', snap })
+    useDiagramStore.getState().updateNode(id, { label: 'Edited in v1' })
+    useDiagramStore.getState().dismissMilestonePrompt()
+    applyRoute({ mode: 'designer', view: 'canvas' })
+    expect(useDiagramStore.getState().activeSnapshotId).toBe(snap)
+    expect(useDiagramStore.getState().milestonePromptOpen).toBe(true)
+  })
 })

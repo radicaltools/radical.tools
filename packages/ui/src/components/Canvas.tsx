@@ -24,11 +24,13 @@ import { RelationEdge } from './edges/RelationEdge'
 import { edgeLabelDetail, edgeLabelsShownAt } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { AlignmentGuides } from './AlignmentGuides'
+import { CollapseToggleMirror } from './CollapseToggleMirror'
 import { selectCanvasFocus } from '../store/canvasFocus'
 import { noteUserCamera } from '../store/userCamera'
 import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
-import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize } from '@radical/common/c4'
+import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
+import { newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
 import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
 
 /** The viewport that fits `bounds` in the part of the canvas (`rect`) the
@@ -723,6 +725,10 @@ function StructuralCanvas(): React.ReactElement {
   // is not on screen any more.
   const registeredViewportFns = useRef<{ getViewport: unknown; setViewport: unknown } | null>(null)
   const registeredFocusNodes = useRef<unknown>(null)
+  // And the zoom keys': left behind by a canvas gone (a table, wiki, matrix,
+  // hierarchy or Warnier view shown), ⌘+ did nothing there, kept the
+  // browser from zooming, and zoomed the gone canvas to NaN.
+  const registeredZoom = useRef<{ zoomIn: unknown; zoomOut: unknown } | null>(null)
   // Gone before its first camera (a slide without a canvas came straight
   // after): it puts nothing on window any more, and takes no slide's focus.
   const unmountedRef = useRef(false)
@@ -732,6 +738,9 @@ function StructuralCanvas(): React.ReactElement {
       unmountedRef.current = true
       const W = window as any
       if (registeredFocusNodes.current && W.__rfFocusNodes === registeredFocusNodes.current) delete W.__rfFocusNodes
+      const zoom = registeredZoom.current
+      if (zoom && W.__radicalZoomIn === zoom.zoomIn) delete W.__radicalZoomIn
+      if (zoom && W.__radicalZoomOut === zoom.zoomOut) delete W.__radicalZoomOut
       const mine = registeredViewportFns.current
       if (!mine) return
       if (W.__rfSetViewport === mine.setViewport) delete W.__rfSetViewport
@@ -915,8 +924,12 @@ function StructuralCanvas(): React.ReactElement {
     }, 100)
 
     // Register global zoom helpers used by the Toolbar zoom buttons.
-    ;(window as any).__radicalZoomIn  = () => { takeCamera(); instance.zoomIn({ duration: 300 }) }
-    ;(window as any).__radicalZoomOut = () => { takeCamera(); instance.zoomOut({ duration: 300 }) }
+    if (unmountedRef.current) return
+    const zoomIn = () => { takeCamera(); instance.zoomIn({ duration: 300 }) }
+    const zoomOut = () => { takeCamera(); instance.zoomOut({ duration: 300 }) }
+    registeredZoom.current = { zoomIn, zoomOut }
+    ;(window as any).__radicalZoomIn  = zoomIn
+    ;(window as any).__radicalZoomOut = zoomOut
     return () => {
       delete (window as any).__radicalZoomIn
       delete (window as any).__radicalZoomOut
@@ -1019,22 +1032,9 @@ function StructuralCanvas(): React.ReactElement {
       if (!src) return
 
       const nodeId = findNodeId(e.target as HTMLElement)
-      if (nodeId && nodeId !== src) {
-        const srcNode = state.c4Nodes[src]
-        const dstNode = state.c4Nodes[nodeId]
-        if (srcNode && dstNode) {
-          if (isRelationAllowed(state.metamodel, srcNode.type, dstNode.type)) {
-            state.addRelation({ sourceId: src, targetId: nodeId })
-          } else {
-            const srcLabel = state.metamodel?.nodeTypes[srcNode.type]?.label ?? srcNode.type
-            const dstLabel = state.metamodel?.nodeTypes[dstNode.type]?.label ?? dstNode.type
-            state.pushNotification(
-              `Relation not allowed: ${srcLabel} → ${dstLabel}. The metamodel does not permit this connection.`,
-              'error',
-            )
-          }
-        }
-      }
+      // Refused, of the type the view's chain follows, or asked about where
+      // several types fit (connectNodes).
+      if (nodeId && nodeId !== src) state.connectNodes(src, nodeId)
       state.cancelConnection()
     }
 
@@ -1160,6 +1160,12 @@ function StructuralCanvas(): React.ReactElement {
       }
 
       const size = nodeTypeSize(typeStr, mm)
+      // The values the view's filter asks for, as the table gives them; one
+      // the filter leaves out all the same is added, and a message says so
+      // (it was added without a word, and not drawn).
+      const s = useDiagramStore.getState()
+      const view = s.activeViewId ? s.views[s.activeViewId] : undefined
+      const filtered = newElementFilters(view, { nodes: s.c4Nodes, relations: s.c4Relations, metamodel: s.metamodel }, typeStr)
       // Opens the type's wizard instead, when it has one.
       requestCreateNode({
         type: typeStr,
@@ -1168,10 +1174,17 @@ function StructuralCanvas(): React.ReactElement {
         technology: '',
         collapsed: false,
         external: false,
+        ...filtered?.properties,
         parentId,
         x: relX - size.width / 2,
         y: relY - size.height / 2,
         ...size,
+      } as Omit<C4Node, 'id'>, {
+        onCreated: (id) => {
+          const now = useDiagramStore.getState()
+          const shown = viewShownNodes(now.activeViewId ? now.views[now.activeViewId] : undefined, now.c4Nodes, now.c4Relations)
+          if (shown && !shown.has(id)) now.pushNotification(`${now.c4Nodes[id]?.label ?? typeLabel} was added, but this view's filter does not show it.`, 'warning')
+        },
       })
     },
     [requestCreateNode]
@@ -1182,14 +1195,25 @@ function StructuralCanvas(): React.ReactElement {
     event.dataTransfer.dropEffect = 'copy'
   }, [])
 
-  // Cancel connection on Escape
+  // Cancel connection on Escape; otherwise Escape clears the selection, as
+  // a click on the background does (it did nothing). Not while a field, a
+  // dialog or a menu has it, nor while a presentation plays (Esc ends it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && connectSource) cancelConnection()
+      if (e.key !== 'Escape') return
+      if (connectSource) { cancelConnection(); return }
+      if (e.defaultPrevented) return
+      const el = e.target as HTMLElement | null
+      if (el && typeof el.closest === 'function'
+        && (el.isContentEditable || el.closest('input, textarea, select, [role="dialog"], [role="menu"]'))) return
+      const s = useDiagramStore.getState()
+      if (s.presentationActive || (!s.selectedNodeId && !s.selectedEdgeId && !s.selectedNodeIds.length)) return
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      onPaneClick()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [connectSource, cancelConnection])
+  }, [connectSource, cancelConnection, onPaneClick])
 
   // Cola-driven drag handlers
   const dragRafRef = useRef<number | null>(null)
@@ -1463,7 +1487,10 @@ function StructuralCanvas(): React.ReactElement {
           color="var(--canvas-dots)"
         />
         <AlignmentGuides />
+        <CollapseToggleMirror />
       </ReactFlow>
+
+      <RelationTypeMenu containerRef={containerRef} />
 
       {connectSource && connectMouse && (
         <ConnectionPreviewLine
@@ -1533,6 +1560,63 @@ export function Canvas({ smartLayoutNote }: { smartLayoutNote?: string } = {}): 
       {showPalette && <ElementPalette />}
       <StructuralCanvas />
       {!presenting && <CanvasControls smartLayoutNote={smartLayoutNote} />}
+    </div>
+  )
+}
+
+/** The relation types to pick from when a relation drawn on the canvas
+ *  fits several (relationTypeChoice), at the pointer where it was dropped.
+ *  Esc or a click elsewhere adds nothing. */
+function RelationTypeMenu({ containerRef }: { containerRef: React.RefObject<HTMLDivElement> }): React.ReactElement | null {
+  const choice = useDiagramStore((s) => s.relationTypeChoice)
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  const nodes = useDiagramStore((s) => s.c4Nodes)
+  const choose = useDiagramStore((s) => s.chooseRelationType)
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  // Where the pointer was let go: the menu opens there.
+  useEffect(() => {
+    const onUp = (e: PointerEvent | MouseEvent) => {
+      const r = containerRef.current?.getBoundingClientRect()
+      if (r) setAt({ x: e.clientX - r.left, y: e.clientY - r.top })
+    }
+    window.addEventListener('mouseup', onUp, true)
+    return () => window.removeEventListener('mouseup', onUp, true)
+  }, [containerRef])
+  useEffect(() => {
+    if (!choice) return
+    menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') choose(null) }
+    const onDown = (e: MouseEvent) => { if (!menuRef.current?.contains(e.target as Node)) choose(null) }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('mousedown', onDown, true)
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('mousedown', onDown, true) }
+  }, [choice, choose])
+  if (!choice) return null
+  const source = nodes[choice.sourceId]?.label ?? choice.sourceId
+  const target = nodes[choice.targetId]?.label ?? choice.targetId
+  const box = containerRef.current?.getBoundingClientRect()
+  const x = Math.max(8, Math.min((at?.x ?? (box?.width ?? 400) / 2), (box?.width ?? 400) - 240))
+  const y = Math.max(8, Math.min((at?.y ?? (box?.height ?? 300) / 2), (box?.height ?? 300) - 40 - choice.types.length * 30))
+  return (
+    <div ref={menuRef} className="relation-type-menu" role="menu" aria-label={`Relation from ${source} to ${target}`}
+      style={{ position: 'absolute', left: x, top: y, zIndex: 120 }}>
+      <div className="relation-type-menu-title">{source} → {target}: which relation?</div>
+      {choice.types.map((t) => {
+        const def = metamodel?.relationTypes[t]
+        return (
+          <button key={t} type="button" role="menuitem" title={def?.description} onClick={() => choose(t)}
+            onKeyDown={(e) => {
+              if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+              e.preventDefault()
+              const items = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+              const i = items.indexOf(e.currentTarget)
+              items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus()
+            }}>
+            {def?.label ?? t}
+          </button>
+        )
+      })}
     </div>
   )
 }

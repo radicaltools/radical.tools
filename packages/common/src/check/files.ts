@@ -7,6 +7,7 @@
 // edited; like the rest of .radical/ it stays out of git.
 
 import { SELECTION_DIR } from '../formats/canvasSelection'
+import { stripBom } from '../formats/mdFolder'
 import type { CheckConfig } from './index'
 import type { TestCase, TestStatus } from './reports'
 
@@ -40,9 +41,10 @@ export function parseTestResults(text: string): TestResults | null {
   return { version: 1, readAt: r.readAt, reports: Array.isArray(r.reports) ? r.reports.filter((x) => typeof x === 'string') : [], cases }
 }
 
-/** The rule settings in `text`; throws when it is not a config. */
+/** The rule settings in `text`; throws when it is not a config. A
+ *  byte-order mark (Notepad, PowerShell 5) is no part of the JSON. */
 export function parseCheckConfig(text: string): CheckConfig {
-  const data = JSON.parse(text) as unknown
+  const data = JSON.parse(stripBom(text)) as unknown
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('a config is a JSON object')
   const rules = (data as CheckConfig).rules
   if (rules !== undefined && (typeof rules !== 'object' || rules === null || Array.isArray(rules))) throw new Error('"rules" is an object of rule settings')
