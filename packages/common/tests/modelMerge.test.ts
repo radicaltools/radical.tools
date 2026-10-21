@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
-import { mergeModelEdits, mergeModels, modelEdits } from '../src/modelMerge'
+import { mergeModelEdits, mergeModels, mergeNotices, modelEdits } from '../src/modelMerge'
 
 const node = (id: string, label: string, extra: Partial<C4Node> = {}): C4Node =>
   ({ id, type: 'system', label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...extra }) as C4Node
@@ -67,6 +67,15 @@ describe('mergeModels', () => {
       expect(conflicts).toEqual([])
       expect(dropped).toEqual([{ name: 'Shop', by }])
     }
+  })
+
+  it('says whose change a delete dropped, and what came back', () => {
+    const where = { ours: 'in Studio', theirs: 'outside Studio' }
+    expect(mergeNotices({ dropped: [{ name: 'Shop', by: 'theirs' }], restored: ['Bank'] }, where)).toEqual([
+      'Shop was deleted in Studio; the change made to it outside Studio was dropped',
+      'Bank, deleted on one side, came back with its relations: an element was put into it on the other',
+    ])
+    expect(mergeNotices({ dropped: [{ name: 'Shop', by: 'ours' }] }, where)).toEqual(['Shop was deleted outside Studio; the change made to it in Studio was dropped'])
   })
 
   it('brings back a container one side deleted while the other added an element into it, with its relations and places', () => {
