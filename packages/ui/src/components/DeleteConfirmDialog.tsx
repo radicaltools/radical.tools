@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { hideRefusal, useDiagramStore } from '../store/diagramStore'
+import { descendantIds } from '@radical/common/model'
 
 /**
  * Confirmation modal that appears when the user presses Delete on the canvas.
@@ -33,9 +34,21 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
 
   const firstNode = pending.nodeIds[0] ? c4Nodes[pending.nodeIds[0]] : null
   const firstEdge = pending.edgeIds[0] ? c4Relations[pending.edgeIds[0]] : null
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
   const summary = nodeCount + edgeCount === 1
     ? (firstNode ? `"${firstNode.label}"` : firstEdge ? `relation "${firstEdge.label || '(unnamed)'}"` : '1 element')
-    : `${nodeCount} node(s)${edgeCount ? ` + ${edgeCount} relation(s)` : ''}`
+    : [nodeCount ? plural(nodeCount, 'element', 'elements') : '', edgeCount ? plural(edgeCount, 'relation', 'relations') : ''].filter(Boolean).join(' and ')
+  // What Remove from model takes: the elements with what lies inside them,
+  // and every relation of any of them (the prompt counted the selection
+  // only: "8 node(s) + 10 relation(s)" removed 10 and 30).
+  const removedNodes = new Set<string>()
+  for (const id of pending.nodeIds) {
+    if (!c4Nodes[id]) continue
+    removedNodes.add(id)
+    for (const d of descendantIds(id, c4Nodes)) removedNodes.add(d)
+  }
+  const removedRelations = Object.values(c4Relations).filter((r) => pending.edgeIds.includes(r.id) || removedNodes.has(r.sourceId) || removedNodes.has(r.targetId)).length
+  const removes = [removedNodes.size ? plural(removedNodes.size, 'element', 'elements') : '', removedRelations ? plural(removedRelations, 'relation', 'relations') : ''].filter(Boolean).join(' and ')
 
   const canHide = !!activeViewId && nodeCount > 0 && !refusal
 
@@ -51,7 +64,8 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
             <div className="milestone-option-title">Remove from model</div>
             <div className="milestone-option-desc">
               Permanently delete from the model (and from every view that
-              references it). Children of nodes are removed as well.
+              references it): {removes}, with what lies inside the elements
+              and their relations.
             </div>
           </button>
           <button

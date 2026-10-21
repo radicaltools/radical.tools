@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useDiagramStore, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG } from '@radical/common/c4'
-import { resolveEarsSubject, isReservedPropertyKey, relationTypeKeepsAggregates, type PropertyDef } from '@radical/common/metamodel'
+import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeKeepsAggregates, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { ViewPipelinePanel } from './ViewPipelinePanel'
 import { MarkdownText } from './MarkdownText'
@@ -1833,7 +1833,7 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
 // EARS inline sentence editor for right panel (compact)
 const EARS_SENTENCE_FIELDS = ['trigger', 'precondition', 'unwanted_condition', 'feature', 'action'] as const
 
-function EarsSentencePreview({ node, nodeId, subject: subjectProp, readOnly, updateNode }: { node: Record<string, unknown>; nodeId: string; subject?: string; readOnly: boolean; updateNode: (id: string, patch: Record<string, unknown>) => void }) {
+function EarsSentencePreview({ node, nodeId, subject: subjectProp, statePhrase, readOnly, updateNode }: { node: Record<string, unknown>; nodeId: string; subject?: string; statePhrase?: string; readOnly: boolean; updateNode: (id: string, patch: Record<string, unknown>) => void }) {
   const earsType = String(node.ears_type ?? 'ubiquitous')
   const subject = subjectProp || 'the system'
 
@@ -1868,6 +1868,12 @@ function EarsSentencePreview({ node, nodeId, subject: subjectProp, readOnly, upd
     )
   }
 
+  // A requirement pointing at a state (While in state) reads "While the
+  // Order is Confirmed", as on the canvas and in the wiki; it read the
+  // precondition's text, or ‹precondition›.
+  const precondition = statePhrase
+    ? <span className="ears-fixed-sm" title="The state it points at (While in state)">{statePhrase}</span>
+    : <Slot fieldKey="precondition" placeholder="‹precondition›" />
   const shall = (<><span className="ears-subject-sm">{subject}</span><span className="ears-fixed-sm"> shall </span><Slot fieldKey="action" placeholder="‹action›" /><span className="ears-fixed-sm">.</span></>)
 
   let content: React.ReactNode
@@ -1875,13 +1881,13 @@ function EarsSentencePreview({ node, nodeId, subject: subjectProp, readOnly, upd
     case 'event-driven':
       content = (<><span className="ears-fixed-sm">When </span><Slot fieldKey="trigger" placeholder="‹trigger›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
     case 'state-driven':
-      content = (<><span className="ears-fixed-sm">While </span><Slot fieldKey="precondition" placeholder="‹precondition›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
+      content = (<><span className="ears-fixed-sm">While </span>{precondition}<span className="ears-fixed-sm">, </span>{shall}</>); break
     case 'unwanted-behaviour':
       content = (<><span className="ears-fixed-sm">If </span><Slot fieldKey="unwanted_condition" placeholder="‹condition›" /><span className="ears-fixed-sm">, then </span>{shall}</>); break
     case 'optional':
       content = (<><span className="ears-fixed-sm">Where </span><Slot fieldKey="feature" placeholder="‹feature›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
     case 'complex':
-      content = (<><span className="ears-fixed-sm">While </span><Slot fieldKey="precondition" placeholder="‹precondition›" /><span className="ears-fixed-sm">, when </span><Slot fieldKey="trigger" placeholder="‹trigger›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
+      content = (<><span className="ears-fixed-sm">While </span>{precondition}<span className="ears-fixed-sm">, when </span><Slot fieldKey="trigger" placeholder="‹trigger›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
     default:
       content = (<><span className="ears-subject-sm">{subject.charAt(0).toUpperCase() + subject.slice(1)}</span><span className="ears-fixed-sm"> shall </span><Slot fieldKey="action" placeholder="‹action›" /><span className="ears-fixed-sm">.</span></>)
   }
@@ -2057,7 +2063,8 @@ function AttrValue({ def, value, readOnly, onChange }: {
 }) {
   const shown = value ?? def.default
   if (def.type === 'ref') {
-    return <RefPicker def={def as PropertyDef} value={value} readOnly={readOnly} className="pp-input pp-select" onChange={(v) => !readOnly && onChange(v)} />
+    // None picked is no value ("(none)" stored event: "").
+    return <RefPicker def={def as PropertyDef} value={value} readOnly={readOnly} className="pp-input pp-select" onChange={(v) => !readOnly && onChange(v === '' ? undefined : v)} />
   }
   if (def.type === 'boolean') {
     return (
@@ -2324,7 +2331,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
           <section className="pp-section">
             <div className="pp-section-title">Sentence</div>
             <div className="props-ears-sentence">
-              <EarsSentencePreview node={record} nodeId={node.id} subject={resolveEarsSubject(node.id, c4Relations, c4Nodes)} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} />
+              <EarsSentencePreview node={record} nodeId={node.id} subject={resolveEarsSubject(node.id, c4Relations, c4Nodes)} statePhrase={requirementStatePhrase(node, c4Nodes, c4Relations) || undefined} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} />
               <EarsQuickEntry nodeId={node.id} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} compact />
             </div>
           </section>
@@ -2422,7 +2429,9 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
             typeLabel={relTypeDef?.label ?? 'Relation'}
             color={relTypeDef?.color ?? '#64748b'}
             title={String(rel.label ?? '')}
-            titlePlaceholder="No label"
+            // A transition without a label of its own reads as its line does
+            // ("PaymentReceived [ok] / reserve ^OrderPaid"), not "No label".
+            titlePlaceholder={relationDisplayLabel(rel, c4Nodes) || 'No label'}
             readOnly={readOnly}
             onTitle={(v) => set('label', v)}
             context={(
