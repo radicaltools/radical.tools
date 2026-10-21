@@ -393,7 +393,7 @@ type WrittenFolder =
   | { name: string; handle: FsDirHandle; session: MdFolderSession }
 
 /** Pick a folder (Electron or web) and write `data` into it as a Markdown
- *  model named after the folder (`fallbackName` when the browser gives no
+ *  model named `modelName`, else after the folder (`fallbackName` when the browser gives no
  *  name). A folder that already holds `.md` / `.json` files but is not a
  *  Radical model is written into only if `confirmForeign` returns true.
  *  Returns null on cancel, refusal or a failed write. */
@@ -408,9 +408,10 @@ async function pickAndWriteFolder(
   if (h.pickFolder && h.writeFolder) {
     const picked = await h.pickFolder()
     if (!picked.success || !picked.folderPath) return null
-    const name = modelName ?? defaultNameFromFolder(picked.folderPath)
+    const folderName = defaultNameFromFolder(picked.folderPath)
+    const name = modelName ?? folderName
     const present = h.readFolder ? await h.readFolder(picked.folderPath) : null
-    if (present?.success && present.files && !(await mayWriteInto(present.files, name, confirmForeign))) {
+    if (present?.success && present.files && !(await mayWriteInto(present.files, folderName, confirmForeign))) {
       return null
     }
     const res = await h.writeFolder(picked.folderPath, serializeToMdFolder(data, name))
@@ -425,10 +426,11 @@ async function pickAndWriteFolder(
   if (webFolderSupported()) {
     const handle = await pickWebDirectory()
     if (!handle) return null
-    const name = modelName ?? (handle.name || fallbackName)
+    const folderName = handle.name || fallbackName
+    const name = modelName ?? folderName
     const session = new MdFolderSession(handleFolderStorage(handle))
     try {
-      if (!(await mayWriteInto(await session.readAll(), name, confirmForeign))) return null
+      if (!(await mayWriteInto(await session.readAll(), folderName, confirmForeign))) return null
       const res = await session.write(serializeToMdFolder(data, name))
       if (!res.ok) return null // changed while we were writing; nothing written
     } catch (e) {
