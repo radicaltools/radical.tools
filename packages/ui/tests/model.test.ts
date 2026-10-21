@@ -237,11 +237,20 @@ describe('reparentNodes', () => {
   })
 
   it('moves a node into another parent, keeping its canvas position', () => {
-    const shop = add({ ...base, type: 'domain', label: 'Shop', x: 1000, y: 500, width: 800, height: 600 } as Omit<C4Node, 'id'>)
+    // Loaded, not added: an add on top of Shop would push Shop clear.
     // Holding something, Shop is drawn at its size (an empty one is drawn
     // at its folded size, and what lies outside that is placed beside).
-    add({ ...base, type: 'system', label: 'Billing', parentId: shop, x: 450, y: 350 } as Omit<C4Node, 'id'>)
-    const sys = add({ ...base, type: 'system', label: 'Orders', x: 1100, y: 700 } as Omit<C4Node, 'id'>)
+    const shop = 'shop'
+    const sys = 'orders'
+    useDiagramStore.getState().loadDiagram({
+      nodes: [
+        { ...base, id: shop, type: 'domain', label: 'Shop', x: 1000, y: 500, width: 800, height: 600 },
+        { ...base, id: 'billing', type: 'system', label: 'Billing', parentId: shop, x: 450, y: 350 },
+        { ...base, id: sys, type: 'system', label: 'Orders', x: 1100, y: 700 },
+      ] as C4Node[],
+      relations: [],
+    })
+    useDiagramStore.setState({ metamodel: builtInGovernanceMetamodel() } as any)
     useDiagramStore.getState().reparentNodes([sys], shop)
     const moved = useDiagramStore.getState().c4Nodes[sys]
     expect(moved.parentId).toBe(shop)
