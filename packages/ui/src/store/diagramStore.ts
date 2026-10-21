@@ -63,7 +63,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, fittedParentSize, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
+import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
@@ -391,7 +391,7 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
   const defaultPositions = merged.defaultPositions ?? {}
   const activeViewId = change.to.activeViewId && views[change.to.activeViewId] ? change.to.activeViewId : null
   const view = activeViewId ? views[activeViewId] : undefined
-  const positions = view ? view.positions : defaultPositions
+  const positions = view ? view.positions ?? {} : defaultPositions
   if (Object.keys(positions).length > 0) showCanvasPositions(c4Nodes, positions, view, c4Relations)
   return {
     entry: {
@@ -569,11 +569,35 @@ function _asOneStep<T>(action: () => T): T {
   }
 }
 
+/** The camera in use when a model was loaded. Loading shows All elements
+ *  while the canvas still has the camera of what it showed (a view, on a
+ *  reload): until it moves, it is not All elements' and is not saved as
+ *  theirs (a merged reload wrote the view's camera into defaultViewport). */
+let _cameraAtLoad: { x: number; y: number; zoom: number } | null = null
+
+/** The camera in use now, unless it is still the one from before a load. */
+function allElementsCamera(camera: { x: number; y: number; zoom: number } | null): { x: number; y: number; zoom: number } | null {
+  const was = _cameraAtLoad
+  if (!camera || (was && was.x === camera.x && was.y === camera.y && was.zoom === camera.zoom)) return null
+  return camera
+}
+
+/** Counts the user's steps: each undo step made, undone or redone. */
+let _historyMark = 0
+
+/** A number that changes with each undo step the user makes, undoes or
+ *  redoes: whether the model was edited since a moment (autosave saves
+ *  after a load only once it was, D15). */
+export function historyMark(): number {
+  return _historyMark
+}
+
 function _pushUndoEntry(entry: HistoryEntry): void {
   if (_oneStepDepth > 0) {
     if (_oneStepPushed) return
     _oneStepPushed = true
   }
+  _historyMark++
   _undoStack.push(entry)
   if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
   _redoStack.length = 0 // clear redo on new change
@@ -891,6 +915,47 @@ function snapshotPositions(nodes: Record<string, C4Node>): Record<string, NodePo
   return result
 }
 
+/**
+ * Places the elements `added` while Smart Layout ran, once its layout is
+ * on the canvas (D11): inside its parent beside its siblings, the parent
+ * grown with room made (placeUnplaced); at the top level, as near the
+ * elements it is related to as there is room. Mutates `state` (inside
+ * immer set).
+ */
+function placeAddedDuringLayout(state: DiagramStore, added: string[]): void {
+  const nodes = state.c4Nodes as Record<string, C4Node>
+  const relations = state.c4Relations as Record<string, C4Relation>
+  const fresh = new Set(added)
+  const known = Object.fromEntries(Object.keys(nodes).filter((id) => !fresh.has(id)).map((id) => [id, true]))
+  const view = state.activeViewId ? state.views[state.activeViewId] as DiagramView | undefined : undefined
+  const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
+  placeUnplaced(nodes, known, shown)
+  const rootOf = (id: string): C4Node => {
+    let n = nodes[id]
+    while (n.parentId && nodes[n.parentId]) n = nodes[n.parentId]
+    return n
+  }
+  const parents = new Set(Object.values(nodes).filter((n) => n.parentId).map((n) => n.parentId!))
+  const box = (n: C4Node) => ({ x: n.x, y: n.y, ...drawnSize(n, parents.has(n.id)) })
+  for (const id of added) {
+    const node = nodes[id]
+    if (!node || node.parentId || (shown && !shown.has(id))) continue
+    const ends = Object.values(relations)
+      .map((r) => (r.sourceId === id ? r.targetId : r.targetId === id ? r.sourceId : null))
+      .filter((other): other is string => !!other && !!nodes[other] && !fresh.has(other) && (!shown || shown.has(other)))
+      .map((other) => box(rootOf(other)))
+    if (!ends.length) continue
+    const centre = {
+      x: ends.reduce((sum, b) => sum + b.x + b.width / 2, 0) / ends.length,
+      y: ends.reduce((sum, b) => sum + b.y + b.height / 2, 0) / ends.length,
+    }
+    const taken = Object.values(nodes).filter((n) => !n.parentId && n.id !== id && (!shown || shown.has(n.id))).map(box)
+    const at = freeSpotNear(taken, drawnSize(node, parents.has(id)), centre)
+    node.x = at.x
+    node.y = at.y
+  }
+}
+
 /** Apply a positions map onto c4Nodes (mutates in-place, use inside immer set) */
 function applyPositions(nodes: Record<string, C4Node>, positions: Record<string, NodePosition>): void {
   for (const [id, pos] of Object.entries(positions)) {
@@ -917,7 +982,12 @@ function showCanvasPositions(
   // Only a canvas draws positions: a table, wiki, matrix, hierarchy or flow
   // view keeps what it was given.
   if (view && view.kind && view.kind !== 'static') return []
-  return placeUnplaced(nodes, positions, view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined)
+  const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
+  // Folded as the view draws it: its own folds over the model's, and a
+  // container none of whose children it shows.
+  const childless = computeViewCollapsedSet(shown, nodes)
+  const folded = view ? (n: C4Node): boolean => nodeEffectivelyCollapsedInView(n, view.id, view) || childless.has(n.id) : undefined
+  return placeUnplaced(nodes, positions, shown, folded)
 }
 
 /** The positions a canvas view opens with when it has none of its own (a
@@ -3284,21 +3354,25 @@ export const useDiagramStore = create<DiagramStore>()(
                 cur = p
               }
 
-              // Grow around the collapsed box's centre: the children's
-              // bounds (which the group's box is drawn around) are centred
-              // on it. From the box's top-left corner the group ran right
-              // and down, and pushed the diagram below and beside it away.
-              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-              for (const c of children) {
-                if (Math.abs(c.x) < 1 && Math.abs(c.y) < 1) continue // placed below
-                const w = c.collapsed ? COLLAPSED_WIDTH[c.type] : (c.width ?? 0)
-                const h = c.collapsed ? COLLAPSED_HEIGHT[c.type] : (c.height ?? 0)
-                minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x + w)
-                minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y + h)
-              }
-              if (minX <= maxX) {
-                const dx = COLLAPSED_WIDTH[parent.type] / 2 - (minX + maxX) / 2
-                const dy = COLLAPSED_HEIGHT[parent.type] / 2 - (minY + maxY) / 2
+              // Grow around the collapsed box's centre: the frame the
+              // children open to (the one fitParentToChildren gives them,
+              // header and margins included) is centred on it, the reverse
+              // of a collapse, which shrinks to the frame's centre. From
+              // the box's top-left corner the group ran right and down, and
+              // pushed the diagram below and beside it away; centring the
+              // children's bounds instead (lower than the frame's middle by
+              // the header) walked the frame up on every cycle.
+              const shownView = activeViewId ? get().views[activeViewId] : undefined
+              const shownHere = shownView ? computeViewNodeSet(shownView as any, allNodes, get().c4Relations) : undefined
+              const placedKids = children.filter((c) => (!shownHere || shownHere.has(c.id)) && (Math.abs(c.x) >= 1 || Math.abs(c.y) >= 1)) // the rest placed below
+              if (placedKids.length > 0) {
+                const frame = fittedParentSize(parent, placedKids.map((c) => ({
+                  x: c.x, y: c.y,
+                  width: c.collapsed ? COLLAPSED_WIDTH[c.type] : (c.width ?? 0),
+                  height: c.collapsed ? COLLAPSED_HEIGHT[c.type] : (c.height ?? 0),
+                })))
+                const dx = COLLAPSED_WIDTH[parent.type] / 2 - frame.width / 2
+                const dy = COLLAPSED_HEIGHT[parent.type] / 2 - frame.height / 2
                 set((state) => {
                   const p = state.c4Nodes[id]
                   if (p) { p.x += dx; p.y += dy }
@@ -4014,7 +4088,8 @@ export const useDiagramStore = create<DiagramStore>()(
             if (activeViewId === null) _milestoneAllPositions = currentPos
           } else if (activeViewId === null) {
             state.defaultPositions = currentPos as any
-            if (currentViewport) state.defaultViewport = currentViewport
+            const camera = allElementsCamera(currentViewport)
+            if (camera) state.defaultViewport = camera
           } else if (state.views[activeViewId]) {
             const view = state.views[activeViewId]
             if (activeViewId !== _firstLayoutOf) view.positions = viewCanvasPositions(view, c4Nodes, currentPos, viewDrawnIds(view as DiagramView, c4Nodes as Record<string, C4Node>, state.c4Relations as Record<string, C4Relation>)) as any
@@ -4029,7 +4104,7 @@ export const useDiagramStore = create<DiagramStore>()(
             incomingViewport = state.defaultViewport as typeof incomingViewport
           } else {
             const view = state.views[newId]
-            if (view && Object.keys(view.positions).length > 0) {
+            if (view && Object.keys(view.positions ?? {}).length > 0) {
               incoming = view.positions as Record<string, NodePosition>
             }
             if (view?.viewport) incomingViewport = view.viewport
@@ -4193,7 +4268,8 @@ export const useDiagramStore = create<DiagramStore>()(
           const viewId = state.activeViewId
           if (viewId === null) {
             state.defaultPositions = currentPos as any
-            if (camera) state.defaultViewport = camera
+            const shown = allElementsCamera(camera)
+            if (shown) state.defaultViewport = shown
           } else if (state.views[viewId]) {
             const view = state.views[viewId]
             if (viewId !== _firstLayoutOf) view.positions = viewCanvasPositions(view, get().c4Nodes, currentPos, viewDrawnIds(view as DiagramView, get().c4Nodes, get().c4Relations)) as any
@@ -4298,7 +4374,21 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       setViewCollapsed(viewId, nodeIds, collapsed) {
-        if (!get().views[viewId]) return
+        const view = get().views[viewId]
+        if (!view) return
+        // On the canvas shown, as its −/+ does: the box shrinks to its
+        // middle, or opens round it and makes room. The lists alone opened
+        // it at the folded box's corner, over its neighbours.
+        if (get().activeViewId === viewId && (view.kind ?? 'static') === 'static') {
+          const toggled = nodeIds.filter((id) => {
+            const n = get().c4Nodes[id]
+            return !!n && isContainerType(n.type) && nodeEffectivelyCollapsedInView(n, viewId, get().views[viewId]) !== collapsed
+          })
+          if (toggled.length === nodeIds.length) {
+            _asOneStep(() => { for (const id of toggled) get().toggleCollapse(id) })
+            return
+          }
+        }
         get()._pushUndo()
         get()._milestoneViewEdit(viewId)
         set((state) => { model.setViewCollapsed(state, viewId, nodeIds, collapsed) })
@@ -4333,8 +4423,10 @@ export const useDiagramStore = create<DiagramStore>()(
           if (first) placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, first, view, state.c4Relations as Record<string, C4Relation>)
         })
         get()._sync()
-        // The live layout drops what it had of the canvas shown before.
+        // The live layout drops what it had of the canvas shown before (and,
+        // shown as no canvas, lays nothing out).
         if (placed) _liveLayout?.reset(placed)
+        else if (get().activeViewId === viewId) _liveLayout?.reset()
       },
 
       setTreemapFocus(viewId, focusId) {
@@ -5069,6 +5161,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const input = layoutInputForView(get())
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const target = layoutTarget(get())
+          const present = new Set(Object.keys(get().c4Nodes))
           const result = await runSmartLayout(input.nodes, input.relations, get().metamodel as Metamodel | undefined, (progress) => {
             set((s) => { s.smartLayoutProgress = progress })
           }, { alignments: input.alignments, edgeStyle: model.edgeStyleOf(get(), get().activeViewId) })
@@ -5092,6 +5185,12 @@ export const useDiagramStore = create<DiagramStore>()(
             applyLayoutPositions(state.c4Nodes, result.winner.positions, input)
             unpinLaidOut(state, get().appMode)
           })
+          // Added while the layout ran: its drop point was a place in the
+          // layout this one replaces (893 px from anything on 300
+          // elements). It is placed as a new element here, in the layout's
+          // undo step (D11).
+          const added = Object.keys(get().c4Nodes).filter((id) => !present.has(id))
+          if (added.length) set((state) => { placeAddedDuringLayout(state, added) })
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
           // Final collision-safety pass at root level (same as ELK/Radical paths).
@@ -5219,6 +5318,11 @@ export const useDiagramStore = create<DiagramStore>()(
           // collapsed/expanded overrides included, so a node collapsed on All
           // elements but expanded in this view is a group here, not a leaf.
           getModel: () => {
+            // Only a canvas is laid out. Behind a table, wiki, Warnier,
+            // matrix or treemap view nobody sees the layout: it moved
+            // nodes[].x/y for many seconds after an add, holding the save.
+            const shown = get().activeViewId ? get().views[get().activeViewId!] : undefined
+            if (shown && (shown.kind ?? 'static') !== 'static') return { nodes: {}, relations: {}, alignments: [], pinned: [] }
             const { nodes, relations, alignments } = layoutInputForView(get())
             return { nodes, relations, alignments, pinned: pinnedNodeIds(activeLayoutConstraints(get())) }
           },
@@ -5336,6 +5440,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().appMode !== 'designer') return
         if (_undoStack.length === 0) return
         const item = _undoStack.pop()!
+        _historyMark++
         // push current state to redo, on the step's canvas, where Undo goes
         const now = _captureState(get())
         const canvas = (isStepChange(item) ? item.to : item).activeViewId
@@ -5368,6 +5473,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().appMode !== 'designer') return
         if (_redoStack.length === 0) return
         const item = _redoStack.pop()!
+        _historyMark++
         // push current state to undo, on the step's canvas, where Redo goes
         const now = _captureState(get())
         const canvas = (isStepChange(item) ? item.to : item).activeViewId
@@ -6812,6 +6918,8 @@ export const useDiagramStore = create<DiagramStore>()(
           state.views = views as any
           state.defaultPositions = defaultPos as any
           state.defaultViewport = defaultVP
+          const rawVP = typeof window !== 'undefined' ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
+          _cameraAtLoad = rawVP ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom } : null
           state.defaultLayoutConstraints = (data.defaultLayoutConstraints ?? []) as any
           state.defaultEdgeStyle = data.defaultEdgeStyle ?? 'curved'
           state.activeViewId = null

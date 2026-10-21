@@ -51,6 +51,20 @@ describe('aggregated quality', () => {
     expect(bestIndexKeepingCurrent([clearly, worse])).toBe(0)
     expect(KEEP_CURRENT_MARGIN).toBeGreaterThan(0)
   })
+
+  it('picks the same winner whatever layout it starts from, and keeps it the next time (item 193)', () => {
+    // The sample's 13-element Trace list: its two best layered layouts, and
+    // the unarranged layout the first run started from. Ranked with that
+    // one, the top-down layout won; the next run, from it, ranked without
+    // it, picked the left-right one: MCP smart_layout rewrote the view twice.
+    const topDown = score({ leafCentrality: 1.85, aspectPenalty: 0.0042, compactness: 0.0417, symmetryDeficit: 0.655, edgeLengthSd: 0.4, spaceImbalance: 0.0769 })
+    const leftRight = score({ leafCentrality: 1.99, symmetryDeficit: 0.777, edgeLengthSd: 0.101, spaceImbalance: 0.1538 })
+    const start = score({ renderedCrossings: 4, renderedOverdraws: 4, edgeLengthSd: 3.04, compactness: 2.6, shallowCrossings: 2, crowdedAngles: 2, spaceImbalance: 0.46, labelCrowding: 0.0002 })
+    const first = bestIndexKeepingCurrent([topDown, leftRight, start])
+    expect(first).toBeLessThan(2)
+    const winner = [topDown, leftRight][first]
+    expect(bestIndexKeepingCurrent([topDown, leftRight, { ...winner }])).toBe(2)
+  })
 })
 
 describe('crossing angle and angular resolution', () => {

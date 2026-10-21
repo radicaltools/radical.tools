@@ -14,7 +14,7 @@ import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { mergeModelEdits, mergeModels, mergeNotices, modelEdits, type MergeDrop, type ModelEdits } from '@radical/common/modelMerge'
-import { useDiagramStore, parkedLiveModel, type ParkedDesigner } from '@radical/ui/store/diagramStore'
+import { useDiagramStore, historyMark, parkedLiveModel, type ParkedDesigner } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore, DocumentUnreadableError, StorageFullError, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
 
@@ -71,6 +71,8 @@ export function reloadActiveDocument(): void {
 // active document is (LS or FS, resolved fresh on every flush).
 if (typeof window !== 'undefined') {
   let _persistTimer: ReturnType<typeof setTimeout> | null = null
+  /** The longest a save waits while the model goes on changing. */
+  const MAX_SAVE_WAIT_MS = 2000
   let _suspended = false
   /** Edits made since the last save was handed to the document store: what a
    *  reload of an outside edit merges into the model it loads. */
@@ -164,9 +166,19 @@ if (typeof window !== 'undefined') {
       reportSaveError(e, !leaving)
     }
   }
+  /** When the save waiting now was first asked for. */
+  let _pendingSince = 0
   const schedulePersist = (delay = 400): void => {
     _unsaved = true
-    if (_persistTimer !== null) clearTimeout(_persistTimer)
+    if (_persistTimer !== null) {
+      // Changes that keep coming (a layout settling on a large canvas) hold
+      // the save back no longer than this: each one put it off again, and
+      // a Warnier process of 150 steps was never saved.
+      if (Date.now() - _pendingSince >= MAX_SAVE_WAIT_MS) return
+      clearTimeout(_persistTimer)
+    } else {
+      _pendingSince = Date.now()
+    }
     _persistTimer = setTimeout(() => {
       _persistTimer = null
       void flushPersist()
@@ -237,6 +249,47 @@ if (typeof window !== 'undefined') {
    *  a slide, not the document) and lost the edits held for an agent. */
   let _changedWhilePresenting: string | null = null
 
+  // ── A load saves nothing by itself ──────────────────────────────────────
+  // After a load (a reload of the page, a document opened, an outside
+  // change) the store goes on changing: the live layout settles, the canvas
+  // gives places to what it has none for, the camera is put back. None of
+  // it is the user's: until they edit the model (an undo step made, undone
+  // or redone, or a change to more than places), nothing is written. A
+  // reload saved the document and its nodes[].x/y mirror, also in Viewer
+  // and Presenter (D15).
+  /** historyMark() when the active document was last loaded; null once the
+   *  user has edited it since. */
+  let _loadedAt: number | null = historyMark()
+  const NODE_PLACE = new Set(['x', 'y', 'width', 'height'])
+  const VIEW_PLACE = new Set(['positions', 'viewport'])
+  /** `next` differs from `was` in the places `keys` name only. */
+  const placesOnly = <T extends object>(was: Record<string, T>, next: Record<string, T>, keys: Set<string>): boolean => {
+    const ids = new Set([...Object.keys(was), ...Object.keys(next)])
+    for (const id of ids) {
+      const a = was[id] as Record<string, unknown> | undefined
+      const b = next[id] as Record<string, unknown> | undefined
+      if (a === b) continue
+      if (!a || !b) return false
+      for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+        if (!keys.has(k) && a[k] !== b[k]) return false
+      }
+    }
+    return true
+  }
+  /** The change from `prev` to `s` only places things (the live layout, a
+   *  canvas shown, the camera). */
+  type StoreState = ReturnType<typeof useDiagramStore.getState>
+  const placesOnlyChange = (s: StoreState, prev: StoreState): boolean =>
+    s.c4Relations === prev.c4Relations &&
+    s.sequences === prev.sequences &&
+    s.defaultLayoutConstraints === prev.defaultLayoutConstraints &&
+    s.defaultEdgeStyle === prev.defaultEdgeStyle &&
+    s.snapshots === prev.snapshots &&
+    s.presentations === prev.presentations &&
+    s.metamodel === prev.metamodel &&
+    (s.c4Nodes === prev.c4Nodes || placesOnly(prev.c4Nodes as Record<string, object>, s.c4Nodes as Record<string, object>, NODE_PLACE)) &&
+    (s.views === prev.views || placesOnly(prev.views as Record<string, object>, s.views as Record<string, object>, VIEW_PLACE))
+
   let prev = useDiagramStore.getState()
   useDiagramStore.subscribe((s) => {
     if (prev.presentationActive && !s.presentationActive && _changedWhilePresenting) {
@@ -275,6 +328,12 @@ if (typeof window !== 'undefined') {
     // explored model layout is not written alongside them.
     const presChangedInExplore =
       isExploreMode && s.presentations !== prev.presentations
+    if (_loadedAt !== null && modelChanged && historyMark() === _loadedAt && placesOnlyChange(s, prev)) {
+      // The load settling: kept from disk until the user edits.
+      prev = s
+      return
+    }
+    if (modelChanged && !isExploreMode) _loadedAt = null
     if (!isExploreMode && modelChanged) {
       prev = s
       schedulePersist()
@@ -398,6 +457,8 @@ if (typeof window !== 'undefined') {
         if (seq !== _loadSeq) return
         _suspended = false
         _loadingId = null
+        // What settles from here on is the load's, not an edit.
+        _loadedAt = mergedEdits ? null : historyMark()
         // The merged edits are still to be saved.
         if (mergedEdits) schedulePersist()
         if (documents.getActiveId() === id) for (const listener of [..._loadListeners]) listener(id)

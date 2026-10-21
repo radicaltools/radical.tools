@@ -18,7 +18,7 @@
  *     drops deleted elements from it
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { LiveColaEngine, relaxLayout } from '@radical/layout/liveColaEngine'
+import { LIVE_CHILD_TOP_MIN, LiveColaEngine, relaxLayout } from '@radical/layout/liveColaEngine'
 import { useDiagramStore } from '../src/store/diagramStore'
 import { NODE_SIZES, pinnedNodeIds, type C4Node, type C4Relation, type DiagramView } from '@radical/common/c4'
 import type { Alignment } from '@radical/layout/constraints'
@@ -337,6 +337,40 @@ describe('A drag and the open containers it does not touch', () => {
     engine.stop()
     expect(absOf(nodes, 'user')).toEqual({ x: -400, y: -200 })
     for (const id of ['shop', 'web', 'api', 'bank']) expect(frame(nodes, id)).toEqual(frame(before, id))
+  })
+
+  it('keeps the groups beside the one dragged in below their system\'s header (item 218)', () => {
+    // The sample's Core Banking view: Risk & Data holds its first child
+    // 110 px below its top, more than the physics leaves.
+    const nodes: Nodes = Object.fromEntries([
+      node('sys-core', 'system', { x: 30, y: 120, width: 1230, height: 1440 }),
+      node('dom-access', 'group', { parentId: 'sys-core', x: 20, y: 110, width: 690, height: 330 }),
+      node('ctn-apigw', 'container', { parentId: 'dom-access', x: 20, y: 110, width: 300, height: 200 }),
+      node('ctn-auth', 'container', { parentId: 'dom-access', x: 370, y: 110, width: 300, height: 200 }),
+      node('dom-banking', 'group', { parentId: 'sys-core', x: 20, y: 650, width: 610, height: 770 }),
+      node('ctn-payments', 'container', { parentId: 'dom-banking', x: 110, y: 340, width: 240, height: 410 }),
+      node('comp-validator', 'component', { parentId: 'ctn-payments', x: 20, y: 110, width: 200, height: 120 }),
+      node('comp-fx', 'component', { parentId: 'ctn-payments', x: 20, y: 270, width: 200, height: 120 }),
+      node('ctn-accounts', 'container', { parentId: 'dom-banking', x: 20, y: 110, width: 300, height: 200 }),
+      node('ctn-evtbus', 'queue', { parentId: 'dom-banking', x: 370, y: 178, width: 220, height: 95 }),
+      node('dom-risk', 'group', { parentId: 'sys-core', x: 750, y: 110, width: 460, height: 500 }),
+      node('ctn-fraud', 'container', { parentId: 'dom-risk', x: 20, y: 280, width: 300, height: 200 }),
+      node('ctn-db-acc', 'database', { parentId: 'dom-risk', x: 20, y: 110, width: 190, height: 130 }),
+      node('ctn-db-tx', 'database', { parentId: 'dom-risk', x: 250, y: 110, width: 190, height: 130 }),
+    ].map((n) => [n.id, n]))
+    const links: Record<string, C4Relation> = Object.fromEntries([
+      ['ctn-apigw', 'ctn-auth'], ['ctn-apigw', 'ctn-payments'], ['ctn-apigw', 'ctn-accounts'], ['ctn-payments', 'ctn-db-tx'],
+      ['ctn-accounts', 'ctn-db-acc'], ['ctn-payments', 'ctn-evtbus'], ['ctn-accounts', 'ctn-evtbus'], ['ctn-evtbus', 'ctn-fraud'],
+    ].map(([sourceId, targetId], i) => [`r${i}`, { id: `r${i}`, sourceId, targetId } as C4Relation]))
+    const engine = engineFor(nodes, links)
+    engine.start(true)
+    const at = absOf(nodes, 'ctn-apigw')
+    calmDrag(engine, nodes, 'ctn-apigw', { x: at.x + 100, y: at.y + 67 })
+    engine.release('ctn-apigw')
+    engine.stop()
+    // The canvas draws a child nearer its parent's top at that distance:
+    // the model must not say less.
+    for (const id of ['dom-access', 'dom-risk', 'dom-banking']) expect(nodes[id].y, id).toBeGreaterThanOrEqual(LIVE_CHILD_TOP_MIN)
   })
 
   it('moves a dragged container with the frame it had', () => {

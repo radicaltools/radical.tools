@@ -18,11 +18,11 @@ import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE, serializeAgentActivity } from '@radical/common/formats/agentActivity'
 import { displayVersion } from '@radical/common/version'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
-import { fitShown, growWithRoom, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
+import { fitShown, growFrameLeftUp, growWithRoom, makeRoomAround, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
-import { viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
+import { computeViewNodeSet, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
-import { pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
+import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
 import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
@@ -193,6 +193,55 @@ function settleGeometry(before: DiagramData, after: DiagramData): void {
     const prev = old[node.id]
     if (prev && prev.x === node.x && prev.y === node.y && prev.width === node.width && prev.height === node.height) continue
     after.defaultPositions[node.id] = { x: node.x, y: node.y, width: node.width, height: node.height }
+  }
+}
+
+/** Whether `view` draws `node` folded: folded there, or on the model and
+ *  not opened there. */
+const foldedOn = (view: DiagramView, node: C4Node): boolean =>
+  isContainerType(node.type) && ((node.collapsed && !view.expandedNodeIds?.includes(node.id)) || !!view.collapsedNodeIds?.includes(node.id))
+
+/** A container folded or opened on a view (update_view collapse, expand)
+ *  changes size there as Studio's toggle changes it: folded, to the middle
+ *  of its frame; opened, with the frame its children need round the folded
+ *  box's middle, what lies round it making room, its parents refit. Opened
+ *  as the lists alone said, it was drawn at the folded box's corner at full
+ *  size, over its neighbours. Mutates `after`'s view positions. */
+function settleViewFolds(before: DiagramData, after: DiagramData): void {
+  const old = byId(before.nodes)
+  const model = byId(after.nodes)
+  const relations = byId(after.relations)
+  const views = new Map((before.views ?? []).map((view) => [view.id, view]))
+  for (const view of after.views ?? []) {
+    const prev = views.get(view.id)
+    const positions = view.positions
+    if (!prev || !positions || (view.kind ?? 'static') !== 'static') continue
+    const toggled = after.nodes.filter((n) => n.id in positions && old[n.id] && foldedOn(prev, old[n.id]) !== foldedOn(view, n))
+    if (!toggled.length) continue
+    // The view's canvas: its places, folded as it folds them.
+    const nodes: Record<string, C4Node> = Object.fromEntries(after.nodes.map((n) => [n.id, { ...n, ...positions[n.id], collapsed: foldedOn(view, n) }]))
+    const canvas = modelCanvas(nodes, computeViewNodeSet(view, model, relations))
+    for (const { id } of toggled) {
+      const node = nodes[id]
+      if (node.collapsed) {
+        node.x += Math.max(0, (node.width - COLLAPSED_WIDTH[node.type]) / 2)
+        node.y += Math.max(0, (node.height - COLLAPSED_HEIGHT[node.type]) / 2)
+      } else {
+        fitShown(nodes, id, canvas)
+        node.x += COLLAPSED_WIDTH[node.type] / 2 - node.width / 2
+        node.y += COLLAPSED_HEIGHT[node.type] / 2 - node.height / 2
+        for (const [sid, at] of Object.entries(makeRoomAround(id, nodes, canvas))) Object.assign(nodes[sid], at)
+      }
+      if (!node.parentId || !nodes[node.parentId]) continue
+      // Opened round its middle, it can reach past its parent's left or top
+      // edge, where a refit (which grows right and down) does not follow.
+      growFrameLeftUp(nodes, node.parentId, canvas.shown)
+      growWithRoom(nodes, node.parentId, canvas)
+    }
+    for (const id of Object.keys(positions)) {
+      const n = nodes[id]
+      if (n) positions[id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+    }
   }
 }
 
@@ -446,6 +495,7 @@ export class FolderModel {
 
       let changed = result.data ?? facade.toDiagramData()
       settleGeometry(data, changed)
+      settleViewFolds(data, changed)
       const metamodel = facade.getMetamodel?.()
       // A view per element this call made (an element added, a group made)
       // is laid out at once, as Studio does when it is first opened.

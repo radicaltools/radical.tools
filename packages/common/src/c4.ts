@@ -686,7 +686,9 @@ export function withCanvasPositions<V extends DiagramView>(
 ): V[] {
   return views.map((view) => {
     const kept = viewCanvasPositions(view, nodes, view.positions ?? {}, drawnOf?.(view))
-    return Object.keys(kept).length === Object.keys(view.positions ?? {}).length ? view : { ...view, positions: kept }
+    // A view written without `positions` (by hand, by another tool) has
+    // none: it is not laid out yet.
+    return view.positions && Object.keys(kept).length === Object.keys(view.positions).length ? view : { ...view, positions: kept }
   })
 }
 

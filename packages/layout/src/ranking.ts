@@ -93,11 +93,17 @@ export function bestIndex(scores: readonly CompositeScore[]): number {
 export const KEEP_CURRENT_MARGIN = 0.25
 
 /** Like bestIndex, with the last score the layout on screen: it is kept
- *  (its index returned) unless another is better by KEEP_CURRENT_MARGIN. */
+ *  (its index returned) unless the best of the others is better by
+ *  KEEP_CURRENT_MARGIN. That best is the best among the others alone: with
+ *  the layout on screen in the ranking, how bad it was moved the means and
+ *  deviations, so the winner depended on where the run started, and a run
+ *  from the layout it had just made picked another one (MCP smart_layout
+ *  called twice rewrote the view twice). */
 export function bestIndexKeepingCurrent(scores: readonly CompositeScore[]): number {
-  const best = bestIndex(scores)
   const current = scores.length - 1
-  if (best === current) return current
+  if (current <= 0) return current
+  if (bestIndex(scores) === current) return current
+  const best = bestIndex(scores.slice(0, current))
   const quality = aggregatedQuality(scores)
   const currentClean = scores[current].nodeOverlap <= OVERLAP_TOLERANCE || scores[current].nodeOverlap <= scores[best].nodeOverlap
   return currentClean && quality[current] - quality[best] < KEEP_CURRENT_MARGIN ? current : best

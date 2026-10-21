@@ -376,6 +376,9 @@ describe('a slide added in Presenter after edits in Designer', () => {
       if (viewId) store().setActiveView(viewId)
       const id = Object.keys(store().c4Nodes).find((k) => !store().c4Nodes[k].parentId)!
       const x = store().c4Nodes[id].x + 333
+      // A drag: its undo step, then the move (a move alone, as the layout
+      // settling after a load makes, is saved by nothing, D15).
+      store()._pushUndo()
       useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, [id]: { ...st.c4Nodes[id], x } } }))
       await new Promise((r) => setTimeout(r, 600))
       const saved = async (): Promise<number | undefined> => {
