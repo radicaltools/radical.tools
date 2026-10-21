@@ -27,7 +27,7 @@ function state(): ModelState {
 
 describe('moving a relation end', () => {
   it('refuses a pair the metamodel does not allow', () => {
-    expect(checkPatchRelation(state(), 'uses', { targetId: 'admin' })).toMatch(/Relation not allowed: Person → Person/)
+    expect(checkPatchRelation(state(), 'uses', { targetId: 'adrOld' })).toMatch(/Relation not allowed: Person → ADR/)
   })
 
   it('allows an allowed pair and ignores updates that keep both ends', () => {

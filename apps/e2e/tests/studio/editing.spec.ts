@@ -118,14 +118,13 @@ test('connect two elements with Alt-drag', async ({ studio }) => {
 })
 
 test('a connection the metamodel forbids is refused', async ({ page, studio }) => {
-  await studio.addFromPalette('Person', { x: 400, y: 150 })
-  await expect(studio.nodes).toHaveCount(4)
-  const newPerson = studio.nodes.filter({ hasNot: page.getByText('Customer', { exact: true }) })
-    .filter({ has: page.getByText('Person', { exact: true }) })
-  // Person → person is not an allowed pair in the C4 metamodel.
-  await studio.connect(studio.node('customer'), newPerson)
-  await expect(page.getByText(/Relation not allowed: Person → Person/)).toBeVisible()
-  await expect(studio.edges).toHaveCount(2)
+  await studio.open('v-containers')
+  await expect(studio.nodes).toHaveCount(6)
+  const edges = await studio.edges.count()
+  // A database never starts an interaction in the C4 metamodel.
+  await studio.connect(studio.node('db'), studio.node('customer'))
+  await expect(page.getByText(/Relation not allowed: Database → Person/)).toBeVisible()
+  await expect(studio.edges).toHaveCount(edges)
 })
 
 test('undo and redo', async ({ page, studio }) => {

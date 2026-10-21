@@ -101,3 +101,45 @@ test('a model file that does not parse, or is gone, is named and left as it is',
   await page.waitForTimeout(1500)
   expect(await file.exists()).toBe(false)
 })
+
+// D20 and D6 (runs 45 to 64): a Structurizr workspace's views came in as
+// nothing (the import landed on All elements), and what it could not read
+// went without a word.
+test('Open → Structurizr DSL… brings the views, opens the first, and says what it left out', async ({ page, studio }) => {
+  const dsl = `workspace "Shop" {
+    !include people.dsl
+    model {
+        customer = person "Customer"
+        shop = softwareSystem "Shop" {
+            web = container "Web App"
+            api = container "API"
+        }
+        customer -> web "Browses"
+        web -> api "Calls"
+        deploymentEnvironment "Live" {
+            deploymentNode "Server" {
+            }
+        }
+    }
+    views {
+        systemContext shop "Context" {
+            include *
+        }
+        container shop "Containers" {
+            include *
+        }
+    }
+}`
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Structurizr DSL…' }).click()
+  await (await chooser).setFiles({ name: 'shop.dsl', mimeType: 'text/plain', buffer: Buffer.from(dsl) })
+  await studio.ready()
+  // The first view, with what it shows: Customer and Shop, folded.
+  await expect(page).toHaveURL(/\/v\/view-1/)
+  await expect(studio.nodes).toHaveCount(2)
+  await expect(page.locator('.toast-message')).toContainText(/!include people\.dsl.*Deployment environment "Live"/)
+  const doc = JSON.parse(await studio.storedJson(studio.activeDocId())) as { views: { name: string }[] }
+  expect(doc.views.map((v) => v.name)).toEqual(['Context', 'Containers'])
+})
