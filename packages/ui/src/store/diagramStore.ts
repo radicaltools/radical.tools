@@ -655,7 +655,12 @@ function showCanvasPositions(
   // Only a canvas draws positions: a table, wiki, matrix, hierarchy or flow
   // view keeps what it was given.
   if (view && view.kind && view.kind !== 'static') return []
-  return placeUnplaced(nodes, positions, view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined)
+  const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
+  // Folded as the view draws it: its own folds over the model's, and a
+  // container none of whose children it shows.
+  const childless = computeViewCollapsedSet(shown, nodes)
+  const folded = view ? (n: C4Node): boolean => nodeEffectivelyCollapsedInView(n, view.id, view) || childless.has(n.id) : undefined
+  return placeUnplaced(nodes, positions, shown, folded)
 }
 
 /** The positions a canvas view opens with when it has none of its own (a

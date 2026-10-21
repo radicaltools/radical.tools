@@ -342,3 +342,37 @@ describe('showing an element that is searched for (expandAncestors)', () => {
     expect(store().c4Nodes.ctn1.collapsed).toBe(true)
   })
 })
+
+describe('a container collapsed at its parent\'s edge', () => {
+  /** A system holding a narrow container on the left and a wide one, with
+   *  components, against its right edge: folded, the wide one leaves its
+   *  parent a frame narrower than its stored (open) width. */
+  const edge = () => ({
+    nodes: [
+      { id: 'sys', type: 'system', label: 'Shop', x: 0, y: 0, width: 1420, height: 460, collapsed: false },
+      { id: 'a', type: 'container', label: 'Web', parentId: 'sys', x: 30, y: 120, width: 300, height: 200, collapsed: false },
+      { id: 'b', type: 'container', label: 'Orders', parentId: 'sys', x: 400, y: 120, width: 990, height: 310, collapsed: false },
+      { id: 'b1', type: 'component', label: 'Checkout', parentId: 'b', x: 20, y: 120, width: 220, height: 140, collapsed: false },
+      { id: 'b2', type: 'component', label: 'Billing', parentId: 'b', x: 750, y: 120, width: 220, height: 140, collapsed: false },
+      { id: 'ext', type: 'person', label: 'Buyer', x: 0, y: -400, width: 220, height: 180, collapsed: false },
+    ] as C4Node[],
+    relations: [],
+    views: [{ id: 'v', name: 'Shop', nodeIds: ['sys', 'a', 'b', 'b1', 'b2', 'ext'], positions: {} }],
+  })
+
+  it('stays where it is after a view switch (item 222)', () => {
+    const s = useDiagramStore.getState
+    s().loadDiagram(edge() as any)
+    s().setActiveView('v')
+    s().toggleCollapse('b')
+    const at = () => Object.fromEntries(['sys', 'a', 'b', 'ext'].map((id) => {
+      const n = s().c4Nodes[id]
+      return [id, { x: Math.round(n.x), y: Math.round(n.y), width: Math.round(n.width), height: Math.round(n.height) }]
+    }))
+    const folded = at()
+    expect(folded.sys.width).toBeLessThan(1100)
+    s().setActiveView(null)
+    s().setActiveView('v')
+    expect(at()).toEqual(folded)
+  })
+})
