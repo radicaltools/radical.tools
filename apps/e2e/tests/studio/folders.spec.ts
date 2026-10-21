@@ -384,3 +384,25 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
   await page.keyboard.press('Escape')
   await expect(panel).toHaveCount(0)
 })
+
+// Item 189: an agent's write closed the card of a selected relation while it
+// was typed in (the focus went, the next keys were lost); an element's card
+// stayed open. The reload took the document opened at boot for another, and
+// dropped the selection.
+test('an outside write keeps the selected relation\'s card open, and what is typed in it', async ({ page, studio }) => {
+  await page.locator('.lp-view-card', { hasText: 'Containers' }).click()
+  await expect(studio.node('api')).toBeVisible()
+  await saveAsFolder(page)
+  await expect.poll(() => folder.paths()).toContain('nodes/customer.md')
+  await page.locator('[data-testid="rf__edge-r3"] .react-flow__edge-interaction').dispatchEvent('click')
+  const technology = page.locator('.right-panel.open').getByLabel('Technology', { exact: true })
+  await technology.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' v2')
+  const file = (await folder.files())['nodes/customer.md']
+  await folder.write('nodes/customer.md', file.replace('label: "Customer"', 'label: "Book Lover"'))
+  await expect(studio.node('customer')).toContainText('Book Lover', { timeout: 10_000 })
+  await expect(technology).toBeFocused()
+  await page.keyboard.type('.1')
+  await expect(technology).toHaveValue('SQL v2.1')
+})

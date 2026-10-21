@@ -2318,6 +2318,10 @@ export const useDiagramStore = create<DiagramStore>()(
       // Signal the boot startLiveLayout() call to skip cola's bulk phase
       // so the persisted positions aren't immediately overwritten.
       _initLoadedFromDisk = true
+      // The document the views' selections belong to: read again (an
+      // agent's write), the one opened at boot was taken for another, and
+      // a selected relation's card closed while it was typed in.
+      _viewSelectionsDoc = documentBackend()?.getActiveId() ?? null
     } else if (viewerProfile) {
       initNodes = {}
       initRelations = {}
