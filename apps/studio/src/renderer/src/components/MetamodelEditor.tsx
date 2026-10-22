@@ -130,6 +130,38 @@ function CountInput({ value, onCommit }: { value: number | undefined; onCommit: 
   )
 }
 
+/** The name of a type, a relation type or a property: taken as it is typed,
+ *  while it is not blank; an emptied field goes back to the name when it is
+ *  left or Enter is pressed (a type could be left with none, a blank entry
+ *  in the palette, which upsert_node_type refuses). */
+function NameInput({ value, onChange, className = 'mm-input', placeholder }: {
+  value: string
+  onChange: (name: string) => void
+  className?: string
+  placeholder?: string
+}): React.ReactElement {
+  const [text, setText] = useState(value)
+  useEffect(() => { setText((cur) => (cur.trim() === value ? cur : value)) }, [value])
+  const commit = (): void => {
+    const name = text.trim()
+    if (name && name !== value) onChange(name)
+    setText(name || value)
+  }
+  return (
+    <input
+      className={className}
+      value={text}
+      placeholder={placeholder}
+      onChange={(e) => {
+        setText(e.target.value)
+        if (e.target.value.trim()) onChange(e.target.value.trim())
+      }}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
+    />
+  )
+}
+
 /** The key of a property: taken when the field is left or Enter is
  *  pressed, and only when it is one a property may have. Applied on each
  *  key, "type" (or "x", on the way to "xml") was the element's own field
@@ -214,11 +246,11 @@ function PropertyEditor({
             of={of}
             onCommit={(key) => update(i, { key })}
           />
-          <input
+          <NameInput
             className="mm-input mm-prop-label"
             value={p.label}
             placeholder="Label"
-            onChange={(e) => update(i, { label: e.target.value })}
+            onChange={(label) => update(i, { label })}
           />
           <select
             className="mm-input mm-prop-type"
@@ -378,11 +410,7 @@ function NodeTypeCard({
           <div className="mm-row">
             <label className="mm-field">
               <span>Label</span>
-              <input
-                className="mm-input"
-                value={def.label}
-                onChange={(e) => onChange({ label: e.target.value })}
-              />
+              <NameInput value={def.label} onChange={(label) => onChange({ label })} />
             </label>
             <label className="mm-field mm-field-color">
               <span>Color</span>
@@ -558,11 +586,7 @@ function RelationTypeCard({
           <div className="mm-row">
             <label className="mm-field">
               <span>Label</span>
-              <input
-                className="mm-input"
-                value={def.label}
-                onChange={(e) => onChange({ label: e.target.value })}
-              />
+              <NameInput value={def.label} onChange={(label) => onChange({ label })} />
             </label>
           </div>
           <div className="mm-row">
@@ -966,7 +990,7 @@ export function MetamodelEditor(): React.ReactElement {
 
   return createPortal(
     <div
-      className="milestone-modal-backdrop"
+      className="milestone-modal-backdrop mm-editor-backdrop"
       onMouseDown={(e) => {
         if (e.target !== e.currentTarget) return
         const start = e.currentTarget

@@ -2757,8 +2757,9 @@ interface DiagramStore {
   connectSource: string | null
   connectionModifier: 'shift' | 'ctrl' | 'alt' | 'meta'
   /** A relation drawn between two elements that several relation types
-   *  fit: the canvas asks which (chooseRelationType). */
-  relationTypeChoice: { sourceId: string; targetId: string; types: string[] } | null
+   *  fit, or one whose end is moved onto such a pair (`relationId`): the
+   *  canvas asks which (chooseRelationType). */
+  relationTypeChoice: { sourceId: string; targetId: string; types: string[]; relationId?: string } | null
 
   // ── actions: nodes ──
   addNode: (node: Omit<C4Node, 'id'>) => string
@@ -2810,6 +2811,10 @@ interface DiagramStore {
   // ── actions: relations ──
   addRelation: (rel: Omit<C4Relation, 'id'>) => void
   updateRelation: (id: string, updates: Partial<Omit<C4Relation, 'id'>>) => void
+  /** An end of a relation moved on the canvas (its reconnect handle): as
+   *  updateRelation, and where the type it has does not fit the new pair
+   *  and several do, asked about first (relationTypeChoice). */
+  moveRelationEnd: (id: string, updates: Pick<Partial<C4Relation>, 'sourceId' | 'targetId'>) => void
   removeRelation: (id: string) => void
   onConnect: (connection: Connection) => void
   /** A relation drawn on the canvas (a handle, Alt-drag): refused where the
@@ -2817,7 +2822,8 @@ interface DiagramStore {
    *  chain does not follow is not drawn), of the type the chain follows, and
    *  asked about where several types fit (relationTypeChoice). */
   connectNodes: (sourceId: string, targetId: string) => void
-  /** Adds the relation asked about, of `type`; null drops it. */
+  /** Adds the relation asked about (or moves the end asked about), of
+   *  `type`; null drops it. */
   chooseRelationType: (type: string | null) => void
 
   // ── actions: selection ──
@@ -4614,6 +4620,20 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
       },
 
+      moveRelationEnd(id, updates) {
+        const s = get()
+        const refused = model.checkPatchRelation(s, id, updates)
+        if (refused) { s.pushNotification(refused, 'error'); return }
+        const fit = model.relationTypeOnMove(s, id, updates)
+        const rel = s.c4Relations[id]
+        if (fit.ask && rel) {
+          const ends = { sourceId: updates.sourceId ?? rel.sourceId, targetId: updates.targetId ?? rel.targetId }
+          set((state) => { state.relationTypeChoice = { ...ends, types: fit.ask!, relationId: id } })
+          return
+        }
+        s.updateRelation(id, fit.type ? { ...updates, relationType: fit.type } : updates)
+      },
+
       removeRelation(id) {
         get()._pushUndo()
         get()._markMilestoneEdit()
@@ -4661,7 +4681,9 @@ export const useDiagramStore = create<DiagramStore>()(
       chooseRelationType(type) {
         const choice = get().relationTypeChoice
         set((state) => { state.relationTypeChoice = null })
-        if (choice && type) get().addRelation({ sourceId: choice.sourceId, targetId: choice.targetId, relationType: type })
+        if (!choice || !type) return
+        if (choice.relationId) get().updateRelation(choice.relationId, { sourceId: choice.sourceId, targetId: choice.targetId, relationType: type })
+        else get().addRelation({ sourceId: choice.sourceId, targetId: choice.targetId, relationType: type })
       },
 
       // ── selection ────────────────────────────────────────────────────────

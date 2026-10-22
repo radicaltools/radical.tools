@@ -101,6 +101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An element dragged to the right inside its container, taking the container's left edge along, was saved up to 72 px left of where the canvas drew it: *Redo*, a reload and a view switch drew it there. It is saved where it is drawn
 - *Wrap into…* no longer puts the new container on top of the elements beside the selection (and keeps it so after a reload): it makes room as a drop does, pushing what it covers clear
 - Explore from here: a click on an element's *+* where the line of one of its relations runs over it opened the relation instead of the *+*'s menu; the *+* and *−* are drawn above the lines, and a click on them always reaches them
+- Metamodel editor: the activity rail's Models, AI, Export and Settings open their menus over the editor, which stays open (a click on them closed the editor and opened no menu)
+- Metamodel editor: unticking the last allowed parent of a type that elements sit in asks first, naming them, and Validation lists them (it was taken without a word, while Studio then refused to place the type in anything)
+- Metamodel editor: the name of a type, a relation type or a property cannot be left empty: an emptied field goes back to the name it had (a type could be left with no name, a blank entry in the palette)
+- Change source…, Change destination… and the reconnect handle of a relation ask for its type where the one it has does not fit the new pair and several do, as drawing a relation does (it was left with no type, which Validation then flagged)
 - Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else
 - Deleting every element a view lists leaves the view empty; it used to turn into a view of the whole model (51 elements on a wiki that listed 14)
 - Wiki: after writing an element, one click on an "Add: …" link below the line opens its line (the first click was lost)

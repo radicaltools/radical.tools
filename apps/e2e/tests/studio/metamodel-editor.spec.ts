@@ -301,3 +301,66 @@ test('enum options typed and the editor closed with Esc are kept as the field sh
     return stored.metamodel?.nodeTypes.container.properties?.find((p) => p.key === 'tier')?.options
   }).toEqual(['gold', 'silver'])
 })
+
+// F-0017: a type's last allowed parent unticked was taken without a word and
+// Validation stayed silent (it read no parents as any parent), while Studio
+// then refused to place the type anywhere (it reads them as none).
+test('unticking a type\'s last allowed parent asks first, naming what it leaves out', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await openEditor(page)
+  const card = page.locator('.mm-card', { has: page.locator('.mm-type-id', { hasText: /^database$/ }) })
+  await card.locator('.mm-card-header').click()
+  const parent = (name: string) => card.locator('.mm-parent-grid label', { hasText: new RegExp(`^${name}$`) }).locator('input')
+  await parent('Group').uncheck()
+  await expect(parent('Group')).not.toBeChecked()
+  let asked = ''
+  page.once('dialog', (d) => { asked = d.message(); void d.dismiss() })
+  await parent('Software System').uncheck().catch(() => {})
+  await expect.poll(() => asked).toContain('Database "Orders DB" cannot be inside Software System')
+  await expect(parent('Software System')).toBeChecked()
+  page.once('dialog', (d) => { void d.accept() })
+  await parent('Software System').uncheck()
+  await expect(parent('Software System')).not.toBeChecked()
+  await expect(page.locator('.mm-issues-count')).toHaveText('1')
+})
+
+// F-0019: a type's Label could be emptied, which left a blank palette entry
+// and card header; upsert_node_type refuses a blank label.
+test('an emptied name of a type, a relation type or a property goes back to the one it had', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await openEditor(page)
+  const card = page.locator('.mm-card', { has: page.locator('.mm-type-id', { hasText: /^database$/ }) })
+  await card.locator('.mm-card-header').click()
+  const label = card.locator('.mm-field', { hasText: /^Label/ }).locator('input')
+  await label.fill('')
+  await label.press('Tab')
+  await expect(label).toHaveValue('Database')
+  await expect(card.locator('.mm-type-label')).toHaveText('Database')
+  // A name typed over it is taken, trimmed.
+  await label.fill(' Store ')
+  await label.press('Tab')
+  await expect(label).toHaveValue('Store')
+
+  const rel = page.locator('.mm-card', { has: page.locator('.mm-type-id', { hasText: /^interacts$/ }) })
+  await rel.locator('.mm-card-header').click()
+  const relLabel = rel.locator('.mm-field', { hasText: /^Label/ }).locator('input')
+  const relName = await relLabel.inputValue()
+  await relLabel.fill('')
+  await relLabel.press('Tab')
+  await expect(relLabel).toHaveValue(relName)
+
+  const row = await newPropertyRow(page, 'container')
+  await row.locator('.mm-prop-label').fill('')
+  await row.locator('.mm-prop-label').press('Tab')
+  await expect(row.locator('.mm-prop-label')).toHaveValue('New property')
+
+  await closeEditor(page)
+  await expect(page.locator('.palette-item', { hasText: /^\s*Store\s*$/ })).toHaveCount(1)
+  await expect.poll(async () => {
+    const doc = JSON.parse(await studio.storedJson()) as { metamodel?: { nodeTypes: Record<string, { label: string; properties?: { label: string }[] }>; relationTypes: Record<string, { label: string }> } }
+    const mm = doc.metamodel
+    return mm && [mm.nodeTypes.database.label, mm.relationTypes.interacts.label, mm.nodeTypes.container.properties?.at(-1)?.label]
+  }).toEqual(['Store', relName, 'New property'])
+})

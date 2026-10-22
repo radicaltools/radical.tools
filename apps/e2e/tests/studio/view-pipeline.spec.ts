@@ -525,6 +525,57 @@ test('a relation drawn between two entities asks for its type', async ({ page, s
   await expect(type.locator('option')).toHaveText(['Part of', 'References'])
 })
 
+// F-0018: an end of a relation moved onto a pair where several types fit
+// (Change destination…, the reconnect handle) left it with no type, unasked.
+test.describe('a relation\'s end moved onto a pair where several types fit', () => {
+  test.beforeEach(async ({ page, studio }) => {
+    const node = (id: string, type: string, x: number, y: number, extra = {}) => ({ id, type, label: id, x, y, width: 220, height: 90, collapsed: false, ...extra })
+    await studio.seedDocument(JSON.stringify({
+      metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+      nodes: [
+        node('Line', 'entity', 0, 0, { kind: 'entity' }),
+        node('Order', 'entity', 0, 400, { kind: 'aggregate-root' }),
+        node('Kept', 'requirement', 400, 0, { ears_type: 'ubiquitous', action: 'The system shall keep orders' }),
+      ],
+      relations: [{ id: 'sat', sourceId: 'Line', targetId: 'Kept', relationType: 'satisfies' }],
+      views: [{ id: 'dom', name: 'Domain', nodeIds: [], positions: {} }],
+    }))
+    await studio.open('dom')
+    await page.locator('.react-flow__edge-interaction').first().dispatchEvent('click')
+    await expect(page.getByRole('button', { name: /Change destination/ })).toBeVisible()
+  })
+  const storedType = async (studio: import('../../support/fixtures').Studio) =>
+    (await studio.storedDoc()).relations.map((r) => [r.targetId, (r as { relationType?: string }).relationType])
+
+  test('Change destination… asks for the type', async ({ page, studio }) => {
+    await page.getByRole('button', { name: /Change destination/ }).click()
+    await page.getByRole('menuitem', { name: /^Order/ }).click()
+    const menu = page.locator('.pp-action-menu')
+    await expect(menu.getByText('Line → Order: which relation?')).toBeVisible()
+    await expect(menu.getByRole('menuitem')).toHaveText(['Part of', 'References'])
+    await page.waitForTimeout(300)
+    expect(await storedType(studio)).toEqual([['Kept', 'satisfies']])
+    await menu.getByRole('menuitem', { name: 'References' }).click()
+    await expect.poll(() => storedType(studio)).toEqual([['Order', 'references']])
+  })
+
+  test('the reconnect handle asks for the type where it is let go', async ({ page, studio }) => {
+    await studio.settle()
+    const handle = (await page.locator('circle.nodrag.nopan').nth(1).boundingBox())!
+    const order = (await studio.node('Order').boundingBox())!
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(handle.x + 5, handle.y + 5, { steps: 3 })
+    await page.mouse.move(order.x + order.width / 2, order.y + order.height / 2, { steps: 20 })
+    await page.mouse.up()
+    const menu = page.getByRole('menu', { name: 'Relation from Line to Order' })
+    await expect(menu.getByRole('menuitem')).toHaveText(['Part of', 'References'])
+    expect(await storedType(studio)).toEqual([['Kept', 'satisfies']])
+    await menu.getByRole('menuitem', { name: 'Part of' }).click()
+    await expect.poll(() => storedType(studio)).toEqual([['Order', 'part-of']])
+  })
+})
+
 // Open point of runs 45 to 64: a level reached both ways along derives
 // offered "+ Requirement / Need / Requirement…".
 test('the table\'s + row names each type it adds once', async ({ page, studio }) => {
