@@ -111,6 +111,32 @@ test('flow', async ({ page, shot }) => {
   await shot('flow')
 })
 
+/** Explore from here on the bookstore's API, grown by API's + and saved as
+ *  the view of type Explore "API context"; Web App's + menu open. */
+test('explore', async ({ page, studio, shot }) => {
+  await page.goto(`/#/d/${encodeURIComponent('ls:docs-bookstore')}/m/designer/v/v-containers`)
+  await expect(page.locator('.app-layout')).toBeVisible()
+  await settle(page)
+  await studio.node('api').click()
+  await page.getByRole('button', { name: 'Explore from here' }).click()
+  const api = page.getByRole('menu', { name: 'Add to API' })
+  for (const text of ['reads/writes', 'charges card', 'calls']) await api.locator('.explore-menu-row', { hasText: text }).getByRole('checkbox').check()
+  await api.getByRole('menuitem', { name: 'Show checked' }).click()
+  await settle(page)
+  await page.getByRole('button', { name: 'Save as view…' }).click()
+  const form = page.getByRole('form', { name: 'Save as view' })
+  await form.getByLabel('Name').fill('API context')
+  await form.getByLabel('Folder').fill('Explorations')
+  await form.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Explore: API context')).toBeVisible()
+  await page.getByRole('button', { name: 'Fit All' }).click()
+  await settle(page)
+  await page.getByRole('button', { name: /^Show \d+ more related to Web App$/ }).click()
+  await expect(page.getByRole('menu', { name: 'Add to Web App' })).toBeVisible()
+  await page.mouse.move(1300, 860)
+  await shot('explore')
+})
+
 /** The Processes view with a step selected: its actions in its type line and its properties card. */
 test('warnier', async ({ page, shot }) => {
   await open(page, 'view-processes')

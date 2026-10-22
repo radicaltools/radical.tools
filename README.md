@@ -56,7 +56,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 - **AI assistant**: chat with OpenAI / Anthropic / Gemini / Ollama to generate and modify diagrams
 - **Radical Forge**: turn a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewable stage at a time, each filling gaps in the ones before (you keep or reject each such change), and a final review; the description is kept in the model as a Need the requirements derive from
 - **Architecture Hub**: browse and import 120+ curated architecture concepts (patterns, fitness functions, ADRs, requirements, blueprints) from [hub.radical.tools](https://hub.radical.tools); blueprints include per-actor screen flows and named views
-- **Six view kinds**: Structure, Flow, Hierarchy, Table, Matrix and Wiki, each filtered by a chain of levels (needs → requirements → scenarios) and kept in folders
+- **Eight view kinds**: Structure, Flow, Hierarchy, Table, Matrix, Wiki, Warnier and Explore, each filtered by a chain of levels (needs → requirements → scenarios) or, for Explore, grown level by level from one element, and kept in folders
 - **Presentation mode**: slides over views and milestones, played in the window with a navigation bar
 - **Metamodel editor**: customise node types, relation types, and constraints, with typed properties including references to other elements
 - **Time travel**: milestones of the whole model, with a diff against the previous one and edits that propagate to later milestones
