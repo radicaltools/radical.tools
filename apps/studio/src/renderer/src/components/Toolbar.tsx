@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react'
+import React, { useCallback, useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRailSlot } from '@radical/ui/components/RightPanel'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
@@ -593,7 +593,7 @@ function InspectorModeButton({ active, onClick }: { active: boolean; onClick: ()
       : 'Inspector — what radical check says about the model'
   return (
     <button className={`toolbar-mode-btn${active ? ' active' : ''}`} onClick={onClick} disabled={!enabled} title={title}>
-      <IconInspect /> Inspector
+      <IconInspect /><span className="toolbar-label">Inspector</span>
       {enabled && check && (check.errors > 0 || check.warnings > 0) && (
         <span className="insp-count">{check.errors > 0 && <span className="e">✖ {check.errors}</span>}<span className="w">⚠ {check.warnings}</span></span>
       )}
@@ -607,6 +607,78 @@ function IconInspect(): React.ReactElement {
       <circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" strokeLinecap="round" /><path d="M5 7l1.5 1.5L9 5.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
+}
+
+// ── Room for Quick Search ────────────────────────────────────────────────────
+//
+// Quick Search stands in the window's middle, ‹ › before it and History after
+// it (App draws it; --qs-x is the block's middle, --qs-w Quick Search's
+// width). With less room between the toolbar's two sides the block moves off
+// the middle, then Quick Search narrows, then the perspectives drop their
+// labels: nothing may lie on top of anything that takes a click (below about
+// 1160 px a click on Designer opened History).
+
+/** Quick Search's width at most, and the least before the labels go. */
+const QS_MAX = 520
+const QS_MIN = 200
+/** Between Quick Search and the navigation either side of it. */
+const NAV_GAP = 8
+/** Between the navigation and the toolbar's two sides. */
+const SIDE_GAP = 8
+
+/** Places the middle block; true while the perspectives go without their
+ *  labels. `search`: Quick Search is shown (not in the Inspector, where the
+ *  navigation meets in the middle). */
+function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, appMode: string): boolean {
+  const [compact, setCompact] = useState(false)
+  const fit = useCallback(() => {
+    const el = bar.current
+    if (!el) return
+    const width = window.innerWidth
+    const edges = (selector: string, side: 'left' | 'right'): number[] =>
+      [...el.querySelectorAll<HTMLElement>(selector)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => r[side])
+    const start = Math.max(0, ...edges(':scope > .app-brand, :scope > .toolbar-edit', 'right'))
+    const end = Math.min(width, ...edges(':scope > .branch-btn-wrap, :scope > .toolbar-mode-switch', 'left'))
+    // How much wider the perspectives are with their labels than without
+    // (a label left out keeps its width in scrollWidth).
+    let labels = 0
+    for (const label of el.querySelectorAll<HTMLElement>('.toolbar-mode-btn .toolbar-label')) {
+      const gap = parseFloat(getComputedStyle(label.parentElement!).columnGap) || 0
+      labels += (compact ? label.scrollWidth : label.getBoundingClientRect().width) + gap
+    }
+    const endWithLabels = compact ? end - labels : end
+    const endWithout = compact ? end : end + labels
+    const [before = 0, after = 0] = [...el.querySelectorAll<HTMLElement>(':scope > .toolbar-center > *')].map((g) => g.getBoundingClientRect().width)
+    // The navigation stands this far from Quick Search, or from the middle.
+    const gap = search ? NAV_GAP : 3
+    // Quick Search's room between the sides, the navigation taken out.
+    const room = (sideEnd: number): number => sideEnd - SIDE_GAP - (start + SIDE_GAP) - before - after - 2 * gap
+    const nextCompact = room(endWithLabels) < (search ? QS_MIN : 0)
+    const sideEnd = nextCompact ? endWithout : endWithLabels
+    // As wide as the window gave it before; narrower when the sides need it.
+    const wanted = Math.min(QS_MAX, Math.max(300, width - 920))
+    const qs = search ? Math.floor(Math.max(0, Math.min(wanted, room(sideEnd)))) : 0
+    // In the window's middle when it fits there, else as near it as it can be.
+    const lowest = start + SIDE_GAP + before + gap + qs / 2
+    const highest = sideEnd - SIDE_GAP - after - gap - qs / 2
+    const x = Math.round(Math.max(lowest, Math.min(width / 2, highest)))
+    const root = document.documentElement.style
+    if (root.getPropertyValue('--qs-w') !== `${qs}px`) root.setProperty('--qs-w', `${qs}px`)
+    if (root.getPropertyValue('--qs-x') !== `${x}px`) root.setProperty('--qs-x', `${x}px`)
+    if (nextCompact !== compact) setCompact(nextCompact)
+  }, [bar, search, compact])
+  useLayoutEffect(() => {
+    fit()
+    const el = bar.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    // The sides change width on their own (a count on Inspector or on
+    // Changes on branch, the fonts loading), the window by a resize.
+    const watch = new ResizeObserver(() => fit())
+    for (const side of el.querySelectorAll(':scope > .app-brand, :scope > .toolbar-edit, :scope > .branch-btn-wrap, :scope > .toolbar-mode-switch, :scope > .toolbar-center > *')) watch.observe(side)
+    window.addEventListener('resize', fit)
+    return () => { watch.disconnect(); window.removeEventListener('resize', fit) }
+  }, [fit, appMode])
+  return compact
 }
 
 export function Toolbar(): React.ReactElement {
@@ -793,8 +865,11 @@ export function Toolbar(): React.ReactElement {
     return () => window.removeEventListener('radical:open-agent-forge', onOpen as EventListener)
   }, [])
 
+  const bar = useRef<HTMLDivElement>(null)
+  const compact = useMiddleRoom(bar, appMode !== 'inspector', appMode)
+
   return (
-    <div className="toolbar">
+    <div className={`toolbar${compact ? ' compact' : ''}`} ref={bar}>
       <AISettingsModal open={aiSettingsOpen} onClose={handleCloseAISettings} />
       <AboutDialog open={aboutOpen} onClose={handleCloseAbout} />
       <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} bindTo={hubBindTo} />
@@ -826,7 +901,7 @@ export function Toolbar(): React.ReactElement {
           back in Designer (shown there, enabled, they did nothing). Fit, zoom
           and Smart Layout are on the canvas (CanvasControls). */}
       {appMode === 'designer' && (
-        <div className="toolbar-group" role="group" aria-label="Edit">
+        <div className="toolbar-group toolbar-edit" role="group" aria-label="Edit">
           <button className="toolbar-btn toolbar-icon-btn" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
             <IconUndo />
           </button>
@@ -856,21 +931,21 @@ export function Toolbar(): React.ReactElement {
           onClick={() => setAppMode('designer')}
           title="Designer perspective — edit the model"
         >
-          <IconModelling /> Designer
+          <IconModelling /><span className="toolbar-label">Designer</span>
         </button>
         <button
           className={`toolbar-mode-btn${appMode === 'viewer' ? ' active' : ''}`}
           onClick={() => setAppMode('viewer')}
           title="Viewer perspective — explore the model"
         >
-          <IconView /> Viewer
+          <IconView /><span className="toolbar-label">Viewer</span>
         </button>
         <button
           className={`toolbar-mode-btn${appMode === 'presenter' ? ' active' : ''}`}
           onClick={() => setAppMode('presenter')}
           title="Presenter perspective — build and play presentations"
         >
-          <IconPresentation /> Presenter
+          <IconPresentation /><span className="toolbar-label">Presenter</span>
         </button>
         <InspectorModeButton active={appMode === 'inspector'} onClick={() => setAppMode('inspector')} />
       </div>

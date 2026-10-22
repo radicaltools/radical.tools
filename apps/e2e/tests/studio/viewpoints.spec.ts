@@ -87,8 +87,9 @@ test('every viewpoint of the Radical metamodel opens as a view of its type', asy
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
   await studio.openSample()
-  // A viewpoint of one element makes a group and opens its first view, or
-  // the group when the sample has no such element.
+  // A viewpoint of one element makes a group and opens its first view; when
+  // the sample has no such element, nothing opens: a group is never a canvas
+  // of its own (F-0021), and the list shows it unfolded, holding no view.
   const ONE = 'one'
   const NONE = 'none'
   const expected: Array<[string, string, boolean | typeof ONE | typeof NONE]> = [
@@ -115,7 +116,7 @@ test('every viewpoint of the Radical metamodel opens as a view of its type', asy
     await expect(page.getByText('Runtime Error')).toHaveCount(0)
     await page.locator('.left-panel .rp-slider.show-props .rp-back-btn').click()
     const meta = page.locator('.lp-view-card.active .lp-card-meta')
-    if (shows === NONE) await expect(meta, `${name} holds no view in the sample`).toContainText(/\b0 views/)
+    if (shows === NONE) await expect(page.locator('.lp-view-card.lp-view-group', { hasText: name }).last().locator('.lp-card-meta'), `${name} holds no view in the sample`).toContainText(/\b0 views/)
     else if (shows) await expect(meta, `${name} shows elements`).toContainText(/\b[1-9]\d* nodes?/)
     else await expect(meta, `${name} shows nothing in the sample`).toContainText(/\b0 nodes/)
   }

@@ -16,7 +16,7 @@ import { viewShownNodes } from '@radical/common/viewPipeline'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
-import { isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode } from '@radical/common/model'
+import { firstViewOfGroup, isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { showNodeInView, useCardOpen } from '../store/showInView'
@@ -1398,7 +1398,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     setNewMenuOpen(false)
     if (!id) return
     // A group of views of one element: open, on its first view.
-    const first = viewsOfGroup(useDiagramStore.getState().views, id).sort(byName)[0]
+    const first = firstViewOfGroup(useDiagramStore.getState().views, id)
     if (isViewGroup(useDiagramStore.getState().views[id], metamodel)) setOpenGroups((prev) => new Set(prev).add(id))
     setActiveView(first?.id ?? id)
     if (onOpenProps) onOpenProps(first?.id ?? id)
@@ -1440,14 +1440,17 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     return next
   })
   // The view opened from elsewhere (the card's Views, Quick Search, a link)
-  // is scrolled into sight in the list, once its folder or group is open.
+  // is scrolled into sight in the list, once its folder or group is open,
+  // and once the list is shown: opened while the rail showed another
+  // section, it was scrolled while hidden, which does nothing.
   const listRef = useRef<HTMLDivElement>(null)
   const toReveal = useRef(true)
+  const listShown = useLeftPanelSection((s) => s.open === 'views')
   useEffect(() => { toReveal.current = true }, [activeViewId])
   useEffect(() => {
-    if (!toReveal.current) return
+    if (!toReveal.current || !listShown) return
     const card = listRef.current?.querySelector('.lp-view-card.active')
-    if (!card) return
+    if (!card || !card.getClientRects().length) return
     toReveal.current = false
     card.scrollIntoView?.({ block: 'nearest' })
   })

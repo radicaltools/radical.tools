@@ -1913,6 +1913,10 @@ export function viewById(s: Pick<DiagramStore, 'views' | 'exploration'>, id: str
   return s.views[id] ?? (s.exploration?.id === id ? s.exploration : undefined)
 }
 
+/** Whether `id` names an exploration (open or closed since): the route of
+ *  one closed is a place that is gone. */
+export { isExplorationId } from './exploration'
+
 /** The canvas shown is the temporary exploration (Explore from here). */
 export function onExploration(s: Pick<DiagramStore, 'activeViewId' | 'exploration'>): boolean {
   return !!s.activeViewId && s.exploration?.id === s.activeViewId
@@ -5078,6 +5082,14 @@ export const useDiagramStore = create<DiagramStore>()(
         })
       },
       setActiveView(newId) {
+        // A group of views per element is never a canvas of its own: it
+        // opens on its first view (none: nothing opens). Quick Search, a
+        // link and Back drew it as one, and saved positions into it.
+        if (newId && model.isViewGroup(get().views[newId], get().metamodel)) {
+          const first = model.firstViewOfGroup(get().views, newId)
+          if (!first) return
+          newId = first.id
+        }
         const { activeViewId, c4Nodes, appMode } = get()
         if (newId === activeViewId) return
 

@@ -525,6 +525,41 @@ test('the toolbar groups undo, navigation around Quick Search, and the branch\'s
   expect(changes.x + changes.width).toBeLessThanOrEqual(modes.x)
 })
 
+// F-0001: below about 1160 px the toolbar's buttons lay on top of each
+// other, and a click on Designer opened History.
+test('at every window width down to the desktop app\'s narrowest, nothing in the toolbar lies on top of anything clickable', async ({ page }) => {
+  const clash = () => page.evaluate(() => {
+    const shown = (el: Element) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 }
+    const items = [...document.querySelectorAll('.toolbar button, .quick-search-bar')].filter(shown)
+    const name = (el: Element) => el.getAttribute('aria-label') || el.textContent?.trim() || el.className
+    for (const el of items) {
+      const r = el.getBoundingClientRect()
+      if (r.left < 0 || r.right > window.innerWidth) return `${name(el)} is out of the window`
+      if ((el as HTMLButtonElement).disabled) continue
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      if (!hit || !el.contains(hit)) return `${name(el)} is under ${hit ? name(hit) : 'nothing'}`
+    }
+    for (const a of items) for (const b of items) {
+      if (a === b || a.contains(b) || b.contains(a)) continue
+      const p = a.getBoundingClientRect(), q = b.getBoundingClientRect()
+      if (p.left < q.right - 0.5 && q.left < p.right - 0.5 && p.top < q.bottom - 0.5 && q.top < p.bottom - 0.5) return `${name(a)} overlaps ${name(b)}`
+    }
+    return null
+  })
+  for (const mode of ['Designer', 'Viewer']) {
+    await page.setViewportSize({ width: 1440, height: 800 })
+    await page.locator('.toolbar-mode-btn', { hasText: mode }).click()
+    await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(new RegExp(mode))
+    for (let width = 1440; width >= 900; width -= 20) {
+      await page.setViewportSize({ width, height: 800 })
+      await expect.poll(clash, { message: `${mode} at ${width} px` }).toBeNull()
+    }
+  }
+  // The perspectives still answer a click at the narrowest.
+  await page.locator('.toolbar-mode-btn', { hasText: 'Designer' }).click()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+})
+
 test('a menu of the activity rail answers ↑ and ↓ and closes when Tab leaves it', async ({ page }) => {
   await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.keyboard.press('ArrowDown')
